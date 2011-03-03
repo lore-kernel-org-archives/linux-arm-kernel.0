@@ -1,99 +1,113 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Mar 2011 10:35:23 -0800
-Subject: [PATCH 0/3] OMAP: DMA: mstandby mode and runtime pm support
-In-Reply-To: <1298542475-1460-1-git-send-email-manjugk@ti.com> (Manjunath
-	Kondaiah G.'s message of "Thu, 24 Feb 2011 15:44:32 +0530")
-References: <1298542475-1460-1-git-send-email-manjugk@ti.com>
-Message-ID: <87hbbkqcgk.fsf@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 3 Mar 2011 13:51:30 -0500 (EST)
+Subject: [PATCH] ARM: Thumb-2: Add local symbols to work around gas
+	behaviour
+In-Reply-To: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
+References: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1103031347360.18193@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+On Thu, 3 Mar 2011, Dave Martin wrote:
 
-> This patch series is remaining part of dma hwmod to support pm runtime 
-> and for handling mstandby mode for all applicable DMA mstandby mode errata.
+> All current versions of gas at the time of writing have issues
+> fixing up pc-relative instructions which reference global symbols,
+> due to the potential need to support symbol preemption.
+> Even though symbol preemption is not relevant to the Linux kernel,
+> there is no way to inform the tools of this, so we get the problem.
+> 
+> Most pc-relative forms in ARM, and all pc-relative forms in
+> Thumb, will cause the assembler to fail with various fixup error
+> messages when used to reference global symbols.
+> 
+> The legacy behaviour is for ADR and plain LDR instructions in ARM
+> which reference global symbols to be fixed up silently with no
+> relocation emitted.  This means that building the kernel in ARM
+> currently works without problems, but it may be a bug, and the
+> behaviour could change in the future.
+> 
+> After discussion with Richard Earnshaw, it seems that there is
+> no single obvious remedy for this inconsistent behaviour,
+> so there is not likely to be a comprehensive upstream fix for
+> a while.
+> 
+> A workaround which should be valid for all past and all
+> foreseeable future versions of gas is to express the need for
+> a local fixup explicitly, by declaring a shadow local symbol
+> for any global symbol which needs to be addressed using ADR
+> or any pc-relative LDR variant.
+> 
+> This patch implements this workaround for the one part of the
+> main kernel currently known to be affected.  The resulting code
+> builds and works correctly in ARM and Thumb.
+> 
+> Similar fixes may be needed in mach-specific assembler.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-This is still not runtime-suspending when I use my DMA test in linking
-mode.
+I'd suggest making the shadow local symbol truly local by prefixing it 
+with .L so gas won't even store it in the symbol table which would 
+otherwise "pollute" backtrace annotations and the like.
 
-If I put a large enough period between transfers, it should autosuspend
-during transfers.  It seems to do auto-suspend and resume once, but then
-it never suspends again.
-
-I tested with my dmatest module[1], and loaded with:
-
-  # insmod ./dmatest.ko linking=1 forever=1 forever_period=1024
-
-Not only does it not auto-suspend between transfers (which I expected),
-it also doesn't suspend after removing the module which stops all active
-channels.
-
-Kevin
-
-[1] git://gitorious.org/omap-test/dmatest.git
-
-> The alignment for pm runtime API's usage is at:
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/51588/focus=52493
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/50762/focus=50840
->
-> The alignment for handling mstandby mode errata handling is at:
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/47398/focus=47426
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/47479/focus=47537
->
-> Testing:
-> Compile tested for
->  - omap1_defconfig
->  - omap2plus_defconfig
->
-> Boot test on:
->  - OMAP1710-H3
->  - OMAP2420-H4
->  - OMAP3430-LDP
->  - OMAP3630-Zoom3
->  - OMAP4430-Blaze
->
-> DMA memory to memory test cases(including chaining) are executed for
-> all the above boards and for each test case, 
-> /sys/devices/platform/omap/omap_dma_system.0/power/runtime_status
-> was verified and after completion of the tests, runtime_status will be 
-> always suspended.
->
-> Apart from that, offmode testing is done for OMAP3430-LDP using the procedure:
-> echo 1 > /debug/pm_debug/sleep_while_idle
-> echo 1 > /debug/pm_debug/enable_off_mode
-> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
->
-> With the above steps, core off mode count gets increasing if the the board
-> is idle for more than 5 seconds.
->
-> Baseline:
-> Applies cleanly on top of mainline 2.6.38-rc6:
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
-> commit f5412be599602124d2bdd49947b231dd77c0bf99
-> Author: Linus Torvalds <torvalds@linux-foundation.org>
-> Date:   Mon Feb 21 17:25:52 2011 -0800
->
->     Linux 2.6.38-rc6
->
-> Note: OMAP1 is tested on top of 2.6.38-rc5 since rc6 is broken for omap1 build
->
-> Patch Summary:
-> ==============
-> G, Manjunath Kondaiah (2):
->   OMAP2+: PM: omap device: API's for handling mstandby mode
->   OMAP2+: DMA: prevent races while setting M idle mode to nostandby
->
-> Manjunath G Kondaiah (1):
->   OMAP: PM: DMA: Enable runtime pm
->
->  arch/arm/mach-omap1/dma.c                     |    1 +
->  arch/arm/mach-omap2/dma.c                     |   16 ++
->  arch/arm/mach-omap2/omap_hwmod.c              |   42 ++++++
->  arch/arm/plat-omap/dma.c                      |  190 +++++++++++++++++++++----
->  arch/arm/plat-omap/include/plat/dma.h         |    1 +
->  arch/arm/plat-omap/include/plat/omap_device.h |    2 +
->  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    4 +-
->  arch/arm/plat-omap/omap_device.c              |   64 +++++++++
->  8 files changed, 293 insertions(+), 27 deletions(-)
+> ---
+>  arch/arm/kernel/relocate_kernel.S |   12 ++++++++----
+>  1 files changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+> index 9cf4cbf..a2599e7 100644
+> --- a/arch/arm/kernel/relocate_kernel.S
+> +++ b/arch/arm/kernel/relocate_kernel.S
+> @@ -7,8 +7,8 @@
+>  	.globl relocate_new_kernel
+>  relocate_new_kernel:
+>  
+> -	ldr	r0,kexec_indirection_page
+> -	ldr	r1,kexec_start_address
+> +	ldr	r0,__kexec_indirection_page
+> +	ldr	r1,__kexec_start_address
+>  
+>  	/*
+>  	 * If there is no indirection page (we are doing crashdumps)
+> @@ -55,27 +55,31 @@ relocate_new_kernel:
+>  	/* Jump to relocated kernel */
+>  	mov lr,r1
+>  	mov r0,#0
+> -	ldr r1,kexec_mach_type
+> -	ldr r2,kexec_boot_atags
+> +	ldr r1,__kexec_mach_type
+> +	ldr r2,__kexec_boot_atags
+>  	mov pc,lr
+>  
+>  	.align
+>  
+>  	.globl kexec_start_address
+>  kexec_start_address:
+> +__kexec_start_address:
+>  	.long	0x0
+>  
+>  	.globl kexec_indirection_page
+>  kexec_indirection_page:
+> +__kexec_indirection_page:
+>  	.long	0x0
+>  
+>  	.globl kexec_mach_type
+>  kexec_mach_type:
+> +__kexec_mach_type:
+>  	.long	0x0
+>  
+>  	/* phy addr of the atags for the new kernel */
+>  	.globl kexec_boot_atags
+>  kexec_boot_atags:
+> +__kexec_boot_atags:
+>  	.long	0x0
+>  
+>  relocate_new_kernel_end:
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
