@@ -1,29 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Mar 2011 10:20:49 -0800
-Subject: [patch v3 3/3] arm: omap4: support pmu
-In-Reply-To: <1299149633-699-4-git-send-email-tom.leiming@gmail.com>
-References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
-	<1299149633-699-4-git-send-email-tom.leiming@gmail.com>
-Message-ID: <20110303182049.GN20560@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 3 Mar 2011 19:22:23 +0100
+Subject: [PATCH] ARM: mx51: Print silicon revision on boot
+In-Reply-To: <87d3m8vzsm.fsf@lebrac.rtp-net.org>
+References: <1299114747-14091-1-git-send-email-festevam@gmail.com>
+	<87lj0wwr0g.fsf@lebrac.rtp-net.org>
+	<AANLkTinPvxKR0ppW5jKWSOw=x05w0tb6_d6x+e4ZWdan@mail.gmail.com>
+	<20110303164427.GX29521@pengutronix.de>
+	<87d3m8vzsm.fsf@lebrac.rtp-net.org>
+Message-ID: <20110303182223.GZ29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* tom.leiming at gmail.com <tom.leiming@gmail.com> [110303 02:52]:
-> From: Ming Lei <tom.leiming@gmail.com>
+On Thu, Mar 03, 2011 at 07:12:25PM +0100, Arnaud Patard wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
 > 
-> This patch supports pmu irq routed from CTI, so
-> make pmu/perf working on OMAP4.
+> Hi,
 > 
-> The idea is from Woodruff Richard in the disscussion
-> about "Oprofile on Pandaboard / Omap4" on pandaboard at googlegroups.com.
+> > On Thu, Mar 03, 2011 at 12:43:14PM -0300, Fabio Estevam wrote:
+> >> Hi Arnaud,
+> >> 
+> >> On Thu, Mar 3, 2011 at 5:24 AM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
+> >> > Fabio Estevam <festevam@gmail.com> writes:
+> >> > Hi,
+> >> >
+> >> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >> >
+> >> > Why I like having boot log, I don't like have too verbose boot logs. If
+> >> > you add this, you have a good reason (I hope), but I can't know
+> >> > it. There's no patch description. So, please give a patch with proper
+> >> > explanation of why you need that. Anyway, having a proper patch
+> >> > description is imho always a good idea.
+> >> 
+> >> I think that printing the silicon version on boot is useful
+> >> information. Many issues are fixed in the latest silicon revision, so
+> >> while debugging mx51 issues it is good to know from the boot log if
+> >> someone is using the latest silicon version or not.
+> >
+> > +1
+> >
+> > There is less useful information in the bootlog than this. Also, there's
+> > the quiet option to not wait on the slow serial console.
 > 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Woodruff Richard <r-woodruff2@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> You missed something in my mail. My point was not really about log
+> verbosity. There was *no* description at all. We both know that silicon
+> rev 2.0 has some nasty bugs like broken neon which has been fixed in rev
+> 3.0 so it may be a good idea to print that but without proper
+> description, the aim may well have been "I want to print this because I
+> find it nice". I know it may be hard to write proper description but
+> here, it's not. I even got a good description as answer to my mail. I
+> should not had to ask for it.
 
-You'll probably want to queue this along with the to other
-patches via the Russell, so:
+I'd like a better patch description aswell, I just wanted to stress that
+I too like the idea of having the tapeout version printed during boot.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
