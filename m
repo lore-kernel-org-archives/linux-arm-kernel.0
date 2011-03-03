@@ -1,36 +1,32 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:17 +0530
-Subject: [PATCH V2 04/13] dw_dmac: Calling dwc_scan_descriptors from
-	dwc_tx_status() after taking lock
+Date: Thu, 3 Mar 2011 15:47:18 +0530
+Subject: [PATCH V2 05/13] dw_dmac: Adding support for 64 bit access width for
+	memcpy xfers
 In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
 References: <cover.1299146382.git.viresh.kumar@st.com>
-Message-ID: <72245f0f6b2b25072a0d4641e66b8699819c683e.1299146382.git.viresh.kumar@st.com>
+Message-ID: <42625509e43721a26cc70e9f5fe16d0b93ebff84.1299146382.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lock must be taken before calling dwc_scan_descriptors, as this may
-access/modify shared data and queues. dwc_tx_status wasn't taking lock before
-calling this routine. This patch add code that takes lock before calling
-dwc_scan_descriptors.
-
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/dma/dw_dmac.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 942b50f..2b0d5e9 100644
+index 2b0d5e9..e5d97bf 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -836,7 +836,9 @@ dwc_tx_status(struct dma_chan *chan,
- 
- 	ret = dma_async_is_complete(cookie, last_complete, last_used);
- 	if (ret != DMA_SUCCESS) {
-+		spin_lock_bh(&dwc->lock);
- 		dwc_scan_descriptors(to_dw_dma(chan->device), dwc);
-+		spin_unlock_bh(&dwc->lock);
- 
- 		last_complete = dwc->completed;
- 		last_used = chan->cookie;
+@@ -583,7 +583,9 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	 * We can be a lot more clever here, but this should take care
+ 	 * of the most common optimization.
+ 	 */
+-	if (!((src | dest  | len) & 3))
++	if (!((src | dest  | len) & 7))
++		src_width = dst_width = 3;
++	else if (!((src | dest  | len) & 3))
+ 		src_width = dst_width = 2;
+ 	else if (!((src | dest | len) & 1))
+ 		src_width = dst_width = 1;
 -- 
 1.7.2.2
