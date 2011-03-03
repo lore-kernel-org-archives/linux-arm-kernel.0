@@ -1,61 +1,33 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Wed, 2 Mar 2011 20:51:41 -0600
-Subject: [PATCHv2] omap:mailbox: resolve hang issue
-In-Reply-To: <20110303014416.GL20560@atomide.com>
-References: <1299104058-28565-1-git-send-email-x0095078@ti.com>
-	<20110303014416.GL20560@atomide.com>
-Message-ID: <AANLkTin4LUkC=bARTaAweJ96FnVHy9dLqto=yjD=ovaL@mail.gmail.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Thu, 3 Mar 2011 11:00:35 +0800
+Subject: [PATCH V5 1/6] pxa3xx_nand: make scan procedure more clear
+In-Reply-To: <1298901359.2809.25.camel@localhost>
+References: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
+	<1298860335-18638-2-git-send-email-leiwen@marvell.com>
+	<1298901359.2809.25.camel@localhost>
+Message-ID: <AANLkTinb7oZDzvD94RWLZqnLnaX5kY97CxJ+34eVJNmU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2011 at 7:44 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Armando Uribe <x0095078@ti.com> [110302 13:54]:
->> From: Hari Kanigeri <h-kanigeri2@ti.com>
->>
->> omap4 interrupt disable bits is different. On rx kfifo full, the mbox rx
->> interrupts wasn't getting disabled, and this is causing the rcm stress tests
->> to hang.
->>
->> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
->> Signed-off-by: Armando Uribe <x0095078@ti.com>
->> Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
->
-> Should we merge this as a fix for the 2.6.38 still?
+Hi Artem,
 
-yeah, if it can still be merged in 2.6.38 because it is a fix it would be great.
+On Mon, Feb 28, 2011 at 9:55 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Mon, 2011-02-28 at 10:32 +0800, Lei Wen wrote:
+>> Signed-off-by: Lei Wen <leiwen@marvell.com>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: David Woodhouse <dwmw2@infradead.org>
+>> Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+>
+> Could you please improve the commit message and make it explain why your
+> code makes "scan" more clear, what exactly you do to improve it?
+>
 
-Regards,
-Fernando.
+The previous probe function is some kind of big part. I seperate the resource
+allocation in this patch to keep the probe process more clear than before.
 
->
-> Tony
->
->> ---
->> ?arch/arm/mach-omap2/mailbox.c | ? 10 ++++++----
->> ?1 files changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
->> index 394413d..011ca50 100644
->> --- a/arch/arm/mach-omap2/mailbox.c
->> +++ b/arch/arm/mach-omap2/mailbox.c
->> @@ -193,10 +193,12 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
->> ? ? ? ? ? ? ? omap_mbox_type_t irq)
->> ?{
->> ? ? ? struct omap_mbox2_priv *p = mbox->priv;
->> - ? ? u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
->> - ? ? l = mbox_read_reg(p->irqdisable);
->> - ? ? l &= ~bit;
->> - ? ? mbox_write_reg(l, p->irqdisable);
->> + ? ? u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
->> +
->> + ? ? if (!cpu_is_omap44xx())
->> + ? ? ? ? ? ? bit = mbox_read_reg(p->irqdisable) & ~bit;
->> +
->> + ? ? mbox_write_reg(bit, p->irqdisable);
->> ?}
->>
->> ?static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
->> --
->> 1.7.0.4
->>
->
+It indeed, the original patch has little comments on it. I would post
+a fixed version for that. :)
+
+Thanks,
+Lei
