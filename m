@@ -1,37 +1,55 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 02 Mar 2011 20:41:22 -0800
-Subject: [Qualcomm PM8921 MFD 5/6] MAINTAINERS: Add pmic8921, pmic8xxx
-	subdevices maintainers
-In-Reply-To: <1299106213.4208.112.camel@Joe-Laptop>
-References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>	
-	<1299104001-5240-6-git-send-email-adharmap@codeaurora.org>
-	<1299106213.4208.112.camel@Joe-Laptop>
-Message-ID: <4D6F1BF2.5080908@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 03 Mar 2011 13:43:02 +0900
+Subject: [PATCH/RFC 0/3] ARM: S5P: Add common DPHY control code for
+	MIPI-CSIS/MIPI-DSIM devices
+In-Reply-To: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
+References: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <01a701cbd95d$9873c160$c95b4420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe Perches wrote:
-> On Wed, 2011-03-02 at 14:13 -0800, adharmap at codeaurora.org wrote:
->> diff --git a/MAINTAINERS b/MAINTAINERS
+Sylwester Nawrocki wrote:
 > 
-> The patch subject is not quite correct.
-> You're adding patterns, not maintainers.
-
-Ok will fix it in the next patch series.
-
-> Another option is a wildcard pattern match like:
+> Hello,
 > 
-> F:	drivers/*/pm8???-*
+> the following patch series adds a common platform code to enable control
+> of MIPI-CSI receiver's DPHY from within it's V4L2 subdev driver. The
+driver
+> is supposed to support possibly all S5P SoCs variants and the PHY handling
+> details need to be hidden in the platform code. The functionality behind
+> "dphy_csis" clocks is not exact a functionality of the clock, but they
+have
+> common features. If the clock API rules are to strict to accept this kind
+> of usage then I'm willing to create some intermediate layer that will
+finally
+> solve PHY handling for MIPI-CSI, MIPI-DSIM, USB, SATA.. devices, without
+> issues
+> on a common kernel binary for multiple boards.
 > 
-> instead of:
 > 
-> F:	drivers/gpio/pm8xxx-gpio.c
-> F:	drivers/mfd/pm8921-core.c
-> F:	drivers/mfd/pm8xxx-irq.c
-> F:	drivers/mfd/pm8xxx-mpp.c
+> The patch series contains:
+> [PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
+> [PATCH 2/3] ARM: S5PV210: Add clock entries for MIPI DPHY control
+> [PATCH 3/3] ARM: EXYNOS4: Add clock entries for MIPI DPHY control
+> 
+> Rebased onto kgene-for-next branch at:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> 
 
-Will do, thanks for this wildcard pattern
+Maybe we discussed about this ago.
+I remember, we agree that to control phy cannot be handled in clock part.
 
+And didn't say to make some kind of common s5p phy setup/control function?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/038038.ht
+ml
+
+I thought it is possible to make it even though some registers is in
+different place.
+
+Thanks.
+
+Best regards,
+Kgene.
 --
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
