@@ -1,97 +1,63 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 02 Mar 2011 23:49:47 -0800
+Date: Wed, 02 Mar 2011 23:57:10 -0800
 Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
-In-Reply-To: <20110302083904.GA4493@n2100.arm.linux.org.uk>
+In-Reply-To: <201103020923.36796.arnd@arndb.de>
 References: <4D6D9C03.2080906@codeaurora.org>
-	<20110302083904.GA4493@n2100.arm.linux.org.uk>
-Message-ID: <4D6F481B.8000700@codeaurora.org>
+	<201103020923.36796.arnd@arndb.de>
+Message-ID: <4D6F49D6.3080605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry that it took a while for me to get back. Had to contact our 
-resident ARM expert to reconfirm my points and gather all the data in an 
-externally available format.
-
-On 03/02/2011 12:39 AM, Russell King - ARM Linux wrote:
-> On Tue, Mar 01, 2011 at 05:23:15PM -0800, Saravana Kannan wrote:
->> If I'm not missing some magic, this would mean that
->> "CONFIG_ARM_DMA_MEM_BUFFERABLE" determines if readl(s)/writel(s) get to
->> have a built in mb() or not.
+On 03/02/2011 12:23 AM, Arnd Bergmann wrote:
+> On Wednesday 02 March 2011 02:23:15 Saravana Kannan wrote:
+>> There are so many other drivers that don't use or care about DMA and
+>> might still want to ensure some ordering constraints between their
+>> readl(s)/writel(s). They can't depend on readl/writel taking care of it
+>> for them since their code could be used in a kernel configuration that
+>> doesn't enable this config.
 >
-> You're missing that CONFIG_ARM_DMA_MEM_BUFFERABLE not only changes
-> readl/writel but also the type for DMA coherent memory from strongly
-> ordered to memory, non-cacheable.
+> What exactly are the ordering constraints, do you need the full
+> dmb() for readl() and dsb() for writel(), or just a compiler barrier?
 
-Yeah, I noticed that after I sent the email, but my questions in my 
-previous email still remains valid. See below.
+I wasn't referring to a compiler barrier. I'm referring to one of the 
+real barrier instructions.
 
-> The barriers are required to ensure that reads and writes to DMA
-> coherent memory are visible to the DMA device before the write
-> completes, and any value read from DMA coherent memory will not
-> bypass a read from a DMA device.
+> I think we need the barrier() even for the relaxed variant, but
+> that is fairly lightweight. What would be a reason to have more?
+
+Please see my response to Russell in other other email. I think it 
+should answer your question by clarifying my point.
+
+>> Firstly, I don't know how many people noticed this and realize they
+>> can't depend on readl/writel to take care of the mb()s for them. Seems
+>> like an unnecessary encouragement to make mistakes when it didn't need
+>> to be so.
+>>
+>> Secondly, even if they realize they have to take care of it, they will
+>> have to continue using mb()s in to force ordering between their
+>> reads/writes. So, are we depending on the compiler to optimize these
+>> extra mb() out in the case where the config is enabled? I'm not sure it
+>> will be able to optimize out the extra mb()s in all cases.
 >
-> The barriers in the IO macros have nothing to do with whether reads/writes
-> to normal cacheable memory are visible to DMA devices.  That is what the
-> streaming DMA API is for.
->
-> In any case, the IO macros are always ordered with respect to other
-> device writes irrespective of CONFIG_ARM_DMA_MEM_BUFFERABLE.
+> The compiler certainly won't merge multiple inline assembly statements,
+> but multiple barrier() statements don't make it worse than just one.
+> barrier() just forces accessing variables from memory that could otherwise
+> be kept in registers.
 
-<snip>
+Yes, I was aware of how compiler barriers work and how multiple 
+consecutive compiler barriers are the same as one compiler barrier. The 
+email was about the real barrier instructions.
 
-> I think you misunderstand what's going on.  IO accesses are always ordered
-> with respect to themselves.  The barriers are there to ensure ordering
-> between DMA coherent memory (normal non-cached memory) and IO accesses
-> (device).
+> The other problems we still need to fix are the complete absence of
+> barriers in inb()/outb() style accessors, which are meant to be stricter
+> than readl()/writel(), and the fact that we rely on undefined behavior
+> in gcc regarding the atomicity of multi-byte accesses, as we recently
+> found out when a new gcc turned a readl into byte accesses.
 
-Unfortunately this is not correct. The ARM spec doesn't guarantee that 
-all IO accesses should be ordered with respect to themselves. It only 
-requires that the ordering should be guaranteed at least within a 1KB 
-region.
-
-You can find this info in ARMv7 ARM spec[1] named 
-"DDI0406B_arm_architecture_reference_manual_errata_markup_8_0.pdf", on 
-page A3-45. There is a para that goes:
-
-"Accesses must arrive at any particular memory-mapped peripheral or 
-block of memory in program order, that is, A1 must arrive before A2. 
-There are no ordering restrictions about when accesses arrive at 
-different peripherals or blocks of memory, provided that the accesses 
-follow the general ordering rules given in this section."
-
-And the most critical point is hidden in a comment that goes:
-"The size of a memory mapped peripheral, or a block of memory, is 
-IMPLEMENTATION DEFINED, but is not smaller than 1KByte."
-
-I guess most of the confusion is due to the ARM spec not being very 
-obvious about the 1KB limitation.
-
-So, going back to my point, I think it's wrong for 
-CONFIG_ARM_DMA_MEM_BUFFERABLE to control how stuff unrelated to DMA behaves.
-
-I have also encountered a few people who kept went "but readl/writel was 
-recently changed to add mem barriers, so we can all remove the mb()s in 
-our driver (unrelated to DMA) code". That would have made their code 
-incorrect for two reasons:
-1. readl/writel doesn't always have a mem barrier because of config that 
-can be turned off.
-2. In cases where readl/writel didn't have mb(), there is not enough 
-ordering guarantee without an explicit mb().
-
-I think as a community, we should stop saying that readl/writel ensures 
-ordering with respect to all IO accesses. It doesn't even guarantee 
-ordering within the same device (when their register regions are > 1KB).
-
-After reading the above, please let me know if a patch to decouple the 
-"readl/writel with builtin mb()" from CONFIG_ARM_DMA_MEM_BUFFERABLE 
-would be accepted. If so, I can go ahead and send it out soon.
-
-[1] 
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0406b/index.html
+I haven't gotten that far :-) I really appreciate response!
 
 Thanks,
 Saravana
-
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
