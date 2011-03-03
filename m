@@ -1,105 +1,39 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 3 Mar 2011 22:33:11 +0100
-Subject: [PATCH 3/4] OMAP3 and 4 i2c mark extended reg enums as extended
-	only
-In-Reply-To: <20110303135037.30648.90406.stgit@otae.warmcat.com>
-References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-	<20110303135037.30648.90406.stgit@otae.warmcat.com>
-Message-ID: <4D700917.70105@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  3 Mar 2011 22:36:57 +0100
+Subject: [PATCH] ARM: mxc91231: select MXC_AVIC
+Message-ID: <1299188217-2051-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/3/2011 2:50 PM, Andy Green wrote:
-> The OMAP I2C driver dynamically chooses between two register sets of
-> differing sizes depending on the cpu type it finds itself on.
->
-> It has been observed that the existing code references non-existing
-> registers on OMAP3530, because while it correctly chose the smaller
-> register layout based on cpu type, the code uses the probed register
-> ID to decide if to execute code referencing an extra register, and
-> both register layout devices on OMAP3530 and OMAP4430 report the same
-> probed ID of 0x40.
+This fixes:
 
-Since it is a patch on the I2C driver, the subject should start with 
-something like "I2C: OMAP2+: XXXXX". That comment is also applicable for 
-the other patches of the series except the first one.
+	arch/arm/kernel/built-in.o: In function `__irq_svc':
+	io.c:(.text+0x2e0): undefined reference to `avic_base'
+	arch/arm/kernel/built-in.o: In function `__irq_usr':
+	io.c:(.text+0x4c8): undefined reference to `avic_base'
+	arch/arm/mach-mxc91231/built-in.o: In function `mxc91231_init_irq':
+	magx-zn5.c:(.init.text+0x18): undefined reference to `mxc_init_irq'
 
-> This patch changes the extended register name to make it clearer
-> they only exist in OMAP4 context
->
-> Cc: patches at linaro.org
-> Reported-by: Peter Maydell<peter.maydell@linaro.org>
-> Signed-off-by: Andy Green<andy.green@linaro.org>
+and was broken by
 
-The I2C maintainer should be in CC as well.
+	c7259df (ARM i.MX irq: Compile avic irq code only on SoCs that need it)
 
-> ---
->
->   drivers/i2c/busses/i2c-omap.c |   23 ++++++++++++-----------
->   1 files changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index d6500ec..e09c62d 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -72,11 +72,12 @@ enum {
->   	OMAP_I2C_SCLH_REG,
->   	OMAP_I2C_SYSTEST_REG,
->   	OMAP_I2C_BUFSTAT_REG,
-> -	OMAP_I2C_REVNB_LO,
-> -	OMAP_I2C_REVNB_HI,
-> -	OMAP_I2C_IRQSTATUS_RAW,
-> -	OMAP_I2C_IRQENABLE_SET,
-> -	OMAP_I2C_IRQENABLE_CLR,
-> +	/* only on OMAP4430 */
-> +	OMAP_I2C_OMAP4430_REVNB_LO,
-> +	OMAP_I2C_OMAP4430_REVNB_HI,
-> +	OMAP_I2C_OMAP4430_IRQSTATUS_RAW,
-> +	OMAP_I2C_OMAP4430_IRQENABLE_SET,
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/plat-mxc/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I think that you should keep only the comment, because it is not really 
-recommended to add SoC related information directly in IP register names.
-These new registers are just an evolution of the I2C IP. The first 
-instances of that version are used in OMAP4 first, but OMAP4 variants 
-(4440) and OMAP5 will use the same one.
-
-Bottom line is that we can probably drop that patch from the series.
-
-Regards,
-Benoit
-
-> +	OMAP_I2C_OMAP4430_IRQENABLE_CLR,
->   };
->
->   /* I2C Interrupt Enable Register (OMAP_I2C_IE): */
-> @@ -244,11 +245,11 @@ const static u8 omap4_reg_map[] = {
->   	[OMAP_I2C_SCLH_REG] = 0xb8,
->   	[OMAP_I2C_SYSTEST_REG] = 0xbC,
->   	[OMAP_I2C_BUFSTAT_REG] = 0xc0,
-> -	[OMAP_I2C_REVNB_LO] = 0x00,
-> -	[OMAP_I2C_REVNB_HI] = 0x04,
-> -	[OMAP_I2C_IRQSTATUS_RAW] = 0x24,
-> -	[OMAP_I2C_IRQENABLE_SET] = 0x2c,
-> -	[OMAP_I2C_IRQENABLE_CLR] = 0x30,
-> +	[OMAP_I2C_OMAP4430_REVNB_LO] = 0x00,
-> +	[OMAP_I2C_OMAP4430_REVNB_HI] = 0x04,
-> +	[OMAP_I2C_OMAP4430_IRQSTATUS_RAW] = 0x24,
-> +	[OMAP_I2C_OMAP4430_IRQENABLE_SET] = 0x2c,
-> +	[OMAP_I2C_OMAP4430_IRQENABLE_CLR] = 0x30,
->   };
->
->   static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
-> @@ -309,7 +310,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
->
->   	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
->   	if (dev->rev>= OMAP_I2C_REV_ON_4430)
-> -		omap_i2c_write_reg(dev, OMAP_I2C_IRQENABLE_CLR, 1);
-> +		omap_i2c_write_reg(dev, OMAP_I2C_OMAP4430_IRQENABLE_CLR, 1);
->   	else
->   		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 15dd518..8d183c5 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -33,6 +33,7 @@ config ARCH_MX3
+ config ARCH_MXC91231
+ 	bool "MXC91231-based"
+ 	select CPU_V6
++	select MXC_AVIC
+ 	help
+ 	  This enables support for systems based on the Freescale MXC91231 family
+ 
+-- 
+1.7.2.3
