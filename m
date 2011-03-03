@@ -1,37 +1,61 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Thu, 3 Mar 2011 11:40:26 +0900
-Subject: [PATCH] ARM: S5PC210: add support for i2c PMICs on Universal_C210
-	board
-In-Reply-To: <20110215113504.GF4152@n2100.arm.linux.org.uk>
-References: <1297767555-13326-1-git-send-email-m.szyprowski@samsung.com>
-	<20110215113504.GF4152@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimHPzbWpqFMXr2D46VXxLeHaAVTtpeCSaByweu8@mail.gmail.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Wed, 2 Mar 2011 20:51:41 -0600
+Subject: [PATCHv2] omap:mailbox: resolve hang issue
+In-Reply-To: <20110303014416.GL20560@atomide.com>
+References: <1299104058-28565-1-git-send-email-x0095078@ti.com>
+	<20110303014416.GL20560@atomide.com>
+Message-ID: <AANLkTin4LUkC=bARTaAweJ96FnVHy9dLqto=yjD=ovaL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 8:35 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 15, 2011 at 11:59:15AM +0100, Marek Szyprowski wrote:
->> ?#include <mach/map.h>
->> +#include <mach/gpio.h>
+On Wed, Mar 2, 2011 at 7:44 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Armando Uribe <x0095078@ti.com> [110302 13:54]:
+>> From: Hari Kanigeri <h-kanigeri2@ti.com>
+>>
+>> omap4 interrupt disable bits is different. On rx kfifo full, the mbox rx
+>> interrupts wasn't getting disabled, and this is causing the rcm stress tests
+>> to hang.
+>>
+>> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+>> Signed-off-by: Armando Uribe <x0095078@ti.com>
+>> Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
 >
-> Need I say anything about this?
+> Should we merge this as a fix for the 2.6.38 still?
 
-Hi Russell,
+yeah, if it can still be merged in 2.6.38 because it is a fix it would be great.
 
-How about to prevent it as compiler error? It's frequent mistake.
+Regards,
+Fernando.
 
-At each mach/gpio.h
-
-#ifndef __LINUX_GPIO_H
-#error "You should include <linux/gpio.h> instead of <mach/gpio.h>."
-#endif
-
-Thank you,
-Kyungmin Park
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+> Tony
+>
+>> ---
+>> ?arch/arm/mach-omap2/mailbox.c | ? 10 ++++++----
+>> ?1 files changed, 6 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+>> index 394413d..011ca50 100644
+>> --- a/arch/arm/mach-omap2/mailbox.c
+>> +++ b/arch/arm/mach-omap2/mailbox.c
+>> @@ -193,10 +193,12 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+>> ? ? ? ? ? ? ? omap_mbox_type_t irq)
+>> ?{
+>> ? ? ? struct omap_mbox2_priv *p = mbox->priv;
+>> - ? ? u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+>> - ? ? l = mbox_read_reg(p->irqdisable);
+>> - ? ? l &= ~bit;
+>> - ? ? mbox_write_reg(l, p->irqdisable);
+>> + ? ? u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+>> +
+>> + ? ? if (!cpu_is_omap44xx())
+>> + ? ? ? ? ? ? bit = mbox_read_reg(p->irqdisable) & ~bit;
+>> +
+>> + ? ? mbox_write_reg(bit, p->irqdisable);
+>> ?}
+>>
+>> ?static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
+>> --
+>> 1.7.0.4
+>>
 >
