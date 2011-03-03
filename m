@@ -1,42 +1,45 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Thu, 3 Mar 2011 09:49:09 +0530
-Subject: [PATCH 1/8 resend] dw_dmac: Remove compilation dependency from
-	AVR32
-In-Reply-To: <4D6F0E32.6050505@st.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-	<d41145ce4d5e3d870f720709f68d5b1dbf34d6a0.1298889267.git.viresh.kumar@st.com>
-	<1299084372.6974.91.camel@vkoul-udesk3> <4D6F0E32.6050505@st.com>
-Message-ID: <20110303041909.GT244@DLHLAP0379>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 03 Mar 2011 13:33:01 +0900
+Subject: [PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
+In-Reply-To: <1299087289-29926-2-git-send-email-s.nawrocki@samsung.com>
+References: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
+	<1299087289-29926-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <01a501cbd95c$37069cf0$a513d6d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 11:42:42AM +0800, Viresh KUMAR wrote:
-> On 03/02/2011 10:16 PM, Koul, Vinod wrote:
-> > On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
-
-[...]
-
-> >>  drivers/dma/Kconfig |    1 -
-> >>  1 files changed, 0 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> >> index 1c28816..95c7db7 100644
-> >> --- a/drivers/dma/Kconfig
-> >> +++ b/drivers/dma/Kconfig
-> >> @@ -82,7 +82,6 @@ config INTEL_IOP_ADMA
-> >>  
-> >>  config DW_DMAC
-> >>  	tristate "Synopsys DesignWare AHB DMA support"
-> >> -	depends on AVR32
-> > Shouldn't you be adding a corresponding depends on new arch? And since
-> > this supports old arch as well, it should say depends on both...
+Sylwester Nawrocki wrote:
 > 
-> Why should this driver be dependent on ARM or AVR32? It can be present
-> on any other arch too.. So i thought removing this dependency all together
-> is better.
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-s5p/dev-csis0.c              |    2 +-
+>  arch/arm/plat-s5p/dev-csis1.c              |    2 +-
+>  arch/arm/plat-s5p/include/plat/csis.h      |   28
+--------------------------
+> --
+>  arch/arm/plat-s5p/include/plat/mipi_csis.h |   28
+> ++++++++++++++++++++++++++++
+>  4 files changed, 30 insertions(+), 30 deletions(-)
+>  delete mode 100644 arch/arm/plat-s5p/include/plat/csis.h
+>  create mode 100644 arch/arm/plat-s5p/include/plat/mipi_csis.h
+> 
+Oops, why didn't use '-M'?
+It can show me this like following.
 
-There could be a dependency on HAVE_CLK as it uses clock APIs.
+.../plat-s5p/include/plat/{csis.h => mipi_csis.h}  |   10 +++++-----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+ rename arch/arm/plat-s5p/include/plat/{csis.h => mipi_csis.h} (68%)
 
--- 
-regards
-Shiraz
+Secondly, I remember this...
+Following is your response at that time.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/038037.ht
+ml
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
