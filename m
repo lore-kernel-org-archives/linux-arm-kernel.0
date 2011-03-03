@@ -1,35 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Mar 2011 10:38:13 +0000
-Subject: [PATCH 1/4] ARM i.MX: Move gpio initialization to SoC specific
-	files
-In-Reply-To: <20110303103434.GI29521@pengutronix.de>
-References: <1299063683-24903-1-git-send-email-s.hauer@pengutronix.de>
-	<1299063683-24903-2-git-send-email-s.hauer@pengutronix.de>
-	<20110303102904.GC13179@n2100.arm.linux.org.uk>
-	<20110303103434.GI29521@pengutronix.de>
-Message-ID: <20110303103813.GD13179@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 3 Mar 2011 11:49:02 +0100
+Subject: [PATCH V3 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
+In-Reply-To: <010C9052C42A00499CE76D637FA5EE900C82A4@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298892725-23672-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110228144741.GF15532@pengutronix.de>
+	<010C9052C42A00499CE76D637FA5EE900C7B7B@039-SN1MPN1-001.039d.mgd.msft.net>
+	<20110301113115.GB2212@pengutronix.de>
+	<010C9052C42A00499CE76D637FA5EE900C82A4@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <20110303104902.GE3649@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 11:34:34AM +0100, Sascha Hauer wrote:
-> On Thu, Mar 03, 2011 at 10:29:04AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Mar 02, 2011 at 12:01:20PM +0100, Sascha Hauer wrote:
-> > > diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-> > > index 378c61b..8613e44 100644
-> > > --- a/arch/arm/mach-imx/mm-imx1.c
-> > > +++ b/arch/arm/mach-imx/mm-imx1.c
-> > > @@ -23,6 +23,8 @@
-> > >  
-> > >  #include <mach/common.h>
-> > >  #include <mach/hardware.h>
-> > > +#include <mach/gpio.h>
-> > 
-> > linux/gpio.h
-> 
-> I guessed that you would say that. I used mach/gpio.h intentionally
-> because I don't need the gpio functions but the
-> DEFINE_IMX_GPIO_PORT_IRQ_HIGH macro from this header. Should I use
-> linux/gpio.h anyway?
 
-Hmm.  As that's all you want, I guess you should stick with mach/gpio.h
-here.
+> > > > > +/* Abort type definition in the command register  */
+> > > > > +#define  SDHCI_CMD_ABORTCMD        0xC0
+> > > >
+> > > > Won't that belong into sd.h (unless I misunderstood your last mail)?
+> > > This is the bit definitions of the ABORTCMD CMD-TYPE on the bit6~7 of
+> > CMD register.
+> > > Here is the definition of the CMD register derived from SDHC spec. FYI.
+> > > D15   D14 D13  D08     D07 D06       D05                  D04
+> > D03                       D02         D01 D00
+> > > Rsvd  Command  Index   Command Type  Data Present Select  Command Index
+> > Check Enable   Command CRC Check Enable  Rsvd        Response Type Select
+> >
+> > Ack, I found that, too. Exactly because it is in the standard, I thought
+> > this should rather go into sd.h than sdhci-esdhc-imx.c. Would be a
+> > seperate patch, though.
+> >
+> Do you means the sdhci.h file?
+> I find that the sd.h file doesn't contain the bit definitions stuff of SD HOST CONTROLLER registers.
+> The sdhci.h file has them, such as:
+> #define SDHCI_COMMAND           0x0E
+> #define  SDHCI_CMD_RESP_MASK    0x03
+> #define  SDHCI_CMD_CRC          0x08
+> #define  SDHCI_CMD_INDEX        0x10
+> #define  SDHCI_CMD_DATA         0x20
+
+My idea was that it belongs more to the command definitions, thus sd.h.
+But as long as there is nothing to be solved at core-level sdhci.h might
+do for now as well.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110303/7ac90df5/attachment.sig>
