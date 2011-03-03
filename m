@@ -1,103 +1,37 @@
-From: andy@warmcat.com (Andy Green)
-Date: Thu, 03 Mar 2011 13:50:22 +0000
-Subject: [PATCH 1/4] OMAP3 and 4 hwmod I2C units only allow 16 bit access
-In-Reply-To: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-Message-ID: <20110303135022.30648.8996.stgit@otae.warmcat.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Thu, 3 Mar 2011 15:50:26 +0200
+Subject: Compiling a kernel for armv5 + armv6
+In-Reply-To: <20110303132056.GB18351@pengutronix.de>
+References: <20110303132056.GB18351@pengutronix.de>
+Message-ID: <AANLkTi=u_R=c0b0PQEK_fLqEOfXe-rcyiaEr73kzo2E9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Maydell noticed when running under QEMU he was getting
-errors reporting 32-bit access to I2C peripheral unit registers
-that are documented to be 8 or 16-bit only[1][2]
-
-The I2C driver is blameless as it wraps its accesses in a
-function using __raw_writew and __raw_readw, it turned out it
-is the hwmod stuff.
-
-However the hwmod code already has a flag to force a
-perhipheral unit to only be accessed using 16-bit operations.
-
-This patch applies the 16-bit only flag to the OMAP3xxx and
-OMAP44xx hwmod structs.
-
-[1] OMAP4430 Technical reference manual section 23.1.6.2
-[2] OMAP3530 Techincal reference manual section 18.6
-
-Cc: patches at linaro.org
-Reported-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
----
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    3 +++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
- 2 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 541092c..1409779 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1170,6 +1170,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c1_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_i2c1_hwmod = {
- 	.name		= "i2c1",
-+	.flags		= HWMOD_16BIT_REG,
- 	.mpu_irqs	= i2c1_mpu_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(i2c1_mpu_irqs),
- 	.sdma_reqs	= i2c1_sdma_reqs,
-@@ -1212,6 +1213,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c2_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_i2c2_hwmod = {
- 	.name		= "i2c2",
-+	.flags		= HWMOD_16BIT_REG,
- 	.mpu_irqs	= i2c2_mpu_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(i2c2_mpu_irqs),
- 	.sdma_reqs	= i2c2_sdma_reqs,
-@@ -1254,6 +1256,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c3_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_i2c3_hwmod = {
- 	.name		= "i2c3",
-+	.flags		= HWMOD_16BIT_REG,
- 	.mpu_irqs	= i2c3_mpu_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(i2c3_mpu_irqs),
- 	.sdma_reqs	= i2c3_sdma_reqs,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index ce646f2..c500416 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2280,7 +2280,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c1_slaves[] = {
- static struct omap_hwmod omap44xx_i2c1_hwmod = {
- 	.name		= "i2c1",
- 	.class		= &omap44xx_i2c_hwmod_class,
--	.flags		= HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
- 	.mpu_irqs	= omap44xx_i2c1_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c1_irqs),
- 	.sdma_reqs	= omap44xx_i2c1_sdma_reqs,
-@@ -2396,7 +2396,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c2_slaves[] = {
- static struct omap_hwmod omap44xx_i2c2_hwmod = {
- 	.name		= "i2c2",
- 	.class		= &omap44xx_i2c_hwmod_class,
--	.flags		= HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
- 	.mpu_irqs	= omap44xx_i2c2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c2_irqs),
- 	.sdma_reqs	= omap44xx_i2c2_sdma_reqs,
-@@ -2449,7 +2449,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c3_slaves[] = {
- static struct omap_hwmod omap44xx_i2c3_hwmod = {
- 	.name		= "i2c3",
- 	.class		= &omap44xx_i2c_hwmod_class,
--	.flags		= HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
- 	.mpu_irqs	= omap44xx_i2c3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c3_irqs),
- 	.sdma_reqs	= omap44xx_i2c3_sdma_reqs,
-@@ -2502,7 +2502,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c4_slaves[] = {
- static struct omap_hwmod omap44xx_i2c4_hwmod = {
- 	.name		= "i2c4",
- 	.class		= &omap44xx_i2c_hwmod_class,
--	.flags		= HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
- 	.mpu_irqs	= omap44xx_i2c4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c4_irqs),
- 	.sdma_reqs	= omap44xx_i2c4_sdma_reqs,
+On Thu, Mar 3, 2011 at 3:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Doing so currently breaks with:
+>
+> arch/arm/kernel/entry-armv.S: Assembler messages:
+> arch/arm/kernel/entry-armv.S:196: Error: selected processor does not support `strex r1,r2,[sp]'
+> arch/arm/kernel/entry-armv.S:228: Error: selected processor does not support `strex r1,r2,[sp]'
+> arch/arm/kernel/entry-armv.S:286: Error: selected processor does not support `strex r1,r2,[sp]'
+> arch/arm/kernel/entry-armv.S:323: Error: selected processor does not support `strex r1,r2,[sp]'
+>
+> These are used in svc_exit and restore_user_regs.
+>
+> Is there a way to fix this or do we have to live with this?
+try to add this line to the Makefile
+ AFLAGS_entry-armv.o      :=-Wa,-march=armv6k
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
