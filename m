@@ -1,33 +1,33 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu,  3 Mar 2011 14:58:29 +0000
-Subject: [PATCH 1/7] ARM: SAMSUNG: Include devs.h in dev-uart.c to prototype
-	devices
+Date: Thu,  3 Mar 2011 14:58:32 +0000
+Subject: [PATCH 4/7] ARM: S3C64XX: Tone down SDHCI debugging
 In-Reply-To: <20110303145710.GA32234@opensource.wolfsonmicro.com>
 References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-Message-ID: <1299164315-22246-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1299164315-22246-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensures that the declaration agrees with the definition and makes sparse
-happy.
+The MMC core calls s3c6400_setup_sdhcp_cfg_card() very frequently, causing
+the log message in there at KERN_INFO to be displayed a lot which is slow
+and overly chatty. Convert the message into a pr_debug() to tone this down.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/plat-samsung/dev-uart.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/setup-sdhci.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/dev-uart.c b/arch/arm/plat-samsung/dev-uart.c
-index 3776cd9..5928105 100644
---- a/arch/arm/plat-samsung/dev-uart.c
-+++ b/arch/arm/plat-samsung/dev-uart.c
-@@ -15,6 +15,8 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-s3c64xx/setup-sdhci.c b/arch/arm/mach-s3c64xx/setup-sdhci.c
+index 1a94203..f344a22 100644
+--- a/arch/arm/mach-s3c64xx/setup-sdhci.c
++++ b/arch/arm/mach-s3c64xx/setup-sdhci.c
+@@ -56,7 +56,7 @@ void s3c6400_setup_sdhci_cfg_card(struct platform_device *dev,
+ 	else
+ 		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
  
-+#include <plat/devs.h>
-+
- /* uart devices */
- 
- static struct platform_device s3c24xx_uart_device0 = {
+-	printk(KERN_INFO "%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
++	pr_debug("%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
+ 	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
+ 	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
+ }
 -- 
 1.7.2.3
