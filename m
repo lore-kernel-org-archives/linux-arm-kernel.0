@@ -1,32 +1,40 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:18 +0530
-Subject: [PATCH V2 05/13] dw_dmac: Adding support for 64 bit access width for
-	memcpy xfers
+Date: Thu, 3 Mar 2011 15:47:19 +0530
+Subject: [PATCH V2 06/13] dw_dmac: Change value of DWC_MAX_COUNT to 4095.
 In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
 References: <cover.1299146382.git.viresh.kumar@st.com>
-Message-ID: <42625509e43721a26cc70e9f5fe16d0b93ebff84.1299146382.git.viresh.kumar@st.com>
+Message-ID: <0e767d5a3f538e476b72c7d5ccac88e2f5fcdf1a.1299146382.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Every descriptor can transfer a maximum count of 4095 (12 bits, in control reg),
+So we must have DWC_MAX_COUNT as 4095 instead of 2048 for better performance.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/dma/dw_dmac.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 2b0d5e9..e5d97bf 100644
+index e5d97bf..734829f 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -583,7 +583,9 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	 * We can be a lot more clever here, but this should take care
- 	 * of the most common optimization.
- 	 */
--	if (!((src | dest  | len) & 3))
-+	if (!((src | dest  | len) & 7))
-+		src_width = dst_width = 3;
-+	else if (!((src | dest  | len) & 3))
- 		src_width = dst_width = 2;
- 	else if (!((src | dest | len) & 1))
- 		src_width = dst_width = 1;
+@@ -47,14 +47,13 @@
+ 
+ /*
+  * This is configuration-dependent and usually a funny size like 4095.
+- * Let's round it down to the nearest power of two.
+  *
+  * Note that this is a transfer count, i.e. if we transfer 32-bit
+- * words, we can do 8192 bytes per descriptor.
++ * words, we can do 16480 bytes per descriptor.
+  *
+  * This parameter is also system-specific.
+  */
+-#define DWC_MAX_COUNT	2048U
++#define DWC_MAX_COUNT	4095U
+ 
+ /*
+  * Number of descriptors to allocate for each channel. This should be
 -- 
 1.7.2.2
