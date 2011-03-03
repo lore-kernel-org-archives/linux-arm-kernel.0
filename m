@@ -1,38 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 3 Mar 2011 15:22:42 +0000
-Subject: [Qualcomm PM8921 MFD 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <4D6F1B2B.3090706@codeaurora.org>
-References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
-	<1299104001-5240-3-git-send-email-adharmap@codeaurora.org>
-	<20110302224616.GB32325@opensource.wolfsonmicro.com>
-	<4D6F1B2B.3090706@codeaurora.org>
-Message-ID: <20110303152242.GB32234@opensource.wolfsonmicro.com>
+From: raghuveer.murthy@ti.com (Raghuveer Murthy)
+Date: Thu,  3 Mar 2011 20:57:58 +0530
+Subject: [PATCH v3 1/3] OMAP: DSS2: Adding dss_features for independent core
+	clk divider
+In-Reply-To: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
+References: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
+Message-ID: <1299166080-15380-2-git-send-email-raghuveer.murthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 08:38:03PM -0800, Abhijeet Dharmapurikar wrote:
-> Mark Brown wrote:
+In OMAP3xxx DISPC_DIVISOR register has a logical clock divisor (lcd_div)
+field. The lcd_div is common, for deciding the DISPC core functional clock
+frequency, and the final pixel clock frequency for LCD display.
 
-> >Is it really useful to register a struct device purely for the interrupt
-> >controller?  I'd have expected this to be core functionality of the
-> >device.  The fact that you need to store the device at all is a bit odd
-> >too as you're using the MFD API.
+In OMAP4, there are 2 LCD channels, hence two divisor registers, DISPC_DIVISOR1
+and DISPC_DIVISOR2. Also, there is a third register DISPC_DIVISOR.
 
-> This design is slightly different from other MFD drivers.
-> I separated the interrupt from the core because the interrupt
-> implementation for different Qualcomm pmics remains the same. On
-> 8660 FFA boards for example, we have two pmic chips that have the
-> same interrupt subdevice implementation (the number of interrupts
-> managed by each is different). I didn't want to duplicate the exact
-> code in the core driver - hence a separate interrupt driver.
+The DISPC_DIVISOR in OMAP4 is used to configure lcd_div exclusively for core
+functional clock configuration. For pixel clock configuration of primary and
+secondary LCDs, lcd_div of DISPC_DIVISOR1 and DISPC_DIVISOR2 are used
+respectively
 
-Could you deal with this with a library instead?
+Signed-off-by: Archit Taneja <archit@ti.com>
+Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+---
+ drivers/video/omap2/dss/dss_features.c |    3 ++-
+ drivers/video/omap2/dss/dss_features.h |    2 ++
+ 2 files changed, 4 insertions(+), 1 deletions(-)
 
-> With that in mind, the driver has following functions
-> pm8xxxx_read_root
-> pm8xxxx_read_master
-> pm8xxxx_read_block
-
-> Do you still think I should change the name?
-
-I'd suggest adding an _irq in there.
+diff --git a/drivers/video/omap2/dss/dss_features.c b/drivers/video/omap2/dss/dss_features.c
+index ccae57b..dc170ad 100644
+--- a/drivers/video/omap2/dss/dss_features.c
++++ b/drivers/video/omap2/dss/dss_features.c
+@@ -234,7 +234,8 @@ static struct omap_dss_features omap4_dss_features = {
+ 
+ 	.has_feature	=
+ 		FEAT_GLOBAL_ALPHA | FEAT_PRE_MULT_ALPHA |
+-		FEAT_MGR_LCD2 | FEAT_GLOBAL_ALPHA_VID1,
++		FEAT_MGR_LCD2 | FEAT_GLOBAL_ALPHA_VID1 |
++		FEAT_CORE_CLK_DIV,
+ 
+ 	.num_mgrs = 3,
+ 	.num_ovls = 3,
+diff --git a/drivers/video/omap2/dss/dss_features.h b/drivers/video/omap2/dss/dss_features.h
+index 65d6de7..569d1b2 100644
+--- a/drivers/video/omap2/dss/dss_features.h
++++ b/drivers/video/omap2/dss/dss_features.h
+@@ -36,6 +36,8 @@ enum dss_feat_id {
+ 	FEAT_LINEBUFFERSPLIT	= 1 << 8,
+ 	FEAT_ROWREPEATENABLE	= 1 << 9,
+ 	FEAT_RESIZECONF		= 1 << 10,
++	/* Independent core clk divider */
++	FEAT_CORE_CLK_DIV	= 1 << 11,
+ };
+ 
+ /* DSS register field id */
+-- 
+1.7.0.4
