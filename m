@@ -1,44 +1,33 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Thu, 03 Mar 2011 14:55:00 -0800
-Subject: [Qualcomm PM8921 MFD 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <20110303152242.GB32234@opensource.wolfsonmicro.com>
-References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
-	<1299104001-5240-3-git-send-email-adharmap@codeaurora.org>
-	<20110302224616.GB32325@opensource.wolfsonmicro.com>
-	<4D6F1B2B.3090706@codeaurora.org>
-	<20110303152242.GB32234@opensource.wolfsonmicro.com>
-Message-ID: <4D701C44.7090506@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 03 Mar 2011 14:56:10 -0800
+Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
+	setup function
+In-Reply-To: <1299084806-16546-14-git-send-email-marc.zyngier@arm.com> (Marc
+	Zyngier's message of "Wed, 2 Mar 2011 16:53:19 +0000")
+References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
+	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <8ya62rzlsol.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Wed, Mar 02, 2011 at 08:38:03PM -0800, Abhijeet Dharmapurikar wrote:
->> Mark Brown wrote:
-> 
->>> Is it really useful to register a struct device purely for the interrupt
->>> controller?  I'd have expected this to be core functionality of the
->>> device.  The fact that you need to store the device at all is a bit odd
->>> too as you're using the MFD API.
-> 
->> This design is slightly different from other MFD drivers.
->> I separated the interrupt from the core because the interrupt
->> implementation for different Qualcomm pmics remains the same. On
->> 8660 FFA boards for example, we have two pmic chips that have the
->> same interrupt subdevice implementation (the number of interrupts
->> managed by each is different). I didn't want to duplicate the exact
->> code in the core driver - hence a separate interrupt driver.
-> 
-> Could you deal with this with a library instead?
+On Wed, Mar 02 2011, Marc Zyngier wrote:
 
-Can you please clarify what a library means here?
+> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+>  }
+>  
+> -inline int local_timer_ack(void)
+> +static inline int mem_local_timer_ack(void)
+>  {
+>  	return 1;
+>  }
 
->> pm8xxxx_read_block
-> 
->> Do you still think I should change the name?
-> 
-> I'd suggest adding an _irq in there.
-Ok will do.
+Mispelled 'msm'.
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+Basic sanity test seems to be working at least on UMP.  Currently
+testing SMP.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
