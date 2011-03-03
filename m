@@ -1,32 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Mar 2011 19:15:55 +0100
-Subject: [PATCH v9 1/1] PRUSS UIO driver support
-In-Reply-To: <1299175677-17859-2-git-send-email-pratheesh@ti.com>
-References: <1299175677-17859-1-git-send-email-pratheesh@ti.com>
-	<1299175677-17859-2-git-send-email-pratheesh@ti.com>
-Message-ID: <201103031915.55825.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Mar 2011 10:20:49 -0800
+Subject: [patch v3 3/3] arm: omap4: support pmu
+In-Reply-To: <1299149633-699-4-git-send-email-tom.leiming@gmail.com>
+References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
+	<1299149633-699-4-git-send-email-tom.leiming@gmail.com>
+Message-ID: <20110303182049.GN20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2011 19:07:57 Pratheesh Gangadhar wrote:
-> +struct uio_pruss_dev {
-> +       struct uio_info *info;
-> +       struct clk *pruss_clk;
-> +       dma_addr_t sram_paddr;
-> +       dma_addr_t ddr_paddr;
-> +       void __iomem *prussio_vaddr;
-> +       void *sram_vaddr;
-> +       void *ddr_vaddr;
-> +       unsigned int hostirq_start;
-> +       unsigned int pintc_base;
-> +};
-> +
-> +struct pruss_priv {
-> +       struct uio_pruss_dev *pupdev;
-> +};
+* tom.leiming at gmail.com <tom.leiming@gmail.com> [110303 02:52]:
+> From: Ming Lei <tom.leiming@gmail.com>
+> 
+> This patch supports pmu irq routed from CTI, so
+> make pmu/perf working on OMAP4.
+> 
+> The idea is from Woodruff Richard in the disscussion
+> about "Oprofile on Pandaboard / Omap4" on pandaboard at googlegroups.com.
+> 
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Woodruff Richard <r-woodruff2@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 
-I cannot see the point of struct pruss_priv, I think it would be better to
-just merge the two data structures into one. Everything else looks
-good to me now.
+You'll probably want to queue this along with the to other
+patches via the Russell, so:
 
-	Arnd
+Acked-by: Tony Lindgren <tony@atomide.com>
