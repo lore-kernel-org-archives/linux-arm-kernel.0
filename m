@@ -1,91 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Mar 2011 10:35:32 +0100
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <alpine.LFD.2.00.1103022343410.2701@localhost6.localdomain6>
-References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20110302215238.GK22310@pengutronix.de>
-	<alpine.LFD.2.00.1103022343410.2701@localhost6.localdomain6>
-Message-ID: <20110303093532.GO22310@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 03 Mar 2011 15:02:15 +0530
+Subject: [PATCH] OMAP2+: PM: Warn users of sleep_while_idle if
+	!CONFIG_CPU_IDLE
+In-Reply-To: <87sjv6h5h2.fsf@ti.com>
+References: <1297857860-3713-1-git-send-email-rnayak@ti.com>
+	<87sjv6h5h2.fsf@ti.com>
+Message-ID: <4D6F601F.60002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guten Morgen Thomas,
+On Wednesday 02 March 2011 03:24 AM, Kevin Hilman wrote:
+> Rajendra Nayak<rnayak@ti.com>  writes:
+>
+>> This should help users who do a
+>> 'echo 1>  /debug/pm_debug/sleep_while_idle' with a
+>> config which has !CONFIG_CPU_IDLE and wonder
+>> why OMAP is'nt sleeping in idle.
+>
+> This isn't quite right, as 'sleep_while_idle' is actually a flag for
+> whether or not to call omap_sram_idle() at all.
 
-On Thu, Mar 03, 2011 at 12:51:32AM +0100, Thomas Gleixner wrote:
-> Uwe,
-> 
-> On Wed, 2 Mar 2011, Uwe Kleine-K?nig wrote:
-> > On Wed, Mar 02, 2011 at 11:17:58AM -0600, Dinh.Nguyen at freescale.com wrote:
-> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-mx5/pm.c
-> > I'd like to have that called pm-imx51.c
-> 
-> And I'd like to have a pony.
-http://www.carl-russ-schule.de/files/Pony.jpg
+Hi Kevin,
 
-> 
-> > > +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-> > the parentheses aren't needed here
-> 
-> Could you finally provide a patch to checkpatch.pl or git commit which
-> resolves that issue once and forever ?
-> 
-> Not to mention the fact, that those parentheses are not disturbing the
-> readability of that code at all.
-So it seems we're different.
+I know this is used in 'omap3_pm_idle' as well
+to decide whether or not to call omap_sram_idle() but
+I was'nt quite sure what omap3_pm_idle is expected to do
+in the first place.
+We end up calling omap_sram_idle here without really
+programming any target state. Do we really need this to
+happen, instead can't we just rely on ARM generic code
+to do a WFI in case we don't have cpuidle support enabled?
 
-> 
-> > > +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-> > ditto
-> 
-> Ditto.
-> 
-> > > +static int __init mx5_pm_init(void)
-> > I'd prefer to have that called by imx51_init_early.
-> 
-> And the reason is? 
-> 
->     1) your personal preference
->     2) there is some useful technical reason
-> 
-> If #1, then this comment was just waste of electrons
-> If #2, you failed to provide some reasonable explanation
-Actually it's #2, and to quote a different review[1]:
+regards,
+Rajendra
 
-	Reviewers hint to a correct solution and you are supposed to
-	lookup what that solution means and act accordingly. If you do
-	not understand the hint or its implications please ask [...]
-
-> Again, I'd like to have a pony.
-http://h-6.abload.de/img/pony01_pixelquelle_dal8701.jpg
-
-> Seriously, while all of us admire your invaluable skills of running
-> scripts over patches and kernel code, that kind of review you are
-> trying to provide is utterly useless.
-actually it's not a script, but I guess that doesn't matter much.
-
-> 1) The patch itself has been questioned about its correctness hours
->    before you added the output of your secret script. It was already
->    reported to be non functional. So what's the value of adding
->    scriptable review to it?
-It might save the patch sender from a third iteration.
-
-> 2) As long as you do not see the most obvious functional problems with
->    a patch please spare your script computing power and the bandwidth
->    you are consuming by your futile attempts to gain a profile as a
->    patch reviewer.
-The functionallity of the patch has been questioned before so I didn't
-see a value in repeating that :-)  To be honest, I didn't check for
-functional problems, but IMHO it's OK to provide feedback about a part
-of the problems if you don't see all of them.
-
-Best regards
-Uwe
-
-[1] http://article.gmane.org/gmane.linux.kernel/1107265
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> Even without CPUidle, WFI will still be attempted.
+>
+> Kevin
+>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/pm-debug.c |    9 +++++++++
+>>   1 files changed, 9 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+>> index 125f565..1e722a0 100644
+>> --- a/arch/arm/mach-omap2/pm-debug.c
+>> +++ b/arch/arm/mach-omap2/pm-debug.c
+>> @@ -569,6 +569,10 @@ static int option_get(void *data, u64 *val)
+>>
+>>   	*val = *option;
+>>
+>> +#ifndef CONFIG_CPU_IDLE
+>> +	if (option ==&sleep_while_idle)
+>> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
+>> +#endif
+>>   	return 0;
+>>   }
+>>
+>> @@ -581,6 +585,11 @@ static int option_set(void *data, u64 val)
+>>
+>>   	*option = val;
+>>
+>> +#ifndef CONFIG_CPU_IDLE
+>> +	if (option ==&sleep_while_idle)
+>> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
+>> +#endif
+>> +
+>>   	if (option ==&enable_off_mode) {
+>>   		if (val)
+>>   			omap_pm_enable_off_mode();
