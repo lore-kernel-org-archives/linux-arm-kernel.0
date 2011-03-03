@@ -1,53 +1,96 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 03 Mar 2011 15:22:37 +0300
-Subject: [patch v2 1/2] mc13892: reboot on wdi event
-In-Reply-To: <20110302185000.369378760@rtp-net.org>
-References: <20110302184512.512010086@rtp-net.org>
-	<20110302185000.369378760@rtp-net.org>
-Message-ID: <4D6F880D.3000207@ru.mvista.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  3 Mar 2011 12:39:06 +0000
+Subject: [PATCH] ARM: Thumb-2: Add local symbols to work around gas behaviour
+Message-ID: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+All current versions of gas at the time of writing have issues
+fixing up pc-relative instructions which reference global symbols,
+due to the potential need to support symbol preemption.
+Even though symbol preemption is not relevant to the Linux kernel,
+there is no way to inform the tools of this, so we get the problem.
 
-On 02-03-2011 21:45, Arnaud Patard (Rtp) wrote:
+Most pc-relative forms in ARM, and all pc-relative forms in
+Thumb, will cause the assembler to fail with various fixup error
+messages when used to reference global symbols.
 
-> By default, on wdi (watchdog input) event the mc13892 is powering off.
-> This patch allows to change this behaviour throught platform_data.
+The legacy behaviour is for ADR and plain LDR instructions in ARM
+which reference global symbols to be fixed up silently with no
+relocation emitted.  This means that building the kernel in ARM
+currently works without problems, but it may be a bug, and the
+behaviour could change in the future.
 
-    Er, for some reason, this patch was in attachment...
+After discussion with Richard Earnshaw, it seems that there is
+no single obvious remedy for this inconsistent behaviour,
+so there is not likely to be a comprehensive upstream fix for
+a while.
 
-> v2:
-> - move to mc13xxx-core
-> - make it configurable
+A workaround which should be valid for all past and all
+foreseeable future versions of gas is to express the need for
+a local fixup explicitly, by declaring a shadow local symbol
+for any global symbol which needs to be addressed using ADR
+or any pc-relative LDR variant.
 
-> Signed-off-by: Arnaud Patard<arnaud.patard@rtp-net.org>
+This patch implements this workaround for the one part of the
+main kernel currently known to be affected.  The resulting code
+builds and works correctly in ARM and Thumb.
 
-> Index: linux-2.6-submit/drivers/mfd/mc13xxx-core.c
-> ===================================================================
-> --- linux-2.6-submit.orig/drivers/mfd/mc13xxx-core.c	2011-03-01 22:26:40.000000000 +0100
-> +++ linux-2.6-submit/drivers/mfd/mc13xxx-core.c	2011-03-02 12:24:30.000000000 +0100
-> @@ -136,6 +136,9 @@
->   #define MC13XXX_REVISION_FAB		(0x03 << 11)
->   #define MC13XXX_REVISION_ICIDCODE	(0x3f << 13)
->
-> +#define MC13892_POWERCTL2		15
-> +#define MC13892_POWERCTL2_WDIRESET	(1<<12)
+Similar fixes may be needed in mach-specific assembler.
 
-    Please add spaces around << to@least be consistent with the code above 
-and below.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/kernel/relocate_kernel.S |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-> +
->   #define MC13783_ADC1		44
->   #define MC13783_ADC1_ADEN		(1 << 0)
->   #define MC13783_ADC1_RAND		(1 << 1)
-[...]
-> @@ -734,6 +738,15 @@
->   	if (ret || id == MC13XXX_ID_INVALID)
->   		goto err_revision;
->
-> +	if ((id == MC13XXX_ID_MC13892) && pdata->wdi_reboot) {
-
-    Parens around == not necessary.
-
-WBR, Sergei
+diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+index 9cf4cbf..a2599e7 100644
+--- a/arch/arm/kernel/relocate_kernel.S
++++ b/arch/arm/kernel/relocate_kernel.S
+@@ -7,8 +7,8 @@
+ 	.globl relocate_new_kernel
+ relocate_new_kernel:
+ 
+-	ldr	r0,kexec_indirection_page
+-	ldr	r1,kexec_start_address
++	ldr	r0,__kexec_indirection_page
++	ldr	r1,__kexec_start_address
+ 
+ 	/*
+ 	 * If there is no indirection page (we are doing crashdumps)
+@@ -55,27 +55,31 @@ relocate_new_kernel:
+ 	/* Jump to relocated kernel */
+ 	mov lr,r1
+ 	mov r0,#0
+-	ldr r1,kexec_mach_type
+-	ldr r2,kexec_boot_atags
++	ldr r1,__kexec_mach_type
++	ldr r2,__kexec_boot_atags
+ 	mov pc,lr
+ 
+ 	.align
+ 
+ 	.globl kexec_start_address
+ kexec_start_address:
++__kexec_start_address:
+ 	.long	0x0
+ 
+ 	.globl kexec_indirection_page
+ kexec_indirection_page:
++__kexec_indirection_page:
+ 	.long	0x0
+ 
+ 	.globl kexec_mach_type
+ kexec_mach_type:
++__kexec_mach_type:
+ 	.long	0x0
+ 
+ 	/* phy addr of the atags for the new kernel */
+ 	.globl kexec_boot_atags
+ kexec_boot_atags:
++__kexec_boot_atags:
+ 	.long	0x0
+ 
+ relocate_new_kernel_end:
+-- 
+1.7.1
