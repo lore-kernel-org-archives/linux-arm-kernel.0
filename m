@@ -1,73 +1,53 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 03 Mar 2011 15:02:15 +0530
-Subject: [PATCH] OMAP2+: PM: Warn users of sleep_while_idle if
-	!CONFIG_CPU_IDLE
-In-Reply-To: <87sjv6h5h2.fsf@ti.com>
-References: <1297857860-3713-1-git-send-email-rnayak@ti.com>
-	<87sjv6h5h2.fsf@ti.com>
-Message-ID: <4D6F601F.60002@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Mar 2011 11:02:06 +0100
+Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
+	CPU family choice
+In-Reply-To: <20110303052653.GA19961@b20223-02.ap.freescale.net>
+References: <20110302112559.GC22310@pengutronix.de>
+	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110303052653.GA19961@b20223-02.ap.freescale.net>
+Message-ID: <20110303100206.GP22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2011 03:24 AM, Kevin Hilman wrote:
-> Rajendra Nayak<rnayak@ti.com>  writes:
->
->> This should help users who do a
->> 'echo 1>  /debug/pm_debug/sleep_while_idle' with a
->> config which has !CONFIG_CPU_IDLE and wonder
->> why OMAP is'nt sleeping in idle.
->
-> This isn't quite right, as 'sleep_while_idle' is actually a flag for
-> whether or not to call omap_sram_idle() at all.
+Hi Richard,
 
-Hi Kevin,
+On Thu, Mar 03, 2011 at 01:26:54PM +0800, Richard Zhao wrote:
+> On Wed, Mar 02, 2011 at 06:23:05PM +0100, Uwe Kleine-K?nig wrote:
+> > The only use of selecting MX2-based before was to get the choice to select
+> > between i.MX21 and i.MX27. So better provide this choice directly.
+> > 
+> > Note that this has an influence on reduced i.MX21 configs because the
+> > former default "MACH_MX21" for the "CPUs" choice makes MACH_MX21 not
+> > appear in the reduced config and so the default for "Freescale CPU family:"
+> > (i.e. ARCH_MX3) is used now.  mx21_defconfig is adapted not to be affected
+> > by this problem.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I know this is used in 'omap3_pm_idle' as well
-to decide whether or not to call omap_sram_idle() but
-I was'nt quite sure what omap3_pm_idle is expected to do
-in the first place.
-We end up calling omap_sram_idle here without really
-programming any target state. Do we really need this to
-happen, instead can't we just rely on ARM generic code
-to do a WFI in case we don't have cpuidle support enabled?
+> > -config ARCH_MX2
+> > -	bool "MX2-based"
+> > +config MACH_MX21
+> > +	bool "MX21-based"
+> > +	select ARCH_MX2
+> >  	help
+> > -	  This enables support for systems based on the Freescale i.MX2 family
+> > +	  This enables support for systems based on the Freescale i.MX21 family
+> Is it ToDo marker like ARCH_51? Why is it MACH_xx while others are ARCH_XX?
+this is done to keep existing code working. MACH_MX21 and MACH_MX27 are
+used in drivers/.
 
-regards,
-Rajendra
+> It might be little strange that mx2x is a excetion while others are grouped.
+This is good, it might make people aware that there is still work to do.
+:-)  After the first steps for a multi-SoC-kernel are done, the grouping
+has to change anyhow and doesn't match cpu families anymore. Moreover
+MX2 is (IMHO) a marketing name, e.g. because i.MX25 is too different
+compared to i.MX21 and i.MX27. And note that i.MX25 had a seperat entry
+already before.
 
->
-> Even without CPUidle, WFI will still be attempted.
->
-> Kevin
->
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> ---
->>   arch/arm/mach-omap2/pm-debug.c |    9 +++++++++
->>   1 files changed, 9 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
->> index 125f565..1e722a0 100644
->> --- a/arch/arm/mach-omap2/pm-debug.c
->> +++ b/arch/arm/mach-omap2/pm-debug.c
->> @@ -569,6 +569,10 @@ static int option_get(void *data, u64 *val)
->>
->>   	*val = *option;
->>
->> +#ifndef CONFIG_CPU_IDLE
->> +	if (option ==&sleep_while_idle)
->> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
->> +#endif
->>   	return 0;
->>   }
->>
->> @@ -581,6 +585,11 @@ static int option_set(void *data, u64 val)
->>
->>   	*option = val;
->>
->> +#ifndef CONFIG_CPU_IDLE
->> +	if (option ==&sleep_while_idle)
->> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
->> +#endif
->> +
->>   	if (option ==&enable_off_mode) {
->>   		if (val)
->>   			omap_pm_enable_off_mode();
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
