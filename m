@@ -1,67 +1,36 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 02 Mar 2011 21:55:39 -0800
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <4D6E218F.2020804@stericsson.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>	<4D6DAE6E.4030701@bluewatersys.com>	<4D6DB1B1.4060908@codeaurora.org>	<4D6DFE67.3020801@stericsson.com>	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-	<4D6E218F.2020804@stericsson.com>
-Message-ID: <4D6F2D5B.10009@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 2 Mar 2011 23:08:00 -0700 (MST)
+Subject: [PATCH 0/3] OMAP2+ hwmod fixes
+In-Reply-To: <4D6D2589.3090505@ti.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<4D5BCC10.2060301@ti.com>
+	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
+	<4D5E85EA.70605@ti.com>
+	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+	<e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
+	<alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
+	<19850e063c924a8a30c69ac02621a659@mail.gmail.com>
+	<4D6D2589.3090505@ti.com>
+Message-ID: <alpine.DEB.2.00.1103022303560.10981@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2011 02:53 AM, Maxime Coquelin wrote:
-> On 03/02/2011 11:36 AM, Linus Walleij wrote:
->> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
->> <maxime.coquelin-nonst@stericsson.com> wrote:
->>
->>> I think we should have a tree like this :
->>>
->>> /sys/devices/system/soc/
->>> /sys/devices/system/soc/unique_id<- Unified way to export an ID for
->>> all machs
->> Arbitrary number of bits? Some will have a 64-bit ID, some will have
->> 32-bit
->> etc.
->
-> Yes, here is the difficulty. For example, in our case, the SoC unique ID
-> is 160 bits long.
-> Maybe it would be a better solution to get rid of this unified file, and
-> keep only mach specific entries? I mean :
->
-> /sys/devices/system/soc/
-> /sys/devices/system/soc/mach_name
-> /sys/devices/system/soc/foo_id
-> /sys/devices/system/soc/bar_id
+Hi Beno?t,
 
-Sorry for the late reply guys. Got wrapped up is some other stuff.
+On Tue, 1 Mar 2011, Cousson, Benoit wrote:
 
-I'm with Maxime on getting rid of the unique id file. It's not as if 
-it's unique across all machs and archs. Any user space caring to look at 
-the id will anyway have to check the mach/family first. So, there is no 
-point in having this unique id file. It just adds more weirdness and 
-complexity to deal with the different formats or ways each family wants 
-to export the id. Actually, in the case of MSM, we don't have any need 
-to export unique id. We just want to export what type of soc it is 
-within the MSM family.
+> So to conclude, I will drop the #3 and just push #1 and #2.
+> 
+> #1 is fine with addition of the WARN.
 
-As for the path, it's not clear we have settled on the final path. I see 
-us ping-pong between /sys/devices/system/soc/ and 
-/sys/devices/system/soc/mach/. Can we drop the "mach" subdir? Seems 
-pointless.
+We should probably drop this one now that _setup() is allowed to be called 
+on hwmods that have already been setup (commit 48d54f3f).
 
-The mandatory file, I would like to call it "family", since "mach" is 
-too specific (omap3 and omap4 is my usual example -- they can have one 
-implementation of socinfo and report the family as "omap"). We don't 
-want people to misunderstand "mach" to be an accurate representation of 
-the xxxx in mach-xxxx.
+> #2 does return an error but does not print anything, but since each call
+> (_init_main_clk, _init_interface_clks, _init_opt_clks) does report
+> some pr_warn in case of error, this is fine.
 
-The patch that adds this should probably allow each socinfo 
-implementation to specify the family name and an array of attributes 
-(struct attribute *) that can be used to expose whatever else they want 
-to export.
+#2 looks fine to me.
 
-Thanks,
-Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+- Paul
