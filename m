@@ -1,152 +1,54 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 3 Mar 2011 17:15:59 +0800
-Subject: [PATCH 1/2] ARM: imx5x: clean up ARCH_MX5X
-In-Reply-To: <20110303085033.GN22310@pengutronix.de>
-References: <1299141603-22148-1-git-send-email-richard.zhao@freescale.com>
-	<20110303085033.GN22310@pengutronix.de>
-Message-ID: <20110303091558.GA22211@b20223-02.ap.freescale.net>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Mar 2011 09:17:32 +0000
+Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
+	setup function
+In-Reply-To: <8ya39n5ntzt.fsf@huya.qualcomm.com>
+References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
+	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
+	<8ya39n5ntzt.fsf@huya.qualcomm.com>
+Message-ID: <1299143852.10633.45.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, 2011-03-02 at 12:32 -0800, David Brown wrote:
 
-On Thu, Mar 03, 2011 at 09:50:33AM +0100, Uwe Kleine-K?nig wrote:
-> On Thu, Mar 03, 2011 at 04:40:02PM +0800, Richard Zhao wrote:
-> > Move to SOC_SOC_IMX5X. Leave only places which prevent multi-soc
-> > using ARCH_MX5X.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Looks OK, probably you need to split off the changes that touch files in
-> drivers/ though.
-Yes. Will Sashca merge drivers part too, or someone else?
-> 
-> (Hmm, no diffstat?)
-ah, removing "-p".
+David,
 
-Thanks
-Richard
+> On Wed, Mar 02 2011, Marc Zyngier wrote:
 > 
-> Best regards
-> Uwe
-> 
-> > diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> > index 03ec6e9..83ee088 100644
-> > --- a/arch/arm/mach-mx5/Kconfig
-> > +++ b/arch/arm/mach-mx5/Kconfig
-> > @@ -1,5 +1,6 @@
-> >  if ARCH_MX5
-> > -# ARCH_MX51 and ARCH_MX50 are left for compatibility
-> > +# ARCH_MX50/51/53 are left to mark places where prevent multi-soc in single
-> > +# image. So for most time, SOC_IMX50/51/53 should be used.
-> >  
-> >  config ARCH_MX50
-> >  	bool
-> > diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-> > index 33530d2..be7df13 100644
-> > --- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-> > +++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-> > @@ -194,7 +194,7 @@ static int __init imxXX_add_imx_dma(void)
-> >  	} else
+> > ---
+> >  arch/arm/mach-msm/timer.c |   22 +++++++++++++++++++---
+> >  1 files changed, 19 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+> > index 56f920c..e029363 100644
+> > --- a/arch/arm/mach-msm/timer.c
+> > +++ b/arch/arm/mach-msm/timer.c
+> > @@ -228,6 +243,8 @@ static void __init msm_timer_init(void)
+> >  	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
 > >  #endif
 > >  
-> > -#if defined(CONFIG_ARCH_MX51)
-> > +#if defined(CONFIG_SOC_IMX51)
-> >  	if (cpu_is_mx51()) {
-> >  		imx51_imx_sdma_data.pdata.script_addrs = &addr_imx51_to1;
-> >  		ret = imx_add_imx_sdma(&imx51_imx_sdma_data);
-> > diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
-> > index ba65c92..a3d930d 100644
-> > --- a/arch/arm/plat-mxc/include/mach/irqs.h
-> > +++ b/arch/arm/plat-mxc/include/mach/irqs.h
-> > @@ -23,17 +23,17 @@
-> >  #define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
-> >  
-> >  /* these are ordered by size to support multi-SoC kernels */
-> > -#if defined CONFIG_ARCH_MX53
-> > +#if defined CONFIG_SOC_IMX53
-> >  #define MXC_GPIO_IRQS		(32 * 7)
-> >  #elif defined CONFIG_ARCH_MX2
-> >  #define MXC_GPIO_IRQS		(32 * 6)
-> > -#elif defined CONFIG_ARCH_MX50
-> > +#elif defined CONFIG_SOC_IMX50
-> >  #define MXC_GPIO_IRQS		(32 * 6)
-> >  #elif defined CONFIG_ARCH_MX1
-> >  #define MXC_GPIO_IRQS		(32 * 4)
-> >  #elif defined CONFIG_ARCH_MX25
-> >  #define MXC_GPIO_IRQS		(32 * 4)
-> > -#elif defined CONFIG_ARCH_MX51
-> > +#elif defined CONFIG_SOC_IMX51
-> >  #define MXC_GPIO_IRQS		(32 * 4)
-> >  #elif defined CONFIG_ARCH_MXC91231
-> >  #define MXC_GPIO_IRQS		(32 * 4)
-> > diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-> > index 04c7a26..3781f2f 100644
-> > --- a/arch/arm/plat-mxc/include/mach/mxc.h
-> > +++ b/arch/arm/plat-mxc/include/mach/mxc.h
-> > @@ -127,7 +127,7 @@ extern unsigned int __mxc_cpu_type;
-> >  # define cpu_is_mx35()		(0)
-> >  #endif
-> >  
-> > -#ifdef CONFIG_ARCH_MX50
-> > +#ifdef CONFIG_SOC_IMX50
-> >  # ifdef mxc_cpu_type
-> >  #  undef mxc_cpu_type
-> >  #  define mxc_cpu_type __mxc_cpu_type
-> > @@ -139,7 +139,7 @@ extern unsigned int __mxc_cpu_type;
-> >  # define cpu_is_mx50()		(0)
-> >  #endif
-> >  
-> > -#ifdef CONFIG_ARCH_MX51
-> > +#ifdef CONFIG_SOC_IMX51
-> >  # ifdef mxc_cpu_type
-> >  #  undef mxc_cpu_type
-> >  #  define mxc_cpu_type __mxc_cpu_type
-> > @@ -151,7 +151,7 @@ extern unsigned int __mxc_cpu_type;
-> >  # define cpu_is_mx51()		(0)
-> >  #endif
-> >  
-> > -#ifdef CONFIG_ARCH_MX53
-> > +#ifdef CONFIG_SOC_IMX53
-> >  # ifdef mxc_cpu_type
-> >  #  undef mxc_cpu_type
-> >  #  define mxc_cpu_type __mxc_cpu_type
-> > diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> > index c895922..450afc5 100644
-> > --- a/drivers/mtd/nand/Kconfig
-> > +++ b/drivers/mtd/nand/Kconfig
-> > @@ -476,7 +476,7 @@ config MTD_NAND_MPC5121_NFC
-> >  
-> >  config MTD_NAND_MXC
-> >  	tristate "MXC NAND support"
-> > -	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || ARCH_MX51
-> > +	depends on IMX_HAVE_PLATFORM_MXC_NAND
-> >  	help
-> >  	  This enables the driver for the NAND flash controller on the
-> >  	  MXC processors.
-> > diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> > index bb233a9..9f9d3f7 100644
-> > --- a/drivers/spi/Kconfig
-> > +++ b/drivers/spi/Kconfig
-> > @@ -164,10 +164,10 @@ config SPI_IMX_VER_0_4
-> >  	def_bool y if ARCH_MX31
-> >  
-> >  config SPI_IMX_VER_0_7
-> > -	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51 || ARCH_MX53
-> > +	def_bool y if ARCH_MX25 || ARCH_MX35 || SOC_IMX51 || SOC_IMX53
-> >  
-> >  config SPI_IMX_VER_2_3
-> > -	def_bool y if ARCH_MX51 || ARCH_MX53
-> > +	def_bool y if SOC_IMX51 || SOC_IMX53
-> >  
-> >  config SPI_IMX
-> >  	tristate "Freescale i.MX SPI controllers"
-> > -- 
-> > 1.7.1
-> > 
-> > 
-> > 
+> > +	percpu_timer_register(msm_timer_ops_ptr);
+> > +
+> >  	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
+> >  		struct msm_clock *clock = &msm_clocks[i];
+> >  		struct clock_event_device *ce = &clock->clockevent;
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> I'm having difficulty figuring out what tree/branch these patches are
+> based off of, so I haven't been able to test this, yet.  But, so far,
+> the MSM changes look coherent.
 > 
+> If you can give me a ref for your source tree, I can try to do some
+> testing of these changes to make sure nothing is broken by it.
+
+The whole serie is against -next as of yesterday, plus Will's multi-tile
+support for Versatile Express, available from Russell's patch system:
+http://www.arm.linux.org.uk/developer/patches/download.php?id=6771/1
+
+It would be very helpful if you could give it a go on MSM.
+
+Thanks,
+
+	M.
+-- 
+Reality is an implementation detail.
