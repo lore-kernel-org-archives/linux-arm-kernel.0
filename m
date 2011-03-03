@@ -1,103 +1,45 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Thu, 03 Mar 2011 14:40:29 +0800
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <201102011711.31258.jeremy.kerr@canonical.com>
-Message-ID: <1299134429.100626.661279191478.0.gpush@pororo>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 3 Mar 2011 12:50:33 +0530
+Subject: [PATCH 00/17] omap4: pm: suspend, hotplug and cpuilde support
+In-Reply-To: <87oc5txf0d.fsf@ti.com>
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
+	<87oc5txf0d.fsf@ti.com>
+Message-ID: <b69f8a76bdde3e73f623c5c93c767b61@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Thursday, March 03, 2011 5:16 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 00/17] omap4: pm: suspend, hotplug and cpuilde
+> support
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> > This series adds OMAP4 suspend and cpuidle support till MPU
+> subsystem
+> > (MPUSS) off-mode. The suspend on SMP machines uses cpu-hotplug
+> > infrastructure to take down the non-boot CPUs. We put secondary
+> > CPU(CPU1 in OMAP4) to OFF state via cpu-hotplug.
+> > In cpuidle too, low power states are attempted only when the
+> > CPU1 is put to OFF state via cpu-hotplug because of hardware
+> > constraints.
+>
+> Minor nit on patch subjects:  both OMAP and PM are acronyms, please
+> capitalize.
+>
+Will Fix that.
 
-These patches are an attempt to allow platforms to share clock code. At
-present, the definitions of 'struct clk' are local to platform code,
-which makes allocating and initialising cross-platform clock sources
-difficult, and makes it impossible to compile a single image containing
-support for two ARM platforms with different struct clks.
+> Also, can you rebase this on Paul's integration-2.6.39 branch?
+> There
+> are several things in this series that conflict with changes there.
+>
+I did that already and found issues around static dependencies.
+Rajendra and myself are sorting those out.
 
-The three patches are for the architecture-independent kernel code,
-introducing the common clk infrastructure. The changelog for the first
-patch includes details about the new clock definitions.
+Will address the comments on this series and post v2.
 
-Many thanks to the following for their input:
- * Benjamin Herrenschmidt <benh@kernel.crashing.org>
- * Ben Dooks <ben-linux@fluff.org>
- * Baruch Siach <baruch@tkos.co.il>
- * Russell King <linux@arm.linux.org.uk>
- * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
- * Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
- * Vincent Guittot <vincent.guittot@linaro.org>
- * Sascha Hauer <s.hauer@pengutronix.de>
- * Ryan Mallon <ryan@bluewatersys.com>
- * Colin Cross <ccross@google.com>
- * Jassi Brar <jassisinghbrar@gmail.com>
- * Saravana Kannan <skannan@codeaurora.org>
-
-Cheers,
-
-
-Jeremy
-
---
-v14:
- * make empty clk_prepare & clk_unprepare static inline
-
-v13:
- * Don't expose __clk_get and clk_put - prototypes in clkdev.c instead
- * Add might_sleep to clk_set_rate
- * Comment clarifications & fixups
- * Remove zero initialisers
- * Fold warnings into main clk.c change
-
-v12:
- * Always refcount, even when enable/prepare ops are NULL
- * Unify prepare & enable count checking
- * Update comments for prepare/unprepare
- * Use spin_{lock,unlock}_irqsave
- * Change clk_put to __clk_put, and use the shared clk_put
-
-v11:
- * add prepare/unprepare for non-atomic switching, document atomicity
- * move to drivers/clk/
-
-v10:
- * comment fixups, from Uwe's review
- * added DEFINE_CLK_FIXED
-
-v9:
- * comment improvements
- * kerneldoc fixups
- * add WARN_ON to clk_disable
-
-v8:
- * add atomic clocks, and locking wrappers
- * expand comments on clk and clk_ops
-
-v7:
- * change CLK_INIT to initialise clk->mutex statically
-
-v6:
- * fixed up references to 'clk_operations' in the changelog
-
-v5:
- * uninline main API, and share definitions with !USE_COMMON_STRUCT_CLK
- * add __clk_get
- * delay mutex init
- * kerneldoc for struct clk
-
-v4:
- * use mutex for enable/disable locking
- * DEFINE_CLK -> INIT_CLK, and pass the clk name for mutex init
- * struct clk_operations -> struct clk_ops
-
-v3:
- * do clock usage refcounting in common code
- * provide sample port
-
-v2:
- * no longer ARM-specific
- * use clk_operations
-
----
-Jeremy Kerr (2):
-      Add a common struct clk
-      clk: Generic support for fixed-rate clocks
+Regards,
+Santosh
