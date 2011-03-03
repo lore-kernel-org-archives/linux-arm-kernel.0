@@ -1,47 +1,54 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:20 +0530
-Subject: [PATCH V2 07/13] dw_dmac: Mark all tx_descriptors with DMA_CRTL_ACK
-	after xfer finish
+Date: Thu, 3 Mar 2011 15:47:21 +0530
+Subject: [PATCH V2 08/13] dw_dmac: Pass Channel Allocation Order from
+	platform_data
 In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
 References: <cover.1299146382.git.viresh.kumar@st.com>
-Message-ID: <2532583bc4c61efb844ed151273d77f5760a5762.1299146382.git.viresh.kumar@st.com>
+Message-ID: <ae9ffb45b87e19aabeba9321ffffb8ec2b5f5056.1299146382.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc_desc_get checks all descriptors for DMA_CTRL_ACK before allocating them for
-transfers. And descriptors are not marked with DMA_CRTL_ACK after transfer
-finishes. Thus descriptor once used is not usable again. This patch marks
-descriptors with DMA_CRTL_ACK after dma xfer finishes
+In SPEAr Platform channels 4-7 have more Fifo depth. So we must get better
+channel first. This patch introduces concept of channel allocation order in
+dw_dmac. If user doesn't pass anything or 0, than normal (ascending) channel
+allocation will follow, else channels will be allocated in descending order.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ drivers/dma/dw_dmac.c   |    6 +++++-
+ include/linux/dw_dmac.h |    3 +++
+ 2 files changed, 8 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 734829f..836c299 100644
+index 836c299..076a2fa 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -198,6 +198,7 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- 	dma_async_tx_callback		callback;
- 	void				*param;
- 	struct dma_async_tx_descriptor	*txd = &desc->txd;
-+	struct dw_desc			*child;
+@@ -1319,7 +1319,11 @@ static int __init dw_probe(struct platform_device *pdev)
+ 		dwc->chan.device = &dw->dma;
+ 		dwc->chan.cookie = dwc->completed = 1;
+ 		dwc->chan.chan_id = i;
+-		list_add_tail(&dwc->chan.device_node, &dw->dma.channels);
++		if (pdata->chan_allocation_order == CHAN_ALLOCATION_ASCENDING)
++			list_add_tail(&dwc->chan.device_node,
++					&dw->dma.channels);
++		else
++			list_add(&dwc->chan.device_node, &dw->dma.channels);
  
- 	dev_vdbg(chan2dev(&dwc->chan), "descriptor %u complete\n", txd->cookie);
+ 		dwc->ch_regs = &__dw_regs(dw)->CHAN[i];
+ 		spin_lock_init(&dwc->lock);
+diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
+index deec66b..a18c498 100644
+--- a/include/linux/dw_dmac.h
++++ b/include/linux/dw_dmac.h
+@@ -22,6 +22,9 @@
+ struct dw_dma_platform_data {
+ 	unsigned int	nr_channels;
+ 	bool		is_private;
++#define CHAN_ALLOCATION_ASCENDING	0	/* zero to seven */
++#define CHAN_ALLOCATION_DESCENDING	1	/* seven to zero */
++	unsigned char	chan_allocation_order;
+ };
  
-@@ -206,6 +207,12 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- 	param = txd->callback_param;
- 
- 	dwc_sync_desc_for_cpu(dwc, desc);
-+
-+	/* async_tx_ack */
-+	list_for_each_entry(child, &desc->tx_list, desc_node)
-+		async_tx_ack(&child->txd);
-+	async_tx_ack(&desc->txd);
-+
- 	list_splice_init(&desc->tx_list, &dwc->free_list);
- 	list_move(&desc->desc_node, &dwc->free_list);
- 
+ /**
 -- 
 1.7.2.2
