@@ -1,54 +1,51 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Mar 2011 09:17:32 +0000
-Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
-	setup function
-In-Reply-To: <8ya39n5ntzt.fsf@huya.qualcomm.com>
-References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
-	<8ya39n5ntzt.fsf@huya.qualcomm.com>
-Message-ID: <1299143852.10633.45.camel@e102391-lin.cambridge.arm.com>
+From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
+Date: Thu, 3 Mar 2011 14:54:12 +0530
+Subject: [PATCH v8 1/1] PRUSS UIO driver support
+In-Reply-To: <201103021422.27094.arnd@arndb.de>
+References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
+	<1299065886-30099-2-git-send-email-pratheesh@ti.com>
+	<201103021422.27094.arnd@arndb.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008718@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-02 at 12:32 -0800, David Brown wrote:
+Hi,
 
-David,
-
-> On Wed, Mar 02 2011, Marc Zyngier wrote:
-> 
-> > ---
-> >  arch/arm/mach-msm/timer.c |   22 +++++++++++++++++++---
-> >  1 files changed, 19 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-> > index 56f920c..e029363 100644
-> > --- a/arch/arm/mach-msm/timer.c
-> > +++ b/arch/arm/mach-msm/timer.c
-> > @@ -228,6 +243,8 @@ static void __init msm_timer_init(void)
-> >  	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
-> >  #endif
-> >  
-> > +	percpu_timer_register(msm_timer_ops_ptr);
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Wednesday, March 02, 2011 6:52 PM
+> On Wednesday 02 March 2011, Pratheesh Gangadhar wrote:
 > > +
-> >  	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
-> >  		struct msm_clock *clock = &msm_clocks[i];
-> >  		struct clock_event_device *ce = &clock->clockevent;
+> > +static struct clk *pruss_clk;
+> > +static struct uio_info *info;
+> > +static dma_addr_t sram_paddr, ddr_paddr;
+> > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
+> > +
 > 
-> I'm having difficulty figuring out what tree/branch these patches are
-> based off of, so I haven't been able to test this, yet.  But, so far,
-> the MSM changes look coherent.
+> To my initial comment about these being single-instance
+> variables, you said you'd change that, which has not happened
+> yet.
 > 
-> If you can give me a ref for your source tree, I can try to do some
-> testing of these changes to make sure nothing is broken by it.
+I will do this in next version. Also realized that in next SoC, 
+PRU INTC base offset is different, so plan to add a platform_data
+variable to make this portable.
 
-The whole serie is against -next as of yesterday, plus Will's multi-tile
-support for Versatile Express, available from Russell's patch system:
-http://www.arm.linux.org.uk/developer/patches/download.php?id=6771/1
++#define PINTC_HIDISR	0x4038
++#define PINTC_HIPIR	0x4900
++#define PINTC_HIER	0x5500 
 
-It would be very helpful if you could give it a go on MSM.
+These hard coding also need to go to make it fully portable.
++int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
++p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
 
-Thanks,
+> Also, I now noticed that the types are wrong, you are
+> missing __iomem annotations for MMIO ranges. Please make
+> sure that the code builds fine with sparse and "make C=1",
+> which will tell you about these problems.
+> 
+Thanks, this also helped to identify 2 unused lines in the code.
 
-	M.
--- 
-Reality is an implementation detail.
++		p->mem[1].internal_addr = sram_vaddr;
++		p->mem[2].internal_addr = ddr_vaddr;
+
+Pratheesh
