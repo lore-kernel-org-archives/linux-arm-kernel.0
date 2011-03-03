@@ -1,53 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Mar 2011 11:02:06 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <20110303052653.GA19961@b20223-02.ap.freescale.net>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110303052653.GA19961@b20223-02.ap.freescale.net>
-Message-ID: <20110303100206.GP22310@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 03 Mar 2011 10:11:57 +0000
+Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
+In-Reply-To: <4D6F481B.8000700@codeaurora.org>
+References: <4D6D9C03.2080906@codeaurora.org>
+	<20110302083904.GA4493@n2100.arm.linux.org.uk>
+	<4D6F481B.8000700@codeaurora.org>
+Message-ID: <1299147117.22540.25.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Thu, 2011-03-03 at 07:49 +0000, Saravana Kannan wrote:
+> On 03/02/2011 12:39 AM, Russell King - ARM Linux wrote:
+> > On Tue, Mar 01, 2011 at 05:23:15PM -0800, Saravana Kannan wrote:
+> >> If I'm not missing some magic, this would mean that
+> >> "CONFIG_ARM_DMA_MEM_BUFFERABLE" determines if readl(s)/writel(s) get to
+> >> have a built in mb() or not.
+[...]
+> > I think you misunderstand what's going on.  IO accesses are always ordered
+> > with respect to themselves.  The barriers are there to ensure ordering
+> > between DMA coherent memory (normal non-cached memory) and IO accesses
+> > (device).
+> 
+> Unfortunately this is not correct. The ARM spec doesn't guarantee that
+> all IO accesses should be ordered with respect to themselves. It only
+> requires that the ordering should be guaranteed at least within a 1KB
+> region.
 
-On Thu, Mar 03, 2011 at 01:26:54PM +0800, Richard Zhao wrote:
-> On Wed, Mar 02, 2011 at 06:23:05PM +0100, Uwe Kleine-K?nig wrote:
-> > The only use of selecting MX2-based before was to get the choice to select
-> > between i.MX21 and i.MX27. So better provide this choice directly.
-> > 
-> > Note that this has an influence on reduced i.MX21 configs because the
-> > former default "MACH_MX21" for the "CPUs" choice makes MACH_MX21 not
-> > appear in the reduced config and so the default for "Freescale CPU family:"
-> > (i.e. ARCH_MX3) is used now.  mx21_defconfig is adapted not to be affected
-> > by this problem.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+That's because the CPU does not have control of the delays on various
+buses. But a device connected to the same bus receives the accesses in
+order.
 
-> > -config ARCH_MX2
-> > -	bool "MX2-based"
-> > +config MACH_MX21
-> > +	bool "MX21-based"
-> > +	select ARCH_MX2
-> >  	help
-> > -	  This enables support for systems based on the Freescale i.MX2 family
-> > +	  This enables support for systems based on the Freescale i.MX21 family
-> Is it ToDo marker like ARCH_51? Why is it MACH_xx while others are ARCH_XX?
-this is done to keep existing code working. MACH_MX21 and MACH_MX27 are
-used in drivers/.
+> And the most critical point is hidden in a comment that goes:
+> "The size of a memory mapped peripheral, or a block of memory, is
+> IMPLEMENTATION DEFINED, but is not smaller than 1KByte."
+> 
+> I guess most of the confusion is due to the ARM spec not being very
+> obvious about the 1KB limitation.
 
-> It might be little strange that mx2x is a excetion while others are grouped.
-This is good, it might make people aware that there is still work to do.
-:-)  After the first steps for a multi-SoC-kernel are done, the grouping
-has to change anyhow and doesn't match cpu families anymore. Moreover
-MX2 is (IMHO) a marketing name, e.g. because i.MX25 is too different
-compared to i.MX21 and i.MX27. And note that i.MX25 had a seperat entry
-already before.
+What that means is that the hardware shouldn't have two different buses
+(possibly with different delays) within a 1KB range.
 
-Best regards
-Uwe
+Even if accesses to all peripherals are ordered, you still cannot
+guarantee that a writel() would change the state of a device (and that's
+specific to all architectures). Sometimes if you want to make sure the
+device state changed you need a readl() back.
+
+> So, going back to my point, I think it's wrong for
+> CONFIG_ARM_DMA_MEM_BUFFERABLE to control how stuff unrelated to DMA behaves.
+
+In an ideal world, all driver authors know what memory ordering is and
+add the necessary barriers. But since that's not the case, the only way
+to get ordering between Normal Non-cacheable access (DMA buffer) and
+Device access (via writel) is to add the mb() in the I/O accessors.
+
+This has been discussed at length on several occasions on linux-arch and
+LKML. We don't have other solution since adding barriers to drivers
+wasn't found feasible by others. Of course, if you can optimised your
+driver to use the relaxed accessors and add explicit barriers.
+
+> I have also encountered a few people who kept went "but readl/writel was
+> recently changed to add mem barriers, so we can all remove the mb()s in
+> our driver (unrelated to DMA) code". 
+
+But why did they have those barriers around I/O accessors in the first
+place? As you say, nothing related to DMA. If you access two different
+devices and want to ensure an ordering of the state changes, I doubt a
+barrier would help. Most likely you need a read back from the device.
+
+> That would have made their code incorrect for two reasons:
+> 1. readl/writel doesn't always have a mem barrier because of config that
+> can be turned off.
+> 2. In cases where readl/writel didn't have mb(), there is not enough
+> ordering guarantee without an explicit mb().
+
+See my comment above, what do they try to achieve by using mb() around
+already ordered I/O accessors?
+
+> I think as a community, we should stop saying that readl/writel ensures
+> ordering with respect to all IO accesses. It doesn't even guarantee
+> ordering within the same device (when their register regions are > 1KB).
+
+It definitely guarantees ordering to the same device. The 1KB is a
+minimum limit but there is no upper bound (and it should definitely
+cover a single device).
+
+> After reading the above, please let me know if a patch to decouple the
+> "readl/writel with builtin mb()" from CONFIG_ARM_DMA_MEM_BUFFERABLE
+> would be accepted. If so, I can go ahead and send it out soon.
+
+No, I don't think this would be acceptable. I can point you to past
+discussion where Linus stated that Normal Non-cacheable memory and I/O
+accesses should be ordered.
+
+What you can do actually is make sure that all architectures support the
+relaxed accessors and change the drivers to use these instead.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
