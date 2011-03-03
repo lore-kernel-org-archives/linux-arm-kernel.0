@@ -1,35 +1,32 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 3 Mar 2011 22:55:54 +0100
-Subject: [PATCH 0/4] OMAP 3 and 4 i2c fixes
-In-Reply-To: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-Message-ID: <4D700E6A.10409@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 3 Mar 2011 14:17:23 -0800
+Subject: [PATCH 0/3] ARM: tegra: PCI-e improvements
+In-Reply-To: <cover.1299068166.git.mike@compulab.co.il>
+References: <cover.1299068166.git.mike@compulab.co.il>
+Message-ID: <AANLkTimmBAv1jpDyJXGpbSHo7pN-R2s1iZChdiP_y706@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To summarize my comments on your series.
-
-On 3/3/2011 2:50 PM, Andy Green wrote:
-> The following series fixes two issues with OMAP 3 and 4 i2c support.
+On Wed, Mar 2, 2011 at 4:34 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Hi all,
+> This patches add PCI-e powergating support and fix for TrimSlice PCI-e initialization in the mutliplatform kernels.
 >
-> First, hwmod tables don't have the i2c units marked up as being
-> for 16-bit access only, which is mandatory.
+> The patches are also available at git repository
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
+>
+> The following changes since commit ccac05152e7c6a8103b9e7a801bc995180a800fc:
+>
+> ?ARM: Tegra: DMA: Fail safe if initialization fails (2011-02-23 14:06:03 -0800)
+>
+> Mike Rapoport (3):
+> ?ARM: tegra: PCIE minor code refactoring
+> ?ARM: tegra: add PCI Express power gating
+> ?ARM: tegra: trimslice: initialize PCI-e only when running on
+> ? ?TrimSlice
+>
+> ?arch/arm/mach-tegra/board-trimslice.c | ? ?3 ++
+> ?arch/arm/mach-tegra/pcie.c ? ? ? ? ? ?| ? 38 ++++++++++++++++++++++++--------
+> ?2 files changed, 31 insertions(+), 10 deletions(-)
 
-That part is OK, and should just be extended to 2430 for the sake of 
-completeness. A rev attribute should be added as well for the second part.
-
-> Second, the i2c peripheral unit init code is confused about using
-> cpu_is...() and probed peripheral unit version, leading to OMAP3
-> i2c code doing the wrong thing and accessing nonexistant registers.
-
-That part should be revisited to use a better way to identify the IP 
-revision.
-
-Most of the code is there, you just have to copy the correct information 
-during I2C device init.
-
-Just let me know if you are not comfortable with that latest part, some 
-l-o folks, including me, can help you.
-
-Thanks,
-Benoit
+Ack - I put all 3 in tegra for-next.  With these patches, I can boot
+my board with Trimslice and pci compiled in.
