@@ -1,55 +1,91 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 03 Mar 2011 10:34:21 +0100
-Subject: [PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
-In-Reply-To: <01a501cbd95c$37069cf0$a513d6d0$%kim@samsung.com>
-References: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
-	<1299087289-29926-2-git-send-email-s.nawrocki@samsung.com>
-	<01a501cbd95c$37069cf0$a513d6d0$%kim@samsung.com>
-Message-ID: <4D6F609D.3020501@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Mar 2011 10:35:32 +0100
+Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
+In-Reply-To: <alpine.LFD.2.00.1103022343410.2701@localhost6.localdomain6>
+References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20110302215238.GK22310@pengutronix.de>
+	<alpine.LFD.2.00.1103022343410.2701@localhost6.localdomain6>
+Message-ID: <20110303093532.GO22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Guten Morgen Thomas,
 
-On 03/03/2011 05:33 AM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/plat-s5p/dev-csis0.c              |    2 +-
->>  arch/arm/plat-s5p/dev-csis1.c              |    2 +-
->>  arch/arm/plat-s5p/include/plat/csis.h      |   28
-> --------------------------
->> --
->>  arch/arm/plat-s5p/include/plat/mipi_csis.h |   28
->> ++++++++++++++++++++++++++++
->>  4 files changed, 30 insertions(+), 30 deletions(-)
->>  delete mode 100644 arch/arm/plat-s5p/include/plat/csis.h
->>  create mode 100644 arch/arm/plat-s5p/include/plat/mipi_csis.h
->>
-> Oops, why didn't use '-M'?
-> It can show me this like following.
+On Thu, Mar 03, 2011 at 12:51:32AM +0100, Thomas Gleixner wrote:
+> Uwe,
 > 
-
-Yes, I could do better. Sorry, I had two version of the patch
-and somehow ended up with te wrong one being send.
-
-> .../plat-s5p/include/plat/{csis.h => mipi_csis.h}  |   10 +++++-----
->  3 files changed, 7 insertions(+), 7 deletions(-)
->  rename arch/arm/plat-s5p/include/plat/{csis.h => mipi_csis.h} (68%)
+> On Wed, 2 Mar 2011, Uwe Kleine-K?nig wrote:
+> > On Wed, Mar 02, 2011 at 11:17:58AM -0600, Dinh.Nguyen at freescale.com wrote:
+> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> Secondly, I remember this...
-> Following is your response at that time.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/038037.ht
-> ml
+> > > --- /dev/null
+> > > +++ b/arch/arm/mach-mx5/pm.c
+> > I'd like to have that called pm-imx51.c
 > 
+> And I'd like to have a pony.
+http://www.carl-russ-schule.de/files/Pony.jpg
 
-Yes, but afterwards I realized there will be issues when one is trying
-to build common kernel binary for multiple SoCs.
-Nevertheless I will prepare common code for S5P and a callback into platform
-code, so at least we can move on with the v4l driver.
+> 
+> > > +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
+> > the parentheses aren't needed here
+> 
+> Could you finally provide a patch to checkpatch.pl or git commit which
+> resolves that issue once and forever ?
+> 
+> Not to mention the fact, that those parentheses are not disturbing the
+> readability of that code at all.
+So it seems we're different.
 
-Thanks,
+> 
+> > > +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
+> > ditto
+> 
+> Ditto.
+> 
+> > > +static int __init mx5_pm_init(void)
+> > I'd prefer to have that called by imx51_init_early.
+> 
+> And the reason is? 
+> 
+>     1) your personal preference
+>     2) there is some useful technical reason
+> 
+> If #1, then this comment was just waste of electrons
+> If #2, you failed to provide some reasonable explanation
+Actually it's #2, and to quote a different review[1]:
+
+	Reviewers hint to a correct solution and you are supposed to
+	lookup what that solution means and act accordingly. If you do
+	not understand the hint or its implications please ask [...]
+
+> Again, I'd like to have a pony.
+http://h-6.abload.de/img/pony01_pixelquelle_dal8701.jpg
+
+> Seriously, while all of us admire your invaluable skills of running
+> scripts over patches and kernel code, that kind of review you are
+> trying to provide is utterly useless.
+actually it's not a script, but I guess that doesn't matter much.
+
+> 1) The patch itself has been questioned about its correctness hours
+>    before you added the output of your secret script. It was already
+>    reported to be non functional. So what's the value of adding
+>    scriptable review to it?
+It might save the patch sender from a third iteration.
+
+> 2) As long as you do not see the most obvious functional problems with
+>    a patch please spare your script computing power and the bandwidth
+>    you are consuming by your futile attempts to gain a profile as a
+>    patch reviewer.
+The functionallity of the patch has been questioned before so I didn't
+see a value in repeating that :-)  To be honest, I didn't check for
+functional problems, but IMHO it's OK to provide feedback about a part
+of the problems if you don't see all of them.
+
+Best regards
+Uwe
+
+[1] http://article.gmane.org/gmane.linux.kernel/1107265
+
 -- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
