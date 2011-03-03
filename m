@@ -1,10 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  3 Mar 2011 14:31:00 +0100
-Subject: [PATCH 6/6] mmc i.MX sdhci: use IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX to
-	depend on
+Date: Thu,  3 Mar 2011 14:30:55 +0100
+Subject: [PATCH 1/6] media/video i.MX: use IMX_HAVE_PLATFORM_* macros
 In-Reply-To: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
 References: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1299159060-9289-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1299159060-9289-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +13,34 @@ depending on ARCH_* directly.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
+Cc: linux-media at vger.kernel.org
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: Hans Verkuil <hverkuil@xs4all.nl>
 ---
- drivers/mmc/host/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/media/video/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index afe8c6f..326d78b 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -134,7 +134,7 @@ config MMC_SDHCI_CNS3XXX
+diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+index aa02160..6f869ed 100644
+--- a/drivers/media/video/Kconfig
++++ b/drivers/media/video/Kconfig
+@@ -814,7 +814,7 @@ config MX1_VIDEO
  
- config MMC_SDHCI_ESDHC_IMX
- 	bool "SDHCI platform support for the Freescale eSDHC i.MX controller"
--	depends on MMC_SDHCI_PLTFM && (ARCH_MX25 || ARCH_MX35 || ARCH_MX5)
-+	depends on MMC_SDHCI_PLTFM && IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	select MMC_SDHCI_IO_ACCESSORS
- 	help
- 	  This selects the Freescale eSDHC controller support on the platform
+ config VIDEO_MX1
+ 	tristate "i.MX1/i.MXL CMOS Sensor Interface driver"
+-	depends on VIDEO_DEV && ARCH_MX1 && SOC_CAMERA
++	depends on VIDEO_DEV && SOC_CAMERA && IMX_HAVE_PLATFORM_MX1_CAMERA
+ 	select FIQ
+ 	select VIDEOBUF_DMA_CONTIG
+ 	select MX1_VIDEO
+@@ -872,7 +872,7 @@ config VIDEO_MX2_HOSTSUPPORT
+ 
+ config VIDEO_MX2
+ 	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
+-	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
++	depends on VIDEO_DEV && SOC_CAMERA && IMX_HAVE_PLATFORM_MX2_CAMERA
+ 	select VIDEOBUF_DMA_CONTIG
+ 	select VIDEO_MX2_HOSTSUPPORT
+ 	---help---
 -- 
 1.7.2.3
