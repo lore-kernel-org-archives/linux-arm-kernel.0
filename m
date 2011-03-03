@@ -1,59 +1,82 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:13 +0530
-Subject: [PATCH V2 00/13] dmaengine/dw_dmac: Extending support & minor fixes
-Message-ID: <cover.1299146382.git.viresh.kumar@st.com>
+Date: Thu, 3 Mar 2011 15:47:16 +0530
+Subject: [PATCH V2 03/13] dw_dmac: Move single descriptor from dwc->queue to
+	dwc->active_list in dwc_complete_all
+In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
+References: <cover.1299146382.git.viresh.kumar@st.com>
+Message-ID: <f81115ecac5c0badf9499c65c7540f0f8446114a.1299146382.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following set of patches extends dw_dmac support and fixes minor bugs.
+dwc_complete_all and other routines was removing all descriptors from dwc->queue
+and pushing them to dwc->active_list. Only one was required to be removed. Also
+we are calling dwc_dostart, once list is fixed.
 
-Changes since V1:
-I had few more patches that i prepared today. I wasn't sure if i should
-add them to existing patchset, but as they are very much associated to this
-patchset, i added them here.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/dw_dmac.c |   20 ++++++++------------
+ 1 files changed, 8 insertions(+), 12 deletions(-)
 
-Following new patches have been added in V2:
-- dw_dmac: Replace module_init() with subsys_initcall()
-- dw_dmac: Change value of DWC_MAX_COUNT to 4095
-- dw_dmac: Changing type of src_master and dest_master to u8
-- dw_dmac: Setting Default Burst length for transfers as 16
-- Allow src/dst msize & flow controller to be configured at runtime
-- at32ap700x: Specify DMA Flow Controller, Src and Dst msize or burst size
-
-Other than this following are changes after getting review comments on V1:
-- Added driver dependency on HAVE_CLK & fixed commit message issues
-- Added descriptive commit message in: "Calling dwc_scan_descriptors from..."
-- Aligned struct instance in: "Mark all tx_descriptors with..." 
-- Removed: "dw_dmac: call dwc_scan_descriptor from dwc_issue_pending..." as it
-  was already commited in linux-next.
-
-Viresh KUMAR (1):
-  dw_dmac: Allow src/dst msize & flow controller to be configured at
-    runtime
-
-Viresh Kumar (12):
-  dw_dmac: Remove compilation dependency from AVR32 and put on HAVE_CLK
-  dw_dmac: Replace module_init() with subsys_initcall()
-  dw_dmac: Move single descriptor from dwc->queue to dwc->active_list
-    in dwc_complete_all
-  dw_dmac: Calling dwc_scan_descriptors from dwc_tx_status() after
-    taking lock
-  dw_dmac: Adding support for 64 bit access width for memcpy xfers
-  dw_dmac: Change value of DWC_MAX_COUNT to 4095.
-  dw_dmac: Mark all tx_descriptors with DMA_CRTL_ACK after xfer finish
-  dw_dmac: Pass Channel Allocation Order from platform_data
-  dw_dmac: Pass Channel Priority from platform_data
-  dw_dmac: Changing type of src_master and dest_master to u8.
-  dw_dmac: Setting Default Burst length for transfers as 16.
-  avr32: at32ap700x: Specify DMA Flow Controller, Src and Dst msize or
-    burst size
-
- arch/avr32/mach-at32ap/at32ap700x.c |    9 +++++
- drivers/dma/Kconfig                 |    2 +-
- drivers/dma/dw_dmac.c               |   67 +++++++++++++++++++++++------------
- drivers/dma/dw_dmac_regs.h          |    4 ++
- include/linux/dw_dmac.h             |   43 +++++++++++++++++++++--
- 5 files changed, 98 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 064a183..942b50f 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -87,11 +87,6 @@ static struct dw_desc *dwc_first_active(struct dw_dma_chan *dwc)
+ 	return list_entry(dwc->active_list.next, struct dw_desc, desc_node);
+ }
+ 
+-static struct dw_desc *dwc_first_queued(struct dw_dma_chan *dwc)
+-{
+-	return list_entry(dwc->queue.next, struct dw_desc, desc_node);
+-}
+-
+ static struct dw_desc *dwc_desc_get(struct dw_dma_chan *dwc)
+ {
+ 	struct dw_desc *desc, *_desc;
+@@ -262,10 +257,11 @@ static void dwc_complete_all(struct dw_dma *dw, struct dw_dma_chan *dwc)
+ 	 * Submit queued descriptors ASAP, i.e. before we go through
+ 	 * the completed ones.
+ 	 */
+-	if (!list_empty(&dwc->queue))
+-		dwc_dostart(dwc, dwc_first_queued(dwc));
+ 	list_splice_init(&dwc->active_list, &list);
+-	list_splice_init(&dwc->queue, &dwc->active_list);
++	if (!list_empty(&dwc->queue)) {
++		list_move(dwc->queue.next, &dwc->active_list);
++		dwc_dostart(dwc, dwc_first_active(dwc));
++	}
+ 
+ 	list_for_each_entry_safe(desc, _desc, &list, desc_node)
+ 		dwc_descriptor_complete(dwc, desc);
+@@ -325,8 +321,8 @@ static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
+ 		cpu_relax();
+ 
+ 	if (!list_empty(&dwc->queue)) {
+-		dwc_dostart(dwc, dwc_first_queued(dwc));
+-		list_splice_init(&dwc->queue, &dwc->active_list);
++		list_move(dwc->queue.next, &dwc->active_list);
++		dwc_dostart(dwc, dwc_first_active(dwc));
+ 	}
+ }
+ 
+@@ -352,7 +348,7 @@ static void dwc_handle_error(struct dw_dma *dw, struct dw_dma_chan *dwc)
+ 	 */
+ 	bad_desc = dwc_first_active(dwc);
+ 	list_del_init(&bad_desc->desc_node);
+-	list_splice_init(&dwc->queue, dwc->active_list.prev);
++	list_move(dwc->queue.next, dwc->active_list.prev);
+ 
+ 	/* Clear the error flag and try to restart the controller */
+ 	dma_writel(dw, CLEAR.ERROR, dwc->mask);
+@@ -547,8 +543,8 @@ static dma_cookie_t dwc_tx_submit(struct dma_async_tx_descriptor *tx)
+ 	if (list_empty(&dwc->active_list)) {
+ 		dev_vdbg(chan2dev(tx->chan), "tx_submit: started %u\n",
+ 				desc->txd.cookie);
+-		dwc_dostart(dwc, desc);
+ 		list_add_tail(&desc->desc_node, &dwc->active_list);
++		dwc_dostart(dwc, dwc_first_active(dwc));
+ 	} else {
+ 		dev_vdbg(chan2dev(tx->chan), "tx_submit: queued %u\n",
+ 				desc->txd.cookie);
 -- 
 1.7.2.2
