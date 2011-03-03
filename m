@@ -1,72 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Mar 2011 22:12:27 -0300
-Subject: [PATCH] ARM: mx51: Print silicon revision on boot
-Message-ID: <1299114747-14091-1-git-send-email-festevam@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 02 Mar 2011 17:22:50 -0800
+Subject: [PATCH 0/6] omap3: pm: Fixes for low power code
+In-Reply-To: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Mon, 21 Feb 2011 18:49:19 +0530")
+References: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87k4ghro9h.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c   |    1 +
- arch/arm/mach-mx5/cpu.c               |   21 +++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mx51.h |    1 +
- 3 files changed, 23 insertions(+), 0 deletions(-)
+Hi Santosh,
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 652ace4..1282a60 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1510,6 +1510,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 
- 	clk_enable(&iim_clk);
- 	mx51_revision();
-+	mx51_display_revision();
- 	clk_disable(&iim_clk);
- 
- 	/* move usb_phy_clk to 24MHz */
-diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-index df46b5e..565ed4d 100644
---- a/arch/arm/mach-mx5/cpu.c
-+++ b/arch/arm/mach-mx5/cpu.c
-@@ -51,6 +51,27 @@ int mx51_revision(void)
- }
- EXPORT_SYMBOL(mx51_revision);
- 
-+void mx51_display_revision(void)
-+{
-+	int rev;
-+	char *srev;
-+	rev = mx51_revision();
-+
-+	switch (rev) {
-+	case IMX_CHIP_REVISION_2_0:
-+		srev = "2.0";
-+		break;
-+	case IMX_CHIP_REVISION_3_0:
-+		srev = "3.0";
-+		break;
-+	default:
-+		return IMX_CHIP_REVISION_UNKNOWN;
-+		srev = "unknown";
-+	}
-+	printk(KERN_INFO "CPU identified as i.MX51, silicon rev %s\n", srev);
-+}
-+EXPORT_SYMBOL(mx51_display_revision);
-+
- #ifdef CONFIG_NEON
- 
- /*
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 1eb339e..dede19a 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -347,6 +347,7 @@
- 
- #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
- extern int mx51_revision(void);
-+extern void mx51_display_revision(void);
- #endif
- 
- /* tape-out 1 defines */
--- 
-1.6.0.4
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> The series does below fixes to the omap3 low power code.
+> 	1. Use supported ARMv7 instructions instead of the legacy ones
+> 	2. Fix the MMU on sequence
+> 	3. Fix the cache flush scenario when only L1 lost.
+> 	4. Remove all un-necessary context save registers
+> 	5. Disable C-bit before cache clean
+> 	6. Use set_cr() exported API instead of custom one. 
+
+Look like good cleanups, thanks.
+
+> It's generated against mainline and tested with OMAP3630 ZOOM3.
+> 	1. Renetion and off-mode mode in suspend - ok.
+> 	2. Retention in idle - ok
+
+Testing this series along with other PM changes queued up for mainline
+(my pm-core branch), this doesn't work for me on 3630/Zoom3 (but works
+fine on 3430/n900.)
+
+Here's what I did using omap2plus_defconfig + enabling CPUidle
+
+First tested suspend:
+
+echo 4 > /debug/pm_debug/wakeup_timer_seconds 
+echo mem > /sys/power/state
+
+then, setup UART idle/wakeup:
+
+echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout 
+echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup 
+
+then enabled idle:
+
+echo 1 > /debug/pm_debug/sleep_while_idle  
+
+As soon as I do this, it hangs.
+
+Without your series, it's working fine for me.  Only after merging your
+series it hangs.
+
+Kevin
+
+
+> The following changes since commit 85e2efbb1db9a18d218006706d6e4fbeb0216213:
+>   Linus Torvalds (1):
+>         Linux 2.6.38-rc5
+>
+> Santosh Shilimkar (6):
+>   omap3: pm: Use amrv7 supported instructions instead of legacy cp15
+>     ones
+>   omap3: pm: Fix the mmu on sequence in the asm code
+>   omap3: pm: Allow the cache clean when L1 is lost.
+>   omap3: pm: Remove un-necessary cp15 registers form low power cpu
+>     context
+>   omap3: pm: Clear the SCTLR C bit in asm code to prevent data cache
+>     allocation
+>   omap3: pm: Use exported set_cr() instead of a custom one.
+>
+>  arch/arm/mach-omap2/pm34xx.c    |    7 +-
+>  arch/arm/mach-omap2/sleep34xx.S |  223 ++++++++++++++-------------------------
+>  2 files changed, 78 insertions(+), 152 deletions(-)
