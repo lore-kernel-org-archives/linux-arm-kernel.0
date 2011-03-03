@@ -1,94 +1,31 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 3 Mar 2011 14:44:15 +0000
-Subject: [RFC PATCH] ARM: Use generic BUG() handler
-In-Reply-To: <20110303141113.GF25891@n2100.arm.linux.org.uk>
-References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
-	<20110301084949.GA16733@n2100.arm.linux.org.uk>
-	<20110301085911.GB16733@n2100.arm.linux.org.uk>
-	<19820.47240.801312.507393@pilspetsen.it.uu.se>
-	<20110301100306.GA18007@n2100.arm.linux.org.uk>
-	<AANLkTinMnZAupxn7oYFhqkN1Y0OD-eyN=UeRpw96no9r@mail.gmail.com>
-	<20110302105930.GA2363@arm.com>
-	<20110303141113.GF25891@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikQurH0FiYTpH1Xi22y7So47JsXCaxBe3ujzZp5@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 3 Mar 2011 14:57:11 +0000
+Subject: [PATCH 0/7] Various Samsung updates
+Message-ID: <20110303145710.GA32234@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2011 at 2:11 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 02, 2011 at 10:59:50AM +0000, Dave Martin wrote:
->> + ? ? asm volatile("1:\t" __bug_instr "\n" ? ? ? ? ? ?q ? ? ? \
->> + ? ? ? ? ? ? ? ? ?".pushsection .rodata.str, \"a\"\n" ? ? ? ?\
->> + ? ? ? ? ? ? ? ? ?"2:\t.asciz \"" #__file "\"\n" ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ?".popsection\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->
-> Doesn't this mean we end up with multiple file names?
+This is a patch series I've got built up for the Samsung platforms, some
+of which has been pending for the entire release cycle.  I know Ben's
+said he's extremely busy right now (as you can see some of these patches
+are from him), perhaps it would make sense to apply these via Kukjin's
+tree for the time being?
 
-Hmmm, yes, you're right.
+Ben Dooks (2):
+      ARM: S3C64XX: Add clock for i2c1
+      ARM: S3C64XX: Reduce output of s3c64xx_dma_init1()
 
-After a bit of digging in the documentation, I find that ELF supports
-mergable string sections though, so
+Mark Brown (5):
+      ARM: SAMSUNG: Include devs.h in dev-uart.c to prototype devices
+      ARM: S3C64XX: Staticise non-exported GPIO to interrupt functions
+      ARM: S3C64XX: Tone down SDHCI debugging
+      ARM: SMDK6410: Fix build with WM1190 disabled and WM1192 enabled
+      ARM: SMDK6410: Update regulator names for debugfs compatiblity
 
-.pushsection .rodata.str, "aMS", 1
-    .asciz __FILE__
-.popsection
-
-...actually looks like it ought to do the right thing: duplicate
-strings in the section get merged during linking, even if there are
-duplicates from a single object.
-
-Simple experiments suggest that the linker does this right, even
-merging distinct strings which share a common suffix.  Do we use this
-elsewhere in the kernel?  It it's not already used, it could be a win
-for any large, static string tables.
-
->
->> + ? ? ? ? ? ? ? ? ?".pushsection __bug_table,\"a\"\n" ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ?"3:\t.word 1b, 2b\n" ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ?"\t.hword " #__line ", 0\n" ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? ? ? ?".popsection" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? unreachable(); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> +} while (0)
->
-> Second problem is that the above produces this:
->
-> ? ? ? ?1: ? ? ?.word 0xec000000
-> .pushsection .rodata.str, "a"
-> 2: ? ? ?.asciz "__FILE__"
-> .popsection
-> .pushsection __bug_table,"a"
-> 3: ? ? ?.word 1b, 2b
-> ? ? ? ?.hword __LINE__, 0
-> .popsection
->
-> which is clearly not what we want.
-
-Indeed.  I did say I hadn't tested it :)
-
-> Adding another level of indirection
-> starts to get closer to what we desire:
->
-> ? ? ? ?1: ? ? ?.word 0xec000000
-> .pushsection .rodata.str, "a"
-> 2: ? ? ?.asciz ""t.c""
-> .popsection
-> .pushsection __bug_table,"a"
-> 3: ? ? ?.word 1b, 2b
-> ? ? ? ?.hword 19, 0
-> .popsection
->
-> but we're still ending up with multiple strings containing the filename,
-> which is going to excessively bloat the kernel no end.
->
-
-We'd need to remove the duplicate quotes, too.
-
-For the .org <blah> + sizeof (struct bug_entry) problem, Will pointed
-out that there's a BUILD_BUG_ON() macro which we could used to avoid
-silently producing a bad build if the result of that sizeof isn't what
-we expect.
-
-So I still think it could work ... but it's a bit of an ugly hack I confess.
-
-Cheers
----Dave
+ arch/arm/mach-s3c64xx/clock.c         |    6 ++++++
+ arch/arm/mach-s3c64xx/dma.c           |   11 ++++++-----
+ arch/arm/mach-s3c64xx/gpiolib.c       |    4 ++--
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |   13 +++++++------
+ arch/arm/mach-s3c64xx/setup-sdhci.c   |    2 +-
+ arch/arm/plat-samsung/dev-uart.c      |    2 ++
+ 6 files changed, 24 insertions(+), 14 deletions(-)
