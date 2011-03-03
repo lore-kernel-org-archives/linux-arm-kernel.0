@@ -1,39 +1,80 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu,  3 Mar 2011 14:58:31 +0000
-Subject: [PATCH 3/7] ARM: S3C64XX: Add clock for i2c1
+Date: Thu,  3 Mar 2011 14:58:35 +0000
+Subject: [PATCH 7/7] ARM: SMDK6410: Update regulator names for debugfs
+	compatiblity
 In-Reply-To: <20110303145710.GA32234@opensource.wolfsonmicro.com>
 References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-Message-ID: <1299164315-22246-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
+The debugfs support added to the regulator API (which has been merged
+in during this merge window) creates directories for regulators named
+after the display names for the regulators so replace / as a separator
+for multiple supplies with + in the SMDK6410 machine.
 
-The clock for i2c1 has been missing for a while, add it to the list of
-clocks for the system and ensure it is initialised at startup.
-
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/clock.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index dd37820..fdfc4d5 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -151,6 +151,12 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s3c64xx_pclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_PCLK_IIC,
- 	}, {
-+		.name		= "i2c",
-+		.id		= 1,
-+		.parent		= &clk_p,
-+		.enable		= s3c64xx_pclk_ctrl,
-+		.ctrlbit	= S3C6410_CLKCON_PCLK_I2C1,
-+	}, {
- 		.name		= "iis",
- 		.id		= 0,
- 		.parent		= &clk_p,
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 4094707..2f30c79 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -353,7 +353,7 @@ static struct regulator_init_data smdk6410_vddpll __initdata = {
+ /* VDD_UH_MMC, LDO5 on J5 */
+ static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
+ 	.constraints = {
+-		.name = "PVDD_UH/PVDD_MMC",
++		.name = "PVDD_UH+PVDD_MMC",
+ 		.always_on = 1,
+ 	},
+ };
+@@ -419,7 +419,7 @@ static struct regulator_init_data smdk6410_vddaudio __initdata = {
+ /* S3C64xx internal logic & PLL */
+ static struct regulator_init_data wm8350_dcdc1_data __initdata = {
+ 	.constraints = {
+-		.name = "PVDD_INT/PVDD_PLL",
++		.name = "PVDD_INT+PVDD_PLL",
+ 		.min_uV = 1200000,
+ 		.max_uV = 1200000,
+ 		.always_on = 1,
+@@ -454,7 +454,7 @@ static struct regulator_consumer_supply wm8350_dcdc4_consumers[] __initdata = {
+ 
+ static struct regulator_init_data wm8350_dcdc4_data __initdata = {
+ 	.constraints = {
+-		.name = "PVDD_HI/PVDD_EXT/PVDD_SYS/PVCCM2MTV",
++		.name = "PVDD_HI+PVDD_EXT+PVDD_SYS+PVCCM2MTV",
+ 		.min_uV = 3000000,
+ 		.max_uV = 3000000,
+ 		.always_on = 1,
+@@ -466,7 +466,7 @@ static struct regulator_init_data wm8350_dcdc4_data __initdata = {
+ /* OTGi/1190-EV1 HPVDD & AVDD */
+ static struct regulator_init_data wm8350_ldo4_data __initdata = {
+ 	.constraints = {
+-		.name = "PVDD_OTGI/HPVDD/AVDD",
++		.name = "PVDD_OTGI+HPVDD+AVDD",
+ 		.min_uV = 1200000,
+ 		.max_uV = 1200000,
+ 		.apply_uV = 1,
+@@ -557,7 +557,7 @@ static struct wm831x_backlight_pdata wm1192_backlight_pdata = {
+ 
+ static struct regulator_init_data wm1192_dcdc3 = {
+ 	.constraints = {
+-		.name = "PVDD_MEM/PVDD_GPS",
++		.name = "PVDD_MEM+PVDD_GPS",
+ 		.always_on = 1,
+ 	},
+ };
+@@ -568,7 +568,7 @@ static struct regulator_consumer_supply wm1192_ldo1_consumers[] = {
+ 
+ static struct regulator_init_data wm1192_ldo1 = {
+ 	.constraints = {
+-		.name = "PVDD_LCD/PVDD_EXT",
++		.name = "PVDD_LCD+PVDD_EXT",
+ 		.always_on = 1,
+ 	},
+ 	.consumer_supplies = wm1192_ldo1_consumers,
 -- 
 1.7.2.3
