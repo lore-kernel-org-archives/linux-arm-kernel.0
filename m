@@ -1,46 +1,37 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  3 Mar 2011 14:30:55 +0100
-Subject: [PATCH 1/6] media/video i.MX: use IMX_HAVE_PLATFORM_* macros
-In-Reply-To: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
-References: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1299159060-9289-2-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  3 Mar 2011 14:30:54 +0100
+Subject: [PATCH] remove kconfig dependencies from ARCH_MX*/MACH_MX*
+Message-ID: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX architecture provides IMX_HAVE_PLATFORM_* macros to signal
-that a selected SoC supports a certain hardware. Use them instead of
-depending on ARCH_* directly.
+The following series changes several i.MX relevant kconfig entries
+to depend on IMX_HAVE_PLATFORM_* macros instead of depending on
+indiviual i.MX variants.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: linux-media at vger.kernel.org
-Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
-Cc: Hans Verkuil <hverkuil@xs4all.nl>
----
+Sascha
+
+The following changes since commit cbdbb4c1d22e26f9d5314fefe6f2c7e5ed7f6a0f:
+
+  Merge branch 'drm-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6 (2011-03-02 20:02:32 -0800)
+
+are available in the git repository at:
+
+  none ..BRANCH.NOT.VERIFIED..
+
+Sascha Hauer (6):
+      media/video i.MX: use IMX_HAVE_PLATFORM_* macros
+      rtc i.MX Dryice: use IMX_HAVE_PLATFORM_IMXDI_RTC to depend on
+      usb i.MX21: use IMX_HAVE_PLATFORM_IMX21_HCD to depend on
+      video i.MX: remove mx1 compile time dependencies
+      watchdog i.MX: use IMX_HAVE_PLATFORM_IMX2_WDT to depend on
+      mmc i.MX sdhci: use IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX to depend on
+
  drivers/media/video/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index aa02160..6f869ed 100644
---- a/drivers/media/video/Kconfig
-+++ b/drivers/media/video/Kconfig
-@@ -814,7 +814,7 @@ config MX1_VIDEO
- 
- config VIDEO_MX1
- 	tristate "i.MX1/i.MXL CMOS Sensor Interface driver"
--	depends on VIDEO_DEV && ARCH_MX1 && SOC_CAMERA
-+	depends on VIDEO_DEV && SOC_CAMERA && IMX_HAVE_PLATFORM_MX1_CAMERA
- 	select FIQ
- 	select VIDEOBUF_DMA_CONTIG
- 	select MX1_VIDEO
-@@ -872,7 +872,7 @@ config VIDEO_MX2_HOSTSUPPORT
- 
- config VIDEO_MX2
- 	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
--	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
-+	depends on VIDEO_DEV && SOC_CAMERA && IMX_HAVE_PLATFORM_MX2_CAMERA
- 	select VIDEOBUF_DMA_CONTIG
- 	select VIDEO_MX2_HOSTSUPPORT
- 	---help---
--- 
-1.7.2.3
+ drivers/mmc/host/Kconfig    |    2 +-
+ drivers/rtc/Kconfig         |    2 +-
+ drivers/usb/host/Kconfig    |    2 +-
+ drivers/video/Kconfig       |    2 +-
+ drivers/video/imxfb.c       |   28 ++++++----------------------
+ drivers/watchdog/Kconfig    |    2 +-
+ 7 files changed, 13 insertions(+), 29 deletions(-)
