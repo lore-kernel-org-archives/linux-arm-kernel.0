@@ -1,46 +1,49 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Thu, 3 Mar 2011 16:42:58 +0530
-Subject: [PATCH v2 02/13] da850: pruss platform specific additions.
-In-Reply-To: <4102429DCB2B4B47A4F51ED0B9A62E2B@subhasishg>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-3-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF35DEE@dbde02.ent.ti.com>
-	<4102429DCB2B4B47A4F51ED0B9A62E2B@subhasishg>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008825@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Mar 2011 12:49:49 +0100
+Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
+In-Reply-To: <alpine.LFD.2.00.1103031140330.2701@localhost6.localdomain6>
+References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20110302215238.GK22310@pengutronix.de>
+	<alpine.LFD.2.00.1103022343410.2701@localhost6.localdomain6>
+	<20110303093532.GO22310@pengutronix.de>
+	<alpine.LFD.2.00.1103031140330.2701@localhost6.localdomain6>
+Message-ID: <20110303114949.GQ22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Thomas,
 
-> -----Original Message-----
-> From: Subhasish Ghosh [mailto:subhasish at mistralsolutions.com]
-> Sent: Tuesday, March 01, 2011 12:29 PM
-> Hello,
+On Thu, Mar 03, 2011 at 12:02:15PM +0100, Thomas Gleixner wrote:
+> On Thu, 3 Mar 2011, Uwe Kleine-K?nig wrote:
+> > On Thu, Mar 03, 2011 at 12:51:32AM +0100, Thomas Gleixner wrote:
+> > > > > +static int __init mx5_pm_init(void)
+> > > > I'd prefer to have that called by imx51_init_early.
+> > > 
+> > > And the reason is? 
+> > > 
+> > >     1) your personal preference
+> > >     2) there is some useful technical reason
+> > > 
+> > > If #1, then this comment was just waste of electrons
+> > > If #2, you failed to provide some reasonable explanation
+> > Actually it's #2, and to quote a different review[1]:
+> > 
+> > 	Reviewers hint to a correct solution and you are supposed to
+> > 	lookup what that solution means and act accordingly. If you do
+> > 	not understand the hint or its implications please ask [...]
 > 
-> Can we not have the PRU UIO also as a part of the MFD framework.
-> I know that the UIO is not really a device, but I feel its incorrect to
-> register the same device twice.
-> Instead we can have a single entry as the MFD framework and the UIO, as a
-> child device, based upon the MFD driver APIs.
+> I said the above when I hinted to use DEFINE_SPINLOCK(lock) instead of
+> static spinlock_t lock. And that requires to lookup what
+> DEFINE_SPINLOCK() actually does, which is a reasonable request.
 > 
-> All that we need to do is add an entry into the da8xx_pruss_devices
-> structure
-> and the MFD driver will do the rest to get the UIO probe called.
-> 
-Well I see the need for MFD for in-kernel PRUSS based drivers like UART/CAN, 
-but UIO use cases are typically mutually exclusive to this. UIO driver 
-exports whole PRUSS I/O region and Interrupts to user space application and 
-all the tasks including PRUSS INTC setup, loading firmware and
-enable/disable PRUs are handled by PRUSS user driver.
-I feel it will be a nightmare to make them co-exist unless say we have
-2 instances of PRUSS in a SOC. Think about kernel driver setting up PRUSS, PINTC and loading firmware and user land overriding and vice versa. Things are much simpler if we make the usage model mutually exclusive.
-Also I don't see any overlap in functionality and reuse UIO can gain from
-MFD driver.  
-Since we can't register device twice - I would prefer KConfig based check
-for the same. 
+> How is the author of that code supposed to figure out what the merit
+> of s/mx5_pm_init/imx51_init_early/ is? By looking up your preferences
+> in google or what?
+Note I didn't suggest to change the function name.
 
-Also can you point me where you add UART and CAN driver as children to PRUSS
-MFD driver - I can't seem to find this in patches.
+Best regards
+Uwe
 
-Thanks,
-Pratheesh
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
