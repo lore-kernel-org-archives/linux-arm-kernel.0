@@ -1,96 +1,37 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  3 Mar 2011 12:39:06 +0000
-Subject: [PATCH] ARM: Thumb-2: Add local symbols to work around gas behaviour
-Message-ID: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Mar 2011 13:46:58 +0100
+Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
+In-Reply-To: <20110303115242.GA25891@n2100.arm.linux.org.uk>
+References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20110302215238.GK22310@pengutronix.de>
+	<20110303115242.GA25891@n2100.arm.linux.org.uk>
+Message-ID: <20110303124658.GR22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All current versions of gas at the time of writing have issues
-fixing up pc-relative instructions which reference global symbols,
-due to the potential need to support symbol preemption.
-Even though symbol preemption is not relevant to the Linux kernel,
-there is no way to inform the tools of this, so we get the problem.
+On Thu, Mar 03, 2011 at 11:52:42AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 02, 2011 at 10:52:38PM +0100, Uwe Kleine-K?nig wrote:
+> > > +static int __init mx5_pm_init(void)
+> > > +{
+> > > +	if (cpu_is_mx51())
+> > > +		suspend_set_ops(&mx5_suspend_ops);
+> > I'd prefer to have that called by imx51_init_early.
+> 
+> This function name looks fine.  As we now have an init_early in the
+> arch hooks, let's keep things called foo_init_early() to that use
+> and not start using 'early' for stuff used from initcalls.
+> 
+> Renaming this is a recipe for causing confusion and having grep hit
+> false positives.  Please leave it as is.
+It seems you and Thomas both didn't notice the "by" in my sentence.
+Or maybe it's not proper English? The thing I wanted to express is that
+instead of introducing another initcall I prefer that imx51_init_early
+calls mx5_pm_init instead. The name mx5_pm_init is fine for me, though
+imx51_pm_init would still be better.
 
-Most pc-relative forms in ARM, and all pc-relative forms in
-Thumb, will cause the assembler to fail with various fixup error
-messages when used to reference global symbols.
+Best regards
+Uwe
 
-The legacy behaviour is for ADR and plain LDR instructions in ARM
-which reference global symbols to be fixed up silently with no
-relocation emitted.  This means that building the kernel in ARM
-currently works without problems, but it may be a bug, and the
-behaviour could change in the future.
-
-After discussion with Richard Earnshaw, it seems that there is
-no single obvious remedy for this inconsistent behaviour,
-so there is not likely to be a comprehensive upstream fix for
-a while.
-
-A workaround which should be valid for all past and all
-foreseeable future versions of gas is to express the need for
-a local fixup explicitly, by declaring a shadow local symbol
-for any global symbol which needs to be addressed using ADR
-or any pc-relative LDR variant.
-
-This patch implements this workaround for the one part of the
-main kernel currently known to be affected.  The resulting code
-builds and works correctly in ARM and Thumb.
-
-Similar fixes may be needed in mach-specific assembler.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/kernel/relocate_kernel.S |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-index 9cf4cbf..a2599e7 100644
---- a/arch/arm/kernel/relocate_kernel.S
-+++ b/arch/arm/kernel/relocate_kernel.S
-@@ -7,8 +7,8 @@
- 	.globl relocate_new_kernel
- relocate_new_kernel:
- 
--	ldr	r0,kexec_indirection_page
--	ldr	r1,kexec_start_address
-+	ldr	r0,__kexec_indirection_page
-+	ldr	r1,__kexec_start_address
- 
- 	/*
- 	 * If there is no indirection page (we are doing crashdumps)
-@@ -55,27 +55,31 @@ relocate_new_kernel:
- 	/* Jump to relocated kernel */
- 	mov lr,r1
- 	mov r0,#0
--	ldr r1,kexec_mach_type
--	ldr r2,kexec_boot_atags
-+	ldr r1,__kexec_mach_type
-+	ldr r2,__kexec_boot_atags
- 	mov pc,lr
- 
- 	.align
- 
- 	.globl kexec_start_address
- kexec_start_address:
-+__kexec_start_address:
- 	.long	0x0
- 
- 	.globl kexec_indirection_page
- kexec_indirection_page:
-+__kexec_indirection_page:
- 	.long	0x0
- 
- 	.globl kexec_mach_type
- kexec_mach_type:
-+__kexec_mach_type:
- 	.long	0x0
- 
- 	/* phy addr of the atags for the new kernel */
- 	.globl kexec_boot_atags
- kexec_boot_atags:
-+__kexec_boot_atags:
- 	.long	0x0
- 
- relocate_new_kernel_end:
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
