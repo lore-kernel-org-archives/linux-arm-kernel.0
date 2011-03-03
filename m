@@ -1,101 +1,152 @@
 From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Thu,  3 Mar 2011 18:53:52 +0800
-Subject: [patch v3 2/3] arm: pmu: allow platform specific irq enable/disable
-	handling
+Date: Thu,  3 Mar 2011 18:53:53 +0800
+Subject: [patch v3 3/3] arm: omap4: support pmu
 In-Reply-To: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
 References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1299149633-699-3-git-send-email-tom.leiming@gmail.com>
+Message-ID: <1299149633-699-4-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ming Lei <tom.leiming@gmail.com>
 
-This patch introduces .enable_irq and .disable_irq into
-struct arm_pmu_platdata, so platform specific irq enablement
-can be handled after request_irq, and platform specific irq
-disablement can be handled before free_irq.
+This patch supports pmu irq routed from CTI, so
+make pmu/perf working on OMAP4.
 
-This patch is for support of  pmu irq routed from CTI on omap4.
+The idea is from Woodruff Richard in the disscussion
+about "Oprofile on Pandaboard / Omap4" on pandaboard at googlegroups.com.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Woodruff Richard <r-woodruff2@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 ---
- arch/arm/include/asm/pmu.h   |   15 ++++++++++++---
- arch/arm/kernel/perf_event.c |   15 ++++++++++++---
- 2 files changed, 24 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/devices.c              |   82 +++++++++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/omap44xx.h |    2 +
+ 2 files changed, 81 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 7544ce6..e50c542 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -22,13 +22,22 @@ enum arm_pmu_type {
- /*
-  * struct arm_pmu_platdata - ARM PMU platform data
-  *
-- * @handle_irq: an optional handler which will be called from the interrupt and
-- * passed the address of the low level handler, and can be used to implement
-- * any platform specific handling before or after calling it.
-+ * @handle_irq: an optional handler which will be called from the
-+ * 	interrupt and passed the address of the low level handler,
-+ * 	and can be used to implement any platform specific handling
-+ * 	before or after calling it.
-+ * @enable_irq: an optional handler which will be called after
-+ * 	request_irq and be used to handle some platform specific
-+ * 	irq enablement
-+ * @disable_irq: an optional handler which will be called before
-+ * 	free_irq and be used to handle some platform specific
-+ * 	irq disablement
-  */
- struct arm_pmu_platdata {
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
-+	void (*enable_irq)(int irq);
-+	void (*disable_irq)(int irq);
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index d216976..d97bb5a 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -22,6 +22,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+ #include <asm/pmu.h>
++#include <asm/cti.h>
+ 
+ #include <plat/tc.h>
+ #include <plat/board.h>
+@@ -322,20 +323,95 @@ static struct resource omap3_pmu_resource = {
+ 	.flags	= IORESOURCE_IRQ,
  };
  
- #ifdef CONFIG_CPU_HAS_PMU
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 22e194eb..61ff471 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -422,14 +422,18 @@ armpmu_reserve_hardware(void)
- 			pr_warning("unable to request IRQ%d for ARM perf "
- 				"counters\n", irq);
- 			break;
--		}
-+		} else if (plat->enable_irq)
-+			plat->enable_irq(irq);
- 	}
++static struct resource omap4_pmu_resource[] = {
++	{
++		.start	= OMAP44XX_IRQ_CTI0,
++		.end	= OMAP44XX_IRQ_CTI0,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= OMAP44XX_IRQ_CTI1,
++		.end	= OMAP44XX_IRQ_CTI1,
++		.flags	= IORESOURCE_IRQ,
++	}
++};
++
+ static struct platform_device omap_pmu_device = {
+ 	.name		= "arm-pmu",
+ 	.id		= ARM_PMU_DEVICE_CPU,
+ 	.num_resources	= 1,
+ };
  
- 	if (err) {
- 		for (i = i - 1; i >= 0; --i) {
- 			irq = platform_get_irq(pmu_device, i);
--			if (irq >= 0)
-+			if (irq >= 0) {
-+				if (plat->disable_irq)
-+					plat->disable_irq(irq);
- 				free_irq(irq, NULL);
-+			}
- 		}
- 		release_pmu(pmu_device);
- 		pmu_device = NULL;
-@@ -442,11 +446,16 @@ static void
- armpmu_release_hardware(void)
++static struct arm_pmu_platdata omap4_pmu_data;
++static struct cti omap4_cti[2];
++
++static void omap4_enable_cti(int irq)
++{
++	if (irq == OMAP44XX_IRQ_CTI0)
++		cti_enable(&omap4_cti[0]);
++	else if (irq == OMAP44XX_IRQ_CTI1)
++		cti_enable(&omap4_cti[1]);
++}
++
++static void omap4_disable_cti(int irq)
++{
++	if (irq == OMAP44XX_IRQ_CTI0)
++		cti_disable(&omap4_cti[0]);
++	else if (irq == OMAP44XX_IRQ_CTI1)
++		cti_disable(&omap4_cti[1]);
++}
++
++static irqreturn_t omap4_pmu_handler(int irq, void *dev, irq_handler_t handler)
++{
++	if (irq == OMAP44XX_IRQ_CTI0)
++		cti_irq_ack(&omap4_cti[0]);
++	else if (irq == OMAP44XX_IRQ_CTI1)
++		cti_irq_ack(&omap4_cti[1]);
++
++	return handler(irq, dev);
++}
++
++static void omap4_configure_pmu_irq(void)
++{
++	void __iomem *base0;
++	void __iomem *base1;
++
++	base0 = ioremap(OMAP44XX_CTI0_BASE, SZ_4K);
++	base1 = ioremap(OMAP44XX_CTI1_BASE, SZ_4K);
++	if (!base0 && !base1) {
++		pr_err("ioremap for OMAP4 CTI failed\n");
++		return;
++	}
++
++	/*configure CTI0 for pmu irq routing*/
++	cti_init(&omap4_cti[0], base0, OMAP44XX_IRQ_CTI0, 6);
++	cti_unlock(&omap4_cti[0]);
++	cti_map_trigger(&omap4_cti[0], 1, 6, 2);
++
++	/*configure CTI1 for pmu irq routing*/
++	cti_init(&omap4_cti[1], base1, OMAP44XX_IRQ_CTI1, 6);
++	cti_unlock(&omap4_cti[1]);
++	cti_map_trigger(&omap4_cti[1], 1, 6, 2);
++
++	omap4_pmu_data.handle_irq = omap4_pmu_handler;
++	omap4_pmu_data.enable_irq = omap4_enable_cti;
++	omap4_pmu_data.disable_irq = omap4_disable_cti;
++}
++
+ static void omap_init_pmu(void)
  {
- 	int i, irq;
-+	struct arm_pmu_platdata *plat =
-+		dev_get_platdata(&pmu_device->dev);
+-	if (cpu_is_omap24xx())
++	if (cpu_is_omap24xx()) {
+ 		omap_pmu_device.resource = &omap2_pmu_resource;
+-	else if (cpu_is_omap34xx())
++	} else if (cpu_is_omap34xx()) {
+ 		omap_pmu_device.resource = &omap3_pmu_resource;
+-	else
++	} else if (cpu_is_omap44xx()) {
++		omap_pmu_device.resource = omap4_pmu_resource;
++		omap_pmu_device.num_resources = 2;
++		omap_pmu_device.dev.platform_data = &omap4_pmu_data;
++		omap4_configure_pmu_irq();
++	} else {
+ 		return;
++	}
  
- 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
- 		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
-+		if (irq >= 0) {
-+			if (plat->disable_irq)
-+				plat->disable_irq(irq);
- 			free_irq(irq, NULL);
-+		}
- 	}
- 	armpmu->stop();
+ 	platform_device_register(&omap_pmu_device);
+ }
+diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
+index ea2b8a6..b127a16 100644
+--- a/arch/arm/plat-omap/include/plat/omap44xx.h
++++ b/arch/arm/plat-omap/include/plat/omap44xx.h
+@@ -57,5 +57,7 @@
+ #define OMAP44XX_HSUSB_OHCI_BASE	(L4_44XX_BASE + 0x64800)
+ #define OMAP44XX_HSUSB_EHCI_BASE	(L4_44XX_BASE + 0x64C00)
+ 
++#define OMAP44XX_CTI0_BASE		0x54148000
++#define OMAP44XX_CTI1_BASE		0x54149000
+ #endif /* __ASM_ARCH_OMAP44XX_H */
  
 -- 
 1.7.3
