@@ -1,66 +1,55 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Mar 2011 21:59:04 +0530
-Subject: [PATCH 08/17] omap4: pm: Add GIC save/restore support
-In-Reply-To: <8739n55f75.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-9-git-send-email-santosh.shilimkar@ti.com>
-	<8739n55f75.fsf@ti.com>
-Message-ID: <000b275e5d210abd5dec6c09c5508734@mail.gmail.com>
+Date: Thu, 3 Mar 2011 22:00:00 +0530
+Subject: [PATCH 10/17] omap4: pm: Add L2 cache lowpower support
+In-Reply-To: <878vwx40bh.fsf@ti.com>
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-11-git-send-email-santosh.shilimkar@ti.com>
+	<878vwx40bh.fsf@ti.com>
+Message-ID: <5d01c6484d0d490b88624e841b6f10ae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 4:00 AM
+> Sent: Thursday, March 03, 2011 4:06 AM
 > To: Santosh Shilimkar
 > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 08/17] omap4: pm: Add GIC save/restore support
-[...]
-
-> > @@ -67,6 +82,17 @@ struct omap4_cpu_pm_info {
+> Subject: Re: [PATCH 10/17] omap4: pm: Add L2 cache lowpower support
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> > When MPUSS hits off-mode e, L2 cache is lost. This patch adds L2X0
+> > necessary maintenance operations and context restoration in the
+> > low power code.
 > >
-> >  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Reviewed-by: Kevin Hilman <khilman@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap4-mpuss-lowpower.c |   11 +++++
+> >  arch/arm/mach-omap2/omap4-sar-layout.h     |    2 +
+> >  arch/arm/mach-omap2/sleep44xx.S            |   64
+> ++++++++++++++++++++++++++++
+> >  3 files changed, 77 insertions(+), 0 deletions(-)
 > >
-> > +/* Helper functions */
-> > +static inline void sar_writel(u32 val, u32 offset, u8 idx)
-> > +{
-> > +	__raw_writel(val, sar_ram_base + offset + 4 * idx);
-> > +}
+> > diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+> b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+> > index a30f19b..bff768f 100644
+> > --- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+> > +++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+> > @@ -49,6 +49,7 @@
+> >  #include <asm/system.h>
+> >  #include <asm/irq.h>
+> >  #include <asm/hardware/gic.h>
+> > +#include <asm/hardware/cache-l2x0.h>
+> >
+> >  #include <plat/omap44xx.h>
+> >  #include <mach/omap4-common.h>
+> > @@ -341,6 +342,7 @@ int __init omap4_mpuss_init(void)
+> >  {
+> >  	struct omap4_cpu_pm_info *pm_info;
+> >  	u8 i;
+> > +	u32 val;
 >
-> aha, this is what I was thinking of in the earlier SAR patch.
+> This will cause an 'unused variable' compiler warning when
+> !CONFIG_CACHE_L2X0
 >
-> Something like this should be part of the SAR code, not here.
->
-If you remember during the internal review, this helpers
-are added to improve the readability and they are inline
-functions. Same is the case with wakeupgen save code.
-
-If you move this code to SAR file and GIC helper
-to gic file, the save routine will become highly
-un-optimal.
-
-In General Save is like below.
-	Read_Harfware_register()
-	Write_it_sar_location()
-
-This happens for every GIC and wakeupgen
-registers and hence moving this across files
-and calling them from there is going add un-necessary
-stack overhead.
-
-I already got rid-off the global address pointers. I will
-get those now using omap4_get_*_base() and store it for
-local use in the file.
-
-
-> > +static inline u32 gic_readl(u32 offset, u8 idx)
-> > +{
-> > +	return __raw_readl(gic_dist_base_addr + offset + 4 * idx);
-> > +}
->
-> Similarily, it would be nice tos see this as part of GIC code so
-> this code doesn't have to access a global base address pointer.
->
-Same comment applies here too.
-
-Regards
-Santosh
+Good catch. Fixed
