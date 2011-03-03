@@ -1,82 +1,36 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:16 +0530
-Subject: [PATCH V2 03/13] dw_dmac: Move single descriptor from dwc->queue to
-	dwc->active_list in dwc_complete_all
+Date: Thu, 3 Mar 2011 15:47:17 +0530
+Subject: [PATCH V2 04/13] dw_dmac: Calling dwc_scan_descriptors from
+	dwc_tx_status() after taking lock
 In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
 References: <cover.1299146382.git.viresh.kumar@st.com>
-Message-ID: <f81115ecac5c0badf9499c65c7540f0f8446114a.1299146382.git.viresh.kumar@st.com>
+Message-ID: <72245f0f6b2b25072a0d4641e66b8699819c683e.1299146382.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc_complete_all and other routines was removing all descriptors from dwc->queue
-and pushing them to dwc->active_list. Only one was required to be removed. Also
-we are calling dwc_dostart, once list is fixed.
+Lock must be taken before calling dwc_scan_descriptors, as this may
+access/modify shared data and queues. dwc_tx_status wasn't taking lock before
+calling this routine. This patch add code that takes lock before calling
+dwc_scan_descriptors.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |   20 ++++++++------------
- 1 files changed, 8 insertions(+), 12 deletions(-)
+ drivers/dma/dw_dmac.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 064a183..942b50f 100644
+index 942b50f..2b0d5e9 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -87,11 +87,6 @@ static struct dw_desc *dwc_first_active(struct dw_dma_chan *dwc)
- 	return list_entry(dwc->active_list.next, struct dw_desc, desc_node);
- }
+@@ -836,7 +836,9 @@ dwc_tx_status(struct dma_chan *chan,
  
--static struct dw_desc *dwc_first_queued(struct dw_dma_chan *dwc)
--{
--	return list_entry(dwc->queue.next, struct dw_desc, desc_node);
--}
--
- static struct dw_desc *dwc_desc_get(struct dw_dma_chan *dwc)
- {
- 	struct dw_desc *desc, *_desc;
-@@ -262,10 +257,11 @@ static void dwc_complete_all(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 	 * Submit queued descriptors ASAP, i.e. before we go through
- 	 * the completed ones.
- 	 */
--	if (!list_empty(&dwc->queue))
--		dwc_dostart(dwc, dwc_first_queued(dwc));
- 	list_splice_init(&dwc->active_list, &list);
--	list_splice_init(&dwc->queue, &dwc->active_list);
-+	if (!list_empty(&dwc->queue)) {
-+		list_move(dwc->queue.next, &dwc->active_list);
-+		dwc_dostart(dwc, dwc_first_active(dwc));
-+	}
+ 	ret = dma_async_is_complete(cookie, last_complete, last_used);
+ 	if (ret != DMA_SUCCESS) {
++		spin_lock_bh(&dwc->lock);
+ 		dwc_scan_descriptors(to_dw_dma(chan->device), dwc);
++		spin_unlock_bh(&dwc->lock);
  
- 	list_for_each_entry_safe(desc, _desc, &list, desc_node)
- 		dwc_descriptor_complete(dwc, desc);
-@@ -325,8 +321,8 @@ static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 		cpu_relax();
- 
- 	if (!list_empty(&dwc->queue)) {
--		dwc_dostart(dwc, dwc_first_queued(dwc));
--		list_splice_init(&dwc->queue, &dwc->active_list);
-+		list_move(dwc->queue.next, &dwc->active_list);
-+		dwc_dostart(dwc, dwc_first_active(dwc));
- 	}
- }
- 
-@@ -352,7 +348,7 @@ static void dwc_handle_error(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 	 */
- 	bad_desc = dwc_first_active(dwc);
- 	list_del_init(&bad_desc->desc_node);
--	list_splice_init(&dwc->queue, dwc->active_list.prev);
-+	list_move(dwc->queue.next, dwc->active_list.prev);
- 
- 	/* Clear the error flag and try to restart the controller */
- 	dma_writel(dw, CLEAR.ERROR, dwc->mask);
-@@ -547,8 +543,8 @@ static dma_cookie_t dwc_tx_submit(struct dma_async_tx_descriptor *tx)
- 	if (list_empty(&dwc->active_list)) {
- 		dev_vdbg(chan2dev(tx->chan), "tx_submit: started %u\n",
- 				desc->txd.cookie);
--		dwc_dostart(dwc, desc);
- 		list_add_tail(&desc->desc_node, &dwc->active_list);
-+		dwc_dostart(dwc, dwc_first_active(dwc));
- 	} else {
- 		dev_vdbg(chan2dev(tx->chan), "tx_submit: queued %u\n",
- 				desc->txd.cookie);
+ 		last_complete = dwc->completed;
+ 		last_used = chan->cookie;
 -- 
 1.7.2.2
