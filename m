@@ -1,51 +1,43 @@
 From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Thu, 3 Mar 2011 14:54:12 +0530
+Date: Thu, 3 Mar 2011 14:59:42 +0530
 Subject: [PATCH v8 1/1] PRUSS UIO driver support
-In-Reply-To: <201103021422.27094.arnd@arndb.de>
+In-Reply-To: <alpine.LFD.2.00.1103022155030.2701@localhost6.localdomain6>
 References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
 	<1299065886-30099-2-git-send-email-pratheesh@ti.com>
-	<201103021422.27094.arnd@arndb.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008718@dbde02.ent.ti.com>
+	<20110302200956.GB23818@local> <201103022123.38050.arnd@arndb.de>
+	<alpine.LFD.2.00.1103022155030.2701@localhost6.localdomain6>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008731@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi,
-
 > -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, March 02, 2011 6:52 PM
-> On Wednesday 02 March 2011, Pratheesh Gangadhar wrote:
-> > +
-> > +static struct clk *pruss_clk;
-> > +static struct uio_info *info;
-> > +static dma_addr_t sram_paddr, ddr_paddr;
-> > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> > +
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: Thursday, March 03, 2011 2:27 AM
+> On Wed, 2 Mar 2011, Arnd Bergmann wrote:
 > 
-> To my initial comment about these being single-instance
-> variables, you said you'd change that, which has not happened
-> yet.
+> > On Wednesday 02 March 2011 21:09:56 Hans J. Koch wrote:
+> > > > +static struct uio_info *info;
+> > > > +static dma_addr_t sram_paddr, ddr_paddr;
+> > > > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
+> > >
+> > > So the correct thing would be
+> > >
+> > > static void __iomem *prussio_vaddr;
+> > > static void *sram_vaddr, *ddr_vaddr;
+> >
+> > I also commented that it should not be a global variable at
+> > all, but a dynamic data structure referenced from the device.
+> >
+> > Not important, but Pratheesh said he'd change it. If it stays
+> > a global variable, I'd at least expect an explanation why
+> > the static variable is considered better in this case.
 > 
-I will do this in next version. Also realized that in next SoC, 
-PRU INTC base offset is different, so plan to add a platform_data
-variable to make this portable.
-
-+#define PINTC_HIDISR	0x4038
-+#define PINTC_HIPIR	0x4900
-+#define PINTC_HIER	0x5500 
-
-These hard coding also need to go to make it fully portable.
-+int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
-+p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
-
-> Also, I now noticed that the types are wrong, you are
-> missing __iomem annotations for MMIO ranges. Please make
-> sure that the code builds fine with sparse and "make C=1",
-> which will tell you about these problems.
+> I did not pick at that, because there is no indicator that we'll see
+> more than one PRUSS unit per SoC in the forseeable future.
 > 
-Thanks, this also helped to identify 2 unused lines in the code.
+It's a possibility - May be in 2-3 years time.
 
-+		p->mem[1].internal_addr = sram_vaddr;
-+		p->mem[2].internal_addr = ddr_vaddr;
-
+Thanks,
 Pratheesh
