@@ -1,44 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 3 Mar 2011 12:43:14 -0300
-Subject: [PATCH] ARM: mx51: Print silicon revision on boot
-In-Reply-To: <87lj0wwr0g.fsf@lebrac.rtp-net.org>
-References: <1299114747-14091-1-git-send-email-festevam@gmail.com>
-	<87lj0wwr0g.fsf@lebrac.rtp-net.org>
-Message-ID: <AANLkTinPvxKR0ppW5jKWSOw=x05w0tb6_d6x+e4ZWdan@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 3 Mar 2011 21:34:23 +0530
+Subject: [PATCH 01/17] omap4: pm: Add omap WakeupGen module support
+In-Reply-To: <87hbbl8aaz.fsf@ti.com>
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-2-git-send-email-santosh.shilimkar@ti.com>
+	<87hbbl8aaz.fsf@ti.com>
+Message-ID: <61680f5ee8942ca702a9edd3496c3090@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
-
-On Thu, Mar 3, 2011 at 5:24 AM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> Fabio Estevam <festevam@gmail.com> writes:
-> Hi,
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Thursday, March 03, 2011 3:17 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 01/17] omap4: pm: Add omap WakeupGen module
+> support
 >
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+[...]
+> > +
+> > +static inline u32 cpu_readl(u8 idx, u32 cpu)
 >
-> Why I like having boot log, I don't like have too verbose boot logs. If
-> you add this, you have a good reason (I hope), but I can't know
-> it. There's no patch description. So, please give a patch with proper
-> explanation of why you need that. Anyway, having a proper patch
-> description is imho always a good idea.
+> Minor nit: the cpu_ prefix is too generic, how about wakeupgen_ or
+> wugen_?
+>
+Done. I used wakeupgen_ prefeix.
 
-I think that printing the silicon version on boot is useful
-information. Many issues are fixed in the latest silicon revision, so
-while debugging mx51 issues it is good to know from the boot log if
-someone is using the latest silicon version or not.
+[...]
 
-We currently do that on mx31/mx35 kernel, and I think it would be nice
-to have this information for mx5 as well.
+> > +static void _wakeupgen_set_all(unsigned int cpu, unsigned int
+> reg)
+> > +{
+> > +	u8 i;
+> > +
+> > +	for (i = 0; i < NR_BANKS; i++)
+> > +		cpu_writel(reg, i, cpu);
+> > +}
+> > +
+> > +static void _wakeupgen_set(unsigned int irq, unsigned int set)
+>
+> I (still) don't like a single "set" function, especially when it
+> takes a
+> "set" argument.
+>
+> Make separate set and clear functions, with the common stuff in a
+> helper function like _wakeupgen_get_irq() or something.
+>
+Done.
 
-It is just a single line, so don?t believe it will add any significant overhead.
+[...]
 
-> Moreover, there's already good hint if you want to know if you're on to2
-> or to3. On rev < 3.0, you have this in logs:
-> VFP support v0.3: implementor 41 architecture 3 part 30 variant c rev 2
-> Turning off NEON support, detected broken NEON implementation
+> > +
+> > +#ifdef CONFIG_PM
+>
+> I think this should be CONFIG_SUSPEND
+I don't see any body using "CONFIG_SUSPEND".
+set_wake() seems to be under CONFIG_PM, so I
+am retaining as it is.
+>
+> > +/*
+> > + * Architecture specific set_wake extension
+> > + */
+> > +static int wakeupgen_set_wake(struct irq_data *d, unsigned int
+> on)
 
-Ok, but still I prefer one single line stating the CPU version explicitly.
 
-Regards,
+> > +	/* Static mapping, never released */
+> > +	wakeupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
+> > +	BUG_ON(!wakeupgen_base);
+>
+> A WARN_ON() with a graceful exit is more appropriate here:
+>
+Done.
 
-Fabio Estevam
+Regards
+Santosh
