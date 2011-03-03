@@ -1,62 +1,66 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Mar 2011 21:44:43 +0530
-Subject: [PATCH 05/17] omap4: pm: Initialise all the clockdomains to
-	supported states
-In-Reply-To: <87r5ap5fqg.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-6-git-send-email-santosh.shilimkar@ti.com>
-	<87r5ap5fqg.fsf@ti.com>
-Message-ID: <e3449fa0a9fb4909fbfcc3a2ff57802d@mail.gmail.com>
+Date: Thu, 3 Mar 2011 21:45:02 +0530
+Subject: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form Low power
+	modes
+In-Reply-To: <87ipw15fh0.fsf@ti.com>
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-8-git-send-email-santosh.shilimkar@ti.com>
+	<87ipw15fh0.fsf@ti.com>
+Message-ID: <2438425cddc1f413357129985562ec74@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 3:48 AM
+> Sent: Thursday, March 03, 2011 3:54 AM
 > To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Rajendra Nayak
-> Subject: Re: [PATCH 05/17] omap4: pm: Initialise all the
-> clockdomains to supported states
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form
+> Low power modes
 >
 > Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 >
-> > Initialise hardware supervised mode for all clockdomains if it's
-> > supported. Initiate sleep transition for other clockdomains,
-> > if they are not being used.
+> > The SGI(Software Generated Interrupts) are not wakeup capable from
+> > low power states. This is known limitation on OMAP4 and needs to
+> be
+> > worked around by using software forced clockdomain wake-up. CPU0
+> forces
+> > the CPU1 clockdomain to software force wakeup. After the wakeup,
+> CPU1
+> > restores its clockdomain hardware supervised mode.
+> >
+> > More details can be found in OMAP4430 TRM - Version J
+> > Section :
+> > 	4.3.4.2 Power States of CPU0 and CPU1
 > >
 > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 > > Reviewed-by: Kevin Hilman <khilman@ti.com>
 > > ---
-> >  arch/arm/mach-omap2/pm44xx.c |   22 +++++++++++++++++++++-
-> >  1 files changed, 21 insertions(+), 1 deletions(-)
+> >  arch/arm/mach-omap2/omap-hotplug.c |    9 +++++++++
+> >  arch/arm/mach-omap2/omap-smp.c     |   27
+> ++++++++++++++++++++++++++-
+> >  2 files changed, 35 insertions(+), 1 deletions(-)
 > >
-> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-
-> omap2/pm44xx.c
-> > index b142673..9a9dc41 100644
-> > --- a/arch/arm/mach-omap2/pm44xx.c
-> > +++ b/arch/arm/mach-omap2/pm44xx.c
-> > @@ -17,9 +17,11 @@
-> >  #include <linux/slab.h>
-> >  #include <plat/clock.h>
+> > diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-
+> omap2/omap-hotplug.c
+> > index 9f8f097..cf4ab15 100644
+> > --- a/arch/arm/mach-omap2/omap-hotplug.c
+> > +++ b/arch/arm/mach-omap2/omap-hotplug.c
+> > @@ -23,6 +23,7 @@
+> >  #include <mach/omap-wakeupgen.h>
 > >
-> > -#include "powerdomain.h"
-> >  #include <mach/omap4-common.h>
-> >
-> > +#include "powerdomain.h"
+> >  #include "powerdomain.h"
 > > +#include "clockdomain.h"
-> > +
-> >  struct power_state {
-> >  	struct powerdomain *pwrdm;
-> >  	u32 next_state;
-> > @@ -74,6 +76,22 @@ static const struct platform_suspend_ops
-> omap_pm_ops = {
-> >  };
-> >  #endif /* CONFIG_SUSPEND */
 > >
-> > +/*
-> > + * Enable hardwarew supervised mode for all clockdomains if it's
+> >  int platform_cpu_kill(unsigned int cpu)
+> >  {
+> > @@ -36,6 +37,11 @@ int platform_cpu_kill(unsigned int cpu)
+> >  void platform_cpu_die(unsigned int cpu)
+> >  {
+> >  	unsigned int this_cpu;
+> > +	static struct clockdomain *cpu1_clkdm;
+> > +
+> > +	/* To avoid cpu1 clockdomain lookup every time */
 >
-> typo: hardware
+> minor: comment doesn't really match code and could just be removed
 >
 Fixed
