@@ -1,80 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu,  3 Mar 2011 14:58:35 +0000
-Subject: [PATCH 7/7] ARM: SMDK6410: Update regulator names for debugfs
-	compatiblity
+Date: Thu,  3 Mar 2011 14:58:34 +0000
+Subject: [PATCH 6/7] ARM: SMDK6410: Fix build with WM1190 disabled and WM1192
+	enabled
 In-Reply-To: <20110303145710.GA32234@opensource.wolfsonmicro.com>
 References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-Message-ID: <1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1299164315-22246-6-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debugfs support added to the regulator API (which has been merged
-in during this merge window) creates directories for regulators named
-after the display names for the regulators so replace / as a separator
-for multiple supplies with + in the SMDK6410 machine.
+Avoid relying on implicit inclusion of machine.h
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-smdk6410.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 4094707..2f30c79 100644
+index 1cb4ab3..4094707 100644
 --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
 +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -353,7 +353,7 @@ static struct regulator_init_data smdk6410_vddpll __initdata = {
- /* VDD_UH_MMC, LDO5 on J5 */
- static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
- 	.constraints = {
--		.name = "PVDD_UH/PVDD_MMC",
-+		.name = "PVDD_UH+PVDD_MMC",
- 		.always_on = 1,
- 	},
- };
-@@ -419,7 +419,7 @@ static struct regulator_init_data smdk6410_vddaudio __initdata = {
- /* S3C64xx internal logic & PLL */
- static struct regulator_init_data wm8350_dcdc1_data __initdata = {
- 	.constraints = {
--		.name = "PVDD_INT/PVDD_PLL",
-+		.name = "PVDD_INT+PVDD_PLL",
- 		.min_uV = 1200000,
- 		.max_uV = 1200000,
- 		.always_on = 1,
-@@ -454,7 +454,7 @@ static struct regulator_consumer_supply wm8350_dcdc4_consumers[] __initdata = {
+@@ -28,6 +28,7 @@
+ #include <linux/delay.h>
+ #include <linux/smsc911x.h>
+ #include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
  
- static struct regulator_init_data wm8350_dcdc4_data __initdata = {
- 	.constraints = {
--		.name = "PVDD_HI/PVDD_EXT/PVDD_SYS/PVCCM2MTV",
-+		.name = "PVDD_HI+PVDD_EXT+PVDD_SYS+PVCCM2MTV",
- 		.min_uV = 3000000,
- 		.max_uV = 3000000,
- 		.always_on = 1,
-@@ -466,7 +466,7 @@ static struct regulator_init_data wm8350_dcdc4_data __initdata = {
- /* OTGi/1190-EV1 HPVDD & AVDD */
- static struct regulator_init_data wm8350_ldo4_data __initdata = {
- 	.constraints = {
--		.name = "PVDD_OTGI/HPVDD/AVDD",
-+		.name = "PVDD_OTGI+HPVDD+AVDD",
- 		.min_uV = 1200000,
- 		.max_uV = 1200000,
- 		.apply_uV = 1,
-@@ -557,7 +557,7 @@ static struct wm831x_backlight_pdata wm1192_backlight_pdata = {
- 
- static struct regulator_init_data wm1192_dcdc3 = {
- 	.constraints = {
--		.name = "PVDD_MEM/PVDD_GPS",
-+		.name = "PVDD_MEM+PVDD_GPS",
- 		.always_on = 1,
- 	},
- };
-@@ -568,7 +568,7 @@ static struct regulator_consumer_supply wm1192_ldo1_consumers[] = {
- 
- static struct regulator_init_data wm1192_ldo1 = {
- 	.constraints = {
--		.name = "PVDD_LCD/PVDD_EXT",
-+		.name = "PVDD_LCD+PVDD_EXT",
- 		.always_on = 1,
- 	},
- 	.consumer_supplies = wm1192_ldo1_consumers,
+ #ifdef CONFIG_SMDK6410_WM1190_EV1
+ #include <linux/mfd/wm8350/core.h>
 -- 
 1.7.2.3
