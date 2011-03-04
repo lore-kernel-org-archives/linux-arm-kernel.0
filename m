@@ -1,47 +1,51 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 04 Mar 2011 08:56:07 -0800
-Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from going
-	to RET or OFF when DSS is on
-In-Reply-To: <854C6400F5AA6644BA6FE7953F3E769B0380F12F@008-AM1MPN1-013.mgdnok.nokia.com>
-	(Tero Kristo's message of "Fri, 4 Mar 2011 08:14:07 +0000")
-References: <20110301220833.32613.54669.stgit@twilight.localdomain>
-	<20110301224918.32613.95176.stgit@twilight.localdomain>
-	<87pqq7pz27.fsf@ti.com>
-	<854C6400F5AA6644BA6FE7953F3E769B0380F12F@008-AM1MPN1-013.mgdnok.nokia.com>
-Message-ID: <87lj0uj048.fsf@ti.com>
+Date: Fri, 04 Mar 2011 09:00:00 -0800
+Subject: [PATCH] i2c-omap: Program I2C_WE on OMAP4 to enable i2c wakeup
+In-Reply-To: <1299245544-23790-1-git-send-email-rnayak@ti.com> (Rajendra
+	Nayak's message of "Fri, 4 Mar 2011 19:02:24 +0530")
+References: <1299245544-23790-1-git-send-email-rnayak@ti.com>
+Message-ID: <87ei6mizxr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Rajendra Nayak <rnayak@ti.com> writes:
 
-<Tero.Kristo@nokia.com> writes:
-
-[...]
-
->>>
->>> +	/* If DSS is active, prevent CORE RET/OFF */
->>> +	dss_state = pwrdm_read_pwrst(dss_pd);
->>> +	if (dss_state == PWRDM_POWER_ON &&
->>> +	    core_next_state != PWRDM_POWER_ON)
->>> +		core_next_state = PWRDM_POWER_INACTIVE;
->>> +
->>
->>Due to sleepdeps/autodeps, when this code runs, DSS powerdomain is
->>always on.  The result is that CORE is always set to INACTIVE.
+> For the I2C module to be wakeup capable, programming I2C_WE
+> register (which was skipped for OMAP4430) is needed
+> even on OMAP4.
+> This fixes i2c controller timeouts which were seen recently
+> with the static dependency being cleared between MPU and
+> L4PER clockdomains.
 >
-> Now I recall that someone was asking about a patch similar to this
-> earlier, and had the same issue with DSS sleepdep collision.
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> Patch is based on 2.6.38-rc7 kernel.
 
->
-> What is the reason for having the sleepdep for DSS powerdomain anyway?
-> At least I can't see any reason why the sleepdep for DSS should be
-> set. In my opinion it should be perfectly okay for DSS domain to idle
-> independently of MPU/CORE, as this is going to be better for power
-> consumption also.
+Acked-by: Kevin Hilman <khilman@ti.com>
 
-Agreed, but currently the sleepdeps with MPU are automatically managed
-(by clkdm autodeps and hwmod initiator deps.)  Until we have merged a
-solution to more selectively enable sleepdeps (or remove them) $SUBJECT
-patch cannot be merged.
+Ben, looks like another fix that should be queued for 2.6.38-rc.
+
+Thanks,
 
 Kevin
+
+
+>
+>  drivers/i2c/busses/i2c-omap.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 829a2a1..58a58c7 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -378,9 +378,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  			 * REVISIT: Some wkup sources might not be needed.
+>  			 */
+>  			dev->westate = OMAP_I2C_WE_ALL;
+> -			if (dev->rev < OMAP_I2C_REV_ON_4430)
+> -				omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+> -								dev->westate);
+> +			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+>  		}
+>  	}
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
