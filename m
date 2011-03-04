@@ -1,26 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 4 Mar 2011 11:22:50 +0800
-Subject: [PATCH 1/2] ARM: imx5x: clean up ARCH_MX5X
-In-Reply-To: <20110303105638.GD1655@S2101-09.ap.freescale.net>
-References: <1299141603-22148-1-git-send-email-richard.zhao@freescale.com>
-	<20110303104823.GC1655@S2101-09.ap.freescale.net>
-	<20110303105638.GD1655@S2101-09.ap.freescale.net>
-Message-ID: <20110304032249.GC12223@S2101-09.ap.freescale.net>
+From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
+Date: Fri, 4 Mar 2011 08:55:27 +0530
+Subject: [PATCH v9 1/1] PRUSS UIO driver support
+In-Reply-To: <201103031915.55825.arnd@arndb.de>
+References: <1299175677-17859-1-git-send-email-pratheesh@ti.com>
+	<1299175677-17859-2-git-send-email-pratheesh@ti.com>
+	<201103031915.55825.arnd@arndb.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008B02@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 06:56:38PM +0800, Shawn Guo wrote:
-> On Thu, Mar 03, 2011 at 06:48:23PM +0800, Shawn Guo wrote:
-> > On Thu, Mar 03, 2011 at 04:40:02PM +0800, Richard Zhao wrote:
-> > > Move to SOC_SOC_IMX5X. Leave only places which prevent multi-soc
-> >           ^^^^^^^^^^^^^
-> > SOC_IMX51?  Same question on SOC_SOC_IMX3X in the second patch.
-> > 
-> What I meant is SOC_IMX5X.  Double 'SOC_' bothers me.
+Hi,
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, March 03, 2011 11:46 PM
+> On Thursday 03 March 2011 19:07:57 Pratheesh Gangadhar wrote:
+> > +struct uio_pruss_dev {
+> > +       struct uio_info *info;
+> > +       struct clk *pruss_clk;
+> > +       dma_addr_t sram_paddr;
+> > +       dma_addr_t ddr_paddr;
+> > +       void __iomem *prussio_vaddr;
+> > +       void *sram_vaddr;
+> > +       void *ddr_vaddr;
+> > +       unsigned int hostirq_start;
+> > +       unsigned int pintc_base;
+> > +};
+> > +
+> > +struct pruss_priv {
+> > +       struct uio_pruss_dev *pupdev;
+> > +};
 > 
-My mail box went wrong yesterday.  The messages were not delivered.
-As Sascha has picked them up, it may not worth a fix.
+> I cannot see the point of struct pruss_priv, I think it would be better to
+> just merge the two data structures into one. Everything else looks
+> good to me now.
 
--- 
-Regards,
-Shawn
+pruss_priv is needed to get access to uio_pruss_dev from uio_info *info in
+UIO interrupt handler (pruss_handler) and shall be per interrupt entry.
+
++static irqreturn_t pruss_handler(int irq, struct uio_info *info) {
++	struct pruss_priv *priv = info->priv;
++	struct uio_pruss_dev *gdev = priv->pupdev;
+
+Note that info is a pointer to array supporting 8 interrupts. This allows to
+redirect to driver structure via info->priv quickly.
+
+Thanks,
+Pratheesh   
