@@ -1,17 +1,31 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 4 Mar 2011 18:16:07 +0200
-Subject: PXA270 Random Hangs at Low Core Freq
-In-Reply-To: <A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
-References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
-	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
-	<A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
-Message-ID: <201103041816.08109.anarsoul@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 04 Mar 2011 19:14:49 +0300
+Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
+In-Reply-To: <20110304080653.3f2c3f19@debxo>
+References: <20110304080653.3f2c3f19@debxo>
+Message-ID: <4D710FF9.6040305@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Michael, recently I discovered that PXA270 (at least in Zipit Z2) works 
-unstable (just hangs randomly) with fastbus bit set in CCLKCFG, check if 
-bootloader sets it on your board, and if it does try to clear it.
+Hello.
 
-Regards
-Vasily
+Andres Salomon wrote:
+
+> Note that this relies on stuff currently in mfd's next tree, but this
+> is also a newer driver.  I'm not sure which tree it should go through,
+> as it's a problem that shows up in next.
+
+    This passage should be under --- tear line.
+
+> From: Andres Salomon <dilinger@queued.net>
+
+> MFD changes in c738892f cause the mc13xxx_platform_data struct
+
+    Linus asks to also specify the commit summary in parens.
+
+> to change.  This changes one more (new) user of it, fixing a build
+> error.
+
+> Signed-off-by: Andres Salomon <dilinger@queued.net>
+
+WBR, Sergei
