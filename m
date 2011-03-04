@@ -1,38 +1,45 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Fri, 04 Mar 2011 13:41:31 +0900
-Subject: [PATCH] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-In-Reply-To: <01ad01cbd961$40e69720$c2b3c560$%kim@samsung.com>
-References: <1299028671-9062-1-git-send-email-dh09.lee@samsung.com>
-	<01ad01cbd961$40e69720$c2b3c560$%kim@samsung.com>
-Message-ID: <4D706D7B.8020009@samsung.com>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Fri,  4 Mar 2011 10:12:51 +0530
+Subject: [PATCH v10 0/1] Add PRUSS UIO driver support
+Message-ID: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 2011-03-03, Kukjin Kim wrote:
->
->>  #
->>  # Display device support
->> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
->> index 5bf00b9..1d0d222 100644
->> --- a/arch/arm/mach-exynos4/Kconfig
->> +++ b/arch/arm/mach-exynos4/Kconfig
->> @@ -135,6 +135,7 @@ config MACH_NURI
->>  	select EXYNOS4_SETUP_I2C1
->>  	select EXYNOS4_SETUP_I2C5
->>  	select EXYNOS4_SETUP_SDHCI
->> +	select HAVE_PWM
-> Since Banajit's PWM backlight patches will be merged, should be following
-> your next patch.
->
-> +	select SAMSUNG_DEV_PWM
->
->
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-Dear Kukjin,
-Thanks for your review.
-I'm preparing next patch for your review including other modifications.
-But, I cannot find committed patches of PWM backlight of Banajit.
-Was it merged? If so, please tell me committed tree.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-Thank you,
-Donghwa Lee
+Platform/board specific portion of this patch depends on Mistral patches below
+
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
+
+I will submit a seperate patch set on top of these patches to support PRUSS
+UIO driver.
+
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
+
+ drivers/uio/Kconfig       |   17 +++
+ drivers/uio/Makefile      |    1 +
+ drivers/uio/uio_pruss.c   |  247 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/uio_pruss.h |   25 +++++
+ 4 files changed, 290 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
+ create mode 100644 include/linux/uio_pruss.h
