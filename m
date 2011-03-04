@@ -1,25 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Mar 2011 16:55:14 -0500 (EST)
-Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <87r5amftpx.fsf@ti.com>
-References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
-	<7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com>
-	<20110304174709.GB20560@atomide.com>
-	<AANLkTi=UCk5thBSM_JpFPRAr_POtx-DphP-DrVLBNyMG@mail.gmail.com>
-	<87r5amftpx.fsf@ti.com>
-Message-ID: <alpine.LFD.2.00.1103041654150.27995@xanadu.home>
+From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
+Date: Fri,  4 Mar 2011 17:09:11 -0500
+Subject: [PATCH 0/3] ARM: Add Scorpion/ScorpionMP support to perf and Oprofile
+Message-ID: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Mar 2011, Kevin Hilman wrote:
+This patchset contains the following features:
+It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
+and Oprofile.
+It adds PMU support for Scorpion and ScorpionMP.
+It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
 
-> Dave, just to confirm something The outstanding toolchain bugs only
-> affect compiling in Thumb-2 mode, right?  IOW, if I merge just this
-> series (without having the other toolchain workaround patches) we should
-> still be able to compile/run fine in ARM mode, correct?
+Sheetal Sahasrabudhe (3):
+  msm: Add support for Scorpion and ScorpionMP PMU
+  [ARM] perfevents: Add support for Scorpion performance monitors
+  [ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
 
-Correct.
+ arch/arm/include/asm/perf_event.h          |    2 +
+ arch/arm/kernel/perf_event.c               |   11 +
+ arch/arm/kernel/perf_event_qc.c            |  677 ++++++++++++++++++++++++++++
+ arch/arm/mach-msm/Makefile                 |    2 +
+ arch/arm/mach-msm/include/mach/irqs-7x30.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8960.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8x50.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8x60.h |    2 +-
+ arch/arm/mach-msm/pmu.c                    |   36 ++
+ arch/arm/oprofile/common.c                 |    4 +
+ 10 files changed, 736 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/kernel/perf_event_qc.c
+ create mode 100644 arch/arm/mach-msm/pmu.c
 
+-- 
+1.7.4.1
 
-Nicolas
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
