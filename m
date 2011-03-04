@@ -1,126 +1,58 @@
-From: dudl@cypress.com (dudl at cypress.com)
-Date: Fri, 04 Mar 2011 11:42:54 +0000
-Subject: CHROMIUM: arm: tegra: Add platfrom devices for Cypress trackpad
-	(issue6623011)
-Message-ID: <20cf3005123492db71049da6a54a@google.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Mar 2011 11:47:50 -0000
+Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use EOI
+	in parent chip
+In-Reply-To: <alpine.LFD.2.00.1103021806560.2701@localhost6.localdomain6>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
+	<20110228140327.GA1937@n2100.arm.linux.org.uk>
+	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
+	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
+	<20110228214445.GD1937@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
+	<20110301201904.GA27107@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+	<001301cbd8ef$29403c10$7bc0b430$@deacon@arm.com>
+	<alpine.LFD.2.00.1103021806560.2701@localhost6.localdomain6>
+Message-ID: <000401cbda61$fd8759e0$f8960da0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewers: ccross_android.com, konkers_android.com, olof_lixom.net,  
-linux_arm.linux.org.uk, linux-tegra_vger.kernel.org,  
-linux-arm-kernel_lists.infradead.org, linux-kernel_vger.kernel.org, Micah  
-C, dudl,
+Hi Thomas,
 
-Description:
-CHROMIUM: arm: tegra: Add platfrom devices for Cypress trackpad
+> > > irqchip1.c
+> > >
+> > > struct irq_chip1;
+> > >
+> > > handle_primary_irq(int irq, struct irq_desc *desc)
+> > > {
+> > > 	chip->irq_ack();
+> > > 	desc->demux();
+> > > }
+> > >
+> > > init()
+> > > {
+> > > 	irq_set_chip(PRIMARY_IRQ, &irq_chip1);
+> > > 	irq_set_primary_handler(PRIMARY_IRQ, handle_primary_irq);
+> > > }
+> >
+> > I think with this approach you get the exact opposite problem; that
+> > is the primary irq_chip doesn't know which IRQs are going to be
+> > demuxed so it cannot know at init time which IRQs need their primary
+> > handler set. Is the idea that you set_primary_handler for all IRQs,
+> > stash that in the descriptor somewhere and then replace handle_irq
+> > with the primary handler when a demux handler is registered?
+> >
+> > I guess I'm missing something here,
+> 
+> No, I missed that. Darn, yes this would need storing the
+> primary_handler in some separate pointer or having a callback into the
+> chip implementation to make this fully distangled.
 
-1. Add platfrom data strcuture cyapa_platfrom_data.
-2. Add trackpad device into platfrom I2C bus 0.
-3. Initialize platfrom data for cyapa_platfrom_data.
-4. This code is merged based kernel version 2.7.37-rc5.
+You could remove the need for pointer switching by having a bitmap
+indicating the flow control supported by the primary chip and then
+having a single primary handler implementation which checks the map.
+Not especially nice but it does allow for demux handlers to exist
+where they are sufficient.
 
-
-Change-Id: I3591317ac9c3b7d5328a9c617d662ad6be6065a2
-Signed-off-by: Du, Dudley <dudl@cypress.com>
-
-BUG=None
-TEST=Test on arm tegra2 seaborad and kaen platform
-
-Please review this at http://codereview.chromium.org/6623011/
-
-SVN Base: http://git.chromium.org/git/kernel-next.git at chromeos-2.6.37-rc5
-
-Affected files:
-   M arch/arm/mach-tegra/board-seaboard.h
-   M arch/arm/mach-tegra/board-seaboard.c
-
-
-Index: arch/arm/mach-tegra/board-seaboard.c
-diff --git a/arch/arm/mach-tegra/board-seaboard.c  
-b/arch/arm/mach-tegra/board-seaboard.c
-index  
-75fbab68ef61c0c117bb8dafa2aaca90947a860b..de272cc73794c6600994af3c0e834dd884f6b56b  
-100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -303,6 +303,36 @@ static struct tegra_i2c_platform_data  
-seaboard_dvc_platform_data = {
-  	.is_dvc		= true,
-  };
-
-+/* for Cypress Trackpad. */
-+#include <linux/cyapa.h>
-+
-+static int cyapa_i2c_platform_init(void)
-+{
-+	return 0;
-+}
-+
-+static int cyapa_i2c_platform_wakeup(void)
-+{
-+	return 0;
-+}
-+
-+static struct cyapa_platform_data cyapa_i2c_platform_data = {
-+	.flag = 0,
-+	.gen = CYAPA_GEN2,
-+	.power_state = CYAPA_PWR_ACTIVE,
-+	.use_absolute_mode = false,
-+	.use_polling_mode = false,
-+	.polling_interval_time_active = CYAPA_ACTIVE_POLLING_INTVAL_TIME,
-+	.polling_interval_time_lowpower = CYAPA_LOWPOWER_POLLING_INTVAL_TIME,
-+	.active_touch_timeout = CYAPA_ACTIVE_TOUCH_TIMEOUT,
-+	.name = CYAPA_I2C_NAME,
-+	.irq_gpio = TEGRA_GPIO_CYTP_INT,
-+	.report_rate = CYAPA_REPORT_RATE,
-+
-+	.wakeup = cyapa_i2c_platform_wakeup,
-+	.init = cyapa_i2c_platform_init,
-+};
-+
-  static struct i2c_board_info __initdata seaboard_i2c0_devices[] = {
-  	{
-  		I2C_BOARD_INFO("wm8903", 0x1a),
-@@ -311,6 +341,11 @@ static struct i2c_board_info __initdata  
-seaboard_i2c0_devices[] = {
-  		I2C_BOARD_INFO("isl29018", 0x44),
-  		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_ISL29018_IRQ),
-  	},
-+	{
-+		I2C_BOARD_INFO(CYAPA_I2C_NAME, 0x67),
-+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CYTP_INT),
-+		.platform_data = &cyapa_i2c_platform_data,
-+	},
-  };
-
-  static struct i2c_board_info __initdata seaboard_i2c4_devices[] = {
-@@ -549,6 +584,11 @@ static void __init tegra_seaboard_init(void)
-
-  	tegra_gpio_enable(TEGRA_GPIO_LIDSWITCH);
-  	tegra_gpio_enable(TEGRA_GPIO_POWERKEY);
-+
-+	/* for Cypress trackpad. */
-+	tegra_gpio_enable(TEGRA_GPIO_CYTP_INT);
-+	gpio_request(TEGRA_GPIO_CYTP_INT, "gpio_cytp_int");
-+	gpio_direction_input(TEGRA_GPIO_CYTP_INT);
-  }
-
-  MACHINE_START(SEABOARD, "seaboard")
-Index: arch/arm/mach-tegra/board-seaboard.h
-diff --git a/arch/arm/mach-tegra/board-seaboard.h  
-b/arch/arm/mach-tegra/board-seaboard.h
-index  
-5e1fc48bfa940056f2fd8e4c3bee5124d1398da4..4a38c4163ac338e90433a95afb90ec57a456ed1b  
-100644
---- a/arch/arm/mach-tegra/board-seaboard.h
-+++ b/arch/arm/mach-tegra/board-seaboard.h
-@@ -28,6 +28,9 @@
-  #define TEGRA_GPIO_ISL29018_IRQ		TEGRA_GPIO_PZ2
-  #define TEGRA_GPIO_AC_ONLINE		TEGRA_GPIO_PV3
-
-+/* for Cypress Trackpad gpio interrupt. */
-+#define TEGRA_GPIO_CYTP_INT		TEGRA_GPIO_PW2
-+
-  void seaboard_pinmux_init(void);
-  int seaboard_panel_init(void);
-  int seaboard_sdhci_init(void);
+Will
