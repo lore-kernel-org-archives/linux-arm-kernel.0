@@ -1,40 +1,23 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Mar 2011 11:09:50 +0000
-Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
-	setup function
-In-Reply-To: <8ya62rzlsol.fsf@huya.qualcomm.com>
-References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
-	<8ya62rzlsol.fsf@huya.qualcomm.com>
-Message-ID: <1299236990.10633.62.camel@e102391-lin.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Mar 2011 11:12:53 +0000
+Subject: [Qualcomm PM8921 MFD 2/6] mfd: pm8xxx: Add irq support
+In-Reply-To: <4D701C44.7090506@codeaurora.org>
+References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
+	<1299104001-5240-3-git-send-email-adharmap@codeaurora.org>
+	<20110302224616.GB32325@opensource.wolfsonmicro.com>
+	<4D6F1B2B.3090706@codeaurora.org>
+	<20110303152242.GB32234@opensource.wolfsonmicro.com>
+	<4D701C44.7090506@codeaurora.org>
+Message-ID: <20110304111253.GA17653@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-03 at 14:56 -0800, David Brown wrote:
-> On Wed, Mar 02 2011, Marc Zyngier wrote:
-> 
-> > diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-> >  }
-> >  
-> > -inline int local_timer_ack(void)
-> > +static inline int mem_local_timer_ack(void)
-> >  {
-> >  	return 1;
-> >  }
-> 
-> Mispelled 'msm'.
+On Thu, Mar 03, 2011 at 02:55:00PM -0800, Abhijeet Dharmapurikar wrote:
+> Mark Brown wrote:
 
-Damned. Thanks, will fix.
+>> Could you deal with this with a library instead?
 
-> Basic sanity test seems to be working at least on UMP.  Currently
-> testing SMP.
+> Can you please clarify what a library means here?
 
-Thanks for that. Please let me know how SMP goes.
-
-Cheers,
-
-	M.
--- 
-Reality is an implementation detail.
--- 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+You can share the code without creating a struct device, just have the
+driver for each chip call into the common code.
