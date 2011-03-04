@@ -1,30 +1,27 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 4 Mar 2011 18:16:13 +0000
-Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <20110304174709.GB20560@atomide.com>
-References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
-	<7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com>
-	<20110304174709.GB20560@atomide.com>
-Message-ID: <AANLkTi=UCk5thBSM_JpFPRAr_POtx-DphP-DrVLBNyMG@mail.gmail.com>
+From: mboards@prograde.net (Michael Cashwell)
+Date: Fri, 4 Mar 2011 13:42:17 -0500
+Subject: PXA270 Random Hangs at Low Core Freq
+In-Reply-To: <201103041816.08109.anarsoul@gmail.com>
+References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
+	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
+	<A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
+	<201103041816.08109.anarsoul@gmail.com>
+Message-ID: <8C145DA2-AEF8-42AC-A4FB-C93003808D8C@prograde.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 4, 2011 at 5:47 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110304 09:36]:
->> >
->> > Following up on this, it looks like I have some locally-recorded
->> > acks
->> > which didn't make it into my posting ...
->
-> To me looks like this is ready to go, but I'd like to see Kevin's
-> acks on this one as this touches the PM code.
->
-> Or if Kevin wants to take the series, here's my ack for the series:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On Mar 4, 2011, at 11:16 AM, Vasily Khoruzhick wrote:
 
-Thanks -- I'll wait for Kevin to comment also.
+> Hi, Michael, recently I discovered that PXA270 (at least in Zipit Z2) works unstable (just hangs randomly) with fastbus bit set in CCLKCFG, check if bootloader sets it on your board, and if it does try to clear it.
 
-Cheers
----Dave
+Hi Vasily,
+
+Thanks for the info. The curious thing is that arch/arm/mach-pxa/cpufreq-pxa2xx.c has a data table called pxa27x_freqs[] that seems to have FASTBUS set to true for all frequencies. So if CPUFREQ is enabled (which I do to save power) the kernel will enable FASTBUS even if the boot loader does not.
+
+The boot loader would control that feature only if CPUFREQ were turned off (either in the config or dynamically). Is that the case you mean? If you are not using CPUFREQ in Linux what fixed frequency are you running?
+
+What I've ultimately done is comment out all the lower frequencies. If it only switches between 416, 520 and 624 MHz it works fine. It only hangs for me if I also allow the lower frequencies, and interestingly, the lower I allow the sooner the hang happens. It's unfortunate since the lower frequencies would save more power but I simply cannot make them work reliably.
+
+I've still not been able to identify why this happens (largely since JTAG becomes unresponsive) or find any published errata that I'm not accounting for.
+
+-Mike
