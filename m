@@ -1,7 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu,  3 Mar 2011 21:22:04 -0300
-Subject: [PATCH v2] ARM: mx51: Print silicon revision on boot
-Message-ID: <1299198124-4064-1-git-send-email-festevam@gmail.com>
+Date: Thu,  3 Mar 2011 21:37:38 -0300
+Subject: [PATCH v3] ARM: mx51: Print silicon revision on boot
+Message-ID: <1299199058-5539-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,13 +15,14 @@ CPU identified as i.MX51, silicon rev 3.0
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
+Changes since v2:
+- Remove unneeded return inside mx51_display_revision 
 Changes since v1:
 - Added patch description
-
  arch/arm/mach-mx5/clock-mx51-mx53.c   |    1 +
- arch/arm/mach-mx5/cpu.c               |   21 +++++++++++++++++++++
+ arch/arm/mach-mx5/cpu.c               |   20 ++++++++++++++++++++
  arch/arm/plat-mxc/include/mach/mx51.h |    1 +
- 3 files changed, 23 insertions(+), 0 deletions(-)
+ 3 files changed, 22 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
 index 652ace4..1282a60 100644
@@ -36,10 +37,10 @@ index 652ace4..1282a60 100644
  
  	/* move usb_phy_clk to 24MHz */
 diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-index df46b5e..565ed4d 100644
+index df46b5e..da3d8c9 100644
 --- a/arch/arm/mach-mx5/cpu.c
 +++ b/arch/arm/mach-mx5/cpu.c
-@@ -51,6 +51,27 @@ int mx51_revision(void)
+@@ -51,6 +51,26 @@ int mx51_revision(void)
  }
  EXPORT_SYMBOL(mx51_revision);
  
@@ -57,7 +58,6 @@ index df46b5e..565ed4d 100644
 +		srev = "3.0";
 +		break;
 +	default:
-+		return IMX_CHIP_REVISION_UNKNOWN;
 +		srev = "unknown";
 +	}
 +	printk(KERN_INFO "CPU identified as i.MX51, silicon rev %s\n", srev);
