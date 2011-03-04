@@ -1,132 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 4 Mar 2011 21:50:08 +0100
-Subject: [PATCH 0/6] move mach-mx3/* to mach-imx
-Message-ID: <20110304205008.GX22310@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  4 Mar 2011 21:51:19 +0100
+Subject: [PATCH 3/6] ARM: mx3/pcm037: properly allocate memory for mx3-camera
+In-Reply-To: <20110304205008.GX22310@pengutronix.de>
+References: <20110304205008.GX22310@pengutronix.de>
+Message-ID: <1299271882-2130-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+There is no need to memzero the buffer because dma_alloc_coherent zeros
+the memory for us.
 
-this series on top of Sascha's imx-for-2.6.39 branch gets rid of
-mach-mx3.
+This fixes:
 
-It's compile tested on all in-tree mx_defconfigs + a mx25 build + a
-mxc91231 build and run tested on a pcm037 machine (i.e. a i.MX31) that
-is affected by the move.
+	BUG: Your driver calls ioremap() on system memory.  This leads
+	<4>to architecturally unpredictable behaviour on ARMv6+, and ioremap()
+	<4>will fail in the next kernel release.  Please fix your driver.
 
-Best regards
-Uwe
+Tested-by: Michael Grzeschik <mgr@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-mx3/mach-pcm037.c |   34 ++++++++++++++++++----------------
+ 1 files changed, 18 insertions(+), 16 deletions(-)
 
-The following changes since commit 4d2f13be1e370a670c1cae20c194d5ce961e0fa5:
-
-  ARM: imx3x: clean up ARCH_MX3X (2011-03-03 13:17:15 +0100)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/ukl/linux-2.6.git imx-for-2.6.39
-
-Uwe Kleine-K?nig (6):
-      ARM: mxc91231: select MXC_AVIC
-      ARM: mx3: dynamically allocate "mxc_rtc" devices
-      ARM: mx3/pcm037: properly allocate memory for mx3-camera
-      ARM: mx3/mx31moboard: properly allocate memory for mx3-camera
-      [RFC] ARM: mx3: dynamically allocate "ipu-core" devices
-      ARM: imx: move mx3 support to mach-imx
-
- arch/arm/Makefile                                  |    2 +-
- arch/arm/mach-imx/Kconfig                          |  269 ++++++++++++++++++++
- arch/arm/mach-imx/Makefile                         |   37 +++-
- arch/arm/mach-imx/Makefile.boot                    |    4 +
- arch/arm/mach-imx/cache-l2x0.c                     |   56 ++++
- arch/arm/{mach-mx3 => mach-imx}/clock-imx31.c      |    2 +-
- arch/arm/{mach-mx3 => mach-imx}/clock-imx35.c      |    0
- arch/arm/{mach-mx3/cpu.c => mach-imx/cpu-imx31.c}  |   38 +---
- arch/arm/mach-imx/cpu-imx35.c                      |   45 ++++
- .../crm_regs.h => mach-imx/crmregs-imx31.h}        |    0
- arch/arm/{mach-mx3 => mach-imx}/devices-imx31.h    |   12 +
- arch/arm/{mach-mx3 => mach-imx}/devices-imx35.h    |    8 +
- arch/arm/{mach-mx3 => mach-imx}/ehci-imx31.c       |    0
- arch/arm/{mach-mx3 => mach-imx}/ehci-imx35.c       |    0
- .../eukrea_mbimxsd35-baseboard.c}                  |   10 +-
- arch/arm/{mach-mx3 => mach-imx}/iomux-imx31.c      |    0
- .../arm/{mach-mx3 => mach-imx}/mach-armadillo5x0.c |   14 +-
- arch/arm/{mach-mx3 => mach-imx}/mach-bug.c         |    0
- arch/arm/{mach-mx3 => mach-imx}/mach-cpuimx35.c    |    1 -
- .../arm/{mach-mx3 => mach-imx}/mach-kzm_arm11_01.c |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-mx31_3ds.c    |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-mx31ads.c     |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-mx31lilly.c   |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-mx31lite.c    |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-mx31moboard.c |   66 +++--
- arch/arm/{mach-mx3 => mach-imx}/mach-mx35_3ds.c    |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-pcm037.c      |   65 +++---
- arch/arm/{mach-mx3 => mach-imx}/mach-pcm037_eet.c  |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-pcm043.c      |   12 +-
- arch/arm/{mach-mx3 => mach-imx}/mach-qong.c        |    1 -
- arch/arm/{mach-mx3 => mach-imx}/mach-vpr200.c      |   12 +-
- arch/arm/mach-imx/mm-imx31.c                       |   66 +++++
- arch/arm/mach-imx/mm-imx35.c                       |   63 +++++
- arch/arm/{mach-mx3 => mach-imx}/mx31lilly-db.c     |    8 +-
- arch/arm/{mach-mx3 => mach-imx}/mx31lite-db.c      |    3 +-
- .../{mach-mx3 => mach-imx}/mx31moboard-devboard.c  |    1 -
- .../{mach-mx3 => mach-imx}/mx31moboard-marxbot.c   |    1 -
- .../{mach-mx3 => mach-imx}/mx31moboard-smartbot.c  |    1 -
- arch/arm/{mach-mx3 => mach-imx}/pcm037.h           |    0
- arch/arm/mach-mx3/Kconfig                          |  257 -------------------
- arch/arm/mach-mx3/Makefile                         |   26 --
- arch/arm/mach-mx3/Makefile.boot                    |    3 -
- arch/arm/mach-mx3/devices.c                        |  115 ---------
- arch/arm/mach-mx3/devices.h                        |    4 -
- arch/arm/mach-mx3/mm.c                             |  141 ----------
- arch/arm/plat-mxc/Kconfig                          |    2 +-
- arch/arm/plat-mxc/devices/Kconfig                  |    6 +
- arch/arm/plat-mxc/devices/Makefile                 |    2 +
- arch/arm/plat-mxc/devices/platform-ipu-core.c      |  129 ++++++++++
- arch/arm/plat-mxc/devices/platform-mxc_rtc.c       |   40 +++
- arch/arm/plat-mxc/include/mach/devices-common.h    |   27 ++
- 51 files changed, 856 insertions(+), 700 deletions(-)
- create mode 100644 arch/arm/mach-imx/cache-l2x0.c
- rename arch/arm/{mach-mx3 => mach-imx}/clock-imx31.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/clock-imx35.c (100%)
- rename arch/arm/{mach-mx3/cpu.c => mach-imx/cpu-imx31.c} (72%)
- create mode 100644 arch/arm/mach-imx/cpu-imx35.c
- rename arch/arm/{mach-mx3/crm_regs.h => mach-imx/crmregs-imx31.h} (100%)
- rename arch/arm/{mach-mx3 => mach-imx}/devices-imx31.h (86%)
- rename arch/arm/{mach-mx3 => mach-imx}/devices-imx35.h (90%)
- rename arch/arm/{mach-mx3 => mach-imx}/ehci-imx31.c (100%)
- rename arch/arm/{mach-mx3 => mach-imx}/ehci-imx35.c (100%)
- rename arch/arm/{mach-mx3/eukrea_mbimxsd-baseboard.c => mach-imx/eukrea_mbimxsd35-baseboard.c} (97%)
- rename arch/arm/{mach-mx3 => mach-imx}/iomux-imx31.c (100%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-armadillo5x0.c (97%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-bug.c (100%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-cpuimx35.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-kzm_arm11_01.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx31_3ds.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx31ads.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx31lilly.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx31lite.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx31moboard.c (93%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-mx35_3ds.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-pcm037.c (94%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-pcm037_eet.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-pcm043.c (97%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-qong.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mach-vpr200.c (96%)
- create mode 100644 arch/arm/mach-imx/mm-imx31.c
- create mode 100644 arch/arm/mach-imx/mm-imx35.c
- rename arch/arm/{mach-mx3 => mach-imx}/mx31lilly-db.c (96%)
- rename arch/arm/{mach-mx3 => mach-imx}/mx31lite-db.c (98%)
- rename arch/arm/{mach-mx3 => mach-imx}/mx31moboard-devboard.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mx31moboard-marxbot.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/mx31moboard-smartbot.c (99%)
- rename arch/arm/{mach-mx3 => mach-imx}/pcm037.h (100%)
- delete mode 100644 arch/arm/mach-mx3/Kconfig
- delete mode 100644 arch/arm/mach-mx3/Makefile
- delete mode 100644 arch/arm/mach-mx3/Makefile.boot
- delete mode 100644 arch/arm/mach-mx3/devices.c
- delete mode 100644 arch/arm/mach-mx3/devices.h
- delete mode 100644 arch/arm/mach-mx3/mm.c
- create mode 100644 arch/arm/plat-mxc/devices/platform-ipu-core.c
- create mode 100644 arch/arm/plat-mxc/devices/platform-mxc_rtc.c
+diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
+index f07d3bd..497b39b 100644
+--- a/arch/arm/mach-mx3/mach-pcm037.c
++++ b/arch/arm/mach-mx3/mach-pcm037.c
+@@ -31,6 +31,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/gfp.h>
++#include <linux/memblock.h>
+ 
+ #include <media/soc_camera.h>
+ 
+@@ -410,25 +411,16 @@ struct mx3_camera_pdata camera_pdata = {
+ 	.mclk_10khz	= 2000,
+ };
+ 
+-static int __init pcm037_camera_alloc_dma(const size_t buf_size)
++static phys_addr_t mx3_camera_base __initdata;
++#define MX3_CAMERA_BUF_SIZE SZ_4M
++
++static int __init pcm037_camera_alloc_dma(void)
+ {
+-	dma_addr_t dma_handle;
+-	void *buf;
+ 	int dma;
+ 
+-	if (buf_size < 2 * 1024 * 1024)
+-		return -EINVAL;
+-
+-	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+-	if (!buf) {
+-		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+-		return -ENOMEM;
+-	}
+-
+-	memset(buf, 0, buf_size);
+-
+ 	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+-					dma_handle, dma_handle, buf_size,
++					mx3_camera_base, mx3_camera_base,
++					MX3_CAMERA_BUF_SIZE,
+ 					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+ 
+ 	/* The way we call dma_declare_coherent_memory only a malloc can fail */
+@@ -649,7 +641,7 @@ static void __init pcm037_init(void)
+ 	else
+ 		iclink_mt9t031.power = NULL;
+ 
+-	if (!pcm037_camera_alloc_dma(4 * 1024 * 1024))
++	if (!pcm037_camera_alloc_dma())
+ 		mxc_register_device(&mx3_camera, &camera_pdata);
+ 
+ 	platform_device_register(&pcm970_sja1000);
+@@ -680,9 +672,19 @@ struct sys_timer pcm037_timer = {
+ 	.init	= pcm037_timer_init,
+ };
+ 
++static void __init pcm037_reserve(void)
++{
++	/* reserve 4 MiB for mx3-camera */
++	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
++			MX3_CAMERA_BUF_SIZE);
++	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
++	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
++}
++
+ MACHINE_START(PCM037, "Phytec Phycore pcm037")
+ 	/* Maintainer: Pengutronix */
+ 	.boot_params = MX3x_PHYS_OFFSET + 0x100,
++	.reserve = pcm037_reserve,
+ 	.map_io = mx31_map_io,
+ 	.init_early = imx31_init_early,
+ 	.init_irq = mx31_init_irq,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.3
