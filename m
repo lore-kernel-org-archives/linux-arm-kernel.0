@@ -1,216 +1,543 @@
 From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Fri,  4 Mar 2011 14:21:38 +0900
-Subject: [PATCH V2 2/3] ARM: S5P: Update machine initialization for HRT
+Date: Fri,  4 Mar 2011 14:21:37 +0900
+Subject: [PATCH V2 1/3] ARM: S5P: Add s5p_timer support for HRT
 In-Reply-To: <1299216099-7709-1-git-send-email-sbkim73@samsung.com>
 References: <1299216099-7709-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1299216099-7709-3-git-send-email-sbkim73@samsung.com>
+Message-ID: <1299216099-7709-2-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update mach-s5p64x0 and mach-s5pv210
-machine  initialization for hrt support.
-PWM Timer3 is used for default clockevent.
-PWM Timer4 is used for defualt clocksource.
+This patch adds support HR-Timer(High Resolution Timer) and dynamic
+tick system for S5P SoCs. There are many clock sources for HR-Timer
+on S5P SoCs. The PWM timer, RTC, System Timer, and MCT can be used
+for clock source.
+This patch can only support PWM timer for clocksource of
+S5P64x0 and S5PV210.
 
 Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-s5p64x0/mach-smdk6440.c |    4 +++-
- arch/arm/mach-s5p64x0/mach-smdk6450.c |    4 +++-
- arch/arm/mach-s5pv210/mach-aquila.c   |    4 +++-
- arch/arm/mach-s5pv210/mach-goni.c     |    4 +++-
- arch/arm/mach-s5pv210/mach-smdkc110.c |    4 +++-
- arch/arm/mach-s5pv210/mach-smdkv210.c |    4 +++-
- arch/arm/mach-s5pv210/mach-torbreck.c |    4 +++-
- 7 files changed, 21 insertions(+), 7 deletions(-)
+ arch/arm/plat-s5p/Makefile                |    1 +
+ arch/arm/plat-s5p/include/plat/s5p-time.h |   40 +++
+ arch/arm/plat-s5p/s5p-time.c              |  452 +++++++++++++++++++++++++++++
+ 3 files changed, 493 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-s5p/include/plat/s5p-time.h
+ create mode 100644 arch/arm/plat-s5p/s5p-time.c
 
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index e5beb84..676e5c1 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -43,6 +43,7 @@
- #include <plat/pll.h>
- #include <plat/adc.h>
- #include <plat/ts.h>
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 4bd5cf9..3b8cc2f 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -22,6 +22,7 @@ obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
+ obj-$(CONFIG_S5P_SYSTEM_MMU)	+= sysmmu.o
+ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_PM)		+= irq-pm.o
++obj-$(CONFIG_GENERIC_CLOCKEVENTS) += s5p-time.o
+ 
+ # devices
+ 
+diff --git a/arch/arm/plat-s5p/include/plat/s5p-time.h b/arch/arm/plat-s5p/include/plat/s5p-time.h
+new file mode 100644
+index 0000000..9956136
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/s5p-time.h
+@@ -0,0 +1,40 @@
++/* linux/arch/arm/plat-s5p/include/plat/s5p-time.h
++ *
++ * Copyright 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * Header file for s5p time support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_S5P_TIME_H
++#define __ASM_PLAT_S5P_TIME_H __FILE__
++
++/* S5P HR-Timer Clock mode */
++enum s5p_timer_mode {
++	S5P_PWM0,
++	S5P_PWM1,
++	S5P_PWM2,
++	S5P_PWM3,
++	S5P_PWM4,
++};
++
++struct s5p_timer_source {
++	unsigned int event_id;
++	unsigned int source_id;
++};
++
++/* Be able to sleep for atleast 4 seconds (usually more) */
++#define S5PTIMER_MIN_RANGE	4
++
++#define TCNT_MAX		0xffffffff
++#define NON_PERIODIC		0
++#define PERIODIC		1
++
++extern void __init s5p_set_timer_source(enum s5p_timer_mode event,
++					enum s5p_timer_mode source);
++extern	struct sys_timer s5p_timer;
++#endif /* __ASM_PLAT_S5P_TIME_H */
+diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
+new file mode 100644
+index 0000000..1d2447e
+--- /dev/null
++++ b/arch/arm/plat-s5p/s5p-time.c
+@@ -0,0 +1,452 @@
++/* linux/arch/arm/plat-s5p/s5p-time.c
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P - Common hr-timer support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/sched.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/platform_device.h>
++
++#include <asm/smp_twd.h>
++#include <asm/mach/time.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/sched_clock.h>
++
++#include <mach/map.h>
++#include <plat/devs.h>
++#include <plat/regs-timer.h>
 +#include <plat/s5p-time.h>
- 
- #define SMDK6440_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -136,6 +137,7 @@ static void __init smdk6440_map_io(void)
- 	s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
- 	s3c24xx_init_clocks(12000000);
- 	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init smdk6440_machine_init(void)
-@@ -159,5 +161,5 @@ MACHINE_START(SMDK6440, "SMDK6440")
- 	.init_irq	= s5p6440_init_irq,
- 	.map_io		= smdk6440_map_io,
- 	.init_machine	= smdk6440_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-index 3a20de0..b474ef4 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -43,6 +43,7 @@
- #include <plat/pll.h>
- #include <plat/adc.h>
- #include <plat/ts.h>
-+#include <plat/s5p-time.h>
- 
- #define SMDK6450_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -155,6 +156,7 @@ static void __init smdk6450_map_io(void)
- 	s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
- 	s3c24xx_init_clocks(19200000);
- 	s3c24xx_init_uarts(smdk6450_uartcfgs, ARRAY_SIZE(smdk6450_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init smdk6450_machine_init(void)
-@@ -178,5 +180,5 @@ MACHINE_START(SMDK6450, "SMDK6450")
- 	.init_irq	= s5p6450_init_irq,
- 	.map_io		= smdk6450_map_io,
- 	.init_machine	= smdk6450_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 557add4..9a7b47e 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -39,6 +39,7 @@
- #include <plat/fb.h>
- #include <plat/fimc-core.h>
- #include <plat/sdhci.h>
-+#include <plat/s5p-time.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define AQUILA_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -664,6 +665,7 @@ static void __init aquila_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(aquila_uartcfgs, ARRAY_SIZE(aquila_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init aquila_machine_init(void)
-@@ -698,5 +700,5 @@ MACHINE_START(AQUILA, "Aquila")
- 	.init_irq	= s5pv210_init_irq,
- 	.map_io		= aquila_map_io,
- 	.init_machine	= aquila_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 056f5c7..4ed619a 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -45,6 +45,7 @@
- #include <plat/keypad.h>
- #include <plat/sdhci.h>
- #include <plat/clock.h>
-+#include <plat/s5p-time.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define GONI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -823,6 +824,7 @@ static void __init goni_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(goni_uartcfgs, ARRAY_SIZE(goni_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init goni_machine_init(void)
-@@ -873,5 +875,5 @@ MACHINE_START(GONI, "GONI")
- 	.init_irq	= s5pv210_init_irq,
- 	.map_io		= goni_map_io,
- 	.init_machine	= goni_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
-index ce11a02..6c412c8 100644
---- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-@@ -30,6 +30,7 @@
- #include <plat/ata.h>
- #include <plat/iic.h>
- #include <plat/pm.h>
-+#include <plat/s5p-time.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define SMDKC110_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -111,6 +112,7 @@ static void __init smdkc110_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init smdkc110_machine_init(void)
-@@ -138,5 +140,5 @@ MACHINE_START(SMDKC110, "SMDKC110")
- 	.init_irq	= s5pv210_init_irq,
- 	.map_io		= smdkc110_map_io,
- 	.init_machine	= smdkc110_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index bc9fdb5..9e2be7f 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -43,6 +43,7 @@
- #include <plat/keypad.h>
- #include <plat/pm.h>
- #include <plat/fb.h>
-+#include <plat/s5p-time.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define SMDKV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -272,6 +273,7 @@ static void __init smdkv210_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init smdkv210_machine_init(void)
-@@ -306,5 +308,5 @@ MACHINE_START(SMDKV210, "SMDKV210")
- 	.init_irq	= s5pv210_init_irq,
- 	.map_io		= smdkv210_map_io,
- 	.init_machine	= smdkv210_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-s5pv210/mach-torbreck.c
-index 043c938..925fc0d 100644
---- a/arch/arm/mach-s5pv210/mach-torbreck.c
-+++ b/arch/arm/mach-s5pv210/mach-torbreck.c
-@@ -27,6 +27,7 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/iic.h>
-+#include <plat/s5p-time.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define TORBRECK_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -104,6 +105,7 @@ static void __init torbreck_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(torbreck_uartcfgs, ARRAY_SIZE(torbreck_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
- }
- 
- static void __init torbreck_machine_init(void)
-@@ -127,5 +129,5 @@ MACHINE_START(TORBRECK, "TORBRECK")
- 	.init_irq	= s5pv210_init_irq,
- 	.map_io		= torbreck_map_io,
- 	.init_machine	= torbreck_machine_init,
--	.timer		= &s3c24xx_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
++
++static struct clk *tin_event;
++static struct clk *tin_source;
++static struct clk *tdiv_event;
++static struct clk *tdiv_source;
++static struct clk *timerclk;
++static struct s5p_timer_source timer_source;
++static unsigned long clock_count_per_tick;
++static void s5p_timer_resume(void);
++
++static void s5p_time_stop(enum s5p_timer_mode mode)
++{
++	unsigned long tcon;
++
++	tcon = __raw_readl(S3C2410_TCON);
++
++	switch (mode) {
++	case S5P_PWM0:
++		tcon &= ~S3C2410_TCON_T0START;
++		break;
++
++	case S5P_PWM1:
++		tcon &= ~S3C2410_TCON_T1START;
++		break;
++
++	case S5P_PWM2:
++		tcon &= ~S3C2410_TCON_T2START;
++		break;
++
++	case S5P_PWM3:
++		tcon &= ~S3C2410_TCON_T3START;
++		break;
++
++	case S5P_PWM4:
++		tcon &= ~S3C2410_TCON_T4START;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", mode);
++		break;
++	}
++	__raw_writel(tcon, S3C2410_TCON);
++}
++
++static void s5p_time_setup(enum s5p_timer_mode mode, unsigned long tcnt)
++{
++	unsigned long tcon;
++
++	tcon = __raw_readl(S3C2410_TCON);
++
++	tcnt--;
++
++	switch (mode) {
++	case S5P_PWM0:
++		tcon &= ~(0x0f << 0);
++		tcon |= S3C2410_TCON_T0MANUALUPD;
++		break;
++
++	case S5P_PWM1:
++		tcon &= ~(0x0f << 8);
++		tcon |= S3C2410_TCON_T1MANUALUPD;
++		break;
++
++	case S5P_PWM2:
++		tcon &= ~(0x0f << 12);
++		tcon |= S3C2410_TCON_T2MANUALUPD;
++		break;
++
++	case S5P_PWM3:
++		tcon &= ~(0x0f << 16);
++		tcon |= S3C2410_TCON_T3MANUALUPD;
++		break;
++
++	case S5P_PWM4:
++		tcon &= ~(0x07 << 20);
++		tcon |= S3C2410_TCON_T4MANUALUPD;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", mode);
++		break;
++	}
++
++	__raw_writel(tcnt, S3C2410_TCNTB(mode));
++	__raw_writel(tcnt, S3C2410_TCMPB(mode));
++	__raw_writel(tcon, S3C2410_TCON);
++}
++
++static void s5p_time_start(enum s5p_timer_mode mode, bool periodic)
++{
++	unsigned long tcon;
++
++	tcon  = __raw_readl(S3C2410_TCON);
++
++	switch (mode) {
++	case S5P_PWM0:
++		tcon |= S3C2410_TCON_T0START;
++		tcon &= ~S3C2410_TCON_T0MANUALUPD;
++
++		if (periodic)
++			tcon |= S3C2410_TCON_T0RELOAD;
++		else
++			tcon &= ~S3C2410_TCON_T0RELOAD;
++		break;
++
++	case S5P_PWM1:
++		tcon |= S3C2410_TCON_T1START;
++		tcon &= ~S3C2410_TCON_T1MANUALUPD;
++
++		if (periodic)
++			tcon |= S3C2410_TCON_T1RELOAD;
++		else
++			tcon &= ~S3C2410_TCON_T1RELOAD;
++		break;
++
++	case S5P_PWM2:
++		tcon |= S3C2410_TCON_T2START;
++		tcon &= ~S3C2410_TCON_T2MANUALUPD;
++
++		if (periodic)
++			tcon |= S3C2410_TCON_T2RELOAD;
++		else
++			tcon &= ~S3C2410_TCON_T2RELOAD;
++		break;
++
++	case S5P_PWM3:
++		tcon |= S3C2410_TCON_T3START;
++		tcon &= ~S3C2410_TCON_T3MANUALUPD;
++
++		if (periodic)
++			tcon |= S3C2410_TCON_T3RELOAD;
++		else
++			tcon &= ~S3C2410_TCON_T3RELOAD;
++		break;
++
++	case S5P_PWM4:
++		tcon |= S3C2410_TCON_T4START;
++		tcon &= ~S3C2410_TCON_T4MANUALUPD;
++
++		if (periodic)
++			tcon |= S3C2410_TCON_T4RELOAD;
++		else
++			tcon &= ~S3C2410_TCON_T4RELOAD;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", mode);
++		break;
++	}
++	__raw_writel(tcon, S3C2410_TCON);
++}
++
++static int s5p_set_next_event(unsigned long cycles,
++				struct clock_event_device *evt)
++{
++	s5p_time_setup(timer_source.event_id, cycles);
++	s5p_time_start(timer_source.event_id, NON_PERIODIC);
++
++	return 0;
++}
++
++static void s5p_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *evt)
++{
++	s5p_time_stop(timer_source.event_id);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		s5p_time_setup(timer_source.event_id, clock_count_per_tick);
++		s5p_time_start(timer_source.event_id, PERIODIC);
++		break;
++
++	case CLOCK_EVT_MODE_ONESHOT:
++		break;
++
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		break;
++
++	case CLOCK_EVT_MODE_RESUME:
++		s5p_timer_resume();
++		break;
++	}
++}
++
++static void s5p_timer_resume(void)
++{
++	/* event timer restart */
++	s5p_time_setup(timer_source.event_id, clock_count_per_tick);
++	s5p_time_start(timer_source.event_id, PERIODIC);
++
++	/* source timer restart */
++	s5p_time_setup(timer_source.source_id, TCNT_MAX);
++	s5p_time_start(timer_source.source_id, PERIODIC);
++}
++
++void __init s5p_set_timer_source(enum s5p_timer_mode event,
++				 enum s5p_timer_mode source)
++{
++	s3c_device_timer[event].dev.bus = &platform_bus_type;
++	s3c_device_timer[source].dev.bus = &platform_bus_type;
++
++	timer_source.event_id = event;
++	timer_source.source_id = source;
++}
++
++static struct clock_event_device time_event_device = {
++	.name		= "s5p_event_timer",
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.rating		= 200,
++	.shift		= 32,
++	.set_next_event	= s5p_set_next_event,
++	.set_mode	= s5p_set_mode,
++};
++
++static irqreturn_t s5p_clock_event_isr(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction s5p_clock_event_irq = {
++	.name		= "s5p_time_irq",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= s5p_clock_event_isr,
++	.dev_id		= &time_event_device,
++};
++
++static void __init s5p_clockevent_init(void)
++{
++	unsigned long pclk;
++	unsigned long clock_rate;
++	unsigned int irq_number;
++	struct clk *tscaler;
++
++	pclk = clk_get_rate(timerclk);
++
++	tscaler = clk_get_parent(tdiv_event);
++
++	clk_set_rate(tscaler, pclk / 2);
++	clk_set_rate(tdiv_event, pclk / 2);
++	clk_set_parent(tin_event, tdiv_event);
++
++	clock_rate = clk_get_rate(tin_event);
++	clock_count_per_tick = clock_rate / HZ;
++
++	clockevents_calc_mult_shift(&time_event_device,
++				    clock_rate, S5PTIMER_MIN_RANGE);
++	time_event_device.max_delta_ns =
++		clockevent_delta2ns(-1, &time_event_device);
++	time_event_device.min_delta_ns =
++		clockevent_delta2ns(1, &time_event_device);
++
++	time_event_device.cpumask = cpumask_of(0);
++	clockevents_register_device(&time_event_device);
++
++	irq_number = timer_source.event_id + IRQ_TIMER0;
++	setup_irq(irq_number, &s5p_clock_event_irq);
++}
++
++static cycle_t s5p_timer_read(struct clocksource *cs)
++{
++	unsigned long offset = 0;
++
++	switch (timer_source.source_id) {
++	case S5P_PWM0:
++	case S5P_PWM1:
++	case S5P_PWM2:
++	case S5P_PWM3:
++		offset = (timer_source.source_id * 0x0c) + 0x14;
++		break;
++
++	case S5P_PWM4:
++		offset = 0x40;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
++		return 0;
++	}
++
++	return (cycle_t) ~__raw_readl(S3C_TIMERREG(offset));
++}
++
++/*
++ * Override the global weak sched_clock symbol with this
++ * local implementation which uses the clocksource to get some
++ * better resolution when scheduling the kernel. We accept that
++ * this wraps around for now, since it is just a relative time
++ * stamp. (Inspired by U300 implementation.)
++ */
++static DEFINE_CLOCK_DATA(cd);
++
++unsigned long long notrace sched_clock(void)
++{
++	u32 cyc;
++	unsigned long offset = 0;
++
++	switch (timer_source.source_id) {
++	case S5P_PWM0:
++	case S5P_PWM1:
++	case S5P_PWM2:
++	case S5P_PWM3:
++		offset = (timer_source.source_id * 0x0c) + 0x14;
++		break;
++
++	case S5P_PWM4:
++		offset = 0x40;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
++		return 0;
++	}
++
++	cyc = ~__raw_readl(S3C_TIMERREG(offset));
++	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
++}
++
++static void notrace s5p_update_sched_clock(void)
++{
++	u32 cyc;
++	unsigned long offset = 0;
++
++	switch (timer_source.source_id) {
++	case S5P_PWM0:
++	case S5P_PWM1:
++	case S5P_PWM2:
++	case S5P_PWM3:
++		offset = (timer_source.source_id * 0x0c) + 0x14;
++		break;
++
++	case S5P_PWM4:
++		offset = 0x40;
++		break;
++
++	default:
++		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
++	}
++
++	cyc = ~__raw_readl(S3C_TIMERREG(offset));
++	update_sched_clock(&cd, cyc, (u32)~0);
++}
++
++struct clocksource time_clocksource = {
++	.name		= "s5p_clocksource_timer",
++	.rating		= 250,
++	.read		= s5p_timer_read,
++	.mask		= CLOCKSOURCE_MASK(32),
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static void __init s5p_clocksource_init(void)
++{
++	unsigned long pclk;
++	unsigned long clock_rate;
++
++	pclk = clk_get_rate(timerclk);
++
++	clk_set_rate(tdiv_source, pclk / 2);
++	clk_set_parent(tin_source, tdiv_source);
++
++	clock_rate = clk_get_rate(tin_source);
++
++	init_sched_clock(&cd, s5p_update_sched_clock, 32, clock_rate);
++
++	s5p_time_setup(timer_source.source_id, TCNT_MAX);
++	s5p_time_start(timer_source.source_id, PERIODIC);
++
++	if (clocksource_register_hz(&time_clocksource, clock_rate))
++		panic("%s: can't register clocksource\n", time_clocksource.name);
++}
++
++static void __init s5p_timer_resources(void)
++{
++
++	unsigned long event_id = timer_source.event_id;
++	unsigned long source_id = timer_source.source_id;
++
++	timerclk = clk_get(NULL, "timers");
++
++	clk_enable(timerclk);
++
++	if (IS_ERR(timerclk))
++		panic("failed to get timers clock for timer");
++
++	tin_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tin");
++
++	if (IS_ERR(tin_event))
++		panic("failed to get pwm-tin clock for event timer");
++
++	tdiv_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tdiv");
++
++	if (IS_ERR(tdiv_event))
++		panic("failed to get pwm-tdiv clock for event timer");
++
++	clk_enable(tin_event);
++
++	tin_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tin");
++	if (IS_ERR(tin_source))
++		panic("failed to get pwm-tin clock for source timer");
++
++	tdiv_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tdiv");
++	if (IS_ERR(tdiv_source))
++		panic("failed to get pwm-tdiv clock for source timer");
++
++	clk_enable(tin_source);
++}
++
++static void __init s5p_timer_init(void)
++{
++	s5p_timer_resources();
++	s5p_clockevent_init();
++	s5p_clocksource_init();
++}
++
++struct sys_timer s5p_timer = {
++	.init		= s5p_timer_init,
++};
 -- 
 1.7.1
