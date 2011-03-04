@@ -1,272 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 Mar 2011 09:19:16 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <20110303201009.GT22310@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110303121153.GJ29521@pengutronix.de>
-	<20110303162513.GS22310@pengutronix.de>
-	<20110303180026.GC18351@pengutronix.de>
-	<20110303201009.GT22310@pengutronix.de>
-Message-ID: <20110304081916.GB29521@pengutronix.de>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 04 Mar 2011 08:25:51 +0000
+Subject: [PATCH 2/4] OMAP3 I2C document why cpu type and not peripheral
+	unit ID used to probe
+In-Reply-To: <4D700441.50206@ti.com>
+References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
+	<20110303135030.30648.14923.stgit@otae.warmcat.com>
+	<4D700441.50206@ti.com>
+Message-ID: <4D70A20F.6070508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 09:10:09PM +0100, Uwe Kleine-K?nig wrote:
-> Right, it's not sensible to do this selection, but the fact that it is
-> possible makes me feel it's ugly. I thought a bit more about that I and
-> another reason for not using SOC_IMXxy for Kconfig is that it might be
-> natural to group i.MX50 and i.MX53 together because they share the same
-> PHYS_OFFSET. So there are three possibilities:
-> 
->  1) group them using a symbol named SOC_IMX50_IMX53
->  2) select both SOC_IMX50 and SOC_IMX53 independant of the machines
->     enabled.
->  3) don't allow to build both SoCs into a single image without
->     IMX_MULTI_ARCHITECTURE
-> 
-> 2) is similar to my first suggestion---it might make things more
-> complicated than necessary at runtime. 3) is a limitation that shouldn't
-> be needed. So 1) is the best? Then I prefer to have a completly
-> different naming scheme for the grouping.
-> 
-> Does this make sense?
+On 03/03/2011 09:12 PM, Somebody in the thread at some point said:
 
-Lets give it a try. How does the following look like? Note I also skipped
-The explicit IMX_MULTI_ARCHITECTURE switch and depend on
-ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR directly instead.
+Hi -
 
-8<---------------------------------------
+Thanks for your comments.
 
-ARM i.MX: Allow to compile armv4 and armv5 based i.MX SoCs in a single kernel
+> The issue is that this revision field is not really documented in OMAP4
+> TRM, so you should not rely on it. Moreover, as you already noticed, the
+> revision number is not even accurate. OMAP3 and 4 are using a different
+> programming model but this is not reflected in this field.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig |  109 +++++++++++++++++++++++++++++++++++----------
- arch/arm/plat-mxc/Kconfig |   17 +------
- 2 files changed, 88 insertions(+), 38 deletions(-)
+OK.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 5eec099..932084c 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -1,8 +1,28 @@
-+if ARCH_IMX
-+
- config IMX_HAVE_DMA_V1
- 	bool
- 
-+# obsolete: The MACH_MX/ARCH_MX should go away once the users
-+# are moved to the corresponding SOC_IMX_* in the tree
-+config MACH_MX21
-+	bool
-+
-+config MACH_MX27
-+	bool
-+
-+config ARCH_MX25
-+	bool
-+
-+config ARCH_MX2
-+	bool
-+
-+config ARCH_MX1
-+	bool
-+
- config SOC_IMX1
- 	bool
-+	select ARCH_MX1
- 	select CPU_ARM920T
- 	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
-@@ -10,6 +30,8 @@ config SOC_IMX1
- 
- config SOC_IMX21
- 	bool
-+	select MACH_MX21
-+	select ARCH_MX2
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
- 	select IMX_HAVE_DMA_V1
-@@ -18,6 +40,7 @@ config SOC_IMX21
- 
- config SOC_IMX25
- 	bool
-+	select ARCH_MX25
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V2
- 	select ARCH_MXC_IOMUX_V3
-@@ -25,13 +48,68 @@ config SOC_IMX25
- 
- config SOC_IMX27
- 	bool
-+	select ARCH_MX2
-+	select MACH_MX27
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
- 	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
- 
--if ARCH_MX1
-+config ARCH_ALLOW_IMX1
-+	bool
-+
-+config ARCH_ALLOW_IMX21
-+	bool
-+
-+config ARCH_ALLOW_IMX25
-+	bool
-+
-+config ARCH_ALLOW_IMX27
-+	bool
-+
-+if ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR
-+config ARCH_IMX_MULTI_IMX1
-+	select ARCH_ALLOW_IMX1
-+	bool "i.MX1 support"
-+
-+config ARCH_IMX_MULTI_IMX21
-+	select ARCH_ALLOW_IMX21
-+	bool "i.MX21 support"
-+
-+config ARCH_IMX_MULTI_IMX25
-+	select ARCH_ALLOW_IMX25
-+	bool "i.MX25 support"
-+
-+config ARCH_IMX_MULTI_OMX27
-+	select ARCH_ALLOW_IMX27
-+	bool "i.MX27 support"
-+endif
-+
-+if !(ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR)
-+comment "enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR to get"
-+comment "support for multiple i.MX Families"
-+choice
-+	prompt "Select i.MX CPU"
-+config ARCH_IMX_ONLY_IMX1
-+	select ARCH_ALLOW_IMX1
-+	bool "i.MX1 support"
-+
-+config ARCH_IMX_ONLY_IMX21
-+	select ARCH_ALLOW_IMX21
-+	bool "i.MX21 support"
-+
-+config ARCH_IMX_ONLY_IMX25
-+	select ARCH_ALLOW_IMX25
-+	bool "i.MX25 support"
-+
-+config ARCH_IMX_ONLY_IMX27
-+	select ARCH_ALLOW_IMX27
-+	bool "i.MX27 support"
-+endchoice
-+endif
-+
-+if ARCH_ALLOW_IMX1
- 
- comment "MX1 platforms:"
- config MACH_MXLADS
-@@ -39,6 +117,7 @@ config MACH_MXLADS
- 
- config ARCH_MX1ADS
- 	bool "MX1ADS platform"
-+	select SOC_IMX1
- 	select MACH_MXLADS
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
-@@ -48,32 +127,13 @@ config ARCH_MX1ADS
- config MACH_SCB9328
- 	bool "Synertronixx scb9328"
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select SOC_IMX1
- 	help
- 	  Say Y here if you are using a Synertronixx scb9328 board
- 
- endif
- 
--if ARCH_MX2
--
--choice
--	prompt "CPUs:"
--	default MACH_MX21
--
--config MACH_MX21
--	bool "i.MX21 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX21 processor.
--
--config MACH_MX27
--	bool "i.MX27 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX27 processor.
--
--endchoice
--
--endif
--
--if MACH_MX21
-+if ARCH_ALLOW_IMX21
- 
- comment "MX21 platforms:"
- 
-@@ -90,7 +150,7 @@ config MACH_MX21ADS
- 
- endif
- 
--if ARCH_MX25
-+if ARCH_ALLOW_IMX25
- 
- comment "MX25 platforms:"
- 
-@@ -138,7 +198,7 @@ endchoice
- 
- endif
- 
--if MACH_MX27
-+if ARCH_ALLOW_IMX27
- 
- comment "MX27 platforms:"
- 
-@@ -313,3 +373,4 @@ config MACH_IMX27IPCAM
- 	  configurations for the board and its peripherals.
- 
- endif
-+endif
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index b0cb425..5625e78 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -8,21 +8,10 @@ choice
- 	prompt "Freescale CPU family:"
- 	default ARCH_MX3
- 
--config ARCH_MX1
--	bool "MX1-based"
--	select SOC_IMX1
-+config ARCH_IMX
-+	bool "i.MX1, i.MX21, i.MX25, i.MX27 based"
- 	help
--	  This enables support for systems based on the Freescale i.MX1 family
--
--config ARCH_MX2
--	bool "MX2-based"
--	help
--	  This enables support for systems based on the Freescale i.MX2 family
--
--config ARCH_MX25
--	bool "MX25-based"
--	help
--	  This enables support for systems based on the Freescale i.MX25 family
-+	  This enables support for systems based on the Freescale i.MX1/2 family
- 
- config ARCH_MX3
- 	bool "MX3-based"
--- 
-1.7.2.3
+> Since that issue is quite common in many OMAP IPs, we introduced a SW
+> field in hwmod_class that should reflect the change in IP programming
+> model. For the moment it is a simple integer that we increment each time
+> there is change in a programming model that will impact the driver.
+>
+> You can check how it was done for the timer for example:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alright.  In I2C case the path is hwmod class -> platform data though 
+since hwmod content directly is not used in the driver, but platform 
+data is.
+
+>> +
+>> if (cpu_is_omap44xx())
+>> dev->regs = (u8 *) omap4_reg_map;
+>
+> OK, this is not part of your patch, but any call to cpu_is are forbidden
+> from the driver. As soon as you have the revision field from hwmod you
+> can get rid of all that code.
+
+Well, as you point out they are not forbidden enough since I was just 
+working with what was already there.
+
+However this hwmod scheme will cover it all AFAICS, so I will extend the 
+patches to nuke all cpu_is... from the driver.
+
+-Andy
