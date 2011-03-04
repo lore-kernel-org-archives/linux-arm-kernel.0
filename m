@@ -1,24 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Mar 2011 16:28:57 +0900
-Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
-References: <4D676BB8.9040803@samsung.com>
-	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
-	<4D6B5949.8020606@samsung.com>
-	<002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
-Message-ID: <028201cbda3d$d5dc83d0$81958b70$%kim@samsung.com>
+Date: Fri, 04 Mar 2011 16:31:21 +0900
+Subject: [PATCH] ARM: EXYNOS4: enabled lcd and backlight in NURI board
+In-Reply-To: <4D706D7B.8020009@samsung.com>
+References: <1299028671-9062-1-git-send-email-dh09.lee@samsung.com>
+	<01ad01cbd961$40e69720$c2b3c560$%kim@samsung.com>
+	<4D706D7B.8020009@samsung.com>
+Message-ID: <028501cbda3e$2b4c2870$81e47950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Donghwa Lee wrote:
 > 
-> Oops, NURI board is not registered yet :(
-> So can't merge this before updating it now.
-> Or should drop update defconfig from this...
+>  On 2011-03-03, Kukjin Kim wrote:
+> >
+> >>  #
+> >>  # Display device support
+> >> diff --git a/arch/arm/mach-exynos4/Kconfig
+b/arch/arm/mach-exynos4/Kconfig
+> >> index 5bf00b9..1d0d222 100644
+> >> --- a/arch/arm/mach-exynos4/Kconfig
+> >> +++ b/arch/arm/mach-exynos4/Kconfig
+> >> @@ -135,6 +135,7 @@ config MACH_NURI
+> >>  	select EXYNOS4_SETUP_I2C1
+> >>  	select EXYNOS4_SETUP_I2C5
+> >>  	select EXYNOS4_SETUP_SDHCI
+> >> +	select HAVE_PWM
+> > Since Banajit's PWM backlight patches will be merged, should be
+following
+> > your next patch.
+> >
+> > +	select SAMSUNG_DEV_PWM
+> >
+> >
 > 
-So applied without defconfig changes.
-As you know, if required, can do it later :)
-
-If any problems, please let me know.
+> Dear Kukjin,
+> Thanks for your review.
+> I'm preparing next patch for your review including other modifications.
+> But, I cannot find committed patches of PWM backlight of Banajit.
+> Was it merged? If so, please tell me committed tree.
+> 
+I merged it just now :)
+You can see it in my for-next.
 
 Thanks.
 
