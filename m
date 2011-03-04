@@ -1,39 +1,49 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Fri, 4 Mar 2011 20:50:37 +0100
-Subject: [PATCH v10 1/1] PRUSS UIO driver support
-In-Reply-To: <1299213772-21931-2-git-send-email-pratheesh@ti.com>
-References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
-	<1299213772-21931-2-git-send-email-pratheesh@ti.com>
-Message-ID: <20110304195036.GF28175@local>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 4 Mar 2011 12:11:32 -0800
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency with cpufreq
+	notifiers
+In-Reply-To: <4D70BE9D.4000507@stericsson.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+Message-ID: <AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2011 at 10:12:52AM +0530, Pratheesh Gangadhar wrote:
-> This patch implements PRUSS (Programmable Real-time Unit Sub System)
-> UIO driver which exports SOC resources associated with PRUSS like
-> I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
-> processors which is efficient in performing embedded tasks that
-> require manipulation of packed memory mapped data structures and
-> handling system events that have tight real time constraints. This
-> driver is currently supported on Texas Instruments DA850, AM18xx and
-> OMAP-L138 devices.
-> For example, PRUSS runs firmware for real-time critical industrial
-> communication data link layer and communicates with application stack
-> running in user space via shared memory and IRQs.
-> 
-> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/uio/Kconfig       |   17 +++
->  drivers/uio/Makefile      |    1 +
->  drivers/uio/uio_pruss.c   |  247 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/uio_pruss.h |   25 +++++
->  4 files changed, 290 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/uio/uio_pruss.c
->  create mode 100644 include/linux/uio_pruss.h
+On Fri, Mar 4, 2011 at 2:27 AM, martin persson
+<martin.persson@stericsson.com> wrote:
+> We've seen no problems using this patch and have been grateful for it's
+> existence. So I'm happy to put:
+>
+> Tested-by: martin.persson at stericsson.com
+>
+> /Martin
+>
+> On 03/04/2011 11:17 AM, Linus Walleij wrote:
+>>
+>> 2010/11/18 Colin Cross<ccross@android.com>:
+>>
+>>> The clock to the ARM TWD local timer scales with the cpu
+>>> frequency. To allow the cpu frequency to change while
+>>> maintaining a constant TWD frequency, pick a lower target
+>>> frequency for the TWD and use the prescaler to divide down
+>>> to the closest lower frequency.
+>>
+>> We are using this with some custom hooks for the U8500.
+>>
+>> Tested-by: Linus Walleij<linus.walleij@linaro.org>
+>>
+>> Martin Persson can probably provide an additional Tested-by
+>> from ST-Ericsson if it helps.
+>>
+>> Colin are you merging this patch for 2.6.39 through
+>> Russells tracker or pull request? It's an important patch
+>> for us.
+>>
+>> Yours,
+>> Linus Walleij
+>
 
-Make that include/linux/platform_data/uio_pruss.h as Greg said.
-Otherwise, I don't see further issues, so I think we can take the next version.
-
-Thanks,
-Hans
+I never got any responses, and it conflicts with Rob Herring's patch
+6434/1, although that has not been applied.  Russell, do you want this
+in the patch tracker?
