@@ -1,43 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 4 Mar 2011 16:36:47 +0100
-Subject: [PATCH] MAINTAINERS: Update MSM maintainers
-In-Reply-To: <4D66CDD4.7080103@codeaurora.org>
-References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
-	<1298420395.17118.6.camel@m0nster>
-	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
-	<4D657B69.4000107@codeaurora.org>
-	<1298512932.17118.16.camel@m0nster>
-	<4D66CDD4.7080103@codeaurora.org>
-Message-ID: <20110304153646.GC1358@ucw.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 Mar 2011 16:58:05 +0100
+Subject: [PATCH v10 1/1] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C009039@dbde02.ent.ti.com>
+References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
+	<20110304142028.GD28175@local>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C009039@dbde02.ent.ti.com>
+Message-ID: <201103041658.05655.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > There's nothing really to figure out. I don't feel like you and David
-> > can do the job alone. My intentions are just to make sure that you don't
-> > mess with my targets, and that you do the right thing by the community.
+On Friday 04 March 2011, Nori, Sekhar wrote:
+> On Fri, Mar 04, 2011 at 19:50:28, Hans J. Koch wrote:
+> > On Fri, Mar 04, 2011 at 10:12:52AM +0530, Pratheesh Gangadhar wrote:
+> > > diff --git a/include/linux/uio_pruss.h b/include/linux/uio_pruss.h
+> > > new file mode 100644
+> > > index 0000000..8c9b2c9
+> > > --- /dev/null
+> > > +++ b/include/linux/uio_pruss.h
 > > 
-> > Daniel
+> > That should go to arch/arm/mach-davinci/include/mach/
+> > and not to the top level include/linux/ directory.
 > 
-> I'd like to address the points you mention.  I disagree with your
-> personal feelings about David's suitability for the task.  David has
-> been involved with Linux MSM development for it's entire history.
+> It was put in here because this driver
+> will be used across two ARM architectures
+> (DaVinci and OMAP). Although it won't be used
+> outside of ARM at least in near future.
 
-So he's great developer.
+I think include/linux/ is fine for this, and arch/arm/include/asm would
+be ok as well. You might want to have only a single pruss header
+file that defines all the platform data for the child drivers, though.
 
-> responsibility.  I agree that this is a somewhat new role for him, but
-> maintainers have to start somewhere.  From what I've seen so far, David
-> is showing the proper maturity and judgement expected from a
-> maintainer.  As an example, I would point to David's handling of
-> Arnd's
+Ideally, you would of course not need the header at all. This will
+be possible with the move to a flat device tree, where you can store the
+offset as a property of the device
 
-So you agree dwalker has more experience as maintainer, and cite an
-example where dbrown handled things ok.
+Another alternative would be to move it to a resource of the platform
+device.
 
-But you know this patch was great counterexample. Trying to remove
-someone from mainainers without asking them first is very very
-impolite...
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
