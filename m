@@ -1,111 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 4 Mar 2011 15:36:46 -0700 (MST)
-Subject: [PATCH] OMAP1: McBSP: fix build break for non-multi-OMAP1 configs
-Message-ID: <alpine.DEB.2.00.1103041535150.10981@utopia.booyaka.com>
+From: bryanh@codeaurora.org (Bryan Huntsman)
+Date: Fri, 04 Mar 2011 14:42:29 -0800
+Subject: [PATCH 0/3] ARM: Add Scorpion/ScorpionMP support to perf and
+	Oprofile
+In-Reply-To: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
+References: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
+Message-ID: <4D716AD5.1070403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/04/2011 02:09 PM, Sheetal Sahasrabudhe wrote:
+> This patchset contains the following features:
+> It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
+> and Oprofile.
+> It adds PMU support for Scorpion and ScorpionMP.
+> It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
+> 
+> Sheetal Sahasrabudhe (3):
+>   msm: Add support for Scorpion and ScorpionMP PMU
+>   [ARM] perfevents: Add support for Scorpion performance monitors
+>   [ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
+> 
+>  arch/arm/include/asm/perf_event.h          |    2 +
+>  arch/arm/kernel/perf_event.c               |   11 +
+>  arch/arm/kernel/perf_event_qc.c            |  677 ++++++++++++++++++++++++++++
+>  arch/arm/mach-msm/Makefile                 |    2 +
+>  arch/arm/mach-msm/include/mach/irqs-7x30.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8960.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8x50.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8x60.h |    2 +-
+>  arch/arm/mach-msm/pmu.c                    |   36 ++
+>  arch/arm/oprofile/common.c                 |    4 +
+>  10 files changed, 736 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/kernel/perf_event_qc.c
+>  create mode 100644 arch/arm/mach-msm/pmu.c
+> 
 
-Commit 3cf32bba8ca0e0052ca41d74d455a5805b7fea85 ("OMAP: McBSP: Convert
-McBSP to platform device model") in the current omap-for-linus branch
-breaks compilation with non-multi-OMAP1 configs:
+Some minor comments from a quick review:
+- you're using multi-line commenting style for single line comments
+- see Documentation/CodingStyle, Chapter 8, for preferred multi-line
+commenting style
+- 'mv perf_event_qc.c perf_event_msm.c'?
 
-  CC      arch/arm/mach-omap1/mcbsp.o
-arch/arm/mach-omap1/mcbsp.c: In function 'omap1_mcbsp_init':
-arch/arm/mach-omap1/mcbsp.c:384: warning: dereferencing 'void *' pointer
-arch/arm/mach-omap1/mcbsp.c:387: error: invalid use of void expression
-arch/arm/mach-omap1/mcbsp.c:390: warning: dereferencing 'void *' pointer
-arch/arm/mach-omap1/mcbsp.c:393: error: invalid use of void expression
+- Bryan
 
-Fix by avoiding NULL dereferences.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap1/mcbsp.c |   18 ++++++++++++------
- 1 files changed, 12 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
-index e68f6c0..d9af981 100644
---- a/arch/arm/mach-omap1/mcbsp.c
-+++ b/arch/arm/mach-omap1/mcbsp.c
-@@ -136,6 +136,8 @@ struct resource omap7xx_mcbsp_res[][6] = {
- 	},
- };
- 
-+#define omap7xx_mcbsp_res_0		omap7xx_mcbsp_res[0]
-+
- static struct omap_mcbsp_platform_data omap7xx_mcbsp_pdata[] = {
- 	{
- 		.ops		= &omap1_mcbsp_ops,
-@@ -147,7 +149,7 @@ static struct omap_mcbsp_platform_data omap7xx_mcbsp_pdata[] = {
- #define OMAP7XX_MCBSP_RES_SZ		ARRAY_SIZE(omap7xx_mcbsp_res[1])
- #define OMAP7XX_MCBSP_COUNT		ARRAY_SIZE(omap7xx_mcbsp_res)
- #else
--#define omap7xx_mcbsp_res		NULL
-+#define omap7xx_mcbsp_res_0		NULL
- #define omap7xx_mcbsp_pdata		NULL
- #define OMAP7XX_MCBSP_RES_SZ		0
- #define OMAP7XX_MCBSP_COUNT		0
-@@ -238,6 +240,8 @@ struct resource omap15xx_mcbsp_res[][6] = {
- 	},
- };
- 
-+#define omap15xx_mcbsp_res_0		omap15xx_mcbsp_res[0]
-+
- static struct omap_mcbsp_platform_data omap15xx_mcbsp_pdata[] = {
- 	{
- 		.ops		= &omap1_mcbsp_ops,
-@@ -252,7 +256,7 @@ static struct omap_mcbsp_platform_data omap15xx_mcbsp_pdata[] = {
- #define OMAP15XX_MCBSP_RES_SZ		ARRAY_SIZE(omap15xx_mcbsp_res[1])
- #define OMAP15XX_MCBSP_COUNT		ARRAY_SIZE(omap15xx_mcbsp_res)
- #else
--#define omap15xx_mcbsp_res		NULL
-+#define omap15xx_mcbsp_res_0		NULL
- #define omap15xx_mcbsp_pdata		NULL
- #define OMAP15XX_MCBSP_RES_SZ		0
- #define OMAP15XX_MCBSP_COUNT		0
-@@ -343,6 +347,8 @@ struct resource omap16xx_mcbsp_res[][6] = {
- 	},
- };
- 
-+#define omap16xx_mcbsp_res_0		omap16xx_mcbsp_res[0]
-+
- static struct omap_mcbsp_platform_data omap16xx_mcbsp_pdata[] = {
- 	{
- 		.ops		= &omap1_mcbsp_ops,
-@@ -357,7 +363,7 @@ static struct omap_mcbsp_platform_data omap16xx_mcbsp_pdata[] = {
- #define OMAP16XX_MCBSP_RES_SZ		ARRAY_SIZE(omap16xx_mcbsp_res[1])
- #define OMAP16XX_MCBSP_COUNT		ARRAY_SIZE(omap16xx_mcbsp_res)
- #else
--#define omap16xx_mcbsp_res		NULL
-+#define omap16xx_mcbsp_res_0		NULL
- #define omap16xx_mcbsp_pdata		NULL
- #define OMAP16XX_MCBSP_RES_SZ		0
- #define OMAP16XX_MCBSP_COUNT		0
-@@ -381,19 +387,19 @@ static int __init omap1_mcbsp_init(void)
- 		return -ENOMEM;
- 
- 	if (cpu_is_omap7xx())
--		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res[0],
-+		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res_0,
- 					OMAP7XX_MCBSP_RES_SZ,
- 					omap7xx_mcbsp_pdata,
- 					OMAP7XX_MCBSP_COUNT);
- 
- 	if (cpu_is_omap15xx())
--		omap_mcbsp_register_board_cfg(omap15xx_mcbsp_res[0],
-+		omap_mcbsp_register_board_cfg(omap15xx_mcbsp_res_0,
- 					OMAP15XX_MCBSP_RES_SZ,
- 					omap15xx_mcbsp_pdata,
- 					OMAP15XX_MCBSP_COUNT);
- 
- 	if (cpu_is_omap16xx())
--		omap_mcbsp_register_board_cfg(omap16xx_mcbsp_res[0],
-+		omap_mcbsp_register_board_cfg(omap16xx_mcbsp_res_0,
- 					OMAP16XX_MCBSP_RES_SZ,
- 					omap16xx_mcbsp_pdata,
- 					OMAP16XX_MCBSP_COUNT);
 -- 
-1.7.2.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
