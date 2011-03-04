@@ -1,35 +1,51 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Fri, 4 Mar 2011 17:05:22 +0100
-Subject: [PATCH v10 1/1] PRUSS UIO driver support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C009039@dbde02.ent.ti.com>
-References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
-	<1299213772-21931-2-git-send-email-pratheesh@ti.com>
-	<20110304142028.GD28175@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C009039@dbde02.ent.ti.com>
-Message-ID: <20110304160522.GE28175@local>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Mar 2011 08:11:58 -0800
+Subject: [PATCH 08/17] omap4: pm: Add GIC save/restore support
+In-Reply-To: <20b497dc6e31dd5eb91b2a11002966c2@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 4 Mar 2011 14:09:18 +0530")
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
+	<1298112158-28469-9-git-send-email-santosh.shilimkar@ti.com>
+	<8739n55f75.fsf@ti.com>
+	<20b497dc6e31dd5eb91b2a11002966c2@mail.gmail.com>
+Message-ID: <87ipvykgq9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2011 at 08:11:56PM +0530, Nori, Sekhar wrote:
-> Hi Hans,
-> 
-> On Fri, Mar 04, 2011 at 19:50:28, Hans J. Koch wrote:
-> > On Fri, Mar 04, 2011 at 10:12:52AM +0530, Pratheesh Gangadhar wrote:
-> > > diff --git a/include/linux/uio_pruss.h b/include/linux/uio_pruss.h
-> > > new file mode 100644
-> > > index 0000000..8c9b2c9
-> > > --- /dev/null
-> > > +++ b/include/linux/uio_pruss.h
-> > 
-> > That should go to arch/arm/mach-davinci/include/mach/
-> > and not to the top level include/linux/ directory.
-> 
-> It was put in here because this driver
-> will be used across two ARM architectures
-> (DaVinci and OMAP). Although it won't be used
-> outside of ARM at least in near future.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-OK, I accept that. I'll review the rest soon.
+>> -----Original Message-----
+>> From: Kevin Hilman [mailto:khilman at ti.com]
+>> Sent: Thursday, March 03, 2011 4:00 AM
+>> To: Santosh Shilimkar
+>> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH 08/17] omap4: pm: Add GIC save/restore support
+>>
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>
+> [...]
+>
+>> > +	/*
+>> > +	 * Find out how many interrupts are supported.
+>> > +	 * OMAP4 supports max of 128 SPIs where as GIC can support
+>> > +	 * up to 1020 interrupt sources.
+>> > +	 */
+>> > +	max_spi_reg = __raw_readl(gic_dist_base_addr + GIC_DIST_CTR) &
+>> 0x1f;
+>> > +	max_spi_irq = max_spi_reg * 32;
+>>
+>> Based on the spec, this should also be max'd at 1020 so you never
+>> write the reserved values after 1020.
+>>
+>
+> That's correct as per generic GIC specs. On OMAP4, the maximum IRQs
+> already fused in "DIST_CTR"  bit-fields and fixed. Hence we don't
+> need that additional comparison.
+>
+
+OK, clarifiying this in the comment above would avoid confusion for
+anyone looking at this code in combination with the spec.
 
 Thanks,
-Hans
+
+Kevin
