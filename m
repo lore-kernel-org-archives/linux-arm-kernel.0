@@ -1,53 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Mar 2011 16:29:38 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add ARMLEX4210 Board support file
-In-Reply-To: <AANLkTimd0frTRpmwf+0OQ2HjYTOqD3NMEEZQovqGVYH1@mail.gmail.com>
-References: <10012655.143611299137229715.JavaMail.weblogic@epml15>
-	<AANLkTimd0frTRpmwf+0OQ2HjYTOqD3NMEEZQovqGVYH1@mail.gmail.com>
-Message-ID: <028401cbda3d$eb0dc700$c1295500$%kim@samsung.com>
+From: Tero.Kristo@nokia.com (Tero.Kristo at nokia.com)
+Date: Fri, 4 Mar 2011 08:14:07 +0000
+Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from
+	going to RET or OFF when DSS is on
+In-Reply-To: <87pqq7pz27.fsf@ti.com>
+References: <20110301220833.32613.54669.stgit@twilight.localdomain>
+	<20110301224918.32613.95176.stgit@twilight.localdomain>
+	<87pqq7pz27.fsf@ti.com>
+Message-ID: <854C6400F5AA6644BA6FE7953F3E769B0380F12F@008-AM1MPN1-013.mgdnok.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On Thu, Mar 3, 2011 at 4:27 PM, ALIM AKHTAR <alim.akhtar@samsung.com>
-wrote:
-> > This patch is based on 'for-next' ?branch of kgene tree.
-> >
-> > This patch adds Samsung ARMLEX4210 ?board support file
-> > which is based on Exynos4210.
-> >
-> > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> > ---
-> > ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? | ? 13 ++
-> > ?arch/arm/mach-exynos4/Makefile ? ? ? ? ?| ? ?1 +
-> > ?arch/arm/mach-exynos4/mach-armlex4210.c | ?213
-> +++++++++++++++++++++++++++++++
-> > ?3 files changed, 227 insertions(+), 0 deletions(-)
-> > ?create mode 100644 arch/arm/mach-exynos4/mach-armlex4210.c
+Hi Kevin,
 
-(snip)
+>-----Original Message-----
+>From: ext Kevin Hilman [mailto:khilman at ti.com]
+>Sent: 04 March, 2011 01:25
+>To: Paul Walmsley
+>Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>Kristo Tero (Nokia-MS/Tampere)
+>Subject: Re: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from
+>going to RET or OFF when DSS is on
+>
+>Paul Walmsley <paul@pwsan.com> writes:
+>
+>> From: Tero Kristo <tero.kristo@nokia.com>
+>>
+>> Prevent the CORE power domain from entering RETENTION or OFF when DSS
+>> is on.  Otherwise, the display FIFO(s) may underflow due to the time
+>> needed for the CORE to wake back up, causing tearing and unnecessary
+>> interrupts.
+>>
+>> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+>> [paul at pwsan.com: wrote commit message]
+>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>
+>This isn't quite ready for merge, and needs a little more testing with
+>current DSS driver and mainline.
+>
+>> ---
+>>  arch/arm/mach-omap2/cpuidle34xx.c |   10 ++++++++--
+>>  1 files changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-
+>omap2/cpuidle34xx.c
+>> index 0335cd8..d1b7789 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> @@ -9,8 +9,9 @@
+>>   * Copyright (C) 2007 Texas Instruments, Inc.
+>>   * Karthik Dasu <karthik-dp@ti.com>
+>>   *
+>> - * Copyright (C) 2006 Nokia Corporation
+>> + * Copyright (C) 2006, 2011 Nokia Corporation
+>>   * Tony Lindgren <tony@atomide.com>
+>> + * Tero Kristo <tero.kristo@nokia.com>
+>>   *
+>>   * Copyright (C) 2005 Texas Instruments, Inc.
+>>   * Richard Woodruff <r-woodruff2@ti.com>
+>> @@ -268,6 +269,12 @@ static int omap3_enter_idle_bm(struct
+>cpuidle_device *dev,
+>>  		goto select_state;
+>>  	}
+>>
+>> +	/* If DSS is active, prevent CORE RET/OFF */
+>> +	dss_state = pwrdm_read_pwrst(dss_pd);
+>> +	if (dss_state == PWRDM_POWER_ON &&
+>> +	    core_next_state != PWRDM_POWER_ON)
+>> +		core_next_state = PWRDM_POWER_INACTIVE;
+>> +
+>
+>Due to sleepdeps/autodeps, when this code runs, DSS powerdomain is
+>always on.  The result is that CORE is always set to INACTIVE.
 
-> > +static struct s3c_sdhci_platdata armlex4210_hsmmc3_pdata __initdata = {
-> > + ? ? ? .cd_type ? ? ? ? ? ? ? ?= S3C_SDHCI_CD_PERMANENT,
-> > + ? ? ? .max_width ? ? ? ? ? ? ?= 4,
-> maybe you missed the clk_type. It's required for exynos4 series.
-> clk_type ? ? ? ? ? ? ? = S3C_SDHCI_CLK_DIV_EXTERNAL,
+Now I recall that someone was asking about a patch similar to this earlier, and had the same issue with DSS sleepdep collision.
 
-Right :)
-The clk_type(..._EXTERNAL) should be added for Exynos4210.
+What is the reason for having the sleepdep for DSS powerdomain anyway? At least I can't see any reason why the sleepdep for DSS should be set. In my opinion it should be perfectly okay for DSS domain to idle independently of MPU/CORE, as this is going to be better for power consumption also.
 
-Hi Alim,
 
-Others, looks ok.
-So applied with fixing above.
-
-If any problems, please let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>A side effect of this problem is exposing a known issue with PER wakeups
+>(UART3, GPIO).  Since CORE never goes to retention/off, IO-pad
+>wakeups are never enabled, so PER wakeups do not work.
+>
+>I think we need a different way of checking for DSS activity.
+>
+>Sounds like another usecase for idle notifiers.
+>
+>Kevin
