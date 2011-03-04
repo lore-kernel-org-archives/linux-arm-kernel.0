@@ -1,48 +1,47 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Fri, 4 Mar 2011 08:55:27 +0530
-Subject: [PATCH v9 1/1] PRUSS UIO driver support
-In-Reply-To: <201103031915.55825.arnd@arndb.de>
-References: <1299175677-17859-1-git-send-email-pratheesh@ti.com>
-	<1299175677-17859-2-git-send-email-pratheesh@ti.com>
-	<201103031915.55825.arnd@arndb.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008B02@dbde02.ent.ti.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Fri, 4 Mar 2011 13:19:03 +0900
+Subject: [PATCH 0/2] add Samsung SoC based MIPI-DSI support.
+In-Reply-To: <4D244884.70204@samsung.com>
+References: <4D244884.70204@samsung.com>
+Message-ID: <AANLkTi=e_ONRgG8YAMhakgSg4_0Nuyu6abWtJUeE-Ts-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, March 03, 2011 11:46 PM
-> On Thursday 03 March 2011 19:07:57 Pratheesh Gangadhar wrote:
-> > +struct uio_pruss_dev {
-> > +       struct uio_info *info;
-> > +       struct clk *pruss_clk;
-> > +       dma_addr_t sram_paddr;
-> > +       dma_addr_t ddr_paddr;
-> > +       void __iomem *prussio_vaddr;
-> > +       void *sram_vaddr;
-> > +       void *ddr_vaddr;
-> > +       unsigned int hostirq_start;
-> > +       unsigned int pintc_base;
-> > +};
-> > +
-> > +struct pruss_priv {
-> > +       struct uio_pruss_dev *pupdev;
-> > +};
-> 
-> I cannot see the point of struct pruss_priv, I think it would be better to
-> just merge the two data structures into one. Everything else looks
-> good to me now.
+Hello, Mr. Kukjin.
 
-pruss_priv is needed to get access to uio_pruss_dev from uio_info *info in
-UIO interrupt handler (pruss_handler) and shall be per interrupt entry.
+how are you doing on these patches below?
 
-+static irqreturn_t pruss_handler(int irq, struct uio_info *info) {
-+	struct pruss_priv *priv = info->priv;
-+	struct uio_pruss_dev *gdev = priv->pupdev;
+with previous call, you said that they have no problem.
+so please, apply them below to your samsung git.
 
-Note that info is a pointer to array supporting 8 interrupts. This allows to
-redirect to driver structure via info->priv quickly.
+thank you.
 
-Thanks,
-Pratheesh   
+2011/1/5 daeinki <inki.dae@samsung.com>:
+> Hello, all.
+>
+> S5PC110 and S5PC210 SoC platform have one or two MIPI-DSI controller.
+> MIPI-DSI controller can be used to connect MIPI-DSI based LCD Panel.
+> this patch adds MIPI-DSI controller driver.
+>
+> to use this driver, MIPI-DSI based LCD panel driver have to register
+> mipi_dsim_lcd_driver object to MIPI-DSI driver and then when MIPI-DSI
+> driver is probed, probe callback of LCD panel driver registered would be
+> called.
+>
+> this patch includes just only MIPI-DSI driver because now mainline
+> kernel has no any machine support with MIPI-DSI based LCD panel so this
+> driver has been tested locally. I will have patch work for it and send
+> it including machine specific codes in the future.
+>
+> The patch series contains:
+>
+> [PATCH 1/2] s5pc110: add clock gate for MIPI-DSI controller.
+> [PATCH 2/2] s5pc110: add MIPI-DSI controller driver.
+>
+> thank you.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
