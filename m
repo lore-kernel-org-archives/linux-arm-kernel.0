@@ -1,23 +1,29 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Fri, 4 Mar 2011 10:10:44 +0100
-Subject: Recall: [PATCH 1/2] ARM imx53: add pwm devices support
-In-Reply-To: <33F32152BE7EC740BC2C838D2836AC870FA8D8@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <33F32152BE7EC740BC2C838D2836AC870FA8D8@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20110304091044.GD18351@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 Mar 2011 10:11:36 +0100
+Subject: [PATCH v10 1/1] PRUSS UIO driver support
+In-Reply-To: <1299213772-21931-2-git-send-email-pratheesh@ti.com>
+References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
+	<1299213772-21931-2-git-send-email-pratheesh@ti.com>
+Message-ID: <201103041011.36932.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2011 at 02:50:23AM +0000, Chen Jie-B02280 wrote:
-> Chen Jie-B02280 would like to recall the message, "[PATCH 1/2] ARM imx53: add pwm devices support".
+On Friday 04 March 2011 05:42:52 Pratheesh Gangadhar wrote:
+> This patch implements PRUSS (Programmable Real-time Unit Sub System)
+> UIO driver which exports SOC resources associated with PRUSS like
+> I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
+> processors which is efficient in performing embedded tasks that
+> require manipulation of packed memory mapped data structures and
+> handling system events that have tight real time constraints. This
+> driver is currently supported on Texas Instruments DA850, AM18xx and
+> OMAP-L138 devices.
+> For example, PRUSS runs firmware for real-time critical industrial
+> communication data link layer and communicates with application stack
+> running in user space via shared memory and IRQs.
+ 
+Looks good
 
-Does this mean I shall not apply this patch? If so please answer to your
-original mail saying so. This recall thing is not very helpful.
+> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
+> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
