@@ -1,36 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 04 Mar 2011 08:31:05 -0600
-Subject: [PATCH] ARM: fix compile error in tlb.h
-In-Reply-To: <1299248663-27130-1-git-send-email-linus.walleij@stericsson.com>
-References: <1299248663-27130-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4D70F7A9.3010203@gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 4 Mar 2011 20:11:56 +0530
+Subject: [PATCH v10 1/1] PRUSS UIO driver support
+In-Reply-To: <20110304142028.GD28175@local>
+References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
+	<1299213772-21931-2-git-send-email-pratheesh@ti.com>
+	<20110304142028.GD28175@local>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C009039@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Hi Hans,
 
-On 03/04/2011 08:24 AM, Linus Walleij wrote:
-> From: Linus Walleij<linus.walleij@linaro.org>
->
-> It seems some of the new tlb handling code merged for 2.6.38-rc7
-> use<linux/pagemap.h>  while this is only included for the NON-MMU
-> case. This moves the inclusion out of the clause so the kernel
-> compiles.
->
-> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
-> ---
-> Symptom without this patch:
->
-> n file included from /home/elinwal/linux-2.6/arch/arm/mm/init.c:27:
-> /home/elinwal/linux-2.6/arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
-> /home/elinwal/linux-2.6/arch/arm/include/asm/tlb.h:104: error: implicit declaration of function 'release_pages'
-> /home/elinwal/linux-2.6/arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
-> /home/elinwal/linux-2.6/arch/arm/include/asm/tlb.h:168: error: implicit declaration of function 'page_cache_release'
-> make[3]: *** [arch/arm/mm/init.o] Error 1
+On Fri, Mar 04, 2011 at 19:50:28, Hans J. Koch wrote:
+> On Fri, Mar 04, 2011 at 10:12:52AM +0530, Pratheesh Gangadhar wrote:
+> > diff --git a/include/linux/uio_pruss.h b/include/linux/uio_pruss.h
+> > new file mode 100644
+> > index 0000000..8c9b2c9
+> > --- /dev/null
+> > +++ b/include/linux/uio_pruss.h
+> 
+> That should go to arch/arm/mach-davinci/include/mach/
+> and not to the top level include/linux/ directory.
 
-There's already a patch in the patch system and Russell's tree for this. 
-Perhaps it did not get in due to Russell's machine crashing.
+It was put in here because this driver
+will be used across two ARM architectures
+(DaVinci and OMAP). Although it won't be used
+outside of ARM at least in near future.
 
-ARM: 6757/1: fix tlb.h induced linux/swap.h build failure
-
-Rob
+Thanks,
+Sekhar
