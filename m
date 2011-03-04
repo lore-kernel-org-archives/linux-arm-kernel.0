@@ -1,49 +1,29 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Mar 2011 10:39:32 +0900
-Subject: [PATCH 7/7] ARM: SMDK6410: Update regulator names for debugfs
-	compatiblity
-In-Reply-To: <1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Fri, 04 Mar 2011 10:33:53 +0900
+Subject: [PATCH 0/7] Various Samsung updates
+In-Reply-To: <20110303145910.GC17460@trinity.fluff.org>
 References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-	<1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <022401cbda0d$08d18550$1a748ff0$%kim@samsung.com>
+	<20110303145910.GC17460@trinity.fluff.org>
+Message-ID: <022301cbda0c$3c550a60$b4ff1f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Ben Dooks wrote:
 > 
-> The debugfs support added to the regulator API (which has been merged
-> in during this merge window) creates directories for regulators named
-> after the display names for the regulators so replace / as a separator
-> for multiple supplies with + in the SMDK6410 machine.
+> On Thu, Mar 03, 2011 at 02:57:11PM +0000, Mark Brown wrote:
+> > This is a patch series I've got built up for the Samsung platforms, some
+> > of which has been pending for the entire release cycle.  I know Ben's
+> > said he's extremely busy right now (as you can see some of these patches
+> > are from him), perhaps it would make sense to apply these via Kukjin's
+> > tree for the time being?
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-smdk6410.c |   12 ++++++------
->  1 files changed, 6 insertions(+), 6 deletions(-)
+> I'm ok with these being sent upstream via whoever's tree. I do note
+> that there's a pile of s3c24xx I seem to have missed completely after
+> falling off linux-kernel a couple of months ago.
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
-> s3c64xx/mach-smdk6410.c
-> index 4094707..2f30c79 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> @@ -353,7 +353,7 @@ static struct regulator_init_data smdk6410_vddpll
-> __initdata = {
->  /* VDD_UH_MMC, LDO5 on J5 */
->  static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
+Ok, applied into my tree :)
 
-Mark, there is no '__initdata' in my tree.
-I just applied following changes (/ -> +).
-
-If any updates/patches, please let me know :)
-
->  	.constraints = {
-> -		.name = "PVDD_UH/PVDD_MMC",
-> +		.name = "PVDD_UH+PVDD_MMC",
->  		.always_on = 1,
->  	},
->  };
-
-(snip)
+As a note, they will be sent to upstream this weekend for 38.
 
 Thanks.
 
@@ -52,3 +32,28 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> > Ben Dooks (2):
+> >       ARM: S3C64XX: Add clock for i2c1
+> >       ARM: S3C64XX: Reduce output of s3c64xx_dma_init1()
+> >
+> > Mark Brown (5):
+> >       ARM: SAMSUNG: Include devs.h in dev-uart.c to prototype devices
+> >       ARM: S3C64XX: Staticise non-exported GPIO to interrupt functions
+> >       ARM: S3C64XX: Tone down SDHCI debugging
+> >       ARM: SMDK6410: Fix build with WM1190 disabled and WM1192 enabled
+> >       ARM: SMDK6410: Update regulator names for debugfs compatiblity
+> >
+> >  arch/arm/mach-s3c64xx/clock.c         |    6 ++++++
+> >  arch/arm/mach-s3c64xx/dma.c           |   11 ++++++-----
+> >  arch/arm/mach-s3c64xx/gpiolib.c       |    4 ++--
+> >  arch/arm/mach-s3c64xx/mach-smdk6410.c |   13 +++++++------
+> >  arch/arm/mach-s3c64xx/setup-sdhci.c   |    2 +-
+> >  arch/arm/plat-samsung/dev-uart.c      |    2 ++
+> >  6 files changed, 24 insertions(+), 14 deletions(-)
+> 
+> --
+> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+> 
+> Large Hadron Colada: A large Pina Colada that makes the universe
+disappear.
