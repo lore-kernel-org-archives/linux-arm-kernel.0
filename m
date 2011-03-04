@@ -1,573 +1,238 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 04 Mar 2011 10:01:11 +0100
-Subject: [PATCH 4/7] v4l: videobuf2: add Samsung SYSMMU (IOMMU) based allocator
+Date: Fri, 04 Mar 2011 10:01:13 +0100
+Subject: [PATCH 6/7] s5p-fimc: Add support for vb2-s5p-iommu allocator
 In-Reply-To: <1299229274-9753-1-git-send-email-m.szyprowski@samsung.com>
 References: <1299229274-9753-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1299229274-9753-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1299229274-9753-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+This patch adds support for videobuf2-s5p-iommu allocator to s5p-fimc
+driver. This allocator is selected only on systems that contains support
+for S5P SYSMMU module. Otherwise the standard videobuf2-dma-contig is
+used.
 
-This patch adds new videobuf2 memory allocator dedicated to Samsung SoC
-series with IOMMU module. It requires s5p-sysmmu low level driver for
-controlling iommu. This allocator aquires memory with standard
-alloc_page() call and doesn't suffer from memory fragmentation issues.
-Curretnly it supports only iommu module on Sasmung S5PV310 SoC series.
-
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/media/video/Kconfig               |    8 +-
- drivers/media/video/Makefile              |    1 +
- drivers/media/video/videobuf2-s5p-iommu.c |  444 +++++++++++++++++++++++++++++
- include/media/videobuf2-s5p-iommu.h       |   50 ++++
- 4 files changed, 502 insertions(+), 1 deletions(-)
- create mode 100644 drivers/media/video/videobuf2-s5p-iommu.c
- create mode 100644 include/media/videobuf2-s5p-iommu.h
+ drivers/media/video/Kconfig                 |    3 +-
+ drivers/media/video/s5p-fimc/fimc-capture.c |    4 +-
+ drivers/media/video/s5p-fimc/fimc-core.c    |   22 ++++---
+ drivers/media/video/s5p-fimc/fimc-mem.h     |   87 +++++++++++++++++++++++++++
+ 4 files changed, 104 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/media/video/s5p-fimc/fimc-mem.h
 
 diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index e2f5a69..9806505 100644
+index 9806505..12fb325 100644
 --- a/drivers/media/video/Kconfig
 +++ b/drivers/media/video/Kconfig
-@@ -60,12 +60,18 @@ config VIDEOBUF2_VMALLOC
- 	select VIDEOBUF2_MEMOPS
- 	tristate
+@@ -1018,7 +1018,8 @@ config VIDEO_MEM2MEM_TESTDEV
+ config  VIDEO_SAMSUNG_S5P_FIMC
+ 	tristate "Samsung S5P FIMC (video postprocessor) driver"
+ 	depends on VIDEO_DEV && VIDEO_V4L2 && PLAT_S5P
+-	select VIDEOBUF2_DMA_CONTIG
++	select VIDEOBUF2_S5P_IOMMU if S5P_SYSTEM_MMU
++	select VIDEOBUF2_DMA_CONTIG if !S5P_SYSTEM_MMU
+ 	select V4L2_MEM2MEM_DEV
+ 	help
+ 	  This is a v4l2 driver for the S5P camera interface
+diff --git a/drivers/media/video/s5p-fimc/fimc-capture.c b/drivers/media/video/s5p-fimc/fimc-capture.c
+index f8d7de5..6819908 100644
+--- a/drivers/media/video/s5p-fimc/fimc-capture.c
++++ b/drivers/media/video/s5p-fimc/fimc-capture.c
+@@ -29,8 +29,8 @@
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-mem2mem.h>
+ #include <media/videobuf2-core.h>
+-#include <media/videobuf2-dma-contig.h>
  
--
- config VIDEOBUF2_DMA_SG
- 	#depends on HAS_DMA
- 	select VIDEOBUF2_CORE
- 	select VIDEOBUF2_MEMOPS
- 	tristate
-+
-+config VIDEOBUF2_S5P_IOMMU
-+	select GENERIC_ALLOCATOR
-+	select VIDEOBUF2_CORE
-+	select VIDEOBUF2_MEMOPS
-+	tristate
-+
- #
- # Multimedia Video device configuration
- #
-diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
-index ac54652..fd9488d 100644
---- a/drivers/media/video/Makefile
-+++ b/drivers/media/video/Makefile
-@@ -118,6 +118,7 @@ obj-$(CONFIG_VIDEOBUF2_MEMOPS)		+= videobuf2-memops.o
- obj-$(CONFIG_VIDEOBUF2_VMALLOC)		+= videobuf2-vmalloc.o
- obj-$(CONFIG_VIDEOBUF2_DMA_CONTIG)	+= videobuf2-dma-contig.o
- obj-$(CONFIG_VIDEOBUF2_DMA_SG)		+= videobuf2-dma-sg.o
-+obj-$(CONFIG_VIDEOBUF2_S5P_IOMMU)	+= videobuf2-s5p-iommu.o
++#include "fimc-mem.h"
+ #include "fimc-core.h"
  
- obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
+ static struct v4l2_subdev *fimc_subdev_register(struct fimc_dev *fimc,
+@@ -881,7 +881,7 @@ int fimc_register_capture_device(struct fimc_dev *fimc)
+ 	q->io_modes = VB2_MMAP | VB2_USERPTR;
+ 	q->drv_priv = fimc->vid_cap.ctx;
+ 	q->ops = &fimc_capture_qops;
+-	q->mem_ops = &vb2_dma_contig_memops;
++	q->mem_ops = &fimc_vb2_allocator_memops;
+ 	q->buf_struct_size = sizeof(struct fimc_vid_buffer);
  
-diff --git a/drivers/media/video/videobuf2-s5p-iommu.c b/drivers/media/video/videobuf2-s5p-iommu.c
+ 	vb2_queue_init(q);
+diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
+index c92dbdb..f06aaea 100644
+--- a/drivers/media/video/s5p-fimc/fimc-core.c
++++ b/drivers/media/video/s5p-fimc/fimc-core.c
+@@ -27,8 +27,8 @@
+ #include <linux/clk.h>
+ #include <media/v4l2-ioctl.h>
+ #include <media/videobuf2-core.h>
+-#include <media/videobuf2-dma-contig.h>
+ 
++#include "fimc-mem.h"
+ #include "fimc-core.h"
+ 
+ static char *fimc_clocks[MAX_FIMC_CLOCKS] = {
+@@ -458,7 +458,7 @@ int fimc_prepare_addr(struct fimc_ctx *ctx, struct vb2_buffer *vb,
+ 	dbg("memplanes= %d, colplanes= %d, pix_size= %d",
+ 		frame->fmt->memplanes, frame->fmt->colplanes, pix_size);
+ 
+-	paddr->y = vb2_dma_contig_plane_paddr(vb, 0);
++	paddr->y = fimc_vb2_plane_addr(vb, 0);
+ 
+ 	if (frame->fmt->memplanes == 1) {
+ 		switch (frame->fmt->colplanes) {
+@@ -486,10 +486,10 @@ int fimc_prepare_addr(struct fimc_ctx *ctx, struct vb2_buffer *vb,
+ 		}
+ 	} else {
+ 		if (frame->fmt->memplanes >= 2)
+-			paddr->cb = vb2_dma_contig_plane_paddr(vb, 1);
++			paddr->cb = fimc_vb2_plane_addr(vb, 1);
+ 
+ 		if (frame->fmt->memplanes == 3)
+-			paddr->cr = vb2_dma_contig_plane_paddr(vb, 2);
++			paddr->cr = fimc_vb2_plane_addr(vb, 2);
+ 	}
+ 
+ 	dbg("PHYS_ADDR: y= 0x%X  cb= 0x%X cr= 0x%X ret= %d",
+@@ -1375,7 +1375,7 @@ static int queue_init(void *priv, struct vb2_queue *src_vq,
+ 	src_vq->io_modes = VB2_MMAP | VB2_USERPTR;
+ 	src_vq->drv_priv = ctx;
+ 	src_vq->ops = &fimc_qops;
+-	src_vq->mem_ops = &vb2_dma_contig_memops;
++	src_vq->mem_ops = &fimc_vb2_allocator_memops;
+ 	src_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
+ 
+ 	ret = vb2_queue_init(src_vq);
+@@ -1387,7 +1387,7 @@ static int queue_init(void *priv, struct vb2_queue *src_vq,
+ 	dst_vq->io_modes = VB2_MMAP | VB2_USERPTR;
+ 	dst_vq->drv_priv = ctx;
+ 	dst_vq->ops = &fimc_qops;
+-	dst_vq->mem_ops = &vb2_dma_contig_memops;
++	dst_vq->mem_ops = &fimc_vb2_allocator_memops;
+ 	dst_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
+ 
+ 	return vb2_queue_init(dst_vq);
+@@ -1685,12 +1685,15 @@ static int fimc_probe(struct platform_device *pdev)
+ 		goto err_clk;
+ 	}
+ 
+-	/* Initialize contiguous memory allocator */
+-	fimc->alloc_ctx = vb2_dma_contig_init_ctx(&fimc->pdev->dev);
++	/* Initialize memory allocator */
++	fimc->alloc_ctx = fimc_vb2_allocator_init(pdev);
+ 	if (IS_ERR(fimc->alloc_ctx)) {
+ 		ret = PTR_ERR(fimc->alloc_ctx);
+ 		goto err_irq;
+ 	}
++	ret = fimc_vb2_allocator_enable(fimc->alloc_ctx);
++	if (ret)
++		goto err_irq;
+ 
+ 	ret = fimc_register_m2m_device(fimc);
+ 	if (ret)
+@@ -1747,7 +1750,8 @@ static int __devexit fimc_remove(struct platform_device *pdev)
+ 
+ 	fimc_clk_release(fimc);
+ 
+-	vb2_dma_contig_cleanup_ctx(fimc->alloc_ctx);
++	fimc_vb2_allocator_disable(fimc->alloc_ctx);
++	fimc_vb2_allocator_cleanup(fimc->alloc_ctx);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 
+diff --git a/drivers/media/video/s5p-fimc/fimc-mem.h b/drivers/media/video/s5p-fimc/fimc-mem.h
 new file mode 100644
-index 0000000..5826fe0
+index 0000000..9ac9bc6
 --- /dev/null
-+++ b/drivers/media/video/videobuf2-s5p-iommu.c
-@@ -0,0 +1,444 @@
++++ b/drivers/media/video/s5p-fimc/fimc-mem.h
+@@ -0,0 +1,87 @@
 +/*
-+ * videobuf2-s5p-iommu.c - SYSMMU (IOMMU) based memory allocator for videobuf2
-+ *
-+ * Copyright (C) 2011 Samsung Electronics
-+ *
-+ * Author: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
++ * Copyright (c) 2011 Samsung Electronics
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <linux/module.h>
-+#include <linux/mm.h>
-+#include <linux/scatterlist.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/vmalloc.h>
-+#include <linux/genalloc.h>
-+#include <linux/device.h>
-+#include <asm/cacheflush.h>
-+#include <asm/page.h>
++#ifndef FIMC_MEM_H_
++#define FIMC_MEM_H_
 +
-+#include <media/videobuf2-core.h>
-+#include <media/videobuf2-memops.h>
++/*
++ * fimc-mem.h is the interface for videbuf2 allocator. It is a proxy
++ * to real allocator depending on system capabilities.
++ * 1. on S5PC100 & S5PV210/S5PC110 systems vb2-dma-contig is used
++ * 2. on S5PV310/S5PC210 systems vb2-s5p-iommu allocator is selected.
++ *
++ */
++
++#ifdef CONFIG_S5P_SYSTEM_MMU
++
 +#include <media/videobuf2-s5p-iommu.h>
 +
-+/*
-+ * 17: single piece of memory (one bitmap entry) equals 128k,
-+ * so by default the genalloc's bitmap occupies 4kB (one page
-+ * for a number of architectures)
-+ */
-+#define VB2_S5P_IOMMU_PIECE_ORDER	17
++#define fimc_vb2_allocator_memops vb2_s5p_iommu_memops
 +
-+/* -1: use default node id to allocate gen_pool/gen_pool_chunk structure from */
-+#define VB2_S5P_IOMMU_NODE_ID		-1
-+
-+/*
-+ * starting address of the virtual address space of the client device
-+ * must not be zero
-+ */
-+#define VB2_S5P_IOMMU_MEM_BASE		0x30000000
-+
-+/* size of the virtual address space of the client device */
-+#define VB2_S5P_IOMMU_MEM_SIZE		0x40000000
-+
-+struct vb2_s5p_iommu_alloc_ctx {
-+	/* not interpreted here; only passed to the sysmmu driver */
-+	void *sysmmu;
-+
-+	struct gen_pool *pool;
-+};
-+
-+struct vb2_s5p_iommu_desc {
-+	unsigned long		size;
-+	unsigned int		num_pages;
-+	struct page		**pages;
-+};
-+
-+struct vb2_s5p_iommu_buf {
-+	unsigned long			drv_addr;
-+	unsigned long			vaddr;
-+
-+	struct vb2_s5p_iommu_desc	info;
-+	int				offset;
-+	atomic_t			refcount;
-+	int				write;
-+	struct vm_area_struct		*vma;
-+
-+	struct vb2_vmarea_handler	handler;
-+
-+	struct vb2_s5p_iommu_alloc_ctx	*ctx;
-+};
-+
-+static void vb2_s5p_iommu_put(void *buf_priv);
-+
-+static void *vb2_s5p_iommu_alloc(void *alloc_ctx, unsigned long size)
++static inline void *fimc_vb2_allocator_init(struct platform_device *pdev)
 +{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx = alloc_ctx;
-+	struct vb2_s5p_iommu_buf *buf;
-+	int i, ret;
-+
-+	BUG_ON(NULL == alloc_ctx);
-+
-+	buf = kzalloc(sizeof *buf, GFP_KERNEL);
-+	if (!buf)
-+		return NULL;
-+
-+	buf->drv_addr = gen_pool_alloc(ctx->pool, size);
-+	if (0 == buf->drv_addr)
-+		goto gen_pool_alloc_fail;
-+
-+	buf->info.size = size;
-+	buf->info.num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-+	buf->ctx = ctx;
-+	buf->info.pages = kzalloc(
-+		buf->info.num_pages * sizeof(struct page *), GFP_KERNEL);
-+	if (!buf->info.pages)
-+		goto fail_pages_array_alloc;
-+
-+	for (i = 0; i < buf->info.num_pages; ++i) {
-+		buf->info.pages[i] = alloc_page(GFP_KERNEL | __GFP_ZERO);
-+		if (NULL == buf->info.pages[i])
-+			goto fail_pages_alloc;
-+	}
-+
-+	buf->handler.refcount = &buf->refcount;
-+	buf->handler.put = vb2_s5p_iommu_put;
-+	buf->handler.arg = buf;
-+
-+	atomic_inc(&buf->refcount);
-+
-+	ret = s5p_sysmmu_map_area(ctx->sysmmu, buf->drv_addr,
-+		buf->info.num_pages, buf->info.pages);
-+
-+	if (ret < 0)
-+		goto fail_sysmmu_map_area;
-+
-+	/*
-+	 * TODO: Ensure no one else flushes the cache later onto our memory
-+	 * which already contains important data.
-+	 * Perhaps find a better way to do it.
-+	 */
-+	flush_cache_all();
-+	outer_flush_all();
-+	return buf;
-+
-+fail_sysmmu_map_area:
-+fail_pages_alloc:
-+	while (--i >= 0)
-+		__free_page(buf->info.pages[i]);
-+	kfree(buf->info.pages);
-+
-+fail_pages_array_alloc:
-+	gen_pool_free(ctx->pool, buf->drv_addr, size);
-+
-+gen_pool_alloc_fail:
-+	kfree(buf);
-+	return NULL;
++	struct vb2_s5p_iommu_request iommu_req;
++	memset(&iommu_req, 0, sizeof(iommu_req));
++	iommu_req.ip = S5P_SYSMMU_FIMC0 + pdev->id;
++	return vb2_s5p_iommu_init(&pdev->dev, &iommu_req);
 +}
 +
-+static void vb2_s5p_iommu_put(void *buf_priv)
++static inline void fimc_vb2_allocator_cleanup(void *alloc_ctx)
 +{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
-+	int i = buf->info.num_pages;
-+
-+	if (atomic_dec_and_test(&buf->refcount)) {
-+		s5p_sysmmu_unmap_area(buf->ctx->sysmmu, buf->drv_addr,
-+				      buf->info.num_pages);
-+		if (buf->vaddr)
-+			vm_unmap_ram((void *)buf->vaddr, buf->info.num_pages);
-+		while (--i >= 0)
-+			__free_page(buf->info.pages[i]);
-+		kfree(buf->info.pages);
-+		gen_pool_free(buf->ctx->pool, buf->drv_addr, buf->info.size);
-+		kfree(buf);
-+	}
++	return vb2_s5p_iommu_cleanup(alloc_ctx);
 +}
 +
-+static void *vb2_s5p_iommu_get_userptr(void *alloc_ctx, unsigned long vaddr,
-+				    unsigned long size, int write)
++static inline unsigned long fimc_vb2_plane_addr(struct vb2_buffer *b, int n)
 +{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx = alloc_ctx;
-+	struct vb2_s5p_iommu_buf *buf;
-+	unsigned long first, last;
-+	int num_pages_from_user, ret;
-+	void *rv = NULL;
-+
-+	BUG_ON(NULL == alloc_ctx);
-+
-+	buf = kzalloc(sizeof *buf, GFP_KERNEL);
-+	if (!buf)
-+		return rv;
-+
-+	buf->drv_addr = gen_pool_alloc(ctx->pool, size);
-+	if (0 == buf->drv_addr) {
-+		rv = ERR_PTR(-ENOMEM);
-+		goto userptr_gen_pool_alloc_fail;
-+	}
-+
-+	buf->write = write;
-+	buf->offset = vaddr & ~PAGE_MASK;
-+	buf->info.size = size;
-+	first = (vaddr           & PAGE_MASK) >> PAGE_SHIFT;
-+	last  = ((vaddr + size - 1) & PAGE_MASK) >> PAGE_SHIFT;
-+	buf->info.num_pages = last - first + 1;
-+	buf->ctx = ctx;
-+	buf->info.pages = kzalloc(buf->info.num_pages * sizeof(struct page *),
-+				  GFP_KERNEL);
-+	if (!buf->info.pages) {
-+		rv = ERR_PTR(-ENOMEM);
-+		goto userptr_fail_pages_array_alloc;
-+	}
-+
-+	down_read(&current->mm->mmap_sem);
-+	num_pages_from_user = get_user_pages(current, current->mm,
-+					     vaddr & PAGE_MASK,
-+					     buf->info.num_pages,
-+					     write,
-+					     1, /* force */
-+					     buf->info.pages,
-+					     NULL);
-+	up_read(&current->mm->mmap_sem);
-+
-+	if (num_pages_from_user == buf->info.num_pages) {
-+		ret = s5p_sysmmu_map_area(ctx->sysmmu, buf->drv_addr,
-+			buf->info.num_pages, buf->info.pages);
-+
-+		if (ret)
-+			goto userptr_fail_sysmmu_map_area;
-+
-+		return buf;
-+	} else if (num_pages_from_user < 0) {
-+		struct vm_area_struct *vma;
-+		dma_addr_t paddr = 0;
-+
-+		ret = vb2_get_contig_userptr(vaddr, size, &vma, &paddr);
-+
-+		if (ret) {
-+			rv = ERR_PTR(ret);
-+			goto userptr_fail_get_contig;
-+		}
-+
-+		buf->vma = vma;
-+
-+		ret = s5p_sysmmu_map_phys_area(ctx->sysmmu, buf->drv_addr,
-+					       paddr, buf->info.num_pages);
-+		if (ret)
-+			goto userptr_fail_sysmmu_map_area;
-+
-+		return buf;
-+	}
-+	/* else fail */
-+
-+userptr_fail_sysmmu_map_area:
-+	while (--num_pages_from_user >= 0)
-+		put_page(buf->info.pages[num_pages_from_user]);
-+	if (buf->vma)
-+		vb2_put_vma(buf->vma);
-+userptr_fail_get_contig:
-+	kfree(buf->info.pages);
-+
-+userptr_fail_pages_array_alloc:
-+	gen_pool_free(ctx->pool, buf->drv_addr, size);
-+
-+userptr_gen_pool_alloc_fail:
-+	kfree(buf);
-+	return rv;
++	return vb2_s5p_iommu_plane_addr(b, n);
 +}
 +
-+/*
-+ * @put_userptr: inform the allocator that a USERPTR buffer will no longer
-+ *		 be used
-+ */
-+static void vb2_s5p_iommu_put_userptr(void *buf_priv)
++static inline int fimc_vb2_allocator_enable(void *alloc_ctx)
 +{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
-+	int i = buf->info.num_pages;
-+
-+	printk(KERN_DEBUG "%s: Releasing userspace buffer of %d pages\n",
-+	       __func__, buf->info.num_pages);
-+	if (buf->vaddr)
-+		vm_unmap_ram((void *)buf->vaddr, buf->info.num_pages);
-+	s5p_sysmmu_unmap_area(buf->ctx->sysmmu, buf->drv_addr,
-+			      buf->info.num_pages);
-+	if (buf->vma) {
-+		vb2_put_vma(buf->vma);
-+	} else {
-+		while (--i >= 0) {
-+			if (buf->write)
-+				set_page_dirty_lock(buf->info.pages[i]);
-+			put_page(buf->info.pages[i]);
-+		}
-+	}
-+	kfree(buf->info.pages);
-+	gen_pool_free(buf->ctx->pool, buf->drv_addr, buf->info.size);
-+	kfree(buf);
++	return vb2_s5p_iommu_enable(alloc_ctx);
 +}
 +
-+static void *vb2_s5p_iommu_vaddr(void *buf_priv)
++static inline int fimc_vb2_allocator_disable(void *alloc_ctx)
 +{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
-+
-+	BUG_ON(!buf);
-+
-+	if (!buf->vaddr)
-+		buf->vaddr = (unsigned long)vm_map_ram(buf->info.pages,
-+					buf->info.num_pages,
-+					-1,
-+					pgprot_writecombine(PAGE_KERNEL));
-+
-+	/* add offset in case userptr is not page-aligned */
-+	return (void *)(buf->vaddr + buf->offset);
++	return vb2_s5p_iommu_disable(alloc_ctx);
 +}
 +
-+static unsigned int vb2_s5p_iommu_num_users(void *buf_priv)
-+{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
++#else	/* use vb2-dma-contig allocator */
 +
-+	return atomic_read(&buf->refcount);
++#include <media/videobuf2-dma-contig.h>
++
++#define fimc_vb2_allocator_memops vb2_dma_contig_memops
++
++static inline void *fimc_vb2_allocator_init(struct platform_device *pdev)
++{
++	return vb2_dma_contig_init_ctx(&pdev->dev);
 +}
 +
-+static int vb2_s5p_iommu_mmap(void *buf_priv, struct vm_area_struct *vma)
++static inline void fimc_vb2_allocator_cleanup(void *alloc_ctx)
 +{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
-+	unsigned long uaddr = vma->vm_start;
-+	unsigned long usize = vma->vm_end - vma->vm_start;
-+	int i = 0;
++	vb2_dma_contig_cleanup_ctx(alloc_ctx);
++}
 +
-+	if (!buf) {
-+		printk(KERN_ERR "No memory to map\n");
-+		return -EINVAL;
-+	}
++static inline unsigned long fimc_vb2_plane_addr(struct vb2_buffer *b, int n)
++{
++	return vb2_dma_contig_plane_paddr(b, n);
++}
 +
-+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-+	do {
-+		int ret;
-+
-+		ret = vm_insert_page(vma, uaddr, buf->info.pages[i++]);
-+		if (ret) {
-+			printk(KERN_ERR "Remapping memory, error: %d\n", ret);
-+			return ret;
-+		}
-+
-+		uaddr += PAGE_SIZE;
-+		usize -= PAGE_SIZE;
-+	} while (usize > 0);
-+
-+
-+	/*
-+	 * Use common vm_area operations to track buffer refcount.
-+	 */
-+	vma->vm_private_data	= &buf->handler;
-+	vma->vm_ops		= &vb2_common_vm_ops;
-+
-+	vma->vm_ops->open(vma);
-+
++static inline int fimc_vb2_allocator_enable(void *alloc_ctx)
++{
 +	return 0;
 +}
 +
-+static void *vb2_s5p_iommu_cookie(void *buf_priv)
++static inline int fimc_vb2_allocator_disable(void *alloc_ctx)
 +{
-+	struct vb2_s5p_iommu_buf *buf = buf_priv;
-+
-+	return (void *)buf->drv_addr + buf->offset;
++	return 0;
 +}
-+
-+const struct vb2_mem_ops vb2_s5p_iommu_memops = {
-+	.alloc		= vb2_s5p_iommu_alloc,
-+	.put		= vb2_s5p_iommu_put,
-+	.get_userptr	= vb2_s5p_iommu_get_userptr,
-+	.put_userptr	= vb2_s5p_iommu_put_userptr,
-+	.vaddr		= vb2_s5p_iommu_vaddr,
-+	.mmap		= vb2_s5p_iommu_mmap,
-+	.num_users	= vb2_s5p_iommu_num_users,
-+	.cookie		= vb2_s5p_iommu_cookie,
-+};
-+EXPORT_SYMBOL_GPL(vb2_s5p_iommu_memops);
-+
-+void
-+*vb2_s5p_iommu_init(struct device *dev, struct vb2_s5p_iommu_request *iommu_req)
-+{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx;
-+	unsigned long mem_base, mem_size;
-+
-+	ctx = kzalloc(sizeof *ctx, GFP_KERNEL);
-+	if (!ctx)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (iommu_req->align_order && iommu_req->align_order < PAGE_SHIFT)
-+		iommu_req->align_order = PAGE_SHIFT;
-+
-+	ctx->pool = gen_pool_create(
-+		iommu_req->align_order ? iommu_req->align_order :
-+		VB2_S5P_IOMMU_PIECE_ORDER,
-+		VB2_S5P_IOMMU_NODE_ID);
-+
-+	if (!ctx->pool)
-+		goto pool_alloc_fail;
-+
-+	if (0 == iommu_req->mem_base && 0 == iommu_req->mem_size) {
-+		mem_base = VB2_S5P_IOMMU_MEM_BASE;
-+		mem_size = VB2_S5P_IOMMU_MEM_SIZE;
-+	} else {
-+		mem_base = iommu_req->mem_base;
-+		mem_size = iommu_req->mem_size;
-+	}
-+
-+	if (gen_pool_add(ctx->pool, mem_base, mem_size, VB2_S5P_IOMMU_NODE_ID))
-+		goto chunk_add_fail;
-+
-+	ctx->sysmmu = s5p_sysmmu_get(dev, iommu_req->ip);
-+	if (!ctx->sysmmu) {
-+		dev_err(dev, "SYSMMU get failed\n");
-+		goto chunk_add_fail;
-+	}
-+
-+	return ctx;
-+
-+chunk_add_fail:
-+	gen_pool_destroy(ctx->pool);
-+pool_alloc_fail:
-+	kfree(ctx);
-+	return ERR_PTR(-ENOMEM);
-+}
-+EXPORT_SYMBOL_GPL(vb2_s5p_iommu_init);
-+
-+void vb2_s5p_iommu_cleanup(void *alloc_ctx)
-+{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx = alloc_ctx;
-+
-+	BUG_ON(NULL == alloc_ctx);
-+
-+	s5p_sysmmu_put(ctx->sysmmu);
-+
-+	gen_pool_destroy(ctx->pool);
-+
-+	kfree(alloc_ctx);
-+}
-+EXPORT_SYMBOL_GPL(vb2_s5p_iommu_cleanup);
-+
-+int vb2_s5p_iommu_enable(void *alloc_ctx)
-+{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx = alloc_ctx;
-+
-+	BUG_ON(NULL == alloc_ctx);
-+
-+	return s5p_sysmmu_control(ctx->sysmmu, S5P_SYSMMU_ENABLE_PRIVATE);
-+}
-+EXPORT_SYMBOL_GPL(vb2_s5p_iommu_enable);
-+
-+int vb2_s5p_iommu_disable(void *alloc_ctx)
-+{
-+	struct vb2_s5p_iommu_alloc_ctx *ctx = alloc_ctx;
-+
-+	BUG_ON(NULL == alloc_ctx);
-+
-+	return s5p_sysmmu_control(ctx->sysmmu, S5P_SYSMMU_DISABLE);
-+}
-+EXPORT_SYMBOL_GPL(vb2_s5p_iommu_disable);
-+
-+MODULE_DESCRIPTION("s5p iommu memory handling routines for videobuf2");
-+MODULE_AUTHOR("Andrzej Pietrasiewicz");
-+MODULE_LICENSE("GPL");
-diff --git a/include/media/videobuf2-s5p-iommu.h b/include/media/videobuf2-s5p-iommu.h
-new file mode 100644
-index 0000000..5bad763
---- /dev/null
-+++ b/include/media/videobuf2-s5p-iommu.h
-@@ -0,0 +1,50 @@
-+/*
-+ * videobuf2-s5p-iommu.h - SYSMMU (IOMMU)-based memory allocator for videobuf2
-+ *
-+ * Copyright (C) 2011 Samsung Electronics
-+ *
-+ * Author: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation.
-+ */
-+
-+#ifndef _MEDIA_VIDEOBUF2_S5P_IOMMU_H
-+#define _MEDIA_VIDEOBUF2_S5P_IOMMU_H
-+
-+#include <media/videobuf2-core.h>
-+#include <plat/sysmmu.h>
-+
-+struct device;
-+
-+struct vb2_s5p_iommu_request {
-+	/* mem_base and mem_size both 0 => use allocator's default */
-+	unsigned long		mem_base;
-+	unsigned long		mem_size;
-+	enum s5p_sysmmu_ip	ip;
-+	/*
-+	 * align_order 0 => use allocator's default
-+	 * 0 < align_order < PAGE_SHIFT => rounded to PAGE_SHIFT by allocator
-+	 */
-+	int			align_order;
-+};
-+
-+static inline unsigned long vb2_s5p_iommu_plane_addr(
-+		struct vb2_buffer *vb, unsigned int plane_no)
-+{
-+	return (unsigned long)vb2_plane_cookie(vb, plane_no);
-+}
-+
-+extern const struct vb2_mem_ops vb2_s5p_iommu_memops;
-+
-+void *vb2_s5p_iommu_init(struct device *dev,
-+			 struct vb2_s5p_iommu_request *iommu_req);
-+
-+void vb2_s5p_iommu_cleanup(void *alloc_ctx);
-+
-+int vb2_s5p_iommu_enable(void *alloc_ctx);
-+
-+int vb2_s5p_iommu_disable(void *alloc_ctx);
 +
 +#endif
++
++#endif /* FIMC_CORE_H_ */
 -- 
 1.7.1.569.g6f426
