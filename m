@@ -1,58 +1,17 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 4 Mar 2011 21:44:48 +0530
-Subject: [PATCH 08/17] omap4: pm: Add GIC save/restore support
-In-Reply-To: <87ipvykgq9.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-9-git-send-email-santosh.shilimkar@ti.com><8739n55f75.fsf@ti.com><20b497dc6e31dd5eb91b2a11002966c2@mail.gmail.com>
-	<87ipvykgq9.fsf@ti.com>
-Message-ID: <80e67b305c809bfd218fff06ad27b97a@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 4 Mar 2011 18:16:07 +0200
+Subject: PXA270 Random Hangs at Low Core Freq
+In-Reply-To: <A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
+References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
+	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
+	<A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
+Message-ID: <201103041816.08109.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Friday, March 04, 2011 9:42 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 08/17] omap4: pm: Add GIC save/restore support
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> >> -----Original Message-----
-> >> From: Kevin Hilman [mailto:khilman at ti.com]
-> >> Sent: Thursday, March 03, 2011 4:00 AM
-> >> To: Santosh Shilimkar
-> >> Cc: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> >> Subject: Re: [PATCH 08/17] omap4: pm: Add GIC save/restore
-> support
-> >>
-> >> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> >>
-> >
-> > [...]
-> >
-> >> > +	/*
-> >> > +	 * Find out how many interrupts are supported.
-> >> > +	 * OMAP4 supports max of 128 SPIs where as GIC can
-> support
-> >> > +	 * up to 1020 interrupt sources.
-> >> > +	 */
-> >> > +	max_spi_reg = __raw_readl(gic_dist_base_addr +
-> GIC_DIST_CTR) &
-> >> 0x1f;
-> >> > +	max_spi_irq = max_spi_reg * 32;
-> >>
-> >> Based on the spec, this should also be max'd at 1020 so you never
-> >> write the reserved values after 1020.
-> >>
-> >
-> > That's correct as per generic GIC specs. On OMAP4, the maximum
-> IRQs
-> > already fused in "DIST_CTR"  bit-fields and fixed. Hence we don't
-> > need that additional comparison.
-> >
->
-> OK, clarifiying this in the comment above would avoid confusion for
-> anyone looking at this code in combination with the spec.
->
-Ok. Will update it
+Hi, Michael, recently I discovered that PXA270 (at least in Zipit Z2) works 
+unstable (just hangs randomly) with fastbus bit set in CCLKCFG, check if 
+bootloader sets it on your board, and if it does try to clear it.
+
+Regards
+Vasily
