@@ -1,41 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 04 Mar 2011 21:58:56 +0300
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 4 Mar 2011 20:46:16 +0100
 Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
 In-Reply-To: <20110304083822.0f40d120@debxo>
-References: <20110304080653.3f2c3f19@debxo>	<4D710FF9.6040305@ru.mvista.com>
+References: <20110304080653.3f2c3f19@debxo> <4D710FF9.6040305@ru.mvista.com>
 	<20110304083822.0f40d120@debxo>
-Message-ID: <4D713670.70506@ru.mvista.com>
+Message-ID: <20110304194616.GW22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-Andres Salomon wrote:
-
->>> Note that this relies on stuff currently in mfd's next tree, but
->>> this is also a newer driver.  I'm not sure which tree it should go
->>> through, as it's a problem that shows up in next.
-
->>     This passage should be under --- tear line.
-
+On Fri, Mar 04, 2011 at 08:38:22AM -0800, Andres Salomon wrote:
+> On Fri, 04 Mar 2011 19:14:49 +0300
+> Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> 
+> > Hello.
+> > 
+> > Andres Salomon wrote:
+> > 
+> > > Note that this relies on stuff currently in mfd's next tree, but
+> > > this is also a newer driver.  I'm not sure which tree it should go
+> > > through, as it's a problem that shows up in next.
+> > 
+> >     This passage should be under --- tear line.
+> 
 > What?
+Actually putting it above the commit log and separating it by a scissors
+line (see git-mailinfo(1), git am -c) should be fine, too.
 
-    See Documentation/SubmittingPatches, section 15, "The canonical patch format".
+This is all about selecting which part of the message should end up in
+the commit log.  Git ignores everything after the tripple dash (apart
+from the patch of course).
 
->>> From: Andres Salomon <dilinger@queued.net>
+Best regards
+Uwe
 
->>> MFD changes in c738892f cause the mc13xxx_platform_data struct
-
->>     Linus asks to also specify the commit summary in parens.
-
-> Also, what?  If there are changes to how patches should be submitted,
-> please provide a reference (Documentation/SubmittingPatches should
-> be updated, as well).
-
-    I have no time to rummage in the mail archives, sorry.
-
->>> to change.  This changes one more (new) user of it, fixing a build
->>> error.
->>> Signed-off-by: Andres Salomon <dilinger@queued.net>
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
