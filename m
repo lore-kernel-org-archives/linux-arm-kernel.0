@@ -1,38 +1,52 @@
-From: martin.persson@stericsson.com (martin persson)
-Date: Fri, 4 Mar 2011 11:27:41 +0100
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency with cpufreq
-	notifiers
-In-Reply-To: <AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>
-	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-Message-ID: <4D70BE9D.4000507@stericsson.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 4 Mar 2011 11:57:56 +0100
+Subject: [PATCH] OMAP2/3: VENC hwmod: add OCPIF_SWSUP_IDLE flag to
+	interface
+In-Reply-To: <alpine.DEB.2.00.1103032300480.10981@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1103032300480.10981@utopia.booyaka.com>
+Message-ID: <4D70C5B4.3080401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've seen no problems using this patch and have been grateful for it's existence. So I'm happy to put:
++ Tomi
 
-Tested-by: martin.persson at stericsson.com
+Hi Paul,
 
-/Martin
+On 3/4/2011 7:02 AM, Paul Walmsley wrote:
+>
+> According to the hwmod interface data, the DSS submodule "VENC" uses a
+> clock, "dss_54m_fck"/"dss_tv_fck", which the PRCM cannot autoidle.  By
+> default, the hwmod code assumes that interface clocks can be autoidled
+> by the PRCM.  When the interface clock can't be autoidled by the PRCM,
+> those interfaces must be marked with the OCPIF_SWSUP_IDLE flag.
+> Otherwise, the "interface clock" will always have a non-zero use
+> count, and the device won't enter idle.  This problem was observed on
+> N8x0.
+>
+> Fix the immediate problem by marking the VENC interface with the
+> OCPIF_SWSUP_IDLE flag.  But it's not clear that
+> "dss_54m_fck"/"dss_tv_fck" is really the correct interface clock for
+> VENC.  It may be that the VENC interface should use a
+> hardware-autoidling interface clock.  This is the situation on OMAP4,
+> which uses "l3_div_ck" as the VENC interface clock, which can be
+> autoidled by the PRCM.  Clarification from TI is needed.
 
-On 03/04/2011 11:17 AM, Linus Walleij wrote:
-> 2010/11/18 Colin Cross<ccross@android.com>:
->
->> The clock to the ARM TWD local timer scales with the cpu
->> frequency. To allow the cpu frequency to change while
->> maintaining a constant TWD frequency, pick a lower target
->> frequency for the TWD and use the prescaler to divide down
->> to the closest lower frequency.
-> We are using this with some custom hooks for the U8500.
->
-> Tested-by: Linus Walleij<linus.walleij@linaro.org>
->
-> Martin Persson can probably provide an additional Tested-by
-> from ST-Ericsson if it helps.
->
-> Colin are you merging this patch for 2.6.39 through
-> Russells tracker or pull request? It's an important patch
-> for us.
->
-> Yours,
-> Linus Walleij
+Yep, this is clearly wrong, all DSS modules are using the same 
+interconnect port from the L4, thus they should all use the dss_ick as 
+interface clock and not the functional clock dss_tv_fck.
+
+There is something strange with that module because the main_clk is 
+attached to dss1_alwon_fck instead of dss_tv_fck.
+
+I'm quite sure that both are needed to make that module work and that's 
+why it was added as an interface clock.
+In theory, one of them should be an optional clock like on OMAP4.
+
+
+Sumit,
+
+Could you explain the rational behind the usage of dss_tv_fck as an iclk 
+and dss1_alwon_fck as a fclk?
+
+Thanks,
+Benoit
