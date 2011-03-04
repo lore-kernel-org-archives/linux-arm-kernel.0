@@ -1,44 +1,38 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 4 Mar 2011 22:50:23 +0530
-Subject: [PATCH 00/17] omap4: pm: suspend, hotplug and cpuilde support
-In-Reply-To: <87oc5txf0d.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-	<87oc5txf0d.fsf@ti.com>
-Message-ID: <aac02e1097a15c84cf795db5bfc49b48@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 4 Mar 2011 17:35:01 +0000
+Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
+References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 5:16 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 00/17] omap4: pm: suspend, hotplug and cpuilde
-> support
+On Fri, Mar 4, 2011 at 3:33 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> This set of patches, along with some other patches under
+> discussion on alkml, should enable omap3 and omap4 kernels to be
+> built with CONFIG_THUMB2_KERNEL.
 >
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> This patch set builds on recent cleanup done by the omap
+> maintainers.
 >
-> > This series adds OMAP4 suspend and cpuidle support till MPU
-> subsystem
-> > (MPUSS) off-mode. The suspend on SMP machines uses cpu-hotplug
-> > infrastructure to take down the non-boot CPUs. We put secondary
-> > CPU(CPU1 in OMAP4) to OFF state via cpu-hotplug.
-> > In cpuidle too, low power states are attempted only when the
-> > CPU1 is put to OFF state via cpu-hotplug because of hardware
-> > constraints.
+> At least some of this code definitely works, most features have
+> been tested successfully. ?Further testing, especially of Thumb-2
+> behaviour, is still welcome.
 >
-> Minor nit on patch subjects:  both OMAP and PM are acronyms, please
-> capitalize.
+> In particular, I still have no Ack/Tested-by on the following
+> patches, so it would be great if anyone who has an opportunity
+> to do a final review / re-test can do so.
 >
-> Also, can you rebase this on Paul's integration-2.6.39 branch?
-> There
-> are several things in this series that conflict with changes there.
->
+> ?* ARM: omap3: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
+> ?* ARM: omap3: Thumb-2 compatibility for sram34xx.S
+> ?* ARM: omap3: Thumb-2 compatibility for sleep34xx.S
 
-Rebased branch against your pm-core.
+Following up on this, it looks like I have some locally-recorded acks
+which didn't make it into my posting ...
 
-git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-omap4_pm_for-next
+The one patch I currently have no feedback on is this one:
 
-Regards,
-Santosh
+  * ARM: omap4: Provide do_wfi() for Thumb-2
+
+Cheers
+---Dave
