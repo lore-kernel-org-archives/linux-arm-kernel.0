@@ -1,70 +1,83 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Mar 2011 15:24:48 -0800
-Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from going
-	to RET or OFF when DSS is on
-In-Reply-To: <20110301224918.32613.95176.stgit@twilight.localdomain> (Paul
-	Walmsley's message of "Tue, 01 Mar 2011 15:49:24 -0700")
-References: <20110301220833.32613.54669.stgit@twilight.localdomain>
-	<20110301224918.32613.95176.stgit@twilight.localdomain>
-Message-ID: <87pqq7pz27.fsf@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu,  3 Mar 2011 21:22:04 -0300
+Subject: [PATCH v2] ARM: mx51: Print silicon revision on boot
+Message-ID: <1299198124-4064-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Having the silicon revision to appear on the boot log is a useful information.
 
-> From: Tero Kristo <tero.kristo@nokia.com>
->
-> Prevent the CORE power domain from entering RETENTION or OFF when DSS
-> is on.  Otherwise, the display FIFO(s) may underflow due to the time
-> needed for the CORE to wake back up, causing tearing and unnecessary
-> interrupts.
->
-> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-> [paul at pwsan.com: wrote commit message]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+MX31 and MX35 already show the silicon revision on boot. Add support for displaying such information for MX51 as well.
 
-This isn't quite ready for merge, and needs a little more testing with
-current DSS driver and mainline.
+Tested on a MX51EVK, where it shows:
 
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 0335cd8..d1b7789 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -9,8 +9,9 @@
->   * Copyright (C) 2007 Texas Instruments, Inc.
->   * Karthik Dasu <karthik-dp@ti.com>
->   *
-> - * Copyright (C) 2006 Nokia Corporation
-> + * Copyright (C) 2006, 2011 Nokia Corporation
->   * Tony Lindgren <tony@atomide.com>
-> + * Tero Kristo <tero.kristo@nokia.com>
->   *
->   * Copyright (C) 2005 Texas Instruments, Inc.
->   * Richard Woodruff <r-woodruff2@ti.com>
-> @@ -268,6 +269,12 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
->  		goto select_state;
->  	}
->  
-> +	/* If DSS is active, prevent CORE RET/OFF */
-> +	dss_state = pwrdm_read_pwrst(dss_pd);
-> +	if (dss_state == PWRDM_POWER_ON &&
-> +	    core_next_state != PWRDM_POWER_ON)
-> +		core_next_state = PWRDM_POWER_INACTIVE;
-> +
+CPU identified as i.MX51, silicon rev 3.0
 
-Due to sleepdeps/autodeps, when this code runs, DSS powerdomain is
-always on.  The result is that CORE is always set to INACTIVE.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Added patch description
 
-A side effect of this problem is exposing a known issue with PER wakeups
-(UART3, GPIO).  Since CORE never goes to retention/off, IO-pad
-wakeups are never enabled, so PER wakeups do not work.
+ arch/arm/mach-mx5/clock-mx51-mx53.c   |    1 +
+ arch/arm/mach-mx5/cpu.c               |   21 +++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mx51.h |    1 +
+ 3 files changed, 23 insertions(+), 0 deletions(-)
 
-I think we need a different way of checking for DSS activity.
-
-Sounds like another usecase for idle notifiers.
-
-Kevin
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 652ace4..1282a60 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1510,6 +1510,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 
+ 	clk_enable(&iim_clk);
+ 	mx51_revision();
++	mx51_display_revision();
+ 	clk_disable(&iim_clk);
+ 
+ 	/* move usb_phy_clk to 24MHz */
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index df46b5e..565ed4d 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -51,6 +51,27 @@ int mx51_revision(void)
+ }
+ EXPORT_SYMBOL(mx51_revision);
+ 
++void mx51_display_revision(void)
++{
++	int rev;
++	char *srev;
++	rev = mx51_revision();
++
++	switch (rev) {
++	case IMX_CHIP_REVISION_2_0:
++		srev = "2.0";
++		break;
++	case IMX_CHIP_REVISION_3_0:
++		srev = "3.0";
++		break;
++	default:
++		return IMX_CHIP_REVISION_UNKNOWN;
++		srev = "unknown";
++	}
++	printk(KERN_INFO "CPU identified as i.MX51, silicon rev %s\n", srev);
++}
++EXPORT_SYMBOL(mx51_display_revision);
++
+ #ifdef CONFIG_NEON
+ 
+ /*
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index 1eb339e..dede19a 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -347,6 +347,7 @@
+ 
+ #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
+ extern int mx51_revision(void);
++extern void mx51_display_revision(void);
+ #endif
+ 
+ /* tape-out 1 defines */
+-- 
+1.6.0.4
