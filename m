@@ -1,24 +1,126 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Mar 2011 11:33:33 +0000
-Subject: [PATCH 7/7] ARM: SMDK6410: Update regulator names for debugfs
-	compatiblity
-In-Reply-To: <022401cbda0d$08d18550$1a748ff0$%kim@samsung.com>
-References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-	<1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<022401cbda0d$08d18550$1a748ff0$%kim@samsung.com>
-Message-ID: <20110304113333.GB17653@sirena.org.uk>
+From: dudl@cypress.com (dudl at cypress.com)
+Date: Fri, 04 Mar 2011 11:42:54 +0000
+Subject: CHROMIUM: arm: tegra: Add platfrom devices for Cypress trackpad
+	(issue6623011)
+Message-ID: <20cf3005123492db71049da6a54a@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2011 at 10:39:32AM +0900, Kukjin Kim wrote:
+Reviewers: ccross_android.com, konkers_android.com, olof_lixom.net,  
+linux_arm.linux.org.uk, linux-tegra_vger.kernel.org,  
+linux-arm-kernel_lists.infradead.org, linux-kernel_vger.kernel.org, Micah  
+C, dudl,
 
-> >  /* VDD_UH_MMC, LDO5 on J5 */
-> >  static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
+Description:
+CHROMIUM: arm: tegra: Add platfrom devices for Cypress trackpad
 
-> Mark, there is no '__initdata' in my tree.
-> I just applied following changes (/ -> +).
+1. Add platfrom data strcuture cyapa_platfrom_data.
+2. Add trackpad device into platfrom I2C bus 0.
+3. Initialize platfrom data for cyapa_platfrom_data.
+4. This code is merged based kernel version 2.7.37-rc5.
 
-> If any updates/patches, please let me know :)
 
-That's fine, your resolution doesn't seem to have shown up in -next yet
-but there's no actual dependency upon that for this change.
+Change-Id: I3591317ac9c3b7d5328a9c617d662ad6be6065a2
+Signed-off-by: Du, Dudley <dudl@cypress.com>
+
+BUG=None
+TEST=Test on arm tegra2 seaborad and kaen platform
+
+Please review this at http://codereview.chromium.org/6623011/
+
+SVN Base: http://git.chromium.org/git/kernel-next.git at chromeos-2.6.37-rc5
+
+Affected files:
+   M arch/arm/mach-tegra/board-seaboard.h
+   M arch/arm/mach-tegra/board-seaboard.c
+
+
+Index: arch/arm/mach-tegra/board-seaboard.c
+diff --git a/arch/arm/mach-tegra/board-seaboard.c  
+b/arch/arm/mach-tegra/board-seaboard.c
+index  
+75fbab68ef61c0c117bb8dafa2aaca90947a860b..de272cc73794c6600994af3c0e834dd884f6b56b  
+100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -303,6 +303,36 @@ static struct tegra_i2c_platform_data  
+seaboard_dvc_platform_data = {
+  	.is_dvc		= true,
+  };
+
++/* for Cypress Trackpad. */
++#include <linux/cyapa.h>
++
++static int cyapa_i2c_platform_init(void)
++{
++	return 0;
++}
++
++static int cyapa_i2c_platform_wakeup(void)
++{
++	return 0;
++}
++
++static struct cyapa_platform_data cyapa_i2c_platform_data = {
++	.flag = 0,
++	.gen = CYAPA_GEN2,
++	.power_state = CYAPA_PWR_ACTIVE,
++	.use_absolute_mode = false,
++	.use_polling_mode = false,
++	.polling_interval_time_active = CYAPA_ACTIVE_POLLING_INTVAL_TIME,
++	.polling_interval_time_lowpower = CYAPA_LOWPOWER_POLLING_INTVAL_TIME,
++	.active_touch_timeout = CYAPA_ACTIVE_TOUCH_TIMEOUT,
++	.name = CYAPA_I2C_NAME,
++	.irq_gpio = TEGRA_GPIO_CYTP_INT,
++	.report_rate = CYAPA_REPORT_RATE,
++
++	.wakeup = cyapa_i2c_platform_wakeup,
++	.init = cyapa_i2c_platform_init,
++};
++
+  static struct i2c_board_info __initdata seaboard_i2c0_devices[] = {
+  	{
+  		I2C_BOARD_INFO("wm8903", 0x1a),
+@@ -311,6 +341,11 @@ static struct i2c_board_info __initdata  
+seaboard_i2c0_devices[] = {
+  		I2C_BOARD_INFO("isl29018", 0x44),
+  		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_ISL29018_IRQ),
+  	},
++	{
++		I2C_BOARD_INFO(CYAPA_I2C_NAME, 0x67),
++		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CYTP_INT),
++		.platform_data = &cyapa_i2c_platform_data,
++	},
+  };
+
+  static struct i2c_board_info __initdata seaboard_i2c4_devices[] = {
+@@ -549,6 +584,11 @@ static void __init tegra_seaboard_init(void)
+
+  	tegra_gpio_enable(TEGRA_GPIO_LIDSWITCH);
+  	tegra_gpio_enable(TEGRA_GPIO_POWERKEY);
++
++	/* for Cypress trackpad. */
++	tegra_gpio_enable(TEGRA_GPIO_CYTP_INT);
++	gpio_request(TEGRA_GPIO_CYTP_INT, "gpio_cytp_int");
++	gpio_direction_input(TEGRA_GPIO_CYTP_INT);
+  }
+
+  MACHINE_START(SEABOARD, "seaboard")
+Index: arch/arm/mach-tegra/board-seaboard.h
+diff --git a/arch/arm/mach-tegra/board-seaboard.h  
+b/arch/arm/mach-tegra/board-seaboard.h
+index  
+5e1fc48bfa940056f2fd8e4c3bee5124d1398da4..4a38c4163ac338e90433a95afb90ec57a456ed1b  
+100644
+--- a/arch/arm/mach-tegra/board-seaboard.h
++++ b/arch/arm/mach-tegra/board-seaboard.h
+@@ -28,6 +28,9 @@
+  #define TEGRA_GPIO_ISL29018_IRQ		TEGRA_GPIO_PZ2
+  #define TEGRA_GPIO_AC_ONLINE		TEGRA_GPIO_PV3
+
++/* for Cypress Trackpad gpio interrupt. */
++#define TEGRA_GPIO_CYTP_INT		TEGRA_GPIO_PW2
++
+  void seaboard_pinmux_init(void);
+  int seaboard_panel_init(void);
+  int seaboard_sdhci_init(void);
