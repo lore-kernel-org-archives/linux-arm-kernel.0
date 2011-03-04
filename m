@@ -1,115 +1,111 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 4 Mar 2011 23:28:16 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <20110304081916.GB29521@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110303121153.GJ29521@pengutronix.de>
-	<20110303162513.GS22310@pengutronix.de>
-	<20110303180026.GC18351@pengutronix.de>
-	<20110303201009.GT22310@pengutronix.de>
-	<20110304081916.GB29521@pengutronix.de>
-Message-ID: <20110304222816.GZ22310@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 4 Mar 2011 15:36:46 -0700 (MST)
+Subject: [PATCH] OMAP1: McBSP: fix build break for non-multi-OMAP1 configs
+Message-ID: <alpine.DEB.2.00.1103041535150.10981@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added linux-kbuild to Cc:]
 
-Hello,
+Commit 3cf32bba8ca0e0052ca41d74d455a5805b7fea85 ("OMAP: McBSP: Convert
+McBSP to platform device model") in the current omap-for-linus branch
+breaks compilation with non-multi-OMAP1 configs:
 
-yet another reply to your mail, the last one for today, I promise.
+  CC      arch/arm/mach-omap1/mcbsp.o
+arch/arm/mach-omap1/mcbsp.c: In function 'omap1_mcbsp_init':
+arch/arm/mach-omap1/mcbsp.c:384: warning: dereferencing 'void *' pointer
+arch/arm/mach-omap1/mcbsp.c:387: error: invalid use of void expression
+arch/arm/mach-omap1/mcbsp.c:390: warning: dereferencing 'void *' pointer
+arch/arm/mach-omap1/mcbsp.c:393: error: invalid use of void expression
 
-> +config ARCH_IMX_MULTI_OMX27
-> +	select ARCH_ALLOW_IMX27
-> +	bool "i.MX27 support"
-s/OMX/IMX/
+Fix by avoiding NULL dereferences.
 
-Other than that is works.  One ugly thing about that patch is that when
-starting with
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap1/mcbsp.c |   18 ++++++++++++------
+ 1 files changed, 12 insertions(+), 6 deletions(-)
 
- ?       *** enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR to get *** ?
- ?       *** support for multiple i.MX Families ***                  ?
- ?       Select i.MX CPU (i.MX27 support)  --->                      ?
- ?     *** MX27 platforms: ***                                       ?
- ? [*] MX27ADS platform                                              ?
- ? [*] Phytec phyCORE-i.MX27 CPU module (pcm038)                     ?
-
-and then enabling ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR this yields
-
- ? [ ]   i.MX1 support (NEW)                                         ?
- ? [ ]   i.MX21 support (NEW)                                        ?
- ? [ ]   i.MX25 support (NEW)                                        ?
- ? [ ]   i.MX27 support (NEW)                                        ?
- ? [ ]   i.MX31 and i.MX35 support (NEW)                             ?
-
-.
-
-At least the machines enabled before are reselected when enabling "i.MX27
-support". Still it would be nice if "i.MX27 support" would be
-autoselected in this case. Any ideas?
-[For those that didn't see Sascha's patch, the construct in
-arch/arm/mach-imx/Kconfig is:
-
-	config ARCH_ALLOW_IMX1
-		bool
-
-	config ARCH_ALLOW_IMX21
-		bool
-	...
-
-	if ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR
-	config ARCH_IMX_MULTI_IMX1
-		select ARCH_ALLOW_IMX1
-		bool "i.MX1 support"
-
-	config ARCH_IMX_MULTI_IMX21
-		select ARCH_ALLOW_IMX21
-		bool "i.MX21 support"
-	...
-	endif
-
-	if !(ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR)
-	choice
-		prompt "Select i.MX CPU"
-	config ARCH_IMX_ONLY_IMX1
-		select ARCH_ALLOW_IMX1
-		bool "i.MX1 support"
-
-	config ARCH_IMX_ONLY_IMX21
-		select ARCH_ALLOW_IMX21
-		bool "i.MX21 support"
-	...
-	endchoice
-	endif
-]
-
-I merged Sascha's patch into my "move mach-mx3/* to mach-imx" series;
-the tree is provided at
-
-	git://git.pengutronix.de/git/ukl/linux-2.6.git multi-soc-kernel
-
-. As this tree doesn't contain ARM_PATCH_PHYS_VIRT yet, I tested the UI
-with the patch below.
-
-Best regards
-Uwe
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index cfc398a..f5e0638 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -106,6 +106,9 @@ config ARCH_ALLOW_IMX31
- config ARCH_ALLOW_IMX35
- 	bool
+diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
+index e68f6c0..d9af981 100644
+--- a/arch/arm/mach-omap1/mcbsp.c
++++ b/arch/arm/mach-omap1/mcbsp.c
+@@ -136,6 +136,8 @@ struct resource omap7xx_mcbsp_res[][6] = {
+ 	},
+ };
  
-+config ARM_PATCH_PHYS_VIRT
-+	bool "testme"
++#define omap7xx_mcbsp_res_0		omap7xx_mcbsp_res[0]
 +
- if ARM_PATCH_PHYS_VIRT && AUTO_ZRELADDR
- config ARCH_IMX_MULTI_IMX1
- 	select ARCH_ALLOW_IMX1
-
+ static struct omap_mcbsp_platform_data omap7xx_mcbsp_pdata[] = {
+ 	{
+ 		.ops		= &omap1_mcbsp_ops,
+@@ -147,7 +149,7 @@ static struct omap_mcbsp_platform_data omap7xx_mcbsp_pdata[] = {
+ #define OMAP7XX_MCBSP_RES_SZ		ARRAY_SIZE(omap7xx_mcbsp_res[1])
+ #define OMAP7XX_MCBSP_COUNT		ARRAY_SIZE(omap7xx_mcbsp_res)
+ #else
+-#define omap7xx_mcbsp_res		NULL
++#define omap7xx_mcbsp_res_0		NULL
+ #define omap7xx_mcbsp_pdata		NULL
+ #define OMAP7XX_MCBSP_RES_SZ		0
+ #define OMAP7XX_MCBSP_COUNT		0
+@@ -238,6 +240,8 @@ struct resource omap15xx_mcbsp_res[][6] = {
+ 	},
+ };
+ 
++#define omap15xx_mcbsp_res_0		omap15xx_mcbsp_res[0]
++
+ static struct omap_mcbsp_platform_data omap15xx_mcbsp_pdata[] = {
+ 	{
+ 		.ops		= &omap1_mcbsp_ops,
+@@ -252,7 +256,7 @@ static struct omap_mcbsp_platform_data omap15xx_mcbsp_pdata[] = {
+ #define OMAP15XX_MCBSP_RES_SZ		ARRAY_SIZE(omap15xx_mcbsp_res[1])
+ #define OMAP15XX_MCBSP_COUNT		ARRAY_SIZE(omap15xx_mcbsp_res)
+ #else
+-#define omap15xx_mcbsp_res		NULL
++#define omap15xx_mcbsp_res_0		NULL
+ #define omap15xx_mcbsp_pdata		NULL
+ #define OMAP15XX_MCBSP_RES_SZ		0
+ #define OMAP15XX_MCBSP_COUNT		0
+@@ -343,6 +347,8 @@ struct resource omap16xx_mcbsp_res[][6] = {
+ 	},
+ };
+ 
++#define omap16xx_mcbsp_res_0		omap16xx_mcbsp_res[0]
++
+ static struct omap_mcbsp_platform_data omap16xx_mcbsp_pdata[] = {
+ 	{
+ 		.ops		= &omap1_mcbsp_ops,
+@@ -357,7 +363,7 @@ static struct omap_mcbsp_platform_data omap16xx_mcbsp_pdata[] = {
+ #define OMAP16XX_MCBSP_RES_SZ		ARRAY_SIZE(omap16xx_mcbsp_res[1])
+ #define OMAP16XX_MCBSP_COUNT		ARRAY_SIZE(omap16xx_mcbsp_res)
+ #else
+-#define omap16xx_mcbsp_res		NULL
++#define omap16xx_mcbsp_res_0		NULL
+ #define omap16xx_mcbsp_pdata		NULL
+ #define OMAP16XX_MCBSP_RES_SZ		0
+ #define OMAP16XX_MCBSP_COUNT		0
+@@ -381,19 +387,19 @@ static int __init omap1_mcbsp_init(void)
+ 		return -ENOMEM;
+ 
+ 	if (cpu_is_omap7xx())
+-		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res[0],
++		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res_0,
+ 					OMAP7XX_MCBSP_RES_SZ,
+ 					omap7xx_mcbsp_pdata,
+ 					OMAP7XX_MCBSP_COUNT);
+ 
+ 	if (cpu_is_omap15xx())
+-		omap_mcbsp_register_board_cfg(omap15xx_mcbsp_res[0],
++		omap_mcbsp_register_board_cfg(omap15xx_mcbsp_res_0,
+ 					OMAP15XX_MCBSP_RES_SZ,
+ 					omap15xx_mcbsp_pdata,
+ 					OMAP15XX_MCBSP_COUNT);
+ 
+ 	if (cpu_is_omap16xx())
+-		omap_mcbsp_register_board_cfg(omap16xx_mcbsp_res[0],
++		omap_mcbsp_register_board_cfg(omap16xx_mcbsp_res_0,
+ 					OMAP16XX_MCBSP_RES_SZ,
+ 					omap16xx_mcbsp_pdata,
+ 					OMAP16XX_MCBSP_COUNT);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.3
