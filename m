@@ -1,29 +1,53 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Mar 2011 10:33:53 +0900
-Subject: [PATCH 0/7] Various Samsung updates
-In-Reply-To: <20110303145910.GC17460@trinity.fluff.org>
-References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
-	<20110303145910.GC17460@trinity.fluff.org>
-Message-ID: <022301cbda0c$3c550a60$b4ff1f20$%kim@samsung.com>
+Date: Fri, 04 Mar 2011 10:53:05 +0900
+Subject: [PATCH v3] ARM: EXYNOS4: add support for i2c PMICs on
+	Universal_C210	board
+In-Reply-To: <1299164371-23398-1-git-send-email-m.szyprowski@samsung.com>
+References: <018901cbd949$c86e8f80$594bae80$%kim@samsung.com>
+	<1299164371-23398-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <022f01cbda0e$ea1d30d0$be579270$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
+Marek Szyprowski wrote:
 > 
-> On Thu, Mar 03, 2011 at 02:57:11PM +0000, Mark Brown wrote:
-> > This is a patch series I've got built up for the Samsung platforms, some
-> > of which has been pending for the entire release cycle.  I know Ben's
-> > said he's extremely busy right now (as you can see some of these patches
-> > are from him), perhaps it would make sense to apply these via Kukjin's
-> > tree for the time being?
+> This patch adds basic definitions for MAX8952 & LP3974 (MAX8998
+> compatible) PMICs for UniversalC210 board. Power consumers for the
+> device drivers will be added later. These two PMICs occupy I2C5 bus.
 > 
-> I'm ok with these being sent upstream via whoever's tree. I do note
-> that there's a pile of s3c24xx I seem to have missed completely after
-> falling off linux-kernel a couple of months ago.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/Kconfig               |    2 +
+>  arch/arm/mach-exynos4/mach-universal_c210.c |  413
+> +++++++++++++++++++++++++++
+>  2 files changed, 415 insertions(+), 0 deletions(-)
 > 
-Ok, applied into my tree :)
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index ad03840..d58cbb5 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -116,8 +116,10 @@ config MACH_UNIVERSAL_C210
+>  	select S3C_DEV_HSMMC2
+>  	select S3C_DEV_HSMMC3
+>  	select S3C_DEV_I2C1
+> + 	select S3C_DEV_I2C5
+   ^
+Used 1 white space + tab here.
+As you know, just 1 tab is enough :)
 
-As a note, they will be sent to upstream this weekend for 38.
+>  	select S5P_DEV_ONENAND
+>  	select EXYNOS4_SETUP_I2C1
+> + 	select EXYNOS4_SETUP_I2C5
+   ^
+Same as above.
+
+>  	select EXYNOS4_SETUP_SDHCI
+>  	help
+>  	  Machine support for Samsung Mobile Universal S5PC210 Reference
+
+Thanks for your re-working.
+Ok, will apply with above fixing.
 
 Thanks.
 
@@ -32,28 +56,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> > Ben Dooks (2):
-> >       ARM: S3C64XX: Add clock for i2c1
-> >       ARM: S3C64XX: Reduce output of s3c64xx_dma_init1()
-> >
-> > Mark Brown (5):
-> >       ARM: SAMSUNG: Include devs.h in dev-uart.c to prototype devices
-> >       ARM: S3C64XX: Staticise non-exported GPIO to interrupt functions
-> >       ARM: S3C64XX: Tone down SDHCI debugging
-> >       ARM: SMDK6410: Fix build with WM1190 disabled and WM1192 enabled
-> >       ARM: SMDK6410: Update regulator names for debugfs compatiblity
-> >
-> >  arch/arm/mach-s3c64xx/clock.c         |    6 ++++++
-> >  arch/arm/mach-s3c64xx/dma.c           |   11 ++++++-----
-> >  arch/arm/mach-s3c64xx/gpiolib.c       |    4 ++--
-> >  arch/arm/mach-s3c64xx/mach-smdk6410.c |   13 +++++++------
-> >  arch/arm/mach-s3c64xx/setup-sdhci.c   |    2 +-
-> >  arch/arm/plat-samsung/dev-uart.c      |    2 ++
-> >  6 files changed, 24 insertions(+), 14 deletions(-)
-> 
-> --
-> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-> 
-> Large Hadron Colada: A large Pina Colada that makes the universe
-disappear.
