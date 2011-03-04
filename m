@@ -1,76 +1,79 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 4 Mar 2011 14:51:25 +0900
-Subject: staging: iio: ak8975: make gpio platdata mandatory
-In-Reply-To: <AANLkTik1MSkfyb36AHUOG+OK=h=rt1D4sbpyUiYg07dT@mail.gmail.com>
-References: <AANLkTik1MSkfyb36AHUOG+OK=h=rt1D4sbpyUiYg07dT@mail.gmail.com>
-Message-ID: <AANLkTinXLC+tb7AkVBm-_xKS4ukA6v_AHDKkHKWvP6i3@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 3 Mar 2011 23:02:15 -0700 (MST)
+Subject: [PATCH] OMAP2/3: VENC hwmod: add OCPIF_SWSUP_IDLE flag to
+ interface
+Message-ID: <alpine.DEB.2.00.1103032300480.10981@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Mar 4, 2011 at 2:34 PM, Naveen Krishna Ch
-<naveenkrishna.ch@gmail.com> wrote:
-> Issue:
-> For some architectures CONFIG_GENERIC_GPIO is defined,
-> leaving irq_to_gpio undefined. ?Causing build break.
+According to the hwmod interface data, the DSS submodule "VENC" uses a
+clock, "dss_54m_fck"/"dss_tv_fck", which the PRCM cannot autoidle.  By
+default, the hwmod code assumes that interface clocks can be autoidled
+by the PRCM.  When the interface clock can't be autoidled by the PRCM,
+those interfaces must be marked with the OCPIF_SWSUP_IDLE flag.
+Otherwise, the "interface clock" will always have a non-zero use
+count, and the device won't enter idle.  This problem was observed on
+N8x0.
 
-It's better to implement the irq_to_gpio. Since gpio_to_irq is already
-implemented. it's just vice versa.
+Fix the immediate problem by marking the VENC interface with the
+OCPIF_SWSUP_IDLE flag.  But it's not clear that
+"dss_54m_fck"/"dss_tv_fck" is really the correct interface clock for
+VENC.  It may be that the VENC interface should use a
+hardware-autoidling interface clock.  This is the situation on OMAP4,
+which uses "l3_div_ck" as the VENC interface clock, which can be
+autoidled by the PRCM.  Clarification from TI is needed.
 
-Thank you,
-Kyungmin Park
->
-> Solution:
-> 1. Some architechtures define irq_to_gpio in machine specific code.
-> 2. Make GPIO in platdata mandatory.
->
-> Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
-> ---
->
-> ?drivers/staging/iio/magnetometer/ak8975.c | ? ?8 ++++----
-> ?1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/staging/iio/magnetometer/ak8975.c
-> b/drivers/staging/iio/magnetometer/ak8975.c
-> index 80c0f41..8456d1f 100644
-> --- a/drivers/staging/iio/magnetometer/ak8975.c
-> +++ b/drivers/staging/iio/magnetometer/ak8975.c
-> @@ -98,7 +98,6 @@ struct ak8975_data {
-> ? ? ? ?unsigned long ? ? ? ? ? mode;
-> ? ? ? ?u8 ? ? ? ? ? ? ? ? ? ? ?reg_cache[AK8975_MAX_REGS];
-> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? eoc_gpio;
-> - ? ? ? int ? ? ? ? ? ? ? ? ? ? eoc_irq;
-> ?};
->
-> ?/*
-> @@ -453,12 +452,13 @@ static int ak8975_probe(struct i2c_client *client,
-> ? ? ? ?mutex_init(&data->lock);
->
-> ? ? ? ?/* Grab and set up the supplied GPIO. */
-> - ? ? ? data->eoc_irq = client->irq;
-> ? ? ? ?pdata = client->dev.platform_data;
-> ? ? ? ?if (pdata)
-> ? ? ? ? ? ? ? ?data->eoc_gpio = pdata->gpio;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? data->eoc_gpio = irq_to_gpio(client->irq);
-> + ? ? ? else {
-> + ? ? ? else {
-> + ? ? ? ? ? ? ? dev_err(&client->dev, "failed, no platform GPIO specified\n");
-> + ? ? ? ? ? ? ? goto exit;
-> + ? ? ? }
->
-> ? ? ? ?if (!data->eoc_gpio) {
-> ? ? ? ? ? ? ? ?dev_err(&client->dev, "failed, no valid GPIO\n");
-> --
-> 1.7.0.4
->
-> --
-> Shine bright,
-> (: Nav :)
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Problem found and patch tested on N8x0 by Tony Lindgren
+<tony@atomide.com>.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Senthilvadivu Guruswamy <svadivu@ti.com>
+Cc: Sumit Semwal <sumit.semwal@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 +
+ 3 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index e0bc2c7..61e58bd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1410,6 +1410,7 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__dss_venc = {
+ 			.flags	= OMAP_FIREWALL_L4,
+ 		}
+ 	},
++	.flags		= OCPIF_SWSUP_IDLE,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 4aa74d7..490789a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -1485,6 +1485,7 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__dss_venc = {
+ 	.clk		= "dss_54m_fck",
+ 	.addr		= omap2430_dss_venc_addrs,
+ 	.addr_cnt	= ARRAY_SIZE(omap2430_dss_venc_addrs),
++	.flags		= OCPIF_SWSUP_IDLE,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index e2792cf..eb48b8c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1844,6 +1844,7 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__dss_venc = {
+ 			.flags	= OMAP_FIREWALL_L4,
+ 		}
+ 	},
++	.flags		= OCPIF_SWSUP_IDLE,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+-- 
+1.7.2.3
