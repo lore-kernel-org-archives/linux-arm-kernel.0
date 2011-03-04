@@ -1,25 +1,40 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 04 Mar 2011 09:06:55 -0800
-Subject: [PATCH] MAINTAINERS: Update MSM maintainers
-In-Reply-To: <20110304153646.GC1358@ucw.cz> (Pavel Machek's message of "Fri, 4
-	Mar 2011 16:36:47 +0100")
-References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
-	<1298420395.17118.6.camel@m0nster>
-	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
-	<4D657B69.4000107@codeaurora.org> <1298512932.17118.16.camel@m0nster>
-	<4D66CDD4.7080103@codeaurora.org> <20110304153646.GC1358@ucw.cz>
-Message-ID: <8yasjv2ke6o.fsf@huya.qualcomm.com>
+Date: Fri, 04 Mar 2011 09:11:52 -0800
+Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
+	setup function
+In-Reply-To: <1299258355.10633.68.camel@e102391-lin.cambridge.arm.com> (Marc
+	Zyngier's message of "Fri, 04 Mar 2011 17:05:55 +0000")
+References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
+	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
+	<8ya62rzlsol.fsf@huya.qualcomm.com>
+	<1299236990.10633.62.camel@e102391-lin.cambridge.arm.com>
+	<8yawrkekece.fsf@huya.qualcomm.com>
+	<1299258355.10633.68.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <8yak4gekdyf.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04 2011, Pavel Machek wrote:
+On Fri, Mar 04 2011, Marc Zyngier wrote:
 
-> But you know this patch was great counterexample. Trying to remove
-> someone from mainainers without asking them first is very very
-> impolite...
+> On Fri, 2011-03-04 at 09:03 -0800, David Brown wrote:
+>> On Fri, Mar 04 2011, Marc Zyngier wrote:
+>> 
+>> > On Thu, 2011-03-03 at 14:56 -0800, David Brown wrote:
+>> 
+>> >> Basic sanity test seems to be working at least on UMP.  Currently
+>> >> testing SMP.
+>> >
+>> > Thanks for that. Please let me know how SMP goes.
+>> 
+>> Appears to work fine.
+>
+> Brilliant. May I add a Tested-By: tag on the fixed version?
 
-Yeah, I screwed up.  Hopefully my future screwups will be more
-technical, which are usually easier to fix.
+Sure:
+
+Tested-by: David Brown <davidb@codeaurora.org>
+
+at least on this patch.
 
 David
 
