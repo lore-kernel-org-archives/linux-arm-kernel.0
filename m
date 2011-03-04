@@ -1,38 +1,53 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri,  4 Mar 2011 19:02:24 +0530
-Subject: [PATCH] i2c-omap: Program I2C_WE on OMAP4 to enable i2c wakeup
-Message-ID: <1299245544-23790-1-git-send-email-rnayak@ti.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Fri, 4 Mar 2011 15:20:28 +0100
+Subject: [PATCH v10 1/1] PRUSS UIO driver support
+In-Reply-To: <1299213772-21931-2-git-send-email-pratheesh@ti.com>
+References: <1299213772-21931-1-git-send-email-pratheesh@ti.com>
+	<1299213772-21931-2-git-send-email-pratheesh@ti.com>
+Message-ID: <20110304142028.GD28175@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the I2C module to be wakeup capable, programming I2C_WE
-register (which was skipped for OMAP4430) is needed
-even on OMAP4.
-This fixes i2c controller timeouts which were seen recently
-with the static dependency being cleared between MPU and
-L4PER clockdomains.
+On Fri, Mar 04, 2011 at 10:12:52AM +0530, Pratheesh Gangadhar wrote:
+> diff --git a/include/linux/uio_pruss.h b/include/linux/uio_pruss.h
+> new file mode 100644
+> index 0000000..8c9b2c9
+> --- /dev/null
+> +++ b/include/linux/uio_pruss.h
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
-Patch is based on 2.6.38-rc7 kernel.
+That should go to arch/arm/mach-davinci/include/mach/
+and not to the top level include/linux/ directory.
 
- drivers/i2c/busses/i2c-omap.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+> @@ -0,0 +1,25 @@
+> +/*
+> + * include/linux/uio_pruss.h
+> + *
+> + * Platform data for uio_pruss driver
+> + *
+> + * Copyright (C) 2010-11 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _UIO_PRUSS_H_
+> +#define _UIO_PRUSS_H_
+> +
+> +/* Used to configure the PRUSS INTC base offset for UIO driver */
+> +struct uio_pruss_pdata {
+> +	u32	pintc_base;
+> +};
+> +#endif /* _LINUX_UIO_PRUSS_H_ */
+> -- 
+> 1.6.0.6
+> 
+> 
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 829a2a1..58a58c7 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -378,9 +378,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 			 * REVISIT: Some wkup sources might not be needed.
- 			 */
- 			dev->westate = OMAP_I2C_WE_ALL;
--			if (dev->rev < OMAP_I2C_REV_ON_4430)
--				omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
--								dev->westate);
-+			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
- 		}
- 	}
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--- 
-1.7.0.4
+Thanks,
+Hans
