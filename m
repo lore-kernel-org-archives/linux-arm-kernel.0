@@ -1,33 +1,63 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 4 Mar 2011 15:27:26 +0530
-Subject: [PATCH V2 11/13] dw_dmac: Allow src/dst msize & flow controller
-	to be configured at runtime
-In-Reply-To: <426996869f6231ebff1cbfab5c7ee4c89ccc8745.1299146382.git.viresh.kumar@st.com>
-References: <cover.1299146382.git.viresh.kumar@st.com>
-	<426996869f6231ebff1cbfab5c7ee4c89ccc8745.1299146382.git.viresh.kumar@st.com>
-Message-ID: <4D70B786.3010509@st.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 4 Mar 2011 11:05:06 +0100
+Subject: [PATCH 3/4] OMAP3 and 4 i2c mark extended reg enums as extended
+	only
+In-Reply-To: <4D70A381.50409@linaro.org>
+References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
+	<20110303135037.30648.90406.stgit@otae.warmcat.com>
+	<4D700917.70105@ti.com> <4D70A381.50409@linaro.org>
+Message-ID: <4D70B952.7050807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2011 03:47 PM, Viresh KUMAR wrote:
-> From: Viresh KUMAR <viresh.kumar@st.com>
-> 
-> Msize or Burst Size is peripheral dependent in case of slave_sg transfers, and
-> in case of memcpy transfers it is platform dependent. So msize configuration
-> must come from platform data.
-> 
-> Also some peripherals (ex: JPEG), need to be flow controller for dma transfers,
-> so this information in case of slave_sg transfers must come from platform data.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/dw_dmac.c      |   10 ++++++----
->  drivers/dma/dw_dmac_regs.h |    1 +
->  include/linux/dw_dmac.h    |   30 ++++++++++++++++++++++++++++++
->  3 files changed, 37 insertions(+), 4 deletions(-)
-> 
+On 3/4/2011 9:32 AM, Andy Green wrote:
+> On 03/03/2011 09:33 PM, Somebody in the thread at some point said:
+>
+> Hi -
+>
+>> Since it is a patch on the I2C driver, the subject should start with
+>> something like "I2C: OMAP2+: XXXXX". That comment is also applicable for
+>> the other patches of the series except the first one.
+>>
+>>> This patch changes the extended register name to make it clearer
+>>> they only exist in OMAP4 context
+>>>
+>>> Cc: patches at linaro.org
+>>> Reported-by: Peter Maydell<peter.maydell@linaro.org>
+>>> Signed-off-by: Andy Green<andy.green@linaro.org>
+>>
+>> The I2C maintainer should be in CC as well.
+>
+> OK thanks for this correction.
+>
+>>> + /* only on OMAP4430 */
+>>> + OMAP_I2C_OMAP4430_REVNB_LO,
+>>> + OMAP_I2C_OMAP4430_REVNB_HI,
+>>> + OMAP_I2C_OMAP4430_IRQSTATUS_RAW,
+>>> + OMAP_I2C_OMAP4430_IRQENABLE_SET,
+>>
+>> I think that you should keep only the comment, because it is not really
+>> recommended to add SoC related information directly in IP register names.
+>> These new registers are just an evolution of the I2C IP. The first
+>> instances of that version are used in OMAP4 first, but OMAP4 variants
+>> (4440) and OMAP5 will use the same one.
+>>
+>> Bottom line is that we can probably drop that patch from the series.
+>
+> The desire of this patch is to make it clear to the eye that a register
+> that was introduced in what we will now call "IP_V2" is being touched.
+> That is good because then code like
+>
+> 	if (dev->rev == BLAH_IP_V1)
+> 		touch(BLAH_BLAH_IP_V2);
+>
+> will stand out clearly as wrong.  So I will update the patch rather than
+> drop it, since the IP_Vn scheme is a much better fit for what is
+> actually being done.  If you still don't like it we can forget about it
+> then.
 
-Sorry, i missed similar changes for dw_dma_cyclic_prep(). Will resend it.
+It is a little bit better. I personally don't think it is necessary, but 
+since it is a purely subjective opinion, you can go ahead with that fix.
 
---
-viresh
+Regards,
+Benoit
