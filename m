@@ -1,155 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 4 Mar 2011 15:46:29 -0700 (MST)
-Subject: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across off
-	mode
-In-Reply-To: <1297353724-11665-2-git-send-email-premi@ti.com>
-References: <1297353724-11665-1-git-send-email-premi@ti.com>
-	<1297353724-11665-2-git-send-email-premi@ti.com>
-Message-ID: <alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Sat,  5 Mar 2011 04:30:16 +0530
+Subject: [PATCH v11 0/1] Add PRUSS UIO driver support
+Message-ID: <1299279617-21108-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sanjeev,
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-On Thu, 10 Feb 2011, Sanjeev Premi wrote:
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-> As per commit "bb33cc58", ROM code is expected to restore
-> context related to CORE domain. As part of this change,
-> CM_AUTOIDLE_PLL is neither saved nor restored.
+Platform/board specific portion of this patch depends on Mistral patches below
 
-... by Linux.
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
 
-> This results in loosing the value of AUTO_PERIPH_DPLL.
+I will submit a seperate patch set on top of these patches to support PRUSS
+UIO driver.
 
-A few questions:
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
 
-- Is ROM code supposed to restore this register?
-
-- Is there a documented list of which registers/bitfields the ROM code 
-will and won't restore?
-
-- Are the entire contents of the register lost, or just AUTO_PERIPH_DPLL?
-
-> The concern of setting the AUTOIDLE flag before the DPLL
-> is locked seems valid. Hence, the restoration of this
-> register is delayed until after the context of PER
-> domain is restored.
-
-Could you explain a little more about this?  Is there a hardware 
-limitation where AUTO_PERIPH_DPLL shouldn't be set unless the DPLL is 
-locked?
-
-> 
-> The patch has been verified on OMAP3EVM by checking value
-> of CM_AUTOIDLE_PLL register across the suspend/resume
-> sequence (using devmem) with flags sleep_while_idle and
-> enable_off_mode set to 1.
-> 
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> ---
->  arch/arm/mach-omap2/cm2xxx_3xxx.c |   13 +++++++++++++
->  arch/arm/mach-omap2/pm34xx.c      |   25 ++++++++++++++++++++++++-
->  2 files changed, 37 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.c b/arch/arm/mach-omap2/cm2xxx_3xxx.c
-> index 96954aa..a775d8a 100644
-> --- a/arch/arm/mach-omap2/cm2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/cm2xxx_3xxx.c
-> @@ -178,6 +178,7 @@ struct omap3_cm_regs {
->  	u32 per_cm_clksel;
->  	u32 emu_cm_clksel;
->  	u32 emu_cm_clkstctrl;
-> +	u32 pll_cm_autoidle;
->  	u32 pll_cm_autoidle2;
->  	u32 pll_cm_clksel4;
->  	u32 pll_cm_clksel5;
-> @@ -250,6 +251,8 @@ void omap3_cm_save_context(void)
->  		omap2_cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
->  	cm_context.emu_cm_clkstctrl =
->  		omap2_cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
-> +	cm_context.pll_cm_autoidle =
-> +		 omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
->  	cm_context.pll_cm_autoidle2 =
->  		omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
->  	cm_context.pll_cm_clksel4 =
-> @@ -468,4 +471,14 @@ void omap3_cm_restore_context(void)
->  	omap2_cm_write_mod_reg(cm_context.cm_clkout_ctrl, OMAP3430_CCR_MOD,
->  			       OMAP3_CM_CLKOUT_CTRL_OFFSET);
->  }
-> +
-> +
-> +/**
-> + * Returns the value corresponding to CM_AUTOIDLE_PLL from the most recent
-> + * context saved before entering the OFF mode.
-> + */
-> +u32 stored_cm_autoidle_pll(void)
-> +{
-> +	return cm_context.pll_cm_autoidle;
-> +}
->  #endif
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 8bb85fb..25bd230 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -91,6 +91,8 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
->  static struct powerdomain *core_pwrdm, *per_pwrdm;
->  static struct powerdomain *cam_pwrdm;
->  
-> +extern u32 stored_cm_autoidle_pll(void);
-> +
->  static inline void omap3_per_save_context(void)
->  {
->  	omap_gpio_save_context();
-> @@ -163,6 +165,25 @@ static void omap3_core_restore_context(void)
->  	omap_dma_global_context_restore();
->  }
->  
-> +/**
-> + * Restore the contents of CM_AUTOIDLE_PLL register.
-> + *
-> + * The implementation below restores AUTO_CORE_DPLL as 'good' redundancy.
-
-I don't understand this part.  Are the entire contents of the register 
-lost, or just the AUTO_PERIPH_DPLL field?
-
-> + */
-> +static void pll_mod_restore_autoidle(void)
-> +{
-> +	u32 ctx = stored_cm_autoidle_pll();
-> +	u32 val = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
-> +
-> +	if (ctx & OMAP3430_AUTO_CORE_DPLL_MASK)
-> +		val |= ctx & OMAP3430_AUTO_CORE_DPLL_MASK;
-> +
-> +	if (ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK)
-> +		val |= ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK;
-> +
-> +	omap2_cm_write_mod_reg(val, PLL_MOD, CM_AUTOIDLE);
-> +}
-> +
->  /*
->   * FIXME: This function should be called before entering off-mode after
->   * OMAP3 secure services have been accessed. Currently it is only called
-> @@ -488,8 +509,10 @@ void omap_sram_idle(void)
->  	if (per_next_state < PWRDM_POWER_ON) {
->  		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
->  		omap2_gpio_resume_after_idle();
-> -		if (per_prev_state == PWRDM_POWER_OFF)
-> +		if (per_prev_state == PWRDM_POWER_OFF) {
->  			omap3_per_restore_context();
-> +			pll_mod_restore_autoidle();
-> +		}
->  		omap_uart_resume_idle(2);
->  		omap_uart_resume_idle(3);
->  	}
-> -- 
-> 1.7.2.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
-- Paul
+ drivers/uio/Kconfig                     |   17 ++
+ drivers/uio/Makefile                    |    1 +
+ drivers/uio/uio_pruss.c                 |  247 +++++++++++++++++++++++++++++++
+ include/linux/platform_data/uio_pruss.h |   25 +++
+ 4 files changed, 290 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
+ create mode 100644 include/linux/platform_data/uio_pruss.h
