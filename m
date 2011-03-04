@@ -1,58 +1,31 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Fri, 4 Mar 2011 11:04:14 +0530
-Subject: staging: iio: ak8975: make gpio platdata mandatory
-Message-ID: <AANLkTik1MSkfyb36AHUOG+OK=h=rt1D4sbpyUiYg07dT@mail.gmail.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Fri,  4 Mar 2011 14:21:36 +0900
+Subject: [PATCH V2 0/3] ARM: S5P: Add HRT support for s5p series 
+Message-ID: <1299216099-7709-1-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Issue:
-For some architectures CONFIG_GENERIC_GPIO is defined,
-leaving irq_to_gpio undefined.  Causing build break.
+The Following  patches support high resolution timer for s5p series.
+In this version, I had modified clk_get scheme and Added sched_clock_support 
+and clockevents_calc_mult_shift function. 
+For initialization functions,Added  __init MACRO.
+Basically, I had reflected comments of Russell King, Linus Walleij,
+and Kyungmin Park.
+ 
+Changes since v1:
+ - Add sched_clock support (Linus Walleij)
+ - Add clockevents_calc_mult_shift
+ - Modify clk_get scheme
+ - Default clockevent is PWM timer3
+ 
+The patch series contains:
 
-Solution:
-1. Some architechtures define irq_to_gpio in machine specific code.
-2. Make GPIO in platdata mandatory.
+[PATCH V2 1/3] ARM: S5P: Add s5p_timer support for HRT
+[PATCH V2 2/3] ARM: S5P: Update machine initialization for HRT
+[PATCH V2 3/3] ARM: S5P: Update defconfig for HRT support
 
-Signed-off-by: Naveen Krishna Ch <ch.naveen@samsung.com>
----
+For applying this patch, It is needed pwm timer patches.
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/4178
 
- drivers/staging/iio/magnetometer/ak8975.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/staging/iio/magnetometer/ak8975.c
-b/drivers/staging/iio/magnetometer/ak8975.c
-index 80c0f41..8456d1f 100644
---- a/drivers/staging/iio/magnetometer/ak8975.c
-+++ b/drivers/staging/iio/magnetometer/ak8975.c
-@@ -98,7 +98,6 @@ struct ak8975_data {
-        unsigned long           mode;
-        u8                      reg_cache[AK8975_MAX_REGS];
-        int                     eoc_gpio;
--       int                     eoc_irq;
- };
-
- /*
-@@ -453,12 +452,13 @@ static int ak8975_probe(struct i2c_client *client,
-        mutex_init(&data->lock);
-
-        /* Grab and set up the supplied GPIO. */
--       data->eoc_irq = client->irq;
-        pdata = client->dev.platform_data;
-        if (pdata)
-                data->eoc_gpio = pdata->gpio;
--       else
--               data->eoc_gpio = irq_to_gpio(client->irq);
-+       else {
-+       else {
-+               dev_err(&client->dev, "failed, no platform GPIO specified\n");
-+               goto exit;
-+       }
-
-        if (!data->eoc_gpio) {
-                dev_err(&client->dev, "failed, no valid GPIO\n");
---
-1.7.0.4
-
---
-Shine bright,
-(: Nav :)
+Thanks and regards,
+S.B. Kim
