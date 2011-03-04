@@ -1,44 +1,35 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Mar 2011 17:13:10 +0000
-Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
-	setup function
-In-Reply-To: <8yak4gekdyf.fsf@huya.qualcomm.com>
-References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
-	<8ya62rzlsol.fsf@huya.qualcomm.com>
-	<1299236990.10633.62.camel@e102391-lin.cambridge.arm.com>
-	<8yawrkekece.fsf@huya.qualcomm.com>
-	<1299258355.10633.68.camel@e102391-lin.cambridge.arm.com>
-	<8yak4gekdyf.fsf@huya.qualcomm.com>
-Message-ID: <1299258790.10633.69.camel@e102391-lin.cambridge.arm.com>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Fri, 4 Mar 2011 17:17:23 +0000
+Subject: [PATCH] i2c-omap: Program I2C_WE on OMAP4 to enable i2c wakeup
+In-Reply-To: <87ei6mizxr.fsf@ti.com>
+References: <1299245544-23790-1-git-send-email-rnayak@ti.com>
+	<87ei6mizxr.fsf@ti.com>
+Message-ID: <20110304171723.GF17460@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-03-04 at 09:11 -0800, David Brown wrote:
-> On Fri, Mar 04 2011, Marc Zyngier wrote:
+On Fri, Mar 04, 2011 at 09:00:00AM -0800, Kevin Hilman wrote:
+> Rajendra Nayak <rnayak@ti.com> writes:
 > 
-> > On Fri, 2011-03-04 at 09:03 -0800, David Brown wrote:
-> >> On Fri, Mar 04 2011, Marc Zyngier wrote:
-> >> 
-> >> > On Thu, 2011-03-03 at 14:56 -0800, David Brown wrote:
-> >> 
-> >> >> Basic sanity test seems to be working at least on UMP.  Currently
-> >> >> testing SMP.
-> >> >
-> >> > Thanks for that. Please let me know how SMP goes.
-> >> 
-> >> Appears to work fine.
+> > For the I2C module to be wakeup capable, programming I2C_WE
+> > register (which was skipped for OMAP4430) is needed
+> > even on OMAP4.
+> > This fixes i2c controller timeouts which were seen recently
+> > with the static dependency being cleared between MPU and
+> > L4PER clockdomains.
 > >
-> > Brilliant. May I add a Tested-By: tag on the fixed version?
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > ---
+> > Patch is based on 2.6.38-rc7 kernel.
 > 
-> Sure:
+> Acked-by: Kevin Hilman <khilman@ti.com>
 > 
-> Tested-by: David Brown <davidb@codeaurora.org>
-> 
-> at least on this patch.
+> Ben, looks like another fix that should be queued for 2.6.38-rc.
 
-Thanks for testing, David.
+I'll put together the couple of fixes I've got and send them to Linus
+at the end of the weekend.
 
-	M.
 -- 
-Reality is an implementation detail.
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
