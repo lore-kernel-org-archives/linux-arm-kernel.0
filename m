@@ -1,24 +1,54 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Mar 2011 17:41:19 -0800
-Subject: [PATCH] omap3: cpuidle: Add description field to each C-state.
-In-Reply-To: <1297437132-1005-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297437132-1005-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299202879.3989.499.camel@vence>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 04 Mar 2011 10:39:32 +0900
+Subject: [PATCH 7/7] ARM: SMDK6410: Update regulator names for debugfs
+	compatiblity
+In-Reply-To: <1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <20110303145710.GA32234@opensource.wolfsonmicro.com>
+	<1299164315-22246-7-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <022401cbda0d$08d18550$1a748ff0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-11 at 20:42 +0530, Santosh Shilimkar wrote:
-> Add a description field to each idle C-state. This helps to give
-> better data with PowerTop and one don't have to refer to the code
-> to link what Cx means from system point of view while analysing
-> PowerTop data.
+Mark Brown wrote:
 > 
-> No functional change.
+> The debugfs support added to the regulator API (which has been merged
+> in during this merge window) creates directories for regulators named
+> after the display names for the regulators so replace / as a separator
+> for multiple supplies with + in the SMDK6410 machine.
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c |   12 ++++++------
+>  1 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
+> s3c64xx/mach-smdk6410.c
+> index 4094707..2f30c79 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> @@ -353,7 +353,7 @@ static struct regulator_init_data smdk6410_vddpll
+> __initdata = {
+>  /* VDD_UH_MMC, LDO5 on J5 */
+>  static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
 
-Looks good, queuing for 2.6.39 (branch: for_2.6.39/pm-misc)
+Mark, there is no '__initdata' in my tree.
+I just applied following changes (/ -> +).
 
-Kevin
+If any updates/patches, please let me know :)
+
+>  	.constraints = {
+> -		.name = "PVDD_UH/PVDD_MMC",
+> +		.name = "PVDD_UH+PVDD_MMC",
+>  		.always_on = 1,
+>  	},
+>  };
+
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
