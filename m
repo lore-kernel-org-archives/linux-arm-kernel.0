@@ -1,97 +1,42 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 5 Mar 2011 11:38:12 +0000
-Subject: [PATCH] [ARM] orion5x: use safer FPGA ID 'default' for TS-78xx
-In-Reply-To: <20110305112937.GA22117@chipmunk>
-References: <20110305112937.GA22117@chipmunk>
-Message-ID: <20110305113812.GC22117@chipmunk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Mar 2011 11:38:17 +0000
+Subject: [PATCH 1/8 resend] dw_dmac: Remove compilation dependency from
+	AVR32
+In-Reply-To: <20110303041909.GT244@DLHLAP0379>
+References: <cover.1298889267.git.viresh.kumar@st.com>
+	<d41145ce4d5e3d870f720709f68d5b1dbf34d6a0.1298889267.git.viresh.kumar@st.com>
+	<1299084372.6974.91.camel@vkoul-udesk3>
+	<4D6F0E32.6050505@st.com> <20110303041909.GT244@DLHLAP0379>
+Message-ID: <20110305113817.GC27468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-....abort!
+On Thu, Mar 03, 2011 at 09:49:09AM +0530, Shiraz Hashim wrote:
+> On Thu, Mar 03, 2011 at 11:42:42AM +0800, Viresh KUMAR wrote:
+> > On 03/02/2011 10:16 PM, Koul, Vinod wrote:
+> > > On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
+> 
+> [...]
+> 
+> > >>  drivers/dma/Kconfig |    1 -
+> > >>  1 files changed, 0 insertions(+), 1 deletions(-)
+> > >>
+> > >> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> > >> index 1c28816..95c7db7 100644
+> > >> --- a/drivers/dma/Kconfig
+> > >> +++ b/drivers/dma/Kconfig
+> > >> @@ -82,7 +82,6 @@ config INTEL_IOP_ADMA
+> > >>  
+> > >>  config DW_DMAC
+> > >>  	tristate "Synopsys DesignWare AHB DMA support"
+> > >> -	depends on AVR32
+> > > Shouldn't you be adding a corresponding depends on new arch? And since
+> > > this supports old arch as well, it should say depends on both...
+> > 
+> > Why should this driver be dependent on ARM or AVR32? It can be present
+> > on any other arch too.. So i thought removing this dependency all together
+> > is better.
+> 
+> There could be a dependency on HAVE_CLK as it uses clock APIs.
 
-* Alexander Clouter <alex@digriz.org.uk> [2011-03-05 11:29:37+0000]:
->
-> Originally the FPGA ID checking switch statement left disabled all the
-> TS implemented FPGA devices if the ID was unknown to it.  Michael Spang
-> created a fix in 3c390473 that changed the default to enable the devices
-> in the event TS silently release more revisions into the wild, this
-> unfortunately breaks custom FPGA bitstreams.
-> 
-> This patch amends the switch statement so that the TS devices are only
-> enabled if on the revision number is unknown (whilst the magic matches).
-> 
-> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
-> ---
->  arch/arm/mach-orion5x/ts78xx-fpga.h  |   19 ++++++++++---------
->  arch/arm/mach-orion5x/ts78xx-setup.c |   18 +++++++++++++-----
->  2 files changed, 23 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/ts78xx-fpga.h b/arch/arm/mach-orion5x/ts78xx-fpga.h
-> index 791f754..f0e3be1 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-fpga.h
-> +++ b/arch/arm/mach-orion5x/ts78xx-fpga.h
-> @@ -1,3 +1,4 @@
-> +#define TS_78XX_FPGA_MAGIC 0x00b480
->  #define FPGAID(_magic, _rev) ((_magic << 8) + _rev)
->  
->  /*
-> @@ -6,15 +7,15 @@
->   */
->  enum fpga_ids {
->  	/* Technologic Systems */
-> -	TS7800_REV_1	= FPGAID(0x00b480, 0x01),
-> -	TS7800_REV_2	= FPGAID(0x00b480, 0x02),
-> -	TS7800_REV_3	= FPGAID(0x00b480, 0x03),
-> -	TS7800_REV_4	= FPGAID(0x00b480, 0x04),
-> -	TS7800_REV_5	= FPGAID(0x00b480, 0x05),
-> -	TS7800_REV_6	= FPGAID(0x00b480, 0x06),
-> -	TS7800_REV_7	= FPGAID(0x00b480, 0x07),
-> -	TS7800_REV_8	= FPGAID(0x00b480, 0x08),
-> -	TS7800_REV_9	= FPGAID(0x00b480, 0x09),
-> +	TS7800_REV_1	= FPGAID(TS_78XX_FPGA_MAGIC, 0x01),
-> +	TS7800_REV_2	= FPGAID(TS_78XX_FPGA_MAGIC, 0x02),
-> +	TS7800_REV_3	= FPGAID(TS_78XX_FPGA_MAGIC, 0x03),
-> +	TS7800_REV_4	= FPGAID(TS_78XX_FPGA_MAGIC, 0x04),
-> +	TS7800_REV_5	= FPGAID(TS_78XX_FPGA_MAGIC, 0x05),
-> +	TS7800_REV_6	= FPGAID(TS_78XX_FPGA_MAGIC, 0x06),
-> +	TS7800_REV_7	= FPGAID(TS_78XX_FPGA_MAGIC, 0x07),
-> +	TS7800_REV_8	= FPGAID(TS_78XX_FPGA_MAGIC, 0x08),
-> +	TS7800_REV_9	= FPGAID(TS_78XX_FPGA_MAGIC, 0x09),
->  
->  	/* Unaffordable & Expensive */
->  	UAE_DUMMY	= FPGAID(0xffffff, 0x01),
-> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index 1cac714..82e57a6 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
-> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -399,11 +399,19 @@ static void ts78xx_fpga_supports(void)
->  		ts78xx_fpga.supports.ts_rng.present = 1;
->  		break;
->  	default:
-> -		printk(KERN_WARNING "Unrecognized TS-78XX FPGA ID 0x%02x",
-> -		       ts78xx_fpga.id);
-> -		ts78xx_fpga.supports.ts_rtc.present = 1;
-> -		ts78xx_fpga.supports.ts_nand.present = 1;
-> -		ts78xx_fpga.supports.ts_rng.present = 1;
-> +		/* enable TS devices if at least the magic matches */
-> +		if (((ts78xx_fpga.id >> 8) & 0xffffff) == TS_78XX_FPGA_MAGIC) {
-> +			printk(KERN_WARNING "TS-78xx FPGA: unrecognized revision 0x%.2x\n",
-> +					ts78xx_fpga.id & 0xff);
-> +			ts78xx_fpga.supports.ts_rtc.present = 1;
-> +			ts78xx_fpga.supports.ts_nand.present = 1;
-> +			ts78xx_fpga.supports.ts_rng.present = 1;
-> +			break;
-> +		}
-> +
-> +		ts78xx_fpga.supports.ts_rtc.present = 0;
-> +		ts78xx_fpga.supports.ts_nand.present = 0;
-> +		ts78xx_fpga.supports.ts_rng.present = 0;
->  	}
->  }
->  
->
-
--- 
-Alexander Clouter
-.sigmonster says: Anger is momentary madness.
-                  		-- Horace
+If it uses the clk APIs then it should already depend on HAVE_CLK.
