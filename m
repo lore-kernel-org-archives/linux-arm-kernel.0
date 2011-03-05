@@ -1,148 +1,24 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Sat, 5 Mar 2011 19:36:04 +0200
-Subject: [PATCH V3 05/19] OMAP3+: voltage: use IS_ERR_OR_NULL
-In-Reply-To: <1299338962-5602-6-git-send-email-nm@ti.com>
-References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-6-git-send-email-nm@ti.com>
-Message-ID: <AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 05 Mar 2011 14:37:11 -0500 (EST)
+Subject: [PATCHv2] [ARM] orion5x: use safer FPGA ID 'default' for TS-78xx
+In-Reply-To: <20110305114936.GD22117@chipmunk>
+References: <20110305112937.GA22117@chipmunk> <20110305114936.GD22117@chipmunk>
+Message-ID: <alpine.LFD.2.00.1103051432380.27995@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On Sat, 5 Mar 2011, Alexander Clouter wrote:
 
-On Sat, Mar 5, 2011 at 5:29 PM, Nishanth Menon <nm@ti.com> wrote:
-> Use IS_ERR_OR_NULL macro instead of !xyz || IS_ERR(xyz) usage.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> ?arch/arm/mach-omap2/voltage.c | ? 22 +++++++++++-----------
-> ?1 files changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-> index 53c399f..76bcaee 100644
-> --- a/arch/arm/mach-omap2/voltage.c
-> +++ b/arch/arm/mach-omap2/voltage.c
-> @@ -682,7 +682,7 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
+> Originally the FPGA ID checking switch statement left disabled all the
+> TS implemented FPGA devices if the ID was unknown to it.  Michael Spang
+> created a fix in 3c390473 that changed the default to enable the devices
 
-I have one comment here. voltdm is received as parameter and it's
-already checked by IS_ERR(). Is there any specific reason for that?
-IS_ERR() doesn't suppose to be a macro to check if the pointer is
-valid or not, but to know if there's an invalid value with error code
-in the pointer value. It's useful when you have a function which
-returns a pointer but it can return an error code when it fails.
-Please, note that IS_ERR() won't detect invalid pointers which does
-not represent an error code, so it's not correct to rely on it for
-this purpose.
-IMO, instead of change to IS_ERR_OR_NULL(), you could only remove
-IS_ERR(). The same apply for the other cases.
+If you want to abbreviate commit hash values, you should keep the 
+beginning of them not the end.  This commit is:
 
-Kind regards,
+	commit f9b1184e12e5ff8129b04837dffddb5a3c390473
 
-David Cohen
+So a shorter form would be f9b1184e.  I amended it locally.
 
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return 0;
-> ? ? ? ?}
-> @@ -703,7 +703,7 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
-> ? ? ? ?struct omap_vdd_info *vdd;
-> ? ? ? ?u8 curr_vsel;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return 0;
-> ? ? ? ?}
-> @@ -738,7 +738,7 @@ void omap_vp_enable(struct voltagedomain *voltdm)
-> ? ? ? ?struct omap_vdd_info *vdd;
-> ? ? ? ?u32 vpconfig;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> @@ -776,7 +776,7 @@ void omap_vp_disable(struct voltagedomain *voltdm)
-> ? ? ? ?u32 vpconfig;
-> ? ? ? ?int timeout;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> @@ -829,7 +829,7 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
-> @@ -858,7 +858,7 @@ void omap_voltage_reset(struct voltagedomain *voltdm)
-> ?{
-> ? ? ? ?unsigned long target_uvdc;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> @@ -890,7 +890,7 @@ void omap_voltage_get_volttable(struct voltagedomain *voltdm,
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> @@ -921,7 +921,7 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
-> ? ? ? ?struct omap_vdd_info *vdd;
-> ? ? ? ?int i;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return ERR_PTR(-EINVAL);
-> ? ? ? ?}
-> @@ -959,7 +959,7 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
-> @@ -986,7 +986,7 @@ struct dentry *omap_voltage_get_dbgdir(struct voltagedomain *voltdm)
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return NULL;
-> ? ? ? ?}
-> @@ -1011,7 +1011,7 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
-> ?{
-> ? ? ? ?struct omap_vdd_info *vdd;
->
-> - ? ? ? if (!voltdm || IS_ERR(voltdm)) {
-> + ? ? ? if (IS_ERR_OR_NULL(voltdm)) {
-> ? ? ? ? ? ? ? ?pr_warning("%s: VDD specified does not exist!\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+
+Nicolas
