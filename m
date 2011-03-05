@@ -1,56 +1,29 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 5 Mar 2011 10:32:18 +0000
-Subject: [PATCH v2 2/2] ARM: Enable TS-78XX features in unknown revisions
-Message-ID: <bbf948-iel.ln1@chipmunk.wormnet.eu>
+From: bill_carson@126.com (rocky)
+Date: Sat, 5 Mar 2011 18:19:27 +0800 (CST)
+Subject: Question about free_pgd_slow ?
+In-Reply-To: <AANLkTi=obVFm=cwDyUCXQvEK3rDYberc9YWRVkv6_qZ=@mail.gmail.com>
+References: <AANLkTi=obVFm=cwDyUCXQvEK3rDYberc9YWRVkv6_qZ=@mail.gmail.com>
+	<79b2dce2.4b84.12e5ae30c01.Coremail.bill_carson@126.com>
+Message-ID: <14bf5cc1.490f.12e858767f5.Coremail.bill_carson@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-In gmane.linux.kernel Michael Spang <mspang@csclub.uwaterloo.ca> wrote:
->
-> When the manufacturer increases the revision number the platform
-> devices for the RTC, NAND, and RNG disappear. We should assume
-> new revisions have these devices instead of assuming they do not.
->
-NACK
+At 2011-03-02 23:52:03?"Rabin Vincent" <rabin@rab.in> wrote:>On Fri, Feb 25, 2011 at 09:05, rocky <bill_carson@126.com> wrote:>> free_pgd_slow in arch/arm/mm/pgd.c  free the 4 pages at pgd level,l>> while could I ask a question about why free the page by pointed by pgd>> index 0 ?>>Besides the 16k for the pgd, it frees the second level* page table>referenced at index 0 of the pgd.>>(* - of course it frees pud+pmd+pte, but on current ARM this folds down>to just the second level page table.)>>On ARM, FIRST_USER_ADDRESS is set to PAGE_SIZE because the vectors may>need to be placed at 0x0.  Since the tables for that translation have to>always be active, functions like exit_mmap() will not free the 0th>secondary level page table (see the calls to free_pgtables() there).  So>we free it here when we're freeing the pgd.
+Thanks Rabin
+I dig the code more deeper,
+exit_mmap called free_pgtables by setting floor with FIRST_USER_ADDRESS, 
+then in free_pgd_range , vma->start first aligned with PMD_MASK before compared with floor, 
+PMD_MASK for arm is 2M aligned ,so that means 0~0x200000 virtual address mapping is free in
+free_pgd_slow.
 
-This would break things for anyone running a custom FPGA bitstream (and 
-they are out there) .  The RTC and RNG are possibly the only things that 
-are able to be implemented in a custom FPGA, the NAND is wholly TS 
-specific..
+But I still dont get it, 
+why is that  low vector mapping must always be active even though the task is going to exit?
 
-Please could you refrain submitting patches for TS-7800 without having 
-a quick look at:
- * http://git.kernel.org/?p=linux/kernel/git/nico/orion.git
- * http://www.digriz.org.uk/ts78xx/kernel
+rocky
 
-The former is pretty much what you have to base all your patches on so 
-you should be tracking it (which would have solved the re-inventing the 
-revision update patch), whilst the latter would help tell you things 
-that have already been done elsewhere.
 
-The latter site also includes thoughts on where the platform code is 
-going.  So far as *zero* people have ever provided feedback or thoughts 
-(unfortunately they seem too busy just bluntly hammering things in the 
-ts7000 forum) I have so far to date only done things that I feel are 
-most appropriate.  This includes things like the doorbell code necessary 
-to get IRQ's firing from the PC/104 bus...which I hope no-one is wasting 
-their time re-implementing?
 
-This is not a case of megalomania, it's a case of saving wasted effort, 
-testing patches and getting obtaining code review.
-
-I can see the value in this particular patch, but problems with it could 
-have trivially been avoided by reworking the FPGA ID code so that the 
-RTC/NAND/RNG are only enabled when the *magic* is set to 0x00b480; then 
-we should remove the all the 'case TS7800_REV_1..9' bits.  I'll put this 
-together and push it to Nico, reverting your efforts... :-/
-
-Cheers
-
-[1] http://git.wormnet.eu/?p=alex/ts78xx.git;a=commitdiff;h=de3a91588ccc5f9443f0e0a1656a94c6ddb19bdb
-
--- 
-Alexander Clouter
-.sigmonster says: It's not the fall that kills you, it's the landing.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110305/374de67a/attachment-0001.html>
