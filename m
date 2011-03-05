@@ -1,42 +1,41 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat,  5 Mar 2011 20:59:05 +0530
-Subject: [PATCH V3 02/19] OMAP3+: voltage: fix build warning
+Date: Sat,  5 Mar 2011 20:59:06 +0530
+Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
 In-Reply-To: <1299338962-5602-1-git-send-email-nm@ti.com>
 References: <1299338962-5602-1-git-send-email-nm@ti.com>
-Message-ID: <1299338962-5602-3-git-send-email-nm@ti.com>
+Message-ID: <1299338962-5602-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle the case for a future SoC where sys_ck_name might be
-uninitialized. Fixes the build warning:
-arch/arm/mach-omap2/voltage.c: In function 'omap_voltage_late_init':
-arch/arm/mach-omap2/voltage.c:86:8: warning: 'sys_ck_name' may be used uninitialized in this function
+Blindly setting a 1.2V setting in the initial structure may not even
+match the default voltages stored in the voltage table which are
+supported for the domain. For example, OMAP3430 core domain does not
+use 1.2V and ends up generating a warning on the first transition.
+
+Further, since omap2_set_init_voltage is called as part of the pm
+framework's initialization sequence to configure the voltage required
+for the current OPP, the call does(and has to) setup the system
+voltage(curr_volt as a result) using the right mechanisms appropriate
+for the system at that point of time. This also overrides
+initialization we are currently doing in voltage.c making it
+redundant. So, remove the wrong and redundant initialization.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/voltage.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/voltage.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index e0cbd93..56961df 100644
+index 56961df..1b40aa0 100644
 --- a/arch/arm/mach-omap2/voltage.c
 +++ b/arch/arm/mach-omap2/voltage.c
-@@ -91,10 +91,14 @@ static int __init _config_common_vdd_data(struct omap_vdd_info *vdd)
- 	 * XXX Clockfw should handle this, or this should be in a
- 	 * struct record
- 	 */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
- 		sys_ck_name = "sys_ck";
--	else if (cpu_is_omap44xx())
-+	} else if (cpu_is_omap44xx()) {
- 		sys_ck_name = "sys_clkin_ck";
-+	} else {
-+		pr_err("%s: Unsupported OMAP\n", __func__);
-+		return -EINVAL;
-+	}
+@@ -116,7 +116,6 @@ static int __init _config_common_vdd_data(struct omap_vdd_info *vdd)
+ 	sys_clk_speed /= 1000;
  
- 	/*
- 	 * Sys clk rate is require to calculate vp timeout value and
+ 	/* Generic voltage parameters */
+-	vdd->curr_volt = 1200000;
+ 	vdd->volt_scale = vp_forceupdate_scale_voltage;
+ 	vdd->vp_enabled = false;
+ 
 -- 
 1.7.1
