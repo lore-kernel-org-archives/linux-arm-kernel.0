@@ -1,39 +1,35 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 05 Mar 2011 15:30:58 +0300
-Subject: [PATCH 2/2] ARM: Enable TS-78XX features in unknown revisions
-In-Reply-To: <1299299957-13018-2-git-send-email-mspang@csclub.uwaterloo.ca>
-References: <1299299957-13018-1-git-send-email-mspang@csclub.uwaterloo.ca>
-	<1299299957-13018-2-git-send-email-mspang@csclub.uwaterloo.ca>
-Message-ID: <4D722D02.5090504@ru.mvista.com>
+Date: Sat, 05 Mar 2011 15:36:11 +0300
+Subject: [PATCH] [ARM] orion5x: fix compiler cast warnings in
+	ts78xx-setup.c
+In-Reply-To: <20110305113104.GB22117@chipmunk>
+References: <20110305113104.GB22117@chipmunk>
+Message-ID: <4D722E3B.8000608@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 05-03-2011 7:39, Michael Spang wrote:
+On 05-03-2011 14:31, Alexander Clouter wrote:
 
-> When the manufacturer increases the revision number the platform
-> devices for the RTC, NAND, and RNG disappear. We should assume
-> new revisions have these devices instead of assuming they do not.
-
-> Signed-off-by: Michael Spang<mspang@csclub.uwaterloo.ca>
+> Signed-off-by: Alexander Clouter<alex@digriz.org.uk>
 > ---
->   arch/arm/mach-orion5x/ts78xx-setup.c |    8 +++++---
->   1 files changed, 5 insertions(+), 3 deletions(-)
+>   arch/arm/mach-orion5x/ts78xx-setup.c |    4 ++--
+>   1 files changed, 2 insertions(+), 2 deletions(-)
 
 > diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index 7bed418..13d1fc5 100644
+> index 82e57a6..78e3b9a 100644
 > --- a/arch/arm/mach-orion5x/ts78xx-setup.c
 > +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -343,9 +343,11 @@ static void ts78xx_fpga_supports(void)
->   		ts78xx_fpga.supports.ts_rng.present = 1;
->   		break;
->   	default:
-> -		ts78xx_fpga.supports.ts_rtc.present = 0;
-> -		ts78xx_fpga.supports.ts_nand.present = 0;
-> -		ts78xx_fpga.supports.ts_rng.present = 0;
-> +		printk(KERN_WARN "Unrecognized TS-78XX FPGA ID 0x%02x",
+> @@ -200,7 +200,7 @@ static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
+>   	int sz;
+>
+>   	if (off) {
+> -		sz = min(4 - off, len);
+> +		sz = min((int) (4 - off), len);
 
-    Use pr_warning() or pr_warn().
+    Maybe:
+
+		sz = min_t(int, 4 - off, len);
 
 WBR, Sergei
