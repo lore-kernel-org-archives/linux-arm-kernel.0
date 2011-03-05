@@ -1,169 +1,126 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri,  4 Mar 2011 22:42:30 -0700
-Subject: [PATCH 3/5] ARM: tegra: Harmony: Beginnings of audio support
-In-Reply-To: <1299303752-7779-1-git-send-email-swarren@nvidia.com>
-References: <1299303752-7779-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1299303752-7779-4-git-send-email-swarren@nvidia.com>
+Date: Fri,  4 Mar 2011 22:44:27 -0700
+Subject: [PATCH 1/3] ARM: Tegra: Add devices.c entries for audio
+In-Reply-To: <1299303869-7827-1-git-send-email-swarren@nvidia.com>
+References: <1299303869-7827-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1299303869-7827-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change includes everything required to enable audio on Harmony, except
-those parts which rely on code not currently in Tegra's for-next branch, i.e.
-except those parts which rely on merges of the Tegra I2C driver or latest
-ASoC subsystem.
-
-* Define GPIO names for audio-related GPIOs
-* Set up platform data and platform device for ASoC machine driver
-* Register audio-related platform devices
-* Initialize audio-related clocks
-* Correctly configure pinmux and GPIO enables for audio-related pins
+For I2S, DAS, PCM devices
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/board-harmony-pinmux.c |   16 ++++++++++------
- arch/arm/mach-tegra/board-harmony.c        |   25 +++++++++++++++++++++++++
- arch/arm/mach-tegra/board-harmony.h        |    7 +++++++
- 3 files changed, 42 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/devices.c            |   70 ++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/devices.h            |    4 ++
+ arch/arm/mach-tegra/include/mach/iomap.h |    3 +
+ 3 files changed, 77 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-index 3ada474..4d63e2e 100644
---- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-+++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-@@ -27,11 +27,11 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
- 	{TEGRA_PINGROUP_ATC,   TEGRA_MUX_NAND,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_ATD,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_ATE,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
--	{TEGRA_PINGROUP_CDEV1, TEGRA_MUX_OSC,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_CDEV1, TEGRA_MUX_PLLA_OUT,      TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_CDEV2, TEGRA_MUX_PLLP_OUT4,     TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_CRTP,  TEGRA_MUX_CRT,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_CSUS,  TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_DAP4,  TEGRA_MUX_DAP4,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-@@ -114,13 +114,13 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
- 	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPDI,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPDO,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SPIB,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SPIC,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
-+	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-+	{TEGRA_PINGROUP_SPIB,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-+	{TEGRA_PINGROUP_SPIC,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPID,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPIE,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPIF,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SPIG,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_SPIG,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPIH,  TEGRA_MUX_SPI2_ALT,      TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_UAA,   TEGRA_MUX_ULPI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_UAB,   TEGRA_MUX_ULPI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
-@@ -147,6 +147,10 @@ static struct tegra_gpio_table gpio_table[] = {
- 	{ .gpio = TEGRA_GPIO_SD4_CD,		.enable = true	},
- 	{ .gpio = TEGRA_GPIO_SD4_WP,		.enable = true	},
- 	{ .gpio = TEGRA_GPIO_SD4_POWER,		.enable = true	},
-+	{ .gpio = TEGRA_GPIO_CDC_IRQ,		.enable = true	},
-+	{ .gpio = TEGRA_GPIO_HP_DET,		.enable = true	},
-+	{ .gpio = TEGRA_GPIO_INT_MIC_EN,	.enable = true	},
-+	{ .gpio = TEGRA_GPIO_EXT_MIC_EN,	.enable = true	},
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+index 682e6d3..1528f9d 100644
+--- a/arch/arm/mach-tegra/devices.c
++++ b/arch/arm/mach-tegra/devices.c
+@@ -503,3 +503,73 @@ struct platform_device tegra_uarte_device = {
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 	},
  };
- 
- void harmony_pinmux_init(void)
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index 7e2218f..17262b4 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -2,6 +2,7 @@
-  * arch/arm/mach-tegra/board-harmony.c
-  *
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (C) 2011 NVIDIA, Inc.
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -24,12 +25,14 @@
- #include <linux/io.h>
- #include <linux/i2c.h>
- #include <linux/i2c-tegra.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/setup.h>
- 
-+#include <mach/harmony_audio.h>
- #include <mach/iomap.h>
- #include <mach/irqs.h>
- #include <mach/sdhci.h>
-@@ -91,12 +94,30 @@ static void harmony_i2c_init(void)
- 	platform_device_register(&tegra_i2c_device4);
- }
- 
-+static struct harmony_audio_platform_data harmony_audio_pdata = {
-+	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
-+	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
-+	.gpio_int_mic_en	= TEGRA_GPIO_INT_MIC_EN,
-+	.gpio_ext_mic_en	= TEGRA_GPIO_EXT_MIC_EN,
++
++static struct resource i2s_resource1[] = {
++	[0] = {
++		.start	= INT_I2S1,
++		.end	= INT_I2S1,
++		.flags	= IORESOURCE_IRQ
++	},
++	[1] = {
++		.start	= TEGRA_DMA_REQ_SEL_I2S_1,
++		.end	= TEGRA_DMA_REQ_SEL_I2S_1,
++		.flags	= IORESOURCE_DMA
++	},
++	[2] = {
++		.start	= TEGRA_I2S1_BASE,
++		.end	= TEGRA_I2S1_BASE + TEGRA_I2S1_SIZE - 1,
++		.flags	= IORESOURCE_MEM
++	}
 +};
 +
-+static struct platform_device harmony_audio_device = {
-+	.name	= "tegra-snd-harmony",
-+	.id	= 0,
-+	.dev	= {
-+		.platform_data  = &harmony_audio_pdata,
++static struct resource i2s_resource2[] = {
++	[0] = {
++		.start	= INT_I2S2,
++		.end	= INT_I2S2,
++		.flags	= IORESOURCE_IRQ
++	},
++	[1] = {
++		.start	= TEGRA_DMA_REQ_SEL_I2S2_1,
++		.end	= TEGRA_DMA_REQ_SEL_I2S2_1,
++		.flags	= IORESOURCE_DMA
++	},
++	[2] = {
++		.start	= TEGRA_I2S2_BASE,
++		.end	= TEGRA_I2S2_BASE + TEGRA_I2S2_SIZE - 1,
++		.flags	= IORESOURCE_MEM
++	}
++};
++
++struct platform_device tegra_i2s_device1 = {
++	.name		= "tegra-i2s",
++	.id		= 0,
++	.resource	= i2s_resource1,
++	.num_resources	= ARRAY_SIZE(i2s_resource1),
++};
++
++struct platform_device tegra_i2s_device2 = {
++	.name		= "tegra-i2s",
++	.id		= 1,
++	.resource	= i2s_resource2,
++	.num_resources	= ARRAY_SIZE(i2s_resource2),
++};
++
++static struct resource tegra_das_resources[] = {
++	[0] = {
++		.start = TEGRA_APB_MISC_DAS_BASE,
++		.end = TEGRA_APB_MISC_DAS_BASE + TEGRA_APB_MISC_DAS_SIZE - 1,
++		.flags = IORESOURCE_MEM,
 +	},
 +};
- 
- static struct platform_device *harmony_devices[] __initdata = {
- 	&debug_uart,
- 	&tegra_sdhci_device1,
- 	&tegra_sdhci_device2,
- 	&tegra_sdhci_device4,
-+	&tegra_i2s_device1,
-+	&tegra_das_device,
-+	&tegra_pcm_device,
-+	&harmony_audio_device,
- };
- 
- static void __init tegra_harmony_fixup(struct machine_desc *desc,
-@@ -112,6 +133,10 @@ static void __init tegra_harmony_fixup(struct machine_desc *desc,
- static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
- 	{ "uartd",	"pll_p",	216000000,	true },
-+	{ "pll_a",	"pll_p_out1",	56448000,	true },
-+	{ "pll_a_out0",	"pll_a",	11289600,	true },
-+	{ "cdev1",	NULL,		0,		true },
-+	{ "i2s1",	"pll_a_out0",	11289600,	false},
- 	{ NULL,		NULL,		0,		0},
- };
- 
-diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
-index 4fe33b8..9243521 100644
---- a/arch/arm/mach-tegra/board-harmony.h
-+++ b/arch/arm/mach-tegra/board-harmony.h
-@@ -17,12 +17,19 @@
- #ifndef _MACH_TEGRA_BOARD_HARMONY_H
- #define _MACH_TEGRA_BOARD_HARMONY_H
- 
-+#define HARMONY_GPIO_WM8903(_x_)	(TEGRA_NR_GPIOS + (_x_))
 +
- #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
- #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
- #define TEGRA_GPIO_SD2_POWER		TEGRA_GPIO_PT3
- #define TEGRA_GPIO_SD4_CD		TEGRA_GPIO_PH2
- #define TEGRA_GPIO_SD4_WP		TEGRA_GPIO_PH3
- #define TEGRA_GPIO_SD4_POWER		TEGRA_GPIO_PI6
-+#define TEGRA_GPIO_CDC_IRQ		TEGRA_GPIO_PX3
-+#define TEGRA_GPIO_SPKR_EN		HARMONY_GPIO_WM8903(2)
-+#define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW2
-+#define TEGRA_GPIO_INT_MIC_EN		TEGRA_GPIO_PX0
-+#define TEGRA_GPIO_EXT_MIC_EN		TEGRA_GPIO_PX1
++struct platform_device tegra_das_device = {
++	.name		= "tegra-das",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(tegra_das_resources),
++	.resource	= tegra_das_resources,
++};
++
++struct platform_device tegra_pcm_device = {
++	.name = "tegra-pcm-audio",
++	.id = -1,
++};
+diff --git a/arch/arm/mach-tegra/devices.h b/arch/arm/mach-tegra/devices.h
+index 888810c..4a7dc0a 100644
+--- a/arch/arm/mach-tegra/devices.h
++++ b/arch/arm/mach-tegra/devices.h
+@@ -42,5 +42,9 @@ extern struct platform_device tegra_uartc_device;
+ extern struct platform_device tegra_uartd_device;
+ extern struct platform_device tegra_uarte_device;
+ extern struct platform_device tegra_pmu_device;
++extern struct platform_device tegra_i2s_device1;
++extern struct platform_device tegra_i2s_device2;
++extern struct platform_device tegra_das_device;
++extern struct platform_device tegra_pcm_device;
  
- void harmony_pinmux_init(void);
+ #endif
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 691cdab..19dec3a 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -122,6 +122,9 @@
+ #define TEGRA_APB_MISC_BASE		0x70000000
+ #define TEGRA_APB_MISC_SIZE		SZ_4K
+ 
++#define TEGRA_APB_MISC_DAS_BASE		0x70000c00
++#define TEGRA_APB_MISC_DAS_SIZE		SZ_128
++
+ #define TEGRA_AC97_BASE			0x70002000
+ #define TEGRA_AC97_SIZE			SZ_512
  
 -- 
 1.7.1
