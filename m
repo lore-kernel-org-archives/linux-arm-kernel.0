@@ -1,49 +1,38 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat,  5 Mar 2011 20:59:11 +0530
-Subject: [PATCH V3 08/19] OMAP3+: SR: make notify independent of class
+Date: Sat,  5 Mar 2011 20:59:12 +0530
+Subject: [PATCH V3 09/19] OMAP3+: SR: disable interrupt by default
 In-Reply-To: <1299338962-5602-1-git-send-email-nm@ti.com>
 References: <1299338962-5602-1-git-send-email-nm@ti.com>
-Message-ID: <1299338962-5602-9-git-send-email-nm@ti.com>
+Message-ID: <1299338962-5602-10-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Interrupt notification mechanism of SmartReflex can be used by the
-choice of implementation of the class driver. For example, Class 2 and
-Class 1.5 of SmartReflex can both use the interrupt notification to
-identify the transition of voltage or other events.
+We will enable and disable interrupt on a need basis in the class
+driver. We need to keep the IRQ disabled by default else the
+forceupdate or vcbypass events could trigger events that we don't
+need/expect to handle.
 
-Hence, the actual class does not matter for notifier. Let the class
-driver's handling decide how it should be used. SmartReflex driver
-should provide just the primitives.
+This is a preparation for SmartReflex AVS class drivers such as
+class 2 and class 1.5 which would need to use interrupts. Existing
+SmartReflex AVS class 3 driver does not require to use interrupts
+and is not impacted by this change.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 2566552..7096300 100644
+index 7096300..f9057ad 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -142,7 +142,7 @@ static irqreturn_t sr_interrupt(int irq, void *data)
- 		sr_write_reg(sr_info, IRQSTATUS, status);
+@@ -267,6 +267,7 @@ static int sr_late_init(struct omap_sr *sr_info)
+ 				0, name, (void *)sr_info);
+ 		if (ret)
+ 			goto error;
++		disable_irq(sr_info->irq);
  	}
  
--	if (sr_class->class_type == SR_CLASS2 && sr_class->notify)
-+	if (sr_class->notify)
- 		sr_class->notify(sr_info->voltdm, status);
- 
- 	return IRQ_HANDLED;
-@@ -257,9 +257,7 @@ static int sr_late_init(struct omap_sr *sr_info)
- 	struct resource *mem;
- 	int ret = 0;
- 
--	if (sr_class->class_type == SR_CLASS2 &&
--		sr_class->notify_flags && sr_info->irq) {
--
-+	if (sr_class->notify && sr_class->notify_flags && sr_info->irq) {
- 		name = kasprintf(GFP_KERNEL, "sr_%s", sr_info->voltdm->name);
- 		if (name == NULL) {
- 			ret = -ENOMEM;
+ 	if (pdata && pdata->enable_on_init)
 -- 
 1.7.1
