@@ -1,155 +1,166 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 6 Mar 2011 00:40:20 +0800
-Subject: [PATCH 2/4] ARM: mxs/mx28evk: add framebuffer device
+Date: Sun, 6 Mar 2011 00:40:19 +0800
+Subject: [PATCH 1/4] ARM: mxs: add helper macro for pad control
 In-Reply-To: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
 References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1299343222-30670-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1299343222-30670-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch is to add pad control helper macro to make the code easy
+to read.  The need is being seen when adding pad definitions for
+LCDIF which gets ~30 pads to define.
+
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/Kconfig        |    1 +
- arch/arm/mach-mxs/clock-mx28.c   |    2 +
- arch/arm/mach-mxs/mach-mx28evk.c |   78 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 81 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/include/mach/iomux.h |    3 +
+ arch/arm/mach-mxs/mach-mx23evk.c       |   16 ++----
+ arch/arm/mach-mxs/mach-mx28evk.c       |   82 +++++++++++---------------------
+ 3 files changed, 37 insertions(+), 64 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 4f0b673..cffd860 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -33,6 +33,7 @@ config MACH_MX28EVK
- 	select MXS_HAVE_AMBA_DUART
- 	select MXS_HAVE_PLATFORM_AUART
- 	select MXS_HAVE_PLATFORM_FEC
-+	select MXS_HAVE_PLATFORM_MXSFB
- 	select MXS_OCOTP
- 	default y
- 	help
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 8277056..56bd164 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -750,6 +750,8 @@ int __init mx28_clocks_init(void)
- 	clk_enable(&emi_clk);
- 	clk_enable(&uart_clk);
+diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
+index fe558e3..7abdf58 100644
+--- a/arch/arm/mach-mxs/include/mach/iomux.h
++++ b/arch/arm/mach-mxs/include/mach/iomux.h
+@@ -91,6 +91,9 @@ typedef u32 iomux_cfg_t;
+ #define MXS_PAD_PULLUP	((PAD_PULLUP << MXS_PAD_PULL_SHIFT) | \
+ 					MXS_PAD_PULL_VALID_MASK)
  
-+	clk_set_parent(&lcdif_clk, &ref_pix_clk);
++/* generic pad control used in most cases */
++#define MXS_PAD_CTRL	(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
 +
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ #define MXS_IOMUX_PAD(_bank, _pin, _muxsel, _ma, _vol, _pull)		\
+ 		(((iomux_cfg_t)(_bank) << MXS_PAD_BANK_SHIFT) |		\
+ 		((iomux_cfg_t)(_pin) << MXS_PAD_PIN_SHIFT) |		\
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index 0737ce2..d724054 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -28,18 +28,14 @@
  
- 	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
+ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+ 	/* duart */
+-	MX23_PAD_PWM0__DUART_RX | MXS_PAD_4MA,
+-	MX23_PAD_PWM1__DUART_TX | MXS_PAD_4MA,
++	MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
++	MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+ 
+ 	/* auart */
+-	MX23_PAD_AUART1_RX__AUART1_RX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_AUART1_TX__AUART1_TX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_AUART1_CTS__AUART1_CTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_AUART1_RTS__AUART1_RTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
++	MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
++	MX23_PAD_AUART1_CTS__AUART1_CTS | MXS_PAD_CTRL,
++	MX23_PAD_AUART1_RTS__AUART1_RTS | MXS_PAD_CTRL,
+ };
+ 
+ static void __init mx23evk_init(void)
 diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index 987e3d5..2102ffd 100644
+index 1f0b708..987e3d5 100644
 --- a/arch/arm/mach-mxs/mach-mx28evk.c
 +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -29,6 +29,8 @@
- #include "gpio.h"
- 
- #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
-+#define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
-+#define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
- #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+@@ -33,68 +33,42 @@
  
  static const iomux_cfg_t mx28evk_pads[] __initconst = {
-@@ -69,6 +71,40 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
- 	MX28_PAD_SSP1_DATA3__GPIO_2_15 | MXS_PAD_CTRL,
+ 	/* duart */
+-	MX28_PAD_PWM0__DUART_RX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_PWM1__DUART_TX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
++	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+ 
+ 	/* auart0 */
+-	MX28_PAD_AUART0_RX__AUART0_RX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART0_TX__AUART0_TX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART0_CTS__AUART0_CTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART0_RTS__AUART0_RTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
+ 	/* auart3 */
+-	MX28_PAD_AUART3_RX__AUART3_RX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART3_TX__AUART3_TX |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART3_CTS__AUART3_CTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_AUART3_RTS__AUART3_RTS |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_AUART3_RX__AUART3_RX | MXS_PAD_CTRL,
++	MX28_PAD_AUART3_TX__AUART3_TX | MXS_PAD_CTRL,
++	MX28_PAD_AUART3_CTS__AUART3_CTS | MXS_PAD_CTRL,
++	MX28_PAD_AUART3_RTS__AUART3_RTS | MXS_PAD_CTRL,
+ 
++#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+ 	/* fec0 */
+-	MX28_PAD_ENET0_MDC__ENET0_MDC |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_MDIO__ENET0_MDIO |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_RXD0__ENET0_RXD0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_RXD1__ENET0_RXD1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_TXD0__ENET0_TXD0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_TXD1__ENET0_TXD1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET_CLK__CLKCTRL_ENET |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
++	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
++	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+ 	/* fec1 */
+-	MX28_PAD_ENET0_CRS__ENET1_RX_EN |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_RXD2__ENET1_RXD0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_RXD3__ENET1_RXD1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_COL__ENET1_TX_EN |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_TXD2__ENET1_TXD0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_ENET0_TXD3__ENET1_TXD1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_ENET0_CRS__ENET1_RX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD2__ENET1_RXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD3__ENET1_RXD1 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_COL__ENET1_TX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD2__ENET1_TXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MXS_PAD_FEC,
+ 	/* phy power line */
+-	MX28_PAD_SSP1_DATA3__GPIO_2_15 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_SSP1_DATA3__GPIO_2_15 | MXS_PAD_CTRL,
  	/* phy reset line */
- 	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 | MXS_PAD_CTRL,
-+
-+	/* mxsfb (lcdif) */
-+	MX28_PAD_LCD_D00__LCD_D0 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D01__LCD_D1 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D02__LCD_D2 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D03__LCD_D3 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D04__LCD_D4 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D05__LCD_D5 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D06__LCD_D6 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D07__LCD_D7 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D08__LCD_D8 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D09__LCD_D9 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D18__LCD_D18 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D19__LCD_D19 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D20__LCD_D20 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D21__LCD_D21 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D22__LCD_D22 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_D23__LCD_D23 | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_RD_E__LCD_VSYNC | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_RS__LCD_DOTCLK | MXS_PAD_CTRL,
-+	MX28_PAD_LCD_CS__LCD_ENABLE | MXS_PAD_CTRL,
-+	/* LCD panel enable */
-+	MX28_PAD_LCD_RESET__GPIO_3_30 | MXS_PAD_CTRL,
-+	/* backlight control */
-+	MX28_PAD_PWM2__GPIO_3_18 | MXS_PAD_CTRL,
+-	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 | MXS_PAD_CTRL,
  };
  
  /* fec */
-@@ -152,8 +188,36 @@ error:
- 	return -ETIMEDOUT;
- }
- 
-+/* mxsfb (lcdif) */
-+static struct fb_videomode mx28evk_video_modes[] = {
-+	{
-+		.name		= "Seiko-43WVF1G",
-+		.refresh	= 60,
-+		.xres		= 800,
-+		.yres		= 480,
-+		.pixclock	= 29851, /* picosecond (33.5 MHz) */
-+		.left_margin	= 89,
-+		.right_margin	= 164,
-+		.upper_margin	= 23,
-+		.lower_margin	= 10,
-+		.hsync_len	= 10,
-+		.vsync_len	= 10,
-+		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
-+				  FB_SYNC_DOTCLK_FAILING_ACT,
-+	},
-+};
-+
-+static const struct mxsfb_platform_data mx28evk_mxsfb_pdata __initconst = {
-+	.mode_list	= mx28evk_video_modes,
-+	.mode_count	= ARRAY_SIZE(mx28evk_video_modes),
-+	.default_bpp	= 32,
-+	.ld_intf_width	= STMLCDIF_24BIT,
-+};
-+
- static void __init mx28evk_init(void)
- {
-+	int ret;
-+
- 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
- 
- 	mx28_add_duart();
-@@ -166,6 +230,20 @@ static void __init mx28evk_init(void)
- 	mx28evk_fec_reset();
- 	mx28_add_fec(0, &mx28_fec_pdata[0]);
- 	mx28_add_fec(1, &mx28_fec_pdata[1]);
-+
-+	ret = gpio_request_one(MX28EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
-+	if (ret)
-+		pr_warn("failed to request gpio lcd-enable: %d\n", ret);
-+	else
-+		gpio_set_value(MX28EVK_LCD_ENABLE, 1);
-+
-+	ret = gpio_request_one(MX28EVK_BL_ENABLE, GPIOF_DIR_OUT, "bl-enable");
-+	if (ret)
-+		pr_warn("failed to request gpio bl-enable: %d\n", ret);
-+	else
-+		gpio_set_value(MX28EVK_BL_ENABLE, 1);
-+
-+	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
- }
- 
- static void __init mx28evk_timer_init(void)
 -- 
 1.7.1
