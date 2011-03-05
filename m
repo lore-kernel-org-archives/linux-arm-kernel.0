@@ -1,35 +1,52 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 05 Mar 2011 15:36:11 +0300
-Subject: [PATCH] [ARM] orion5x: fix compiler cast warnings in
-	ts78xx-setup.c
-In-Reply-To: <20110305113104.GB22117@chipmunk>
-References: <20110305113104.GB22117@chipmunk>
-Message-ID: <4D722E3B.8000608@ru.mvista.com>
+From: slawomir.cygan@gmail.com (=?ISO-8859-2?Q?S=B3awomir_Cygan?=)
+Date: Sat, 5 Mar 2011 14:50:58 +0100
+Subject: hard coded value for idcode field in struct cpu_table
+In-Reply-To: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
+References: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
+Message-ID: <AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 05-03-2011 14:31, Alexander Clouter wrote:
-
-> Signed-off-by: Alexander Clouter<alex@digriz.org.uk>
-> ---
->   arch/arm/mach-orion5x/ts78xx-setup.c |    4 ++--
->   1 files changed, 2 insertions(+), 2 deletions(-)
-
-> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index 82e57a6..78e3b9a 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
-> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -200,7 +200,7 @@ static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
->   	int sz;
+On Thu, Mar 3, 2011 at 2:49 PM, Madhavi Manchala
+<madhavi.linux@gmail.com> wrote:
+> Dear All,
 >
->   	if (off) {
-> -		sz = min(4 - off, len);
-> +		sz = min((int) (4 - off), len);
+> I do not understand the value of idcode field in the struct cpu_table
+> i.e. the value is hard coded. I did not find that value in the user
+> manuals also. The code is available at
+> linux/arch/arm/plat-s3c24xx/cpu.c file. Currently, I am implementing
+> code for Samsung S3C2510A processor which is not available in the
+> current sources. Where can I find the idcode value for Samsung
+> S3C2510A processor?
+>
+> Any ideas will be appreciated.
+>
+> Thanks and ?Regards,
+> Madhavi M.
+>
+Hi,
+This field is defined for example in this datasheed:
 
-    Maybe:
+http://www.alldatasheet.com/datasheet-pdf/pdf/84872/SAMSUNG/S3C2410A.html
 
-		sz = min_t(int, 4 - off, len);
+PDF page 282:
 
-WBR, Sergei
+GENERAL STATUS REGISTER (GSTATUSn)
+Register Address R/W Description Reset Value
+GSTATUS0 0x560000AC R External pin status Undefined
+
+>>>>>   GSTATUS1 0x560000B0 R Chip ID 0x32410000 <<<
+
+GSTATUS2 0x560000B4 R/W Reset status 0x1
+GSTATUS3 0x560000B8 R/W Infrom register 0x0
+GSTATUS4 0x560000BC R/W Infrom register 0x0
+
+This is "GSTATUS1" register initial value
+
+
+I don't think that S3c25 are so similar to S3c25, so they provide
+exactly the same method of chip identification.
+
+-- 
+Pozdrawiam,
+S?awomir Cygan
