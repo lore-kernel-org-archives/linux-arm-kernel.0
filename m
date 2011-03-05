@@ -1,367 +1,155 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Sat, 5 Mar 2011 01:30:04 +0100
-Subject: [PATCH v11 1/1] PRUSS UIO driver support
-In-Reply-To: <1299279617-21108-2-git-send-email-pratheesh@ti.com>
-References: <1299279617-21108-1-git-send-email-pratheesh@ti.com>
-	<1299279617-21108-2-git-send-email-pratheesh@ti.com>
-Message-ID: <20110305003004.GA1295@local>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Mar 2011 17:27:00 -0800
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Wed, 2 Mar 2011 16:42:23 +0530")
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87bp1q5pcr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 05, 2011 at 04:30:17AM +0530, Pratheesh Gangadhar wrote:
-> This patch implements PRUSS (Programmable Real-time Unit Sub System)
-> UIO driver which exports SOC resources associated with PRUSS like
-> I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
-> processors which is efficient in performing embedded tasks that
-> require manipulation of packed memory mapped data structures and
-> handling system events that have tight real time constraints. This
-> driver is currently supported on Texas Instruments DA850, AM18xx and
-> OMAP-L138 devices.
-> For example, PRUSS runs firmware for real-time critical industrial
-> communication data link layer and communicates with application stack
-> running in user space via shared memory and IRQs.
-> 
-> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-Signed-off-by: Hans J. Koch <hjk@hansjkoch.de>
+> For device pads which have OMAP_DEVICE_PAD_WAKEUP set (which means they
+> are wakeup capable) enable the IO-daisy wakeup capability.
+> During re-muxing avoid direct write with val as this can disturb if any
+> mux done at bootloader level so read the pad then write back.
+>
+> Also add an API to fetch the wake-up status bit is set for given omap-hwmod
+> device using available mux info which is added during omap_hwmod_mux_init.
+> Wakeup status bit is needed for uart_resume_idle call from sram_idle path
+> based on wake-up event has occurred for given uart we can enable clocks back.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
-I think, we've got it. Thanks for your contribution and your patience.
-Not many UIO programmers hang on through 11 patch versions...
+Another issue with this patch...
 
-Thanks,
-Hans
+This actually is a change in behavior from the previous code.  The
+current code (albiet hacky) only enables IO-ring wakeups when
+device_may_wakeup() == true.
+
+This code should probably also do the same.
+
+Kevin
 
 > ---
->  drivers/uio/Kconfig                     |   17 ++
->  drivers/uio/Makefile                    |    1 +
->  drivers/uio/uio_pruss.c                 |  247 +++++++++++++++++++++++++++++++
->  include/linux/platform_data/uio_pruss.h |   25 +++
->  4 files changed, 290 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/uio/uio_pruss.c
->  create mode 100644 include/linux/platform_data/uio_pruss.h
-> 
-> diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
-> index bb44079..6f3ea9b 100644
-> --- a/drivers/uio/Kconfig
-> +++ b/drivers/uio/Kconfig
-> @@ -94,4 +94,21 @@ config UIO_NETX
->  	  To compile this driver as a module, choose M here; the module
->  	  will be called uio_netx.
+>  arch/arm/mach-omap2/mux.c                    |   28 ++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/mux.h                    |   13 ++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod.c             |   13 ++++++++++++
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+>  4 files changed, 55 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 98148b6..50edcea 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -317,6 +317,29 @@ err1:
+>  	return NULL;
+>  }
 >  
-> +config UIO_PRUSS
-> +	tristate "Texas Instruments PRUSS driver"
-> +	depends on ARCH_DAVINCI_DA850
-> +	help
-> +	  PRUSS driver for OMAPL138/DA850/AM18XX devices
-> +	  PRUSS driver requires user space components, examples and user space
-> +	  driver is available from below SVN repo - you may use anonymous login
-> +
-> +	  https://gforge.ti.com/gf/project/pru_sw/
-> +
-> +	  More info on API is available at below wiki
-> +
-> +	  http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called uio_pruss.
-> +
->  endif
-> diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
-> index 18fd818..d4dd9a5 100644
-> --- a/drivers/uio/Makefile
-> +++ b/drivers/uio/Makefile
-> @@ -6,3 +6,4 @@ obj-$(CONFIG_UIO_AEC)	+= uio_aec.o
->  obj-$(CONFIG_UIO_SERCOS3)	+= uio_sercos3.o
->  obj-$(CONFIG_UIO_PCI_GENERIC)	+= uio_pci_generic.o
->  obj-$(CONFIG_UIO_NETX)	+= uio_netx.o
-> +obj-$(CONFIG_UIO_PRUSS)         += uio_pruss.o
-> diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
-> new file mode 100644
-> index 0000000..daf6e77
-> --- /dev/null
-> +++ b/drivers/uio/uio_pruss.c
-> @@ -0,0 +1,247 @@
-> +/*
-> + * Programmable Real-Time Unit Sub System (PRUSS) UIO driver (uio_pruss)
-> + *
-> + * This driver exports PRUSS host event out interrupts and PRUSS, L3 RAM,
-> + * and DDR RAM to user space for applications interacting with PRUSS firmware
-> + *
-> + * Copyright (C) 2010-11 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/moduleparam.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/uio_driver.h>
-> +#include <linux/platform_data/uio_pruss.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/slab.h>
-> +#include <mach/sram.h>
-> +
-> +#define DRV_NAME "pruss_uio"
-> +#define DRV_VERSION "1.0"
-> +
-> +static int sram_pool_sz = SZ_16K;
-> +module_param(sram_pool_sz, int, 0);
-> +MODULE_PARM_DESC(sram_pool_sz, "sram pool size to allocate ");
-> +
-> +static int extram_pool_sz = SZ_256K;
-> +module_param(extram_pool_sz, int, 0);
-> +MODULE_PARM_DESC(extram_pool_sz, "external ram pool size to allocate");
-> +
-> +/*
-> + * Host event IRQ numbers from PRUSS - PRUSS can generate upto 8 interrupt
-> + * events to AINTC of ARM host processor - which can be used for IPC b/w PRUSS
-> + * firmware and user space application, async notification from PRU firmware
-> + * to user space application
-> + * 3	PRU_EVTOUT0
-> + * 4	PRU_EVTOUT1
-> + * 5	PRU_EVTOUT2
-> + * 6	PRU_EVTOUT3
-> + * 7	PRU_EVTOUT4
-> + * 8	PRU_EVTOUT5
-> + * 9	PRU_EVTOUT6
-> + * 10	PRU_EVTOUT7
-> +*/
-> +#define MAX_PRUSS_EVT	8
-> +
-> +#define PINTC_HIDISR	0x0038
-> +#define PINTC_HIPIR	0x0900
-> +#define HIPIR_NOPEND	0x80000000
-> +#define PINTC_HIER	0x1500
-> +
-> +struct uio_pruss_dev {
-> +	struct uio_info *info;
-> +	struct clk *pruss_clk;
-> +	dma_addr_t sram_paddr;
-> +	dma_addr_t ddr_paddr;
-> +	void __iomem *prussio_vaddr;
-> +	void *sram_vaddr;
-> +	void *ddr_vaddr;
-> +	unsigned int hostirq_start;
-> +	unsigned int pintc_base;
-> +};
-> +
-> +static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+> +/* Gets the wakeup status of given pad from omap-hwmod */
+> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
 > +{
-> +	struct uio_pruss_dev *gdev = info->priv;
-> +	int intr_bit = (irq - gdev->hostirq_start + 2);
-> +	int val, intr_mask = (1 << intr_bit);
-> +	void __iomem *base = gdev->prussio_vaddr + gdev->pintc_base;
-> +	void __iomem *intren_reg = base + PINTC_HIER;
-> +	void __iomem *intrdis_reg = base + PINTC_HIDISR;
-> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
+> +	int i;
+> +	unsigned int val;
+> +	u8 ret = 0;
 > +
-> +	val = ioread32(intren_reg);
-> +	/* Is interrupt enabled and active ? */
-> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND))
-> +		return IRQ_NONE;
-> +	/* Disable interrupt */
-> +	iowrite32(intr_bit, intrdis_reg);
-> +	return IRQ_HANDLED;
-> +}
+> +	for (i = 0; i < hmux->nr_pads; i++) {
+> +		struct omap_device_pad *pad = &hmux->pads[i];
 > +
-> +static void pruss_cleanup(struct platform_device *dev,
-> +			struct uio_pruss_dev *gdev)
-> +{
-> +	int cnt;
-> +	struct uio_info *p = gdev->info;
-> +
-> +	for (cnt = 0; cnt < MAX_PRUSS_EVT; cnt++, p++) {
-> +		uio_unregister_device(p);
-> +		kfree(p->name);
-> +	}
-> +	iounmap(gdev->prussio_vaddr);
-> +	if (gdev->ddr_vaddr) {
-> +		dma_free_coherent(&dev->dev, extram_pool_sz, gdev->ddr_vaddr,
-> +			gdev->ddr_paddr);
-> +	}
-> +	if (gdev->sram_vaddr)
-> +		sram_free(gdev->sram_vaddr, sram_pool_sz);
-> +	kfree(gdev->info);
-> +	clk_put(gdev->pruss_clk);
-> +	kfree(gdev);
-> +}
-> +
-> +static int __devinit pruss_probe(struct platform_device *dev)
-> +{
-> +	struct uio_info *p;
-> +	struct uio_pruss_dev *gdev;
-> +	struct resource *regs_prussio;
-> +	int ret = -ENODEV, cnt = 0, len;
-> +	struct uio_pruss_pdata *pdata = dev->dev.platform_data;
-> +
-> +	gdev = kzalloc(sizeof(struct uio_pruss_dev), GFP_KERNEL);
-> +	if (!gdev)
-> +		return -ENOMEM;
-> +
-> +	gdev->info = kzalloc(sizeof(*p) * MAX_PRUSS_EVT, GFP_KERNEL);
-> +	if (!gdev->info) {
-> +		kfree(gdev);
-> +		return -ENOMEM;
-> +	}
-> +	/* Power on PRU in case its not done as part of boot-loader */
-> +	gdev->pruss_clk = clk_get(&dev->dev, "pruss");
-> +	if (IS_ERR(gdev->pruss_clk)) {
-> +		dev_err(&dev->dev, "Failed to get clock\n");
-> +		kfree(gdev->info);
-> +		kfree(gdev);
-> +		ret = PTR_ERR(gdev->pruss_clk);
-> +		return ret;
-> +	} else {
-> +		clk_enable(gdev->pruss_clk);
+> +		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
+> +			val = omap_mux_read(pad->partition,
+> +						pad->mux->reg_offset);
+> +			if (val & OMAP_WAKEUP_EVENT) {
+> +				ret = 1;
+> +				break;
+> +			}
+> +		}
 > +	}
 > +
-> +	regs_prussio = platform_get_resource(dev, IORESOURCE_MEM, 0);
-> +	if (!regs_prussio) {
-> +		dev_err(&dev->dev, "No PRUSS I/O resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	if (!regs_prussio->start) {
-> +		dev_err(&dev->dev, "Invalid memory resource\n");
-> +		goto out_free;
-> +	}
-> +
-> +	gdev->sram_vaddr = sram_alloc(sram_pool_sz, &(gdev->sram_paddr));
-> +	if (!gdev->sram_vaddr) {
-> +		dev_err(&dev->dev, "Could not allocate SRAM pool\n");
-> +		goto out_free;
-> +	}
-> +
-> +	gdev->ddr_vaddr = dma_alloc_coherent(&dev->dev, extram_pool_sz,
-> +				&(gdev->ddr_paddr), GFP_KERNEL | GFP_DMA);
-> +	if (!gdev->ddr_vaddr) {
-> +		dev_err(&dev->dev, "Could not allocate external memory\n");
-> +		goto out_free;
-> +	}
-> +
-> +	len = resource_size(regs_prussio);
-> +	gdev->prussio_vaddr = ioremap(regs_prussio->start, len);
-> +	if (!gdev->prussio_vaddr) {
-> +		dev_err(&dev->dev, "Can't remap PRUSS I/O  address range\n");
-> +		goto out_free;
-> +	}
-> +
-> +	gdev->pintc_base = pdata->pintc_base;
-> +	gdev->hostirq_start = platform_get_irq(dev, 0);
-> +
-> +	for (cnt = 0, p = gdev->info; cnt < MAX_PRUSS_EVT; cnt++, p++) {
-> +		p->mem[0].addr = regs_prussio->start;
-> +		p->mem[0].size = resource_size(regs_prussio);
-> +		p->mem[0].memtype = UIO_MEM_PHYS;
-> +
-> +		p->mem[1].addr = gdev->sram_paddr;
-> +		p->mem[1].size = sram_pool_sz;
-> +		p->mem[1].memtype = UIO_MEM_PHYS;
-> +
-> +		p->mem[2].addr = gdev->ddr_paddr;
-> +		p->mem[2].size = extram_pool_sz;
-> +		p->mem[2].memtype = UIO_MEM_PHYS;
-> +
-> +		p->name = kasprintf(GFP_KERNEL, "pruss_evt%d", cnt);
-> +		p->version = DRV_VERSION;
-> +
-> +		/* Register PRUSS IRQ lines */
-> +		p->irq = gdev->hostirq_start + cnt;
-> +		p->handler = pruss_handler;
-> +		p->priv = gdev;
-> +
-> +		ret = uio_register_device(&dev->dev, p);
-> +		if (ret < 0)
-> +			goto out_free;
-> +	}
-> +
-> +	platform_set_drvdata(dev, gdev);
-> +	return 0;
-> +
-> +out_free:
-> +	pruss_cleanup(dev, gdev);
 > +	return ret;
 > +}
 > +
-> +static int __devexit pruss_remove(struct platform_device *dev)
-> +{
-> +	struct uio_pruss_dev *gdev = platform_get_drvdata(dev);
+>  /* Assumes the calling function takes care of locking */
+>  void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>  {
+> @@ -342,6 +365,9 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>  				break;
+>  			flags &= ~OMAP_DEVICE_PAD_ENABLED;
+>  			val = pad->idle;
+> +			if (flags & OMAP_DEVICE_PAD_WAKEUP)
+> +				val |= OMAP_WAKEUP_EN;
 > +
-> +	pruss_cleanup(dev, gdev);
-> +	platform_set_drvdata(dev, NULL);
+>  			pr_debug("%s: Idling %s %x\n", __func__,
+>  					pad->name, val);
+>  			break;
+> @@ -358,6 +384,8 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>  		};
+>  
+>  		if (val >= 0) {
+> +			val |= omap_mux_read(pad->partition,
+> +						pad->mux->reg_offset);
+>  			omap_mux_write(pad->partition, val,
+>  					pad->mux->reg_offset);
+>  			pad->flags = flags;
+> diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+> index a4ab17a..84a8fc2 100644
+> --- a/arch/arm/mach-omap2/mux.h
+> +++ b/arch/arm/mach-omap2/mux.h
+> @@ -220,8 +220,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
+>   */
+>  void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
+>  
+> +
+> +/**
+> + * omap_hwmod_mux_wakeup - omap hwmod check given pad had wakeup event
+> + * @hmux:		Pads for a hwmod
+> + *
+> + * Called only from omap_hwmod.c, do not use.
+> + */
+> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux);
+>  #else
+>  
+> +static inline int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
+> +{
 > +	return 0;
 > +}
 > +
-> +static struct platform_driver pruss_driver = {
-> +	.probe = pruss_probe,
-> +	.remove = __devexit_p(pruss_remove),
-> +	.driver = {
-> +		   .name = DRV_NAME,
-> +		   .owner = THIS_MODULE,
-> +		   },
-> +};
+>  static inline int omap_mux_init_gpio(int gpio, int val)
+>  {
+>  	return 0;
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 9e89a58..893dae1 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2239,3 +2239,16 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
+>  
+>  	return ret;
+>  }
 > +
-> +static int __init pruss_init_module(void)
-> +{
-> +	return platform_driver_register(&pruss_driver);
-> +}
-> +
-> +module_init(pruss_init_module);
-> +
-> +static void __exit pruss_exit_module(void)
-> +{
-> +	platform_driver_unregister(&pruss_driver);
-> +}
-> +
-> +module_exit(pruss_exit_module);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_VERSION(DRV_VERSION);
-> +MODULE_AUTHOR("Amit Chatterjee <amit.chatterjee@ti.com>");
-> +MODULE_AUTHOR("Pratheesh Gangadhar <pratheesh@ti.com>");
-> diff --git a/include/linux/platform_data/uio_pruss.h b/include/linux/platform_data/uio_pruss.h
-> new file mode 100644
-> index 0000000..f39140a
-> --- /dev/null
-> +++ b/include/linux/platform_data/uio_pruss.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * include/linux/platform_data/uio_pruss.h
+> +/**
+> + * omap_hwmod_pad_wakeup_status - get pad wakeup status if mux is available.
+> + * @oh: struct omap_hwmod *
 > + *
-> + * Platform data for uio_pruss driver
-> + *
-> + * Copyright (C) 2010-11 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * Returns the wake_up status bit of available pad mux pin.
 > + */
-> +
-> +#ifndef _UIO_PRUSS_H_
-> +#define _UIO_PRUSS_H_
-> +
-> +/* To configure the PRUSS INTC base offset for UIO driver */
-> +struct uio_pruss_pdata {
-> +	u32	pintc_base;
-> +};
-> +#endif /* _UIO_PRUSS_H_ */
-> -- 
-> 1.6.0.6
-> 
-> 
+> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh)
+> +{
+> +	if (oh->mux)
+> +		return omap_hwmod_mux_wakeup(oh->mux);
+> +	return -EINVAL;
+> +}
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index fedd829..4100be0 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -588,6 +588,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+>  int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
+>  u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+>  
+> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh);
+>  /*
+>   * Chip variant-specific hwmod init routines - XXX should be converted
+>   * to use initcalls once the initial boot ordering is straightened out
