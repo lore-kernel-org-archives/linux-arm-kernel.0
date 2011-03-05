@@ -1,36 +1,28 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Sat, 05 Mar 2011 21:46:52 +0100
-Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
-	(Nguyen Dinh-R's message of "Fri, 4 Mar 2011 23:33:11 +0000")
-References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <87oc5puwg3.fsf@lebrac.rtp-net.org>
+From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
+Date: Sat, 5 Mar 2011 13:18:50 -0800 (PST)
+Subject: [PATCH 1/3] msm: Add support for Scorpion and ScorpionMP PMU
+In-Reply-To: <4D71F7A0.5010101@codeaurora.org>
+References: <1299276583-12542-1-git-send-email-sheetals@codeaurora.org>
+	<4D71F7A0.5010101@codeaurora.org>
+Message-ID: <abd1b409d545d4a3c24e4f0dedf56c6f.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+Hi Trilok,
 
-> Hi Arnaud,
-
-Hi,
-
+>> +static int __init scorpion_pmu_init(void)
+>> +{
+>> +	platform_device_register(&pmu_device);
 >
-> I just sent out a 2nd set of the MX51 LPM patch. I have tested successfully on my mx51 babbage without any code modifications.
+> platform_device_register can fail. Better do it like
 >
-> If you would kindly verify on your side, that would great.
->
-> You need both patches:
->
-> [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
-> [PATCHv2 2/2] ARM: mx51: Add support for low power suspend on MX51
+> "return platform_device_register(&pmu_device);
 
-No success. I even tried disabling nearly all drivers and nothing. The
-last line I have in the serial console is :
+Good catch, I will update it.
 
-PM: late suspend of devices complete after 0.354 msecs
+Thanks,
+Sheetal
 
-So, I still don't know if the system is crashing while suspending or if
-the system is suspended but doesn't wake up.
-
-Arnaud
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
