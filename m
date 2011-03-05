@@ -1,28 +1,21 @@
-From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
-Date: Sat, 5 Mar 2011 13:40:07 -0800 (PST)
-Subject: [PATCH 0/3] ARM: Add Scorpion/ScorpionMP support to perf and
-	Oprofile
-In-Reply-To: <4D716AD5.1070403@codeaurora.org>
-References: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
-	<4D716AD5.1070403@codeaurora.org>
-Message-ID: <ae824b511bff00411fa33086cb529c32.squirrel@www.codeaurora.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 6 Mar 2011 00:30:59 +0200
+Subject: [PATCH v2 1/3] ARM: PXA: PXAFB: Fix double-free issue
+In-Reply-To: <1298214147-11578-1-git-send-email-anarsoul@gmail.com>
+References: <20110217110321.GF24627@n2100.arm.linux.org.uk>
+	<1298214147-11578-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201103060030.59584.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
+Please discard this series.
 
-> Some minor comments from a quick review:
-> - you're using multi-line commenting style for single line comments
-> - see Documentation/CodingStyle, Chapter 8, for preferred multi-line
-> commenting style
-I will fix the commenting style wherever needed.
+PXA270/3xx overlay memory management is still broken - it was not good 
+decision to allocate memory on open/close - after some time OS just does not 
+have 115kb of contiguous memory, so it fails to allocate overlay fb memory 
+after ~1h of uptime.
 
-> - 'mv perf_event_qc.c perf_event_msm.c'?
-That's fine with me.
+I'll rework it and resend soon.
 
-Thanks,
-Sheetal
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards
+Vasily
