@@ -1,52 +1,16 @@
-From: slawomir.cygan@gmail.com (=?ISO-8859-2?Q?S=B3awomir_Cygan?=)
-Date: Sat, 5 Mar 2011 14:50:58 +0100
-Subject: hard coded value for idcode field in struct cpu_table
-In-Reply-To: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
-References: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
-Message-ID: <AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Mar 2011 14:02:43 +0000
+Subject: [PATCH V6 0/8] SPEAr3xx & SPEAr6xx Fixes
+In-Reply-To: <cover.1298977691.git.viresh.kumar@st.com>
+References: <cover.1298977691.git.viresh.kumar@st.com>
+Message-ID: <20110305140243.GD27468@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2011 at 2:49 PM, Madhavi Manchala
-<madhavi.linux@gmail.com> wrote:
-> Dear All,
->
-> I do not understand the value of idcode field in the struct cpu_table
-> i.e. the value is hard coded. I did not find that value in the user
-> manuals also. The code is available at
-> linux/arch/arm/plat-s3c24xx/cpu.c file. Currently, I am implementing
-> code for Samsung S3C2510A processor which is not available in the
-> current sources. Where can I find the idcode value for Samsung
-> S3C2510A processor?
->
-> Any ideas will be appreciated.
->
-> Thanks and ?Regards,
-> Madhavi M.
->
-Hi,
-This field is defined for example in this datasheed:
+On Tue, Mar 01, 2011 at 04:56:06PM +0530, Viresh Kumar wrote:
+> This patchset contains minor fixes, renames, & reordering of code of #include
+> files.
 
-http://www.alldatasheet.com/datasheet-pdf/pdf/84872/SAMSUNG/S3C2410A.html
-
-PDF page 282:
-
-GENERAL STATUS REGISTER (GSTATUSn)
-Register Address R/W Description Reset Value
-GSTATUS0 0x560000AC R External pin status Undefined
-
->>>>>   GSTATUS1 0x560000B0 R Chip ID 0x32410000 <<<
-
-GSTATUS2 0x560000B4 R/W Reset status 0x1
-GSTATUS3 0x560000B8 R/W Infrom register 0x0
-GSTATUS4 0x560000BC R/W Infrom register 0x0
-
-This is "GSTATUS1" register initial value
-
-
-I don't think that S3c25 are so similar to S3c25, so they provide
-exactly the same method of chip identification.
-
--- 
-Pozdrawiam,
-S?awomir Cygan
+This set looks absolutely fine.  I assume that it should apply on top of
+my 'spear' branch?  If so, please submit this series to the patch system,
+thanks.
