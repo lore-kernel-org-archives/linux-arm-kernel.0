@@ -1,94 +1,39 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 5 Mar 2011 11:49:36 +0000
-Subject: [PATCHv2] [ARM] orion5x: use safer FPGA ID 'default' for TS-78xx
-In-Reply-To: <20110305112937.GA22117@chipmunk>
-References: <20110305112937.GA22117@chipmunk>
-Message-ID: <20110305114936.GD22117@chipmunk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 05 Mar 2011 15:30:58 +0300
+Subject: [PATCH 2/2] ARM: Enable TS-78XX features in unknown revisions
+In-Reply-To: <1299299957-13018-2-git-send-email-mspang@csclub.uwaterloo.ca>
+References: <1299299957-13018-1-git-send-email-mspang@csclub.uwaterloo.ca>
+	<1299299957-13018-2-git-send-email-mspang@csclub.uwaterloo.ca>
+Message-ID: <4D722D02.5090504@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally the FPGA ID checking switch statement left disabled all the
-TS implemented FPGA devices if the ID was unknown to it.  Michael Spang
-created a fix in 3c390473 that changed the default to enable the devices
-in the event TS silently release more revisions into the wild, this
-unfortunately breaks custom FPGA bitstreams.
+Hello.
 
-This patch amends the switch statement so that the TS devices are only
-enabled if on the revision number is unknown (whilst the magic matches).
+On 05-03-2011 7:39, Michael Spang wrote:
 
-Changelog:
- v2: neater implementation and some cosmetic changes
- v1: initial release <20110305112937.GA22117@chipmunk>
+> When the manufacturer increases the revision number the platform
+> devices for the RTC, NAND, and RNG disappear. We should assume
+> new revisions have these devices instead of assuming they do not.
 
-Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
----
- arch/arm/mach-orion5x/ts78xx-fpga.h  |   19 ++++++++++---------
- arch/arm/mach-orion5x/ts78xx-setup.c |   19 ++++++++++++++-----
- 2 files changed, 24 insertions(+), 14 deletions(-)
+> Signed-off-by: Michael Spang<mspang@csclub.uwaterloo.ca>
+> ---
+>   arch/arm/mach-orion5x/ts78xx-setup.c |    8 +++++---
+>   1 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/ts78xx-fpga.h b/arch/arm/mach-orion5x/ts78xx-fpga.h
-index 791f754..151e89e 100644
---- a/arch/arm/mach-orion5x/ts78xx-fpga.h
-+++ b/arch/arm/mach-orion5x/ts78xx-fpga.h
-@@ -1,3 +1,4 @@
-+#define TS7800_FPGA_MAGIC 0x00b480
- #define FPGAID(_magic, _rev) ((_magic << 8) + _rev)
- 
- /*
-@@ -6,15 +7,15 @@
-  */
- enum fpga_ids {
- 	/* Technologic Systems */
--	TS7800_REV_1	= FPGAID(0x00b480, 0x01),
--	TS7800_REV_2	= FPGAID(0x00b480, 0x02),
--	TS7800_REV_3	= FPGAID(0x00b480, 0x03),
--	TS7800_REV_4	= FPGAID(0x00b480, 0x04),
--	TS7800_REV_5	= FPGAID(0x00b480, 0x05),
--	TS7800_REV_6	= FPGAID(0x00b480, 0x06),
--	TS7800_REV_7	= FPGAID(0x00b480, 0x07),
--	TS7800_REV_8	= FPGAID(0x00b480, 0x08),
--	TS7800_REV_9	= FPGAID(0x00b480, 0x09),
-+	TS7800_REV_1	= FPGAID(TS7800_FPGA_MAGIC, 0x01),
-+	TS7800_REV_2	= FPGAID(TS7800_FPGA_MAGIC, 0x02),
-+	TS7800_REV_3	= FPGAID(TS7800_FPGA_MAGIC, 0x03),
-+	TS7800_REV_4	= FPGAID(TS7800_FPGA_MAGIC, 0x04),
-+	TS7800_REV_5	= FPGAID(TS7800_FPGA_MAGIC, 0x05),
-+	TS7800_REV_6	= FPGAID(TS7800_FPGA_MAGIC, 0x06),
-+	TS7800_REV_7	= FPGAID(TS7800_FPGA_MAGIC, 0x07),
-+	TS7800_REV_8	= FPGAID(TS7800_FPGA_MAGIC, 0x08),
-+	TS7800_REV_9	= FPGAID(TS7800_FPGA_MAGIC, 0x09),
- 
- 	/* Unaffordable & Expensive */
- 	UAE_DUMMY	= FPGAID(0xffffff, 0x01),
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index 1cac714..3f2e1cd 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -399,11 +399,20 @@ static void ts78xx_fpga_supports(void)
- 		ts78xx_fpga.supports.ts_rng.present = 1;
- 		break;
- 	default:
--		printk(KERN_WARNING "Unrecognized TS-78XX FPGA ID 0x%02x",
--		       ts78xx_fpga.id);
--		ts78xx_fpga.supports.ts_rtc.present = 1;
--		ts78xx_fpga.supports.ts_nand.present = 1;
--		ts78xx_fpga.supports.ts_rng.present = 1;
-+		/* enable devices if magic matches */
-+		switch ((ts78xx_fpga.id >> 8) & 0xffffff) {
-+		case TS7800_FPGA_MAGIC:
-+			printk(KERN_WARNING "TS-7800 FPGA: unrecognized revision 0x%.2x\n",
-+					ts78xx_fpga.id & 0xff);
-+			ts78xx_fpga.supports.ts_rtc.present = 1;
-+			ts78xx_fpga.supports.ts_nand.present = 1;
-+			ts78xx_fpga.supports.ts_rng.present = 1;
-+			break;
-+		default:
-+			ts78xx_fpga.supports.ts_rtc.present = 0;
-+			ts78xx_fpga.supports.ts_nand.present = 0;
-+			ts78xx_fpga.supports.ts_rng.present = 0;
-+		}
- 	}
- }
- 
--- 
-1.7.4.1
+> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+> index 7bed418..13d1fc5 100644
+> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
+> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+> @@ -343,9 +343,11 @@ static void ts78xx_fpga_supports(void)
+>   		ts78xx_fpga.supports.ts_rng.present = 1;
+>   		break;
+>   	default:
+> -		ts78xx_fpga.supports.ts_rtc.present = 0;
+> -		ts78xx_fpga.supports.ts_nand.present = 0;
+> -		ts78xx_fpga.supports.ts_rng.present = 0;
+> +		printk(KERN_WARN "Unrecognized TS-78XX FPGA ID 0x%02x",
+
+    Use pr_warning() or pr_warn().
+
+WBR, Sergei
