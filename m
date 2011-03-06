@@ -1,70 +1,47 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 6 Mar 2011 14:18:28 +0800
-Subject: [PATCH 1/3 RESEND] video: mxsfb: smarten the code a little bit
-In-Reply-To: <1299341931-30241-2-git-send-email-shawn.guo@freescale.com>
-References: <1299341931-30241-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1299392308-2551-1-git-send-email-shawn.guo@freescale.com>
+Date: Sun, 6 Mar 2011 14:30:55 +0800
+Subject: [PATCH 1/3] video: mxsfb: smarten the code a little bit
+In-Reply-To: <20110306040920.GA1223@S2101-09.ap.freescale.net>
+References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
+	<1299341931-30241-2-git-send-email-shawn.guo@freescale.com>
+	<201103051741.12167.arnd@arndb.de>
+	<20110306040920.GA1223@S2101-09.ap.freescale.net>
+Message-ID: <20110306063054.GB1223@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Fix indentation issue in register definitions
-* Add a message for a successful mxsfb_probe, which seems useful
-  to tell that mxsfb driver is built in and probed successfully
+On Sun, Mar 06, 2011 at 12:09:21PM +0800, Shawn Guo wrote:
+> Hi Arnd,
+> 
+> On Sat, Mar 05, 2011 at 05:41:11PM +0100, Arnd Bergmann wrote:
+> > On Saturday 05 March 2011 17:18:49 Shawn Guo wrote:
+> > > @@ -882,7 +884,6 @@ static struct platform_device_id mxsfb_devtype[] = {
+> > >         }, {
+> > >                 .name = "imx28-fb",
+> > >                 .driver_data = MXSFB_V4,
+> > > -       }, {
+> > >         },
+> > >  };
+> > 
+> > This is broken, you need to have an empty entry as the end marker,
+> > otherwise, the match function will interpret whatever comes in 
+> > memory after the last entry as input data, until it hits zeroes.
+> > 
+> Ah, my dumb.  Thanks for pointing this out.  I will recover it with
+> a marker, and also prepare a patch to fix the exactly same issue I
+> created in fec.c :)
+> 
+Just found that fec has been fixed by the following commit on David's
+tree.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/video/mxsfb.c |   17 ++++++++++-------
- 1 files changed, 10 insertions(+), 7 deletions(-)
+commit 9eb0e6f26e48ef22cc56a2b81b1572ace999f70f
+Author: Axel Lin <axel.lin@gmail.com>
+Date:   Tue Feb 22 23:28:46 2011 +0000
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index a3b1179..9591cb6 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -52,11 +52,11 @@
- #define LCDC_CTRL			0x00
- #define LCDC_CTRL1			0x10
- #define LCDC_V4_CTRL2			0x20
--#define LCDC_V3_TRANSFER_COUNT	0x20
--#define LCDC_V4_TRANSFER_COUNT	0x30
--#define LCDC_V4_CUR_BUF		0x40
-+#define LCDC_V3_TRANSFER_COUNT		0x20
-+#define LCDC_V4_TRANSFER_COUNT		0x30
-+#define LCDC_V4_CUR_BUF			0x40
- #define LCDC_V4_NEXT_BUF		0x50
--#define LCDC_V3_CUR_BUF		0x30
-+#define LCDC_V3_CUR_BUF			0x30
- #define LCDC_V3_NEXT_BUF		0x40
- #define LCDC_TIMING			0x60
- #define LCDC_VDCTRL0			0x70
-@@ -71,8 +71,8 @@
- #define LCDC_DVICTRL4			0x100
- #define LCDC_V4_DATA			0x180
- #define LCDC_V3_DATA			0x1b0
--#define LCDC_V4_DEBUG0		0x1d0
--#define LCDC_V3_DEBUG0		0x1f0
-+#define LCDC_V4_DEBUG0			0x1d0
-+#define LCDC_V3_DEBUG0			0x1f0
- 
- #define CTRL_SFTRST			(1 << 31)
- #define CTRL_CLKGATE			(1 << 30)
-@@ -832,6 +832,8 @@ static int __devinit mxsfb_probe(struct platform_device *pdev)
- 		mxsfb_enable_controller(fb_info);
- 	}
- 
-+	dev_info(&pdev->dev, "initialized\n");
-+
- 	return 0;
- 
- error_register:
-@@ -883,7 +885,8 @@ static struct platform_device_id mxsfb_devtype[] = {
- 		.name = "imx28-fb",
- 		.driver_data = MXSFB_V4,
- 	}, {
--	},
-+		/* sentinel */
-+	}
- };
- MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
- 
+    net/fec: fix unterminated platform_device_id table
+
+    The platform_device_id table is supposed to be zero-terminated.
+
 -- 
-1.7.1
+Regards,
+Shawn
