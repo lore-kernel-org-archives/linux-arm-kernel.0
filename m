@@ -1,47 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 6 Mar 2011 14:30:55 +0800
-Subject: [PATCH 1/3] video: mxsfb: smarten the code a little bit
-In-Reply-To: <20110306040920.GA1223@S2101-09.ap.freescale.net>
-References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
-	<1299341931-30241-2-git-send-email-shawn.guo@freescale.com>
-	<201103051741.12167.arnd@arndb.de>
-	<20110306040920.GA1223@S2101-09.ap.freescale.net>
-Message-ID: <20110306063054.GB1223@S2101-09.ap.freescale.net>
+From: madhavi.linux@gmail.com (Madhavi Manchala)
+Date: Sun, 6 Mar 2011 13:21:19 +0530
+Subject: hard coded value for idcode field in struct cpu_table
+In-Reply-To: <AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
+References: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
+	<AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
+Message-ID: <AANLkTi==5uRAvWfAen0=eNNcBJy-AoBm1M_iotdE69oa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2011 at 12:09:21PM +0800, Shawn Guo wrote:
-> Hi Arnd,
-> 
-> On Sat, Mar 05, 2011 at 05:41:11PM +0100, Arnd Bergmann wrote:
-> > On Saturday 05 March 2011 17:18:49 Shawn Guo wrote:
-> > > @@ -882,7 +884,6 @@ static struct platform_device_id mxsfb_devtype[] = {
-> > >         }, {
-> > >                 .name = "imx28-fb",
-> > >                 .driver_data = MXSFB_V4,
-> > > -       }, {
-> > >         },
-> > >  };
-> > 
-> > This is broken, you need to have an empty entry as the end marker,
-> > otherwise, the match function will interpret whatever comes in 
-> > memory after the last entry as input data, until it hits zeroes.
-> > 
-> Ah, my dumb.  Thanks for pointing this out.  I will recover it with
-> a marker, and also prepare a patch to fix the exactly same issue I
-> created in fec.c :)
-> 
-Just found that fec has been fixed by the following commit on David's
-tree.
+2011/3/5 S?awomir Cygan <slawomir.cygan@gmail.com>:
+> On Thu, Mar 3, 2011 at 2:49 PM, Madhavi Manchala
+> <madhavi.linux@gmail.com> wrote:
+>> Dear All,
+>>
+>> I do not understand the value of idcode field in the struct cpu_table
+>> i.e. the value is hard coded. I did not find that value in the user
+>> manuals also. The code is available at
+>> linux/arch/arm/plat-s3c24xx/cpu.c file. Currently, I am implementing
+>> code for Samsung S3C2510A processor which is not available in the
+>> current sources. Where can I find the idcode value for Samsung
+>> S3C2510A processor?
+>>
+>> Any ideas will be appreciated.
+>>
+>> Thanks and ?Regards,
+>> Madhavi M.
+>>
+> Hi,
+> This field is defined for example in this datasheed:
+>
+> http://www.alldatasheet.com/datasheet-pdf/pdf/84872/SAMSUNG/S3C2410A.html
+>
+> PDF page 282:
+>
+> GENERAL STATUS REGISTER (GSTATUSn)
+> Register Address R/W Description Reset Value
+> GSTATUS0 0x560000AC R External pin status Undefined
+>
+>>>>>> ? GSTATUS1 0x560000B0 R Chip ID 0x32410000 <<<
+>
+> GSTATUS2 0x560000B4 R/W Reset status 0x1
+> GSTATUS3 0x560000B8 R/W Infrom register 0x0
+> GSTATUS4 0x560000BC R/W Infrom register 0x0
+>
+> This is "GSTATUS1" register initial value
+>
+>
+> I don't think that S3c25 are so similar to S3c25, so they provide
+> exactly the same method of chip identification.
 
-commit 9eb0e6f26e48ef22cc56a2b81b1572ace999f70f
-Author: Axel Lin <axel.lin@gmail.com>
-Date:   Tue Feb 22 23:28:46 2011 +0000
+Thank you very much Slawomir Cygan for the information. However, I did
+not find any CHIP ID in the S3C2510A documentation, as you said. There
+are IDs which are PCI vendor ID and device ID. I guess, this is
+different from that chip ID as in case S3C2410A.
 
-    net/fec: fix unterminated platform_device_id table
+Thanks and Regards,
+Madhavi M.
 
-    The platform_device_id table is supposed to be zero-terminated.
-
--- 
-Regards,
-Shawn
+>
+> --
+> Pozdrawiam,
+> S?awomir Cygan
+>
