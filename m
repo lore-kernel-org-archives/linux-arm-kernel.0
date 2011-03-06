@@ -1,71 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sun, 06 Mar 2011 08:15:06 +0530
-Subject: [PATCH V3 05/19] OMAP3+: voltage: use IS_ERR_OR_NULL
-In-Reply-To: <AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
-References: <1299338962-5602-1-git-send-email-nm@ti.com>	<1299338962-5602-6-git-send-email-nm@ti.com>
-	<AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
-Message-ID: <4D72F532.3020909@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 6 Mar 2011 12:09:21 +0800
+Subject: [PATCH 1/3] video: mxsfb: smarten the code a little bit
+In-Reply-To: <201103051741.12167.arnd@arndb.de>
+References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
+	<1299341931-30241-2-git-send-email-shawn.guo@freescale.com>
+	<201103051741.12167.arnd@arndb.de>
+Message-ID: <20110306040920.GA1223@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Cohen wrote, on 03/05/2011 11:06 PM:
-[..]
->> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
->> index 53c399f..76bcaee 100644
->> --- a/arch/arm/mach-omap2/voltage.c
->> +++ b/arch/arm/mach-omap2/voltage.c
->> @@ -682,7 +682,7 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
->>   {
->>         struct omap_vdd_info *vdd;
->>
->> -       if (!voltdm || IS_ERR(voltdm)) {
->> +       if (IS_ERR_OR_NULL(voltdm)) {
->
-> I have one comment here. voltdm is received as parameter and it's
-> already checked by IS_ERR(). Is there any specific reason for that?
-yes:
-1. omap_voltage_domain_lookup can return ERR_PTR() in certain conditions
-2. the !voltdm is coz of the usage of these APIs from external to 
-voltage.c (sr, pm, dvfs etc) - it is possible (and has happend) when 
-mistakes have been made and NULL pointers passed as voltdm.
+Hi Arnd,
 
-
-> IS_ERR() doesn't suppose to be a macro to check if the pointer is
-> valid or not, but to know if there's an invalid value with error code
-> in the pointer value. It's useful when you have a function which
-> returns a pointer but it can return an error code when it fails.
-> Please, note that IS_ERR() won't detect invalid pointers which does
-> not represent an error code, so it's not correct to rely on it for
-> this purpose.
-> IMO, instead of change to IS_ERR_OR_NULL(), you could only remove
-> IS_ERR(). The same apply for the other cases.
-no, I am not convinced with your argument.
-
-omap_voltage_get_nom_volt(omap_voltage_domain_lookup("me"));
-IS_ERR is useful in this case. If I were to remove vdata, 
-PTR_ERR(something)== vdata and vdata !=NULL and it will try to 
-dereference and crash.
-
-my_dumb_func(){
-	struct voltagedomain *vdata = NULL;
-	if (cpu_is_omap3630()_) {
-		vdata = omap_voltage_domain_lookup("mpu")
-	}
-	/* forgot to add other cpu types or a else case */
-	/* do other things */
-	me_volt=omap_voltage_get_nom_volt(vdata);
-	/* do things with me_volt */
-}
-
-Sorry, but i think the check, even if seems superfluous is sane IMHO. 
-even if the above code worked on 3630, it'd fail on o4/3430 without the 
-check, it can even crash. and given that we've all seen our fair share 
-of developers who develop for one platform without consideration that 
-the rest of the world uses others as well... I do feel cases like above 
-example might infact be a reality.
-
-[...]
+On Sat, Mar 05, 2011 at 05:41:11PM +0100, Arnd Bergmann wrote:
+> On Saturday 05 March 2011 17:18:49 Shawn Guo wrote:
+> > @@ -882,7 +884,6 @@ static struct platform_device_id mxsfb_devtype[] = {
+> >         }, {
+> >                 .name = "imx28-fb",
+> >                 .driver_data = MXSFB_V4,
+> > -       }, {
+> >         },
+> >  };
+> 
+> This is broken, you need to have an empty entry as the end marker,
+> otherwise, the match function will interpret whatever comes in 
+> memory after the last entry as input data, until it hits zeroes.
+> 
+Ah, my dumb.  Thanks for pointing this out.  I will recover it with
+a marker, and also prepare a patch to fix the exactly same issue I
+created in fec.c :)
 
 -- 
 Regards,
-Nishanth Menon
+Shawn
