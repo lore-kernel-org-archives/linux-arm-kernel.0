@@ -1,34 +1,25 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun,  6 Mar 2011 18:46:26 +0300
-Subject: [PATCH] [ARM] tlb: fix build error with CONFIG_SWAP=n
-Message-ID: <1299426386-28746-1-git-send-email-dbaryshkov@gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 6 Mar 2011 08:34:07 -0800
+Subject: [PATCH 1/2] Add initial support for the Toshiba AC100/Dynabook AZ
+	netbook
+In-Reply-To: <1299421906-7366-2-git-send-email-marvin24@gmx.de>
+References: <1299421906-7366-1-git-send-email-marvin24@gmx.de>
+	<1299421906-7366-2-git-send-email-marvin24@gmx.de>
+Message-ID: <AANLkTik9v=gdtoTe_hza9onpXRfRG4_=hZuxVsgY+UVE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix this build error with CONFIG_SWAP=n:
+On Sun, Mar 6, 2011 at 6:31 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> ---
+> ?arch/arm/mach-tegra/Kconfig ? ? ? ? ? ? ?| ? ?5 +
+> ?arch/arm/mach-tegra/Makefile ? ? ? ? ? ? | ? ?3 +
+> ?arch/arm/mach-tegra/board-paz00-pinmux.c | ?157 ++++++++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/board-paz00.c ? ? ? ?| ?128 ++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/board-paz00.h ? ? ? ?| ? 22 ++++
+> ?5 files changed, 315 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-tegra/board-paz00-pinmux.c
+> ?create mode 100644 arch/arm/mach-tegra/board-paz00.c
+> ?create mode 100644 arch/arm/mach-tegra/board-paz00.h
 
-In file included from arch/arm/mm/init.c:28:
-arch/arm/include/asm/tlb.h: In function ?tlb_flush_mmu?:
-arch/arm/include/asm/tlb.h:104: error: implicit declaration of function ?release_pages?
-arch/arm/include/asm/tlb.h: In function ?tlb_remove_page?:
-arch/arm/include/asm/tlb.h:168: error: implicit declaration of function ?page_cache_release?
-
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/include/asm/tlb.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index 82dfe5d..36e75e5 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -29,6 +29,7 @@
- 
- #else /* !CONFIG_MMU */
- 
-+#include <linux/pagemap.h>
- #include <linux/swap.h>
- #include <asm/pgalloc.h>
- #include <asm/tlbflush.h>
--- 
-1.7.2.3
+The patch looks fine, but can you add a short patch description?
