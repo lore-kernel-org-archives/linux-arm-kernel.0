@@ -1,28 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 Mar 2011 16:36:56 +0000
-Subject: [PATCH] [ARM] tlb: fix build error with CONFIG_SWAP=n
-In-Reply-To: <1299426386-28746-1-git-send-email-dbaryshkov@gmail.com>
-References: <1299426386-28746-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20110306163656.GH27468@n2100.arm.linux.org.uk>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 6 Mar 2011 09:42:46 -0800
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+Message-ID: <AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2011 at 06:46:26PM +0300, Dmitry Eremin-Solenikov wrote:
-> Fix this build error with CONFIG_SWAP=n:
-> 
-> In file included from arch/arm/mm/init.c:28:
-> arch/arm/include/asm/tlb.h: In function ?tlb_flush_mmu?:
-> arch/arm/include/asm/tlb.h:104: error: implicit declaration of function ?release_pages?
-> arch/arm/include/asm/tlb.h: In function ?tlb_remove_page?:
-> arch/arm/include/asm/tlb.h:168: error: implicit declaration of function ?page_cache_release?
+On Sun, Mar 6, 2011 at 6:20 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+>> arm-kernel-bounces at lists.infradead.org] On Behalf Of Linus Walleij
+>> Sent: Sunday, March 06, 2011 5:37 PM
+>> To: Santosh Shilimkar
+>> Cc: Russell King; Srinidhi KASAGAR; Harald Gustafsson; Linus
+>> Walleij; linux-kernel at vger.kernel.org; Rickard ANDERSSON; martin
+>> persson; Colin Cross; Varun Swara; Catalin Marinas; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: Re: [PATCH] ARM: twd: Adjust localtimer frequency
+>> withcpufreqnotifiers
+>>
+>> On Sat, Mar 5, 2011 at 9:19 AM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>
+>> > While doing this patch for OMAP I also found that
+>> > CPUFREQ notifiers does delays scaling timer frequency
+>> > and there is a tick deviation(3-4 ms) around 1st tick and
+>> > last tick around twd rescaling.
+>>
+>> Is this caused by ticks that have been programmed
+>> already (based on the previous frequency) when the scaling
+>> takes effect? (That's most likely I think.)
+>>
+> That's correct Linus. I noticed that Collin's patch reduces that
+> problem a bit. In my patch I was always leaving the scaling
+> to post notifier which actually aggravates the scenario.
 
-Already caught:
+If you always scale in the post notifier, you will end up with delays
+that are too short when the cpu frequency increases before the scaling
+is decreased.
 
-http://ftp.arm.linux.org.uk/git/?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/fixes
+A large tick deviation is unexpected - the timer value doesn't need to
+be reprogrammed, we are adjusting a prescaler between the cpu clock
+and the counter so that the counter always increments at the same
+frequency.  The only inaccuracy occurs between when the prescaler is
+reprogrammed and the clock frequency changes, where it counts at the
+wrong frequency.  This time should hopefully be very short.
 
-11 days    Uwe Kleine...   ARM: 6757/1: fix tlb.h induced linux/swap.h
-ago                        build failure
+On Tegra, the worst case transition is from the lowest frequency,
+54MHz, to the highest frequency, 250 MHz.  Assuming a 1MHz twd rate,
+the prescaler goes from 54 to 250.  If the time between changing the
+prescaler and clock is 3 ms (1 ms for the pll to lock, 2 ms worst case
+waiting for the IPI to the other cpu), the timer will increment 648
+times (3 ms * 54 MHz / 250) instead of 3000 times (3 ms * 250 Mhz /
+250), delaying the next tick by 2.3 ms.
 
-I've had about four of these patches over the last two weeks or so,
-it would be a good idea to check the git tree before sending another
-version of this.
+>> The latter could be fixed by simply calling
+>> schedule() for each CPU connected in the same core as
+>> the TWD at the end of twd_update_cpu_frequency(),
+>> couldn't it?
+>>
+> I don't think schedule will do any difference here because
+> it's the actual tick duration which getting changed. The
+> tick does happen as per the timer load value. Now it all
+> depends at what point time in tick window the timer scaling
+> happens.
+>
+>> Colin what do you say?
+>>
+
+You can't call schedule, interrupts are disabled.  You may be able to
+reprogram the clockevents based on the clocksource.  Is there any way
+for a clockevent to invalidate the current event and ask for it to be
+reprogrammed?
+
+>> > Another issue was not able to select higher fixed twd rate
+>> > and found fix for the same.
+>>
+>> Can you send out the patch?
+>>
+> Sure. May be let's get all these twd scaling
+> patches on the list. Rob's clock patches, Collin's
+> notifier patch. And then I shall post the fix on
+> top of that.
+>
+> Regards,
+> Santosh
+>
