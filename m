@@ -1,76 +1,71 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Sun, 6 Mar 2011 10:40:33 +0900
-Subject: staging: iio: ak8975: make gpio platdata mandatory
-In-Reply-To: <20110306005841.GF27468@n2100.arm.linux.org.uk>
-References: <AANLkTik1MSkfyb36AHUOG+OK=h=rt1D4sbpyUiYg07dT@mail.gmail.com>
-	<AANLkTinXLC+tb7AkVBm-_xKS4ukA6v_AHDKkHKWvP6i3@mail.gmail.com>
-	<AANLkTikWcW4X2eHoYLk_Ctd0kG8uY8LE8g2HPJCki-N0@mail.gmail.com>
-	<20110306005841.GF27468@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=C-M8cjEHkvPYfR+hQpBUuoG=wjR_XXPyYyfCD@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 06 Mar 2011 08:15:06 +0530
+Subject: [PATCH V3 05/19] OMAP3+: voltage: use IS_ERR_OR_NULL
+In-Reply-To: <AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>	<1299338962-5602-6-git-send-email-nm@ti.com>
+	<AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
+Message-ID: <4D72F532.3020909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
-
-On 6 March 2011 09:58, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Sun, Mar 06, 2011 at 09:31:41AM +0900, Naveen Krishna Ch wrote:
->> Hi Kyungmin Park,
+David Cohen wrote, on 03/05/2011 11:06 PM:
+[..]
+>> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+>> index 53c399f..76bcaee 100644
+>> --- a/arch/arm/mach-omap2/voltage.c
+>> +++ b/arch/arm/mach-omap2/voltage.c
+>> @@ -682,7 +682,7 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
+>>   {
+>>         struct omap_vdd_info *vdd;
 >>
->> On 4 March 2011 14:51, Kyungmin Park <kmpark@infradead.org> wrote:
->> > Hi,
->> >
->> > On Fri, Mar 4, 2011 at 2:34 PM, Naveen Krishna Ch
->> > <naveenkrishna.ch@gmail.com> wrote:
->> >> Issue:
->> >> For some architectures CONFIG_GENERIC_GPIO is defined,
->> >> leaving irq_to_gpio undefined. ?Causing build break.
->> >
->> > It's better to implement the irq_to_gpio. Since gpio_to_irq is already
->> > implemented. it's just vice versa.
->> Implementing such macros in machine header files leads to inclusion of
->> mach/gpio.h or irqs.h
->> Russel King, seems against to the same...
+>> -       if (!voltdm || IS_ERR(voltdm)) {
+>> +       if (IS_ERR_OR_NULL(voltdm)) {
 >
-> Four reasons:
->
-> 1. including mach/gpio.h means that the code is non-portable to other
-> ? architectures.
-> 2. linux/gpio.h defines helpers for the !GENERIC_GPIO case.
-> 3. it's good practice to always use linux/ includes rather than asm/ or
-> ? mach/ where-ever possible.
-> 4. over time, standard helpers tend to get split out into the common
-> ? architecture-independent header files. ?Who would like to volunteer
-> ? to fix up all the mach/gpio.h->linux/gpio.h when that happens.
-I understand,  the complication created by using machine specific code.
->
-> However:
->> >> For some architectures CONFIG_GENERIC_GPIO is defined,
->> >> leaving irq_to_gpio undefined. ?Causing build break.
->
-> I read this as saying: "There are architectures which set
-> CONFIG_GENERIC_GPIO but do not provide a definition for irq_to_gpio()".
-> If that's true, then that's a problem for those architectures to solve.
-I will start looking into fixing the problem, instead of this issue.
+> I have one comment here. voltdm is received as parameter and it's
+> already checked by IS_ERR(). Is there any specific reason for that?
+yes:
+1. omap_voltage_domain_lookup can return ERR_PTR() in certain conditions
+2. the !voltdm is coz of the usage of these APIs from external to 
+voltage.c (sr, pm, dvfs etc) - it is possible (and has happend) when 
+mistakes have been made and NULL pointers passed as voltdm.
 
->
-> However, first I'd like you to clear up some confusion: what do you mean
-> by architecture? ?ARM/Sparc/x86? ?Or S3C2410 vs OMAP4430 vs Orion vs
-> Tegra? ?The former are architectures. ?The latter are SoCs or families
-> of SoCs/machines/platforms.
-I mean, SoCs or families.
->
-> Last point: do _not_ cc: mailing list managers for normal discussion
-> email - I'm talking about the majordomo at vger.kernel.org which was in the
-> CC in this thread.
-Sorry my bad, Will correct it here on.
 
-> Mailing list managers take specially formatted email
-> messages in order to take automated action. ?They do not recognise plain
-> language, and you'll probably get a verbose error reply.
-Yes, I Did..
->
-Thanks, for your prompt reply and the explanation.
+> IS_ERR() doesn't suppose to be a macro to check if the pointer is
+> valid or not, but to know if there's an invalid value with error code
+> in the pointer value. It's useful when you have a function which
+> returns a pointer but it can return an error code when it fails.
+> Please, note that IS_ERR() won't detect invalid pointers which does
+> not represent an error code, so it's not correct to rely on it for
+> this purpose.
+> IMO, instead of change to IS_ERR_OR_NULL(), you could only remove
+> IS_ERR(). The same apply for the other cases.
+no, I am not convinced with your argument.
+
+omap_voltage_get_nom_volt(omap_voltage_domain_lookup("me"));
+IS_ERR is useful in this case. If I were to remove vdata, 
+PTR_ERR(something)== vdata and vdata !=NULL and it will try to 
+dereference and crash.
+
+my_dumb_func(){
+	struct voltagedomain *vdata = NULL;
+	if (cpu_is_omap3630()_) {
+		vdata = omap_voltage_domain_lookup("mpu")
+	}
+	/* forgot to add other cpu types or a else case */
+	/* do other things */
+	me_volt=omap_voltage_get_nom_volt(vdata);
+	/* do things with me_volt */
+}
+
+Sorry, but i think the check, even if seems superfluous is sane IMHO. 
+even if the above code worked on 3630, it'd fail on o4/3430 without the 
+check, it can even crash. and given that we've all seen our fair share 
+of developers who develop for one platform without consideration that 
+the rest of the world uses others as well... I do feel cases like above 
+example might infact be a reality.
+
+[...]
 
 -- 
-Shine bright,
-(: Nav :)
+Regards,
+Nishanth Menon
