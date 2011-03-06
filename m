@@ -1,64 +1,56 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Sun, 6 Mar 2011 13:21:19 +0530
-Subject: hard coded value for idcode field in struct cpu_table
-In-Reply-To: <AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
-References: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
-	<AANLkTi=1zJoGwOXCbAaCn=+wRuAjgBsOUvKhOPqH0SaF@mail.gmail.com>
-Message-ID: <AANLkTi==5uRAvWfAen0=eNNcBJy-AoBm1M_iotdE69oa@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 6 Mar 2011 08:18:40 +0000
+Subject: [PATCH V3 05/19] OMAP3+: voltage: use IS_ERR_OR_NULL
+In-Reply-To: <4D72F532.3020909@ti.com>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-6-git-send-email-nm@ti.com>
+	<AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
+	<4D72F532.3020909@ti.com>
+Message-ID: <20110306081840.GB2400@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/5 S?awomir Cygan <slawomir.cygan@gmail.com>:
-> On Thu, Mar 3, 2011 at 2:49 PM, Madhavi Manchala
-> <madhavi.linux@gmail.com> wrote:
->> Dear All,
->>
->> I do not understand the value of idcode field in the struct cpu_table
->> i.e. the value is hard coded. I did not find that value in the user
->> manuals also. The code is available at
->> linux/arch/arm/plat-s3c24xx/cpu.c file. Currently, I am implementing
->> code for Samsung S3C2510A processor which is not available in the
->> current sources. Where can I find the idcode value for Samsung
->> S3C2510A processor?
->>
->> Any ideas will be appreciated.
->>
->> Thanks and ?Regards,
->> Madhavi M.
->>
-> Hi,
-> This field is defined for example in this datasheed:
+On Sun, Mar 06, 2011 at 08:15:06AM +0530, Nishanth Menon wrote:
+> my_dumb_func(){
+> 	struct voltagedomain *vdata = NULL;
+> 	if (cpu_is_omap3630()_) {
+> 		vdata = omap_voltage_domain_lookup("mpu")
+> 	}
+> 	/* forgot to add other cpu types or a else case */
+> 	/* do other things */
+> 	me_volt=omap_voltage_get_nom_volt(vdata);
+> 	/* do things with me_volt */
+> }
 >
-> http://www.alldatasheet.com/datasheet-pdf/pdf/84872/SAMSUNG/S3C2410A.html
->
-> PDF page 282:
->
-> GENERAL STATUS REGISTER (GSTATUSn)
-> Register Address R/W Description Reset Value
-> GSTATUS0 0x560000AC R External pin status Undefined
->
->>>>>> ? GSTATUS1 0x560000B0 R Chip ID 0x32410000 <<<
->
-> GSTATUS2 0x560000B4 R/W Reset status 0x1
-> GSTATUS3 0x560000B8 R/W Infrom register 0x0
-> GSTATUS4 0x560000BC R/W Infrom register 0x0
->
-> This is "GSTATUS1" register initial value
->
->
-> I don't think that S3c25 are so similar to S3c25, so they provide
-> exactly the same method of chip identification.
+> Sorry, but i think the check, even if seems superfluous is sane IMHO.  
+> even if the above code worked on 3630, it'd fail on o4/3430 without the  
+> check, it can even crash. and given that we've all seen our fair share  
+> of developers who develop for one platform without consideration that  
+> the rest of the world uses others as well... I do feel cases like above  
+> example might infact be a reality.
 
-Thank you very much Slawomir Cygan for the information. However, I did
-not find any CHIP ID in the S3C2510A documentation, as you said. There
-are IDs which are PCI vendor ID and device ID. I guess, this is
-different from that chip ID as in case S3C2410A.
+But normal practice is to check the return value from functions before
+it's used.  So:
 
-Thanks and Regards,
-Madhavi M.
+ my_dumb_func(){
+	struct voltagedomain *vdata = NULL;
+	if (cpu_is_omap3630()) {
+		vdata = omap_voltage_domain_lookup("mpu")
+	}
+	/* forgot to add other cpu types or a else case */
 
->
-> --
-> Pozdrawiam,
-> S?awomir Cygan
->
++	if (!vdata)
++		return some error;
+
+	/* do other things */
+	me_volt=omap_voltage_get_nom_volt(vdata);
+	/* do things with me_volt */
+ }
+
+is the right way to deal with this.  Pushing the primary error checking
+down into sub-functions is stupid - where does it stop?  Do you check
+me_volt for errors?  Do you get functions which use me_volt to check for
+errors from that too?
+
+It's a silly idea.  Put the primary error checking in the function which
+gets the return value.  Don't bury it in sub-functions.
