@@ -1,166 +1,247 @@
-From: alberto@amarulasolutions.com (Alberto Panizzo)
-Date: Mon, 07 Mar 2011 10:06:31 +0100
-Subject: [PATCH 2/4] mach-mx31_3ds: Add support for the MMC slot of the
-	personality board
-In-Reply-To: <20110307082721.GK29521@pengutronix.de>
-References: <1299425878.2624.29.camel@realization>
-	<1299426001.2624.31.camel@realization>
-	<20110307082721.GK29521@pengutronix.de>
-Message-ID: <1299488791.2468.17.camel@realization>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 7 Mar 2011 10:48:10 +0100
+Subject: [patch v3 1/3] arm: introduce cross trigger interface helpers
+In-Reply-To: <1299149633-699-2-git-send-email-tom.leiming@gmail.com>
+References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
+	<1299149633-699-2-git-send-email-tom.leiming@gmail.com>
+Message-ID: <AANLkTi=v4DgdQdtTi6Qn24upQvRObffWh=vRTAVHWXgX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-03-07 at 09:27 +0100, Sascha Hauer wrote:
-> On Sun, Mar 06, 2011 at 04:40:01PM +0100, Alberto Panizzo wrote:
-> > 
-> > 
-> > Signed-off-by: Alberto Panizzo <alberto@amarulasolutions.com>
-> > ---
-> >  arch/arm/mach-mx3/mach-mx31_3ds.c |  116 ++++++++++++++++++++++++++++++++++++-
-> >  1 files changed, 114 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> > index f1dbb9d..cd73513 100644
-> > --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> > +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> > @@ -35,6 +35,7 @@
-> >  #include <mach/iomux-mx3.h>
-> >  #include <mach/3ds_debugboard.h>
-> >  #include <mach/ulpi.h>
-> > +#include <mach/mmc.h>
-> >  
-> >  #include "devices-imx31.h"
-> >  #include "devices.h"
-> > @@ -99,6 +100,98 @@ static int mx31_3ds_pins[] = {
-> >  	/* I2C1 */
-> >  	MX31_PIN_I2C_CLK__I2C1_SCL,
-> >  	MX31_PIN_I2C_DAT__I2C1_SDA,
-> > +	/* SDHC1 */
-> > +	MX31_PIN_SD1_DATA3__SD1_DATA3,
-> > +	MX31_PIN_SD1_DATA2__SD1_DATA2,
-> > +	MX31_PIN_SD1_DATA1__SD1_DATA1,
-> > +	MX31_PIN_SD1_DATA0__SD1_DATA0,
-> > +	MX31_PIN_SD1_CLK__SD1_CLK,
-> > +	MX31_PIN_SD1_CMD__SD1_CMD,
-> > +	MX31_PIN_GPIO3_1__GPIO3_1, /* Card detect */
-> > +	MX31_PIN_GPIO3_0__GPIO3_0, /* OE */
-> > +};
-> > +
-> > +/*
-> > + * Support for SD card slot in personality board
-> > + */
-> > +static int mx31_3ds_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-> > +			       void *data)
-> > +{
-> > +	int ret;
-> > +	int gpio_det, gpio_bus_en;
-> > +
-> > +	gpio_det = IOMUX_TO_GPIO(MX31_PIN_GPIO3_1);
-> > +	gpio_bus_en = IOMUX_TO_GPIO(MX31_PIN_GPIO3_0);
-> > +
-> > +	ret = gpio_request(gpio_det, "sdhc1-card-detect");
-> > +	if (ret) {
-> > +		pr_warning("Unable to request the SD/MMC card-detect GPIO.\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = gpio_request(gpio_bus_en, "sdhc1-bus-enable");
-> > +	if (ret) {
-> > +		pr_warning("Unable to request the SD/MMC bus enable GPIO.\n");
-> > +		goto gpio_free_be;
-> > +	}
-> > +
-> > +	ret = gpio_direction_input(gpio_det);
-> > +	if (ret) {
-> > +		pr_warning("Unable to manage the SD/MMC card-detect GPIO.\n");
-> > +		goto gpio_free_all;
-> > +	}
-> > +
-> > +	ret = gpio_direction_output(gpio_bus_en, 0);
-> > +	if (ret) {
-> > +		pr_warning("Unable to manage the SD/MMC bus enable GPIO.\n");
-> > +		goto gpio_free_all;
-> > +	}
-> 
-> Wolfram just arrived, so I probably have some moments left before he
-> says it: You should use gpio_request_array here.
+On Thu, Mar 3, 2011 at 11:53 AM,  <tom.leiming@gmail.com> wrote:
+> From: Ming Lei <tom.leiming@gmail.com>
+>
+> OMAP4 uses cross trigger interface(CTI) to route
+> performance monitor irq to GIC, so introduce cti
+> helpers to make access for cti easily.
+>
+> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> ---
+> ?arch/arm/include/asm/cti.h | ?177 ++++++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 177 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/include/asm/cti.h
+>
+> diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
+> new file mode 100644
+> index 0000000..48f173a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/cti.h
+> @@ -0,0 +1,177 @@
+> +/*
+> + * ?arch/arm/include/asm/cti.h
+> + */
+> +#ifndef __ASMARM_CTI_H
+> +#define __ASMARM_CTI_H
+> +
+> +#include ? ? ? <asm/io.h>
+> +
+> +/*The registers' definition is from section 3.2 of
+> + * ? ? Embedded Cross Trigger Revision: r0p0
+> + **/
+> +#define ? ? ? ? ? ? ? ?CTICONTROL ? ? ? ? ? ? ?0x000
+> +#define ? ? ? ? ? ? ? ?CTISTATUS ? ? ? ? ? ? ? 0x004
+> +#define ? ? ? ? ? ? ? ?CTILOCK ? ? ? ? ? ? ? ? 0x008
+> +#define ? ? ? ? ? ? ? ?CTIPROTECTION ? ? ? ? ? 0x00C
+> +#define ? ? ? ? ? ? ? ?CTIINTACK ? ? ? ? ? ? ? 0x010
+> +#define ? ? ? ? ? ? ? ?CTIAPPSET ? ? ? ? ? ? ? 0x014
+> +#define ? ? ? ? ? ? ? ?CTIAPPCLEAR ? ? ? ? ? ? 0x018
+> +#define ? ? ? ? ? ? ? ?CTIAPPPULSE ? ? ? ? ? ? 0x01c
+> +#define ? ? ? ? ? ? ? ?CTIINEN ? ? ? ? ? ? ? ? 0x020
+> +#define ? ? ? ? ? ? ? ?CTIOUTEN ? ? ? ? ? ? ? ?0x0A0
+> +#define ? ? ? ? ? ? ? ?CTITRIGINSTATUS ? ? ? ? 0x130
+> +#define ? ? ? ? ? ? ? ?CTITRIGOUTSTATUS ? ? ? ?0x134
+> +#define ? ? ? ? ? ? ? ?CTICHINSTATUS ? ? ? ? ? 0x138
+> +#define ? ? ? ? ? ? ? ?CTICHOUTSTATUS ? ? ? ? ?0x13c
+> +#define ? ? ? ? ? ? ? ?CTIPERIPHID0 ? ? ? ? ? ?0xFE0
+> +#define ? ? ? ? ? ? ? ?CTIPERIPHID1 ? ? ? ? ? ?0xFE4
+> +#define ? ? ? ? ? ? ? ?CTIPERIPHID2 ? ? ? ? ? ?0xFE8
+> +#define ? ? ? ? ? ? ? ?CTIPERIPHID3 ? ? ? ? ? ?0xFEC
+> +#define ? ? ? ? ? ? ? ?CTIPCELLID0 ? ? ? ? ? ? 0xFF0
+> +#define ? ? ? ? ? ? ? ?CTIPCELLID1 ? ? ? ? ? ? 0xFF4
+> +#define ? ? ? ? ? ? ? ?CTIPCELLID2 ? ? ? ? ? ? 0xFF8
+> +#define ? ? ? ? ? ? ? ?CTIPCELLID3 ? ? ? ? ? ? 0xFFC
+> +
+> +/*The two below are from section 3.6.4 of
+> + * ? ? CoreSight v1.0 Architecture Specification
+> + **/
+> +#define ? ? ? ? ? ? ? ?LOCKACCESS ? ? ? ? ? ? ?0xFB0
+> +#define ? ? ? ? ? ? ? ?LOCKSTATUS ? ? ? ? ? ? ?0xFB4
+> +
+> +/**
+> + * struct cti - cross trigger interface struct
+> + * @base: mapped virtual address for the cti base
+> + * @irq: irq number for the cti
+> + * @trig_out_for_irq: triger out number which will cause
+> + * ? ? the @irq happen
+> + *
+> + * cti struct used to operate cti registers.
+> + */
+> +struct cti {
+> + ? ? ? void *base;
+> + ? ? ? int irq;
+> + ? ? ? int trig_out_for_irq;
+> +};
+> +
+> +/**
+> + * cti_init - initialize the cti instance
+> + * @cti: cti instance
+> + * @base: mapped virtual address for the cti base
+> + * @irq: irq number for the cti
+> + * @trig_out: triger out number which will cause
+> + * ? ? the @irq happen
+> + *
+> + * called by machine code to pass the board dependent
+> + * @base, @irq and @trig_out to cti.
+> + */
+> +static inline void cti_init(struct cti *cti,
+> + ? ? ? void *base, int irq, int trig_out)
+> +{
+> + ? ? ? cti->base = base;
+> + ? ? ? cti->irq ?= irq;
+> + ? ? ? cti->trig_out_for_irq = trig_out;
+> +}
+> +
+> +/**
+> + * cti_map_trigger - use the @chan to map @trig_in to @trig_out
+> + * @cti: cti instance
+> + * @trig_in: trigger in number
+> + * @trig_out: trigger out number
+> + * @channel: channel number
+> + *
+> + * This function maps one trigger in of @trig_in to one trigger
+> + * out of @trig_out using the channel @chan.
+> + */
+> +static inline void cti_map_trigger(struct cti *cti,
+> + ? ? ? int trig_in, int trig_out, int chan)
+> +{
+> + ? ? ? void *base = cti->base;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? val = __raw_readl(base + CTIINEN + trig_in * 4);
+Rather use 'void __iomem *' type for the __raw_readl and __raw_writel functions.
+Idem for the other occurences here below.
 
-Ok I'll check the API.
+> + ? ? ? val |= 1 << chan;
+> + ? ? ? __raw_writel(val, base + CTIINEN + trig_in * 4);
+> +
+> + ? ? ? val = __raw_readl(base + CTIOUTEN + trig_out * 4);
+> + ? ? ? val |= 1 << chan;
+> + ? ? ? __raw_writel(val, base + CTIOUTEN + trig_out * 4);
+> +}
+> +
+> +/**
+> + * cti_enable - enable the cti module
+> + * @cti: cti instance
+> + *
+> + * enable the cti module
+> + */
+> +static inline void cti_enable(struct cti *cti)
+> +{
+> + ? ? ? __raw_writel(0x1, cti->base);
+> +}
+> +
+> +/**
+> + * cti_disable - disable the cti module
+> + * @cti: cti instance
+> + *
+> + * enable the cti module
+> + */
+> +static inline void cti_disable(struct cti *cti)
+> +{
+> + ? ? ? __raw_writel(0, cti->base);
+> +}
+> +
+> +/**
+> + * cti_irq_ack - clear the cti irq
+> + * @cti: cti instance
+> + *
+> + * clear the cti irq
+> + */
+> +static inline void cti_irq_ack(struct cti *cti)
+> +{
+> + ? ? ? void *base = cti->base;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? val = __raw_readl(base + CTIINTACK);
+> + ? ? ? val |= 1 << cti->trig_out_for_irq;
+> + ? ? ? __raw_writel(val, base + CTIINTACK);
+> +}
+> +
+> +/**
+> + * cti_unlock - unlock cti module
+> + * @cti: cti instance
+> + *
+> + * unlock the cti module, or else any writes to the cti
+> + * module is not allowed.
+> + */
+> +static inline void cti_unlock(struct cti *cti)
+> +{
+> + ? ? ? void *base = cti->base;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? val = __raw_readl(base + LOCKSTATUS);
+> +
+> + ? ? ? if (val & 1) {
+> + ? ? ? ? ? ? ? val = 0xC5ACCE55;
+Could this be defined as a macro?
 
-> 
-> > +
-> > +	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
-> > +			  detect_irq, IRQF_DISABLED |
-> > +			  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-> > +			  "sdhc1-detect", data);
-> > +	if (ret) {
-> > +		pr_warning("Unable to request the SD/MMC card-detect IRQ.\n");
-> > +		goto gpio_free_all;
-> > +	}
-> > +
-> > +	return 0;
-> > +
-> > +gpio_free_all:
-> > +	gpio_free(gpio_bus_en);
-> > +gpio_free_be:
-> > +	gpio_free(gpio_det);
-> > +	return ret;
-> > +}
-> > +
-> > +static void mx31_3ds_sdhc1_exit(struct device *dev, void *data)
-> > +{
-> > +	free_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO3_1), data);
-> > +	gpio_free(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1));
-> > +	gpio_free(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0));
-> > +}
-> > +
-> > +static void mx31_3ds_sdhc1_setpower(struct device *dev, unsigned int vdd)
-> > +{
-> > +	/*
-> > +	 * While the voltage stuff is done by the driver, activate the
-> > +	 * Buffer Enable Pin only if there is a card in slot to fix the card
-> > +	 * voltage issue caused by bi-directional chip TXB0108 on 3Stack.
-> > +	 * Done here because at this stage we have for sure a debounced value
-> > +	 * of the presence of the card, showed by the value of vdd.
-> > +	 * 7 == ilog2(MMC_VDD_165_195)
-> > +	 */
-> > +	if (vdd > 7)
-> > +		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0), 1);
-> > +	else
-> > +		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0), 0);
-> > +}
-> > +
-> > +static struct imxmmc_platform_data sdhc1_pdata = {
-> > +	.init	= mx31_3ds_sdhc1_init,
-> > +	.exit	= mx31_3ds_sdhc1_exit,
-> > +	.setpower = mx31_3ds_sdhc1_setpower,
-> >  };
-> >  
-> >  /*
-> > @@ -132,11 +225,26 @@ static struct regulator_init_data pwgtx_init = {
-> >  
-> >  static struct regulator_init_data gpo_init = {
-> >  	.constraints = {
-> > -		.boot_on = 1,
-> > -		.always_on = 1,
-> > +		.boot_on	= 1,
-> > +		.always_on	= 1,
-> >  	}
-> >  };
-> 
-> 
-> Please just keep it as it is. Some people like the initializers
-> vertically aligned, others prefer spaces here. But if someone made
-> a decision, don't change it to increase the chance that git blame
-> shows something useful.
+> + ? ? ? ? ? ? ? __raw_writel(val, base + LOCKACCESS);
+> + ? ? ? }
+> +}
+> +
+> +/**
+> + * cti_lock - lock cti module
+> + * @cti: cti instance
+> + *
+> + * lock the cti module, so any writes to the cti
+> + * module will be not allowed.
+> + */
+> +static inline void cti_lock(struct cti *cti)
+> +{
+> + ? ? ? void *base = cti->base;
+> + ? ? ? unsigned long val;
+> +
+> + ? ? ? val = __raw_readl(base + LOCKSTATUS);
+> +
+> + ? ? ? if (!(val & 1)) {
+> + ? ? ? ? ? ? ? val = ~0xC5ACCE55;
+Idem
 
-OK but indeed I've done it for consistency with all the rest of the
-file.
-A new version soon.
+> + ? ? ? ? ? ? ? __raw_writel(val, base + LOCKACCESS);
+> + ? ? ? }
+> +}
+> +#endif
+> --
+> 1.7.3
 
-Alberto!
--- 
-| Alberto Panizzo                                 Amarula Solutions BV |
-| CTO  -  Founder                                      Cruquiuskade 47 |
-| T. +31(0)851119171                              Amsterdam 1018 AM NL |
-| F. +31(0)204106211                          www.amarulasolutions.com |
+Minor comments: checkpatch throws away some warnings:
+
+WARNING: please, no space before tabs
+#74: FILE: arch/arm/include/asm/cti.h:10:
++ * ^IEmbedded Cross Trigger Revision: r0p0$
+
+WARNING: please, no space before tabs
+#100: FILE: arch/arm/include/asm/cti.h:36:
++ * ^ICoreSight v1.0 Architecture Specification$
+
+WARNING: please, no space before tabs
+#110: FILE: arch/arm/include/asm/cti.h:46:
++ * ^Ithe @irq happen$
+
+WARNING: please, no space before tabs
+#126: FILE: arch/arm/include/asm/cti.h:62:
++ * ^Ithe @irq happen$
+
+total: 0 errors, 4 warnings, 177 lines checked
+
+
+Regards,
+Jean
+
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
