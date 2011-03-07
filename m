@@ -1,24 +1,30 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 7 Mar 2011 01:25:00 -0600
-Subject: [PATCH] OMAP2+: hwmod: use status bit info for reset line
-In-Reply-To: <alpine.DEB.2.00.1103041326200.10981@utopia.booyaka.com>
-References: <1299026809-32168-1-git-send-email-omar.ramirez@ti.com>
-	<alpine.DEB.2.00.1103041326200.10981@utopia.booyaka.com>
-Message-ID: <AANLkTimA3ZUUh=yDJ3n=R+6vmx9Eboe-t_veN+EQrYTA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Mar 2011 08:26:57 +0100
+Subject: A few mxsfb patches
+In-Reply-To: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
+References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110307072657.GF29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul
+Hi Shawn,
 
-On Fri, Mar 4, 2011 at 3:36 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> It's after our -rc6 cutoff, but I'll take it anyway for 2.6.39. ?Made a
-> few minor changes -- updated patch below -- if you have a chance, please
-> give it a quick test. ?The 'integration-2.6.39' branch at
-> git://git.pwsan.com/linux-integration now contains it. ?Or if you have any
-> comments about the changes, those are welcome too.
+On Sun, Mar 06, 2011 at 12:18:48AM +0800, Shawn Guo wrote:
+> The patches came from the work of adding framebuffer for mx28evk and
+> mx23evk boards.  They are all minor changes.
+> 
+>  [PATCH 1/3] video: mxsfb: smarten the code a little bit
+>  [PATCH 2/3] video: mxsfb: fix the incorrect error checking for alloc_pages_exact
+>  [PATCH 3/3] video: mxsfb: add DOTCLK polarity configuration support
 
-Agree with changes, didn't see any issue either while testing.
+As this driver is new, we can squash these patches into the original
+patch and add your ack to this one, if that's ok for you.
 
-Regards,
+Sascha
 
-Omar
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
