@@ -1,31 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 07 Mar 2011 10:19:15 +0000
-Subject: [PATCH 2/3] [ARM] perfevents: Add support for Scorpion
-	performance monitors
-In-Reply-To: <1299276616-12918-1-git-send-email-sheetals@codeaurora.org>
-References: <1299276616-12918-1-git-send-email-sheetals@codeaurora.org>
-Message-ID: <1299493155.7349.2.camel@e102144-lin.cambridge.arm.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 7 Mar 2011 18:20:11 +0800
+Subject: [patch v3 1/3] arm: introduce cross trigger interface helpers
+In-Reply-To: <AANLkTi=v4DgdQdtTi6Qn24upQvRObffWh=vRTAVHWXgX@mail.gmail.com>
+References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
+	<1299149633-699-2-git-send-email-tom.leiming@gmail.com>
+	<AANLkTi=v4DgdQdtTi6Qn24upQvRObffWh=vRTAVHWXgX@mail.gmail.com>
+Message-ID: <AANLkTi=xLq9fhHn1n_QzwsqhDuP4QUyGG+fj+usWPeYn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sheetal,
+Hi Jean,
 
-On Fri, 2011-03-04 at 22:10 +0000, Sheetal Sahasrabudhe wrote:
-> This commit adds support for performance monitors provided by
-> Qualcomm Scorpion and ScorpionMP processor to perfevents.
-> 
-> Signed-off-by: Sheetal Sahasrabudhe <sheetals@codeaurora.org>
-> ---
->  arch/arm/include/asm/perf_event.h |    2 +
->  arch/arm/kernel/perf_event.c      |   11 +
->  arch/arm/kernel/perf_event_qc.c   |  677 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 690 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/kernel/perf_event_qc.c
+2011/3/7 Jean Pihet <jean.pihet@newoldbits.com>:
 
-I reviewed a few iterations of this patch off-list so you can add my
-review tag (after fixing the comments and filename as pointed out by
-Bryan):
+>> +static inline void cti_map_trigger(struct cti *cti,
+>> + ? ? ? int trig_in, int trig_out, int chan)
+>> +{
+>> + ? ? ? void *base = cti->base;
+>> + ? ? ? unsigned long val;
+>> +
+>> + ? ? ? val = __raw_readl(base + CTIINEN + trig_in * 4);
+> Rather use 'void __iomem *' type for the __raw_readl and __raw_writel functions.
+> Idem for the other occurences here below.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Will do it.
 
-Will
+>> +static inline void cti_unlock(struct cti *cti)
+>> +{
+>> + ? ? ? void *base = cti->base;
+>> + ? ? ? unsigned long val;
+>> +
+>> + ? ? ? val = __raw_readl(base + LOCKSTATUS);
+>> +
+>> + ? ? ? if (val & 1) {
+>> + ? ? ? ? ? ? ? val = 0xC5ACCE55;
+> Could this be defined as a macro?
+
+This is even hard-coded in ECT spec, so not needed to
+define as macro.
+
+>
+>> + ? ? ? ? ? ? ? __raw_writel(val, base + LOCKACCESS);
+>> + ? ? ? }
+>> +}
+>> +
+>> +/**
+>> + * cti_lock - lock cti module
+>> + * @cti: cti instance
+>> + *
+>> + * lock the cti module, so any writes to the cti
+>> + * module will be not allowed.
+>> + */
+>> +static inline void cti_lock(struct cti *cti)
+>> +{
+>> + ? ? ? void *base = cti->base;
+>> + ? ? ? unsigned long val;
+>> +
+>> + ? ? ? val = __raw_readl(base + LOCKSTATUS);
+>> +
+>> + ? ? ? if (!(val & 1)) {
+>> + ? ? ? ? ? ? ? val = ~0xC5ACCE55;
+> Idem
+
+See above.
+
+
+thanks,
+-- 
+Lei Ming
