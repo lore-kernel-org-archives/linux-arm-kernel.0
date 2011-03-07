@@ -1,49 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 7 Mar 2011 10:26:03 +0000
-Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <87r5amftpx.fsf@ti.com>
-References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
-	<7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com>
-	<20110304174709.GB20560@atomide.com>
-	<AANLkTi=UCk5thBSM_JpFPRAr_POtx-DphP-DrVLBNyMG@mail.gmail.com>
-	<87r5amftpx.fsf@ti.com>
-Message-ID: <AANLkTimV_mygA+2iBLPO2WvLBGTjEfUTHjCyMFn6wuYj@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon,  7 Mar 2011 18:31:10 +0800
+Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
+Message-ID: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 4, 2011 at 9:42 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Dave Martin <dave.martin@linaro.org> writes:
->
->> On Fri, Mar 4, 2011 at 5:47 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110304 09:36]:
->>>> >
->>>> > Following up on this, it looks like I have some locally-recorded
->>>> > acks
->>>> > which didn't make it into my posting ...
->>>
->>> To me looks like this is ready to go, but I'd like to see Kevin's
->>> acks on this one as this touches the PM code.
->>>
->>> Or if Kevin wants to take the series, here's my ack for the series:
->>>
->>> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Yeah, I'll queue this series.
->
->> Thanks -- I'll wait for Kevin to comment also.
->
-> I have to give one more round of sanity testing to this series, but
-> otherwise I have no outstanding issues. ?I also need to coordinate with
-> Santosh on this because he has an additional cleanup series that touches
-> the same code.
->
-> Dave, just to confirm something The outstanding toolchain bugs only
-> affect compiling in Thumb-2 mode, right? ?IOW, if I merge just this
-> series (without having the other toolchain workaround patches) we should
-> still be able to compile/run fine in ARM mode, correct?
+  CC [M]  crypto/xcbc.o
+In file included from /opt/git/ubuntu/roc/natty/fs/binfmt_aout.c:32:
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h: In function ?aout_dump_thread?:
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:35: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:36: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:37: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:38: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:39: error: ?struct debug_info? has no member named ?nsaved?
+make[3]: *** [fs/binfmt_aout.o] Error 1
+make[2]: *** [fs] Error 2
 
-Yes, that's right.
+This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
 
-Cheers
----Dave
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ arch/arm/include/asm/a.out-core.h |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
+index 93d04ac..639f5c8 100644
+--- a/arch/arm/include/asm/a.out-core.h
++++ b/arch/arm/include/asm/a.out-core.h
+@@ -32,12 +32,6 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
+ 	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
+ 	dump->u_ssize = 0;
+ 
+-	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
+-	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
+-	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
+-	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
+-	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
+-
+ 	if (dump->start_stack < 0x04000000)
+ 		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
+ 
+-- 
+1.7.1
