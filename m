@@ -1,26 +1,46 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  7 Mar 2011 15:19:11 +0200
-Subject: [PATCH] ARM: imx/mx25: dynamically allocate pwm devices
-Message-ID: <5cdc9853c72e9225a6d087ab6fc487903a337f8d.1299503913.git.baruch@tkos.co.il>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Mon,  7 Mar 2011 19:36:57 +0530
+Subject: [PATCH v1 1/1] davinci: macro rename DA8XX_LPSC0_DMAX to
+	DA8XX_LPSC0_PRUSS.
+Message-ID: <1299506818-11785-1-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-imx/devices-imx25.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+DMAX is an internal name for the module which is
+known as PRUSS in TI public documentation. This patch just
+gets the code in sync with TI documentation.
 
-diff --git a/arch/arm/mach-imx/devices-imx25.h b/arch/arm/mach-imx/devices-imx25.h
-index d1ea79a..b591d72 100644
---- a/arch/arm/mach-imx/devices-imx25.h
-+++ b/arch/arm/mach-imx/devices-imx25.h
-@@ -85,3 +85,7 @@ extern const struct imx_spi_imx_data imx25_cspi_data[] __initconst;
- #define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
- #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
- #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
-+
-+extern struct imx_mxc_pwm_data imx25_mxc_pwm_data[] __initconst;
-+#define imx25_add_mxc_pwm(id)	\
-+	imx_add_mxc_pwm(&imx25_mxc_pwm_data[id])
+Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+---
+ arch/arm/mach-davinci/da830.c            |    2 +-
+ arch/arm/mach-davinci/include/mach/psc.h |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index ec23ab4..0577a5d 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -148,7 +148,7 @@ static struct clk scr2_ss_clk = {
+ static struct clk dmax_clk = {
+ 	.name		= "dmax",
+ 	.parent		= &pll0_sysclk2,
+-	.lpsc		= DA8XX_LPSC0_DMAX,
++	.lpsc		= DA8XX_LPSC0_PRUSS,
+ 	.flags		= ALWAYS_ENABLED,
+ };
+ 
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index 62b0858..a47e6f2 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -150,7 +150,7 @@
+ #define DA8XX_LPSC0_SCR0_SS		10
+ #define DA8XX_LPSC0_SCR1_SS		11
+ #define DA8XX_LPSC0_SCR2_SS		12
+-#define DA8XX_LPSC0_DMAX		13
++#define DA8XX_LPSC0_PRUSS		13
+ #define DA8XX_LPSC0_ARM			14
+ #define DA8XX_LPSC0_GEM			15
+ 
 -- 
 1.7.2.3
