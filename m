@@ -1,26 +1,57 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 07 Mar 2011 19:23:15 +0300
-Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
-In-Reply-To: <4D744870.20909@ti.com>
-References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-4-git-send-email-nm@ti.com>
-	<4D738E04.5090207@ru.mvista.com> <4D744870.20909@ti.com>
-Message-ID: <4D750673.702@ru.mvista.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 7 Mar 2011 16:35:48 +0000
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <87fwqyvrzf.fsf@lebrac.rtp-net.org>
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Arnaud,
 
-On 07-03-2011 5:52, Nishanth Menon wrote:
 
->>> Blindly setting a 1.2V setting
+>-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-
+>bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+>Sent: Monday, March 07, 2011 10:02 AM
+>To: Nguyen Dinh-R00091
+>Cc: linux at arm.linux.org.uk; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; Vaidyanathan
+>Ranjani-RA5478; u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-
+>kernel at lists.infradead.org
+>Subject: Re: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+>
+>Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+>
+>> Hi Arnaud,
+>
+>Hi,
+>>
+>> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
+>
+>I never said I was testing on babbage. The reason is because I'm using a
+>efika smartbook and not a babbage.
+>
+>>
+>> root at freescale ~$ uname -a
+>> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
+>
+>2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
+>Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
+>without even testing it on the current tree. Can you please test suspend
+>with current imx for-next tree (with no other patches than theses 2
+>patches if possible), in order to make sure that it's still working with it ?
+>
 
->> Hm, seems tautological...
+The current imx for-next tree is not booting on my Babbage board. Is it okay for you with your HW. I'll have to debug the booting part first.
 
-> As a non native English speaker, I would like to understand how we could
-> improve this. I suppose you mean "Blindly setting 1.2V" is better here. Am i
-> correct?
-
-    Yes.
-
-WBR, Sergei
+>Thanks,
+>Arnaud
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
