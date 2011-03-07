@@ -1,35 +1,27 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Mon, 7 Mar 2011 16:40:33 +0200
-Subject: [PATCH V3 13/19] OMAP3+: SR: Reuse sr_[start|stop]_vddautocomp
-	functions
-In-Reply-To: <1299338962-5602-14-git-send-email-nm@ti.com>
-References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-14-git-send-email-nm@ti.com>
-Message-ID: <20110307164033.01a3b67c.jhnikula@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 7 Mar 2011 20:14:58 +0530
+Subject: Question about free_pgd_slow ?
+In-Reply-To: <14bf5cc1.490f.12e858767f5.Coremail.bill_carson@126.com>
+References: <79b2dce2.4b84.12e5ae30c01.Coremail.bill_carson@126.com>
+	<AANLkTi=obVFm=cwDyUCXQvEK3rDYberc9YWRVkv6_qZ=@mail.gmail.com>
+	<14bf5cc1.490f.12e858767f5.Coremail.bill_carson@126.com>
+Message-ID: <AANLkTikyeE=YEJ03-zewU9i_aMfG=A9kOKdpe4Fywax6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat,  5 Mar 2011 20:59:16 +0530
-Nishanth Menon <nm@ti.com> wrote:
+2011/3/5 rocky <bill_carson@126.com>:
+> But I still dont get it, why is that  low vector mapping must always
+> be active even though the task is going to exit?
 
-> From: Jarkko Nikula <jhnikula@gmail.com>
-> 
-> sr_start_vddautocomp and sr_stop_autocomp functions can be reused from
-> omap_sr_enable, omap_sr_disable and omap_sr_disable_reset_volt and by
-> adding one additional argument sr_stop_autocomp. This allows us to have
-> a single point where SR enable and disable operations are controlled from.
-> 
-> [nm at ti.com: synced it up with class start/stop as well. autocomp flag
->  should only be disabled when SR is disabled for that domain]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-> ---
-> Side note: Jarkko has'nt seen this rev as I just finished the rebase and tested
-> but adding his signed-off anyways as he is primary contributor to the idea
-> and the patch.
-> 
-This version looks good to me. We agreed with Nishant that squashing my
-trivial patches with Nishant's set makes the most sense.
+exit_mmap() is called by the exiting task.  In this case, the page table
+that free_pgtables() operates on is the page table which is currently
+in use.  Consider what would happen if we remove the vector mapping here
+and an interrupt hits immediately after -- the cpu will (recursively)
+fault while trying to find the vector page mapping.
 
--- 
-Jarkko
+pgd_free() on the other hand is safe because it's called when we've
+switched away from this mm, and the page table is no longer in use
+(mm->mm_count == 0).
+
+Have a look at exit_mm(), which increases the mm_count before calling
+mm_put(), and finish_task_switch(), which does the mmdrop().
