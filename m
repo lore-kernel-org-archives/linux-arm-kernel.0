@@ -1,55 +1,54 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 Mar 2011 11:04:29 -0800
-Subject: [PATCH 0/3] OMAP: DMA: mstandby mode and runtime pm support
-In-Reply-To: <20110307110611.GA8743@m-desktop> (Manjunath Kondaiah G.'s
-	message of "Mon, 7 Mar 2011 16:36:12 +0530")
-References: <1298542475-1460-1-git-send-email-manjugk@ti.com>
-	<87hbbkqcgk.fsf@ti.com> <20110304041826.GA7025@m-desktop>
-	<20110307110611.GA8743@m-desktop>
-Message-ID: <87bp1m7nwi.fsf@ti.com>
+Date: Mon, 07 Mar 2011 11:06:03 -0800
+Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from going
+	to RET or OFF when DSS is on
+In-Reply-To: <854C6400F5AA6644BA6FE7953F3E769B0380FE45@008-AM1MPN1-013.mgdnok.nokia.com>
+	(Tero Kristo's message of "Mon, 7 Mar 2011 12:02:22 +0000")
+References: <20110301220833.32613.54669.stgit@twilight.localdomain>
+	<20110301224918.32613.95176.stgit@twilight.localdomain>
+	<87pqq7pz27.fsf@ti.com>
+	<854C6400F5AA6644BA6FE7953F3E769B0380F12F@008-AM1MPN1-013.mgdnok.nokia.com>
+	<87lj0uj048.fsf@ti.com>
+	<854C6400F5AA6644BA6FE7953F3E769B0380FE45@008-AM1MPN1-013.mgdnok.nokia.com>
+Message-ID: <871v2i7ntw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+<Tero.Kristo@nokia.com> writes:
 
-> On Fri, Mar 04, 2011 at 09:48:26AM +0530, G, Manjunath Kondaiah wrote:
->> On Thu, Mar 03, 2011 at 10:35:23AM -0800, Kevin Hilman wrote:
->> > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
->> > 
->> > > This patch series is remaining part of dma hwmod to support pm runtime 
->> > > and for handling mstandby mode for all applicable DMA mstandby mode errata.
->> > 
->> > This is still not runtime-suspending when I use my DMA test in linking
->> > mode.
->> > 
->> > If I put a large enough period between transfers, it should autosuspend
->> > during transfers.  It seems to do auto-suspend and resume once, but then
->> > it never suspends again.
->> > 
->> > I tested with my dmatest module[1], and loaded with:
->> > 
->> >   # insmod ./dmatest.ko linking=1 forever=1 forever_period=1024
->> > 
->> > Not only does it not auto-suspend between transfers (which I expected),
->> > it also doesn't suspend after removing the module which stops all active
->> > channels.
->> 
->> The normal chaining test cases are executed and which used to show the
->> proper status. Let me reproduce this issue with your test procedure.
+[...]
+
+>>>>>
+>>>>> +	/* If DSS is active, prevent CORE RET/OFF */
+>>>>> +	dss_state = pwrdm_read_pwrst(dss_pd);
+>>>>> +	if (dss_state == PWRDM_POWER_ON &&
+>>>>> +	    core_next_state != PWRDM_POWER_ON)
+>>>>> +		core_next_state = PWRDM_POWER_INACTIVE;
+>>>>> +
+>>>>
+>>>>Due to sleepdeps/autodeps, when this code runs, DSS powerdomain is
+>>>>always on.  The result is that CORE is always set to INACTIVE.
+>>>
+>>> Now I recall that someone was asking about a patch similar to this
+>>> earlier, and had the same issue with DSS sleepdep collision.
+>>
+>>>
+>>> What is the reason for having the sleepdep for DSS powerdomain anyway?
+>>> At least I can't see any reason why the sleepdep for DSS should be
+>>> set. In my opinion it should be perfectly okay for DSS domain to idle
+>>> independently of MPU/CORE, as this is going to be better for power
+>>> consumption also.
+>>
+>>Agreed, but currently the sleepdeps with MPU are automatically managed
+>>(by clkdm autodeps and hwmod initiator deps.)  Until we have merged a
+>>solution to more selectively enable sleepdeps (or remove them) $SUBJECT
+>>patch cannot be merged.
 >
-> ok. I am able to reproduce this issue and fixed _get_sync usage in
-> omap_start_dma if channel linking is used. Earlier it was handled for
-> the cases with chaining API's. If linking is done without chaining
-> API's, it will result in _get_sync and _put mismatch.
+> Ok I thought this is the case... it would be possible to implement a
+> temporary/permanent solution that uses idle status check instead of
+> pwrdm state check, and prevent core idle if dss is not going to
+> idle. What is the current status with those idlest patches anyway?
 
-Great, glad you found it.
-
-My DMA test module predates the existence of a chaining API, so I guess
-that's part of the problem.  Glad it helped though.
-
-> Thanks for the test case and I will be re posting the patches with the 
-> above fix.
-
-Thanks,
+Paul will have to answer that one.
 
 Kevin
