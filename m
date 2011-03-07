@@ -1,137 +1,54 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Mon, 7 Mar 2011 15:30:30 +0530
-Subject: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across off
-	mode
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
-References: <1297353724-11665-1-git-send-email-premi@ti.com>
-	<1297353724-11665-2-git-send-email-premi@ti.com>
-	<alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
-Message-ID: <c9be31ca3dab99320a409e957330506c@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 7 Mar 2011 11:06:39 +0100
+Subject: [PATCH 0/3] ARM: Add Scorpion/ScorpionMP support to perf and
+	Oprofile
+In-Reply-To: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
+References: <1299276551-11978-1-git-send-email-sheetals@codeaurora.org>
+Message-ID: <AANLkTinmRZ4H_UCDokx=WgPYxCSvP1is7uwRZ9KtC4rZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Premi, Sanjeev
-> Sent: Monday, March 07, 2011 2:16 PM
-> To: Paul Walmsley
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL
-> across off mode
->
-> > -----Original Message-----
-> > From: Paul Walmsley [mailto:paul at pwsan.com]
-> > Sent: Saturday, March 05, 2011 4:16 AM
-> > To: Premi, Sanjeev
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/1] omap3: Save and restore
-> CM_AUTOIDLE_PLL across
-> > off mode
-> >
-> > Hello Sanjeev,
-> >
-> > On Thu, 10 Feb 2011, Sanjeev Premi wrote:
-> >
-> > > As per commit "bb33cc58", ROM code is expected to restore
-> > > context related to CORE domain. As part of this change,
-> > > CM_AUTOIDLE_PLL is neither saved nor restored.
-> >
-> > ... by Linux.
-> [sp] Yes.
->
-> >
-> > > This results in loosing the value of AUTO_PERIPH_DPLL.
-> >
-> > A few questions:
-> >
-> > - Is ROM code supposed to restore this register?
-> [sp] Going by the description of the commit message I referenced, it
->      It appears to be the case. I am yet to get official confirmation
->      from the ROM code team (usually takes quite long); but all
->      experiments (i put them in patch 0/1) suggest so.
-> >
-> > - Is there a documented list of which registers/bitfields the ROM code
-> > will and won't restore?
-> [sp] No that I am aware of; but yes I have already requested for same
->      since this issue was found.
-> >
-> > - Are the entire contents of the register lost, or just
-> AUTO_PERIPH_DPLL?
-> [sp] Just AUTO_PERIPH_DPLL.
-As per OMAP3630 TRM Section 26.5, register CM_AUTOIDLE_PLL is supposed to
-be restored by ROM code. The PM code should only store these registers
-before entering off mode. So only thing that needs to be done in this
-patch set is to save these registers.
+Hi,
 
-Vishwa
+On Fri, Mar 4, 2011 at 11:09 PM, Sheetal Sahasrabudhe
+<sheetals@codeaurora.org> wrote:
+> This patchset contains the following features:
+> It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
+> and Oprofile.
+> It adds PMU support for Scorpion and ScorpionMP.
+> It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
+>
+> Sheetal Sahasrabudhe (3):
+> ?msm: Add support for Scorpion and ScorpionMP PMU
+> ?[ARM] perfevents: Add support for Scorpion performance monitors
+> ?[ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
+>
+> ?arch/arm/include/asm/perf_event.h ? ? ? ? ?| ? ?2 +
+> ?arch/arm/kernel/perf_event.c ? ? ? ? ? ? ? | ? 11 +
+> ?arch/arm/kernel/perf_event_qc.c ? ? ? ? ? ?| ?677 ++++++++++++++++++++++++++++
+> ?arch/arm/mach-msm/Makefile ? ? ? ? ? ? ? ? | ? ?2 +
+> ?arch/arm/mach-msm/include/mach/irqs-7x30.h | ? ?2 +-
+> ?arch/arm/mach-msm/include/mach/irqs-8960.h | ? ?2 +-
+> ?arch/arm/mach-msm/include/mach/irqs-8x50.h | ? ?2 +-
+> ?arch/arm/mach-msm/include/mach/irqs-8x60.h | ? ?2 +-
+> ?arch/arm/mach-msm/pmu.c ? ? ? ? ? ? ? ? ? ?| ? 36 ++
+> ?arch/arm/oprofile/common.c ? ? ? ? ? ? ? ? | ? ?4 +
+> ?10 files changed, 736 insertions(+), 4 deletions(-)
+> ?create mode 100644 arch/arm/kernel/perf_event_qc.c
+> ?create mode 100644 arch/arm/mach-msm/pmu.c
+>
 
+I cannot test on the actual HW so here is the review ack:
+Reviewed-by: Jean Pihet <j-pihet@ti.com>
 
+Thanks,
+Jean
 
->
-> >
-> > > The concern of setting the AUTOIDLE flag before the DPLL
-> > > is locked seems valid. Hence, the restoration of this
-> > > register is delayed until after the context of PER
-> > > domain is restored.
-> >
-> > Could you explain a little more about this?  Is there a hardware
-> > limitation where AUTO_PERIPH_DPLL shouldn't be set unless the DPLL
-> is
-> > locked?
-> [sp] This is based on my understanding (and observation) that DPLL may
->      take longer to lock after resume. Now if the clock goes to AUTOIDLE
->      before it is locked; I am not sure what would be the consequences.
-> >
-> > >
-> > > The patch has been verified on OMAP3EVM by checking value
-> > > of CM_AUTOIDLE_PLL register across the suspend/resume
-> > > sequence (using devmem) with flags sleep_while_idle and
-> > > enable_off_mode set to 1.
-> > >
-> > > Signed-off-by: Sanjeev Premi <premi@ti.com>
-> > > ---
->
-> [sp]
-> [snip]...[snip]
->
-> > >
-> > > +/**
-> > > + * Restore the contents of CM_AUTOIDLE_PLL register.
-> > > + *
-> > > + * The implementation below restores AUTO_CORE_DPLL as 'good'
-> > redundancy.
-> >
-> > I don't understand this part.  Are the entire contents of the register
-> > lost, or just the AUTO_PERIPH_DPLL field?
-> >
->
-> [sp] As put above, only AUTO_PERIPH_DPLL; but this is based on
-> observation
->      not a *real specification*; I chose to set the AUTO_CORE_DPLL bit
-as
->      redundancy.
->
-> ~sanjeev
->
-> > > + */
-> > > +static void pll_mod_restore_autoidle(void)
-> > > +{
-> > > +	u32 ctx = stored_cm_autoidle_pll();
-> > > +	u32 val = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
-> > > +
-> > > +	if (ctx & OMAP3430_AUTO_CORE_DPLL_MASK)
-> > > +		val |= ctx & OMAP3430_AUTO_CORE_DPLL_MASK;
-> > > +
-> > > +	if (ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK)
-> > > +		val |= ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK;
-> > > +
-> > > +	omap2_cm_write_mod_reg(val, PLL_MOD, CM_AUTOIDLE);
-> > > +}
-> > > +
-> [snip]...[snip]
+> --
+> 1.7.4.1
 >
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+>
+>
