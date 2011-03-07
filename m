@@ -1,104 +1,39 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 07 Mar 2011 08:00:34 +0100
-Subject: [PATCH 08/09] ARM: s3c2440: gta02: Request usb pullup pin before
-	using it
-In-Reply-To: <031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
-References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-	<1297043521-21903-8-git-send-email-lars@metafoo.de>
-	<000301cbd70f$12367070$36a35150$%kim@samsung.com>
-	<4D6B7826.1030500@metafoo.de>
-	<003201cbd734$79d87050$6d8950f0$%kim@samsung.com>
-	<4D6B7FE6.8090802@metafoo.de>
-	<031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
-Message-ID: <4D748292.7030302@metafoo.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 07 Mar 2011 15:45:54 +0900
+Subject: [PATCH] Exynos4: Remove meaningless REGULATOR config option
+In-Reply-To: <20110304124041.GD17653@sirena.org.uk>
+References: <20110304051609.GA15121@july> <4D70D295.7030101@ru.mvista.com>
+	<20110304124041.GD17653@sirena.org.uk>
+Message-ID: <031201cbdc93$510052b0$f300f810$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2011 07:42 AM, Kukjin Kim wrote:
-> Lars-Peter Clausen wrote:
->>
->> On 02/28/2011 11:44 AM, Kukjin Kim wrote:
->>> Lars-Peter Clausen wrote:
->>>>
->>>> On 02/28/2011 07:16 AM, Kukjin Kim wrote:
->>>>> Lars-Peter Clausen wrote:
->>>>>>
->>>>>> Request the gpio pin used to control the usb pullup before using it
-> to
->>>>> avoid
->>>>>> a
->>>>>> runtime warning about an auto-requested gpio.
->>>>>>
->>>>>> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
->>>>>> ---
->>>>>>  arch/arm/mach-s3c2440/mach-gta02.c |   17 +++++++++++++++--
->>>>>>  1 files changed, 15 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
->>>>> b/arch/arm/mach-s3c2440/mach-
->>>>>> gta02.c
->>>>>> index 1396639..94456fa 100644
->>>>>> --- a/arch/arm/mach-s3c2440/mach-gta02.c
->>>>>> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
->>>>>> @@ -451,11 +451,11 @@ static void gta02_udc_command(enum
->>> s3c2410_udc_cmd_e
->>>>>> cmd)
->>>>>>  	switch (cmd) {
->>>>>>  	case S3C2410_UDC_P_ENABLE:
->>>>>>  		pr_debug("%s S3C2410_UDC_P_ENABLE\n", __func__);
->>>>>> -		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
->>>>>> +		gpio_set_value(GTA02_GPIO_USB_PULLUP, 1);
->>>>>
->>>>> How about following instead?
->>>>> 	gpio_request(GTA02_GPIO_USB_PULLUP, "USB_PULLUP");
->>>>> 	gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
->>>>> 	gpio_free(GTA02_GPIO_USB_PULLUP);
->>>>>
->>>>
->>>> I don't think that is a good idea. This gpio should really be reserved
-> for
->>>> the
->>>> udc driver. If it is freed again, it could be requested from someone
-> else
->>>> which
->>>> could lead to undefined behaviour.
->>>>
->>> Yes right, but I mean the board designer already knows the usage of
->>> regarding GPIOs on his board.
->>> So why do we really need gpio_request for it?...
->>
->> Well, for one because it's part of the gpio-api. You should not call any
->> other
->> gpio functions on a pin unless you've successfully requested that pin.
->> On the other hand this helps debugging and ensures that the same gpio is
-> not
->> used by two drivers accident. For example it is also possible to request
->> gpios
->> from userspace using the gpio sysfs. So by keeping the gpio requested it
-> wont
->> be possible to request it from userspace by accident. And the gpio will
-> also
->> be
->> listed in the gpio debugfs file, which can be helpful for debugging as
-> well.
->>
->> - Lars
+Mark Brown wrote:
 > 
-> Hi Lars,
+> On Fri, Mar 04, 2011 at 02:52:53PM +0300, Sergei Shtylyov wrote:
+> > On 04-03-2011 8:16, Kyungmin Park wrote:
 > 
-> Ok, will apply :)
-> Thanks.
+> >> From: Kyungmin Park<kyungmin.park@samsung.com>
 > 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> >> reguration APIs are guarded at its header file
 > 
+> >    Regulation?
+> 
+> >> No need to define at codes.
+> 
+> >    Can't understand this.
+> 
+> The regulator API ifdefs itself out when not enabled so there is no need
+> for users to do this.
 
-Hi Kgene
+Hi Mark and Sergei,
 
-Actually I've prepared another patch, which I'm was about to send in a few
-minutes, which moves the controlling of the pullup pin to the udc driver.
+Thanks for your pointing out and suggestion :)
 
-- Lars
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
