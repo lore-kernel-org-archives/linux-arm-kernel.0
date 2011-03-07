@@ -1,50 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 7 Mar 2011 11:48:33 +0100
-Subject: [PATCH V5 4/6] mmc: sdhci-esdhc: make the writel/readl as the
-	general APIs
-In-Reply-To: <1299060283-6404-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1299060283-6404-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1299060283-6404-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110307104833.GC3425@pengutronix.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Mon, 7 Mar 2011 16:36:12 +0530
+Subject: [PATCH 0/3] OMAP: DMA: mstandby mode and runtime pm support
+In-Reply-To: <20110304041826.GA7025@m-desktop>
+References: <1298542475-1460-1-git-send-email-manjugk@ti.com>
+	<87hbbkqcgk.fsf@ti.com> <20110304041826.GA7025@m-desktop>
+Message-ID: <20110307110611.GA8743@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct pltfm_imx_data *imx_data =
-> +				(struct pltfm_imx_data *)pltfm_host->scratchpad;
-> +
+On Fri, Mar 04, 2011 at 09:48:26AM +0530, G, Manjunath Kondaiah wrote:
+> On Thu, Mar 03, 2011 at 10:35:23AM -0800, Kevin Hilman wrote:
+> > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> > 
+> > > This patch series is remaining part of dma hwmod to support pm runtime 
+> > > and for handling mstandby mode for all applicable DMA mstandby mode errata.
+> > 
+> > This is still not runtime-suspending when I use my DMA test in linking
+> > mode.
+> > 
+> > If I put a large enough period between transfers, it should autosuspend
+> > during transfers.  It seems to do auto-suspend and resume once, but then
+> > it never suspends again.
+> > 
+> > I tested with my dmatest module[1], and loaded with:
+> > 
+> >   # insmod ./dmatest.ko linking=1 forever=1 forever_period=1024
+> > 
+> > Not only does it not auto-suspend between transfers (which I expected),
+> > it also doesn't suspend after removing the module which stops all active
+> > channels.
+> 
+> The normal chaining test cases are executed and which used to show the
+> proper status. Let me reproduce this issue with your test procedure.
 
-Uh, no. Sorry that was a misunderstanding of this:
+ok. I am able to reproduce this issue and fixed _get_sync usage in
+omap_start_dma if channel linking is used. Earlier it was handled for
+the cases with chaining API's. If linking is done without chaining
+API's, it will result in _get_sync and _put mismatch.
 
-===
-Do you means keep the u32 scratchpad, and use one u32---> pointer exchange, right?
--       u32 scratchpad; /* to handle quirks across io-accessor calls */
-+       void *priv; /* to handle quirks across io-accessor calls */
-===
+Thanks for the test case and I will be re posting the patches with the 
+above fix.
 
-When you said "exchanging" 'scratchpad' with a 'void *', I thought you really
-meant replacing it in the struct like the diff sketches. Casting a variable to
-a struct * is not a good idea. The private structure itself looks okay.
-
-> +	struct pltfm_imx_data *imx_data;
-> +
-> +	imx_data = kzalloc(sizeof(struct pltfm_imx_data), GFP_KERNEL);
-> +	pltfm_host->scratchpad = (u32)imx_data;
->  
->  	clk = clk_get(mmc_dev(host->mmc), NULL);
->  	if (IS_ERR(clk)) {
-
-Do that after clk_get, otherwise you leak memory if it clk_get fails.
-
-Regards
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110307/05e1935e/attachment-0001.sig>
+-Manjunath
