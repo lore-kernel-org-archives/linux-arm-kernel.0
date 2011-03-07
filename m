@@ -1,65 +1,103 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Mon, 7 Mar 2011 19:07:00 +0100
-Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
-References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
-	<87oc5puwg3.fsf@lebrac.rtp-net.org>
-	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
-	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
-	<56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <20110307180700.GQ29521@pengutronix.de>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Mon,  7 Mar 2011 10:33:52 -0800
+Subject: [PATCH] msm: gpio-v2: Add missing BIT field macros for interrupt
+	control
+Message-ID: <1299522832-31233-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 04:35:48PM +0000, Nguyen Dinh-R00091 wrote:
-> Hi Arnaud,
-> 
-> 
-> >-----Original Message-----
-> >From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> >bounces at lists.infradead.org] On Behalf Of Arnaud Patard
-> >Sent: Monday, March 07, 2011 10:02 AM
-> >To: Nguyen Dinh-R00091
-> >Cc: linux at arm.linux.org.uk; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; Vaidyanathan
-> >Ranjani-RA5478; u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-
-> >kernel at lists.infradead.org
-> >Subject: Re: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
-> >
-> >Nguyen Dinh-R00091 <R00091@freescale.com> writes:
-> >
-> >> Hi Arnaud,
-> >
-> >Hi,
-> >>
-> >> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
-> >
-> >I never said I was testing on babbage. The reason is because I'm using a
-> >efika smartbook and not a babbage.
-> >
-> >>
-> >> root at freescale ~$ uname -a
-> >> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
-> >
-> >2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
-> >Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
-> >without even testing it on the current tree. Can you please test suspend
-> >with current imx for-next tree (with no other patches than theses 2
-> >patches if possible), in order to make sure that it's still working with it ?
-> >
-> 
-> The current imx for-next tree is not booting on my Babbage board. Is
-> it okay for you with your HW. I'll have to debug the booting part
-> first.
+The gpio-v2 file was missing the BIT field macros causing incorrect
+values to be written at incorrect offsets within the TLMM block registers.
+These registers are used for masking/unmasking interrupts and configuring them
+This change fixes that problem.
 
-Probably because other than kconfig states i.MX51 and i.MX53 cannot be
-compiled in one kernel. the for-next branch boots fine on my babbage.
+Change-Id: Ib538a2d09bca039b058627ddc309a7faaaf6bc8d
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/mach-msm/gpio-v2.c |   36 ++++++++++++++++++++++++++----------
+ 1 files changed, 26 insertions(+), 10 deletions(-)
 
-Sascha
-
-
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+index 0de19ec..fb52d6d 100644
+--- a/arch/arm/mach-msm/gpio-v2.c
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -62,10 +62,10 @@ enum {
+  * can be triggered but the status register will not reflect it.
+  */
+ enum {
+-	INTR_ENABLE        = 0,
+-	INTR_POL_CTL       = 1,
+-	INTR_DECT_CTL      = 2,
+-	INTR_RAW_STATUS_EN = 3,
++	INTR_ENABLE_BIT        = 0,
++	INTR_POL_CTL_BIT       = 1,
++	INTR_DECT_CTL_BIT      = 2,
++	INTR_RAW_STATUS_EN_BIT = 3,
+ };
+ 
+ /* Codes of interest in GPIO_INTR_CFG_SU.
+@@ -75,6 +75,22 @@ enum {
+ 	TARGET_PROC_NONE     = 7,
+ };
+ 
++/*
++ * When a GPIO triggers, two separate decisions are made, controlled
++ * by two separate flags.
++ *
++ * - First, INTR_RAW_STATUS_EN controls whether or not the GPIO_INTR_STATUS
++ * register for that GPIO will be updated to reflect the triggering of that
++ * gpio.  If this bit is 0, this register will not be updated.
++ * - Second, INTR_ENABLE controls whether an interrupt is triggered.
++ *
++ * If INTR_ENABLE is set and INTR_RAW_STATUS_EN is NOT set, an interrupt
++ * can be triggered but the status register will not reflect it.
++ */
++#define INTR_RAW_STATUS_EN BIT(INTR_RAW_STATUS_EN_BIT)
++#define INTR_ENABLE        BIT(INTR_ENABLE_BIT)
++#define INTR_DECT_CTL_EDGE BIT(INTR_DECT_CTL_BIT)
++#define INTR_POL_CTL_HI    BIT(INTR_POL_CTL_BIT)
+ 
+ #define GPIO_INTR_CFG_SU(gpio)    (MSM_TLMM_BASE + 0x0400 + (0x04 * (gpio)))
+ #define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
+@@ -217,9 +233,9 @@ static void msm_gpio_update_dual_edge_pos(unsigned gpio)
+ 	do {
+ 		val = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
+ 		if (val)
+-			clear_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
++			clear_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
+ 		else
+-			set_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
++			set_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
+ 		val2 = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
+ 		intstat = readl(GPIO_INTR_STATUS(gpio)) & BIT(INTR_STATUS);
+ 		if (intstat || val == val2)
+@@ -274,22 +290,22 @@ static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
+ 	bits = readl(GPIO_INTR_CFG(gpio));
+ 
+ 	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
+-		bits |= BIT(INTR_DECT_CTL);
++		bits |= INTR_DECT_CTL_EDGE;
+ 		irq_desc[irq].handle_irq = handle_edge_irq;
+ 		if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
+ 			__set_bit(gpio, msm_gpio.dual_edge_irqs);
+ 		else
+ 			__clear_bit(gpio, msm_gpio.dual_edge_irqs);
+ 	} else {
+-		bits &= ~BIT(INTR_DECT_CTL);
++		bits &= ~INTR_DECT_CTL_EDGE;
+ 		irq_desc[irq].handle_irq = handle_level_irq;
+ 		__clear_bit(gpio, msm_gpio.dual_edge_irqs);
+ 	}
+ 
+ 	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
+-		bits |= BIT(INTR_POL_CTL);
++		bits |= INTR_POL_CTL_HI;
+ 	else
+-		bits &= ~BIT(INTR_POL_CTL);
++		bits &= ~INTR_POL_CTL_HI;
+ 
+ 	writel(bits, GPIO_INTR_CFG(gpio));
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by an employee of the Qualcomm Innovation Center,Inc
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
