@@ -1,28 +1,68 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 07 Mar 2011 08:22:32 +0530
-Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
-In-Reply-To: <4D738E04.5090207@ru.mvista.com>
+Date: Mon, 07 Mar 2011 08:26:08 +0530
+Subject: [PATCH V3 05/19] OMAP3+: voltage: use IS_ERR_OR_NULL
+In-Reply-To: <20110306081840.GB2400@n2100.arm.linux.org.uk>
 References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-4-git-send-email-nm@ti.com>
-	<4D738E04.5090207@ru.mvista.com>
-Message-ID: <4D744870.20909@ti.com>
+	<1299338962-5602-6-git-send-email-nm@ti.com>
+	<AANLkTi=q_ASfvLbZv=D8p3XvuMX8ek3hcEHU5wtfkm7J@mail.gmail.com>
+	<4D72F532.3020909@ti.com>
+	<20110306081840.GB2400@n2100.arm.linux.org.uk>
+Message-ID: <4D744948.8000808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote, on 03/06/2011 07:07 PM:
+Russell King - ARM Linux wrote, on 03/06/2011 01:48 PM:
+> On Sun, Mar 06, 2011 at 08:15:06AM +0530, Nishanth Menon wrote:
+>> my_dumb_func(){
+>> 	struct voltagedomain *vdata = NULL;
+>> 	if (cpu_is_omap3630()_) {
+>> 		vdata = omap_voltage_domain_lookup("mpu")
+>> 	}
+>> 	/* forgot to add other cpu types or a else case */
+>> 	/* do other things */
+>> 	me_volt=omap_voltage_get_nom_volt(vdata);
+>> 	/* do things with me_volt */
+>> }
+>>
+>> Sorry, but i think the check, even if seems superfluous is sane IMHO.
+>> even if the above code worked on 3630, it'd fail on o4/3430 without the
+>> check, it can even crash. and given that we've all seen our fair share
+>> of developers who develop for one platform without consideration that
+>> the rest of the world uses others as well... I do feel cases like above
+>> example might infact be a reality.
 >
->> Blindly setting a 1.2V setting
+> But normal practice is to check the return value from functions before
+> it's used.  So:
 >
->     Hm, seems tautological...
-As a non native English speaker, I would like to understand how we could 
-improve this. I suppose you mean "Blindly setting 1.2V" is better here. 
-Am i correct?
+>   my_dumb_func(){
+> 	struct voltagedomain *vdata = NULL;
+> 	if (cpu_is_omap3630()) {
+> 		vdata = omap_voltage_domain_lookup("mpu")
+> 	}
+> 	/* forgot to add other cpu types or a else case */
+>
+> +	if (!vdata)
+> +		return some error;
+>
+> 	/* do other things */
+> 	me_volt=omap_voltage_get_nom_volt(vdata);
+> 	/* do things with me_volt */
+>   }
+>
+> is the right way to deal with this.  Pushing the primary error checking
+> down into sub-functions is stupid - where does it stop?  Do you check
+> me_volt for errors?  Do you get functions which use me_volt to check for
+> errors from that too?
+>
+> It's a silly idea.  Put the primary error checking in the function which
+> gets the return value.  Don't bury it in sub-functions.
 
->> in the initial structure may not even
->> match the default voltages stored in the voltage table which are
->> supported for the domain. For example, OMAP3430 core domain does not
->> use 1.2V and ends up generating a warning on the first transition.
-[..]
+I agree with you on this - sub functions esp static ones should able to 
+trust the parameters passed to it by callers. for the moment, I suggest 
+we drop this patch from this series - it has no functional impact to the 
+overall goal which I was attempting to achieve. Cleanups of the voltage, 
+smartreflex layers are an ongoing activity currently and should be 
+takenup as part of it.
 
 -- 
 Regards,
