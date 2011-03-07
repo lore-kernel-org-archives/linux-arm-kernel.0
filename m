@@ -1,32 +1,65 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 7 Mar 2011 09:39:03 -0800
-Subject: [PATCH] ARM: tegra: trimslice: enable MMC/SD slots
-In-Reply-To: <1299509842-21191-1-git-send-email-mike@compulab.co.il>
-References: <1299509842-21191-1-git-send-email-mike@compulab.co.il>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF045687B867@HQMAIL01.nvidia.com>
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Mon, 7 Mar 2011 19:07:00 +0100
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20110307180700.GQ29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Rapoport wrote at Monday, March 07, 2011 7:57 AM:
-> TrimSlice has MicroSD and standard MMC/SD slots.
-> Register sdhci devices and enable GPIOs for MMC/SD slot.
+On Mon, Mar 07, 2011 at 04:35:48PM +0000, Nguyen Dinh-R00091 wrote:
+> Hi Arnaud,
 > 
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> @@ -139,7 +142,13 @@ static __initdata struct tegra_pingroup_config
-> trimslice_pinmux[] = {
->  	{TEGRA_PINGROUP_XM2D,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,
-> TEGRA_TRI_NORMAL},
->  };
 > 
-> +static struct tegra_gpio_table gpio_table[] = {
-> +	{ .gpio = TEGRA_GPIO_PP1,	.enable = true	}, /* mmc4 cd */
-> +	{ .gpio = TEGRA_GPIO_PP2,	.enable = true	}, /* mmc4 wp */
-> +};
-> +
+> >-----Original Message-----
+> >From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> >bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+> >Sent: Monday, March 07, 2011 10:02 AM
+> >To: Nguyen Dinh-R00091
+> >Cc: linux at arm.linux.org.uk; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; Vaidyanathan
+> >Ranjani-RA5478; u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-
+> >kernel at lists.infradead.org
+> >Subject: Re: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+> >
+> >Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+> >
+> >> Hi Arnaud,
+> >
+> >Hi,
+> >>
+> >> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
+> >
+> >I never said I was testing on babbage. The reason is because I'm using a
+> >efika smartbook and not a babbage.
+> >
+> >>
+> >> root at freescale ~$ uname -a
+> >> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
+> >
+> >2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
+> >Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
+> >without even testing it on the current tree. Can you please test suspend
+> >with current imx for-next tree (with no other patches than theses 2
+> >patches if possible), in order to make sure that it's still working with it ?
+> >
+> 
+> The current imx for-next tree is not booting on my Babbage board. Is
+> it okay for you with your HW. I'll have to debug the booting part
+> first.
 
-Not a big deal, but it'd be great if this could use defines that name the
-GPIOs, like other boards do now; see Olof's boards-for-next tree for examples
-on Harmony and Seaboard.
+Probably because other than kconfig states i.MX51 and i.MX53 cannot be
+compiled in one kernel. the for-next branch boots fine on my babbage.
+
+Sascha
+
 
 -- 
-nvpublic
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
