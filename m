@@ -1,91 +1,108 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Mon, 07 Mar 2011 17:15:17 +0900
-Subject: [PATCH v2] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-In-Reply-To: <032401cbdc96$e134f360$a39eda20$%kim@samsung.com>
-References: <1299460218-22748-1-git-send-email-dh09.lee@samsung.com>
-	<032401cbdc96$e134f360$a39eda20$%kim@samsung.com>
-Message-ID: <4D749415.7080705@samsung.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 7 Mar 2011 14:16:26 +0530
+Subject: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across off
+	mode
+In-Reply-To: <alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
+References: <1297353724-11665-1-git-send-email-premi@ti.com>
+	<1297353724-11665-2-git-send-email-premi@ti.com>
+	<alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Thank you for your comments.
-I had answer below and will fix it along your comments.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Saturday, March 05, 2011 4:16 AM
+> To: Premi, Sanjeev
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across
+> off mode
+> 
+> Hello Sanjeev,
+> 
+> On Thu, 10 Feb 2011, Sanjeev Premi wrote:
+> 
+> > As per commit "bb33cc58", ROM code is expected to restore
+> > context related to CORE domain. As part of this change,
+> > CM_AUTOIDLE_PLL is neither saved nor restored.
+> 
+> ... by Linux.
+[sp] Yes.
 
-On 2011-03-07, Kukjin Kim wrote:
-> Donghwa Lee wrote:
->> This patch enables lcd and backlight drivers in NURI board.
->>
->> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> Changes since v1:
->> - Adds backlight platform data to control brightness and GPIO
->> - Modify inappropriate function name and remove useless codes.
->> - And so on.
->>
->>  arch/arm/mach-exynos4/Kconfig     |    1 +
->>  arch/arm/mach-exynos4/mach-nuri.c |   81
->> +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 82 insertions(+), 0 deletions(-)
-> Thanks for re-work :)
-> There are small comments below.
->
-> (snip)
->
->> +static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int
-> power)
->> +{
->> +	int gpio = EXYNOS4_GPE1(5);
->> +
->> +	if (power)
->> +		gpio_direction_output(gpio, 1);
->> +	else
->> +		gpio_direction_output(gpio, 0);
-> 	gpio_direction_output(gpio, power);
->
+> 
+> > This results in loosing the value of AUTO_PERIPH_DPLL.
+> 
+> A few questions:
+> 
+> - Is ROM code supposed to restore this register?
+[sp] Going by the description of the commit message I referenced, it
+     It appears to be the case. I am yet to get official confirmation
+     from the ROM code team (usually takes quite long); but all
+     experiments (i put them in patch 0/1) suggest so.
+> 
+> - Is there a documented list of which registers/bitfields the ROM code
+> will and won't restore?
+[sp] No that I am aware of; but yes I have already requested for same
+     since this issue was found.
+> 
+> - Are the entire contents of the register lost, or just AUTO_PERIPH_DPLL?
+[sp] Just AUTO_PERIPH_DPLL.
 
-Ok, I will fix it.
+> 
+> > The concern of setting the AUTOIDLE flag before the DPLL
+> > is locked seems valid. Hence, the restoration of this
+> > register is delayed until after the context of PER
+> > domain is restored.
+> 
+> Could you explain a little more about this?  Is there a hardware
+> limitation where AUTO_PERIPH_DPLL shouldn't be set unless the DPLL is
+> locked?
+[sp] This is based on my understanding (and observation) that DPLL may
+     take longer to lock after resume. Now if the clock goes to AUTOIDLE
+     before it is locked; I am not sure what would be the consequences.
+> 
+> >
+> > The patch has been verified on OMAP3EVM by checking value
+> > of CM_AUTOIDLE_PLL register across the suspend/resume
+> > sequence (using devmem) with flags sleep_while_idle and
+> > enable_off_mode set to 1.
+> >
+> > Signed-off-by: Sanjeev Premi <premi@ti.com>
+> > ---
 
->> +}
->> +
->> +static int nuri_bl_init(struct device *dev)
->> +{
->> +	int ret, gpio = EXYNOS4_GPE2(3);
->> +
->> +	ret = gpio_request(gpio, "LCD_LDO_EN");
->> +	if (!ret)
->> +		gpio_direction_output(gpio, 0);
->> +
->> +	return 0;
-> 	return ret;
->
+[sp] 
+[snip]...[snip]
 
-I will fix it.
+> >
+> > +/**
+> > + * Restore the contents of CM_AUTOIDLE_PLL register.
+> > + *
+> > + * The implementation below restores AUTO_CORE_DPLL as 'good'
+> redundancy.
+> 
+> I don't understand this part.  Are the entire contents of the register
+> lost, or just the AUTO_PERIPH_DPLL field?
+> 
 
->> +}
-> (snip)
->
->> +static struct platform_device nuri_lcd_device = {
->> +	.name			= "platform-lcd",
->> +	.id			= -1,
->> +	.dev			= {
->> +		.platform_data	= (void *) &nuri_lcd_platform_data,
-> 		.platform_data = &nuri_lcd_platform_data,
->
->> +	},
->> +};
+[sp] As put above, only AUTO_PERIPH_DPLL; but this is based on observation
+     not a *real specification*; I chose to set the AUTO_CORE_DPLL bit as
+     redundancy.
 
-I will fix it.
+~sanjeev
 
-> (snip)
->
-> You used gpio_request() for EXYNOS4_GPE2(3) and EXYNOS4_GPE1(5), but
-> EXYNOS4_GPE1(5). Is there any reason or policy for it?
->
->
-
-You mean why I left out the gpio_free() after gpio_request(), right?
-There was my mistake, I will add it.
-
-Thank you,
-Donghwa Lee
+> > + */
+> > +static void pll_mod_restore_autoidle(void)
+> > +{
+> > +	u32 ctx = stored_cm_autoidle_pll();
+> > +	u32 val = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
+> > +
+> > +	if (ctx & OMAP3430_AUTO_CORE_DPLL_MASK)
+> > +		val |= ctx & OMAP3430_AUTO_CORE_DPLL_MASK;
+> > +
+> > +	if (ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK)
+> > +		val |= ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK;
+> > +
+> > +	omap2_cm_write_mod_reg(val, PLL_MOD, CM_AUTOIDLE);
+> > +}
+> > +
+[snip]...[snip]
