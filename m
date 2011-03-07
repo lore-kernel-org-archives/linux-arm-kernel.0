@@ -1,33 +1,46 @@
-From: alberto@amarulasolutions.com (Alberto Panizzo)
-Date: Mon, 07 Mar 2011 11:42:09 +0100
-Subject: [PATCHv3 0/4] Continue the mx31_3ds machine support
-In-Reply-To: <4D74B091.2010908@pengutronix.de>
-References: <1299492598.2468.30.camel@realization>
-	<4D74B091.2010908@pengutronix.de>
-Message-ID: <1299494529.2468.42.camel@realization>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Mar 2011 10:42:38 -0000
+Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
+In-Reply-To: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
+References: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <000801cbdcb4$612bde40$23839ac0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Bryan,
 
-this series on top of Sascha's imx-for-2.6.39 branch continue the
-support of peripherals for the machine mx31_3ds.
+> Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
 
-The first one fix also a kernel NULL pointer error introduced by
-4d2f13be1e370a670c1cae20c194d5ce961e0fa5
+Is there a patch 2/2 as well? (I only received this one).
+ 
+> This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+>  arch/arm/include/asm/a.out-core.h |    6 ------
+>  1 files changed, 0 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
+> index 93d04ac..639f5c8 100644
+> --- a/arch/arm/include/asm/a.out-core.h
+> +++ b/arch/arm/include/asm/a.out-core.h
+> @@ -32,12 +32,6 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
+>  	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
+>  	dump->u_ssize = 0;
+> 
+> -	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
+> -	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
+> -	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
+> -	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
+> -	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
+> -
+>  	if (dump->start_stack < 0x04000000)
+>  		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
 
-In v2 all group of GPIO requests are packed with gpio_request_array
+Damn, looks like I forgot to update this code. I think it might be better
+to memset zero the u_debugreg array rather than ignore the assignment and
+also add a comment to struct user to explain that thie field is no longer
+used.
 
-In v3 fixed:
- - the first patch comment
- - an inconsistency of patch 2 code style
- - code style of patch 3
-all pointed out by Marc Kleine-Budde 
-
-Thanks all,
-
--- 
-| Alberto Panizzo                                 Amarula Solutions BV |
-| CTO  -  Founder                                      Cruquiuskade 47 |
-| T. +31(0)851119171                              Amsterdam 1018 AM NL |
-| F. +31(0)204106211                          www.amarulasolutions.com |
+Will
