@@ -1,31 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Mar 2011 15:45:04 +0800
-Subject: A few mxsfb patches
-In-Reply-To: <20110307072657.GF29521@pengutronix.de>
-References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
-	<20110307072657.GF29521@pengutronix.de>
-Message-ID: <20110307074503.GA12291@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Mar 2011 08:54:45 +0100
+Subject: [PATCH 2/4] ARM: mxs/mx28evk: add framebuffer deviceg
+In-Reply-To: <1299343222-30670-3-git-send-email-shawn.guo@freescale.com>
+References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
+	<1299343222-30670-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110307075445.GI29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 08:26:57AM +0100, Sascha Hauer wrote:
-> Hi Shawn,
+On Sun, Mar 06, 2011 at 12:40:20AM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/Kconfig        |    1 +
+>  arch/arm/mach-mxs/clock-mx28.c   |    2 +
+>  arch/arm/mach-mxs/mach-mx28evk.c |   78 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 81 insertions(+), 0 deletions(-)
 > 
-Hi Sascha,
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 4f0b673..cffd860 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -33,6 +33,7 @@ config MACH_MX28EVK
+>  	select MXS_HAVE_AMBA_DUART
+>  	select MXS_HAVE_PLATFORM_AUART
+>  	select MXS_HAVE_PLATFORM_FEC
+> +	select MXS_HAVE_PLATFORM_MXSFB
+>  	select MXS_OCOTP
+>  	default y
+>  	help
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 8277056..56bd164 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -750,6 +750,8 @@ int __init mx28_clocks_init(void)
+>  	clk_enable(&emi_clk);
+>  	clk_enable(&uart_clk);
+>  
+> +	clk_set_parent(&lcdif_clk, &ref_pix_clk);
 
-> On Sun, Mar 06, 2011 at 12:18:48AM +0800, Shawn Guo wrote:
-> > The patches came from the work of adding framebuffer for mx28evk and
-> > mx23evk boards.  They are all minor changes.
-> > 
-> >  [PATCH 1/3] video: mxsfb: smarten the code a little bit
-> >  [PATCH 2/3] video: mxsfb: fix the incorrect error checking for alloc_pages_exact
-> >  [PATCH 3/3] video: mxsfb: add DOTCLK polarity configuration support
-> 
-> As this driver is new, we can squash these patches into the original
-> patch and add your ack to this one, if that's ok for you.
-> 
-No problem, as they are really some simple changes.
+While probably being the right thing to do this should not be in this
+patch.
+
+Sascha
+
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
