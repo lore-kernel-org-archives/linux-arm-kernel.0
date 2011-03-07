@@ -1,39 +1,48 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 7 Mar 2011 09:16:29 +0530
-Subject: [PATCH V6 0/8] SPEAr3xx & SPEAr6xx Fixes
-In-Reply-To: <20110305140848.GA6846@n2100.arm.linux.org.uk>
-References: <cover.1298977691.git.viresh.kumar@st.com>
-	<20110305140243.GD27468@n2100.arm.linux.org.uk>
-	<20110305140441.GE27468@n2100.arm.linux.org.uk>
-	<20110305140848.GA6846@n2100.arm.linux.org.uk>
-Message-ID: <4D745515.9030200@st.com>
+Date: Mon, 7 Mar 2011 09:45:13 +0530
+Subject: [PATCH 1/8 resend] dw_dmac: Remove compilation dependency from
+	AVR32
+In-Reply-To: <20110305113817.GC27468@n2100.arm.linux.org.uk>
+References: <cover.1298889267.git.viresh.kumar@st.com>
+	<d41145ce4d5e3d870f720709f68d5b1dbf34d6a0.1298889267.git.viresh.kumar@st.com>
+	<1299084372.6974.91.camel@vkoul-udesk3>
+	<4D6F0E32.6050505@st.com> <20110303041909.GT244@DLHLAP0379>
+	<20110305113817.GC27468@n2100.arm.linux.org.uk>
+Message-ID: <4D745BD1.4020506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2011 07:38 PM, Russell King - ARM Linux wrote:
-> On Sat, Mar 05, 2011 at 02:04:41PM +0000, Russell King - ARM Linux wrote:
->> On Sat, Mar 05, 2011 at 02:02:43PM +0000, Russell King - ARM Linux wrote:
->>> On Tue, Mar 01, 2011 at 04:56:06PM +0530, Viresh Kumar wrote:
->>>> This patchset contains minor fixes, renames, & reordering of code of #include
->>>> files.
->>>
->>> This set looks absolutely fine.  I assume that it should apply on top of
->>> my 'spear' branch?  If so, please submit this series to the patch system,
->>> thanks.
->>
->> BTW, please drop the 'ST ' from the subject lines, I don't think there's
->> any other SPEAr which it could be confused with.
->>
->> For 'ST SPEAr Clock Framework: ...' please use 'SPEAr: Clock Framework: ...'
->> instead.
-> 
-> One last comment on the subject lines - please don't use 'Replacing' etc,
-> but 'Replace' - as the replacement is not an ongoing exercise.  Same for
-> other patches which use '-ing' verbs in their subject.
-> .
-> 
+On 03/05/2011 05:08 PM, Russell King - ARM Linux wrote:
+> On Thu, Mar 03, 2011 at 09:49:09AM +0530, Shiraz Hashim wrote:
+>> > On Thu, Mar 03, 2011 at 11:42:42AM +0800, Viresh KUMAR wrote:
+>>> > > On 03/02/2011 10:16 PM, Koul, Vinod wrote:
+>>>> > > > On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
+>> > 
+>> > [...]
+>> > 
+>>>>> > > >>  drivers/dma/Kconfig |    1 -
+>>>>> > > >>  1 files changed, 0 insertions(+), 1 deletions(-)
+>>>>> > > >>
+>>>>> > > >> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>>>> > > >> index 1c28816..95c7db7 100644
+>>>>> > > >> --- a/drivers/dma/Kconfig
+>>>>> > > >> +++ b/drivers/dma/Kconfig
+>>>>> > > >> @@ -82,7 +82,6 @@ config INTEL_IOP_ADMA
+>>>>> > > >>  
+>>>>> > > >>  config DW_DMAC
+>>>>> > > >>  	tristate "Synopsys DesignWare AHB DMA support"
+>>>>> > > >> -	depends on AVR32
+>>>> > > > Shouldn't you be adding a corresponding depends on new arch? And since
+>>>> > > > this supports old arch as well, it should say depends on both...
+>>> > > 
+>>> > > Why should this driver be dependent on ARM or AVR32? It can be present
+>>> > > on any other arch too.. So i thought removing this dependency all together
+>>> > > is better.
+>> > 
+>> > There could be a dependency on HAVE_CLK as it uses clock APIs.
+> If it uses the clk APIs then it should already depend on HAVE_CLK.
 
-Ok.
+It wasn't. But i have done that in my patchset.
 
 -- 
 viresh
