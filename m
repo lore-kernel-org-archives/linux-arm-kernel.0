@@ -1,41 +1,84 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 7 Mar 2011 11:59:02 -0800
-Subject: [PATCH 0/3] Tegra i2c board changes + defconfig update
-In-Reply-To: <1299486399-21761-1-git-send-email-olof@lixom.net>
-References: <1299486399-21761-1-git-send-email-olof@lixom.net>
-Message-ID: <AANLkTikxNgsE37t86VkLamzzt9W-E7jBTOTfXkqEvK9p@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 7 Mar 2011 20:59:10 +0100
+Subject: [PATCH 1/2] Add initial support for the Toshiba AC100/Dynabook AZ
+	netbook
+In-Reply-To: <AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
+References: <1299421906-7366-1-git-send-email-marvin24@gmx.de>
+	<1299421906-7366-2-git-send-email-marvin24@gmx.de>
+	<AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
+Message-ID: <201103072059.11231.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2011 at 12:26 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> Here is a short series of i2c patches to configure the i2c-tegra driver
-> for the boards in the tree, and to register some of the devices.
->
-> It also includes a defconfig update that enables the new drivers, enables
-> TRIMSLICE by default since the pcie fix makes it possible and also turns
-> on a few more config options that are useful (i.e. EFI partition tables
-> and some common board devices).
->
-> Since these patches rely on drivers that will be merged during the
-> upcoming window, this is my plan:
->
-> * Check them into boards-for-next together with Stephen W's
-> ?other late-merge board patches in a day or two
-> * Ask sfr to add said branch to linux-next (towards the end of list of trees)
-> * Sit on them until merge window is open and base tegra, i2c and asoc have
-> ?all been merged
-> * Rebase to current upstream when said trees are in, let it sit for 1
-> ?day for a linux-next cycle for sanity-check
-> * Send pull request
->
->
-> -Olof
+Hi,
 
-Do we need two branches in linux-next?  I think we should just push
-all of this to Tegra's for-next branch, and keep a for-linus branch
-that points to the last change that will build without merging with
-linux-next.  There shouldn't be any conflicts with linux-next, and
-there is no need for linux-next to build after merging some of its
-branches.
+On Monday 07 March 2011 09:37:26 Olof Johansson wrote:
+> On Sun, Mar 6, 2011 at 6:31 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> 
+> As Colin said, a short patch description would be appreciated.
+
+ok.
+ 
+> > diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
+> > new file mode 100644
+> > index 0000000..347a919
+> > --- /dev/null
+> > +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
+> [...]
+> > +static struct tegra_gpio_table gpio_table[] = {
+> > +       { .gpio = TEGRA_GPIO_PV5,       .enable = true  }, /* mmc2 cd   */
+> > +       { .gpio = TEGRA_GPIO_PH1,       .enable = true  }, /* mmc2 wp   */
+> > +       { .gpio = TEGRA_GPIO_PT3,       .enable = true  }, /* mmc2 pwr  */
+> > +       { .gpio = TEGRA_GPIO_PH2,       .enable = true  }, /* mmc4 cd   */
+> > +       { .gpio = TEGRA_GPIO_PH3,       .enable = true  }, /* mmc4 wp   */
+> > +       { .gpio = TEGRA_GPIO_PI6,       .enable = true  }, /* mmc4 pwr  */
+> > +};
+> 
+> Stephen Warren cleaned up Harmony and Seaboard and moved the GPIO
+> definitions to board-<board>.h and gave them symbolic names. Would you
+> mind doing that for these as well, please?
+
+will do.
+
+> > diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+> > new file mode 100644
+> > index 0000000..a33ce98
+> > --- /dev/null
+> > +++ b/arch/arm/mach-tegra/board-paz00.c
+> [...]
+> > +static struct tegra_sdhci_platform_data sdhci_pdata1 = {
+> > +       .cd_gpio        = -1,
+> > +       .wp_gpio        = -1,
+> > +       .power_gpio     = -1,
+> > +};
+> > +
+> > +static struct tegra_sdhci_platform_data sdhci_pdata2 = {
+> > +       .cd_gpio        = TEGRA_GPIO_PV5,
+> > +       .wp_gpio        = TEGRA_GPIO_PH1,
+> > +       .power_gpio     = TEGRA_GPIO_PT3,
+> > +};
+> > +
+> > +static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+> > +       .cd_gpio        = TEGRA_GPIO_PH2,
+> > +       .wp_gpio        = TEGRA_GPIO_PH3,
+> > +       .power_gpio     = TEGRA_GPIO_PI6,
+> > +       .is_8bit        = 1,
+> > +};
+> 
+> Weird, the internal eMMC has CD and WP gpios?!
+
+Yes that's strange. On the other hand, harmony has these gpios, the Toshiba 
+source defines them, and they don't hurt. So I vote for keeping them for 
+consistency reasons.
+
+It was good that you mentioned these gpios as I found an error in my original
+post. On AC100, the external mmc is connected to the first sdhci, not the 
+second. Even Toshiba/Compal seem to were confused as they also added a wrong 
+comment to the source (which I blindly followed).
+
+I'll send an updated version soon, which also adds PAZ00 to tegra_defconfig.
+
+Thanks!
+
+Marc
