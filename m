@@ -1,103 +1,164 @@
 From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Mon,  7 Mar 2011 10:33:52 -0800
-Subject: [PATCH] msm: gpio-v2: Add missing BIT field macros for interrupt
-	control
-Message-ID: <1299522832-31233-1-git-send-email-rvaswani@codeaurora.org>
+Date: Mon,  7 Mar 2011 10:35:22 -0800
+Subject: [PATCHv2 1/3] msm: Remove arch-specific gpiomux tables
+Message-ID: <1299522922-31294-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-v2 file was missing the BIT field macros causing incorrect
-values to be written at incorrect offsets within the TLMM block registers.
-These registers are used for masking/unmasking interrupts and configuring them
-This change fixes that problem.
+Remove arch-specific gpiomux files and include the gpiomux configs
+as a part of the board file.
 
-Change-Id: Ib538a2d09bca039b058627ddc309a7faaaf6bc8d
+Change-Id: I83de33c6d5f9e8e91832d8173d31a96cf11ce592
 Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
 ---
- arch/arm/mach-msm/gpio-v2.c |   36 ++++++++++++++++++++++++++----------
- 1 files changed, 26 insertions(+), 10 deletions(-)
+v2: Re-send
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index 0de19ec..fb52d6d 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -62,10 +62,10 @@ enum {
-  * can be triggered but the status register will not reflect it.
-  */
- enum {
--	INTR_ENABLE        = 0,
--	INTR_POL_CTL       = 1,
--	INTR_DECT_CTL      = 2,
--	INTR_RAW_STATUS_EN = 3,
-+	INTR_ENABLE_BIT        = 0,
-+	INTR_POL_CTL_BIT       = 1,
-+	INTR_DECT_CTL_BIT      = 2,
-+	INTR_RAW_STATUS_EN_BIT = 3,
- };
+ arch/arm/mach-msm/Makefile        |    4 +-
+ arch/arm/mach-msm/board-msm8x60.c |    3 ++
+ arch/arm/mach-msm/board-qsd8x50.c |   12 ++++++++
+ arch/arm/mach-msm/gpiomux-8x50.c  |   51 -------------------------------------
+ arch/arm/mach-msm/gpiomux-8x60.c  |   19 -------------
+ 5 files changed, 17 insertions(+), 72 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/gpiomux-8x50.c
+ delete mode 100644 arch/arm/mach-msm/gpiomux-8x60.c
+
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index ea8c74f..b6c6ec8 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -30,8 +30,8 @@ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+ obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o devices-msm8960.o
  
- /* Codes of interest in GPIO_INTR_CFG_SU.
-@@ -75,6 +75,22 @@ enum {
- 	TARGET_PROC_NONE     = 7,
- };
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-v1.o gpiomux.o
+-obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+-obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
++obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-v1.o gpiomux.o
++obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-v2.o gpiomux.o
+ ifdef CONFIG_MSM_V2_TLMM
+ ifndef CONFIG_ARCH_MSM8960
+ # TODO: TLMM Mapping issues need to be resolved
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index b3c55f1..6c0b868 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -27,6 +27,9 @@
  
-+/*
-+ * When a GPIO triggers, two separate decisions are made, controlled
-+ * by two separate flags.
-+ *
-+ * - First, INTR_RAW_STATUS_EN controls whether or not the GPIO_INTR_STATUS
-+ * register for that GPIO will be updated to reflect the triggering of that
-+ * gpio.  If this bit is 0, this register will not be updated.
-+ * - Second, INTR_ENABLE controls whether an interrupt is triggered.
-+ *
-+ * If INTR_ENABLE is set and INTR_RAW_STATUS_EN is NOT set, an interrupt
-+ * can be triggered but the status register will not reflect it.
-+ */
-+#define INTR_RAW_STATUS_EN BIT(INTR_RAW_STATUS_EN_BIT)
-+#define INTR_ENABLE        BIT(INTR_ENABLE_BIT)
-+#define INTR_DECT_CTL_EDGE BIT(INTR_DECT_CTL_BIT)
-+#define INTR_POL_CTL_HI    BIT(INTR_POL_CTL_BIT)
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
++#include "gpiomux.h"
++
++struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {};
  
- #define GPIO_INTR_CFG_SU(gpio)    (MSM_TLMM_BASE + 0x0400 + (0x04 * (gpio)))
- #define GPIO_CONFIG(gpio)         (MSM_TLMM_BASE + 0x1000 + (0x10 * (gpio)))
-@@ -217,9 +233,9 @@ static void msm_gpio_update_dual_edge_pos(unsigned gpio)
- 	do {
- 		val = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
- 		if (val)
--			clear_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
-+			clear_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
- 		else
--			set_gpio_bits(BIT(INTR_POL_CTL), GPIO_INTR_CFG(gpio));
-+			set_gpio_bits(INTR_POL_CTL_HI, GPIO_INTR_CFG(gpio));
- 		val2 = readl(GPIO_IN_OUT(gpio)) & BIT(GPIO_IN);
- 		intstat = readl(GPIO_INTR_STATUS(gpio)) & BIT(INTR_STATUS);
- 		if (intstat || val == val2)
-@@ -274,22 +290,22 @@ static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
- 	bits = readl(GPIO_INTR_CFG(gpio));
  
- 	if (flow_type & IRQ_TYPE_EDGE_BOTH) {
--		bits |= BIT(INTR_DECT_CTL);
-+		bits |= INTR_DECT_CTL_EDGE;
- 		irq_desc[irq].handle_irq = handle_edge_irq;
- 		if ((flow_type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
- 			__set_bit(gpio, msm_gpio.dual_edge_irqs);
- 		else
- 			__clear_bit(gpio, msm_gpio.dual_edge_irqs);
- 	} else {
--		bits &= ~BIT(INTR_DECT_CTL);
-+		bits &= ~INTR_DECT_CTL_EDGE;
- 		irq_desc[irq].handle_irq = handle_level_irq;
- 		__clear_bit(gpio, msm_gpio.dual_edge_irqs);
- 	}
+ static void __init msm8x60_map_io(void)
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index b464d48..b63b7c4 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -36,9 +36,21 @@
+ #include <mach/mmc.h>
  
- 	if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
--		bits |= BIT(INTR_POL_CTL);
-+		bits |= INTR_POL_CTL_HI;
- 	else
--		bits &= ~BIT(INTR_POL_CTL);
-+		bits &= ~INTR_POL_CTL_HI;
+ #include "devices.h"
++#include "gpiomux.h"
  
- 	writel(bits, GPIO_INTR_CFG(gpio));
+ extern struct sys_timer msm_timer;
  
++struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
++	[86] = { /* UART3 RX */
++		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
++			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
++	},
++	[87] = { /* UART3 TX */
++		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
++			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
++	},
++};
++
+ static const resource_size_t qsd8x50_surf_smc91x_base __initdata = 0x70000300;
+ static const unsigned        qsd8x50_surf_smc91x_gpio __initdata = 156;
+ 
+diff --git a/arch/arm/mach-msm/gpiomux-8x50.c b/arch/arm/mach-msm/gpiomux-8x50.c
+deleted file mode 100644
+index f7a4ea5..0000000
+--- a/arch/arm/mach-msm/gpiomux-8x50.c
++++ /dev/null
+@@ -1,51 +0,0 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- */
+-#include "gpiomux.h"
+-
+-#if defined(CONFIG_MMC_MSM) || defined(CONFIG_MMC_MSM_MODULE)
+-	#define SDCC_DAT_0_3_CMD_ACTV_CFG (GPIOMUX_VALID | GPIOMUX_PULL_UP\
+-					| GPIOMUX_FUNC_1 | GPIOMUX_DRV_8MA)
+-	#define SDCC_CLK_ACTV_CFG (GPIOMUX_VALID | GPIOMUX_PULL_NONE\
+-					| GPIOMUX_FUNC_1 | GPIOMUX_DRV_8MA)
+-#else
+-	#define SDCC_DAT_0_3_CMD_ACTV_CFG 0
+-	#define SDCC_CLK_ACTV_CFG 0
+-#endif
+-
+-#define SDC1_SUSPEND_CONFIG (GPIOMUX_VALID | GPIOMUX_PULL_DOWN\
+-				| GPIOMUX_FUNC_GPIO | GPIOMUX_DRV_2MA)
+-
+-struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
+-	[86] = { /* UART3 RX */
+-		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
+-			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
+-	},
+-	[87] = { /* UART3 TX */
+-		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
+-			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
+-	},
+-	/* SDC1 data[3:0] & CMD */
+-	[51 ... 55] = {
+-		.active = SDCC_DAT_0_3_CMD_ACTV_CFG,
+-		.suspended = SDC1_SUSPEND_CONFIG
+-	},
+-	/* SDC1 CLK */
+-	[56] = {
+-		.active = SDCC_CLK_ACTV_CFG,
+-		.suspended = SDC1_SUSPEND_CONFIG
+-	},
+-};
+diff --git a/arch/arm/mach-msm/gpiomux-8x60.c b/arch/arm/mach-msm/gpiomux-8x60.c
+deleted file mode 100644
+index 7b380b3..0000000
+--- a/arch/arm/mach-msm/gpiomux-8x60.c
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- */
+-#include "gpiomux.h"
+-
+-struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {};
 -- 
 Sent by an employee of the Qualcomm Innovation Center,Inc
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
