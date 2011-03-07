@@ -1,90 +1,81 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 07 Mar 2011 15:42:56 +0900
-Subject: [PATCH 08/09] ARM: s3c2440: gta02: Request usb pullup pin before
-	using it
-In-Reply-To: <4D6B7FE6.8090802@metafoo.de>
-References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-	<1297043521-21903-8-git-send-email-lars@metafoo.de>
-	<000301cbd70f$12367070$36a35150$%kim@samsung.com>
-	<4D6B7826.1030500@metafoo.de>
-	<003201cbd734$79d87050$6d8950f0$%kim@samsung.com>
-	<4D6B7FE6.8090802@metafoo.de>
-Message-ID: <031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
+Date: Mon, 07 Mar 2011 16:11:24 +0900
+Subject: [PATCH v2] ARM: EXYNOS4: enabled lcd and backlight in NURI board
+In-Reply-To: <1299460218-22748-1-git-send-email-dh09.lee@samsung.com>
+References: <1299460218-22748-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <032401cbdc96$e134f360$a39eda20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lars-Peter Clausen wrote:
+Donghwa Lee wrote:
 > 
-> On 02/28/2011 11:44 AM, Kukjin Kim wrote:
-> > Lars-Peter Clausen wrote:
-> >>
-> >> On 02/28/2011 07:16 AM, Kukjin Kim wrote:
-> >>> Lars-Peter Clausen wrote:
-> >>>>
-> >>>> Request the gpio pin used to control the usb pullup before using it
-to
-> >>> avoid
-> >>>> a
-> >>>> runtime warning about an auto-requested gpio.
-> >>>>
-> >>>> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> >>>> ---
-> >>>>  arch/arm/mach-s3c2440/mach-gta02.c |   17 +++++++++++++++--
-> >>>>  1 files changed, 15 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
-> >>> b/arch/arm/mach-s3c2440/mach-
-> >>>> gta02.c
-> >>>> index 1396639..94456fa 100644
-> >>>> --- a/arch/arm/mach-s3c2440/mach-gta02.c
-> >>>> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-> >>>> @@ -451,11 +451,11 @@ static void gta02_udc_command(enum
-> > s3c2410_udc_cmd_e
-> >>>> cmd)
-> >>>>  	switch (cmd) {
-> >>>>  	case S3C2410_UDC_P_ENABLE:
-> >>>>  		pr_debug("%s S3C2410_UDC_P_ENABLE\n", __func__);
-> >>>> -		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
-> >>>> +		gpio_set_value(GTA02_GPIO_USB_PULLUP, 1);
-> >>>
-> >>> How about following instead?
-> >>> 	gpio_request(GTA02_GPIO_USB_PULLUP, "USB_PULLUP");
-> >>> 	gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
-> >>> 	gpio_free(GTA02_GPIO_USB_PULLUP);
-> >>>
-> >>
-> >> I don't think that is a good idea. This gpio should really be reserved
-for
-> >> the
-> >> udc driver. If it is freed again, it could be requested from someone
-else
-> >> which
-> >> could lead to undefined behaviour.
-> >>
-> > Yes right, but I mean the board designer already knows the usage of
-> > regarding GPIOs on his board.
-> > So why do we really need gpio_request for it?...
+> This patch enables lcd and backlight drivers in NURI board.
 > 
-> Well, for one because it's part of the gpio-api. You should not call any
-> other
-> gpio functions on a pin unless you've successfully requested that pin.
-> On the other hand this helps debugging and ensures that the same gpio is
-not
-> used by two drivers accident. For example it is also possible to request
-> gpios
-> from userspace using the gpio sysfs. So by keeping the gpio requested it
-wont
-> be possible to request it from userspace by accident. And the gpio will
-also
-> be
-> listed in the gpio debugfs file, which can be helpful for debugging as
-well.
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> Changes since v1:
+> - Adds backlight platform data to control brightness and GPIO
+> - Modify inappropriate function name and remove useless codes.
+> - And so on.
 > 
-> - Lars
+>  arch/arm/mach-exynos4/Kconfig     |    1 +
+>  arch/arm/mach-exynos4/mach-nuri.c |   81
+> +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 82 insertions(+), 0 deletions(-)
 
-Hi Lars,
+Thanks for re-work :)
+There are small comments below.
 
-Ok, will apply :)
+(snip)
+
+> +static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int
+power)
+> +{
+> +	int gpio = EXYNOS4_GPE1(5);
+> +
+> +	if (power)
+> +		gpio_direction_output(gpio, 1);
+> +	else
+> +		gpio_direction_output(gpio, 0);
+
+	gpio_direction_output(gpio, power);
+
+> +}
+> +
+> +static int nuri_bl_init(struct device *dev)
+> +{
+> +	int ret, gpio = EXYNOS4_GPE2(3);
+> +
+> +	ret = gpio_request(gpio, "LCD_LDO_EN");
+> +	if (!ret)
+> +		gpio_direction_output(gpio, 0);
+> +
+> +	return 0;
+
+	return ret;
+
+> +}
+
+(snip)
+
+> +static struct platform_device nuri_lcd_device = {
+> +	.name			= "platform-lcd",
+> +	.id			= -1,
+> +	.dev			= {
+> +		.platform_data	= (void *) &nuri_lcd_platform_data,
+
+		.platform_data = &nuri_lcd_platform_data,
+
+> +	},
+> +};
+
+(snip)
+
+You used gpio_request() for EXYNOS4_GPE2(3) and EXYNOS4_GPE1(5), but
+EXYNOS4_GPE1(5). Is there any reason or policy for it?
+
+
 Thanks.
 
 Best regards,
