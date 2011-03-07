@@ -1,93 +1,90 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 07 Mar 2011 15:45:59 +0900
-Subject: [PATCH] Exynos4: Remove meaningless REGULATOR config option
-In-Reply-To: <20110304051609.GA15121@july>
-References: <20110304051609.GA15121@july>
-Message-ID: <031301cbdc93$5174bf60$f45e3e20$%kim@samsung.com>
+Date: Mon, 07 Mar 2011 15:42:56 +0900
+Subject: [PATCH 08/09] ARM: s3c2440: gta02: Request usb pullup pin before
+	using it
+In-Reply-To: <4D6B7FE6.8090802@metafoo.de>
+References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
+	<1297043521-21903-8-git-send-email-lars@metafoo.de>
+	<000301cbd70f$12367070$36a35150$%kim@samsung.com>
+	<4D6B7826.1030500@metafoo.de>
+	<003201cbd734$79d87050$6d8950f0$%kim@samsung.com>
+	<4D6B7FE6.8090802@metafoo.de>
+Message-ID: <031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Lars-Peter Clausen wrote:
 > 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
+> On 02/28/2011 11:44 AM, Kukjin Kim wrote:
+> > Lars-Peter Clausen wrote:
+> >>
+> >> On 02/28/2011 07:16 AM, Kukjin Kim wrote:
+> >>> Lars-Peter Clausen wrote:
+> >>>>
+> >>>> Request the gpio pin used to control the usb pullup before using it
+to
+> >>> avoid
+> >>>> a
+> >>>> runtime warning about an auto-requested gpio.
+> >>>>
+> >>>> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> >>>> ---
+> >>>>  arch/arm/mach-s3c2440/mach-gta02.c |   17 +++++++++++++++--
+> >>>>  1 files changed, 15 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
+> >>> b/arch/arm/mach-s3c2440/mach-
+> >>>> gta02.c
+> >>>> index 1396639..94456fa 100644
+> >>>> --- a/arch/arm/mach-s3c2440/mach-gta02.c
+> >>>> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
+> >>>> @@ -451,11 +451,11 @@ static void gta02_udc_command(enum
+> > s3c2410_udc_cmd_e
+> >>>> cmd)
+> >>>>  	switch (cmd) {
+> >>>>  	case S3C2410_UDC_P_ENABLE:
+> >>>>  		pr_debug("%s S3C2410_UDC_P_ENABLE\n", __func__);
+> >>>> -		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
+> >>>> +		gpio_set_value(GTA02_GPIO_USB_PULLUP, 1);
+> >>>
+> >>> How about following instead?
+> >>> 	gpio_request(GTA02_GPIO_USB_PULLUP, "USB_PULLUP");
+> >>> 	gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
+> >>> 	gpio_free(GTA02_GPIO_USB_PULLUP);
+> >>>
+> >>
+> >> I don't think that is a good idea. This gpio should really be reserved
+for
+> >> the
+> >> udc driver. If it is freed again, it could be requested from someone
+else
+> >> which
+> >> could lead to undefined behaviour.
+> >>
+> > Yes right, but I mean the board designer already knows the usage of
+> > regarding GPIOs on his board.
+> > So why do we really need gpio_request for it?...
 > 
-> reguration APIs are guarded at its header file
-> No need to define at codes.
+> Well, for one because it's part of the gpio-api. You should not call any
+> other
+> gpio functions on a pin unless you've successfully requested that pin.
+> On the other hand this helps debugging and ensures that the same gpio is
+not
+> used by two drivers accident. For example it is also possible to request
+> gpios
+> from userspace using the gpio sysfs. So by keeping the gpio requested it
+wont
+> be possible to request it from userspace by accident. And the gpio will
+also
+> be
+> listed in the gpio debugfs file, which can be helpful for debugging as
+well.
 > 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> diff --git a/arch/arm/mach-exynos4/cpufreq.c b/arch/arm/mach-
-> exynos4/cpufreq.c
-> index 174f080..a16ac35 100644
-> --- a/arch/arm/mach-exynos4/cpufreq.c
-> +++ b/arch/arm/mach-exynos4/cpufreq.c
-> @@ -31,10 +31,8 @@ static struct clk *moutcore;
->  static struct clk *mout_mpll;
->  static struct clk *mout_apll;
-> 
-> -#ifdef CONFIG_REGULATOR
->  static struct regulator *arm_regulator;
->  static struct regulator *int_regulator;
-> -#endif
-> 
->  static struct cpufreq_freqs freqs;
->  static unsigned int memtype;
-> @@ -434,10 +432,8 @@ static int exynos4_target(struct cpufreq_policy
-*policy,
->  	/* control regulator */
->  	if (freqs.new > freqs.old) {
->  		/* Voltage up */
-> -#ifdef CONFIG_REGULATOR
->  		regulator_set_voltage(arm_regulator, arm_volt, arm_volt);
->  		regulator_set_voltage(int_regulator, int_volt, int_volt);
-> -#endif
->  	}
-> 
->  	/* Clock Configuration Procedure */
-> @@ -446,10 +442,8 @@ static int exynos4_target(struct cpufreq_policy
-*policy,
->  	/* control regulator */
->  	if (freqs.new < freqs.old) {
->  		/* Voltage down */
-> -#ifdef CONFIG_REGULATOR
->  		regulator_set_voltage(arm_regulator, arm_volt, arm_volt);
->  		regulator_set_voltage(int_regulator, int_volt, int_volt);
-> -#endif
->  	}
-> 
->  	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> @@ -521,7 +515,6 @@ static int __init exynos4_cpufreq_init(void)
->  	if (IS_ERR(mout_apll))
->  		goto out;
-> 
-> -#ifdef CONFIG_REGULATOR
->  	arm_regulator = regulator_get(NULL, "vdd_arm");
->  	if (IS_ERR(arm_regulator)) {
->  		printk(KERN_ERR "failed to get resource %s\n", "vdd_arm");
-> @@ -533,7 +526,6 @@ static int __init exynos4_cpufreq_init(void)
->  		printk(KERN_ERR "failed to get resource %s\n", "vdd_int");
->  		goto out;
->  	}
-> -#endif
-> 
->  	/*
->  	 * Check DRAM type.
-> @@ -565,13 +557,11 @@ out:
->  	if (!IS_ERR(mout_apll))
->  		clk_put(mout_apll);
-> 
-> -#ifdef CONFIG_REGULATOR
->  	if (!IS_ERR(arm_regulator))
->  		regulator_put(arm_regulator);
-> 
->  	if (!IS_ERR(int_regulator))
->  		regulator_put(int_regulator);
-> -#endif
-> 
->  	printk(KERN_ERR "%s: failed initialization\n", __func__);
-> 
-Ok, applied with Mark's description.
+> - Lars
 
+Hi Lars,
+
+Ok, will apply :)
 Thanks.
 
 Best regards,
