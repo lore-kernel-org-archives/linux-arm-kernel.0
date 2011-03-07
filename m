@@ -1,38 +1,68 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 7 Mar 2011 13:09:50 -0800
-Subject: [PATCH v11 1/1] PRUSS UIO driver support
-In-Reply-To: <20110305003004.GA1295@local>
-References: <1299279617-21108-1-git-send-email-pratheesh@ti.com>
-	<1299279617-21108-2-git-send-email-pratheesh@ti.com>
-	<20110305003004.GA1295@local>
-Message-ID: <20110307210950.GA21433@kroah.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 07 Mar 2011 13:35:19 -0800
+Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 4 Mar 2011 23:08:17 +0530")
+References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
+	<AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
+	<7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com>
+Message-ID: <87d3m2397s.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 05, 2011 at 01:30:04AM +0100, Hans J. Koch wrote:
-> On Sat, Mar 05, 2011 at 04:30:17AM +0530, Pratheesh Gangadhar wrote:
-> > This patch implements PRUSS (Programmable Real-time Unit Sub System)
-> > UIO driver which exports SOC resources associated with PRUSS like
-> > I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
-> > processors which is efficient in performing embedded tasks that
-> > require manipulation of packed memory mapped data structures and
-> > handling system events that have tight real time constraints. This
-> > driver is currently supported on Texas Instruments DA850, AM18xx and
-> > OMAP-L138 devices.
-> > For example, PRUSS runs firmware for real-time critical industrial
-> > communication data link layer and communicates with application stack
-> > running in user space via shared memory and IRQs.
-> > 
-> > Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-> > Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Signed-off-by: Hans J. Koch <hjk@hansjkoch.de>
-> 
-> I think, we've got it. Thanks for your contribution and your patience.
-> Not many UIO programmers hang on through 11 patch versions...
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Thanks so much for all of you doing this review as well, that too take
-persistance :)
+> Dave,
+>> -----Original Message-----
+>> From: Dave Martin [mailto:dave.martin at linaro.org]
+>> Sent: Friday, March 04, 2011 11:05 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: patches at linaro.org; Tony Lindgren; Santosh Shilimkar; Jean
+>> Pihet; Kevin Hilman; linux-omap at vger.kernel.org; Nicolas Pitre;
+>> linaro-dev at lists.linaro.org
+>> Subject: Re: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2
+>> compatibility fixes
+>>
+>> On Fri, Mar 4, 2011 at 3:33 PM, Dave Martin <dave.martin@linaro.org>
+>> wrote:
+>> > This set of patches, along with some other patches under
+>> > discussion on alkml, should enable omap3 and omap4 kernels to be
+>> > built with CONFIG_THUMB2_KERNEL.
+>> >
+>> > This patch set builds on recent cleanup done by the omap
+>> > maintainers.
+>> >
+>> > At least some of this code definitely works, most features have
+>> > been tested successfully. ?Further testing, especially of Thumb-2
+>> > behaviour, is still welcome.
+>> >
+>> > In particular, I still have no Ack/Tested-by on the following
+>> > patches, so it would be great if anyone who has an opportunity
+>> > to do a final review / re-test can do so.
+>> >
+>> > ?* ARM: omap3: Convert END() to ENDPROC() for correct linkage with
+>> CONFIG_THUMB2_KERNEL
+>> > ?* ARM: omap3: Thumb-2 compatibility for sram34xx.S
+>> > ?* ARM: omap3: Thumb-2 compatibility for sleep34xx.S
+>>
+>> Following up on this, it looks like I have some locally-recorded
+>> acks
+>> which didn't make it into my posting ...
+>>
+>> The one patch I currently have no feedback on is this one:
+>>
+>>   * ARM: omap4: Provide do_wfi() for Thumb-2
+>>
+> You can drop this one since do_wfi()  won't be needed
+> anymore after my recent series.
+>
+> http://www.spinics.net/lists/linux-omap/msg46495.html
 
-greg k-h
+Santosh,
+
+I'm planning to queue/merge Dave's series as-is for 2.6.39, since it has
+already received significan review & testing.
+
+When you update your OMAP4 series, feel free to drop it as needed.
+
+Kevin
