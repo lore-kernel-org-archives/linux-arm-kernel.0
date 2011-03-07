@@ -1,153 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Mar 2011 07:59:04 +0900
-Subject: [PATCH v3] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-In-Reply-To: <1299487030-8675-1-git-send-email-dh09.lee@samsung.com>
-References: <1299487030-8675-1-git-send-email-dh09.lee@samsung.com>
-Message-ID: <038801cbdd1b$436a0c30$ca3e2490$%kim@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Mar 2011 15:13:49 -0800
+Subject: [PATCH 0/3] Tegra i2c board changes + defconfig update
+In-Reply-To: <AANLkTimWi2z30tBK_1N_6gjqgbugCeCwc1oV3zWtModj@mail.gmail.com>
+References: <1299486399-21761-1-git-send-email-olof@lixom.net>
+	<AANLkTikxNgsE37t86VkLamzzt9W-E7jBTOTfXkqEvK9p@mail.gmail.com>
+	<20110307200452.GM1829@sirena.org.uk>
+	<AANLkTimWi2z30tBK_1N_6gjqgbugCeCwc1oV3zWtModj@mail.gmail.com>
+Message-ID: <AANLkTikjoRVjbLhf_QbLu41ZKM+=q+nMxbAk81AU=O5y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Donghwa Lee wrote:
-> 
-> This patch enables lcd and backlight drivers in NURI board.
-> 
-> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes since v2:
-> - code clean and make a pair of gpio_request()/gpio_free()
-> 
->  arch/arm/mach-exynos4/Kconfig     |    1 +
->  arch/arm/mach-exynos4/mach-nuri.c |   74
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 75 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index 5bf00b9..de31e4d 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -135,6 +135,7 @@ config MACH_NURI
->  	select EXYNOS4_SETUP_I2C1
->  	select EXYNOS4_SETUP_I2C5
->  	select EXYNOS4_SETUP_SDHCI
-> +	select SAMSUNG_DEV_PWM
->  	help
->  	  Machine support for Samsung Mobile NURI Board.
-> 
-> diff --git a/arch/arm/mach-exynos4/mach-nuri.c
-b/arch/arm/mach-exynos4/mach-
-> nuri.c
-> index 28010bd..f18e573 100644
-> --- a/arch/arm/mach-exynos4/mach-nuri.c
-> +++ b/arch/arm/mach-exynos4/mach-nuri.c
-> @@ -17,6 +17,10 @@
->  #include <linux/regulator/machine.h>
->  #include <linux/regulator/fixed.h>
->  #include <linux/mmc/host.h>
-> +#include <linux/fb.h>
-> +#include <linux/pwm_backlight.h>
-> +
-> +#include <video/platform_lcd.h>
-> 
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> @@ -181,6 +185,73 @@ static struct platform_device nuri_gpio_keys = {
->  	},
->  };
-> 
-> +static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int
-power)
-> +{
-> +	int gpio = EXYNOS4_GPE1(5);
-> +
-> +	gpio_request(gpio, "LVDS_nSHDN");
-> +	gpio_direction_output(gpio, power);
-> +	gpio_free(gpio);
-> +}
-> +
-> +static int nuri_bl_init(struct device *dev)
-> +{
-> +	int ret, gpio = EXYNOS4_GPE2(3);
-> +
-> +	ret = gpio_request(gpio, "LCD_LDO_EN");
-> +	if (!ret)
-> +		gpio_direction_output(gpio, 0);
-> +
-> +	return ret;
-> +}
-> +
-> +static int nuri_bl_notify(struct device *dev, int brightness)
-> +{
-> +	if (brightness < 1)
-> +		brightness = 0;
-> +
-> +	gpio_set_value(EXYNOS4_GPE2(3), 1);
-> +
-> +	return brightness;
-> +}
-> +
-> +static void nuri_bl_exit(struct device *dev)
-> +{
-> +	gpio_free(EXYNOS4_GPE2(3));
-> +}
-> +
-> +/* nuri pwm backlight */
-> +static struct platform_pwm_backlight_data nuri_backlight_data = {
-> +	.pwm_id			= 0,
-> +	.pwm_period_ns		= 30000,
-> +	.max_brightness		= 100,
-> +	.dft_brightness		= 50,
-> +	.init			= nuri_bl_init,
-> +	.notify			= nuri_bl_notify,
-> +	.exit			= nuri_bl_exit,
-> +};
-> +
-> +static struct platform_device nuri_backlight_device = {
-> +	.name			= "pwm-backlight",
-> +	.id			= -1,
-> +	.dev			= {
-> +		.parent		= &s3c_device_timer[0].dev,
-> +		.platform_data	= &nuri_backlight_data,
-> +	},
-> +};
-> +
-> +static struct plat_lcd_data nuri_lcd_platform_data = {
-> +	.set_power		= nuri_lcd_power_on,
-> +};
-> +
-> +static struct platform_device nuri_lcd_device = {
-> +	.name			= "platform-lcd",
-> +	.id			= -1,
-> +	.dev			= {
-> +		.platform_data	= &nuri_lcd_platform_data,
-> +	},
-> +};
-> +
->  /* I2C1 */
->  static struct i2c_board_info i2c1_devs[] __initdata = {
->  	/* Gyro, To be updated */
-> @@ -201,8 +272,11 @@ static struct platform_device *nuri_devices[]
-__initdata
-> = {
->  	&s3c_device_wdt,
->  #endif
-> 
-> +	&s3c_device_timer[0],
->  	/* NURI Devices */
->  	&nuri_gpio_keys,
-> +	&nuri_lcd_device,
-> +	&nuri_backlight_device,
->  };
-> 
->  static void __init nuri_map_io(void)
-> --
-> 1.6.0.4
+On Mon, Mar 7, 2011 at 12:07 PM, Colin Cross <ccross@android.com> wrote:
+> On Mon, Mar 7, 2011 at 12:04 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Mon, Mar 07, 2011 at 11:59:02AM -0800, Colin Cross wrote:
+>>
+>>> linux-next. ?There shouldn't be any conflicts with linux-next, and
+>>> there is no need for linux-next to build after merging some of its
+>>> branches.
+>>
+>> -next gets built after each merge so the tree does need to merge without
+>> the trees that get merged later on.
+>
+> Ok, we can make sure Tegra is merged after i2c and asoc, in which case
+> it should build fine.
 
-Ok, will apply.
-Thanks.
+Main drawback is that the tegra main for-next branch doesn't build on
+its own then. Not a big deal, especially not this close to the merge
+window, IMHO.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I'll send a new pull request picking up the recently posted patches
+then. I'm actually OK with the paz00 patches going in .39 myself,
+since they don't impact any of the existing code, so nothing can
+regress because of them.
+
+New pull request in a bit.
+
+-Olof
