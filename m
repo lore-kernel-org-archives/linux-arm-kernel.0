@@ -1,61 +1,100 @@
-From: Tero.Kristo@nokia.com (Tero.Kristo at nokia.com)
-Date: Mon, 7 Mar 2011 12:02:22 +0000
-Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from
-	going to RET or OFF when DSS is on
-In-Reply-To: <87lj0uj048.fsf@ti.com>
-References: <20110301220833.32613.54669.stgit@twilight.localdomain>
-	<20110301224918.32613.95176.stgit@twilight.localdomain>
-	<87pqq7pz27.fsf@ti.com>
-	<854C6400F5AA6644BA6FE7953F3E769B0380F12F@008-AM1MPN1-013.mgdnok.nokia.com>
-	<87lj0uj048.fsf@ti.com>
-Message-ID: <854C6400F5AA6644BA6FE7953F3E769B0380FE45@008-AM1MPN1-013.mgdnok.nokia.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Mon,  7 Mar 2011 13:03:59 +0100
+Subject: [PATCH] ARM: imx: Add tlv320aic32x4 board specific code to
+	Visstrim_M10.
+Message-ID: <1299499439-4466-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ arch/arm/mach-imx/Kconfig                   |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   27 +++++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
->-----Original Message-----
-From: linux-omap-owner@vger.kernel.org [mailto:linux-omap-
->owner at vger.kernel.org] On Behalf Of ext Kevin Hilman
->Sent: 04 March, 2011 18:56
->To: Kristo Tero (Nokia-MS/Tampere)
->Cc: paul at pwsan.com; linux-omap at vger.kernel.org; linux-arm-
->kernel at lists.infradead.org
->Subject: Re: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from
->going to RET or OFF when DSS is on
->
->Hi Tero,
->
-><Tero.Kristo@nokia.com> writes:
->
->[...]
->
->>>>
->>>> +	/* If DSS is active, prevent CORE RET/OFF */
->>>> +	dss_state = pwrdm_read_pwrst(dss_pd);
->>>> +	if (dss_state == PWRDM_POWER_ON &&
->>>> +	    core_next_state != PWRDM_POWER_ON)
->>>> +		core_next_state = PWRDM_POWER_INACTIVE;
->>>> +
->>>
->>>Due to sleepdeps/autodeps, when this code runs, DSS powerdomain is
->>>always on.  The result is that CORE is always set to INACTIVE.
->>
->> Now I recall that someone was asking about a patch similar to this
->> earlier, and had the same issue with DSS sleepdep collision.
->
->>
->> What is the reason for having the sleepdep for DSS powerdomain anyway?
->> At least I can't see any reason why the sleepdep for DSS should be
->> set. In my opinion it should be perfectly okay for DSS domain to idle
->> independently of MPU/CORE, as this is going to be better for power
->> consumption also.
->
->Agreed, but currently the sleepdeps with MPU are automatically managed
->(by clkdm autodeps and hwmod initiator deps.)  Until we have merged a
->solution to more selectively enable sleepdeps (or remove them) $SUBJECT
->patch cannot be merged.
-
-Ok I thought this is the case... it would be possible to implement a temporary/permanent solution that uses idle status check instead of pwrdm state check, and prevent core idle if dss is not going to idle. What is the current status with those idlest patches anyway?
-
--Tero
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 197f9e2..4d01d8c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -168,6 +168,7 @@ config MACH_IMX27_VISSTRIM_M10
+ 	bool "Vista Silicon i.MX27 Visstrim_m10"
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	help
+ 	  Include support for Visstrim_m10 platform and its different variants.
+ 	  This includes specific configurations for the board and its
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 59716fa..f43e042 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -30,6 +30,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <sound/tlv320aic32x4.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -69,6 +70,11 @@ static const int visstrim_m10_pins[] __initconst = {
+ 	PD15_AOUT_FEC_COL,
+ 	PD16_AIN_FEC_TX_ER,
+ 	PF23_AIN_FEC_TX_EN,
++	/* SSI1 */
++	PC20_PF_SSI1_FS,
++	PC21_PF_SSI1_RXD,
++	PC22_PF_SSI1_TXD,
++	PC23_PF_SSI1_CLK,
+ 	/* SDHC1 */
+ 	PE18_PF_SD1_D0,
+ 	PE19_PF_SD1_D1,
+@@ -202,11 +208,26 @@ static struct pca953x_platform_data visstrim_m10_pca9555_pdata = {
+ 	.invert = 0,
+ };
+ 
++static struct aic32x4_pdata visstrim_m10_aic32x4_pdata = {
++	.power_cfg = AIC32X4_PWR_MICBIAS_2075_LDOIN |
++		     AIC32X4_PWR_AVDD_DVDD_WEAK_DISABLE |
++		     AIC32X4_PWR_AIC32X4_LDO_ENABLE |
++		     AIC32X4_PWR_CMMODE_LDOIN_RANGE_18_36 |
++		     AIC32X4_PWR_CMMODE_HP_LDOIN_POWERED,
++	.micpga_routing = AIC32X4_MICPGA_ROUTE_LMIC_IN2R_10K |
++			 AIC32X4_MICPGA_ROUTE_RMIC_IN1L_10K,
++	.swapdacs = false,
++};
++
+ static struct i2c_board_info visstrim_m10_i2c_devices[] = {
+ 	{
+ 		I2C_BOARD_INFO("pca9555", 0x20),
+ 		.platform_data = &visstrim_m10_pca9555_pdata,
+ 	},
++	{
++		I2C_BOARD_INFO("tlv320aic32x4", 0x18),
++		.platform_data = &visstrim_m10_aic32x4_pdata,
++	}
+ };
+ 
+ /* USB OTG */
+@@ -222,6 +243,11 @@ static struct mxc_usbh_platform_data visstrim_m10_usbotg_pdata = {
+ 	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
+ };
+ 
++/* SSI */
++static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
++	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
++};
++
+ static void __init visstrim_m10_board_init(void)
+ {
+ 	int ret;
+@@ -231,6 +257,7 @@ static void __init visstrim_m10_board_init(void)
+ 	if (ret)
+ 		pr_err("Failed to setup pins (%d)\n", ret);
+ 
++	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
+ 	imx27_add_imx_uart0(&uart_pdata);
+ 
+ 	i2c_register_board_info(0, visstrim_m10_i2c_devices,
+-- 
+1.7.0.4
