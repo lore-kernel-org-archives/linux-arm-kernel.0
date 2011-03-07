@@ -1,46 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Mar 2011 10:42:38 -0000
-Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
-In-Reply-To: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
-References: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <000801cbdcb4$612bde40$23839ac0$@deacon@arm.com>
+From: alberto@amarulasolutions.com (Alberto Panizzo)
+Date: Mon, 07 Mar 2011 11:44:13 +0100
+Subject: [PATCHv3 1/4] spi_imx: Fix misspelled configuration variable SOC_IMX31
+In-Reply-To: <1299494529.2468.42.camel@realization>
+References: <1299492598.2468.30.camel@realization>
+	<4D74B091.2010908@pengutronix.de>
+	<1299494529.2468.42.camel@realization>
+Message-ID: <1299494653.2468.44.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
 
-> Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
+This fix a kernel NULL pointer error while initialising SPI introduced 
+by: 4d2f13be1e370a670c1cae20c194d5ce961e0fa5
 
-Is there a patch 2/2 as well? (I only received this one).
+Signed-off-by: Alberto Panizzo <alberto@amarulasolutions.com>
+---
+ drivers/spi/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index bd9dad5..996cf03 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -161,7 +161,7 @@ config SPI_IMX_VER_0_0
+ 	def_bool y if SOC_IMX21 || SOC_IMX27
  
-> This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  arch/arm/include/asm/a.out-core.h |    6 ------
->  1 files changed, 0 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
-> index 93d04ac..639f5c8 100644
-> --- a/arch/arm/include/asm/a.out-core.h
-> +++ b/arch/arm/include/asm/a.out-core.h
-> @@ -32,12 +32,6 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
->  	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
->  	dump->u_ssize = 0;
-> 
-> -	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
-> -	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
-> -	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
-> -	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
-> -	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
-> -
->  	if (dump->start_stack < 0x04000000)
->  		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
-
-Damn, looks like I forgot to update this code. I think it might be better
-to memset zero the u_debugreg array rather than ignore the assignment and
-also add a comment to struct user to explain that thie field is no longer
-used.
-
-Will
+ config SPI_IMX_VER_0_4
+-	def_bool y if SOC_MX31
++	def_bool y if SOC_IMX31
+ 
+ config SPI_IMX_VER_0_7
+ 	def_bool y if ARCH_MX25 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+-- 
+1.7.1
