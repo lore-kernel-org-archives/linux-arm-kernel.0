@@ -1,46 +1,40 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon,  7 Mar 2011 19:36:57 +0530
-Subject: [PATCH v1 1/1] davinci: macro rename DA8XX_LPSC0_DMAX to
-	DA8XX_LPSC0_PRUSS.
-Message-ID: <1299506818-11785-1-git-send-email-subhasish@mistralsolutions.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Mon, 7 Mar 2011 16:30:47 +0200
+Subject: [PATCH] OMAP1: McBSP: fix build break for non-multi-OMAP1 configs
+In-Reply-To: <alpine.DEB.2.00.1103041535150.10981@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1103041535150.10981@utopia.booyaka.com>
+Message-ID: <20110307163047.a65c51d2.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMAX is an internal name for the module which is
-known as PRUSS in TI public documentation. This patch just
-gets the code in sync with TI documentation.
+On Fri, 4 Mar 2011 15:36:46 -0700 (MST)
+Paul Walmsley <paul@pwsan.com> wrote:
 
-Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
----
- arch/arm/mach-davinci/da830.c            |    2 +-
- arch/arm/mach-davinci/include/mach/psc.h |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> Commit 3cf32bba8ca0e0052ca41d74d455a5805b7fea85 ("OMAP: McBSP: Convert
+> McBSP to platform device model") in the current omap-for-linus branch
+> breaks compilation with non-multi-OMAP1 configs:
+> 
+>   CC      arch/arm/mach-omap1/mcbsp.o
+> arch/arm/mach-omap1/mcbsp.c: In function 'omap1_mcbsp_init':
+> arch/arm/mach-omap1/mcbsp.c:384: warning: dereferencing 'void *' pointer
+> arch/arm/mach-omap1/mcbsp.c:387: error: invalid use of void expression
+> arch/arm/mach-omap1/mcbsp.c:390: warning: dereferencing 'void *' pointer
+> arch/arm/mach-omap1/mcbsp.c:393: error: invalid use of void expression
+> 
+> +#define omap7xx_mcbsp_res_0		omap7xx_mcbsp_res[0]
+> +
+...
+>  	if (cpu_is_omap7xx())
+> -		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res[0],
+> +		omap_mcbsp_register_board_cfg(omap7xx_mcbsp_res_0,
+>  					OMAP7XX_MCBSP_RES_SZ,
+>  					omap7xx_mcbsp_pdata,
+>  					OMAP7XX_MCBSP_COUNT);
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index ec23ab4..0577a5d 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -148,7 +148,7 @@ static struct clk scr2_ss_clk = {
- static struct clk dmax_clk = {
- 	.name		= "dmax",
- 	.parent		= &pll0_sysclk2,
--	.lpsc		= DA8XX_LPSC0_DMAX,
-+	.lpsc		= DA8XX_LPSC0_PRUSS,
- 	.flags		= ALWAYS_ENABLED,
- };
- 
-diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
-index 62b0858..a47e6f2 100644
---- a/arch/arm/mach-davinci/include/mach/psc.h
-+++ b/arch/arm/mach-davinci/include/mach/psc.h
-@@ -150,7 +150,7 @@
- #define DA8XX_LPSC0_SCR0_SS		10
- #define DA8XX_LPSC0_SCR1_SS		11
- #define DA8XX_LPSC0_SCR2_SS		12
--#define DA8XX_LPSC0_DMAX		13
-+#define DA8XX_LPSC0_PRUSS		13
- #define DA8XX_LPSC0_ARM			14
- #define DA8XX_LPSC0_GEM			15
- 
--- 
-1.7.2.3
+omapxxx_mcbsp_res_0 doesn't look the best here in readability point of
+view but provides the smallest fix as no need to rename array and
+modify the _RES_SZ and _COUNT macros. So this fix is needed here and a
+small readability update can be done later.
+
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
