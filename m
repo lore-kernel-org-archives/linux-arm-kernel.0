@@ -1,98 +1,132 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 7 Mar 2011 17:55:22 +0530
-Subject: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Wayoperationcan
-	cause data corruption
-In-Reply-To: <000a01cbdcc0$3d0dfeb0$b729fc10$@deacon@arm.com>
-References: <1298032525-21115-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110227120021.GA15314@n2100.arm.linux.org.uk>	<20110228101351.GA30781@n2100.arm.linux.org.uk><69dd173e3c7b4d02ef50ceaa19b2343a@mail.gmail.com>
-	<000a01cbdcc0$3d0dfeb0$b729fc10$@deacon@arm.com>
-Message-ID: <491849bc08797fc8c4d0def52dd6308a@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 7 Mar 2011 13:55:21 +0100
+Subject: [PATCH v2 2/4] OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+In-Reply-To: <1299484388-16205-3-git-send-email-omar.ramirez@ti.com>
+References: <1299484388-16205-1-git-send-email-omar.ramirez@ti.com>
+	<1299484388-16205-3-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4D74D5B9.2070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Will for reporting it.
+Hi Omar,
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Monday, March 07, 2011 5:38 PM
-> To: 'Santosh Shilimkar'; Russell King - ARM Linux
-> Cc: tony at atomide.com; Catalin Marinas; linux-omap at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/2] ARM: l2x0: Errata fix for flush by
-> Wayoperationcan cause data corruption
+I have some concern about the introduction of a hwmod that does not 
+match the actual HW capability. MMU does exist, but there is no SW 
+control for it. In fact the only control available is for mmu + cache + 
+logic, and that's why the MMU is handle today under the main DSP/IPU hwmod.
+
+Here you are just duplicating dsp_hwmod and ipu_hwmod with dsp_mmu_hwmod 
+/ ipu_mmu_hwmod and adding some memory space for the mmu part.
+
+In that case, you can still use the previous name and add the missing 
+entries in it.
+
+The only advantage I can see is the usage of a common class that will 
+allow you to handle both DSP and IPU using the same "MMU" driver.
+
+So, what are you going to do with the remaining entries for dsp_hwmod 
+and ipu_hwmod?
+
+If these two become useless and only the mmu part is useful, we can 
+potentially rename them like you did, but without keeping the original.
+
+On 3/7/2011 8:53 AM, Ramirez Luna, Omar wrote:
+> Add mmu hwmod data for ipu and dsp.
 >
-> Hi Santosh,
+> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  156 +++++++++++++++++++++++++--
+>   1 files changed, 144 insertions(+), 12 deletions(-)
 >
-> > > On Sun, Feb 27, 2011 at 12:00:21PM +0000, Russell King - ARM
-> Linux
-> > > wrote:
-> > > > > +#else
-> > > > > +/* Optimised out for non-errata case */
-> > > > > +static inline void debug_writel(unsigned long val)
-> > > > > +{
-> > > > >  }
-> > > >
-> > > > #define l2x0_set_debug	NULL
-> > > >
-> > > > > +#endif
-> > >
-> > > I notice you got rid of the inline function.  Have you tried
-> > > building this without the errata enabled?
-> >
-> > I accidently dropped the inline function while
-> > incorporating the comment from you. :(
-> >
-> > Fixed it. Updated version # 6770/1
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 7dbcdf7..149d694 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -27,6 +27,7 @@
+>   #include<plat/mcspi.h>
+>   #include<plat/mcbsp.h>
+>   #include<plat/mmc.h>
+> +#include<plat/iommu.h>
 >
-> This version of the patch (as it appears in -next) is broken:
+>   #include "omap_hwmod_common_data.h"
 >
+> @@ -990,10 +991,6 @@ static struct omap_hwmod_irq_info omap44xx_dsp_irqs[] = {
+>   	{ .irq = 28 + OMAP44XX_IRQ_GIC_START },
+>   };
 >
-> +#define debug_writel(val)	outer_cache.set_debug(val)
+> -static struct omap_hwmod_rst_info omap44xx_dsp_resets[] = {
+> -	{ .name = "mmu_cache", .rst_shift = 1 },
+> -};
+> -
+>   static struct omap_hwmod_rst_info omap44xx_dsp_c0_resets[] = {
+>   	{ .name = "dsp", .rst_shift = 0 },
+>   };
+> @@ -1045,8 +1042,6 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
+>   	.class		=&omap44xx_dsp_hwmod_class,
+>   	.mpu_irqs	= omap44xx_dsp_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dsp_irqs),
+> -	.rst_lines	= omap44xx_dsp_resets,
+> -	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_resets),
+>   	.main_clk	= "dsp_fck",
+>   	.prcm = {
+>   		.omap4 = {
+> @@ -2323,10 +2318,6 @@ static struct omap_hwmod_rst_info omap44xx_ipu_c1_resets[] = {
+>   	{ .name = "cpu1", .rst_shift = 1 },
+>   };
+>
+> -static struct omap_hwmod_rst_info omap44xx_ipu_resets[] = {
+> -	{ .name = "mmu_cache", .rst_shift = 2 },
+> -};
+> -
+>   /* ipu master ports */
+>   static struct omap_hwmod_ocp_if *omap44xx_ipu_masters[] = {
+>   	&omap44xx_ipu__l3_main_2,
+> @@ -2380,8 +2371,6 @@ static struct omap_hwmod omap44xx_ipu_hwmod = {
+>   	.class		=&omap44xx_ipu_hwmod_class,
+>   	.mpu_irqs	= omap44xx_ipu_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_ipu_irqs),
+> -	.rst_lines	= omap44xx_ipu_resets,
+> -	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_ipu_resets),
+>   	.main_clk	= "ipu_fck",
+>   	.prcm		= {
+>   		.omap4 = {
+> @@ -3711,6 +3700,145 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
+>   };
+>
+>   /*
+> + * 'mmu' class
+> + * The memory management unit performs virtual to physical address translation
+> + * for its requestors.
+> + */
 > +
-> +static void l2x0_set_debug(unsigned long val)
-> +{
-> +	writel(val, l2x0_base + L2X0_DEBUG_CTRL);
+> +static struct omap_hwmod_class_sysconfig mmu_sysc = {
+> +	.rev_offs	= 0x000,
+> +	.sysc_offs	= 0x010,
+> +	.syss_offs	= 0x014,
+> +	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
+> +			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	=&omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
+> +	.name = "mmu",
+> +	.sysc =&mmu_sysc,
+> +};
+> +
+> +/* ipu mmu */
+> +
+> +static struct omap_mmu_dev_attr ipu_mmu_dev_attr = {
+> +	.da_start = 0x0,
+> +	.da_end = 0xfffff000,
+> +	.nr_tlb_entries = 32,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_ipu_mmu_hwmod;
 
-This should have been "writel_relaxed()" to avoid the
-cache sync.
-
->  }
->
-> [...]
->
-> @@ -119,9 +120,11 @@ static void l2x0_flush_all(void)
->
->  	/* clean all ways */
->  	spin_lock_irqsave(&l2x0_lock, flags);
-> +	debug_writel(0x03);
->  	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_INV_WAY);
->  	cache_wait_way(l2x0_base + L2X0_CLEAN_INV_WAY, l2x0_way_mask);
->  	cache_sync();
-> +	debug_writel(0x00);
->  	spin_unlock_irqrestore(&l2x0_lock, flags);
->  }
->
->
-> This deadlocks because the writel forces an outer cache sync, which
-> then tries to acquire the spinlock which is held by the calling
-> function.
->
-> If you change l2x0_set_debug to use writel_relaxed then you can
-> avoid the problem.
->
-Ya understood. I couldn't test non-errata case because
-direct right doesn't work because of security and henced missed
-it.
-
-Below is the updated version. Also attached.
-
-Russell,
-Do you want me to push this to patch system or you can
-apply this one?
-
+Minor comment, but if we want to focus on the MMU as the main class, 
+then ipu and dsp will become just instance qualifiers, and thus the name 
+should be mmu_ipu and mmu_dsp.
 
 Regards,
-Santosh
-------
+Benoit
