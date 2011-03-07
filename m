@@ -1,84 +1,86 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Mon, 7 Mar 2011 20:59:10 +0100
-Subject: [PATCH 1/2] Add initial support for the Toshiba AC100/Dynabook AZ
-	netbook
-In-Reply-To: <AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
-References: <1299421906-7366-1-git-send-email-marvin24@gmx.de>
-	<1299421906-7366-2-git-send-email-marvin24@gmx.de>
-	<AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
-Message-ID: <201103072059.11231.marvin24@gmx.de>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 7 Mar 2011 20:01:11 +0000
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <20110307180700.GQ29521@pengutronix.de>
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
+	<20110307180700.GQ29521@pengutronix.de>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA194690@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-On Monday 07 March 2011 09:37:26 Olof Johansson wrote:
-> On Sun, Mar 6, 2011 at 6:31 AM, Marc Dietrich <marvin24@gmx.de> wrote:
-> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> 
-> As Colin said, a short patch description would be appreciated.
+>-----Original Message-----
+From: s.hauer@pengutronix.de [mailto:s.hauer at pengutronix.de]
+>Sent: Monday, March 07, 2011 12:07 PM
+>To: Nguyen Dinh-R00091
+>Cc: Arnaud Patard; linux at arm.linux.org.uk; linux-kernel at vger.kernel.org; Vaidyanathan Ranjani-RA5478;
+>u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+>
+>On Mon, Mar 07, 2011 at 04:35:48PM +0000, Nguyen Dinh-R00091 wrote:
+>> Hi Arnaud,
+>>
+>>
+>> >-----Original Message-----
+>> >From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+>> >bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+>> >Sent: Monday, March 07, 2011 10:02 AM
+>> >To: Nguyen Dinh-R00091
+>> >Cc: linux at arm.linux.org.uk; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; Vaidyanathan
+>> >Ranjani-RA5478; u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-
+>> >kernel at lists.infradead.org
+>> >Subject: Re: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+>> >
+>> >Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+>> >
+>> >> Hi Arnaud,
+>> >
+>> >Hi,
+>> >>
+>> >> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
+>> >
+>> >I never said I was testing on babbage. The reason is because I'm using a
+>> >efika smartbook and not a babbage.
+>> >
+>> >>
+>> >> root at freescale ~$ uname -a
+>> >> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
+>> >
+>> >2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
+>> >Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
+>> >without even testing it on the current tree. Can you please test suspend
+>> >with current imx for-next tree (with no other patches than theses 2
+>> >patches if possible), in order to make sure that it's still working with it ?
+>> >
+>>
+>> The current imx for-next tree is not booting on my Babbage board. Is
+>> it okay for you with your HW. I'll have to debug the booting part
+>> first.
+>
+>Probably because other than kconfig states i.MX51 and i.MX53 cannot be
+>compiled in one kernel. the for-next branch boots fine on my babbage.
+>
 
-ok.
- 
-> > diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
-> > new file mode 100644
-> > index 0000000..347a919
-> > --- /dev/null
-> > +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-> [...]
-> > +static struct tegra_gpio_table gpio_table[] = {
-> > +       { .gpio = TEGRA_GPIO_PV5,       .enable = true  }, /* mmc2 cd   */
-> > +       { .gpio = TEGRA_GPIO_PH1,       .enable = true  }, /* mmc2 wp   */
-> > +       { .gpio = TEGRA_GPIO_PT3,       .enable = true  }, /* mmc2 pwr  */
-> > +       { .gpio = TEGRA_GPIO_PH2,       .enable = true  }, /* mmc4 cd   */
-> > +       { .gpio = TEGRA_GPIO_PH3,       .enable = true  }, /* mmc4 wp   */
-> > +       { .gpio = TEGRA_GPIO_PI6,       .enable = true  }, /* mmc4 pwr  */
-> > +};
-> 
-> Stephen Warren cleaned up Harmony and Seaboard and moved the GPIO
-> definitions to board-<board>.h and gave them symbolic names. Would you
-> mind doing that for these as well, please?
+This doesn't seem right. When I do a "make mx51_defconfig", I see that mx51 and mx53 are selected, which is odd but should be okay if you move mx51_defconfig->mx5_defconfig. After doing a "make mx51_defconfig", I have go unselect mx53 in the menuconfig and the image can boot for me on my MX51 HW. I didn't have to do in 2.6.38-rc1? Shouldn't the image generated from mx51_defconfig be bootable on both mx51 and mx53?
 
-will do.
+I thought we were going the down the path of a single kernel for mx50, mx51, and mx53? Am I missing the correct steps for a single kernel all the mx5 series SoCs?
 
-> > diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-> > new file mode 100644
-> > index 0000000..a33ce98
-> > --- /dev/null
-> > +++ b/arch/arm/mach-tegra/board-paz00.c
-> [...]
-> > +static struct tegra_sdhci_platform_data sdhci_pdata1 = {
-> > +       .cd_gpio        = -1,
-> > +       .wp_gpio        = -1,
-> > +       .power_gpio     = -1,
-> > +};
-> > +
-> > +static struct tegra_sdhci_platform_data sdhci_pdata2 = {
-> > +       .cd_gpio        = TEGRA_GPIO_PV5,
-> > +       .wp_gpio        = TEGRA_GPIO_PH1,
-> > +       .power_gpio     = TEGRA_GPIO_PT3,
-> > +};
-> > +
-> > +static struct tegra_sdhci_platform_data sdhci_pdata4 = {
-> > +       .cd_gpio        = TEGRA_GPIO_PH2,
-> > +       .wp_gpio        = TEGRA_GPIO_PH3,
-> > +       .power_gpio     = TEGRA_GPIO_PI6,
-> > +       .is_8bit        = 1,
-> > +};
-> 
-> Weird, the internal eMMC has CD and WP gpios?!
+Internally, we have a single mx5_defconfig for all MX5 SOCs. Is that something we should look to do?
 
-Yes that's strange. On the other hand, harmony has these gpios, the Toshiba 
-source defines them, and they don't hurt. So I vote for keeping them for 
-consistency reasons.
+Thanks,
+Dinh
 
-It was good that you mentioned these gpios as I found an error in my original
-post. On AC100, the external mmc is connected to the first sdhci, not the 
-second. Even Toshiba/Compal seem to were confused as they also added a wrong 
-comment to the source (which I blindly followed).
-
-I'll send an updated version soon, which also adds PAZ00 to tegra_defconfig.
-
-Thanks!
-
-Marc
+>Sascha
+>
+>
+>--
+>Pengutronix e.K.                           |                             |
+>Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+>Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
