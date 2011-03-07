@@ -1,52 +1,104 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 07 Mar 2011 13:56:11 +0800
-Subject: [PATCH 2/2] [ARM] am300epd: fix resource leak in
-	am300_init_gpio_regs error path
-In-Reply-To: <1299477315.10486.1.camel@mola>
-References: <1299477315.10486.1.camel@mola>
-Message-ID: <1299477371.10486.2.camel@mola>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 07 Mar 2011 08:00:34 +0100
+Subject: [PATCH 08/09] ARM: s3c2440: gta02: Request usb pullup pin before
+	using it
+In-Reply-To: <031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
+References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
+	<1297043521-21903-8-git-send-email-lars@metafoo.de>
+	<000301cbd70f$12367070$36a35150$%kim@samsung.com>
+	<4D6B7826.1030500@metafoo.de>
+	<003201cbd734$79d87050$6d8950f0$%kim@samsung.com>
+	<4D6B7FE6.8090802@metafoo.de>
+	<031101cbdc92$e6c44730$b44cd590$%kim@samsung.com>
+Message-ID: <4D748292.7030302@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If gpio_request fails when i > 0, gpios[0] is not freed in current
-implementation.
+On 03/07/2011 07:42 AM, Kukjin Kim wrote:
+> Lars-Peter Clausen wrote:
+>>
+>> On 02/28/2011 11:44 AM, Kukjin Kim wrote:
+>>> Lars-Peter Clausen wrote:
+>>>>
+>>>> On 02/28/2011 07:16 AM, Kukjin Kim wrote:
+>>>>> Lars-Peter Clausen wrote:
+>>>>>>
+>>>>>> Request the gpio pin used to control the usb pullup before using it
+> to
+>>>>> avoid
+>>>>>> a
+>>>>>> runtime warning about an auto-requested gpio.
+>>>>>>
+>>>>>> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+>>>>>> ---
+>>>>>>  arch/arm/mach-s3c2440/mach-gta02.c |   17 +++++++++++++++--
+>>>>>>  1 files changed, 15 insertions(+), 2 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
+>>>>> b/arch/arm/mach-s3c2440/mach-
+>>>>>> gta02.c
+>>>>>> index 1396639..94456fa 100644
+>>>>>> --- a/arch/arm/mach-s3c2440/mach-gta02.c
+>>>>>> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
+>>>>>> @@ -451,11 +451,11 @@ static void gta02_udc_command(enum
+>>> s3c2410_udc_cmd_e
+>>>>>> cmd)
+>>>>>>  	switch (cmd) {
+>>>>>>  	case S3C2410_UDC_P_ENABLE:
+>>>>>>  		pr_debug("%s S3C2410_UDC_P_ENABLE\n", __func__);
+>>>>>> -		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
+>>>>>> +		gpio_set_value(GTA02_GPIO_USB_PULLUP, 1);
+>>>>>
+>>>>> How about following instead?
+>>>>> 	gpio_request(GTA02_GPIO_USB_PULLUP, "USB_PULLUP");
+>>>>> 	gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
+>>>>> 	gpio_free(GTA02_GPIO_USB_PULLUP);
+>>>>>
+>>>>
+>>>> I don't think that is a good idea. This gpio should really be reserved
+> for
+>>>> the
+>>>> udc driver. If it is freed again, it could be requested from someone
+> else
+>>>> which
+>>>> could lead to undefined behaviour.
+>>>>
+>>> Yes right, but I mean the board designer already knows the usage of
+>>> regarding GPIOs on his board.
+>>> So why do we really need gpio_request for it?...
+>>
+>> Well, for one because it's part of the gpio-api. You should not call any
+>> other
+>> gpio functions on a pin unless you've successfully requested that pin.
+>> On the other hand this helps debugging and ensures that the same gpio is
+> not
+>> used by two drivers accident. For example it is also possible to request
+>> gpios
+>> from userspace using the gpio sysfs. So by keeping the gpio requested it
+> wont
+>> be possible to request it from userspace by accident. And the gpio will
+> also
+>> be
+>> listed in the gpio debugfs file, which can be helpful for debugging as
+> well.
+>>
+>> - Lars
+> 
+> Hi Lars,
+> 
+> Ok, will apply :)
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/mach-pxa/am300epd.c |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
+Hi Kgene
 
-diff --git a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
-index 993d75e..fa8bad2 100644
---- a/arch/arm/mach-pxa/am300epd.c
-+++ b/arch/arm/mach-pxa/am300epd.c
-@@ -125,10 +125,7 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
- 		if (err) {
- 			dev_err(&am300_device->dev, "failed requesting "
- 				"gpio %d, err=%d\n", i, err);
--			while (i >= DB0_GPIO_PIN)
--				gpio_free(i--);
--			i = ARRAY_SIZE(gpios) - 1;
--			goto err_req_gpio;
-+			goto err_req_gpio2;
- 		}
- 	}
- 
-@@ -159,9 +156,13 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
- 
- 	return 0;
- 
-+err_req_gpio2:
-+	while (--i >= DB0_GPIO_PIN)
-+		gpio_free(i);
-+	i = ARRAY_SIZE(gpios);
- err_req_gpio:
--	while (i > 0)
--		gpio_free(gpios[i--]);
-+	while (--i >= 0)
-+		gpio_free(gpios[i]);
- 
- 	return err;
- }
--- 
-1.7.2
+Actually I've prepared another patch, which I'm was about to send in a few
+minutes, which moves the controlling of the pullup pin to the udc driver.
+
+- Lars
