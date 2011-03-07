@@ -1,36 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Mar 2011 11:18:50 -0800
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 7 Mar 2011 11:24:56 -0800
 Subject: [PATCH 3/3] ARM: tegra: enable new drivers in defconfig
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF045687B863@HQMAIL01.nvidia.com>
+In-Reply-To: <AANLkTi=ca32_k+6f65RoxnhpC=yn19Ee2uN72z+pH27s@mail.gmail.com>
 References: <1299486399-21761-1-git-send-email-olof@lixom.net>
 	<1299486399-21761-4-git-send-email-olof@lixom.net>
 	<74CDBE0F657A3D45AFBB94109FB122FF045687B863@HQMAIL01.nvidia.com>
-Message-ID: <AANLkTi=ca32_k+6f65RoxnhpC=yn19Ee2uN72z+pH27s@mail.gmail.com>
+	<AANLkTi=ca32_k+6f65RoxnhpC=yn19Ee2uN72z+pH27s@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF045687B8D7@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2011 at 9:34 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Monday, March 07, 2011 1:27 AM:
->> Enable new platforms and tegra drivers in tegra_defconfig. Also enable
->> some of the common devices several platforms, and GUID partition tables
->> to make it possible to boot a tegra_defconfig kernel with a ChromiumOS
->> filesystem.
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->>...
->> @@ -78,12 +81,21 @@ CONFIG_SERIAL_8250_CONSOLE=y
->> ?# CONFIG_LEGACY_PTYS is not set
->> ?# CONFIG_HW_RANDOM is not set
->> ?CONFIG_I2C=y
->> -# CONFIG_HWMON is not set
->> +# CONFIG_I2C_COMPAT is not set
->> +# CONFIG_I2C_HELPER_AUTO is not set
->> +CONFIG_I2C_TEGRA=y
->> +CONFIG_SENSORS_LM90=y
->
-> I'm not sure why the LM90 is needed?
+Olof Johansson wrote at Monday, March 07, 2011 12:19 PM:
+> On Mon, Mar 7, 2011 at 9:34 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Olof Johansson wrote at Monday, March 07, 2011 1:27 AM:
+> >> Enable new platforms and tegra drivers in tegra_defconfig. Also enable
+> >> some of the common devices several platforms, and GUID partition tables
+> >> to make it possible to boot a tegra_defconfig kernel with a ChromiumOS
+> >> filesystem.
+> >>
+> >> Signed-off-by: Olof Johansson <olof@lixom.net>
+> >>...
+> >> @@ -78,12 +81,21 @@ CONFIG_SERIAL_8250_CONSOLE=y
+> >> ?# CONFIG_LEGACY_PTYS is not set
+> >> ?# CONFIG_HW_RANDOM is not set
+> >> ?CONFIG_I2C=y
+> >> -# CONFIG_HWMON is not set
+> >> +# CONFIG_I2C_COMPAT is not set
+> >> +# CONFIG_I2C_HELPER_AUTO is not set
+> >> +CONFIG_I2C_TEGRA=y
+> >> +CONFIG_SENSORS_LM90=y
+> >
+> > I'm not sure why the LM90 is needed?
+> 
+> LM90 == adt7461 temp sensor, registered and used on seaboard.
 
-LM90 == adt7461 temp sensor, registered and used on seaboard.
+Ah, it's a compatible device. In that case,
 
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
--Olof
+-- 
+nvpublic
