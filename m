@@ -1,45 +1,33 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon,  7 Mar 2011 18:31:10 +0800
-Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
-Message-ID: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
+From: alberto@amarulasolutions.com (Alberto Panizzo)
+Date: Mon, 07 Mar 2011 11:42:09 +0100
+Subject: [PATCHv3 0/4] Continue the mx31_3ds machine support
+In-Reply-To: <4D74B091.2010908@pengutronix.de>
+References: <1299492598.2468.30.camel@realization>
+	<4D74B091.2010908@pengutronix.de>
+Message-ID: <1299494529.2468.42.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC [M]  crypto/xcbc.o
-In file included from /opt/git/ubuntu/roc/natty/fs/binfmt_aout.c:32:
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h: In function ?aout_dump_thread?:
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:35: error: ?struct debug_info? has no member named ?bp?
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:36: error: ?struct debug_info? has no member named ?bp?
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:37: error: ?struct debug_info? has no member named ?bp?
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:38: error: ?struct debug_info? has no member named ?bp?
-/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:39: error: ?struct debug_info? has no member named ?nsaved?
-make[3]: *** [fs/binfmt_aout.o] Error 1
-make[2]: *** [fs] Error 2
+Hello,
 
-This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
+this series on top of Sascha's imx-for-2.6.39 branch continue the
+support of peripherals for the machine mx31_3ds.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/include/asm/a.out-core.h |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+The first one fix also a kernel NULL pointer error introduced by
+4d2f13be1e370a670c1cae20c194d5ce961e0fa5
 
-diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
-index 93d04ac..639f5c8 100644
---- a/arch/arm/include/asm/a.out-core.h
-+++ b/arch/arm/include/asm/a.out-core.h
-@@ -32,12 +32,6 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
- 	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
- 	dump->u_ssize = 0;
- 
--	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
--	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
--	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
--	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
--	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
--
- 	if (dump->start_stack < 0x04000000)
- 		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
- 
+In v2 all group of GPIO requests are packed with gpio_request_array
+
+In v3 fixed:
+ - the first patch comment
+ - an inconsistency of patch 2 code style
+ - code style of patch 3
+all pointed out by Marc Kleine-Budde 
+
+Thanks all,
+
 -- 
-1.7.1
+| Alberto Panizzo                                 Amarula Solutions BV |
+| CTO  -  Founder                                      Cruquiuskade 47 |
+| T. +31(0)851119171                              Amsterdam 1018 AM NL |
+| F. +31(0)204106211                          www.amarulasolutions.com |
