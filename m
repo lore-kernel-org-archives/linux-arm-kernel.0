@@ -1,32 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Mar 2011 16:37:54 +0800
-Subject: [PATCH 0/4] Add framebuffer device for mx28evk and mx23evk boards
-In-Reply-To: <20110307081837.GJ29521@pengutronix.de>
-References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
-	<20110307081837.GJ29521@pengutronix.de>
-Message-ID: <20110307083753.GC12291@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Mar 2011 00:37:26 -0800
+Subject: [PATCH 1/2] Add initial support for the Toshiba AC100/Dynabook AZ
+	netbook
+In-Reply-To: <1299421906-7366-2-git-send-email-marvin24@gmx.de>
+References: <1299421906-7366-1-git-send-email-marvin24@gmx.de>
+	<1299421906-7366-2-git-send-email-marvin24@gmx.de>
+Message-ID: <AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi,
 
-On Mon, Mar 07, 2011 at 09:18:37AM +0100, Sascha Hauer wrote:
-> On Sun, Mar 06, 2011 at 12:40:18AM +0800, Shawn Guo wrote:
-> > This patch set is to add framebuffer device for mx28evk and mx23evk
-> > boards.  A couple notes here:
-> > 
-> > * The patch [PATCH 3/4] was cherry-picked from mxs-mmc-device patch
-> >   set  (Sascha, it seems dma, mmc, flexcan platform patches are all
-> >   waiting for your merging, please let me know if there are still
-> >   something stopping your pick them up)
-> 
-> I just applied dma and flexcan. mmc will have to wait until the
-> mmc driver is merged because currently we do not have the platform_data
-> declaration.
-> 
-The mmc driver has been merged on cjb's tree for some while, so we
-are waiting it gets merged on your tree, right?
+On Sun, Mar 6, 2011 at 6:31 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 
--- 
-Regards,
-Shawn
+As Colin said, a short patch description would be appreciated.
+
+> diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
+> new file mode 100644
+> index 0000000..347a919
+> --- /dev/null
+> +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
+[...]
+> +static struct tegra_gpio_table gpio_table[] = {
+> + ? ? ? { .gpio = TEGRA_GPIO_PV5, ? ? ? .enable = true ?}, /* mmc2 cd ? */
+> + ? ? ? { .gpio = TEGRA_GPIO_PH1, ? ? ? .enable = true ?}, /* mmc2 wp ? */
+> + ? ? ? { .gpio = TEGRA_GPIO_PT3, ? ? ? .enable = true ?}, /* mmc2 pwr ?*/
+> + ? ? ? { .gpio = TEGRA_GPIO_PH2, ? ? ? .enable = true ?}, /* mmc4 cd ? */
+> + ? ? ? { .gpio = TEGRA_GPIO_PH3, ? ? ? .enable = true ?}, /* mmc4 wp ? */
+> + ? ? ? { .gpio = TEGRA_GPIO_PI6, ? ? ? .enable = true ?}, /* mmc4 pwr ?*/
+> +};
+
+Stephen Warren cleaned up Harmony and Seaboard and moved the GPIO
+definitions to board-<board>.h and gave them symbolic names. Would you
+mind doing that for these as well, please?
+
+> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+> new file mode 100644
+> index 0000000..a33ce98
+> --- /dev/null
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+[...]
+> +static struct tegra_sdhci_platform_data sdhci_pdata1 = {
+> + ? ? ? .cd_gpio ? ? ? ?= -1,
+> + ? ? ? .wp_gpio ? ? ? ?= -1,
+> + ? ? ? .power_gpio ? ? = -1,
+> +};
+> +
+> +static struct tegra_sdhci_platform_data sdhci_pdata2 = {
+> + ? ? ? .cd_gpio ? ? ? ?= TEGRA_GPIO_PV5,
+> + ? ? ? .wp_gpio ? ? ? ?= TEGRA_GPIO_PH1,
+> + ? ? ? .power_gpio ? ? = TEGRA_GPIO_PT3,
+> +};
+> +
+> +static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+> + ? ? ? .cd_gpio ? ? ? ?= TEGRA_GPIO_PH2,
+> + ? ? ? .wp_gpio ? ? ? ?= TEGRA_GPIO_PH3,
+> + ? ? ? .power_gpio ? ? = TEGRA_GPIO_PI6,
+> + ? ? ? .is_8bit ? ? ? ?= 1,
+> +};
+
+Weird, the internal eMMC has CD and WP gpios?!
+
+
+-Olof
