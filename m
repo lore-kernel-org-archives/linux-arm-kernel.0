@@ -1,50 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Mar 2011 16:11:43 +0800
-Subject: [PATCH 2/4] ARM: mxs/mx28evk: add framebuffer deviceg
-In-Reply-To: <20110307075445.GI29521@pengutronix.de>
-References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
-	<1299343222-30670-3-git-send-email-shawn.guo@freescale.com>
-	<20110307075445.GI29521@pengutronix.de>
-Message-ID: <20110307081142.GB12291@S2101-09.ap.freescale.net>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 7 Mar 2011 10:15:16 +0200
+Subject: [PATCH 2/2] ARM: s3c24xx: Switch to common GPIO controlled UDC
+	pullup implementation
+In-Reply-To: <1299483720-18175-2-git-send-email-lars@metafoo.de>
+References: <1299483720-18175-1-git-send-email-lars@metafoo.de>
+	<1299483720-18175-2-git-send-email-lars@metafoo.de>
+Message-ID: <201103071015.17295.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 08:54:45AM +0100, Sascha Hauer wrote:
-> On Sun, Mar 06, 2011 at 12:40:20AM +0800, Shawn Guo wrote:
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/Kconfig        |    1 +
-> >  arch/arm/mach-mxs/clock-mx28.c   |    2 +
-> >  arch/arm/mach-mxs/mach-mx28evk.c |   78 ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 81 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> > index 4f0b673..cffd860 100644
-> > --- a/arch/arm/mach-mxs/Kconfig
-> > +++ b/arch/arm/mach-mxs/Kconfig
-> > @@ -33,6 +33,7 @@ config MACH_MX28EVK
-> >  	select MXS_HAVE_AMBA_DUART
-> >  	select MXS_HAVE_PLATFORM_AUART
-> >  	select MXS_HAVE_PLATFORM_FEC
-> > +	select MXS_HAVE_PLATFORM_MXSFB
-> >  	select MXS_OCOTP
-> >  	default y
-> >  	help
-> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> > index 8277056..56bd164 100644
-> > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > @@ -750,6 +750,8 @@ int __init mx28_clocks_init(void)
-> >  	clk_enable(&emi_clk);
-> >  	clk_enable(&uart_clk);
-> >  
-> > +	clk_set_parent(&lcdif_clk, &ref_pix_clk);
+On Monday 07 March 2011 09:42:00 Lars-Peter Clausen wrote:
+> Currently all boards using the s3c2410_udc driver use a GPIO to control the
+> state of the pullup, as a result the same code is reimplemented in each
+> board This patch changes these boards to use the common implementation for
+> GPIO controlled pullup in the UDC driver.
 > 
-> While probably being the right thing to do this should not be in this
-> patch.
-> 
-OK.  Will get a separate patch for this.
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> ---
+>  arch/arm/mach-s3c2410/mach-h1940.c    |   24 +-----------------------
+>  arch/arm/mach-s3c2410/mach-n30.c      |   21 +--------------------
+>  arch/arm/mach-s3c2412/mach-smdk2413.c |   24 +-----------------------
+>  arch/arm/mach-s3c2440/mach-gta02.c    |   22 ++--------------------
+>  arch/arm/mach-s3c2440/mach-mini2440.c |   24 +-----------------------
+>  arch/arm/mach-s3c2440/mach-rx1950.c   |   21 +--------------------
+>  6 files changed, 7 insertions(+), 129 deletions(-)
 
--- 
-Regards,
-Shawn
+For h1940 and rx1950 parts:
+
+Acked-by: Vasily Khoruzhick <anarsoul@gmail.com>
