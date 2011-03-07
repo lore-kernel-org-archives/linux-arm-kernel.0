@@ -1,85 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 07 Mar 2011 16:11:24 +0900
-Subject: [PATCH v2] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-In-Reply-To: <1299460218-22748-1-git-send-email-dh09.lee@samsung.com>
-References: <1299460218-22748-1-git-send-email-dh09.lee@samsung.com>
-Message-ID: <032401cbdc96$e134f360$a39eda20$%kim@samsung.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 7 Mar 2011 01:25:00 -0600
+Subject: [PATCH] OMAP2+: hwmod: use status bit info for reset line
+In-Reply-To: <alpine.DEB.2.00.1103041326200.10981@utopia.booyaka.com>
+References: <1299026809-32168-1-git-send-email-omar.ramirez@ti.com>
+	<alpine.DEB.2.00.1103041326200.10981@utopia.booyaka.com>
+Message-ID: <AANLkTimA3ZUUh=yDJ3n=R+6vmx9Eboe-t_veN+EQrYTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Donghwa Lee wrote:
-> 
-> This patch enables lcd and backlight drivers in NURI board.
-> 
-> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes since v1:
-> - Adds backlight platform data to control brightness and GPIO
-> - Modify inappropriate function name and remove useless codes.
-> - And so on.
-> 
->  arch/arm/mach-exynos4/Kconfig     |    1 +
->  arch/arm/mach-exynos4/mach-nuri.c |   81
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 82 insertions(+), 0 deletions(-)
+Hi Paul
 
-Thanks for re-work :)
-There are small comments below.
+On Fri, Mar 4, 2011 at 3:36 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> It's after our -rc6 cutoff, but I'll take it anyway for 2.6.39. ?Made a
+> few minor changes -- updated patch below -- if you have a chance, please
+> give it a quick test. ?The 'integration-2.6.39' branch at
+> git://git.pwsan.com/linux-integration now contains it. ?Or if you have any
+> comments about the changes, those are welcome too.
 
-(snip)
+Agree with changes, didn't see any issue either while testing.
 
-> +static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int
-power)
-> +{
-> +	int gpio = EXYNOS4_GPE1(5);
-> +
-> +	if (power)
-> +		gpio_direction_output(gpio, 1);
-> +	else
-> +		gpio_direction_output(gpio, 0);
+Regards,
 
-	gpio_direction_output(gpio, power);
-
-> +}
-> +
-> +static int nuri_bl_init(struct device *dev)
-> +{
-> +	int ret, gpio = EXYNOS4_GPE2(3);
-> +
-> +	ret = gpio_request(gpio, "LCD_LDO_EN");
-> +	if (!ret)
-> +		gpio_direction_output(gpio, 0);
-> +
-> +	return 0;
-
-	return ret;
-
-> +}
-
-(snip)
-
-> +static struct platform_device nuri_lcd_device = {
-> +	.name			= "platform-lcd",
-> +	.id			= -1,
-> +	.dev			= {
-> +		.platform_data	= (void *) &nuri_lcd_platform_data,
-
-		.platform_data = &nuri_lcd_platform_data,
-
-> +	},
-> +};
-
-(snip)
-
-You used gpio_request() for EXYNOS4_GPE2(3) and EXYNOS4_GPE1(5), but
-EXYNOS4_GPE1(5). Is there any reason or policy for it?
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Omar
