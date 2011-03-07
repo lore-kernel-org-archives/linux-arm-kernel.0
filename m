@@ -1,50 +1,36 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 07 Mar 2011 18:43:44 +0300
-Subject: [PATCH 2/3] ARM: tegra: harmony: register i2c devices
-In-Reply-To: <1299486399-21761-3-git-send-email-olof@lixom.net>
-References: <1299486399-21761-1-git-send-email-olof@lixom.net>
-	<1299486399-21761-3-git-send-email-olof@lixom.net>
-Message-ID: <4D74FD30.5010806@ru.mvista.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 07 Mar 2011 17:02:28 +0100
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	(Nguyen Dinh-R's message of "Mon, 7 Mar 2011 15:37:38 +0000")
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <87fwqyvrzf.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Nguyen Dinh-R00091 <R00091@freescale.com> writes:
 
-On 07-03-2011 11:26, Olof Johansson wrote:
+> Hi Arnaud,
 
-> Register the base i2c busses on harmony. Devices coming at a later date,
-> but this allows for hand-probing of some of them at least.
-
-> Signed-off-by: Olof Johansson<olof@lixom.net>
-> ---
->   arch/arm/mach-tegra/board-harmony.c |   32 ++++++++++++++++++++++++++++++++
->   1 files changed, 32 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-> index 38c2ab8..d46268d 100644
-> --- a/arch/arm/mach-tegra/board-harmony.c
-> +++ b/arch/arm/mach-tegra/board-harmony.c
-[...]
-> @@ -78,6 +80,35 @@ static struct platform_device harmony_audio_device = {
->   	},
->   };
+Hi,
 >
-> +static struct tegra_i2c_platform_data harmony_i2c1_platform_data = {
-> +	.bus_clk_rate   = 400000,
-> +};
-> +
-> +static struct tegra_i2c_platform_data harmony_i2c2_platform_data = {
-> +	.bus_clk_rate   = 400000,
-> +};
-> +
-> +static struct tegra_i2c_platform_data harmony_i2c3_platform_data = {
-> +	.bus_clk_rate   = 400000,
-> +};
-> +
-> +static struct tegra_i2c_platform_data harmony_dvc_platform_data = {
-> +	.bus_clk_rate   = 400000,
-> +};
+> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
 
-    Why not share the paltform data between devices if it's the same anyway?
+I never said I was testing on babbage. The reason is because I'm using a
+efika smartbook and not a babbage.
 
-WBR, Sergei
+>
+> root at freescale ~$ uname -a
+> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
+
+2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
+Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
+without even testing it on the current tree. Can you please test suspend
+with current imx for-next tree (with no other patches than theses 2
+patches if possible), in order to make sure that it's still working with it ?
+
+Thanks,
+Arnaud
