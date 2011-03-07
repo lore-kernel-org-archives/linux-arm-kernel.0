@@ -1,117 +1,41 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 7 Mar 2011 11:39:31 -0800
-Subject: [PATCH 1/3] ARM: tegra: seaboard: register i2c devices
-In-Reply-To: <AANLkTin6kCEnOFuua70ze4D3igtZuUEVTNRf4zq-qD4D@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 7 Mar 2011 11:59:02 -0800
+Subject: [PATCH 0/3] Tegra i2c board changes + defconfig update
+In-Reply-To: <1299486399-21761-1-git-send-email-olof@lixom.net>
 References: <1299486399-21761-1-git-send-email-olof@lixom.net>
-	<1299486399-21761-2-git-send-email-olof@lixom.net>
-	<74CDBE0F657A3D45AFBB94109FB122FF045687B855@HQMAIL01.nvidia.com>
-	<AANLkTin6kCEnOFuua70ze4D3igtZuUEVTNRf4zq-qD4D@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF045687B8E2@HQMAIL01.nvidia.com>
+Message-ID: <AANLkTikxNgsE37t86VkLamzzt9W-E7jBTOTfXkqEvK9p@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Monday, March 07, 2011 12:30 PM:
-> [oops, missed reply-all]
-> 
+On Mon, Mar 7, 2011 at 12:26 AM, Olof Johansson <olof@lixom.net> wrote:
 > Hi,
-> 
-> On Mon, Mar 7, 2011 at 9:24 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Olof Johansson wrote at Monday, March 07, 2011 1:27 AM:
-> >> Register the base i2c devices on seaboard. A few more are pending,
-> >> but it's a start.
-> >>
-> >> Signed-off-by: Olof Johansson <olof@lixom.net>
-> >> ---
-> >> ?arch/arm/mach-tegra/board-seaboard-pinmux.c | ? ?1 +
-> >> ?arch/arm/mach-tegra/board-seaboard.c ? ? ? ?| ? 83
-> >> +++++++++++++++++++++++++++
-> >> ?2 files changed, 84 insertions(+), 0 deletions(-)
->...
-> >> + ? ? i2c_register_board_info(0, &isl29018_device, 1);
-> >> +
-> >> + ? ? i2c_register_board_info(4, &adt7461_device, 1);
-> >> +
-> >> + ? ? common_i2c_init();
-> >> +}
-> >> +
-> >> +static void __init kaen_i2c_init(void)
-> >> +{
-> >
-> > {seaboard,kaen,wario}_i2c_init seem identical. Should this be a single
-> > shared function, and only the board-specific bits in the non-common
-> > functions? Also, see below.
-> 
-> They are now -- they weren't when all i2c devices were registered. I
-> can re-join them and split them when devices are re-introduced later.
+>
+> Here is a short series of i2c patches to configure the i2c-tegra driver
+> for the boards in the tree, and to register some of the devices.
+>
+> It also includes a defconfig update that enables the new drivers, enables
+> TRIMSLICE by default since the pcie fix makes it possible and also turns
+> on a few more config options that are useful (i.e. EFI partition tables
+> and some common board devices).
+>
+> Since these patches rely on drivers that will be merged during the
+> upcoming window, this is my plan:
+>
+> * Check them into boards-for-next together with Stephen W's
+> ?other late-merge board patches in a day or two
+> * Ask sfr to add said branch to linux-next (towards the end of list of trees)
+> * Sit on them until merge window is open and base tegra, i2c and asoc have
+> ?all been merged
+> * Rebase to current upstream when said trees are in, let it sit for 1
+> ?day for a linux-next cycle for sanity-check
+> * Send pull request
+>
+>
+> -Olof
 
-Perhaps move the common code into common_i2c_init, then put only the
-differences in ${boardname}_i2c_init(), which would currently be empty
-except to call the common function?
-
-> >> + ? ? gpio_request(TEGRA_GPIO_ISL29018_IRQ, "isl29018");
-> >> + ? ? gpio_direction_input(TEGRA_GPIO_ISL29018_IRQ);
-> >> +
-> >> + ? ? i2c_register_board_info(0, &isl29018_device, 1);
-> >> +
-> >> + ? ? i2c_register_board_info(4, &adt7461_device, 1);
-> >> +
-> >> + ? ? common_i2c_init();
-> >> +}
-> >> +
-> >> +static void __init wario_i2c_init(void)
-> >> +{
-> >> + ? ? gpio_request(TEGRA_GPIO_ISL29018_IRQ, "isl29018");
-> >> + ? ? gpio_direction_input(TEGRA_GPIO_ISL29018_IRQ);
-> >> +
-> >> + ? ? i2c_register_board_info(0, &isl29018_device, 1);
-> >> +
-> >> + ? ? i2c_register_board_info(4, &adt7461_device, 1);
-> >> +
-> >> + ? ? common_i2c_init();
-> >> +}
-> >> +
-> >> ?static void __init __tegra_seaboard_init(void)
-> >> ?{
-> >> ? ? ? seaboard_pinmux_init();
-> >> @@ -145,6 +222,8 @@ static void __init tegra_seaboard_init(void)
-> >> ? ? ? debug_uart_platform_data[0].irq = INT_UARTD;
-> >>
-> >> ? ? ? __tegra_seaboard_init();
-> >> +
-> >> + ? ? seaboard_i2c_init();
-> >> ?}
-> >>
-> >> ?static void __init tegra_kaen_init(void)
-> >> @@ -155,6 +234,8 @@ static void __init tegra_kaen_init(void)
-> >> ? ? ? debug_uart_platform_data[0].irq = INT_UARTB;
-> >>
-> >> ? ? ? __tegra_seaboard_init();
-> >
-> > __tegra_seaboard_init calls seaboard_i2c_init.
-> 
-> It shouldn't be (note __tegra* vs tegra*). Maybe I should rename
-> __tegra_seaboard_init to something less alike.
-
-Oh right. I double-checked that, but made the same reading mistake
-both times; the __ version appeared right above the diff, so I 
-must have skipped reading the @@ line.
-
-> >
-> >> +
-> >> + ? ? kaen_i2c_init();
-> >
-> > kaen_i2c_init is the same as seaboard_i2c_init.
-> >
-> > So, all the registration happens twice?
-> 
-> Shouldn't be. The code I am looking at doesn't, so please check your side
-> again?
-
-Yes, it looks functionally OK when read correctly.
-
-If you want, I can ack this, but perhaps reworking the code duplication
-and making that __tegra_seaboard_init rename would make sense;
-common_seaboard_init or common_board_init?
-
--- 
-nvpublic
+Do we need two branches in linux-next?  I think we should just push
+all of this to Tegra's for-next branch, and keep a for-linus branch
+that points to the last change that will build without merging with
+linux-next.  There shouldn't be any conflicts with linux-next, and
+there is no need for linux-next to build after merging some of its
+branches.
