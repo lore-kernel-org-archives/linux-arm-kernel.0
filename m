@@ -1,44 +1,29 @@
-From: B02280@freescale.com (Chen Jie-B02280)
-Date: Mon, 7 Mar 2011 01:50:29 +0000
-Subject: Recall: [PATCH 1/2] ARM imx53: add pwm devices support
-In-Reply-To: <20110304091044.GD18351@pengutronix.de>
-References: <33F32152BE7EC740BC2C838D2836AC870FA8D8@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110304091044.GD18351@pengutronix.de>
-Message-ID: <33F32152BE7EC740BC2C838D2836AC870FB05B@039-SN1MPN1-002.039d.mgd.msft.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 07 Mar 2011 08:22:32 +0530
+Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
+In-Reply-To: <4D738E04.5090207@ru.mvista.com>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-4-git-send-email-nm@ti.com>
+	<4D738E04.5090207@ru.mvista.com>
+Message-ID: <4D744870.20909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sascha,
+Sergei Shtylyov wrote, on 03/06/2011 07:07 PM:
+>
+>> Blindly setting a 1.2V setting
+>
+>     Hm, seems tautological...
+As a non native English speaker, I would like to understand how we could 
+improve this. I suppose you mean "Blindly setting 1.2V" is better here. 
+Am i correct?
 
-Sorry for this confused patch, actually, I sent this patch by wrong operation, this patch has sent out for review few days ago, I want to send out the other patch, but miss send this, so I try to recall it.
-
-Jason Chen / Chen Jie
-NMG / MAD
-Freescale Semiconductor (China) Ltd.
-Shanghai Branch Office
-No.192 Liangjing Rd.,
-Pu Dong New District Shanghai?201203
-Tel:???? 021-28937178?
-Fax:???? 021-28937444
-E-mail:??Jason.Chen at freescale.com
-
------Original Message-----
-From: s.hauer@pengutronix.de [mailto:s.hauer at pengutronix.de] 
-Sent: Friday, March 04, 2011 5:11 PM
-To: Chen Jie-B02280
-Cc: linux-arm-kernel at lists.infradead.org; eric.miao at linaro.org
-Subject: Re: Recall: [PATCH 1/2] ARM imx53: add pwm devices support
-
-On Fri, Mar 04, 2011 at 02:50:23AM +0000, Chen Jie-B02280 wrote:
-> Chen Jie-B02280 would like to recall the message, "[PATCH 1/2] ARM imx53: add pwm devices support".
-
-Does this mean I shall not apply this patch? If so please answer to your original mail saying so. This recall thing is not very helpful.
-
-Sascha
-
+>> in the initial structure may not even
+>> match the default voltages stored in the voltage table which are
+>> supported for the domain. For example, OMAP3430 core domain does not
+>> use 1.2V and ends up generating a warning on the first transition.
+[..]
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Nishanth Menon
