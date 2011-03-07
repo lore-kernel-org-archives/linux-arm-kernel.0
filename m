@@ -1,20 +1,149 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Mar 2011 07:57:57 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.38-rc8
-Message-ID: <038701cbdd1b$1c11b890$543529b0$%kim@samsung.com>
+Date: Tue, 08 Mar 2011 07:59:04 +0900
+Subject: [PATCH v3] ARM: EXYNOS4: enabled lcd and backlight in NURI board
+In-Reply-To: <1299487030-8675-1-git-send-email-dh09.lee@samsung.com>
+References: <1299487030-8675-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <038801cbdd1b$436a0c30$ca3e2490$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Donghwa Lee wrote:
+> 
+> This patch enables lcd and backlight drivers in NURI board.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> Changes since v2:
+> - code clean and make a pair of gpio_request()/gpio_free()
+> 
+>  arch/arm/mach-exynos4/Kconfig     |    1 +
+>  arch/arm/mach-exynos4/mach-nuri.c |   74
+> +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 75 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index 5bf00b9..de31e4d 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -135,6 +135,7 @@ config MACH_NURI
+>  	select EXYNOS4_SETUP_I2C1
+>  	select EXYNOS4_SETUP_I2C5
+>  	select EXYNOS4_SETUP_SDHCI
+> +	select SAMSUNG_DEV_PWM
+>  	help
+>  	  Machine support for Samsung Mobile NURI Board.
+> 
+> diff --git a/arch/arm/mach-exynos4/mach-nuri.c
+b/arch/arm/mach-exynos4/mach-
+> nuri.c
+> index 28010bd..f18e573 100644
+> --- a/arch/arm/mach-exynos4/mach-nuri.c
+> +++ b/arch/arm/mach-exynos4/mach-nuri.c
+> @@ -17,6 +17,10 @@
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/fixed.h>
+>  #include <linux/mmc/host.h>
+> +#include <linux/fb.h>
+> +#include <linux/pwm_backlight.h>
+> +
+> +#include <video/platform_lcd.h>
+> 
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+> @@ -181,6 +185,73 @@ static struct platform_device nuri_gpio_keys = {
+>  	},
+>  };
+> 
+> +static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int
+power)
+> +{
+> +	int gpio = EXYNOS4_GPE1(5);
+> +
+> +	gpio_request(gpio, "LVDS_nSHDN");
+> +	gpio_direction_output(gpio, power);
+> +	gpio_free(gpio);
+> +}
+> +
+> +static int nuri_bl_init(struct device *dev)
+> +{
+> +	int ret, gpio = EXYNOS4_GPE2(3);
+> +
+> +	ret = gpio_request(gpio, "LCD_LDO_EN");
+> +	if (!ret)
+> +		gpio_direction_output(gpio, 0);
+> +
+> +	return ret;
+> +}
+> +
+> +static int nuri_bl_notify(struct device *dev, int brightness)
+> +{
+> +	if (brightness < 1)
+> +		brightness = 0;
+> +
+> +	gpio_set_value(EXYNOS4_GPE2(3), 1);
+> +
+> +	return brightness;
+> +}
+> +
+> +static void nuri_bl_exit(struct device *dev)
+> +{
+> +	gpio_free(EXYNOS4_GPE2(3));
+> +}
+> +
+> +/* nuri pwm backlight */
+> +static struct platform_pwm_backlight_data nuri_backlight_data = {
+> +	.pwm_id			= 0,
+> +	.pwm_period_ns		= 30000,
+> +	.max_brightness		= 100,
+> +	.dft_brightness		= 50,
+> +	.init			= nuri_bl_init,
+> +	.notify			= nuri_bl_notify,
+> +	.exit			= nuri_bl_exit,
+> +};
+> +
+> +static struct platform_device nuri_backlight_device = {
+> +	.name			= "pwm-backlight",
+> +	.id			= -1,
+> +	.dev			= {
+> +		.parent		= &s3c_device_timer[0].dev,
+> +		.platform_data	= &nuri_backlight_data,
+> +	},
+> +};
+> +
+> +static struct plat_lcd_data nuri_lcd_platform_data = {
+> +	.set_power		= nuri_lcd_power_on,
+> +};
+> +
+> +static struct platform_device nuri_lcd_device = {
+> +	.name			= "platform-lcd",
+> +	.id			= -1,
+> +	.dev			= {
+> +		.platform_data	= &nuri_lcd_platform_data,
+> +	},
+> +};
+> +
+>  /* I2C1 */
+>  static struct i2c_board_info i2c1_devs[] __initdata = {
+>  	/* Gyro, To be updated */
+> @@ -201,8 +272,11 @@ static struct platform_device *nuri_devices[]
+__initdata
+> = {
+>  	&s3c_device_wdt,
+>  #endif
+> 
+> +	&s3c_device_timer[0],
+>  	/* NURI Devices */
+>  	&nuri_gpio_keys,
+> +	&nuri_lcd_device,
+> +	&nuri_backlight_device,
+>  };
+> 
+>  static void __init nuri_map_io(void)
+> --
+> 1.6.0.4
 
-Please pull Samsung fixes from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-These things are for small fixes on 2.6.38-rc8.
-If any problems, please let me know.
-
+Ok, will apply.
 Thanks.
 
 Best regards,
@@ -22,45 +151,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit dd9c1549edef02290edced639f67b54a25abbe0e:
-
-  Linux 2.6.38-rc7 (2011-03-01 13:55:12 -0800)
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-Banajit Goswami (1):
-      ARM: S5P64X0: Fix number of GPIO lines in Bank F
-
-Ben Dooks (3):
-      ARM: S3C64XX: Fix keypad setup to configure correct number of rows
-      ARM: S3C64XX: Add clock for i2c1
-      ARM: S3C64XX: Reduce output of s3c64xx_dma_init1()
-
-Lars-Peter Clausen (2):
-      ARM: S3C2440: Select missing S3C_DEV_USB_HOST on GTA02
-      ARM: S3C2440: Fix usage gpio bank j pin definitions on GTA02
-
-Mark Brown (5):
-      ARM: SAMSUNG: Include devs.h in dev-uart.c to prototype devices
-      ARM: S3C64XX: Staticise non-exported GPIO to interrupt functions
-      ARM: S3C64XX: Tone down SDHCI debugging
-      ARM: S3C64XX: Fix build with WM1190 disabled and WM1192 enabled on
-SMDK6410
-      ARM: S3C64XX: Update regulator names for debugfs compatiblity on
-SMDK6410
-
- arch/arm/mach-s3c2440/Kconfig              |    1 +
- arch/arm/mach-s3c2440/include/mach/gta02.h |   26
-+++++++++++++-------------
- arch/arm/mach-s3c64xx/clock.c              |    6 ++++++
- arch/arm/mach-s3c64xx/dma.c                |   11 ++++++-----
- arch/arm/mach-s3c64xx/gpiolib.c            |    4 ++--
- arch/arm/mach-s3c64xx/mach-smdk6410.c      |   13 +++++++------
- arch/arm/mach-s3c64xx/setup-keypad.c       |    2 +-
- arch/arm/mach-s3c64xx/setup-sdhci.c        |    2 +-
- arch/arm/mach-s5p64x0/include/mach/gpio.h  |    4 ++--
- arch/arm/plat-samsung/dev-uart.c           |    2 ++
- 10 files changed, 41 insertions(+), 30 deletions(-)
