@@ -1,258 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 7 Mar 2011 17:34:50 +0530
-Subject: [patch v3 1/3] arm: introduce cross trigger interface helpers
-In-Reply-To: <1299149633-699-2-git-send-email-tom.leiming@gmail.com>
-References: <1299149633-699-1-git-send-email-tom.leiming@gmail.com>
-	<1299149633-699-2-git-send-email-tom.leiming@gmail.com>
-Message-ID: <3f76fc2a20fc67cd0e62b1d574ed32b8@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Mar 2011 12:07:32 -0000
+Subject: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way
+	operationcan	cause data corruption
+In-Reply-To: <69dd173e3c7b4d02ef50ceaa19b2343a@mail.gmail.com>
+References: <1298032525-21115-1-git-send-email-santosh.shilimkar@ti.com>	<1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>	<20110227120021.GA15314@n2100.arm.linux.org.uk>	<20110228101351.GA30781@n2100.arm.linux.org.uk>
+	<69dd173e3c7b4d02ef50ceaa19b2343a@mail.gmail.com>
+Message-ID: <000a01cbdcc0$3d0dfeb0$b729fc10$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei,
-Some comments below
+Hi Santosh,
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> tom.leiming at gmail.com
-> Sent: Thursday, March 03, 2011 4:24 PM
-> To: linux at arm.linux.org.uk
-> Cc: Ming Lei; will.deacon at arm.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: [patch v3 1/3] arm: introduce cross trigger interface
-> helpers
->
-> From: Ming Lei <tom.leiming@gmail.com>
->
-> OMAP4 uses cross trigger interface(CTI) to route
-> performance monitor irq to GIC, so introduce cti
-> helpers to make access for cti easily.
->
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/include/asm/cti.h |  177
-> ++++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 177 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/include/asm/cti.h
->
-> diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-> new file mode 100644
-> index 0000000..48f173a
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cti.h
-> @@ -0,0 +1,177 @@
-> +/*
-> + *  arch/arm/include/asm/cti.h
-> + */
-In general the file name path doesn't give much and rather
-difficult to maintain when file are moved around. You
-can drop above path and may be add some text if you like.
+> > On Sun, Feb 27, 2011 at 12:00:21PM +0000, Russell King - ARM Linux
+> > wrote:
+> > > > +#else
+> > > > +/* Optimised out for non-errata case */
+> > > > +static inline void debug_writel(unsigned long val)
+> > > > +{
+> > > >  }
+> > >
+> > > #define l2x0_set_debug	NULL
+> > >
+> > > > +#endif
+> >
+> > I notice you got rid of the inline function.  Have you tried
+> > building this without the errata enabled?
+> 
+> I accidently dropped the inline function while
+> incorporating the comment from you. :(
+> 
+> Fixed it. Updated version # 6770/1
 
-> +#ifndef __ASMARM_CTI_H
-> +#define __ASMARM_CTI_H
-> +
-> +#include	<asm/io.h>
-> +
-> +/*The registers' definition is from section 3.2 of
-> + * 	Embedded Cross Trigger Revision: r0p0
-> + **/
-Watch out for commenting style.
-
-> +#define		CTICONTROL		0x000
-> +#define		CTISTATUS		0x004
-> +#define		CTILOCK			0x008
-> +#define		CTIPROTECTION		0x00C
-> +#define		CTIINTACK		0x010
-> +#define		CTIAPPSET		0x014
-> +#define		CTIAPPCLEAR		0x018
-> +#define		CTIAPPPULSE		0x01c
-> +#define		CTIINEN			0x020
-> +#define		CTIOUTEN		0x0A0
-> +#define		CTITRIGINSTATUS		0x130
-> +#define		CTITRIGOUTSTATUS	0x134
-> +#define		CTICHINSTATUS		0x138
-> +#define		CTICHOUTSTATUS		0x13c
-> +#define		CTIPERIPHID0		0xFE0
-> +#define		CTIPERIPHID1		0xFE4
-> +#define		CTIPERIPHID2		0xFE8
-> +#define		CTIPERIPHID3		0xFEC
-> +#define		CTIPCELLID0		0xFF0
-> +#define		CTIPCELLID1		0xFF4
-> +#define		CTIPCELLID2		0xFF8
-> +#define		CTIPCELLID3		0xFFC
-> +
-> +/*The two below are from section 3.6.4 of
-> + * 	CoreSight v1.0 Architecture Specification
-> + **/
-
-Ditto
-
-> +#define		LOCKACCESS		0xFB0
-> +#define		LOCKSTATUS		0xFB4
-> +
-> +/**
-> + * struct cti - cross trigger interface struct
-> + * @base: mapped virtual address for the cti base
-> + * @irq: irq number for the cti
-> + * @trig_out_for_irq: triger out number which will cause
-> + * 	the @irq happen
-> + *
-> + * cti struct used to operate cti registers.
-> + */
-> +struct cti {
-> +	void *base;
-> +	int irq;
-> +	int trig_out_for_irq;
-> +};
-> +
-> +/**
-> + * cti_init - initialize the cti instance
-> + * @cti: cti instance
-> + * @base: mapped virtual address for the cti base
-> + * @irq: irq number for the cti
-> + * @trig_out: triger out number which will cause
-> + * 	the @irq happen
-> + *
-> + * called by machine code to pass the board dependent
-> + * @base, @irq and @trig_out to cti.
-> + */
-> +static inline void cti_init(struct cti *cti,
-> +	void *base, int irq, int trig_out)
-> +{
-> +	cti->base = base;
-> +	cti->irq  = irq;
-> +	cti->trig_out_for_irq = trig_out;
-> +}
-> +
-> +/**
-> + * cti_map_trigger - use the @chan to map @trig_in to @trig_out
-> + * @cti: cti instance
-> + * @trig_in: trigger in number
-> + * @trig_out: trigger out number
-> + * @channel: channel number
-> + *
-> + * This function maps one trigger in of @trig_in to one trigger
-> + * out of @trig_out using the channel @chan.
-> + */
-> +static inline void cti_map_trigger(struct cti *cti,
-> +	int trig_in, int trig_out, int chan)
-> +{
-> +	void *base = cti->base;
-
-s/ void *base / void __iomem *base
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + CTIINEN + trig_in * 4);
-> +	val |= 1 << chan;
-> +	__raw_writel(val, base + CTIINEN + trig_in * 4);
-> +
-> +	val = __raw_readl(base + CTIOUTEN + trig_out * 4);
-> +	val |= 1 << chan;
-> +	__raw_writel(val, base + CTIOUTEN + trig_out * 4);
-> +}
-> +
-> +/**
-> + * cti_enable - enable the cti module
-> + * @cti: cti instance
-> + *
-> + * enable the cti module
-> + */
-> +static inline void cti_enable(struct cti *cti)
-> +{
-> +	__raw_writel(0x1, cti->base);
-Even though base address points to CTICONTROL you
-should add that.
-__raw_writel(0x1, cti->base + CTICONTROL);
-
-> +}
-> +
-> +/**
-> + * cti_disable - disable the cti module
-> + * @cti: cti instance
-> + *
-> + * enable the cti module
-> + */
-> +static inline void cti_disable(struct cti *cti)
-> +{
-> +	__raw_writel(0, cti->base);
-__raw_writel(0x0, cti->base + CTICONTROL);
+This version of the patch (as it appears in -next) is broken:
 
 
-> +}
-> +
-> +/**
-> + * cti_irq_ack - clear the cti irq
-> + * @cti: cti instance
-> + *
-> + * clear the cti irq
-> + */
-> +static inline void cti_irq_ack(struct cti *cti)
-> +{
-> +	void *base = cti->base;
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + CTIINTACK);
-> +	val |= 1 << cti->trig_out_for_irq;
-You could use
-BIT(cti->trig_out_for_irq)
++#define debug_writel(val)	outer_cache.set_debug(val)
++
++static void l2x0_set_debug(unsigned long val)
++{
++	writel(val, l2x0_base + L2X0_DEBUG_CTRL);
+ }
 
-> +	__raw_writel(val, base + CTIINTACK);
-> +}
-> +
-> +/**
-> + * cti_unlock - unlock cti module
-> + * @cti: cti instance
-> + *
-> + * unlock the cti module, or else any writes to the cti
-> + * module is not allowed.
-> + */
-> +static inline void cti_unlock(struct cti *cti)
-> +{
-> +	void *base = cti->base;
+[...]
+
+@@ -119,9 +120,11 @@ static void l2x0_flush_all(void)
+ 
+ 	/* clean all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
++	debug_writel(0x03);
+ 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_INV_WAY);
+ 	cache_wait_way(l2x0_base + L2X0_CLEAN_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
++	debug_writel(0x00);
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
 
 
-s/ void *base / void __iomem *base
+This deadlocks because the writel forces an outer cache sync, which
+then tries to acquire the spinlock which is held by the calling
+function.
 
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + LOCKSTATUS);
-> +
-> +	if (val & 1) {
-> +		val = 0xC5ACCE55;
+If you change l2x0_set_debug to use writel_relaxed then you can avoid
+the problem.
 
-Define a macro for "0xC5ACCE55" with some comments
-please.
-> +		__raw_writel(val, base + LOCKACCESS);
-> +	}
-> +}
-> +
-> +/**
-> + * cti_lock - lock cti module
-> + * @cti: cti instance
-> + *
-> + * lock the cti module, so any writes to the cti
-> + * module will be not allowed.
-> + */
-> +static inline void cti_lock(struct cti *cti)
-> +{
-> +	void *base = cti->base;
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + LOCKSTATUS);
-> +
-> +	if (!(val & 1)) {
-> +		val = ~0xC5ACCE55;
-
-Ditto
-> +		__raw_writel(val, base + LOCKACCESS);
-> +	}
-> +}
-> +#endif
-> --
-> 1.7.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
