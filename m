@@ -1,30 +1,30 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 7 Mar 2011 10:15:16 +0200
-Subject: [PATCH 2/2] ARM: s3c24xx: Switch to common GPIO controlled UDC
-	pullup implementation
-In-Reply-To: <1299483720-18175-2-git-send-email-lars@metafoo.de>
-References: <1299483720-18175-1-git-send-email-lars@metafoo.de>
-	<1299483720-18175-2-git-send-email-lars@metafoo.de>
-Message-ID: <201103071015.17295.anarsoul@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Mar 2011 09:18:37 +0100
+Subject: [PATCH 0/4] Add framebuffer device for mx28evk and mx23evk boards
+In-Reply-To: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
+References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110307081837.GJ29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 March 2011 09:42:00 Lars-Peter Clausen wrote:
-> Currently all boards using the s3c2410_udc driver use a GPIO to control the
-> state of the pullup, as a result the same code is reimplemented in each
-> board This patch changes these boards to use the common implementation for
-> GPIO controlled pullup in the UDC driver.
+On Sun, Mar 06, 2011 at 12:40:18AM +0800, Shawn Guo wrote:
+> This patch set is to add framebuffer device for mx28evk and mx23evk
+> boards.  A couple notes here:
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> ---
->  arch/arm/mach-s3c2410/mach-h1940.c    |   24 +-----------------------
->  arch/arm/mach-s3c2410/mach-n30.c      |   21 +--------------------
->  arch/arm/mach-s3c2412/mach-smdk2413.c |   24 +-----------------------
->  arch/arm/mach-s3c2440/mach-gta02.c    |   22 ++--------------------
->  arch/arm/mach-s3c2440/mach-mini2440.c |   24 +-----------------------
->  arch/arm/mach-s3c2440/mach-rx1950.c   |   21 +--------------------
->  6 files changed, 7 insertions(+), 129 deletions(-)
+> * The patch [PATCH 3/4] was cherry-picked from mxs-mmc-device patch
+>   set  (Sascha, it seems dma, mmc, flexcan platform patches are all
+>   waiting for your merging, please let me know if there are still
+>   something stopping your pick them up)
 
-For h1940 and rx1950 parts:
+I just applied dma and flexcan. mmc will have to wait until the
+mmc driver is merged because currently we do not have the platform_data
+declaration.
 
-Acked-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
