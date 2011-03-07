@@ -1,66 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Mar 2011 00:37:26 -0800
-Subject: [PATCH 1/2] Add initial support for the Toshiba AC100/Dynabook AZ
-	netbook
-In-Reply-To: <1299421906-7366-2-git-send-email-marvin24@gmx.de>
-References: <1299421906-7366-1-git-send-email-marvin24@gmx.de>
-	<1299421906-7366-2-git-send-email-marvin24@gmx.de>
-Message-ID: <AANLkTinncQdKy-POUN2QQJYhc20Kg6z-grUBqehu7k8x@mail.gmail.com>
+From: c.aeschlimann@acn-group.ch (Christophe Aeschlimann)
+Date: Mon, 07 Mar 2011 09:40:41 +0100
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+	<4D5BDA3D.5080905@acn-group.ch>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
+Message-ID: <4D749A09.8050101@acn-group.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sudhakar,
 
-On Sun, Mar 6, 2011 at 6:31 AM, Marc Dietrich <marvin24@gmx.de> wrote:
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+On 17.02.2011 05:23, Rajashekhara, Sudhakar wrote:
+> 
+> Reverting the commit 140176159597ea1f23dcccb47b5c38fdf7c7faa8 
+> (ASoC: Configure symmetric rates for tlv320aic3x) resolves the issue. We are
+> still working on the proper fix.
+> 
+> Thanks,
+> Sudhakar 
+> 
 
-As Colin said, a short patch description would be appreciated.
+Did you find a proper solution to that issue ?
 
-> diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
-> new file mode 100644
-> index 0000000..347a919
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-[...]
-> +static struct tegra_gpio_table gpio_table[] = {
-> + ? ? ? { .gpio = TEGRA_GPIO_PV5, ? ? ? .enable = true ?}, /* mmc2 cd ? */
-> + ? ? ? { .gpio = TEGRA_GPIO_PH1, ? ? ? .enable = true ?}, /* mmc2 wp ? */
-> + ? ? ? { .gpio = TEGRA_GPIO_PT3, ? ? ? .enable = true ?}, /* mmc2 pwr ?*/
-> + ? ? ? { .gpio = TEGRA_GPIO_PH2, ? ? ? .enable = true ?}, /* mmc4 cd ? */
-> + ? ? ? { .gpio = TEGRA_GPIO_PH3, ? ? ? .enable = true ?}, /* mmc4 wp ? */
-> + ? ? ? { .gpio = TEGRA_GPIO_PI6, ? ? ? .enable = true ?}, /* mmc4 pwr ?*/
-> +};
+Kind Regards,
 
-Stephen Warren cleaned up Harmony and Seaboard and moved the GPIO
-definitions to board-<board>.h and gave them symbolic names. Would you
-mind doing that for these as well, please?
+Christophe
 
-> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-> new file mode 100644
-> index 0000000..a33ce98
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-[...]
-> +static struct tegra_sdhci_platform_data sdhci_pdata1 = {
-> + ? ? ? .cd_gpio ? ? ? ?= -1,
-> + ? ? ? .wp_gpio ? ? ? ?= -1,
-> + ? ? ? .power_gpio ? ? = -1,
-> +};
-> +
-> +static struct tegra_sdhci_platform_data sdhci_pdata2 = {
-> + ? ? ? .cd_gpio ? ? ? ?= TEGRA_GPIO_PV5,
-> + ? ? ? .wp_gpio ? ? ? ?= TEGRA_GPIO_PH1,
-> + ? ? ? .power_gpio ? ? = TEGRA_GPIO_PT3,
-> +};
-> +
-> +static struct tegra_sdhci_platform_data sdhci_pdata4 = {
-> + ? ? ? .cd_gpio ? ? ? ?= TEGRA_GPIO_PH2,
-> + ? ? ? .wp_gpio ? ? ? ?= TEGRA_GPIO_PH3,
-> + ? ? ? .power_gpio ? ? = TEGRA_GPIO_PI6,
-> + ? ? ? .is_8bit ? ? ? ?= 1,
-> +};
+-- 
+Christophe Aeschlimann
 
-Weird, the internal eMMC has CD and WP gpios?!
+Embedded Software Engineer & IT Manager
 
+ACN Advanced Communications Networks S.A.
 
--Olof
+Rue du Puits-Godet 8a
+2000 Neuch?tel, Switzerland
+
+T?l. +41 32 724 74 31
+
+c.aeschlimann at acn-group.ch
