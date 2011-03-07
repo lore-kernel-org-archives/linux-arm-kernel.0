@@ -1,32 +1,31 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  7 Mar 2011 12:18:55 +0200
-Subject: [PATCH] ARM: imx/mx25: fix (again) spi device registration typo
-Message-ID: <261dca45230fd96c27c3d8c1cdeefa35a21ff414.1299493026.git.baruch@tkos.co.il>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 07 Mar 2011 10:19:15 +0000
+Subject: [PATCH 2/3] [ARM] perfevents: Add support for Scorpion
+	performance monitors
+In-Reply-To: <1299276616-12918-1-git-send-email-sheetals@codeaurora.org>
+References: <1299276616-12918-1-git-send-email-sheetals@codeaurora.org>
+Message-ID: <1299493155.7349.2.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This typo was fixed in 46e3f30 (mx25: fix spi device registration typo), but a
-the merge at 0e44e059 (Merge commit 'v2.6.37-rc4' into imx-for-2.6.38) resolved
-the merge conflict wrongly.
+Hi Sheetal,
 
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-imx/devices-imx25.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Fri, 2011-03-04 at 22:10 +0000, Sheetal Sahasrabudhe wrote:
+> This commit adds support for performance monitors provided by
+> Qualcomm Scorpion and ScorpionMP processor to perfevents.
+> 
+> Signed-off-by: Sheetal Sahasrabudhe <sheetals@codeaurora.org>
+> ---
+>  arch/arm/include/asm/perf_event.h |    2 +
+>  arch/arm/kernel/perf_event.c      |   11 +
+>  arch/arm/kernel/perf_event_qc.c   |  677 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 690 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/kernel/perf_event_qc.c
 
-diff --git a/arch/arm/mach-imx/devices-imx25.h b/arch/arm/mach-imx/devices-imx25.h
-index bde33ca..d1ea79a 100644
---- a/arch/arm/mach-imx/devices-imx25.h
-+++ b/arch/arm/mach-imx/devices-imx25.h
-@@ -81,7 +81,7 @@ imx25_sdhci_esdhc_imx_data[] __initconst;
- 
- extern const struct imx_spi_imx_data imx25_cspi_data[] __initconst;
- #define imx25_add_spi_imx(id, pdata)	\
--	imx_add_spi_imx(&imx25_spi_imx_data[id], pdata)
-+	imx_add_spi_imx(&imx25_cspi_data[id], pdata)
- #define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
- #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
- #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
--- 
-1.7.2.3
+I reviewed a few iterations of this patch off-list so you can add my
+review tag (after fixing the comments and filename as pointed out by
+Bryan):
+
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+Will
