@@ -1,8 +1,10 @@
 From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 07 Mar 2011 13:55:15 +0800
-Subject: [PATCH 1/2] [ARM] am200epd: fix resource leak in
-	am200_init_gpio_regs error path
-Message-ID: <1299477315.10486.1.camel@mola>
+Date: Mon, 07 Mar 2011 13:56:11 +0800
+Subject: [PATCH 2/2] [ARM] am300epd: fix resource leak in
+	am300_init_gpio_regs error path
+In-Reply-To: <1299477315.10486.1.camel@mola>
+References: <1299477315.10486.1.camel@mola>
+Message-ID: <1299477371.10486.2.camel@mola>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,16 +13,33 @@ implementation.
 
 Signed-off-by: Axel Lin <axel.lin@gmail.com>
 ---
- arch/arm/mach-pxa/am200epd.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/am300epd.c |   13 +++++++------
+ 1 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/am200epd.c b/arch/arm/mach-pxa/am200epd.c
-index 3499fad..811d797 100644
---- a/arch/arm/mach-pxa/am200epd.c
-+++ b/arch/arm/mach-pxa/am200epd.c
-@@ -128,8 +128,8 @@ static int am200_init_gpio_regs(struct metronomefb_par *par)
+diff --git a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
+index 993d75e..fa8bad2 100644
+--- a/arch/arm/mach-pxa/am300epd.c
++++ b/arch/arm/mach-pxa/am300epd.c
+@@ -125,10 +125,7 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
+ 		if (err) {
+ 			dev_err(&am300_device->dev, "failed requesting "
+ 				"gpio %d, err=%d\n", i, err);
+-			while (i >= DB0_GPIO_PIN)
+-				gpio_free(i--);
+-			i = ARRAY_SIZE(gpios) - 1;
+-			goto err_req_gpio;
++			goto err_req_gpio2;
+ 		}
+ 	}
+ 
+@@ -159,9 +156,13 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
+ 
  	return 0;
  
++err_req_gpio2:
++	while (--i >= DB0_GPIO_PIN)
++		gpio_free(i);
++	i = ARRAY_SIZE(gpios);
  err_req_gpio:
 -	while (i > 0)
 -		gpio_free(gpios[i--]);
