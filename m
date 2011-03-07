@@ -1,36 +1,26 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Mon, 07 Mar 2011 17:02:28 +0100
-Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
-	(Nguyen Dinh-R's message of "Mon, 7 Mar 2011 15:37:38 +0000")
-References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
-	<87oc5puwg3.fsf@lebrac.rtp-net.org>
-	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <87fwqyvrzf.fsf@lebrac.rtp-net.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 07 Mar 2011 19:23:15 +0300
+Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
+In-Reply-To: <4D744870.20909@ti.com>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-4-git-send-email-nm@ti.com>
+	<4D738E04.5090207@ru.mvista.com> <4D744870.20909@ti.com>
+Message-ID: <4D750673.702@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+Hello.
 
-> Hi Arnaud,
+On 07-03-2011 5:52, Nishanth Menon wrote:
 
-Hi,
->
-> Just to verify that you are testing on an MX51-Babbage board? Here's my log:
+>>> Blindly setting a 1.2V setting
 
-I never said I was testing on babbage. The reason is because I'm using a
-efika smartbook and not a babbage.
+>> Hm, seems tautological...
 
->
-> root at freescale ~$ uname -a
-> Linux freescale 2.6.38-rc1+ #93 Fri Mar 4 17:18:15 CST 2011 armv7l GNU/Linux
+> As a non native English speaker, I would like to understand how we could
+> improve this. I suppose you mean "Blindly setting 1.2V" is better here. Am i
+> correct?
 
-2.6.38-rc1+ ? which tree are you using ? The for-next branch of Sascha
-Hauer's tree is at least 2.6.38-rc5 so you're trying to merge something
-without even testing it on the current tree. Can you please test suspend
-with current imx for-next tree (with no other patches than theses 2
-patches if possible), in order to make sure that it's still working with it ?
+    Yes.
 
-Thanks,
-Arnaud
+WBR, Sergei
