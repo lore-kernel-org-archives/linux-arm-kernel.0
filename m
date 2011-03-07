@@ -1,108 +1,41 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 7 Mar 2011 14:16:26 +0530
-Subject: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across off
-	mode
-In-Reply-To: <alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
-References: <1297353724-11665-1-git-send-email-premi@ti.com>
-	<1297353724-11665-2-git-send-email-premi@ti.com>
-	<alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Mar 2011 09:49:09 +0100
+Subject: [PATCH 0/4] Add framebuffer device for mx28evk and mx23evk boards
+In-Reply-To: <20110307083753.GC12291@S2101-09.ap.freescale.net>
+References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
+	<20110307081837.GJ29521@pengutronix.de>
+	<20110307083753.GC12291@S2101-09.ap.freescale.net>
+Message-ID: <20110307084909.GL29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Saturday, March 05, 2011 4:16 AM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across
-> off mode
+On Mon, Mar 07, 2011 at 04:37:54PM +0800, Shawn Guo wrote:
+> Hi Sascha,
 > 
-> Hello Sanjeev,
-> 
-> On Thu, 10 Feb 2011, Sanjeev Premi wrote:
-> 
-> > As per commit "bb33cc58", ROM code is expected to restore
-> > context related to CORE domain. As part of this change,
-> > CM_AUTOIDLE_PLL is neither saved nor restored.
-> 
-> ... by Linux.
-[sp] Yes.
+> On Mon, Mar 07, 2011 at 09:18:37AM +0100, Sascha Hauer wrote:
+> > On Sun, Mar 06, 2011 at 12:40:18AM +0800, Shawn Guo wrote:
+> > > This patch set is to add framebuffer device for mx28evk and mx23evk
+> > > boards.  A couple notes here:
+> > > 
+> > > * The patch [PATCH 3/4] was cherry-picked from mxs-mmc-device patch
+> > >   set  (Sascha, it seems dma, mmc, flexcan platform patches are all
+> > >   waiting for your merging, please let me know if there are still
+> > >   something stopping your pick them up)
+> > 
+> > I just applied dma and flexcan. mmc will have to wait until the
+> > mmc driver is merged because currently we do not have the platform_data
+> > declaration.
+> > 
+> The mmc driver has been merged on cjb's tree for some while, so we
+> are waiting it gets merged on your tree, right?
 
-> 
-> > This results in loosing the value of AUTO_PERIPH_DPLL.
-> 
-> A few questions:
-> 
-> - Is ROM code supposed to restore this register?
-[sp] Going by the description of the commit message I referenced, it
-     It appears to be the case. I am yet to get official confirmation
-     from the ROM code team (usually takes quite long); but all
-     experiments (i put them in patch 0/1) suggest so.
-> 
-> - Is there a documented list of which registers/bitfields the ROM code
-> will and won't restore?
-[sp] No that I am aware of; but yes I have already requested for same
-     since this issue was found.
-> 
-> - Are the entire contents of the register lost, or just AUTO_PERIPH_DPLL?
-[sp] Just AUTO_PERIPH_DPLL.
+No, we are waiting for cjb's tree hitting mainline. Otherwise the
+imx-for-2.6.39 branch cannot be compiled which is bad.
 
-> 
-> > The concern of setting the AUTOIDLE flag before the DPLL
-> > is locked seems valid. Hence, the restoration of this
-> > register is delayed until after the context of PER
-> > domain is restored.
-> 
-> Could you explain a little more about this?  Is there a hardware
-> limitation where AUTO_PERIPH_DPLL shouldn't be set unless the DPLL is
-> locked?
-[sp] This is based on my understanding (and observation) that DPLL may
-     take longer to lock after resume. Now if the clock goes to AUTOIDLE
-     before it is locked; I am not sure what would be the consequences.
-> 
-> >
-> > The patch has been verified on OMAP3EVM by checking value
-> > of CM_AUTOIDLE_PLL register across the suspend/resume
-> > sequence (using devmem) with flags sleep_while_idle and
-> > enable_off_mode set to 1.
-> >
-> > Signed-off-by: Sanjeev Premi <premi@ti.com>
-> > ---
+Sascha
 
-[sp] 
-[snip]...[snip]
-
-> >
-> > +/**
-> > + * Restore the contents of CM_AUTOIDLE_PLL register.
-> > + *
-> > + * The implementation below restores AUTO_CORE_DPLL as 'good'
-> redundancy.
-> 
-> I don't understand this part.  Are the entire contents of the register
-> lost, or just the AUTO_PERIPH_DPLL field?
-> 
-
-[sp] As put above, only AUTO_PERIPH_DPLL; but this is based on observation
-     not a *real specification*; I chose to set the AUTO_CORE_DPLL bit as
-     redundancy.
-
-~sanjeev
-
-> > + */
-> > +static void pll_mod_restore_autoidle(void)
-> > +{
-> > +	u32 ctx = stored_cm_autoidle_pll();
-> > +	u32 val = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
-> > +
-> > +	if (ctx & OMAP3430_AUTO_CORE_DPLL_MASK)
-> > +		val |= ctx & OMAP3430_AUTO_CORE_DPLL_MASK;
-> > +
-> > +	if (ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK)
-> > +		val |= ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK;
-> > +
-> > +	omap2_cm_write_mod_reg(val, PLL_MOD, CM_AUTOIDLE);
-> > +}
-> > +
-[snip]...[snip]
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
