@@ -1,27 +1,28 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 7 Mar 2011 20:14:58 +0530
-Subject: Question about free_pgd_slow ?
-In-Reply-To: <14bf5cc1.490f.12e858767f5.Coremail.bill_carson@126.com>
-References: <79b2dce2.4b84.12e5ae30c01.Coremail.bill_carson@126.com>
-	<AANLkTi=obVFm=cwDyUCXQvEK3rDYberc9YWRVkv6_qZ=@mail.gmail.com>
-	<14bf5cc1.490f.12e858767f5.Coremail.bill_carson@126.com>
-Message-ID: <AANLkTikyeE=YEJ03-zewU9i_aMfG=A9kOKdpe4Fywax6@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 Mar 2011 14:47:00 +0000
+Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
+In-Reply-To: <4D713670.70506@ru.mvista.com>
+References: <20110304080653.3f2c3f19@debxo> <4D710FF9.6040305@ru.mvista.com>
+	<20110304083822.0f40d120@debxo> <4D713670.70506@ru.mvista.com>
+Message-ID: <20110307144700.GF1829@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/5 rocky <bill_carson@126.com>:
-> But I still dont get it, why is that  low vector mapping must always
-> be active even though the task is going to exit?
+On Fri, Mar 04, 2011 at 09:58:56PM +0300, Sergei Shtylyov wrote:
+> Andres Salomon wrote:
 
-exit_mmap() is called by the exiting task.  In this case, the page table
-that free_pgtables() operates on is the page table which is currently
-in use.  Consider what would happen if we remove the vector mapping here
-and an interrupt hits immediately after -- the cpu will (recursively)
-fault while trying to find the vector page mapping.
+>>>> MFD changes in c738892f cause the mc13xxx_platform_data struct
 
-pgd_free() on the other hand is safe because it's called when we've
-switched away from this mm, and the page table is no longer in use
-(mm->mm_count == 0).
+>>>     Linus asks to also specify the commit summary in parens.
 
-Have a look at exit_mm(), which increases the mm_count before calling
-mm_put(), and finish_task_switch(), which does the mmdrop().
+>> Also, what?  If there are changes to how patches should be submitted,
+>> please provide a reference (Documentation/SubmittingPatches should
+>> be updated, as well).
+
+>    I have no time to rummage in the mail archives, sorry.
+
+There's been multiple discussions of this.  The issue is that commit IDs
+only mean something in specific trees and go bad if someone rebases,
+and they aren't legibile by humans (so even if the commit is in
+something like Linus' tree the reader still needs a git repository to
+figure out what changes are being talked about).
