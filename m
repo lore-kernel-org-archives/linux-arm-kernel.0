@@ -1,134 +1,166 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Mon, 07 Mar 2011 17:37:10 +0900
-Subject: [PATCH v3] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-Message-ID: <1299487030-8675-1-git-send-email-dh09.lee@samsung.com>
+From: alberto@amarulasolutions.com (Alberto Panizzo)
+Date: Mon, 07 Mar 2011 10:06:31 +0100
+Subject: [PATCH 2/4] mach-mx31_3ds: Add support for the MMC slot of the
+	personality board
+In-Reply-To: <20110307082721.GK29521@pengutronix.de>
+References: <1299425878.2624.29.camel@realization>
+	<1299426001.2624.31.camel@realization>
+	<20110307082721.GK29521@pengutronix.de>
+Message-ID: <1299488791.2468.17.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables lcd and backlight drivers in NURI board.
+On Mon, 2011-03-07 at 09:27 +0100, Sascha Hauer wrote:
+> On Sun, Mar 06, 2011 at 04:40:01PM +0100, Alberto Panizzo wrote:
+> > 
+> > 
+> > Signed-off-by: Alberto Panizzo <alberto@amarulasolutions.com>
+> > ---
+> >  arch/arm/mach-mx3/mach-mx31_3ds.c |  116 ++++++++++++++++++++++++++++++++++++-
+> >  1 files changed, 114 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > index f1dbb9d..cd73513 100644
+> > --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> > @@ -35,6 +35,7 @@
+> >  #include <mach/iomux-mx3.h>
+> >  #include <mach/3ds_debugboard.h>
+> >  #include <mach/ulpi.h>
+> > +#include <mach/mmc.h>
+> >  
+> >  #include "devices-imx31.h"
+> >  #include "devices.h"
+> > @@ -99,6 +100,98 @@ static int mx31_3ds_pins[] = {
+> >  	/* I2C1 */
+> >  	MX31_PIN_I2C_CLK__I2C1_SCL,
+> >  	MX31_PIN_I2C_DAT__I2C1_SDA,
+> > +	/* SDHC1 */
+> > +	MX31_PIN_SD1_DATA3__SD1_DATA3,
+> > +	MX31_PIN_SD1_DATA2__SD1_DATA2,
+> > +	MX31_PIN_SD1_DATA1__SD1_DATA1,
+> > +	MX31_PIN_SD1_DATA0__SD1_DATA0,
+> > +	MX31_PIN_SD1_CLK__SD1_CLK,
+> > +	MX31_PIN_SD1_CMD__SD1_CMD,
+> > +	MX31_PIN_GPIO3_1__GPIO3_1, /* Card detect */
+> > +	MX31_PIN_GPIO3_0__GPIO3_0, /* OE */
+> > +};
+> > +
+> > +/*
+> > + * Support for SD card slot in personality board
+> > + */
+> > +static int mx31_3ds_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
+> > +			       void *data)
+> > +{
+> > +	int ret;
+> > +	int gpio_det, gpio_bus_en;
+> > +
+> > +	gpio_det = IOMUX_TO_GPIO(MX31_PIN_GPIO3_1);
+> > +	gpio_bus_en = IOMUX_TO_GPIO(MX31_PIN_GPIO3_0);
+> > +
+> > +	ret = gpio_request(gpio_det, "sdhc1-card-detect");
+> > +	if (ret) {
+> > +		pr_warning("Unable to request the SD/MMC card-detect GPIO.\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = gpio_request(gpio_bus_en, "sdhc1-bus-enable");
+> > +	if (ret) {
+> > +		pr_warning("Unable to request the SD/MMC bus enable GPIO.\n");
+> > +		goto gpio_free_be;
+> > +	}
+> > +
+> > +	ret = gpio_direction_input(gpio_det);
+> > +	if (ret) {
+> > +		pr_warning("Unable to manage the SD/MMC card-detect GPIO.\n");
+> > +		goto gpio_free_all;
+> > +	}
+> > +
+> > +	ret = gpio_direction_output(gpio_bus_en, 0);
+> > +	if (ret) {
+> > +		pr_warning("Unable to manage the SD/MMC bus enable GPIO.\n");
+> > +		goto gpio_free_all;
+> > +	}
+> 
+> Wolfram just arrived, so I probably have some moments left before he
+> says it: You should use gpio_request_array here.
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-Changes since v2:
-- code clean and make a pair of gpio_request()/gpio_free()
+Ok I'll check the API.
 
- arch/arm/mach-exynos4/Kconfig     |    1 +
- arch/arm/mach-exynos4/mach-nuri.c |   74 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+), 0 deletions(-)
+> 
+> > +
+> > +	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
+> > +			  detect_irq, IRQF_DISABLED |
+> > +			  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+> > +			  "sdhc1-detect", data);
+> > +	if (ret) {
+> > +		pr_warning("Unable to request the SD/MMC card-detect IRQ.\n");
+> > +		goto gpio_free_all;
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +gpio_free_all:
+> > +	gpio_free(gpio_bus_en);
+> > +gpio_free_be:
+> > +	gpio_free(gpio_det);
+> > +	return ret;
+> > +}
+> > +
+> > +static void mx31_3ds_sdhc1_exit(struct device *dev, void *data)
+> > +{
+> > +	free_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO3_1), data);
+> > +	gpio_free(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1));
+> > +	gpio_free(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0));
+> > +}
+> > +
+> > +static void mx31_3ds_sdhc1_setpower(struct device *dev, unsigned int vdd)
+> > +{
+> > +	/*
+> > +	 * While the voltage stuff is done by the driver, activate the
+> > +	 * Buffer Enable Pin only if there is a card in slot to fix the card
+> > +	 * voltage issue caused by bi-directional chip TXB0108 on 3Stack.
+> > +	 * Done here because at this stage we have for sure a debounced value
+> > +	 * of the presence of the card, showed by the value of vdd.
+> > +	 * 7 == ilog2(MMC_VDD_165_195)
+> > +	 */
+> > +	if (vdd > 7)
+> > +		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0), 1);
+> > +	else
+> > +		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_GPIO3_0), 0);
+> > +}
+> > +
+> > +static struct imxmmc_platform_data sdhc1_pdata = {
+> > +	.init	= mx31_3ds_sdhc1_init,
+> > +	.exit	= mx31_3ds_sdhc1_exit,
+> > +	.setpower = mx31_3ds_sdhc1_setpower,
+> >  };
+> >  
+> >  /*
+> > @@ -132,11 +225,26 @@ static struct regulator_init_data pwgtx_init = {
+> >  
+> >  static struct regulator_init_data gpo_init = {
+> >  	.constraints = {
+> > -		.boot_on = 1,
+> > -		.always_on = 1,
+> > +		.boot_on	= 1,
+> > +		.always_on	= 1,
+> >  	}
+> >  };
+> 
+> 
+> Please just keep it as it is. Some people like the initializers
+> vertically aligned, others prefer spaces here. But if someone made
+> a decision, don't change it to increase the chance that git blame
+> shows something useful.
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 5bf00b9..de31e4d 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -135,6 +135,7 @@ config MACH_NURI
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_I2C5
- 	select EXYNOS4_SETUP_SDHCI
-+	select SAMSUNG_DEV_PWM
- 	help
- 	  Machine support for Samsung Mobile NURI Board.
- 
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 28010bd..f18e573 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -17,6 +17,10 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mmc/host.h>
-+#include <linux/fb.h>
-+#include <linux/pwm_backlight.h>
-+
-+#include <video/platform_lcd.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -181,6 +185,73 @@ static struct platform_device nuri_gpio_keys = {
- 	},
- };
- 
-+static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int power)
-+{
-+	int gpio = EXYNOS4_GPE1(5);
-+
-+	gpio_request(gpio, "LVDS_nSHDN");
-+	gpio_direction_output(gpio, power);
-+	gpio_free(gpio);
-+}
-+
-+static int nuri_bl_init(struct device *dev)
-+{
-+	int ret, gpio = EXYNOS4_GPE2(3);
-+
-+	ret = gpio_request(gpio, "LCD_LDO_EN");
-+	if (!ret)
-+		gpio_direction_output(gpio, 0);
-+
-+	return ret;
-+}
-+
-+static int nuri_bl_notify(struct device *dev, int brightness)
-+{
-+	if (brightness < 1)
-+		brightness = 0;
-+
-+	gpio_set_value(EXYNOS4_GPE2(3), 1);
-+
-+	return brightness;
-+}
-+
-+static void nuri_bl_exit(struct device *dev)
-+{
-+	gpio_free(EXYNOS4_GPE2(3));
-+}
-+
-+/* nuri pwm backlight */
-+static struct platform_pwm_backlight_data nuri_backlight_data = {
-+	.pwm_id			= 0,
-+	.pwm_period_ns		= 30000,
-+	.max_brightness		= 100,
-+	.dft_brightness		= 50,
-+	.init			= nuri_bl_init,
-+	.notify			= nuri_bl_notify,
-+	.exit			= nuri_bl_exit,
-+};
-+
-+static struct platform_device nuri_backlight_device = {
-+	.name			= "pwm-backlight",
-+	.id			= -1,
-+	.dev			= {
-+		.parent		= &s3c_device_timer[0].dev,
-+		.platform_data	= &nuri_backlight_data,
-+	},
-+};
-+
-+static struct plat_lcd_data nuri_lcd_platform_data = {
-+	.set_power		= nuri_lcd_power_on,
-+};
-+
-+static struct platform_device nuri_lcd_device = {
-+	.name			= "platform-lcd",
-+	.id			= -1,
-+	.dev			= {
-+		.platform_data	= &nuri_lcd_platform_data,
-+	},
-+};
-+
- /* I2C1 */
- static struct i2c_board_info i2c1_devs[] __initdata = {
- 	/* Gyro, To be updated */
-@@ -201,8 +272,11 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&s3c_device_wdt,
- #endif
- 
-+	&s3c_device_timer[0],
- 	/* NURI Devices */
- 	&nuri_gpio_keys,
-+	&nuri_lcd_device,
-+	&nuri_backlight_device,
- };
- 
- static void __init nuri_map_io(void)
+OK but indeed I've done it for consistency with all the rest of the
+file.
+A new version soon.
+
+Alberto!
 -- 
-1.6.0.4
+| Alberto Panizzo                                 Amarula Solutions BV |
+| CTO  -  Founder                                      Cruquiuskade 47 |
+| T. +31(0)851119171                              Amsterdam 1018 AM NL |
+| F. +31(0)204106211                          www.amarulasolutions.com |
