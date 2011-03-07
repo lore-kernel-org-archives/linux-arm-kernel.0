@@ -1,68 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 Mar 2011 13:35:19 -0800
-Subject: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com> (Santosh
-	Shilimkar's message of "Fri, 4 Mar 2011 23:08:17 +0530")
-References: <1299252837-18074-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTimz0Ko9GFtLTcBQVV_c2DAPU5XhV47xT+R9Q7mv@mail.gmail.com>
-	<7b1ef0e49e8b8c1c20b0965a58c4fe73@mail.gmail.com>
-Message-ID: <87d3m2397s.fsf@ti.com>
+From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
+Date: Mon,  7 Mar 2011 16:46:44 -0500
+Subject: [PATCH v2 0/3] ARM: Add Scorpion/ScorpionMP support to perf and
+	Oprofile
+Message-ID: <1299534404-25346-1-git-send-email-sheetals@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+This patchset contains the following features:
+It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
+and Oprofile.
+It adds PMU support for Scorpion and ScorpionMP.
+It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
 
-> Dave,
->> -----Original Message-----
->> From: Dave Martin [mailto:dave.martin at linaro.org]
->> Sent: Friday, March 04, 2011 11:05 PM
->> To: linux-arm-kernel at lists.infradead.org
->> Cc: patches at linaro.org; Tony Lindgren; Santosh Shilimkar; Jean
->> Pihet; Kevin Hilman; linux-omap at vger.kernel.org; Nicolas Pitre;
->> linaro-dev at lists.linaro.org
->> Subject: Re: [PATCH v5 REPOST 0/5] ARM: omap[34]: Thumb-2
->> compatibility fixes
->>
->> On Fri, Mar 4, 2011 at 3:33 PM, Dave Martin <dave.martin@linaro.org>
->> wrote:
->> > This set of patches, along with some other patches under
->> > discussion on alkml, should enable omap3 and omap4 kernels to be
->> > built with CONFIG_THUMB2_KERNEL.
->> >
->> > This patch set builds on recent cleanup done by the omap
->> > maintainers.
->> >
->> > At least some of this code definitely works, most features have
->> > been tested successfully. ?Further testing, especially of Thumb-2
->> > behaviour, is still welcome.
->> >
->> > In particular, I still have no Ack/Tested-by on the following
->> > patches, so it would be great if anyone who has an opportunity
->> > to do a final review / re-test can do so.
->> >
->> > ?* ARM: omap3: Convert END() to ENDPROC() for correct linkage with
->> CONFIG_THUMB2_KERNEL
->> > ?* ARM: omap3: Thumb-2 compatibility for sram34xx.S
->> > ?* ARM: omap3: Thumb-2 compatibility for sleep34xx.S
->>
->> Following up on this, it looks like I have some locally-recorded
->> acks
->> which didn't make it into my posting ...
->>
->> The one patch I currently have no feedback on is this one:
->>
->>   * ARM: omap4: Provide do_wfi() for Thumb-2
->>
-> You can drop this one since do_wfi()  won't be needed
-> anymore after my recent series.
->
-> http://www.spinics.net/lists/linux-omap/msg46495.html
+Sheetal Sahasrabudhe (3):
+  msm: Add support for Scorpion and ScorpionMP PMU
+  [ARM] perfevents: Add support for Scorpion performance monitors
+  [ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
 
-Santosh,
+ arch/arm/include/asm/perf_event.h          |    2 +
+ arch/arm/kernel/perf_event.c               |   11 +
+ arch/arm/kernel/perf_event_msm.c           |  665 ++++++++++++++++++++++++++++
+ arch/arm/mach-msm/Makefile                 |    2 +
+ arch/arm/mach-msm/include/mach/irqs-7x30.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8960.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8x50.h |    2 +-
+ arch/arm/mach-msm/include/mach/irqs-8x60.h |    2 +-
+ arch/arm/mach-msm/pmu.c                    |   35 ++
+ arch/arm/oprofile/common.c                 |    4 +
+ 10 files changed, 723 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/kernel/perf_event_msm.c
+ create mode 100644 arch/arm/mach-msm/pmu.c
 
-I'm planning to queue/merge Dave's series as-is for 2.6.39, since it has
-already received significan review & testing.
+-- 
+1.7.4.1
 
-When you update your OMAP4 series, feel free to drop it as needed.
-
-Kevin
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
