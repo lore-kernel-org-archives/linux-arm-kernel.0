@@ -1,36 +1,137 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 7 Mar 2011 18:00:08 +0800
-Subject: [PATCH V5 1/6] pxa3xx_nand: make scan procedure more clear
-In-Reply-To: <1299491371.2746.14.camel@localhost>
-References: <AANLkTinb7oZDzvD94RWLZqnLnaX5kY97CxJ+34eVJNmU@mail.gmail.com>
-	<1299121710-6263-1-git-send-email-leiwen@marvell.com>
-	<1299491371.2746.14.camel@localhost>
-Message-ID: <AANLkTik2px-jmz0CSq03dYWjQWp2pMpdSmkKYwNWHjt=@mail.gmail.com>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Mon, 7 Mar 2011 15:30:30 +0530
+Subject: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL across off
+	mode
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
+References: <1297353724-11665-1-git-send-email-premi@ti.com>
+	<1297353724-11665-2-git-send-email-premi@ti.com>
+	<alpine.DEB.2.00.1103041540540.10981@utopia.booyaka.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C0E5A55@dbde02.ent.ti.com>
+Message-ID: <c9be31ca3dab99320a409e957330506c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
-
-On Mon, Mar 7, 2011 at 5:49 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Thu, 2011-03-03 at 11:08 +0800, Lei Wen wrote:
->> The previous probe function is some kind of big part.
->> This patch seperate the resource allocation to keep the probe process
->> more clear than before.
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Premi, Sanjeev
+> Sent: Monday, March 07, 2011 2:16 PM
+> To: Paul Walmsley
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/1] omap3: Save and restore CM_AUTOIDLE_PLL
+> across off mode
 >
-> It is a bit confusing that you sent 2 patches 1 and 6. What is in the
-> middle? Is it save to apply these 2 only?
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Saturday, March 05, 2011 4:16 AM
+> > To: Premi, Sanjeev
+> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/1] omap3: Save and restore
+> CM_AUTOIDLE_PLL across
+> > off mode
+> >
+> > Hello Sanjeev,
+> >
+> > On Thu, 10 Feb 2011, Sanjeev Premi wrote:
+> >
+> > > As per commit "bb33cc58", ROM code is expected to restore
+> > > context related to CORE domain. As part of this change,
+> > > CM_AUTOIDLE_PLL is neither saved nor restored.
+> >
+> > ... by Linux.
+> [sp] Yes.
 >
+> >
+> > > This results in loosing the value of AUTO_PERIPH_DPLL.
+> >
+> > A few questions:
+> >
+> > - Is ROM code supposed to restore this register?
+> [sp] Going by the description of the commit message I referenced, it
+>      It appears to be the case. I am yet to get official confirmation
+>      from the ROM code team (usually takes quite long); but all
+>      experiments (i put them in patch 0/1) suggest so.
+> >
+> > - Is there a documented list of which registers/bitfields the ROM code
+> > will and won't restore?
+> [sp] No that I am aware of; but yes I have already requested for same
+>      since this issue was found.
+> >
+> > - Are the entire contents of the register lost, or just
+> AUTO_PERIPH_DPLL?
+> [sp] Just AUTO_PERIPH_DPLL.
+As per OMAP3630 TRM Section 26.5, register CM_AUTOIDLE_PLL is supposed to
+be restored by ROM code. The PM code should only store these registers
+before entering off mode. So only thing that needs to be done in this
+patch set is to save these registers.
 
-I just update the patch 1 and 6, since it add the comment as you mentioned.
-For 2-5 has no update, I don't update them...
-Those middle patch could be found at:
-2/6 http://www.spinics.net/lists/arm-kernel/msg116285.html
-3/6 http://www.spinics.net/lists/arm-kernel/msg116284.html
-4/6 http://www.spinics.net/lists/arm-kernel/msg116282.html
-5/6 http://www.spinics.net/lists/arm-kernel/msg116283.html
+Vishwa
 
-Best regards,
-Lei
+
+
+>
+> >
+> > > The concern of setting the AUTOIDLE flag before the DPLL
+> > > is locked seems valid. Hence, the restoration of this
+> > > register is delayed until after the context of PER
+> > > domain is restored.
+> >
+> > Could you explain a little more about this?  Is there a hardware
+> > limitation where AUTO_PERIPH_DPLL shouldn't be set unless the DPLL
+> is
+> > locked?
+> [sp] This is based on my understanding (and observation) that DPLL may
+>      take longer to lock after resume. Now if the clock goes to AUTOIDLE
+>      before it is locked; I am not sure what would be the consequences.
+> >
+> > >
+> > > The patch has been verified on OMAP3EVM by checking value
+> > > of CM_AUTOIDLE_PLL register across the suspend/resume
+> > > sequence (using devmem) with flags sleep_while_idle and
+> > > enable_off_mode set to 1.
+> > >
+> > > Signed-off-by: Sanjeev Premi <premi@ti.com>
+> > > ---
+>
+> [sp]
+> [snip]...[snip]
+>
+> > >
+> > > +/**
+> > > + * Restore the contents of CM_AUTOIDLE_PLL register.
+> > > + *
+> > > + * The implementation below restores AUTO_CORE_DPLL as 'good'
+> > redundancy.
+> >
+> > I don't understand this part.  Are the entire contents of the register
+> > lost, or just the AUTO_PERIPH_DPLL field?
+> >
+>
+> [sp] As put above, only AUTO_PERIPH_DPLL; but this is based on
+> observation
+>      not a *real specification*; I chose to set the AUTO_CORE_DPLL bit
+as
+>      redundancy.
+>
+> ~sanjeev
+>
+> > > + */
+> > > +static void pll_mod_restore_autoidle(void)
+> > > +{
+> > > +	u32 ctx = stored_cm_autoidle_pll();
+> > > +	u32 val = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
+> > > +
+> > > +	if (ctx & OMAP3430_AUTO_CORE_DPLL_MASK)
+> > > +		val |= ctx & OMAP3430_AUTO_CORE_DPLL_MASK;
+> > > +
+> > > +	if (ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK)
+> > > +		val |= ctx & OMAP3430_AUTO_PERIPH_DPLL_MASK;
+> > > +
+> > > +	omap2_cm_write_mod_reg(val, PLL_MOD, CM_AUTOIDLE);
+> > > +}
+> > > +
+> [snip]...[snip]
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
