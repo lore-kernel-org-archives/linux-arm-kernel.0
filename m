@@ -1,61 +1,163 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 7 Mar 2011 08:34:00 +0100
-Subject: [PATCH] ARM: mxs/tx28: fix up LCD pads
-In-Reply-To: <1299342440-30620-1-git-send-email-shawn.guo@freescale.com>
-References: <1299342440-30620-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110307073400.GG29521@pengutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon,  7 Mar 2011 08:41:59 +0100
+Subject: [PATCH 1/2] USB: s3c2410_udc: Add common implementation for GPIO
+	controlled pullups
+Message-ID: <1299483720-18175-1-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2011 at 12:27:20AM +0800, Shawn Guo wrote:
-> * In any case, LCD only needs one group of VSYNC, HSYNC, and DOTCLK.
->   So remove the redundant and useless one.
-> * LCD_ENABLE pad should not work as a GPIO for LCD, and there must be
->   one pad for ENABLE function.
+Currently all boards using the s3c2410_udc driver use a GPIO to control the
+state of the pullup, as a result the same code is reimplemented in each board
+file.
+This patch adds support for using a GPIO to control the pullup state to the udc
+driver, so the boards can use a common implementation.
 
-Thanks for pointing this out. I'll have a look into it.
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+---
+ arch/arm/plat-s3c24xx/include/plat/udc.h |    4 ++
+ drivers/usb/gadget/s3c2410_udc.c         |   60 +++++++++++++++++++++++++----
+ 2 files changed, 55 insertions(+), 9 deletions(-)
 
-Sascha
-
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Hi Lothar, Uwe,
-> 
-> I do not have the schematics of TX28 board, and I'm guessing the fix.
-> So it really needs your comments here.
-> 
-> Regards,
-> Shawn
-> 
->  arch/arm/mach-mxs/mach-tx28.c |    6 +-----
->  1 files changed, 1 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-> index b65e371..16a0059 100644
-> --- a/arch/arm/mach-mxs/mach-tx28.c
-> +++ b/arch/arm/mach-mxs/mach-tx28.c
-> @@ -61,11 +61,7 @@ static const iomux_cfg_t tx28_stk5v3_pads[] __initconst = {
->  	MX28_PAD_LCD_RD_E__LCD_VSYNC | LCD_MODE,
->  	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | LCD_MODE,
->  	MX28_PAD_LCD_RS__LCD_DOTCLK | LCD_MODE,
-> -	MX28_PAD_LCD_CS__LCD_CS | LCD_MODE,
-> -	MX28_PAD_LCD_VSYNC__LCD_VSYNC | LCD_MODE,
-> -	MX28_PAD_LCD_HSYNC__LCD_HSYNC | LCD_MODE,
-> -	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | LCD_MODE,
-> -	MX28_PAD_LCD_ENABLE__GPIO_1_31 | LCD_MODE,
-> +	MX28_PAD_LCD_CS__LCD_ENABLE | LCD_MODE,
->  	MX28_PAD_LCD_RESET__GPIO_3_30 | LCD_MODE,
->  	MX28_PAD_PWM0__PWM_0 | LCD_MODE,
->  
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
+diff --git a/arch/arm/plat-s3c24xx/include/plat/udc.h b/arch/arm/plat-s3c24xx/include/plat/udc.h
+index 546bb40..80457c6 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/udc.h
++++ b/arch/arm/plat-s3c24xx/include/plat/udc.h
+@@ -27,6 +27,10 @@ enum s3c2410_udc_cmd_e {
+ struct s3c2410_udc_mach_info {
+ 	void	(*udc_command)(enum s3c2410_udc_cmd_e);
+  	void	(*vbus_draw)(unsigned int ma);
++
++	unsigned int pullup_pin;
++	unsigned int pullup_pin_inverted;
++
+ 	unsigned int vbus_pin;
+ 	unsigned char vbus_pin_inverted;
+ };
+diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+index 2b02520..6d8b040 100644
+--- a/drivers/usb/gadget/s3c2410_udc.c
++++ b/drivers/usb/gadget/s3c2410_udc.c
+@@ -1481,7 +1481,9 @@ static int s3c2410_udc_set_pullup(struct s3c2410_udc *udc, int is_on)
+ {
+ 	dprintk(DEBUG_NORMAL, "%s()\n", __func__);
+ 
+-	if (udc_info && udc_info->udc_command) {
++	if (udc_info && (udc_info->udc_command ||
++		gpio_is_valid(udc_info->pullup_pin))) {
++
+ 		if (is_on)
+ 			s3c2410_udc_enable(udc);
+ 		else {
+@@ -1558,6 +1560,32 @@ static const struct usb_gadget_ops s3c2410_ops = {
+ 	.vbus_draw		= s3c2410_vbus_draw,
+ };
+ 
++static void s3c2410_udc_command(enum s3c2410_udc_cmd_e cmd)
++{
++	if (!udc_info)
++		return;
++
++	if (udc_info->udc_command) {
++		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
++	} else if (gpio_is_valid(udc_info->pullup_pin)) {
++		int value;
++
++		switch (cmd) {
++		case S3C2410_UDC_P_ENABLE:
++			value = 1;
++			break;
++		case S3C2410_UDC_P_DISABLE:
++			value = 0;
++			break;
++		default:
++			return;
++		}
++		value ^= udc_info->pullup_pin_inverted;
++
++		gpio_set_value(udc_info->pullup_pin, value);
++	}
++}
++
+ /*------------------------- gadget driver handling---------------------------*/
+ /*
+  * s3c2410_udc_disable
+@@ -1579,8 +1607,7 @@ static void s3c2410_udc_disable(struct s3c2410_udc *dev)
+ 	udc_write(0x1F, S3C2410_UDC_EP_INT_REG);
+ 
+ 	/* Good bye, cruel world */
+-	if (udc_info && udc_info->udc_command)
+-		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
++	s3c2410_udc_command(S3C2410_UDC_P_DISABLE);
+ 
+ 	/* Set speed to unknown */
+ 	dev->gadget.speed = USB_SPEED_UNKNOWN;
+@@ -1641,8 +1668,7 @@ static void s3c2410_udc_enable(struct s3c2410_udc *dev)
+ 	udc_write(S3C2410_UDC_INT_EP0, S3C2410_UDC_EP_INT_EN_REG);
+ 
+ 	/* time to say "hello, world" */
+-	if (udc_info && udc_info->udc_command)
+-		udc_info->udc_command(S3C2410_UDC_P_ENABLE);
++	s3c2410_udc_command(S3C2410_UDC_P_ENABLE);
+ }
+ 
+ /*
+@@ -1917,6 +1943,17 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
+ 		udc->vbus = 1;
+ 	}
+ 
++	if (udc_info && !udc_info->udc_command &&
++		gpio_is_valid(udc_info->pullup_pin)) {
++
++		retval = gpio_request_one(udc_info->pullup_pin,
++				udc_info->vbus_pin_inverted ?
++				GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
++				"udc pullup");
++		if (retval)
++			goto err_vbus_irq;
++	}
++
+ 	if (s3c2410_udc_debugfs_root) {
+ 		udc->regs_info = debugfs_create_file("registers", S_IRUGO,
+ 				s3c2410_udc_debugfs_root,
+@@ -1929,6 +1966,9 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++err_vbus_irq:
++	if (udc_info && udc_info->vbus_pin > 0)
++		free_irq(gpio_to_irq(udc_info->vbus_pin), udc);
+ err_gpio_claim:
+ 	if (udc_info && udc_info->vbus_pin > 0)
+ 		gpio_free(udc_info->vbus_pin);
+@@ -1956,6 +1996,10 @@ static int s3c2410_udc_remove(struct platform_device *pdev)
+ 
+ 	debugfs_remove(udc->regs_info);
+ 
++	if (udc_info && !udc_info->udc_command &&
++		gpio_is_valid(udc_info->pullup_pin))
++		gpio_free(udc_info->pullup_pin);
++
+ 	if (udc_info && udc_info->vbus_pin > 0) {
+ 		irq = gpio_to_irq(udc_info->vbus_pin);
+ 		free_irq(irq, udc);
+@@ -1987,16 +2031,14 @@ static int s3c2410_udc_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static int s3c2410_udc_suspend(struct platform_device *pdev, pm_message_t message)
+ {
+-	if (udc_info && udc_info->udc_command)
+-		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
++	s3c2410_udc_command(S3C2410_UDC_P_DISABLE);
+ 
+ 	return 0;
+ }
+ 
+ static int s3c2410_udc_resume(struct platform_device *pdev)
+ {
+-	if (udc_info && udc_info->udc_command)
+-		udc_info->udc_command(S3C2410_UDC_P_ENABLE);
++	s3c2410_udc_command(S3C2410_UDC_P_ENABLE);
+ 
+ 	return 0;
+ }
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.2.3
