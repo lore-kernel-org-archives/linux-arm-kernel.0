@@ -1,38 +1,59 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 7 Mar 2011 09:49:09 +0100
-Subject: [PATCH 0/4] Add framebuffer device for mx28evk and mx23evk boards
-In-Reply-To: <20110307083753.GC12291@S2101-09.ap.freescale.net>
-References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
-	<20110307081837.GJ29521@pengutronix.de>
-	<20110307083753.GC12291@S2101-09.ap.freescale.net>
-Message-ID: <20110307084909.GL29521@pengutronix.de>
+Date: Mon, 7 Mar 2011 09:53:58 +0100
+Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
+In-Reply-To: <20110304080653.3f2c3f19@debxo>
+References: <20110304080653.3f2c3f19@debxo>
+Message-ID: <20110307085358.GM29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 04:37:54PM +0800, Shawn Guo wrote:
-> Hi Sascha,
-> 
-> On Mon, Mar 07, 2011 at 09:18:37AM +0100, Sascha Hauer wrote:
-> > On Sun, Mar 06, 2011 at 12:40:18AM +0800, Shawn Guo wrote:
-> > > This patch set is to add framebuffer device for mx28evk and mx23evk
-> > > boards.  A couple notes here:
-> > > 
-> > > * The patch [PATCH 3/4] was cherry-picked from mxs-mmc-device patch
-> > >   set  (Sascha, it seems dma, mmc, flexcan platform patches are all
-> > >   waiting for your merging, please let me know if there are still
-> > >   something stopping your pick them up)
-> > 
-> > I just applied dma and flexcan. mmc will have to wait until the
-> > mmc driver is merged because currently we do not have the platform_data
-> > declaration.
-> > 
-> The mmc driver has been merged on cjb's tree for some while, so we
-> are waiting it gets merged on your tree, right?
+On Fri, Mar 04, 2011 at 08:06:53AM -0800, Andres Salomon wrote:
+> Note that this relies on stuff currently in mfd's next tree, but this
+> is also a newer driver.  I'm not sure which tree it should go through,
+> as it's a problem that shows up in next.
 
-No, we are waiting for cjb's tree hitting mainline. Otherwise the
-imx-for-2.6.39 branch cannot be compiled which is bad.
+Please ping me again when the mfd tree is in Linus master. I see no
+other chance fixing this on my side other than removing regulator
+support for efika completely for now. So I guess you have to live with
+the compile breakage for some time.
 
 Sascha
+
+> 
+> 
+> 
+> From: Andres Salomon <dilinger@queued.net>
+> 
+> MFD changes in c738892f cause the mc13xxx_platform_data struct
+> to change.  This changes one more (new) user of it, fixing a build
+> error.
+> 
+> Signed-off-by: Andres Salomon <dilinger@queued.net>
+> ---
+>  arch/arm/mach-mx5/mx51_efika.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
+> index 74991c9..6451fb4 100644
+> --- a/arch/arm/mach-mx5/mx51_efika.c
+> +++ b/arch/arm/mach-mx5/mx51_efika.c
+> @@ -572,8 +572,10 @@ static struct mc13xxx_regulator_init_data mx51_efika_regulators[] = {
+>  
+>  static struct mc13xxx_platform_data mx51_efika_mc13892_data = {
+>  	.flags = MC13XXX_USE_RTC | MC13XXX_USE_REGULATOR,
+> -	.num_regulators = ARRAY_SIZE(mx51_efika_regulators),
+> -	.regulators = mx51_efika_regulators,
+> +	.regulators = {
+> +		.num_regulators = ARRAY_SIZE(mx51_efika_regulators),
+> +		.regulators = mx51_efika_regulators,
+> +	},
+>  };
+>  
+>  static struct spi_board_info mx51_efika_spi_board_info[] __initdata = {
+> -- 
+> 1.7.2.3
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
