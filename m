@@ -1,184 +1,271 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 07 Mar 2011 22:44:29 -0700
-Subject: [PATCH 2/5] omap: hwmod: add syss reset done flags to omap2,
-	omap3 hwmods
+Date: Mon, 07 Mar 2011 22:44:35 -0700
+Subject: [PATCH 5/5] OMAP2+: hwmod: use status bit info for reset line
 In-Reply-To: <20110308054315.1309.10538.stgit@twilight.localdomain>
 References: <20110308054315.1309.10538.stgit@twilight.localdomain>
-Message-ID: <20110308054428.1309.70008.stgit@twilight.localdomain>
+Message-ID: <20110308054433.1309.99944.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Avinash.H.M <avinashhm@ti.com>
+From: omar ramirez <omar.ramirez@ti.com>
 
-Some of the omap2, omap3 peripherals support software reset. This
-can be done through the softreset bit in sysconfig register.
-The reset status can be checked through resetdone bit of
-sysstatus register. syss_has_reset_status is added to the hwmod
-database of peripherals which have resetdone bit in sysstatus register.
+On OMAP2 and OMAP3 the reset ctrl shift doesn't match the
+status bit, as it does on OMAP4, when handling the reset lines.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Reviewed-by: Govindraj.R <govindraj.raja@ti.com>
-Signed-off-by: Avinash.H.M <avinashhm@ti.com>
+This patch adds a new member in the reset info structure, so now it
+can be added as part of hwmod data, and checked accordingly for
+OMAP2 or 3; otherwise, there could be cases when the shift masks
+doesn't match both of the registers, and a successful reset might
+throw an error message or vice versa.
+
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+[paul at pwsan.com: added a warning if st_shift used on OMAP4; renamed 'r'
+ variable; improved some documentation]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   11 ++++++-----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   12 +++++++-----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   13 ++++++++-----
- 3 files changed, 21 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |   75 +++++++++++++++-----------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |   18 +++---
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    5 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 +
+ 4 files changed, 58 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index f323c6b..de3ac63 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -366,7 +366,7 @@ static struct omap_hwmod_class_sysconfig omap2420_wd_timer_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 671f871..b0238e1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -972,25 +972,29 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ }
+ 
+ /**
+- * _lookup_hardreset - return the register bit shift for this hwmod/reset line
++ * _lookup_hardreset - fill register bit info for this hwmod/reset line
+  * @oh: struct omap_hwmod *
+  * @name: name of the reset line in the context of this hwmod
++ * @ohri: struct omap_hwmod_rst_info * that this function will fill in
+  *
+  * Return the bit position of the reset line that match the
+  * input name. Return -ENOENT if not found.
+  */
+-static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name)
++static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name,
++			    struct omap_hwmod_rst_info *ohri)
+ {
+ 	int i;
+ 
+ 	for (i = 0; i < oh->rst_lines_cnt; i++) {
+ 		const char *rst_line = oh->rst_lines[i].name;
+ 		if (!strcmp(rst_line, name)) {
+-			u8 shift = oh->rst_lines[i].rst_shift;
+-			pr_debug("omap_hwmod: %s: _lookup_hardreset: %s: %d\n",
+-				 oh->name, rst_line, shift);
++			ohri->rst_shift = oh->rst_lines[i].rst_shift;
++			ohri->st_shift = oh->rst_lines[i].st_shift;
++			pr_debug("omap_hwmod: %s: %s: %s: rst %d st %d\n",
++				 oh->name, __func__, rst_line, ohri->rst_shift,
++				 ohri->st_shift);
+ 
+-			return shift;
++			return 0;
+ 		}
+ 	}
+ 
+@@ -1009,21 +1013,22 @@ static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
++	struct omap_hwmod_rst_info ohri;
++	u8 ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &ohri);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
+-						  shift);
++						  ohri.rst_shift);
+ 	else if (cpu_is_omap44xx())
+ 		return omap4_prm_assert_hardreset(oh->prcm.omap4.rstctrl_reg,
+-						  shift);
++						  ohri.rst_shift);
+ 	else
+ 		return -EINVAL;
+ }
+@@ -1040,29 +1045,34 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
+-	int r;
++	struct omap_hwmod_rst_info ohri;
++	int ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &ohri);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		r = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+-						 shift);
+-	else if (cpu_is_omap44xx())
+-		r = omap4_prm_deassert_hardreset(oh->prcm.omap4.rstctrl_reg,
+-						 shift);
+-	else
++	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
++		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
++						   ohri.rst_shift,
++						   ohri.st_shift);
++	} else if (cpu_is_omap44xx()) {
++		if (ohri.st_shift)
++			pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
++			       oh->name, name);
++		ret = omap4_prm_deassert_hardreset(oh->prcm.omap4.rstctrl_reg,
++						   ohri.rst_shift);
++	} else {
+ 		return -EINVAL;
++	}
+ 
+-	if (r == -EBUSY)
++	if (ret == -EBUSY)
+ 		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
+ 
+-	return r;
++	return ret;
+ }
+ 
+ /**
+@@ -1075,21 +1085,22 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
++	struct omap_hwmod_rst_info ohri;
++	u8 ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &ohri);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
+-						       shift);
++						       ohri.st_shift);
+ 	} else if (cpu_is_omap44xx()) {
+ 		return omap4_prm_is_hardreset_asserted(oh->prcm.omap4.rstctrl_reg,
+-						       shift);
++						       ohri.rst_shift);
+ 	} else {
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index ec03625..051213f 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -118,7 +118,8 @@ int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+ /**
+  * omap2_prm_deassert_hardreset - deassert a submodule hardreset line and wait
+  * @prm_mod: PRM submodule base (e.g. CORE_MOD)
+- * @shift: register bit shift corresponding to the reset line to deassert
++ * @rst_shift: register bit shift corresponding to the reset line to deassert
++ * @st_shift: register bit shift for the status of the deasserted submodule
+  *
+  * Some IPs like dsp or iva contain processors that require an HW
+  * reset line to be asserted / deasserted in order to fully enable the
+@@ -129,27 +130,28 @@ int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+  * -EINVAL upon an argument error, -EEXIST if the submodule was already out
+  * of reset, or -EBUSY if the submodule did not exit reset promptly.
+  */
+-int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
++int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift)
+ {
+-	u32 mask;
++	u32 rst, st;
+ 	int c;
+ 
+ 	if (!(cpu_is_omap24xx() || cpu_is_omap34xx()))
+ 		return -EINVAL;
+ 
+-	mask = 1 << shift;
++	rst = 1 << rst_shift;
++	st = 1 << st_shift;
+ 
+ 	/* Check the current status to avoid de-asserting the line twice */
+-	if (omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTCTRL, mask) == 0)
++	if (omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTCTRL, rst) == 0)
+ 		return -EEXIST;
+ 
+ 	/* Clear the reset status by writing 1 to the status bit */
+-	omap2_prm_rmw_mod_reg_bits(0xffffffff, mask, prm_mod, OMAP2_RM_RSTST);
++	omap2_prm_rmw_mod_reg_bits(0xffffffff, st, prm_mod, OMAP2_RM_RSTST);
+ 	/* de-assert the reset control line */
+-	omap2_prm_rmw_mod_reg_bits(mask, 0, prm_mod, OMAP2_RM_RSTCTRL);
++	omap2_prm_rmw_mod_reg_bits(rst, 0, prm_mod, OMAP2_RM_RSTCTRL);
+ 	/* wait the status to be set */
+ 	omap_test_timeout(omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTST,
+-						  mask),
++						  st),
+ 			  MAX_MODULE_HARDRESET_WAIT, c);
+ 
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 49654c8..a1fc62a 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -282,7 +282,8 @@ static inline int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+ 		"not suppose to be used on omap4\n");
+ 	return 0;
+ }
+-static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
++static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
++						u8 st_shift)
+ {
+ 	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
+ 		"not suppose to be used on omap4\n");
+@@ -300,7 +301,7 @@ extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
+ /* These omap2_ PRM functions apply to both OMAP2 and 3 */
+ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+-extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift);
++extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
+ 
+ #endif	/* CONFIG_ARCH_OMAP4 */
+ #endif
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index c61e126..867e2e8 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -124,6 +124,7 @@ struct omap_hwmod_dma_info {
+  * struct omap_hwmod_rst_info - IPs reset lines use by hwmod
+  * @name: name of the reset line (module local name)
+  * @rst_shift: Offset of the reset bit
++ * @st_shift: Offset of the reset status bit (OMAP2/3 only)
+  *
+  * @name should be something short, e.g., "cpu0" or "rst". It is defined
+  * locally to the hwmod.
+@@ -131,6 +132,7 @@ struct omap_hwmod_dma_info {
+ struct omap_hwmod_rst_info {
+ 	const char	*name;
+ 	u8		rst_shift;
++	u8		st_shift;
  };
  
-@@ -407,7 +407,7 @@ static struct omap_hwmod_class_sysconfig uart_sysc = {
- 	.syss_offs	= 0x58,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -818,7 +818,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
- 	.rev_offs	= 0x00,
- 	.sysc_offs	= 0x20,
- 	.syss_offs	= 0x10,
--	.sysc_flags	= SYSC_HAS_SOFTRESET,
-+	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
- 
-@@ -990,7 +990,8 @@ static struct omap_hwmod_class_sysconfig omap242x_gpio_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -1132,7 +1133,7 @@ static struct omap_hwmod_class_sysconfig omap2420_dma_sysc = {
- 	.syss_offs	= 0x0028,
- 	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_MIDLEMODE |
- 			   SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_EMUFREE |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index de0015d..a791957 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -422,7 +422,7 @@ static struct omap_hwmod_class_sysconfig omap2430_wd_timer_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
- 
-@@ -463,7 +463,7 @@ static struct omap_hwmod_class_sysconfig uart_sysc = {
- 	.syss_offs	= 0x58,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -849,7 +849,8 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
- 	.rev_offs	= 0x00,
- 	.sysc_offs	= 0x20,
- 	.syss_offs	= 0x10,
--	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
- 
-@@ -1047,7 +1048,8 @@ static struct omap_hwmod_class_sysconfig omap243x_gpio_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -1219,7 +1221,7 @@ static struct omap_hwmod_class_sysconfig omap2430_dma_sysc = {
- 	.syss_offs	= 0x0028,
- 	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_MIDLEMODE |
- 			   SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_EMUFREE |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index e9d0012..33bae0a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -545,7 +545,8 @@ static struct omap_hwmod_class_sysconfig omap3xxx_wd_timer_sysc = {
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_EMUFREE |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY),
-+			   SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -557,7 +558,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
- 	.syss_offs	= 0x10,
- 	.sysc_flags	= (SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SIDLEMODE |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -599,7 +600,7 @@ static struct omap_hwmod_class_sysconfig uart_sysc = {
- 	.syss_offs	= 0x58,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE |
- 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			   SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -1404,7 +1405,8 @@ static struct omap_hwmod_class_sysconfig omap3xxx_gpio_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
--			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields    = &omap_hwmod_sysc_type1,
- };
-@@ -1658,7 +1660,8 @@ static struct omap_hwmod_class_sysconfig omap3xxx_dma_sysc = {
- 	.syss_offs	= 0x0028,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
- 			   SYSC_HAS_MIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
--			   SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ /**
