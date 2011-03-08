@@ -1,28 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Mar 2011 15:48:45 -0800
-Subject: [PATCH v2] ARM: tegra: seaboard: register i2c devices
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF045687B99F@HQMAIL01.nvidia.com>
-References: <1299540862-3848-1-git-send-email-olof@lixom.net>
-	<74CDBE0F657A3D45AFBB94109FB122FF045687B99F@HQMAIL01.nvidia.com>
-Message-ID: <AANLkTinTg+E6grA_ns22gNHeYLCZ4G1BuGRwOJ002FBR@mail.gmail.com>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Tue,  8 Mar 2011 05:38:55 +0530
+Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
+	standalone.
+Message-ID: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2011 at 3:42 PM, Stephen Warren <swarren@nvidia.com> wrote:
+Lets non-standard NAND drivers take advantage of known NAND
+chip information.
 
->> @@ -166,6 +166,7 @@ static struct tegra_gpio_table gpio_table[] = {
->> ? ? ? { .gpio = TEGRA_GPIO_SD2_POWER, ? ? ? ? .enable = true },
->> ? ? ? { .gpio = TEGRA_GPIO_LIDSWITCH, ? ? ? ? .enable = true },
->> ? ? ? { .gpio = TEGRA_GPIO_POWERKEY, ? ? ? ? ?.enable = true },
->> + ? ? { .gpio = TEGRA_GPIO_ISL29018_IRQ, ? ? ?.enable = true },
->
-> There's a space after "_IRQ," here. I think that's what's throwing off
-> the display in my crappy email reader.
->
-> Aside from that,
+The initial development of msm nand driver, driver uses the supported
+NAND devices information as a hardcoded table. Remove the existing
+hardcoded supported flash device table and read the flash device
+information from the flash id table which are part of the mtd subsystem.
 
-Ah, d'oh. thanks. Fixed up as I added your acked-by, I won't repost
-just for that though.
+Signed-off-by: Dima Zavin <dima@android.com>
+Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+---
+Changes in V2
+* Add more description to the commit text.
 
+ drivers/mtd/nand/Kconfig |   10 +++++++---
+ 1 files changed, 7 insertions(+), 3 deletions(-)
 
--Olof
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index c895922..782275e 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -1,3 +1,10 @@
++config MTD_NAND_IDS
++	tristate "Include chip ids for known NAND devices."
++	depends on MTD
++	help
++	  Useful for NAND drivers that do not use the NAND subsystem but
++	  still like to take advantage of the known chip information.
++
+ config MTD_NAND_ECC
+ 	tristate
+ 
+@@ -123,9 +130,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
+ 	 or in DMA interrupt mode.
+ 	 Say y for DMA mode or MPU mode will be used
+ 
+-config MTD_NAND_IDS
+-	tristate
+-
+ config MTD_NAND_RICOH
+ 	tristate "Ricoh xD card reader"
+ 	default n
+-- 
+1.7.1.1
+
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
