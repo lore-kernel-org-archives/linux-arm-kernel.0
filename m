@@ -1,73 +1,151 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 8 Mar 2011 11:53:06 +0200
-Subject: SMP soft lockup on smp_call_function_many when doing flush_tlb_page
-Message-ID: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Tue, 8 Mar 2011 19:05:50 +0900
+Subject: [PATCH/RFC 0/7] Samsung IOMMU videobuf2 allocator and s5p-fimc
+	update
+In-Reply-To: <001301cbdd74$1044a4b0$30cdee10$%szyprowski@samsung.com>
+References: <1299229274-9753-1-git-send-email-m.szyprowski@samsung.com>
+	<03ab01cbdd62$739550d0$5abff270$%kim@samsung.com>
+	<001301cbdd74$1044a4b0$30cdee10$%szyprowski@samsung.com>
+Message-ID: <AANLkTin9Lj8cR2cTfz5s72c=rJaNy5ia866+gT1tNnpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-    The lockup below happens on my SMP system that doesn't support hw
-tlb broadcast.
-    after some debug I found that the mask inside
-smp_call_function_many() which points to mm_cpumask, get changed
-asynchronously, apparently by reset_context() that called from IPI
-that was issued by another cpu.
-    when I disable interrupts in smp_call_function_many around the
-code that uses the mask, the issue disappears.
-    also, reverting the patch "ARM: 5905/1: ARM: Global ASID
-allocation on SMP" eliminates this specific bug.
+Hello, Mr. Kukjin.
 
 
+2011/3/8 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Hello,
+>
+> On Tuesday, March 08, 2011 8:29 AM Kukjin Kim wrote:
+>
+>> Hello,
+>>
+>> There are comments for your System MMU driver below.
+>
+> Please take into account that this was an initial version of our SYSMMU
+> driver to start the discussion, so there were a few minor problems left.
+> Thanks for pointing them out btw. :)
+>
+>
+>> It's good that System MMU has functionality of mapping but System MMU have
+>> to use other mapping of virtual memory allocator.
+>
+you mean that other page sizes such as large, small page and so on
+should be supported in mapping also? otherwise use 64k not 4k page?
 
-BUG: soft lockup - CPU#0 stuck for 61s! [aptitude:1721]
-Modules linked in:
-Pid: 1721, comm:             aptitude
-CPU: 0    Not tainted  (2.6.35.9-00005-g106dd76 #4)
-PC is at csd_lock_wait+0x14/0x28
-LR is at smp_call_function_many+0x1f0/0x21c
-pc : [<c01b70d8>]    lr : [<c01b7804>]    psr: 20000113
-sp : e19b5d30  ip : e19b5d40  fp : e19b5d3c
-r10: c05560e0  r9 : 00da3000  r8 : 00000001
-r7 : c002ea00  r6 : c0dd1a00  r5 : 00000000  r4 : c0dd1a18
-r3 : 00000000  r2 : 00000e00  r1 : 00000004  r0 : c0dd1a00
-Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 00c5387d  Table: 21b6001a  DAC: 00000015
-[<c014e5c0>] (show_regs+0x0/0x50) from [<c01bdc64>] (softlockup_tick+0x160/0x1c8
-)
- r4:e19b5ce8 r3:c002db44
-[<c01bdb04>] (softlockup_tick+0x0/0x1c8) from [<c019c330>] (run_local_timers+0x1
-c/0x20)
-[<c019c314>] (run_local_timers+0x0/0x20) from [<c019c368>] (update_process_times
-+0x34/0x58)
-[<c019c334>] (update_process_times+0x0/0x58) from [<c01b33d4>] (tick_periodic+0x
-e8/0x114)
- r6:c0dd0050 r5:c05a3dc0 r4:c0dd0050 r3:20000113
-[<c01b32ec>] (tick_periodic+0x0/0x114) from [<c01b342c>] (tick_handle_periodic+0
-x2c/0xd4)
-[<c01b3400>] (tick_handle_periodic+0x0/0xd4) from [<c01529cc>] (ipi_timer+0x3c/0
-x4c)
- r7:c002ea00 r6:80000020 r5:c05a3dc0 r4:c0dd0050
-[<c0152990>] (ipi_timer+0x0/0x4c) from [<c002f3fc>] (do_local_timer+0x58/0x88)
- r4:00000000 r3:00003687
-[<c002f3a4>] (do_local_timer+0x0/0x88) from [<c0043f74>] (__irq_svc+0x34/0x100)
-Exception stack(0xe19b5ce8 to 0xe19b5d30)
-5ce0:                   c0dd1a00 00000004 00000e00 00000000 c0dd1a18 00000000
-5d00: c0dd1a00 c002ea00 00000001 00da3000 c05560e0 e19b5d3c e19b5d40 e19b5d30
-5d20: c01b7804 c01b70d8 20000113 ffffffff
- r5:fbb21000 r4:ffffffff
-[<c01b70c4>] (csd_lock_wait+0x0/0x28) from [<c01b7804>] (smp_call_function_many+
-0x1f0/0x21c)
-[<c01b7614>] (smp_call_function_many+0x0/0x21c) from [<c0152bac>] (T.319+0x2c/0x
-6c)
-[<c0152b80>] (T.319+0x0/0x6c) from [<c0152ca8>] (flush_tlb_page+0x40/0xa4)
- r6:41fb1000 r5:e1b906a8 r4:00000000 r3:00000000
-[<c0152c68>] (flush_tlb_page+0x0/0xa4) from [<c01e653c>] (do_wp_page+0x3c0/0x7cc
-)
-[<c01e617c>] (do_wp_page+0x0/0x7cc) from [<c01e735c>] (handle_mm_fault+0x6e4/0x7
-a8)
-[<c01e6c78>] (handle_mm_fault+0x0/0x7a8) from [<c0046014>] (do_page_fault+0x130/
-0x2f8)
-[<c0045ee4>] (do_page_fault+0x0/0x2f8) from [<c002f590>] (do_DataAbort+0x3c/0xa0
-)
-[<c002f554>] (do_DataAbort+0x0/0xa0) from [<c00443c4>] (ret_from_exception+0x0/0
-x10)
+> Could you elaborate on this? I'm not sure I understand right your problem.
+>
+> SYSMMU driver is a low-level driver for the SYSMMU module. The driver should
+> provide all the basic functionality that is (or might be) hardware dependent.
+> Creating a mapping is one of such elementary functionalities. Sysmmu client
+> (let it be videobuf2-s5p-iommu, vcmm, maybe even other driver directly)
+> should not need to know the format of page descriptors or the way they are
+> arranged in the memory. The sysmmu should provide low level functions to create
+> and remove a mapping. Managing a virtual space is something that MIGHT be client
+> dependent and should be left to the client.
+>
+> This design allows for different approaches to coexist. Videobuf2-s5p-iommu
+> client will manage the virtual space with gen_alloc framework, while vcmm will
+> use its own methods.
+>
+> It would be great if one decide to unify iommu interfaces across the kernel,
+> but this will be a long road. We need to start from something simple (platform
+> private) and working first.
+>
+>> And would be better to change sysmmu_list to use array of defined in
+>> s5p_sysmmu_ip enumeration, so that can get enhancement of memory space
+>> usage, speed, and readability of codes.
+>
+> Yes, the list can be simplified to an array, but this is really a minor issue.
+>
+>> TLB replacement policy does not need to use LRU. Of course, current System
+>> MMU also needs it. I think, the round robin is enough, because to access
+>> memory has no temporal locality and to make LRU need to access to System
+>> MMU register one more. The reset value is round robin.
+>
+> Well, the best possibility is to allow sysmmu clients to decide which policy
+> should be used. For some devices (I'm thinking of MFC) LRU policy might give
+> a little speedup.
+>
+>> In the setting of SHARED page table in s5p_sysmmu_control_locked, get the
+>> page table base address of ARM core from cp15 register now. But current->mm-
+>> >pgd is better for more compatibility.
+>
+> Right, this way the pgd table pointer can be acquired in a more system friendly
+> way.
+>
+>> When it make page table with PRIVATE page table methods, the size of the
+>> structure to manage the second page table is quite big. It is much better
+>> rather that to make slab with cache size of 1KB.
+>
+> Yes, our initial driver uses directly 4KB pages to manage 4 consecutive second
+> page tables. However usually the allocations of client devices will be few but
+> quite large each. So most of pages used to hold second level page tables will
+> be effectively reused.
+>
+> You are right however that the approach with a slab with 1KB units will
+> result in code that is cleaner and easier to understand.
+>
+>> Besides, the page mapping implementation is not safe in your System MMU
+>> driver. Because only first one confirms primary page table entry, when it
+>> assigns four second page tables consecutively at a time.
+>
+> That's a direct result of the 4-second-level-at-once method of allocating
+> second level pages, but this can be cleaned by using 1KB with slab.
+>
+>> The System MMU driver cannot apply runtime pm by oneself with calling
+>> pm_runtime_put_sync(). The reason is because a device with System MMU can
+>> on/off power. I think just clock gating is enough. However, I can't find
+>> clock enable/disable in your driver.
+>
+> Clock is enabled in probe() and disabled in remove(). pm_runtime_get/put_sync()
+> only increases/decreases use count of a respective power domain, so the actual
+> device driver also has to call pm_runtime_get/put. Calling pm_runtime_put_sync()
+> will not shut down the power if the sysmmu client driver has called
+> pm_runtime_get() without pm_runtime_put(). I see no problems here. Could you
+> elaborate your issue?
+>
+>>
+>> By PRIVATE page table method, each system MMU comes to have a page table
+>> only for oneself. In this case, the problem is that each MFC System MMU L
+>> and R having another page table.
+>
+> Yes, true. This is consequence of the MFC hardware design and the fact that
+> it has 2 AXI master interfaces and 2 SYSMMU controllers. Each of them have to
+> be configured separately. Each of them has a separate virtual driver's address
+> space. Such configuration is used by the MFC driver posted in v7 patch series.
+>
+>> In your System MMU driver, the page size is always 4KB crucially. This says
+>> TLB thrashing and produces a result to lose a TLB hit rate. It is a big
+>> problem with the device such as rotator which does not do sequential access
+>> especially.
+>
+> The page size is set to 4KB, because Linux kernel uses 4KB pages by default.
+> Once support for other page size is available in the kernel, then sysmmu can be
+> extended also.
+>
+>> And the IRQ handler just outputs only a message. It should be implemented
+>> in call back function to be able to handle from each device driver.
+>
+> This was only for debugging purpose, but you are right that the sysmmu API in
+> this area need to be extended.
+>
+>> When it sets System MMU in SHARED page table, kernel virtual memory is
+>> broken by a method such as s5p_sysmmu_map_area()
+>
+> Yes, there should be a check added to prevent messing with ARM pgd in SHARED
+> mode.
+>
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
