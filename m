@@ -1,38 +1,133 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 07 Mar 2011 19:15:50 -0700
-Subject: [PATCH 1/3] OMAP2/3: WKUP powerdomain: mark as being always on
+Date: Mon, 07 Mar 2011 19:15:52 -0700
+Subject: [PATCH 3/3] OMAP2+: powerdomain: add pwrdm_can_ever_lose_context()
 In-Reply-To: <20110308021018.31946.29962.stgit@twilight.localdomain>
 References: <20110308021018.31946.29962.stgit@twilight.localdomain>
-Message-ID: <20110308021546.31946.87970.stgit@twilight.localdomain>
+Message-ID: <20110308021551.31946.19903.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark the WKUP powerdomain as being always on -- at least, as long as the
-chip has power.  This will be used to enable the powerdomain code to
-determine whether a given powerdomain is ever able to power off.  While
-here, update the file copyright.
+Some drivers wish to know whether the device that they control can
+ever lose context, for example, when the device's enclosing
+powerdomain loses power.  They can use this information to determine
+whether it is necessary to save and restore device context, or whether
+it can be skipped.  Implement the powerdomain portion of this by
+adding the function pwrdm_can_ever_lose_context().  This is not for
+use directly from driver code, but instead is intended to be called
+from driver-subarch integration code (i.e., arch/arm/*omap* code).
+
+Currently, the result from this function should be passed into the
+driver code via struct platform_data, but at some point this should
+be part of some common or OMAP-specific device code.
+
+While here, update file copyrights.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   43 ++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/powerdomain.h |   18 +++++++--------
+ 2 files changed, 50 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
-index 5b4dd97..96cda13 100644
---- a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index eaed0df..a11be81 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
 @@ -2,7 +2,7 @@
-  * OMAP2/3 common powerdomain definitions
+  * OMAP powerdomain control
   *
   * Copyright (C) 2007-2008 Texas Instruments, Inc.
+- * Copyright (C) 2007-2009 Nokia Corporation
++ * Copyright (C) 2007-2011 Nokia Corporation
+  *
+  * Written by Paul Walmsley
+  * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
+@@ -938,3 +938,44 @@ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
+ 
+ 	return count;
+ }
++
++/**
++ * pwrdm_can_ever_lose_context - can this powerdomain ever lose context?
++ * @pwrdm: struct powerdomain *
++ *
++ * Given a struct powerdomain * @pwrdm, returns 1 if the powerdomain
++ * can lose either memory or logic context or if @pwrdm is invalid, or
++ * returns 0 otherwise.  This function is not concerned with how the
++ * powerdomain registers are programmed (i.e., to go off or not); it's
++ * concerned with whether it's ever possible for this powerdomain to
++ * go off while some other part of the chip is active.  This function
++ * assumes that every powerdomain can go to either ON or INACTIVE.
++ */
++bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
++{
++	int i;
++
++	if (IS_ERR_OR_NULL(pwrdm)) {
++		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
++			 __func__);
++		return 1;
++	}
++
++	if (pwrdm->pwrsts & PWRSTS_OFF)
++		return 1;
++
++	if (pwrdm->pwrsts & PWRSTS_RET) {
++		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
++			return 1;
++
++		for (i = 0; i < pwrdm->banks; i++)
++			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
++				return 1;
++	}
++
++	for (i = 0; i < pwrdm->banks; i++)
++		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
++			return 1;
++
++	return 0;
++}
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 0b7a357..027f40b 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -2,7 +2,7 @@
+  * OMAP2/3/4 powerdomain control
+  *
+  * Copyright (C) 2007-2008, 2010 Texas Instruments, Inc.
 - * Copyright (C) 2007-2010 Nokia Corporation
 + * Copyright (C) 2007-2011 Nokia Corporation
   *
-  * Paul Walmsley, Jouni H?gander
+  * Paul Walmsley
   *
-@@ -76,4 +76,5 @@ struct powerdomain wkup_omap2_pwrdm = {
- 	.name		= "wkup_pwrdm",
- 	.prcm_offs	= WKUP_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX | CHIP_IS_OMAP3430),
-+	.pwrsts		= PWRSTS_ON,
- };
+@@ -34,17 +34,14 @@
+ 
+ /* Powerdomain allowable state bitfields */
+ #define PWRSTS_ON		(1 << PWRDM_POWER_ON)
++#define PWRSTS_INACTIVE		(1 << PWRDM_POWER_INACTIVE)
++#define PWRSTS_RET		(1 << PWRDM_POWER_RET)
+ #define PWRSTS_OFF		(1 << PWRDM_POWER_OFF)
+-#define PWRSTS_OFF_ON		((1 << PWRDM_POWER_OFF) | \
+-				 (1 << PWRDM_POWER_ON))
+ 
+-#define PWRSTS_OFF_RET		((1 << PWRDM_POWER_OFF) | \
+-				 (1 << PWRDM_POWER_RET))
+-
+-#define PWRSTS_RET_ON		((1 << PWRDM_POWER_RET) | \
+-				 (1 << PWRDM_POWER_ON))
+-
+-#define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | (1 << PWRDM_POWER_ON))
++#define PWRSTS_OFF_ON		(PWRSTS_OFF | PWRSTS_ON)
++#define PWRSTS_OFF_RET		(PWRSTS_OFF | PWRSTS_RET)
++#define PWRSTS_RET_ON		(PWRSTS_RET | PWRSTS_ON)
++#define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | PWRSTS_ON)
+ 
+ 
+ /* Powerdomain flags */
+@@ -211,6 +208,7 @@ int pwrdm_pre_transition(void);
+ int pwrdm_post_transition(void);
+ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
+ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
++bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+ 
+ extern void omap2xxx_powerdomains_init(void);
+ extern void omap3xxx_powerdomains_init(void);
