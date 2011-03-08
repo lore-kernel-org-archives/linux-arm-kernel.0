@@ -1,57 +1,53 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Mar 2011 10:31:26 -0800
-Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
-	requested pads
-In-Reply-To: <20110308172625.GE26463@atomide.com> (Tony Lindgren's message of
-	"Tue, 8 Mar 2011 09:26:25 -0800")
-References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
-	<87lj0u8mrf.fsf@ti.com> <87tyfi49cs.fsf@ti.com>
-	<AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
-	<20110308172625.GE26463@atomide.com>
-Message-ID: <87k4g9qxa9.fsf@ti.com>
+From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
+Date: Tue, 8 Mar 2011 10:31:46 -0800 (PST)
+Subject: [PATCH v2 2/3] [ARM] perfevents: Add support for Scorpion
+	performance monitors
+In-Reply-To: <1299595957.6872.7.camel@e102144-lin.cambridge.arm.com>
+References: <1299534463-25802-1-git-send-email-sheetals@codeaurora.org>
+	<1299595957.6872.7.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4653fb879092e41c468c067ebb4fb901.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Hi Will,
 
-> * Govindraj <govindraj.ti@gmail.com> [110308 03:43]:
->> 
->> I am not sure whether now we can control read/writes to pad_mux from any driver
->> interface and I think we have to go through mux framework for any
->> read/writes to mux.
+On Tue, March 8, 2011 6:52 am, Will Deacon wrote:
+> [...]
 >
-> Sure, the drivers should not mess with those registers directly.
+>> +static DEFINE_PER_CPU(u32, venum_orig_val);
+>> +static DEFINE_PER_CPU(u32, fp_orig_val);
+>> +
+>> +static void scorpion_pre_vlpm(void)
+>> +{
+>> +       u32 venum_new_val;
+>> +       u32 fp_new_val;
+>> +       /* CPACR Enable CP10 access*/
+>> +       asm volatile("mrc p15, 0, %0, c1, c0, 2" : "=r" (venum_orig_val));
+>> +       venum_new_val = venum_orig_val | 0x00100000;
+>> +       asm volatile("mcr p15, 0, %0, c1, c0, 2" : : "r" (venum_new_val));
+>> +       isb();
+>> +       /* Enable FPEXC */
+>> +       fp_orig_val = fmrx(FPEXC);
+>> +       fp_new_val = fp_orig_val | FPEXC_EN;
+>> +       fmxr(FPEXC, fp_new_val);
+>> +}
+>> +
 >
->> with this I cant control pad wake up capabilities with sysfs as done
->> earlier in serial.c
->> now control to read/write to pad is outside scope of the driver
->> interface as omap_hwmod_mux
->> is the one that takes decision for driver with mux values provided
->> during omap_hwmod_mux_init.
+> When I looked at this originally, I thought it would be nice to have
+> some functions or macros for poking with the CPACR and planned to submit
+> that as a separate patch...
 >
-> The sysfs interface to control this should still be from the drivers.
-> Sounds like we need some way to set the wakeup flags before pm_runtime_put
-> is called.
+> ... well it turns out we already have this! Please can you update this
+> bit of code to use the {get,set}_copro_access functions in asm/system.h?
+> You can use the CPACC_SVC macro to generate the access mask too instead
+> of hardcoding the 0x00100000.
 
-Exactly.  Driver's can currently check device_may_wakeup(dev) to
-determine if they *should* set wakeup flags, but currently, we don't
-have a clean way to pass the info down to core code.
+Great! I have made the change and reposted the patch.
+Please let me know if it looks good.
 
-One possible option (albeit hacky) is for the omap_hwmod_mux code to
-check device_may_wakeup() itself, and set the bits accordingly.  This
-means drivers don't have to do anything, but drivers also loose control
-of enabling/disabling wakeups.
+Thanks,
+Sheetal
 
-I think what we need are two omap_device-level APIs for wakeups.
-
-One for enable/disable of wakeups (both module-level and IO-ring, the 
-driver should not care about the difference between the two):
-
-int omap_device_[enable|disable](struct platform_device *pdev);
-
-bool omap_device_wakeup_occured(struct platform_device *pdev);
-
-As OMAP-specific APIs, both of these should of course be called through
-pdata function pointers.
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
