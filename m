@@ -1,46 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 8 Mar 2011 18:18:26 +0800
-Subject: [PATCH 0/4] Add framebuffer device for mx28evk and mx23evk boards
-In-Reply-To: <20110307081837.GJ29521@pengutronix.de>
-References: <1299343222-30670-1-git-send-email-shawn.guo@freescale.com>
-	<20110307081837.GJ29521@pengutronix.de>
-Message-ID: <20110308101825.GC21188@S2101-09.ap.freescale.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 8 Mar 2011 11:34:59 +0100 (CET)
+Subject: [PATCH v9 1/1] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C008B02@dbde02.ent.ti.com>
+References: <1299175677-17859-1-git-send-email-pratheesh@ti.com>
+	<1299175677-17859-2-git-send-email-pratheesh@ti.com>
+	<201103031915.55825.arnd@arndb.de>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C008B02@dbde02.ent.ti.com>
+Message-ID: <alpine.LFD.2.00.1103081133510.2787@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Fri, 4 Mar 2011, TK, Pratheesh Gangadhar wrote:
 
-On Mon, Mar 07, 2011 at 09:18:37AM +0100, Sascha Hauer wrote:
-> On Sun, Mar 06, 2011 at 12:40:18AM +0800, Shawn Guo wrote:
-> > This patch set is to add framebuffer device for mx28evk and mx23evk
-> > boards.  A couple notes here:
+> Hi,
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Thursday, March 03, 2011 11:46 PM
+> > On Thursday 03 March 2011 19:07:57 Pratheesh Gangadhar wrote:
+> > > +struct uio_pruss_dev {
+> > > +       struct uio_info *info;
+> > > +       struct clk *pruss_clk;
+> > > +       dma_addr_t sram_paddr;
+> > > +       dma_addr_t ddr_paddr;
+> > > +       void __iomem *prussio_vaddr;
+> > > +       void *sram_vaddr;
+> > > +       void *ddr_vaddr;
+> > > +       unsigned int hostirq_start;
+> > > +       unsigned int pintc_base;
+> > > +};
+> > > +
+> > > +struct pruss_priv {
+> > > +       struct uio_pruss_dev *pupdev;
+> > > +};
 > > 
-> > * The patch [PATCH 3/4] was cherry-picked from mxs-mmc-device patch
-> >   set  (Sascha, it seems dma, mmc, flexcan platform patches are all
-> >   waiting for your merging, please let me know if there are still
-> >   something stopping your pick them up)
+> > I cannot see the point of struct pruss_priv, I think it would be better to
+> > just merge the two data structures into one. Everything else looks
+> > good to me now.
 > 
-> I just applied dma and flexcan. mmc will have to wait until the
+> pruss_priv is needed to get access to uio_pruss_dev from uio_info *info in
+> UIO interrupt handler (pruss_handler) and shall be per interrupt entry.
+> 
+> +static irqreturn_t pruss_handler(int irq, struct uio_info *info) {
+> +	struct pruss_priv *priv = info->priv;
+> +	struct uio_pruss_dev *gdev = priv->pupdev;
+> 
+> Note that info is a pointer to array supporting 8 interrupts. This allows to
+> redirect to driver structure via info->priv quickly.
 
-I'm rebasing my mx28evk framebuffer patch set, and found the following
-one was missing from the flexcan merging.
+struct uio_pruss_dev *dev = container_of(info, struct uio_pruss_dev, info);
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 895d066..cdbe18b 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -33,6 +33,7 @@ config MACH_MX28EVK
-        select MXS_HAVE_AMBA_DUART
-        select MXS_HAVE_PLATFORM_AUART
-        select MXS_HAVE_PLATFORM_FEC
-+       select MXS_HAVE_PLATFORM_FLEXCAN
-        select MXS_OCOTP
-        default y
-        help
+Perhaps ?
 
-> mmc driver is merged because currently we do not have the platform_data
-> declaration.
+Thanks,
 
--- 
-Regards,
-Shawn
+	tglx
