@@ -1,175 +1,35 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue,  8 Mar 2011 15:06:57 +0000
-Subject: [PATCHv6 5/5] picoxcell: support for the PC7302 development board
-In-Reply-To: <1299596817-19879-1-git-send-email-jamie@jamieiles.com>
-References: <1299596817-19879-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1299596817-19879-6-git-send-email-jamie@jamieiles.com>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Tue,  8 Mar 2011 20:43:24 +0530
+Subject: [PATCH] audio : AM3517 : Adding i2c info for AIC23 codec
+Message-ID: <1299597204-25160-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PC7302 development board is capable of taking both PC3X2 and PC3X3
-devices and features NOR flash, NAND flash, SPI NOR flash a serial
-console, 100Mb Ethernet and a number of picoArray peripherals.
+From: Abhilash Vadakkepat Koyamangalath <x0151633@psplinux051.india.ti.com>
 
-This patch provides initial support for running on the PC7302 board.
+The i2c_board_info entry supporting AIC23 codec was added into
+the i2c2 bus.
 
-v4:
-	- reduce to the bare minimum for NOR flash booting.
-v3:
-	- remove redundant __init declarations.
-v2:
-	- multiplex the NAND CLE pin by pad name.
-	- convert to __raw_ io accessors.
+Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
 ---
- arch/arm/mach-picoxcell/Kconfig        |   11 +++
- arch/arm/mach-picoxcell/Makefile       |    1 +
- arch/arm/mach-picoxcell/board_pc7302.c |  109 ++++++++++++++++++++++++++++++++
- 3 files changed, 121 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/board_pc7302.c
+ arch/arm/mach-omap2/board-am3517evm.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
-index 7b74a45..9e08542 100644
---- a/arch/arm/mach-picoxcell/Kconfig
-+++ b/arch/arm/mach-picoxcell/Kconfig
-@@ -1,2 +1,13 @@
- if ARCH_PICOXCELL
-+
-+comment "Picochip picoXcell board selection"
-+
-+config BOARD_PC7302
-+	bool "Support PC7302 Board"
-+	default y
-+	help
-+          Include support for the picoChip PC7302 platform. This platform is
-+	  can take any of the PC3X2 or PC3X3 devices and includes SPI NOR
-+	  flash, parallel NOR flash and NAND flash.
-+
- endif
-diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index f6fc8de..69a9e6b 100644
---- a/arch/arm/mach-picoxcell/Makefile
-+++ b/arch/arm/mach-picoxcell/Makefile
-@@ -2,3 +2,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
- 				   time.o \
- 				   devices.o \
- 				   clk.o
-+obj-$(CONFIG_BOARD_PC7302)	+= board_pc7302.o
-diff --git a/arch/arm/mach-picoxcell/board_pc7302.c b/arch/arm/mach-picoxcell/board_pc7302.c
-new file mode 100644
-index 0000000..6d2b5e0
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/board_pc7302.c
-@@ -0,0 +1,109 @@
-+/*
-+ * linux/arch/arm/mach-picoxcell/board_pc7302.c
-+ *
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/spi/flash.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include "picoxcell_core.h"
-+
-+static long pc7302_panic_blink(int state)
-+{
-+	__raw_writel(state ? 0xFF : 0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+					    GPIO_SW_PORT_C_DR_REG_OFFSET));
-+	return 0;
-+}
-+
-+static void pc7302_panic_init(void)
-+{
-+	/*
-+	 * We have a BOOT_ERROR pin on PC7302. Reuse that for signalling when
-+	 * the kernel panics. There is only 1 bit wired up to port C but it
-+	 * won't hurt to configure all of them.
-+	 */
-+	__raw_writel(0xF, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+			       GPIO_SW_PORT_C_DDR_REG_OFFSET));
-+	__raw_writel(0x0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
-+			       GPIO_SW_PORT_C_CTL_REG_OFFSET));
-+
-+	panic_blink = pc7302_panic_blink;
-+}
-+
-+static struct mtd_partition pc7302_nor_partitions[] = {
-+	{
-+		.name		= "Boot",
-+		.size		= SZ_128K,
-+		.offset		= 0,
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index ad71cbf..8da8d20 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -358,6 +358,9 @@ static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
+ };
+ static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
+ 	{
++		I2C_BOARD_INFO("tlv320aic23", 0x1A),
 +	},
 +	{
-+		.name		= "Boot Environment",
-+		.size		= SZ_128K,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name		= "Kernel",
-+		.size		= SZ_4M,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+	{
-+		.name		= "Application",
-+		.size		= MTDPART_SIZ_FULL,
-+		.offset		= MTDPART_OFS_APPEND,
-+	},
-+};
-+
-+static struct physmap_flash_data pc7302_nor_flash_data = {
-+	.width		= 1,
-+	.parts		= pc7302_nor_partitions,
-+	.nr_parts	= ARRAY_SIZE(pc7302_nor_partitions)
-+};
-+
-+static struct resource pc7302_nor_resource = {
-+	.start	= PICOXCELL_FLASH_BASE,
-+	.end	= PICOXCELL_FLASH_BASE + SZ_128M - 1,
-+	.flags	= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device pc7302_nor = {
-+	.name		    = "physmap-flash",
-+	.id		    = -1,
-+	.dev.platform_data  = &pc7302_nor_flash_data,
-+	.resource	    = &pc7302_nor_resource,
-+	.num_resources	    = 1,
-+};
-+
-+static void pc7302_init_nor(void)
-+{
-+	platform_device_register(&pc7302_nor);
-+}
-+
-+static void __init pc7302_init(void)
-+{
-+	picoxcell_core_init();
-+	pc7302_init_nor();
-+	pc7302_panic_init();
-+}
-+
-+MACHINE_START(PC7302, "PC7302")
-+	.map_io		= picoxcell_map_io,
-+	.init_irq	= picoxcell_init_irq,
-+	.init_early	= picoxcell_init_early,
-+	.timer		= &picoxcell_sys_timer,
-+	.init_machine	= pc7302_init,
-+MACHINE_END
+ 		I2C_BOARD_INFO("tca6416", 0x21),
+ 		.platform_data = &am3517evm_gpio_expander_info_0,
+ 	},
 -- 
-1.7.4
+1.6.2.4
