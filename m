@@ -1,25 +1,35 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 08 Mar 2011 09:50:22 +0200
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-Message-ID: <1299570622.2754.4.camel@localhost>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 08 Mar 2011 11:01:37 +0200
+Subject: [GIT PULL]: TrimSlice update
+Message-ID: <4D75F071.7050401@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-08 at 05:38 +0530, Murali Nalajala wrote:
-> Lets non-standard NAND drivers take advantage of known NAND
-> chip information.
-> 
-> The initial development of msm nand driver, driver uses the supported
-> NAND devices information as a hardcoded table. Remove the existing
-> hardcoded supported flash device table and read the flash device
-> information from the flash id table which are part of the mtd subsystem.
+Hi Colin,
 
-Why this initial version should be upstream? Why wouldn't you make it
-"standard" first?
+Please pull last minute update for the TrimSlice that enables the SD
+slots on the platform.
+
+The patches are based on your current for-next branch.
+
+The following changes since commit d5fdafd38ca0c28c4648909ce0afd0a5420309ca:
+
+  ARM: tegra: trimslice: initialize PCI-e only when running on TrimSlice
+(2011-03-03 13:57:31 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git
+trimslice/upstream
+
+Mike Rapoport (1):
+      ARM: tegra: trimslice: enable MMC/SD slots
+
+ arch/arm/mach-tegra/board-trimslice-pinmux.c |    9 +++++++++
+ arch/arm/mach-tegra/board-trimslice.c        |   19 +++++++++++++++++++
+ arch/arm/mach-tegra/board-trimslice.h        |    3 +++
+ 3 files changed, 31 insertions(+), 0 deletions(-)
+
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Sincerely yours,
+Mike.
