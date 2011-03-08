@@ -1,36 +1,35 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Tue, 8 Mar 2011 10:10:58 +0530
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <4D749A09.8050101@acn-group.ch>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-	<4D5BDA3D.5080905@acn-group.ch>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
-	<4D749A09.8050101@acn-group.ch>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5EC7@dbde02.ent.ti.com>
+From: dilinger@queued.net (Andres Salomon)
+Date: Tue, 8 Mar 2011 05:32:26 +0000
+Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
+In-Reply-To: <20110307144700.GF1829@sirena.org.uk>
+References: <20110304080653.3f2c3f19@debxo> <4D710FF9.6040305@ru.mvista.com>
+	<20110304083822.0f40d120@debxo> <4D713670.70506@ru.mvista.com>
+	<20110307144700.GF1829@sirena.org.uk>
+Message-ID: <20110308053226.7300e65d@debxo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christophe,
+On Mon, 7 Mar 2011 14:47:00 +0000
+Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-On Mon, Mar 07, 2011 at 14:10:41, Christophe Aeschlimann wrote:
-> Hi Sudhakar,
+> On Fri, Mar 04, 2011 at 09:58:56PM +0300, Sergei Shtylyov wrote:
+> > Andres Salomon wrote:
 > 
-> On 17.02.2011 05:23, Rajashekhara, Sudhakar wrote:
-> > 
-> > Reverting the commit 140176159597ea1f23dcccb47b5c38fdf7c7faa8
-> > (ASoC: Configure symmetric rates for tlv320aic3x) resolves the issue. 
-> > We are still working on the proper fix.
-> > 
-> > Thanks,
-> > Sudhakar
-> > 
+> >>>> MFD changes in c738892f cause the mc13xxx_platform_data struct
 > 
-> Did you find a proper solution to that issue ?
+> >>>     Linus asks to also specify the commit summary in parens.
 > 
+> >> Also, what?  If there are changes to how patches should be
+> >> submitted, please provide a reference
+> >> (Documentation/SubmittingPatches should be updated, as well).
+> 
+> >    I have no time to rummage in the mail archives, sorry.
+> 
+> There's been multiple discussions of this.  The issue is that commit
+> IDs only mean something in specific trees and go bad if someone
+> rebases, and they aren't legibile by humans (so even if the commit is
+> in something like Linus' tree the reader still needs a git repository
+> to figure out what changes are being talked about).
 
-Did the workaround work for you?
-
-Because of other engagements we have not spent time on finding the proper fix.
-
-Regards,
-Sudhakar
+Ah, thanks, that makes sense.  Sergei's original statement was unclear
+("...instead of just the commit ID" would've helped).
