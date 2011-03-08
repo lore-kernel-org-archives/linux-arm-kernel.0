@@ -1,82 +1,103 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 08 Mar 2011 13:33:49 +0000
-Subject: SMP soft lockup on smp_call_function_many when doing
-	flush_tlb_page
-In-Reply-To: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
-References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
-Message-ID: <1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Tue,  8 Mar 2011 19:27:39 +0530
+Subject: [PATCH v3 0/7] pruss mfd drivers
+Message-ID: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-08 at 09:53 +0000, saeed bishara wrote:
->     The lockup below happens on my SMP system that doesn't support hw
-> tlb broadcast.
->     after some debug I found that the mask inside
-> smp_call_function_many() which points to mm_cpumask, get changed
-> asynchronously, apparently by reset_context() that called from IPI
-> that was issued by another cpu.
->     when I disable interrupts in smp_call_function_many around the
-> code that uses the mask, the issue disappears.
->     also, reverting the patch "ARM: 5905/1: ARM: Global ASID
-> allocation on SMP" eliminates this specific bug.
+				PRUSS Functional Block Diagram
+		/-------------------------------------------------------\
+		|							|
+		|			|------|			|
+	32GPO<------->PRU CORE-0 <----->|      |<----> DRAM 0		|
+	30GPI<------->(4KB IRAM)	|  S   |	(512 Bytes)	|
+		|			|      |			|
+	32GPO<------->PRU CORE-1 <----->|  C   |<----> DRAM 1		|
+	30GPI<------->(4KB IRAM)	|      |	(512 Bytes)	|
+		|			|  R   |			|
+		|			|      |			|
+Ints to ARM/	|	Interrupt <---->|      |-------------------------> Master I/F (to SCR2)
+DSP INTC <------------->Controller	|      |<------------------------- Slave I/F (from SCR2)
+Events from	|	(INTC)		|------|			|
+Periph + PRUs	|							|
+		\-------------------------------------------------------/
 
-It looks like smp_call_function_many() does all the checks on the mask
-argument that it received and decides that there are CPUs to call (fair
-enough). But in the meantime reset_context() via IPI clears this mask
-leaving only the current CPU. Once the IPI was handled,
-smp_call_function_many() copies this mask to data->cpumask and clears
-the current CPU leaving an empty mask. It then waits for the other
-(none) CPUs to clear the csd lock which would never happen as data->refs
-is 0.
+Programmable Realtime Unit (PRU) is basically a 32-bit RISC
+processor available within TI's DA8XX SOCs. It consists of local
+instruction and data RAM and also has access to SOC resources
+via a Switched Central Resource (SCR).
 
-There are probably a few ways to fix this. My preferred method is to
-modify the generic code (I'll add a proper commit log later and post it
-on LKML if it works):
+There are two PRU's available within DA8XX SOC's PRUSS, hence providing
+two execution cores. Devices/Protocols can be emulated on these utilizing
+either both or only one of the PRUs independently.
 
+The rational behind the MFD driver being the fact that multiple devices can
+be implemented on the cores independently.
+It's also possible, as in our case, to implement a single device on both
+the PRU's resulting in improved load sharing.
 
-diff --git a/kernel/smp.c b/kernel/smp.c
-index 9910744..a79454f 100644
---- a/kernel/smp.c
-+++ b/kernel/smp.c
-@@ -499,6 +499,10 @@ void smp_call_function_many(const struct cpumask *mask,
- 	smp_wmb();
- 
- 	atomic_set(&data->refs, cpumask_weight(data->cpumask));
-+	if (unlikely(!atomic_read(&data->refs))) {
-+		csd_unlock(&data->csd);
-+		return;
-+	}
- 
- 	raw_spin_lock_irqsave(&call_function.lock, flags);
- 	/*
+A detailed description is also available here:
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
 
+version 3:
+=========
+* added locking to mfd driver.
+* removed typedefs.
+* resource allocation through mfd.
+* renamed da8xx_register_pruss to da8xx_register_pruss_mfd.
+* removed da8xx_pruss directory for suart.
+* combined all suart headers.
+* modified register structure for pruss.
+* added function clk_add_alias_mcasp.
+* suart api layer cleanup.
+* removed semaphore usage.
+* updated to latest internal code base.
+* removed __suart_err/dbg.
 
-An alternative would be to copy the cpumask to a local variable in
-on_each_cpu_mask(), though the workaround above would cover other cases
-that we haven't spotted yet. Also, the smp_call_function_many()
-description doesn't state that the cpumask should not be modified.
+version 2:
+==========
+* added pruss TTY Soft-UART driver.
+* added pruss Soft-UART board and platform changes.
+* fixed previous review comments.
+* reordered patch sequence.
 
+version 1:
+==========
+* added pruss mfd driver.
 
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 8f57f32..1717dec 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -16,10 +16,13 @@
- static void on_each_cpu_mask(void (*func)(void *), void *info, int wait,
- 	const struct cpumask *mask)
- {
-+	struct cpumask call_mask;
-+
- 	preempt_disable();
- 
-+	cpumask_copy(&call_mask, mask);
- 	smp_call_function_many(mask, func, info, wait);
--	if (cpumask_test_cpu(smp_processor_id(), mask))
-+	if (cpumask_test_cpu(smp_processor_id(), &call_mask))
- 		func(info);
- 
- 	preempt_enable();
+Subhasish Ghosh (7):
+  mfd: add pruss mfd driver.
+  da850: pruss platform specific additions.
+  da850: pruss board specific additions.
+  mfd: pruss SUART private data.
+  da850: pruss SUART board specific additions.
+  da850: pruss SUART platform specific additions.
+  tty: add pruss SUART driver
 
+ arch/arm/mach-davinci/board-da850-evm.c    |   68 ++
+ arch/arm/mach-davinci/da850.c              |    7 +
+ arch/arm/mach-davinci/devices-da8xx.c      |   83 ++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
+ drivers/mfd/Kconfig                        |   10 +
+ drivers/mfd/Makefile                       |    1 +
+ drivers/mfd/da8xx_pru.c                    |  560 +++++++++
+ drivers/tty/serial/Kconfig                 |   22 +
+ drivers/tty/serial/Makefile                |   10 +
+ drivers/tty/serial/pruss_suart.c           | 1058 +++++++++++++++++
+ drivers/tty/serial/pruss_suart.h           | 1081 +++++++++++++++++
+ drivers/tty/serial/pruss_suart_api.c       | 1757 ++++++++++++++++++++++++++++
+ drivers/tty/serial/pruss_suart_utils.c     |  391 ++++++
+ include/linux/mfd/da8xx/da8xx_pru.h        |  139 +++
+ include/linux/mfd/da8xx/da8xx_prucore.h    |  129 ++
+ include/linux/serial_core.h                |    2 +
+ 16 files changed, 5320 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mfd/da8xx_pru.c
+ create mode 100644 drivers/tty/serial/pruss_suart.c
+ create mode 100644 drivers/tty/serial/pruss_suart.h
+ create mode 100644 drivers/tty/serial/pruss_suart_api.c
+ create mode 100644 drivers/tty/serial/pruss_suart_utils.c
+ create mode 100644 include/linux/mfd/da8xx/da8xx_pru.h
+ create mode 100644 include/linux/mfd/da8xx/da8xx_prucore.h
 
 -- 
-Catalin
+1.7.2.3
