@@ -1,61 +1,218 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue,  8 Mar 2011 17:34:34 -0600
-Subject: [PATCH v3 4/7] ARM: vexpress: add sp804 clock
+Date: Tue,  8 Mar 2011 17:34:35 -0600
+Subject: [PATCH v3 5/7] ARM: timer-sp: support timer clock freq other than 1MHz
 In-Reply-To: <1299627277-20311-1-git-send-email-robherring2@gmail.com>
 References: <1299627277-20311-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1299627277-20311-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1299627277-20311-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Add a clock for sp804 timer.
+The timer-sp code is fixed to 1MHz timer clock. Add clock api
+calls to get the timer clock frequency and support for independent
+clock frequencies.
+
+Rename timer names for clocksource and clockevent to timer-sp or
+the clock connection ID string if provided.
+
+Compile tested on integrator, realview, versatile, and vexpress. Boot
+tested on vexpress.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-vexpress/ct-ca9x4.c |    4 ++--
- arch/arm/mach-vexpress/v2m.c      |    7 +++++++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/common/timer-sp.c               |   43 +++++++++++++++++++++---------
+ arch/arm/include/asm/hardware/timer-sp.h |    4 +-
+ arch/arm/mach-integrator/integrator_cp.c |    4 +-
+ arch/arm/mach-realview/core.c            |    4 +-
+ arch/arm/mach-versatile/core.c           |    4 +-
+ arch/arm/mach-vexpress/v2m.c             |    4 +-
+ 6 files changed, 40 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 30d5a5b..3528b1a 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -73,8 +73,8 @@ static void __init ct_ca9x4_timer_init(void)
- 	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
- 	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index 6ef3342..c5572d0 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -18,6 +18,8 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
++#include <linux/clk.h>
++#include <linux/err.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+@@ -26,12 +28,7 @@
  
--	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1));
--	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0);
-+	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), NULL);
-+	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0, NULL);
+ #include <asm/hardware/arm_timer.h>
+ 
+-/*
+- * These timers are currently always setup to be clocked at 1MHz.
+- */
+-#define TIMER_FREQ_KHZ	(1000)
+-#define TIMER_RELOAD	(TIMER_FREQ_KHZ * 1000 / HZ)
+-
++static unsigned long sp804_clksrc_rate;
+ static void __iomem *clksrc_base;
+ 
+ static cycle_t sp804_read(struct clocksource *cs)
+@@ -40,19 +37,28 @@ static cycle_t sp804_read(struct clocksource *cs)
  }
  
- static struct sys_timer ct_ca9x4_timer = {
+ static struct clocksource clocksource_sp804 = {
+-	.name		= "timer3",
+ 	.rating		= 200,
+ 	.read		= sp804_read,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+-void __init sp804_clocksource_init(void __iomem *base)
++void __init sp804_clocksource_init(void __iomem *base, char *clk_id)
+ {
++	struct clk *clk;
+ 	struct clocksource *cs = &clocksource_sp804;
+ 
++	cs->name = clk_id ? clk_id : "timer-sp";
++
+ 	clksrc_base = base;
+ 
++	clk = clk_get_sys("sp804", clk_id);
++	if (IS_ERR(clk) || clk_enable(clk))
++		panic("sp804 clksrc: cannot get clock\n");
++
++	clk_enable(clk);
++	sp804_clksrc_rate = clk_get_rate(clk);
++
+ 	/* setup timer 0 as free-running clocksource */
+ 	writel(0, clksrc_base + TIMER_CTRL);
+ 	writel(0xffffffff, clksrc_base + TIMER_LOAD);
+@@ -60,10 +66,11 @@ void __init sp804_clocksource_init(void __iomem *base)
+ 	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+ 		clksrc_base + TIMER_CTRL);
+ 
+-	clocksource_register_khz(cs, TIMER_FREQ_KHZ);
++	clocksource_register_hz(cs, sp804_clksrc_rate);
+ }
+ 
+ 
++static unsigned long sp804_clkevt_rate;
+ static void __iomem *clkevt_base;
+ 
+ /*
+@@ -90,7 +97,7 @@ static void sp804_set_mode(enum clock_event_mode mode,
+ 
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		writel(TIMER_RELOAD, clkevt_base + TIMER_LOAD);
++		writel(sp804_clkevt_rate / HZ, clkevt_base + TIMER_LOAD);
+ 		ctrl |= TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
+ 		break;
+ 
+@@ -120,7 +127,6 @@ static int sp804_set_next_event(unsigned long next,
+ }
+ 
+ static struct clock_event_device sp804_clockevent = {
+-	.name		= "timer0",
+ 	.shift		= 32,
+ 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+ 	.set_mode	= sp804_set_mode,
+@@ -136,14 +142,25 @@ static struct irqaction sp804_timer_irq = {
+ 	.dev_id		= &sp804_clockevent,
+ };
+ 
+-void __init sp804_clockevents_init(void __iomem *base, unsigned int timer_irq)
++void __init sp804_clockevents_init(void __iomem *base, unsigned int timer_irq,
++				   char *clk_id)
+ {
++	struct clk *clk;
+ 	struct clock_event_device *evt = &sp804_clockevent;
+ 
++	evt->name = clk_id ? clk_id : "timer-sp";
++
+ 	clkevt_base = base;
+ 
++	clk = clk_get_sys("sp804", clk_id);
++	if (IS_ERR(clk) || clk_enable(clk))
++		panic("sp804 clkevt: cannot get clock\n");
++
++	clk_enable(clk);
++	sp804_clkevt_rate = clk_get_rate(clk);
++
+ 	evt->irq = timer_irq;
+-	evt->mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC, evt->shift);
++	evt->mult = div_sc(sp804_clkevt_rate, NSEC_PER_SEC, evt->shift);
+ 	evt->max_delta_ns = clockevent_delta2ns(0xffffffff, evt);
+ 	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
+ 
+diff --git a/arch/arm/include/asm/hardware/timer-sp.h b/arch/arm/include/asm/hardware/timer-sp.h
+index 21e75e3..dc31cb0 100644
+--- a/arch/arm/include/asm/hardware/timer-sp.h
++++ b/arch/arm/include/asm/hardware/timer-sp.h
+@@ -1,2 +1,2 @@
+-void sp804_clocksource_init(void __iomem *);
+-void sp804_clockevents_init(void __iomem *, unsigned int);
++void sp804_clocksource_init(void __iomem *, char *);
++void sp804_clockevents_init(void __iomem *, unsigned int, char *);
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index a9cec65..977788f 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -482,8 +482,8 @@ static void __init intcp_timer_init(void)
+ 	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
+ 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(TIMER2_VA_BASE);
+-	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1);
++	sp804_clocksource_init(TIMER2_VA_BASE, NULL);
++	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1, NULL);
+ }
+ 
+ static struct sys_timer cp_timer = {
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index ee07755..70316c6 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -552,8 +552,8 @@ void __init realview_timer_init(unsigned int timer_irq)
+ 	writel(0, timer2_va_base + TIMER_CTRL);
+ 	writel(0, timer3_va_base + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(timer3_va_base);
+-	sp804_clockevents_init(timer0_va_base, timer_irq);
++	sp804_clocksource_init(timer3_va_base, NULL);
++	sp804_clockevents_init(timer0_va_base, timer_irq, NULL);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e9c5a17..b3094a7 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -771,8 +771,8 @@ static void __init versatile_timer_init(void)
+ 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+ 	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(TIMER3_VA_BASE);
+-	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMERINT0_1);
++	sp804_clocksource_init(TIMER3_VA_BASE, NULL);
++	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMERINT0_1, NULL);
+ }
+ 
+ struct sys_timer versatile_timer = {
 diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 63ef663..c056259 100644
+index c056259..f5e9ab0 100644
 --- a/arch/arm/mach-vexpress/v2m.c
 +++ b/arch/arm/mach-vexpress/v2m.c
-@@ -335,6 +335,10 @@ static struct clk osc2_clk = {
- 	.rate	= 24000000,
- };
+@@ -67,8 +67,8 @@ static void __init v2m_timer_init(void)
+ 	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+ 	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
  
-+static struct clk sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk dummy_apb_pclk;
+-	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1));
+-	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0);
++	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1), NULL);
++	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0, NULL);
+ }
  
- static struct clk_lookup v2m_lookups[] = {
-@@ -365,6 +369,9 @@ static struct clk_lookup v2m_lookups[] = {
- 	}, {	/* CLCD */
- 		.dev_id		= "mb:clcd",
- 		.clk		= &osc1_clk,
-+	}, {	/* SP804 Timer */
-+		.dev_id		= "sp804",
-+		.clk		= &sp804_clk,
- 	},
- };
- 
+ struct sys_timer v2m_timer = {
 -- 
 1.7.1
