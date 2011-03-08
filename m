@@ -1,111 +1,42 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 Mar 2011 10:44:04 +0100
-Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052 regulator
-Message-ID: <1299577444-31480-1-git-send-email-linus.walleij@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Mar 2011 09:49:55 +0000
+Subject: [PATCH 1/3] This patch adds support HR-Timer(High Resolution
+	Timer) and dynamic tick system for S5P SoCs. There are many clock
+	sources for HR-Timer on S5P SoCs. The PWM timer, RTC, System Timer,
+	and MCT can be used for clock source. This patch can only support
+	PWM timer for clocksource of S5P64x0 and S5PV210.
+In-Reply-To: <1299456554-15280-2-git-send-email-sbkim73@samsung.com>
+References: <1299456554-15280-1-git-send-email-sbkim73@samsung.com>
+	<1299456554-15280-2-git-send-email-sbkim73@samsung.com>
+Message-ID: <20110308094955.GB25874@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+> Subject: [PATCH 1/3] This patch adds support HR-Timer(High Resolution Timer)
+        and dynamic tick system for S5P SoCs. There are many clock
+        sources for HR-Timer on S5P SoCs. The PWM timer, RTC, System Timer,
+        and MCT can be used for clock source. This patch can only support PWM
+        timer for clocksource of S5P64x0 and S5PV210.
 
-This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
+Please don't fill the subject line with the entire patch description.
+Subject lines are always supposed to be a brief summary of the message
+being sent, or with patches a brief summary of what the patch is about.
 
-Cc: Samuel Ortiz <samuel.ortiz@intel.com>
-Cc: Liam Girdwood <lrg@slimlogic.co.uk>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Ola Lilja <ola.o.lilja@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   26 +++++++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
- arch/arm/mach-ux500/board-mop500.c            |   14 +++++++++++++
- 3 files changed, 41 insertions(+), 0 deletions(-)
+Put the rest of the patch description in the body of the message.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 533967c..a2cb353 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -11,6 +11,32 @@
- #include <linux/kernel.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/ab8500.h>
-+#include "board-mop500-regulators.h"
-+
-+/*
-+ * TPS61052 regulator
-+ */
-+static struct regulator_consumer_supply tps61052_vaudio_consumers[] = {
-+	/*
-+	 * Boost converter supply to raise voltage on audio speaker, this
-+	 * is actually connected to three pins, VInVhfL (left amplifier)
-+	 * VInVhfR (right amplifier) and VIntDClassInt - all three must
-+	 * be connected to the same voltage.
-+	 */
-+	REGULATOR_SUPPLY("vintdclassint", "ab8500-codec.0"),
-+};
-+
-+struct regulator_init_data tps61052_regulator = {
-+	.constraints = {
-+		.name = "vaudio-hf",
-+		.min_uV = 4500000,
-+		.max_uV = 4500000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+		REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(tps61052_vaudio_consumers),
-+	.consumer_supplies = tps61052_vaudio_consumers,
-+};
- 
- /* AB8500 regulators */
- struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-index 2675fae..a795cec 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.h
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-@@ -15,5 +15,6 @@
- #include <linux/regulator/ab8500.h>
- 
- extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
-+extern struct regulator_init_data tps61052_regulator;
- 
- #endif
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index a393f57..1e75d7e 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -20,6 +20,7 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/ab8500.h>
- #include <linux/mfd/tc3589x.h>
-+#include <linux/mfd/tps6105x.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -114,6 +115,15 @@ static struct pl022_ssp_controller ssp0_platform_data = {
- };
- 
- /*
-+ * TPS61052
-+ */
-+
-+static struct tps6105x_platform_data mop500_tps61052_data = {
-+	.mode = TPS6105X_MODE_VOLTAGE,
-+	.regulator_data = &tps61052_regulator,
-+};
-+
-+/*
-  * TC35892
-  */
- 
-@@ -135,6 +145,10 @@ static struct tc3589x_platform_data mop500_tc35892_data = {
- 
- static struct i2c_board_info mop500_i2c0_devices[] = {
- 	{
-+		I2C_BOARD_INFO("tps61052", 0x33),
-+		.platform_data  = &mop500_tps61052_data,
-+	},
-+	{
- 		I2C_BOARD_INFO("tc3589x", 0x42),
- 		.irq            = NOMADIK_GPIO_TO_IRQ(217),
- 		.platform_data  = &mop500_tc35892_data,
--- 
-1.7.3.2
+Don't say things like "This patch adds", "Adding support for", etc.  When
+the patch has been merged, years later it doesn't make sense to read such
+patch descriptions.
+
+"S5P: Common HRT and NO_HZ support" is sufficient to summarise the patch.
+
+Note that some mail clients only show you the first 40 or so characters of
+the subject line in their message index.  To illustrate:
+
+6472 N   Mar 07 Sangbeom Kim    (  19) [PATCH V3 0/3] ARM: S5P: Add HRT support
+6473     Mar 07 Sangbeom Kim    ( 530) ??>[PATCH 1/3] This patch adds support HR
+6474 N   Mar 07 Sangbeom Kim    ( 208) ??>[PATCH 2/3] This patch modify s5pv210_
+6475 N   Mar 07 Sangbeom Kim    ( 112) ??>[PATCH 3/3] This patch update mach-s5p
+
+So to have half the subject space wasted by "This patch modify" is not
+very productive.
