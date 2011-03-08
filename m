@@ -1,50 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Mar 2011 08:05:29 +0900
-Subject: [PATCH v2 0/3] ARM: S5P: Add D-PHY control platform helpers for
-	MIPI-CSIS/DSIM drivers
-In-Reply-To: <1299179061-30959-1-git-send-email-s.nawrocki@samsung.com>
-References: <01a701cbd95d$9873c160$c95b4420$%kim@samsung.com>
-	<1299179061-30959-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <042301cbdde5$54047a60$fc0d6f20$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Mar 2011 15:11:49 -0800
+Subject: [PATCH] OMAP1: McBSP: fix build break for non-multi-OMAP1 configs
+In-Reply-To: <alpine.DEB.2.00.1103071933350.10981@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1103041535150.10981@utopia.booyaka.com>
+	<20110307163047.a65c51d2.jhnikula@gmail.com>
+	<alpine.DEB.2.00.1103071933350.10981@utopia.booyaka.com>
+Message-ID: <20110308231149.GG26463@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+* Paul Walmsley <paul@pwsan.com> [110307 18:32]:
+> On Mon, 7 Mar 2011, Jarkko Nikula wrote:
 > 
-> Hello,
+> > omapxxx_mcbsp_res_0 doesn't look the best here in readability point of
+> > view but provides the smallest fix as no need to rename array and
+> > modify the _RES_SZ and _COUNT macros. So this fix is needed here and a
+> > small readability update can be done later.
+> > 
+> > Acked-by: Jarkko Nikula <jhnikula@gmail.com>
 > 
-> the following patch series adds the platform helpers for MIPI-CSIS and
-MIPI-
-> DSIM
-> drivers to control their corresponding D-PHYs.
-> MIPI-DSIM driver should use its D-PHY control function from
-plat-s5p/setup-
-> mipi.c.
-> 
-> Changes since v1:
-> - created common setup-mipi.c under plat-s5p for all S5P/EXYNOS4* SoCs
-> 
-> 
-> The patch series contains:
-> [PATCH v2 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update
-Copyright
-> [PATCH v2 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY
-control
-> callback
-> [PATCH v2 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM D-PHY
-control
-> 
-Hi Sylwester,
+> Thanks Jarkko.  For what it's worth, I agree it's an ugly patch.
 
-Basically, I agree with your current approach :)
+Applying.
 
-Will review it today and re-think other method about your ifdef(EXYNOS4) so
-that can support single kernel later.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
