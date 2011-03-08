@@ -1,30 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Mar 2011 09:36:57 +0000
-Subject: Amba CLCD register definitions
-In-Reply-To: <4D75EF86.8020103@linuxtv.org>
-References: <4D75EF86.8020103@linuxtv.org>
-Message-ID: <20110308093657.GA25874@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 8 Mar 2011 10:44:04 +0100
+Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052 regulator
+Message-ID: <1299577444-31480-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2011 at 09:57:42AM +0100, Michael Hunold wrote:
-> While working on that, I came across the following oddity. The Amba CLCD
-> driver supports both PL110 and PL111 primecells.
-> 
-> The PL110 register summary can be found here:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0161e/I904416.html
+From: Linus Walleij <linus.walleij@linaro.org>
 
-PL110 is rather screwed up because there's various revisions and
-implementations within ARM which have different register layouts and
-register namings.  Eg, you'll find Versatile has a PL110 fitted but has
-the PL111 register layout with IENB and CNTL swapped.
+This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
 
-I don't remember the ancestry of the names, but DDI0161D only gives the
-registers long names.  They probably came from an implementation provided
-by ARM in years gone by, which would've been created by those doing
-platform support back in the early days.
+Cc: Samuel Ortiz <samuel.ortiz@intel.com>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Ola Lilja <ola.o.lilja@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |   26 +++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
+ arch/arm/mach-ux500/board-mop500.c            |   14 +++++++++++++
+ 3 files changed, 41 insertions(+), 0 deletions(-)
 
-It's only with DDI0161E that they've been given short names.
-
-I don't think we should change the names just because someone decided to
-add such things to the latest revision of documentation.
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 533967c..a2cb353 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -11,6 +11,32 @@
+ #include <linux/kernel.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/ab8500.h>
++#include "board-mop500-regulators.h"
++
++/*
++ * TPS61052 regulator
++ */
++static struct regulator_consumer_supply tps61052_vaudio_consumers[] = {
++	/*
++	 * Boost converter supply to raise voltage on audio speaker, this
++	 * is actually connected to three pins, VInVhfL (left amplifier)
++	 * VInVhfR (right amplifier) and VIntDClassInt - all three must
++	 * be connected to the same voltage.
++	 */
++	REGULATOR_SUPPLY("vintdclassint", "ab8500-codec.0"),
++};
++
++struct regulator_init_data tps61052_regulator = {
++	.constraints = {
++		.name = "vaudio-hf",
++		.min_uV = 4500000,
++		.max_uV = 4500000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++		REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(tps61052_vaudio_consumers),
++	.consumer_supplies = tps61052_vaudio_consumers,
++};
+ 
+ /* AB8500 regulators */
+ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+index 2675fae..a795cec 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.h
++++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+@@ -15,5 +15,6 @@
+ #include <linux/regulator/ab8500.h>
+ 
+ extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
++extern struct regulator_init_data tps61052_regulator;
+ 
+ #endif
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index a393f57..1e75d7e 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -20,6 +20,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/ab8500.h>
+ #include <linux/mfd/tc3589x.h>
++#include <linux/mfd/tps6105x.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -114,6 +115,15 @@ static struct pl022_ssp_controller ssp0_platform_data = {
+ };
+ 
+ /*
++ * TPS61052
++ */
++
++static struct tps6105x_platform_data mop500_tps61052_data = {
++	.mode = TPS6105X_MODE_VOLTAGE,
++	.regulator_data = &tps61052_regulator,
++};
++
++/*
+  * TC35892
+  */
+ 
+@@ -135,6 +145,10 @@ static struct tc3589x_platform_data mop500_tc35892_data = {
+ 
+ static struct i2c_board_info mop500_i2c0_devices[] = {
+ 	{
++		I2C_BOARD_INFO("tps61052", 0x33),
++		.platform_data  = &mop500_tps61052_data,
++	},
++	{
+ 		I2C_BOARD_INFO("tc3589x", 0x42),
+ 		.irq            = NOMADIK_GPIO_TO_IRQ(217),
+ 		.platform_data  = &mop500_tc35892_data,
+-- 
+1.7.3.2
