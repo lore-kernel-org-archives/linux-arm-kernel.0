@@ -1,63 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Mar 2011 17:13:19 +0000
-Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for chained
-	handlers
+Date: Tue,  8 Mar 2011 17:13:21 +0000
+Subject: [PATCH 3/7] ARM: tegra: update GPIO chained IRQ handler to use
+	entry/exit functions
 In-Reply-To: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
 References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1299604405-12960-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1299604405-12960-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some chained IRQ handlers are written to cope with primary chips of
-potentially different flow types. Whether this a sensible thing to do
-is a point of contention.
+This patch updates the Tegra gpio chained IRQ handler to use the chained
+IRQ enter/exit functions in order to function correctly on primary
+controllers with different methods of flow control.
 
-This patch introduces entry/exit functions for chained handlers which
-infer the flow type of the primary chip by checking whether or not
-the ->irq_eoi function pointer is present and calling back to the
-primary chip as necessary.
+This is required for the GIC to move to fasteoi interrupt handling.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Colin Cross <ccross@android.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/mach/irq.h |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/gpio.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 22ac140..34d1de8 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -34,4 +34,31 @@ do {							\
- 	raw_spin_unlock(&desc->lock);			\
- } while(0)
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+index ad80488..406b687 100644
+--- a/arch/arm/mach-tegra/gpio.c
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -220,8 +220,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	int port;
+ 	int pin;
+ 	int unmasked = 0;
++	struct irq_chip chip = get_irq_desc_chip(desc);
  
-+#ifndef __ASSEMBLY__
-+static inline void chained_irq_enter(struct irq_chip *chip,
-+				     struct irq_desc *desc)
-+{
-+	/* FastEOI controllers require no action on entry. */
-+	if (chip->irq_eoi)
-+		return;
-+
-+	if (chip->irq_mask_ack) {
-+		chip->irq_mask_ack(&desc->irq_data);
-+	} else {
-+		chip->irq_mask(&desc->irq_data);
-+		if (chip->irq_ack)
-+			chip->irq_ack(&desc->irq_data);
-+	}
-+}
-+
-+static inline void chained_irq_exit(struct irq_chip *chip,
-+				    struct irq_desc *desc)
-+{
-+	if (chip->irq_eoi)
-+		chip->irq_eoi(&desc->irq_data);
-+	else
-+		chip->irq_unmask(&desc->irq_data);
-+}
-+#endif
-+
- #endif
+-	desc->irq_data.chip->irq_ack(&desc->irq_data);
++	chained_irq_enter(chip, desc);
+ 
+ 	bank = get_irq_data(irq);
+ 
+@@ -240,7 +241,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			 */
+ 			if (lvl & (0x100 << pin)) {
+ 				unmasked = 1;
+-				desc->irq_data.chip->irq_unmask(&desc->irq_data);
++				chained_irq_exit(chip, desc);
+ 			}
+ 
+ 			generic_handle_irq(gpio_to_irq(gpio + pin));
+@@ -248,7 +249,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	}
+ 
+ 	if (!unmasked)
+-		desc->irq_data.chip->irq_unmask(&desc->irq_data);
++		chained_irq_exit(chip, desc);
+ 
+ }
+ 
 -- 
 1.7.0.4
