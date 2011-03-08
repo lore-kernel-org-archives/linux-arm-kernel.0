@@ -1,625 +1,254 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 8 Mar 2011 13:04:04 +0100 (CET)
-Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Tue, 8 Mar 2011 17:49:31 +0530
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <87lj0u8mrf.fsf@ti.com>
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	<87lj0u8mrf.fsf@ti.com>
+Message-ID: <AANLkTin2f7n-v5Hg7NHB8a4fEmpzt_07xy-M1wjnKHtU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Mar 2011, adharmap at codeaurora.org wrote:
-> +static int __devinit pm8921_add_subdevices(const struct pm8921_platform_data
-> +					   *pdata,
-> +					   struct pm8921 *pmic,
-> +					   u32 rev)
-> +{
-> +	int ret = 0;
-> +	int irq_base = 0;
-> +	void *irq_data;
-> +
-> +	if (pdata->irq_pdata) {
+On Sat, Mar 5, 2011 at 5:24 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Govindraj,
+>
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> For device pads which have OMAP_DEVICE_PAD_WAKEUP set (which means they
+>> are wakeup capable) enable the IO-daisy wakeup capability.
+>> During re-muxing avoid direct write with val as this can disturb if any
+>> mux done at bootloader level so read the pad then write back.
+>>
+>> Also add an API to fetch the wake-up status bit is set for given omap-hwmod
+>> device using available mux info which is added during omap_hwmod_mux_init.
+>> Wakeup status bit is needed for uart_resume_idle call from sram_idle path
+>> based on wake-up event has occurred for given uart we can enable clocks back.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/mux.c ? ? ? ? ? ? ? ? ? ?| ? 28 ++++++++++++++++++++++++++
+>> ?arch/arm/mach-omap2/mux.h ? ? ? ? ? ? ? ? ? ?| ? 13 ++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 13 ++++++++++++
+>> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 +
+>> ?4 files changed, 55 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+>> index 98148b6..50edcea 100644
+>> --- a/arch/arm/mach-omap2/mux.c
+>> +++ b/arch/arm/mach-omap2/mux.c
+>> @@ -317,6 +317,29 @@ err1:
+>> ? ? ? return NULL;
+>> ?}
+>>
+>> +/* Gets the wakeup status of given pad from omap-hwmod */
+>> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
+>
+> should return a bool
+>
+> Also, documentation should be clear that it returns true if *any* pad
+> associated with this device has a wakeup event.
+>
+> Also a name reflecting the get/check/status nature of this function
+> would help readability, maybe:
+>
+> bool omap_hwmod_mux_wakeup_event(struct omap_hwmod_mux_info *hmux)
 
-So if pdata->irq_pdata == NULL you return success. Is that correct ?
-Also please return early on (!pdata->irq_pdata) and avoid that extra
-indent level for the real code path.
+Yes sure will modify.
 
-> +		pdata->irq_pdata->irq_cdata.nirqs = PM8921_NR_IRQS;
-> +		pdata->irq_pdata->irq_cdata.rev = rev;
-> +		irq_base = pdata->irq_pdata->irq_base;
-> +		irq_data = pm8xxx_irq_init(pmic->dev, pdata->irq_pdata);
-> +
-> +		if (IS_ERR(irq_data)) {
-> +			pr_err("Failed to init interrupts ret=%ld\n",
-> +					PTR_ERR(irq_data));
-> +			ret = PTR_ERR(irq_data);
-> +			goto bail;
+>
+>> +{
+>> + ? ? int i;
+>> + ? ? unsigned int val;
+>> + ? ? u8 ret = 0;
+>> +
+>> + ? ? for (i = 0; i < hmux->nr_pads; i++) {
+>> + ? ? ? ? ? ? struct omap_device_pad *pad = &hmux->pads[i];
+>> +
+>> + ? ? ? ? ? ? if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
+>> + ? ? ? ? ? ? ? ? ? ? val = omap_mux_read(pad->partition,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
+>> + ? ? ? ? ? ? ? ? ? ? if (val & OMAP_WAKEUP_EVENT) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = 1;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? return ret;
+>> +}
+>> +
+>> ?/* Assumes the calling function takes care of locking */
+>> ?void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>> ?{
+>> @@ -342,6 +365,9 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> ? ? ? ? ? ? ? ? ? ? ? flags &= ~OMAP_DEVICE_PAD_ENABLED;
+>> ? ? ? ? ? ? ? ? ? ? ? val = pad->idle;
+>> + ? ? ? ? ? ? ? ? ? ? if (flags & OMAP_DEVICE_PAD_WAKEUP)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val |= OMAP_WAKEUP_EN;
+>> +
+>
+> Is this needed on every idle transition?
+>
+> You're currently setting it on every idle transition, but never clearing
+> it. ?If it is to be a one-time thing, then move it to the early init of
+> the mux.
 
-  			return PTR_ERR(irq_data);
+I will be removing this as said in earlier mail.
 
-And then you have
-    	        }
-		pmic->irq_data = irq_data;
-		return 0;
 
-> +		} else
-> +			pmic->irq_data = irq_data;
-> +	}
-> +
-> +bail:
-> +	return ret;
-> +}
+>
+>> ? ? ? ? ? ? ? ? ? ? ? pr_debug("%s: Idling %s %x\n", __func__,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->name, val);
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>> @@ -358,6 +384,8 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>> ? ? ? ? ? ? ? };
+>>
+>> ? ? ? ? ? ? ? if (val >= 0) {
+>> + ? ? ? ? ? ? ? ? ? ? val |= omap_mux_read(pad->partition,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
+>
+> I don't think this is doing what you expect, and will lead to very
+> difficult to find bugs. ?Since your OR'ing in bits from the current
+> value, you will never be able to clear any bits in this register.
+>
+> As just a dumb example, consider the enable case where
+> pad->enable=MUX_MODE0 (0x0). ?If the bootloader has initialized this pad
+> to MUX_MODE7 (0x7), this code will never set it to MUX_MODE0, since this
+> read and OR of the existing value will always set it back to MUX_MODE7.
+>
+> At a minimum, this change should be a separate patch with a more
+> detailed description.
+>
 
-> +struct pm_irq_chip {
-> +	struct list_head	link;
-> +	struct device		*dev;
-> +	spinlock_t		pm_irq_lock;
-> +	u8			*irqs_allowed;
-> +	u16			*irqs_to_handle;
-> +	u8			*config;
-> +	unsigned long		*wake_enable;
-> +	unsigned int		devirq;
-> +	unsigned int		count_wakeable;
-> +	unsigned int		irq_base;
-> +	unsigned int		num_irqs;
-> +	unsigned int		num_blocks;
-> +	unsigned int		num_masters;
-> +};
-> +
-> +static LIST_HEAD(pm_irq_chips);
-> +
-> +/* Helper Functions */
-> +static DEFINE_RATELIMIT_STATE(pm8xxx_irq_ratelimit, 60 * HZ, 10);
-> +
-> +static inline int pm8xxx_can_print(void)
-> +{
-> +	return __ratelimit(&pm8xxx_irq_ratelimit);
-> +}
-> +
-> +static int
-> +pm8xxx_read_root_irq(const struct pm_irq_chip *chip, u8 *rp)
-> +{
-> +	return pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_ROOT, rp);
-> +}
-> +
-> +static int
-> +pm8xxx_read_master_irq(const struct pm_irq_chip *chip, u8 m, u8 *bp)
-> +{
-> +	return pm8xxx_readb(chip->dev,
-> +			SSBI_REG_ADDR_IRQ_M_STATUS1 + m, bp);
-> +}
-> +
-> +static int
-> +pm8xxx_read_block_irq(const struct pm_irq_chip *chip, u8 bp, u8 *ip)
-> +{
-> +	int	rc;
-> +
-> +	rc = pm8xxx_writeb(chip->dev,
-> +				SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
-> +	if (rc) {
-> +		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
-> +		goto bail_out;
+Also this is change will be removed and default serial_pad
+reg will have proper values for .enable and .idle fields using
+which it will muxed accordingly
+[snip of default rx serial reg given in previous mail.]
 
-These goto's are silly. return rc; is fine here.
+>
+>> ? ? ? ? ? ? ? ? ? ? ? omap_mux_write(pad->partition, val,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
+>> ? ? ? ? ? ? ? ? ? ? ? pad->flags = flags;
+>> diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+>> index a4ab17a..84a8fc2 100644
+>> --- a/arch/arm/mach-omap2/mux.h
+>> +++ b/arch/arm/mach-omap2/mux.h
+>> @@ -220,8 +220,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
+>> ? */
+>> ?void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
+>>
+>> +
+>> +/**
+>> + * omap_hwmod_mux_wakeup - omap hwmod check given pad had wakeup event
+>> + * @hmux: ? ? ? ? ? ?Pads for a hwmod
+>> + *
+>> + * Called only from omap_hwmod.c, do not use.
+>> + */
+>> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux);
+>> ?#else
+>>
+>> +static inline int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
+>> +{
+>> + ? ? return 0;
+>> +}
+>> +
+>> ?static inline int omap_mux_init_gpio(int gpio, int val)
+>> ?{
+>> ? ? ? return 0;
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 9e89a58..893dae1 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -2239,3 +2239,16 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
+>>
+>> ? ? ? return ret;
+>> ?}
+>> +
+>> +/**
+>> + * omap_hwmod_pad_wakeup_status - get pad wakeup status if mux is available.
+>> + * @oh: struct omap_hwmod *
+>> + *
+>> + * Returns the wake_up status bit of available pad mux pin.
+>> + */
+>> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh)
+>
+> Again, naming here could improve readability. ?Maybe:
+>
+> bool omap_hmwod_get_io_wakeup_status(struct omap_hwmod *oh)
+>
+> From the name and the bool return, it should be clear that this is just
+> checking for the wakeup event. ?I also think it should be clear that
+> this is checking for IO-ring wakeups, not module wakeups.
+>
+> Also, in PATCH 5/7, you're calling this hwmod API directly from a
+> driver. ?Drivers should not know anything about hwmods. ?Any
+> OMAP-specific hooks must be called through pdata function pointers.
+> Also, they should go through omap_device, which would then call
+> omap_hwmod.
+>
 
-> +	}
-> +
-> +	rc = pm8xxx_readb(chip->dev,
-> +			SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
-> +	if (rc)
-> +		pr_err("Failed Reading Status rc=%d\n", rc);
-> +bail_out:
-> +	return rc;
-> +}
-> +
-> +static int
-> +pm8xxx_config_irq(const struct pm_irq_chip *chip, u8 bp, u8 cp)
-> +{
-> +	int	rc;
-> +
-> +	rc = pm8xxx_writeb(chip->dev,
-> +				SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
+Agree omap-device level api to pad wakeup check is better.
 
-And how are the callers of this function serialized against the other
-functions which access SSBI_REG_ADDR_IRQ_BLK_SEL ?
 
-> +	if (rc) {
-> +		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
-> +		goto bail_out;
-> +	}
-> +
-> +	rc = pm8xxx_writeb(chip->dev,
-> +				SSBI_REG_ADDR_IRQ_CONFIG, cp);
-> +	if (rc)
-> +		pr_err("Failed Configuring IRQ rc=%d\n", rc);
-> +bail_out:
-> +	return rc;
-> +}
-> +
-> +static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip,
-> +				int block, int *handled)
-> +{
-> +	int ret = 0;
-> +	u8 bits;
-> +	int pmirq, irq, k;
+> Thinking more about this (and how you use it in PATCH 5/7), what is
+> needed is an omap_device level API to check if a wakeup occured for that
+> device. ?That function would check for either module-level wakeup or IO
+> pad wakeup. ?The driver should not need to care about how the wakeup
+> occurred.
+>
 
-Can you please collapse all int variables into one line. Also why are
-the iterators in your various functions randomly named i, j, k and
-whatever? We usually use i for the first iterator and j when we have a
-nested section.
+Module level wakeup doesn't seem to work and only
+way it seem to wakeup is through using resume_idle
+from sram_idle.
 
-> +	spin_lock(&chip->pm_irq_lock);
-> +	ret = pm8xxx_read_block_irq(chip, block, &bits);
-> +	if (ret) {
-> +		if (pm8xxx_can_print())
-> +			pr_err("Failed reading %d block ret=%d",
-> +				block, ret);
-> +		goto out;
-> +	}
+One simple way to reproduce the problem with
+existing code base also is adding this patch which
+will enable module level wakeup always.
 
-You can drop chip->pm_irq_lock here and return if (!bits)
+https://patchwork.kernel.org/patch/501211/
 
-> +	if (!bits) {
-> +		if (pm8xxx_can_print())
-> +			pr_err("block bit set in master but no irqs: %d",
-> +				block);
-> +		goto out;
-> +	}
-> +
-> +	/* Check IRQ bits */
-> +	for (k = 0; k < 8; k++) {
-> +		if (bits & (1 << k)) {
-> +			pmirq = block * 8 + k;
-> +			irq = pmirq + chip->irq_base;
-> +			chip->irqs_to_handle[*handled] = irq;
-> +			(*handled)++;
+and with below change.
 
-Why all this horrible indirection? Why don't you call
-generic_handle_irq() right away?
+govindraj at Linux-BSP-Server:~/clones/linux-omap-2.6$ gd
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 47eef48..6343773 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -380,6 +380,7 @@ static void omap_uart_allow_sleep(struct
+omap_uart_state *uart)
+        omap_uart_smart_idle_enable(uart, 1);
+        uart->can_sleep = 1;
+        del_timer(&uart->timer);
++       omap_uart_disable_clocks(uart);
+ }
 
-> +		}
-> +	}
-> +out:
-> +	spin_unlock(&chip->pm_irq_lock);
-> +	return ret;
-> +}
-> +
-> +static int pm8xxx_irq_master_handler(struct pm_irq_chip *chip,
-> +					int master, int *handled)
-> +{
-> +	int ret = 0;
-> +	u8 blockbits;
-> +	int block_number, j;
-> +
-> +	ret = pm8xxx_read_master_irq(chip, master, &blockbits);
-> +	if (ret) {
-> +		pr_err("Failed to read master %d ret=%d\n", master, ret);
-> +		return ret;
-> +	}
-> +	if (!blockbits) {
-> +		if (pm8xxx_can_print())
+We can see module level wakeup doesn't wakeup the uart.
+once we set sleep_timeout for uart and timer starts.
 
-What's the point of this ratelimit? This should not happen at all and
-if it happens often enough that you need a rate limit then you better
-figure out why and fix the real problem instead of papering over it.
 
-> +			pr_err("master bit set in root but no blocks: %d",
-> +				master);
-> +		return 0;
-> +	}
-> +
-> +	for (j = 0; j < 8; j++)
-> +		if (blockbits & (1 << j)) {
-> +			block_number = master * 8 + j;	/* block # */
-> +			ret |= pm8xxx_irq_block_handler(chip, block_number,
-> +								handled);
-> +		}
-> +	return ret;
-> +}
-> +
-> +static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct pm_irq_chip *chip = get_irq_data(irq);
-> +	int	i, ret;
-> +	u8	root;
-> +	int	masters = 0, handled = 0;
-> +
-> +	ret = pm8xxx_read_root_irq(chip, &root);
-> +	if (ret) {
-> +		pr_err("Can't read root status ret=%d\n", ret);
-> +		return;
-> +	}
-> +
-> +	/* on pm8xxx series masters start from bit 1 of the root */
-> +	masters = root >> 1;
-> +
-> +	/* Read allowed masters for blocks. */
-> +	for (i = 0; i < chip->num_masters; i++)
-> +		if (masters & (1 << i))
-> +			pm8xxx_irq_master_handler(chip, i, &handled);
-> +
-> +	for (i = 0; i < handled; i++)
-> +		generic_handle_irq(chip->irqs_to_handle[i]);
-> +
-> +	desc->chip->ack(irq);
-
-  chip->irq_ack()
-
-> +}
-> +
-> +static void pm8xxx_irq_ack(struct irq_data *d)
-> +{
-> +	const struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = d->irq - chip->irq_base;
-> +	u8	block, config;
-> +
-> +	block = pmirq / 8;
-> +
-> +	config = PM_IRQF_WRITE | chip->config[pmirq] | PM_IRQF_CLR;
-> +	/* Keep the mask */
-> +	if (!(chip->irqs_allowed[block] & (1 << (pmirq % 8))))
-> +		config |= PM_IRQF_MASK_FE | PM_IRQF_MASK_RE;
-
-What's the point of this exercise? ack is called before mask and it
-should never be called when the interrupt is masked.
-
-> +	pm8xxx_config_irq(chip, block, config);
-> +}
-> +
-> +static void pm8xxx_irq_mask(struct irq_data *d)
-> +{
-> +	const struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = d->irq - chip->irq_base;
-> +	int	master, irq_bit;
-> +	u8	block, config;
-> +
-> +	block = pmirq / 8;
-> +	master = block / 8;
-> +	irq_bit = pmirq % 8;
-> +
-> +	chip->irqs_allowed[block] &= ~(1 << irq_bit);
-> +
-> +	config = PM_IRQF_WRITE | chip->config[pmirq] |
-> +		PM_IRQF_MASK_FE | PM_IRQF_MASK_RE;
-
-Why don't you define PM_IRQF_MASK as PM_IRQF_MASK_FE | PM_IRQF_MASK_RE
-and use this instead of having those line breaks.
-
-Also every function which calls pm8xxx_config_irq() ORs
-PM_IRQF_WRITE. Why can't you do that in pm8xxx_config_irq() and only
-OR the real relevant bits in the various callers ?
-
-> +	pm8xxx_config_irq(chip, block, config);
-> +}
-> +
-> +static void pm8xxx_irq_unmask(struct irq_data *d)
-> +{
-> +	const struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = d->irq - chip->irq_base;
-> +	int	master, irq_bit;
-> +	u8	block, config, old_irqs_allowed;
-> +
-> +	block = pmirq / 8;
-> +	master = block / 8;
-> +	irq_bit = pmirq % 8;
-> +
-> +	old_irqs_allowed = chip->irqs_allowed[block];
-
-  ???
-
-> +	chip->irqs_allowed[block] |= 1 << irq_bit;
-> +
-> +	config = PM_IRQF_WRITE | chip->config[pmirq];
-> +	pm8xxx_config_irq(chip, block, config);
-> +}
-> +
-> +static int pm8xxx_irq_set_type(struct irq_data *d, unsigned int flow_type)
-> +{
-> +	const struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = d->irq - chip->irq_base;
-> +	int master, irq_bit;
-> +	u8 block, config;
-> +
-> +	block = pmirq / 8;
-> +	master = block / 8;
-> +	irq_bit  = pmirq % 8;
-> +
-> +	chip->config[pmirq] = (irq_bit << PM_IRQF_BITS_SHIFT) |
-> +			PM_IRQF_MASK_RE | PM_IRQF_MASK_FE;
-> +	if (flow_type & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)) {
-> +		if (flow_type & IRQF_TRIGGER_RISING)
-> +			chip->config[pmirq] &= ~PM_IRQF_MASK_RE;
-> +		if (flow_type & IRQF_TRIGGER_FALLING)
-> +			chip->config[pmirq] &= ~PM_IRQF_MASK_FE;
-> +	} else {
-> +		chip->config[pmirq] |= PM_IRQF_LVL_SEL;
-> +
-> +		if (flow_type & IRQF_TRIGGER_HIGH)
-> +			chip->config[pmirq] &= ~PM_IRQF_MASK_RE;
-> +		else
-> +			chip->config[pmirq] &= ~PM_IRQF_MASK_FE;
-> +	}
-> +
-> +	config = PM_IRQF_WRITE
-> +		| chip->config[pmirq] | PM_IRQF_CLR;
-
-Grrr. These random line breaks all over the place are horrible.
-
-Also please make that:
-
-     cfg = chip->config[pmirq] | PM_IRQF_WRITE | PM_IRQF_CLR;
-
-So all the bits which you OR to the stored config are together.
-
-> +	return pm8xxx_config_irq(chip, block, config);
-> +}
-> +
-> +static int pm8xxx_irq_set_wake(struct irq_data *d, unsigned int on)
-> +{ 
-> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = d->irq - chip->irq_base;
-> +
-> +	if (on) {
-> +		set_bit(pmirq, chip->wake_enable);
-> +		chip->count_wakeable++;
-> +	} else {
-> +		clear_bit(pmirq, chip->wake_enable);
-> +		chip->count_wakeable--;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct irq_chip pm8xxx_irq_chip = {
-> +	.name		= "pm8xxx",
-> +	.irq_ack	= pm8xxx_irq_ack,
-> +	.irq_mask	= pm8xxx_irq_mask,
-> +	.irq_unmask	= pm8xxx_irq_unmask,
-> +	.irq_set_type	= pm8xxx_irq_set_type,
-> +	.irq_set_wake	= pm8xxx_irq_set_wake,
-> +};
-> +
-> +int pm8xxx_get_irq_stat(void *data, int irq)
-> +{
-> +	struct pm_irq_chip *chip = data;
-> +	int pmirq;
-> +	int     rc;
-> +	u8      block, bits, bit;
-> +	unsigned long flags;
-> +
-> +	if (chip == NULL || irq < chip->irq_base ||
-> +			irq >= chip->irq_base + chip->num_irqs)
-> +		return -EINVAL;
-> +
-> +	pmirq = irq - chip->irq_base;
-> +
-> +	block = pmirq / 8;
-> +	bit = pmirq % 8;
-> +
-> +	spin_lock_irqsave(&chip->pm_irq_lock, flags);
-> +
-> +	rc = pm8xxx_writeb(chip->dev,
-> +				SSBI_REG_ADDR_IRQ_BLK_SEL, block);
-> +	if (rc) {
-> +		pr_err("Failed Selecting block irq=%d pmirq=%d blk=%d rc=%d\n",
-> +			irq, pmirq, block, rc);
-> +		goto bail_out;
-> +	}
-> +
-> +	rc = pm8xxx_readb(chip->dev,
-> +				SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
-> +	if (rc) {
-> +		pr_err("Failed Configuring irq=%d pmirq=%d blk=%d rc=%d\n",
-> +			irq, pmirq, block, rc);
-> +		goto bail_out;
-> +	}
-> +
-> +	rc = (bits & (1 << bit)) ? 1 : 0;
-> +
-> +bail_out:
-> +	spin_unlock_irqrestore(&chip->pm_irq_lock, flags);
-> +
-> +	return rc;
-> +}
-> +EXPORT_SYMBOL(pm8xxx_get_irq_stat);
-
-EXPORT_SYMBOL_GPL if at all. Why needs this to be exported?
-
-> +
-> +#ifdef CONFIG_PM
-> +int pm8xxx_suspend_irq(const void *data)
-> +{
-> +	const struct pm_irq_chip *chip = data;
-> +	int pmirq;
-> +
-> +	for (pmirq = 0; pmirq < chip->num_irqs; pmirq++) {
-> +		if (chip->config[i] && !test_bit(i, chip->wake_enable)) {
-> +			if (!((chip->config[i] & PM_IRQF_MASK_ALL)
-> +			      == PM_IRQF_MASK_ALL)) {
-> +				irq = i + chip->irq_base;
-> +				pm8xxx_irq_mask(get_irq_data(irq));
-> +			}
-> +		}
-> +	}
-> +
-> +	if (!chip->count_wakeable)
-> +		disable_irq(chip->dev->irq);
-> +
-> +	return 0;
-> +}
-> +
-> +void pm8xxx_show_resume_irq(void)
-> +{
-> +	struct pm_irq_chip *chip;
-> +	u8 block, bits;
-> +	int pmirq;
-> +
-> +	list_for_each_entry(chip, &pm_irq_chips, link) {
-> +		for (pmirq = 0; pmirq < chip->num_irqs; pmirq++) {
-> +			if (test_bit(pmirq, chip->wake_enable)) {
-> +				block = pmirq / 8;
-> +				if (!pm8xxx_read_block_irq(chip,
-> +							&block, &bits)) {
-> +					if (bits & (1 << (pmirq & 0x7)))
-> +						pr_warning("%d triggered\n",
-> +						pmirq + chip->pdata.irq_base);
-> +				}
-> +			}
-> +		}
-> +	}
-> +}
-
-What's the point of this function?
-
-> +int pm8xxx_resume_irq(const void *data)
-> +{
-> +	const struct pm_irq_chip *chip = data;
-> +	int pmirq;
-> +
-> +	for (pmirq = 0; pmirq < chip->num_irqs; pmirq++) {
-> +		if (chip->config[i] && !test_bit(i, chip->wake_enable)) {
-> +			if (!((chip->config[i] & PM_IRQF_MASK_ALL)
-> +			      == PM_IRQF_MASK_ALL)) {
-> +				irq = i + chip->irq_base;
-> +				pm8xxx_irq_unmask(get_irq_data(irq));
-> +			}
-> +		}
-> +	}
-> +
-> +	if (!chip->count_wakeable)
-> +		enable_irq(chip->dev->irq);
-> +
-> +	return 0;
-> +}
-> +#else
-> +#define	pm8xxx_suspend		NULL
-> +#define	pm8xxx_resume		NULL
-
-Where is pm8xxx_suspend/pm8xxx_resume defined for the !PM case and
-where are those used at all ?
-
-> +#endif
-> +
-> +void * __devinit pm8xxx_irq_init(struct device *dev,
-> +				const struct pm8xxx_irq_platform_data *pdata)
-> +{
-> +	struct pm_irq_chip  *chip;
-> +	int devirq;
-> +	int rc;
-> +	unsigned int pmirq;
-> +
-> +	if (!pdata) {
-> +		pr_err("No platform data\n");
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	devirq = pdata->devirq;
-> +	if (devirq < 0) {
-> +		pr_err("missing devirq\n");
-> +		rc = devirq;
-> +		goto out;
-> +	}
-> +
-> +	chip = kzalloc(sizeof(struct pm_irq_chip), GFP_KERNEL);
-> +	if (!chip) {
-> +		pr_err("Cannot alloc pm_irq_chip struct\n");
-> +		rc = -ENOMEM;
-> +		goto out;
-> +	}
-> +
-> +	chip->dev = dev;
-> +	chip->devirq = devirq;
-> +	chip->irq_base = pdata->irq_base;
-> +	chip->num_irqs = pdata->irq_cdata.nirqs;
-> +	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
-> +	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
-> +	spin_lock_init(&chip->pm_irq_lock);
-> +
-> +	chip->irqs_allowed = kzalloc(sizeof(u8) * chip->num_blocks, GFP_KERNEL);
-> +	if (!chip->irqs_allowed) {
-> +		pr_err("Cannot alloc irqs_allowed array\n");
-> +		rc = -ENOMEM;
-> +		goto free_pm_irq_chip;
-> +	}
-> +
-> +	chip->irqs_to_handle = kzalloc(sizeof(u16) * chip->num_irqs,
-> +								GFP_KERNEL);
-> +	if (!chip->irqs_to_handle) {
-> +		pr_err("Cannot alloc irqs_to_handle array\n");
-> +		rc = -ENOMEM;
-> +		goto free_irqs_allowed;
-> +	}
-> +	chip->config = kzalloc(sizeof(u8) * chip->num_irqs, GFP_KERNEL);
-> +	if (!chip->config) {
-> +		pr_err("Cannot alloc config array\n");
-> +		rc = -ENOMEM;
-> +		goto free_irqs_to_handle;
-> +	}
-> +	chip->wake_enable = kzalloc(sizeof(unsigned long)
-> +			* DIV_ROUND_UP(chip->num_irqs, BITS_PER_LONG),
-> +			GFP_KERNEL);
-> +	if (!chip->wake_enable) {
-> +		pr_err("Cannot alloc wake_enable array\n");
-> +		rc = -ENOMEM;
-> +		goto free_config;
-> +	}
-> +	list_add(&chip->link, &pm_irq_chips);
-
-What's that list for and how is it protected ?
-
-> +	for (pmirq = 0; pmirq < chip->num_irqs; pmirq++) {
-> +		set_irq_chip(chip->irq_base + pmirq, &pm8xxx_irq_chip);
-> +		set_irq_chip_data(chip->irq_base + pmirq, chip);
-> +		set_irq_handler(chip->irq_base + pmirq, handle_level_irq);
-> +#ifdef CONFIG_ARM
-> +		set_irq_flags(chip->irq_base + pmirq, IRQF_VALID);
-> +#else
-> +		set_irq_noprobe(chip->irq_base + pmirq);
-> +#endif
-> +	}
-> +
-> +	set_irq_type(devirq, pdata->irq_trigger_flag);
-> +	set_irq_data(devirq, chip);
-> +	set_irq_chained_handler(devirq, pm8xxx_irq_handler);
-> +	set_irq_wake(devirq, 1);
-> +
-> +	return chip;
-> +
-> +free_config:
-> +	kfree(chip->config);
-> +free_irqs_to_handle:
-> +	kfree(chip->irqs_to_handle);
-> +free_irqs_allowed:
-> +	kfree(chip->irqs_allowed);
-
-No need for 3 separate labels. You kzalloc() chip, so you can call
-kfree() on chip->xxx unconditionally.
-
-> +free_pm_irq_chip:
-> +	kfree(chip);
-> +out:
-> +	return ERR_PTR(rc);
-> +}
-
-> +#ifdef CONFIG_MFD_PM8XXX_IRQ
-> +/**
-> + * pm8xxx_get_irq_stat - get the status of the irq line
-> + * @dev: the interrupt device
-> + * @irq: the irq number
-> + *
-> + * The pm8xxx gpio and mpp rely on the interrupt block to read
-> + * the values on their pins. This function is to facilitate reading
-> + * the status of a gpio or an mpp line. The caller has to convert the
-> + * gpio number to irq number.
-> + *
-> + * RETURNS:
-> + * an int indicating the value read on that line
-> + */
-
-Please move that comment into the implementation.
-
-> +int pm8xxx_get_irq_stat(void *data, int irq);
-
-Thanks,
-
-	tglx
+>> +{
+>> + ? ? if (oh->mux)
+>> + ? ? ? ? ? ? return omap_hwmod_mux_wakeup(oh->mux);
+>> + ? ? return -EINVAL;
+>> +}
+>> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+>> index fedd829..4100be0 100644
+>> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+>> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+>> @@ -588,6 +588,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+>> ?int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
+>> ?u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+>>
+>> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh);
+>> ?/*
+>> ? * Chip variant-specific hwmod init routines - XXX should be converted
+>> ? * to use initcalls once the initial boot ordering is straightened out
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
