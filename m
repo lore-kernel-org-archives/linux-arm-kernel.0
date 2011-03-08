@@ -1,159 +1,52 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 8 Mar 2011 16:31:13 +0000
-Subject: [patch v4 1/3] arm: introduce cross trigger interface helpers
-In-Reply-To: <1299598729-27974-2-git-send-email-tom.leiming@gmail.com>
-References: <1299598729-27974-1-git-send-email-tom.leiming@gmail.com>
-	<1299598729-27974-2-git-send-email-tom.leiming@gmail.com>
-Message-ID: <20110308163113.GB9995@trinity.fluff.org>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 8 Mar 2011 18:49:13 +0200
+Subject: SMP soft lockup on smp_call_function_many when doing
+	flush_tlb_page
+In-Reply-To: <AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+Message-ID: <AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2011 at 11:38:47PM +0800, tom.leiming at gmail.com wrote:
-> From: Ming Lei <tom.leiming@gmail.com>
-> 
-> OMAP4 uses cross trigger interface(CTI) to route
-> performance monitor irq to GIC, so introduce cti
-> helpers to make access for cti easily.
-> 
-> Acked-by: Jean Pihet <j-pihet@ti.com>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/include/asm/cti.h |  179 ++++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 179 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/include/asm/cti.h
-> 
-> diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-> new file mode 100644
-> index 0000000..a0ada3e
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cti.h
-> @@ -0,0 +1,179 @@
-> +#ifndef __ASMARM_CTI_H
-> +#define __ASMARM_CTI_H
-> +
-> +#include	<asm/io.h>
-> +
-> +/* The registers' definition is from section 3.2 of
-> + * Embedded Cross Trigger Revision: r0p0
-> + */
-> +#define		CTICONTROL		0x000
-> +#define		CTISTATUS		0x004
-> +#define		CTILOCK			0x008
-> +#define		CTIPROTECTION		0x00C
-> +#define		CTIINTACK		0x010
-> +#define		CTIAPPSET		0x014
-> +#define		CTIAPPCLEAR		0x018
-> +#define		CTIAPPPULSE		0x01c
-> +#define		CTIINEN			0x020
-> +#define		CTIOUTEN		0x0A0
-> +#define		CTITRIGINSTATUS		0x130
-> +#define		CTITRIGOUTSTATUS	0x134
-> +#define		CTICHINSTATUS		0x138
-> +#define		CTICHOUTSTATUS		0x13c
-> +#define		CTIPERIPHID0		0xFE0
-> +#define		CTIPERIPHID1		0xFE4
-> +#define		CTIPERIPHID2		0xFE8
-> +#define		CTIPERIPHID3		0xFEC
-> +#define		CTIPCELLID0		0xFF0
-> +#define		CTIPCELLID1		0xFF4
-> +#define		CTIPCELLID2		0xFF8
-> +#define		CTIPCELLID3		0xFFC
+>> ? ? ? ?atomic_set(&data->refs, cpumask_weight(data->cpumask));
+>> + ? ? ? if (unlikely(!atomic_read(&data->refs))) {
+>> + ? ? ? ? ? ? ? csd_unlock(&data->csd);
+>> + ? ? ? ? ? ? ? return;
+>> + ? ? ? }
+> I don't think this is save, if the mask get cleaned after having cpu
+> set to valid value and before calculating the next_cpu, the code with
+> go to the fast path (smp_call_function_single)
+I was wrong, this is actually not a problem, taking the fast path will
+not hang the process.
 
-could you just use the primecell register information for these
-
-> +/* The below are from section 3.6.4 of
-> + * CoreSight v1.0 Architecture Specification
-> + */
-> +#define		LOCKACCESS		0xFB0
-> +#define		LOCKSTATUS		0xFB4
-> +
-> +/* write this value to LOCKACCESS will unlock the module, and
-> + * other value will lock the module
-> + */
-> +#define		LOCKCODE		0xC5ACCE55
-> +
-> +/**
-> + * struct cti - cross trigger interface struct
-> + * @base: mapped virtual address for the cti base
-> + * @irq: irq number for the cti
-> + * @trig_out_for_irq: triger out number which will cause
-> + *	the @irq happen
-> + *
-> + * cti struct used to operate cti registers.
-> + */
-> +struct cti {
-> +	void __iomem *base;
-> +	int irq;
-> +	int trig_out_for_irq;
-> +};
-> +
-> +/**
-> + * cti_init - initialize the cti instance
-> + * @cti: cti instance
-> + * @base: mapped virtual address for the cti base
-> + * @irq: irq number for the cti
-> + * @trig_out: triger out number which will cause
-> + *	the @irq happen
-> + *
-> + * called by machine code to pass the board dependent
-> + * @base, @irq and @trig_out to cti.
-> + */
-> +static inline void cti_init(struct cti *cti,
-> +	void __iomem *base, int irq, int trig_out)
-> +{
-> +	cti->base = base;
-> +	cti->irq  = irq;
-> +	cti->trig_out_for_irq = trig_out;
-> +}
-> +
-> +/**
-> + * cti_map_trigger - use the @chan to map @trig_in to @trig_out
-> + * @cti: cti instance
-> + * @trig_in: trigger in number
-> + * @trig_out: trigger out number
-> + * @channel: channel number
-> + *
-> + * This function maps one trigger in of @trig_in to one trigger
-> + * out of @trig_out using the channel @chan.
-> + */
-> +static inline void cti_map_trigger(struct cti *cti,
-> +	int trig_in, int trig_out, int chan)
-> +{
-> +	void __iomem *base = cti->base;
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + CTIINEN + trig_in * 4);
-> +	val |= BIT(chan);
-> +	__raw_writel(val, base + CTIINEN + trig_in * 4);
-> +
-> +	val = __raw_readl(base + CTIOUTEN + trig_out * 4);
-> +	val |= BIT(chan);
-> +	__raw_writel(val, base + CTIOUTEN + trig_out * 4);
-> +}
-
-
-> +/**
-> + * cti_enable - enable the cti module
-> + * @cti: cti instance
-> + *
-> + * enable the cti module
-> + */
-> +static inline void cti_enable(struct cti *cti)
-> +{
-> +	__raw_writel(0x1, cti->base + CTICONTROL);
-> +}
-
-> +static inline void cti_irq_ack(struct cti *cti)
-> +{
-> +	void __iomem *base = cti->base;
-> +	unsigned long val;
-> +
-> +	val = __raw_readl(base + CTIINTACK);
-> +	val |= BIT(cti->trig_out_for_irq);
-
-would it be easier to get a pre-shifted bit here?
-
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+>> An alternative would be to copy the cpumask to a local variable in
+>> on_each_cpu_mask(), though the workaround above would cover other cases
+>> that we haven't spotted yet. Also, the smp_call_function_many()
+>> description doesn't state that the cpumask should not be modified.
+>>
+>>
+>> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+>> index 8f57f32..1717dec 100644
+>> --- a/arch/arm/kernel/smp_tlb.c
+>> +++ b/arch/arm/kernel/smp_tlb.c
+>> @@ -16,10 +16,13 @@
+>> ?static void on_each_cpu_mask(void (*func)(void *), void *info, int wait,
+>> ? ? ? ?const struct cpumask *mask)
+>> ?{
+>> + ? ? ? struct cpumask call_mask;
+>> +
+>> ? ? ? ?preempt_disable();
+>>
+>> + ? ? ? cpumask_copy(&call_mask, mask);
+>> ? ? ? ?smp_call_function_many(mask, func, info, wait);
+> ?I'll check this one, but the mask here should be call_mask.
+>> - ? ? ? if (cpumask_test_cpu(smp_processor_id(), mask))
+>> + ? ? ? if (cpumask_test_cpu(smp_processor_id(), &call_mask))
+>> ? ? ? ? ? ? ? ?func(info);
+>>
+this patch increases my system instability, for some reason, the
+call_function_data data get corrupted when the
+generic_smp_call_function_interrupt() is running.
+saeed
