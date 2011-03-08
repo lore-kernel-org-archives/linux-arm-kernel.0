@@ -1,57 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Mar 2011 17:13:21 +0000
-Subject: [PATCH 3/7] ARM: tegra: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1299604405-12960-4-git-send-email-will.deacon@arm.com>
+Date: Tue,  8 Mar 2011 17:13:18 +0000
+Subject: [PATCH v3 0/7] Migrate GIC to fasteoi flow control
+Message-ID: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the Tegra gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
+Hello,
 
-This is required for the GIC to move to fasteoi interrupt handling.
+This is version 3 of the patch series originally posted here:
 
-Cc: Colin Cross <ccross@android.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-tegra/gpio.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+v1.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043083.html
+v2.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043984.html
 
-diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-index ad80488..406b687 100644
---- a/arch/arm/mach-tegra/gpio.c
-+++ b/arch/arm/mach-tegra/gpio.c
-@@ -220,8 +220,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	int port;
- 	int pin;
- 	int unmasked = 0;
-+	struct irq_chip chip = get_irq_desc_chip(desc);
- 
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
-+	chained_irq_enter(chip, desc);
- 
- 	bank = get_irq_data(irq);
- 
-@@ -240,7 +241,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			 */
- 			if (lvl & (0x100 << pin)) {
- 				unmasked = 1;
--				desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+				chained_irq_exit(chip, desc);
- 			}
- 
- 			generic_handle_irq(gpio_to_irq(gpio + pin));
-@@ -248,7 +249,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	}
- 
- 	if (!unmasked)
--		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+		chained_irq_exit(chip, desc);
- 
- }
- 
--- 
-1.7.0.4
+Changes since v2:
+
+	* Added chained_irq_{enter,exit} functions to work with chained
+	  handlers that support multiple primary chips and to aid in
+	  bisectibility
+	* Based on 2.6.38-rc8
+
+As a result of these changes, all of the BSP code has been reworked so
+I'm afraid I need some fresh acks and tested-bys because the old ones
+are no longer valid.
+
+I appreciate there is some debate concerning the sanity of chained
+handlers with potentially multiple primary chips, but I can't think of
+a way to fix these without considering the handlers on a case-by-case
+basis which is not the intent of this patch series.
+
+Cheers,
+
+Will
+
+
+Will Deacon (7):
+  ARM: irq: introduce entry and exit functions for chained handlers
+  ARM: omap: update GPIO chained IRQ handler to use entry/exit
+    functions
+  ARM: tegra: update GPIO chained IRQ handler to use entry/exit
+    functions
+  ARM: s5pv310: update IRQ combiner to use chained entry/exit functions
+  ARM: msm: update GPIO chained IRQ handler to use entry/exit functions
+  ARM: nmk: update GPIO chained IRQ handler to entry/exit functions
+  ARM: gic: use handle_fasteoi_irq for SPIs
+
+ arch/arm/common/gic.c                |   22 +++++++++-------------
+ arch/arm/include/asm/mach/irq.h      |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-msm/gpio-v2.c          |    6 +++++-
+ arch/arm/mach-s5pv310/irq-combiner.c |    6 ++----
+ arch/arm/mach-tegra/gpio.c           |    7 ++++---
+ arch/arm/plat-nomadik/gpio.c         |   10 ++--------
+ arch/arm/plat-omap/gpio.c            |    7 ++++---
+ 7 files changed, 53 insertions(+), 32 deletions(-)
