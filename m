@@ -1,39 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Mar 2011 20:06:02 -0700 (MST)
-Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
-	OMAP2xxx
-In-Reply-To: <871v2qk177.fsf@ti.com>
-References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-	<871v2qk177.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1103072005150.10981@utopia.booyaka.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Tue, 8 Mar 2011 10:10:58 +0530
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+In-Reply-To: <4D749A09.8050101@acn-group.ch>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+	<4D5BDA3D.5080905@acn-group.ch>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
+	<4D749A09.8050101@acn-group.ch>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C0E5EC7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Mar 2011, Kevin Hilman wrote:
+Hi Christophe,
 
-> Paul Walmsley <paul@pwsan.com> writes:
+On Mon, Mar 07, 2011 at 14:10:41, Christophe Aeschlimann wrote:
+> Hi Sudhakar,
 > 
-> > This patch series adds clock framework-controlled autoidle support for
-> > the OMAP2xxx DPLL, APLLs, and OMAP2/3 interface clocks.  The old
-> > direct register writes in the PM code to enable clock autoidle have been
-> > removed.  
-> >
-> > This series also ensures that all clock autoidle is disabled during
-> > boot and only re-enabled if CONFIG_PM is enabled.
-> >
-> > The series applies on the 'clk_autoidle_a_2.6.39' branch of
-> > git://git.pwsan.com/linux-2.6.
-> >
-> > Boot-tested on N800, and dynamic idle-tested on OMAP3430 Beagleboard.
-> > Compile-tested with omap1_defconfig, omap2plus_defconfig, a 5912
-> > OSK-only config, an N8x0-only config, an OMAP3-only config, and an OMAP4-only
-> > config.
+> On 17.02.2011 05:23, Rajashekhara, Sudhakar wrote:
+> > 
+> > Reverting the commit 140176159597ea1f23dcccb47b5c38fdf7c7faa8
+> > (ASoC: Configure symmetric rates for tlv320aic3x) resolves the issue. 
+> > We are still working on the proper fix.
+> > 
+> > Thanks,
+> > Sudhakar
+> > 
 > 
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> Did you find a proper solution to that issue ?
+> 
 
-Thanks, added your Reviewed-by: on these.
+Did the workaround work for you?
 
-> Feel free to merge the various pm*.c changes via your tree.
+Because of other engagements we have not spent time on finding the proper fix.
 
-
-- Paul
+Regards,
+Sudhakar
