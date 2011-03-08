@@ -1,57 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Mar 2011 17:13:20 +0000
-Subject: [PATCH 2/7] ARM: omap: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1299604405-12960-3-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Mar 2011 09:26:25 -0800
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	<87lj0u8mrf.fsf@ti.com> <87tyfi49cs.fsf@ti.com>
+	<AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
+Message-ID: <20110308172625.GE26463@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the OMAP gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
+* Govindraj <govindraj.ti@gmail.com> [110308 03:43]:
+> 
+> I am not sure whether now we can control read/writes to pad_mux from any driver
+> interface and I think we have to go through mux framework for any
+> read/writes to mux.
 
-Cc: Colin Cross <ccross@google.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/plat-omap/gpio.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+Sure, the drivers should not mess with those registers directly.
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 971d186..830c1a6 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1143,8 +1143,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct gpio_bank *bank;
- 	u32 retrigger = 0;
- 	int unmasked = 0;
-+	struct irq_chip *chip = get_irq_desc_chip(desc);
- 
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
-+	chained_irq_enter(chip, desc);
- 
- 	bank = get_irq_data(irq);
- #ifdef CONFIG_ARCH_OMAP1
-@@ -1201,7 +1202,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		configured, we could unmask GPIO bank interrupt immediately */
- 		if (!level_mask && !unmasked) {
- 			unmasked = 1;
--			desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+			chained_irq_exit(chip, desc);
- 		}
- 
- 		isr |= retrigger;
-@@ -1237,7 +1238,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	interrupt */
- exit:
- 	if (!unmasked)
--		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+		chained_irq_exit(chip, desc);
- }
- 
- static void gpio_irq_shutdown(struct irq_data *d)
--- 
-1.7.0.4
+> with this I cant control pad wake up capabilities with sysfs as done
+> earlier in serial.c
+> now control to read/write to pad is outside scope of the driver
+> interface as omap_hwmod_mux
+> is the one that takes decision for driver with mux values provided
+> during omap_hwmod_mux_init.
+
+The sysfs interface to control this should still be from the drivers.
+Sounds like we need some way to set the wakeup flags before pm_runtime_put
+is called.
+
+Regards,
+
+Tony
