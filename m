@@ -1,254 +1,172 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Tue, 8 Mar 2011 17:49:31 +0530
-Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
-	requested pads
-In-Reply-To: <87lj0u8mrf.fsf@ti.com>
-References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
-	<87lj0u8mrf.fsf@ti.com>
-Message-ID: <AANLkTin2f7n-v5Hg7NHB8a4fEmpzt_07xy-M1wjnKHtU@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 8 Mar 2011 13:30:07 +0100
+Subject: [PATCH] [ARM] MX1: Add ARMadeus Systems APF9328 board support
+In-Reply-To: <1299261002-9804-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1299261002-9804-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20110308123006.GE18351@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 5, 2011 at 5:24 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Govindraj,
->
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> For device pads which have OMAP_DEVICE_PAD_WAKEUP set (which means they
->> are wakeup capable) enable the IO-daisy wakeup capability.
->> During re-muxing avoid direct write with val as this can disturb if any
->> mux done at bootloader level so read the pad then write back.
->>
->> Also add an API to fetch the wake-up status bit is set for given omap-hwmod
->> device using available mux info which is added during omap_hwmod_mux_init.
->> Wakeup status bit is needed for uart_resume_idle call from sram_idle path
->> based on wake-up event has occurred for given uart we can enable clocks back.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> ---
->> ?arch/arm/mach-omap2/mux.c ? ? ? ? ? ? ? ? ? ?| ? 28 ++++++++++++++++++++++++++
->> ?arch/arm/mach-omap2/mux.h ? ? ? ? ? ? ? ? ? ?| ? 13 ++++++++++++
->> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 13 ++++++++++++
->> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 +
->> ?4 files changed, 55 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
->> index 98148b6..50edcea 100644
->> --- a/arch/arm/mach-omap2/mux.c
->> +++ b/arch/arm/mach-omap2/mux.c
->> @@ -317,6 +317,29 @@ err1:
->> ? ? ? return NULL;
->> ?}
->>
->> +/* Gets the wakeup status of given pad from omap-hwmod */
->> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
->
-> should return a bool
->
-> Also, documentation should be clear that it returns true if *any* pad
-> associated with this device has a wakeup event.
->
-> Also a name reflecting the get/check/status nature of this function
-> would help readability, maybe:
->
-> bool omap_hwmod_mux_wakeup_event(struct omap_hwmod_mux_info *hmux)
+Hi,
 
-Yes sure will modify.
+On Fri, Mar 04, 2011 at 05:50:02PM +0000, Gwenhael Goavec-Merou wrote:
+> APF9328 is an i.MXL based SOM (System On Module) that can be plugged on 
+> several docking/development boards. Here only basic module support 
+> is added (Ethernet, Serial, NOR Flash).
+> 
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
+> Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
+> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+> ---
+>  arch/arm/mach-imx/Kconfig        |    6 ++
+>  arch/arm/mach-imx/Makefile       |    1 +
+>  arch/arm/mach-imx/mach-apf9328.c |  172 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 179 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/mach-apf9328.c
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 56684b5..863ed2c 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -51,6 +51,12 @@ config MACH_SCB9328
+>  	help
+>  	  Say Y here if you are using a Synertronixx scb9328 board
+>  
+> +config MACH_APF9328
+> +	bool "APF9328"
+> +	select IMX_HAVE_PLATFORM_IMX_UART
+> +	help
+> +	  Say Yes here if you are using the Armadeus APF9328 development board
+> +
+>  endif
+>  
+>  if ARCH_MX2
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 77100bf..444fdf7 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -19,6 +19,7 @@ obj-$(CONFIG_MX1_VIDEO)	+= mx1-camera-fiq.o mx1-camera-fiq-ksym.o
+>  
+>  obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
+>  obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
+> +obj-$(CONFIG_MACH_APF9328) += mach-apf9328.o
+>  
+>  obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+>  
+> diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
+> new file mode 100644
+> index 0000000..5c57f15b
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-apf9328.c
+> @@ -0,0 +1,172 @@
+> +/*
+> + * linux/arch/arm/mach-imx/mach-apf9328.c
+> + *
+> + * Copyright (c) 2005-2011 ARMadeus systems <support@armadeus.com>
+> + *
+> + * This work is based on mach-scb9328.c which is:
+> + * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
+> + * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/dm9000.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/common.h>
+> +#include <mach/hardware.h>
+> +#include <mach/irqs.h>
+> +#include <mach/iomux-mx1.h>
+> +
+> +#include "devices-imx1.h"
+> +
+> +/*
+> + * The APF9328 can have up to 32MB NOR Flash
+> + */
+> +static struct resource flash_resource = {
+> +	.start	= MX1_CS0_PHYS,
+> +	.end	= MX1_CS0_PHYS + (32 * 1024 * 1024) - 1,
+> +	.flags	= IORESOURCE_MEM,
+> +};
+> +
+> +static struct physmap_flash_data apf9328_flash_data = {
+> +	.width  = 2,
+> +};
+> +
+> +static struct platform_device apf9328_flash_device = {
+> +	.name		= "physmap-flash",
+> +	.id		= 0,
+> +	.dev = {
+> +		.platform_data = &apf9328_flash_data,
+> +	},
+> +	.resource = &flash_resource,
+> +	.num_resources = 1,
+> +};
+> +
+> +/*
+> + * APF9328 has a DM9000 Ethernet controller
+> + */
+> +static struct dm9000_plat_data dm9000_setup = {
+> +	.flags          = DM9000_PLATF_16BITONLY
+> +};
+> +
+> +static struct resource dm9000_resources[] = {
+> +	[0] = {
+> +		.start  = (MX1_CS4_PHYS + 0x00C00000),
+> +		.end    = (MX1_CS4_PHYS + 0x00C00001),
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start  = (MX1_CS4_PHYS + 0x00C00002),
+> +		.end    = (MX1_CS4_PHYS + 0x00C00003),
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[2] = {
+> +		.start  = (IRQ_GPIOB(14)),
+> +		.end    = (IRQ_GPIOB(14)),
+> +		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+> +	},
+> +};
+> +
+> +static struct platform_device dm9000x_device = {
+> +	.name		= "dm9000",
+> +	.id		= 0,
+> +	.num_resources	= ARRAY_SIZE(dm9000_resources),
+> +	.resource	= dm9000_resources,
+> +	.dev		= {
+> +		.platform_data = &dm9000_setup,
+> +	}
+> +};
+> +
+> +/* --- SERIAL RESSOURCE --- */
+> +static int mxc_uart0_pins[] = {
+> +	PC9_PF_UART1_CTS,
+> +	PC10_PF_UART1_RTS,
+> +	PC11_PF_UART1_TXD,
+> +	PC12_PF_UART1_RXD,
+> +};
 
->
->> +{
->> + ? ? int i;
->> + ? ? unsigned int val;
->> + ? ? u8 ret = 0;
->> +
->> + ? ? for (i = 0; i < hmux->nr_pads; i++) {
->> + ? ? ? ? ? ? struct omap_device_pad *pad = &hmux->pads[i];
->> +
->> + ? ? ? ? ? ? if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
->> + ? ? ? ? ? ? ? ? ? ? val = omap_mux_read(pad->partition,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
->> + ? ? ? ? ? ? ? ? ? ? if (val & OMAP_WAKEUP_EVENT) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = 1;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->> +
->> ?/* Assumes the calling function takes care of locking */
->> ?void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
->> ?{
->> @@ -342,6 +365,9 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> ? ? ? ? ? ? ? ? ? ? ? flags &= ~OMAP_DEVICE_PAD_ENABLED;
->> ? ? ? ? ? ? ? ? ? ? ? val = pad->idle;
->> + ? ? ? ? ? ? ? ? ? ? if (flags & OMAP_DEVICE_PAD_WAKEUP)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val |= OMAP_WAKEUP_EN;
->> +
->
-> Is this needed on every idle transition?
->
-> You're currently setting it on every idle transition, but never clearing
-> it. ?If it is to be a one-time thing, then move it to the early init of
-> the mux.
+We normally do the pin setup in a single table which is used during
+board initalization and not in init/exit driver callbacks. Can
+you do the same here, please?
 
-I will be removing this as said in earlier mail.
-
-
->
->> ? ? ? ? ? ? ? ? ? ? ? pr_debug("%s: Idling %s %x\n", __func__,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->name, val);
->> ? ? ? ? ? ? ? ? ? ? ? break;
->> @@ -358,6 +384,8 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
->> ? ? ? ? ? ? ? };
->>
->> ? ? ? ? ? ? ? if (val >= 0) {
->> + ? ? ? ? ? ? ? ? ? ? val |= omap_mux_read(pad->partition,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
->
-> I don't think this is doing what you expect, and will lead to very
-> difficult to find bugs. ?Since your OR'ing in bits from the current
-> value, you will never be able to clear any bits in this register.
->
-> As just a dumb example, consider the enable case where
-> pad->enable=MUX_MODE0 (0x0). ?If the bootloader has initialized this pad
-> to MUX_MODE7 (0x7), this code will never set it to MUX_MODE0, since this
-> read and OR of the existing value will always set it back to MUX_MODE7.
->
-> At a minimum, this change should be a separate patch with a more
-> detailed description.
->
-
-Also this is change will be removed and default serial_pad
-reg will have proper values for .enable and .idle fields using
-which it will muxed accordingly
-[snip of default rx serial reg given in previous mail.]
-
->
->> ? ? ? ? ? ? ? ? ? ? ? omap_mux_write(pad->partition, val,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pad->mux->reg_offset);
->> ? ? ? ? ? ? ? ? ? ? ? pad->flags = flags;
->> diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
->> index a4ab17a..84a8fc2 100644
->> --- a/arch/arm/mach-omap2/mux.h
->> +++ b/arch/arm/mach-omap2/mux.h
->> @@ -220,8 +220,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
->> ? */
->> ?void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
->>
->> +
->> +/**
->> + * omap_hwmod_mux_wakeup - omap hwmod check given pad had wakeup event
->> + * @hmux: ? ? ? ? ? ?Pads for a hwmod
->> + *
->> + * Called only from omap_hwmod.c, do not use.
->> + */
->> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux);
->> ?#else
->>
->> +static inline int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
->> +{
->> + ? ? return 0;
->> +}
->> +
->> ?static inline int omap_mux_init_gpio(int gpio, int val)
->> ?{
->> ? ? ? return 0;
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index 9e89a58..893dae1 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -2239,3 +2239,16 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
->>
->> ? ? ? return ret;
->> ?}
->> +
->> +/**
->> + * omap_hwmod_pad_wakeup_status - get pad wakeup status if mux is available.
->> + * @oh: struct omap_hwmod *
->> + *
->> + * Returns the wake_up status bit of available pad mux pin.
->> + */
->> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh)
->
-> Again, naming here could improve readability. ?Maybe:
->
-> bool omap_hmwod_get_io_wakeup_status(struct omap_hwmod *oh)
->
-> From the name and the bool return, it should be clear that this is just
-> checking for the wakeup event. ?I also think it should be clear that
-> this is checking for IO-ring wakeups, not module wakeups.
->
-> Also, in PATCH 5/7, you're calling this hwmod API directly from a
-> driver. ?Drivers should not know anything about hwmods. ?Any
-> OMAP-specific hooks must be called through pdata function pointers.
-> Also, they should go through omap_device, which would then call
-> omap_hwmod.
->
-
-Agree omap-device level api to pad wakeup check is better.
+Sascha
 
 
-> Thinking more about this (and how you use it in PATCH 5/7), what is
-> needed is an omap_device level API to check if a wakeup occured for that
-> device. ?That function would check for either module-level wakeup or IO
-> pad wakeup. ?The driver should not need to care about how the wakeup
-> occurred.
->
-
-Module level wakeup doesn't seem to work and only
-way it seem to wakeup is through using resume_idle
-from sram_idle.
-
-One simple way to reproduce the problem with
-existing code base also is adding this patch which
-will enable module level wakeup always.
-
-https://patchwork.kernel.org/patch/501211/
-
-and with below change.
-
-govindraj at Linux-BSP-Server:~/clones/linux-omap-2.6$ gd
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 47eef48..6343773 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -380,6 +380,7 @@ static void omap_uart_allow_sleep(struct
-omap_uart_state *uart)
-        omap_uart_smart_idle_enable(uart, 1);
-        uart->can_sleep = 1;
-        del_timer(&uart->timer);
-+       omap_uart_disable_clocks(uart);
- }
-
-We can see module level wakeup doesn't wakeup the uart.
-once we set sleep_timeout for uart and timer starts.
-
-
->> +{
->> + ? ? if (oh->mux)
->> + ? ? ? ? ? ? return omap_hwmod_mux_wakeup(oh->mux);
->> + ? ? return -EINVAL;
->> +}
->> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> index fedd829..4100be0 100644
->> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> @@ -588,6 +588,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
->> ?int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
->> ?u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
->>
->> +int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh);
->> ?/*
->> ? * Chip variant-specific hwmod init routines - XXX should be converted
->> ? * to use initcalls once the initial boot ordering is straightened out
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
