@@ -1,65 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Mar 2011 10:57:52 +0000
-Subject: [PATCH] ARM: aout-core: zero thread debug registers in a.out core dump
-Message-ID: <1299581872-18098-1-git-send-email-will.deacon@arm.com>
+From: andy@warmcat.com (Andy Green)
+Date: Tue, 08 Mar 2011 11:07:17 +0000
+Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from driver
+Message-ID: <20110308105934.23531.83540.stgit@otae.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The removal of the single-step emulation from ptrace on ARM means that
-thread_struct no longer has software breakpoint fields in its debug
-member.
+The following series removes cpu_...() usage completely from the
+omap-i2c driver by having decisions about functional implementation
+choices in the SoC held in cpu-specific hwmod tables that are
+already established, or for OMAP1 where there is no hwmod, set at
+OMAP1-specific i2c bus addition time.
 
-This patch fixes the a.out core dump code so that the debug registers
-are zeroed rather than trying to copy from non-existent fields.
+Along the way it solves two issues with the existing implementation,
+that only 16-bit accesses are documented to be allowed to the I2C
+peripheral unit, and that due to a confusion in the existing driver
+about whether it is faced with a newer IP version on OMAP3530, currently
+it writes to a random non-existent I2C register at times on that
+platform.
 
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Reported-by: Bryan Wu <bryan.wu@canonical.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+The patch series is quite extended from the first try thanks to
+comments from Benoit Cousson.
+
+Patches are tested on OMAP3530 and OMAP4430 I have but will need
+confirming they don't break anything on OMAP1xxx and OMAP2xxx as
+agreed with Benoit.
+
+Cc: patches at linaro.org
+Cc: Ben Dooks <ben-linux@fluff.org>
+Reported-by: Peter Maydell <peter.maydell@linaro.org>
+
 ---
 
-Hi Bryan,
+Andy Green (18):
+      I2C: OMAP1/OMAP2+: prepend I2C IP version to probed version shown in dev_info
+      I2C: OMAP2+: Convert omap I2C driver to use feature implementation flags from platform data
+      I2C: OMAP1: set i2c unit feature implementation flags in platform data
+      I2C: OMAP2+: add correct functionality flags to all omap2plus i2c dev_attr
+      I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each cpu_... test
+      I2C: OMAP2+: Pass flags up to omap i2c platform_data as well
+      I2C: OMAP1/OMAP2+: add flags field to omap i2c platform data
+      I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
+      I2C: OMAP2+: address confused probed version naming
+      I2C: OMAP2+: Solve array bounds overflow error on i2c idle
+      I2C: OMAP2+: use platform_data ip revision to select register map
+      I2C: OMAP2+: Pass hwmod rev knowledge via platform_data when i2c bus added
+      I2C: OMAP1: set IP revision in platform data
+      I2C: OMAP: add rev to omap i2c platform data
+      I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
+      I2C: OMAP2+:  Introduce I2C IP versioning constants
+      I2C: OMAP2+: Name registers in I2C IP V2 only accordingly
+      I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
 
-Feel free to upgrade your tag on this (signed-off / acked) since this is
-clearly based on the patch you posted yesterday. I'd like to get this to
-Russell ASAP so that we don't get a build-breaker in the near future.
 
-Cheers,
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    8 ++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    6 ++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   13 ++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   18 ++++-
+ arch/arm/plat-omap/i2c.c                   |   27 ++++++++
+ arch/arm/plat-omap/include/plat/i2c.h      |    3 +
+ drivers/i2c/busses/i2c-omap.c              |   98 +++++++++++++++-------------
+ include/linux/i2c-omap.h                   |   29 ++++++++
+ 8 files changed, 151 insertions(+), 51 deletions(-)
 
-Will
-
- arch/arm/include/asm/a.out-core.h |    6 +-----
- arch/arm/include/asm/user.h       |    2 +-
- 2 files changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
-index 93d04ac..92f10cb 100644
---- a/arch/arm/include/asm/a.out-core.h
-+++ b/arch/arm/include/asm/a.out-core.h
-@@ -32,11 +32,7 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
- 	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
- 	dump->u_ssize = 0;
- 
--	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
--	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
--	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
--	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
--	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
-+	memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg));
- 
- 	if (dump->start_stack < 0x04000000)
- 		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
-diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
-index 05ac4b0..35917b3 100644
---- a/arch/arm/include/asm/user.h
-+++ b/arch/arm/include/asm/user.h
-@@ -71,7 +71,7 @@ struct user{
- 				/* the registers. */
-   unsigned long magic;		/* To uniquely identify a core file */
-   char u_comm[32];		/* User command that was responsible */
--  int u_debugreg[8];
-+  int u_debugreg[8];		/* No longer used */
-   struct user_fp u_fp;		/* FP state */
-   struct user_fp_struct * u_fp0;/* Used by gdb to help find the values for */
-   				/* the FP registers. */
 -- 
-1.7.0.4
+Signature
