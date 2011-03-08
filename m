@@ -1,45 +1,86 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 08 Mar 2011 15:43:19 -0800
-Subject: [PATCH 1/4] msm: iommu: Clock control for the IOMMU driver
-In-Reply-To: <1298599242-21971-1-git-send-email-stepanm@codeaurora.org>
-	(Stepan Moskovchenko's message of "Thu, 24 Feb 2011 18:00:39 -0800")
-References: <1298599242-21971-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <8yak4g9faaw.fsf@huya.qualcomm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Mar 2011 16:56:53 -0700 (MST)
+Subject: [PATCH] OMAP2+: clockdomain: add flag that will block autodeps from
+	being added for a clockdomain
+Message-ID: <alpine.DEB.2.00.1103081654200.15132@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stepan Moskovchenko (6):
-      msm: iommu: Clock control for the IOMMU driver
-      msm: iommu: Rework clock logic and add IOMMU bus clock control
-      msm: iommu: Use ASID tagging instead of VMID tagging
-      msm: iommu: Remove dependency on IDR
-      msm: iommu: Don't read from write-only registers
-      msm: iommu: Enable HTW L2 redirection on MSM8960
 
- arch/arm/mach-msm/Kconfig                      |    2 +-
- arch/arm/mach-msm/devices-iommu.c              |   31 ++--
- arch/arm/mach-msm/include/mach/iommu.h         |   18 ++-
- arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h |   32 +---
- arch/arm/mach-msm/iommu.c                      |   72 +++++++--
- arch/arm/mach-msm/iommu_dev.c                  |  230 ++++++++++++++----------
- 6 files changed, 232 insertions(+), 153 deletions(-)
+Add a new clockdomain flag, CLKDM_NO_AUTODEPS, which, when marked on a
+clockdomain, will prevent "autodeps" from being associated with the
+clockdomain.  ("Autodeps" are sleep dependencies and wakeup
+dependencies from/to processor modules that are automatically added to
+a clockdomain when it is in hardware-supervised idle mode.  They are
+deprecated -- a relic from the old CDP trees -- but are still in use
+for OMAP3.)  Autodeps are presumably only needed due to hardware bugs
+where a device goes idle unexpectedly.
 
-I have pulled these changes into my MSM tree, which can be
-found at
+This patch should allow easy testing of which clockdomains actually
+still need autodeps.  Add the flag to the struct clockdomain you wish to 
+test, compile, boot, see if system still works :-)
 
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clockdomain.c |    4 ++--
+ arch/arm/mach-omap2/clockdomain.h |   12 ++++++++++--
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-in the for-next branch
-
-This patch will show up in the next release of the linux-next tree
-(usually sometime within the next 24 hours during the week.)
-
-The path will hopefully also be merged in Linus' tree for the next
--rc kernel release.
-
-Thanks,
-David
-
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 58e42f7..2b4ab0b 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -181,7 +181,7 @@ static void _clkdm_add_autodeps(struct clockdomain *clkdm)
+ {
+ 	struct clkdm_autodep *autodep;
+ 
+-	if (!autodeps)
++	if (!autodeps || clkdm->flags & CLKDM_NO_AUTODEPS)
+ 		return;
+ 
+ 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
+@@ -215,7 +215,7 @@ static void _clkdm_del_autodeps(struct clockdomain *clkdm)
+ {
+ 	struct clkdm_autodep *autodep;
+ 
+-	if (!autodeps)
++	if (!autodeps || clkdm->flags & CLKDM_NO_AUTODEPS)
+ 		return;
+ 
+ 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index 9b459c2..5add071 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -4,7 +4,7 @@
+  * OMAP2/3 clockdomain framework functions
+  *
+  * Copyright (C) 2008 Texas Instruments, Inc.
+- * Copyright (C) 2008-2010 Nokia Corporation
++ * Copyright (C) 2008-2011 Nokia Corporation
+  *
+  * Paul Walmsley
+  *
+@@ -22,11 +22,19 @@
+ #include <plat/clock.h>
+ #include <plat/cpu.h>
+ 
+-/* Clockdomain capability flags */
++/*
++ * Clockdomain flags
++ *
++ * XXX Document CLKDM_CAN_* flags
++ *
++ * CLKDM_NO_AUTODEPS: Prevent "autodeps" from being added/removed from this
++ *     clockdomain.  (Currently, this applies to OMAP3 clockdomains only.)
++ */
+ #define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
+ #define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
+ #define CLKDM_CAN_ENABLE_AUTO			(1 << 2)
+ #define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
++#define CLKDM_NO_AUTODEPS			(1 << 4)
+ 
+ #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
+ #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2.3
