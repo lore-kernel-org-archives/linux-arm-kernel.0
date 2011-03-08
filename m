@@ -1,97 +1,134 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Tue, 8 Mar 2011 14:46:04 +0530
-Subject: [PATCH 3/3] OMAP2+: powerdomain: add pwrdm_can_ever_lose_context()
-In-Reply-To: <20110308021551.31946.19903.stgit@twilight.localdomain>
-References: <20110308021018.31946.29962.stgit@twilight.localdomain>
-	<20110308021551.31946.19903.stgit@twilight.localdomain>
-Message-ID: <AANLkTimuYVuxiqifxPEqfxyVuSYcKL563TZCP5uNM8Ss@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 08 Mar 2011 10:34:40 +0100
+Subject: [PATCH/RFC 0/7] Samsung IOMMU videobuf2 allocator and s5p-fimc
+	update
+In-Reply-To: <03ab01cbdd62$739550d0$5abff270$%kim@samsung.com>
+References: <1299229274-9753-1-git-send-email-m.szyprowski@samsung.com>
+	<03ab01cbdd62$739550d0$5abff270$%kim@samsung.com>
+Message-ID: <001301cbdd74$1044a4b0$30cdee10$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 8, 2011 at 07:45, Paul Walmsley <paul@pwsan.com> wrote:
-> Some drivers wish to know whether the device that they control can
-> ever lose context, for example, when the device's enclosing
-> powerdomain loses power. ?They can use this information to determine
-> whether it is necessary to save and restore device context, or whether
-> it can be skipped. ?Implement the powerdomain portion of this by
-> adding the function pwrdm_can_ever_lose_context(). ?This is not for
-> use directly from driver code, but instead is intended to be called
-> from driver-subarch integration code (i.e., arch/arm/*omap* code).
->
-> Currently, the result from this function should be passed into the
-> driver code via struct platform_data, but at some point this should
-> be part of some common or OMAP-specific device code.
->
-> While here, update file copyrights.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
-> ?arch/arm/mach-omap2/powerdomain.c | ? 43 ++++++++++++++++++++++++++++++++++++-
-> ?arch/arm/mach-omap2/powerdomain.h | ? 18 +++++++--------
-> ?2 files changed, 50 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index eaed0df..a11be81 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -2,7 +2,7 @@
-> ?* OMAP powerdomain control
-> ?*
-> ?* Copyright (C) 2007-2008 Texas Instruments, Inc.
-> - * Copyright (C) 2007-2009 Nokia Corporation
-> + * Copyright (C) 2007-2011 Nokia Corporation
-> ?*
-> ?* Written by Paul Walmsley
-> ?* Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
-> @@ -938,3 +938,44 @@ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
->
-> ? ? ? ?return count;
-> ?}
-> +
-> +/**
-> + * pwrdm_can_ever_lose_context - can this powerdomain ever lose context?
-> + * @pwrdm: struct powerdomain *
-> + *
-> + * Given a struct powerdomain * @pwrdm, returns 1 if the powerdomain
-> + * can lose either memory or logic context or if @pwrdm is invalid, or
-> + * returns 0 otherwise. ?This function is not concerned with how the
-> + * powerdomain registers are programmed (i.e., to go off or not); it's
-> + * concerned with whether it's ever possible for this powerdomain to
-> + * go off while some other part of the chip is active. ?This function
-> + * assumes that every powerdomain can go to either ON or INACTIVE.
-> + */
-> +bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
-> +{
-> + ? ? ? int i;
-> +
-> + ? ? ? if (IS_ERR_OR_NULL(pwrdm)) {
-> + ? ? ? ? ? ? ? pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ?__func__);
-> + ? ? ? ? ? ? ? return 1;
+Hello,
 
-Do you really want to return 1 in case of invalid powerdomain pointer?
+On Tuesday, March 08, 2011 8:29 AM Kukjin Kim wrote:
 
--V Charulatha
+> Hello,
+> 
+> There are comments for your System MMU driver below.
 
-> + ? ? ? }
-> +
-> + ? ? ? if (pwrdm->pwrsts & PWRSTS_OFF)
-> + ? ? ? ? ? ? ? return 1;
-> +
-> + ? ? ? if (pwrdm->pwrsts & PWRSTS_RET) {
-> + ? ? ? ? ? ? ? if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
-> + ? ? ? ? ? ? ? ? ? ? ? return 1;
-> +
-> + ? ? ? ? ? ? ? for (i = 0; i < pwrdm->banks; i++)
-> + ? ? ? ? ? ? ? ? ? ? ? if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return 1;
-> + ? ? ? }
-> +
-> + ? ? ? for (i = 0; i < pwrdm->banks; i++)
-> + ? ? ? ? ? ? ? if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
-> + ? ? ? ? ? ? ? ? ? ? ? return 1;
-> +
-> + ? ? ? return 0;
-> +}
+Please take into account that this was an initial version of our SYSMMU
+driver to start the discussion, so there were a few minor problems left.
+Thanks for pointing them out btw. :)
 
-<<snip>>
+ 
+> It's good that System MMU has functionality of mapping but System MMU have
+> to use other mapping of virtual memory allocator.
+
+Could you elaborate on this? I'm not sure I understand right your problem.
+
+SYSMMU driver is a low-level driver for the SYSMMU module. The driver should
+provide all the basic functionality that is (or might be) hardware dependent.
+Creating a mapping is one of such elementary functionalities. Sysmmu client
+(let it be videobuf2-s5p-iommu, vcmm, maybe even other driver directly)
+should not need to know the format of page descriptors or the way they are
+arranged in the memory. The sysmmu should provide low level functions to create
+and remove a mapping. Managing a virtual space is something that MIGHT be client
+dependent and should be left to the client. 
+
+This design allows for different approaches to coexist. Videobuf2-s5p-iommu
+client will manage the virtual space with gen_alloc framework, while vcmm will
+use its own methods.
+
+It would be great if one decide to unify iommu interfaces across the kernel,
+but this will be a long road. We need to start from something simple (platform
+private) and working first.
+ 
+> And would be better to change sysmmu_list to use array of defined in
+> s5p_sysmmu_ip enumeration, so that can get enhancement of memory space
+> usage, speed, and readability of codes.
+
+Yes, the list can be simplified to an array, but this is really a minor issue.
+
+> TLB replacement policy does not need to use LRU. Of course, current System
+> MMU also needs it. I think, the round robin is enough, because to access
+> memory has no temporal locality and to make LRU need to access to System
+> MMU register one more. The reset value is round robin.
+
+Well, the best possibility is to allow sysmmu clients to decide which policy
+should be used. For some devices (I'm thinking of MFC) LRU policy might give
+a little speedup.
+
+> In the setting of SHARED page table in s5p_sysmmu_control_locked, get the
+> page table base address of ARM core from cp15 register now. But current->mm-
+> >pgd is better for more compatibility.
+
+Right, this way the pgd table pointer can be acquired in a more system friendly
+way.
+
+> When it make page table with PRIVATE page table methods, the size of the
+> structure to manage the second page table is quite big. It is much better
+> rather that to make slab with cache size of 1KB.
+
+Yes, our initial driver uses directly 4KB pages to manage 4 consecutive second
+page tables. However usually the allocations of client devices will be few but
+quite large each. So most of pages used to hold second level page tables will
+be effectively reused. 
+
+You are right however that the approach with a slab with 1KB units will
+result in code that is cleaner and easier to understand.
+
+> Besides, the page mapping implementation is not safe in your System MMU
+> driver. Because only first one confirms primary page table entry, when it
+> assigns four second page tables consecutively at a time.
+
+That's a direct result of the 4-second-level-at-once method of allocating
+second level pages, but this can be cleaned by using 1KB with slab.
+
+> The System MMU driver cannot apply runtime pm by oneself with calling
+> pm_runtime_put_sync(). The reason is because a device with System MMU can
+> on/off power. I think just clock gating is enough. However, I can't find
+> clock enable/disable in your driver.
+
+Clock is enabled in probe() and disabled in remove(). pm_runtime_get/put_sync()
+only increases/decreases use count of a respective power domain, so the actual
+device driver also has to call pm_runtime_get/put. Calling pm_runtime_put_sync()
+will not shut down the power if the sysmmu client driver has called
+pm_runtime_get() without pm_runtime_put(). I see no problems here. Could you 
+elaborate your issue?
+
+> 
+> By PRIVATE page table method, each system MMU comes to have a page table
+> only for oneself. In this case, the problem is that each MFC System MMU L
+> and R having another page table.
+
+Yes, true. This is consequence of the MFC hardware design and the fact that
+it has 2 AXI master interfaces and 2 SYSMMU controllers. Each of them have to
+be configured separately. Each of them has a separate virtual driver's address
+space. Such configuration is used by the MFC driver posted in v7 patch series.
+
+> In your System MMU driver, the page size is always 4KB crucially. This says
+> TLB thrashing and produces a result to lose a TLB hit rate. It is a big
+> problem with the device such as rotator which does not do sequential access
+> especially.
+
+The page size is set to 4KB, because Linux kernel uses 4KB pages by default.
+Once support for other page size is available in the kernel, then sysmmu can be
+extended also.
+
+> And the IRQ handler just outputs only a message. It should be implemented
+> in call back function to be able to handle from each device driver.
+
+This was only for debugging purpose, but you are right that the sysmmu API in 
+this area need to be extended.
+
+> When it sets System MMU in SHARED page table, kernel virtual memory is
+> broken by a method such as s5p_sysmmu_map_area()
+
+Yes, there should be a check added to prevent messing with ARM pgd in SHARED 
+mode.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
