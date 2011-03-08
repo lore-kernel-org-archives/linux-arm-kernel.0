@@ -1,54 +1,61 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 8 Mar 2011 19:54:45 +0530
-Subject: [PATCH 0/3] OMAP: DMA: mstandby mode and runtime pm support
-In-Reply-To: <20110307110611.GA8743@m-desktop>
-References: <1298542475-1460-1-git-send-email-manjugk@ti.com>
-	<87hbbkqcgk.fsf@ti.com> <20110304041826.GA7025@m-desktop>
-	<20110307110611.GA8743@m-desktop>
-Message-ID: <20110308141002.GA19004@m-desktop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 08 Mar 2011 14:52:37 +0000
+Subject: [PATCH v2 2/3] [ARM] perfevents: Add support for Scorpion
+	performance monitors
+In-Reply-To: <1299534463-25802-1-git-send-email-sheetals@codeaurora.org>
+References: <1299534463-25802-1-git-send-email-sheetals@codeaurora.org>
+Message-ID: <1299595957.6872.7.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 04:36:12PM +0530, G, Manjunath Kondaiah wrote:
-> On Fri, Mar 04, 2011 at 09:48:26AM +0530, G, Manjunath Kondaiah wrote:
-> > On Thu, Mar 03, 2011 at 10:35:23AM -0800, Kevin Hilman wrote:
-> > > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-> > > 
-> > > > This patch series is remaining part of dma hwmod to support pm runtime 
-> > > > and for handling mstandby mode for all applicable DMA mstandby mode errata.
-> > > 
-> > > This is still not runtime-suspending when I use my DMA test in linking
-> > > mode.
-> > > 
-> > > If I put a large enough period between transfers, it should autosuspend
-> > > during transfers.  It seems to do auto-suspend and resume once, but then
-> > > it never suspends again.
-> > > 
-> > > I tested with my dmatest module[1], and loaded with:
-> > > 
-> > >   # insmod ./dmatest.ko linking=1 forever=1 forever_period=1024
-> > > 
-> > > Not only does it not auto-suspend between transfers (which I expected),
-> > > it also doesn't suspend after removing the module which stops all active
-> > > channels.
-> > 
-> > The normal chaining test cases are executed and which used to show the
-> > proper status. Let me reproduce this issue with your test procedure.
+
+Hello Sheetal,
+
+
+On Mon, 2011-03-07 at 21:47 +0000, Sheetal Sahasrabudhe wrote:
+> This commit adds support for performance monitors provided by
+> Qualcomm Scorpion and ScorpionMP processor to perfevents.
 > 
-> ok. I am able to reproduce this issue and fixed _get_sync usage in
-> omap_start_dma if channel linking is used. Earlier it was handled for
-> the cases with chaining API's. If linking is done without chaining
-> API's, it will result in _get_sync and _put mismatch.
+> Signed-off-by: Sheetal Sahasrabudhe <sheetals@codeaurora.org>
+> Reviewed-by: Jean Pihet <j-pihet@ti.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/perf_event.h |    2 +
+>  arch/arm/kernel/perf_event.c      |   11 +
+>  arch/arm/kernel/perf_event_msm.c  |  665 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 678 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/kernel/perf_event_msm.c
 > 
-> Thanks for the test case and I will be re posting the patches with the 
-> above fix.
-While testing your test case with off mode for scenario:
-insmod ./dmatest.ko linking=1 forever=1 forever_period=1024 debug=1
+[...]
 
-the transfer after timer expiry will get corrupted once it comes out of
-off mode. Debugging offmode issue... 
+> +static DEFINE_PER_CPU(u32, venum_orig_val);
+> +static DEFINE_PER_CPU(u32, fp_orig_val);
+> +
+> +static void scorpion_pre_vlpm(void)
+> +{
+> +       u32 venum_new_val;
+> +       u32 fp_new_val;
+> +       /* CPACR Enable CP10 access*/
+> +       asm volatile("mrc p15, 0, %0, c1, c0, 2" : "=r" (venum_orig_val));
+> +       venum_new_val = venum_orig_val | 0x00100000;
+> +       asm volatile("mcr p15, 0, %0, c1, c0, 2" : : "r" (venum_new_val));
+> +       isb();
+> +       /* Enable FPEXC */
+> +       fp_orig_val = fmrx(FPEXC);
+> +       fp_new_val = fp_orig_val | FPEXC_EN;
+> +       fmxr(FPEXC, fp_new_val);
+> +}
+> +
 
-Trying to use omap_pm_get_dev_context_loss_count(dev) for checking
-offmode count for context restore in omap_start_dma.
+When I looked at this originally, I thought it would be nice to have
+some functions or macros for poking with the CPACR and planned to submit
+that as a separate patch...
 
--Manjunath
+... well it turns out we already have this! Please can you update this
+bit of code to use the {get,set}_copro_access functions in asm/system.h?
+You can use the CPACC_SVC macro to generate the access mask too instead
+of hardcoding the 0x00100000.
+
+Cheers,
+
+Will
