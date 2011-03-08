@@ -1,56 +1,54 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 08 Mar 2011 15:16:11 +0100
-Subject: [PATCH 0/2] ARM: EXYNOS4: Enhancement of System MMU
-In-Reply-To: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
-References: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
-Message-ID: <000701cbdd9b$634c3840$29e4a8c0$%szyprowski@samsung.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 8 Mar 2011 19:54:45 +0530
+Subject: [PATCH 0/3] OMAP: DMA: mstandby mode and runtime pm support
+In-Reply-To: <20110307110611.GA8743@m-desktop>
+References: <1298542475-1460-1-git-send-email-manjugk@ti.com>
+	<87hbbkqcgk.fsf@ti.com> <20110304041826.GA7025@m-desktop>
+	<20110307110611.GA8743@m-desktop>
+Message-ID: <20110308141002.GA19004@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Mar 07, 2011 at 04:36:12PM +0530, G, Manjunath Kondaiah wrote:
+> On Fri, Mar 04, 2011 at 09:48:26AM +0530, G, Manjunath Kondaiah wrote:
+> > On Thu, Mar 03, 2011 at 10:35:23AM -0800, Kevin Hilman wrote:
+> > > "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> > > 
+> > > > This patch series is remaining part of dma hwmod to support pm runtime 
+> > > > and for handling mstandby mode for all applicable DMA mstandby mode errata.
+> > > 
+> > > This is still not runtime-suspending when I use my DMA test in linking
+> > > mode.
+> > > 
+> > > If I put a large enough period between transfers, it should autosuspend
+> > > during transfers.  It seems to do auto-suspend and resume once, but then
+> > > it never suspends again.
+> > > 
+> > > I tested with my dmatest module[1], and loaded with:
+> > > 
+> > >   # insmod ./dmatest.ko linking=1 forever=1 forever_period=1024
+> > > 
+> > > Not only does it not auto-suspend between transfers (which I expected),
+> > > it also doesn't suspend after removing the module which stops all active
+> > > channels.
+> > 
+> > The normal chaining test cases are executed and which used to show the
+> > proper status. Let me reproduce this issue with your test procedure.
+> 
+> ok. I am able to reproduce this issue and fixed _get_sync usage in
+> omap_start_dma if channel linking is used. Earlier it was handled for
+> the cases with chaining API's. If linking is done without chaining
+> API's, it will result in _get_sync and _put mismatch.
+> 
+> Thanks for the test case and I will be re posting the patches with the 
+> above fix.
+While testing your test case with off mode for scenario:
+insmod ./dmatest.ko linking=1 forever=1 forever_period=1024 debug=1
 
-On Monday, March 07, 2011 2:19 AM KyongHo Cho wrote:
+the transfer after timer expiry will get corrupted once it comes out of
+off mode. Debugging offmode issue... 
 
-> This patch includes the following enhancements for System MMU:
-> - Enhanced readability
-> - Removal of unused data structures or their members
-> - Simplified function definitions
-> - Corrections of some logical errors
-> - Full compliance with Linux coding style
-> - Simpler way of registering callback functions of System MMU faults
-> - Add clock gating for System MMU
+Trying to use omap_pm_get_dev_context_loss_count(dev) for checking
+offmode count for context restore in omap_start_dma.
 
-Thanks for updating the driver, I have however some comments.
-
-EXYNOS4 platform has total of 16 sysmmu blocks. Each of them is exactly the
-same - each has a register region, an interrupt and clock. However your driver
-uses a single platform device for all 16 units and a large resource array (see
-arch/arm/mach-exynos4). This approach also complicates the clock management 
-(you need to create custom names for sysmmu clocks, this will cause a lot of
-problems in the future update to clkdev!). This also heavily complicates the
-driver (you need the arrays of all the resources all over the driver) and is
-against the Linux driver model. In the proper model one should create a
-platform driver for a single module and instantiate it many times for each hw
-module found in the system. For a reference please take a look at the sysmmu
-Andrzej has developed in parallel to You: 
-http://www.mail-archive.com/linux-media at vger.kernel.org/msg28871.html
-
-For a reference please also check the Samsung Power Domains driver 
-(arch/arm/mach-exynos4/dev-pd.c and arch/arm/plat-s5p/pd.c).
-
-The second problem I've noticed is the s5p_sysmmu_set_tablebase_pgd() call. 
-In my opinion it simplifies the sysmmu api too much. This function assumes
-that the sysmmu client (i.e. a multimedia device driver or videobuf2-allocator
-or vcmm) has a knowledge about the pgd/pte descriptors format. As you know the
-format of pgd/pte descriptors is hardware dependent (it may even change in the
-future version of SoCs), so constructing the pgd and pte tables is a low-level
-operation that should be performed by sysmmu driver. Keeping this call in the
-current form results in a requirement that each sysmmu client MUST know the
-hardware details of the sysmmu module. In my opinion SysMMU client should only
-manage the virtual space and have the ability to add or remove a mapping for
-particular range of pages/memory on particular sysmmu chip. 
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+-Manjunath
