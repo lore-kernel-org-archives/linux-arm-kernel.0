@@ -1,60 +1,36 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 07 Mar 2011 22:44:25 -0700
-Subject: [PATCH 0/5] OMAP2+: hwmod: miscellaneous fixes for 2.6.39
-Message-ID: <20110308054315.1309.10538.stgit@twilight.localdomain>
+Date: Mon, 07 Mar 2011 22:44:31 -0700
+Subject: [PATCH 3/5] OMAP2+: hwmod: Fix what _init_clock returns
+In-Reply-To: <20110308054315.1309.10538.stgit@twilight.localdomain>
+References: <20110308054315.1309.10538.stgit@twilight.localdomain>
+Message-ID: <20110308054429.1309.36007.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Rajendra Nayak <rnayak@ti.com>
 
-this series contains some fixes for the OMAP hwmod code and data:
+_init_clock always returns 0 and does
+not propogate the error (in case of failure)
+back to the caller, causing _init_clocks to
+fail silently.
 
-- the OCP_SYSCONFIG.AUTOIDLE bit mask has been corrected;
-
-- several OMAP2/3 hwmods have been marked with SYSS_HAS_RESET_STATUS,
-  which was previously missing;
-
-- _init_clocks() now passes along the return value of its clock lookups,
-  allowing an enclosing iterator to terminate if something goes wrong;
-
-- an enhancement allowing non-standard OMAP2/3 hard-reset line status bit
-  shifts to be explicitly specified;
-
-- and a minor documentation fix.
-
-
-- Paul
-
-
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Acked-by: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-hwmod_a_2.6.39
-   text	   data	    bss	    dec	    hex	filename
-5702465	 501384	5596664	11800513	 b40fc1	vmlinux.omap2plus_defconfig.orig
-5702629	 501384	5596664	11800677	 b41065	vmlinux.omap2plus_defconfig
-
-
-Avinash.H.M (1):
-      omap: hwmod: add syss reset done flags to omap2, omap3 hwmods
-
-Paul Walmsley (1):
-      OMAP2+: hwmod: fix a documentation bug with HWMOD_NO_OCP_AUTOIDLE
-
-Rajendra Nayak (1):
-      OMAP2+: hwmod: Fix what _init_clock returns
-
-Tarun Kanti DebBarma (1):
-      OMAP2+: hwmod: fix incorrect computation of autoidle_mask
-
-omar ramirez (1):
-      OMAP2+: hwmod: use status bit info for reset line
-
-
- arch/arm/mach-omap2/omap_hwmod.c             |   79 +++++++++++++++-----------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |   11 ++--
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |   12 ++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   13 +++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c           |   18 +++---
- arch/arm/mach-omap2/prm2xxx_3xxx.h           |    5 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +
- 7 files changed, 82 insertions(+), 60 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 9b4f6cd..671f871 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -926,7 +926,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
+ 	if (!ret)
+ 		oh->_state = _HWMOD_STATE_CLKS_INITED;
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ /**
