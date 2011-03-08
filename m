@@ -1,41 +1,81 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 08 Mar 2011 10:34:17 -0800
-Subject: [PATCH v3 1/2] MAINTAINERS: Add drivers/platform/msm to MSM
-	subsystem
-In-Reply-To: <1299038465-11782-2-git-send-email-kheitke@codeaurora.org>
-	(Kenneth Heitke's message of "Tue, 1 Mar 2011 21:01:04 -0700")
-References: <1299038465-11782-1-git-send-email-kheitke@codeaurora.org>
-	<1299038465-11782-2-git-send-email-kheitke@codeaurora.org>
-Message-ID: <8yalj0pjwba.fsf@huya.qualcomm.com>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Tue, 8 Mar 2011 10:47:57 -0800
+Subject: [PATCH v3 7/7] tty: add pruss SUART driver
+In-Reply-To: <1299592667-21367-8-git-send-email-subhasish@mistralsolutions.com>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
+	<1299592667-21367-8-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <20110308104757.0f75409b.randy.dunlap@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01 2011, Kenneth Heitke wrote:
+On Tue,  8 Mar 2011 19:27:46 +0530 Subhasish Ghosh wrote:
 
+> This patch adds support for the TTY compliant
+> Soft-UART device emulated on PRUSS.
+> 
+> This patch depends on:
+> davinci: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS.
+> 		https://patchwork.kernel.org/patch/615681/
+> davinci: changed SRAM allocator to shared ram.
+> 		https://patchwork.kernel.org/patch/549351/
+> 
+> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 > ---
->  MAINTAINERS |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 59869e4..696cb18 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -904,6 +904,7 @@ F:	drivers/mmc/host/msm_sdcc.c
->  F:	drivers/mmc/host/msm_sdcc.h
->  F:	drivers/tty/serial/msm_serial.h
->  F:	drivers/tty/serial/msm_serial.c
-> +F:	drivers/platform/msm/
->  T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
->  S:	Maintained
+>  drivers/tty/serial/Kconfig             |   22 +
+>  drivers/tty/serial/Makefile            |   10 +
+>  drivers/tty/serial/pruss_suart.c       | 1058 +++++++++++++++++++
+>  drivers/tty/serial/pruss_suart.h       | 1081 ++++++++++++++++++++
+>  drivers/tty/serial/pruss_suart_api.c   | 1757 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/pruss_suart_utils.c |  391 +++++++
+>  include/linux/serial_core.h            |    2 +
+>  7 files changed, 4321 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/tty/serial/pruss_suart.c
+>  create mode 100644 drivers/tty/serial/pruss_suart.h
+>  create mode 100644 drivers/tty/serial/pruss_suart_api.c
+>  create mode 100644 drivers/tty/serial/pruss_suart_utils.c
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 2b83346..14ea0a3 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1596,4 +1596,26 @@ config SERIAL_PCH_UART
+>  	  This driver is for PCH(Platform controller Hub) UART of Intel EG20T
+>  	  which is an IOH(Input/Output Hub) for x86 embedded processor.
+>  	  Enabling PCH_DMA, this PCH UART works as DMA mode.
+> +
+> +#
+> +# SUART Kernel Configuration
+> +#
+> +
+> +config SERIAL_PRUSS_SUART
+> +	depends on ARCH_DAVINCI && ARCH_DAVINCI_DA850
+> +	select SERIAL_CORE
+> +	tristate "PRUSS based SoftUART emulation on DA8XX"
+> +	---help---
+> +	This driver emulates upto eight different UARTs on the PRUSS.
 
-This should be sent 'To' someone who will be able to bring this patch
-into the tree.  Probably one of Andrew Morton or Greg KH should be made
-the 'To' and this resent.  At a minimum, I would need one of them to
-sign the patch off.
+	                     up to
 
-Thanks,
-David
+> +	You may modify the NR_SUARTS macro in the driver to emulate
+> +	less number of UARTS as per your requirement.
+> +	If not sure, mark N
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	             mark N.
+
+> +
+> +config PRUSS_SUART_MCASP
+> +    int "McASP number"
+> +    depends on ARCH_DAVINCI && ARCH_DAVINCI_DA830 && SERIAL_PRUSS_SUART
+> +    default "0"
+> +    ---help---
+> +    Enter the McASP number to use with SUART (0, 1 or 2).
+> +	You will need to recompile the kernel if this is changed.
+
+The 2 help text lines should be indented the same.
+
+>  endmenu
+
+
+---
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
