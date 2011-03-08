@@ -1,275 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Mar 2011 20:59:46 +0100
-Subject: [PATCH 4/4] mx31_3ds: Add support for the camera device on the
-	personality board
-In-Reply-To: <1299426101.2624.33.camel@realization>
-References: <1299425878.2624.29.camel@realization>
-	<1299426101.2624.33.camel@realization>
-Message-ID: <20110308195946.GB22310@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 08 Mar 2011 12:22:24 -0800
+Subject: [PATCH 0/4] Initial patches for MSM display update
+In-Reply-To: <1299100542-11120-1-git-send-email-carlv@codeaurora.org> (Carl
+	Vanderlip's message of "Wed, 2 Mar 2011 13:15:42 -0800")
+References: <1299100542-11120-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <8yalj0picqn.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alberto,
+On Wed, Mar 02 2011, Carl Vanderlip wrote:
 
-On Sun, Mar 06, 2011 at 04:41:41PM +0100, Alberto Panizzo wrote:
-> Signed-off-by: Alberto Panizzo <alberto@amarulasolutions.com>
-> ---
->  arch/arm/mach-mx3/mach-mx31_3ds.c |  157 +++++++++++++++++++++++++++++++++++++
->  1 files changed, 157 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> index de250cb..9ea2c2c 100644
-> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> @@ -25,6 +25,9 @@
->  #include <linux/regulator/machine.h>
->  #include <linux/usb/otg.h>
->  #include <linux/usb/ulpi.h>
-> +#include <linux/memblock.h>
-> +
-> +#include <media/soc_camera.h>
->  
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
-> @@ -39,6 +42,7 @@
->  #include <mach/mmc.h>
->  #include <mach/ipu.h>
->  #include <mach/mx3fb.h>
-> +#include <mach/mx3_camera.h>
->  
->  #include "devices-imx31.h"
->  #include "devices.h"
-> @@ -141,6 +145,98 @@ static int mx31_3ds_pins[] = {
->  	MX31_PIN_HSYNC__HSYNC,
->  	MX31_PIN_FPSHIFT__FPSHIFT,
->  	MX31_PIN_CONTRAST__CONTRAST,
-> +	/* CSI */
-> +	MX31_PIN_CSI_D6__CSI_D6,
-> +	MX31_PIN_CSI_D7__CSI_D7,
-> +	MX31_PIN_CSI_D8__CSI_D8,
-> +	MX31_PIN_CSI_D9__CSI_D9,
-> +	MX31_PIN_CSI_D10__CSI_D10,
-> +	MX31_PIN_CSI_D11__CSI_D11,
-> +	MX31_PIN_CSI_D12__CSI_D12,
-> +	MX31_PIN_CSI_D13__CSI_D13,
-> +	MX31_PIN_CSI_D14__CSI_D14,
-> +	MX31_PIN_CSI_D15__CSI_D15,
-> +	MX31_PIN_CSI_HSYNC__CSI_HSYNC,
-> +	MX31_PIN_CSI_MCLK__CSI_MCLK,
-> +	MX31_PIN_CSI_PIXCLK__CSI_PIXCLK,
-> +	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
-> +	MX31_PIN_CSI_D5__GPIO3_5, /* CMOS PWDN */
-> +	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_GPIO), /* CMOS reset */
-> +};
-> +
-> +/*
-> + * Camera support
-> + */
-> +static phys_addr_t mx3_camera_base __initdata;
-> +#define MX3_CAMERA_BUF_SIZE SZ_8M
-> +
-> +static int __init mx31_3ds_camera_alloc_dma(void)
-> +{
-> +	int dma;
-> +
-> +	if (!mx3_camera_base)
-> +		return -ENOMEM;
-> +
-> +	dma = dma_declare_coherent_memory(&mx3_camera.dev,
-> +					mx3_camera_base, mx3_camera_base,
-> +					MX3_CAMERA_BUF_SIZE,
-> +					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-This conflicts with the series I sent end of last week.  Sascha didn't
-comment yet.
+> These are the first series of a set of patches to update the MSM display
+> drivers to support newer MDP versions and display modes (while also providing
+> a base for future display development). The original source for these patches
+> is the Google Android kernel tree located here:
+> http://android.git.kernel.org/kernel/msm.git
+>
+> Arve Hj?nnev?g (1):
+>   [ARM] msm_fb: Fix framebuffer console
+>
+> Dima Zavin (3):
+>   video: msmfb: Put the partial update magic value into the fix_screen
+>     struct.
+>   [ARM] msm: mdp: Add support for RGBX 8888 image format.
+>   [ARM] msm: mdp: Set the correct pack pattern for XRGB/ARGB
+>
+>  drivers/video/msm/mdp_hw.h  |   11 +++++++++--
+>  drivers/video/msm/mdp_ppp.c |    1 +
+>  drivers/video/msm/msm_fb.c  |   16 ++++++++++++++--
+>  include/linux/msm_mdp.h     |    1 +
+>  4 files changed, 25 insertions(+), 4 deletions(-)
 
-> +
-> +	if (!(dma & DMA_MEMORY_MAP))
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mx31_3ds_camera_power(struct device *dev, int on)
-> +{
-> +	/* enable or disable the camera */
-> +	pr_debug("%s: %s the camera\n", __func__, on ? "ENABLE" : "DISABLE");
-> +	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), on ? 0 : 1);
-> +
-> +	if (!on)
-> +		goto out;
-> +
-> +	/* If enabled, give a reset impulse */
-> +	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_RI_DTE1), 0);
-> +	msleep(20);
-> +	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_RI_DTE1), 1);
-> +	msleep(100);
-> +
-> +out:
-> +	return 0;
-> +}
-> +
-> +static struct i2c_board_info mx31_3ds_i2c_camera = {
-> +	I2C_BOARD_INFO("ov2640", 0x30),
-> +};
-> +
-> +static struct regulator_bulk_data mx31_3ds_camera_regs[] = {
-> +	{ .supply = "cmos_vcore" },
-> +	{ .supply = "cmos_2v8" },
-> +};
-> +
-> +static struct soc_camera_link iclink_ov2640 = {
-> +	.bus_id		= 0,
-> +	.board_info	= &mx31_3ds_i2c_camera,
-> +	.i2c_adapter_id	= 0,
-> +	.power		= mx31_3ds_camera_power,
-> +	.regulators	= mx31_3ds_camera_regs,
-> +	.num_regulators	= ARRAY_SIZE(mx31_3ds_camera_regs),
-> +};
-> +
-> +static struct platform_device mx31_3ds_ov2640 = {
-> +	.name	= "soc-camera-pdrv",
-> +	.id	= 0,
-> +	.dev	= {
-> +		.platform_data = &iclink_ov2640,
-> +	},
-> +};
-for a few extra points you could dynamically allocate this device.
+I have pulled these changes into my MSM tree, which can be
+found at
 
-> +
-> +struct mx3_camera_pdata mx31_3ds_camera_pdata = {
-> +	.dma_dev	= &mx3_ipu.dev,
-> +	.flags		= MX3_CAMERA_DATAWIDTH_10,
-> +	.mclk_10khz	= 2600,
->  };
->  
->  /*
-> @@ -320,6 +416,7 @@ static struct regulator_init_data vmmc2_init = {
->  
->  static struct regulator_consumer_supply vmmc1_consumers[] = {
->  	REGULATOR_SUPPLY("lcd_2v8", NULL),
-> +	REGULATOR_SUPPLY("cmos_2v8", "soc-camera-pdrv.0"),
->  };
->  
->  static struct regulator_init_data vmmc1_init = {
-> @@ -350,6 +447,22 @@ static struct regulator_init_data vgen_init = {
->  	.consumer_supplies = vgen_consumers,
->  };
->  
-> +static struct regulator_consumer_supply vvib_consumers[] = {
-> +	REGULATOR_SUPPLY("cmos_vcore", "soc-camera-pdrv.0"),
-> +};
-> +
-> +static struct regulator_init_data vvib_init = {
-> +	.constraints = {
-> +		.min_uV = 1300000,
-> +		.max_uV = 1300000,
-> +		.apply_uV = 1,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-> +				  REGULATOR_CHANGE_STATUS,
-> +	},
-> +	.num_consumer_supplies = ARRAY_SIZE(vvib_consumers),
-> +	.consumer_supplies = vvib_consumers,
-> +};
-> +
->  static struct mc13xxx_regulator_init_data mx31_3ds_regulators[] = {
->  	{
->  		.id = MC13783_REG_PWGT1SPI, /* Power Gate for ARM core. */
-> @@ -373,6 +486,9 @@ static struct mc13xxx_regulator_init_data mx31_3ds_regulators[] = {
->  	}, {
->  		.id = MC13783_REG_VGEN,  /* Power LCD */
->  		.init_data = &vgen_init,
-> +	}, {
-> +		.id = MC13783_REG_VVIB,  /* Power CMOS */
-> +		.init_data = &vvib_init,
->  	},
->  };
->  
-> @@ -565,8 +681,14 @@ static const struct imxi2c_platform_data mx31_3ds_i2c0_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +static struct platform_device *devices[] __initdata = {
-> +	&mx31_3ds_ov2640,
-> +};
-> +
->  static void __init mx31_3ds_init(void)
->  {
-> +	int ret;
-> +
->  	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
->  				      "mx31_3ds");
->  
-> @@ -577,6 +699,8 @@ static void __init mx31_3ds_init(void)
->  	spi_register_board_info(mx31_3ds_spi_devs,
->  						ARRAY_SIZE(mx31_3ds_spi_devs));
->  
-> +	platform_add_devices(devices, ARRAY_SIZE(devices));
-> +
->  	imx31_add_imx_keypad(&mx31_3ds_keymap_data);
->  
->  	mx31_3ds_usbotg_init();
-> @@ -604,6 +728,29 @@ static void __init mx31_3ds_init(void)
->  	imx31_add_spi_imx0(&spi0_pdata);
->  	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
->  	mxc_register_device(&mx3_fb, &mx3fb_pdata);
-> +
-> +	/* CSI */
-> +	/* Camera power: default - off */
-> +	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CSI_D5),
-> +			   "camera-power");
-> +	if (!ret) {
-> +		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
-> +	} else {
-> +		pr_err("Failed to request the camera-power gpio");
-> +		iclink_ov2640.power = NULL;
-> +	}
-> +
-> +	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_RI_DTE1),
-> +			   "camera-reset");
-> +	if (!ret)
-> +		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_RI_DTE1), 1);
-> +	else
-> +		pr_err("Failed to request the camera-reset gpio");
-> +
-> +	if (!mx31_3ds_camera_alloc_dma())
-> +		mxc_register_device(&mx3_camera, &mx31_3ds_camera_pdata);
-> +	else
-> +		pr_err("Failed to allocate dma memory for camera");
-Do you really want to continue registering the camera if the
-gpio_request above failed?
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git
 
->  }
->  
->  static void __init mx31_3ds_timer_init(void)
-> @@ -615,6 +762,15 @@ static struct sys_timer mx31_3ds_timer = {
->  	.init	= mx31_3ds_timer_init,
->  };
->  
-> +static void __init mx31_3ds_reserve(void)
-> +{
-> +	/* reserve MX3_CAMERA_BUF_SIZE bytes for mx3-camera */
-> +	mx3_camera_base = memblock_alloc(MX3_CAMERA_BUF_SIZE,
-> +					 MX3_CAMERA_BUF_SIZE);
-> +	memblock_free(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> +	memblock_remove(mx3_camera_base, MX3_CAMERA_BUF_SIZE);
-> +}
-> +
->  MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
->  	/* Maintainer: Freescale Semiconductor, Inc. */
->  	.boot_params = MX3x_PHYS_OFFSET + 0x100,
-> @@ -623,4 +779,5 @@ MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
->  	.init_irq = mx31_init_irq,
->  	.timer = &mx31_3ds_timer,
->  	.init_machine = mx31_3ds_init,
-> +	.reserve = mx31_3ds_reserve,
->  MACHINE_END
-Russell wants a different ordering here, see
+in the for-next branch
 
-	http://article.gmane.org/gmane.linux.ports.arm.omap/50721/match=russell+init_early+reserve+map_io
+This patch will show up in the next release of the linux-next tree
+(usually sometime within the next 24 hours during the week.)
 
-Best regards
-Uwe
+The path will hopefully also be merged in Linus' tree for the next
+-rc kernel release.
+
+Thanks,
+David
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
