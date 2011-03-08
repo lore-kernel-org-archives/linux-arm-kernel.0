@@ -1,37 +1,38 @@
-From: andy@warmcat.com (Andy Green)
-Date: Tue, 08 Mar 2011 11:09:34 +0000
-Subject: [PATCH 2 18/18] I2C: OMAP1/OMAP2+: prepend I2C IP version to probed
-	version shown in dev_info
-In-Reply-To: <20110308105934.23531.83540.stgit@otae.warmcat.com>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
-Message-ID: <20110308110934.23531.70384.stgit@otae.warmcat.com>
+From: david.jander@protonic.nl (David Jander)
+Date: Tue, 8 Mar 2011 12:40:23 +0100
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <20110307180700.GQ29521@pengutronix.de>
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
+	<20110307180700.GQ29521@pengutronix.de>
+Message-ID: <20110308124023.5a952d13@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IP version is prepended to the existing printed probed
-version as an "epoch" version.
 
-Cc: patches at linaro.org
-Cc: Ben Dooks <ben-linux@fluff.org>
-Reported-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
----
+Hi Sascha,
 
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On Mon, 7 Mar 2011 19:07:00 +0100
+"s.hauer at pengutronix.de" <s.hauer@pengutronix.de> wrote:
+>[...]
+> > The current imx for-next tree is not booting on my Babbage board. Is
+> > it okay for you with your HW. I'll have to debug the booting part
+> > first.
+> 
+> Probably because other than kconfig states i.MX51 and i.MX53 cannot be
+> compiled in one kernel. the for-next branch boots fine on my babbage.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index c997c55..d53cd61 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1093,8 +1093,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_unuse_clocks;
- 	}
- 
--	dev_info(dev->dev, "bus %d rev%d.%d at %d kHz\n",
--		 pdev->id, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-+	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
-+		 pdata->rev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
- 
- 	omap_i2c_idle(dev);
- 
+Would you mind explaining (or pointing to an explanation) as to why this is
+not supposed to work? Given the high level of compatibility between MX51 and
+MX53, I'd say there must be a very good reason not to enable a single binary
+kernel for both. Or is this just temporary brokenness?
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
