@@ -1,45 +1,19 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 8 Mar 2011 23:12:06 +0100
-Subject: [PATCH 2/3] ARM: tegra: harmony: initialize the TPS65862 PMIC
-In-Reply-To: <4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
-References: <cover.1299588456.git.mike@compulab.co.il>
-	<4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
-Message-ID: <201103082312.06911.marvin24@gmx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Mar 2011 22:32:10 +0000
+Subject: [PATCH V6 7/8] ST SPEAr: Remove unused *_SIZE macros from
+	spear*.h files
+In-Reply-To: <92b2423158317c4fc283ae07edfe6047fedea5cf.1298977691.git.viresh.kumar@st.com>
+References: <cover.1298977691.git.viresh.kumar@st.com>
+	<92b2423158317c4fc283ae07edfe6047fedea5cf.1298977691.git.viresh.kumar@st.com>
+Message-ID: <20110308223210.GA605@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Tue, Mar 01, 2011 at 04:56:13PM +0530, Viresh Kumar wrote:
+> Now we used standard SZ_* macros instead of self defined *_SIZE macros. This
+> patch removes all such unused *_SIZE macros for spear3xx & 6xx.
 
-Am Dienstag 08 M?rz 2011, um 13:58:58 schrieb Mike Rapoport:
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
->  arch/arm/mach-tegra/Makefile              |    1 +
->  arch/arm/mach-tegra/board-harmony-power.c |  161 +++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/board-harmony.c       |    1 +
->  arch/arm/mach-tegra/board-harmony.h       |    1 +
->  4 files changed, 164 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/board-harmony-power.c
+This doesn't appear to apply to spear320.h:
 
-...
-> 
-> diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
-> new file mode 100644
-> index 0000000..ca43d7a
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/board-harmony-power.c
-...
-> +static struct i2c_board_info __initdata harmony_regulators[] = {
-> +	{
-> +		I2C_BOARD_INFO("tps6586x", 0x34),
-> +		.irq		= INT_EXTERNAL_PMU,
-> +		.platform_data	= &tps_platform,
-> +	},
-> +};
-> +
-> +int __init harmony_regulator_init(void)
-> +{
-> +	i2c_register_board_info(3, harmony_regulators, 1);
-
-I don't know harmony well, but are you sure this is 3, not 4, as on all other boards?
-
-Marc
+error: patch failed: arch/arm/mach-spear3xx/include/mach/spear320.h:17
+error: arch/arm/mach-spear3xx/include/mach/spear320.h: patch does not apply
