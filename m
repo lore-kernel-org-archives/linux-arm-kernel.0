@@ -1,29 +1,73 @@
-From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Tue,  8 Mar 2011 12:07:26 -0700
-Subject: [PATCH v3 1/2] MAINTAINERS: Add drivers/platform/msm to MSM subsystem
-Message-ID: <1299611247-16785-1-git-send-email-kheitke@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Mar 2011 12:16:54 -0700 (MST)
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable requested
+	pads
+In-Reply-To: <87k4g9qxa9.fsf@ti.com>
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	<87lj0u8mrf.fsf@ti.com> <87tyfi49cs.fsf@ti.com>
+	<AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
+	<20110308172625.GE26463@atomide.com> <87k4g9qxa9.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1103081211170.10981@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
----
- MAINTAINERS |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hi
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 59869e4..696cb18 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -904,6 +904,7 @@ F:	drivers/mmc/host/msm_sdcc.c
- F:	drivers/mmc/host/msm_sdcc.h
- F:	drivers/tty/serial/msm_serial.h
- F:	drivers/tty/serial/msm_serial.c
-+F:	drivers/platform/msm/
- T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
- S:	Maintained
- 
--- 
-1.7.3.3
+On Tue, 8 Mar 2011, Kevin Hilman wrote:
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > * Govindraj <govindraj.ti@gmail.com> [110308 03:43]:
+> >> 
+> >> I am not sure whether now we can control read/writes to pad_mux from any driver
+> >> interface and I think we have to go through mux framework for any
+> >> read/writes to mux.
+> >
+> > Sure, the drivers should not mess with those registers directly.
+> >
+> >> with this I cant control pad wake up capabilities with sysfs as done
+> >> earlier in serial.c
+> >> now control to read/write to pad is outside scope of the driver
+> >> interface as omap_hwmod_mux
+> >> is the one that takes decision for driver with mux values provided
+> >> during omap_hwmod_mux_init.
+> >
+> > The sysfs interface to control this should still be from the drivers.
+> > Sounds like we need some way to set the wakeup flags before pm_runtime_put
+> > is called.
+> 
+> Exactly.  Driver's can currently check device_may_wakeup(dev) to
+> determine if they *should* set wakeup flags, but currently, we don't
+> have a clean way to pass the info down to core code.
+> 
+> One possible option (albeit hacky) is for the omap_hwmod_mux code to
+> check device_may_wakeup() itself, and set the bits accordingly.  This
+> means drivers don't have to do anything, but drivers also loose control
+> of enabling/disabling wakeups.
+> 
+> I think what we need are two omap_device-level APIs for wakeups.
+> 
+> One for enable/disable of wakeups (both module-level and IO-ring, the 
+> driver should not care about the difference between the two):
+
+Probably this should only control IO-ring/chain wakeups.  Enabling 
+asynchronous wakeups will need to be handled differently...
+
+> int omap_device_[enable|disable](struct platform_device *pdev);
+> 
+> bool omap_device_wakeup_occured(struct platform_device *pdev);
+> 
+> As OMAP-specific APIs, both of these should of course be called through
+> pdata function pointers.
+
+Looks good to me, modulo the obvious corrections, although the names of 
+these functions should probably say "ioring_wakeup" rather than just 
+"wakeup" to make it clear what exactly they are intended to do.
+
+As we discussed in chat, we can drop the existing 
+omap_hwmod_{enable,disable}_wakeup() functions, since these were 
+effectively obsoleted by commit 9980ce53 ("OMAP: hwmod: Enable module 
+wakeup if in smartidle").
+
+
+- Paul
