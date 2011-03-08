@@ -1,85 +1,102 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Mar 2011 17:11:04 +0530
-Subject: [PATCH 0/6] omap3: pm: Fixes for low power code
-In-Reply-To: <87k4ghro9h.fsf@ti.com>
-References: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
-	<87k4ghro9h.fsf@ti.com>
-Message-ID: <b5cdbcef5de05fd6fa85f532e8c29271@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Tue, 8 Mar 2011 17:14:29 +0530
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <87tyfi49cs.fsf@ti.com>
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	<87lj0u8mrf.fsf@ti.com> <87tyfi49cs.fsf@ti.com>
+Message-ID: <AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+> On Sat, Mar 5, 2011 at 7:27 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Kevin Hilman <khilman@ti.com> writes:
+>
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+> [...]
+>
+>>> ?/* Assumes the calling function takes care of locking */
+>>> ?void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>>> ?{
+>>> @@ -342,6 +365,9 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?break;
+>>> ? ? ? ? ? ? ? ? ? ? ?flags &= ~OMAP_DEVICE_PAD_ENABLED;
+>>> ? ? ? ? ? ? ? ? ? ? ?val = pad->idle;
+>>> + ? ? ? ? ? ? ? ? ? ?if (flags & OMAP_DEVICE_PAD_WAKEUP)
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?val |= OMAP_WAKEUP_EN;
+>>> +
+>>
+>> Is this needed on every idle transition?
+>>
+>> You're currently setting it on every idle transition, but never clearing
+>> it. ?If it is to be a one-time thing, then move it to the early init of
+>> the mux.
+>
+> Just to clarify...
+>
+> So as soon as the hwmod is first idled, IO-ring wakeups are enabled for
+> any pads that have OMAP_DEVICE_PAD_WAKEUP.
+>
+> The problem here (compared with behavior of existing code) is that there
+> is no provision for disabling IO-ring wakeups.
+>
+> For example, with current code, you can disable wakeups from userspace
+> using the sysfs control file /sys/devices/.../power/wakeup, whose value
+> can be checked using device_may_wakeup(), like current
+> mach-omap2/serial.c code does.
+>
+> With this patch, IO-ring wakeups are always enabled, and never disabled.
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 6:53 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 0/6] omap3: pm: Fixes for low power code
->
-> Hi Santosh,
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> > The series does below fixes to the omap3 low power code.
-> > 	1. Use supported ARMv7 instructions instead of the legacy ones
-> > 	2. Fix the MMU on sequence
-> > 	3. Fix the cache flush scenario when only L1 lost.
-> > 	4. Remove all un-necessary context save registers
-> > 	5. Disable C-bit before cache clean
-> > 	6. Use set_cr() exported API instead of custom one.
->
-> Look like good cleanups, thanks.
->
-> > It's generated against mainline and tested with OMAP3630 ZOOM3.
-> > 	1. Renetion and off-mode mode in suspend - ok.
-> > 	2. Retention in idle - ok
->
-> Testing this series along with other PM changes queued up for
-> mainline
-> (my pm-core branch), this doesn't work for me on 3630/Zoom3 (but
-> works
-> fine on 3430/n900.)
->
-> Here's what I did using omap2plus_defconfig + enabling CPUidle
->
-> First tested suspend:
->
-> echo 4 > /debug/pm_debug/wakeup_timer_seconds
-> echo mem > /sys/power/state
->
-> then, setup UART idle/wakeup:
->
-> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
-> echo enabled >
-> /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
->
-> then enabled idle:
->
-> echo 1 > /debug/pm_debug/sleep_while_idle
->
-> As soon as I do this, it hangs.
->
-> Without your series, it's working fine for me.  Only after merging
-> your series it hangs.
->
+I am reworking on this patch with new patch this will not have below two snip
+changes and will be removed.
 
-I rebased this series against latest pm-core branch which also
-has Dave's THUMB2 series merged.
++                       if (flags & OMAP_DEVICE_PAD_WAKEUP)
++                               val |= OMAP_WAKEUP_EN;
++
 
-After few trials I managed to reproduce the issue. With
-above steps it was still working for me but with off mode
-enabled, I saw a lock-up in suspend. Further debugging, I
-found that one CP15 register save/restore position was
-swapped which lead to this. I fixed that.
+and
 
-I have pushed the rebased series on below branch.
++                       val |= omap_mux_read(pad->partition,
++                                               pad->mux->reg_offset);
 
-git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-pm-core-omap3-asm
+some more changes I have added for default rx serial pad as below
+[this will be done in patch 6/7]
 
-Regards,
-Santosh
++       {
++               .name   = "uart1_rx.uart1_rx",
++               .flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++               .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++               .idle   = OMAP_WAKEUP_EN,
++       },
++};
+
+
+So with this change it will enable io-pad wakeup once we disable
+clocks based on
+.idle values and remux back to .enable values once we enable clocks back.
+so io-pad wakeup for rx will be enabled only when I do put_sync.
+[I verified this with lauterbach also]
+
+I am not sure whether now we can control read/writes to pad_mux from any driver
+interface and I think we have to go through mux framework for any
+read/writes to mux.
+with this I cant control pad wake up capabilities with sysfs as done
+earlier in serial.c
+now control to read/write to pad is outside scope of the driver
+interface as omap_hwmod_mux
+is the one that takes decision for driver with mux values provided
+during omap_hwmod_mux_init.
+
+--
+Thanks,
+Govindraj.R
+
+
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
