@@ -1,34 +1,26 @@
-From: andy@warmcat.com (Andy Green)
-Date: Wed, 09 Mar 2011 14:04:05 +0000
-Subject: [PATCH 2 15/18] I2C: OMAP2+: add correct functionality flags
-	to all omap2plus i2c dev_attr
-In-Reply-To: <4D778551.5010900@ti.com>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
-	<20110308110912.23531.6379.stgit@otae.warmcat.com>
-	<4D778551.5010900@ti.com>
-Message-ID: <4D7788D5.8040603@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 09 Mar 2011 17:07:15 +0300
+Subject: [PATCH] stable: sheevaplug-setup.c fix LED color name and add
+	support for second LED This is a patch to the sheevaplug-setup.c file
+	that
+	fixes the color name of the existing health LED. That LED gpio 49 is
+	green
+	when off and blue when on. The patch also adds support for the second
+	LED
+	that is green when off and red when on. Signed-off-by: Robin Becker
+	<robin@reportlab.com>
+In-Reply-To: <1299677239-3352-1-git-send-email-robin@reportlab.com>
+References: <1299677239-3352-1-git-send-email-robin@reportlab.com>
+Message-ID: <4D778993.3040902@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2011 01:49 PM, Somebody in the thread at some point said:
+Hello.
 
-Hi -
+On 09-03-2011 16:27, Robin Becker wrote:
 
-> I have one minor comment about the OMAP4 dev_attr position in the
-> structure. The point here is just to be aligned with the template
-> used by the generator.
->
-> Acked-by: Benoit Cousson<b-cousson@ti.com>
+> From: replabrobin <robin@reportlab.com>
 
-> The generator is adding a (probably useless...) comment on top of the
-> structure. For the comment I'd prefer to stick to the template. I'll
-> do a massive cleanup when every OMAP4 drivers will be migrated to
-> hwmod. And then OMAP2&  3 at some point will stick to that as well.
+    Real name is required in signoff.
 
-> The OMAP4 part should look like the patch below. I've just updated
-> the scripts to add the new data you introduced.
-
-I'm fine if you just want to replace that stanza with yours that matches 
-the script's member ordering.  Thanks for a rapid review ^^
-
--Andy
+WBR, Sergei
