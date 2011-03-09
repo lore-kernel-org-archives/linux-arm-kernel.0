@@ -1,37 +1,93 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 09 Mar 2011 09:41:23 +0200
-Subject: [PATCH 2/3] ARM: tegra: harmony: initialize the TPS65862 PMIC
-In-Reply-To: <20110308131541.GB5892@sirena.org.uk>
-References: <cover.1299588456.git.mike@compulab.co.il>
-	<4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
-	<20110308131541.GB5892@sirena.org.uk>
-Message-ID: <4D772F23.70304@compulab.co.il>
+From: r.sricharan@ti.com (sricharan)
+Date: Wed,  9 Mar 2011 13:15:38 +0530
+Subject: [PATCH] omap2+: mux: Remove the use of IDLE flag.
+Message-ID: <1299656738-7885-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/11 15:15, Mark Brown wrote:
-> On Tue, Mar 08, 2011 at 02:58:58PM +0200, Mike Rapoport wrote:
-> 
->> +static struct regulator_consumer_supply tps658621_ldo2_supply[] = {
->> +	REGULATOR_SUPPLY("vdd_rtc", NULL),
->> +};
-> 
-> I feel sure that some of these could be using a struct device, though
-> since they're probably all going to be required to be always on I'd
-> expect it's not useful to have them mapped as supplies at all and the
-> drivers could just assume they were there.
+Currently OMAP_DEVICE_PAD_IDLE flag is used to mux pins
+dynamically. This can be simplified by using the enabled
+state variable of each pad. This also fixes the issue of
+the static pads not getting muxed after idling and
+disable/enable state transitions.
 
-I'd prefer to keep it as is for now and update the supplies when merging the
-drivers that actually use them.
+Signed-off-by: sricharan <r.sricharan@ti.com>
+---
+ arch/arm/mach-omap2/mux.c |   19 +++++++------------
+ arch/arm/mach-omap2/mux.h |    1 -
+ 2 files changed, 7 insertions(+), 13 deletions(-)
 
->> +#define REGULATOR_INIT(_id, _minmv, _maxmv)				\
->> +	{								\
-> 
-> This should be namespaced, someone might add a generic macro with that
-> name.
-
-Ok, will fix.
-
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 8717370..bb043cb 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -359,7 +359,6 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+ 			struct omap_device_pad *pad = hmux->pads_dynamic[i];
+ 			int val = -EINVAL;
+ 
+-			pad->flags |= OMAP_DEVICE_PAD_IDLE;
+ 			val = pad->idle;
+ 			omap_mux_write(pad->partition, val,
+ 					pad->mux->reg_offset);
+@@ -369,25 +368,18 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+ 	}
+ 
+ 	/* Runtime enabling of dynamic pads */
+-	if ((state == _HWMOD_STATE_ENABLED) && hmux->pads_dynamic) {
+-		int idled = 0;
+-
++	if ((state == _HWMOD_STATE_ENABLED) && hmux->pads_dynamic
++					&& hmux->enabled) {
+ 		for (i = 0; i < hmux->nr_pads_dynamic; i++) {
+ 			struct omap_device_pad *pad = hmux->pads_dynamic[i];
+ 			int val = -EINVAL;
+ 
+-			if (!(pad->flags & OMAP_DEVICE_PAD_IDLE))
+-				continue;
+-
+-			pad->flags &= ~OMAP_DEVICE_PAD_IDLE;
+ 			val = pad->enable;
+ 			omap_mux_write(pad->partition, val,
+ 					pad->mux->reg_offset);
+-			idled++;
+ 		}
+ 
+-		if (idled)
+-			return;
++		return;
+ 	}
+ 
+ 	/* Enabling or disabling of all pads */
+@@ -404,7 +396,6 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+ 					pad->name, val);
+ 			break;
+ 		case _HWMOD_STATE_DISABLED:
+-		default:
+ 			/* Use safe mode unless OMAP_DEVICE_PAD_REMUX */
+ 			if (flags & OMAP_DEVICE_PAD_REMUX)
+ 				val = pad->off;
+@@ -412,6 +403,10 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+ 				val = OMAP_MUX_MODE7;
+ 			pr_debug("%s: Disabling %s %x\n", __func__,
+ 					pad->name, val);
++			break;
++		default:
++			/* Nothing to be done */
++			break;
+ 		};
+ 
+ 		if (val >= 0) {
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index 1d5bf42..8920fa4 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -159,7 +159,6 @@ struct omap_board_mux {
+ 	u16	value;
+ };
+ 
+-#define OMAP_DEVICE_PAD_IDLE		BIT(7)	/* Not needed for board-*.c */
+ #define OMAP_DEVICE_PAD_REMUX		BIT(1)	/* Dynamically remux a pad,
+ 						   needs enable, idle and off
+ 						   values */
 -- 
-Sincerely yours,
-Mike.
+1.7.0.4
