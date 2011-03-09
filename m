@@ -1,53 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Mar 2011 15:40:05 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <20110215121437.GG4152@n2100.arm.linux.org.uk>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-	<20110215103127.GC4152@n2100.arm.linux.org.uk>
-	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
-	<20110215113242.GD4152@n2100.arm.linux.org.uk>
-	<20110215121437.GG4152@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 9 Mar 2011 16:43:27 +0100
+Subject: [PATCH 2 15/18] I2C: OMAP2+: add correct functionality flags
+	to all omap2plus i2c dev_attr
+In-Reply-To: <4D7788D5.8040603@linaro.org>
+References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
+	<20110308110912.23531.6379.stgit@otae.warmcat.com>
+	<4D778551.5010900@ti.com> <4D7788D5.8040603@linaro.org>
+Message-ID: <4D77A01F.8080706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2011 12:14, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Note that the generic code doesn't allow us to delay frees on UP as it
-> assumes that if there's no TLB entry, the CPU won't speculatively
-> prefetch. ?This seems to be where ARM differs from the rest of the
-> planet. ?Please confirm that this is indeed the case.
->
-> ?arch/arm/include/asm/tlb.h | ? 79 +++++++++++++++++++++++++++++++++++++-------
-> ?1 files changed, 67 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-> index f41a6f5..1ca3e16 100644
-> --- a/arch/arm/include/asm/tlb.h
-> +++ b/arch/arm/include/asm/tlb.h
-[...]
-> +static inline void tlb_add_flush(struct mmu_gather *tlb, unsigned long addr)
-> +{
-> + ? ? ? if (!tlb->fullmm) {
-> + ? ? ? ? ? ? ? if (addr < tlb->range_start)
-> + ? ? ? ? ? ? ? ? ? ? ? tlb->range_start = addr;
-> + ? ? ? ? ? ? ? if (addr + PAGE_SIZE > tlb->range_end)
-> + ? ? ? ? ? ? ? ? ? ? ? tlb->range_end = addr + PAGE_SIZE;
-> + ? ? ? }
-> +}
-[...]
-> +static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
-> + ? ? ? unsigned long addr)
-> +{
-> + ? ? ? pgtable_page_dtor(pte);
-> + ? ? ? tlb_add_flush(addr);
-> + ? ? ? tlb_remove_page(tlb, pte);
-> ?}
+On 3/9/2011 3:04 PM, Andy Green wrote:
+> On 03/09/2011 01:49 PM, Somebody in the thread at some point said:
+> 
+> Hi -
+> 
+>> I have one minor comment about the OMAP4 dev_attr position in the
+>> structure. The point here is just to be aligned with the template
+>> used by the generator.
+>>
+>> Acked-by: Benoit Cousson<b-cousson@ti.com>
+> 
+>> The generator is adding a (probably useless...) comment on top of the
+>> structure. For the comment I'd prefer to stick to the template. I'll
+>> do a massive cleanup when every OMAP4 drivers will be migrated to
+>> hwmod. And then OMAP2&   3 at some point will stick to that as well.
+> 
+>> The OMAP4 part should look like the patch below. I've just updated
+>> the scripts to add the new data you introduced.
+> 
+> I'm fine if you just want to replace that stanza with yours that matches
+> the script's member ordering.  Thanks for a rapid review ^^
 
-The above call to tlb_add_flush() would only add a PAGE_SIZE. But
-since we free an entire PTE, shouldn't the range cover addr ..
-addr+PTRS_PER_PTE*PAGE_SIZE?
+You can find it below. I changed as well the subject as suggested.
 
--- 
-Catalin
+Benoit
+
+---
