@@ -1,59 +1,97 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 09 Mar 2011 15:06:24 -0800
-Subject: [PATCH 5/7] Serial: OMAP: add runtime pm support for omap-serial
-	driver
-In-Reply-To: <AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
-	(Govindraj's message of "Wed, 9 Mar 2011 20:37:11 +0530")
-References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
-	<1298903958-6496-6-git-send-email-govindraj.raja@ti.com>
-	<87r5am499h.fsf@ti.com>
-	<AANLkTim35McK1cFFEXyS49D6b8CT+4pQfmKAswOn3e7_@mail.gmail.com>
-	<87hbbdjc7y.fsf@ti.com>
-	<AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
-Message-ID: <87oc5jvqq7.fsf@ti.com>
+Date: Wed, 09 Mar 2011 15:42:18 -0800
+Subject: [PATCH] omap2plus: smartreflex: remove sr debug directory in
+	omap_sr_remove()
+In-Reply-To: <1297958250-13612-1-git-send-email-sawant@ti.com>
+	(sawant@ti.com's message of "Thu, 17 Feb 2011 21:27:30 +0530")
+References: <1297958250-13612-1-git-send-email-sawant@ti.com>
+Message-ID: <87fwqvvp2d.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
+sawant at ti.com writes:
 
-[...]
-
->>
->> So here's an experiment to try with autosuspend. ?I suspect this will
->> work, just hack it up to prove the concept. ?If it works, we can make
->> something more generic. ?Here are a few alternatives to try. ?I may
->> experiment with some of them tomorrow as well, but please let me know
->> what you try:
->>
->> Using autosuspend, clocks will get cut independently of the idle path.
->> Then, use the PRCM ISR detection of UART module wakeups to call the
->> UART's interrupt handler. ?The interrupt handler will pm_runtime_get(),
->> enable the clocks, and then take care of the interrupt. ?Done.
->>
->> Alternatively, you could test it on current code by simply removing the
->> resume_from_idle call from the idle path and calling it instead from the
->> PRCM ISR when UART module wakeups are detected.
+> From: Anand S Sawant <sawant@ti.com>
 >
-> I remember doing similar experiment didn't seem to help,
+> omap_sr_probe() creates the smartreflex debug directory and its
+> underlying nvalue debug directory. These directories are removed in
+> omap_sr_remove().
 >
+> Basic smartreflex functionality tested on OMAP3630 Zoom3 & OMAP4430 SDP
+>
+> Signed-off-by: Anand S Sawant <sawant@ti.com>
 
-To show it's possible, I did really hacky proof of concept, hard-coded
-to UART3 console for n900/beagle, but at least it shows that this
-approach can work, and the module-level wakeups are working and can be
-used as the trigger for UART wakeup instead of resume_from_idle.  Of
-course, it still has problems with using serial after non-UART wakeups,
-but once omap-serial is using runtime PM, that will no longer be an
-issue.
-
-My hacky branch is called pm-wip/uart-wkup and is in my pm git tree[1]
-(based at the pm-core branch)
-
-To test module-level wakeups (instead of IO-ring) I again forced CORE to
-stay on during suspend, and tested wakeup from suspend on 3430/n900:
-
-  echo 3 > /debug/pm_debug/core_pwrdm/suspend
-  echo mem > /sys/power/state
+Thanks, queuing for 2.6.39 (branch: for_2.6.39/pm-misc)
 
 Kevin
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+> ---
+> Rebased on the latest Kevin's pm branch 
+> (commit id: b6fb54bc4bfc396a9b982d76c1c954c974290a1a)
+>
+>  arch/arm/mach-omap2/smartreflex.c |   23 +++++++++++++----------
+>  1 files changed, 13 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index a1f532e..dc19f17 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -54,6 +54,7 @@ struct omap_sr {
+>  	struct list_head		node;
+>  	struct omap_sr_nvalue_table	*nvalue_table;
+>  	struct voltagedomain		*voltdm;
+> +	struct dentry			*dbg_dir;
+>  };
+>  
+>  /* sr_list contains all the instances of smartreflex module */
+> @@ -822,7 +823,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+>  	struct omap_sr *sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
+>  	struct omap_sr_data *pdata = pdev->dev.platform_data;
+>  	struct resource *mem, *irq;
+> -	struct dentry *vdd_dbg_dir, *dbg_dir, *nvalue_dir;
+> +	struct dentry *vdd_dbg_dir, *nvalue_dir;
+>  	struct omap_volt_data *volt_data;
+>  	int i, ret = 0;
+>  
+> @@ -895,23 +896,23 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+>  	if (!vdd_dbg_dir)
+>  		return -EINVAL;
+>  
+> -	dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
+> -	if (IS_ERR(dbg_dir)) {
+> +	sr_info->dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
+> +	if (IS_ERR(sr_info->dbg_dir)) {
+>  		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
+>  			__func__);
+> -		return PTR_ERR(dbg_dir);
+> +		return PTR_ERR(sr_info->dbg_dir);
+>  	}
+>  
+> -	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR, dbg_dir,
+> -				(void *)sr_info, &pm_sr_fops);
+> -	(void) debugfs_create_x32("errweight", S_IRUGO, dbg_dir,
+> +	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
+> +			sr_info->dbg_dir, (void *)sr_info, &pm_sr_fops);
+> +	(void) debugfs_create_x32("errweight", S_IRUGO, sr_info->dbg_dir,
+>  			&sr_info->err_weight);
+> -	(void) debugfs_create_x32("errmaxlimit", S_IRUGO, dbg_dir,
+> +	(void) debugfs_create_x32("errmaxlimit", S_IRUGO, sr_info->dbg_dir,
+>  			&sr_info->err_maxlimit);
+> -	(void) debugfs_create_x32("errminlimit", S_IRUGO, dbg_dir,
+> +	(void) debugfs_create_x32("errminlimit", S_IRUGO, sr_info->dbg_dir,
+>  			&sr_info->err_minlimit);
+>  
+> -	nvalue_dir = debugfs_create_dir("nvalue", dbg_dir);
+> +	nvalue_dir = debugfs_create_dir("nvalue", sr_info->dbg_dir);
+>  	if (IS_ERR(nvalue_dir)) {
+>  		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
+>  			"for n-values\n", __func__);
+> @@ -975,6 +976,8 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+>  
+>  	if (sr_info->autocomp_active)
+>  		sr_stop_vddautocomp(sr_info);
+> +	if (sr_info->dbg_dir)
+> +		debugfs_remove_recursive(sr_info->dbg_dir);
+>  
+>  	list_del(&sr_info->node);
+>  	iounmap(sr_info->base);
