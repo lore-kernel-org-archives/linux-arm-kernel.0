@@ -1,86 +1,54 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 09 Mar 2011 12:59:41 +0100
-Subject: [PATCH v3 3/7] da850: pruss board specific additions.
-In-Reply-To: <1299592667-21367-4-git-send-email-subhasish@mistralsolutions.com>
-References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
-	<1299592667-21367-4-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4D776BAD.1020307@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 9 Mar 2011 13:02:10 +0100
+Subject: [PATCH 0/3] TP6105x core and regulator driver v2
+Message-ID: <1299672130-4669-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2011 02:57 PM, Subhasish Ghosh wrote:
-> This patch adds board specific initializations and setup routines.
-> 
-> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-> ---
->  arch/arm/mach-davinci/board-da850-evm.c |   25 +++++++++++++++++++++++++
->  1 files changed, 25 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 11f986b..c614c82 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -1053,6 +1053,26 @@ static __init int da850_evm_init_cpufreq(void)
->  static __init int da850_evm_init_cpufreq(void) { return 0; }
->  #endif
->  
-> +static struct da8xx_pruss_devices pruss_devices[] = {
-> +	{.dev_name = NULL,},
-> +};
-> +
-> +static int __init da8xx_evm_setup_pruss(void)
-> +{
-> +	u32 ret = 0;
-your functions returns an int, not an u32
-> +	u32 count;
+From: Linus Walleij <linus.walleij@linaro.org>
 
-use "int i" for loop counter.
+This adds an MFD device for handling the TPS61052 boost converter
+used in audio.
 
-> +
-> +	for (count = 0; count < ARRAY_SIZE(pruss_devices); count++) {
-> +		if (pruss_devices[count].setup != NULL) {
+Changes v1->v2:
+- Only register the mfd cells that are actually going to be used
+  in the core driver (Mark)
+- Don't set deafault valies in any registers on startup of core nor
+  regulator driver (Mark)
+- Use voltage set/get selector APIs to simplify regulator code (Mark)
+- Reorder initcall placements (Mark)
+- Platform data only allows one voltage so don't mark the consumer
+  as "changeable" (Mark)
+- Remove mfd cells on exit from tps6105x core (self)
+- Clear separation of core driver and regulator patch in the
+  series (Jonas)
+- Do not mark core driver experimental (Mark)
+- De-parenthesize numerals in header file (Jonas)
+- kmalloc rather than kzalloc core state holder (Jonas)
+- Update copyright headers (Jonas, Lee)
 
-you may omit the "!= NULL"
+If any of you guys are happy, acked/reviewed-by is appreciated.
 
-> +			ret = pruss_devices[count].setup();
-> +			if (ret)
-> +				return ret;
+Linus Walleij (3):
+  mfd: add a core driver for TI TPS61050/TPS61052 chips v2
+  regulator: add a subdriver for TI TPS6105x regulator portions v2
+  mach-ux500: configure board for the TPS61052 regulator v2
 
-in case of an error you don't clean up correct
-
-> +		}
-> +	}
-> +
-> +	return da8xx_register_pruss_mfd(pruss_devices);
-> +}
-> +
->  static __init void da850_evm_init(void)
->  {
->  	int ret;
-> @@ -1127,6 +1147,11 @@ static __init void da850_evm_init(void)
->  
->  	da8xx_register_mcasp(0, &da850_evm_snd_data);
->  
-> +	ret = da8xx_evm_setup_pruss();
-> +	if (ret)
-> +		pr_warning("%s: pruss initialization failed: %d\n",
-> +				__func__, ret);
-> +
->  	ret = davinci_cfg_reg_list(da850_lcdcntl_pins);
->  	if (ret)
->  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
-
+ arch/arm/mach-ux500/Kconfig                   |    1 +
+ arch/arm/mach-ux500/board-mop500-regulators.c |   25 +++
+ arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
+ arch/arm/mach-ux500/board-mop500.c            |   14 ++
+ drivers/mfd/Kconfig                           |   11 +
+ drivers/mfd/Makefile                          |    1 +
+ drivers/mfd/tps6105x.c                        |  245 +++++++++++++++++++++++++
+ drivers/regulator/Kconfig                     |    9 +
+ drivers/regulator/Makefile                    |    2 +-
+ drivers/regulator/tps6105x-regulator.c        |  195 ++++++++++++++++++++
+ include/linux/mfd/tps6105x.h                  |  101 ++++++++++
+ 11 files changed, 604 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/mfd/tps6105x.c
+ create mode 100644 drivers/regulator/tps6105x-regulator.c
+ create mode 100644 include/linux/mfd/tps6105x.h
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110309/9b942493/attachment.sig>
+1.7.3.2
