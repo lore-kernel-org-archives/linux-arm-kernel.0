@@ -1,31 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Mar 2011 21:02:36 +0100
-Subject: [RFC PATCHv1 2/2] ux500: Export U8500 SoC info through sysfs
-In-Reply-To: <1299689961-5028-3-git-send-email-maxime.coquelin-nonst@stericsson.com>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299689961-5028-3-git-send-email-maxime.coquelin-nonst@stericsson.com>
-Message-ID: <201103092102.36712.arnd@arndb.de>
+From: steve@sakoman.com (Steve Sakoman)
+Date: Wed,  9 Mar 2011 12:20:53 -0800
+Subject: [PATCH 0/2] OMAP: Overo: Add gpio-leds and gpio-keys support
+Message-ID: <1299702055-12480-1-git-send-email-steve@sakoman.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 March 2011 17:59:21 Maxime Coquelin wrote:
-> ST-Ericsson's U8500 implementation.
-> Register sysfs SoC interface, and export SoC ID, process and silicon revision
-> number.
+Overo COMs and expansion boards have three LEDS and 2 push button switches
+connected to GPIO pins.  This patch series adds support for utilizing
+them with gpio-keys and gpio-leds.
 
-> +static char *ux500_get_soc_id(struct sys_soc_info *si)
-> +{
-> +	void __iomem *uid_base = __io_address(U8500_BB_UID_BASE);
+Steve Sakoman (2):
+  OMAP: Add gpio-leds support for Overo
+  OMAP: Add gpio-keys support for Overo
 
-> +static char *ux500_get_revision(struct sys_soc_info *si)
-> +{
-> +	unsigned int rev = dbx500_revision();
->
-> +
-> +static char *ux500_get_process(struct sys_soc_info *si)
-> +{
-
-These should all just be attributes of the platform device that
-represents your SoC.
-
-	Arnd
+ arch/arm/mach-omap2/board-overo.c |   93 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 93 insertions(+), 0 deletions(-)
