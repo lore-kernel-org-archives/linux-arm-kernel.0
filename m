@@ -1,34 +1,40 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 9 Mar 2011 16:56:17 +0100
-Subject: [PATCH 2 14/18] I2C: OMAP1/OMAP2+: create omap I2C functionality
-	flags for each cpu_... test
-In-Reply-To: <4D779A33.9070905@linaro.org>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>	<20110308110904.23531.66727.stgit@otae.warmcat.com>
-	<AANLkTi=KjWq9B9Bt90Th72=tXF2BfEv1p1Z-0=Sk1Z+t@mail.gmail.com>
-	<4D779A33.9070905@linaro.org>
-Message-ID: <4D77A321.4070804@ti.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 9 Mar 2011 17:03:00 +0100
+Subject: [PATCH v3 2/3] [ARM] perfevents: Add support for Scorpion
+	performance monitors
+In-Reply-To: <a4755347806be2bd3d2bc8bdda498e6b.squirrel@www.codeaurora.org>
+References: <1299608733-28514-1-git-send-email-sheetals@codeaurora.org>
+	<AANLkTimDgPxUP1PbT8g9V99kA_KTbQkz6ssz=+UKksKk@mail.gmail.com>
+	<a4755347806be2bd3d2bc8bdda498e6b.squirrel@www.codeaurora.org>
+Message-ID: <AANLkTik6bY3mwVj6=34etVN-VPFmKYi-gPTad_VArsYs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/9/2011 4:18 PM, Andy Green wrote:
-> On 03/09/2011 02:31 PM, Somebody in the thread at some point said:
->
-> Hi -
->
->> Minor comment, Can you use
->> BIT(0) for 1, BIT(1) for 2 ... BIT (8) for 0x100
->
-> OK, I agree it will be nicer.  Thanks for the comment.
->
-> I guess I can just change this and issue just this guy as try 3 rather
-> than sending the whole series mostly unchanged.  In that case, I'll take
-> care of Benoit's member re-ordering to match the scripts at the same
-> time and issue that guy as try 3 as well.
+On Wed, Mar 9, 2011 at 4:46 PM, Sheetal Sahasrabudhe
+<sheetals@codeaurora.org> wrote:
+> Hi Jean,
+Hi Sheetal,
 
-It is up to Ben, but maybe it will be less confusing to re-send the 
-whole series, since you have at least two patches to update.
+>
+> On Wed, March 9, 2011 12:44 am, Jean Pihet wrote:
+>> Thanks for the update.
+>> I still have some nitpicking comments below.
+>
+> I have fixed the multi-line comments and added spaces as per your feedback.
+> I will be sending out the updated patch shortly.
+Ok, thanks for fixing it!
 
-Maybe, just wait a little bit in case someone else has something to say 
-about this series.
+Jean
 
-Benoit
+>
+> Thanks,
+> Sheetal
+>
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
+>
+>
