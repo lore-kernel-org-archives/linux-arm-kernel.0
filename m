@@ -1,51 +1,42 @@
-From: arno.steffen@googlemail.com (Arno Steffen)
-Date: Wed, 9 Mar 2011 15:02:06 +0100
-Subject: IRQ handler under load - slow response
-Message-ID: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 9 Mar 2011 15:02:27 +0100
+Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from
+	driver
+In-Reply-To: <20110308233820.GJ26463@atomide.com>
+References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
+	<4D76A164.2060801@ti.com> <20110308233820.GJ26463@atomide.com>
+Message-ID: <4D778873.4070308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, maybe someone of you can give me hint what is wrong with my system.
-I do have coded an irq-handler, handling changes at GPIO pins. The
-response time (from changing the level at Input until output is set in
-IRQ handler) is ok (<100?s)
-Then I started with fork another process, which is under heavy load
-(consumes a lot of CPU power). From now the response time was quite
-jittering and edge changes within 10ms are handled not reliable, so it
-misses some input changes.
-It seems that IRQ is not responding so fast, probably because of some
-kind of process switch???
+Hi Tony,
 
-In application I announce the IRQ with
-    sigaction (SIGUSR1, &strSigAction, NULL);
-on rising edges.
+On 3/9/2011 12:38 AM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [110308 13:34]:
+>> Hi Andy,
+>>
+>> Thanks for that really fast update. That looks pretty good at first
+>> glance. I still have to review in details.
+>
+> Yes nice job!
+>
+>> And we need to find some volunteers for OMAP1&  2 testing.
+>
+> I gave it a quick try on osk5912, seems to work just fine.
+> Will apply these for testing purposes to linux-omap tree while
+> waiting for the minor fixes.
+>
+> Looks like Benoit should take the arch/arm/*omap*/*hwmod*
+> patches, the rest should go throug Ben. So for all of them:
 
----------------
+Paul and I already acked the hwmod data, but the whole series should 
+maybe go through Ben, because the hwmod files will need some defines 
+added in the i2c header file. So we cannot separate the hwmod* patches 
+from the driver files patches.
 
-Inside the kernel driver the IRQ will be announced with:
-  s32Status = request_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
-                                     GpioIrqHandler,
-                                     0,
-                                     "GPIOINTR",
-                                     NULL);
+I just have one minor comment to keep the OMAP4 data in sync with the 
+autogen, but if Andy does not have any important update to do on that 
+series, I can potentially fix that later.
 
-The handler looks like
-
-static irqreturn_t GpioIrqHandler (int irq, void *dev_id)
-{
-    int s32GpioNumber = 0 ;
-    s32GpioNumber = irq - IH_GPIO_BASE;
-    set_bit (s32GpioNumber , (volatile unsigned long *) &gsts32GpioIrqStatus);
-    tasklet_schedule (&GpioTasklet);
-    return IRQ_HANDLED;
-}
-
-DECLARE_TASKLET(GpioTasklet, GpioIntrTasklet, 0);
-
-------------------
-
-What have I done wrong? Do I have a chance to speed up the response
-from changing inputs?
-
-best regards
-Steffen
+Regards
+Benoit
