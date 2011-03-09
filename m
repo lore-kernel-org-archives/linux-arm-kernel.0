@@ -1,105 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Mar 2011 17:14:46 -0800
-Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
-	requested pads
-In-Reply-To: <AANLkTin2f7n-v5Hg7NHB8a4fEmpzt_07xy-M1wjnKHtU@mail.gmail.com>
-	(Govindraj's message of "Tue, 8 Mar 2011 17:49:31 +0530")
-References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
-	<87lj0u8mrf.fsf@ti.com>
-	<AANLkTin2f7n-v5Hg7NHB8a4fEmpzt_07xy-M1wjnKHtU@mail.gmail.com>
-Message-ID: <87mxl5m6wp.fsf@ti.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Tue, 8 Mar 2011 20:41:03 -0500
+Subject: [PATCH 3/3] OMAP2+: powerdomain: add pwrdm_can_ever_lose_context()
+In-Reply-To: <alpine.DEB.2.00.1103081108300.10981@utopia.booyaka.com>
+References: <20110308021018.31946.29962.stgit@twilight.localdomain>
+	<20110308021551.31946.19903.stgit@twilight.localdomain>
+	<AANLkTimuYVuxiqifxPEqfxyVuSYcKL563TZCP5uNM8Ss@mail.gmail.com>
+	<alpine.DEB.2.00.1103081108300.10981@utopia.booyaka.com>
+Message-ID: <AANLkTikKGKqonAiMTDQk+9mvx6bU3EzYrEy6wzP+cgoq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
+On Tue, Mar 8, 2011 at 13:10, Paul Walmsley <paul@pwsan.com> wrote:
+> On Tue, 8 Mar 2011, Varadarajan, Charulatha wrote:
+>
+>> Do you really want to return 1 in case of invalid powerdomain pointer?
+>
+> Sure, that's why I wrote it that way. ?It seems less risky than returning
+> 0. ?Do you have a proposal that makes more sense, given that this is going
+> to be called immediately after a omap_{device,hwmod}_get_pwrdm() ?
 
-> Module level wakeup doesn't seem to work and only
-> way it seem to wakeup is through using resume_idle
-> from sram_idle.
+Well. This means that it is the caller's responsibility to verify the
+powerdomain pointer before calling this function. Otherwise, this
+function assumes that the powerdomain looses context.
 
-Have you verified if the module wakeups themselves are not working, or
-just that the wakeup is not propagating to a device IRQ?
+I thought that it would be appropriate to return an int value, with
+which, the func would return an error in case of pwrdm ptr error,
+return a zero if the powerdomain can ever loose context and a
+non-zero value otherwise. What do you think?
 
-As a quick test, I did a suspend-only test shows that module-level
-wakeups (at least from PER UART) are working.
-
-On 3530/Beagle, which has console on UART3 (in PER), I successfully
-tested module level wakeups from suspend.
-
-First, I added a simple debug printk[1] to show the wakeup source.
-Then, I ensure CORE stays 'ON' during suspend.  If CORE stays on, the IO
-ring is never armed, so only module wakeups can happen:
-
-   # echo 3 > /debug/pm_debug/core_pwrdm/suspend 
-
-then I suspend
-
-   # echo mem > /sys/power/state 
-
-and type a key on the console to wakeup, and I see:
-
-   PRCM IRQ: mod 0x800: WKST=0x00000800
-
-Which shows PER wakeup from UART3.  If you do the same without setting
-CORE to ON, you'll see that the first wakeup is in the WKUP powerdomain
-from the IO ring.
-
-So module-level wakeups are indeed working.
-
-The problem is actually not that module wakeups are working, but rather
-that the module does not generate an interrupt upon wakeup if it is
-idle.  The resume_from_idle hack works because as soon as clocks are
-enabled, the module generates the interrupt (special thanks to Paul
-Walmsley for helping me understand this.)
+-V Charulatha
 
 >
-> One simple way to reproduce the problem with
-> existing code base also is adding this patch which
-> will enable module level wakeup always.
 >
-> https://patchwork.kernel.org/patch/501211/
+> - Paul
 >
-> and with below change.
->
-> govindraj at Linux-BSP-Server:~/clones/linux-omap-2.6$ gd
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index 47eef48..6343773 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -380,6 +380,7 @@ static void omap_uart_allow_sleep(struct
-> omap_uart_state *uart)
->         omap_uart_smart_idle_enable(uart, 1);
->         uart->can_sleep = 1;
->         del_timer(&uart->timer);
-> +       omap_uart_disable_clocks(uart);
->  }
->
-> We can see module level wakeup doesn't wakeup the uart.
-> once we set sleep_timeout for uart and timer starts.
-
-The above change alone can never work.  I'm pretty sure you wouldn't see
-IO-ring wakeups will not happen with this change either because the
-kernel will probably hang.
-
-If you disable the clocks here, then any console usage between the
-timeout and the idle path will hang the kernel.  You can't do this
-without taking the console lock.  Doing that will be much easier in your
-new driver.
-
-Kevin
-
-
-[1]
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 6e2bd38..677a235 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -219,6 +219,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs)
- 		iclk = omap2_cm_read_mod_reg(module, iclk_off);
- 		fclk = omap2_cm_read_mod_reg(module, fclk_off);
- 		while (wkst) {
-+			printk("PRCM IRQ: mod 0x%x: WKST=0x%08x\n",
-+			       module, wkst);
- 			clken = wkst;
- 			omap2_cm_set_mod_reg_bits(clken, module, iclk_off);
- 			/*
