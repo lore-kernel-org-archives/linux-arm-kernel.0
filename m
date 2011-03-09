@@ -1,23 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 09 Mar 2011 15:50:48 +0000
-Subject: SMP soft lockup on smp_call_function_many when doing
-	flush_tlb_page
-In-Reply-To: <AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
-References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
-	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
-	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
-	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
-Message-ID: <1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 9 Mar 2011 16:56:17 +0100
+Subject: [PATCH 2 14/18] I2C: OMAP1/OMAP2+: create omap I2C functionality
+	flags for each cpu_... test
+In-Reply-To: <4D779A33.9070905@linaro.org>
+References: <20110308105934.23531.83540.stgit@otae.warmcat.com>	<20110308110904.23531.66727.stgit@otae.warmcat.com>
+	<AANLkTi=KjWq9B9Bt90Th72=tXF2BfEv1p1Z-0=Sk1Z+t@mail.gmail.com>
+	<4D779A33.9070905@linaro.org>
+Message-ID: <4D77A321.4070804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
-> > Did you get a chance to try this patch?
-> yes, it works fine
+On 3/9/2011 4:18 PM, Andy Green wrote:
+> On 03/09/2011 02:31 PM, Somebody in the thread at some point said:
+>
+> Hi -
+>
+>> Minor comment, Can you use
+>> BIT(0) for 1, BIT(1) for 2 ... BIT (8) for 0x100
+>
+> OK, I agree it will be nicer.  Thanks for the comment.
+>
+> I guess I can just change this and issue just this guy as try 3 rather
+> than sending the whole series mostly unchanged.  In that case, I'll take
+> care of Benoit's member re-ordering to match the scripts at the same
+> time and issue that guy as try 3 as well.
 
-Thanks for trying. I'll add a commit log and post.
+It is up to Ben, but maybe it will be less confusing to re-send the 
+whole series, since you have at least two patches to update.
 
--- 
-Catalin
+Maybe, just wait a little bit in case someone else has something to say 
+about this series.
+
+Benoit
