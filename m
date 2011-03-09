@@ -1,73 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed,  9 Mar 2011 11:32:41 +0530
-Subject: [PATCH v2] OMAP4: PM: Set static dependency between MPUSS and EMIF
-Message-ID: <1299650561-26162-1-git-send-email-santosh.shilimkar@ti.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 09 Mar 2011 08:23:31 +0200
+Subject: [PATCH 2/3] ARM: tegra: harmony: initialize the TPS65862 PMIC
+In-Reply-To: <201103082312.06911.marvin24@gmx.de>
+References: <cover.1299588456.git.mike@compulab.co.il>
+	<4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
+	<201103082312.06911.marvin24@gmx.de>
+Message-ID: <4D771CE3.6020606@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per OMAP4430 TRM, the dynamic dependency between MEMIF and MPUSS
-clockdomains is enable by default. Refer register CM_MPU_DYNAMICDEP
-description for details.
+On 03/09/11 00:12, Marc Dietrich wrote:
+> Hi Mike,
+> 
+> Am Dienstag 08 M?rz 2011, um 13:58:58 schrieb Mike Rapoport:
+>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>> ---
+>>  arch/arm/mach-tegra/Makefile              |    1 +
+>>  arch/arm/mach-tegra/board-harmony-power.c |  161 +++++++++++++++++++++++++++++
+>>  arch/arm/mach-tegra/board-harmony.c       |    1 +
+>>  arch/arm/mach-tegra/board-harmony.h       |    1 +
+>>  4 files changed, 164 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-tegra/board-harmony-power.c
+> 
+> ...
+>>
+>> diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
+>> new file mode 100644
+>> index 0000000..ca43d7a
+>> --- /dev/null
+>> +++ b/arch/arm/mach-tegra/board-harmony-power.c
+> ...
+>> +static struct i2c_board_info __initdata harmony_regulators[] = {
+>> +	{
+>> +		I2C_BOARD_INFO("tps6586x", 0x34),
+>> +		.irq		= INT_EXTERNAL_PMU,
+>> +		.platform_data	= &tps_platform,
+>> +	},
+>> +};
+>> +
+>> +int __init harmony_regulator_init(void)
+>> +{
+>> +	i2c_register_board_info(3, harmony_regulators, 1);
+> 
+> I don't know harmony well, but are you sure this is 3, not 4, as on all other boards?
 
-But it doesn't seems to work as expected and MPUSS doesn't wakeup
-from off-mode if the static dependency is not set between MPUSS and
-EMIF clockdomains. i.e CM_MPU_STATICDEP.MEMIF_STATDEP = 0
+In the mainline version of i2c-tegra the adapter (and therefore bus) number
+equals the platform device id, and in case of DVC adapter it's 3.
 
-The issue is under investigation with hardware team.
+> 
+> Marc
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
-v2: Added a pr_info() suggested by Paul Walmsley
 
-Patch applies on top of OMAP4 PM series.
-Relevant thread on this issue:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg46173.html
-
- arch/arm/mach-omap2/pm44xx.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index d4ad31e..b3ce1b1 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -198,6 +198,7 @@ void omap4_pm_off_mode_enable(int enable)
- static int __init omap4_pm_init(void)
- {
- 	int ret;
-+	struct clockdomain *emif_clkdm, *mpuss_clkdm;
- 
- 	if (!cpu_is_omap44xx())
- 		return -ENODEV;
-@@ -213,6 +214,27 @@ static int __init omap4_pm_init(void)
- 
- 	(void) clkdm_for_each(clkdms_setup, NULL);
- 
-+	/*
-+	 * FIXME: Remove the MPUSS <-> EMIF static dependency once the
-+	 * dynamic dependency issue is root-caused.
-+	 * The dynamic dependency between MEMIF and MPUSS doesn't seems to
-+	 * work as expected and MPUSS does not wakeup from off-mode if
-+	 * the static dependency is not set between them.
-+	 * i.e. CM_MPU_STATICDEP.MEMIF_STATDEP = 0
-+	 */
-+	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
-+	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
-+	if ((!mpuss_clkdm) || (!emif_clkdm))
-+		goto err2;
-+
-+	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
-+	if (ret) {
-+		pr_err("Failed to add MPUSS <-> EMIF wakeup dependency\n");
-+		goto err2;
-+	}
-+	
-+	pr_info("OMAP4 PM: Temporary static dependency added between EMIF and MPUSS\n");
-+
- 	ret = omap4_mpuss_init();
- 	if (ret) {
- 		pr_err("Failed to initialise OMAP4 MPUSS\n");
 -- 
-1.6.0.4
+Sincerely yours,
+Mike.
