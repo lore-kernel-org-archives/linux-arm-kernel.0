@@ -1,43 +1,56 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 09 Mar 2011 15:23:11 +0200
-Subject: [PATCH 2/3] ARM: tegra: harmony: initialize the TPS65862 PMIC
-In-Reply-To: <20110309131511.GB30257@opensource.wolfsonmicro.com>
-References: <cover.1299588456.git.mike@compulab.co.il>
-	<4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
-	<20110308131541.GB5892@sirena.org.uk>
-	<4D772F23.70304@compulab.co.il>
-	<20110309101508.GD6923@opensource.wolfsonmicro.com>
-	<4D776A42.9030107@compulab.co.il>
-	<20110309122222.GG6923@opensource.wolfsonmicro.com>
-	<4D777E6C.5040000@compulab.co.il>
-	<20110309131511.GB30257@opensource.wolfsonmicro.com>
-Message-ID: <4D777F3F.40208@compulab.co.il>
+From: replabrobin@gmail.com (Robin Becker)
+Date: Wed,  9 Mar 2011 13:27:19 +0000
+Subject: [PATCH] stable: sheevaplug-setup.c fix LED color name and add support
+	for second LED This is a patch to the sheevaplug-setup.c file
+	that fixes the color name of the existing health LED. That LED
+	gpio 49 is green when off and blue when on. The patch also adds
+	support for the second LED that is green when off and red when
+	on. Signed-off-by: Robin Becker <robin@reportlab.com>
+Message-ID: <1299677239-3352-1-git-send-email-robin@reportlab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/11 15:15, Mark Brown wrote:
-> On Wed, Mar 09, 2011 at 03:19:40PM +0200, Mike Rapoport wrote:
->> On 03/09/11 14:22, Mark Brown wrote:
-> 
->>> Note that there's no issue with having no supplies set for a regulator
->>> so no reason not to register the supplies themselves, it's just the
->>> supply map that I was flagging.
-> 
->> I.e. having something like
-> 
->> static struct regulator_consumer_supply tps658621_ldo7_supply[] = {
->> };
-> 
-> Well, I'd just omit the array entirely if it's empty but yes.
+From: replabrobin <robin@reportlab.com>
 
-This would break nice un-namespaced REGULATOR_INIT macros :)
+---
+ arch/arm/mach-kirkwood/sheevaplug-setup.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index d2eec35..40441da 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -58,7 +58,13 @@ static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
+ 
+ static struct gpio_led sheevaplug_led_pins[] = {
+ 	{
+-		.name			= "plug:green:health",
++		.name			= "plug:red:misc",
++		.default_trigger	= "none",
++		.gpio			= 46,
++		.active_low		= 1,
++	},
++	{
++		.name			= "plug:blue:health",
+ 		.default_trigger	= "default-on",
+ 		.gpio			= 49,
+ 		.active_low		= 1,
+@@ -80,13 +86,15 @@ static struct platform_device sheevaplug_leds = {
+ 
+ static unsigned int sheevaplug_mpp_config[] __initdata = {
+ 	MPP29_GPIO,	/* USB Power Enable */
+-	MPP49_GPIO,	/* LED */
++	MPP46_GPIO,	/* RED LED */
++	MPP49_GPIO,	/* BLUE LED */
+ 	0
+ };
+ 
+ static unsigned int sheeva_esata_mpp_config[] __initdata = {
+ 	MPP29_GPIO,	/* USB Power Enable */
+ 	MPP44_GPIO,	/* SD Write Protect */
++	MPP46_GPIO,	/* RED LED */
+ 	MPP47_GPIO,	/* SD Card Detect */
+ 	MPP49_GPIO,	/* LED Green */
+ 	0
 -- 
-Sincerely yours,
-Mike.
+1.7.4.1
