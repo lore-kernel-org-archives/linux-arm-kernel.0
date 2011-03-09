@@ -1,40 +1,30 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 9 Mar 2011 17:03:00 +0100
-Subject: [PATCH v3 2/3] [ARM] perfevents: Add support for Scorpion
-	performance monitors
-In-Reply-To: <a4755347806be2bd3d2bc8bdda498e6b.squirrel@www.codeaurora.org>
-References: <1299608733-28514-1-git-send-email-sheetals@codeaurora.org>
-	<AANLkTimDgPxUP1PbT8g9V99kA_KTbQkz6ssz=+UKksKk@mail.gmail.com>
-	<a4755347806be2bd3d2bc8bdda498e6b.squirrel@www.codeaurora.org>
-Message-ID: <AANLkTik6bY3mwVj6=34etVN-VPFmKYi-gPTad_VArsYs@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 09 Mar 2011 08:28:45 -0800
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D775418.6050105@ti.com> (Rajendra Nayak's message of "Wed, 09
+	Mar 2011 15:49:04 +0530")
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+Message-ID: <87zkp4dzr6.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2011 at 4:46 PM, Sheetal Sahasrabudhe
-<sheetals@codeaurora.org> wrote:
-> Hi Jean,
-Hi Sheetal,
+Rajendra Nayak <rnayak@ti.com> writes:
 
+>> In terms of triage, does this patch fix something that currently doesn't
+>> work (meaning that we should try to merge it for 2.6.39)?  Or can we plan
+>> to merge this during the 2.6.40 time frame?  It would be ideal, of course,
+>> if we could wait until 2.6.40, given how close we are to the merge window
+>> opening.
 >
-> On Wed, March 9, 2011 12:44 am, Jean Pihet wrote:
->> Thanks for the update.
->> I still have some nitpicking comments below.
->
-> I have fixed the multi-line comments and added spaces as per your feedback.
-> I will be sending out the updated patch shortly.
-Ok, thanks for fixing it!
+> Since no clockdomains on OMAP4 were programmed in HW_AUTO untill now,
+> we did not have any issues, but with the recent series from Santosh
+> (which adds mpu ret/off support in idle/suspend) programming the
+> clockdomains to HW_AUTO did show issues/aborts, and this patch
+> fixes them.
 
-Jean
+FWIW, I was planning to merge the OMAP4 MPU ret/off series from Santosh
+for 2.6.39, so this patch would be required for that to series to work.
 
->
-> Thanks,
-> Sheetal
->
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
->
->
->
+Kevin
