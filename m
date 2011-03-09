@@ -1,79 +1,70 @@
-From: steve@sakoman.com (Steve Sakoman)
-Date: Wed,  9 Mar 2011 12:20:55 -0800
-Subject: [PATCH 2/2] OMAP: Add gpio-keys support for Overo
-In-Reply-To: <1299702055-12480-1-git-send-email-steve@sakoman.com>
-References: <1299702055-12480-1-git-send-email-steve@sakoman.com>
-Message-ID: <1299702055-12480-3-git-send-email-steve@sakoman.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Mar 2011 12:32:00 -0800
+Subject: [PATCH] omap2+: mux: Add macro for configuring static with
+	omap_hwmod_mux_init (Re: [PATCH] omap2+: mux: Remove the use of IDLE
+	flag)
+In-Reply-To: <b76e32aff88265d31cc1b7b2fc502a32@mail.gmail.com>
+References: <1299472552-22017-1-git-send-email-r.sricharan@ti.com>
+	<20110308164033.GC26463@atomide.com>
+	<b76e32aff88265d31cc1b7b2fc502a32@mail.gmail.com>
+Message-ID: <20110309203200.GP26463@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the standard push buttons available on
-Overo expansion boards.
+* Sricharan R <r.sricharan@ti.com> [110309 03:47]:
+> 
+> Btw,I have fixed the comments on the below patches that
+> I sent for configuring the serial pads.
+> 
+> 4430sdp:
+> http://marc.info/?l=linux-omap&m=129900334420003&w=2
+> 
+> omap4panda:
+> http://marc.info/?l=linux-omap&m=129900338520082&w=2
+> 
+> 3430sdp:
+> http://marc.info/?l=linux-omap&m=129619117726479&w=2
+> 
+> Can you please check if they are ok?
 
-Signed-off-by: Steve Sakoman <steve@sakoman.com>
----
- arch/arm/mach-omap2/board-overo.c |   42 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+Look OK to me, but let's make things a bit easier to read
+and maintain with the following patch. Can you please
+update your patches to use this macro?
 
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index adc204b..f39d983 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -519,6 +519,47 @@ static void __init overo_init_led(void)
- static inline void __init overo_init_led(void) { return; }
- #endif
+Each line then just becomes something like:
+
+OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
+		OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
+
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 9 Mar 2011 12:14:04 -0800
+Subject: [PATCH] omap2+: mux: Add macro for configuring static with omap_hwmod_mux_init
+
+Add macro for defining static pins in the board file.
+
+We can now start implementing pin multiplexing in the platform init
+code for devices that call omap_hwmod_mux_init. Currently that is
+only implemented for serial.c.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -186,6 +186,12 @@ struct omap_device_pad {
  
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
-+
-+static struct gpio_keys_button gpio_buttons[] = {
-+	{
-+		.code			= BTN_0,
-+		.gpio			= 23,
-+		.desc			= "button0",
-+		.wakeup			= 1,
-+	},
-+	{
-+		.code			= BTN_1,
-+		.gpio			= 14,
-+		.desc			= "button1",
-+		.wakeup			= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data gpio_keys_pdata = {
-+	.buttons	= gpio_buttons,
-+	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-+};
-+
-+static struct platform_device gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &gpio_keys_pdata,
-+	},
-+};
-+
-+static void __init overo_init_keys(void)
-+{
-+	platform_device_register(&gpio_keys_device);
+ struct omap_hwmod_mux_info;
+ 
++#define OMAP_MUX_STATIC(signal, mode)					\
++{									\
++	.name	= (signal),						\
++	.enable	= (mode),						\
 +}
 +
-+#else
-+static inline void __init overo_init_keys(void) { return; }
-+#endif
-+
- static int overo_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
-@@ -699,6 +740,7 @@ static void __init overo_init(void)
- 	overo_init_smsc911x();
- 	overo_display_init();
- 	overo_init_led();
-+	overo_init_keys();
+ #if defined(CONFIG_OMAP_MUX)
  
- 	/* Ensure SDRC pins are mux'd for self-refresh */
- 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
--- 
-1.7.0.4
+ /**
