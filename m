@@ -1,35 +1,53 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Wed, 9 Mar 2011 16:22:53 +0100
-Subject: IRQ handler under load - slow response
-In-Reply-To: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
-References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
-Message-ID: <20110309152252.GB333@e-circ.dyndns.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Mar 2011 15:40:05 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
+	tables
+In-Reply-To: <20110215121437.GG4152@n2100.arm.linux.org.uk>
+References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
+	<20110215103127.GC4152@n2100.arm.linux.org.uk>
+	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
+	<20110215113242.GD4152@n2100.arm.linux.org.uk>
+	<20110215121437.GG4152@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2011 at 03:02:06PM +0100, Arno Steffen wrote:
+On 15 February 2011 12:14, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Note that the generic code doesn't allow us to delay frees on UP as it
+> assumes that if there's no TLB entry, the CPU won't speculatively
+> prefetch. ?This seems to be where ARM differs from the rest of the
+> planet. ?Please confirm that this is indeed the case.
+>
+> ?arch/arm/include/asm/tlb.h | ? 79 +++++++++++++++++++++++++++++++++++++-------
+> ?1 files changed, 67 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+> index f41a6f5..1ca3e16 100644
+> --- a/arch/arm/include/asm/tlb.h
+> +++ b/arch/arm/include/asm/tlb.h
+[...]
+> +static inline void tlb_add_flush(struct mmu_gather *tlb, unsigned long addr)
+> +{
+> + ? ? ? if (!tlb->fullmm) {
+> + ? ? ? ? ? ? ? if (addr < tlb->range_start)
+> + ? ? ? ? ? ? ? ? ? ? ? tlb->range_start = addr;
+> + ? ? ? ? ? ? ? if (addr + PAGE_SIZE > tlb->range_end)
+> + ? ? ? ? ? ? ? ? ? ? ? tlb->range_end = addr + PAGE_SIZE;
+> + ? ? ? }
+> +}
+[...]
+> +static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+> + ? ? ? unsigned long addr)
+> +{
+> + ? ? ? pgtable_page_dtor(pte);
+> + ? ? ? tlb_add_flush(addr);
+> + ? ? ? tlb_remove_page(tlb, pte);
+> ?}
 
-> ------------------
-> 
-> What have I done wrong?
-You put code with different scheduling needs in the same scheduling pool.
-> Do I have a chance to speed up the response
-> from changing inputs?
+The above call to tlb_add_flush() would only add a PAGE_SIZE. But
+since we free an entire PTE, shouldn't the range cover addr ..
+addr+PTRS_PER_PTE*PAGE_SIZE?
 
-I've been playing with scheduling policies before (I'm not the expert).
-My hint:
-your tasklet is executed in the softirq handler. This will run at normal
-priority (see '$ ps -jefHc' for example)
-
-a)
-You could 'chrt --rr PID' of your softirqd
-
-b)
-replace your tasklet with a threaded irq handler, which you can
-'chrt --rr PID'. This has the effect that only your own piece of code
-is raised in priority.
-> 
-> best regards
-> Steffen
-Hope this will help.
-Kurt
+-- 
+Catalin
