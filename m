@@ -1,299 +1,88 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 10 Mar 2011 09:38:51 +1300
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <1299689961-5028-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299689961-5028-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-Message-ID: <4D77E55B.8060802@bluewatersys.com>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Wed,  9 Mar 2011 21:46:20 +0100
+Subject: [PATCH RFC] arm: mini2440: Fix uda134x codec problem.
+Message-ID: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2011 05:59 AM, Maxime Coquelin wrote:
-> Common base to export System-on-Chip related informations through sysfs.
-> 
-> Creation of a "soc" directory under /sys/devices/system/.
-> Creation of a common "mach_name" entry to export machine name.
-> Creation of platform-defined SoC information entries.
+ASoC audio for mini2440 platform in current kenrel doesn't work.
+First problem is samsung_asoc_dma device is missing in initialization.
+Next problem is with codec. Codec is initialized but never probed
+because no platform_device exist for codec driver. It leads to errors
+during codec binding to asoc dai. Next problem was platform data which
+was passed from board to asoc main driver but not passed to codec when
+called codec_soc_probe().
 
-A few comments below. Echoing some of Jamie's and Mark's comments.
+Following patch should fix issues. But not sure if in correct way.
+Please review.
 
-~Ryan
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/mach-s3c2440/mach-mini2440.c |    7 +++++++
+ sound/soc/codecs/uda134x.c            |    3 ++-
+ sound/soc/samsung/s3c24xx_uda134x.c   |    3 ++-
+ 3 files changed, 11 insertions(+), 2 deletions(-)
 
-> 
-> Signed-off-by: Maxime COQUELIN <maxime.coquelin-nonst@stericsson.com>
-> ---
->  drivers/base/Kconfig    |    4 ++
->  drivers/base/Makefile   |    1 +
->  drivers/base/soc.c      |   88 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/sys_soc.h |   33 +++++++++++++++++
->  4 files changed, 126 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/base/soc.c
->  create mode 100644 include/linux/sys_soc.h
-> 
-> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> index d57e8d0..4f2b56d 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -168,4 +168,8 @@ config SYS_HYPERVISOR
->  	bool
->  	default n
->  
-> +config SYS_SOC
-> +	bool "Export SoC specific informations"
-> +	depends on EMBEDDED
-
-This should ideally be automatically selected by platforms which provide
-SoC information.
-
-Also, the word "informations" sounds odd to me. It can be replaced above
-with "information" and in some other places with "pieces of information"
-or similar.
-
-> +
->  endmenu
-> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> index 5f51c3b..f3bcfb3 100644
-> --- a/drivers/base/Makefile
-> +++ b/drivers/base/Makefile
-> @@ -18,6 +18,7 @@ ifeq ($(CONFIG_SYSFS),y)
->  obj-$(CONFIG_MODULES)	+= module.o
->  endif
->  obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
-> +obj-$(CONFIG_SYS_SOC) += soc.o
->  
->  ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
->  
-> diff --git a/drivers/base/soc.c b/drivers/base/soc.c
-> new file mode 100644
-> index 0000000..6fa538b
-> --- /dev/null
-> +++ b/drivers/base/soc.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Copyright (C) ST-Ericsson SA 2011
-> + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/sysdev.h>
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/stat.h>
-> +#include <linux/slab.h>
-> +#include <linux/sys_soc.h>
-> +
-> +static struct sysdev_class_attribute *soc_default_attrs[];
-> +
-> +struct sys_soc {
-> +	char *mach_name;
-> +	struct sysdev_class class;
-> +};
-> +
-> +struct sys_soc soc = {
-> +	.class = {
-> +		.name = "soc",
-> +		.attrs = soc_default_attrs,
-> +	},
-> +};
-> +
-> +static ssize_t show_mach_name(struct sysdev_class *class,
-> +				struct sysdev_class_attribute *attr, char *buf)
-> +{
-> +	return sprintf(buf, "%s\n", soc.mach_name);
-> +}
-> +static SYSDEV_CLASS_ATTR(mach_name, S_IRUGO, show_mach_name, NULL);
-
-If you make mach_name work like the other SoC info attributes then it
-can be exported using the generic show_info function below. It also
-means that struct sys_soc is no longer necessary; you can just have the
-global sysdev_class.
-
-> +
-> +static ssize_t show_info(struct sysdev_class *class,
-> +				struct sysdev_class_attribute *attr, char *buf)
-> +{
-> +	struct sys_soc_info *si = container_of(attr,
-> +			struct sys_soc_info, attr);
-> +
-> +	if (si->info)
-> +		return sprintf(buf, "%s\n", si->info);
-> +	else if (si->get_info)
-> +		return sprintf(buf, "%s\n", si->get_info(si));
-> +	else
-> +		return sprintf(buf, "No data\n");
-
-Agree with others that it should be a bug to have an item with no data.
-i.e. the registration should fail, probably with a WARN_ON. I also agree
-that buf should be passed directly into the get_info callback. How do we
-deal with overflow from dodgy callbacks? From memory we can safely write
-at least one page to a sysfs buffer?
-
-> +}
-> +
-> +void __init register_sys_soc_info(struct sys_soc_info *info, int nb_info)
-> +{
-
-register_sys_soc_info can only be called once. That may be the
-intention, but it needs to be documented as such. Possibly a WARN_ON to
-catch it being called multiple times? I could see potential bugs in
-kernels which have multiple SoC/platforms built in.
-
-This function should also be static, since calling it directly will
-result in the mach_name entry never being set.
-
-> +	int i;
-> +
-> +	for (i = 0; i < nb_info; i++) {
-> +		info[i].attr.attr.name = info[i].name;
-> +		info[i].attr.attr.mode = S_IRUGO;
-> +		info[i].attr.show = show_info;
-
-This is double handling. Can't we do something like this:
-
-struct sys_soc_info {
-	char *info;
-	char *(*get_info)(struct sys_soc_info *);
-	struct sysdev_class_attribute attr;
-};
-
-#define SYS_SOC_ATTR_VALUE(name, value) {	\
-	.attr.attr.name = name,			\
-	.mode           = S_IRUGO,		\
-	.info           = value,		\
-}
-
-#define SYS_SOC_ATTR_CALLBACK(name, callback) {	\
-	.attr.attr.name = name,			\
-	.mode           = S_IRUGO,		\
-	.get_info       = callback,		\
-}
-
-Then the above code isn't necessary and the ux500 platform registration
-looks like this:
-
-static struct sys_soc_info soc_info[] = {
-	SYS_SOC_ATTR_CALLBACK("soc_id",   ux500_get_soc_id),
-	SYS_SOC_ATTR_CALLBACK("revision", ux500_get_revision),
-	SYS_SOC_ATTR_CALLBACK("process",  ux500_get_process),
-};
-
-Which is much more concise.
-
-> +
-> +		sysdev_class_create_file(&soc.class, &info[i].attr);
-
-sysdev_class_create_file can fail, so we should propagate the error up.
-
-> +	}
-> +}
-> +
-> +void __init register_sys_soc(char *name, struct sys_soc_info *info, int num)
-> +{
-> +	int len;
-> +
-> +	len = strlen(name);
-> +	soc.mach_name = kzalloc(len + 1, GFP_KERNEL);
-> +	if (!soc.mach_name)
-> +		return;
-> +
-> +	sprintf(soc.mach_name, "%s", name);
-
-Change name to mach_name (or family?) to make it clearer what it is for
-and make it const. Use kstrdup. This function should really return
-proper error codes rather than silently failing.
-
-I also think mach_name should be added the same way as the other items
-since it should simplify the code a little.
-
-> +
-> +	if (sysdev_class_register(&soc.class)) {
-> +		kfree(soc.mach_name);
-> +		return;
-> +	}
-
-Standard kernel coding practice is:
-
-	err = sysdev_class_register(&soc.class);	
-	if (err) {
-		kfree(soc.mach_name);
-		return err;
-	}
-
-> +
-> +	register_sys_soc_info(info, num);
-> +}
-> +
-> +/*
-> + * Common attributes for all platforms.
-> + * Only machine name for now
-> + */
-> +static struct sysdev_class_attribute *soc_default_attrs[] = {
-> +	&attr_mach_name,
-> +	NULL
-> +};
-
-This becomes part of the ABI, so needs to be documented.
-
-> diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-> new file mode 100644
-> index 0000000..b91a924
-> --- /dev/null
-> +++ b/include/linux/sys_soc.h
-> @@ -0,0 +1,33 @@
-> +/*
-> + * Copyright (C) ST-Ericsson SA 2011
-> + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +#ifndef __SYS_SOC_H
-> +#define __SYS_SOC_H
-> +
-> +#include <linux/sysdev.h>
-> +
-> +/**
-> + * struct sys_soc_info - SoC exports related informations
-> + * @name: name of the export
-> + * @info: pointer on the key to export
-> + * @get_info: callback to retrieve key if info field is NULL
-
-It should be noted here that one and only one of info and get_info must
-be set.
-
-> + * @attr: export's sysdev class attribute
-> + */
-> +struct sys_soc_info {
-> +	char *name;
-> +	char *info;
-> +	char *(*get_info)(struct sys_soc_info *);
-> +	struct sysdev_class_attribute attr;
-> +};
-> +
-> +/**
-> + * void register_sys_soc(char *name, struct sys_soc_info *, int num)
-> + * @name: name of the machine
-
-This is not really descriptive enough. We need to be reasonably clear
-about what we mean by 'name'. Is it the mach name (i.e. the name of the
-mach-xxxx) directory, is it the family (i.e. omap3 and omap4 are both
-under omap), or is it something else?
-
-> + * @info: pointer on the info table to export
-> + * @num: number of info to export
-> + */
-
-Need to document here that register_sys_soc must only be called once.
-
-> +void register_sys_soc(char *name, struct sys_soc_info *info, int num);
-> +
-> +#endif /* __SYS_SOC_H */
-
-~Ryan
-
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index f62bb4c..7c3fb07 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -506,6 +506,11 @@ static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
+ 	},
+ };
+ 
++static struct platform_device uda1340_codec = {
++		.name = "uda134x-codec",
++		.id = -1,
++};
++
+ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_ohci,
+ 	&s3c_device_wdt,
+@@ -521,7 +526,9 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_nand,
+ 	&s3c_device_sdi,
+ 	&s3c_device_iis,
++	&uda1340_codec,
+ 	&mini2440_audio,
++	&samsung_asoc_dma,
+ };
+ 
+ static void __init mini2440_map_io(void)
+diff --git a/sound/soc/codecs/uda134x.c b/sound/soc/codecs/uda134x.c
+index e76847a..48ffd40 100644
+--- a/sound/soc/codecs/uda134x.c
++++ b/sound/soc/codecs/uda134x.c
+@@ -486,7 +486,8 @@ static struct snd_soc_dai_driver uda134x_dai = {
+ static int uda134x_soc_probe(struct snd_soc_codec *codec)
+ {
+ 	struct uda134x_priv *uda134x;
+-	struct uda134x_platform_data *pd = dev_get_drvdata(codec->card->dev);
++	struct uda134x_platform_data *pd = codec->card->dev->platform_data;
++
+ 	int ret;
+ 
+ 	printk(KERN_INFO "UDA134X SoC Audio Codec\n");
+diff --git a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda134x.c
+index 2c09e93..86f1dc4 100644
+--- a/sound/soc/samsung/s3c24xx_uda134x.c
++++ b/sound/soc/samsung/s3c24xx_uda134x.c
+@@ -226,7 +226,7 @@ static struct snd_soc_ops s3c24xx_uda134x_ops = {
+ static struct snd_soc_dai_link s3c24xx_uda134x_dai_link = {
+ 	.name = "UDA134X",
+ 	.stream_name = "UDA134X",
+-	.codec_name = "uda134x-hifi",
++	.codec_name = "uda134x-codec",
+ 	.codec_dai_name = "uda134x-hifi",
+ 	.cpu_dai_name = "s3c24xx-iis",
+ 	.ops = &s3c24xx_uda134x_ops,
+@@ -321,6 +321,7 @@ static int s3c24xx_uda134x_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(s3c24xx_uda134x_snd_device,
+ 			     &snd_soc_s3c24xx_uda134x);
++	platform_device_add_data(s3c24xx_uda134x_snd_device, &s3c24xx_uda134x, sizeof(s3c24xx_uda134x));
+ 	ret = platform_device_add(s3c24xx_uda134x_snd_device);
+ 	if (ret) {
+ 		printk(KERN_ERR "S3C24XX_UDA134X SoC Audio: Unable to add\n");
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+1.7.1
