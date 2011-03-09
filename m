@@ -1,76 +1,64 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed,  9 Mar 2011 16:31:17 +0200
-Subject: [PATCH v2 1/3] ARM: tegra: harmony: update PCI-e initialization
-	sequence
+Date: Wed,  9 Mar 2011 16:31:19 +0200
+Subject: [PATCH v2 3/3] ARM: tegra: update defconfig
 In-Reply-To: <cover.1299681036.git.mike@compulab.co.il>
 References: <cover.1299681036.git.mike@compulab.co.il>
-Message-ID: <0d5b92a9de105a916e66a544473c9780a51f95a1.1299681036.git.mike@compulab.co.il>
+Message-ID: <9bb699b7edf6bf50fe3680af99b4ff59fec03d3f.1299681036.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Harmony board PCI-e subsystem can be enabled only after certain
-voltage regulators are on. One of the regulators is an internal
-regulator on the PMIC and another one is controlled by a PMIC GPIO.
-Addition of the voltage control to the Harmony PCI-e initialization
-allows booting of kernel with CONFIG_TEGRA_PCI even if the PMIC driver
-is not loaded. In this case the PCI-e initialization will fail
-gracefully intead of hanging the system.
+* Enable TPS6586x PMIC driver
+* Enable RealTek 8169 used on TrimSlice
+* Allow booting with root on NFS
 
 Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 ---
- arch/arm/mach-tegra/board-harmony-pcie.c |   24 +++++++++++++++++++++++-
- 1 files changed, 23 insertions(+), 1 deletions(-)
+ arch/arm/configs/tegra_defconfig |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-index f7e7d45..9c27b95 100644
---- a/arch/arm/mach-tegra/board-harmony-pcie.c
-+++ b/arch/arm/mach-tegra/board-harmony-pcie.c
-@@ -27,13 +27,29 @@
- 
- #ifdef CONFIG_TEGRA_PCI
- 
-+/* GPIO 3 of the PMIC */
-+#define EN_VDD_1V05_GPIO	(TEGRA_NR_GPIOS + 2)
-+
- static int __init harmony_pcie_init(void)
- {
-+	struct regulator *regulator = NULL;
- 	int err;
- 
- 	if (!machine_is_harmony())
- 		return 0;
- 
-+	err = gpio_request(EN_VDD_1V05_GPIO, "EN_VDD_1V05");
-+	if (err)
-+		return err;
-+
-+	gpio_direction_output(EN_VDD_1V05_GPIO, 1);
-+
-+	regulator = regulator_get(NULL, "pex_clk");
-+	if (IS_ERR_OR_NULL(regulator))
-+		goto err_reg;
-+
-+	regulator_enable(regulator);
-+
- 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_GPV, TEGRA_TRI_NORMAL);
- 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXA, TEGRA_TRI_NORMAL);
- 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_NORMAL);
-@@ -49,9 +65,15 @@ err_pcie:
- 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXA, TEGRA_TRI_TRISTATE);
- 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_TRISTATE);
- 
-+	regulator_disable(regulator);
-+	regulator_put(regulator);
-+err_reg:
-+	gpio_free(EN_VDD_1V05_GPIO);
-+
- 	return err;
- }
- 
--subsys_initcall(harmony_pcie_init);
-+/* PCI should be initialized after I2C, mfd and regulators */
-+subsys_initcall_sync(harmony_pcie_init);
- 
- #endif
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index eb8c31e..8845f1c 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -44,6 +44,10 @@ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+ CONFIG_NET_KEY=y
+ CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IP_PNP_RARP=y
+ CONFIG_INET_ESP=y
+ # CONFIG_INET_XFRM_MODE_TUNNEL is not set
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+@@ -70,7 +74,7 @@ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
+ CONFIG_NETDEVICES=y
+ CONFIG_DUMMY=y
+-# CONFIG_NETDEV_1000 is not set
++CONFIG_R8169=y
+ # CONFIG_NETDEV_10000 is not set
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT is not set
+@@ -86,7 +90,9 @@ CONFIG_I2C=y
+ # CONFIG_I2C_HELPER_AUTO is not set
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SENSORS_LM90=y
+-# CONFIG_MFD_SUPPORT is not set
++CONFIG_MFD_TPS6586X=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_TPS6586X=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+@@ -108,6 +114,8 @@ CONFIG_EXT3_FS_SECURITY=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_NLS_CODEPAGE_437=y
 -- 
 1.7.3.1
