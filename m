@@ -1,26 +1,52 @@
-From: andy@warmcat.com (Andy Green)
-Date: Wed, 09 Mar 2011 15:18:11 +0000
-Subject: [PATCH 2 14/18] I2C: OMAP1/OMAP2+: create omap I2C functionality
-	flags for each cpu_... test
-In-Reply-To: <AANLkTi=KjWq9B9Bt90Th72=tXF2BfEv1p1Z-0=Sk1Z+t@mail.gmail.com>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>	<20110308110904.23531.66727.stgit@otae.warmcat.com>
-	<AANLkTi=KjWq9B9Bt90Th72=tXF2BfEv1p1Z-0=Sk1Z+t@mail.gmail.com>
-Message-ID: <4D779A33.9070905@linaro.org>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 9 Mar 2011 17:22:27 +0200
+Subject: SMP soft lockup on smp_call_function_many when doing
+	flush_tlb_page
+In-Reply-To: <1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
+	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2011 02:31 PM, Somebody in the thread at some point said:
+>
+> Did you get a chance to try this patch?
+yes, it works fine
+>
+>> >> An alternative would be to copy the cpumask to a local variable in
+>> >> on_each_cpu_mask(), though the workaround above would cover other cases
+>> >> that we haven't spotted yet. Also, the smp_call_function_many()
+>> >> description doesn't state that the cpumask should not be modified.
+>> >>
+>> >>
+>> >> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+>> >> index 8f57f32..1717dec 100644
+>> >> --- a/arch/arm/kernel/smp_tlb.c
+>> >> +++ b/arch/arm/kernel/smp_tlb.c
+>> >> @@ -16,10 +16,13 @@
+>> >> ?static void on_each_cpu_mask(void (*func)(void *), void *info, int wait,
+>> >> ? ? ? ?const struct cpumask *mask)
+>> >> ?{
+>> >> + ? ? ? struct cpumask call_mask;
+>> >> +
+>> >> ? ? ? ?preempt_disable();
+>> >>
+>> >> + ? ? ? cpumask_copy(&call_mask, mask);
+>> >> ? ? ? ?smp_call_function_many(mask, func, info, wait);
+>> > ?I'll check this one, but the mask here should be call_mask.
+>> >> - ? ? ? if (cpumask_test_cpu(smp_processor_id(), mask))
+>> >> + ? ? ? if (cpumask_test_cpu(smp_processor_id(), &call_mask))
+>> >> ? ? ? ? ? ? ? ?func(info);
+>> >>
+>> this patch increases my system instability, for some reason, the
+>> call_function_data data get corrupted when the
+>> generic_smp_call_function_interrupt() is running.
+>
+> Strange, the patch only copies the cpumask.
+this patch also works fine, seems the instability was due to the code
+that I added in order to accelerate the failure.
 
-Hi -
-
-> Minor comment, Can you use
-> BIT(0) for 1, BIT(1) for 2 ... BIT (8) for 0x100
-
-OK, I agree it will be nicer.  Thanks for the comment.
-
-I guess I can just change this and issue just this guy as try 3 rather 
-than sending the whole series mostly unchanged.  In that case, I'll take 
-care of Benoit's member re-ordering to match the scripts at the same 
-time and issue that guy as try 3 as well.
-
--Andy
+saeed
