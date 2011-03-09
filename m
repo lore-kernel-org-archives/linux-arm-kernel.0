@@ -1,55 +1,36 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 09 Mar 2011 08:23:31 +0200
+Date: Wed, 09 Mar 2011 09:41:23 +0200
 Subject: [PATCH 2/3] ARM: tegra: harmony: initialize the TPS65862 PMIC
-In-Reply-To: <201103082312.06911.marvin24@gmx.de>
+In-Reply-To: <20110308131541.GB5892@sirena.org.uk>
 References: <cover.1299588456.git.mike@compulab.co.il>
 	<4ade6d195fff78271085eafb0a99de3be8beb426.1299588456.git.mike@compulab.co.il>
-	<201103082312.06911.marvin24@gmx.de>
-Message-ID: <4D771CE3.6020606@compulab.co.il>
+	<20110308131541.GB5892@sirena.org.uk>
+Message-ID: <4D772F23.70304@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/11 00:12, Marc Dietrich wrote:
-> Hi Mike,
+On 03/08/11 15:15, Mark Brown wrote:
+> On Tue, Mar 08, 2011 at 02:58:58PM +0200, Mike Rapoport wrote:
 > 
-> Am Dienstag 08 M?rz 2011, um 13:58:58 schrieb Mike Rapoport:
->> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
->> ---
->>  arch/arm/mach-tegra/Makefile              |    1 +
->>  arch/arm/mach-tegra/board-harmony-power.c |  161 +++++++++++++++++++++++++++++
->>  arch/arm/mach-tegra/board-harmony.c       |    1 +
->>  arch/arm/mach-tegra/board-harmony.h       |    1 +
->>  4 files changed, 164 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-tegra/board-harmony-power.c
-> 
-> ...
->>
->> diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
->> new file mode 100644
->> index 0000000..ca43d7a
->> --- /dev/null
->> +++ b/arch/arm/mach-tegra/board-harmony-power.c
-> ...
->> +static struct i2c_board_info __initdata harmony_regulators[] = {
->> +	{
->> +		I2C_BOARD_INFO("tps6586x", 0x34),
->> +		.irq		= INT_EXTERNAL_PMU,
->> +		.platform_data	= &tps_platform,
->> +	},
+>> +static struct regulator_consumer_supply tps658621_ldo2_supply[] = {
+>> +	REGULATOR_SUPPLY("vdd_rtc", NULL),
 >> +};
->> +
->> +int __init harmony_regulator_init(void)
->> +{
->> +	i2c_register_board_info(3, harmony_regulators, 1);
 > 
-> I don't know harmony well, but are you sure this is 3, not 4, as on all other boards?
+> I feel sure that some of these could be using a struct device, though
+> since they're probably all going to be required to be always on I'd
+> expect it's not useful to have them mapped as supplies at all and the
+> drivers could just assume they were there.
 
-In the mainline version of i2c-tegra the adapter (and therefore bus) number
-equals the platform device id, and in case of DVC adapter it's 3.
+I'd prefer to keep it as is for now and update the supplies when merging the
+drivers that actually use them.
 
+>> +#define REGULATOR_INIT(_id, _minmv, _maxmv)				\
+>> +	{								\
 > 
-> Marc
+> This should be namespaced, someone might add a generic macro with that
+> name.
 
+Ok, will fix.
 
 -- 
 Sincerely yours,
