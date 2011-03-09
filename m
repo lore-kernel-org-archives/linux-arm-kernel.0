@@ -1,148 +1,74 @@
-From: andy@warmcat.com (Andy Green)
-Date: Tue, 8 Mar 2011 11:09:12 +0000
-Subject: [PATCH] OMAP2+: hwmod data: add correct functionality flags to all omap2plus i2c dev_attr
-Message-ID: <mailman.166.1299685429.1530.linux-arm-kernel@lists.infradead.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 09 Mar 2011 16:44:48 +0100
+Subject: [PATCH v2] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY
+	control callback
+In-Reply-To: <1299179061-30959-3-git-send-email-s.nawrocki@samsung.com>
+References: <1299179061-30959-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1299685488-15258-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new functionality flags for OMAP i2c unit to all OMAP2+
-hwmod definitions.
+Extend MIPI-CSIS driver's platform data structure with a callback
+for D-PHY enable and reset control. Also add a flag indicating
+whether the external MIPI-CSI (VDD18_MIPI) power supply should
+be managed in the driver through the "vdd" power supply. On some
+boards this regulator may be a fixed voltage regulator without
+an inhibit function.
 
-Cc: patches at linaro.org
-Cc: Ben Dooks <ben-linux@fluff.org>
-Reported-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
-[b-cousson at ti.com: Move dev_attr to stick to
-hwmod template, update the subject]
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    3 +++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    9 +++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   10 ++++++++++
- 4 files changed, 28 insertions(+), 1 deletions(-)
+Hello,
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index de92d75..fe70365 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1450,7 +1450,12 @@ static struct omap_hwmod_class i2c_class = {
- 	.rev		= OMAP_I2C_IP_VERSION_1,
- };
+in this version I have updated the platform data structure with
+an additional flag indicating whether the driver should attempt to
+control the external mipi-csis (VDD18_MIPI) voltage regulator or not.
+This might be needed on systems where MIPI VDD power supply cannot be 
+separately switched on/off.
+
+SN
+
+---
+ arch/arm/plat-s5p/include/plat/mipi_csis.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+index eb3beab..bb4f396 100644
+--- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
++++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+@@ -11,18 +11,33 @@
+ #ifndef PLAT_S5P_MIPI_CSIS_H_
+ #define PLAT_S5P_MIPI_CSIS_H_ __FILE__
  
--static struct omap_i2c_dev_attr i2c_dev_attr;
-+static struct omap_i2c_dev_attr i2c_dev_attr = {
-+	.flags		= OMAP_I2C_FLAG_NO_FIFO |
-+			  OMAP_I2C_FLAG_SIMPLE_CLOCK |
-+			  OMAP_I2C_FLAG_16BIT_DATA_REG |
-+			  OMAP_I2C_FLAG_BUS_SHIFT_2,
-+};
- 
- /* I2C1 */
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index d737b99..a30b100 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1527,6 +1527,9 @@ static struct omap_hwmod_class i2c_class = {
- 
- static struct omap_i2c_dev_attr i2c_dev_attr = {
- 	.fifo_depth	= 8, /* bytes */
-+	.flags		= OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-+			  OMAP_I2C_FLAG_BUS_SHIFT_2 |
-+			  OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
- };
- 
- /* I2C1 */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 324162d..f804e78 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1876,6 +1876,9 @@ static struct omap_hwmod omap3xxx_dss_venc_hwmod = {
- 
- static struct omap_i2c_dev_attr i2c1_dev_attr = {
- 	.fifo_depth	= 8, /* bytes */
-+	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-+		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
-+		 OMAP_I2C_FLAG_BUS_SHIFT_2,
- };
- 
- static struct omap_hwmod_irq_info i2c1_mpu_irqs[] = {
-@@ -1919,6 +1922,9 @@ static struct omap_hwmod omap3xxx_i2c1_hwmod = {
- 
- static struct omap_i2c_dev_attr i2c2_dev_attr = {
- 	.fifo_depth	= 8, /* bytes */
-+	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-+		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
-+		 OMAP_I2C_FLAG_BUS_SHIFT_2,
- };
- 
- static struct omap_hwmod_irq_info i2c2_mpu_irqs[] = {
-@@ -1962,6 +1968,9 @@ static struct omap_hwmod omap3xxx_i2c2_hwmod = {
- 
- static struct omap_i2c_dev_attr i2c3_dev_attr = {
- 	.fifo_depth	= 64, /* bytes */
-+	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-+		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
-+		 OMAP_I2C_FLAG_BUS_SHIFT_2,
- };
- 
- static struct omap_hwmod_irq_info i2c3_mpu_irqs[] = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 5d3f684..c2edb21 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -27,6 +27,7 @@
- #include <plat/mcspi.h>
- #include <plat/mcbsp.h>
- #include <plat/mmc.h>
-+#include <plat/i2c.h>
- 
- #include "omap_hwmod_common_data.h"
- 
-@@ -2090,6 +2091,11 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
- 	.rev	= OMAP_I2C_IP_VERSION_2,
- };
- 
-+/* i2c dev_attr */
-+static struct omap_i2c_dev_attr i2c_dev_attr = {
-+	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
-+};
++struct platform_device;
 +
- /* i2c1 */
- static struct omap_hwmod omap44xx_i2c1_hwmod;
- static struct omap_hwmod_irq_info omap44xx_i2c1_irqs[] = {
-@@ -2138,6 +2144,7 @@ static struct omap_hwmod omap44xx_i2c1_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_I2C1_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &i2c_dev_attr,
- 	.slaves		= omap44xx_i2c1_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c1_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2191,6 +2198,7 @@ static struct omap_hwmod omap44xx_i2c2_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_I2C2_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &i2c_dev_attr,
- 	.slaves		= omap44xx_i2c2_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c2_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2244,6 +2252,7 @@ static struct omap_hwmod omap44xx_i2c3_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_I2C3_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &i2c_dev_attr,
- 	.slaves		= omap44xx_i2c3_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c3_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2297,6 +2306,7 @@ static struct omap_hwmod omap44xx_i2c4_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_I2C4_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &i2c_dev_attr,
- 	.slaves		= omap44xx_i2c4_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c4_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ /**
+  * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
+  * @clk_rate: bus clock frequency
+  * @lanes: number of data lanes used
+  * @alignment: data alignment in bits
+  * @hs_settle: HS-RX settle time
++ * @fixed_phy_vdd: set to 0 if the driver should be managing external
++ *		   D-PHY power supply through the "vdd" regulator supply
++ * @phy_enable: pointer to a callback controlling D-PHY enable/reset
+  */
+ struct s5p_platform_mipi_csis {
+ 	unsigned long clk_rate;
+ 	u8 lanes;
+ 	u8 alignment;
+ 	u8 hs_settle;
++	unsigned fixed_phy_vdd:1;
++	int (*phy_enable)(struct platform_device *pdev, bool on);
+ };
+ 
++/**
++ * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
++ * @pdev: MIPI-CSIS platform device
++ * @on: true to enable D-PHY and deassert its reset
++ *	false to disable D-PHY
++ */
++int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
++
+ #endif /* PLAT_S5P_MIPI_CSIS_H_ */
 -- 
-1.7.0.4
+1.7.4.1
