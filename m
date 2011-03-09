@@ -1,88 +1,66 @@
-From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Wed,  9 Mar 2011 21:46:20 +0100
-Subject: [PATCH RFC] arm: mini2440: Fix uda134x codec problem.
-Message-ID: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 9 Mar 2011 14:44:02 -0700 (MST)
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D775418.6050105@ti.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+Message-ID: <alpine.DEB.2.00.1103091440101.15132@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC audio for mini2440 platform in current kenrel doesn't work.
-First problem is samsung_asoc_dma device is missing in initialization.
-Next problem is with codec. Codec is initialized but never probed
-because no platform_device exist for codec driver. It leads to errors
-during codec binding to asoc dai. Next problem was platform data which
-was passed from board to asoc main driver but not passed to codec when
-called codec_soc_probe().
+(cc'ing Tero also)
 
-Following patch should fix issues. But not sure if in correct way.
-Please review.
+Hi Rajendra
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
----
- arch/arm/mach-s3c2440/mach-mini2440.c |    7 +++++++
- sound/soc/codecs/uda134x.c            |    3 ++-
- sound/soc/samsung/s3c24xx_uda134x.c   |    3 ++-
- 3 files changed, 11 insertions(+), 2 deletions(-)
+On Wed, 9 Mar 2011, Rajendra Nayak wrote:
 
-diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index f62bb4c..7c3fb07 100644
---- a/arch/arm/mach-s3c2440/mach-mini2440.c
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -506,6 +506,11 @@ static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
- 	},
- };
- 
-+static struct platform_device uda1340_codec = {
-+		.name = "uda134x-codec",
-+		.id = -1,
-+};
-+
- static struct platform_device *mini2440_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_wdt,
-@@ -521,7 +526,9 @@ static struct platform_device *mini2440_devices[] __initdata = {
- 	&s3c_device_nand,
- 	&s3c_device_sdi,
- 	&s3c_device_iis,
-+	&uda1340_codec,
- 	&mini2440_audio,
-+	&samsung_asoc_dma,
- };
- 
- static void __init mini2440_map_io(void)
-diff --git a/sound/soc/codecs/uda134x.c b/sound/soc/codecs/uda134x.c
-index e76847a..48ffd40 100644
---- a/sound/soc/codecs/uda134x.c
-+++ b/sound/soc/codecs/uda134x.c
-@@ -486,7 +486,8 @@ static struct snd_soc_dai_driver uda134x_dai = {
- static int uda134x_soc_probe(struct snd_soc_codec *codec)
- {
- 	struct uda134x_priv *uda134x;
--	struct uda134x_platform_data *pd = dev_get_drvdata(codec->card->dev);
-+	struct uda134x_platform_data *pd = codec->card->dev->platform_data;
-+
- 	int ret;
- 
- 	printk(KERN_INFO "UDA134X SoC Audio Codec\n");
-diff --git a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda134x.c
-index 2c09e93..86f1dc4 100644
---- a/sound/soc/samsung/s3c24xx_uda134x.c
-+++ b/sound/soc/samsung/s3c24xx_uda134x.c
-@@ -226,7 +226,7 @@ static struct snd_soc_ops s3c24xx_uda134x_ops = {
- static struct snd_soc_dai_link s3c24xx_uda134x_dai_link = {
- 	.name = "UDA134X",
- 	.stream_name = "UDA134X",
--	.codec_name = "uda134x-hifi",
-+	.codec_name = "uda134x-codec",
- 	.codec_dai_name = "uda134x-hifi",
- 	.cpu_dai_name = "s3c24xx-iis",
- 	.ops = &s3c24xx_uda134x_ops,
-@@ -321,6 +321,7 @@ static int s3c24xx_uda134x_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(s3c24xx_uda134x_snd_device,
- 			     &snd_soc_s3c24xx_uda134x);
-+	platform_device_add_data(s3c24xx_uda134x_snd_device, &s3c24xx_uda134x, sizeof(s3c24xx_uda134x));
- 	ret = platform_device_add(s3c24xx_uda134x_snd_device);
- 	if (ret) {
- 		printk(KERN_ERR "S3C24XX_UDA134X SoC Audio: Unable to add\n");
--- 
-1.7.1
+> On Wednesday 09 March 2011 09:20 AM, Paul Walmsley wrote:
+> > On Fri, 4 Mar 2011, Rajendra Nayak wrote:
+> 
+> PRCM waking up the module's clockdomains when in hardware-supervised
+> and INACTIVE, atleast does not seem to be true for OMAP4 and does seem
+> to be documented atleast in the func specs (need to see if its
+> in TRM, else I will raise a request to include it) Chapter 11 to 23,
+> Section Chapter#.5.2.1: Enabling one <clockdomain name> module after
+> power-on-reset.
+> This seems to suggest that the clockdomains have to be force woken-up
+> using SW_WKUP, and can then be programmed in HW_AUTO once the module
+> is accessible.
+> From what I know this was true on OMAP3 as well and maybe on OMAP2,
+> and thinking of why we might not have seen any issues with them, I
+> realized, because of the autodeps of all clockdomains with MPU, they
+> would never be in INACTIVE while a module is being enabled, even if
+> the clockdomain was in HW_AUTO.
+
+OK, maybe this is why the autodeps were needed, because otherwise we would 
+need to wake the clockdomain up before enabling the clocks.  Something to 
+experiment with for 2.6.40.
+
+> hmm.. I am not sure if this is a TRM bug, but FWIK, no clockdomains
+> should go to INACTIVE without taking into account the target idle
+> state. All targets should be sent a idlereq and only on a idleack from
+> all of them, should the clockdomain transition to INACTIVE. If the
+> clockdomain hits INACTIVE just based on its initiators asserting
+> standby, it does not seem right.
+
+Ok, probably just a TRM bug then.  Guess we'll find out when we start 
+removing the autodeps...
+
+> Btw, the patch does not change the behaviour/sequence followed on OMAP3,
+> it just affects OMAP4.
+
+Until the autodeps get removed :-)
+
+> Since no clockdomains on OMAP4 were programmed in HW_AUTO untill now,
+> we did not have any issues, but with the recent series from Santosh
+> (which adds mpu ret/off support in idle/suspend) programming the
+> clockdomains to HW_AUTO did show issues/aborts, and this patch
+> fixes them.
+
+Okay, I'll queue this for 2.6.39.
+
+Thanks for thinking through the module enable sequence with me,
+
+
+- Paul
