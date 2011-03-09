@@ -1,52 +1,35 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Wed, 9 Mar 2011 17:22:27 +0200
-Subject: SMP soft lockup on smp_call_function_many when doing
-	flush_tlb_page
-In-Reply-To: <1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
-References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
-	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
-	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
-	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
+From: kurt.van.dijck@eia.be (Kurt Van Dijck)
+Date: Wed, 9 Mar 2011 16:22:53 +0100
+Subject: IRQ handler under load - slow response
+In-Reply-To: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+Message-ID: <20110309152252.GB333@e-circ.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Did you get a chance to try this patch?
-yes, it works fine
->
->> >> An alternative would be to copy the cpumask to a local variable in
->> >> on_each_cpu_mask(), though the workaround above would cover other cases
->> >> that we haven't spotted yet. Also, the smp_call_function_many()
->> >> description doesn't state that the cpumask should not be modified.
->> >>
->> >>
->> >> diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
->> >> index 8f57f32..1717dec 100644
->> >> --- a/arch/arm/kernel/smp_tlb.c
->> >> +++ b/arch/arm/kernel/smp_tlb.c
->> >> @@ -16,10 +16,13 @@
->> >> ?static void on_each_cpu_mask(void (*func)(void *), void *info, int wait,
->> >> ? ? ? ?const struct cpumask *mask)
->> >> ?{
->> >> + ? ? ? struct cpumask call_mask;
->> >> +
->> >> ? ? ? ?preempt_disable();
->> >>
->> >> + ? ? ? cpumask_copy(&call_mask, mask);
->> >> ? ? ? ?smp_call_function_many(mask, func, info, wait);
->> > ?I'll check this one, but the mask here should be call_mask.
->> >> - ? ? ? if (cpumask_test_cpu(smp_processor_id(), mask))
->> >> + ? ? ? if (cpumask_test_cpu(smp_processor_id(), &call_mask))
->> >> ? ? ? ? ? ? ? ?func(info);
->> >>
->> this patch increases my system instability, for some reason, the
->> call_function_data data get corrupted when the
->> generic_smp_call_function_interrupt() is running.
->
-> Strange, the patch only copies the cpumask.
-this patch also works fine, seems the instability was due to the code
-that I added in order to accelerate the failure.
+On Wed, Mar 09, 2011 at 03:02:06PM +0100, Arno Steffen wrote:
 
-saeed
+> ------------------
+> 
+> What have I done wrong?
+You put code with different scheduling needs in the same scheduling pool.
+> Do I have a chance to speed up the response
+> from changing inputs?
+
+I've been playing with scheduling policies before (I'm not the expert).
+My hint:
+your tasklet is executed in the softirq handler. This will run at normal
+priority (see '$ ps -jefHc' for example)
+
+a)
+You could 'chrt --rr PID' of your softirqd
+
+b)
+replace your tasklet with a threaded irq handler, which you can
+'chrt --rr PID'. This has the effect that only your own piece of code
+is raised in priority.
+> 
+> best regards
+> Steffen
+Hope this will help.
+Kurt
