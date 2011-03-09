@@ -1,137 +1,124 @@
 From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 9 Mar 2011 20:15:29 +0530
-Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
-	requested pads
-In-Reply-To: <87mxl5m6wp.fsf@ti.com>
-References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
-	<87lj0u8mrf.fsf@ti.com>
-	<AANLkTin2f7n-v5Hg7NHB8a4fEmpzt_07xy-M1wjnKHtU@mail.gmail.com>
-	<87mxl5m6wp.fsf@ti.com>
-Message-ID: <AANLkTimGdDrJvyyFFz6T_WFhVkbUhVMd-+iiMqAKNNh6@mail.gmail.com>
+Date: Wed, 9 Mar 2011 20:37:11 +0530
+Subject: [PATCH 5/7] Serial: OMAP: add runtime pm support for omap-serial
+	driver
+In-Reply-To: <87hbbdjc7y.fsf@ti.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-6-git-send-email-govindraj.raja@ti.com>
+	<87r5am499h.fsf@ti.com>
+	<AANLkTim35McK1cFFEXyS49D6b8CT+4pQfmKAswOn3e7_@mail.gmail.com>
+	<87hbbdjc7y.fsf@ti.com>
+Message-ID: <AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2011 at 6:44 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Wed, Mar 9, 2011 at 7:18 AM, Kevin Hilman <khilman@ti.com> wrote:
 > Govindraj <govindraj.ti@gmail.com> writes:
 >
->> Module level wakeup doesn't seem to work and only
->> way it seem to wakeup is through using resume_idle
->> from sram_idle.
+> [...]
 >
-> Have you verified if the module wakeups themselves are not working, or
-> just that the wakeup is not propagating to a device IRQ?
->
-
-Actually the wakeup happens but control never moves to uart isr
-Gets looped for ever in clearing wakeup status in prcm_irq_handler
-path.
-
---> omap2_cm_rmw_mod_reg_bits
-     ---> prcm_clear_mod_irqs
-          ---> prcm_interrupt_handler
-
-it gets looped here forever.
-
-
-> As a quick test, I did a suspend-only test shows that module-level
-> wakeups (at least from PER UART) are working.
->
-> On 3530/Beagle, which has console on UART3 (in PER), I successfully
-> tested module level wakeups from suspend.
->
-> First, I added a simple debug printk[1] to show the wakeup source.
-> Then, I ensure CORE stays 'ON' during suspend. ?If CORE stays on, the IO
-> ring is never armed, so only module wakeups can happen:
->
-> ? # echo 3 > /debug/pm_debug/core_pwrdm/suspend
->
-> then I suspend
->
-> ? # echo mem > /sys/power/state
->
-> and type a key on the console to wakeup, and I see:
->
-> ? PRCM IRQ: mod 0x800: WKST=0x00000800
-
-Yes Correct, here seems to work.
-
-
->
-> Which shows PER wakeup from UART3. ?If you do the same without setting
-> CORE to ON, you'll see that the first wakeup is in the WKUP powerdomain
-> from the IO ring.
->
-> So module-level wakeups are indeed working.
->
-> The problem is actually not that module wakeups are working, but rather
-> that the module does not generate an interrupt upon wakeup if it is
-> idle. ?The resume_from_idle hack works because as soon as clocks are
-> enabled, the module generates the interrupt (special thanks to Paul
-> Walmsley for helping me understand this.)
->
+>>> This function should not be needed.
+>>>
+>>> The timer should be replaced by the auto-suspend feature of runtime PM.
 >>
->> One simple way to reproduce the problem with
->> existing code base also is adding this patch which
->> will enable module level wakeup always.
+>> If I use autosuspend based on timer runtime framework
+>> will disable clocks based on autosuspend timeout.
 >>
->> https://patchwork.kernel.org/patch/501211/
->>
->> and with below change.
->>
->> govindraj at Linux-BSP-Server:~/clones/linux-omap-2.6$ gd
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index 47eef48..6343773 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -380,6 +380,7 @@ static void omap_uart_allow_sleep(struct
->> omap_uart_state *uart)
->> ? ? ? ? omap_uart_smart_idle_enable(uart, 1);
->> ? ? ? ? uart->can_sleep = 1;
->> ? ? ? ? del_timer(&uart->timer);
->> + ? ? ? omap_uart_disable_clocks(uart);
->> ?}
->>
->> We can see module level wakeup doesn't wakeup the uart.
->> once we set sleep_timeout for uart and timer starts.
+>> But if I cut clocks outside sram idle path module level wakeup
+>> will not work.
+>> if I cut func clocks outside prepare for idle
+>> wake_up is a problem.
 >
-> The above change alone can never work. ?I'm pretty sure you wouldn't see
-> IO-ring wakeups will not happen with this change either because the
-> kernel will probably hang.
+> As I mentioned in the other thread, module wakeups are not the problem,
+> rather the module generating the interrupt is the problem. ?So cutting
+> clocks outside prepare_for_idle path is not the problem. ?It's the
+> re-enabling of the clocks that is important.
 >
-> If you disable the clocks here, then any console usage between the
-> timeout and the idle path will hang the kernel. ?You can't do this
-> without taking the console lock. ?Doing that will be much easier in your
-> new driver.
+>> So I am going with existing model where we are cutting clocks in
+>> prepare idle and enabling the clock back in resume_idle based on
+>> wakeup event as any other combination doesn't seem to work.
+>>
+>> [As stated in other thread to reproduce the issue
+>> with module level wakeup]
+>>
+>> Even with existing framework if I try to experiment
+>> by cutting clocks after uart timeout in allow_sleep
+>> func, module level wakeup doesn't seem to happen.
+>>>
+>>> Instead of calling omap_port_disable() callers should call
+>>> pm_runtime_put_autosuspend(), and the console_stop() should be part of
+>>> the ->runtime_suspend() callback.
+>>>
+>>> Also, why do you check for pm_runtime_suspended()? ?Just call it for
+>>> every time and we get runtime PM use-counting and statistics for free
+>>> and the ->runtime_suspend() callback will be called when the usecount
+>>> goes to zero.
+>>>
+>>
+>> Yes correct, but I can't balance the put_sync and get_sync
+>> as said above. I can call put_sync only once in prepare_idle
+>> to cut clocks. But having put_sync outside prepare_idle, if
+>> clocks are cut module level wakeup doesn't seem to happen.
+>>
+>>
+>>>> +static void serial_omap_inactivity_timer(unsigned long uart_no)
+>>>> +{
+>>>> + ? ? struct uart_omap_port *up = ui[uart_no];
+>>>> +
+>>>> + ? ? up->can_sleep = 1;
+>>>> + ? ? omap_uart_smart_idle(up);
+>>>> +}
+>>>
+>>> This will not be needed if using the autosuspend feature.
+>>
+>> Using autosuspend, module level wakeup will not happen
+>> since autosuspend cuts clocks outside prepare_idle
+>> based on autosuspend timeout.
+>
+> OK, I get the point. ?You mentioned module level wakeups about 10 times
+> in this message. ?;)
+>
+> However, rather than continue to hack around this problem we need to
+> understand the root cause. ?Thanks to Paul, I think I undersand the root
+> cause as explained in the other thread, and I think there's a relatively
+> easy way to make them work.
+>
+> So here's an experiment to try with autosuspend. ?I suspect this will
+> work, just hack it up to prove the concept. ?If it works, we can make
+> something more generic. ?Here are a few alternatives to try. ?I may
+> experiment with some of them tomorrow as well, but please let me know
+> what you try:
+>
+> Using autosuspend, clocks will get cut independently of the idle path.
+> Then, use the PRCM ISR detection of UART module wakeups to call the
+> UART's interrupt handler. ?The interrupt handler will pm_runtime_get(),
+> enable the clocks, and then take care of the interrupt. ?Done.
+>
+> Alternatively, you could test it on current code by simply removing the
+> resume_from_idle call from the idle path and calling it instead from the
+> PRCM ISR when UART module wakeups are detected.
 
-sorry forgot to specify here, to avoid above scenario I am suppressing
-complete printk's using sysfs interface.
-echo 0 > /proc/sys/kernel/printk
-so by applying this patch and booting up and then suppressing printks
-then setting uart timeout, after timeout hitting any key.
-Similar behavior of always in loop to clear wakeup status.
+I remember doing similar experiment didn't seem to help,
 
---
-Thanks,
-Govindraj.R
+>
+> Another option to experiment with: use PRCM ISR to trigger a SW
+> interrupt of the UART IRQ (cf. MPU_INTC.INTCPS_ISR_SETn registers.)
+> This may be the cleanest approach, and not require calling into the
+> driver, but I'm not sure if the normal interrupt clearing process will
+> also clear the SW interrupt.
 
+need to check this.
+
+>
+> The best longer-term solution is will be to use the chained PRCM
+> interrupt handler[1] (not yet finished.) ?Using that, drivers could
+> directly register for their individual module wakeup interrupts.
+
+Agree.
 
 >
 > Kevin
 >
->
-> [1]
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 6e2bd38..677a235 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -219,6 +219,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs)
-> ? ? ? ? ? ? ? ?iclk = omap2_cm_read_mod_reg(module, iclk_off);
-> ? ? ? ? ? ? ? ?fclk = omap2_cm_read_mod_reg(module, fclk_off);
-> ? ? ? ? ? ? ? ?while (wkst) {
-> + ? ? ? ? ? ? ? ? ? ? ? printk("PRCM IRQ: mod 0x%x: WKST=0x%08x\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?module, wkst);
-> ? ? ? ? ? ? ? ? ? ? ? ?clken = wkst;
-> ? ? ? ? ? ? ? ? ? ? ? ?omap2_cm_set_mod_reg_bits(clken, module, iclk_off);
-> ? ? ? ? ? ? ? ? ? ? ? ?/*
+> [1] http://marc.info/?l=linux-omap&m=129258489308837&w=2
 >
 >
