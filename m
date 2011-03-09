@@ -1,204 +1,157 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Mar 2011 07:55:12 +0900
-Subject: [PATCH v2 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM
-	D-PHY	control
-In-Reply-To: <1299179061-30959-4-git-send-email-s.nawrocki@samsung.com>
-References: <01a701cbd95d$9873c160$c95b4420$%kim@samsung.com>
-	<1299179061-30959-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 9 Mar 2011 23:05:42 +0000
+Subject: [PATCH] ARM:boot:device tree: Allow the device tree binary to
+	be appended to zImage
+In-Reply-To: <20110309215800.26377.43925.stgit@riker>
+References: <20110309215800.26377.43925.stgit@riker>
+Message-ID: <20110309230542.GC9995@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Add common code for MIPI-CSIS and MIPI-DSIM drivers to support
-> their corresponding D-PHY's enable and reset control.
-> Tested with S5PV210 and EXYNOS4 SoCs.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Wed, Mar 09, 2011 at 01:58:00PM -0800, John Bonesio wrote:
+> This patch provides the ability to boot using a device tree that is appended
+> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+
+I'd much rather see something that wrappers the kernel and passes the
+DT through an ATAG. So possibly a pre-amble as well?
+ 
+> Signed-off-by: John Bonesio <bones@secretlab.ca>
 > ---
->  arch/arm/mach-exynos4/include/mach/regs-pmu.h   |    5 ++
->  arch/arm/mach-s5pv210/include/mach/regs-clock.h |    5 +-
->  arch/arm/plat-s5p/Kconfig                       |    5 ++
->  arch/arm/plat-s5p/Makefile                      |    1 +
->  arch/arm/plat-s5p/setup-mipi.c                  |   68
-> +++++++++++++++++++++++
->  5 files changed, 83 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/plat-s5p/setup-mipi.c
 > 
-> diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-b/arch/arm/mach-
-> exynos4/include/mach/regs-pmu.h
-> index 2ddd617..985416d 100644
-> --- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-> +++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-> @@ -17,6 +17,11 @@
+>  arch/arm/Kconfig                |    7 ++++
+>  arch/arm/boot/compressed/head.S |   75 +++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 79 insertions(+), 3 deletions(-)
 > 
->  #define S5P_PMUREG(x)			(S5P_VA_PMU + (x))
-> 
-> +#define S5P_MIPI_DPHY_CONTROL(n)	S5P_PMUREG(0x0710 + (n) * 4)
-> +#define S5P_MIPI_DPHY_ENABLE		(1 << 0)
-> +#define S5P_MIPI_DPHY_SRESETN		(1 << 1)
-> +#define S5P_MIPI_DPHY_MRESETN		(1 << 2)
-> +
->  #define S5P_PMU_CAM_CONF		S5P_PMUREG(0x3C00)
->  #define S5P_PMU_TV_CONF			S5P_PMUREG(0x3C20)
->  #define S5P_PMU_MFC_CONF		S5P_PMUREG(0x3C40)
-> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-b/arch/arm/mach-
-> s5pv210/include/mach/regs-clock.h
-> index 4c45b74..78925c5 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-> @@ -146,6 +146,10 @@
->  #define S5P_OM_STAT		S5P_CLKREG(0xE100)
->  #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
->  #define S5P_DAC_CONTROL		S5P_CLKREG(0xE810)
-> +#define S5P_MIPI_DPHY_CONTROL(x) S5P_CLKREG(0xE814)
-> +#define S5P_MIPI_DPHY_ENABLE	(1 << 0)
-> +#define S5P_MIPI_DPHY_SRESETN	(1 << 1)
-> +#define S5P_MIPI_DPHY_MRESETN	(1 << 2)
-> 
->  #define S5P_INFORM0		S5P_CLKREG(0xF000)
->  #define S5P_INFORM1		S5P_CLKREG(0xF004)
-> @@ -161,7 +165,6 @@
->  #define S5P_MDNIE_SEL		S5P_CLKREG(0x7008)
->  #define S5P_MIPI_PHY_CON0	S5P_CLKREG(0x7200)
->  #define S5P_MIPI_PHY_CON1	S5P_CLKREG(0x7204)
-> -#define S5P_MIPI_DPHY_CONTROL	S5P_CLKREG(0xE814)
-> 
->  #define S5P_IDLE_CFG_TL_MASK	(3 << 30)
->  #define S5P_IDLE_CFG_TM_MASK	(3 << 28)
-> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-> index 6390ac7..be316d7 100644
-> --- a/arch/arm/plat-s5p/Kconfig
-> +++ b/arch/arm/plat-s5p/Kconfig
-> @@ -74,3 +74,8 @@ config S5P_DEV_CSIS1
->  	bool
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index d8a330f..1a55e3e 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1593,6 +1593,13 @@ config USE_OF
 >  	help
->  	  Compile in platform device definitions for MIPI-CSIS channel 1
-> +
-> +config S5P_SETUP_MIPI
-
-How about S5P_SETUP_MIPIPHY ?
-
-> +	bool
+>  	  Include support for flattened device tree machine descriptions.
+>  
+> +config ARM_APPENDED_DTB
+> +	bool "Use appended device tree blob"
+> +	depends on OF
 > +	help
-> +	  Compile in common setup code for MIPI-CSIS and MIPI-DSIM devices.
-> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-> index 4bd5cf9..84651af 100644
-> --- a/arch/arm/plat-s5p/Makefile
-> +++ b/arch/arm/plat-s5p/Makefile
-> @@ -31,3 +31,4 @@ obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
->  obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
->  obj-$(CONFIG_S5P_DEV_CSIS0)	+= dev-csis0.o
->  obj-$(CONFIG_S5P_DEV_CSIS1)	+= dev-csis1.o
-> +obj-$(CONFIG_S5P_SETUP_MIPI)	+= setup-mipi.o
-> diff --git a/arch/arm/plat-s5p/setup-mipi.c
-b/arch/arm/plat-s5p/setup-mipi.c
-> new file mode 100644
-> index 0000000..4d8ae96
-> --- /dev/null
-> +++ b/arch/arm/plat-s5p/setup-mipi.c
-
-I think, "setup-mipiphy.c" is more clearly :)
-
-> @@ -0,0 +1,68 @@
+> +	  With this option, the boot code will look for a device tree binary
+> +	  (dtb) appended to zImage.
+> +
+>  # Compressed boot loader in ROM.  Yes, we really want to ask about
+>  # TEXT and BSS so we preserve their values in the config files.
+>  config ZBOOT_ROM_TEXT
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 200625c..611719e 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -210,6 +210,58 @@ restart:	adr	r0, LC0
+>  		 */
+>  		mov	r10, r6
+>  #endif
+> +#ifdef CONFIG_ARM_APPENDED_DTB
 > +/*
-> + * Copyright (C) 2011 Samsung Electronics Co., Ltd
+> + *   r0  = delta
+> + *   r2  = BSS start
+> + *   r3  = BSS end
+> + *   r4  = final kernel address
+> + *   r5  = start of this image
+> + *   r6  = _edata
+> + *   r7  = architecture ID
+> + *   r8  = atags/device tree pointer
+> + *   r9  = size of decompressed image
+> + *   r10 = end of this image, including  bss/stack/malloc space if non XIP
+> + *   r11 = GOT start
+> + *   r12 = GOT end
 > + *
-> + * S5P - Helper functions for MIPI-CSIS and MIPI-DSIM D-PHY control
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * if there are device trees (dtb) appended to zImage, advance r10 so that the
+> + * dtb data will get relocated along with the kernel if necessary.
 > + */
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +
-> +#ifdef CONFIG_ARCH_EXYNOS4
-> +#include <mach/regs-pmu.h>
+> +		ldr	lr, [r6, #0]
+> +#ifndef __ARMEB__
+> +		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
 > +#else
-> +#include <mach/regs-clock.h>
+> +		ldr	r1, =0xd00dfeed
 > +#endif
+> +		cmp	lr, r1
+> +		bne	dtb_check_done
+> +
+> +		mov	r8, r6			@ use the appended device tree
+> +
+> +		/* Get the dtb's size */
+> +		ldr	lr, [r6, #4]
+> +
+> +#ifndef __ARMEB__
+> +		/* convert lr (dtb size) to little endian */
+> +		eor	r1, lr, lr, ror #16
+> +		bic	r1, r1, #0x00ff0000
+> +		mov	lr, lr, ror #8
+> +		eor	lr, lr, r1, lsr #8
+> +#endif
+> +		/*
+> +		 * dtb size rounded up to a multiple of 8 bytes so a
+> +		 * misaligned GOT entry doesn't cause the end of the
+> +		 * dtb binary to be overwritten.
+> +		 */
+> +		add	lr, lr, #7
+> +		bic	lr, lr, #7
+> +
+> +		add	r10, r10, lr
+> +		add	r6, r6, lr
+> +dtb_check_done:
+> +#endif
+>  
+>  /*
+>   * Check to see if we will overwrite ourselves.
+> @@ -272,7 +324,8 @@ wont_overwrite:
+>   *   r12 = GOT end
+>   *   sp  = stack pointer
+>   */
+> -		teq	r0, #0
+> +		add	r1, r0, lr
+> +		teq	r1, #0
+>  		beq	not_relocated
+>  		add	r11, r11, r0
+>  		add	r12, r12, r0
+> @@ -288,12 +341,28 @@ wont_overwrite:
+>  
+>  		/*
+>  		 * Relocate all entries in the GOT table.
+> +		 * Bump bss entries to _edata + dtb size
+>  		 */
+>  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
+> -		add	r1, r1, r0		@ table.  This fixes up the
+> -		str	r1, [r11], #4		@ C references.
+> +		add	r1, r1, r0		@ This fixes up C references
+> +		cmp	r1, r2			@ if entry >= bss_start &&
+> +		cmphs	r3, r1			@       bss_end > entry
+> +		addhi	r1, lr			@    entry += dtb size
+> +		str	r1, [r11], #4		@ next entry
+>  		cmp	r11, r12
+>  		blo	1b
+> +
+> +		/* bump our bss registers too */
+> +		add	r2, r2, lr
+> +		add	r3, r3, lr
+> +
+> +		/*
+> +		 * bump the stack pinter
+> +		 *
+> + 		 * If the linker script changes so the stack is not after
+> +		 * the bss section, this code will be wrong.
+> +		 */
+> +		add	sp, sp, lr
+>  #else
+>  
+>  		/*
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-How about following?
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
---- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-@@ -160,7 +160,9 @@
- #define S5P_CLKDIV_BUS_GPLR_SHIFT      (4)
- #define S5P_CLKDIV_BUS_GPLR_MASK       (0x7 << S5P_CLKDIV_BUS_GPLR_SHIFT)
-
--/* Compatibility defines */
-+/* Compatibility defines and inclusion */
-+
-+#include <mach/regs-pmu.h>
-
- #define S5P_EPLL_CON                   S5P_EPLL_CON0
-
-Then, just adding regs-clock.h here.
-
-+#include <mach/regs-clock.h>
-
-> +
-> +static int __s5p_mipi_phy_control(struct platform_device *pdev,
-> +				  bool on, u32 reset)
-> +{
-> +	static DEFINE_SPINLOCK(lock);
-> +	void __iomem *addr;
-> +	unsigned long flags;
-> +	int pid;
-> +	u32 cfg;
-> +
-> +	if (!pdev)
-> +		return -EINVAL;
-> +
-> +	pid = (pdev->id == -1) ? 0 : pdev->id;
-> +
-> +	if (pid != 0 && pid != 1)
-> +		return -EINVAL;
-> +
-> +	addr = S5P_MIPI_DPHY_CONTROL(pid);
-> +
-> +	spin_lock_irqsave(&lock, flags);
-> +
-> +	cfg = __raw_readl(addr);
-> +	cfg = on ? (cfg | reset) : (cfg & ~reset);
-> +	__raw_writel(cfg, addr);
-> +
-> +	if (on) {
-> +		cfg |= S5P_MIPI_DPHY_ENABLE;
-> +	} else if (!(cfg & (S5P_MIPI_DPHY_SRESETN |
-> +			    S5P_MIPI_DPHY_MRESETN) & ~reset)) {
-> +		cfg &= ~S5P_MIPI_DPHY_ENABLE;
-> +	}
-> +
-> +	__raw_writel(cfg, addr);
-> +	spin_unlock_irqrestore(&lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +int s5p_csis_phy_enable(struct platform_device *pdev, bool on)
-> +{
-> +	return __s5p_mipi_phy_control(pdev, on, S5P_MIPI_DPHY_SRESETN);
-> +}
-> +
-> +int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
-> +{
-> +	return __s5p_mipi_phy_control(pdev, on, S5P_MIPI_DPHY_MRESETN);
-> +}
-> --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
