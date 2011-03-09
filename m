@@ -1,123 +1,49 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 9 Mar 2011 13:03:16 +0100
-Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052 regulator v2
-Message-ID: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed,  9 Mar 2011 17:35:50 +0530
+Subject: [GIT PULL] OMAP: L3 error handling driver for for 2.6.39
+Message-ID: <1299672350-17397-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Tony,
 
-This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
+Here is the pull-request for OMAP3 and OMAP4 L3 error handling driver.
+It's based on the latest omap-for-linus branch of yours.
 
-Cc: Samuel Ortiz <samuel.ortiz@intel.com>
-Cc: Liam Girdwood <lrg@slimlogic.co.uk>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Ola Lilja <ola.o.lilja@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/Kconfig                   |    1 +
- arch/arm/mach-ux500/board-mop500-regulators.c |   25 +++++++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
- arch/arm/mach-ux500/board-mop500.c            |   14 ++++++++++++++
- 4 files changed, 41 insertions(+), 0 deletions(-)
+The following changes since commit 0640b436e410290193f554dcfd777bcdeee59697:
+  Abhilash Vadakkepat Koyamangalath (1):
+        audio : AM3517 : Adding i2c info for AIC23 codec
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 247caa3..7f8620f 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -22,6 +22,7 @@ menu "Ux500 target platform"
- config MACH_U8500
- 	bool "U8500 Development platform"
- 	depends on UX500_SOC_DB8500
-+	select TPS6105X
- 	help
- 	  Include support for the mop500 development platform.
+are available in the git repository at:
+
+  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap-l3-for-next
+
+Felipe Balbi (1):
+      OMAP3: l3: Introduce l3-interconnect error handling driver
+
+Santosh Shilimkar (1):
+      OMAP4: l3: Introduce l3-interconnect error handling driver
+
+sricharan (4):
+      OMAP3: hwmod_data: Add address space and irq in L3 hwmod.
+      OMAP3: devices: Initialise the l3 device with the hwmod data.
+      OMAP4: hwmod_data: Add address space and irq in L3 hwmod.
+      OMAP4: Initialise the l3 device with the hwmod data.
+
+ arch/arm/mach-omap2/Makefile               |    4 +
+ arch/arm/mach-omap2/devices.c              |   64 ++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   22 ++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   38 +++
+ arch/arm/mach-omap2/omap_l3_noc.c          |  253 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap_l3_noc.h          |  132 +++++++++++
+ arch/arm/mach-omap2/omap_l3_smx.c          |  314 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_l3_smx.h          |  338 ++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/irqs.h     |    2 +
+ 9 files changed, 1165 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_l3_noc.c
+ create mode 100644 arch/arm/mach-omap2/omap_l3_noc.h
+ create mode 100644 arch/arm/mach-omap2/omap_l3_smx.c
+ create mode 100644 arch/arm/mach-omap2/omap_l3_smx.h
  
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 533967c..0825012 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -11,6 +11,31 @@
- #include <linux/kernel.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/ab8500.h>
-+#include "board-mop500-regulators.h"
-+
-+/*
-+ * TPS61052 regulator
-+ */
-+static struct regulator_consumer_supply tps61052_vaudio_consumers[] = {
-+	/*
-+	 * Boost converter supply to raise voltage on audio speaker, this
-+	 * is actually connected to three pins, VInVhfL (left amplifier)
-+	 * VInVhfR (right amplifier) and VIntDClassInt - all three must
-+	 * be connected to the same voltage.
-+	 */
-+	REGULATOR_SUPPLY("vintdclassint", "ab8500-codec.0"),
-+};
-+
-+struct regulator_init_data tps61052_regulator = {
-+	.constraints = {
-+		.name = "vaudio-hf",
-+		.min_uV = 4500000,
-+		.max_uV = 4500000,
-+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(tps61052_vaudio_consumers),
-+	.consumer_supplies = tps61052_vaudio_consumers,
-+};
- 
- /* AB8500 regulators */
- struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-index 2675fae..a795cec 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.h
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-@@ -15,5 +15,6 @@
- #include <linux/regulator/ab8500.h>
- 
- extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
-+extern struct regulator_init_data tps61052_regulator;
- 
- #endif
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index a393f57..1e75d7e 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -20,6 +20,7 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/ab8500.h>
- #include <linux/mfd/tc3589x.h>
-+#include <linux/mfd/tps6105x.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -114,6 +115,15 @@ static struct pl022_ssp_controller ssp0_platform_data = {
- };
- 
- /*
-+ * TPS61052
-+ */
-+
-+static struct tps6105x_platform_data mop500_tps61052_data = {
-+	.mode = TPS6105X_MODE_VOLTAGE,
-+	.regulator_data = &tps61052_regulator,
-+};
-+
-+/*
-  * TC35892
-  */
- 
-@@ -135,6 +145,10 @@ static struct tc3589x_platform_data mop500_tc35892_data = {
- 
- static struct i2c_board_info mop500_i2c0_devices[] = {
- 	{
-+		I2C_BOARD_INFO("tps61052", 0x33),
-+		.platform_data  = &mop500_tps61052_data,
-+	},
-+	{
- 		I2C_BOARD_INFO("tc3589x", 0x42),
- 		.irq            = NOMADIK_GPIO_TO_IRQ(217),
- 		.platform_data  = &mop500_tc35892_data,
--- 
-1.7.3.2
+ Regards
+ Santosh
