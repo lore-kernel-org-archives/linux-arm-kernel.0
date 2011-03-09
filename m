@@ -1,124 +1,236 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 9 Mar 2011 20:37:11 +0530
-Subject: [PATCH 5/7] Serial: OMAP: add runtime pm support for omap-serial
-	driver
-In-Reply-To: <87hbbdjc7y.fsf@ti.com>
-References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
-	<1298903958-6496-6-git-send-email-govindraj.raja@ti.com>
-	<87r5am499h.fsf@ti.com>
-	<AANLkTim35McK1cFFEXyS49D6b8CT+4pQfmKAswOn3e7_@mail.gmail.com>
-	<87hbbdjc7y.fsf@ti.com>
-Message-ID: <AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 09 Mar 2011 16:17:39 +0100
+Subject: [PATCH v2] ARM: S5P: Add platform helpers for camera
+	GPIO	configuration
+In-Reply-To: <01c701cbd975$c7dcd2d0$57967870$%kim@samsung.com>
+References: <01c701cbd975$c7dcd2d0$57967870$%kim@samsung.com>
+Message-ID: <1299683859-9242-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2011 at 7:18 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
->
-> [...]
->
->>> This function should not be needed.
->>>
->>> The timer should be replaced by the auto-suspend feature of runtime PM.
->>
->> If I use autosuspend based on timer runtime framework
->> will disable clocks based on autosuspend timeout.
->>
->> But if I cut clocks outside sram idle path module level wakeup
->> will not work.
->> if I cut func clocks outside prepare for idle
->> wake_up is a problem.
->
-> As I mentioned in the other thread, module wakeups are not the problem,
-> rather the module generating the interrupt is the problem. ?So cutting
-> clocks outside prepare_for_idle path is not the problem. ?It's the
-> re-enabling of the clocks that is important.
->
->> So I am going with existing model where we are cutting clocks in
->> prepare idle and enabling the clock back in resume_idle based on
->> wakeup event as any other combination doesn't seem to work.
->>
->> [As stated in other thread to reproduce the issue
->> with module level wakeup]
->>
->> Even with existing framework if I try to experiment
->> by cutting clocks after uart timeout in allow_sleep
->> func, module level wakeup doesn't seem to happen.
->>>
->>> Instead of calling omap_port_disable() callers should call
->>> pm_runtime_put_autosuspend(), and the console_stop() should be part of
->>> the ->runtime_suspend() callback.
->>>
->>> Also, why do you check for pm_runtime_suspended()? ?Just call it for
->>> every time and we get runtime PM use-counting and statistics for free
->>> and the ->runtime_suspend() callback will be called when the usecount
->>> goes to zero.
->>>
->>
->> Yes correct, but I can't balance the put_sync and get_sync
->> as said above. I can call put_sync only once in prepare_idle
->> to cut clocks. But having put_sync outside prepare_idle, if
->> clocks are cut module level wakeup doesn't seem to happen.
->>
->>
->>>> +static void serial_omap_inactivity_timer(unsigned long uart_no)
->>>> +{
->>>> + ? ? struct uart_omap_port *up = ui[uart_no];
->>>> +
->>>> + ? ? up->can_sleep = 1;
->>>> + ? ? omap_uart_smart_idle(up);
->>>> +}
->>>
->>> This will not be needed if using the autosuspend feature.
->>
->> Using autosuspend, module level wakeup will not happen
->> since autosuspend cuts clocks outside prepare_idle
->> based on autosuspend timeout.
->
-> OK, I get the point. ?You mentioned module level wakeups about 10 times
-> in this message. ?;)
->
-> However, rather than continue to hack around this problem we need to
-> understand the root cause. ?Thanks to Paul, I think I undersand the root
-> cause as explained in the other thread, and I think there's a relatively
-> easy way to make them work.
->
-> So here's an experiment to try with autosuspend. ?I suspect this will
-> work, just hack it up to prove the concept. ?If it works, we can make
-> something more generic. ?Here are a few alternatives to try. ?I may
-> experiment with some of them tomorrow as well, but please let me know
-> what you try:
->
-> Using autosuspend, clocks will get cut independently of the idle path.
-> Then, use the PRCM ISR detection of UART module wakeups to call the
-> UART's interrupt handler. ?The interrupt handler will pm_runtime_get(),
-> enable the clocks, and then take care of the interrupt. ?Done.
->
-> Alternatively, you could test it on current code by simply removing the
-> resume_from_idle call from the idle path and calling it instead from the
-> PRCM ISR when UART module wakeups are detected.
+Add functions for configuration of the parallel camera
+bus pins on S5PV210 and Exynos4 SoC.
 
-I remember doing similar experiment didn't seem to help,
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
->
-> Another option to experiment with: use PRCM ISR to trigger a SW
-> interrupt of the UART IRQ (cf. MPU_INTC.INTCPS_ISR_SETn registers.)
-> This may be the cleanest approach, and not require calling into the
-> driver, but I'm not sure if the normal interrupt clearing process will
-> also clear the SW interrupt.
+Hello,
 
-need to check this.
+this is a corrected version of platform helpers for the peripheral
+parallel camera bus configuration in S5PV210 and Exynos4 SoCs.
 
->
-> The best longer-term solution is will be to use the chained PRCM
-> interrupt handler[1] (not yet finished.) ?Using that, drivers could
-> directly register for their individual module wakeup interrupts.
+Changes since v1:
+- Renamed files: camera.h/camport.h, setup-camera.c/setup-fimc.c
+- Replaced "camif" with "fimc" in function and data type names
+- Removed driver strength setup (it turned out than only the clock
+  source pin needed maximum driver strength on the test boards, 
+  so I've moved its configuration to the board code)
 
-Agree.
 
->
-> Kevin
->
-> [1] http://marc.info/?l=linux-omap&m=129258489308837&w=2
->
->
+Regards,
+Sylwester Nawrocki
+---
+ arch/arm/mach-exynos4/Kconfig            |    5 +++
+ arch/arm/mach-exynos4/Makefile           |    1 +
+ arch/arm/mach-exynos4/setup-fimc.c       |   44 ++++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/Kconfig            |    5 +++
+ arch/arm/mach-s5pv210/Makefile           |    1 +
+ arch/arm/mach-s5pv210/setup-fimc.c       |   43 +++++++++++++++++++++++++++++
+ arch/arm/plat-s5p/include/plat/camport.h |   28 +++++++++++++++++++
+ 7 files changed, 127 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-exynos4/setup-fimc.c
+ create mode 100644 arch/arm/mach-s5pv210/setup-fimc.c
+ create mode 100644 arch/arm/plat-s5p/include/plat/camport.h
+
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index ad03840..cfe8c33 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -71,6 +71,11 @@ config EXYNOS4_SETUP_SDHCI_GPIO
+ 	help
+ 	  Common setup code for SDHCI gpio.
+ 
++config EXYNOS4_SETUP_FIMC
++	bool
++	help
++	  Common setup code for the camera interfaces.
++
+ # machine support
+ 
+ menu "EXYNOS4 Machines"
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index 0558235..57770d6 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -32,6 +32,7 @@ obj-y					+= dev-audio.o
+ obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
+ obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
+ 
++obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
+ obj-$(CONFIG_EXYNOS4_SETUP_I2C2)	+= setup-i2c2.o
+ obj-$(CONFIG_EXYNOS4_SETUP_I2C3)	+= setup-i2c3.o
+diff --git a/arch/arm/mach-exynos4/setup-fimc.c b/arch/arm/mach-exynos4/setup-fimc.c
+new file mode 100644
+index 0000000..6a45078
+--- /dev/null
++++ b/arch/arm/mach-exynos4/setup-fimc.c
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
++ *
++ * Exynos4 camera interface GPIO configuration.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/gpio.h>
++#include <plat/gpio-cfg.h>
++#include <plat/camport.h>
++
++int exynos4_fimc_setup_gpio(enum s5p_camport_id id)
++{
++	u32 gpio8, gpio5;
++	u32 sfn;
++	int ret;
++
++	switch (id) {
++	case S5P_CAMPORT_A:
++		gpio8 = EXYNOS4_GPJ0(0); /* PCLK, VSYNC, HREF, DATA[0:4] */
++		gpio5 = EXYNOS4_GPJ1(0); /* DATA[5:7], CLKOUT, FIELD */
++		sfn = S3C_GPIO_SFN(2);
++		break;
++
++	case S5P_CAMPORT_B:
++		gpio8 = EXYNOS4_GPE0(0); /* DATA[0:7] */
++		gpio5 = EXYNOS4_GPE1(0); /* PCLK, VSYNC, HREF, CLKOUT, FIELD */
++		sfn = S3C_GPIO_SFN(3);
++		break;
++
++	default:
++		WARN(1, "Wrong camport id: %d\n", id);
++		return -EINVAL;
++	}
++
++	ret = s3c_gpio_cfgall_range(gpio8, 8, sfn, S3C_GPIO_PULL_UP);
++	if (ret)
++		return ret;
++
++	return s3c_gpio_cfgall_range(gpio5, 5, sfn, S3C_GPIO_PULL_UP);
++}
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 53aabef..3b6d0d4 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -53,6 +53,11 @@ config S5PV210_SETUP_SDHCI_GPIO
+ 	help
+ 	  Common setup code for SDHCI gpio.
+ 
++config S5PV210_SETUP_FIMC
++	bool
++	help
++	  Common setup code for the camera interfaces.
++
+ menu "S5PC110 Machines"
+ 
+ config MACH_AQUILA
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index ff1a0db..11f1790 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -31,6 +31,7 @@ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+ 
+ obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
++obj-$(CONFIG_S5PV210_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
+ obj-$(CONFIG_S5PV210_SETUP_IDE)		+= setup-ide.o
+diff --git a/arch/arm/mach-s5pv210/setup-fimc.c b/arch/arm/mach-s5pv210/setup-fimc.c
+new file mode 100644
+index 0000000..54cc5b1
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/setup-fimc.c
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
++ *
++ * S5PV210 camera interface GPIO configuration.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/gpio.h>
++#include <plat/gpio-cfg.h>
++#include <plat/camport.h>
++
++int s5pv210_fimc_setup_gpio(enum s5p_camport_id id)
++{
++	u32 gpio8, gpio5;
++	int ret;
++
++	switch (id) {
++	case S5P_CAMPORT_A:
++		gpio8 = S5PV210_GPE0(0);
++		gpio5 = S5PV210_GPE1(0);
++		break;
++
++	case S5P_CAMPORT_B:
++		gpio8 = S5PV210_GPJ0(0);
++		gpio5 = S5PV210_GPJ1(0);
++		break;
++
++	default:
++		WARN(1, "Wrong camport id: %d\n", id);
++		return -EINVAL;
++	}
++
++	ret = s3c_gpio_cfgall_range(gpio8, 8, S3C_GPIO_SFN(2),
++				    S3C_GPIO_PULL_UP);
++	if (ret)
++		return ret;
++
++	return s3c_gpio_cfgall_range(gpio5, 5, S3C_GPIO_SFN(2),
++				     S3C_GPIO_PULL_UP);
++}
+diff --git a/arch/arm/plat-s5p/include/plat/camport.h b/arch/arm/plat-s5p/include/plat/camport.h
+new file mode 100644
+index 0000000..71688c8
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/camport.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
++ *
++ * S5P series camera interface helper functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef PLAT_S5P_CAMPORT_H_
++#define PLAT_S5P_CAMPORT_H_ __FILE__
++
++enum s5p_camport_id {
++	S5P_CAMPORT_A,
++	S5P_CAMPORT_B,
++};
++
++/*
++ * The helper functions to configure GPIO for the camera parallel bus.
++ * The camera port can be multiplexed with any FIMC entity, even multiple
++ * FIMC entities are allowed to be attached to a single port simultaneously.
++ * These functions are to be used in the board setup code.
++ */
++int s5pv210_fimc_setup_gpio(enum s5p_camport_id id);
++int exynos4_fimc_setup_gpio(enum s5p_camport_id id);
++
++#endif
+-- 
+1.7.4.1
