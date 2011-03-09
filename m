@@ -1,17 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Mar 2011 08:23:19 +0000
-Subject: [PATCH 2/3] ARM: EXYNOS4: Suspend to RAM Support
-In-Reply-To: <1299636521-4831-3-git-send-email-jc.lee@samsung.com>
-References: <1299636521-4831-1-git-send-email-jc.lee@samsung.com>
-	<1299636521-4831-3-git-send-email-jc.lee@samsung.com>
-Message-ID: <20110309082319.GC605@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 9 Mar 2011 09:26:01 +0100
+Subject: [PATCH] net/fec: check id_entry pointer before using it
+In-Reply-To: <1299639004-21546-1-git-send-email-jason.hui@linaro.org>
+References: <1299639004-21546-1-git-send-email-jason.hui@linaro.org>
+Message-ID: <20110309082601.GA3145@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2011 at 11:08:40AM +0900, Jaecheol Lee wrote:
-> This patch adds support suspend to ram for EXYNOS4210.
-> As a note, this includes function of outer cache flush
-> because it is used before entering PM.
+On Wed, Mar 09, 2011 at 10:50:04AM +0800, Jason Liu wrote:
+> The id_entry will possibly be NULL, So, need check
+> id_entry and make sure it not NULL before using it.
 
-This should be updated to use the generic CPU sleep support, found in my
-tree.
+When does it become NULL?
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110309/7a8fd09f/attachment.sig>
