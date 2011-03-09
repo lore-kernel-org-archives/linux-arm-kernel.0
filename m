@@ -1,157 +1,59 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 9 Mar 2011 23:05:42 +0000
-Subject: [PATCH] ARM:boot:device tree: Allow the device tree binary to
-	be appended to zImage
-In-Reply-To: <20110309215800.26377.43925.stgit@riker>
-References: <20110309215800.26377.43925.stgit@riker>
-Message-ID: <20110309230542.GC9995@trinity.fluff.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 09 Mar 2011 15:06:24 -0800
+Subject: [PATCH 5/7] Serial: OMAP: add runtime pm support for omap-serial
+	driver
+In-Reply-To: <AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
+	(Govindraj's message of "Wed, 9 Mar 2011 20:37:11 +0530")
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-6-git-send-email-govindraj.raja@ti.com>
+	<87r5am499h.fsf@ti.com>
+	<AANLkTim35McK1cFFEXyS49D6b8CT+4pQfmKAswOn3e7_@mail.gmail.com>
+	<87hbbdjc7y.fsf@ti.com>
+	<AANLkTim0Xuu8Bs4tzyH1kQp2eS5nUq8stQX4MGzELEE6@mail.gmail.com>
+Message-ID: <87oc5jvqq7.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2011 at 01:58:00PM -0800, John Bonesio wrote:
-> This patch provides the ability to boot using a device tree that is appended
-> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+Govindraj <govindraj.ti@gmail.com> writes:
 
-I'd much rather see something that wrappers the kernel and passes the
-DT through an ATAG. So possibly a pre-amble as well?
- 
-> Signed-off-by: John Bonesio <bones@secretlab.ca>
-> ---
-> 
->  arch/arm/Kconfig                |    7 ++++
->  arch/arm/boot/compressed/head.S |   75 +++++++++++++++++++++++++++++++++++++--
->  2 files changed, 79 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d8a330f..1a55e3e 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1593,6 +1593,13 @@ config USE_OF
->  	help
->  	  Include support for flattened device tree machine descriptions.
->  
-> +config ARM_APPENDED_DTB
-> +	bool "Use appended device tree blob"
-> +	depends on OF
-> +	help
-> +	  With this option, the boot code will look for a device tree binary
-> +	  (dtb) appended to zImage.
-> +
->  # Compressed boot loader in ROM.  Yes, we really want to ask about
->  # TEXT and BSS so we preserve their values in the config files.
->  config ZBOOT_ROM_TEXT
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 200625c..611719e 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -210,6 +210,58 @@ restart:	adr	r0, LC0
->  		 */
->  		mov	r10, r6
->  #endif
-> +#ifdef CONFIG_ARM_APPENDED_DTB
-> +/*
-> + *   r0  = delta
-> + *   r2  = BSS start
-> + *   r3  = BSS end
-> + *   r4  = final kernel address
-> + *   r5  = start of this image
-> + *   r6  = _edata
-> + *   r7  = architecture ID
-> + *   r8  = atags/device tree pointer
-> + *   r9  = size of decompressed image
-> + *   r10 = end of this image, including  bss/stack/malloc space if non XIP
-> + *   r11 = GOT start
-> + *   r12 = GOT end
-> + *
-> + * if there are device trees (dtb) appended to zImage, advance r10 so that the
-> + * dtb data will get relocated along with the kernel if necessary.
-> + */
-> +
-> +		ldr	lr, [r6, #0]
-> +#ifndef __ARMEB__
-> +		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
-> +#else
-> +		ldr	r1, =0xd00dfeed
-> +#endif
-> +		cmp	lr, r1
-> +		bne	dtb_check_done
-> +
-> +		mov	r8, r6			@ use the appended device tree
-> +
-> +		/* Get the dtb's size */
-> +		ldr	lr, [r6, #4]
-> +
-> +#ifndef __ARMEB__
-> +		/* convert lr (dtb size) to little endian */
-> +		eor	r1, lr, lr, ror #16
-> +		bic	r1, r1, #0x00ff0000
-> +		mov	lr, lr, ror #8
-> +		eor	lr, lr, r1, lsr #8
-> +#endif
-> +		/*
-> +		 * dtb size rounded up to a multiple of 8 bytes so a
-> +		 * misaligned GOT entry doesn't cause the end of the
-> +		 * dtb binary to be overwritten.
-> +		 */
-> +		add	lr, lr, #7
-> +		bic	lr, lr, #7
-> +
-> +		add	r10, r10, lr
-> +		add	r6, r6, lr
-> +dtb_check_done:
-> +#endif
->  
->  /*
->   * Check to see if we will overwrite ourselves.
-> @@ -272,7 +324,8 @@ wont_overwrite:
->   *   r12 = GOT end
->   *   sp  = stack pointer
->   */
-> -		teq	r0, #0
-> +		add	r1, r0, lr
-> +		teq	r1, #0
->  		beq	not_relocated
->  		add	r11, r11, r0
->  		add	r12, r12, r0
-> @@ -288,12 +341,28 @@ wont_overwrite:
->  
->  		/*
->  		 * Relocate all entries in the GOT table.
-> +		 * Bump bss entries to _edata + dtb size
->  		 */
->  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
-> -		add	r1, r1, r0		@ table.  This fixes up the
-> -		str	r1, [r11], #4		@ C references.
-> +		add	r1, r1, r0		@ This fixes up C references
-> +		cmp	r1, r2			@ if entry >= bss_start &&
-> +		cmphs	r3, r1			@       bss_end > entry
-> +		addhi	r1, lr			@    entry += dtb size
-> +		str	r1, [r11], #4		@ next entry
->  		cmp	r11, r12
->  		blo	1b
-> +
-> +		/* bump our bss registers too */
-> +		add	r2, r2, lr
-> +		add	r3, r3, lr
-> +
-> +		/*
-> +		 * bump the stack pinter
-> +		 *
-> + 		 * If the linker script changes so the stack is not after
-> +		 * the bss section, this code will be wrong.
-> +		 */
-> +		add	sp, sp, lr
->  #else
->  
->  		/*
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[...]
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+>>
+>> So here's an experiment to try with autosuspend. ?I suspect this will
+>> work, just hack it up to prove the concept. ?If it works, we can make
+>> something more generic. ?Here are a few alternatives to try. ?I may
+>> experiment with some of them tomorrow as well, but please let me know
+>> what you try:
+>>
+>> Using autosuspend, clocks will get cut independently of the idle path.
+>> Then, use the PRCM ISR detection of UART module wakeups to call the
+>> UART's interrupt handler. ?The interrupt handler will pm_runtime_get(),
+>> enable the clocks, and then take care of the interrupt. ?Done.
+>>
+>> Alternatively, you could test it on current code by simply removing the
+>> resume_from_idle call from the idle path and calling it instead from the
+>> PRCM ISR when UART module wakeups are detected.
+>
+> I remember doing similar experiment didn't seem to help,
+>
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+To show it's possible, I did really hacky proof of concept, hard-coded
+to UART3 console for n900/beagle, but at least it shows that this
+approach can work, and the module-level wakeups are working and can be
+used as the trigger for UART wakeup instead of resume_from_idle.  Of
+course, it still has problems with using serial after non-UART wakeups,
+but once omap-serial is using runtime PM, that will no longer be an
+issue.
+
+My hacky branch is called pm-wip/uart-wkup and is in my pm git tree[1]
+(based at the pm-core branch)
+
+To test module-level wakeups (instead of IO-ring) I again forced CORE to
+stay on during suspend, and tested wakeup from suspend on 3430/n900:
+
+  echo 3 > /debug/pm_debug/core_pwrdm/suspend
+  echo mem > /sys/power/state
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
