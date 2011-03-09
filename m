@@ -1,49 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed,  9 Mar 2011 17:35:50 +0530
-Subject: [GIT PULL] OMAP: L3 error handling driver for for 2.6.39
-Message-ID: <1299672350-17397-1-git-send-email-santosh.shilimkar@ti.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Wed, 9 Mar 2011 17:36:12 +0530
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <alpine.DEB.2.00.1103081220140.10981@utopia.booyaka.com>
+References: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+	<87lj0u8mrf.fsf@ti.com> <87tyfi49cs.fsf@ti.com>
+	<AANLkTiknEQrqUt1-sY6-aDw4R5ZMP2uErSjRNB5Yex_v@mail.gmail.com>
+	<alpine.DEB.2.00.1103081220140.10981@utopia.booyaka.com>
+Message-ID: <AANLkTin6kv7apsWtGUubDRcH5JAfL0Kx5cDi5GQjKU1q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Mar 9, 2011 at 12:51 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> By the way, if your patch relies on OMAP_DEVICE_PAD_IDLE, you should
+> probably sync up with Sricharan, who is apparently planning to remove that
+> flag:
+>
 
-Here is the pull-request for OMAP3 and OMAP4 L3 error handling driver.
-It's based on the latest omap-for-linus branch of yours.
+currently I am dependent on OMAP_DEVICE_PAD_WAKEUP flag.
+I am not using OMAP_DEVICE_PAD_IDLE as of now.
 
-The following changes since commit 0640b436e410290193f554dcfd777bcdeee59697:
-  Abhilash Vadakkepat Koyamangalath (1):
-        audio : AM3517 : Adding i2c info for AIC23 codec
+--
+Thanks,
+Govindraj.R
 
-are available in the git repository at:
 
-  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap-l3-for-next
-
-Felipe Balbi (1):
-      OMAP3: l3: Introduce l3-interconnect error handling driver
-
-Santosh Shilimkar (1):
-      OMAP4: l3: Introduce l3-interconnect error handling driver
-
-sricharan (4):
-      OMAP3: hwmod_data: Add address space and irq in L3 hwmod.
-      OMAP3: devices: Initialise the l3 device with the hwmod data.
-      OMAP4: hwmod_data: Add address space and irq in L3 hwmod.
-      OMAP4: Initialise the l3 device with the hwmod data.
-
- arch/arm/mach-omap2/Makefile               |    4 +
- arch/arm/mach-omap2/devices.c              |   64 ++++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   22 ++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   38 +++
- arch/arm/mach-omap2/omap_l3_noc.c          |  253 +++++++++++++++++++++
- arch/arm/mach-omap2/omap_l3_noc.h          |  132 +++++++++++
- arch/arm/mach-omap2/omap_l3_smx.c          |  314 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_l3_smx.h          |  338 ++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/irqs.h     |    2 +
- 9 files changed, 1165 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_l3_noc.c
- create mode 100644 arch/arm/mach-omap2/omap_l3_noc.h
- create mode 100644 arch/arm/mach-omap2/omap_l3_smx.c
- create mode 100644 arch/arm/mach-omap2/omap_l3_smx.h
- 
- Regards
- Santosh
+> ? http://www.mail-archive.com/linux-omap at vger.kernel.org/msg46296.html
+>
+>
+> - Paul
+>
