@@ -1,53 +1,172 @@
 From: jc.lee@samsung.com (Jaecheol Lee)
-Date: Wed,  9 Mar 2011 11:08:41 +0900
-Subject: [PATCH 3/3] ARM: EXYNOS4: Update HRT for supporting PM
+Date: Wed,  9 Mar 2011 11:08:39 +0900
+Subject: [PATCH 1/3] ARM: EXYNOS4: Add PMU Registers for PM
 In-Reply-To: <1299636521-4831-1-git-send-email-jc.lee@samsung.com>
 References: <1299636521-4831-1-git-send-email-jc.lee@samsung.com>
-Message-ID: <1299636521-4831-4-git-send-email-jc.lee@samsung.com>
+Message-ID: <1299636521-4831-2-git-send-email-jc.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates HRT driver for supporting PM.
-The resume function of PWM4 timer which is used clocksource is needed
-when kernel is resuming for restarting.
+This patch adds definitions of PMU registers for EXYNOS4 PM.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 ---
- arch/arm/mach-exynos4/time.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos4/include/mach/regs-pmu.h |  142 +++++++++++++++++++++++--
+ 1 files changed, 133 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
-index e30ac70..86b9fa0 100644
---- a/arch/arm/mach-exynos4/time.c
-+++ b/arch/arm/mach-exynos4/time.c
-@@ -206,12 +206,28 @@ static cycle_t exynos4_pwm4_read(struct clocksource *cs)
- 	return (cycle_t) ~__raw_readl(S3C_TIMERREG(0x40));
- }
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+index 2ddd617..e6d5bfc 100644
+--- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+@@ -15,16 +15,140 @@
  
-+static void exynos4_pwm4_resume(struct clocksource *cs)
-+{
-+	unsigned long pclk;
-+
-+	pclk = clk_get_rate(timerclk);
-+
-+	clk_set_rate(tdiv4, pclk / 2);
-+	clk_set_parent(tin4, tdiv4);
-+
-+	exynos4_pwm_init(4, ~0);
-+	exynos4_pwm_start(4, 1);
-+}
-+
- struct clocksource pwm_clocksource = {
- 	.name		= "pwm_timer4",
- 	.rating		= 250,
- 	.read		= exynos4_pwm4_read,
- 	.mask		= CLOCKSOURCE_MASK(32),
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
-+#ifdef CONFIG_PM
-+	.resume		= exynos4_pwm4_resume,
-+#endif
- };
+ #include <mach/map.h>
  
- static void __init exynos4_clocksource_init(void)
+-#define S5P_PMUREG(x)			(S5P_VA_PMU + (x))
++#define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
+ 
+-#define S5P_PMU_CAM_CONF		S5P_PMUREG(0x3C00)
+-#define S5P_PMU_TV_CONF			S5P_PMUREG(0x3C20)
+-#define S5P_PMU_MFC_CONF		S5P_PMUREG(0x3C40)
+-#define S5P_PMU_G3D_CONF		S5P_PMUREG(0x3C60)
+-#define S5P_PMU_LCD0_CONF		S5P_PMUREG(0x3C80)
+-#define S5P_PMU_LCD1_CONF		S5P_PMUREG(0x3CA0)
+-#define S5P_PMU_GPS_CONF		S5P_PMUREG(0x3CE0)
++#define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
+ 
+-#define S5P_INT_LOCAL_PWR_EN		0x7
++#define S5P_CENTRAL_LOWPWR_CFG			(1 << 16)
++
++#define S5P_CENTRAL_SEQ_OPTION			S5P_PMUREG(0x0208)
++
++#define S5P_USE_STANDBY_WFI0			(1 << 16)
++#define S5P_USE_STANDBY_WFI1			(1 << 17)
++#define S5P_USE_STANDBY_WFE0			(1 << 24)
++#define S5P_USE_STANDBY_WFE1			(1 << 25)
++#define S5P_USE_MASK				((0x3 << 16) | (0x3 << 24))
++
++#define S5P_WAKEUP_STAT				S5P_PMUREG(0x0600)
++#define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
++#define S5P_WAKEUP_MASK				S5P_PMUREG(0x0608)
++
++#define S5P_INFORM0				S5P_PMUREG(0x0800)
++#define S5P_INFORM1				S5P_PMUREG(0x0804)
++#define S5P_INFORM2				S5P_PMUREG(0x0808)
++#define S5P_INFORM3				S5P_PMUREG(0x080C)
++#define S5P_INFORM4				S5P_PMUREG(0x0810)
++#define S5P_INFORM5				S5P_PMUREG(0x0814)
++#define S5P_INFORM6				S5P_PMUREG(0x0818)
++#define S5P_INFORM7				S5P_PMUREG(0x081C)
++
++#define S5P_ARM_CORE0_LOWPWR			S5P_PMUREG(0x1000)
++#define S5P_DIS_IRQ_CORE0			S5P_PMUREG(0x1004)
++#define S5P_DIS_IRQ_CENTRAL0			S5P_PMUREG(0x1008)
++#define S5P_ARM_CORE1_LOWPWR			S5P_PMUREG(0x1010)
++#define S5P_DIS_IRQ_CORE1			S5P_PMUREG(0x1014)
++#define S5P_DIS_IRQ_CENTRAL1			S5P_PMUREG(0x1018)
++#define S5P_ARM_COMMON_LOWPWR			S5P_PMUREG(0x1080)
++#define S5P_L2_0_LOWPWR				S5P_PMUREG(0x10C0)
++#define S5P_L2_1_LOWPWR				S5P_PMUREG(0x10C4)
++#define S5P_CMU_ACLKSTOP_LOWPWR			S5P_PMUREG(0x1100)
++#define S5P_CMU_SCLKSTOP_LOWPWR			S5P_PMUREG(0x1104)
++#define S5P_CMU_RESET_LOWPWR			S5P_PMUREG(0x110C)
++#define S5P_APLL_SYSCLK_LOWPWR			S5P_PMUREG(0x1120)
++#define S5P_MPLL_SYSCLK_LOWPWR			S5P_PMUREG(0x1124)
++#define S5P_VPLL_SYSCLK_LOWPWR			S5P_PMUREG(0x1128)
++#define S5P_EPLL_SYSCLK_LOWPWR			S5P_PMUREG(0x112C)
++#define S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR	S5P_PMUREG(0x1138)
++#define S5P_CMU_RESET_GPSALIVE_LOWPWR		S5P_PMUREG(0x113C)
++#define S5P_CMU_CLKSTOP_CAM_LOWPWR		S5P_PMUREG(0x1140)
++#define S5P_CMU_CLKSTOP_TV_LOWPWR		S5P_PMUREG(0x1144)
++#define S5P_CMU_CLKSTOP_MFC_LOWPWR		S5P_PMUREG(0x1148)
++#define S5P_CMU_CLKSTOP_G3D_LOWPWR		S5P_PMUREG(0x114C)
++#define S5P_CMU_CLKSTOP_LCD0_LOWPWR		S5P_PMUREG(0x1150)
++#define S5P_CMU_CLKSTOP_LCD1_LOWPWR		S5P_PMUREG(0x1154)
++#define S5P_CMU_CLKSTOP_MAUDIO_LOWPWR		S5P_PMUREG(0x1158)
++#define S5P_CMU_CLKSTOP_GPS_LOWPWR		S5P_PMUREG(0x115C)
++#define S5P_CMU_RESET_CAM_LOWPWR		S5P_PMUREG(0x1160)
++#define S5P_CMU_RESET_TV_LOWPWR			S5P_PMUREG(0x1164)
++#define S5P_CMU_RESET_MFC_LOWPWR		S5P_PMUREG(0x1168)
++#define S5P_CMU_RESET_G3D_LOWPWR		S5P_PMUREG(0x116C)
++#define S5P_CMU_RESET_LCD0_LOWPWR		S5P_PMUREG(0x1170)
++#define S5P_CMU_RESET_LCD1_LOWPWR		S5P_PMUREG(0x1174)
++#define S5P_CMU_RESET_MAUDIO_LOWPWR		S5P_PMUREG(0x1178)
++#define S5P_CMU_RESET_GPS_LOWPWR		S5P_PMUREG(0x117C)
++#define S5P_TOP_BUS_LOWPWR			S5P_PMUREG(0x1180)
++#define S5P_TOP_RETENTION_LOWPWR		S5P_PMUREG(0x1184)
++#define S5P_TOP_PWR_LOWPWR			S5P_PMUREG(0x1188)
++#define S5P_LOGIC_RESET_LOWPWR			S5P_PMUREG(0x11A0)
++#define S5P_ONENAND_MEM_LOWPWR			S5P_PMUREG(0x11C0)
++#define S5P_MODIMIF_MEM_LOWPWR			S5P_PMUREG(0x11C4)
++#define S5P_G2D_ACP_MEM_LOWPWR			S5P_PMUREG(0x11C8)
++#define S5P_USBOTG_MEM_LOWPWR			S5P_PMUREG(0x11CC)
++#define S5P_HSMMC_MEM_LOWPWR			S5P_PMUREG(0x11D0)
++#define S5P_CSSYS_MEM_LOWPWR			S5P_PMUREG(0x11D4)
++#define S5P_SECSS_MEM_LOWPWR			S5P_PMUREG(0x11D8)
++#define S5P_PCIE_MEM_LOWPWR			S5P_PMUREG(0x11E0)
++#define S5P_SATA_MEM_LOWPWR			S5P_PMUREG(0x11E4)
++#define S5P_PAD_RETENTION_DRAM_LOWPWR		S5P_PMUREG(0x1200)
++#define S5P_PAD_RETENTION_MAUDIO_LOWPWR		S5P_PMUREG(0x1204)
++#define S5P_PAD_RETENTION_GPIO_LOWPWR		S5P_PMUREG(0x1220)
++#define S5P_PAD_RETENTION_UART_LOWPWR		S5P_PMUREG(0x1224)
++#define S5P_PAD_RETENTION_MMCA_LOWPWR		S5P_PMUREG(0x1228)
++#define S5P_PAD_RETENTION_MMCB_LOWPWR		S5P_PMUREG(0x122C)
++#define S5P_PAD_RETENTION_EBIA_LOWPWR		S5P_PMUREG(0x1230)
++#define S5P_PAD_RETENTION_EBIB_LOWPWR		S5P_PMUREG(0x1234)
++#define S5P_PAD_RETENTION_ISOLATION_LOWPWR	S5P_PMUREG(0x1240)
++#define S5P_PAD_RETENTION_ALV_SEL_LOWPWR	S5P_PMUREG(0x1260)
++#define S5P_XUSBXTI_LOWPWR			S5P_PMUREG(0x1280)
++#define S5P_XXTI_LOWPWR				S5P_PMUREG(0x1284)
++#define S5P_EXT_REGULATOR_LOWPWR		S5P_PMUREG(0x12C0)
++#define S5P_GPIO_MODE_LOWPWR			S5P_PMUREG(0x1300)
++#define S5P_GPIO_MODE_MAUDIO_LOWPWR		S5P_PMUREG(0x1340)
++#define S5P_CAM_LOWPWR				S5P_PMUREG(0x1380)
++#define S5P_TV_LOWPWR				S5P_PMUREG(0x1384)
++#define S5P_MFC_LOWPWR				S5P_PMUREG(0x1388)
++#define S5P_G3D_LOWPWR				S5P_PMUREG(0x138C)
++#define S5P_LCD0_LOWPWR				S5P_PMUREG(0x1390)
++#define S5P_LCD1_LOWPWR				S5P_PMUREG(0x1394)
++#define S5P_MAUDIO_LOWPWR			S5P_PMUREG(0x1398)
++#define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
++#define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
++
++#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
++#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
++#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
++#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
++
++#define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
++#define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
++#define S5P_CAM_OPTION				S5P_PMUREG(0x3C08)
++#define S5P_TV_OPTION				S5P_PMUREG(0x3C28)
++#define S5P_MFC_OPTION				S5P_PMUREG(0x3C48)
++#define S5P_G3D_OPTION				S5P_PMUREG(0x3C68)
++#define S5P_LCD0_OPTION				S5P_PMUREG(0x3C88)
++#define S5P_LCD1_OPTION				S5P_PMUREG(0x3CA8)
++#define S5P_MAUDIO_OPTION			S5P_PMUREG(0x3CC8)
++#define S5P_GPS_OPTION				S5P_PMUREG(0x3CE8)
++#define S5P_GPS_ALIVE_OPTION			S5P_PMUREG(0x3D08)
++
++#define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
++#define S5P_PAD_RET_UART_OPTION			S5P_PMUREG(0x3128)
++#define S5P_PAD_RET_MMCA_OPTION			S5P_PMUREG(0x3148)
++#define S5P_PAD_RET_MMCB_OPTION			S5P_PMUREG(0x3168)
++#define S5P_PAD_RET_EBIA_OPTION			S5P_PMUREG(0x3188)
++#define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
++
++#define S5P_PMU_CAM_CONF			S5P_PMUREG(0x3C00)
++#define S5P_PMU_TV_CONF				S5P_PMUREG(0x3C20)
++#define S5P_PMU_MFC_CONF			S5P_PMUREG(0x3C40)
++#define S5P_PMU_G3D_CONF			S5P_PMUREG(0x3C60)
++#define S5P_PMU_LCD0_CONF			S5P_PMUREG(0x3C80)
++#define S5P_PMU_LCD1_CONF			S5P_PMUREG(0x3CA0)
++#define S5P_PMU_GPS_CONF			S5P_PMUREG(0x3CE0)
++
++#define S5P_INT_LOCAL_PWR_EN			0x7
++
++#define S5P_CHECK_SLEEP				0x00000BAD
+ 
+ #endif /* __ASM_ARCH_REGS_PMU_H */
 -- 
 1.7.1
