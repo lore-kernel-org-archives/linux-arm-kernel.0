@@ -1,33 +1,26 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 10 Mar 2011 14:06:04 +0100
-Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
-In-Reply-To: <1299751843-9743-2-git-send-email-jamie@jamieiles.com>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
-Message-ID: <4D78CCBC.2010807@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Mar 2011 13:08:33 -0000
+Subject: [PATCH] ARM: aout-core: zero thread debug registers in a.out core
+	dump
+In-Reply-To: <AANLkTin0xzSXRPbTqYkXp+2C34Qhoy321LoLERWfvCC4@mail.gmail.com>
+References: <1299581872-18098-1-git-send-email-will.deacon@arm.com>
+	<AANLkTi=uhEfpv1bD_Wtoq4i7kJ5D8yDFmqBwchAnqtXu@mail.gmail.com>
+	<-4405681450588494999@unknownmsgid>
+	<AANLkTin0xzSXRPbTqYkXp+2C34Qhoy321LoLERWfvCC4@mail.gmail.com>
+Message-ID: <000801cbdf24$425fc360$c71f4a20$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/10/2011 11:10 AM, Jamie Iles :
-> --- a/drivers/net/macb.c
-> +++ b/drivers/net/macb.c
-> @@ -18,12 +18,10 @@
->  #include <linux/netdevice.h>
->  #include <linux/etherdevice.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/platform_data/macb.h>
->  #include <linux/platform_device.h>
->  #include <linux/phy.h>
->  
-> -#include <mach/board.h>
-> -#include <mach/cpu.h>
+Hi Bryan,
 
-I did not bouble check but do we need no more cpu_is_ macros?
+> Ah, yeah, I got it.
+> 
+> I think your patch is right, no need for me to repost. Please add my SOB
+> 
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 
-> -
->  #include "macb.h"
->  
->  #define RX_BUFFER_SIZE		128
+Thanks, submitted as 6798/1. Note that the patch system didn't like the
+`re:' substring of ARM: aout-core: zero ... so the patch name has been
+slightly mangled.
 
--- 
-Nicolas Ferre
+Will
