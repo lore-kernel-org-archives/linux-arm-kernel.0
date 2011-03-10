@@ -1,45 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Mar 2011 15:37:20 +0100
-Subject: i.MX Pull request for -next
-In-Reply-To: <20110310135440.GE11273@n2100.arm.linux.org.uk>
-References: <20110310134412.GD29521@pengutronix.de>
-	<20110310135440.GE11273@n2100.arm.linux.org.uk>
-Message-ID: <20110310143720.GE29521@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Mar 2011 20:07:24 +0530
+Subject: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle for GPT1
+In-Reply-To: <alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1103091847150.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
+Message-ID: <3b8b985f13158fbcd110cf45ed7035ad@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 01:54:40PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 10, 2011 at 02:44:13PM +0100, Sascha Hauer wrote:
-> > Hi Russell,
-> > 
-> > please pull the following for the next merge window.
-> 
-> Please can you provide a summary of these changes for me to include in
-> my eventual pull request to Linus?
-> 
+Paul, Benoit,
 
-Sure. Is this enough?
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Thursday, March 10, 2011 2:15 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Rajendra Nayak; Beno?t Cousson
+> Subject: Re: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle
+> for GPT1
+>
+> On Wed, 9 Mar 2011, Paul Walmsley wrote:
+>
+> > From: Rajendra Nayak <rnayak@ti.com>
+> >
+> > Some issues seen (which cause lockups in suspend) with GPT1
+> > after the MPU<->L4_WKUP static dependency was cleared can be
+> > Worked-around for now by forcing GPT1 in software
+> > controlled idle.
+> >
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>
+> Just a quick note, I missed Beno?t's update of the commit message:
+>
+>     http://www.spinics.net/linux/lists/linux-omap/msg48008.html
+>
+> and he's the maintainer of this so we should use his instead.  The
+> revised
+> message is below.
+>
 
-This branch contains the collected Freescale i.MX related updates.
+We continued further debug on the static dependency issues with
+OMAP4 PM series.
+So far from the findings what I have, this timer patch is actually not
+needed and can be dropped. Infact the patch is not really effective
+because current timer driver(not hwmod adapted yet) puts timer1
+in smart idle again.
 
-- additions of board glue code for new devices
-- A bunch of unnecessary ifdef removal
-- Add a full description of iomux settings for i.MX53
+There is another static dep. just like MPUSS<-->EMIF seems to create
+an issue. The lock-up is not very consistently reproducible so it's
+very easy to get miss-leading results. Timer patch was one of those
+observations. With or without timer patch I can reproduce the hang
+with long duration test.
 
-new boards:
-- Efika Smartbook
-- VPR200
-- Ka-Ro TX28
-- Eukrea MBIMXSD51
-- IMX27IPCAM
+Will keep narrowing down the next offending static dependency but
+in mean time I suggest you to drop this patch.
 
-new drivers:
-- Freescale i.MX23/28 AUART driver,
-- Freescale i.MX23/28 framebuffer driver
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Santosh
