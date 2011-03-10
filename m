@@ -1,138 +1,90 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:38:14 +0530
-Subject: [PATCH v2 18/19] OMAP4: cpuidle: Add CPU hotplug notifier and
-	prepare() hook.
+Date: Thu, 10 Mar 2011 19:38:05 +0530
+Subject: [PATCH v2 09/19] OMAP4: PM: Add GIC distributor and interface
+	enable/disable accessory API
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-19-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-10-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 CPUidle, the low power states are triggered when CPU1
-is offlined to OFF power state. When the CPU1 is online, no
-low power states are supported.
+The power management code needs to have access to enable/disable the
+gic cpu interface and distributor based on targetted low power
+states.
 
-The patch adds CPU hotplug notifier to manage the C-state
-states using CPUidle prepare() hook and CPUIDLE_FLAG_IGNORE
-c-state flag.
+These APIs are suppose to me moved to common ARM GIC library and patch
+for the same was posted earlier. The GIC code refactoring is ongoing
+and hence for time being this is kept under OMAP code so that OMAP4
+PM can continue to work.
 
-This was suggested by Kevin Hilman <khilman@ti.com> during
-OMAP4 PM code review.
+Discussion thread:
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42940.html
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |   64 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 64 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/include/mach/omap4-common.h |    5 +++-
+ arch/arm/mach-omap2/omap4-common.c              |   24 +++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index daf41e1..83b7f95 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -13,6 +13,8 @@
- #include <linux/sched.h>
- #include <linux/cpuidle.h>
- #include <linux/clockchips.h>
-+#include <linux/notifier.h>
-+#include <linux/cpu.h>
- 
- #include <asm/proc-fns.h>
- 
-@@ -51,6 +53,8 @@ struct omap4_processor_cx {
- 
- struct omap4_processor_cx omap4_power_states[OMAP4_MAX_STATES];
- static struct powerdomain *mpu_pd, *cpu1_pd, *core_pd;
-+static int needs_state_data_update;
-+static unsigned int state_flags = CPUIDLE_FLAG_IGNORE;
+diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+index a6ce905..a4b3beb 100644
+--- a/arch/arm/mach-omap2/include/mach/omap4-common.h
++++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+@@ -44,6 +44,10 @@ extern void __iomem *omap4_get_gic_dist_base(void);
+ extern void __iomem *omap4_get_gic_cpu_base(void);
+ extern void __iomem *omap4_get_sar_ram_base(void);
+ extern void __init gic_init_irq(void);
++extern void gic_cpu_enable(void);
++extern void gic_cpu_disable(void);
++extern void gic_dist_enable(void);
++extern void gic_dist_disable(void);
+ extern void omap_smc1(u32 fn, u32 arg);
  
  /*
-  * FIXME: Full latency numbers needs to be updated as part of
-@@ -72,6 +76,31 @@ static struct cpuidle_params cpuidle_params_table[] = {
- };
+@@ -64,7 +68,6 @@ extern int omap4_mpuss_init(void);
+ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+ extern void omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
+ extern void omap4_cpu_resume(void);
+-
+ #else
  
- /**
-+ * omap4_prepare_idle - Update C-state parameters dynamically
-+ * @dev: cpuidle device
-+ *
-+ * Called from the CPUidle framework to prepare the device
-+ * for idle before before calling the governor's select function.
-+ */
-+static int omap4_prepare_idle(struct cpuidle_device *dev)
-+{
-+	int i, ret = 0;
-+
-+	if (!needs_state_data_update)
-+		return ret;
-+
-+	/*
-+	 * Update the C-state flags based on CPU1 online
-+	 * or offline state. On OMAP4, the low power C-states
-+	 * are made available when only CPU1 is offline.
-+	 */
-+	for (i = OMAP4_STATE_C2; i < OMAP4_MAX_STATES; i++)
-+		dev->states[i].flags = state_flags;
-+
-+	return ret;
-+}
-+
-+/**
-  * omap4_enter_idle - Programs OMAP4 to enter the specified state
-  * @dev: cpuidle device
-  * @state: The target state to be programmed
-@@ -227,6 +256,36 @@ struct cpuidle_driver omap4_idle_driver = {
- 	.owner =	THIS_MODULE,
- };
+ static inline int omap4_enter_lowpower(unsigned int cpu,
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 97d7d8a..9dd50b7 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -61,6 +61,30 @@ void __init gic_init_irq(void)
+ 	gic_init(0, 29, gic_dist_base_addr, gic_cpu_base);
+ }
  
 +/*
-+ * CPU hotplug notifier to update the C-states when
-+ * CPU1 is offline or onine. While updating C-state flag,
-+ * keep the cpuidle disabled.
++ * FIXME: Remove this GIC APIs once common GIG library starts
++ * supporting it.
 + */
-+static int __cpuinit omap_cpu_hotplug_notify(struct notifier_block *self,
-+					 unsigned long action, void *unused)
++void gic_cpu_enable(void)
 +{
-+	switch (action) {
-+	case CPU_ONLINE:
-+		disable_hlt();
-+		needs_state_data_update = 1;
-+		state_flags = CPUIDLE_FLAG_IGNORE;
-+		enable_hlt();
-+		break;
-+	case CPU_DEAD:
-+		disable_hlt();
-+		needs_state_data_update = 1;
-+		state_flags = CPUIDLE_FLAG_TIME_VALID;
-+		enable_hlt();
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
++	__raw_writel(0xf0, gic_cpu_base + GIC_CPU_PRIMASK);
++	__raw_writel(1, gic_cpu_base + GIC_CPU_CTRL);
 +}
 +
-+static struct notifier_block __refdata omap_ilde_hotplug_notifier = {
-+	.notifier_call = omap_cpu_hotplug_notify,
-+};
++void gic_cpu_disable(void)
++{
++	__raw_writel(0, gic_cpu_base + GIC_CPU_CTRL);
++}
 +
- /**
-  * omap4_idle_init - Init routine for OMAP4 idle
-  *
-@@ -272,12 +331,17 @@ int __init omap4_idle_init(void)
- 	if (!count)
- 		return -EINVAL;
- 	dev->state_count = count;
-+	dev->prepare = omap4_prepare_idle;
- 
- 	if (cpuidle_register_device(dev)) {
- 		pr_err("%s: CPUidle register device failed\n", __func__);
- 			return -EIO;
- 		}
- 
-+	ret = register_hotcpu_notifier(&omap_ilde_hotplug_notifier);
-+	if (ret)
-+		return ret;
++void gic_dist_enable(void)
++{
++	__raw_writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
++}
++void gic_dist_disable(void)
++{
++	__raw_writel(0, gic_dist_base_addr + GIC_CPU_CTRL);
++}
 +
- 	return 0;
- }
- #else
+ #ifdef CONFIG_CACHE_L2X0
+ 
+ void __iomem *omap4_get_l2cache_base(void)
 -- 
 1.6.0.4
