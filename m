@@ -1,33 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Mar 2011 14:58:13 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
-Message-ID: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2011 16:02:18 +0100
+Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
+In-Reply-To: <20110310144455.GG22195@opensource.wolfsonmicro.com>
+References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201103101529.25661.arnd@arndb.de>
+	<20110310144455.GG22195@opensource.wolfsonmicro.com>
+Message-ID: <201103101602.19241.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq init function is referenced from the driver structure and
-we don't appear to have annotations which allow us to mark that it'll
-never be called after system init, causing the linker consistency
-infrastructure to complain. Just remove the __init annotation to avoid
-noise from the build.
+On Thursday 10 March 2011, Mark Brown wrote:
+> Most of the devices doing that on ARMs tend to be devices where there's
+> no bus that it's meaningful to expose to software - they'll typically be
+> hanging off an AHB or APB bus which has either no real software control
+> or control which is very heavily tied into the overall system control
+> and so is better treated over the whole SoC rather than the bus.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/cpufreq.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I can accept that it's reasonable to put all devices under
+/sys/devices/platform/ that are on the same top-level AHB or APB bus,
+although I also don't see a reason against making that bus a single
+device.
 
-diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-s3c64xx/cpufreq.c
-index 74c0e83..4375b97 100644
---- a/arch/arm/mach-s3c64xx/cpufreq.c
-+++ b/arch/arm/mach-s3c64xx/cpufreq.c
-@@ -181,7 +181,7 @@ static void __init s3c64xx_cpufreq_config_regulator(void)
- }
- #endif
- 
--static int __init s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
-+static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
- {
- 	int ret;
- 	struct cpufreq_frequency_table *freq;
--- 
-1.7.2.3
+The one thing that really doesn't belong in /sys/devices/platform/
+however are devices that are clearly children of some other
+device, e.g. a UART behind MFD behind I2C behind AHB.
+
+	Arnd
