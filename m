@@ -1,30 +1,59 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 10 Mar 2011 20:55:04 +0100
-Subject: [PATCH] ARM: mx27: fix gpt4/5 base address
-Message-ID: <1299786904-5494-1-git-send-email-w.sang@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 10 Mar 2011 12:06:59 -0800
+Subject: [PATCH 0/4] SCM fixes and updates
+In-Reply-To: <4D77D502.1090606@codeaurora.org> (Stephen Boyd's message of
+	"Wed, 09 Mar 2011 11:29:06 -0800")
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<4D77D502.1090606@codeaurora.org>
+Message-ID: <8yay64magf0.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reported-by: Igor Trevisan <igt1972@gmail.com>
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/plat-mxc/include/mach/mx27.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On Wed, Mar 09 2011, Stephen Boyd wrote:
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index cbc43ad5..1dc1c52 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -60,8 +60,8 @@
- #define MX27_AUDMUX_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x16000)
- #define MX27_CSPI3_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x17000)
- #define MX27_MSHC_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x18000)
--#define MX27_GPT5_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x19000)
--#define MX27_GPT4_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x1a000)
-+#define MX27_GPT4_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x19000)
-+#define MX27_GPT5_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x1a000)
- #define MX27_UART5_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x1b000)
- #define MX27_UART6_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x1c000)
- #define MX27_I2C2_BASE_ADDR			(MX27_AIPI_BASE_ADDR + 0x1d000)
+> On 02/24/2011 10:44 AM, Stephen Boyd wrote:
+>> These are a few updates to SCM. The first two patches fix some
+>> bad code generation. The next patch saves a couple instructions
+>> on the slow path and the final patch determines the cacheline
+>> size dynamically instead of statically.
+>>
+>> Stephen Boyd (4):
+>>   msm: scm: Mark inline asm as volatile
+>>   msm: scm: Fix improper register assignment
+>>   msm: scm: Check for interruption immediately
+>>   msm: scm: Get cacheline size from CTR
+>
+> Can we queue up patches 1 to 3 from this series for the next window? It
+> looks like everyone is ok with them. I'll respin the fourth patch once I
+> figure out where to go with it.
+
+Seems reasonable to me.  I'll break the first three out and include them
+into msm-next.
+
+Stephen Boyd (3):
+  msm: scm: Mark inline asm as volatile
+  msm: scm: Fix improper register assignment
+  msm: scm: Check for interruption immediately
+
+ arch/arm/mach-msm/scm.c |   58 ++++++++++++++++++++++++++---------------------
+ 1 files changed, 32 insertions(+), 26 deletions(-)
+
+I have pulled these changes into my MSM tree, which can be
+found at
+
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git
+
+in the for-next branch
+
+This patch will show up in the next release of the linux-next tree
+(usually sometime within the next 24 hours during the week.)
+
+The path will hopefully also be merged in Linus' tree for the next
+-rc kernel release.
+
+Thanks,
+David
+
 -- 
-1.7.2.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
