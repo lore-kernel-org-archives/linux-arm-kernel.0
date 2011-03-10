@@ -1,63 +1,72 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:38:13 +0530
-Subject: [PATCH v2 17/19] OMAP4: cpuidle: Switch to gptimer from twd in deeper
-	C-states.
+Date: Thu, 10 Mar 2011 19:38:02 +0530
+Subject: [PATCH v2 06/19] OMAP4: PM: Initialise all the clockdomains to
+	supported states
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-18-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU local timer(TWD) stops when the CPU is transitioning into
-deeper C-States. Since these timers are not wakeup capable, we
-need the wakeup capable global timer to program the wakeup time
-depending on the next timer expiry.
-
-It can be handled by registering a global wakeup capable timer along
-with local timers marked with (mis)feature flag CLOCK_EVT_FEAT_C3STOP.
-Then notify the clock events layer from idle code using
-CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT).
+Initialise hardware supervised mode for all clockdomains if it's
+supported. Initiate sleep transition for other clockdomains,
+if they are not being used.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm44xx.c |   22 +++++++++++++++++++++-
+ 1 files changed, 21 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 19a405c..daf41e1 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -12,6 +12,7 @@
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 7502723..d55a9b8 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -16,9 +16,11 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
  
- #include <linux/sched.h>
- #include <linux/cpuidle.h>
-+#include <linux/clockchips.h>
+-#include "powerdomain.h"
+ #include <mach/omap4-common.h>
  
- #include <asm/proc-fns.h>
- 
-@@ -85,6 +86,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
- 	struct omap4_processor_cx *cx = cpuidle_get_statedata(state);
- 	struct timespec ts_preidle, ts_postidle, ts_idle;
- 	u32 cpu1_state;
-+	int cpu_id = smp_processor_id();
- 
- 	/* Used to keep track of the total time in idle */
- 	getnstimeofday(&ts_preidle);
-@@ -111,8 +113,14 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
- 	pwrdm_set_logic_retst(core_pd, cx->core_logic_state);
- 	omap_set_pwrdm_state(core_pd, cx->core_state);
- 
-+	if (cx->type > OMAP4_STATE_C1)
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
++#include "powerdomain.h"
++#include "clockdomain.h"
 +
- 	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+ 	u32 next_state;
+@@ -73,6 +75,22 @@ static const struct platform_suspend_ops omap_pm_ops = {
+ };
+ #endif /* CONFIG_SUSPEND */
  
-+	if (cx->type > OMAP4_STATE_C1)
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
++/*
++ * Enable hardware supervised mode for all clockdomains if it's
++ * supported. Initiate sleep transition for other clockdomains, if
++ * they are not used
++ */
++static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
++{
++	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
++		clkdm_allow_idle(clkdm);
++	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
++			atomic_read(&clkdm->usecount) == 0)
++		clkdm_sleep(clkdm);
++	return 0;
++}
 +
- 	getnstimeofday(&ts_postidle);
- 	ts_idle = timespec_sub(ts_postidle, ts_preidle);
++
+ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+ {
+ 	struct power_state *pwrst;
+@@ -112,6 +130,8 @@ static int __init omap4_pm_init(void)
+ 		goto err2;
+ 	}
  
++	(void) clkdm_for_each(clkdms_setup, NULL);
++
+ 	ret = omap4_mpuss_init();
+ 	if (ret) {
+ 		pr_err("Failed to initialise OMAP4 MPUSS\n");
 -- 
 1.6.0.4
