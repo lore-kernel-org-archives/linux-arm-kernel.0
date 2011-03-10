@@ -1,63 +1,51 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Thu, 10 Mar 2011 14:36:55 +0530
-Subject: [PATCH] OMAP4: Intialize IVA Device in addition to DSP device.
-In-Reply-To: <1299738148-28557-1-git-send-email-shweta.gulati@ti.com>
-References: <1299738148-28557-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <fc1162b5d4e1a7deb77aa800a3e8fdb3@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Thu, 10 Mar 2011 03:12:54 -0600
+Subject: Single-stepping ARMv7 with KDB...
+Message-ID: <AANLkTimBAm-Eaordw-KSPnEycQYz2z4QM+Dc5nauLFxh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Shweta Gulati
-> Sent: Thursday, March 10, 2011 11:52 AM
-> To: linux-omap at vger.kernel.org
-> Cc: Shweta Gulati; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH] OMAP4: Intialize IVA Device in addition to DSP device.
->
-> OMAP4 has two different Devices IVA and DSP. DSP is bound
-> with MPU for DVFS and IVA has its own well defined OPPs.
-DSP is not in MPU voltage domain. DSP(Tesla) and IVAHD are in the same
-voltage domain. Pls correct this in the commit log.
+Hi,
 
-Vishwa
-> This Patch adds IVA init to 'omap2_init_processor_devices'
-> and make sure that API 'omap2_set_init_voltage' is called
-> for apt dev pointer.
->
-> It fixes Error logs:
->
-> 	omap2_set_init_voltage: Invalid parameters!
-> 	omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
->
-> Tested on OMAP4430 SDP Board.
-> Baseline:
-> http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-
-> pm.git
-> Branch :pm-core
->
-> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
-> ---
->  arch/arm/mach-omap2/pm.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 30af335..49486f5 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -89,6 +89,7 @@ static void omap2_init_processor_devices(void)
->  	if (cpu_is_omap44xx()) {
->  		_init_omap_device("l3_main_1", &l3_dev);
->  		_init_omap_device("dsp", &dsp_dev);
-> +		_init_omap_device("iva", &iva_dev);
->  	} else {
->  		_init_omap_device("l3_main", &l3_dev);
->  	}
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I know that there has been a lot of work recently in cleaning -up
+hardware single stepping / bp support, and from what I have seen this
+has been to support user mode stepping. I'm sorry ahead of time if
+someone already had done something to implement hardware single
+stepping for kernel code. It would be great to be able to single-step
+kernel code from KDB with the 'ss' command.
+
+x86-like single-stepping could be implemented with non-matching IVA,
+but there is the problem that enabling monitor mode in SVC mode will
+immediately result in a trap. That can be worked around by always
+exiting SVC through ABT mode, where we can then turn on the debug
+monitor... On every CPU exception we'd make sure to clear the monitor,
+since with single-stepping on that would immediately fault again when
+we switch to SVC.
+
+To create semantics similar to single-stepping TF flag in x86 EFLAGS,
+the kernel single-stepping BRV/BRC pair would be saved/restored in
+__switch_to, single-stepping would skip the user-mode switches (would
+step across), and single-stepping would step across preemption
+(preemption transparent or even disabled).
+
+The other difficulty is handling ldrex/strex, since blindly stepping
+over them will result in a persistent acquire failure (due to the
+clrex in svc_exit), but this can be worked around by doing something
+like -
+1) If next instruction is strex, we know it will fail. Wait for next
+instruction.
+2) This is the instruction we want to put a matching bp on, but can't
+do it now since we haven't run it yet, and we will
+    just trip on it. Wait for next instruction.
+3) Set matching bp on prev instruction.
+4) Let the ldrex/strex code repeat itself. Hit the matching bp.
+5) Continue single-stepping.
+
+I originally thought of this for KGDB, but gdb seems to want to send
+anything but an "s-packet" (it tries various BP instructions like X
+and Z-packets, then just scribbles over memory to create an invld
+exc.). It's still useful for KDB and GDB could be made aware I
+suppose...
+
+Thoughts?
+A
