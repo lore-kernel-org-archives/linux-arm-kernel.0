@@ -1,56 +1,36 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Thu, 10 Mar 2011 22:09:13 +0530
-Subject: [PATCH] can : AM3517EVM : add platform specific init
-Message-ID: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2011 17:54:07 +0100
+Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
+In-Reply-To: <20110310161917.GD27206@opensource.wolfsonmicro.com>
+References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201103101711.59544.arnd@arndb.de>
+	<20110310161917.GD27206@opensource.wolfsonmicro.com>
+Message-ID: <201103101754.07679.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CAN module on AM3517 requires programming of IO expander
-as part of init sequence. Added transceiver_switch
-callback to handle this.
+On Thursday 10 March 2011, Mark Brown wrote:
+> On Thu, Mar 10, 2011 at 05:11:59PM +0100, Arnd Bergmann wrote:
+> > On Thursday 10 March 2011, Mark Brown wrote:
+> 
+> > > You could, though the bus will just be a noop.  Typically it's more than
+> > > one bus but software basically can't tell.
+> 
+> > Yes. The main reason for representing such a bus in sysfs would be
+> > to match the SOC's block diagram with the structure in the kernel.
+> 
+> If you're doing that things like power domains tend to be a lot more
+> interesting since you can do something meaningful with them in software.
+> The non-visible buses aren't reliably documented anyway and the first
+> procesor datasheet I just pulled up had a whole bunch of devices that
+> span multiple buses anyway :)
 
-Signed-off-by: Sriramakrishnan <srk@ti.com>
-Reviewed-by:  Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
----
- arch/arm/mach-omap2/board-am3517evm.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+Yes, I'm aware that devices are not alwasy in a clear hierarchy and
+that you have bus addressing, device driver, clock, power and interrupt
+(and possibly more) trees that often don't match up.
 
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 2e4aad2..782d72d 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -734,6 +734,23 @@ static struct omap_board_mux board_mux[] __initdata = {
- };
- #endif
- 
-+/*
-+ * HECC information
-+ */
-+
-+#define CAN_STB         214
-+static void hecc_phy_control(int on)
-+{
-+        int r;
-+
-+        r = gpio_request(CAN_STB, "can_stb");
-+        if (r) {
-+                printk(KERN_ERR "failed to get can_stb \n");
-+                return;
-+        }
-+
-+        gpio_direction_output(CAN_STB, (on==1)?0:1);
-+}
- 
- static struct resource am3517_hecc_resources[] = {
- 	{
-@@ -762,6 +779,7 @@ static struct ti_hecc_platform_data am3517_evm_hecc_pdata = {
- 	.mbx_offset		= AM35XX_HECC_MBOX_OFFSET,
- 	.int_line		= AM35XX_HECC_INT_LINE,
- 	.version		= AM35XX_HECC_VERSION,
-+	.transceiver_switch     = hecc_phy_control,
- };
- 
- static void am3517_evm_hecc_init(struct ti_hecc_platform_data *pdata)
--- 
-1.6.2.4
+My point is simply that we should still try to find a helpful tree
+representation in these cases, even if it's not perfect. Almost anything
+is better than having lots of unrelated devices in a flat directory.
+
+	Arnd
