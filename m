@@ -1,56 +1,63 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:37:58 +0530
-Subject: [PATCH v2 02/19] OMAP4: Use WARN_ON() instead of BUG_ON() with
-	graceful exit
+Date: Thu, 10 Mar 2011 19:38:13 +0530
+Subject: [PATCH v2 17/19] OMAP4: cpuidle: Switch to gptimer from twd in deeper
+	C-states.
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-18-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP L2X0 and GIC initialisation code uses BUG_ON() for the
-ioremap() failure scenarios.
+CPU local timer(TWD) stops when the CPU is transitioning into
+deeper C-States. Since these timers are not wakeup capable, we
+need the wakeup capable global timer to program the wakeup time
+depending on the next timer expiry.
 
-Use WARN_ON() instead and allow graceful function exits.
-
-This was suggsted by Kevin Hilman <khilman@ti.com> during
-OMAP4 PM code review.
+It can be handled by registering a global wakeup capable timer along
+with local timers marked with (mis)feature flag CLOCK_EVT_FEAT_C3STOP.
+Then notify the clock events layer from idle code using
+CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT).
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap4-common.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 559d227..8f9b97d 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -36,11 +36,13 @@ void __init gic_init_irq(void)
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 19a405c..daf41e1 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -12,6 +12,7 @@
  
- 	/* Static mapping, never released */
- 	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
--	BUG_ON(!gic_dist_base_addr);
-+	if (WARN_ON(!gic_dist_base_addr))
-+		return;
+ #include <linux/sched.h>
+ #include <linux/cpuidle.h>
++#include <linux/clockchips.h>
  
- 	/* Static mapping, never released */
- 	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
--	BUG_ON(!gic_cpu_base);
-+	if (WARN_ON(!gic_cpu_base))
-+		return;
+ #include <asm/proc-fns.h>
  
- 	omap_wakeupgen_init();
+@@ -85,6 +86,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 	struct omap4_processor_cx *cx = cpuidle_get_statedata(state);
+ 	struct timespec ts_preidle, ts_postidle, ts_idle;
+ 	u32 cpu1_state;
++	int cpu_id = smp_processor_id();
  
-@@ -68,7 +70,8 @@ static int __init omap_l2_cache_init(void)
+ 	/* Used to keep track of the total time in idle */
+ 	getnstimeofday(&ts_preidle);
+@@ -111,8 +113,14 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 	pwrdm_set_logic_retst(core_pd, cx->core_logic_state);
+ 	omap_set_pwrdm_state(core_pd, cx->core_state);
  
- 	/* Static mapping, never released */
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
--	BUG_ON(!l2cache_base);
-+	if (WARN_ON(!l2cache_base))
-+		return -ENODEV;
++	if (cx->type > OMAP4_STATE_C1)
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
++
+ 	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
  
- 	/*
- 	 * 16-way associativity, parity disabled
++	if (cx->type > OMAP4_STATE_C1)
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
++
+ 	getnstimeofday(&ts_postidle);
+ 	ts_idle = timespec_sub(ts_postidle, ts_preidle);
+ 
 -- 
 1.6.0.4
