@@ -1,36 +1,95 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 10 Mar 2011 09:49:41 +0000
-Subject: [PATCH v4 1/3] ARM: S5P: Add s5p_timer support for HRT
-In-Reply-To: <002d01cbdede$65e19660$31a4c320$@com>
-References: <1299636813-4869-1-git-send-email-sbkim73@samsung.com>
-	<1299636813-4869-2-git-send-email-sbkim73@samsung.com>
-	<20110309141016.GB2737@pulham.picochip.com>
-	<002d01cbdede$65e19660$31a4c320$@com>
-Message-ID: <20110310094941.GA3289@pulham.picochip.com>
+From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
+Date: Thu, 10 Mar 2011 10:45:12 +0100
+Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
+In-Reply-To: <20110309173902.GD2737@pulham.picochip.com>
+References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<1299689961-5028-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<20110309173902.GD2737@pulham.picochip.com>
+Message-ID: <4D789DA8.7080703@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/09/2011 06:39 PM, Jamie Iles wrote:
+> Hi Maxime,
+>
+> Thanks for doing this, it looks very nice!  A couple of nitpicks, but
+> I've given it a quick spin on my platform and it provides us with all of
+> the hooks to export all of the information we need.
+>
+> Jamie
 
-On Thu, Mar 10, 2011 at 01:48:22PM +0900, Sangbeom Kim wrote:
-> And Do you mean that Is needed error handling of clk_enable  like 
-> below?
-> 
-> 	clk_enable(timerclk);
-> 
-> 	if (IS_ERR(timerclk)){
-> 		clk_put(timerclk)
-> 		panic("failed to enable timers clock");
-> 	}
+Hi Jamie,
+Thanks for your review. Fine it works for you.
 
-No, clk_enable() returns negative errno on failure, so something like.
+> +
+> +static struct sysdev_class_attribute *soc_default_attrs[];
+> +
+> +struct sys_soc {
+> +	char *mach_name;
+> Can this be made const?
 
-	if (clk_enable(timerclk))
-		panic("failed to enable timerclk");
+Yes, you're right.
 
-> There is no another clk_enable for timerclk.
+>> +
+>> +	if (si->info)
+>> +		return sprintf(buf, "%s\n", si->info);
+>> +	else if (si->get_info)
+>> +		return sprintf(buf, "%s\n", si->get_info(si));
+>> +	else
+>> +		return sprintf(buf, "No data\n");
+> Isn't this a platform error if we don't have a way to get the required
+> info?  If in register_sys_soc_info() we check that one of si->info or
+> si->get_info is non-NULL then we don't need this check.  If we have
+> something like:
+>
+> static bool sys_soc_info_is_valid(struct sys_soc_info *info)
+> {
+> 	if ((!info->info&&  !info->get_info) ||
+> 	    info->info&&  info->get_info)
+> 	    return false;
+>
+> 	return true;
+> }
 
-I didn't mean for just timerclk, there are several other clk_enable()'s 
-for other clks.
+Yes it is a platform error, it should be tested at registration time.
 
-Jamie
+> then we can do this at registration.  Is there a valid use case where
+> someone could set the static info and the dynamic get_info callback?
+>
+
+At registration, no. But in the get_info callback, we can set the info 
+field in order to call the callback once if the value will never change.
+However, I will remove this possibility as it is not clear.
+
+>
+> Make name const?  Also, should num be a size_t?
+
+Fixed
+
+> soc.mach_name = kstrdup(name, GFP_KERNEL) instead of the allocate and
+> sprintf?
+>
+
+Fixed.
+
+>> +struct sys_soc_info {
+>> +	char *name;
+>> +	char *info;
+>> +	char *(*get_info)(struct sys_soc_info *);
+> Could this return a const char* ?
+>
+
+Fixed.
+
+>> +	struct sysdev_class_attribute attr;
+>> +};
+>> +
+>> +/**
+>> + * void register_sys_soc(char *name, struct sys_soc_info *, int num)
+> I think this should be "register_sys_soc - register the soc information"
+> for valid kerneldoc notation..
+
+Fixed.
+
+Regards,
+Maxime
