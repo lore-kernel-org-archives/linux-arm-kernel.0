@@ -1,26 +1,59 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Mar 2011 16:19:18 +0000
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <201103101711.59544.arnd@arndb.de>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103101602.19241.arnd@arndb.de>
-	<20110310152011.GH22195@opensource.wolfsonmicro.com>
-	<201103101711.59544.arnd@arndb.de>
-Message-ID: <20110310161917.GD27206@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Mar 2011 21:57:08 +0530
+Subject: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle for GPT1
+In-Reply-To: <alpine.DEB.2.00.1103100744500.15132@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1103091847150.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
+	<3b8b985f13158fbcd110cf45ed7035ad@mail.gmail.com>
+	<alpine.DEB.2.00.1103100744500.15132@utopia.booyaka.com>
+Message-ID: <9c47364db2da7c8bcec3e21463f001fe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 05:11:59PM +0100, Arnd Bergmann wrote:
-> On Thursday 10 March 2011, Mark Brown wrote:
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, March 10, 2011 8:15 PM
+> To: Santosh Shilimkar
+> Cc: Benoit Cousson; Rajendra Nayak; linux-omap at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; Kevin Hilman
+> Subject: RE: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle
+> for GPT1
+>
+> On Thu, 10 Mar 2011, Santosh Shilimkar wrote:
+>
+> > We continued further debug on the static dependency issues with
+> > OMAP4 PM series.
+> > So far from the findings what I have, this timer patch is actually
+> not
+> > needed and can be dropped. Infact the patch is not really
+> effective
+> > because current timer driver(not hwmod adapted yet) puts timer1
+> > in smart idle again.
+> >
+> > There is another static dep. just like MPUSS<-->EMIF seems to
+> create
+> > an issue. The lock-up is not very consistently reproducible so
+> it's
+> > very easy to get miss-leading results. Timer patch was one of
+> those
+> > observations. With or without timer patch I can reproduce the hang
+> > with long duration test.
+> >
+> > Will keep narrowing down the next offending static dependency but
+> > in mean time I suggest you to drop this patch.
+>
+> Okay, dropped.
+>
+Managed to narrow down the issue with below two offender.
+1) MPUSS <--> MEMIF_STATDEP
+2) MPUSS <--> L3_1_STATDEP
 
-> > You could, though the bus will just be a noop.  Typically it's more than
-> > one bus but software basically can't tell.
+If we keep both of these static deps, then I don't see any
+issues. Will give a overnight run to check the stability.
 
-> Yes. The main reason for representing such a bus in sysfs would be
-> to match the SOC's block diagram with the structure in the kernel.
+Will update the below patch to include L3_1 CD and
+repost the same.
+https://patchwork.kernel.org/patch/620351/
 
-If you're doing that things like power domains tend to be a lot more
-interesting since you can do something meaningful with them in software.
-The non-visible buses aren't reliably documented anyway and the first
-procesor datasheet I just pulled up had a whole bunch of devices that
-span multiple buses anyway :)
+Regards
+Santosh
