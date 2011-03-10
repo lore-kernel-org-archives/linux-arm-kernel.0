@@ -1,36 +1,85 @@
-From: tusharasnair@gmail.com (Tushara S. Nair)
-Date: Thu, 10 Mar 2011 22:48:55 +0530
-Subject: EXPLORE: Lifesciences in India!
-Message-ID: <69af36925472da79f1e49e188d35b3a8@Karnvir-Mundreys-iMac.local>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 10 Mar 2011 18:47:20 +0100
+Subject: [PATCH v2 0/7] OMAP: add PM CONSTRAINTS framework
+Message-ID: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sir,
-?
-I am Tushara? Nair,? the Industry Relationship Manager at Atharva Lifesciences Consulting Pvt. Ltd.? Atharva Lifesciences Consulting is a lifesciences consulting firm tracking the industry in India and in certain territories internationally. Atharva Lifesciences Consulting Pvt. Ltd is the leading consulting firm delivering? reports and information on biopharma in India.
-?
-We publish e-newspapers in 6 editions. Each edition is published once a week.
-?
-EXPLORE BioPharma: Tracks the Science of Biotech & Pharmaceuticals. Click here to see the sample (http://bit.ly/fvGJ5W )
-EXPLORE Agri & Vet: Tracks the realm of Agribusiness and Veterinary Biotechnology. Click here to see the sample (http://bit.ly/ek2uRG )
-EXPLORE Ayurveda: Looks at the world of natural medicine in India. Click here to see the sample (http://bit.ly/eb8HI7 )
-EXPLORE BioPharma Alliances: Looks at joint ventures and agreements in India. Click here to see the sample (http://bit.ly/gPR4KO )
-EXPLORE Aquaculture & Marine Biotechnology: Looks at the marine & fisheries area in India. Click here to see the sample (http://bit.ly/eVaYZs ?)
-EXPLORE BioFuels: Tracks the Alternative Energy Industry in India. Click here to see the sample (http://bit.ly/e0aL4C )
-?
-Please let me know which e-newspaper are you interested to receive.
-?
-With Kind Regards,
-?
-Tushara
-?
---
-Tushara S. Nair
-Industry Relationship Manager
-Atharva Lifesciences Consulting Pvt. Ltd.
-Bangalore, INDIA
-Tel No: +91-80-42140007, 42140016 (Ext:? 31)
-Skype: atharvalife
-?
-alcplt at atharvalife.com
-www.atharvalife.com
+Implement OMAP PM layer omap_pm_set_max_dev_wakeup_lat API by
+creating a unified API which calls omap_device_set_dev_constraint
+for all classes of constraints (devices wake-up latency, devices
+throughput...).
+The implementation of the constraints framework is at the omap_device
+level: management and storage of the constraints, dispatching of the
+constraints to the appropriate low level layers.
+
+NOTE: only works for devices which have been converted to use
+      omap_device/omap_hwmod.
+
+Longer term, we could possibly remove this API from the OMAP PM layer,
+and instead directly use the device level API.
+
+For the devices wake-up latency constraints, the power domains get
+the next power state programmed directly in the registers via
+pwrdm_wakeuplat_update_pwrst.
+
+Note about PM QOS: the MPU and CORE power domains get the next power
+state via cpuidle, which get the strongest wake-up latency constraint
+by querying PM QOS. The usage of PM QOS is temporary, until a generic
+solution is in place.
+
+The bus throughput constraints framework is supported by still is a
+no-op for the moment.
+
+Based on Vibhore's original patch and completely reworked using
+omap_device, omap_hwmod and PM QOS frameworks.
+Cc: Vibhore Vardhan <vvardhan@ti.com>
+
+Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
+on MPU, CORE and PER.
+
+Based on khilman's pm-core branch
+
+v2:
+. updated after review comments from Kevin and Paul,
+. initial patch split according to the layering,
+. added support for ascending or descending order of constraints values,
+. added throughput constraints to the framework, although the tput implementation
+  currently is a no-op,
+
+To Do:
+. refine the wake-up latency figures by defining the conditions of measurements and by
+  measuring on actual hardware,
+. define the effect of power domains states combinations,
+. add the support for the INACTIVE power state,
+. move the power domains state initialization from pwrdms_setup to an early init call,
+. debug: add some control knobs for the wake-up latencies in /sysfs,
+. add a user-space API to request and remove constraints.
+
+
+Jean Pihet (7):
+  OMAP PM: create a PM layer plugin for per-device constraints
+  OMAP: PM CONSTRAINTS: add an enum for the classes of constraint
+  OMAP: PM CONSTRAINTS: implement wake-up latency constraints
+  OMAP: PM CONSTRAINTS: implement the constraints management code
+  OMAP: PM CONSTRAINTS: add a power domains state update function in
+    hwmod
+  OMAP: PM CONSTRAINTS: control power domains next state
+  OMAP: PM CONSTRAINTS: add power domains wake-up latency figures
+
+ arch/arm/mach-omap2/omap_hwmod.c              |   29 ++-
+ arch/arm/mach-omap2/powerdomain.c             |  100 +++++++
+ arch/arm/mach-omap2/powerdomain.h             |   24 ++-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c   |   63 +++++
+ arch/arm/plat-omap/Kconfig                    |    7 +
+ arch/arm/plat-omap/Makefile                   |    1 +
+ arch/arm/plat-omap/include/plat/omap-pm.h     |    4 +
+ arch/arm/plat-omap/include/plat/omap_device.h |   14 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
+ arch/arm/plat-omap/omap-pm-constraints.c      |  371 +++++++++++++++++++++++++
+ arch/arm/plat-omap/omap_device.c              |  202 ++++++++++++++
+ 11 files changed, 813 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/plat-omap/omap-pm-constraints.c
+
+-- 
+1.7.2.3
