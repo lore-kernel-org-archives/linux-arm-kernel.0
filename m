@@ -1,291 +1,211 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 10 Mar 2011 18:47:24 +0100
-Subject: [PATCH v2 4/7] OMAP: PM CONSTRAINTS: implement the constraints
-	management code
+Date: Thu, 10 Mar 2011 18:47:26 +0100
+Subject: [PATCH v2 6/7] OMAP: PM CONSTRAINTS: control power domains next state
 In-Reply-To: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
 References: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1299779247-20511-5-git-send-email-j-pihet@ti.com>
+Message-ID: <1299779247-20511-7-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code at omap device level manages the constraints: storage,
-tracking of requesters and dispatching to the low level
-code (e.g. powerdomain for the wake-up latency constraints).
+When a wake-up constraint is requested or removed the omap device layer
+dispatches the updated strongest constraint value.
+The power domains get the next power state programmed directly in the
+registers via pwrdm_wakeuplat_update_pwrst.
+
+Note about PM QOS: the MPU and CORE power domains get the next power
+state via cpuidle, which get the strongest wake-up latency constraint
+by querying PM QOS. The usage of PM QOS is temporary, until a generic
+solution is in place.
 
 Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
 on MPU, CORE and PER.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap_device.h |   14 ++
- arch/arm/plat-omap/omap_device.c              |  202 +++++++++++++++++++++++++
- 2 files changed, 216 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |  100 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h |   24 ++++++++-
+ 2 files changed, 122 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index e4c349f..d4766c4 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -32,9 +32,11 @@
- #define __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_OMAP_DEVICE_H
- 
- #include <linux/kernel.h>
-+#include <linux/plist.h>
- #include <linux/platform_device.h>
- 
- #include <plat/omap_hwmod.h>
-+#include <plat/omap-pm.h>
- 
- extern struct device omap_device_parent;
- 
-@@ -73,6 +75,15 @@ struct omap_device {
- 	s8				pm_lat_level;
- 	u8				hwmods_cnt;
- 	u8				_state;
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index eaed0df..54ac955 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -19,6 +19,7 @@
+ #include <linux/list.h>
+ #include <linux/errno.h>
+ #include <linux/string.h>
 +
-+};
-+
-+/* Linked list for the devices constraints entries */
-+struct omap_device_constraints_entry {
-+	struct device			*req_dev;
-+	void				*target;
-+	unsigned long			constraint_value;
-+	struct plist_node		node;
- };
- 
- /* Device driver interface (call via platform_data fn ptrs) */
-@@ -107,6 +118,9 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od);
- int omap_device_align_pm_lat(struct platform_device *pdev,
- 			     u32 new_wakeup_lat_limit);
- struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
-+int omap_device_set_dev_constraint(enum omap_pm_constraint_class class,
-+				   struct device *req_dev,
-+				   struct device *dev, long t);
- u32 omap_device_get_context_loss_count(struct platform_device *pdev);
- 
- /* Other */
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 9bbda9a..9199d3e 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -292,10 +292,205 @@ static void _add_optional_clock_clkdev(struct omap_device *od,
- 	}
+ #include "cm2xxx_3xxx.h"
+ #include "prcm44xx.h"
+ #include "cm44xx.h"
+@@ -176,6 +177,105 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
+ 	return 0;
  }
  
-+/* plist that stores the devices wake-up latency constraints */
-+static struct plist_head _wkup_lat_constraints_list;
-+/* Spinlock that protects the constraints lists */
-+static spinlock_t _constraints_lock;
-+/* Mutex that protects the constraints lists ops */
-+static struct mutex _constraints_mutex;
-+
 +/*
-+ * _store_constraint: add/update/remove a constraint from a plist
++ * Test if the current powerdomain is MPU or CORE
 + *
-+ * @constraints_list: plist to use
-+ * @req_dev: constraint requester, used to track the requests
-+ * @target: target which the constraint applies to (e.g. power domain ID or
-+ *  ptr for wake-up latency constraints)
-+ * @value: constraint value. The plist is sorted by the value. -1 remove the
-+ *  constraint from the list
-+ * @ascending: return the lowest constraint value if set to 1, return the
-+ *  highest value if not.
++ * This function is only used by pwrdm_wakeuplat_update_pwrst
++ * which applies the MPU and CORE power domains constraints using PM QOS.
 + *
-+ * Returns the strongest constraint value for the given target, 0 in the
-+ * case there is no constraint on the given target or a negative value in
-+ * case of error.
-+ * The caller must check the validity of the parameters.
++ * This will disappear when all power domains will be controlled directly
++ * from the wake-up latency constraints framework
 + */
-+static long _store_constraint(struct plist_head *constraints_list,
-+			      struct device *req_dev, void *target,
-+			      long value, int ascending)
++static inline int is_pwrdm_mpu_or_core(struct powerdomain *pwrdm)
 +{
-+	struct omap_device_constraints_entry *user;
-+	int found = 0, ret = 0;
-+
-+	mutex_lock(&_constraints_mutex);
-+
-+	/* Check if the constraint requester is already in the list */
-+	plist_for_each_entry(user, constraints_list, node) {
-+		if (user->req_dev == req_dev) {
-+			found = 1;
-+			break;
-+		}
-+	}
-+
-+	if (value >= 0) {
-+		/* Add new entry to the list or update existing request */
-+		if (found &&
-+		    user->constraint_value == value &&
-+		    user->target == target) {
-+			goto exit_ok;
-+		} else if (!found) {
-+			user = kzalloc(
-+				sizeof(struct omap_device_constraints_entry),
-+				GFP_KERNEL);
-+			if (!user) {
-+				pr_err("%s: FATAL ERROR: kzalloc failed\n",
-+				       __func__);
-+				ret = -ENOMEM;
-+				goto exit_error;
-+			}
-+			user->req_dev = req_dev;
-+		} else {
-+			plist_del(&user->node, constraints_list);
-+		}
-+
-+		plist_node_init(&user->node, value);
-+		plist_add(&user->node, constraints_list);
-+		user->node.prio = user->constraint_value = value;
-+		user->target = target;
-+	} else {
-+		/* Remove the constraint from the list */
-+		if (!found) {
-+			pr_err("%s: Error: no prior constraint to release\n",
-+			       __func__);
-+			ret = -EINVAL;
-+			goto exit_error;
-+		}
-+
-+		plist_del(&user->node, constraints_list);
-+		kfree(user);
-+	}
-+
-+exit_ok:
-+	/* Find the strongest constraint for the given target */
-+	ret = 0;
-+	if (ascending) {
-+		list_for_each_entry(user, &(constraints_list)->node_list,
-+				    node.plist.node_list) {
-+			/* Find the lowest (i.e. first) value for the target */
-+			if (user->target == target) {
-+				ret = user->constraint_value;
-+				break;
-+			}
-+		}
-+	} else {
-+		list_for_each_entry_reverse(user,
-+					    &(constraints_list)->node_list,
-+					    node.plist.node_list) {
-+			/* Find the highest (i.e. last) value for the target */
-+			if (user->target == target) {
-+				ret = user->constraint_value;
-+				break;
-+			}
-+		}
-+	}
-+
-+exit_error:
-+	mutex_unlock(&_constraints_mutex);
-+
-+	return ret;
-+}
- 
- /* Public functions for use by core code */
- 
- /**
-+ * omap_device_set_dev_constraint - set/release a device constraint
-+ * @class: constraint class
-+ * @req_dev: constraint requester, used for tracking the constraints
-+ * @dev: device to apply the constraint to. Must have an associated omap_device
-+ * @t: constraint value. A value of -1 removes the constraint.
-+ *
-+ * Using the primary hwmod, set/release a device constraint for the dev
-+ * device, requested by the req_dev device. Depending of the constraint class
-+ * this code calls the appropriate low level code, e.g. power domain for
-+ * the wake-up latency constraints.
-+ *
-+ * If any hwmods exist for the omap_device assoiated with @dev,
-+ * set/release the constraint for the corresponding hwmods, otherwise return
-+ * -EINVAL.
-+ */
-+int omap_device_set_dev_constraint(enum omap_pm_constraint_class class,
-+				   struct device *req_dev,
-+				   struct device *dev, long t)
-+{
-+	struct omap_device *od;
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
-+	struct powerdomain *pwrdm = NULL;
-+	u32 ret = -EINVAL;
-+
-+	/* Look for the platform device for dev */
-+	pdev = to_platform_device(dev);
-+
-+	/* Try to catch non platform devices. */
-+	if (pdev->name == NULL) {
-+		pr_err("%s: Error: platform device for device %s not valid\n",
-+		       __func__, dev_name(dev));
-+		return -EINVAL;
-+	}
-+
-+	/* Find the associated omap_device for dev */
-+	od = _find_by_pdev(pdev);
-+	if (!(od->hwmods_cnt)) {
-+		pr_err("%s: Error: No hwmod for device %s\n",
-+		       __func__, dev_name(dev));
-+		return -EINVAL;
-+	}
-+
-+	/* Find the associated omap_hwmod for dev */
-+	oh = od->hwmods[0];
-+
-+	switch (class) {
-+	case OMAP_PM_CONSTRAINT_WKUP_LAT:
-+		/* Find the pwrdm associated to dev */
-+		pwrdm = omap_device_get_pwrdm(od);
-+		if (!pwrdm) {
-+			pr_err("%s: Error: No pwrdm for device %s\n",
-+			       __func__, dev_name(dev));
-+			ret = -EINVAL;
-+			break;
-+		}
-+
-+		/*
-+		 * Store the constraint in the appropriate list and find the
-+		 * strongest constraint for the given pwrdm
-+		 */
-+		ret = _store_constraint(&_wkup_lat_constraints_list,
-+					req_dev, (void *) pwrdm, t, 1);
-+
-+		/* Apply the constraint to the corresponding pwrdm */
-+		if (ret >= 0) {
-+			ret = omap_hwmod_update_power_state(oh, ret);
-+		} else {
-+			pr_err("%s: Error storing the constraint for device "
-+			       "%s\n", __func__, dev_name(dev));
-+		}
-+
-+		break;
-+	case OMAP_PM_CONSTRAINT_THROUGHPUT:
-+		WARN(1, "OMAP PM: %s: Bus throughput constraint class \
-+		     not implemented\n", __func__);
-+		ret = -EINVAL;
-+		break;
-+	default:
-+		WARN(1, "OMAP PM: %s: invalid constraint class %d",
-+		     __func__, class);
-+	}
-+
-+	return ret;
++	if ((pwrdm == pwrdm_lookup("mpu_pwrdm")) ||
++	    (pwrdm == pwrdm_lookup("core_pwrdm")))
++		return 1;
++	else
++		return 0;
 +}
 +
 +/**
-  * omap_device_get_context_loss_count - get lost context count
-  * @od: struct omap_device *
-  *
-@@ -824,6 +1019,13 @@ struct device omap_device_parent = {
++ * pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
++ * @pwrdm: struct powerdomain * to which requesting device belongs to.
++ * @min_latency: the allowed wake-up latency for the given power domain. A
++ *  value of 0 means 'no constraint' on the pwrdm.
++ *
++ * Finds the power domain next power state that fulfills the constraint.
++ * Programs a new target state if it is different from current power state.
++ *
++ * Returns 0 upon success.
++ */
++int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm, long min_latency)
++{
++	int ret = 0, new_state = 0;
++
++	if (!pwrdm) {
++		WARN(1, "powerdomain: %s: invalid parameter(s)", __func__);
++		return -EINVAL;
++	}
++
++	/*
++	 * Apply constraints to MPU and CORE via the PM QOS API.
++	 * Every power domain struct has a pm_qos_request_list field
++	 */
++	if (is_pwrdm_mpu_or_core(pwrdm)) {
++		if (pm_qos_request_active(&(pwrdm->pm_qos_request)))
++			pm_qos_remove_request(&(pwrdm->pm_qos_request));
++
++		if (min_latency > 0)
++			pm_qos_add_request(&(pwrdm->pm_qos_request),
++					   PM_QOS_CPU_DMA_LATENCY,
++					   min_latency);
++
++		return 0;
++	}
++
++	/*
++	 * Apply constraints to pwrdm other than MPU and CORE by programming
++	 * the pwrdm next power state.
++	 */
++
++	/* Find power state with wakeup latency < minimum constraint */
++	for (new_state = 0x0; new_state < PWRDM_MAX_PWRSTS; new_state++) {
++		if (min_latency == 0 ||
++		    pwrdm->wakeup_lat[new_state] <= min_latency)
++			break;
++	}
++
++	switch (new_state) {
++	case PWRDM_FUNC_PWRST_OFF:
++		new_state = PWRDM_POWER_OFF;
++		break;
++	case PWRDM_FUNC_PWRST_OSWR:
++		pwrdm_set_logic_retst(pwrdm, PWRDM_POWER_OFF);
++		new_state = PWRDM_POWER_RET;
++		break;
++	case PWRDM_FUNC_PWRST_CSWR:
++		pwrdm_set_logic_retst(pwrdm, PWRDM_POWER_RET);
++		new_state = PWRDM_POWER_RET;
++		break;
++	case PWRDM_FUNC_PWRST_ON:
++		new_state = PWRDM_POWER_ON;
++		break;
++	default:
++		pr_warn("powerdomain: requested latency constraint not "
++			"supported %s set to ON state\n", pwrdm->name);
++		new_state = PWRDM_POWER_ON;
++		break;
++	}
++
++	if (pwrdm_read_pwrst(pwrdm) != new_state)
++		ret = omap_set_pwrdm_state(pwrdm, new_state);
++
++	pr_debug("powerdomain: %s pwrst: curr=%d, prev=%d next=%d "
++		 "min_latency=%ld, set_state=%d\n", pwrdm->name,
++		 pwrdm_read_pwrst(pwrdm), pwrdm_read_prev_pwrst(pwrdm),
++		 pwrdm_read_next_pwrst(pwrdm), min_latency, new_state);
++
++	return ret;
++}
++
+ /* Public functions */
  
- static int __init omap_device_init(void)
- {
-+	/* Initialize priority ordered list for wakeup latency constraint */
-+	spin_lock_init(&_constraints_lock);
-+	plist_head_init(&_wkup_lat_constraints_list, &_constraints_lock);
+ /**
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 0b7a357..23b3408 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -19,7 +19,10 @@
+ 
+ #include <linux/types.h>
+ #include <linux/list.h>
+-
++#include <linux/plist.h>
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
++#include <linux/pm_qos_params.h>
+ #include <linux/atomic.h>
+ 
+ #include <plat/cpu.h>
+@@ -46,6 +49,15 @@
+ 
+ #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | (1 << PWRDM_POWER_ON))
+ 
++/* Powerdomain functional power states */
++#define PWRDM_FUNC_PWRST_OFF	0x0
++#define PWRDM_FUNC_PWRST_OSWR	0x1
++#define PWRDM_FUNC_PWRST_CSWR	0x2
++#define PWRDM_FUNC_PWRST_ON	0x3
 +
-+	/* res_mutex protects res_list add and del ops */
-+	mutex_init(&_constraints_mutex);
++#define PWRDM_MAX_FUNC_PWRSTS	4
 +
- 	return device_register(&omap_device_parent);
- }
- core_initcall(omap_device_init);
++#define UNSUP_STATE		-1
+ 
+ /* Powerdomain flags */
+ #define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
+@@ -96,7 +108,11 @@ struct powerdomain;
+  * @state_counter:
+  * @timer:
+  * @state_timer:
+- *
++ * @wakeup_lat: wakeup latencies (in us) for possible powerdomain power states
++ * Note about the wakeup latencies ordering: the values must be sorted
++ *  in decremental order
++ * @pm_qos_request: PM QOS handle, only used to control the MPU and CORE power
++ *  domains states; to be removed when a generic solution is in place.
+  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
+  */
+ struct powerdomain {
+@@ -121,6 +137,8 @@ struct powerdomain {
+ 	s64 timer;
+ 	s64 state_timer[PWRDM_MAX_PWRSTS];
+ #endif
++	const u32 wakeup_lat[PWRDM_MAX_FUNC_PWRSTS];
++	struct pm_qos_request_list pm_qos_request;
+ };
+ 
+ /**
+@@ -210,6 +228,8 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
+ int pwrdm_pre_transition(void);
+ int pwrdm_post_transition(void);
+ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
++
++int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm, long min_latency);
+ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
+ 
+ extern void omap2xxx_powerdomains_init(void);
 -- 
 1.7.2.3
