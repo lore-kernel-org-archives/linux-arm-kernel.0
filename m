@@ -1,101 +1,77 @@
 From: steve@sakoman.com (Steve Sakoman)
-Date: Wed,  9 Mar 2011 16:08:05 -0800
-Subject: [PATCH v2 1/2] OMAP: Add gpio-leds support for Overo
+Date: Wed,  9 Mar 2011 16:08:06 -0800
+Subject: [PATCH v2 2/2] OMAP: Add gpio-keys support for Overo
 In-Reply-To: <1299715686-3920-1-git-send-email-steve@sakoman.com>
 References: <1299715686-3920-1-git-send-email-steve@sakoman.com>
-Message-ID: <1299715686-3920-2-git-send-email-steve@sakoman.com>
+Message-ID: <1299715686-3920-3-git-send-email-steve@sakoman.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the standard LEDs on the Overo COM and expansion boards
+This patch adds support for the standard push buttons available on
+Overo expansion boards.
 
 Signed-off-by: Steve Sakoman <steve@sakoman.com>
 ---
- arch/arm/mach-omap2/board-overo.c |   53 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-overo.c |   42 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 42 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 4278ecb..e694ebd 100644
+index e694ebd..1e17061 100644
 --- a/arch/arm/mach-omap2/board-overo.c
 +++ b/arch/arm/mach-omap2/board-overo.c
-@@ -473,6 +473,52 @@ static struct regulator_consumer_supply overo_vmmc1_supply = {
- 	.supply			= "vmmc",
- };
+@@ -519,6 +519,47 @@ static void __init overo_init_led(void)
+ static inline void __init overo_init_led(void) { return; }
+ #endif
  
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+#include <linux/leds.h>
++#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
 +
-+static struct gpio_led gpio_leds[] = {
++static struct gpio_keys_button gpio_buttons[] = {
 +	{
-+		.name			= "overo:red:gpio21",
-+		.default_trigger	= "heartbeat",
-+		.gpio			= 21,
-+		.active_low		= true,
++		.code			= BTN_0,
++		.gpio			= 23,
++		.desc			= "button0",
++		.wakeup			= 1,
 +	},
 +	{
-+		.name			= "overo:blue:gpio22",
-+		.default_trigger	= "none",
-+		.gpio			= 22,
-+		.active_low		= true,
-+	},
-+	{
-+		.name			= "overo:blue:COM",
-+		.default_trigger	= "mmc0",
-+		.gpio			= -EINVAL,	/* gets replaced */
-+		.active_low		= true,
++		.code			= BTN_1,
++		.gpio			= 14,
++		.desc			= "button1",
++		.wakeup			= 1,
 +	},
 +};
 +
-+static struct gpio_led_platform_data gpio_leds_pdata = {
-+	.leds		= gpio_leds,
-+	.num_leds	= ARRAY_SIZE(gpio_leds),
++static struct gpio_keys_platform_data gpio_keys_pdata = {
++	.buttons	= gpio_buttons,
++	.nbuttons	= ARRAY_SIZE(gpio_buttons),
 +};
 +
-+static struct platform_device gpio_leds_device = {
-+	.name	= "leds-gpio",
++static struct platform_device gpio_keys_device = {
++	.name	= "gpio-keys",
 +	.id	= -1,
 +	.dev	= {
-+		.platform_data	= &gpio_leds_pdata,
++		.platform_data	= &gpio_keys_pdata,
 +	},
 +};
 +
-+static void __init overo_init_led(void)
++static void __init overo_init_keys(void)
 +{
-+	platform_device_register(&gpio_leds_device);
++	platform_device_register(&gpio_keys_device);
 +}
 +
 +#else
-+static inline void __init overo_init_led(void) { return; }
++static inline void __init overo_init_keys(void) { return; }
 +#endif
 +
  static int overo_twl_gpio_setup(struct device *dev,
  		unsigned gpio, unsigned ngpio)
  {
-@@ -480,6 +526,11 @@ static int overo_twl_gpio_setup(struct device *dev,
- 
- 	overo_vmmc1_supply.dev = mmc[0].dev;
- 
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
-+	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
-+#endif
-+
- 	return 0;
- }
- 
-@@ -487,6 +538,7 @@ static struct twl4030_gpio_platform_data overo_gpio_data = {
- 	.gpio_base	= OMAP_MAX_GPIO_LINES,
- 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
- 	.irq_end	= TWL4030_GPIO_IRQ_END,
-+	.use_leds	= true,
- 	.setup		= overo_twl_gpio_setup,
- };
- 
-@@ -648,6 +700,7 @@ static void __init overo_init(void)
- 	overo_spi_init();
+@@ -701,6 +742,7 @@ static void __init overo_init(void)
  	overo_init_smsc911x();
  	overo_display_init();
-+	overo_init_led();
+ 	overo_init_led();
++	overo_init_keys();
  
  	/* Ensure SDRC pins are mux'd for self-refresh */
  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
