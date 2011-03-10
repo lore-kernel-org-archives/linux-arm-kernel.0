@@ -1,78 +1,63 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Mar 2011 14:03:11 +0100
-Subject: [PATCH v4 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update
-	Copyright
+Date: Thu, 10 Mar 2011 14:03:12 +0100
+Subject: [PATCH v4 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY
+	control callback
 In-Reply-To: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
 References: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1299762193-7791-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1299762193-7791-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Extend MIPI-CSIS driver's platform data structure with a callback
+for D-PHY enable and reset control. Also add a flag indicating
+whether the external MIPI-CSI (VDD18_MIPI) power supply should
+be managed in the driver through the "vdd" power supply. On some
+boards this regulator may be a fixed voltage regulator without
+an inhibit function.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-s5p/dev-csis0.c                      |    2 +-
- arch/arm/plat-s5p/dev-csis1.c                      |    2 +-
- .../plat-s5p/include/plat/{csis.h => mipi_csis.h}  |   10 +++++-----
- 3 files changed, 7 insertions(+), 7 deletions(-)
- rename arch/arm/plat-s5p/include/plat/{csis.h => mipi_csis.h} (67%)
+ arch/arm/plat-s5p/include/plat/mipi_csis.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
-index dfab1c8..e3aabef 100644
---- a/arch/arm/plat-s5p/dev-csis0.c
-+++ b/arch/arm/plat-s5p/dev-csis0.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Samsung Electronics
-+ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
-  *
-  * S5P series device definition for MIPI-CSIS channel 0
-  *
-diff --git a/arch/arm/plat-s5p/dev-csis1.c b/arch/arm/plat-s5p/dev-csis1.c
-index e3053f2..08b91b5 100644
---- a/arch/arm/plat-s5p/dev-csis1.c
-+++ b/arch/arm/plat-s5p/dev-csis1.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Samsung Electronics
-+ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
-  *
-  * S5P series device definition for MIPI-CSIS channel 1
-  *
-diff --git a/arch/arm/plat-s5p/include/plat/csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
-similarity index 67%
-rename from arch/arm/plat-s5p/include/plat/csis.h
-rename to arch/arm/plat-s5p/include/plat/mipi_csis.h
-index 51e308c..8b3ada8 100644
---- a/arch/arm/plat-s5p/include/plat/csis.h
+diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+index 8b3ada8..bc2a6c9 100644
+--- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
 +++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2010 Samsung Electronics
-+ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
-  *
-  * S5P series MIPI CSI slave device support
-  *
-@@ -8,11 +8,11 @@
-  * published by the Free Software Foundation.
-  */
+@@ -11,18 +11,33 @@
+ #ifndef PLAT_S5P_MIPI_CSIS_H_
+ #define PLAT_S5P_MIPI_CSIS_H_ __FILE__
  
--#ifndef PLAT_S5P_CSIS_H_
--#define PLAT_S5P_CSIS_H_ __FILE__
-+#ifndef PLAT_S5P_MIPI_CSIS_H_
-+#define PLAT_S5P_MIPI_CSIS_H_ __FILE__
- 
++struct platform_device;
++
  /**
-- * struct s5p_platform_mipi_csis - platform data for MIPI-CSIS
-+ * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
+  * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
   * @clk_rate: bus clock frequency
   * @lanes: number of data lanes used
   * @alignment: data alignment in bits
-@@ -25,4 +25,4 @@ struct s5p_platform_mipi_csis {
+  * @hs_settle: HS-RX settle time
++ * @fixed_phy_vdd: set to 0 if the driver should be managing external
++ *		   D-PHY power supply through the "vdd" regulator supply
++ * @phy_enable: pointer to a callback controlling D-PHY enable/reset
+  */
+ struct s5p_platform_mipi_csis {
+ 	unsigned long clk_rate;
+ 	u8 lanes;
+ 	u8 alignment;
  	u8 hs_settle;
++	bool fixed_phy_vdd;
++	int (*phy_enable)(struct platform_device *pdev, bool on);
  };
  
--#endif /* PLAT_S5P_CSIS_H_ */
-+#endif /* PLAT_S5P_MIPI_CSIS_H_ */
++/**
++ * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
++ * @pdev: MIPI-CSIS platform device
++ * @on: true to enable D-PHY and deassert its reset
++ *	false to disable D-PHY
++ */
++int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
++
+ #endif /* PLAT_S5P_MIPI_CSIS_H_ */
 -- 
 1.7.4.1
