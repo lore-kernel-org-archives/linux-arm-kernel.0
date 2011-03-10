@@ -1,178 +1,96 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:38:08 +0530
-Subject: [PATCH v2 12/19] OMAP4: PM: Add L2 cache lowpower support
+Date: Thu, 10 Mar 2011 19:38:10 +0530
+Subject: [PATCH v2 14/19] OMAP4: pm-debug: Add wakeup timer and debug counters
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-13-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-15-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When MPUSS hits off-mode e, L2 cache is lost. This patch adds L2X0
-necessary maintenance operations and context restoration in the
-low power code.
+This patch adds configurable wakeup timer support in suspend. Also
+for statistics pm counter support is added.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap4-mpuss-lowpower.c |   18 ++++++++
- arch/arm/mach-omap2/omap4-sar-layout.h     |    2 +
- arch/arm/mach-omap2/sleep44xx.S            |   65 ++++++++++++++++++++++++++++
- 3 files changed, 85 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap4-mpuss-lowpower.c |    4 ++++
+ arch/arm/mach-omap2/pm-debug.c             |   10 ++++++++--
+ arch/arm/mach-omap2/pm44xx.c               |    5 +++++
+ 3 files changed, 17 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
-index ddf5b72..026c955 100644
+index 7348d29..3cd9e8b 100644
 --- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
 +++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
-@@ -49,6 +49,7 @@
- #include <asm/system.h>
- #include <asm/irq.h>
- #include <asm/hardware/gic.h>
-+#include <asm/hardware/cache-l2x0.h>
+@@ -289,6 +289,8 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	if (cpu)
+ 		goto cpu_prepare;
  
- #include <plat/omap44xx.h>
- #include <mach/omap4-common.h>
-@@ -336,6 +337,21 @@ ret:
- 	return 0;
- }
- 
-+static void save_l2x0_auxctrl(void)
-+{
-+#ifdef CONFIG_CACHE_L2X0
-+	/*
-+	 * Save the L2X0 AUXCTRL value to SAR memory. Its used to
-+	 * in every restore patch MPUSS OFF path.
-+	 */
-+	void __iomem *l2x0_base = omap4_get_l2cache_base();
-+	u32 val;
-+
-+	val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
-+	__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
-+#endif
-+}
-+
- /*
-  * Initialise OMAP4 MPUSS
-  */
-@@ -418,6 +434,8 @@ int __init omap4_mpuss_init(void)
- 	for (i = 0; i < max_spi_reg; i++)
- 		sar_writel(GIC_ISR_NON_SECURE, ICDISR_SPI_OFFSET, i);
- 
-+	save_l2x0_auxctrl();
-+
- 	return 0;
- }
- 
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-index 3f3e3c9..c72c0c5 100644
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -25,6 +25,8 @@
- #define MMU_OFFSET				0xd00
- #define SCU_OFFSET0				0xd20
- #define SCU_OFFSET1				0xd24
-+#define L2X0_OFFSET				0xd28
-+#define L2X0_AUXCTRL_OFFSET			0xd2c
- 
- /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
- #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
-diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-index 1d166ef..4dd55c4 100644
---- a/arch/arm/mach-omap2/sleep44xx.S
-+++ b/arch/arm/mach-omap2/sleep44xx.S
-@@ -13,6 +13,7 @@
- #include <asm/system.h>
- #include <asm/smp_scu.h>
- #include <asm/memory.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include <plat/omap44xx.h>
- #include <mach/omap4-common.h>
-@@ -59,8 +60,10 @@ ENTRY(omap4_cpu_suspend)
- 	cmp	r1, #0x0
- 	beq	do_WFI				@ Nothing to save, jump to WFI
- 	mov	r5, r0
-+	mov	r6, r1
- 	bl	omap4_get_sar_ram_base
- 	mov	r8, r0
-+	str	r6, [r8, #L2X0_OFFSET]		@ Store save state
- 	ands	r5, r5, #0x0f
- 	orreq	r8, r8, #CPU0_SAVE_OFFSET
- 	orrne	r8, r8, #CPU1_SAVE_OFFSET
-@@ -138,6 +141,42 @@ ENTRY(omap4_cpu_suspend)
- 	ldrne	r1, [r8, #SCU_OFFSET1]
- 	bl	omap4_get_scu_base
- 	bl     scu_power_mode
-+	isb
-+	dsb
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	/*
-+	 * Clean and invalidate the L2 cache.
-+	 * Common cache-l2x0.c functions can't be used here since it
-+	 * uses spinlocks. We are out of coherency here with data cache
-+	 * disabled. The spinlock implementation uses exclusive load/store
-+	 * instruction which can fail without data cache being enabled.
-+	 * OMAP4 hardware doesn't support exclusive monitor which can
-+	 * overcome exclusive access issue. Because of this, CPU can
-+	 * lead to deadlock.
-+	 */
-+l2x_clean_inv:
-+	bl	omap4_get_sar_ram_base
-+	mov	r8, r0
-+	ldr	r0, [r8, #L2X0_OFFSET]
-+	cmp	r0, #3
-+	bne	do_WFI
-+	bl	omap4_get_l2cache_base
-+	mov	r2, r0
-+	mov	r0, #0xff
-+	str	r0, [r2, #L2X0_CLEAN_WAY]
-+wait:
-+	ldr	r0, [r2, #L2X0_CLEAN_WAY]
-+	ands	r0, r0, #0xff
-+	bne	wait
-+l2x_sync:
-+	mov	r0, #0x0
-+	str	r0, [r2, #L2X0_CACHE_SYNC]
-+sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	ands	r0, r0, #0x1
-+	bne	sync
-+#endif
- 
- do_WFI:
- 	/*
-@@ -199,6 +238,32 @@ ENDPROC(omap4_cpu_suspend)
-  */
- 
- ENTRY(omap4_cpu_resume)
-+#ifdef CONFIG_CACHE_L2X0
-+	/*
-+	 * Restore the L2 AUXCTRL and enable the L2 cache.
-+	 * 0x109 =  Program the L2X0 AUXCTRL
-+	 * 0x102 =  Enable the L2 using L2X0 CTRL
-+	 * register r0 contains value to be programmed.
-+	 * L2 cache is already invalidate by ROM code as part
-+	 * of MPUSS OFF wakeup path.
-+	 */
-+	ldr	r2, =OMAP44XX_L2CACHE_BASE
-+	ldr	r0, [r2, #L2X0_CTRL]
-+	and	r0, #0x0f
-+	cmp	r0, #1
-+	beq	skip_l2en			@ Skip if already enabled
-+	ldr	r3, =OMAP44XX_SAR_RAM_BASE
-+	ldr	r0, [r3, #L2X0_AUXCTRL_OFFSET]
-+	ldr	r12, =0x109			@ Setup L2 AUXCTRL value
-+	dsb
-+	smc	#0
-+	mov	r0, #0x1
-+	ldr	r12, =0x102			@ Enable L2 Cache controller
-+	dsb
-+	smc	#0
-+skip_l2en:
-+#endif
++	pwrdm_pre_transition();
 +
  	/*
- 	 * Check the wakeup cpuid and use appropriate
- 	 * SAR BANK location for context restore.
+ 	 * Check MPUSS next state and save GIC if needed
+ 	 * GIC lost during MPU OFF and OSWR
+@@ -334,6 +336,8 @@ cpu_prepare:
+ 		gic_dist_enable();
+ 	}
+ 
++	pwrdm_post_transition();
++
+ ret:
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 34f0e5d..c83a0f6 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -606,9 +606,11 @@ static int __init pm_dbg_init(void)
+ 	if (pm_dbg_init_done)
+ 		return 0;
+ 
+-	if (cpu_is_omap34xx())
++	if (cpu_is_omap34xx()) {
+ 		pm_dbg_reg_modules = omap3_pm_reg_modules;
+-	else {
++	} else if (cpu_is_omap44xx()) {
++		/* Allow pm_dbg_init on OMAP4. */
++	} else {
+ 		printk(KERN_ERR "%s: only OMAP3 supported\n", __func__);
+ 		return -ENODEV;
+ 	}
+@@ -624,6 +626,9 @@ static int __init pm_dbg_init(void)
+ 
+ 	pwrdm_for_each(pwrdms_setup, (void *)d);
+ 
++	if (cpu_is_omap44xx())
++		goto skip_reg_debufs;
++
+ 	pm_dbg_dir = debugfs_create_dir("registers", d);
+ 	if (IS_ERR(pm_dbg_dir))
+ 		return PTR_ERR(pm_dbg_dir);
+@@ -638,6 +643,7 @@ static int __init pm_dbg_init(void)
+ 				pm_dbg_dir, (void *)(i+1), &debug_reg_fops);
+ 
+ 		}
++skip_reg_debufs:
+ 
+ 	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
+ 				   &enable_off_mode, &pm_dbg_option_fops);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 0d1f33a..14d4229 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -41,6 +41,11 @@ static int omap4_pm_suspend(void)
+ 	int state, ret = 0;
+ 	u32 cpu_id = smp_processor_id();
+ 
++	/* Wakeup timer from suspend */
++	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
++		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
++					 wakeup_timer_milliseconds);
++
+ 	/* Save current powerdomain state */
+ 	list_for_each_entry(pwrst, &pwrst_list, node) {
+ 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
 -- 
 1.6.0.4
