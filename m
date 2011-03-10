@@ -1,40 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Mar 2011 15:29:25 +0100
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <20110310140807.GB7411@sirena.org.uk>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<AANLkTikFCAC-hdv0Q_9eQs31XHHEc4wYqRjfY0S=FYcz@mail.gmail.com>
-	<20110310140807.GB7411@sirena.org.uk>
-Message-ID: <201103101529.25661.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Mar 2011 15:37:20 +0100
+Subject: i.MX Pull request for -next
+In-Reply-To: <20110310135440.GE11273@n2100.arm.linux.org.uk>
+References: <20110310134412.GD29521@pengutronix.de>
+	<20110310135440.GE11273@n2100.arm.linux.org.uk>
+Message-ID: <20110310143720.GE29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 March 2011, Mark Brown wrote:
-> On Thu, Mar 10, 2011 at 02:25:19PM +0100, Linus Walleij wrote:
+On Thu, Mar 10, 2011 at 01:54:40PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 10, 2011 at 02:44:13PM +0100, Sascha Hauer wrote:
+> > Hi Russell,
+> > 
+> > please pull the following for the next merge window.
 > 
-> > "platform" means "platform bus" in this context, does it not?
-> > So your reasoning is that since on SoC:s there is one dominant
-> > bus called the platform bus that should also hold a reference to the
-> > SoC-specific stuff.
+> Please can you provide a summary of these changes for me to include in
+> my eventual pull request to Linus?
 > 
-> Lots of stuff (like the MFD children of I2C devices) gets shoved on the
-> platform bus on Linux - every time someone considers creating a new bus
-> type for trivial devices the discussion ends up saying that the code
-> will end up being pretty much identical to the platform bus as it's so
-> straightforward so there's no point in cut'n'pasting the code.
 
-Note that there is a difference between using top-level platform
-devices (the ones that show up in /sys/devices/platform/) and platform
-devices that are children of others (all the others that are in
-/sys/bus/platform).
+Sure. Is this enough?
 
-Creating a new bus_type for trivial things is rather pointless,
-so using a platform device is fine for MFD, since the child devices
-just show up in the hierarchy.
+This branch contains the collected Freescale i.MX related updates.
 
-What some broken drivers do is to create platform devices ad hoc
-and just put them into /sys/platform/ directly although the
-devices clearly have a parent somewhere. These are bugs that should
-be fixed.
+- additions of board glue code for new devices
+- A bunch of unnecessary ifdef removal
+- Add a full description of iomux settings for i.MX53
 
-	Arnd
+new boards:
+- Efika Smartbook
+- VPR200
+- Ka-Ro TX28
+- Eukrea MBIMXSD51
+- IMX27IPCAM
+
+new drivers:
+- Freescale i.MX23/28 AUART driver,
+- Freescale i.MX23/28 framebuffer driver
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
