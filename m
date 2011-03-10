@@ -1,53 +1,81 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 10 Mar 2011 11:41:27 +0800
-Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
-In-Reply-To: <-6991351870718115910@unknownmsgid>
-References: <1299493870-8217-1-git-send-email-bryan.wu@canonical.com>
-	<-6991351870718115910@unknownmsgid>
-Message-ID: <AANLkTi=zbsd1XjHu99SOAu_eJ8h8i9RTs+iVjNyW44Ju@mail.gmail.com>
+Date: Thu, 10 Mar 2011 11:43:53 +0800
+Subject: [PATCH] ARM: aout-core: zero thread debug registers in a.out core
+	dump
+In-Reply-To: <1299581872-18098-1-git-send-email-will.deacon@arm.com>
+References: <1299581872-18098-1-git-send-email-will.deacon@arm.com>
+Message-ID: <AANLkTi=uhEfpv1bD_Wtoq4i7kJ5D8yDFmqBwchAnqtXu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2011 at 6:42 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Tue, Mar 8, 2011 at 6:57 PM, Will Deacon <will.deacon@arm.com> wrote:
+> The removal of the single-step emulation from ptrace on ARM means that
+> thread_struct no longer has software breakpoint fields in its debug
+> member.
+>
+> This patch fixes the a.out core dump code so that the debug registers
+> are zeroed rather than trying to copy from non-existent fields.
+>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reported-by: Bryan Wu <bryan.wu@canonical.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>
 > Hi Bryan,
 >
->> Subject: [PATCH 1/2] ARM: fix compiling error due to debug_info change
->
-> Is there a patch 2/2 as well? (I only received this one).
->
-Oops, my mistake.
-
->> This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->> ---
->> ?arch/arm/include/asm/a.out-core.h | ? ?6 ------
->> ?1 files changed, 0 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
->> index 93d04ac..639f5c8 100644
->> --- a/arch/arm/include/asm/a.out-core.h
->> +++ b/arch/arm/include/asm/a.out-core.h
->> @@ -32,12 +32,6 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
->> ? ? ? dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
->> ? ? ? dump->u_ssize = 0;
->>
->> - ? ? dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
->> - ? ? dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
->> - ? ? dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
->> - ? ? dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
->> - ? ? dump->u_debugreg[4] = tsk->thread.debug.nsaved;
->> -
->> ? ? ? if (dump->start_stack < 0x04000000)
->> ? ? ? ? ? ? ? dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
->
-> Damn, looks like I forgot to update this code. I think it might be better
-> to memset zero the u_debugreg array rather than ignore the assignment and
-> also add a comment to struct user to explain that thie field is no longer
-> used.
+> Feel free to upgrade your tag on this (signed-off / acked) since this is
+> clearly based on the patch you posted yesterday. I'd like to get this to
+> Russell ASAP so that we don't get a build-breaker in the near future.
 >
 
-That makes sense. I will update a patch for you soon.
+Oh, I missed this email. Just send out an similar patch.
 
+> Cheers,
+>
+> Will
+>
+> ?arch/arm/include/asm/a.out-core.h | ? ?6 +-----
+> ?arch/arm/include/asm/user.h ? ? ? | ? ?2 +-
+> ?2 files changed, 2 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
+> index 93d04ac..92f10cb 100644
+> --- a/arch/arm/include/asm/a.out-core.h
+> +++ b/arch/arm/include/asm/a.out-core.h
+> @@ -32,11 +32,7 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
+> ? ? ? ?dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
+> ? ? ? ?dump->u_ssize = 0;
+>
+> - ? ? ? dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
+> - ? ? ? dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
+> - ? ? ? dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
+> - ? ? ? dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
+> - ? ? ? dump->u_debugreg[4] = tsk->thread.debug.nsaved;
+> + ? ? ? memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg));
+>
+I think this should be
+ memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg) * 8);
+
+u_debugreg is a pointer to a int, the array contains 8 of them as we
+found in the user.h
+
+> ? ? ? ?if (dump->start_stack < 0x04000000)
+> ? ? ? ? ? ? ? ?dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
+> diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+> index 05ac4b0..35917b3 100644
+> --- a/arch/arm/include/asm/user.h
+> +++ b/arch/arm/include/asm/user.h
+> @@ -71,7 +71,7 @@ struct user{
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* the registers. */
+> ? unsigned long magic; ? ? ? ? /* To uniquely identify a core file */
+> ? char u_comm[32]; ? ? ? ? ? ? /* User command that was responsible */
+> - ?int u_debugreg[8];
+> + ?int u_debugreg[8]; ? ? ? ? ? /* No longer used */
+> ? struct user_fp u_fp; ? ? ? ? /* FP state */
+> ? struct user_fp_struct * u_fp0;/* Used by gdb to help find the values for */
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* the FP registers. */
+> --
+> 1.7.0.4
+>
+>
 -Bryan
