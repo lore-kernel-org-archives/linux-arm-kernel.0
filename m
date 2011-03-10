@@ -1,69 +1,18 @@
-From: shweta.gulati@ti.com (Shweta Gulati)
-Date: Thu, 10 Mar 2011 10:23:49 +0530
-Subject: [PATCH V3 2/3] OMAP4: Update Voltage Rail Values for MPU, IVA and CORE
-Message-ID: <1299732829-3376-1-git-send-email-shweta.gulati@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Mar 2011 13:51:11 +0900
+Subject: [PATCH V2 0/3] ARM: EXYNOS4: Suspend to RAM Support
+Message-ID: <1299732674-6752-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update MPU, IVA and CORE voltage Rail values obtained from
-OMAP4430 Data Manual Operating Condition Addendum_v0.4.
+This patch adds support suspend to ram on EXYNOS4.
+This is made based on generic CPU sleep support.
 
-Tested on OMAP4430 SDP Board.
+Changes since v1:
+- re-maded based on rmk/pm
+- added some more registers of CMU to save and restore
+- fixed MAUDIO retention after resuming
 
-Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
----
-V3:
-Update CORE Voltages as well
-in sync with V0.4 of OMAP4 Data Manual.
-
-V2:
-Fixed Comments from Nishanth Menon. 
-
- arch/arm/mach-omap2/opp4xxx_data.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
-index ed0efdb..aa624d1 100644
---- a/arch/arm/mach-omap2/opp4xxx_data.c
-+++ b/arch/arm/mach-omap2/opp4xxx_data.c
-@@ -30,10 +30,10 @@
-  * voltage dependent data for each VDD.
-  */
- 
--#define OMAP4430_VDD_MPU_OPP50_UV		930000
--#define OMAP4430_VDD_MPU_OPP100_UV		1100000
--#define OMAP4430_VDD_MPU_OPPTURBO_UV		1260000
--#define OMAP4430_VDD_MPU_OPPNITRO_UV		1350000
-+#define OMAP4430_VDD_MPU_OPP50_UV		1025000
-+#define OMAP4430_VDD_MPU_OPP100_UV		1200000
-+#define OMAP4430_VDD_MPU_OPPTURBO_UV		1313000
-+#define OMAP4430_VDD_MPU_OPPNITRO_UV		1375000
- 
- struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
- 	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP50_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
-@@ -43,9 +43,9 @@ struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
- 	VOLT_DATA_DEFINE(0, 0, 0, 0),
- };
- 
--#define OMAP4430_VDD_IVA_OPP50_UV		930000
--#define OMAP4430_VDD_IVA_OPP100_UV		1100000
--#define OMAP4430_VDD_IVA_OPPTURBO_UV		1260000
-+#define OMAP4430_VDD_IVA_OPP50_UV		1013000
-+#define OMAP4430_VDD_IVA_OPP100_UV		1188000
-+#define OMAP4430_VDD_IVA_OPPTURBO_UV		1300000
- 
- struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
- 	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP50_UV, OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
-@@ -54,8 +54,8 @@ struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
- 	VOLT_DATA_DEFINE(0, 0, 0, 0),
- };
- 
--#define OMAP4430_VDD_CORE_OPP50_UV		930000
--#define OMAP4430_VDD_CORE_OPP100_UV		1100000
-+#define OMAP4430_VDD_CORE_OPP50_UV		1025000
-+#define OMAP4430_VDD_CORE_OPP100_UV		1200000
- 
- struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
- 	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP50_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
--- 
-1.7.0.4
+[PATCH V2 1/3] ARM: EXYNOS4: Add PMU and CMU Registers for PM
+[PATCH V2 2/3] ARM: EXYNOS4: Suspend to RAM Support
+[PATCH V2 3/3] ARM: EXYNOS4: Update HRT for supporting PM
