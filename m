@@ -1,57 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 10 Mar 2011 13:46:21 -0600
-Subject: [PATCH] arm/dt: Add dtb make rule
-Message-ID: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Mar 2011 11:51:58 -0800
+Subject: [PATCH 2/2] OMAP: PM: implement devices constraints APIs
+In-Reply-To: <AANLkTikQOfsteZUAzSWjO-BbAW=ZEX22mhRUFHBMeFTR@mail.gmail.com>
+	(Jean Pihet's message of "Wed, 9 Mar 2011 20:37:51 +0100")
+References: <1299250375-26134-1-git-send-email-j-pihet@ti.com>
+	<1299698346-2768-1-git-send-email-j-pihet@ti.com>
+	<AANLkTikQOfsteZUAzSWjO-BbAW=ZEX22mhRUFHBMeFTR@mail.gmail.com>
+Message-ID: <87y64mbvoh.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-Add a make rule to compile dt blobs for ARM.
+[...]
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/Makefile      |    3 +++
- arch/arm/boot/Makefile |    6 ++++++
- 2 files changed, 9 insertions(+), 0 deletions(-)
+>> + ? ? ? if (pwrdm_read_pwrst(pwrdm) != new_state) {
+>> + ? ? ? ? ? ? ? ret = omap_set_pwrdm_state(pwrdm, new_state);
+>
+> The function pwrdms_setup (called from omap3_pm_init for every pwrdm)
+> runs late in the boot process and so it overwrites the registers
+> values programmed by omap_set_pwrdm_state with the default values.
+> Could the default values get written earlier in the boot process (e.g.
+> at hwmod init) before the devices can put constraints on the power
+> domains?
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index b49dea6..566763f 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -284,6 +284,9 @@ zImage Image xipImage bootpImage uImage: vmlinux
- zinstall install: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
- 
-+%.dtb:
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
- 	$(Q)$(MAKE) $(clean)=$(boot)
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index dcf323d..bb63922 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -13,6 +13,8 @@
- 
- MKIMAGE         := $(srctree)/scripts/mkuboot.sh
- 
-+DTC_FLAGS := -p 1024
-+
- ifneq ($(MACHINE),)
- include $(srctree)/$(MACHINE)/Makefile.boot
- endif
-@@ -59,6 +61,10 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 
- endif
- 
-+# Rule to build device tree blobs
-+$(obj)/%.dtb: $(src)/dts/%.dts
-+	$(call cmd,dtc)
-+
- quiet_cmd_uimage = UIMAGE  $@
-       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
- 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
--- 
-1.7.1
+Yes, default vaules for each power domain's next state should probably
+be written earlier in the boot.  Probably when the powerdomain is
+initialized, or at least when this constraints framework is initialized.
+
+Then, the initial states set in omap3_pm_init() can just be removed.
+
+Kevin
