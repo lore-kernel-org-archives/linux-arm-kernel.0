@@ -1,34 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 Mar 2011 07:45:15 -0700 (MST)
-Subject: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle for
- GPT1
-In-Reply-To: <3b8b985f13158fbcd110cf45ed7035ad@mail.gmail.com>
-References: <alpine.DEB.2.00.1103091847150.15132@utopia.booyaka.com>
-	<alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
-	<3b8b985f13158fbcd110cf45ed7035ad@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1103100744500.15132@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2011 15:52:15 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <1299254660-15765-1-git-send-email-m.szyprowski@samsung.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<1299254660-15765-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201103101552.15536.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Mar 2011, Santosh Shilimkar wrote:
-
-> We continued further debug on the static dependency issues with
-> OMAP4 PM series.
-> So far from the findings what I have, this timer patch is actually not
-> needed and can be dropped. Infact the patch is not really effective
-> because current timer driver(not hwmod adapted yet) puts timer1
-> in smart idle again.
+On Friday 04 March 2011, Marek Szyprowski wrote:
+> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
 > 
-> There is another static dep. just like MPUSS<-->EMIF seems to create
-> an issue. The lock-up is not very consistently reproducible so it's
-> very easy to get miss-leading results. Timer patch was one of those
-> observations. With or without timer patch I can reproduce the hang
-> with long duration test.
+> This patch performs a complete rewrite of sysmmu driver for Samsung platform:
+> - the new version introduces an api to construct device private page
+>   tables and enables to use device private address space mode
+> - simplified the resource management: no more single platform
+>   device with 32 resources is needed, better fits into linux driver model,
+>   each sysmmu instance has it's own resource definition
+> - added support for sysmmu clocks
+> - some other minor API chages required by upcoming videobuf2 allocator
 > 
-> Will keep narrowing down the next offending static dependency but
-> in mean time I suggest you to drop this patch.
+> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Okay, dropped.
+Please explain why create a new IOMMU API when we already have two
+generic ones (include/linux/iommu.h and include/linux/dma-mapping.h).
 
+Is there something that cannot be done with the common code?
+The first approach should be to extend the existing APIs to
+do what you need.
 
-- Paul
+	Arnd
