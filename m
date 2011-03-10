@@ -1,226 +1,126 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 10 Mar 2011 10:10:37 +0000
-Subject: [PATCH 2/8] macb: detect hclk presence from platform data
+Date: Thu, 10 Mar 2011 10:10:38 +0000
+Subject: [PATCH 3/8] macb: convert printk to pr_ and friends
 In-Reply-To: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
 References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1299751843-9743-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <1299751843-9743-4-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than detecting whether we need to do a clk_get() and enable on
-the "hclk" based on the kernel configuration, add an extra field to the
-platform data.  This makes it cleaner to add more supported
-architectures without lots of ifdeffery.
-
-This requires that all instantiations of the device have platform data
-defined but that is the case currently anyway.
+macb is already using the dev_dbg() and friends helpers so use pr_foo()
+along with a pr_fmt() definition to make the printing a little cleaner.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/avr32/mach-at32ap/at32ap700x.c |    2 +
- drivers/net/macb.c                  |   77 ++++++++++++++++++-----------------
- include/linux/platform_data/macb.h  |    1 +
- 3 files changed, 43 insertions(+), 37 deletions(-)
+ drivers/net/macb.c |   34 +++++++++++++++++-----------------
+ 1 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-index 2747cde..2abcafd 100644
---- a/arch/avr32/mach-at32ap/at32ap700x.c
-+++ b/arch/avr32/mach-at32ap/at32ap700x.c
-@@ -1088,6 +1088,8 @@ at32_add_device_eth(unsigned int id, struct eth_platform_data *data)
- 	struct platform_device *pdev;
- 	u32 pin_mask;
- 
-+	data->have_hclk = 1;
-+
- 	switch (id) {
- 	case 0:
- 		pdev = &macb0_device;
 diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-index bfd3601..ae98fee 100644
+index ae98fee..5d676ad 100644
 --- a/drivers/net/macb.c
 +++ b/drivers/net/macb.c
-@@ -246,9 +246,7 @@ static int macb_mii_init(struct macb *bp)
- 	bp->mii_bus->parent = &bp->dev->dev;
- 	pdata = bp->pdev->dev.platform_data;
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+  */
  
--	if (pdata)
--		bp->mii_bus->phy_mask = pdata->phy_mask;
--
-+	bp->mii_bus->phy_mask = pdata->phy_mask;
- 	bp->mii_bus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
- 	if (!bp->mii_bus->irq) {
- 		err = -ENOMEM;
-@@ -1103,9 +1101,14 @@ static const struct net_device_ops macb_netdev_ops = {
- #endif
- };
++#define pr_fmt(fmt) "macb: " fmt
+ #include <linux/clk.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+@@ -175,11 +176,11 @@ static void macb_handle_link_change(struct net_device *dev)
  
-+#ifdef CONFIG_ARCH_AT91
-+#define PCLK_NAME	"macb_clk"
-+#else /* CONFIG_ARCH_AT91 */
-+#define PCLK_NAME	"pclk"
-+#endif
-+
- static int __init macb_probe(struct platform_device *pdev)
- {
--	struct eth_platform_data *pdata;
- 	struct resource *regs;
- 	struct net_device *dev;
- 	struct macb *bp;
-@@ -1113,6 +1116,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 	unsigned long pclk_hz;
- 	u32 config;
- 	int err = -ENXIO;
-+	struct eth_platform_data *pdata;
+ 	if (status_change) {
+ 		if (phydev->link)
+-			printk(KERN_INFO "%s: link up (%d/%s)\n",
++			pr_info("%s: link up (%d/%s)\n",
+ 			       dev->name, phydev->speed,
+ 			       DUPLEX_FULL == phydev->duplex ? "Full":"Half");
+ 		else
+-			printk(KERN_INFO "%s: link down\n", dev->name);
++			pr_info("%s: link down\n", dev->name);
+ 	}
+ }
  
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs) {
-@@ -1120,6 +1124,13 @@ static int __init macb_probe(struct platform_device *pdev)
- 		goto err_out;
+@@ -193,7 +194,7 @@ static int macb_mii_probe(struct net_device *dev)
+ 
+ 	phydev = phy_find_first(bp->mii_bus);
+ 	if (!phydev) {
+-		printk (KERN_ERR "%s: no PHY found\n", dev->name);
++		pr_err("%s: no PHY found\n", dev->name);
+ 		return -1;
  	}
  
-+	err = -EINVAL;
-+	pdata = dev_get_platdata(&pdev->dev);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "no platform data present\n");
-+		goto err_out;
-+	}
-+
- 	err = -ENOMEM;
- 	dev = alloc_etherdev(sizeof(*bp));
- 	if (!dev) {
-@@ -1138,28 +1149,22 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&bp->lock);
- 
--#if defined(CONFIG_ARCH_AT91)
--	bp->pclk = clk_get(&pdev->dev, "macb_clk");
-+	bp->pclk = clk_get(&pdev->dev, PCLK_NAME);
- 	if (IS_ERR(bp->pclk)) {
- 		dev_err(&pdev->dev, "failed to get macb_clk\n");
- 		goto err_out_free_dev;
- 	}
- 	clk_enable(bp->pclk);
--#else
--	bp->pclk = clk_get(&pdev->dev, "pclk");
--	if (IS_ERR(bp->pclk)) {
--		dev_err(&pdev->dev, "failed to get pclk\n");
--		goto err_out_free_dev;
--	}
--	bp->hclk = clk_get(&pdev->dev, "hclk");
--	if (IS_ERR(bp->hclk)) {
--		dev_err(&pdev->dev, "failed to get hclk\n");
--		goto err_out_put_pclk;
-+
-+	if (pdata->have_hclk) {
-+		bp->hclk = clk_get(&pdev->dev, "hclk");
-+		if (IS_ERR(bp->hclk)) {
-+			dev_err(&pdev->dev, "failed to get hclk\n");
-+			goto err_out_put_pclk;
-+		}
-+		clk_enable(bp->hclk);
+@@ -206,7 +207,7 @@ static int macb_mii_probe(struct net_device *dev)
+ 				 PHY_INTERFACE_MODE_RMII :
+ 				 PHY_INTERFACE_MODE_MII);
+ 	if (ret) {
+-		printk(KERN_ERR "%s: Could not attach to PHY\n", dev->name);
++		pr_err("%s: Could not attach to PHY\n", dev->name);
+ 		return ret;
  	}
  
--	clk_enable(bp->pclk);
--	clk_enable(bp->hclk);
--#endif
+@@ -303,7 +304,7 @@ static void macb_tx(struct macb *bp)
  
- 	bp->regs = ioremap(regs->start, regs->end - regs->start + 1);
- 	if (!bp->regs) {
-@@ -1197,9 +1202,8 @@ static int __init macb_probe(struct platform_device *pdev)
- 	macb_writel(bp, NCFGR, config);
+ 	if (status & (MACB_BIT(UND) | MACB_BIT(TSR_RLE))) {
+ 		int i;
+-		printk(KERN_ERR "%s: TX %s, resetting buffers\n",
++		pr_err("%s: TX %s, resetting buffers\n",
+ 			bp->dev->name, status & MACB_BIT(UND) ?
+ 			"underrun" : "retry limit exceeded");
  
- 	macb_get_hwaddr(bp);
--	pdata = pdev->dev.platform_data;
+@@ -574,10 +575,11 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
  
--	if (pdata && pdata->is_rmii)
-+	if (pdata->is_rmii)
- #if defined(CONFIG_ARCH_AT91)
- 		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)) );
- #else
-@@ -1243,14 +1247,12 @@ err_out_free_irq:
- err_out_iounmap:
- 	iounmap(bp->regs);
- err_out_disable_clocks:
--#ifndef CONFIG_ARCH_AT91
--	clk_disable(bp->hclk);
--	clk_put(bp->hclk);
--#endif
-+	if (pdata->have_hclk) {
-+		clk_disable(bp->hclk);
-+		clk_put(bp->hclk);
-+	}
- 	clk_disable(bp->pclk);
--#ifndef CONFIG_ARCH_AT91
- err_out_put_pclk:
--#endif
- 	clk_put(bp->pclk);
- err_out_free_dev:
- 	free_netdev(dev);
-@@ -1263,6 +1265,7 @@ static int __exit macb_remove(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct macb *bp;
-+	struct eth_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 		if (status & MACB_BIT(HRESP)) {
+ 			/*
+-			 * TODO: Reset the hardware, and maybe move the printk
+-			 * to a lower-priority context as well (work queue?)
++			 * TODO: Reset the hardware, and maybe move the
++			 * pr_err to a lower-priority context as well (work
++			 * queue?)
+ 			 */
+-			printk(KERN_ERR "%s: DMA bus error: HRESP not OK\n",
++			pr_err("%s: DMA bus error: HRESP not OK\n",
+ 			       dev->name);
+ 		}
  
- 	dev = platform_get_drvdata(pdev);
+@@ -950,9 +952,8 @@ static int macb_open(struct net_device *dev)
  
-@@ -1276,10 +1279,10 @@ static int __exit macb_remove(struct platform_device *pdev)
- 		unregister_netdev(dev);
- 		free_irq(dev->irq, dev);
- 		iounmap(bp->regs);
--#ifndef CONFIG_ARCH_AT91
--		clk_disable(bp->hclk);
--		clk_put(bp->hclk);
--#endif
-+		if (pdata->have_hclk) {
-+			clk_disable(bp->hclk);
-+			clk_put(bp->hclk);
-+		}
- 		clk_disable(bp->pclk);
- 		clk_put(bp->pclk);
- 		free_netdev(dev);
-@@ -1294,12 +1297,12 @@ static int macb_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	struct net_device *netdev = platform_get_drvdata(pdev);
- 	struct macb *bp = netdev_priv(netdev);
-+	struct eth_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	err = macb_alloc_consistent(bp);
+ 	if (err) {
+-		printk(KERN_ERR
+-		       "%s: Unable to allocate DMA memory (error %d)\n",
+-		       dev->name, err);
++		pr_err("%s: Unable to allocate DMA memory (error %d)\n",
++			 dev->name, err);
+ 		return err;
+ 	}
  
- 	netif_device_detach(netdev);
+@@ -1177,9 +1178,8 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
+ 			  dev->name, dev);
+ 	if (err) {
+-		printk(KERN_ERR
+-		       "%s: Unable to request IRQ %d (error %d)\n",
+-		       dev->name, dev->irq, err);
++		pr_err("%s: Unable to request IRQ %d (error %d)\n",
++			 dev->name, dev->irq, err);
+ 		goto err_out_iounmap;
+ 	}
  
--#ifndef CONFIG_ARCH_AT91
--	clk_disable(bp->hclk);
--#endif
-+	if (pdata->have_hclk)
-+		clk_disable(bp->hclk);
- 	clk_disable(bp->pclk);
+@@ -1230,11 +1230,11 @@ static int __init macb_probe(struct platform_device *pdev)
  
- 	return 0;
-@@ -1309,11 +1312,11 @@ static int macb_resume(struct platform_device *pdev)
- {
- 	struct net_device *netdev = platform_get_drvdata(pdev);
- 	struct macb *bp = netdev_priv(netdev);
-+	struct eth_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	platform_set_drvdata(pdev, dev);
  
- 	clk_enable(bp->pclk);
--#ifndef CONFIG_ARCH_AT91
--	clk_enable(bp->hclk);
--#endif
-+	if (pdata->have_hclk)
-+		clk_enable(bp->hclk);
+-	printk(KERN_INFO "%s: Atmel MACB at 0x%08lx irq %d (%pM)\n",
+-	       dev->name, dev->base_addr, dev->irq, dev->dev_addr);
++	pr_info("%s: Atmel MACB at 0x%08lx irq %d (%pM)\n",
++		dev->name, dev->base_addr, dev->irq, dev->dev_addr);
  
- 	netif_device_attach(netdev);
+ 	phydev = bp->phy_dev;
+-	printk(KERN_INFO "%s: attached PHY driver [%s] "
++	pr_info("%s: attached PHY driver [%s] "
+ 		"(mii_bus:phy_addr=%s, irq=%d)\n", dev->name,
+ 		phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
  
-diff --git a/include/linux/platform_data/macb.h b/include/linux/platform_data/macb.h
-index beddfd3..ae18579 100644
---- a/include/linux/platform_data/macb.h
-+++ b/include/linux/platform_data/macb.h
-@@ -5,6 +5,7 @@ struct eth_platform_data {
- 	u32		phy_mask;
- 	u8		phy_irq_pin;	/* PHY IRQ */
- 	u8		is_rmii;	/* using RMII interface? */
-+	int		have_hclk;	/* have hclk as well as pclk */
- };
- 
- #endif /* __MACB_PDATA_H__ */
 -- 
 1.7.4
