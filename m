@@ -1,57 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Mar 2011 22:09:30 +0900
-Subject: [PATCH v3 0/3] ARM: S5P: Add platform helpers for MIPI-CSIS/DSIM
-	DPHY
-In-Reply-To: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
-References: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <009b01cbdf24$67587c20$36097460$%kim@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 10 Mar 2011 06:16:45 -0700 (MST)
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D78CAFC.4080502@ti.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
+	<4D78CAFC.4080502@ti.com>
+Message-ID: <alpine.DEB.2.00.1103100616240.15132@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Hello,
-> 
-Hi :)
+On Thu, 10 Mar 2011, Rajendra Nayak wrote:
 
-Thanks for your re-submitting.
+> On Thursday 10 March 2011 05:48 PM, Paul Walmsley wrote:
+> > This patch is currently breaking boot on OMAP4430 ES2.0 Pandaboard,
+> > so I've dropped it from the integration branch until it can be
+> > debugged.  Could you check it, please?
+> > 
+> > The tag "integration-2.6.39-20110310-008" of
+> > git://git.pwsan.com/linux-integration boots fine; it's got everything
+> > but this patch.  Then when this patch is applied, I2C problems show
+> > up, and root (on MMC) doesn't mount.
+> 
+> Looks like you are missing this patch which should fix the i2c
+> timeouts..
+> http://marc.info/?l=linux-omap&m=129924561819873&w=2
 
-> the following is a fourth version of a change set adding platform helpers
-> for the MIPI-CSIS and MIPI-DSIM PHYs control on S5PV210 and Exynos4.
-> 
-> Changes since v3:
->  - further copyright change (ptach 1/3)
->  - fixed_phy_vdd type changed to bool (p. 2/3);
-> 
-> Changes since v2:
->  - renamed setup-mipi.c/setup-mipidphy.c
->  - regs-pmu.h header included in regs-clock.s in mach-exynos4 to get
->    rid of CONFIG_ARCH_EXYNOS4 in setup-mipiphy.c
-> 
-> Changes since v1:
->  - updated the platform data structure with an additional flag indicating
->    whether the driver should attempt to control the external mipi-csis
->    (VDD18_MIPI) voltage regulator or not. This might be needed on systems
->    where MIPI VDD power supply cannot be separately switched on/off.
-> 
-> 
-> The patch series contains:
->  [PATCH v4 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update
-Copyright
->  [PATCH v4 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY
-control
-> callback
->  [PATCH v4 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM D-PHY
-control
-> 
-> Created against for-next branch at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> 
-Looks ok to me, will apply.
-Thanks again.
+Thanks, let's see if Ben is planning to merge it for 2.6.39.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+- Paul
