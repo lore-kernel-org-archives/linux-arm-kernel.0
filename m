@@ -1,5 +1,5 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 Mar 2011 06:16:45 -0700 (MST)
+Date: Thu, 10 Mar 2011 06:17:02 -0700 (MST)
 Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
 In-Reply-To: <4D78CAFC.4080502@ti.com>
 References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
@@ -7,9 +7,11 @@ References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
 	<4D775418.6050105@ti.com>
 	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
 	<4D78CAFC.4080502@ti.com>
-Message-ID: <alpine.DEB.2.00.1103100616240.15132@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1103100609080.15132@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Ben,
 
 On Thu, 10 Mar 2011, Rajendra Nayak wrote:
 
@@ -25,9 +27,14 @@ On Thu, 10 Mar 2011, Rajendra Nayak wrote:
 > 
 > Looks like you are missing this patch which should fix the i2c
 > timeouts..
-> http://marc.info/?l=linux-omap&m=129924561819873&w=2
 
-Thanks, let's see if Ben is planning to merge it for 2.6.39.
+Do you think you'll merge this patch:
+
+   http://marc.info/?l=linux-omap&m=129924561819873&w=2
+
+during the 2.6.39 window?  If so, then I'll add Rajendra's clockdomain 
+patch back in to my 2.6.39 queue here; it seems to depend on the I2C 
+driver patch.
 
 
 - Paul
