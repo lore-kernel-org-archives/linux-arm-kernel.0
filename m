@@ -1,159 +1,190 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:37:56 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and CPUilde support.
-Message-ID: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 10 Mar 2011 19:38:07 +0530
+Subject: [PATCH v2 11/19] OMAP4: PM: Add WakeupGen save/restore support
+In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-12-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2 updates:
-Rebased on latest pm-core branch and fixes below comments
-from Kevin Hilman <khilman@ti.com>. 
-- All acronym fixes
-- Use WARN_ON() instead of BUG_ON() with graceful exit.
-- Export omap4_get_base*() rather than global address pointers
-- CPUidle prepare() hook + hotplug notifier to manage C-state dynamically.
-- Dropped debugfs way of changing C-state valid flags in favor of above.
+WakeupGen IP is integrated along with GIC to manage the
+interrupt wakeups from CPU low power states. It's located in
+always ON power domain. It manages masking/unmasking of
+Shared peripheral interrupts(SPI).So the interrupt enable/disable
+control should be in sync and consistent at WakeupGen and GIC so
+that interrupts are not lost.
 
-Full series with cherry-picked dependencies are available on below
-git branch. 
+Considering this GIC and WakeupGen save and restore is done
+together.
 
-git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-omap4_pm_for-next_v2
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/include/mach/omap-wakeupgen.h |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c              |   81 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap4-mpuss-lowpower.c        |    2 +
+ arch/arm/mach-omap2/omap4-sar-layout.h            |   11 +++
+ 4 files changed, 95 insertions(+), 0 deletions(-)
 
-This series adds OMAP4 suspend and cpuidle support till MPU subsystem
-(MPUSS) off-mode. The suspend on SMP machines uses cpu-hotplug 
-infrastructure to take down the non-boot CPUs. We put secondary
-CPU(CPU1 in OMAP4) to OFF state via cpu-hotplug.
-In cpuidle too, low power states are attempted only when the
-CPU1 is put to OFF state via cpu-hotplug because of hardware
-constraints.
-
-Timer wakeup from suspend, debug pm counters and enable_off_mode
-provisions are supported as well.
-
-Special thanks to Kevin Hilman <khilman@ti.com> for doing detail
-off-the list reviews.
-
-The patches are generated against mainline 2.6.38-rc5 and tested with
-OMAP4430 SDP and OMAP4 PANDA board. Any OMAP4 board with ES2.X silicon,
-below features should work with this series. On ES1.0, these PM 
-features are not supported.
-	1. CPU hotplug (CPU is put into off-mode)
-	2. Suspend (Both CPUs put to off-mode and MPUSS to OFF/RET)
-	3. CPUILDE with below C-states.
-		C1 - CPU0 ON + CPU1 ON/OFF + MPU ON + CORE ON
-		C2 - CPU0 ON + CPU1 OFF + MPU ON + CORE ON
-		C3 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON
-		C4 - CPU0 OFF + CPU1 OFF + MPU OFF + CORE ON
-
-In OMAP4 mpuss consist of dual Cortex-A9 with per-cpu local timers
-GIC(Generic Interrupt Controller), SCU(Snoop Control Unit) and PL310
-L2 cache controller and  CPU0/CPU1 LPRM modules.
-CPU0, CPU1 and MPUSS have there own power domain and hence multiple
-low power state combinations are possible. The CPU10 and CPU1
-Close switch Retention(CSWR) isn't supported by hardware.
-Based on various studies, measurements, hardware constraints
-and recommendations from hardware team, only below low power
-modes are supported on OMAP4.
-----------------------------------------
-CPU0		CPU1		MPUSS
-----------------------------------------
-ON		ON		ON
-OFF		OFF		CSWR
-OFF		OFF		OSWR 
-OFF		OFF		OFF
------------------------------------------
-Note: CPU0 is the master core and it is the last CPU to go down
-and first to wake-up when MPUSS low power states are attempted
-
-OSWR(Open Switch Retention) is not added as part of this series
-because it needs some power domain level support which isn't ready
-yet.
-	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38667.html
-
-Powerdomain INACTIVE support is also dropped because of its 
-inconsistency between OMAP4 and OMAP3.
-More information  on this thread -
-	http://www.spinics.net/lists/linux-omap/msg45370.html
-
-This series has a dependency on few patches from below series.
-	- GIC and SCU patches from [1] (queued up in RMK's for-next)
-	- Local Timer patches from [2] (queued up in RMK's for-next)
-	- Not clearing the static deps hack which is getting sorted out.
-
-The cpu-hotplug and suspend works with omap2plus_defconfig. Not to damage
-your file system with current omap2plus_defconfig, disable ARCH_OMAP2 so
-that V6 and V7 support is not built together with SMP.
-To tryout cpuidle, CONFIG_CPU_IDLE needs to be enabled in the build.
-
-CPU-HOTPLUG commands :
-	offline : $echo 0 > /sys/devices/system/cpu/cpu1/online
-	online : $echo 1 > /sys/devices/system/cpu/cpu1/online
-
-Suspend :$echo mem > /sys/power/state
-
-cpuilde : To trigger cpuidle deeper C-states on OMAP4, CPU1 needs
-	to be offlied
-	$echo 0 > /sys/devices/system/cpu/cpu1/online
-
-To see PM debug counters,
-	$mount -t debugfs debugfs /proc/sys/debug/
-	$cat /proc/sys/debug/pm_debug/count
-off-mode debugfs control:
-	enable: $echo 1 > /proc/sys/debug/pm_debug/enable_off_mode
-	disable: $echo 0 > /proc/sys/debug/pm_debug/enable_off_mode
-
-Summary:
-
-Rajendra Nayak (1):
-  OMAP4: cpuidle: Basic CPUidle support
-
-Santosh Shilimkar (18):
-  OMAP4: PM: Add omap WakeupGen module support
-  OMAP4: Use WARN_ON() instead of BUG_ON() with graceful exit
-  OMAP4: PM: Export omap4_get_base*() rather than global address
-    pointers
-  OMAP4: PM: Add SAR RAM support
-  OMAP4: PM: Add CPUX OFF mode support
-  OMAP4: PM: Initialise all the clockdomains to supported states
-  OMAP4: PM: Program CPU1 to hit OFF when off-lined
-  OMAP4: PM: CPU1 wakeup workaround from Low power modes
-  OMAP4: PM: Add GIC distributor and interface enable/disable accessory
-    api
-  OMAP4: PM: Add GIC save/restore support
-  OMAP4: PM: Add WakeupGen save/restore support
-  OMAP4: PM: Add L2 cache lowpower support
-  OMAP4: suspend: Add MPUSS RET and OFF support
-  OMAP4: pm-debug: Add wakeup timer and debug counters
-  OMAP4: cpuidle: Add MPUSS RET OFF states
-  OMAP4: cpuidle: Switch to gptimer from twd in deeper C-states.
-  OMAP4: cpuidle: Add CPU hotplug notifier and prepare() hook.
-  OMAP4: Remove un-used do_wfi() macro.
-
- arch/arm/mach-omap2/Makefile                      |    8 +-
- arch/arm/mach-omap2/cpuidle44xx.c                 |  352 ++++++++++++++++
- arch/arm/mach-omap2/include/mach/omap-wakeupgen.h |   41 ++
- arch/arm/mach-omap2/include/mach/omap4-common.h   |   73 +++-
- arch/arm/mach-omap2/omap-hotplug.c                |   30 ++-
- arch/arm/mach-omap2/omap-smp.c                    |   32 ++-
- arch/arm/mach-omap2/omap-wakeupgen.c              |  319 +++++++++++++++
- arch/arm/mach-omap2/omap4-common.c                |   85 ++++-
- arch/arm/mach-omap2/omap4-mpuss-lowpower.c        |  451 +++++++++++++++++++++
- arch/arm/mach-omap2/omap4-sar-layout.h            |   66 +++
- arch/arm/mach-omap2/pm-debug.c                    |   12 +-
- arch/arm/mach-omap2/pm.h                          |    2 +
- arch/arm/mach-omap2/pm44xx.c                      |  119 ++++++-
- arch/arm/mach-omap2/sleep44xx.S                   |  400 ++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap44xx.h        |    1 +
- 15 files changed, 1958 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
- create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
- create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
- create mode 100644 arch/arm/mach-omap2/omap4-mpuss-lowpower.c
- create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
- create mode 100644 arch/arm/mach-omap2/sleep44xx.S
+diff --git a/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h b/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
+index f10d106..66f31c3 100644
+--- a/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
++++ b/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
+@@ -37,4 +37,5 @@
  
-Regrads,
-Santosh
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42939.html
-[2] http://www.spinics.net/lists/linux-omap/msg45710.html
+ extern int __init omap_wakeupgen_init(void);
+ extern void omap_wakeupgen_irqmask_all(unsigned int cpu, unsigned int set);
++extern void omap_wakeupgen_save(void);
+ #endif
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 43ebd22..7b72927 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -24,6 +24,9 @@
+ #include <asm/hardware/gic.h>
+ 
+ #include <mach/omap-wakeupgen.h>
++#include <mach/omap4-common.h>
++
++#include "omap4-sar-layout.h"
+ 
+ #define NR_BANKS		4
+ #define MAX_IRQS		128
+@@ -35,6 +38,7 @@
+ 
+ /* WakeupGen Base addres */
+ static void __iomem *wakeupgen_base;
++static void __iomem *sar_base;
+ static DEFINE_PER_CPU(u32 [NR_BANKS], irqmasks);
+ static DEFINE_SPINLOCK(wakeupgen_lock);
+ 
+@@ -54,6 +58,11 @@ static inline void wakeupgen_writel(u32 val, u8 idx, u32 cpu)
+ 				(cpu * CPU_ENA_OFFSET) + (idx * 4));
+ }
+ 
++static inline void sar_writel(u32 val, u32 offset, u8 idx)
++{
++	__raw_writel(val, sar_base + offset + (idx * 4));
++}
++
+ static void _wakeupgen_set_all(unsigned int cpu, unsigned int reg)
+ {
+ 	u8 i;
+@@ -236,3 +245,75 @@ int __init omap_wakeupgen_init(void)
+ 
+ 	return 0;
+ }
++
++/**
++ * omap_wakeupgen_save() - WakeupGen context save function
++ *
++ * Save WakewupGen context in SAR BANK3. Restore is done by ROM code.
++ * WakeupGen IP is integrated along with GIC to manage the
++ * interrupt wakeups from CPU low power states. It's located in
++ * always ON power domain. It manages masking/unmasking of
++ * Shared peripheral interrupts(SPI).So the interrupt enable/disable
++ * control should be in sync and consistent at WakeupGen and GIC so
++ * that interrupts are not lost. Hence GIC and WakeupGen are saved
++ * and restored together.
++
++ * During normal operation, WakeupGen delivers external interrupts
++ * directly to the GIC. When the CPU asserts StandbyWFI, indicating
++ * it wants to enter lowpower state, the Standby Controller checks
++ * with the WakeupGen unit using the idlereq/idleack handshake to make
++ * sure there is no incoming interrupts.
++ */
++
++void omap_wakeupgen_save(void)
++{
++	u8 i;
++	u32 val;
++
++	if (omap_rev() == OMAP4430_REV_ES1_0)
++		return;
++
++	if (!sar_base)
++		sar_base = omap4_get_sar_ram_base();
++
++	for (i = 0; i < NR_BANKS; i++) {
++		/* Save the CPUx interrupt mask for IRQ 0 to 127 */
++		val = wakeupgen_readl(i, 0);
++		sar_writel(val, WAKEUPGENENB_OFFSET_CPU0, i);
++		val = wakeupgen_readl(i, 1);
++		sar_writel(val, WAKEUPGENENB_OFFSET_CPU1, i);
++
++		/*
++		 * Disable the secure interrupts for CPUx. The restore
++		 * code blindly restores secure and non-secure interrupt
++		 * masks from SAR RAM. Secure interrupts are not suppose
++		 * to be enabled from HLOS. So overwrite the SAR location
++		 * so that the secure interrupt remains disabled.
++		 */
++		sar_writel(0x0, WAKEUPGENENB_SECURE_OFFSET_CPU0, i);
++		sar_writel(0x0, WAKEUPGENENB_SECURE_OFFSET_CPU1, i);
++	}
++
++	/* Save AuxBoot* registers */
++	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
++	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
++	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
++	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
++
++	/* Save SyncReq generation logic */
++	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
++	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
++	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
++	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
++
++	/* Save SyncReq generation logic */
++	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_MASK);
++	__raw_writel(val, sar_base + PTMSYNCREQ_MASK_OFFSET);
++	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_EN);
++	__raw_writel(val, sar_base + PTMSYNCREQ_EN_OFFSET);
++
++	/* Set the Backup Bit Mask status */
++	val = __raw_readl(sar_base + SAR_BACKUP_STATUS_OFFSET);
++	val |= SAR_BACKUP_STATUS_WAKEUPGEN;
++	__raw_writel(val, sar_base + SAR_BACKUP_STATUS_OFFSET);
++}
+diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+index 446b956..ddf5b72 100644
+--- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+@@ -52,6 +52,7 @@
+ 
+ #include <plat/omap44xx.h>
+ #include <mach/omap4-common.h>
++#include <mach/omap-wakeupgen.h>
+ 
+ #include "omap4-sar-layout.h"
+ #include "pm.h"
+@@ -292,6 +293,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	 * GIC lost during MPU OFF and OSWR
+ 	 */
+ 	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
++		omap_wakeupgen_save();
+ 		gic_save_context();
+ 		save_state = 3;
+ 	}
+diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+index baac4c0..3f3e3c9 100644
+--- a/arch/arm/mach-omap2/omap4-sar-layout.h
++++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+@@ -50,4 +50,15 @@
+ #define SAR_BACKUP_STATUS_GIC_CPU0		0x1
+ #define SAR_BACKUP_STATUS_GIC_CPU1		0x2
+ 
++/* WakeUpGen save restore offset from OMAP44XX_SAR_RAM_BASE */
++#define WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x684)
++#define WAKEUPGENENB_SECURE_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x694)
++#define WAKEUPGENENB_OFFSET_CPU1		(SAR_BANK3_OFFSET + 0x6a4)
++#define WAKEUPGENENB_SECURE_OFFSET_CPU1		(SAR_BANK3_OFFSET + 0x6b4)
++#define AUXCOREBOOT0_OFFSET			(SAR_BANK3_OFFSET + 0x6c4)
++#define AUXCOREBOOT1_OFFSET			(SAR_BANK3_OFFSET + 0x6c8)
++#define PTMSYNCREQ_MASK_OFFSET			(SAR_BANK3_OFFSET + 0x6cc)
++#define PTMSYNCREQ_EN_OFFSET			(SAR_BANK3_OFFSET + 0x6d0)
++#define SAR_BACKUP_STATUS_WAKEUPGEN		0x10
++
+ #endif
+-- 
+1.6.0.4
