@@ -1,65 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Mar 2011 17:05:56 +0100
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <201103101523.27181.arnd@arndb.de>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103092058.34236.arnd@arndb.de>
-	<AANLkTikFCAC-hdv0Q_9eQs31XHHEc4wYqRjfY0S=FYcz@mail.gmail.com>
-	<201103101523.27181.arnd@arndb.de>
-Message-ID: <AANLkTinCCZE5hPC+L6_Uw9UTZekzkTGpW5xxBfzTYa7b@mail.gmail.com>
+From: david.jander@protonic.nl (David Jander)
+Date: Thu, 10 Mar 2011 17:06:27 +0100
+Subject: [PATCHv2 1/2] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <20110310133715.GC29521@pengutronix.de>
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<56132A77AB93C141BF06E6B96CA6CFEA19124C@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87oc5puwg3.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA193F14@039-SN1MPN1-004.039d.mgd.msft.net>
+	<87fwqyvrzf.fsf@lebrac.rtp-net.org>
+	<56132A77AB93C141BF06E6B96CA6CFEA1940F8@039-SN1MPN1-004.039d.mgd.msft.net>
+	<20110307180700.GQ29521@pengutronix.de>
+	<20110308124023.5a952d13@archvile>
+	<20110310133715.GC29521@pengutronix.de>
+Message-ID: <20110310170627.2d8135a7@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 3:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 10 March 2011, Linus Walleij wrote:
->> So platform is just the platform bus, not the, you know,
->> *platform*. There are competing on-chip busses not just one.
->
-> Good point. Note that I did not mean to put the attributes
-> directly under /sys/platform/, but under /sys/platform/foo/,
-> where foo is the main bus that is used between the CPU core
-> and all the SOC components.
->
-> This may of course not be easy. If you have an AMBA or PCI
-> bus, you might want to have it represented as
-> /sys/devices/pci0 and /sys/devices/amba0 instead of
-> /sys/devices/platform/foo/amba0/.
+On Thu, 10 Mar 2011 14:37:15 +0100
+"s.hauer at pengutronix.de" <s.hauer@pengutronix.de> wrote:
 
-Userspace app doing something needs the name and some
-unique number to be looked up. The first iteration of this
-patch (for the OMAPs) put it in /proc/socinfo with all the
-expected fuzz that this should go into sysfs as result.
+> Hi David,
+> 
+> On Tue, Mar 08, 2011 at 12:40:23PM +0100, David Jander wrote:
+> > 
+> > Hi Sascha,
+> > 
+> > On Mon, 7 Mar 2011 19:07:00 +0100
+> > "s.hauer at pengutronix.de" <s.hauer@pengutronix.de> wrote:
+> > >[...]
+> > > > The current imx for-next tree is not booting on my Babbage board. Is
+> > > > it okay for you with your HW. I'll have to debug the booting part
+> > > > first.
+> > > 
+> > > Probably because other than kconfig states i.MX51 and i.MX53 cannot be
+> > > compiled in one kernel. the for-next branch boots fine on my babbage.
+> > 
+> > Would you mind explaining (or pointing to an explanation) as to why this is
+> > not supposed to work? Given the high level of compatibility between MX51
+> > and MX53, I'd say there must be a very good reason not to enable a single
+> > binary kernel for both. Or is this just temporary brokenness?
+> 
+> i.MX51 and i.MX53 have different phys_offsets. Look at
+> arch/arm/mach-mx5/Makefile.boot:
+> 
+>    zreladdr-$(CONFIG_ARCH_MX50) := 0x70008000
+> params_phys-$(CONFIG_ARCH_MX50) := 0x70000100
+> initrd_phys-$(CONFIG_ARCH_MX50) := 0x70800000
+>    zreladdr-$(CONFIG_ARCH_MX51) := 0x90008000
+> params_phys-$(CONFIG_ARCH_MX51) := 0x90000100
+> initrd_phys-$(CONFIG_ARCH_MX51) := 0x90800000
+>    zreladdr-$(CONFIG_ARCH_MX53) := 0x70008000
+> params_phys-$(CONFIG_ARCH_MX53) := 0x70000100
+> initrd_phys-$(CONFIG_ARCH_MX53) := 0x70800000
+> 
+> Compiling a kernel for i.MX50 and i.MX53 will work, but compiling a
+> kernel for i.MX51 and i.MX53 will and up with a kernel assuming SDRAM
+> at 0x70000000 which will fail on a i.MX51. We need
+> phys_to_virt/virt_to_phys runtime patching to get this right. This
+> will be merged in the next merge window.
 
-So: where do we suggest Maxime actually put this then?
+Ok, so it classifies as "temporary brokenness" ;-)
+Thanks a lot for clarifying.
 
-> Making up a pseudo-device that does not refer to any hardware
-> in particular is against the 'devices are only "devices"'
-> rule in Documentation/sysfs-rules.txt.
+Best regards,
 
-Fine then I think we agree this can not realistically be
-under /sys/devices/* unless we first refactor all platforms
-that want to use this mechanism to have top-level-devices.
-
-> If you really want that, it should be in /sys/kernel/,
-> /sys/firmware/ or a new top-level directory in sysfs.
->
-> I think putting it in /sys/devices is good, but it has
-> to be an attribute of an actual device, not an empty
-> one that does not even have any child devices. If the
-> device represents the soc, then every other device
-> that is found in the soc should be a child of this one.
-
-IMO this is not good for socinfo, what is good for apps that
-want socinfo is to just attempt to open+read these file paths.
-Not to invoke libsysfs and start parsing the file tree to see if
-they can find some socinfo somewhere.
-
-What about we just put it in
-/sys/socinfo/* then, and we have a simple,
-easy-to-understand way for apps that want socinfo to
-read it out?
-
-Everyone happy with this?
-
-Yours,
-Linus Walleij
+-- 
+David Jander
+Protonic Holland.
