@@ -1,63 +1,46 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 10 Mar 2011 10:41:37 +0800
-Subject: [PATCH] net/fec: check id_entry pointer before using it
-In-Reply-To: <20110309082601.GA3145@pengutronix.de>
-References: <1299639004-21546-1-git-send-email-jason.hui@linaro.org>
-	<20110309082601.GA3145@pengutronix.de>
-Message-ID: <AANLkTimMEup3ThmMpfGAWVTgsCSEyK=5Ke=+ZjJd169R@mail.gmail.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Wed, 09 Mar 2011 19:36:16 -0800
+Subject: [Qualcomm PM8921 MFD v2 4/6] mfd: pm8xxx-mpp: Add pm8xxx MPP
+	driver
+In-Reply-To: <20110308233045.GB2717@opensource.wolfsonmicro.com>
+References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
+	<1299564590-30116-5-git-send-email-adharmap@codeaurora.org>
+	<20110308233045.GB2717@opensource.wolfsonmicro.com>
+Message-ID: <4D784730.4010307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Wolfram Sang,
+Mark Brown wrote:
+> On Mon, Mar 07, 2011 at 10:09:48PM -0800, adharmap at codeaurora.org wrote:
+> 
+>> +	mpp_chip->gpio_chip.label = PM8XXX_MPP_DEV_NAME;
+>> +	mpp_chip->gpio_chip.direction_input = pm8xxx_mpp_dir_input;
+>> +	mpp_chip->gpio_chip.direction_output = pm8xxx_mpp_dir_output;
+>> +	mpp_chip->gpio_chip.to_irq = pm8xxx_mpp_to_irq;
+>> +	mpp_chip->gpio_chip.get = pm8xxx_mpp_get;
+>> +	mpp_chip->gpio_chip.set = pm8xxx_mpp_set;
+>> +	mpp_chip->gpio_chip.dbg_show = pm8xxx_mpp_dbg_show;
+>> +	mpp_chip->gpio_chip.ngpio = pdata->core_data.nmpps;
+>> +	mpp_chip->gpio_chip.can_sleep = 1;
+>> +	mpp_chip->gpio_chip.dev = &pdev->dev;
+>> +	mpp_chip->gpio_chip.base = pdata->mpp_base;
+> 
+> It's seems really odd that you're adding gpiolib stuff here when you've
+> also got a separate gpiolib driver.  Possibly this all shouldn't
+> actually be split up as much as it is - there's also the issue with the
+> gpiolib driver needing to peer into the interrupt controller.  It might
+> simplify the code if things were merged more.
 
-2011/3/9 Wolfram Sang <w.sang@pengutronix.de>:
-> On Wed, Mar 09, 2011 at 10:50:04AM +0800, Jason Liu wrote:
->> The id_entry will possibly be NULL, So, need check
->> id_entry and make sure it not NULL before using it.
->
-> When does it become NULL?
+I dont think merging code will help here. gpio lines and mpp lines are 
+very different piece of hardware,they have a different register map and 
+different config attributes. They do fall under the generic 'gpiolib' 
+umbrella, but it seems clean to keep them separate.
 
-look at the code:drivers/base/platform.c
+I agree with you that gpio code needs to call on interrupt controller ( 
+a complicated hardware design) but I think I have a clean software 
+implementation to manage it.
 
-static int platform_match(struct device *dev, struct device_driver *drv)
-{
-        struct platform_device *pdev = to_platform_device(dev);
-        struct platform_driver *pdrv = to_platform_driver(drv);
-
-        /* Attempt an OF style match first */
-        if (of_driver_match_device(dev, drv))
-                return 1;
-
-        /* Then try to match against the id table */
-        if (pdrv->id_table)
-                return platform_match_id(pdrv->id_table, pdev) != NULL;
-
-        /* fall-back to driver name match */
-        return (strcmp(pdev->name, drv->name) == 0);
-}
-
-If OF style match first succeed, the function will return and the
-pdev->id_entry will not get set and it's NULL.
-
-BR,
-Jason
-
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.10 (GNU/Linux)
->
-> iEYEARECAAYFAk13OZkACgkQD27XaX1/VRsZgwCeKCNK0ufdrV2186pKO3jD9qfI
-> HcQAn1zZ+Rmv+rpHHQH9JNyMQitNQdXV
-> =Ha2Y
-> -----END PGP SIGNATURE-----
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+-- 
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
