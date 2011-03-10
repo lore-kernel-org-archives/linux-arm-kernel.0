@@ -1,71 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 10 Mar 2011 11:32:17 +0100 (CET)
-Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <4D770E47.6050402@codeaurora.org>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
-	<alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
-	<4D770E47.6050402@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1103101126100.2787@localhost6.localdomain6>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 10 Mar 2011 12:06:34 +0100
+Subject: [PATCH v3 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY
+	control callback
+In-Reply-To: <002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
+References: <002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
+Message-ID: <1299755195-9055-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Mar 2011, Abhijeet Dharmapurikar wrote:
-> Thomas Gleixner wrote:
-> > On Mon, 7 Mar 2011, adharmap at codeaurora.org wrote:
-> > > +	if (pdata->irq_pdata) {
-> > 
-> > So if pdata->irq_pdata == NULL you return success. Is that correct ?
-> 
-> Yes. The board configuration may choose not to use pmic interrupts.
+Extend MIPI-CSIS driver's platform data structure with a callback
+for D-PHY enable and reset control. Also add a flag indicating
+whether the external MIPI-CSI (VDD18_MIPI) power supply should
+be managed in the driver through the "vdd" power supply. On some
+boards this regulator may be a fixed voltage regulator without
+an inhibit function.
 
-Ok.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-s5p/include/plat/mipi_csis.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+index eb3beab..bb4f396 100644
+--- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
++++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+@@ -11,18 +11,33 @@
+ #ifndef PLAT_S5P_MIPI_CSIS_H_
+ #define PLAT_S5P_MIPI_CSIS_H_ __FILE__
  
-> > Also please return early on (!pdata->irq_pdata) and avoid that extra
-> > indent level for the real code path.
-> 
-> I did not do that because there are other subdevices that I will be adding in
-> the later patches. I cannot return early. well I will change it for this
-> patch.
-
-Maybe splitting out the various init subsections into different
-functions which are called from here might be a good thing.
++struct platform_device;
++
+ /**
+  * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
+  * @clk_rate: bus clock frequency
+  * @lanes: number of data lanes used
+  * @alignment: data alignment in bits
+  * @hs_settle: HS-RX settle time
++ * @fixed_phy_vdd: set to 0 if the driver should be managing external
++ *		   D-PHY power supply through the "vdd" regulator supply
++ * @phy_enable: pointer to a callback controlling D-PHY enable/reset
+  */
+ struct s5p_platform_mipi_csis {
+ 	unsigned long clk_rate;
+ 	u8 lanes;
+ 	u8 alignment;
+ 	u8 hs_settle;
++	unsigned fixed_phy_vdd:1;
++	int (*phy_enable)(struct platform_device *pdev, bool on);
+ };
  
-> > > +static void pm8xxx_irq_ack(struct irq_data *d)
-> > > +{
-> > > +	const struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> > > +	unsigned int pmirq = d->irq - chip->irq_base;
-> > > +	u8	block, config;
-> > > +
-> > > +	block = pmirq / 8;
-> > > +
-> > > +	config = PM_IRQF_WRITE | chip->config[pmirq] | PM_IRQF_CLR;
-> > > +	/* Keep the mask */
-> > > +	if (!(chip->irqs_allowed[block] & (1 << (pmirq % 8))))
-> > > +		config |= PM_IRQF_MASK_FE | PM_IRQF_MASK_RE;
-> > 
-> > What's the point of this exercise? ack is called before mask and it
-> 
-> The register design is such that we cannot only clear the interrupt. One has
-> to write to the trigger bits while clearing it. Now trigger bits define
-> whether the interrupt is masked or unmasked. If unmasked they define whether
-> the interrupt rising/falling/level high/level low triggered.
-> So the code remembers which interrupts are masked and for them it clears and
-> rewrite the masked status in trigger bits. For unmasked ones it clears and
-> writes to the trigger bits essentially configuring them same way as it was
-> before. That is why the if satement to check interrupt was masked earlier,
-> chip->irqs_allowed[] maintains which interrupt are unmasked.
-> 
-> > ack is called before mask and it
-> > should never be called when the interrupt is masked.
-> 
-> I didnt quite understand this comment. handle_level_irq calls mask_ack which
-> masks the interrupt and then acks it. In this case the ack is called after the
-
-Indeed, sorry. So the right way to deal with that is to provide a
-mask_ack() callback which does it in the correct order for your
-HW. That way you avoid all the local state storage.
-
-Thanks,
-
-	tglx
++/**
++ * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
++ * @pdev: MIPI-CSIS platform device
++ * @on: true to enable D-PHY and deassert its reset
++ *	false to disable D-PHY
++ */
++int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
++
+ #endif /* PLAT_S5P_MIPI_CSIS_H_ */
+-- 
+1.7.4.1
