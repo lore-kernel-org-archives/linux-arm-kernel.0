@@ -1,166 +1,92 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Thu, 10 Mar 2011 16:57:33 +0800
-Subject: [RFC 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1299747453-25077-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1299747453-25077-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1299747453-25077-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 10 Mar 2011 19:06:50 +0800
+Subject: [PATCH] ARM: aout-core: zero thread debug registers in a.out core
+	dump
+In-Reply-To: <-4405681450588494999@unknownmsgid>
+References: <1299581872-18098-1-git-send-email-will.deacon@arm.com>
+	<AANLkTi=uhEfpv1bD_Wtoq4i7kJ5D8yDFmqBwchAnqtXu@mail.gmail.com>
+	<-4405681450588494999@unknownmsgid>
+Message-ID: <AANLkTin0xzSXRPbTqYkXp+2C34Qhoy321LoLERWfvCC4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_loco.c |  120 +++++++++++++++++++++++++++++++++++
- 1 files changed, 120 insertions(+), 0 deletions(-)
+On Thu, Mar 10, 2011 at 6:15 PM, Will Deacon <will.deacon@arm.com> wrote:
 
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 0a18f8d..9a7bbea 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -23,11 +23,13 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/ahci_platform.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx53.h>
-+#include <mach/ahci_sata.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -203,6 +205,123 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-+/* HW Initialization, if return 0, initialization is successful. */
-+static int sata_init(struct device *dev, void __iomem *addr)
-+{
-+	void __iomem *mmio;
-+	struct clk *clk;
-+	int ret = 0;
-+	u32 tmpdata;
-+
-+	clk = clk_get(dev, "imx_sata_clk");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+		return ret;
-+	}
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't enable clock.\n");
-+		clk_put(clk);
-+		return ret;
-+	}
-+
-+	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-+	clk = clk_get(dev, "usb_phy1");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+		goto no_input_clk;
-+	}
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI Can't enable USB PHY1 clock.\n");
-+		clk_put(clk);
-+		goto no_input_clk;
-+	}
-+
-+	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-+	clk = clk_get(NULL, "ahb_clk");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get AHB clock.\n");
-+		goto no_clk;
-+	}
-+
-+	mmio = ioremap(MX53_SATA_BASE_ADDR, SZ_2K);
-+	if (mmio == NULL) {
-+		printk(KERN_ERR "Failed to map SATA REGS\n");
-+		goto no_clk;
-+	}
-+
-+	tmpdata = readl(mmio + HOST_CAP);
-+	if (!(tmpdata & HOST_CAP_SSS)) {
-+		tmpdata |= HOST_CAP_SSS;
-+		writel(tmpdata, mmio + HOST_CAP);
-+	}
-+
-+	if (!(readl(mmio + HOST_PORTS_IMPL) & 0x1))
-+		writel((readl(mmio + HOST_PORTS_IMPL) | 0x1),
-+			mmio + HOST_PORTS_IMPL);
-+
-+	tmpdata = clk_get_rate(clk) / 1000;
-+	writel(tmpdata, mmio + HOST_TIMER1MS);
-+
-+	iounmap(mmio);
-+
-+	return ret;
-+
-+no_clk:
-+	clk = clk_get(dev, "usb_phy1");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+no_input_clk:
-+	clk = clk_get(dev, "imx_sata_clk");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+	return ret;
-+}
-+
-+static void sata_exit(struct device *dev)
-+{
-+	struct clk *clk;
-+
-+	clk = clk_get(dev, "usb_phy1");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+	clk = clk_get(dev, "imx_sata_clk");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+}
-+
-+static struct ahci_platform_data sata_data = {
-+	.init = sata_init,
-+	.exit = sata_exit,
-+};
-+
- static void __init mx53_loco_board_init(void)
- {
- 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-@@ -215,6 +334,7 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(2, NULL);
-+	imx53_add_ahci_imx(0, &sata_data);
- }
- 
- static void __init mx53_loco_timer_init(void)
--- 
-1.7.1
+> Hi Bryan,
+>
+> > > Hi Bryan,
+> > >
+> > > Feel free to upgrade your tag on this (signed-off / acked) since this
+> is
+> > > clearly based on the patch you posted yesterday. I'd like to get this
+> to
+> > > Russell ASAP so that we don't get a build-breaker in the near future.
+> > >
+> >
+> > Oh, I missed this email. Just send out an similar patch.
+>
+> No problem, I'd just like to get this in the pipeline asap!
+>
+> > > diff --git a/arch/arm/include/asm/a.out-core.h
+> b/arch/arm/include/asm/a.out-core.h
+> > > index 93d04ac..92f10cb 100644
+> > > --- a/arch/arm/include/asm/a.out-core.h
+> > > +++ b/arch/arm/include/asm/a.out-core.h
+> > > @@ -32,11 +32,7 @@ static inline void aout_dump_thread(struct pt_regs
+> *regs, struct user *dump)
+> > >        dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE
+> - 1) >> PAGE_SHIFT;
+> > >        dump->u_ssize = 0;
+> > >
+> > > -       dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
+> > > -       dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
+> > > -       dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
+> > > -       dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
+> > > -       dump->u_debugreg[4] = tsk->thread.debug.nsaved;
+> > > +       memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg));
+> > >
+> > I think this should be
+> >  memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg) * 8);
+> >
+> > u_debugreg is a pointer to a int, the array contains 8 of them as we
+> > found in the user.h
+>
+> dump_udebugreg is an integer array of fixed size. If you look at
+> the disassembly of fs/binfmt_aout.o (removed some inlining,
+> recompiled with -01):
+>
+> 00000c7c <aout_dump_thread>:
+>  c7c:   e92d4038        push    {r3, r4, r5, lr}
+>  c80:   e1a05000        mov     r5, r0
+>  c84:   e1a04001        mov     r4, r1
+>  c88:   e1a0200d        mov     r2, sp
+>
+> [...]
+>
+>  cfc:   e2840090        add     r0, r4, #144    ; 0x90
+>  d00:   e3a01020        mov     r1, #32
+>  d04:   ebfffffe        bl      0 <__memzero>
+>
+> So the size from sizeof is correct, multiplying it by 8 is asking
+> for trouble! If we used the ARRAY_SIZE macro, then the multiplication
+> would be necessary because we would have performed the division inside
+> the macro.
+>
+> Please can you submit another patch? I think the one I posted the other
+> day was alright, so if you re-post that you can add my S-o-B.
+>
+> Thanks,
+>
+> Will
+>
+> Ah, yeah, I got it.
+
+I think your patch is right, no need for me to repost. Please add my SOB
+
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+
+Thanks,
+-Bryan
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110310/f4e66fb0/attachment.html>
