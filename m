@@ -1,40 +1,78 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Mar 2011 14:03:10 +0100
-Subject: [PATCH v3 0/3] ARM: S5P: Add platform helpers for MIPI-CSIS/DSIM DPHY
-Message-ID: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
+Date: Thu, 10 Mar 2011 14:03:11 +0100
+Subject: [PATCH v4 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update
+	Copyright
+In-Reply-To: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
+References: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1299762193-7791-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-s5p/dev-csis0.c                      |    2 +-
+ arch/arm/plat-s5p/dev-csis1.c                      |    2 +-
+ .../plat-s5p/include/plat/{csis.h => mipi_csis.h}  |   10 +++++-----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+ rename arch/arm/plat-s5p/include/plat/{csis.h => mipi_csis.h} (67%)
 
-the following is a fourth version of a change set adding platform helpers 
-for the MIPI-CSIS and MIPI-DSIM PHYs control on S5PV210 and Exynos4.
-
-Changes since v3:
- - further copyright change (ptach 1/3)
- - fixed_phy_vdd type changed to bool (p. 2/3);  	
-
-Changes since v2:
- - renamed setup-mipi.c/setup-mipidphy.c
- - regs-pmu.h header included in regs-clock.s in mach-exynos4 to get
-   rid of CONFIG_ARCH_EXYNOS4 in setup-mipiphy.c
-
-Changes since v1:
- - updated the platform data structure with an additional flag indicating
-   whether the driver should attempt to control the external mipi-csis 
-   (VDD18_MIPI) voltage regulator or not. This might be needed on systems 
-   where MIPI VDD power supply cannot be separately switched on/off.
-
-
-The patch series contains:
- [PATCH v4 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update Copyright
- [PATCH v4 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY control callback
- [PATCH v4 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM D-PHY control
-
-Created against for-next branch at:
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-
-Regards,
---
-Sylwester Nawrocki
-Samsung Poland R&D Center
+diff --git a/arch/arm/plat-s5p/dev-csis0.c b/arch/arm/plat-s5p/dev-csis0.c
+index dfab1c8..e3aabef 100644
+--- a/arch/arm/plat-s5p/dev-csis0.c
++++ b/arch/arm/plat-s5p/dev-csis0.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2010 Samsung Electronics
++ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
+  *
+  * S5P series device definition for MIPI-CSIS channel 0
+  *
+diff --git a/arch/arm/plat-s5p/dev-csis1.c b/arch/arm/plat-s5p/dev-csis1.c
+index e3053f2..08b91b5 100644
+--- a/arch/arm/plat-s5p/dev-csis1.c
++++ b/arch/arm/plat-s5p/dev-csis1.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2010 Samsung Electronics
++ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
+  *
+  * S5P series device definition for MIPI-CSIS channel 1
+  *
+diff --git a/arch/arm/plat-s5p/include/plat/csis.h b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+similarity index 67%
+rename from arch/arm/plat-s5p/include/plat/csis.h
+rename to arch/arm/plat-s5p/include/plat/mipi_csis.h
+index 51e308c..8b3ada8 100644
+--- a/arch/arm/plat-s5p/include/plat/csis.h
++++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2010 Samsung Electronics
++ * Copyright (C) 2010-2011 Samsung Electronics Co., Ltd.
+  *
+  * S5P series MIPI CSI slave device support
+  *
+@@ -8,11 +8,11 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#ifndef PLAT_S5P_CSIS_H_
+-#define PLAT_S5P_CSIS_H_ __FILE__
++#ifndef PLAT_S5P_MIPI_CSIS_H_
++#define PLAT_S5P_MIPI_CSIS_H_ __FILE__
+ 
+ /**
+- * struct s5p_platform_mipi_csis - platform data for MIPI-CSIS
++ * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
+  * @clk_rate: bus clock frequency
+  * @lanes: number of data lanes used
+  * @alignment: data alignment in bits
+@@ -25,4 +25,4 @@ struct s5p_platform_mipi_csis {
+ 	u8 hs_settle;
+ };
+ 
+-#endif /* PLAT_S5P_CSIS_H_ */
++#endif /* PLAT_S5P_MIPI_CSIS_H_ */
+-- 
+1.7.4.1
