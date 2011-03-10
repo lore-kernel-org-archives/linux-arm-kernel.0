@@ -1,42 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 Mar 2011 14:42:48 +0800
-Subject: [PATCH V1] mx51 enchance the sd/mmc HW timing compatibility on
-	mx51 boards.
-In-Reply-To: <1299737746-19324-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1299737746-19324-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110310064247.GH2556@S2100-06.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Mar 2011 12:37:12 +0530
+Subject: [PATCH v2 0/5] OMAP3: PM: Fixes for low power code
+Message-ID: <1299740837-27881-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 02:15:46PM +0800, Richard Zhu wrote:
-> Some cards have the CRC errors in read on mx51 BBG board.
-> Configure the eSDHC pad configurations to level up the
-> compatibility to fix this issue.
-> 
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> Tested-by: Shawn Guo <shawn.gsc@gmail.com>
-> ---
->  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   40 +++++++++++++-------------
->  1 files changed, 20 insertions(+), 20 deletions(-)
-> 
-This is a fix for the regression introduced by:
+The series does below fixes to the omap3 low power code.
+	1. Use supported ARMv7 instructions instead of the legacy ones
+	2. Fix the MMU on sequence
+	3. Fix the cache flush scenario when only L1 lost.
+	4. Remove all un-necessary context save registers
+	5. Disable C-bit before cache clean
 
-commit ee1ae4d7b1c9a8b73e232fa33dc733be59368ff6
-Author: Sascha Hauer <s.hauer@pengutronix.de>
-Date:   Wed Dec 15 09:56:35 2010 +0100
+V2:
+- Rebased series on top of pm-core branch where the Dave Martin's
+  Thumb2 patches are merged.
+- Dropped set_cr() patch since it's already merged in pm-core branch
+- Fixed the hang issue reported by Kevin Hilman with OMAP3630
 
-    ARM i.MX51: Full iomux support
+It's generated against latest pm-core branch and tested suspend
+and cpuilde on OMAP3630 ZOOM.
 
-    This iomux file has been constructed from the Freescale pinmux tool.
-    It contains all pins from the tool, but the datasheet lists some
-    configurations not present in the tool, these are not yet added.
+The following changes since commit 7d6d079fbd46aee85e9b5de1d67de15b85e50b04:
+  Kevin Hilman (1):
+        Merge branch 'for_2.6.39/pm-voltage' into pm-reset
 
-Richard,
+are available in the git repository at:
 
-If there is v2, please change Tested-by as below.
+  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
+pm-core-omap3-asm_v2
 
-Tested-by: Shawn Guo <shawn.guo@freescale.com>
+Santosh Shilimkar (5):
+  OMAP3: PM: Use ARMv7 supported instructions instead of legacy CP15
+    ones
+  OMAP3: PM: Fix the MMU on sequence in the asm code
+  OMAP3: PM: Allow the cache clean when L1 is lost.
+  OMAP3: PM: Remove un-necessary cp15 registers form low power cpu
+    context
+  OMAP3: PM: Clear the SCTLR C bit in asm code to prevent data cache
+    allocation
 
--- 
-Regards,
-Shawn
+ arch/arm/mach-omap2/sleep34xx.S |  224 +++++++++++++++------------------------
+ 1 files changed, 85 insertions(+), 139 deletions(-)
