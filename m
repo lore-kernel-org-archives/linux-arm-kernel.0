@@ -1,40 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 Mar 2011 06:17:02 -0700 (MST)
-Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
-In-Reply-To: <4D78CAFC.4080502@ti.com>
-References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
-	<4D775418.6050105@ti.com>
-	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
-	<4D78CAFC.4080502@ti.com>
-Message-ID: <alpine.DEB.2.00.1103100609080.15132@utopia.booyaka.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 10 Mar 2011 13:17:24 +0000
+Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
+In-Reply-To: <4D78CCBC.2010807@atmel.com>
+References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
+	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
+	<4D78CCBC.2010807@atmel.com>
+Message-ID: <20110310131724.GG6198@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
-
-On Thu, 10 Mar 2011, Rajendra Nayak wrote:
-
-> On Thursday 10 March 2011 05:48 PM, Paul Walmsley wrote:
-> > This patch is currently breaking boot on OMAP4430 ES2.0 Pandaboard,
-> > so I've dropped it from the integration branch until it can be
-> > debugged.  Could you check it, please?
-> > 
-> > The tag "integration-2.6.39-20110310-008" of
-> > git://git.pwsan.com/linux-integration boots fine; it's got everything
-> > but this patch.  Then when this patch is applied, I2C problems show
-> > up, and root (on MMC) doesn't mount.
+On Thu, Mar 10, 2011 at 02:06:04PM +0100, Nicolas Ferre wrote:
+> On 3/10/2011 11:10 AM, Jamie Iles :
+> > --- a/drivers/net/macb.c
+> > +++ b/drivers/net/macb.c
+> > @@ -18,12 +18,10 @@
+> >  #include <linux/netdevice.h>
+> >  #include <linux/etherdevice.h>
+> >  #include <linux/dma-mapping.h>
+> > +#include <linux/platform_data/macb.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/phy.h>
+> >  
+> > -#include <mach/board.h>
+> > -#include <mach/cpu.h>
 > 
-> Looks like you are missing this patch which should fix the i2c
-> timeouts..
+> I did not bouble check but do we need no more cpu_is_ macros?
 
-Do you think you'll merge this patch:
+No, I couldn't see any in there and it builds for all of the AT91 
+targets and all of the AVR32 ones that I tried.  I can't see any macros 
+in there that are likely to use cpu_is_* internally either.
 
-   http://marc.info/?l=linux-omap&m=129924561819873&w=2
-
-during the 2.6.39 window?  If so, then I'll add Rajendra's clockdomain 
-patch back in to my 2.6.39 queue here; it seems to depend on the I2C 
-driver patch.
-
-
-- Paul
+Jamie
