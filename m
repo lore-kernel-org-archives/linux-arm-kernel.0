@@ -1,61 +1,69 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Thu, 10 Mar 2011 13:48:22 +0900
-Subject: [PATCH v4 1/3] ARM: S5P: Add s5p_timer support for HRT
-In-Reply-To: <20110309141016.GB2737@pulham.picochip.com>
-References: <1299636813-4869-1-git-send-email-sbkim73@samsung.com>
-	<1299636813-4869-2-git-send-email-sbkim73@samsung.com>
-	<20110309141016.GB2737@pulham.picochip.com>
-Message-ID: <002d01cbdede$65e19660$31a4c320$@com>
+From: shweta.gulati@ti.com (Shweta Gulati)
+Date: Thu, 10 Mar 2011 10:23:49 +0530
+Subject: [PATCH V3 2/3] OMAP4: Update Voltage Rail Values for MPU, IVA and CORE
+Message-ID: <1299732829-3376-1-git-send-email-shweta.gulati@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Update MPU, IVA and CORE voltage Rail values obtained from
+OMAP4430 Data Manual Operating Condition Addendum_v0.4.
 
-As you said, .shift		= 32, is useless line.
+Tested on OMAP4430 SDP Board.
 
-And Do you mean that Is needed error handling of clk_enable  like below?
+Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+---
+V3:
+Update CORE Voltages as well
+in sync with V0.4 of OMAP4 Data Manual.
 
-	clk_enable(timerclk);
+V2:
+Fixed Comments from Nishanth Menon. 
 
-	if (IS_ERR(timerclk)){
-		clk_put(timerclk)
-		panic("failed to enable timers clock");
-	}
+ arch/arm/mach-omap2/opp4xxx_data.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
-There is no another clk_enable for timerclk.
-I will add clk_enable error handling code.
-
-Thanks and regards,
-S.B. Kim
-
-On Wednesday, March 09, 2011 11:10 PM, Jamie Iles <Jamie@jamieiles.com>
-wrote
-
-> -----Original Message-----
-> > +static struct clock_event_device time_event_device = {
-> > +	.name		= "s5p_event_timer",
-> > +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> > +	.rating		= 200,
-> > +	.shift		= 32,
-> 
-> You are using clockevents_calc_mult_shift so you don't need to specify
-> .shift here.
-> 
-> > +	unsigned long event_id = timer_source.event_id;
-> > +	unsigned long source_id = timer_source.source_id;
-> > +
-> > +	timerclk = clk_get(NULL, "timers");
-> > +	if (IS_ERR(timerclk))
-> > +		panic("failed to get timers clock for timer");
-> > +
-> > +	clk_enable(timerclk);
-> 
-> clk_enable() can fail, should you be checking the return here and the
-> other clk_enable() calls?
-> 
-> Jamie
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
+index ed0efdb..aa624d1 100644
+--- a/arch/arm/mach-omap2/opp4xxx_data.c
++++ b/arch/arm/mach-omap2/opp4xxx_data.c
+@@ -30,10 +30,10 @@
+  * voltage dependent data for each VDD.
+  */
+ 
+-#define OMAP4430_VDD_MPU_OPP50_UV		930000
+-#define OMAP4430_VDD_MPU_OPP100_UV		1100000
+-#define OMAP4430_VDD_MPU_OPPTURBO_UV		1260000
+-#define OMAP4430_VDD_MPU_OPPNITRO_UV		1350000
++#define OMAP4430_VDD_MPU_OPP50_UV		1025000
++#define OMAP4430_VDD_MPU_OPP100_UV		1200000
++#define OMAP4430_VDD_MPU_OPPTURBO_UV		1313000
++#define OMAP4430_VDD_MPU_OPPNITRO_UV		1375000
+ 
+ struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
+ 	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP50_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
+@@ -43,9 +43,9 @@ struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
+ 	VOLT_DATA_DEFINE(0, 0, 0, 0),
+ };
+ 
+-#define OMAP4430_VDD_IVA_OPP50_UV		930000
+-#define OMAP4430_VDD_IVA_OPP100_UV		1100000
+-#define OMAP4430_VDD_IVA_OPPTURBO_UV		1260000
++#define OMAP4430_VDD_IVA_OPP50_UV		1013000
++#define OMAP4430_VDD_IVA_OPP100_UV		1188000
++#define OMAP4430_VDD_IVA_OPPTURBO_UV		1300000
+ 
+ struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
+ 	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP50_UV, OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
+@@ -54,8 +54,8 @@ struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
+ 	VOLT_DATA_DEFINE(0, 0, 0, 0),
+ };
+ 
+-#define OMAP4430_VDD_CORE_OPP50_UV		930000
+-#define OMAP4430_VDD_CORE_OPP100_UV		1100000
++#define OMAP4430_VDD_CORE_OPP50_UV		1025000
++#define OMAP4430_VDD_CORE_OPP100_UV		1200000
+ 
+ struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
+ 	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP50_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
+-- 
+1.7.0.4
