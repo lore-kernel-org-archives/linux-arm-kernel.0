@@ -1,79 +1,44 @@
-From: steve@sakoman.com (Steve Sakoman)
-Date: Wed,  9 Mar 2011 16:08:06 -0800
-Subject: [PATCH v2 2/2] OMAP: Add gpio-keys support for Overo
-In-Reply-To: <1299715686-3920-1-git-send-email-steve@sakoman.com>
-References: <1299715686-3920-1-git-send-email-steve@sakoman.com>
-Message-ID: <1299715686-3920-3-git-send-email-steve@sakoman.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 9 Mar 2011 18:04:10 -0700 (MST)
+Subject: [PATCH] perf: add OMAP support for the new power events
+In-Reply-To: <1299147943-2929-1-git-send-email-j-pihet@ti.com>
+References: <1298052645-4164-1-git-send-email-j-pihet@ti.com>
+	<1299147943-2929-1-git-send-email-j-pihet@ti.com>
+Message-ID: <alpine.DEB.2.00.1103091759300.15132@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the standard push buttons available on
-Overo expansion boards.
+On Thu, 3 Mar 2011, Jean Pihet wrote:
 
-Signed-off-by: Steve Sakoman <steve@sakoman.com>
----
- arch/arm/mach-omap2/board-overo.c |   42 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+> The patch adds the new power management trace points for
+> the OMAP architecture.
+> 
+> The trace points are for:
+> - default idle handler. Since the cpuidle framework is
+>   instrumented in the generic way there is no need to
+>   add trace points in the OMAP specific cpuidle handler;
+> - cpufreq (DVFS),
+> - SoC clocks changes (enable, disable, set_rate),
+> - power domain states: the desired target state and -if different-
+>   the actually hit state.
+> 
+> Because of the generic nature of the changes, OMAP3 and OMAP4 are supported.
+> 
+> Tested on OMAP3 with suspend/resume, cpuidle, basic DVFS.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index e694ebd..1e17061 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -519,6 +519,47 @@ static void __init overo_init_led(void)
- static inline void __init overo_init_led(void) { return; }
- #endif
- 
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
-+
-+static struct gpio_keys_button gpio_buttons[] = {
-+	{
-+		.code			= BTN_0,
-+		.gpio			= 23,
-+		.desc			= "button0",
-+		.wakeup			= 1,
-+	},
-+	{
-+		.code			= BTN_1,
-+		.gpio			= 14,
-+		.desc			= "button1",
-+		.wakeup			= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data gpio_keys_pdata = {
-+	.buttons	= gpio_buttons,
-+	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-+};
-+
-+static struct platform_device gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &gpio_keys_pdata,
-+	},
-+};
-+
-+static void __init overo_init_keys(void)
-+{
-+	platform_device_register(&gpio_keys_device);
-+}
-+
-+#else
-+static inline void __init overo_init_keys(void) { return; }
-+#endif
-+
- static int overo_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
-@@ -701,6 +742,7 @@ static void __init overo_init(void)
- 	overo_init_smsc911x();
- 	overo_display_init();
- 	overo_init_led();
-+	overo_init_keys();
- 
- 	/* Ensure SDRC pins are mux'd for self-refresh */
- 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
--- 
-1.7.0.4
+In terms of tracing powerdomain state changes, since OMAP powerdomains can 
+potentially transition without the MPU knowing about it, some powerdomain 
+transitions will be missed by these.  (The software counters miss them 
+too.)  The only way to be certain about these is to watch the debug 
+observability lines.  Still, it is the rare board that brings out debobs 
+lines.  So this seems reasonable, as long as people don't expect 100% 
+coverage.
+
+For the clock and powerdomain changes,
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+
+- Paul
