@@ -1,617 +1,161 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Mar 2011 13:51:13 +0900
-Subject: [PATCH V2 2/3] ARM: EXYNOS4: Suspend to RAM Support
-In-Reply-To: <1299732674-6752-1-git-send-email-kgene.kim@samsung.com>
-References: <1299732674-6752-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1299732674-6752-3-git-send-email-kgene.kim@samsung.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Thu, 10 Mar 2011 14:15:46 +0800
+Subject: [PATCH V1] mx51 enchance the sd/mmc HW timing compatibility on mx51
+	boards.
+Message-ID: <1299737746-19324-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jaecheol Lee <jc.lee@samsung.com>
+Some cards have the CRC errors in read on mx51 BBG board.
+Configure the eSDHC pad configurations to level up the
+compatibility to fix this issue.
 
-This patch adds support suspend to ram for EXYNOS4210.
-As a note, this includes function of outer cache flush
-because it is used before entering PM.
-
-Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+Tested-by: Shawn Guo <shawn.gsc@gmail.com>
 ---
- arch/arm/mach-exynos4/Makefile               |    1 +
- arch/arm/mach-exynos4/include/mach/pm-core.h |   49 +++
- arch/arm/mach-exynos4/pm.c                   |  420 ++++++++++++++++++++++++++
- arch/arm/mach-exynos4/sleep.S                |   76 +++++
- arch/arm/plat-samsung/include/plat/cpu.h     |    1 +
- 5 files changed, 547 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/include/mach/pm-core.h
- create mode 100644 arch/arm/mach-exynos4/pm.c
- create mode 100644 arch/arm/mach-exynos4/sleep.S
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |   40 +++++++++++++-------------
+ 1 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 45422cb..461ae57 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -14,6 +14,7 @@ obj-				:=
- 
- obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o dma.o
-+obj-$(CONFIG_PM)		+= pm.o sleep.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- 
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-diff --git a/arch/arm/mach-exynos4/include/mach/pm-core.h b/arch/arm/mach-exynos4/include/mach/pm-core.h
-new file mode 100644
-index 0000000..f26e46b
---- /dev/null
-+++ b/arch/arm/mach-exynos4/include/mach/pm-core.h
-@@ -0,0 +1,49 @@
-+/* linux/arch/arm/mach-exynos4/include/mach/pm-core.h
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Based on arch/arm/mach-s3c2410/include/mach/pm-core.h,
-+ * Copyright 2008 Simtec Electronics
-+ *      Ben Dooks <ben@simtec.co.uk>
-+ *      http://armlinux.simtec.co.uk/
-+ *
-+ * EXYNOS4210 - PM core support for arch/arm/plat-s5p/pm.c
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+#include <mach/regs-pmu.h>
-+
-+static inline void s3c_pm_debug_init_uart(void)
-+{
-+	/* nothing here yet */
-+}
-+
-+static inline void s3c_pm_arch_prepare_irqs(void)
-+{
-+	unsigned int tmp;
-+	tmp = __raw_readl(S5P_WAKEUP_MASK);
-+	tmp &= ~(1 << 31);
-+	__raw_writel(tmp, S5P_WAKEUP_MASK);
-+
-+	__raw_writel(s3c_irqwake_intmask, S5P_WAKEUP_MASK);
-+	__raw_writel(s3c_irqwake_eintmask, S5P_EINT_WAKEUP_MASK);
-+}
-+
-+static inline void s3c_pm_arch_stop_clocks(void)
-+{
-+	/* nothing here yet */
-+}
-+
-+static inline void s3c_pm_arch_show_resume_irqs(void)
-+{
-+	/* nothing here yet */
-+}
-+
-+static inline void s3c_pm_arch_update_uart(void __iomem *regs,
-+					   struct pm_uart_save *save)
-+{
-+	/* nothing here yet */
-+}
-diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-new file mode 100644
-index 0000000..10d917d
---- /dev/null
-+++ b/arch/arm/mach-exynos4/pm.c
-@@ -0,0 +1,420 @@
-+/* linux/arch/arm/mach-exynos4/pm.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * EXYNOS4210 - Power Management support
-+ *
-+ * Based on arch/arm/mach-s3c2410/pm.c
-+ * Copyright (c) 2006 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/init.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/hardware/cache-l2x0.h>
-+
-+#include <plat/cpu.h>
-+#include <plat/pm.h>
-+
-+#include <mach/regs-irq.h>
-+#include <mach/regs-gpio.h>
-+#include <mach/regs-clock.h>
-+#include <mach/regs-pmu.h>
-+#include <mach/pm-core.h>
-+
-+static struct sleep_save exynos4_sleep[] = {
-+	{ .reg = S5P_ARM_CORE0_LOWPWR			, .val = 0x2, },
-+	{ .reg = S5P_DIS_IRQ_CORE0			, .val = 0x0, },
-+	{ .reg = S5P_DIS_IRQ_CENTRAL0			, .val = 0x0, },
-+	{ .reg = S5P_ARM_CORE1_LOWPWR			, .val = 0x2, },
-+	{ .reg = S5P_DIS_IRQ_CORE1			, .val = 0x0, },
-+	{ .reg = S5P_DIS_IRQ_CENTRAL1			, .val = 0x0, },
-+	{ .reg = S5P_ARM_COMMON_LOWPWR			, .val = 0x2, },
-+	{ .reg = S5P_L2_0_LOWPWR			, .val = 0x3, },
-+	{ .reg = S5P_L2_1_LOWPWR			, .val = 0x3, },
-+	{ .reg = S5P_CMU_ACLKSTOP_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_SCLKSTOP_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_APLL_SYSCLK_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_MPLL_SYSCLK_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_VPLL_SYSCLK_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_EPLL_SYSCLK_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR	, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_GPSALIVE_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_CAM_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_TV_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_MFC_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_G3D_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_LCD0_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_LCD1_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_MAUDIO_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_CLKSTOP_GPS_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_CAM_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_TV_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_MFC_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_G3D_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_LCD0_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_LCD1_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_MAUDIO_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CMU_RESET_GPS_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_TOP_BUS_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_TOP_RETENTION_LOWPWR		, .val = 0x1, },
-+	{ .reg = S5P_TOP_PWR_LOWPWR			, .val = 0x3, },
-+	{ .reg = S5P_LOGIC_RESET_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_ONENAND_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_MODIMIF_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_G2D_ACP_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_USBOTG_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_HSMMC_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_CSSYS_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_SECSS_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_PCIE_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_SATA_MEM_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_DRAM_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_MAUDIO_LOWPWR	, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_GPIO_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_UART_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_MMCA_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_MMCB_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_EBIA_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_EBIB_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_ISOLATION_LOWPWR	, .val = 0x0, },
-+	{ .reg = S5P_PAD_RETENTION_ALV_SEL_LOWPWR	, .val = 0x0, },
-+	{ .reg = S5P_XUSBXTI_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_XXTI_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_EXT_REGULATOR_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_GPIO_MODE_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_GPIO_MODE_MAUDIO_LOWPWR		, .val = 0x0, },
-+	{ .reg = S5P_CAM_LOWPWR				, .val = 0x0, },
-+	{ .reg = S5P_TV_LOWPWR				, .val = 0x0, },
-+	{ .reg = S5P_MFC_LOWPWR				, .val = 0x0, },
-+	{ .reg = S5P_G3D_LOWPWR				, .val = 0x0, },
-+	{ .reg = S5P_LCD0_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_LCD1_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_MAUDIO_LOWPWR			, .val = 0x0, },
-+	{ .reg = S5P_GPS_LOWPWR				, .val = 0x0, },
-+	{ .reg = S5P_GPS_ALIVE_LOWPWR			, .val = 0x0, },
-+};
-+
-+static struct sleep_save exynos4_set_clksrc[] = {
-+	{ .reg = S5P_CLKSRC_MASK_TOP			, .val = 0x00000001, },
-+	{ .reg = S5P_CLKSRC_MASK_CAM			, .val = 0x11111111, },
-+	{ .reg = S5P_CLKSRC_MASK_TV			, .val = 0x00000111, },
-+	{ .reg = S5P_CLKSRC_MASK_LCD0			, .val = 0x00001111, },
-+	{ .reg = S5P_CLKSRC_MASK_LCD1			, .val = 0x00001111, },
-+	{ .reg = S5P_CLKSRC_MASK_MAUDIO			, .val = 0x00000001, },
-+	{ .reg = S5P_CLKSRC_MASK_FSYS			, .val = 0x01011111, },
-+	{ .reg = S5P_CLKSRC_MASK_PERIL0			, .val = 0x01111111, },
-+	{ .reg = S5P_CLKSRC_MASK_PERIL1			, .val = 0x01110111, },
-+	{ .reg = S5P_CLKSRC_MASK_DMC			, .val = 0x00010000, },
-+};
-+
-+static struct sleep_save exynos4_core_save[] = {
-+	/* CMU side */
-+	SAVE_ITEM(S5P_CLKDIV_LEFTBUS),
-+	SAVE_ITEM(S5P_CLKGATE_IP_LEFTBUS),
-+	SAVE_ITEM(S5P_CLKDIV_RIGHTBUS),
-+	SAVE_ITEM(S5P_CLKGATE_IP_RIGHTBUS),
-+	SAVE_ITEM(S5P_EPLL_CON0),
-+	SAVE_ITEM(S5P_EPLL_CON1),
-+	SAVE_ITEM(S5P_VPLL_CON0),
-+	SAVE_ITEM(S5P_VPLL_CON1),
-+	SAVE_ITEM(S5P_CLKSRC_TOP0),
-+	SAVE_ITEM(S5P_CLKSRC_TOP1),
-+	SAVE_ITEM(S5P_CLKSRC_CAM),
-+	SAVE_ITEM(S5P_CLKSRC_MFC),
-+	SAVE_ITEM(S5P_CLKSRC_IMAGE),
-+	SAVE_ITEM(S5P_CLKSRC_LCD0),
-+	SAVE_ITEM(S5P_CLKSRC_LCD1),
-+	SAVE_ITEM(S5P_CLKSRC_MAUDIO),
-+	SAVE_ITEM(S5P_CLKSRC_FSYS),
-+	SAVE_ITEM(S5P_CLKSRC_PERIL0),
-+	SAVE_ITEM(S5P_CLKSRC_PERIL1),
-+	SAVE_ITEM(S5P_CLKDIV_CAM),
-+	SAVE_ITEM(S5P_CLKDIV_TV),
-+	SAVE_ITEM(S5P_CLKDIV_MFC),
-+	SAVE_ITEM(S5P_CLKDIV_G3D),
-+	SAVE_ITEM(S5P_CLKDIV_IMAGE),
-+	SAVE_ITEM(S5P_CLKDIV_LCD0),
-+	SAVE_ITEM(S5P_CLKDIV_LCD1),
-+	SAVE_ITEM(S5P_CLKDIV_MAUDIO),
-+	SAVE_ITEM(S5P_CLKDIV_FSYS0),
-+	SAVE_ITEM(S5P_CLKDIV_FSYS1),
-+	SAVE_ITEM(S5P_CLKDIV_FSYS2),
-+	SAVE_ITEM(S5P_CLKDIV_FSYS3),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL0),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL1),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL2),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL3),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL4),
-+	SAVE_ITEM(S5P_CLKDIV_PERIL5),
-+	SAVE_ITEM(S5P_CLKDIV_TOP),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_CAM),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_TV),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_LCD0),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_LCD1),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_MAUDIO),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_FSYS),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL0),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL1),
-+	SAVE_ITEM(S5P_CLKGATE_SCLKCAM),
-+	SAVE_ITEM(S5P_CLKGATE_IP_CAM),
-+	SAVE_ITEM(S5P_CLKGATE_IP_TV),
-+	SAVE_ITEM(S5P_CLKGATE_IP_MFC),
-+	SAVE_ITEM(S5P_CLKGATE_IP_G3D),
-+	SAVE_ITEM(S5P_CLKGATE_IP_IMAGE),
-+	SAVE_ITEM(S5P_CLKGATE_IP_LCD0),
-+	SAVE_ITEM(S5P_CLKGATE_IP_LCD1),
-+	SAVE_ITEM(S5P_CLKGATE_IP_FSYS),
-+	SAVE_ITEM(S5P_CLKGATE_IP_GPS),
-+	SAVE_ITEM(S5P_CLKGATE_IP_PERIL),
-+	SAVE_ITEM(S5P_CLKGATE_IP_PERIR),
-+	SAVE_ITEM(S5P_CLKGATE_BLOCK),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_DMC),
-+	SAVE_ITEM(S5P_CLKSRC_DMC),
-+	SAVE_ITEM(S5P_CLKDIV_DMC0),
-+	SAVE_ITEM(S5P_CLKDIV_DMC1),
-+	SAVE_ITEM(S5P_CLKGATE_IP_DMC),
-+	SAVE_ITEM(S5P_CLKSRC_CPU),
-+	SAVE_ITEM(S5P_CLKDIV_CPU),
-+	SAVE_ITEM(S5P_CLKGATE_SCLKCPU),
-+	SAVE_ITEM(S5P_CLKGATE_IP_CPU),
-+	/* GIC side */
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x008),
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x00C),
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x014),
-+	SAVE_ITEM(S5P_VA_GIC_CPU + 0x018),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x000),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x004),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x100),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x104),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x108),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x300),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x304),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x308),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x400),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x404),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x408),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x40C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x410),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x414),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x418),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x41C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x420),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x424),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x428),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x42C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x430),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x434),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x438),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x43C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x440),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x444),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x448),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x44C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x450),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x454),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x458),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x45C),
-+
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x800),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x804),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x808),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x80C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x810),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x814),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x818),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x81C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x820),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x824),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x828),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x82C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x830),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x834),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x838),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x83C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x840),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x844),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x848),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x84C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x850),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x854),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x858),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0x85C),
-+
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC00),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC04),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC08),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC0C),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC10),
-+	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC14),
-+
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x040),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x050),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x060),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x070),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x080),
-+	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x090),
-+};
-+
-+static struct sleep_save exynos4_l2cc_save[] = {
-+	SAVE_ITEM(S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL),
-+	SAVE_ITEM(S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL),
-+	SAVE_ITEM(S5P_VA_L2CC + L2X0_PREFETCH_CTRL),
-+	SAVE_ITEM(S5P_VA_L2CC + L2X0_POWER_CTRL),
-+	SAVE_ITEM(S5P_VA_L2CC + L2X0_AUX_CTRL),
-+};
-+
-+void exynos4_cpu_suspend(void)
-+{
-+	unsigned long tmp;
-+	unsigned long mask = 0xFFFFFFFF;
-+
-+	/* Setting Central Sequence Register for power down mode */
-+
-+	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-+	tmp &= ~(S5P_CENTRAL_LOWPWR_CFG);
-+	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+
-+	/* Setting Central Sequence option Register */
-+
-+	tmp = __raw_readl(S5P_CENTRAL_SEQ_OPTION);
-+	tmp &= ~(S5P_USE_MASK);
-+	tmp |= S5P_USE_STANDBY_WFI0;
-+	__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-+
-+	/* Clear all interrupt pending to avoid early wakeup */
-+
-+	__raw_writel(mask, (S5P_VA_GIC_DIST + 0x280));
-+	__raw_writel(mask, (S5P_VA_GIC_DIST + 0x284));
-+	__raw_writel(mask, (S5P_VA_GIC_DIST + 0x288));
-+
-+	/* Disable all interrupt */
-+
-+	__raw_writel(0x0, (S5P_VA_GIC_CPU + 0x000));
-+	__raw_writel(0x0, (S5P_VA_GIC_DIST + 0x000));
-+	__raw_writel(mask, (S5P_VA_GIC_DIST + 0x184));
-+	__raw_writel(mask, (S5P_VA_GIC_DIST + 0x188));
-+
-+	outer_flush_all();
-+
-+	/* issue the standby signal into the pm unit. */
-+	cpu_do_idle();
-+
-+	/* we should never get past here */
-+	panic("sleep resumed to originator?");
-+}
-+
-+static void exynos4_pm_prepare(void)
-+{
-+	u32 tmp;
-+
-+	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
-+	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
-+
-+	tmp = __raw_readl(S5P_INFORM1);
-+
-+	/* Set value of power down register for sleep mode */
-+
-+	s3c_pm_do_restore_core(exynos4_sleep, ARRAY_SIZE(exynos4_sleep));
-+	__raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
-+
-+	/* ensure at least INFORM0 has the resume address */
-+
-+	__raw_writel(virt_to_phys(s3c_cpu_resume), S5P_INFORM0);
-+
-+	/* Before enter central sequence mode, clock src register have to set */
-+
-+	s3c_pm_do_restore_core(exynos4_set_clksrc, ARRAY_SIZE(exynos4_set_clksrc));
-+
-+}
-+
-+static int exynos4_pm_add(struct sys_device *sysdev)
-+{
-+	pm_cpu_prep = exynos4_pm_prepare;
-+	pm_cpu_sleep = exynos4_cpu_suspend;
-+
-+	return 0;
-+}
-+
-+/* This function copy from linux/arch/arm/kernel/smp_scu.c */
-+
-+void exynos4_scu_enable(void __iomem *scu_base)
-+{
-+	u32 scu_ctrl;
-+
-+	scu_ctrl = __raw_readl(scu_base);
-+	/* already enabled? */
-+	if (scu_ctrl & 1)
-+		return;
-+
-+	scu_ctrl |= 1;
-+	__raw_writel(scu_ctrl, scu_base);
-+
-+	/*
-+	 * Ensure that the data accessed by CPU0 before the SCU was
-+	 * initialised is visible to the other CPUs.
-+	 */
-+	flush_cache_all();
-+}
-+
-+static int exynos4_pm_resume(struct sys_device *dev)
-+{
-+	/* For release retention */
-+
-+	__raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
-+	__raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
-+
-+	s3c_pm_do_restore_core(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
-+
-+	exynos4_scu_enable(S5P_VA_SCU);
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
-+	outer_inv_all();
-+	/* enable L2X0*/
-+	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
-+#endif
-+
-+	return 0;
-+}
-+
-+static struct sysdev_driver exynos4_pm_driver = {
-+	.add		= exynos4_pm_add,
-+	.resume		= exynos4_pm_resume,
-+};
-+
-+static __init int exynos4_pm_drvinit(void)
-+{
-+	unsigned int tmp;
-+
-+	s3c_pm_init();
-+
-+	/* All wakeup disable */
-+
-+	tmp = __raw_readl(S5P_WAKEUP_MASK);
-+	tmp |= ((0xFF << 8) | (0x1F << 1));
-+	__raw_writel(tmp, S5P_WAKEUP_MASK);
-+
-+	return sysdev_driver_register(&exynos4_sysclass, &exynos4_pm_driver);
-+}
-+arch_initcall(exynos4_pm_drvinit);
-diff --git a/arch/arm/mach-exynos4/sleep.S b/arch/arm/mach-exynos4/sleep.S
-new file mode 100644
-index 0000000..6b62425
---- /dev/null
-+++ b/arch/arm/mach-exynos4/sleep.S
-@@ -0,0 +1,76 @@
-+/* linux/arch/arm/mach-exynos4/sleep.S
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * EXYNOS4210 power Manager (Suspend-To-RAM) support
-+ * Based on S3C2410 sleep code by:
-+ *	Ben Dooks, (c) 2004 Simtec Electronics
-+ *
-+ * Based on PXA/SA1100 sleep code by:
-+ *	Nicolas Pitre, (c) 2002 Monta Vista Software Inc
-+ *	Cliff Brake, (c) 2001
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+*/
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/memory.h>
-+
-+	.text
-+
-+	/*
-+	 * s3c_cpu_save
-+	 *
-+	 * entry:
-+	 *	r1 = v:p offset
-+	 */
-+
-+ENTRY(s3c_cpu_save)
-+
-+	stmfd	sp!, { r3 - r12, lr }
-+	ldr	r3, =resume_with_mmu
-+	bl	cpu_suspend
-+
-+	ldr	r0, =pm_cpu_sleep
-+	ldr	r0, [ r0 ]
-+	mov	pc, r0
-+
-+resume_with_mmu:
-+	ldmfd	sp!, { r3 - r12, pc }
-+
-+	.ltorg
-+
-+	/*
-+	 * sleep magic, to allow the bootloader to check for an valid
-+	 * image to resume to. Must be the first word before the
-+	 * s3c_cpu_resume entry.
-+	 */
-+
-+	.word	0x2bedf00d
-+
-+	/*
-+	 * s3c_cpu_resume
-+	 *
-+	 * resume code entry for bootloader to call
-+	 *
-+	 * we must put this code here in the data segment as we have no
-+	 * other way of restoring the stack pointer after sleep, and we
-+	 * must not write to the code segment (code is read-only)
-+	 */
-+
-+ENTRY(s3c_cpu_resume)
-+	b	cpu_resume
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 9addb3d..cedfff5 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -82,6 +82,7 @@ extern struct sysdev_class s3c64xx_sysclass;
- extern struct sysdev_class s5p64x0_sysclass;
- extern struct sysdev_class s5p6442_sysclass;
- extern struct sysdev_class s5pv210_sysclass;
-+extern struct sysdev_class exynos4_sysclass;
- 
- extern void (*s5pc1xx_idle)(void);
- 
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b6767f9..3e41348 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -985,11 +985,11 @@
+ #define MX51_PAD_NANDF_WE_B__GPIO3_3		(_MX51_PAD_NANDF_WE_B__GPIO3_3 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_WE_B__NANDF_WE_B		(_MX51_PAD_NANDF_WE_B__NANDF_WE_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_WE_B__PATA_DIOW		(_MX51_PAD_NANDF_WE_B__PATA_DIOW | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_WE_B__SD3_DATA0		(_MX51_PAD_NANDF_WE_B__SD3_DATA0 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_WE_B__SD3_DATA0		(_MX51_PAD_NANDF_WE_B__SD3_DATA0 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RE_B__GPIO3_4		(_MX51_PAD_NANDF_RE_B__GPIO3_4 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RE_B__NANDF_RE_B		(_MX51_PAD_NANDF_RE_B__NANDF_RE_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RE_B__PATA_DIOR		(_MX51_PAD_NANDF_RE_B__PATA_DIOR | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_RE_B__SD3_DATA1		(_MX51_PAD_NANDF_RE_B__SD3_DATA1 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_RE_B__SD3_DATA1		(_MX51_PAD_NANDF_RE_B__SD3_DATA1 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_ALE__GPIO3_5		(_MX51_PAD_NANDF_ALE__GPIO3_5 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_ALE__NANDF_ALE		(_MX51_PAD_NANDF_ALE__NANDF_ALE | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_ALE__PATA_BUFFER_EN	(_MX51_PAD_NANDF_ALE__PATA_BUFFER_EN | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -999,18 +999,18 @@
+ #define MX51_PAD_NANDF_WP_B__GPIO3_7		(_MX51_PAD_NANDF_WP_B__GPIO3_7 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_WP_B__NANDF_WP_B		(_MX51_PAD_NANDF_WP_B__NANDF_WP_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_WP_B__PATA_DMACK		(_MX51_PAD_NANDF_WP_B__PATA_DMACK | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_WP_B__SD3_DATA2		(_MX51_PAD_NANDF_WP_B__SD3_DATA2 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_WP_B__SD3_DATA2		(_MX51_PAD_NANDF_WP_B__SD3_DATA2 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB0__ECSPI2_SS1		(_MX51_PAD_NANDF_RB0__ECSPI2_SS1 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB0__GPIO3_8		(_MX51_PAD_NANDF_RB0__GPIO3_8 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB0__NANDF_RB0		(_MX51_PAD_NANDF_RB0__NANDF_RB0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB0__PATA_DMARQ		(_MX51_PAD_NANDF_RB0__PATA_DMARQ | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_RB0__SD3_DATA3		(_MX51_PAD_NANDF_RB0__SD3_DATA3 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_RB0__SD3_DATA3		(_MX51_PAD_NANDF_RB0__SD3_DATA3 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB1__CSPI_MOSI		(_MX51_PAD_NANDF_RB1__CSPI_MOSI | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB1__ECSPI2_RDY		(_MX51_PAD_NANDF_RB1__ECSPI2_RDY | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB1__GPIO3_9		(_MX51_PAD_NANDF_RB1__GPIO3_9 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB1__NANDF_RB1		(_MX51_PAD_NANDF_RB1__NANDF_RB1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB1__PATA_IORDY		(_MX51_PAD_NANDF_RB1__PATA_IORDY | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_RB1__SD4_CMD		(_MX51_PAD_NANDF_RB1__SD4_CMD | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_RB1__SD4_CMD		(_MX51_PAD_NANDF_RB1__SD4_CMD | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB2__DISP2_WAIT		(_MX51_PAD_NANDF_RB2__DISP2_WAIT | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB2__ECSPI2_SCLK		(_MX51_PAD_NANDF_RB2__ECSPI2_SCLK | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RB2__FEC_COL		(_MX51_PAD_NANDF_RB2__FEC_COL | MUX_PAD_CTRL(MX51_PAD_CTRL_2))
+@@ -1036,41 +1036,41 @@
+ #define MX51_PAD_NANDF_CS2__GPIO3_18		(_MX51_PAD_NANDF_CS2__GPIO3_18 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS2__NANDF_CS2		(_MX51_PAD_NANDF_CS2__NANDF_CS2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS2__PATA_CS_0		(_MX51_PAD_NANDF_CS2__PATA_CS_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS2__SD4_CLK		(_MX51_PAD_NANDF_CS2__SD4_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS2__SD4_CLK		(_MX51_PAD_NANDF_CS2__SD4_CLK | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL | PAD_CTL_HYS))
+ #define MX51_PAD_NANDF_CS2__USBH3_H1_DP		(_MX51_PAD_NANDF_CS2__USBH3_H1_DP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS3__FEC_MDC		(_MX51_PAD_NANDF_CS3__FEC_MDC | MUX_PAD_CTRL(MX51_PAD_CTRL_5))
+ #define MX51_PAD_NANDF_CS3__GPIO3_19		(_MX51_PAD_NANDF_CS3__GPIO3_19 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS3__NANDF_CS3		(_MX51_PAD_NANDF_CS3__NANDF_CS3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS3__PATA_CS_1		(_MX51_PAD_NANDF_CS3__PATA_CS_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS3__SD4_DAT0		(_MX51_PAD_NANDF_CS3__SD4_DAT0 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS3__SD4_DAT0		(_MX51_PAD_NANDF_CS3__SD4_DAT0 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS3__USBH3_H1_DM		(_MX51_PAD_NANDF_CS3__USBH3_H1_DM | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS4__FEC_TDATA1		(_MX51_PAD_NANDF_CS4__FEC_TDATA1 | MUX_PAD_CTRL(MX51_PAD_CTRL_5))
+ #define MX51_PAD_NANDF_CS4__GPIO3_20		(_MX51_PAD_NANDF_CS4__GPIO3_20 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS4__NANDF_CS4		(_MX51_PAD_NANDF_CS4__NANDF_CS4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS4__PATA_DA_0		(_MX51_PAD_NANDF_CS4__PATA_DA_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS4__SD4_DAT1		(_MX51_PAD_NANDF_CS4__SD4_DAT1 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS4__SD4_DAT1		(_MX51_PAD_NANDF_CS4__SD4_DAT1 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS4__USBH3_STP		(_MX51_PAD_NANDF_CS4__USBH3_STP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS5__FEC_TDATA2		(_MX51_PAD_NANDF_CS5__FEC_TDATA2 | MUX_PAD_CTRL(MX51_PAD_CTRL_5))
+ #define MX51_PAD_NANDF_CS5__GPIO3_21		(_MX51_PAD_NANDF_CS5__GPIO3_21 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS5__NANDF_CS5		(_MX51_PAD_NANDF_CS5__NANDF_CS5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS5__PATA_DA_1		(_MX51_PAD_NANDF_CS5__PATA_DA_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS5__SD4_DAT2		(_MX51_PAD_NANDF_CS5__SD4_DAT2 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS5__SD4_DAT2		(_MX51_PAD_NANDF_CS5__SD4_DAT2 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS5__USBH3_DIR		(_MX51_PAD_NANDF_CS5__USBH3_DIR | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS6__CSPI_SS3		(_MX51_PAD_NANDF_CS6__CSPI_SS3 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS6__FEC_TDATA3		(_MX51_PAD_NANDF_CS6__FEC_TDATA3 | MUX_PAD_CTRL(MX51_PAD_CTRL_5))
+ #define MX51_PAD_NANDF_CS6__GPIO3_22		(_MX51_PAD_NANDF_CS6__GPIO3_22 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS6__NANDF_CS6		(_MX51_PAD_NANDF_CS6__NANDF_CS6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS6__PATA_DA_2		(_MX51_PAD_NANDF_CS6__PATA_DA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS6__SD4_DAT3		(_MX51_PAD_NANDF_CS6__SD4_DAT3 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS6__SD4_DAT3		(_MX51_PAD_NANDF_CS6__SD4_DAT3 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS7__FEC_TX_EN		(_MX51_PAD_NANDF_CS7__FEC_TX_EN | MUX_PAD_CTRL(MX51_PAD_CTRL_5))
+ #define MX51_PAD_NANDF_CS7__GPIO3_23		(_MX51_PAD_NANDF_CS7__GPIO3_23 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_CS7__NANDF_CS7		(_MX51_PAD_NANDF_CS7__NANDF_CS7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_CS7__SD3_CLK		(_MX51_PAD_NANDF_CS7__SD3_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_CS7__SD3_CLK		(_MX51_PAD_NANDF_CS7__SD3_CLK | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL | PAD_CTL_HYS))
+ #define MX51_PAD_NANDF_RDY_INT__ECSPI2_SS0	(_MX51_PAD_NANDF_RDY_INT__ECSPI2_SS0 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	(_MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK | MUX_PAD_CTRL(MX51_PAD_CTRL_4))
+ #define MX51_PAD_NANDF_RDY_INT__GPIO3_24	(_MX51_PAD_NANDF_RDY_INT__GPIO3_24 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_RDY_INT__NANDF_RDY_INT	(_MX51_PAD_NANDF_RDY_INT__NANDF_RDY_INT | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_NANDF_RDY_INT__SD3_CMD		(_MX51_PAD_NANDF_RDY_INT__SD3_CMD | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_NANDF_RDY_INT__SD3_CMD		(_MX51_PAD_NANDF_RDY_INT__SD3_CMD | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_NANDF_D15__ECSPI2_MOSI		(_MX51_PAD_NANDF_D15__ECSPI2_MOSI | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_NANDF_D15__GPIO3_25		(_MX51_PAD_NANDF_D15__GPIO3_25 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+ #define MX51_PAD_NANDF_D15__NANDF_D15		(_MX51_PAD_NANDF_D15__NANDF_D15 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1479,26 +1479,26 @@
+ #define MX51_PAD_SD1_CLK__SD1_CLK		(_MX51_PAD_SD1_CLK__SD1_CLK | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL | PAD_CTL_HYS))
+ #define MX51_PAD_SD1_DATA0__AUD5_TXD		(_MX51_PAD_SD1_DATA0__AUD5_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD1_DATA0__CSPI_MISO		(_MX51_PAD_SD1_DATA0__CSPI_MISO | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+-#define MX51_PAD_SD1_DATA0__SD1_DATA0		(_MX51_PAD_SD1_DATA0__SD1_DATA0 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD1_DATA0__SD1_DATA0		(_MX51_PAD_SD1_DATA0__SD1_DATA0 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_EIM_DA0__EIM_DA0		(_MX51_PAD_EIM_DA0__EIM_DA0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA1__EIM_DA1		(_MX51_PAD_EIM_DA1__EIM_DA1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA2__EIM_DA2		(_MX51_PAD_EIM_DA2__EIM_DA2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA3__EIM_DA3		(_MX51_PAD_EIM_DA3__EIM_DA3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD1_DATA1__AUD5_RXD		(_MX51_PAD_SD1_DATA1__AUD5_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD1_DATA1__SD1_DATA1		(_MX51_PAD_SD1_DATA1__SD1_DATA1 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD1_DATA1__SD1_DATA1		(_MX51_PAD_SD1_DATA1__SD1_DATA1 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_EIM_DA4__EIM_DA4		(_MX51_PAD_EIM_DA4__EIM_DA4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA5__EIM_DA5		(_MX51_PAD_EIM_DA5__EIM_DA5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA6__EIM_DA6		(_MX51_PAD_EIM_DA6__EIM_DA6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA7__EIM_DA7		(_MX51_PAD_EIM_DA7__EIM_DA7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD1_DATA2__AUD5_TXC		(_MX51_PAD_SD1_DATA2__AUD5_TXC | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD1_DATA2__SD1_DATA2		(_MX51_PAD_SD1_DATA2__SD1_DATA2 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD1_DATA2__SD1_DATA2		(_MX51_PAD_SD1_DATA2__SD1_DATA2 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_EIM_DA10__EIM_DA10		(_MX51_PAD_EIM_DA10__EIM_DA10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA11__EIM_DA11		(_MX51_PAD_EIM_DA11__EIM_DA11 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA8__EIM_DA8		(_MX51_PAD_EIM_DA8__EIM_DA8 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_EIM_DA9__EIM_DA9		(_MX51_PAD_EIM_DA9__EIM_DA9 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD1_DATA3__AUD5_TXFS		(_MX51_PAD_SD1_DATA3__AUD5_TXFS | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD1_DATA3__CSPI_SS1		(_MX51_PAD_SD1_DATA3__CSPI_SS1 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+-#define MX51_PAD_SD1_DATA3__SD1_DATA3		(_MX51_PAD_SD1_DATA3__SD1_DATA3 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD1_DATA3__SD1_DATA3		(_MX51_PAD_SD1_DATA3__SD1_DATA3 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_GPIO1_0__CSPI_SS2		(_MX51_PAD_GPIO1_0__CSPI_SS2 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_GPIO1_0__GPIO1_0		(_MX51_PAD_GPIO1_0__GPIO1_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_GPIO1_0__SD1_CD		(_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(MX51_ESDHC_PAD_CTRL))
+@@ -1517,16 +1517,16 @@
+ #define MX51_PAD_SD2_CLK__SD2_CLK		(_MX51_PAD_SD2_CLK__SD2_CLK | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL | PAD_CTL_HYS))
+ #define MX51_PAD_SD2_DATA0__CSPI_MISO		(_MX51_PAD_SD2_DATA0__CSPI_MISO | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA0__SD1_DAT4		(_MX51_PAD_SD2_DATA0__SD1_DAT4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD2_DATA0__SD2_DATA0		(_MX51_PAD_SD2_DATA0__SD2_DATA0 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD2_DATA0__SD2_DATA0		(_MX51_PAD_SD2_DATA0__SD2_DATA0 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA1__SD1_DAT5		(_MX51_PAD_SD2_DATA1__SD1_DAT5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD2_DATA1__SD2_DATA1		(_MX51_PAD_SD2_DATA1__SD2_DATA1 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD2_DATA1__SD2_DATA1		(_MX51_PAD_SD2_DATA1__SD2_DATA1 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA1__USBH3_H2_DP		(_MX51_PAD_SD2_DATA1__USBH3_H2_DP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA2__SD1_DAT6		(_MX51_PAD_SD2_DATA2__SD1_DAT6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD2_DATA2__SD2_DATA2		(_MX51_PAD_SD2_DATA2__SD2_DATA2 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD2_DATA2__SD2_DATA2		(_MX51_PAD_SD2_DATA2__SD2_DATA2 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA2__USBH3_H2_DM		(_MX51_PAD_SD2_DATA2__USBH3_H2_DM | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA3__CSPI_SS2		(_MX51_PAD_SD2_DATA3__CSPI_SS2 | MUX_PAD_CTRL(MX51_ECSPI_PAD_CTRL))
+ #define MX51_PAD_SD2_DATA3__SD1_DAT7		(_MX51_PAD_SD2_DATA3__SD1_DAT7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_SD2_DATA3__SD2_DATA3		(_MX51_PAD_SD2_DATA3__SD2_DATA3 | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX51_PAD_SD2_DATA3__SD2_DATA3		(_MX51_PAD_SD2_DATA3__SD2_DATA3 | MUX_PAD_CTRL(MX51_SDHCI_PAD_CTRL))
+ #define MX51_PAD_GPIO1_2__CCM_OUT_2		(_MX51_PAD_GPIO1_2__CCM_OUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_GPIO1_2__GPIO1_2		(_MX51_PAD_GPIO1_2__GPIO1_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX51_PAD_GPIO1_2__I2C2_SCL		(_MX51_PAD_GPIO1_2__I2C2_SCL | MUX_PAD_CTRL(MX51_I2C_PAD_CTRL))
 -- 
 1.7.1
