@@ -1,61 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 20:07:24 +0530
-Subject: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle for GPT1
-In-Reply-To: <alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1103091847150.15132@utopia.booyaka.com>
-	<alpine.DEB.2.00.1103100143230.15132@utopia.booyaka.com>
-Message-ID: <3b8b985f13158fbcd110cf45ed7035ad@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2011 15:38:26 +0100
+Subject: [PATCH V6 02/17] ST SPEAr13xx: Added PCIe host controller base
+	driver support.
+In-Reply-To: <AANLkTik4dtJwzgwb-h1WSHjJMFthyc0-pqSCninafuA7@mail.gmail.com>
+References: <cover.1298977727.git.viresh.kumar@st.com>
+	<201103011610.24283.arnd@arndb.de>
+	<AANLkTik4dtJwzgwb-h1WSHjJMFthyc0-pqSCninafuA7@mail.gmail.com>
+Message-ID: <201103101538.26428.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul, Benoit,
-
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> Sent: Thursday, March 10, 2011 2:15 PM
-> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: Rajendra Nayak; Beno?t Cousson
-> Subject: Re: [PATCH] OMAP4: hwmod: Disable hardware-controlled idle
-> for GPT1
->
-> On Wed, 9 Mar 2011, Paul Walmsley wrote:
->
-> > From: Rajendra Nayak <rnayak@ti.com>
+On Thursday 10 March 2011, shiraz hashim wrote:
+> >> diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> index fd8c2dc..c3fb454 100644
+> >> --- a/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> +++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> @@ -28,4 +28,11 @@
+> >>  /* typesafe io address */
+> >>  #define __io_address(n)              __io(IO_ADDRESS(n))
 > >
-> > Some issues seen (which cause lockups in suspend) with GPT1
-> > after the MPU<->L4_WKUP static dependency was cleared can be
-> > Worked-around for now by forcing GPT1 in software
-> > controlled idle.
-> >
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
->
-> Just a quick note, I missed Beno?t's update of the commit message:
->
->     http://www.spinics.net/linux/lists/linux-omap/msg48008.html
->
-> and he's the maintainer of this so we should use his instead.  The
-> revised
-> message is below.
->
+> > I could not find the definition for __io() here, but I suspect this is
+> > wrong. If __io_address() is what you use for accessing the direct-mapped
+> > MMIO registers, it cannot also be what you use to access the PCIe PIO
+> > ports, so most likely one of the two is broken. Can you explain?
+> 
+> This is not used in PCIe and infact is not part of this PCIe patch.
+> This is used at few places in the architecture code.
 
-We continued further debug on the static dependency issues with
-OMAP4 PM series.
-So far from the findings what I have, this timer patch is actually not
-needed and can be dropped. Infact the patch is not really effective
-because current timer driver(not hwmod adapted yet) puts timer1
-in smart idle again.
+Let me rephrase my point:
 
-There is another static dep. just like MPUSS<-->EMIF seems to create
-an issue. The lock-up is not very consistently reproducible so it's
-very easy to get miss-leading results. Timer patch was one of those
-observations. With or without timer patch I can reproduce the hang
-with long duration test.
+The __io() macro is used for accessing PIO registers in PCIe drivers,
+it needs to be defined to convert I/O port numbers between PCIBIOS_MIN_IO
+and IO_SPACE_LIMIT to the virtual address that is mapped to the I/O
+space registers on your PCIe bus.
 
-Will keep narrowing down the next offending static dependency but
-in mean time I suggest you to drop this patch.
+__io_address() is used in spear13xx to map from physical addresses
+in the SOC to virtual addresses that are part of the linear mapping
+set up through iotable_init().
 
-Regards,
-Santosh
+These two are not the same, so I believe that either __io_address()
+or __io() is broken.
+
+	Arnd
