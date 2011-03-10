@@ -1,90 +1,40 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Thu, 10 Mar 2011 13:56:17 +0100
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <201103092058.34236.arnd@arndb.de>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299689961-5028-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103092058.34236.arnd@arndb.de>
-Message-ID: <4D78CA71.7000103@stericsson.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 10 Mar 2011 14:03:10 +0100
+Subject: [PATCH v3 0/3] ARM: S5P: Add platform helpers for MIPI-CSIS/DSIM DPHY
+Message-ID: <1299762193-7791-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2011 08:58 PM, Arnd Bergmann wrote:
-> On Wednesday 09 March 2011 17:59:20 Maxime Coquelin wrote:
->> Common base to export System-on-Chip related informations through sysfs.
->>
->> Creation of a "soc" directory under /sys/devices/system/.
-> Why under system?
->
-> As far as I can tell, the SOC already exists as a platform device
-> under /sys/devices/platform, so just put the data in there.
+Hello,
 
-The aim of this patch is to provide a common interface for SoC vendors 
-to export some pieces of information.
-For now, only the machine name is common in this patch set, but some 
-other attributes might be common (family name, silicon process...).
-Moving to /sys/devices/platform means it will be vendor-specific, so we 
-loose the gain of having a common ABI. Right?
+the following is a fourth version of a change set adding platform helpers 
+for the MIPI-CSIS and MIPI-DSIM PHYs control on S5PV210 and Exynos4.
 
-> There is no point in having the same physical device represented
-> as multiple separate instances in sysfs.
->
->> Creation of a common "mach_name" entry to export machine name.
->> Creation of platform-defined SoC information entries.
->>
->> Signed-off-by: Maxime COQUELIN<maxime.coquelin-nonst@stericsson.com>
->> ---
->>   drivers/base/Kconfig    |    4 ++
->>   drivers/base/Makefile   |    1 +
->>   drivers/base/soc.c      |   88 +++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/sys_soc.h |   33 +++++++++++++++++
-> This seems to be missing the documentation file. Every sysfs
-> attribute you create must be documented.
->
+Changes since v3:
+ - further copyright change (ptach 1/3)
+ - fixed_phy_vdd type changed to bool (p. 2/3);  	
 
-Ok, I will fix it.
+Changes since v2:
+ - renamed setup-mipi.c/setup-mipidphy.c
+ - regs-pmu.h header included in regs-clock.s in mach-exynos4 to get
+   rid of CONFIG_ARCH_EXYNOS4 in setup-mipiphy.c
 
->> --- a/drivers/base/Kconfig
->> +++ b/drivers/base/Kconfig
->> @@ -168,4 +168,8 @@ config SYS_HYPERVISOR
->>   	bool
->>   	default n
->>
->> +config SYS_SOC
->> +	bool "Export SoC specific informations"
->> +	depends on EMBEDDED
->> +
->>   endmenu
-> CONFIG_EMBEDDED is gone, and did not mean what you intended.
->
-> Just make the information unconditionally available in
-> the code that manages you SoC.
->
+Changes since v1:
+ - updated the platform data structure with an additional flag indicating
+   whether the driver should attempt to control the external mipi-csis 
+   (VDD18_MIPI) voltage regulator or not. This might be needed on systems 
+   where MIPI VDD power supply cannot be separately switched on/off.
 
-Ok.
 
->> +void __init register_sys_soc(char *name, struct sys_soc_info *info, int num)
->> +{
->> +	int len;
->> +
->> +	len = strlen(name);
->> +	soc.mach_name = kzalloc(len + 1, GFP_KERNEL);
->> +	if (!soc.mach_name)
->> +		return;
->> +
->> +	sprintf(soc.mach_name, "%s", name);
->> +
->> +	if (sysdev_class_register(&soc.class)) {
->> +		kfree(soc.mach_name);
->> +		return;
->> +	}
->> +
->> +	register_sys_soc_info(info, num);
->> +}
-> You do way too much here when all you need is a platform
-> device attribute.
->
-> 	Arnd
+The patch series contains:
+ [PATCH v4 1/3] ARM: S5P: Rename MIPI-CSIS driver header and update Copyright
+ [PATCH v4 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY control callback
+ [PATCH v4 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM D-PHY control
 
-Thanks for your review,
-Maxime
+Created against for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
+Regards,
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
