@@ -1,37 +1,292 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  9 Mar 2011 20:44:31 -0800
-Subject: [PATCH 0/3] Peripheral image loader (PIL)
-Message-ID: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed,  9 Mar 2011 20:44:34 -0800
+Subject: [PATCH 3/3] msm: documentation: Add pil documentation
+In-Reply-To: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
+References: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1299732274-10742-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support for PIL, a peripheral image loader.
-More details can be found in the third patch or the second
-patch's commit text.
+From: Saravana Kannan <skannan@codeaurora.org>
 
-Saravana Kannan (1):
-  msm: documentation: Add pil documentation
-
-Stephen Boyd (2):
-  msm: 8660: Add clock control regions to iomap
-  msm: Peripheral Image Loader (PIL) driver
-
- Documentation/arm/msm/pil.txt                      |  267 ++++++++++
- arch/arm/mach-msm/Kconfig                          |   13 +
- arch/arm/mach-msm/Makefile                         |    2 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |    8 +
- arch/arm/mach-msm/include/mach/peripheral-loader.h |   23 +
- arch/arm/mach-msm/io.c                             |    2 +
- arch/arm/mach-msm/peripheral-loader.c              |  402 +++++++++++++++
- arch/arm/mach-msm/peripheral-loader.h              |   38 ++
- arch/arm/mach-msm/peripheral-reset.c               |  528 ++++++++++++++++++++
- 9 files changed, 1283 insertions(+), 0 deletions(-)
+Change-Id: I471a4b581e0f5f6f4aaf1f585fb3c5805efe0de8
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ Documentation/arm/msm/pil.txt |  264 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 264 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/arm/msm/pil.txt
- create mode 100644 arch/arm/mach-msm/include/mach/peripheral-loader.h
- create mode 100644 arch/arm/mach-msm/peripheral-loader.c
- create mode 100644 arch/arm/mach-msm/peripheral-loader.h
- create mode 100644 arch/arm/mach-msm/peripheral-reset.c
 
+diff --git a/Documentation/arm/msm/pil.txt b/Documentation/arm/msm/pil.txt
+new file mode 100644
+index 0000000..744ab3e
+--- /dev/null
++++ b/Documentation/arm/msm/pil.txt
+@@ -0,0 +1,264 @@
++Introduction
++============
++
++The PIL (Peripheral Image Loader) driver loads peripheral images into memory
++and interfaces with the Peripheral Authentication Service (PAS) to
++authenticate and reset peripherals embedded in the SoC.
++
++The PAS could either be running under secure mode in the application
++processor (secure boot support) or be running as a non-secure kernel driver
++(non-secure boot support).
++
++The PIL driver also does housekeeping to handle cases where more than one
++client driver is using the same peripheral.
++
++Some examples of peripherals are modem, DSP and sensors.
++
++Hardware description
++====================
++
++The memory used by the peripherals for code and data storage will be
++accessible as normal memory to the application processor.
++
++The non-secure code (Linux kernel) will have read/write permissions to the
++peripheral memory by default.
++
++The PAS will have access to a MPU (memory protection unit) that can lock away
++the pages of memory from the Linux kernel. It will also have access to
++registers that can reset each peripheral.
++
++Software description
++====================
++
++The PAS provides the following three APIs:
++
++* Init image - Takes as input the peripheral id and firmware metadata and
++  returns a status indicating the authenticity of the firmware metadata.  The
++  firmware metadata consists of a standard ELF32 header followed by a program
++  header table and an optional blob of data used to authenticate the metadata
++  and the rest of the firmware.
++
++* Verify segment - Takes as input the firmware segment id and the length of
++  the segment. Authenticates whatever amount (specified by the "length"
++  parameter) of the firmware segment that has been loaded and removes
++  non-secure mode read/write permissions for the pages belonging to the
++  firmware segment. Allows multiple calls for the same firmware segment to
++  allow partial loading and authentication.
++
++* Auth and Reset - Verifies all the necessary firmware segments have been
++  loaded and authenticated and then resets the peripheral.
++
++The user space is expected to provide the firmware metadata and firmware
++segments as separate files on persistent storage. See "Interface" section for
++further details.
++
++The PIL driver will use the request_firmware API provided by the Linux kernel
++to read the firmware and firmware metadata from persistent storage.
++
++When a client driver requests for a peripheral to be enabled, the PIL driver
++increments the reference count for that peripheral, loads the firmware
++metadata and calls the PAS Init Image API that initializes the authentication
++state machine using the firmware metadata.
++
++If the initialization succeeds, the PIL driver loads the appropriate firmware
++segments into their respective memory locations and call the PAS Verify
++segment API on each of the loaded segments to authenticate and lock it.
++
++After all the firmware segments have been successfully loaded and
++authenticated, the PAS Auth and Reset API is called to reset the peripheral
++and initiate its boot sequence.
++
++A peripheral enable request to the PIL driver will block until it succeeds
++(or fails) to initiate the peripheral boot sequence but will NOT block until
++the peripheral is ready. It is not possible to block until a peripheral is
++ready since the semantics of "ready" is subjective to the caller.
++
++The PIL driver will maintain a reference count for each of the peripherals.
++So, if a peripheral is already under use and another client driver requests
++for the peripheral to be enabled, the PIL driver will immediately return a
++value to indicate success.
++
++When all the client drivers of a particular peripheral no longer need the
++peripheral and the reference count reaches zero, the PIL driver can cleanly
++shut down the peripheral. Since a lot of drivers in their current state can't
++handle a peripheral restart, the PIL driver will never let the reference
++count go back to zero.
++
++All information about a peripheral, like firmware filenames, peripheral ID
++passed to PAS, etc, will be hard coded in the PIL driver.
++
++All the PIL APIs will execute in the context of the caller. This includes
++calls from the PIL driver to the PAS driver. The PAS driver might decide to
++switch into secure mode from a separate workqueue or in the same context as
++the caller, but that shouldn't have any implications for the PIL API callers
++since all the PIL APIs are blocking calls.
++
++Dependencies:
++-------------
++* Firmware class (CONFIG_FW_LOADER) for using the request_firmware API to
++  load firmware from persistent storage.
++* PAS to authenticate firmware and bring a peripheral out of reset.
++
++Error cases:
++------------
++The PIL driver could fail to enable a peripheral for several reasons like not
++having enough memory to load firmware and metadata, being unable to
++communicate with the PAS, the PAS returning with an error, etc. For all
++possible error cases, the PIL driver does not perform any retries and returns
++an appropriate error code. The client drivers should always check for success
++before trying to access the peripheral.
++
++Design
++======
++
++Design goals:
++-------------
++* The PIL driver must be agnostic to the actual format and method used to
++  authenticate the firmware.
++* Allow for future expansion to support demand loading of parts of firmware
++  for each peripheral.
++* Move most of the work into the preprocessing/building stage of the firmware.
++* Provide an API to the client drivers that absolves them from having to know
++  the structure or names of the firmware in persistent storage.
++* Handle multiple client drivers wanting to enable the same peripheral.
++
++
++Design reasons:
++---------------
++The user space is expected to provide the firmware metadata and segments as
++separate files for the following reasons:
++* Don't need to load the whole ELF file if the authentication info is
++  invalid.
++* Works better during low memory conditions since the amount of memory used
++  at any given instant when loading one segment at a time is smaller than
++  loading the whole ELF file.
++* Since an ELF segment in memory can be much bigger than on file, having a
++  flat binary would waste a lot of space due to zero-fills.
++* Allows for future enhancements to the loading procedure.
++
++Design tradeoffs:
++-----------------
++* With appropriate changes to the request_firmware API, the firmware blobs
++  could be directly loaded into the right memory location. But due to the
++  additional work and community approval that would be needed for modifying
++  the request_firmware API, we load the firmware blobs into kernel memory and
++  then copy them into the appropriate locations.
++
++Alternate designs:
++------------------
++One of the alternate designs that were considered required the firmware to be
++a flat binary. Although this design would simplify the PIL driver, it would
++result in the waste of a lot of persistent storage space (due to large
++zero-fills), prevent demand loading of segments in the future and use a lot
++more memory while loading the firmware.
++
++Software layering:
++------------------
++The peripheral authentication, reset and shutdown implementation is factored
++away into a Peripheral Authentication Service driver to allow the PIL driver
++to be agnostic of secure vs. non-secure boot and the mechanisms needed for
++communicating with any code that might be running in secure mode.
++
++Power Management
++================
++
++Some of the peripherals might support being turned off when not in use.
++Support for this might be disabled in the initial implementation of the PIL
++driver since many of the existing drivers can not handle peripheral restart.
++
++SMP/multi-core
++==============
++
++Will use mutexes to protected data that might be shared (reference count,
++etc).
++
++Security
++========
++
++The PIL driver must validate the physical memory addresses specified in the
++ELF and program header table before loading firmware segments to make sure
++it's not overwriting any memory used by the kernel and possibly PMEM regions
++(if it can be done without being an ugly hack). The PIL driver might need to
++maintain a white list or black list of physical memory address ranges to
++perform the address validation.
++
++Performance
++===========
++
++As mentioned in the design section, the loading of firmware segments is not
++optimal and has room for improvement.
++
++Interface
++=========
++
++In kernel APIs:
++void * pil_get(char *peripheral_name)
++	- Enables (if not already enabled) a peripheral and returns a handle
++	  that can be used to disable the peripheral at a later time. If
++	  peripheral can't be enabled successfully, then returns an error
++	  (use IS_ERR) indicating the reason.
++
++void pil_put(void *peripheral_handle)
++	- Inform PIL that this client no longer needs the peripheral to be
++	  active. Does not necessarily mean that the peripheral would be
++	  disabled or powered off.
++
++
++User space APIs:
++All firmware must be located in the path that is expected by the hotplug (or
++compatible) daemon. A hotplug (or compatible) daemon should be running and be
++able to handle events from the kernel requesting for a firmware file.
++
++The basename of the firmware files will depend on the peripheral. For a given
++peripheral, the metadata filename should end with a ".mdt" and the firmware
++segment files should end with ".bXX" where XX denotes the index of the
++firmware segment starting from 0.
++
++Android hotplug compatible daemon expects the firmware files to be under
++/etc/firmware.
++
++Driver parameters
++=================
++
++No module or kernel command line parameters supported.
++
++Config options
++==============
++
++This driver is enabled using the MSM_PIL kernel config option and will
++depend on the CONFIG_FW_LOADER being available.
++
++Dependencies
++============
++
++Depends on firmware class module for the request_firmware API.
++
++Interacts with the PAS to authenticate the firmware and to initiate the boot
++sequence of a peripheral.
++
++Doesn't communicate with other processors since the secure code, if any, will
++be running on the application processor cores.
++
++User space utilities
++====================
++
++None.
++
++Other
++=====
++
++The firmware_class driver might be changed in the future to directly load the
++firmware into memory locations provided by the caller of request_firmware().
++
++Known issues
++============
++
++None.
++
++To do
++=====
++
++* Modify request_firmware() to directly copy firmware blobs into the
++  appropriate memory locations.
++* Add support for demand loading of firmware segments.
++* Add support for forced peripheral restarts.
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
