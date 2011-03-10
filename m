@@ -1,7 +1,7 @@
 From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Thu, 10 Mar 2011 16:57:32 +0800
-Subject: [RFC 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
-Message-ID: <1299747453-25077-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Date: Thu, 10 Mar 2011 16:59:41 +0800
+Subject: [RFC PATCH 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
+Message-ID: <1299747582-25123-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
