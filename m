@@ -1,95 +1,60 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Thu, 10 Mar 2011 10:45:12 +0100
-Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <20110309173902.GD2737@pulham.picochip.com>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299689961-5028-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<20110309173902.GD2737@pulham.picochip.com>
-Message-ID: <4D789DA8.7080703@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Mar 2011 18:56:40 +0900
+Subject: [PATCH v2] ARM: S5P: Add platform helpers for camera GPIO
+	configuration
+In-Reply-To: <1299683859-9242-1-git-send-email-s.nawrocki@samsung.com>
+References: <01c701cbd975$c7dcd2d0$57967870$%kim@samsung.com>
+	<1299683859-9242-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <008a01cbdf09$76c5b800$64512800$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2011 06:39 PM, Jamie Iles wrote:
-> Hi Maxime,
->
-> Thanks for doing this, it looks very nice!  A couple of nitpicks, but
-> I've given it a quick spin on my platform and it provides us with all of
-> the hooks to export all of the information we need.
->
-> Jamie
+Sylwester Nawrocki wrote:
+> 
+> Add functions for configuration of the parallel camera
+> bus pins on S5PV210 and Exynos4 SoC.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> 
+> Hello,
+> 
+> this is a corrected version of platform helpers for the peripheral
+> parallel camera bus configuration in S5PV210 and Exynos4 SoCs.
+> 
+> Changes since v1:
+> - Renamed files: camera.h/camport.h, setup-camera.c/setup-fimc.c
+> - Replaced "camif" with "fimc" in function and data type names
+> - Removed driver strength setup (it turned out than only the clock
+>   source pin needed maximum driver strength on the test boards,
+>   so I've moved its configuration to the board code)
+> 
+> 
+> Regards,
+> Sylwester Nawrocki
+> ---
+>  arch/arm/mach-exynos4/Kconfig            |    5 +++
+>  arch/arm/mach-exynos4/Makefile           |    1 +
+>  arch/arm/mach-exynos4/setup-fimc.c       |   44
+> ++++++++++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/Kconfig            |    5 +++
+>  arch/arm/mach-s5pv210/Makefile           |    1 +
+>  arch/arm/mach-s5pv210/setup-fimc.c       |   43
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-s5p/include/plat/camport.h |   28 +++++++++++++++++++
+>  7 files changed, 127 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos4/setup-fimc.c
+>  create mode 100644 arch/arm/mach-s5pv210/setup-fimc.c
+>  create mode 100644 arch/arm/plat-s5p/include/plat/camport.h
+> 
+(snip)
 
-Hi Jamie,
-Thanks for your review. Fine it works for you.
+Looks ok to me, will apply :)
+Thanks.
 
-> +
-> +static struct sysdev_class_attribute *soc_default_attrs[];
-> +
-> +struct sys_soc {
-> +	char *mach_name;
-> Can this be made const?
-
-Yes, you're right.
-
->> +
->> +	if (si->info)
->> +		return sprintf(buf, "%s\n", si->info);
->> +	else if (si->get_info)
->> +		return sprintf(buf, "%s\n", si->get_info(si));
->> +	else
->> +		return sprintf(buf, "No data\n");
-> Isn't this a platform error if we don't have a way to get the required
-> info?  If in register_sys_soc_info() we check that one of si->info or
-> si->get_info is non-NULL then we don't need this check.  If we have
-> something like:
->
-> static bool sys_soc_info_is_valid(struct sys_soc_info *info)
-> {
-> 	if ((!info->info&&  !info->get_info) ||
-> 	    info->info&&  info->get_info)
-> 	    return false;
->
-> 	return true;
-> }
-
-Yes it is a platform error, it should be tested at registration time.
-
-> then we can do this at registration.  Is there a valid use case where
-> someone could set the static info and the dynamic get_info callback?
->
-
-At registration, no. But in the get_info callback, we can set the info 
-field in order to call the callback once if the value will never change.
-However, I will remove this possibility as it is not clear.
-
->
-> Make name const?  Also, should num be a size_t?
-
-Fixed
-
-> soc.mach_name = kstrdup(name, GFP_KERNEL) instead of the allocate and
-> sprintf?
->
-
-Fixed.
-
->> +struct sys_soc_info {
->> +	char *name;
->> +	char *info;
->> +	char *(*get_info)(struct sys_soc_info *);
-> Could this return a const char* ?
->
-
-Fixed.
-
->> +	struct sysdev_class_attribute attr;
->> +};
->> +
->> +/**
->> + * void register_sys_soc(char *name, struct sys_soc_info *, int num)
-> I think this should be "register_sys_soc - register the soc information"
-> for valid kerneldoc notation..
-
-Fixed.
-
-Regards,
-Maxime
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
