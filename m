@@ -1,28 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Mar 2011 15:20:11 +0000
+From: helmut.raiger@hale.at (Helmut Raiger)
+Date: Thu, 10 Mar 2011 16:21:44 +0100
 Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <201103101602.19241.arnd@arndb.de>
-References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103101529.25661.arnd@arndb.de>
-	<20110310144455.GG22195@opensource.wolfsonmicro.com>
-	<201103101602.19241.arnd@arndb.de>
-Message-ID: <20110310152011.GH22195@opensource.wolfsonmicro.com>
+In-Reply-To: <20110310151014.GA826@n2100.arm.linux.org.uk>
+References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>	<201103101529.25661.arnd@arndb.de>	<20110310144455.GG22195@opensource.wolfsonmicro.com>	<201103101602.19241.arnd@arndb.de>
+	<20110310151014.GA826@n2100.arm.linux.org.uk>
+Message-ID: <4D78EC88.7010009@hale.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 04:02:18PM +0100, Arnd Bergmann wrote:
+On 03/10/2011 04:10 PM, Russell King - ARM Linux wrote:
+> Who ever thought about putting a UART behind I2C ?  That's insane!
 
-> I can accept that it's reasonable to put all devices under
-> /sys/devices/platform/ that are on the same top-level AHB or APB bus,
-> although I also don't see a reason against making that bus a single
-> device.
+Maxim MAX 3107
+http://www.maxim-ic.com/datasheet/index.mvp/id/6463
 
-You could, though the bus will just be a noop.  Typically it's more than
-one bus but software basically can't tell.
+The advantage is that you can have 8 of them on I2C and hundreds on SPI 
+(which is insane ;-) )
 
-> The one thing that really doesn't belong in /sys/devices/platform/
-> however are devices that are clearly children of some other
-> device, e.g. a UART behind MFD behind I2C behind AHB.
+Helmut
 
-Right, and we seem to be fairly good at squashing such bugs when people
-notice them.
+
+
+--
+Scanned by MailScanner.
