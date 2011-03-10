@@ -1,31 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Mar 2011 17:11:59 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 10 Mar 2011 16:19:18 +0000
 Subject: [RFC PATCHv1 1/2] Export SoC info through sysfs
-In-Reply-To: <20110310152011.GH22195@opensource.wolfsonmicro.com>
+In-Reply-To: <201103101711.59544.arnd@arndb.de>
 References: <1299689961-5028-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
 	<201103101602.19241.arnd@arndb.de>
 	<20110310152011.GH22195@opensource.wolfsonmicro.com>
-Message-ID: <201103101711.59544.arnd@arndb.de>
+	<201103101711.59544.arnd@arndb.de>
+Message-ID: <20110310161917.GD27206@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 March 2011, Mark Brown wrote:
-> On Thu, Mar 10, 2011 at 04:02:18PM +0100, Arnd Bergmann wrote:
-> 
-> > I can accept that it's reasonable to put all devices under
-> > /sys/devices/platform/ that are on the same top-level AHB or APB bus,
-> > although I also don't see a reason against making that bus a single
-> > device.
-> 
-> You could, though the bus will just be a noop.  Typically it's more than
-> one bus but software basically can't tell.
+On Thu, Mar 10, 2011 at 05:11:59PM +0100, Arnd Bergmann wrote:
+> On Thursday 10 March 2011, Mark Brown wrote:
 
-Yes. The main reason for representing such a bus in sysfs would be
-to match the SOC's block diagram with the structure in the kernel.
+> > You could, though the bus will just be a noop.  Typically it's more than
+> > one bus but software basically can't tell.
 
-The cost of an extra device is roughly zero, but structure generally
-helps. Another advantage is that you can associate attributes and names
-with the device, and simplify naming of the children without risking
-name space conflicts.
+> Yes. The main reason for representing such a bus in sysfs would be
+> to match the SOC's block diagram with the structure in the kernel.
 
-	Arnd
+If you're doing that things like power domains tend to be a lot more
+interesting since you can do something meaningful with them in software.
+The non-visible buses aren't reliably documented anyway and the first
+procesor datasheet I just pulled up had a whole bunch of devices that
+span multiple buses anyway :)
