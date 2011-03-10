@@ -1,78 +1,61 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Thu, 10 Mar 2011 14:19:20 -0800
-Subject: [RFC PATCH V2] ARM: Use generic BUG() handler
-In-Reply-To: <AANLkTinTfHqrbVFh6Q68kP=UKJjye8J+iDhRHTcm8BPF@mail.gmail.com>
-References: <1299639325-10384-1-git-send-email-sjg@chromium.org>
-	<AANLkTinTfHqrbVFh6Q68kP=UKJjye8J+iDhRHTcm8BPF@mail.gmail.com>
-Message-ID: <AANLkTinh4-rvhDGesy=STFsiLGyjBb8Scb+BR7tfXQ+G@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 10 Mar 2011 14:48:04 -0800
+Subject: [PATCH 3/8] macb: convert printk to pr_ and friends
+In-Reply-To: <1299751843-9743-4-git-send-email-jamie@jamieiles.com>
+References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
+	<1299751843-9743-4-git-send-email-jamie@jamieiles.com>
+Message-ID: <1299797284.20104.162.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2011 at 1:51 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Wed, Mar 9, 2011 at 2:55 AM, Simon Glass <sjg@chromium.org> wrote:
->> +#ifdef CONFIG_THUMB2_KERNEL
->> +#define BUG_INSTR_VALUE 0xf7f2
->
-> This isn't an undefined instruction... it's actually half of some
-> 32-bit Thumb instruction. Did you mean 0xdexx instead?
+On Thu, 2011-03-10 at 10:10 +0000, Jamie Iles wrote:
+> macb is already using the dev_dbg() and friends helpers so use pr_foo()
+> along with a pr_fmt() definition to make the printing a little cleaner.
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 
-Yes, will fix.
+Hi Jamie.
 
->> +#define BUG_INSTR_TYPE ".hword "
->> +#else
->> +#define BUG_INSTR_VALUE 0xe7f001f2
->> +#define BUG_INSTR_TYPE ".word "
->> +#endif
->> +
->
-> This works, but do we really need to split the definition of the bug
-> instruction into two macros?
+Because these conversions use a struct net_device,
+they would be better as:
 
-This is so that I can test for the correct instruction word in valid_bug_addr().
+	netdev_<foo>(struct net_device *dev, const char *fmt, ...)
 
->
-> Unless you can see a use for calling _BUG() directly with a different
-> instruction value, of course...
->
+> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+> @@ -175,11 +176,11 @@ static void macb_handle_link_change(struct net_device *dev)
+>  
+>  	if (status_change) {
+>  		if (phydev->link)
+> -			printk(KERN_INFO "%s: link up (%d/%s)\n",
+> +			pr_info("%s: link up (%d/%s)\n",
+>  			       dev->name, phydev->speed,
+>  			       DUPLEX_FULL == phydev->duplex ? "Full":"Half");
 
->> + ? ? ? /*
->> + ? ? ? * .exit.text is discarded at runtime, not link time, to deal with
->> + ? ? ? * ?references from bug_table
->> + ? ? ? */
->> + ? ? ? .exit.text : AT(ADDR(.exit.text)) {
->> + ? ? ? ? ? ? ? EXIT_TEXT
->> + ? ? ? }
->> +
->> + ? ? ? .exit.data : AT(ADDR(.exit.data)) {
->> + ? ? ? ? ? ? ? EXIT_DATA
->> + ? ? ? }
->
-> This is the same unfortunate hack we have to do for other fixups,
-> because there's no way to separate out some of these entries in such a
-> way that they can be discarded at link time... ?I did have an idea for
-> an extention to gas which would allow fixups and similar data to be
-> emitted in separate ancillary sections which the linker can handle
-> sensibly, so that bug entries referencing .exit.text (for example) can
-> be discarded at link time.
->
-> See http://sourceware.org/ml/binutils/2011-02/msg00004.html
->
-> I haven't received any support for the idea so far though...
+			netdev_info(dev, "link up (%d/%s)\n",
+				    phydev->speed,
+				    phydev->duplex == DUPLEX_FULL ? "Full" : "Half");
+ 
+>  		else
+> -			printk(KERN_INFO "%s: link down\n", dev->name);
+> +			pr_info("%s: link down\n", dev->name);
 
-Well yes, and some might even argue that calling BUG() in __exit code
-is not a great idea. Here we are adding in all exit data again which
-is about 8.5KB in my kernel. These two pages are then reclaimed at
-runtime.
+			netdev_info(dev, "link down\n");
 
-However, at present I don't see any alternative to this, and this is
-what is done on other architectures to support BUG().
+> @@ -193,7 +194,7 @@ static int macb_mii_probe(struct net_device *dev)
+>  
+>  	phydev = phy_find_first(bp->mii_bus);
+>  	if (!phydev) {
+> -		printk (KERN_ERR "%s: no PHY found\n", dev->name);
+> +		pr_err("%s: no PHY found\n", dev->name);
 
->
-> Cheers
-> ---Dave
->
+		netdev_err(dev, "no PHY found\n");
 
-I will tidy this up, test it properly on Thumb and submit a patch.
+> @@ -206,7 +207,7 @@ static int macb_mii_probe(struct net_device *dev)
+>  				 PHY_INTERFACE_MODE_RMII :
+>  				 PHY_INTERFACE_MODE_MII);
+>  	if (ret) {
+> -		printk(KERN_ERR "%s: Could not attach to PHY\n", dev->name);
+> +		pr_err("%s: Could not attach to PHY\n", dev->name);
 
-Regards,
-Simon
+		netdev_err(dev, "could not attach to PHY\n");
+
+etc...
