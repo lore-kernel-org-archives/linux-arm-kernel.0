@@ -1,46 +1,62 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 09 Mar 2011 19:36:16 -0800
-Subject: [Qualcomm PM8921 MFD v2 4/6] mfd: pm8xxx-mpp: Add pm8xxx MPP
-	driver
-In-Reply-To: <20110308233045.GB2717@opensource.wolfsonmicro.com>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-5-git-send-email-adharmap@codeaurora.org>
-	<20110308233045.GB2717@opensource.wolfsonmicro.com>
-Message-ID: <4D784730.4010307@codeaurora.org>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 10 Mar 2011 11:40:03 +0800
+Subject: [PATCH] ARM: fix compiling error due to debug_info change
+Message-ID: <1299728403-27486-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Mon, Mar 07, 2011 at 10:09:48PM -0800, adharmap at codeaurora.org wrote:
-> 
->> +	mpp_chip->gpio_chip.label = PM8XXX_MPP_DEV_NAME;
->> +	mpp_chip->gpio_chip.direction_input = pm8xxx_mpp_dir_input;
->> +	mpp_chip->gpio_chip.direction_output = pm8xxx_mpp_dir_output;
->> +	mpp_chip->gpio_chip.to_irq = pm8xxx_mpp_to_irq;
->> +	mpp_chip->gpio_chip.get = pm8xxx_mpp_get;
->> +	mpp_chip->gpio_chip.set = pm8xxx_mpp_set;
->> +	mpp_chip->gpio_chip.dbg_show = pm8xxx_mpp_dbg_show;
->> +	mpp_chip->gpio_chip.ngpio = pdata->core_data.nmpps;
->> +	mpp_chip->gpio_chip.can_sleep = 1;
->> +	mpp_chip->gpio_chip.dev = &pdev->dev;
->> +	mpp_chip->gpio_chip.base = pdata->mpp_base;
-> 
-> It's seems really odd that you're adding gpiolib stuff here when you've
-> also got a separate gpiolib driver.  Possibly this all shouldn't
-> actually be split up as much as it is - there's also the issue with the
-> gpiolib driver needing to peer into the interrupt controller.  It might
-> simplify the code if things were merged more.
+CC [M]  crypto/xcbc.o
+In file included from /opt/git/ubuntu/roc/natty/fs/binfmt_aout.c:32:
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h: In function ?aout_dump_thread?:
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:35: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:36: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:37: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:38: error: ?struct debug_info? has no member named ?bp?
+/opt/git/ubuntu/roc/natty/arch/arm/include/asm/a.out-core.h:39: error: ?struct debug_info? has no member named ?nsaved?
+make[3]: *** [fs/binfmt_aout.o] Error 1
+make[2]: *** [fs] Error 2
 
-I dont think merging code will help here. gpio lines and mpp lines are 
-very different piece of hardware,they have a different register map and 
-different config attributes. They do fall under the generic 'gpiolib' 
-umbrella, but it seems clean to keep them separate.
+This bug was introduced by "ARM: 6668/1: ptrace: remove single-step emulation code" from Will Deacon
 
-I agree with you that gpio code needs to call on interrupt controller ( 
-a complicated hardware design) but I think I have a clean software 
-implementation to manage it.
+memset zero the u_debugreg array and add comments to u_debugreg.
 
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ arch/arm/include/asm/a.out-core.h |    7 ++-----
+ arch/arm/include/asm/user.h       |    2 +-
+ 2 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/a.out-core.h b/arch/arm/include/asm/a.out-core.h
+index 93d04ac..11549a0 100644
+--- a/arch/arm/include/asm/a.out-core.h
++++ b/arch/arm/include/asm/a.out-core.h
+@@ -32,11 +32,8 @@ static inline void aout_dump_thread(struct pt_regs *regs, struct user *dump)
+ 	dump->u_dsize = (tsk->mm->brk - tsk->mm->start_data + PAGE_SIZE - 1) >> PAGE_SHIFT;
+ 	dump->u_ssize = 0;
+ 
+-	dump->u_debugreg[0] = tsk->thread.debug.bp[0].address;
+-	dump->u_debugreg[1] = tsk->thread.debug.bp[1].address;
+-	dump->u_debugreg[2] = tsk->thread.debug.bp[0].insn.arm;
+-	dump->u_debugreg[3] = tsk->thread.debug.bp[1].insn.arm;
+-	dump->u_debugreg[4] = tsk->thread.debug.nsaved;
++	/* struct debug_info was dropped, so set u_debugreg as zero */
++	memset(dump->u_debugreg, 0, sizeof(dump->u_debugreg) * 8);
+ 
+ 	if (dump->start_stack < 0x04000000)
+ 		dump->u_ssize = (0x04000000 - dump->start_stack) >> PAGE_SHIFT;
+diff --git a/arch/arm/include/asm/user.h b/arch/arm/include/asm/user.h
+index 05ac4b0..35917b3 100644
+--- a/arch/arm/include/asm/user.h
++++ b/arch/arm/include/asm/user.h
+@@ -71,7 +71,7 @@ struct user{
+ 				/* the registers. */
+   unsigned long magic;		/* To uniquely identify a core file */
+   char u_comm[32];		/* User command that was responsible */
+-  int u_debugreg[8];
++  int u_debugreg[8];		/* No longer used */
+   struct user_fp u_fp;		/* FP state */
+   struct user_fp_struct * u_fp0;/* Used by gdb to help find the values for */
+   				/* the FP registers. */
 -- 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
