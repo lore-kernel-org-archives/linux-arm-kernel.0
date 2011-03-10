@@ -1,29 +1,33 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 10 Mar 2011 12:12:23 -0800
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 10 Mar 2011 12:19:34 -0800
 Subject: [PATCH 1/3] msm: 8660: Add clock control regions to iomap
-In-Reply-To: <4D78F0D8.7000408@ru.mvista.com> (Sergei Shtylyov's message of
-	"Thu, 10 Mar 2011 18:40:08 +0300")
+In-Reply-To: <4D78F0D8.7000408@ru.mvista.com>
 References: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
 	<1299732274-10742-2-git-send-email-sboyd@codeaurora.org>
 	<4D78F0D8.7000408@ru.mvista.com>
-Message-ID: <8yapqpyag60.fsf@huya.qualcomm.com>
+Message-ID: <4D793256.5070904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10 2011, Sergei Shtylyov wrote:
-
-> Hello.
+On 03/10/2011 07:40 AM, Sergei Shtylyov wrote:
 >
-> On 10-03-2011 7:44, Stephen Boyd wrote:
+>> diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+>> b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+>> index 3b19b8f..ddfc85b 100644
+>> --- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+>> +++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+>> @@ -53,6 +53,14 @@
+>>  #define MSM_TLMM_PHYS        0x00800000
+>>  #define MSM_TLMM_SIZE        SZ_16K
+>>
+>> +#define MSM_CLK_CTL_BASE        IOMEM(0xFA010000)
+>> +#define MSM_CLK_CTL_PHYS        0x00900000
+>> +#define MSM_CLK_CTL_SIZE        SZ_16K
 >
->> Change-Id: I9e72f10d0da1d6aaaaf7df85d33b998edf424f6f
->
->    This shouldn't be here.
+>    Surrounding code separates the macro names from values by tabs, and
+> you're using spaces. Should be more consistent...
 
-I can remove the Change-Id when applying the patch, if there aren't any
-other comments.
-
-David
+Thanks, will fix.
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
