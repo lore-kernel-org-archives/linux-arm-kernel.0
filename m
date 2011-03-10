@@ -1,446 +1,449 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 10 Mar 2011 19:08:55 +0100
-Subject: [PATCH 4/6] AT91: AT91SAM9x5 processors support
+Date: Thu, 10 Mar 2011 19:08:56 +0100
+Subject: [PATCH 5/6] AT91: pio: add new PIO3a features
 In-Reply-To: <20110310180628.GH9351@game.jcrosoft.org>
 References: <20110310180628.GH9351@game.jcrosoft.org>
-Message-ID: <1299780537-16481-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1299780537-16481-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dan Liang <dan.liang@atmel.com>
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Add 5series chips family support in at91sam9x5.c:
-- Define clock resources for 5series and some initialization code
+This patch adds the support for new PIO controller found on some
+at91sam SOCs.
+- more peripheral multiplexing
+- more features to configure on a PIO (pull-down, Schmitt trigger, debouncer)
+- support for several irq tirggering features (type and polarity)
 
-Signed-off-by: Dan Liang <dan.liang@atmel.com>
+Debugfs at91_gpio file is updated to monitor configuration.
+
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/at91sam9x5.c |  416 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 416 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-at91/at91sam9x5.c
+ arch/arm/mach-at91/gpio.c                  |  240 ++++++++++++++++++++++++++--
+ arch/arm/mach-at91/include/mach/at91_pio.h |   25 +++
+ arch/arm/mach-at91/include/mach/gpio.h     |    5 +
+ 3 files changed, 257 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-new file mode 100644
-index 0000000..c7f2a81
---- /dev/null
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -0,0 +1,416 @@
-+/*
-+ *  Chip-specific setup code for the AT91SAM9x5 family
-+ *
-+ *  Copyright (C) 2010 Atmel Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/pm.h>
-+
-+#include <asm/irq.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <mach/at91sam9x5.h>
-+#include <mach/at91_pmc.h>
-+#include <mach/at91_rstc.h>
-+#include <mach/at91_shdwc.h>
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index af818a2..8f00902 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -20,6 +20,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ 
 +#include <mach/cpu.h>
-+
-+#include "generic.h"
-+#include "clock.h"
-+
-+static struct map_desc at91sam9x5_io_desc[] __initdata = {
-+	{
-+		.virtual	= AT91_VA_BASE_SYS,
-+		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
-+		.length		= SZ_16K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9X5_SRAM_SIZE,
-+		.pfn		= __phys_to_pfn(AT91SAM9X5_SRAM_BASE),
-+		.length		= AT91SAM9X5_SRAM_SIZE,
-+		.type		= MT_DEVICE,
-+	}
-+};
-+
-+/* --------------------------------------------------------------------
-+ *  Clocks
-+ * -------------------------------------------------------------------- */
-+
+ #include <mach/hardware.h>
+ #include <mach/at91_pio.h>
+ #include <mach/gpio.h>
+@@ -69,6 +70,12 @@ static struct at91_gpio_chip gpio_chip[] = {
+ 
+ static int gpio_banks;
+ 
 +/*
-+ * The peripheral clocks.
++ * Functionnality can change with newer chips
 + */
-+static struct clk pioAB_clk = {
-+	.name		= "pioAB_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_PIOAB,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk pioCD_clk = {
-+	.name		= "pioCD_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_PIOCD,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk smd_clk = {
-+	.name		= "smd_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_SMD,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk usart0_clk = {
-+	.name		= "usart0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_USART0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk usart1_clk = {
-+	.name		= "usart1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_USART1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk usart2_clk = {
-+	.name		= "usart2_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_USART2,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* USART3 clock - Only for sam9g25/sam9x25 */
-+static struct clk usart3_clk = {
-+	.name		= "usart3_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_USART3,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk twi0_clk = {
-+	.name		= "twi0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk twi1_clk = {
-+	.name		= "twi1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk twi2_clk = {
-+	.name		= "twi2_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI2,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk mmc0_clk = {
-+	.name		= "mci0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_MCI0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk spi0_clk = {
-+	.name		= "spi0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_SPI0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk spi1_clk = {
-+	.name		= "spi1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_SPI1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk uart0_clk = {
-+	.name		= "uart0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_UART0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk uart1_clk = {
-+	.name		= "uart1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_UART1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk tcb0_clk = {
-+	.name		= "tcb0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_TCB,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk pwm_clk = {
-+	.name		= "pwm_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_PWM,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk adc_clk = {
-+	.name		= "adc_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_ADC,
-+	.type	= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk dma0_clk = {
-+	.name		= "dma0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_DMA0,
-+	.type	= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk dma1_clk = {
-+	.name		= "dma1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_DMA1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk uhphs_clk = {
-+	.name		= "uhphs_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_UHPHS,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk udphs_clk = {
-+	.name		= "udphs_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_UDPHS,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* emac0 clock - Only for sam9g25/sam9x25/sam9g35/sam9x35 */
-+static struct clk macb0_clk = {
-+	.name		= "macb0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_EMAC0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* lcd clock - Only for sam9g15/sam9g35/sam9x35 */
-+static struct clk lcdc_clk = {
-+	.name		= "lcdc_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_LCDC,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* isi clock - Only for sam9g25 */
-+static struct clk isi_clk = {
-+	.name		= "isi_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_ISI,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk mmc1_clk = {
-+	.name		= "mci1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_MCI1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* emac1 clock - Only for sam9x25 */
-+static struct clk macb1_clk = {
-+	.name		= "macb1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_EMAC1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk ssc_clk = {
-+	.name		= "ssc_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_SSC,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* can0 clock - Only for sam9x35 */
-+static struct clk can0_clk = {
-+	.name		= "can0_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_CAN0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+/* can1 clock - Only for sam9x35 */
-+static struct clk can1_clk = {
-+	.name		= "can1_clk",
-+	.pmc_mask	= 1 << AT91SAM9X5_ID_CAN1,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
++#define cpu_has_pio3()	(cpu_is_at91sam9x5())
 +
-+/* One additional fake clock for ohci */
-+static struct clk ohci_clk = {
-+	.name		= "ohci_clk",
-+	.pmc_mask	= 0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+	.parent		= &uhphs_clk,
-+};
 +
-+/* One additional fake clock for second TC block */
-+static struct clk tcb1_clk = {
-+	.name		= "tcb1_clk",
-+	.pmc_mask	= 0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+	.parent		= &tcb0_clk,
-+};
-+
-+static struct clk *periph_clocks[] __initdata = {
-+	&pioAB_clk,
-+	&pioCD_clk,
-+	&smd_clk,
-+	&usart0_clk,
-+	&usart1_clk,
-+	&usart2_clk,
-+	&twi0_clk,
-+	&twi1_clk,
-+	&twi2_clk,
-+	&mmc0_clk,
-+	&spi0_clk,
-+	&spi1_clk,
-+	&uart0_clk,
-+	&uart1_clk,
-+	&tcb0_clk,
-+	&pwm_clk,
-+	&adc_clk,
-+	&dma0_clk,
-+	&dma1_clk,
-+	&uhphs_clk,
-+	&udphs_clk,
-+	&mmc1_clk,
-+	&ssc_clk,
-+	// irq0
-+	&ohci_clk,
-+	&tcb1_clk,
-+};
-+
-+/*
-+ * The two programmable clocks.
-+ * You must configure pin multiplexing to bring these signals out.
-+ */
-+static struct clk pck0 = {
-+	.name		= "pck0",
-+	.pmc_mask	= AT91_PMC_PCK0,
-+	.type		= CLK_TYPE_PROGRAMMABLE,
-+	.id		= 0,
-+};
-+static struct clk pck1 = {
-+	.name		= "pck1",
-+	.pmc_mask	= AT91_PMC_PCK1,
-+	.type		= CLK_TYPE_PROGRAMMABLE,
-+	.id		= 1,
-+};
-+
-+static void __init at91sam9x5_register_clocks(void)
+ static inline void __iomem *pin_to_controller(unsigned pin)
+ {
+ 	pin -= PIN_BASE;
+@@ -86,6 +93,52 @@ static inline unsigned pin_to_mask(unsigned pin)
+ }
+ 
+ 
++static char peripheral_function(void __iomem *pio, unsigned mask)
 +{
-+	int i;
++	char	ret = 'X';
++	u8	select;
 +
-+	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
-+		clk_register(periph_clocks[i]);
-+
-+	if (cpu_is_at91sam9g25()
-+	|| cpu_is_at91sam9x25())
-+		clk_register(&usart3_clk);
-+
-+	if (cpu_is_at91sam9g25()
-+	|| cpu_is_at91sam9x25()
-+	|| cpu_is_at91sam9g35()
-+	|| cpu_is_at91sam9x35())
-+		clk_register(&macb0_clk);
-+
-+	if (cpu_is_at91sam9g15()
-+	|| cpu_is_at91sam9g35()
-+	|| cpu_is_at91sam9x35())
-+		clk_register(&lcdc_clk);
-+
-+	if (cpu_is_at91sam9g25())
-+		clk_register(&isi_clk);
-+
-+	if (cpu_is_at91sam9x25())
-+		clk_register(&macb1_clk);
-+
-+	if (cpu_is_at91sam9x35()) {
-+		clk_register(&can0_clk);
-+		clk_register(&can1_clk);
++	if (pio) {
++		if (cpu_has_pio3()) {
++			select = !!(__raw_readl(pio + PIO_ABCDSR1) & mask);
++			select |= (!!(__raw_readl(pio + PIO_ABCDSR2) & mask) << 1);
++			ret = 'A' + select;
++		} else {
++			ret = __raw_readl(pio + PIO_ABSR) & mask ?
++							'B' : 'A';
++		}
 +	}
 +
-+	clk_register(&pck0);
-+	clk_register(&pck1);
++	return ret;
 +}
 +
-+/* --------------------------------------------------------------------
-+ *  GPIO
-+ * -------------------------------------------------------------------- */
++static void gpio_printf(struct seq_file *s, void __iomem *pio, unsigned mask)
++{
++	char	*trigger = NULL;
++	char	*polarity = NULL;
 +
-+static struct at91_gpio_bank at91sam9x5_gpio[] = {
-+	{
-+		.id		= AT91SAM9X5_ID_PIOAB,
-+		.offset		= AT91_PIOA,
-+		.clock		= &pioAB_clk,
-+	}, {
-+		.id		= AT91SAM9X5_ID_PIOAB,
-+		.offset		= AT91_PIOB,
-+		.clock		= &pioAB_clk,
-+	}, {
-+		.id		= AT91SAM9X5_ID_PIOCD,
-+		.offset		= AT91_PIOC,
-+		.clock		= &pioCD_clk,
-+	}, {
-+		.id		= AT91SAM9X5_ID_PIOCD,
-+		.offset		= AT91_PIOD,
-+		.clock		= &pioCD_clk,
++	if (__raw_readl(pio + PIO_IMR) & mask) {
++		if (!cpu_has_pio3() || !(__raw_readl(pio + PIO_AIMMR) & mask )) {
++			trigger = "edge";
++			polarity = "both";
++		} else {
++			if (__raw_readl(pio + PIO_ELSR) & mask) {
++				trigger = "level";
++				polarity = __raw_readl(pio + PIO_FRLHSR) & mask ?
++					"high" : "low";
++			} else {
++				trigger = "edge";
++				polarity = __raw_readl(pio + PIO_FRLHSR) & mask ?
++						"rising" : "falling";
++			}
++		}
++		seq_printf(s, "IRQ:%s-%s\t", trigger, polarity);
++	} else {
++		seq_printf(s, "GPIO:%s\t\t",
++				__raw_readl(pio + PIO_PDSR) & mask ? "1" : "0");
 +	}
-+};
-+
-+static void at91sam9x5_reset(void)
-+{
-+	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
 +}
 +
-+static void at91sam9x5_poweroff(void)
+ /*--------------------------------------------------------------------------*/
+ 
+ /* Not all hardware capabilities are exposed through these calls; they
+@@ -133,7 +186,14 @@ int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup)
+ 
+ 	__raw_writel(mask, pio + PIO_IDR);
+ 	__raw_writel(mask, pio + (use_pullup ? PIO_PUER : PIO_PUDR));
+-	__raw_writel(mask, pio + PIO_ASR);
++	if (cpu_has_pio3()) {
++		__raw_writel(__raw_readl(pio + PIO_ABCDSR1) & ~mask,
++							pio + PIO_ABCDSR1);
++		__raw_writel(__raw_readl(pio + PIO_ABCDSR2) & ~mask,
++							pio + PIO_ABCDSR2);
++	} else {
++		__raw_writel(mask, pio + PIO_ASR);
++	}
+ 	__raw_writel(mask, pio + PIO_PDR);
+ 	return 0;
+ }
+@@ -153,7 +213,14 @@ int __init_or_module at91_set_B_periph(unsigned pin, int use_pullup)
+ 
+ 	__raw_writel(mask, pio + PIO_IDR);
+ 	__raw_writel(mask, pio + (use_pullup ? PIO_PUER : PIO_PUDR));
+-	__raw_writel(mask, pio + PIO_BSR);
++	if (cpu_has_pio3()) {
++		__raw_writel(__raw_readl(pio + PIO_ABCDSR1) | mask,
++							pio + PIO_ABCDSR1);
++		__raw_writel(__raw_readl(pio + PIO_ABCDSR2) & ~mask,
++							pio + PIO_ABCDSR2);
++	} else {
++		__raw_writel(mask, pio + PIO_BSR);
++	}
+ 	__raw_writel(mask, pio + PIO_PDR);
+ 	return 0;
+ }
+@@ -161,6 +228,48 @@ EXPORT_SYMBOL(at91_set_B_periph);
+ 
+ 
+ /*
++ * mux the pin to the "C" internal peripheral role.
++ */
++int __init_or_module at91_set_C_periph(unsigned pin, int use_pullup)
 +{
-+	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
++
++	if (!pio || !cpu_has_pio3())
++		return -EINVAL;
++
++	__raw_writel(mask, pio + PIO_IDR);
++	__raw_writel(mask, pio + (use_pullup ? PIO_PUER : PIO_PUDR));
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) & ~mask, pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) | mask, pio + PIO_ABCDSR2);
++	__raw_writel(mask, pio + PIO_PDR);
++	return 0;
 +}
++EXPORT_SYMBOL(at91_set_C_periph);
 +
-+
-+/* --------------------------------------------------------------------
-+ *  AT91SAM9x5 processor initialization
-+ * -------------------------------------------------------------------- */
-+
-+void __init at91sam9x5_initialize(unsigned long main_clock)
-+{
-+	/* Map peripherals */
-+	iotable_init(at91sam9x5_io_desc, ARRAY_SIZE(at91sam9x5_io_desc));
-+
-+	at91_arch_reset = at91sam9x5_reset;
-+	pm_power_off = at91sam9x5_poweroff;
-+	at91_extern_irq = (1 << AT91SAM9X5_ID_IRQ0);
-+
-+	/* Init clock subsystem */
-+	at91_clock_init(main_clock);
-+
-+	/* Register the processor-specific clocks */
-+	at91sam9x5_register_clocks();
-+
-+	/* Register GPIO subsystem */
-+	at91_gpio_init(at91sam9x5_gpio, 4);
-+}
-+
-+/* --------------------------------------------------------------------
-+ *  Interrupt initialization
-+ * -------------------------------------------------------------------- */
 +
 +/*
-+ * The default interrupt priority levels (0 = lowest, 7 = highest).
++ * mux the pin to the "C" internal peripheral role.
 + */
-+static unsigned int at91sam9x5_default_irq_priority[NR_AIC_IRQS] __initdata = {
-+	7,	/* Advanced Interrupt Controller (FIQ) */
-+	7,	/* System Peripherals */
-+	1,	/* Parallel IO Controller A and B */
-+	1,	/* Parallel IO Controller C and D */
-+	4,	/* Soft Modem */
-+	5,	/* USART 0 */
-+	5,	/* USART 1 */
-+	5,	/* USART 2 */
-+	5,	/* USART 3 */
-+	6,	/* Two-Wire Interface 0 */
-+	6,	/* Two-Wire Interface 1 */
-+	6,	/* Two-Wire Interface 2 */
-+	0,	/* Multimedia Card Interface 0 */
-+	5,	/* Serial Peripheral Interface 0 */
-+	5,	/* Serial Peripheral Interface 1 */
-+	5,	/* UART 0 */
-+	5,	/* UART 1 */
-+	0,	/* Timer Counter 0, 1, 2, 3, 4 and 5 */
-+	0,	/* Pulse Width Modulation Controller */
-+	0,	/* ADC Controller */
-+	0,	/* DMA Controller 0 */
-+	0,	/* DMA Controller 1 */
-+	2,	/* USB Host High Speed port */
-+	2,	/* USB Device High speed port */
-+	3,	/* Ethernet MAC 0 */
-+	3,	/* LDC Controller or Image Sensor Interface */
-+	0,	/* Multimedia Card Interface 1 */
-+	3,	/* Ethernet MAC 1 */
-+	4,	/* Synchronous Serial Interface */
-+	4,	/* CAN Controller 0 */
-+	4,	/* CAN Controller 1 */
-+	0,	/* Advanced Interrupt Controller (IRQ0) */
-+};
-+
-+void __init at91sam9x5_init_interrupts(unsigned int priority[NR_AIC_IRQS])
++int __init_or_module at91_set_D_periph(unsigned pin, int use_pullup)
 +{
-+	if (!priority)
-+		priority = at91sam9x5_default_irq_priority;
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
 +
-+	/* Initialize the AIC interrupt controller */
-+	at91_aic_init(priority);
++	if (!pio || !cpu_has_pio3())
++		return -EINVAL;
 +
-+	/* Enable GPIO interrupts */
-+	at91_gpio_irq_setup();
++	__raw_writel(mask, pio + PIO_IDR);
++	__raw_writel(mask, pio + (use_pullup ? PIO_PUER : PIO_PUDR));
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) | mask, pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) | mask, pio + PIO_ABCDSR2);
++	__raw_writel(mask, pio + PIO_PDR);
++	return 0;
 +}
++EXPORT_SYMBOL(at91_set_D_periph);
++
++
++/*
+  * mux the pin to the gpio controller (instead of "A" or "B" peripheral), and
+  * configure it for an input.
+  */
+@@ -213,12 +322,37 @@ int __init_or_module at91_set_deglitch(unsigned pin, int is_on)
+ 
+ 	if (!pio)
+ 		return -EINVAL;
++
++	if (cpu_has_pio3() && is_on)
++		__raw_writel(mask, pio + PIO_IFSCDR);
+ 	__raw_writel(mask, pio + (is_on ? PIO_IFER : PIO_IFDR));
+ 	return 0;
+ }
+ EXPORT_SYMBOL(at91_set_deglitch);
+ 
+ /*
++ * enable/disable the debounce filter;
++ */
++int __init_or_module at91_set_debounce(unsigned pin, int is_on, int div)
++{
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
++
++	if (!pio || !cpu_has_pio3())
++		return -EINVAL;
++
++	if (is_on) {
++		__raw_writel(mask, pio + PIO_IFSCER);
++		__raw_writel(div & PIO_SCDR_DIV, pio + PIO_SCDR);
++		__raw_writel(mask, pio + PIO_IFER);
++	} else {
++		__raw_writel(mask, pio + PIO_IFDR);
++	}
++	return 0;
++}
++EXPORT_SYMBOL(at91_set_debounce);
++
++/*
+  * enable/disable the multi-driver; This is only valid for output and
+  * allows the output pin to run as an open collector output.
+  */
+@@ -236,6 +370,41 @@ int __init_or_module at91_set_multi_drive(unsigned pin, int is_on)
+ EXPORT_SYMBOL(at91_set_multi_drive);
+ 
+ /*
++ * enable/disable the pull-down.
++ * If pull-up already enabled while calling the function, we disable it.
++ */
++int __init_or_module at91_set_pulldown(unsigned pin, int is_on)
++{
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
++
++	if (!pio || !cpu_has_pio3())
++		return -EINVAL;
++
++	/* Disable pull-up anyway */
++	__raw_writel(mask, pio + PIO_PUDR);
++	__raw_writel(mask, pio + (is_on ? PIO_PPDER : PIO_PPDDR));
++	return 0;
++}
++EXPORT_SYMBOL(at91_set_pulldown);
++
++/*
++ * disable Schmitt trigger
++ */
++int __init_or_module at91_disable_schmitt_trig(unsigned pin)
++{
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
++
++	if (!pio || !cpu_has_pio3())
++		return -EINVAL;
++
++	__raw_writel(__raw_readl(pio + PIO_SCHMITT) | mask, pio + PIO_SCHMITT);
++	return 0;
++}
++EXPORT_SYMBOL(at91_disable_schmitt_trig);
++
++/*
+  * assuming the pin is muxed as a gpio output, set its value.
+  */
+ int at91_set_gpio_value(unsigned pin, int value)
+@@ -337,7 +506,10 @@ void at91_gpio_resume(void)
+  * To use any AT91_PIN_* as an externally triggered IRQ, first call
+  * at91_set_gpio_input() then maybe enable its glitch filter.
+  * Then just request_irq() with the pin ID; it works like any ARM IRQ
+- * handler, though it always triggers on rising and falling edges.
++ * handler.
++ * First implementation always triggers on rising and falling edges
++ * whereas the newer PIO3a can be additionally configured to trigger on
++ * level, edge with any polarity.
+  *
+  * Alternatively, certain pins may be used directly as IRQ0..IRQ6 after
+  * configuring them with at91_set_a_periph() or at91_set_b_periph().
+@@ -362,7 +534,7 @@ static void gpio_irq_unmask(struct irq_data *d)
+ 		__raw_writel(mask, pio + PIO_IER);
+ }
+ 
+-static int gpio_irq_type(struct irq_data *d, unsigned type)
++static int gpio_irq_type(unsigned pin, unsigned type)
+ {
+ 	switch (type) {
+ 	case IRQ_TYPE_NONE:
+@@ -373,11 +545,50 @@ static int gpio_irq_type(struct irq_data *d, unsigned type)
+ 	}
+ }
+ 
++/* Alternate irq type for PIO3a support */
++static int alt_gpio_irq_type(unsigned pin, unsigned type)
++{
++	void __iomem	*pio = pin_to_controller(pin);
++	unsigned	mask = pin_to_mask(pin);
++
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		__raw_writel(mask, pio + PIO_ESR);
++		__raw_writel(mask, pio + PIO_REHLSR);
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		__raw_writel(mask, pio + PIO_ESR);
++		__raw_writel(mask, pio + PIO_FELLSR);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		__raw_writel(mask, pio + PIO_LSR);
++		__raw_writel(mask, pio + PIO_FELLSR);
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		__raw_writel(mask, pio + PIO_LSR);
++		__raw_writel(mask, pio + PIO_REHLSR);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		/* disable additional interrupt modes:
++		 * fall back to default behavior */
++		__raw_writel(mask, pio + PIO_AIMDR);
++		return 0;
++	case IRQ_TYPE_NONE:
++	default:
++		pr_warn("AT91: No type for irq %d\n", gpio_to_irq(pin));
++		return -EINVAL;
++	}
++
++	/* enable additional interrupt modes */
++	__raw_writel(mask, pio + PIO_AIMER);
++
++	return 0;
++}
++
+ static struct irq_chip gpio_irqchip = {
+ 	.name		= "GPIO",
+ 	.irq_mask	= gpio_irq_mask,
+ 	.irq_unmask	= gpio_irq_unmask,
+-	.irq_set_type	= gpio_irq_type,
+ 	.irq_set_wake	= gpio_irq_set_wake,
+ };
+ 
+@@ -444,7 +655,7 @@ static int at91_gpio_show(struct seq_file *s, void *unused)
+ 	/* print heading */
+ 	seq_printf(s, "Pin\t");
+ 	for (bank = 0; bank < gpio_banks; bank++) {
+-		seq_printf(s, "PIO%c\t", 'A' + bank);
++		seq_printf(s, "PIO%c\t\t", 'A' + bank);
+ 	};
+ 	seq_printf(s, "\n\n");
+ 
+@@ -458,11 +669,10 @@ static int at91_gpio_show(struct seq_file *s, void *unused)
+ 			unsigned	mask = pin_to_mask(pin);
+ 
+ 			if (__raw_readl(pio + PIO_PSR) & mask)
+-				seq_printf(s, "GPIO:%s", __raw_readl(pio + PIO_PDSR) & mask ? "1" : "0");
++				gpio_printf(s, pio, mask);
+ 			else
+-				seq_printf(s, "%s", __raw_readl(pio + PIO_ABSR) & mask ? "B" : "A");
+-
+-			seq_printf(s, "\t");
++				seq_printf(s, "%c\t\t",
++						peripheral_function(pio, mask));
+ 		}
+ 
+ 		seq_printf(s, "\n");
+@@ -509,6 +719,11 @@ void __init at91_gpio_irq_setup(void)
+ 	unsigned		pioc, pin;
+ 	struct at91_gpio_chip	*this, *prev;
+ 
++	if (cpu_has_pio3())
++		gpio_irqchip.set_type = alt_gpio_irq_type;
++	else
++		gpio_irqchip.set_type = gpio_irq_type;
++
+ 	for (pioc = 0, pin = PIN_BASE, this = gpio_chip, prev = NULL;
+ 			pioc++ < gpio_banks;
+ 			prev = this, this++) {
+@@ -605,9 +820,8 @@ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 					   at91_get_gpio_value(pin) ?
+ 					   "set" : "clear");
+ 			else
+-				seq_printf(s, "[periph %s]\n",
+-					   __raw_readl(pio + PIO_ABSR) &
+-					   mask ? "B" : "A");
++				seq_printf(s, "[periph %c]\n",
++					   peripheral_function(pio, mask));
+ 		}
+ 	}
+ }
+diff --git a/arch/arm/mach-at91/include/mach/at91_pio.h b/arch/arm/mach-at91/include/mach/at91_pio.h
+index c6a31bf..732b11c 100644
+--- a/arch/arm/mach-at91/include/mach/at91_pio.h
++++ b/arch/arm/mach-at91/include/mach/at91_pio.h
+@@ -40,10 +40,35 @@
+ #define PIO_PUER	0x64	/* Pull-up Enable Register */
+ #define PIO_PUSR	0x68	/* Pull-up Status Register */
+ #define PIO_ASR		0x70	/* Peripheral A Select Register */
++#define PIO_ABCDSR1	0x70	/* Peripheral ABCD Select Register 1 [some sam9 only] */
+ #define PIO_BSR		0x74	/* Peripheral B Select Register */
++#define PIO_ABCDSR2	0x74	/* Peripheral ABCD Select Register 2 [some sam9 only] */
+ #define PIO_ABSR	0x78	/* AB Status Register */
++#define PIO_IFSCDR	0x80	/* Input Filter Slow Clock Disable Register */
++#define PIO_IFSCER	0x84	/* Input Filter Slow Clock Enable Register */
++#define PIO_IFSCSR	0x88	/* Input Filter Slow Clock Status Register */
++#define PIO_SCDR	0x8c	/* Slow Clock Divider Debouncing Register */
++#define		PIO_SCDR_DIV	(0x3fff <<  0)		/* Slow Clock Divider Mask */
++#define PIO_PPDDR	0x90	/* Pad Pull-down Disable Register */
++#define PIO_PPDER	0x94	/* Pad Pull-down Enable Register */
++#define PIO_PPDSR	0x98	/* Pad Pull-down Status Register */
+ #define PIO_OWER	0xa0	/* Output Write Enable Register */
+ #define PIO_OWDR	0xa4	/* Output Write Disable Register */
+ #define PIO_OWSR	0xa8	/* Output Write Status Register */
++#define PIO_AIMER	0xb0	/* Additional Interrupt Modes Enable Register */
++#define PIO_AIMDR	0xb4	/* Additional Interrupt Modes Disable Register */
++#define PIO_AIMMR	0xb8	/* Additional Interrupt Modes Mask Register */
++#define PIO_ESR		0xc0	/* Edge Select Register */
++#define PIO_LSR		0xc4	/* Level Select Register */
++#define PIO_ELSR	0xc8	/* Edge/Level Status Register */
++#define PIO_FELLSR	0xd0	/* Falling Edge/Low Level Select Register */
++#define PIO_REHLSR	0xd4	/* Rising Edge/ High Level Select Register */
++#define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
++#define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
++
++#define ABCDSR_PERIPH_A	0x0
++#define ABCDSR_PERIPH_B	0x1
++#define ABCDSR_PERIPH_C	0x2
++#define ABCDSR_PERIPH_D	0x3
+ 
+ #endif
+diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
+index ddeb645..18bec90 100644
+--- a/arch/arm/mach-at91/include/mach/gpio.h
++++ b/arch/arm/mach-at91/include/mach/gpio.h
+@@ -193,10 +193,15 @@
+ extern int __init_or_module at91_set_GPIO_periph(unsigned pin, int use_pullup);
+ extern int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup);
+ extern int __init_or_module at91_set_B_periph(unsigned pin, int use_pullup);
++extern int __init_or_module at91_set_C_periph(unsigned pin, int use_pullup);
++extern int __init_or_module at91_set_D_periph(unsigned pin, int use_pullup);
+ extern int __init_or_module at91_set_gpio_input(unsigned pin, int use_pullup);
+ extern int __init_or_module at91_set_gpio_output(unsigned pin, int value);
+ extern int __init_or_module at91_set_deglitch(unsigned pin, int is_on);
++extern int __init_or_module at91_set_debounce(unsigned pin, int is_on, int div);
+ extern int __init_or_module at91_set_multi_drive(unsigned pin, int is_on);
++extern int __init_or_module at91_set_pulldown(unsigned pin, int is_on);
++extern int __init_or_module at91_disable_schmitt_trig(unsigned pin);
+ 
+ /* callable@any time */
+ extern int at91_set_gpio_value(unsigned pin, int value);
 -- 
 1.7.4.1
