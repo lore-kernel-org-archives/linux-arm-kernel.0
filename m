@@ -1,100 +1,86 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Mar 2011 12:20:01 +0100
-Subject: [PATCH v2 3/3] ARM: S5P: Add support for common MIPI CSIS/DSIM
-	D-PHY control
-In-Reply-To: <002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
-References: <01a701cbd95d$9873c160$c95b4420$%kim@samsung.com>
-	<1299179061-30959-4-git-send-email-s.nawrocki@samsung.com>
-	<002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
-Message-ID: <4D78B3E1.6030506@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Mar 2011 20:29:08 +0900
+Subject: [PATCH v3 2/3] ARM: S5P: Extend MIPI-CSIS platform_data with the
+	PHY	control callback
+In-Reply-To: <1299755195-9055-3-git-send-email-s.nawrocki@samsung.com>
+References: <002601cbdead$0f1cb840$2d5628c0$%kim@samsung.com>
+	<1299755195-9055-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <008d01cbdf16$63de2ad0$2b9a8070$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2011 11:55 PM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
->>
->> Add common code for MIPI-CSIS and MIPI-DSIM drivers to support
->> their corresponding D-PHY's enable and reset control.
->> Tested with S5PV210 and EXYNOS4 SoCs.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos4/include/mach/regs-pmu.h   |    5 ++
->>  arch/arm/mach-s5pv210/include/mach/regs-clock.h |    5 +-
->>  arch/arm/plat-s5p/Kconfig                       |    5 ++
->>  arch/arm/plat-s5p/Makefile                      |    1 +
->>  arch/arm/plat-s5p/setup-mipi.c                  |   68
->> +++++++++++++++++++++++
->>  5 files changed, 83 insertions(+), 1 deletions(-)
->>  create mode 100644 arch/arm/plat-s5p/setup-mipi.c
+Sylwester Nawrocki wrote:
+> 
+> Extend MIPI-CSIS driver's platform data structure with a callback
+> for D-PHY enable and reset control. Also add a flag indicating
+> whether the external MIPI-CSI (VDD18_MIPI) power supply should
+> be managed in the driver through the "vdd" power supply. On some
+> boards this regulator may be a fixed voltage regulator without
+> an inhibit function.
+> 
+Grrr...you submitted same patch yesterday like following :(
+
+"[PATCH v2] ARM: S5P: Extend MIPI-CSIS platform_data with the PHY"
+http://marc.info/?l=linux-arm-kernel&m=129968557727858&w=2
+
 ...
->> diff --git a/arch/arm/plat-s5p/setup-mipi.c
-> b/arch/arm/plat-s5p/setup-mipi.c
->> new file mode 100644
->> index 0000000..4d8ae96
->> --- /dev/null
->> +++ b/arch/arm/plat-s5p/setup-mipi.c
-> 
-> I think, "setup-mipiphy.c" is more clearly :)
 
-OK.
-
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-s5p/include/plat/mipi_csis.h |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
 > 
->> @@ -0,0 +1,68 @@
->> +/*
->> + * Copyright (C) 2011 Samsung Electronics Co., Ltd
->> + *
->> + * S5P - Helper functions for MIPI-CSIS and MIPI-DSIM D-PHY control
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/io.h>
->> +#include <linux/spinlock.h>
->> +
->> +#ifdef CONFIG_ARCH_EXYNOS4
->> +#include <mach/regs-pmu.h>
->> +#else
->> +#include <mach/regs-clock.h>
->> +#endif
+> diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-
+> s5p/include/plat/mipi_csis.h
+> index eb3beab..bb4f396 100644
+> --- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
+> +++ b/arch/arm/plat-s5p/include/plat/mipi_csis.h
+> @@ -11,18 +11,33 @@
+>  #ifndef PLAT_S5P_MIPI_CSIS_H_
+>  #define PLAT_S5P_MIPI_CSIS_H_ __FILE__
 > 
-> How about following?
-> 
-> --- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-> @@ -160,7 +160,9 @@
->  #define S5P_CLKDIV_BUS_GPLR_SHIFT      (4)
->  #define S5P_CLKDIV_BUS_GPLR_MASK       (0x7 << S5P_CLKDIV_BUS_GPLR_SHIFT)
-> 
-> -/* Compatibility defines */
-> +/* Compatibility defines and inclusion */
+> +struct platform_device;
 > +
-> +#include <mach/regs-pmu.h>
-> 
->  #define S5P_EPLL_CON                   S5P_EPLL_CON0
-> 
-> Then, just adding regs-clock.h here.
-> 
-> +#include <mach/regs-clock.h>
-> 
+>  /**
+>   * struct s5p_platform_mipi_csis - platform data for S5P MIPI-CSIS driver
+>   * @clk_rate: bus clock frequency
+>   * @lanes: number of data lanes used
+>   * @alignment: data alignment in bits
+>   * @hs_settle: HS-RX settle time
+> + * @fixed_phy_vdd: set to 0 if the driver should be managing external
+> + *		   D-PHY power supply through the "vdd" regulator supply
+> + * @phy_enable: pointer to a callback controlling D-PHY enable/reset
+>   */
+>  struct s5p_platform_mipi_csis {
+>  	unsigned long clk_rate;
+>  	u8 lanes;
+>  	u8 alignment;
+>  	u8 hs_settle;
+> +	unsigned fixed_phy_vdd:1;
 
-Yeah, that should do the trick, thanks. At least for now it's fine.
-But I think the concept of having common code for peripherals and just
-different headers for register address offset definitions for various
-ARCH_S5P* need to be reconsidered to be able to build single image
-for a few SoCs.
++	bool fixed_phy_vdd:1;
 
->> +
->> +static int __s5p_mipi_phy_control(struct platform_device *pdev,
->> +				  bool on, u32 reset)
-...
+> +	int (*phy_enable)(struct platform_device *pdev, bool on);
+>  };
+> 
+> +/**
+> + * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
+> + * @pdev: MIPI-CSIS platform device
+> + * @on: true to enable D-PHY and deassert its reset
+> + *	false to disable D-PHY
+> + */
+> +int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
+> +
+>  #endif /* PLAT_S5P_MIPI_CSIS_H_ */
+> --
+> 1.7.4.1
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
