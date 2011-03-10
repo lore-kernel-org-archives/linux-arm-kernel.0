@@ -1,113 +1,206 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:38:04 +0530
-Subject: [PATCH v2 08/19] OMAP4: PM: CPU1 wakeup workaround from Low power
-	modes
+Date: Thu, 10 Mar 2011 19:38:09 +0530
+Subject: [PATCH v2 13/19] OMAP4: suspend: Add MPUSS RET and OFF support
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-9-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SGI(Software Generated Interrupts) are not wakeup capable from
-low power states. This is known limitation on OMAP4 and needs to be
-worked around by using software forced clockdomain wake-up. CPU0 forces
-the CPU1 clockdomain to software force wakeup. After the wakeup, CPU1
-restores its clockdomain hardware supervised mode.
+This patch adds MPUSS(MPU Sub System) RET and OFF mode support
+to suspend path. For both MPUSS RET and OFF support, CPUs are
+programmed to OFF state.
 
-More details can be found in OMAP4430 TRM - Version J
-Section :
-	4.3.4.2 Power States of CPU0 and CPU1
+Only MPUSS RET and OFF supported at this point of time. CORE RET
+will be added subsequently.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap-hotplug.c |    8 ++++++++
- arch/arm/mach-omap2/omap-smp.c     |   26 +++++++++++++++++++++++++-
- 2 files changed, 33 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap4-mpuss-lowpower.c |    6 ++-
+ arch/arm/mach-omap2/pm-debug.c             |    2 +
+ arch/arm/mach-omap2/pm.h                   |    1 +
+ arch/arm/mach-omap2/pm44xx.c               |   84 ++++++++++++++++++++++++++-
+ 4 files changed, 88 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-index 9f8f097..fe2dae1 100644
---- a/arch/arm/mach-omap2/omap-hotplug.c
-+++ b/arch/arm/mach-omap2/omap-hotplug.c
-@@ -23,6 +23,7 @@
- #include <mach/omap-wakeupgen.h>
+diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+index 026c955..7348d29 100644
+--- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
+@@ -25,7 +25,7 @@
+  *	ON(Inactive)	OFF		ON(Inactive)
+  *	OFF		OFF		CSWR
+  *	OFF		OFF		OSWR (*TBD)
+- *	OFF		OFF		OFF* (*TBD)
++ *	OFF		OFF		OFF
+  *	----------------------------------------------
+  *
+  * Note: CPU0 is the master core and it is the last CPU to go down
+@@ -293,6 +293,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	 * Check MPUSS next state and save GIC if needed
+ 	 * GIC lost during MPU OFF and OSWR
+ 	 */
++	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+ 	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+ 		omap_wakeupgen_save();
+ 		gic_save_context();
+@@ -414,6 +415,9 @@ int __init omap4_mpuss_init(void)
+ 		return -ENODEV;
+ 	}
+ 
++	/* Clear CPU previous power domain state */
++	pwrdm_clear_all_prev_pwrst(mpuss_pd);
++
+ 	/*
+ 	 * Find out how many interrupts are supported.
+ 	 * OMAP4 supports max of 128 SPIs where as GIC can support
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index a5a83b3..34f0e5d 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -588,6 +588,8 @@ static int option_set(void *data, u64 val)
+ 			omap_pm_disable_off_mode();
+ 		if (cpu_is_omap34xx())
+ 			omap3_pm_off_mode_enable(val);
++		else if (cpu_is_omap44xx())
++			omap4_pm_off_mode_enable(val);
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 797bfd1..ec5a36f 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -17,6 +17,7 @@
+ 
+ extern void *omap3_secure_ram_storage;
+ extern void omap3_pm_off_mode_enable(int);
++extern void omap4_pm_off_mode_enable(int);
+ extern void omap_sram_idle(void);
+ extern int omap3_can_sleep(void);
+ extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index d55a9b8..0d1f33a 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -1,8 +1,9 @@
+ /*
+  * OMAP4 Power Management Routines
+  *
+- * Copyright (C) 2010 Texas Instruments, Inc.
++ * Copyright (C) 2010-2011 Texas Instruments, Inc.
+  * Rajendra Nayak <rnayak@ti.com>
++ * Santosh Shilimkar <santosh.shilimkar@ti.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -20,6 +21,7 @@
  
  #include "powerdomain.h"
-+#include "clockdomain.h"
+ #include "clockdomain.h"
++#include "pm.h"
  
- int platform_cpu_kill(unsigned int cpu)
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+@@ -35,7 +37,48 @@ static LIST_HEAD(pwrst_list);
+ #ifdef CONFIG_SUSPEND
+ static int omap4_pm_suspend(void)
  {
-@@ -36,6 +37,10 @@ int platform_cpu_kill(unsigned int cpu)
- void platform_cpu_die(unsigned int cpu)
- {
- 	unsigned int this_cpu;
-+	static struct clockdomain *cpu1_clkdm;
+-	do_wfi();
++	struct power_state *pwrst;
++	int state, ret = 0;
++	u32 cpu_id = smp_processor_id();
 +
-+	if (!cpu1_clkdm)
-+		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
- 
- 	flush_cache_all();
- 	dsb();
-@@ -59,6 +64,9 @@ void platform_cpu_die(unsigned int cpu)
- 			 * OK, proper wakeup, we're done
- 			 */
- 			omap_wakeupgen_irqmask_all(this_cpu, 0);
++	/* Save current powerdomain state */
++	list_for_each_entry(pwrst, &pwrst_list, node) {
++		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
++	}
 +
-+			/* Restore clockdomain to hardware supervised */
-+			clkdm_allow_idle(cpu1_clkdm);
- 			break;
- 		}
- 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 4fcaa4a..1230c4e 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -25,6 +25,8 @@
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
- 
-+#include "clockdomain.h"
-+
- /* SCU base address */
- static void __iomem *scu_base;
- 
-@@ -54,6 +56,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	static struct clockdomain *cpu1_clkdm;
-+	static bool booted;
- 	/*
- 	 * Set synchronisation state between this boot processor
- 	 * and the secondary one
-@@ -69,7 +73,27 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
- 	flush_cache_all();
- 	smp_wmb();
--	smp_cross_call(cpumask_of(cpu), 1);
-+
-+	if (!cpu1_clkdm)
-+		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
++	/* Set targeted power domain states by suspend */
++	list_for_each_entry(pwrst, &pwrst_list, node) {
++		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
++	}
 +
 +	/*
-+	 * The SGI(Software Generated Interrupts) are not wakeup capable
-+	 * from low power states. This is known limitation on OMAP4 and
-+	 * needs to be worked around by using software forced clockdomain
-+	 * wake-up. To wakeup CPU1, CPU0 forces the CPU1 clockdomain to
-+	 * software force wakeup. After the wakeup, CPU1 restores its
-+	 * clockdomain hardware supervised mode.
-+	 * More details can be found in OMAP4430 TRM - Version J
-+	 * Section :
-+	 *	4.3.4.2 Power States of CPU0 and CPU1
++	 * For MPUSS to hit power domain retention(CSWR or OSWR),
++	 * CPU0 and CPU1 power domain needs to be in OFF or DORMANT
++	 * state. For MPUSS to reach off-mode. CPU0 and CPU1 power domain
++	 * should be in off state.
++	 * Only master CPU followes suspend path. All other CPUs follow
++	 * cpu-hotplug path in system wide suspend. On OMAP4, CPU power
++	 * domain CSWR is not supported by hardware.
++	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 +	 */
-+	if (booted) {
-+		clkdm_wakeup(cpu1_clkdm);
-+	} else {
-+		dsb_sev();
-+		booted = true;
++	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
++
++	/* Restore next powerdomain state */
++	list_for_each_entry(pwrst, &pwrst_list, node) {
++		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
++		if (state > pwrst->next_state) {
++			pr_info("Powerdomain (%s) didn't enter "
++			       "target state %d\n",
++			       pwrst->pwrdm->name, pwrst->next_state);
++			ret = -1;
++		}
++		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 +	}
++	if (ret)
++		pr_err("Could not enter target state in pm_suspend\n");
++	else
++		pr_err("Successfully put all powerdomains to target state\n");
++
+ 	return 0;
+ }
  
- 	/*
- 	 * Now the secondary core is starting up let it run its
+@@ -98,14 +141,47 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+ 	if (!pwrdm->pwrsts)
+ 		return 0;
+ 
++	/*
++	 * Skip CPU0 and CPU1 power domains. CPU1 is programmed
++	 * through hotplug path and CPU0 explicitly programmed
++	 * further down in the code path
++	 */
++	if ((!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
++		(!strcmp(pwrdm->name, "cpu1_pwrdm")))
++		return 0;
++
++	/*
++	 * FIXME: Remove this check when core retention is supported
++	 * Only MPUSS power domain is added in the list.
++	 */
++	if (strcmp(pwrdm->name, "mpu_pwrdm"))
++		return 0;
++
+ 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+ 	if (!pwrst)
+ 		return -ENOMEM;
++
+ 	pwrst->pwrdm = pwrdm;
+-	pwrst->next_state = PWRDM_POWER_ON;
++	pwrst->next_state = PWRDM_POWER_RET;
+ 	list_add(&pwrst->node, &pwrst_list);
+ 
+-	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
++	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
++}
++
++void omap4_pm_off_mode_enable(int enable)
++{
++	struct power_state *pwrst;
++	u32 state;
++
++	if (enable)
++		state = PWRDM_POWER_OFF;
++	else
++		state = PWRDM_POWER_RET;
++
++	list_for_each_entry(pwrst, &pwrst_list, node) {
++		pwrst->next_state = state;
++		omap_set_pwrdm_state(pwrst->pwrdm, state);
++	}
+ }
+ 
+ /**
 -- 
 1.6.0.4
