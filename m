@@ -1,43 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 9 Mar 2011 19:32:31 -0700 (MST)
-Subject: [PATCH] OMAP3: hwmod: remove incorrect SmartReflex -> L4 CORE
-	interconnect links
-Message-ID: <alpine.DEB.2.00.1103091931420.15132@utopia.booyaka.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 10 Mar 2011 10:41:37 +0800
+Subject: [PATCH] net/fec: check id_entry pointer before using it
+In-Reply-To: <20110309082601.GA3145@pengutronix.de>
+References: <1299639004-21546-1-git-send-email-jason.hui@linaro.org>
+	<20110309082601.GA3145@pengutronix.de>
+Message-ID: <AANLkTimMEup3ThmMpfGAWVTgsCSEyK=5Ke=+ZjJd169R@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Wolfram Sang,
 
-Commit d34427267186827dfd62bd8cf726601fffb22534 ("OMAP3: PM: Adding
-smartreflex hwmod data") added data that claims that the L4 CORE has
-two slave interfaces that originate from the SmartReflex modules,
-omap3_l4_core__sr1 and omap3_l4_core__sr2.  But as those two data
-structure records show, it's L4 CORE that has a master port towards
-SR1 and SR2.  Remove the incorrect data.
+2011/3/9 Wolfram Sang <w.sang@pengutronix.de>:
+> On Wed, Mar 09, 2011 at 10:50:04AM +0800, Jason Liu wrote:
+>> The id_entry will possibly be NULL, So, need check
+>> id_entry and make sure it not NULL before using it.
+>
+> When does it become NULL?
 
-Based on a patch by Beno?t Cousson <b-cousson@ti.com>:
+look at the code:drivers/base/platform.c
 
-    https://patchwork.kernel.org/patch/590561/
+static int platform_match(struct device *dev, struct device_driver *drv)
+{
+        struct platform_device *pdev = to_platform_device(dev);
+        struct platform_driver *pdrv = to_platform_driver(drv);
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Sanjeev Premi <premi@ti.com>
-Cc: Thara Gopinath <thara@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+        /* Attempt an OF style match first */
+        if (of_driver_match_device(dev, drv))
+                return 1;
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 8d81813..18b0dd4 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -304,8 +304,6 @@ static struct omap_hwmod_ocp_if omap3_l4_core__sr2 = {
- /* Slave interfaces on the L4_CORE interconnect */
- static struct omap_hwmod_ocp_if *omap3xxx_l4_core_slaves[] = {
- 	&omap3xxx_l3_main__l4_core,
--	&omap3_l4_core__sr1,
--	&omap3_l4_core__sr2,
- };
- 
- /* Master interfaces on the L4_CORE interconnect */
--- 
-1.7.2.3
+        /* Then try to match against the id table */
+        if (pdrv->id_table)
+                return platform_match_id(pdrv->id_table, pdev) != NULL;
+
+        /* fall-back to driver name match */
+        return (strcmp(pdev->name, drv->name) == 0);
+}
+
+If OF style match first succeed, the function will return and the
+pdev->id_entry will not get set and it's NULL.
+
+BR,
+Jason
+
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.10 (GNU/Linux)
+>
+> iEYEARECAAYFAk13OZkACgkQD27XaX1/VRsZgwCeKCNK0ufdrV2186pKO3jD9qfI
+> HcQAn1zZ+Rmv+rpHHQH9JNyMQitNQdXV
+> =Ha2Y
+> -----END PGP SIGNATURE-----
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
