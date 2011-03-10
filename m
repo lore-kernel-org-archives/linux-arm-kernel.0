@@ -1,34 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Mar 2011 13:37:52 +0900
-Subject: [PATCH 2/3] ARM: EXYNOS4: Suspend to RAM Support
-In-Reply-To: <20110309082319.GC605@n2100.arm.linux.org.uk>
-References: <1299636521-4831-1-git-send-email-jc.lee@samsung.com>
-	<1299636521-4831-3-git-send-email-jc.lee@samsung.com>
-	<20110309082319.GC605@n2100.arm.linux.org.uk>
-Message-ID: <006201cbdedc$efd42420$cf7c6c60$%kim@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  9 Mar 2011 20:44:31 -0800
+Subject: [PATCH 0/3] Peripheral image loader (PIL)
+Message-ID: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Wed, Mar 09, 2011 at 11:08:40AM +0900, Jaecheol Lee wrote:
-> > This patch adds support suspend to ram for EXYNOS4210.
-> > As a note, this includes function of outer cache flush
-> > because it is used before entering PM.
-> 
-> This should be updated to use the generic CPU sleep support, found in my
-> tree.
+These patches add support for PIL, a peripheral image loader.
+More details can be found in the third patch or the second
+patch's commit text.
 
-Russell, thanks :)
+Saravana Kannan (1):
+  msm: documentation: Add pil documentation
 
-Yeah it should be based on generic CPU sleep.
+Stephen Boyd (2):
+  msm: 8660: Add clock control regions to iomap
+  msm: Peripheral Image Loader (PIL) driver
 
-As I know, his second patch will be made based on it.
+ Documentation/arm/msm/pil.txt                      |  267 ++++++++++
+ arch/arm/mach-msm/Kconfig                          |   13 +
+ arch/arm/mach-msm/Makefile                         |    2 +
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |    8 +
+ arch/arm/mach-msm/include/mach/peripheral-loader.h |   23 +
+ arch/arm/mach-msm/io.c                             |    2 +
+ arch/arm/mach-msm/peripheral-loader.c              |  402 +++++++++++++++
+ arch/arm/mach-msm/peripheral-loader.h              |   38 ++
+ arch/arm/mach-msm/peripheral-reset.c               |  528 ++++++++++++++++++++
+ 9 files changed, 1283 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/arm/msm/pil.txt
+ create mode 100644 arch/arm/mach-msm/include/mach/peripheral-loader.h
+ create mode 100644 arch/arm/mach-msm/peripheral-loader.c
+ create mode 100644 arch/arm/mach-msm/peripheral-loader.h
+ create mode 100644 arch/arm/mach-msm/peripheral-reset.c
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
