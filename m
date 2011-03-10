@@ -1,16 +1,18 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 10 Mar 2011 09:09:37 +0100
+Date: Thu, 10 Mar 2011 09:17:00 +0100
 Subject: [PATCH] perf: add OMAP support for the new power events
-In-Reply-To: <878vwnvnvj.fsf@ti.com>
+In-Reply-To: <alpine.DEB.2.00.1103091759300.15132@utopia.booyaka.com>
 References: <1298052645-4164-1-git-send-email-j-pihet@ti.com>
 	<1299147943-2929-1-git-send-email-j-pihet@ti.com>
-	<878vwnvnvj.fsf@ti.com>
-Message-ID: <AANLkTikaQ69Rt9Q6vtm8F_S=qLftM=yqjrUcTqj2Rihm@mail.gmail.com>
+	<alpine.DEB.2.00.1103091759300.15132@utopia.booyaka.com>
+Message-ID: <AANLkTi=4PXfF9upXi4hJ5unVyhWSzLBdejbitydy2vpn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 1:08 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Jean Pihet <jean.pihet@newoldbits.com> writes:
+Hi Paul,
+
+On Thu, Mar 10, 2011 at 2:04 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Thu, 3 Mar 2011, Jean Pihet wrote:
 >
 >> The patch adds the new power management trace points for
 >> the OMAP architecture.
@@ -20,16 +22,6 @@ On Thu, Mar 10, 2011 at 1:08 AM, Kevin Hilman <khilman@ti.com> wrote:
 >> ? instrumented in the generic way there is no need to
 >> ? add trace points in the OMAP specific cpuidle handler;
 >> - cpufreq (DVFS),
->
-> Minor: AFAICT, this patch doesn't instrument CPUfreq.
-The generic framework provides a cpu_frequency event. Furthermore the
-clock_set_rate events are reporting the various SoC clock rate
-changes.
-Indeed the changelog is not accurate enough. Is '- cpufreq (DVFS)
-events are covered by the generic cpu_frequency events and the SoC
-clock changes events' better?
-
->
 >> - SoC clocks changes (enable, disable, set_rate),
 >> - power domain states: the desired target state and -if different-
 >> ? the actually hit state.
@@ -40,165 +32,27 @@ clock changes events' better?
 >>
 >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 >
-> With Paul's ack on the powerdomain changes, I'll queue this for 2.6.39
-> after making the above change in the changelog.
+> In terms of tracing powerdomain state changes, since OMAP powerdomains can
+> potentially transition without the MPU knowing about it, some powerdomain
+> transitions will be missed by these. ?(The software counters miss them
+> too.) ?The only way to be certain about these is to watch the debug
+> observability lines. ?Still, it is the rare board that brings out debobs
+> lines. ?So this seems reasonable, as long as people don't expect 100%
+> coverage.
+OK that is correct. The events are tracing SW events only, i.e. a
+trace is generated when a decision is made wrt next power states,
+clock changes etc.
+A remark: the OMAP4+ HW tracing modules do support the changes of
+power domains states. There definitely is more to come on that topic!
 
-Thanks!
+Thanks for reviewing!
 Jean
 
 >
-> Kevin
+> For the clock and powerdomain changes,
+>
+> Acked-by: Paul Walmsley <paul@pwsan.com>
 >
 >
->> ---
->> ?arch/arm/mach-omap2/clock.c ? ? ? | ? 11 +++++++++--
->> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? ?7 +++++++
->> ?arch/arm/mach-omap2/powerdomain.c | ? 26 +++++++++++++++++++++++---
->> ?3 files changed, 39 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->> index 46d03cc..180299e 100644
->> --- a/arch/arm/mach-omap2/clock.c
->> +++ b/arch/arm/mach-omap2/clock.c
->> @@ -22,7 +22,9 @@
->> ?#include <linux/clk.h>
->> ?#include <linux/io.h>
->> ?#include <linux/bitops.h>
->> +#include <trace/events/power.h>
->>
->> +#include <asm/cpu.h>
->> ?#include <plat/clock.h>
->> ?#include "clockdomain.h"
->> ?#include <plat/cpu.h>
->> @@ -261,8 +263,10 @@ void omap2_clk_disable(struct clk *clk)
->>
->> ? ? ? pr_debug("clock: %s: disabling in hardware\n", clk->name);
->>
->> - ? ? if (clk->ops && clk->ops->disable)
->> + ? ? if (clk->ops && clk->ops->disable) {
->> + ? ? ? ? ? ? trace_clock_disable(clk->name, 0, smp_processor_id());
->> ? ? ? ? ? ? ? clk->ops->disable(clk);
->> + ? ? }
->>
->> ? ? ? if (clk->clkdm)
->> ? ? ? ? ? ? ? clkdm_clk_disable(clk->clkdm, clk);
->> @@ -314,6 +318,7 @@ int omap2_clk_enable(struct clk *clk)
->> ? ? ? }
->>
->> ? ? ? if (clk->ops && clk->ops->enable) {
->> + ? ? ? ? ? ? trace_clock_enable(clk->name, 1, smp_processor_id());
->> ? ? ? ? ? ? ? ret = clk->ops->enable(clk);
->> ? ? ? ? ? ? ? if (ret) {
->> ? ? ? ? ? ? ? ? ? ? ? WARN(1, "clock: %s: could not enable: %d\n",
->> @@ -353,8 +358,10 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
->> ? ? ? pr_debug("clock: set_rate for clock %s to rate %ld\n", clk->name, rate);
->>
->> ? ? ? /* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
->> - ? ? if (clk->set_rate)
->> + ? ? if (clk->set_rate) {
->> + ? ? ? ? ? ? trace_clock_set_rate(clk->name, rate, smp_processor_id());
->> ? ? ? ? ? ? ? ret = clk->set_rate(clk, rate);
->> + ? ? }
->>
->> ? ? ? return ret;
->> ?}
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index bd610bc..d46b9ff 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -29,6 +29,7 @@
->> ?#include <linux/delay.h>
->> ?#include <linux/slab.h>
->> ?#include <linux/console.h>
->> +#include <trace/events/power.h>
->>
->> ?#include <plat/sram.h>
->> ?#include "clockdomain.h"
->> @@ -514,8 +515,14 @@ static void omap3_pm_idle(void)
->> ? ? ? if (omap_irq_pending() || need_resched())
->> ? ? ? ? ? ? ? goto out;
->>
->> + ? ? trace_power_start(POWER_CSTATE, 1, smp_processor_id());
->> + ? ? trace_cpu_idle(1, smp_processor_id());
->> +
->> ? ? ? omap_sram_idle();
->>
->> + ? ? trace_power_end(smp_processor_id());
->> + ? ? trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
->> +
->> ?out:
->> ? ? ? local_fiq_enable();
->> ? ? ? local_irq_enable();
->> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
->> index eaed0df..1495eed 100644
->> --- a/arch/arm/mach-omap2/powerdomain.c
->> +++ b/arch/arm/mach-omap2/powerdomain.c
->> @@ -19,12 +19,15 @@
->> ?#include <linux/list.h>
->> ?#include <linux/errno.h>
->> ?#include <linux/string.h>
->> +#include <trace/events/power.h>
->> +
->> ?#include "cm2xxx_3xxx.h"
->> ?#include "prcm44xx.h"
->> ?#include "cm44xx.h"
->> ?#include "prm2xxx_3xxx.h"
->> ?#include "prm44xx.h"
->>
->> +#include <asm/cpu.h>
->> ?#include <plat/cpu.h>
->> ?#include "powerdomain.h"
->> ?#include "clockdomain.h"
->> @@ -32,6 +35,8 @@
->>
->> ?#include "pm.h"
->>
->> +#define PWRDM_TRACE_STATES_FLAG ? ? ?(1<<31)
->> +
->> ?enum {
->> ? ? ? PWRDM_STATE_NOW = 0,
->> ? ? ? PWRDM_STATE_PREV,
->> @@ -130,8 +135,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
->> ?static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
->> ?{
->>
->> - ? ? int prev;
->> - ? ? int state;
->> + ? ? int prev, state, trace_state = 0;
->>
->> ? ? ? if (pwrdm == NULL)
->> ? ? ? ? ? ? ? return -EINVAL;
->> @@ -148,6 +152,17 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
->> ? ? ? ? ? ? ? ? ? ? ? pwrdm->state_counter[prev]++;
->> ? ? ? ? ? ? ? if (prev == PWRDM_POWER_RET)
->> ? ? ? ? ? ? ? ? ? ? ? _update_logic_membank_counters(pwrdm);
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* If the power domain did not hit the desired state,
->> + ? ? ? ? ? ? ?* generate a trace event with both the desired and hit states
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? if (state != prev) {
->> + ? ? ? ? ? ? ? ? ? ? trace_state = (PWRDM_TRACE_STATES_FLAG |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?((state & OMAP_POWERSTATE_MASK) << 8) |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?((prev & OMAP_POWERSTATE_MASK) << 0));
->> + ? ? ? ? ? ? ? ? ? ? trace_power_domain_target(pwrdm->name, trace_state,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? smp_processor_id());
->> + ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? break;
->> ? ? ? default:
->> ? ? ? ? ? ? ? return -EINVAL;
->> @@ -406,8 +421,13 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
->> ? ? ? pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
->> ? ? ? ? ? ? ? ?pwrdm->name, pwrst);
->>
->> - ? ? if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
->> + ? ? if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
->> + ? ? ? ? ? ? /* Trace the pwrdm desired target state */
->> + ? ? ? ? ? ? trace_power_domain_target(pwrdm->name, pwrst,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? smp_processor_id());
->> + ? ? ? ? ? ? /* Program the pwrdm desired target state */
->> ? ? ? ? ? ? ? ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
->> + ? ? }
->>
->> ? ? ? return ret;
->> ?}
+> - Paul
 >
