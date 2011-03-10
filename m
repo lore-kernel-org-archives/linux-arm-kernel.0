@@ -1,70 +1,56 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Mar 2011 19:38:03 +0530
-Subject: [PATCH v2 07/19] OMAP4: PM: Program CPU1 to hit OFF when off-lined
+Date: Thu, 10 Mar 2011 19:37:58 +0530
+Subject: [PATCH v2 02/19] OMAP4: Use WARN_ON() instead of BUG_ON() with
+	graceful exit
 In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1299766095-23879-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Program non-boot CPUs to hit lowest supported power state
-when it is off-lined using cpu hotplug framework.
+OMAP L2X0 and GIC initialisation code uses BUG_ON() for the
+ioremap() failure scenarios.
+
+Use WARN_ON() instead and allow graceful function exits.
+
+This was suggsted by Kevin Hilman <khilman@ti.com> during
+OMAP4 PM code review.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap-hotplug.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-index 4976b93..9f8f097 100644
---- a/arch/arm/mach-omap2/omap-hotplug.c
-+++ b/arch/arm/mach-omap2/omap-hotplug.c
-@@ -20,6 +20,9 @@
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 559d227..8f9b97d 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -36,11 +36,13 @@ void __init gic_init_irq(void)
  
- #include <asm/cacheflush.h>
- #include <mach/omap4-common.h>
-+#include <mach/omap-wakeupgen.h>
-+
-+#include "powerdomain.h"
+ 	/* Static mapping, never released */
+ 	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+-	BUG_ON(!gic_dist_base_addr);
++	if (WARN_ON(!gic_dist_base_addr))
++		return;
  
- int platform_cpu_kill(unsigned int cpu)
- {
-@@ -32,6 +35,8 @@ int platform_cpu_kill(unsigned int cpu)
-  */
- void platform_cpu_die(unsigned int cpu)
- {
-+	unsigned int this_cpu;
-+
- 	flush_cache_all();
- 	dsb();
+ 	/* Static mapping, never released */
+ 	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+-	BUG_ON(!gic_cpu_base);
++	if (WARN_ON(!gic_cpu_base))
++		return;
  
-@@ -39,18 +44,21 @@ void platform_cpu_die(unsigned int cpu)
- 	 * we're ready for shutdown now, so do it
- 	 */
- 	if (omap_modify_auxcoreboot0(0x0, 0x200) != 0x0)
--		printk(KERN_CRIT "Secure clear status failed\n");
-+		pr_err("Secure clear status failed\n");
+ 	omap_wakeupgen_init();
  
- 	for (;;) {
- 		/*
--		 * Execute WFI
-+		 * Enter into low power state
-+		 * clear all interrupt wakeup sources
- 		 */
--		do_wfi();
--
--		if (omap_read_auxcoreboot0() == cpu) {
-+		omap_wakeupgen_irqmask_all(cpu, 1);
-+		omap4_enter_lowpower(cpu, PWRDM_POWER_OFF);
-+		this_cpu = hard_smp_processor_id();
-+		if (omap_read_auxcoreboot0() == this_cpu) {
- 			/*
- 			 * OK, proper wakeup, we're done
- 			 */
-+			omap_wakeupgen_irqmask_all(this_cpu, 0);
- 			break;
- 		}
- 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
+@@ -68,7 +70,8 @@ static int __init omap_l2_cache_init(void)
+ 
+ 	/* Static mapping, never released */
+ 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+-	BUG_ON(!l2cache_base);
++	if (WARN_ON(!l2cache_base))
++		return -ENODEV;
+ 
+ 	/*
+ 	 * 16-way associativity, parity disabled
 -- 
 1.6.0.4
