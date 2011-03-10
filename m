@@ -1,81 +1,116 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 10 Mar 2011 19:25:44 +0530
-Subject: [PATCH] OMAP4: Intialize IVA Device in addition to DSP device.
-In-Reply-To: <fc1162b5d4e1a7deb77aa800a3e8fdb3@mail.gmail.com>
-References: <1299738148-28557-1-git-send-email-shweta.gulati@ti.com>
-	<fc1162b5d4e1a7deb77aa800a3e8fdb3@mail.gmail.com>
-Message-ID: <4D78D860.2050609@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Mar 2011 19:37:59 +0530
+Subject: [PATCH v2 03/19] OMAP4: PM: Export omap4_get_base*() rather than
+	global address pointers
+In-Reply-To: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1299766095-23879-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Few cosmetic comments follow:
-Vishwanath Sripathy wrote, on 03/10/2011 02:36 PM:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
->> kernel-bounces at lists.infradead.org] On Behalf Of Shweta Gulati
->> Sent: Thursday, March 10, 2011 11:52 AM
->> To: linux-omap at vger.kernel.org
->> Cc: Shweta Gulati; linux-arm-kernel at lists.infradead.org
->> Subject: [PATCH] OMAP4: Intialize IVA Device in addition to DSP device.
->>
->> OMAP4 has two different Devices IVA and DSP. DSP is bound
->> with MPU for DVFS and IVA has its own well defined OPPs.
-> DSP is not in MPU voltage domain. DSP(Tesla) and IVAHD are in the same
-> voltage domain. Pls correct this in the commit log.
-True for OMAP4 - DSP and MPU DVFS are independent, in OMAP3, they were 
-scaled together ;)
+This patch exports APIs to get base address for GIC
+distributor, CPU interface, SCU and PL310 L2 Cache which
+are used in OMAP4 PM code.
 
-[...]
->> This Patch adds IVA init to 'omap2_init_processor_devices'
->> and make sure that API 'omap2_set_init_voltage' is called
->> for apt dev pointer.
+This was suggested by Kevin Hilman <khilman@ti.com> during
+OMAP4 PM code review.
 
-set_init_voltage error is just one symptom of the problem. infact, if we 
-wanted to do anything with iva - e.g. dvfs, we would'nt have been able 
-to without the device being registered.
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/include/mach/omap4-common.h |   13 +++++++++++--
+ arch/arm/mach-omap2/omap-smp.c                  |    6 ++++++
+ arch/arm/mach-omap2/omap4-common.c              |   21 ++++++++++++++++++---
+ 3 files changed, 35 insertions(+), 5 deletions(-)
 
->>
->> It fixes Error logs:
-"This also fixes the following error seen during boot as 
-omap2_set_init_voltage can now find the iva device" is better than the 
-"This patch...."?
->>
->> 	omap2_set_init_voltage: Invalid parameters!
->> 	omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
-
-Thanks for catching and fixing this - I had noticed this in my SR 1.5 
-testing(should have posted as well), but had'nt tried to dig further.
-
->>
->> Tested on OMAP4430 SDP Board.
->> Baseline:
->> http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-
->> pm.git
->> Branch :pm-core
-Do you really want this information in commit log? I suggest you move 
-this to the diffstat section.
-
->>
->> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
->> ---
->>   arch/arm/mach-omap2/pm.c |    1 +
->>   1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
->> index 30af335..49486f5 100644
->> --- a/arch/arm/mach-omap2/pm.c
->> +++ b/arch/arm/mach-omap2/pm.c
->> @@ -89,6 +89,7 @@ static void omap2_init_processor_devices(void)
->>   	if (cpu_is_omap44xx()) {
->>   		_init_omap_device("l3_main_1",&l3_dev);
->>   		_init_omap_device("dsp",&dsp_dev);
->> +		_init_omap_device("iva",&iva_dev);
->>   	} else {
->>   		_init_omap_device("l3_main",&l3_dev);
->>   	}
-
-
-
+diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+index de441c0..106edef 100644
+--- a/arch/arm/mach-omap2/include/mach/omap4-common.h
++++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+@@ -25,11 +25,20 @@
+ #endif
+ 
+ #ifdef CONFIG_CACHE_L2X0
+-extern void __iomem *l2cache_base;
++extern void __iomem *omap4_get_l2cache_base(void);
+ #endif
+ 
+-extern void __iomem *gic_dist_base_addr;
++#ifdef CONFIG_SMP
++extern void __iomem *omap4_get_scu_base(void);
++#else
++static inline void __iomem *omap4_get_scu_base(void)
++{
++	return NULL;
++}
++#endif
+ 
++extern void __iomem *omap4_get_gic_dist_base(void);
++extern void __iomem *omap4_get_gic_cpu_base(void);
+ extern void __init gic_init_irq(void);
+ extern void omap_smc1(u32 fn, u32 arg);
+ 
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index b66cfe8..4fcaa4a 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -30,6 +30,12 @@ static void __iomem *scu_base;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
++
++void __iomem *omap4_get_scu_base(void)
++{
++	return scu_base;
++}
++
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+ {
+ 	/*
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 8f9b97d..fdacb9e 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -24,15 +24,25 @@
+ #include <mach/omap-wakeupgen.h>
+ 
+ #ifdef CONFIG_CACHE_L2X0
+-void __iomem *l2cache_base;
++static void __iomem *l2cache_base;
+ #endif
+ 
+-void __iomem *gic_dist_base_addr;
++static void __iomem *gic_dist_base_addr;
++static void __iomem *gic_cpu_base;
+ 
+ 
++void __iomem *omap4_get_gic_dist_base(void)
++{
++	return gic_dist_base_addr;
++}
++
++void __iomem *omap4_get_gic_cpu_base(void)
++{
++	return gic_cpu_base;
++}
++
+ void __init gic_init_irq(void)
+ {
+-	void __iomem *gic_cpu_base;
+ 
+ 	/* Static mapping, never released */
+ 	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+@@ -51,6 +61,11 @@ void __init gic_init_irq(void)
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 
++void __iomem *omap4_get_l2cache_base(void)
++{
++	return l2cache_base;
++}
++
+ static void omap4_l2x0_disable(void)
+ {
+ 	/* Disable PL310 L2 Cache controller */
 -- 
-Regards,
-Nishanth Menon
+1.6.0.4
