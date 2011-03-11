@@ -1,254 +1,48 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Fri, 11 Mar 2011 19:38:38 +0200
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <20110311154017.GD9995@trinity.fluff.org>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299846911-15782-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103111532.52393.arnd@arndb.de>
-	<20110311154017.GD9995@trinity.fluff.org>
-Message-ID: <20110311173838.GB7291@besouro.research.nokia.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 11 Mar 2011 18:57:47 +0100 (CET)
+Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
+In-Reply-To: <4D79A85D.8000301@codeaurora.org>
+References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
+	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
+	<alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
+	<4D770E47.6050402@codeaurora.org>
+	<alpine.LFD.2.00.1103101126100.2787@localhost6.localdomain6>
+	<4D79A85D.8000301@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1103111853480.2787@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 03:40:17PM +0000, ext Ben Dooks wrote:
-> On Fri, Mar 11, 2011 at 03:32:51PM +0100, Arnd Bergmann wrote:
-> > On Friday 11 March 2011, Maxime Coquelin wrote:
-> > > Common base to export System-on-Chip related informations through sysfs.
-> > > 
-> > > Creation of a "socinfo" directory under /sys/.
-> > > Creation of SoC information entries.
-> > > 
-> > > Signed-off-by: Maxime COQUELIN <maxime.coquelin-nonst@stericsson.com>
+On Thu, 10 Mar 2011, Abhijeet Dharmapurikar wrote:
+> Thomas Gleixner wrote:
+> > On Tue, 8 Mar 2011, Abhijeet Dharmapurikar wrote:
+> > > > ack is called before mask and it
+> > > > should never be called when the interrupt is masked.
+> > > I didnt quite understand this comment. handle_level_irq calls mask_ack
+> > > which
+> > > masks the interrupt and then acks it. In this case the ack is called after
+> > > the
 > > 
-> > I think it's better than the previous patch to create an
-> > artificial device in /sys/devices/system/socinfo, but I'd
-> > still prefer the information to be attached to a real device
-> > that represents the SOC, as I explained in the discussion with
-> > Linus Walleij.
+> > Indeed, sorry. So the right way to deal with that is to provide a
+> > mask_ack() callback which does it in the correct order for your
+> > HW. That way you avoid all the local state storage.
 > 
-> Why not create it under the cpu directory?
-
-I think it is mainly because people have strong opinion against
-merging/confusing soc data with cpu data.
-
->  
-> > You should definitely add Greg on Cc, as he's maintaining sysfs
-> > and certainly has an opininion here.
-> > 
-> > 	Arnd
-> > 
-> > > ---
-> > >  Documentation/ABI/testing/sysfs-socinfo |   16 ++++++
-> > >  drivers/base/Kconfig                    |    3 +
-> > >  drivers/base/Makefile                   |    1 +
-> > >  drivers/base/soc.c                      |   79 +++++++++++++++++++++++++++++++
-> > >  include/linux/sys_soc.h                 |   50 +++++++++++++++++++
-> > >  5 files changed, 149 insertions(+), 0 deletions(-)
-> > >  create mode 100644 Documentation/ABI/testing/sysfs-socinfo
-> > >  create mode 100644 drivers/base/soc.c
-> > >  create mode 100644 include/linux/sys_soc.h
-> > > 
-> > > diff --git a/Documentation/ABI/testing/sysfs-socinfo b/Documentation/ABI/testing/sysfs-socinfo
-> > > new file mode 100644
-> > > index 0000000..afd9da2
-> > > --- /dev/null
-> > > +++ b/Documentation/ABI/testing/sysfs-socinfo
-> > > @@ -0,0 +1,16 @@
-> > > +What:		/sys/socinfo
-> > > +Date:		March 2011
-> > > +contact:	Maxime Coquelin <maxime.coquelin-nonst@stericsson.com>
-> > > +Description:
-> > > +		The /sys/socinfo directory contains information about the
-> > > +		System-on-Chip.	It is only available if platform implements it.
-> > > +		This directory contains two kind of attributes :
-> > > +			- common attributes: 
-> > > +				* machine: the name of the machine.
-> > > +				* family: the family name of the SoC
-> > > +			- SoC-specific attributes: The SoC vendor can declare attributes
-> > > +			  to export some strings to user-space, like the serial-number for
-> > > +			  example.
-> > > +
-> > > +Users:
-> > > +		User-space applications which needs these kind of attributes.
-> > > diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> > > index d57e8d0..372ef3a 100644
-> > > --- a/drivers/base/Kconfig
-> > > +++ b/drivers/base/Kconfig
-> > > @@ -168,4 +168,7 @@ config SYS_HYPERVISOR
-> > >  	bool
-> > >  	default n
-> > >  
-> > > +config SYS_SOC
-> > > +	bool
-> > > +
-> > >  endmenu
-> > > diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> > > index 5f51c3b..f3bcfb3 100644
-> > > --- a/drivers/base/Makefile
-> > > +++ b/drivers/base/Makefile
-> > > @@ -18,6 +18,7 @@ ifeq ($(CONFIG_SYSFS),y)
-> > >  obj-$(CONFIG_MODULES)	+= module.o
-> > >  endif
-> > >  obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
-> > > +obj-$(CONFIG_SYS_SOC) += soc.o
-> > >  
-> > >  ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
-> > >  
-> > > diff --git a/drivers/base/soc.c b/drivers/base/soc.c
-> > > new file mode 100644
-> > > index 0000000..046b43b
-> > > --- /dev/null
-> > > +++ b/drivers/base/soc.c
-> > > @@ -0,0 +1,79 @@
-> > > +/*
-> > > + * Copyright (C) ST-Ericsson SA 2011
-> > > + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
-> > > + * License terms:  GNU General Public License (GPL), version 2
-> > > + */
-> > > +
-> > > +#include <linux/sysfs.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/init.h>
-> > > +#include <linux/stat.h>
-> > > +#include <linux/slab.h>
-> > > +#include <linux/sys_soc.h>
-> > > +
-> > > +struct kobject *soc_object;
-> > > +
-> > > +ssize_t show_soc_info(struct kobject *kobj,
-> > > +			struct kobj_attribute *attr, char *buf)
-> > > +{
-> > > +	struct sysfs_soc_info *si = container_of(attr,
-> > > +				struct sysfs_soc_info, attr);
-> > > +
-> > > +	if (si->info)
-> > > +		return sprintf(buf, "%s\n", si->info);
-> > > +
-> > > +	return si->get_info(buf, si);
-> > > +}
-> > 
-> > I think this can be simplified by just letting the soc
-> > register its own show method instead of the get_info function.
-> > 
-> > > +int __init register_sysfs_soc_info(struct sysfs_soc_info *info, int nb_info)
-> > > +{
-> > > +	int i, ret;
-> > > +
-> > > +	for (i = 0; i < nb_info; i++) {
-> > > +		ret = sysfs_create_file(soc_object, &info[i].attr.attr);
-> > > +		if (ret) {
-> > > +			for (i -= 1; i >= 0; i--)
-> > > +				sysfs_remove_file(soc_object, &info[i].attr.attr);
-> > > +			break;
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return ret;
-> > > +}
-> > > +
-> > > +static struct attribute *soc_attrs[] = {
-> > > +	NULL,
-> > > +};
-> > > +
-> > > +static struct attribute_group soc_attr_group = {
-> > > +	.attrs = soc_attrs,
-> > > +};
-> > > +
-> > > +int __init register_sysfs_soc(struct sysfs_soc_info *info, size_t num)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	soc_object = kobject_create_and_add("socinfo", NULL);
-> > > +	if (!soc_object) {
-> > > +		ret = -ENOMEM;
-> > > +		goto exit;
-> > > +	}
-> > > +
-> > > +	ret = sysfs_create_group(soc_object, &soc_attr_group);
-> > > +	if (ret)
-> > > +		goto kset_exit;
-> > > +
-> > > +	ret = register_sysfs_soc_info(info, num);
-> > > +	if (ret)
-> > > +		goto group_exit;
-> > > +
-> > > +	return 0;
-> > > +
-> > > +group_exit:
-> > > +	sysfs_remove_group(soc_object, &soc_attr_group);
-> > > +kset_exit:
-> > > +	kobject_put(soc_object);
-> > > +exit:
-> > > +	return ret;
-> > > +}
-> > > +
-> > > diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-> > > new file mode 100644
-> > > index 0000000..05e5529
-> > > --- /dev/null
-> > > +++ b/include/linux/sys_soc.h
-> > > @@ -0,0 +1,50 @@
-> > > +/*
-> > > + * Copyright (C) ST-Ericsson SA 2011
-> > > + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
-> > > + * License terms:  GNU General Public License (GPL), version 2
-> > > + */
-> > > +#ifndef __SYS_SOC_H
-> > > +#define __SYS_SOC_H
-> > > +
-> > > +#include <linux/kobject.h>
-> > > +
-> > > +/**
-> > > + * struct sys_soc_info - SoC exports related informations
-> > > + * @name: name of the export
-> > > + * @info: pointer on the key to export
-> > > + * @get_info: callback to retrieve key if info field is NULL
-> > > + * @attr: export's sysdev class attribute
-> > > + */
-> > > +struct sysfs_soc_info {
-> > > +	const char *info;
-> > > +	ssize_t (*get_info)(char *buf, struct sysfs_soc_info *);
-> > > +	struct kobj_attribute attr;
-> > > +};
-> > > +
-> > > +ssize_t show_soc_info(struct kobject *, struct kobj_attribute *, char *);
-> > > +
-> > > +#define SYSFS_SOC_ATTR_VALUE(_name, _value) {		\
-> > > +	.attr.attr.name = _name,			\
-> > > +	.attr.attr.mode = S_IRUGO,			\
-> > > +	.attr.show	= show_soc_info,		\
-> > > +	.info           = _value,			\
-> > > +}
-> > > +
-> > > +#define SYSFS_SOC_ATTR_CALLBACK(_name, _callback) {	\
-> > > +	.attr.attr.name = _name,			\
-> > > +	.attr.attr.mode = S_IRUGO,			\
-> > > +	.attr.show	= show_soc_info,		\
-> > > +	.get_info       = _callback,			\
-> > > +}
-> > > +
-> > > +/**
-> > > + * register_sys_soc - register the soc information
-> > > + * @name: name of the machine
-> > > + * @info: pointer on the info table to export
-> > > + * @num: number of info to export
-> > > + *
-> > > + * NOTE: This function must only be called once
-> > > + */
-> > > +int register_sysfs_soc(struct sysfs_soc_info *info, size_t num);
-> > > +
-> > > +#endif /* __SYS_SOC_H */
-> > > -- 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> -- 
-> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+> Yes however while updating the code I noticed that I would need to keep
+> account of all the interrupts enabled and all the interrupts marked wakeup.
+> This aids in switching to the wakeup set in the suspend callback and the
+> enabled set in the resume callback. I will update the resume callback to
+> enable the interrupts in irqs_allowed(the local state storage) in the next
+> patch (my current patch does not do that).
 > 
-> Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+> IOW I need to keep the local state storage.
 
--- 
-Eduardo Valentin
+Wrong. The interrupts are disabled and reenabled by the core code and
+not by some extra suspend/resume callbacks in your driver. The core
+checks those marked as IRQ_WAKE, the wake callback to the irq chip is
+only there if you need to set up some hardware register in order to
+make the wake functionality work. So again, you don't need local state
+as the core tracks the state for you.
+
+Thanks,
+
+	tglx
