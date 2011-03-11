@@ -1,42 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Mar 2011 08:32:24 -0800
-Subject: [GIT PULL] OMAP PM updates for 2.6.39
-In-Reply-To: <AANLkTimMsYhCqqRjcBDCMDT4=iTwBG_qLHWjuxVZTmXE@mail.gmail.com>
-	(Jean Pihet's message of "Fri, 11 Mar 2011 16:33:40 +0100")
-References: <87k4g6eakw.fsf@ti.com>
-	<AANLkTimMsYhCqqRjcBDCMDT4=iTwBG_qLHWjuxVZTmXE@mail.gmail.com>
-Message-ID: <87k4g5botj.fsf@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Mar 2011 16:33:01 -0000
+Subject: Single-stepping ARMv7 with KDB...
+In-Reply-To: <AANLkTimBAm-Eaordw-KSPnEycQYz2z4QM+Dc5nauLFxh@mail.gmail.com>
+References: <AANLkTimBAm-Eaordw-KSPnEycQYz2z4QM+Dc5nauLFxh@mail.gmail.com>
+Message-ID: <000501cbe009$fd53b4c0$f7fb1e40$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+Hi Andrei,
 
-> Hi Kevin,
->
-> On Fri, Mar 11, 2011 at 1:59 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Tony,
->>
->> Please pull the following OMAP PM related changes for the upcoming
->> 2.6.39 merge window.
->>
->> Kevin
->>
->> The following changes since commit a5abba989deceb731047425812d268daf7536575:
->>
->> ?Linux 2.6.38-rc8 (2011-03-07 21:09:37 -0800)
->>
->> are available in the git repository at:
->> ?ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.39/pm-misc
->
-> Waht about the following patch? IIUC it is scheduled for .39.
->
->     perf: add OMAP support for the new power events
->
+> I know that there has been a lot of work recently in cleaning -up
+> hardware single stepping / bp support, and from what I have seen this
+> has been to support user mode stepping. I'm sorry ahead of time if
+> someone already had done something to implement hardware single
+> stepping for kernel code. It would be great to be able to single-step
+> kernel code from KDB with the 'ss' command.
 
-I have another branch (for_2.6.39/pm-integration) that is based on
-Paul's integration branch and includes your perf patch.
+ARM now has support for hardware breakpoints and watchpoints using
+the new hw_breakpoint framework (which in turn is built on top of perf).
 
-Once Tony pulls Paul's integration branch, I will send Tony a 2nd pull
-request for this branch.
+On v7 debug with the co-processor interface (for example, Cortex-A9) we
+use mismatch breakpoints for single-stepping over a hit breakpoint before
+reinserting it again. For breakpoints inside the kernel, we require the
+debugger to register an `overflow handler' which must handle this
+single-stepping itself.
+ 
+x86 uses the hw_breakpoint framework for handling hardware breakpoints
+in KGDB (see kgdb_correct_hw_break for how it converts breakinfo
+structures into perf_events) so it might be possible to do something
+similar for single-step on ARM if we allow the kernel to specify that
+the breakpoint is to be a mismatch by poking the step_ctrl field in
+the arch_hw_breakpoint struct.
 
-Kevin
+> The other difficulty is handling ldrex/strex, since blindly stepping
+> over them will result in a persistent acquire failure (due to the
+> clrex in svc_exit), but this can be worked around by doing something
+> like -
+> 1) If next instruction is strex, we know it will fail. Wait for next
+> instruction.
+> 2) This is the instruction we want to put a matching bp on, but can't
+> do it now since we haven't run it yet, and we will
+>     just trip on it. Wait for next instruction.
+> 3) Set matching bp on prev instruction.
+> 4) Let the ldrex/strex code repeat itself. Hit the matching bp.
+> 5) Continue single-stepping.
+
+IIRC the powerpc code in GDB does something similar to this (actually, it
+looks ahead to try and find the store to pair with the load).
+
+Will
