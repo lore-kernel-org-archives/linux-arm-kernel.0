@@ -1,31 +1,73 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Mar 2011 18:24:36 +0100
-Subject: [RFC PATCHv2 2/2] ux500: Export U8500 SoC info through sysfs
-In-Reply-To: <AANLkTimghAL=mzY0EXoWL+64NB-fQfw8SvjVDOS0-RP9@mail.gmail.com>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299846911-15782-3-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<20110311141110.GS9351@game.jcrosoft.org>
-	<AANLkTimghAL=mzY0EXoWL+64NB-fQfw8SvjVDOS0-RP9@mail.gmail.com>
-Message-ID: <20110311172436.GA14548@game.jcrosoft.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Mar 2011 09:50:22 -0800
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 11 Mar 2011 22:56:41 +0530")
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+	<87d3lycu0h.fsf@ti.com>
+	<3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
+	<871v2dd58y.fsf@ti.com>
+	<f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com>
+Message-ID: <87k4g5a6n5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:20 Fri 11 Mar     , Linus Walleij wrote:
-> On Fri, Mar 11, 2011 at 3:11 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 13:35 Fri 11 Mar ? ? , Maxime Coquelin wrote:
-> >> ST-Ericsson's U8500 implementation.
-> >> Register sysfs SoC interface, and exports:
-> >> ? ? ? - Machine name
-> >> ? ? ? - Family name
-> >> ? ? ? - SoC ID
-> >> ? ? ? - Silicon process
-> >> ? ? ? - Silicon revision number.
-> > I propose some weeks ago exactly the same kind of patch
-> 
-> Could you tell which Subject: and mailing list so I can find it?
-> If it was private can you forward it to the list?
- 892   F Dec14 To linux-kernel [PATCH] base: add sysfs socs info
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Best Regards,
-J.
+> Kevin,
+>
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+>> arm-kernel-bounces at lists.infradead.org] On Behalf Of Kevin Hilman
+>> Sent: Friday, March 11, 2011 9:22 PM
+>> To: Santosh Shilimkar
+>> Cc: linux-omap at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; Rajendra Nayak
+>> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend,CPU-hotplug and
+>> CPUilde support.
+>>
+>
+> [....]
+>
+>> >
+>> > So just to summaries, on OMAP$ 'enable_off_mode' flag is
+>> > used __only__ in Suspend. CPUx power domain always hit OFF
+>> > mode no matter what is state of this flag because CSWR isn't
+>> > supported on these PD's.
+>>
+>> If it's useful only in suspend, then it's redundant with the
+>> <debugfs>/pm_debug/*_pwrdm/suspend controls which allow per-pwrdm
+>> control over next states.
+>>
+>> > We could remove this flag as well but thought that this might be
+>> > useful especially when we add CORE RET, DEVICE OFF support.
+>>
+>> I'd rather see working off-mode be a requirement for getting OMAP4
+>> drivers supported.
+>>
+>> Also, we can still test suspend/resume with off-mode disabled by
+>> using the above debugfs controls.
+>>
+>> > May be we keep this till the constraint frameworks comes in and
+>> > then drop it once for all. I am ok with whatever direction you
+>> > decide here.
+>>
+>> I prefer to drop it completely for OMAP4.
+>>
+> OK. Lets do that.
+>
+> Just to not miss your point here, what I understood here
+> is default suspend state on OMAP$B will be off mode.
+>
+> We still keep "enable_off_mode" flag for testing so that we
+> can disable off mode to debug regressions.
+>
+> Is that right?
+
+No, I want to drop "enable_off_mode" all together for OMAP4.
+
+If you want to change any powerdomain's default next_state, you can use
+the <debugfs>/pm_debug/*_pwrdm/suspend controls.
+
+Kevin
