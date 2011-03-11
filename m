@@ -1,63 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Mar 2011 07:56:19 -0800
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <49a5273c412bf9193a9f930e990d22d4@mail.gmail.com> (Santosh
-	Shilimkar's message of "Fri, 11 Mar 2011 18:01:12 +0530")
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-	<49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
-Message-ID: <87pqpxbqho.fsf@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Mar 2011 15:59:30 -0000
+Subject: [PATCH v3 0/7] Migrate GIC to fasteoi flow control
+In-Reply-To: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
+References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
+Message-ID: <000301cbe005$4ea20390$ebe60ab0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+* I wrote:
+ 
+> Hello,
+> 
+> This is version 3 of the patch series originally posted here:
+> 
+> v1.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043083.html
+> v2.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043984.html
+> 
+> Changes since v2:
+> 
+> 	* Added chained_irq_{enter,exit} functions to work with chained
+> 	  handlers that support multiple primary chips and to aid in
+> 	  bisectibility
+> 	* Based on 2.6.38-rc8
+> 
+> As a result of these changes, all of the BSP code has been reworked so
+> I'm afraid I need some fresh acks and tested-bys because the old ones
+> are no longer valid.
+> 
+> I appreciate there is some debate concerning the sanity of chained
+> handlers with potentially multiple primary chips, but I can't think of
+> a way to fix these without considering the handlers on a case-by-case
+> basis which is not the intent of this patch series.
 
-[...]
+Well, I've not had any feedback on this lot but I'd like to
+get the first patch merged so that the rest of it can go in
+easily with no ordering dependencies.
 
->> >
->> > This series doesn't boot on ES1 (boot log below.)  Do we need to
->> > totally prevent WFI on ES1?
->> >
-> Nope. WFI is ok.
-> The ES1.0 boot issue on pm-core branch doesn't seems to
-> be related to this series. Without this series as well
-> OMAP4 ES1.0 is not booting for me. When I disable
-> CONFIG_PM + WATCHDOG fix, it booted ok. I will
-> git-bisect this later on pm-core branch.
->
->> > Also, if we want a CPUidle enabled kernel to boot on all silicon,
->> > it will need a omap_rev() check during init to ensure it doesn't
->> > override the default idle path.
->> >
-> OMAP4 PM series already takes care of not overriding
-> the default idle path for ES1.0. The omap4_mpuss_init()
-> fails on ES1.0 and hence the CPUidle init is skipped in
-> that case.
->
-> Just to further check, I pulled the latest omap-for-linus
-> branch and merged Paul's pull-request into it. Then
-> applied OMAP4 PM series and I got a boot crash, a different
-> one. This was again related to clock-domain initialization
-> and static deps. I fixed this issue by avoiding omap4_pm_init()
-> code running on ES1.0. With this boot on ES1.0 works fine now
-> with OMAP4 PM series.
+Any comments on the first patch are more than welcome.
 
-Thanks for finding this.  I just tested your v3 branch together with my
-pm-core and it's now booting fine on ES1.
-
-Kevin
-
-> Posted the patch for the same.
-> https://patchwork.kernel.org/patch/628231/
->
->
-> The rebased series against
-> 	Latest 'omap-for-linus + Paul's pull-request'
-> have pushed to below branch.
->
-> git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-> omap4_pm_for-next_v3
->
-> Regards,
-> Santosh
+Will
