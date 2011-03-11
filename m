@@ -1,30 +1,45 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Mar 2011 00:09:28 +0000
-Subject: [PATCH 3/8] macb: convert printk to pr_ and friends
-In-Reply-To: <1299797284.20104.162.camel@Joe-Laptop>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-4-git-send-email-jamie@jamieiles.com>
-	<1299797284.20104.162.camel@Joe-Laptop>
-Message-ID: <20110311000928.GI6198@pulham.picochip.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 10 Mar 2011 16:41:00 -0800
+Subject: [PATCH] kbuild: reenable section mismatch analysis
+In-Reply-To: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110216200734.GA25184@merkur.ravnborg.org>
+	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110310164100.5af81e3b.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 02:48:04PM -0800, Joe Perches wrote:
-> On Thu, 2011-03-10 at 10:10 +0000, Jamie Iles wrote:
-> > macb is already using the dev_dbg() and friends helpers so use pr_foo()
-> > along with a pr_fmt() definition to make the printing a little cleaner.
-> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> 
-> Hi Jamie.
-> 
-> Because these conversions use a struct net_device,
-> they would be better as:
-> 
-> 	netdev_<foo>(struct net_device *dev, const char *fmt, ...)
+On Fri, 18 Feb 2011 21:47:20 +0100
+Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
 
-Ahh nice, I hadn't come across those before.  I'll update all of the 
-pr_* and dev_* statements to use the netdev variants.
+> This was disabled in commit
+> 
+> 	e5f95c8 (kbuild: print only total number of section mismatces found)
+> 
+> because there were too many warnings.  Now we're down to a reasonable
+> number again, so we start scaring people with the details.
+> 
+> Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  lib/Kconfig.debug |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
+> 
+> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+> index 2b97418..0f77ed1 100644
+> --- a/lib/Kconfig.debug
+> +++ b/lib/Kconfig.debug
+> @@ -102,11 +102,7 @@ config HEADERS_CHECK
+>  
+>  config DEBUG_SECTION_MISMATCH
+>  	bool "Enable full Section mismatch analysis"
+> -	depends on UNDEFINED || (BLACKFIN)
+>  	default y
+> -	# This option is on purpose disabled for now.
+> -	# It will be enabled when we are down to a reasonable number
+> -	# of section mismatch warnings (< 10 for an allyesconfig build)
+>  	help
+>  	  The section mismatch analysis checks if there are illegal
+>  	  references from one section to another section.
 
-Thanks for that!
+eaaaargh!  650 lines of crap added to my i386 allmodconfig build output.
 
-Jamie
+I'll be locally opting out of this one, thanks.
