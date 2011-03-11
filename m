@@ -1,39 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Mar 2011 23:13:15 +0100
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <20110311220333.GA30232@kroah.com>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103112242.43962.arnd@arndb.de>
-	<20110311220333.GA30232@kroah.com>
-Message-ID: <201103112313.16128.arnd@arndb.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 11 Mar 2011 23:13:51 +0100
+Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
+In-Reply-To: <201103112355.29081.anarsoul@gmail.com>
+References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
+	<201103112250.56967.marek.vasut@gmail.com>
+	<201103112355.29081.anarsoul@gmail.com>
+Message-ID: <201103112313.51491.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011 23:03:33 Greg KH wrote:
-> On Fri, Mar 11, 2011 at 10:42:43PM +0100, Arnd Bergmann wrote:
-> > On Friday 11 March 2011 20:33:30 Greg KH wrote:
-> > > Make this a "real" device not /sys/socinfo please.  It can be a platform
-> > > device that export the needed information, that way you can have
-> > > multiple ones.
+On Friday 11 March 2011 22:55:28 Vasily Khoruzhick wrote:
+> On Friday 11 March 2011 23:50:56 Marek Vasut wrote:
+> > On Friday 11 March 2011 22:49:13 Vasily Khoruzhick wrote:
+> > > On Friday 11 March 2011 23:42:30 Marek Vasut wrote:
+> > > > On Friday 11 March 2011 15:56:46 Vasily Khoruzhick wrote:
+> > > > > This patch is a part of similar mozzwald's patch which was
+> > > > > based on GPSFan and rkdavis work.
+> > > > 
+> > > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
+> > > > comment for this patch is irelevant and has zero information value.
+> > > 
+> > > Heh, I can add 'from Zipit Z2 community', I don't know their actual
+> > > names nor mail addresses.
 > > 
-> > Note that the version 1 of this patch had a device, and I argued against
-> > that patch on the basis that anything under /sys/devices/ should
-> > reflect an actual part of the hardware, which socinfo by itself
-> > does not.
+> > That's not the point. The point is the comment has zero value, it doesn't
+> > describe the change.
+> > 
+> > > > I also suspect, the pins on the back connector are USB UDC, not UHC
+> > > > ... aka. the hardware has no UHC.
+> > > 
+> > > They are UHC, check http://www.mozzwald.com/node/60
+> > 
+> > So it is compliant or is it a hack ?
 > 
-> Why is the overall SoC not a device?  cpus are (well, they will be in a
-> few kernel versions in the future), so what makes the other bits somehow
-> "special"?
+> PXA27x has OHCI (check datasheet), and it's wired to expansion connector,
+> so you can use it with self-powered USB devices (Zipit Z2 provides only
+> 3.3V on expansion connector). It's definitely not a hack.
 
-The suggestion was to have a single disconnected device stuck 
-in /sys/devices/system/socinfo, and only have it there to
-contain device attributes that can be collected from random
-places in the system, such hardcoded board specific data,
-or read from registers that belong to another device.
+This doesn't make me believe it's compliant. Besides, iirc the zipit hardware 
+wiki says it's only meant for UDC. The fact you can reconfigure it for UHC and 
+use it with a limited amount of devices if you're lucky makes me feel it's so 
+much of a hack.
 
-A real device IMHO would be one that has specific hardware
-properties, such as its own set of device registers or other
-devices that are attached to it and that are represented
-as children of this device.
-
-	Arnd
+> 
+> Regards
+> Vasily
