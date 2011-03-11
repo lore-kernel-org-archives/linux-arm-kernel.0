@@ -1,85 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 22:56:41 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <871v2dd58y.fsf@ti.com>
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
-	<871v2dd58y.fsf@ti.com>
-Message-ID: <f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Mar 2011 17:32:58 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
+	tables
+In-Reply-To: <20110309183507.GB11273@n2100.arm.linux.org.uk>
+References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
+	<20110215103127.GC4152@n2100.arm.linux.org.uk>
+	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
+	<20110215113242.GD4152@n2100.arm.linux.org.uk>
+	<20110215121437.GG4152@n2100.arm.linux.org.uk>
+	<AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
+	<20110309183507.GB11273@n2100.arm.linux.org.uk>
+Message-ID: <1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On Wed, 2011-03-09 at 18:35 +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 09, 2011 at 03:40:05PM +0000, Catalin Marinas wrote:
+> > The above call to tlb_add_flush() would only add a PAGE_SIZE. But
+> > since we free an entire PTE, shouldn't the range cover addr ..
+> > addr+PTRS_PER_PTE*PAGE_SIZE?
+> 
+> Why do we need to?  We're not flushing away the individual PTE entries
+> when we remove an entire page table - we will have already walked the
+> page table removing those entries, which will already have been added.
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Kevin Hilman
-> Sent: Friday, March 11, 2011 9:22 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Rajendra Nayak
-> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend,CPU-hotplug and
-> CPUilde support.
->
+Ah, I missed the fact that tlb_flush() invalidates the whole TLB when
+there is no tlb->vma (the shift_arg_pages case). We could optimise this
+to add the range covered by the PTE page and avoid the !tlb->vma check
+(and a flush_tlb_mm), though not sure it's worth.
 
-[....]
+> This code is to cover the case with LPAE where we need to flush out the
+> L1 entries.  It's nothing to do with the TLB itself.
 
-> >
-> > So just to summaries, on OMAP$ 'enable_off_mode' flag is
-> > used __only__ in Suspend. CPUx power domain always hit OFF
-> > mode no matter what is state of this flag because CSWR isn't
-> > supported on these PD's.
->
-> If it's useful only in suspend, then it's redundant with the
-> <debugfs>/pm_debug/*_pwrdm/suspend controls which allow per-pwrdm
-> control over next states.
->
-> > We could remove this flag as well but thought that this might be
-> > useful especially when we add CORE RET, DEVICE OFF support.
->
-> I'd rather see working off-mode be a requirement for getting OMAP4
-> drivers supported.
->
-> Also, we can still test suspend/resume with off-mode disabled by
-> using the above debugfs controls.
->
-> > May be we keep this till the constraint frameworks comes in and
-> > then drop it once for all. I am ok with whatever direction you
-> > decide here.
->
-> I prefer to drop it completely for OMAP4.
->
-OK. Lets do that.
+This would happen even with the classic page tables on Cortex-A15, L1
+entries are cached.
 
-Just to not miss your point here, what I understood here
-is default suspend state on OMAP$B will be off mode.
-
-We still keep "enable_off_mode" flag for testing so that we
-can disable off mode to debug regressions.
-
-Is that right?
-If yes then only below update is needed.
-
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 2e18c1d..1a8cbdd 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -167,7 +167,7 @@ static int __init pwrdms_setup(struct powerdomain
-*pwrdm, void *unused)
- 		return -ENOMEM;
-
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_POWER_RET;
-+	pwrst->next_state = PWRDM_POWER_OFF;
- 	list_add(&pwrst->node, &pwrst_list);
-
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-@@ -253,6 +253,8 @@ static int __init omap4_pm_init(void)
- 		pr_err("Failed to initialise OMAP4 MPUSS\n");
- 		goto err2;
- 	}
-+	
-+	enable_off_mode = 1;
- #endif
-
- #ifdef CONFIG_SUSPEND
+-- 
+Catalin
