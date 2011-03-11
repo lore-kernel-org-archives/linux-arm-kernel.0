@@ -1,199 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Mar 2011 18:13:05 +0100
-Subject: [PATCH] macb: detect IP version to determin if we are on at91 or avr32
-Message-ID: <1299863585-17263-1-git-send-email-plagnioj@jcrosoft.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Mar 2011 22:53:29 +0530
+Subject: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
+In-Reply-To: <1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
+References: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
+	<1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <6a989dbef4ba595858b7f5b5754d78ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will make macb soc generic and will allow to use it on other arch
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
+> Sent: Friday, March 11, 2011 10:38 PM
+> To: Todd Poynor
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
+>
+> On Wed, 2011-02-23 at 03:55 +0000, Todd Poynor wrote:
+> > Enable dynamic high level clock gating for Cortex-A9 CPUs, as
+> > described in 2.3.3 "Dynamic high level clock gating" of the
+> > Cortex-A9 TRM.  This may cut the clock of the integer core,
+> > system control block, and Data Engine in certain conditions.
+> >
+> > Add ARM errata 720791 to avoid corrupting the Jazelle
+> > instruction stream on earlier Cortex-A9 revisions.
+> >
+> > Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> > ---
+> > Can anyone advise whether this feature should be selectively
+> > enabled (or otherwise modified) due to secured register access,
+> > introduced latencies observed, etc.?
+> >
+> > This has been tested on a few Tegra 2 boards without problems
+> > observed thus far, and some preliminary testing indicates it
+> > may result in fairly significant power savings.  Any additional
+> > testing greatly appreciated.
+>
+> I haven't done any benchmarks on this, so can't comment on this.
+>
+> My view is that something like the boot monitor/firmware should set
+> this
+> up, though that's not always the case. On some OMAP boards Linux
+> runs in
+> non-secure mode and it will fault when trying to set this bit.
+>
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jamie Iles <jamie@jamieiles.com>
----
- drivers/net/macb.c |   96 +++++++++++++++++++++++++---------------------------
- drivers/net/macb.h |    9 +++++
- 2 files changed, 55 insertions(+), 50 deletions(-)
+Or this can be also enabled in the SOC PM initiliasation code
+instead of generic code so that the kernel is independent of
+boot loaders. Ofcourse downside to this is, every SOC will have
+this code duplicated.
 
-diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-index f251866..58cebf2 100644
---- a/drivers/net/macb.c
-+++ b/drivers/net/macb.c
-@@ -22,7 +22,6 @@
- #include <linux/phy.h>
- 
- #include <mach/board.h>
--#include <mach/cpu.h>
- 
- #include "macb.h"
- 
-@@ -1140,28 +1139,30 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&bp->lock);
- 
--#if defined(CONFIG_ARCH_AT91)
--	bp->pclk = clk_get(&pdev->dev, "macb_clk");
--	if (IS_ERR(bp->pclk)) {
--		dev_err(&pdev->dev, "failed to get macb_clk\n");
--		goto err_out_free_dev;
--	}
--	clk_enable(bp->pclk);
--#else
--	bp->pclk = clk_get(&pdev->dev, "pclk");
--	if (IS_ERR(bp->pclk)) {
--		dev_err(&pdev->dev, "failed to get pclk\n");
--		goto err_out_free_dev;
--	}
--	bp->hclk = clk_get(&pdev->dev, "hclk");
--	if (IS_ERR(bp->hclk)) {
--		dev_err(&pdev->dev, "failed to get hclk\n");
--		goto err_out_put_pclk;
--	}
-+	bp->version = macb_readl(bp, VERSION);
- 
--	clk_enable(bp->pclk);
--	clk_enable(bp->hclk);
--#endif
-+	if (macb_is_at91(bp)) {
-+		bp->pclk = clk_get(&pdev->dev, "macb_clk");
-+		if (IS_ERR(bp->pclk)) {
-+			dev_err(&pdev->dev, "failed to get macb_clk\n");
-+			goto err_out_free_dev;
-+		}
-+		clk_enable(bp->pclk);
-+	} else {
-+		bp->pclk = clk_get(&pdev->dev, "pclk");
-+		if (IS_ERR(bp->pclk)) {
-+			dev_err(&pdev->dev, "failed to get pclk\n");
-+			goto err_out_free_dev;
-+		}
-+		bp->hclk = clk_get(&pdev->dev, "hclk");
-+		if (IS_ERR(bp->hclk)) {
-+			dev_err(&pdev->dev, "failed to get hclk\n");
-+			goto err_out_put_pclk;
-+		}
-+
-+		clk_enable(bp->pclk);
-+		clk_enable(bp->hclk);
-+	}
- 
- 	bp->regs = ioremap(regs->start, regs->end - regs->start + 1);
- 	if (!bp->regs) {
-@@ -1191,18 +1192,17 @@ static int __init macb_probe(struct platform_device *pdev)
- 	macb_get_hwaddr(bp);
- 	pdata = pdev->dev.platform_data;
- 
--	if (pdata && pdata->is_rmii)
--#if defined(CONFIG_ARCH_AT91)
--		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)) );
--#else
--		macb_writel(bp, USRIO, 0);
--#endif
--	else
--#if defined(CONFIG_ARCH_AT91)
--		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
--#else
--		macb_writel(bp, USRIO, MACB_BIT(MII));
--#endif
-+	if (pdata && pdata->is_rmii) {
-+		if (macb_is_at91(bp))
-+			macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
-+		else
-+			macb_writel(bp, USRIO, 0);
-+	} else {
-+		if (macb_is_at91(bp))
-+			macb_writel(bp, USRIO, MACB_BIT(CLKEN));
-+		else
-+			macb_writel(bp, USRIO, MACB_BIT(MII));
-+	}
- 
- 	bp->tx_pending = DEF_TX_RING_PENDING;
- 
-@@ -1245,14 +1245,12 @@ err_out_unregister_netdev:
- err_out_iounmap:
- 	iounmap(bp->regs);
- err_out_disable_clocks:
--#ifndef CONFIG_ARCH_AT91
--	clk_disable(bp->hclk);
--	clk_put(bp->hclk);
--#endif
-+	if (!macb_is_at91(bp)) {
-+		clk_disable(bp->hclk);
-+		clk_put(bp->hclk);
-+	}
- 	clk_disable(bp->pclk);
--#ifndef CONFIG_ARCH_AT91
- err_out_put_pclk:
--#endif
- 	clk_put(bp->pclk);
- err_out_free_dev:
- 	free_netdev(dev);
-@@ -1278,10 +1276,10 @@ static int __exit macb_remove(struct platform_device *pdev)
- 		unregister_netdev(dev);
- 		free_irq(dev->irq, dev);
- 		iounmap(bp->regs);
--#ifndef CONFIG_ARCH_AT91
--		clk_disable(bp->hclk);
--		clk_put(bp->hclk);
--#endif
-+		if (!macb_is_at91(bp)) {
-+			clk_disable(bp->hclk);
-+			clk_put(bp->hclk);
-+		}
- 		clk_disable(bp->pclk);
- 		clk_put(bp->pclk);
- 		free_netdev(dev);
-@@ -1299,9 +1297,8 @@ static int macb_suspend(struct platform_device *pdev, pm_message_t state)
- 
- 	netif_device_detach(netdev);
- 
--#ifndef CONFIG_ARCH_AT91
--	clk_disable(bp->hclk);
--#endif
-+	if (!macb_is_at91(bp))
-+		clk_disable(bp->hclk);
- 	clk_disable(bp->pclk);
- 
- 	return 0;
-@@ -1313,9 +1310,8 @@ static int macb_resume(struct platform_device *pdev)
- 	struct macb *bp = netdev_priv(netdev);
- 
- 	clk_enable(bp->pclk);
--#ifndef CONFIG_ARCH_AT91
--	clk_enable(bp->hclk);
--#endif
-+	if (!macb_is_at91(bp))
-+		clk_enable(bp->hclk);
- 
- 	netif_device_attach(netdev);
- 
-diff --git a/drivers/net/macb.h b/drivers/net/macb.h
-index d3212f6..56a4fcb 100644
---- a/drivers/net/macb.h
-+++ b/drivers/net/macb.h
-@@ -59,6 +59,7 @@
- #define MACB_TPQ				0x00bc
- #define MACB_USRIO				0x00c0
- #define MACB_WOL				0x00c4
-+#define MACB_VERSION				0x00fc
- 
- /* Bitfields in NCR */
- #define MACB_LB_OFFSET				0
-@@ -389,6 +390,14 @@ struct macb {
- 	unsigned int 		link;
- 	unsigned int 		speed;
- 	unsigned int 		duplex;
-+
-+	uint32_t		version;
- };
- 
-+#define MACB_VERSION_MASK	0xffff0000
-+#define macb_is_at91(bp)	\
-+	(((bp)->version & MACB_VERSION_MASK) == 0x06010000)
-+#define macb_is_avr32(bp)	\
-+	(((bp)->version & MACB_VERSION_MASK) == 0x00010000)
-+
- #endif /* _MACB_H */
--- 
-1.7.4.1
+Regards,
+Santosh
