@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Mar 2011 12:50:51 +0100
-Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
-References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
-	<201103101552.15536.arnd@arndb.de>
-	<002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
-Message-ID: <201103111250.51252.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Mar 2011 17:26:41 +0530
+Subject: [PATCH] OMAP4: PM: Avoid omap4_pm_init() on OMAP4430 ES1.0
+Message-ID: <1299844601-13248-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011, Marek Szyprowski wrote:
-> 
-> We followed the style of iommu API for other mainline ARM platforms (both OMAP and MSM
-> also have custom API for their iommu modules). I've briefly checked include/linux/iommu.h
-> API and I've noticed that it has been designed mainly for KVM support. There is also
-> include/linux/intel-iommu.h interface, but I it is very specific to intel gfx chips.
+On OMAP4430 ES1.0, Power Management features are not supported.
+Avoid omap4_pm_init() on ES1.0 silicon so that we can continue
+to use same kernel binary to boot on all OMAP4 silicons.
 
-The MSM code actually uses the generic iommu.h code, using register_iommu, so
-the drivers can use the regular iommu_map.
+The ES1.0 boot failure with OMAP4 PM series was because of
+the clockdomain initialisation code. Hardware supervised
+clockdomain mode isn't functional for all clockdomains
+on OMAP4430 ES1.0 silicon so avoid the same.
 
-I believe the omap code predates the iommu API, and should really be changed
-to use that. At least it was added before I started reviewing the code.
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reported-by: Kevin Hilman <khilman@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+Patch applies on top of OMAP4 PM series
 
-The iommu API is not really meant to be KVM specific, it's just that the
-in-tree users are basically limited to KVM at the moment. Another user that
-is coming up soon is the vmio device driver that can be used to transparently
-pass devices to user space. The idea behind the IOMMU API is that you can
-map arbitrary bus addresses to physical memory addresses, but it does not
-deal with allocating the bus addresses or providing buffer management such
-as cache flushes.
+ arch/arm/mach-omap2/pm44xx.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-> Is there any example how include/linux/dma-mapping.h interface can be used for iommu
-> mappings?
-
-The dma-mapping API is the normal interface that you should use for IOMMUs
-that sit between DMA devices and kernel memory. The idea is that you
-completely abstract the concept of an IOMMU so the device driver uses
-the same code for talking to a device with an IOMMU and another device with
-a linear mapping or an swiotlb bounce buffer.
-
-This means that the user of the dma-mapping API does not get to choose the
-bus addresses, but instead you use the API to get a bus address for a
-chunk of memory, and then you can pass that address to a device.
-
-See arch/powerpc/kernel/iommu.c and arch/x86/kernel/amd_iommu.c for common
-examples of how this is implemented. The latter one actually implements
-both the iommu_ops for iommu.h and dma_map_ops for dma-mapping.h.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index e887a5d..2e18c1d 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -203,6 +203,11 @@ static int __init omap4_pm_init(void)
+ 	if (!cpu_is_omap44xx())
+ 		return -ENODEV;
+ 
++	if (omap_rev() == OMAP4430_REV_ES1_0) {
++		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
++		return -ENODEV;
++	}
++
+ 	pr_err("Power Management for TI OMAP4.\n");
+ 
+ #ifdef CONFIG_PM
+-- 
+1.6.0.4
