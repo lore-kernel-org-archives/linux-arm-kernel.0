@@ -1,18 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 11 Mar 2011 12:17:04 +0000
-Subject: [PATCH RFC] arm: mini2440: Fix uda134x codec problem.
-In-Reply-To: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
-References: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <20110311121704.GF1760@opensource.wolfsonmicro.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 11 Mar 2011 15:19:43 +0300
+Subject: [PATCH] can : AM3517EVM : add platform specific init
+In-Reply-To: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
+References: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <4D7A135F.5030004@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2011 at 09:46:20PM +0100, Marek Belisko wrote:
-> ASoC audio for mini2440 platform in current kenrel doesn't work.
-> First problem is samsung_asoc_dma device is missing in initialization.
-> Next problem is with codec. Codec is initialized but never probed
+Hello.
 
-Applied, thanks.  With changes like this you should really split things
-up into a small patch series - if you ever find yourself writing
-"Next problem..." or "Also..." then going on to describe a separate
-change that's a sign that you should be writing a separate patch.
+On 10-03-2011 19:39, Abhilash K V wrote:
+
+> CAN module on AM3517 requires programming of IO expander
+> as part of init sequence. Added transceiver_switch
+> callback to handle this.
+
+> Signed-off-by: Sriramakrishnan<srk@ti.com>
+> Reviewed-by:  Vaibhav Hiremath<hvaibhav@ti.com>
+> Signed-off-by: Abhilash K V<abhilash.kv@ti.com>
+> ---
+>   arch/arm/mach-omap2/board-am3517evm.c |   18 ++++++++++++++++++
+>   1 files changed, 18 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+> index 2e4aad2..782d72d 100644
+> --- a/arch/arm/mach-omap2/board-am3517evm.c
+> +++ b/arch/arm/mach-omap2/board-am3517evm.c
+> @@ -734,6 +734,23 @@ static struct omap_board_mux board_mux[] __initdata = {
+>   };
+>   #endif
+>
+> +/*
+> + * HECC information
+> + */
+> +
+> +#define CAN_STB         214
+> +static void hecc_phy_control(int on)
+> +{
+> +        int r;
+> +
+> +        r = gpio_request(CAN_STB, "can_stb");
+> +        if (r) {
+> +                printk(KERN_ERR "failed to get can_stb \n");
+
+    Have you run the patch thru checkpatch.pl? IIRC, it warns about spaces 
+before '\n'...
+
+WBR, Sergei
