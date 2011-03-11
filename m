@@ -1,61 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Mar 2011 08:47:53 -0800
-Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
-In-Reply-To: <4D7A22F6.5050806@ti.com> (Rajendra Nayak's message of "Fri, 11
-	Mar 2011 18:56:14 +0530")
-References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
-	<4D775418.6050105@ti.com>
-	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
-	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>
-	<4D7A22F6.5050806@ti.com>
-Message-ID: <871v2dbo3q.fsf@ti.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Fri, 11 Mar 2011 17:57:59 +0100
+Subject: [PATCH] can : AM3517EVM : add platform specific init
+In-Reply-To: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
+References: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <4D7A5497.4070801@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+On 03/10/2011 05:39 PM, Abhilash K V wrote:
+> CAN module on AM3517 requires programming of IO expander
+> as part of init sequence. Added transceiver_switch
+> callback to handle this.
+> 
+> Signed-off-by: Sriramakrishnan <srk@ti.com>
+> Reviewed-by:  Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-am3517evm.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+> index 2e4aad2..782d72d 100644
+> --- a/arch/arm/mach-omap2/board-am3517evm.c
+> +++ b/arch/arm/mach-omap2/board-am3517evm.c
+> @@ -734,6 +734,23 @@ static struct omap_board_mux board_mux[] __initdata = {
+>  };
+>  #endif
+>  
+> +/*
+> + * HECC information
+> + */
+> +
+> +#define CAN_STB         214
+> +static void hecc_phy_control(int on)
+> +{
+> +        int r;
+> +
+> +        r = gpio_request(CAN_STB, "can_stb");
+> +        if (r) {
+> +                printk(KERN_ERR "failed to get can_stb \n");
+> +                return;
+> +        }
+> +
+> +        gpio_direction_output(CAN_STB, (on==1)?0:1);
+> +}
 
-[...]
+This function is called ony *any* ifconfig up and down request. I would
+expect gpio_request() will return -EBUSY when it's called more than once.
 
->>
->> It's also breaking boot on OMAP35xx BeagleBoard rev C2.  The kernel
->> boot messages are below - omap2plus_defconfig + DEBUG_LL.  Reverting
->> the patch fixes it.  Could you please take a look?
->
-> I got hold of a Beagle, a sticker on which says rev C1D.
-> Not sure if there is a better way to identify the rev, but
-> this one seems to boot fine for me even with this patch.
-> I just applied this one patch on top of the the tag
-> 'integration-2.6.39-20110310-008' of git://git.pwsan.com/linux-
-> integration.
-
-In the process of testing Santosh's OMAP4 PM series (which includes
-$SUBJECT patch) on OMAP3, I also noticed some problems on beagle (mine
-is a C3.)
-
-Specifially, with $SUBJECT patch applied, none of the powerdomains ever
-reach inactive or RET during idle (suspend seems to work fine.)
-
-Just reverting $SUBJECT patch makes things go back to working normally.
-
-I pushed the test branch I used which is a merge of Santosh's v3 branch
-with my pm branch (branch: tmp/santosh-omap4-pm)
-
-I tested by first doing a suspend test and confirming all the
-powerdomains hit retention.  That worked fine.  Then I did an idle test:
-
-  echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout               
-  echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout               
-  echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout               
-  echo 1 > /debug/pm_debug/sleep_while_idle
-
-and waited for the UARTs to timeout.
-
-Well after the UART timeouts expired, I do not see any powerdomains
-transitioning from ON.
-
-What's even more strange is that the same thing is working fine on all
-the other OMAP3 platforms I tested: 3430/n900, 3630/zoom3 and even a
-different 3530-based platform, the OMAP3EVM.
-
-Kevin
+Wolfgang.
