@@ -1,32 +1,38 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 11 Mar 2011 12:23:42 +0200
-Subject: [PATCH 7/8] ARM: PXA: Z2: Keep kbd backlight disabled by default
+Date: Fri, 11 Mar 2011 12:23:43 +0200
+Subject: [PATCH 8/8] ARM: PXA: Z2: Add default triggers for LEDs
 In-Reply-To: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
 References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1299839023-16601-7-git-send-email-anarsoul@gmail.com>
+Message-ID: <1299839023-16601-8-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It eats too much power, and anyway it's not usefull
-during boot process. Userspace can enable it later.
+So user can see if there's any mmc activity and if device's
+charging.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-pxa/z2.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/z2.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index d1e40ba..2fac54d 100644
+index 2fac54d..7314a79 100644
 --- a/arch/arm/mach-pxa/z2.c
 +++ b/arch/arm/mach-pxa/z2.c
-@@ -210,7 +210,7 @@ static struct platform_pwm_backlight_data z2_backlight_data[] = {
- 		/* Keypad Backlight */
- 		.pwm_id		= 1,
- 		.max_brightness	= 1023,
--		.dft_brightness	= 512,
-+		.dft_brightness	= 0,
- 		.pwm_period_ns	= 1260320,
- 	},
- 	[1] = {
+@@ -315,12 +315,12 @@ struct gpio_led z2_gpio_leds[] = {
+ 	.active_low		= 1,
+ }, {
+ 	.name			= "z2:green:charged",
+-	.default_trigger	= "none",
++	.default_trigger	= "mmc0",
+ 	.gpio			= GPIO85_ZIPITZ2_LED_CHARGED,
+ 	.active_low		= 1,
+ }, {
+ 	.name			= "z2:amber:charging",
+-	.default_trigger	= "none",
++	.default_trigger	= "Z2-charging-or-full",
+ 	.gpio			= GPIO83_ZIPITZ2_LED_CHARGING,
+ 	.active_low		= 1,
+ },
 -- 
 1.7.4.1
