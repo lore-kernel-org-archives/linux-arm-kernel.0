@@ -1,46 +1,42 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 11 Mar 2011 11:20:48 +0200
-Subject: [PATCH 2/4] ARM: PXA: PXAFB: Fix plane Z-ordering problem
+Date: Fri, 11 Mar 2011 11:20:49 +0200
+Subject: [PATCH 3/4] ARM: PXA: PXAFB: Fix typo in ypos assignment
 In-Reply-To: <1299835250-11095-1-git-send-email-anarsoul@gmail.com>
 References: <201103060030.59584.anarsoul@gmail.com>
 	<1299835250-11095-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1299835250-11095-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <1299835250-11095-3-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxafb_overlay_init is not right place to change Z-ordering,
-move it to main plane initialization.
+Sascha Hauer <s.hauer@pengutronix.de> pointed that
+ypos takes value of xpos due to typo.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/video/pxafb.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/video/pxafb.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index 0764759..e2f643e 100644
+index e2f643e..a3bdcc1 100644
 --- a/drivers/video/pxafb.c
 +++ b/drivers/video/pxafb.c
-@@ -952,8 +952,6 @@ static void __devinit pxafb_overlay_init(struct pxafb_info *fbi)
- 	/* mask all IU/BS/EOF/SOF interrupts */
- 	lcd_writel(fbi, LCCR5, ~0);
+@@ -761,7 +761,7 @@ static int overlayfb_check_var(struct fb_var_screeninfo *var,
+ 	int xpos, ypos, pfor, bpp;
  
--	/* place overlay(s) on top of base */
--	fbi->lccr0 |= LCCR0_OUC;
- 	pr_info("PXA Overlay driver loaded successfully!\n");
- }
+ 	xpos = NONSTD_TO_XPOS(var->nonstd);
+-	ypos = NONSTD_TO_XPOS(var->nonstd);
++	ypos = NONSTD_TO_YPOS(var->nonstd);
+ 	pfor = NONSTD_TO_PFOR(var->nonstd);
  
-@@ -1843,6 +1841,12 @@ static struct pxafb_info * __devinit pxafb_init_fbinfo(struct device *dev)
+ 	bpp = pxafb_var_to_bpp(var);
+@@ -842,7 +842,7 @@ static int overlayfb_set_par(struct fb_info *info)
  
- 	pxafb_decode_mach_info(fbi, inf);
+ 	bpp  = pxafb_var_to_bpp(var);
+ 	xpos = NONSTD_TO_XPOS(var->nonstd);
+-	ypos = NONSTD_TO_XPOS(var->nonstd);
++	ypos = NONSTD_TO_YPOS(var->nonstd);
+ 	pfor = NONSTD_TO_PFOR(var->nonstd);
  
-+#ifdef CONFIG_FB_PXA_OVERLAY
-+	/* place overlay(s) on top of base */
-+	if (pxafb_overlay_supported())
-+		fbi->lccr0 |= LCCR0_OUC;
-+#endif
-+
- 	init_waitqueue_head(&fbi->ctrlr_wait);
- 	INIT_WORK(&fbi->task, pxafb_task);
- 	mutex_init(&fbi->ctrlr_lock);
+ 	ofb->control[0] = OVLxC1_PPL(var->xres) | OVLxC1_LPO(var->yres) |
 -- 
 1.7.4.1
