@@ -1,27 +1,60 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 11 Mar 2011 15:49:53 +0200
-Subject: [PATCH v2 0/2] OMAP: Overo: Add gpio-leds and gpio-keys support
-In-Reply-To: <1299715686-3920-1-git-send-email-steve@sakoman.com>
-References: <1299715686-3920-1-git-send-email-steve@sakoman.com>
-Message-ID: <1299851393.2479.12.camel@deskari>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 11 Mar 2011 13:53:35 +0000
+Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
+In-Reply-To: <20110311133713.GQ9351@game.jcrosoft.org>
+References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
+	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
+	<4D78CCBC.2010807@atmel.com>
+	<20110310131724.GG6198@pulham.picochip.com>
+	<20110311014140.GI9351@game.jcrosoft.org>
+	<20110311085605.GK6198@pulham.picochip.com>
+	<20110311125246.GL9351@game.jcrosoft.org>
+	<20110311132536.GE7357@pulham.picochip.com>
+	<20110311133713.GQ9351@game.jcrosoft.org>
+Message-ID: <20110311135335.GG7357@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-09 at 18:08 -0600, Steve Sakoman wrote:
-> Overo COMs and expansion boards have three LEDS and 2 push button switches
-> connected to GPIO pins.  This patch series adds support for utilizing
-> them with gpio-keys and gpio-leds.
-> 
-> Changes from version 1: Guard gpio_leds assignment with CONFIG_LEDS_GPIO check
-> 
-> Steve Sakoman (2):
->   OMAP: Add gpio-leds support for Overo
->   OMAP: Add gpio-keys support for Overo
-> 
->  arch/arm/mach-omap2/board-overo.c |   95 +++++++++++++++++++++++++++++++++++++
->  1 files changed, 95 insertions(+), 0 deletions(-)
-> 
+On Fri, Mar 11, 2011 at 02:37:13PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 13:25 Fri 11 Mar     , Jamie Iles wrote:
+> > On Fri, Mar 11, 2011 at 01:52:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 08:56 Fri 11 Mar     , Jamie Iles wrote:
+> > > > On Fri, Mar 11, 2011 at 02:41:40AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > keep as we need to remove the #ifdef AT91 to cpu_is
+> > > > > 
+> > > > > I've patch for this
+> > > > 
+> > > > Is this for the user IO register where the value written is conditional 
+> > > > on both RMII/MII and arch type?
+> > > yes for 
+> > > 
+> > > #if defined(CONFIG_ARCH_AT91)
+> > > 		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
+> > > #else
+> > > 		macb_writel(bp, USRIO, 0);
+> > > #endif
+> > > 	else
+> > > #if defined(CONFIG_ARCH_AT91)
+> > > 		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
+> > > #else
+> > > 		macb_writel(bp, USRIO, MACB_BIT(MII));
+> > > #endif
+> > 
+> > Ok, but what about non-AT91/AVR32 systems?  They may not have a 
+> > mach/cpu.h and won't have cpu_is_foo() for the platforms the driver is 
+> > interested in.
+> > 
+> > Could we supply these values in the platform data so the driver doesn't 
+> > need to do any cpu_is_ magic?
+>
+> for other arch you can but at91 I prefer to avoid this copy and paste in every
+> soc
 
-Thanks, I'll take these to my tree.
+Ok, just so I'm clear, you want to be able to set the USRIO register 
+based on a cpu_is_foo() test which requires mach/cpu.h to be included.  
 
- Tomi
+For other architectures we may not have mach/cpu.h and the cpu_is_foo() 
+macros, so we'd still need to protect all of that with "#ifdef 
+CONFIG_ARCH_AT91" tests.  Is that okay?
+
+Jamie
