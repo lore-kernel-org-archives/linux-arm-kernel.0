@@ -1,45 +1,40 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 11 Mar 2011 22:35:09 +0100
-Subject: [PATCH 3/4] ARM: PXA: PXAFB: Fix typo in ypos assignment
-In-Reply-To: <1299835250-11095-3-git-send-email-anarsoul@gmail.com>
-References: <201103060030.59584.anarsoul@gmail.com>
-	<1299835250-11095-1-git-send-email-anarsoul@gmail.com>
-	<1299835250-11095-3-git-send-email-anarsoul@gmail.com>
-Message-ID: <201103112235.09581.marek.vasut@gmail.com>
+Date: Fri, 11 Mar 2011 22:36:14 +0100
+Subject: [PATCH v2] z2-battery: Fix count of properties
+In-Reply-To: <1299848972-25596-1-git-send-email-anarsoul@gmail.com>
+References: <4D7A1181.2000802@ru.mvista.com>
+	<1299848972-25596-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201103112236.14261.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011 10:20:49 Vasily Khoruzhick wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> pointed that
-> ypos takes value of xpos due to typo.
-
-You can mark this patch a resend if it already went through LAKML :)
-
+On Friday 11 March 2011 14:09:32 Vasily Khoruzhick wrote:
+> PROP_STATUS property was not counted, as result
+> VOLTAGE_MIN property is missing in sysfs. Fix it.
 > 
 > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+
+You can have my:
+
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+
+on this one.
 > ---
->  drivers/video/pxafb.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> v2: Align comment properly
 > 
-> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index e2f643e..a3bdcc1 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -761,7 +761,7 @@ static int overlayfb_check_var(struct fb_var_screeninfo
-> *var, int xpos, ypos, pfor, bpp;
+>  drivers/power/z2_battery.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
->  	xpos = NONSTD_TO_XPOS(var->nonstd);
-> -	ypos = NONSTD_TO_XPOS(var->nonstd);
-> +	ypos = NONSTD_TO_YPOS(var->nonstd);
->  	pfor = NONSTD_TO_PFOR(var->nonstd);
+> diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
+> index 81304c0..2a9ab89 100644
+> --- a/drivers/power/z2_battery.c
+> +++ b/drivers/power/z2_battery.c
+> @@ -134,6 +134,8 @@ static int z2_batt_ps_init(struct z2_charger *charger,
+> int props) enum power_supply_property *prop;
+>  	struct z2_battery_info *info = charger->info;
 > 
->  	bpp = pxafb_var_to_bpp(var);
-> @@ -842,7 +842,7 @@ static int overlayfb_set_par(struct fb_info *info)
-> 
->  	bpp  = pxafb_var_to_bpp(var);
->  	xpos = NONSTD_TO_XPOS(var->nonstd);
-> -	ypos = NONSTD_TO_XPOS(var->nonstd);
-> +	ypos = NONSTD_TO_YPOS(var->nonstd);
->  	pfor = NONSTD_TO_PFOR(var->nonstd);
-> 
->  	ofb->control[0] = OVLxC1_PPL(var->xres) | OVLxC1_LPO(var->yres) |
+> +	if (info->charge_gpio >= 0)
+> +		props++;	/* POWER_SUPPLY_PROP_STATUS */
+>  	if (info->batt_tech >= 0)
+>  		props++;	/* POWER_SUPPLY_PROP_TECHNOLOGY */
+>  	if (info->batt_I2C_reg >= 0)
