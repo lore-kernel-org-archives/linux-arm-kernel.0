@@ -1,51 +1,41 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Fri, 11 Mar 2011 17:57:59 +0100
-Subject: [PATCH] can : AM3517EVM : add platform specific init
-In-Reply-To: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
-References: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
-Message-ID: <4D7A5497.4070801@grandegger.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Mar 2011 16:56:43 -0000
+Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for
+	chained handlers
+In-Reply-To: <alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
+References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
+	<1299604405-12960-2-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
+Message-ID: <000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2011 05:39 PM, Abhilash K V wrote:
-> CAN module on AM3517 requires programming of IO expander
-> as part of init sequence. Added transceiver_switch
-> callback to handle this.
+> On Tue, 8 Mar 2011, Will Deacon wrote:
 > 
-> Signed-off-by: Sriramakrishnan <srk@ti.com>
-> Reviewed-by:  Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/mach-omap2/board-am3517evm.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
+> > Some chained IRQ handlers are written to cope with primary chips of
+> > potentially different flow types. Whether this a sensible thing to do
+> > is a point of contention.
 > 
-> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-> index 2e4aad2..782d72d 100644
-> --- a/arch/arm/mach-omap2/board-am3517evm.c
-> +++ b/arch/arm/mach-omap2/board-am3517evm.c
-> @@ -734,6 +734,23 @@ static struct omap_board_mux board_mux[] __initdata = {
->  };
->  #endif
->  
-> +/*
-> + * HECC information
-> + */
-> +
-> +#define CAN_STB         214
-> +static void hecc_phy_control(int on)
-> +{
-> +        int r;
-> +
-> +        r = gpio_request(CAN_STB, "can_stb");
-> +        if (r) {
-> +                printk(KERN_ERR "failed to get can_stb \n");
-> +                return;
-> +        }
-> +
-> +        gpio_direction_output(CAN_STB, (on==1)?0:1);
-> +}
+> That wants a comment that these functions are only dealing with
+> fasteoi and level type flow control.
+> 
+> Otherwise fine with me. Feel free to add my Acked-by.
 
-This function is called ony *any* ifconfig up and down request. I would
-expect gpio_request() will return -EBUSY when it's called more than once.
+Thanks Thomas, reworded as followed:
 
-Wolfgang.
+    ARM: irq: introduce entry and exit functions for chained handlers
+    
+    Some chained IRQ handlers are written to cope with primary chips of
+    potentially different flow types. Whether this a sensible thing to do
+    is a point of contention.
+    
+    This patch introduces entry/exit functions for chained handlers which
+    infer the flow type of the primary chip as fasteoi or level-type by
+    checking whether or not the ->irq_eoi function pointer is present and
+    calling back to the primary chip as necessary. Other methods of flow
+    control are not considered.
+
+I'll add your Ack and put this (patch 1) in Russell's patch system next
+week.
+
+Will
