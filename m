@@ -1,60 +1,43 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Mar 2011 13:53:35 +0000
-Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
-In-Reply-To: <20110311133713.GQ9351@game.jcrosoft.org>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
-	<4D78CCBC.2010807@atmel.com>
-	<20110310131724.GG6198@pulham.picochip.com>
-	<20110311014140.GI9351@game.jcrosoft.org>
-	<20110311085605.GK6198@pulham.picochip.com>
-	<20110311125246.GL9351@game.jcrosoft.org>
-	<20110311132536.GE7357@pulham.picochip.com>
-	<20110311133713.GQ9351@game.jcrosoft.org>
-Message-ID: <20110311135335.GG7357@pulham.picochip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Mar 2011 15:07:59 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <000001cbdfe8$ce444b20$6acce160$%szyprowski@samsung.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103111250.51252.arnd@arndb.de>
+	<000001cbdfe8$ce444b20$6acce160$%szyprowski@samsung.com>
+Message-ID: <201103111507.59825.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 02:37:13PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:25 Fri 11 Mar     , Jamie Iles wrote:
-> > On Fri, Mar 11, 2011 at 01:52:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 08:56 Fri 11 Mar     , Jamie Iles wrote:
-> > > > On Fri, Mar 11, 2011 at 02:41:40AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > keep as we need to remove the #ifdef AT91 to cpu_is
-> > > > > 
-> > > > > I've patch for this
-> > > > 
-> > > > Is this for the user IO register where the value written is conditional 
-> > > > on both RMII/MII and arch type?
-> > > yes for 
-> > > 
-> > > #if defined(CONFIG_ARCH_AT91)
-> > > 		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
-> > > #else
-> > > 		macb_writel(bp, USRIO, 0);
-> > > #endif
-> > > 	else
-> > > #if defined(CONFIG_ARCH_AT91)
-> > > 		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
-> > > #else
-> > > 		macb_writel(bp, USRIO, MACB_BIT(MII));
-> > > #endif
-> > 
-> > Ok, but what about non-AT91/AVR32 systems?  They may not have a 
-> > mach/cpu.h and won't have cpu_is_foo() for the platforms the driver is 
-> > interested in.
-> > 
-> > Could we supply these values in the platform data so the driver doesn't 
-> > need to do any cpu_is_ magic?
->
-> for other arch you can but at91 I prefer to avoid this copy and paste in every
-> soc
+On Friday 11 March 2011, Marek Szyprowski wrote:
+> > The iommu API is not really meant to be KVM specific, it's just that the
+> > in-tree users are basically limited to KVM at the moment. Another user that
+> > is coming up soon is the vmio device driver that can be used to transparently
+> > pass devices to user space. The idea behind the IOMMU API is that you can
+> > map arbitrary bus addresses to physical memory addresses, but it does not
+> > deal with allocating the bus addresses or providing buffer management such
+> > as cache flushes.
+> 
+> Yea, I've noticed this and this basically what we expect from iommu driver. 
+> However the iommu.h API requires a separate call to map each single memory page.
+> This is quite ineffective approach and imho the API need to be extended to allow
+> mapping of the arbitrary set of pages.
 
-Ok, just so I'm clear, you want to be able to set the USRIO register 
-based on a cpu_is_foo() test which requires mach/cpu.h to be included.  
+We can always discuss extensions to the existing infrastructure, adding
+an interface for mapping an array of page pointers in the iommu API
+sounds like a good idea.
 
-For other architectures we may not have mach/cpu.h and the cpu_is_foo() 
-macros, so we'd still need to protect all of that with "#ifdef 
-CONFIG_ARCH_AT91" tests.  Is that okay?
+I also think that we should not really have separate iommu and dma-mapping
+interfaces, but rather have a portable way to define an iommu so that it
+can be used through the dma-mapping interfaces. I'm not asking you to
+do that as a prerequisite to merging your driver, but it may be good to
+keep in mind that the current situation is still lacking and that any
+suggestion for improving this as part of your work to support the
+samsung IOMMU is welcome.
 
-Jamie
+Note that the ARM implementation of the dma-mapping.h interface currently
+does not support IOMMUs, but that could be changed by wrapping it
+using the include/asm-generic/dma-mapping-common.h infrastructure.
+
+	Arnd
