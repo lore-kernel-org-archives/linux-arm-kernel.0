@@ -1,37 +1,60 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Mar 2011 13:47:57 +0100
-Subject: [PATCH 2/8] macb: detect hclk presence from platform data
-In-Reply-To: <20110311085443.GJ6198@pulham.picochip.com>
+Date: Fri, 11 Mar 2011 13:52:46 +0100
+Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
+In-Reply-To: <20110311085605.GK6198@pulham.picochip.com>
 References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-3-git-send-email-jamie@jamieiles.com>
-	<20110311014400.GJ9351@game.jcrosoft.org>
-	<20110311085443.GJ6198@pulham.picochip.com>
-Message-ID: <20110311124757.GK9351@game.jcrosoft.org>
+	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
+	<4D78CCBC.2010807@atmel.com>
+	<20110310131724.GG6198@pulham.picochip.com>
+	<20110311014140.GI9351@game.jcrosoft.org>
+	<20110311085605.GK6198@pulham.picochip.com>
+Message-ID: <20110311125246.GL9351@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:54 Fri 11 Mar     , Jamie Iles wrote:
-> On Fri, Mar 11, 2011 at 02:44:00AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 10:10 Thu 10 Mar     , Jamie Iles wrote:
-> > > +#ifdef CONFIG_ARCH_AT91
-> > > +#define PCLK_NAME	"macb_clk"
-> > > +#else /* CONFIG_ARCH_AT91 */
-> > > +#define PCLK_NAME	"pclk"
-> > > +#endif
+On 08:56 Fri 11 Mar     , Jamie Iles wrote:
+> On Fri, Mar 11, 2011 at 02:41:40AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 13:17 Thu 10 Mar     , Jamie Iles wrote:
+> > > On Thu, Mar 10, 2011 at 02:06:04PM +0100, Nicolas Ferre wrote:
+> > > > On 3/10/2011 11:10 AM, Jamie Iles :
+> > > > > --- a/drivers/net/macb.c
+> > > > > +++ b/drivers/net/macb.c
+> > > > > @@ -18,12 +18,10 @@
+> > > > >  #include <linux/netdevice.h>
+> > > > >  #include <linux/etherdevice.h>
+> > > > >  #include <linux/dma-mapping.h>
+> > > > > +#include <linux/platform_data/macb.h>
+> > > > >  #include <linux/platform_device.h>
+> > > > >  #include <linux/phy.h>
+> > > > >  
+> > > > > -#include <mach/board.h>
+> > > > > -#include <mach/cpu.h>
+> > > > 
+> > > > I did not bouble check but do we need no more cpu_is_ macros?
+> > > 
+> > > No, I couldn't see any in there and it builds for all of the AT91 
+> > > targets and all of the AVR32 ones that I tried.  I can't see any macros 
+> > > in there that are likely to use cpu_is_* internally either.
+> >
+> > keep as we need to remove the #ifdef AT91 to cpu_is
 > > 
-> > we need change the clock name and avoid the ifdef
-> > so this will be generic
-> > 
-> > nb I work on the switch to clkdev currently for avr32 and at91
+> > I've patch for this
 > 
-> This should be gone now.  Russell made the suggestion to have a fake clk 
-> for hclk on AT91 so I think I've solved that now.  There's an updated 
-> patch in my reply to Russell's message but essentially I'm using 
-> at91_clock_associate() to turn "macb_pclk" into "hclk" and "pclk".  Does 
-> this seem reasonable?
-please do not use at91_clock_associate as I'm going to remove it as use static
-clock as done on shmobile as example
-so if it's a fake clock please as ochi_clk on 9g45
+> Is this for the user IO register where the value written is conditional 
+> on both RMII/MII and arch type?
+yes for 
+
+#if defined(CONFIG_ARCH_AT91)
+		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
+#else
+		macb_writel(bp, USRIO, 0);
+#endif
+	else
+#if defined(CONFIG_ARCH_AT91)
+		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
+#else
+		macb_writel(bp, USRIO, MACB_BIT(MII));
+#endif
 
 Best Regards,
 J.
