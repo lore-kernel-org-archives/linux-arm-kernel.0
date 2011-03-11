@@ -1,49 +1,41 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 11 Mar 2011 15:19:43 +0300
-Subject: [PATCH] can : AM3517EVM : add platform specific init
-In-Reply-To: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
-References: <1299775153-16766-1-git-send-email-abhilash.kv@ti.com>
-Message-ID: <4D7A135F.5030004@ru.mvista.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Fri, 11 Mar 2011 13:23:37 +0100
+Subject: [PATCH RFC] arm: mini2440: Fix uda134x codec problem.
+In-Reply-To: <20110311121704.GF1760@opensource.wolfsonmicro.com>
+References: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
+	<20110311121704.GF1760@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTintYQ=qO3PALBL-bkiYKQFw0+JiW3=-oZmkRhZ1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 10-03-2011 19:39, Abhilash K V wrote:
-
-> CAN module on AM3517 requires programming of IO expander
-> as part of init sequence. Added transceiver_switch
-> callback to handle this.
-
-> Signed-off-by: Sriramakrishnan<srk@ti.com>
-> Reviewed-by:  Vaibhav Hiremath<hvaibhav@ti.com>
-> Signed-off-by: Abhilash K V<abhilash.kv@ti.com>
-> ---
->   arch/arm/mach-omap2/board-am3517evm.c |   18 ++++++++++++++++++
->   1 files changed, 18 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-> index 2e4aad2..782d72d 100644
-> --- a/arch/arm/mach-omap2/board-am3517evm.c
-> +++ b/arch/arm/mach-omap2/board-am3517evm.c
-> @@ -734,6 +734,23 @@ static struct omap_board_mux board_mux[] __initdata = {
->   };
->   #endif
+On Fri, Mar 11, 2011 at 1:17 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Mar 09, 2011 at 09:46:20PM +0100, Marek Belisko wrote:
+>> ASoC audio for mini2440 platform in current kenrel doesn't work.
+>> First problem is samsung_asoc_dma device is missing in initialization.
+>> Next problem is with codec. Codec is initialized but never probed
 >
-> +/*
-> + * HECC information
-> + */
-> +
-> +#define CAN_STB         214
-> +static void hecc_phy_control(int on)
-> +{
-> +        int r;
-> +
-> +        r = gpio_request(CAN_STB, "can_stb");
-> +        if (r) {
-> +                printk(KERN_ERR "failed to get can_stb \n");
+> Applied, thanks. ?With changes like this you should really split things
+> up into a small patch series - if you ever find yourself writing
+> "Next problem..." or "Also..." then going on to describe a separate
+> change that's a sign that you should be writing a separate patch.
+You're right. I think sending whole patch to help understand what
+I'm trying to do (because wasn't sure). You apply just asoc part right?
+Thanks for comments!
+>
 
-    Have you run the patch thru checkpatch.pl? IIRC, it warns about spaces 
-before '\n'...
+regards,
 
-WBR, Sergei
+marek
+
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+icq: 290551086
+web: http://open-nandra.com
