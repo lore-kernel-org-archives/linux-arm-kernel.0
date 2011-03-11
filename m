@@ -1,47 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Mar 2011 14:39:21 +0100
-Subject: [PATCH 2/8] macb: detect hclk presence from platform data
-In-Reply-To: <20110311130826.GB7357@pulham.picochip.com>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-3-git-send-email-jamie@jamieiles.com>
-	<20110311014400.GJ9351@game.jcrosoft.org>
-	<20110311085443.GJ6198@pulham.picochip.com>
-	<20110311124757.GK9351@game.jcrosoft.org>
-	<20110311130826.GB7357@pulham.picochip.com>
-Message-ID: <20110311133921.GR9351@game.jcrosoft.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 11 Mar 2011 07:48:48 -0600
+Subject: [PATCH v3 0/7] ARM timer clock api support
+In-Reply-To: <20110311081646.GA13596@n2100.arm.linux.org.uk>
+References: <1299627277-20311-1-git-send-email-robherring2@gmail.com>
+	<20110311081646.GA13596@n2100.arm.linux.org.uk>
+Message-ID: <4D7A2840.1020808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:08 Fri 11 Mar     , Jamie Iles wrote:
-> On Fri, Mar 11, 2011 at 01:47:57PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 08:54 Fri 11 Mar     , Jamie Iles wrote:
-> > > On Fri, Mar 11, 2011 at 02:44:00AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > On 10:10 Thu 10 Mar     , Jamie Iles wrote:
-> > > > > +#ifdef CONFIG_ARCH_AT91
-> > > > > +#define PCLK_NAME	"macb_clk"
-> > > > > +#else /* CONFIG_ARCH_AT91 */
-> > > > > +#define PCLK_NAME	"pclk"
-> > > > > +#endif
-> > > > 
-> > > > we need change the clock name and avoid the ifdef
-> > > > so this will be generic
-> > > > 
-> > > > nb I work on the switch to clkdev currently for avr32 and at91
-> > > 
-> > > This should be gone now.  Russell made the suggestion to have a fake clk 
-> > > for hclk on AT91 so I think I've solved that now.  There's an updated 
-> > > patch in my reply to Russell's message but essentially I'm using 
-> > > at91_clock_associate() to turn "macb_pclk" into "hclk" and "pclk".  Does 
-> > > this seem reasonable?
-> > please do not use at91_clock_associate as I'm going to remove it as use static
-> > clock as done on shmobile as example
-> > so if it's a fake clock please as ochi_clk on 9g45
-> 
-> Ok, that's fine.  How about for the "macb_plk" though, won't that need 
-> an at91_clock_associate() or is it OK to rename all of the macb_clk 
-> definitions to have be called "pclk"?
+Russell,
 
-Personnaly I prefer macb_clk but if Nico prefer pclk it's fine
+On 03/11/2011 02:16 AM, Russell King - ARM Linux wrote:
+> On Tue, Mar 08, 2011 at 05:34:30PM -0600, Rob Herring wrote:
+>> From: Rob Herring<rob.herring@calxeda.com>
+>>
+>> This patch series converts ARM sp804 timer and smp_twd timer to use the clock
+>> api.
+>
+> This is what I came up with - I've still not sorted these patches out,
+> the second is a superset of the first.
 
-Best Regards,
-J.
+Any comments on the smp_twd patch? Colin plans to base his cpufreq 
+patches on it.
+
+> +	clk = clk_get_sys(name, NULL);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("sp804: %s clock not found, defaulting to 1MHz: %d\n",
+> +			name, ERR_PTR(clk));
+> +	} else {
+> +		int err = clk_enable(clk);
+> +		if (err != 0) {
+> +			pr_err("sp804: %s clock failed to enable: %d\n",
+> +				name, err);
+> +			clk_put(clk);
+> +		} else {
+> +			rate = clk_get_rate(clk);
+> +		}
+
+You previously said this should fully move to using the clock api. 
+Presumably, that meant no default freq of 1MHz.
+
+Also, my patch allows for clksrc and clkevent timers to have different 
+clocks. Currently, no h/w needs that, but it could happen. Even if they 
+are the same clk, you are introducing a requirement on the calling order 
+of sp804_clocksource_init and sp804_clockevents_init.
+
+Rob
