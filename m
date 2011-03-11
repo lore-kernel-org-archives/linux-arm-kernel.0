@@ -1,97 +1,245 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 11 Mar 2011 16:39:01 +0100
-Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <201103111615.01829.arnd@arndb.de>
-References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
-	<201103111507.59825.arnd@arndb.de>
-	<000101cbdffb$e1844b00$a48ce100$%szyprowski@samsung.com>
-	<201103111615.01829.arnd@arndb.de>
-Message-ID: <000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 11 Mar 2011 15:40:17 +0000
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <201103111532.52393.arnd@arndb.de>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<1299846911-15782-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201103111532.52393.arnd@arndb.de>
+Message-ID: <20110311154017.GD9995@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Mar 11, 2011 at 03:32:51PM +0100, Arnd Bergmann wrote:
+> On Friday 11 March 2011, Maxime Coquelin wrote:
+> > Common base to export System-on-Chip related informations through sysfs.
+> > 
+> > Creation of a "socinfo" directory under /sys/.
+> > Creation of SoC information entries.
+> > 
+> > Signed-off-by: Maxime COQUELIN <maxime.coquelin-nonst@stericsson.com>
+> 
+> I think it's better than the previous patch to create an
+> artificial device in /sys/devices/system/socinfo, but I'd
+> still prefer the information to be attached to a real device
+> that represents the SOC, as I explained in the discussion with
+> Linus Walleij.
 
-On Friday, March 11, 2011 4:15 PM Arnd Bergmann wrote:
-
-> On Friday 11 March 2011, Marek Szyprowski wrote:
-> > On Friday, March 11, 2011 3:08 PM Arnd Bergmann wrote:
-> >
-> > > On Friday 11 March 2011, Marek Szyprowski wrote:
-> > > > > The iommu API is not really meant to be KVM specific, it's just that the
-> > > > > in-tree users are basically limited to KVM at the moment. Another user that
-> > > > > is coming up soon is the vmio device driver that can be used to transparently
-> > > > > pass devices to user space. The idea behind the IOMMU API is that you can
-> > > > > map arbitrary bus addresses to physical memory addresses, but it does not
-> > > > > deal with allocating the bus addresses or providing buffer management such
-> > > > > as cache flushes.
-> > > >
-> > > > Yea, I've noticed this and this basically what we expect from iommu driver.
-> > > > However the iommu.h API requires a separate call to map each single memory page.
-> > > > This is quite ineffective approach and imho the API need to be extended to allow
-> > > > mapping of the arbitrary set of pages.
-> > >
-> > > We can always discuss extensions to the existing infrastructure, adding
-> > > an interface for mapping an array of page pointers in the iommu API
-> > > sounds like a good idea.
-> >
-> > We will investigate this API further. From the first sight it looks it won't take
-> > much work to port/rewrite our driver to fit into iommu.h API.
-> 
-> Ok, sounds good.
-> 
-> > > I also think that we should not really have separate iommu and dma-mapping
-> > > interfaces, but rather have a portable way to define an iommu so that it
-> > > can be used through the dma-mapping interfaces. I'm not asking you to
-> > > do that as a prerequisite to merging your driver, but it may be good to
-> > > keep in mind that the current situation is still lacking and that any
-> > > suggestion for improving this as part of your work to support the
-> > > samsung IOMMU is welcome.
-> >
-> > Well creating a portable iommu framework and merging it with dma-mapping interface
-> > looks like a much harder (and time consuming) task. There is definitely a need for
-> > it. I hope that it can be developed incrementally starting from the current iommu.h
-> > and dma-mapping.h interfaces.
-> 
-> Yes, that is the idea. Maybe we should add it to the list things that the
-> Linaro kernel working group can target for the November release?
-> 
-> > Please note that there might be some subtle differences
-> > in the hardware that such framework must be aware. The first obvious one is the
-> > hardware design. Some platform has central iommu unit, other (like Samsung Exynos4)
-> > has a separate iommu unit per each device driver (this is still a simplification,
-> > because a video codec device has 2 memory interfaces and 2 iommu units). Currently
-> > I probably have not enough knowledge to predict the other possible issues that need
-> > to be taken into account in the portable and generic iommu/dma-mapping frame-work.
-> 
-> The dma-mapping API can deal well with one IOMMU per device, but would
-> need some tricks to work with one device that has two separate IOMMUs.
-
-We need to investigate the internals of dma-mapping API first. Right now I know too
-little in this area.
+Why not create it under the cpu directory?
  
-> I'm not very familar with the iommu API, but in the common KVM scenario,
-> you need one IOMMU per device, so it should handle that just fine as well.
-
-Well, afair there are also systems with one central iommu module, which is shared 
-between devices. I have no idea how such model will fit into the dma-mapping API.
- 
-> > > Note that the ARM implementation of the dma-mapping.h interface currently
-> > > does not support IOMMUs, but that could be changed by wrapping it
-> > > using the include/asm-generic/dma-mapping-common.h infrastructure.
-> >
-> > ARM dma-mapping framework also requires some additional research for better DMA
-> > support (there are still issues with multiple mappings to be resolved).
+> You should definitely add Greg on Cc, as he's maintaining sysfs
+> and certainly has an opininion here.
 > 
-> You mean mapping the same memory into multiple devices, or a different problem?
+> 	Arnd
+> 
+> > ---
+> >  Documentation/ABI/testing/sysfs-socinfo |   16 ++++++
+> >  drivers/base/Kconfig                    |    3 +
+> >  drivers/base/Makefile                   |    1 +
+> >  drivers/base/soc.c                      |   79 +++++++++++++++++++++++++++++++
+> >  include/linux/sys_soc.h                 |   50 +++++++++++++++++++
+> >  5 files changed, 149 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/ABI/testing/sysfs-socinfo
+> >  create mode 100644 drivers/base/soc.c
+> >  create mode 100644 include/linux/sys_soc.h
+> > 
+> > diff --git a/Documentation/ABI/testing/sysfs-socinfo b/Documentation/ABI/testing/sysfs-socinfo
+> > new file mode 100644
+> > index 0000000..afd9da2
+> > --- /dev/null
+> > +++ b/Documentation/ABI/testing/sysfs-socinfo
+> > @@ -0,0 +1,16 @@
+> > +What:		/sys/socinfo
+> > +Date:		March 2011
+> > +contact:	Maxime Coquelin <maxime.coquelin-nonst@stericsson.com>
+> > +Description:
+> > +		The /sys/socinfo directory contains information about the
+> > +		System-on-Chip.	It is only available if platform implements it.
+> > +		This directory contains two kind of attributes :
+> > +			- common attributes: 
+> > +				* machine: the name of the machine.
+> > +				* family: the family name of the SoC
+> > +			- SoC-specific attributes: The SoC vendor can declare attributes
+> > +			  to export some strings to user-space, like the serial-number for
+> > +			  example.
+> > +
+> > +Users:
+> > +		User-space applications which needs these kind of attributes.
+> > diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> > index d57e8d0..372ef3a 100644
+> > --- a/drivers/base/Kconfig
+> > +++ b/drivers/base/Kconfig
+> > @@ -168,4 +168,7 @@ config SYS_HYPERVISOR
+> >  	bool
+> >  	default n
+> >  
+> > +config SYS_SOC
+> > +	bool
+> > +
+> >  endmenu
+> > diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> > index 5f51c3b..f3bcfb3 100644
+> > --- a/drivers/base/Makefile
+> > +++ b/drivers/base/Makefile
+> > @@ -18,6 +18,7 @@ ifeq ($(CONFIG_SYSFS),y)
+> >  obj-$(CONFIG_MODULES)	+= module.o
+> >  endif
+> >  obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
+> > +obj-$(CONFIG_SYS_SOC) += soc.o
+> >  
+> >  ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
+> >  
+> > diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+> > new file mode 100644
+> > index 0000000..046b43b
+> > --- /dev/null
+> > +++ b/drivers/base/soc.c
+> > @@ -0,0 +1,79 @@
+> > +/*
+> > + * Copyright (C) ST-Ericsson SA 2011
+> > + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
+> > + * License terms:  GNU General Public License (GPL), version 2
+> > + */
+> > +
+> > +#include <linux/sysfs.h>
+> > +#include <linux/module.h>
+> > +#include <linux/init.h>
+> > +#include <linux/stat.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/sys_soc.h>
+> > +
+> > +struct kobject *soc_object;
+> > +
+> > +ssize_t show_soc_info(struct kobject *kobj,
+> > +			struct kobj_attribute *attr, char *buf)
+> > +{
+> > +	struct sysfs_soc_info *si = container_of(attr,
+> > +				struct sysfs_soc_info, attr);
+> > +
+> > +	if (si->info)
+> > +		return sprintf(buf, "%s\n", si->info);
+> > +
+> > +	return si->get_info(buf, si);
+> > +}
+> 
+> I think this can be simplified by just letting the soc
+> register its own show method instead of the get_info function.
+> 
+> > +int __init register_sysfs_soc_info(struct sysfs_soc_info *info, int nb_info)
+> > +{
+> > +	int i, ret;
+> > +
+> > +	for (i = 0; i < nb_info; i++) {
+> > +		ret = sysfs_create_file(soc_object, &info[i].attr.attr);
+> > +		if (ret) {
+> > +			for (i -= 1; i >= 0; i--)
+> > +				sysfs_remove_file(soc_object, &info[i].attr.attr);
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static struct attribute *soc_attrs[] = {
+> > +	NULL,
+> > +};
+> > +
+> > +static struct attribute_group soc_attr_group = {
+> > +	.attrs = soc_attrs,
+> > +};
+> > +
+> > +int __init register_sysfs_soc(struct sysfs_soc_info *info, size_t num)
+> > +{
+> > +	int ret;
+> > +
+> > +	soc_object = kobject_create_and_add("socinfo", NULL);
+> > +	if (!soc_object) {
+> > +		ret = -ENOMEM;
+> > +		goto exit;
+> > +	}
+> > +
+> > +	ret = sysfs_create_group(soc_object, &soc_attr_group);
+> > +	if (ret)
+> > +		goto kset_exit;
+> > +
+> > +	ret = register_sysfs_soc_info(info, num);
+> > +	if (ret)
+> > +		goto group_exit;
+> > +
+> > +	return 0;
+> > +
+> > +group_exit:
+> > +	sysfs_remove_group(soc_object, &soc_attr_group);
+> > +kset_exit:
+> > +	kobject_put(soc_object);
+> > +exit:
+> > +	return ret;
+> > +}
+> > +
+> > diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+> > new file mode 100644
+> > index 0000000..05e5529
+> > --- /dev/null
+> > +++ b/include/linux/sys_soc.h
+> > @@ -0,0 +1,50 @@
+> > +/*
+> > + * Copyright (C) ST-Ericsson SA 2011
+> > + * Author: Maxime Coquelin <maxime.coquelin-nonst@stericsson.com> for ST-Ericsson.
+> > + * License terms:  GNU General Public License (GPL), version 2
+> > + */
+> > +#ifndef __SYS_SOC_H
+> > +#define __SYS_SOC_H
+> > +
+> > +#include <linux/kobject.h>
+> > +
+> > +/**
+> > + * struct sys_soc_info - SoC exports related informations
+> > + * @name: name of the export
+> > + * @info: pointer on the key to export
+> > + * @get_info: callback to retrieve key if info field is NULL
+> > + * @attr: export's sysdev class attribute
+> > + */
+> > +struct sysfs_soc_info {
+> > +	const char *info;
+> > +	ssize_t (*get_info)(char *buf, struct sysfs_soc_info *);
+> > +	struct kobj_attribute attr;
+> > +};
+> > +
+> > +ssize_t show_soc_info(struct kobject *, struct kobj_attribute *, char *);
+> > +
+> > +#define SYSFS_SOC_ATTR_VALUE(_name, _value) {		\
+> > +	.attr.attr.name = _name,			\
+> > +	.attr.attr.mode = S_IRUGO,			\
+> > +	.attr.show	= show_soc_info,		\
+> > +	.info           = _value,			\
+> > +}
+> > +
+> > +#define SYSFS_SOC_ATTR_CALLBACK(_name, _callback) {	\
+> > +	.attr.attr.name = _name,			\
+> > +	.attr.attr.mode = S_IRUGO,			\
+> > +	.attr.show	= show_soc_info,		\
+> > +	.get_info       = _callback,			\
+> > +}
+> > +
+> > +/**
+> > + * register_sys_soc - register the soc information
+> > + * @name: name of the machine
+> > + * @info: pointer on the info table to export
+> > + * @num: number of info to export
+> > + *
+> > + * NOTE: This function must only be called once
+> > + */
+> > +int register_sysfs_soc(struct sysfs_soc_info *info, size_t num);
+> > +
+> > +#endif /* __SYS_SOC_H */
+> > -- 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Mapping the same memory area multiple times with different cache settings is not
-legal on ARMv7+ systems. Currently the problems might caused by the low-memory
-kernel linear mapping and second mapping created for example by dma_alloc_coherent()
-function.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
