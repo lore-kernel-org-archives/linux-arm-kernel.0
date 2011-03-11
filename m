@@ -1,7 +1,9 @@
 From: r.sricharan@ti.com (sricharan)
-Date: Fri, 11 Mar 2011 11:34:44 +0530
-Subject: [PATCH V4 2/5] omap4: board-4430sdp: Initialise the serial pads.
-Message-ID: <1299823486-27192-1-git-send-email-r.sricharan@ti.com>
+Date: Fri, 11 Mar 2011 11:34:46 +0530
+Subject: [PATCH V4 4/5] omap4: board-omap4panda: Initialise the serial pads.
+In-Reply-To: <1299823486-27192-1-git-send-email-r.sricharan@ti.com>
+References: <1299823486-27192-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1299823486-27192-3-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,20 +11,20 @@ Use the mux framework to initialise the serial pads.
 
 Signed-off-by: sricharan <r.sricharan@ti.com>
 ---
-V1: Initial Patch
-V2: Remove flags that were to be used for only testing
+V1: Initial Patch.
+V2: Remove flags that were to be used for only testing.
 V3: Add dummy initialisation for uart0.
 V4: Use the Macro for muxing the static pads.
 
- arch/arm/mach-omap2/board-4430sdp.c |   71 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 69 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |   69 +++++++++++++++++++++++++++++++-
+ 1 files changed, 68 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 85805d4..670cbd5 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -625,9 +625,76 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index a94ce07..1dd4401 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -463,8 +463,75 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	OMAP4_MUX(SDMMC5_DAT3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
  	{ .reg_offset = OMAP_MUX_TERMINATOR },
  };
 +
@@ -56,30 +58,30 @@ index 85805d4..670cbd5 100644
 +};
 +
 +static struct omap_board_data serial2_data = {
-+	.id		= 1,
-+	.pads		= serial2_pads,
-+	.pads_cnt	= ARRAY_SIZE(serial2_pads),
++	.id             = 1,
++	.pads           = serial2_pads,
++	.pads_cnt       = ARRAY_SIZE(serial2_pads),
 +};
 +
 +static struct omap_board_data serial3_data = {
-+	.id		= 2,
-+	.pads		= serial3_pads,
-+	.pads_cnt	= ARRAY_SIZE(serial3_pads),
++	.id             = 2,
++	.pads           = serial3_pads,
++	.pads_cnt       = ARRAY_SIZE(serial3_pads),
 +};
 +
 +static struct omap_board_data serial4_data = {
-+	.id		= 3,
-+	.pads		= serial4_pads,
-+	.pads_cnt	= ARRAY_SIZE(serial4_pads),
++	.id             = 3,
++	.pads           = serial4_pads,
++	.pads_cnt       = ARRAY_SIZE(serial4_pads),
 +};
 +
 +static inline void board_serial_init(void)
 +{
 +	struct omap_board_data bdata;
-+	bdata.flags	= 0;
-+	bdata.pads	= NULL;
-+	bdata.pads_cnt	= 0;
-+	bdata.id	= 0;
++	bdata.flags     = 0;
++	bdata.pads      = NULL;
++	bdata.pads_cnt  = 0;
++	bdata.id        = 0;
 +	/* pass dummy data for UART1 */
 +	omap_serial_init_port(&bdata);
 +
@@ -89,24 +91,22 @@ index 85805d4..670cbd5 100644
 +}
  #else
  #define board_mux	NULL
--#endif
 +
 +static inline void board_serial_init(void)
 +{
 +	omap_serial_init();
 +}
-+ #endif
+ #endif
  
- static void __init omap_4430sdp_init(void)
- {
-@@ -644,7 +711,7 @@ static void __init omap_4430sdp_init(void)
- 	omap4_i2c_init();
- 	omap_sfh7741prox_init();
- 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+ static void __init omap4_panda_init(void)
+@@ -481,7 +548,7 @@ static void __init omap4_panda_init(void)
+ 	omap4_panda_i2c_init();
+ 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
+ 	platform_device_register(&omap_vwlan_device);
 -	omap_serial_init();
 +	board_serial_init();
  	omap4_twl6030_hsmmc_init(mmc);
- 
+ 	omap4_ehci_init();
  	usb_musb_init(&musb_board_data);
 -- 
 1.7.0.4
