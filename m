@@ -1,89 +1,62 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Fri, 11 Mar 2011 17:01:21 +0000
-Subject: [RFC] kprobes with thumb2 conditional code
-Message-ID: <1299862881.2512.314.camel@computer2.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Mar 2011 22:36:21 +0530
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <87pqpxbqho.fsf@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
+	<87pqpxbqho.fsf@ti.com>
+Message-ID: <253b4eb553a3bf28584eccdb2e3bd9ed@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Friday, March 11, 2011 9:26 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; Rajendra Nayak; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
+> CPUilde support.
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> [...]
+>
+> >> >
+> >> > This series doesn't boot on ES1 (boot log below.)  Do we need
+> to
+> >> > totally prevent WFI on ES1?
+> >> >
+> > Nope. WFI is ok.
+> > The ES1.0 boot issue on pm-core branch doesn't seems to
+> > be related to this series. Without this series as well
+> > OMAP4 ES1.0 is not booting for me. When I disable
+> > CONFIG_PM + WATCHDOG fix, it booted ok. I will
+> > git-bisect this later on pm-core branch.
+> >
+> >> > Also, if we want a CPUidle enabled kernel to boot on all
+> silicon,
+> >> > it will need a omap_rev() check during init to ensure it
+> doesn't
+> >> > override the default idle path.
+> >> >
+> > OMAP4 PM series already takes care of not overriding
+> > the default idle path for ES1.0. The omap4_mpuss_init()
+> > fails on ES1.0 and hence the CPUidle init is skipped in
+> > that case.
+> >
+> > Just to further check, I pulled the latest omap-for-linus
+> > branch and merged Paul's pull-request into it. Then
+> > applied OMAP4 PM series and I got a boot crash, a different
+> > one. This was again related to clock-domain initialization
+> > and static deps. I fixed this issue by avoiding omap4_pm_init()
+> > code running on ES1.0. With this boot on ES1.0 works fine now
+> > with OMAP4 PM series.
+>
+> Thanks for finding this.  I just tested your v3 branch together with
+> my pm-core and it's now booting fine on ES1.
+>
+Thanks Kevin for test.
 
-I'm about to start work on getting kprobes working with thumb2.
-
-One of the issues I have is that when probes are placed onto
-conditionally executed instructions in a IT block, they may not fire if
-the condition is not met. This is because on ARM we use invalid
-instructions for breakpoints, and the ARM ARM says:
-
-  "it is IMPLEMENTATION DEFINED whether the instruction executes as a
-   NOP or causes an Undefined Instruction exception"
-
-This is a similar issue to that already encountered by GDB [1][2]
-
-If we take this code as an example...
-
-probe1:
-if(condition) {
-probe2:
-    some_code;
-}
-
-It seams reasonable at first sight that probe2 would only fire if the
-condition is true. This will always be the case if the compiler
-generates test-and-branch code, but if it generates conditionally
-executed instructions for 'some_code' then it gets complicated...
-
-The current arm kprobes implementation will always fire probe2 because
-it uses unconditional instructions for its breakpoints. With thumb
-instructions we can't force unconditional execution, so we would have an
-'implementation defined' situation whether it would fire or not when the
-condition is false. (Thought you would hope it would be consistent on a
-particular device.)
-
-Some options for dealing with this, in increasing order of
-complexity... 
-
-1. Accept the situation as described.
-
-2. Change arm probes to use conditional instructions so we would
-(hopefully) have consistent undefined behaviour in both arm and thumb
-code. (If that isn't an oxymoron :-)
-
-3. Do 2, and modify kprobe_handler to test for false firings (breakpoint
-when condition false) and not execute the probe's callback functions in
-these cases. E.g. consistently make probe2 appear to not fire when
-condition is false.
-
-4. Make thumb probes fire unconditionally like current arm
-implementation...
-
-4a. Use breakpoint instructions rather than undefined instructions for
-kprobes. Apparently this doesn't play nicely with hardware debuggers [2]
-though I don't have enough experience in this area to otherwise comment.
-
-4b. Rewrite IT blocks when probes are inserted into them to make the
-breakpoint unconditional. This would require parsing backwards through
-the instruction stream to find the IT instruction, which I don't believe
-is possible with variable length thumb instructions. Or, another
-possibility which was suggested to me, use the unwind table to find the
-start of the containing function and parse forwards to find the IT
-instruction. Though the kernel doesn't currently have enough information
-to skip things like inline data that may be the function.
-
-The effort, complexity and bloat involved in 4b seems to be rather
-excessive to me, even before getting into the book-keeping required to
-handle multiple probes in the same IT block. So 4b is a bit of a straw
-man.
-
-BTW, does anyone know of any test code for kprobes, particularly with
-regard to checking emulation/single-stepping of the different CPU
-instructions?
-
-Thanks for any feedback
-
--- 
-Tixy
-
-
-[1] http://permalink.gmane.org/gmane.comp.gdb.patches/54862  
-[2]
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/72199/focus=73489
+Regards,
+Santosh
