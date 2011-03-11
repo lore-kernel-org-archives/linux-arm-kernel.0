@@ -1,79 +1,176 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 11 Mar 2011 08:37:05 +0530
-Subject: [PATCH V3 2/3] OMAP4: Update Voltage Rail Values for MPU, IVA
-	and CORE
-In-Reply-To: <1299732829-3376-1-git-send-email-shweta.gulati@ti.com>
-References: <1299732829-3376-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <4D7991D9.3010003@ti.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 11 Mar 2011 12:18:18 +0900
+Subject: [PATCH] Exynos4: Add HSMMC channel 4 support
+In-Reply-To: <00d601cbdf94$59254640$0b6fd2c0$%kim@samsung.com>
+References: <20110308025340.GA25712@july>
+	<00d601cbdf94$59254640$0b6fd2c0$%kim@samsung.com>
+Message-ID: <AANLkTimk+GPkxrDx0zG3rMam9OCz9sCL+2n4_c8KwLye@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shweta Gulati wrote, on 03/10/2011 10:23 AM:
-> Update MPU, IVA and CORE voltage Rail values obtained from
-> OMAP4430 Data Manual Operating Condition Addendum_v0.4.
+On Fri, Mar 11, 2011 at 11:30 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
+>>
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Exynos4 has the DesignWare Host controller at channel 4.
+>>
+> Yeah, Exynos4210 has it but it can be happened problem when used your
+> approach later.
+> Because, we can't assume hsmmc4 to be used for dw_mmc on other SoCs.
 >
-> Tested on OMAP4430 SDP Board.
->
-> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
-Thanks for pro-actively keeping this updated.
-Acked-by: Nishanth Menon <nm@ti.com>
+> I mean, other file, eg., dev-dwmmc.c or dev-dwmci.c should be added for its
+> platform devices.
 
-> ---
-> V3:
-> Update CORE Voltages as well
-> in sync with V0.4 of OMAP4 Data Manual.
->
-> V2:
-> Fixed Comments from Nishanth Menon.
->
->   arch/arm/mach-omap2/opp4xxx_data.c |   18 +++++++++---------
->   1 files changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
-> index ed0efdb..aa624d1 100644
-> --- a/arch/arm/mach-omap2/opp4xxx_data.c
-> +++ b/arch/arm/mach-omap2/opp4xxx_data.c
-> @@ -30,10 +30,10 @@
->    * voltage dependent data for each VDD.
->    */
->
-> -#define OMAP4430_VDD_MPU_OPP50_UV		930000
-> -#define OMAP4430_VDD_MPU_OPP100_UV		1100000
-> -#define OMAP4430_VDD_MPU_OPPTURBO_UV		1260000
-> -#define OMAP4430_VDD_MPU_OPPNITRO_UV		1350000
-> +#define OMAP4430_VDD_MPU_OPP50_UV		1025000
-> +#define OMAP4430_VDD_MPU_OPP100_UV		1200000
-> +#define OMAP4430_VDD_MPU_OPPTURBO_UV		1313000
-> +#define OMAP4430_VDD_MPU_OPPNITRO_UV		1375000
->
->   struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
->   	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP50_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
-> @@ -43,9 +43,9 @@ struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
->   	VOLT_DATA_DEFINE(0, 0, 0, 0),
->   };
->
-> -#define OMAP4430_VDD_IVA_OPP50_UV		930000
-> -#define OMAP4430_VDD_IVA_OPP100_UV		1100000
-> -#define OMAP4430_VDD_IVA_OPPTURBO_UV		1260000
-> +#define OMAP4430_VDD_IVA_OPP50_UV		1013000
-> +#define OMAP4430_VDD_IVA_OPP100_UV		1188000
-> +#define OMAP4430_VDD_IVA_OPPTURBO_UV		1300000
->
->   struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
->   	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP50_UV, OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
-> @@ -54,8 +54,8 @@ struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
->   	VOLT_DATA_DEFINE(0, 0, 0, 0),
->   };
->
-> -#define OMAP4430_VDD_CORE_OPP50_UV		930000
-> -#define OMAP4430_VDD_CORE_OPP100_UV		1100000
-> +#define OMAP4430_VDD_CORE_OPP50_UV		1025000
-> +#define OMAP4430_VDD_CORE_OPP100_UV		1200000
->
->   struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
->   	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP50_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
+Who's opinions? Please Cc the proper person at LSI. I want to listen
+his opinions.
 
-
--- 
-Regards,
-Nishanth Menon
+Thank you,
+Kyungmin Park
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
+>> exynos4/include/mach/irqs.h
+>> index 2dc5900..aa32679 100644
+>> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
+>> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+>> @@ -104,6 +104,7 @@
+>> ?#define IRQ_HSMMC1 ? ? ? ? ? COMBINER_IRQ(29, 1)
+>> ?#define IRQ_HSMMC2 ? ? ? ? ? COMBINER_IRQ(29, 2)
+>> ?#define IRQ_HSMMC3 ? ? ? ? ? COMBINER_IRQ(29, 3)
+>> +#define IRQ_HSMMC4 ? ? ? ? ? COMBINER_IRQ(29, 4)
+>>
+>> ?#define IRQ_MIPI_CSIS0 ? ? ? ? ? ? ? COMBINER_IRQ(30, 0)
+>> ?#define IRQ_MIPI_CSIS1 ? ? ? ? ? ? ? COMBINER_IRQ(30, 1)
+>> diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-
+>> exynos4/include/mach/map.h
+>> index 80a41e0..ea79962 100644
+>> --- a/arch/arm/mach-exynos4/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos4/include/mach/map.h
+>> @@ -107,6 +107,7 @@
+>> ?#define S3C_PA_HSMMC1 ? ? ? ? ? ? ? ? ? ? ? ?EXYNOS4_PA_HSMMC(1)
+>> ?#define S3C_PA_HSMMC2 ? ? ? ? ? ? ? ? ? ? ? ?EXYNOS4_PA_HSMMC(2)
+>> ?#define S3C_PA_HSMMC3 ? ? ? ? ? ? ? ? ? ? ? ?EXYNOS4_PA_HSMMC(3)
+>> +#define S3C_PA_HSMMC4 ? ? ? ? ? ? ? ? ? ? ? ?EXYNOS4_PA_HSMMC(4)
+>> ?#define S3C_PA_IIC ? ? ? ? ? ? ? ? ? EXYNOS4_PA_IIC(0)
+>> ?#define S3C_PA_IIC1 ? ? ? ? ? ? ? ? ?EXYNOS4_PA_IIC(1)
+>> ?#define S3C_PA_IIC2 ? ? ? ? ? ? ? ? ?EXYNOS4_PA_IIC(2)
+>> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+>> index be72100..f816985 100644
+>> --- a/arch/arm/plat-samsung/Kconfig
+>> +++ b/arch/arm/plat-samsung/Kconfig
+>> @@ -171,6 +171,11 @@ config S3C_DEV_HSMMC3
+>> ? ? ? help
+>> ? ? ? ? Compile in platform device definitions for HSMMC channel 3
+>>
+>> +config S3C_DEV_HSMMC4
+>> + ? ? bool
+>> + ? ? help
+>> + ? ? ? Compile in platform device definitions for HSMMC channel 4
+>> +
+>> ?config S3C_DEV_HWMON
+>> ? ? ? bool
+>> ? ? ? help
+>> diff --git a/arch/arm/plat-samsung/Makefile
+> b/arch/arm/plat-samsung/Makefile
+>> index e9de58a..7ddba03 100644
+>> --- a/arch/arm/plat-samsung/Makefile
+>> +++ b/arch/arm/plat-samsung/Makefile
+>> @@ -37,6 +37,7 @@ obj-$(CONFIG_S3C_DEV_HSMMC) += dev-hsmmc.o
+>> ?obj-$(CONFIG_S3C_DEV_HSMMC1) += dev-hsmmc1.o
+>> ?obj-$(CONFIG_S3C_DEV_HSMMC2) += dev-hsmmc2.o
+>> ?obj-$(CONFIG_S3C_DEV_HSMMC3) += dev-hsmmc3.o
+>> +obj-$(CONFIG_S3C_DEV_HSMMC4) += dev-hsmmc4.o
+>> ?obj-$(CONFIG_S3C_DEV_HWMON) ?+= dev-hwmon.o
+>> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-i2c0.o
+>> ?obj-$(CONFIG_S3C_DEV_I2C1) ? += dev-i2c1.o
+>> diff --git a/arch/arm/plat-samsung/dev-hsmmc4.c
+> b/arch/arm/plat-samsung/dev-
+>> hsmmc4.c
+>> new file mode 100644
+>> index 0000000..c69a78f
+>> --- /dev/null
+>> +++ b/arch/arm/plat-samsung/dev-hsmmc4.c
+>> @@ -0,0 +1,54 @@
+>> +/* linux/arch/arm/plat-samsung/dev-hsmmc4.c
+>> + *
+>> + * Copyright (C) 2011 Samsung Electronics Co., Ltd.
+>> + *
+>> + * Samsung device definition for hsmmc device 4
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/mmc/host.h>
+>> +#include <linux/mmc/dw_mmc.h>
+>> +#include <linux/dma-mapping.h>
+>> +
+>> +#include <mach/map.h>
+>> +#include <plat/sdhci.h>
+>> +#include <plat/devs.h>
+>> +
+>> +#define S3C_SZ_HSMMC ? ? ? ? 0x1000
+>> +
+>> +static struct resource s3c_hsmmc4_resource[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .start ?= S3C_PA_HSMMC4,
+>> + ? ? ? ? ? ? .end ? ?= S3C_PA_HSMMC4 + S3C_SZ_HSMMC - 1,
+>> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
+>> + ? ? },
+>> + ? ? [1] = {
+>> + ? ? ? ? ? ? .start ?= IRQ_HSMMC4,
+>> + ? ? ? ? ? ? .end ? ?= IRQ_HSMMC4,
+>> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
+>> + ? ? }
+>> +};
+>> +
+>> +static u64 s3c_device_hsmmc4_dmamask = DMA_BIT_MASK(32);
+>> +
+>> +struct platform_device s3c_device_hsmmc4 = {
+>> + ? ? .name ? ? ? ? ? ? ? ? ? = "dw_mmc",
+>> + ? ? .id ? ? ? ? ? ? ? ? ? ? = -1,
+>> + ? ? .num_resources ? ? ? ? ?= ARRAY_SIZE(s3c_hsmmc4_resource),
+>> + ? ? .resource ? ? ? ? ? ? ? = s3c_hsmmc4_resource,
+>> + ? ? .dev ? ? ? ? ? ? ? ? ? ?= {
+>> + ? ? ? ? ? ? .dma_mask ? ? ? ? ? ? ? = &s3c_device_hsmmc4_dmamask,
+>> + ? ? ? ? ? ? .coherent_dma_mask ? ? ?= DMA_BIT_MASK(32),
+>> + ? ? },
+>> +};
+>> +
+>> +void s3c_hsmmc4_set_platdata(struct dw_mci_board *pdata)
+>> +{
+>> + ? ? s3c_set_platdata(pdata, sizeof(struct dw_mci_board),
+>> + ? ? ? ? ? ? ? ? ? ? ?&s3c_device_hsmmc4);
+>> +}
+>> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+>> samsung/include/plat/devs.h
+>> index e2b3ab9..4e198ba 100644
+>> --- a/arch/arm/plat-samsung/include/plat/devs.h
+>> +++ b/arch/arm/plat-samsung/include/plat/devs.h
+>> @@ -65,6 +65,7 @@ extern struct platform_device s3c_device_hsmmc0;
+>> ?extern struct platform_device s3c_device_hsmmc1;
+>> ?extern struct platform_device s3c_device_hsmmc2;
+>> ?extern struct platform_device s3c_device_hsmmc3;
+>> +extern struct platform_device s3c_device_hsmmc4;
+>> ?extern struct platform_device s3c_device_cfcon;
+>>
+>> ?extern struct platform_device s3c_device_spi0;
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
