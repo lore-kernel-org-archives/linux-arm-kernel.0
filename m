@@ -1,81 +1,112 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 11:22:26 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <87d3lycu0h.fsf@ti.com>
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-Message-ID: <3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
+From: r.sricharan@ti.com (sricharan)
+Date: Fri, 11 Mar 2011 11:34:44 +0530
+Subject: [PATCH V4 2/5] omap4: board-4430sdp: Initialise the serial pads.
+Message-ID: <1299823486-27192-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Friday, March 11, 2011 7:13 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; rnayak at ti.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
-> CPUilde support.
->
-> Hi Santosh,
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-[....]
+Use the mux framework to initialise the serial pads.
 
->
-> This series doesn't boot on ES1 (boot log below.)  Do we need to
-> totally prevent WFI on ES1?
->
-> Also, if we want a CPUidle enabled kernel to boot on all silicon, it
-> will need a omap_rev() check during init to ensure it doesn't
-> override the default idle path.
->
-Make sense. Will try it on ES1.0 silicon.
+Signed-off-by: sricharan <r.sricharan@ti.com>
+---
+V1: Initial Patch
+V2: Remove flags that were to be used for only testing
+V3: Add dummy initialisation for uart0.
+V4: Use the Macro for muxing the static pads.
 
+ arch/arm/mach-omap2/board-4430sdp.c |   71 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 69 insertions(+), 2 deletions(-)
 
-[....]
-
-> > off-mode debugfs control:
-> > 	enable: $echo 1 > /proc/sys/debug/pm_debug/enable_off_mode
-> > 	disable: $echo 0 > /proc/sys/debug/pm_debug/enable_off_mode
->
-> Without enabling off-mode, I took CPU1 offline and see that it
-> immediatly goes off.  This makes sense based on the HW, but not in
-> light
-> of the enable_off_mode flag.  For OMAP4, maybe it makes sense to not
-> have the enable_off_mode flag at all?   We'll be getting rid of it
-> on OMAP3 as soon as the constraints framework is ready, so maybe it
-> makes sense to just go without it for OMAP4?
->
-Actually that's expected since enable_off_mode flag doesn't manage CPUX
-power domain states and they are always hit OFF. CSWR isn't
-supported on CPUX power domains as captured in the series. But
-I agree with you that it might be confusing.
-
-[...]
-> More confusion: another test (also with CPUidle enabled), I see that
-> the MPU and DSS are also hitting off-mode:
->
-This behavior changed when we dropped enable_off_mode flag to updated
-C-states in favor of prepare() hooks. DSS showing OFF mode is because
-of debug counter issue. DSS PD doesn't support previous power state
-which these counter code is trying to read. There are couple of
-patches from Rajendra and Thara do address this counter issues but
-they are bit of hacky. May be we can get them on the list to discuss
-further.
-
-So just to summaries, on OMAP$ 'enable_off_mode' flag is
-used __only__ in Suspend. CPUx power domain always hit OFF
-mode no matter what is state of this flag because CSWR isn't
-supported on these PD's.
-
-We could remove this flag as well but thought that this might be
-useful especially when we add CORE RET, DEVICE OFF support.
-
-May be we keep this till the constraint frameworks comes in and
-then drop it once for all. I am ok with whatever direction you
-decide here.
-
-Regards,
-Santosh
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 85805d4..670cbd5 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -625,9 +625,76 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
++
++static struct omap_device_pad serial2_pads[] __initdata = {
++	OMAP_MUX_STATIC("uart2_cts.uart2_cts",
++			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart2_rts.uart2_rts",
++			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart2_rx.uart2_rx",
++			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart2_tx.uart2_tx",
++			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
++};
++
++static struct omap_device_pad serial3_pads[] __initdata = {
++	OMAP_MUX_STATIC("uart3_cts_rctx.uart3_cts_rctx",
++			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart3_rts_sd.uart3_rts_sd",
++			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart3_rx_irrx.uart3_rx_irrx",
++			 OMAP_PIN_INPUT | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
++			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
++};
++
++static struct omap_device_pad serial4_pads[] __initdata = {
++	OMAP_MUX_STATIC("uart4_rx.uart4_rx",
++			 OMAP_PIN_INPUT | OMAP_MUX_MODE0),
++	OMAP_MUX_STATIC("uart4_tx.uart4_tx",
++			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
++};
++
++static struct omap_board_data serial2_data = {
++	.id		= 1,
++	.pads		= serial2_pads,
++	.pads_cnt	= ARRAY_SIZE(serial2_pads),
++};
++
++static struct omap_board_data serial3_data = {
++	.id		= 2,
++	.pads		= serial3_pads,
++	.pads_cnt	= ARRAY_SIZE(serial3_pads),
++};
++
++static struct omap_board_data serial4_data = {
++	.id		= 3,
++	.pads		= serial4_pads,
++	.pads_cnt	= ARRAY_SIZE(serial4_pads),
++};
++
++static inline void board_serial_init(void)
++{
++	struct omap_board_data bdata;
++	bdata.flags	= 0;
++	bdata.pads	= NULL;
++	bdata.pads_cnt	= 0;
++	bdata.id	= 0;
++	/* pass dummy data for UART1 */
++	omap_serial_init_port(&bdata);
++
++	omap_serial_init_port(&serial2_data);
++	omap_serial_init_port(&serial3_data);
++	omap_serial_init_port(&serial4_data);
++}
+ #else
+ #define board_mux	NULL
+-#endif
++
++static inline void board_serial_init(void)
++{
++	omap_serial_init();
++}
++ #endif
+ 
+ static void __init omap_4430sdp_init(void)
+ {
+@@ -644,7 +711,7 @@ static void __init omap_4430sdp_init(void)
+ 	omap4_i2c_init();
+ 	omap_sfh7741prox_init();
+ 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+-	omap_serial_init();
++	board_serial_init();
+ 	omap4_twl6030_hsmmc_init(mmc);
+ 
+ 	usb_musb_init(&musb_board_data);
+-- 
+1.7.0.4
