@@ -1,46 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Mar 2011 19:24:55 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-	<20110215103127.GC4152@n2100.arm.linux.org.uk>
-	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
-	<20110215113242.GD4152@n2100.arm.linux.org.uk>
-	<20110215121437.GG4152@n2100.arm.linux.org.uk>
-	<AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
-	<20110309183507.GB11273@n2100.arm.linux.org.uk>
-	<1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110311192455.GA23109@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Mar 2011 11:35:54 -0800
+Subject: [PATCH] omap2+: mux: Add macro for configuring static with
+	omap_hwmod_mux_init (Re: [PATCH] omap2+: mux: Remove the use of IDLE
+	flag)
+In-Reply-To: <d613e06b28e16ab8da53af60e1e2ec56@mail.gmail.com>
+References: <1299472552-22017-1-git-send-email-r.sricharan@ti.com>
+	<20110308164033.GC26463@atomide.com>
+	<b76e32aff88265d31cc1b7b2fc502a32@mail.gmail.com>
+	<20110309203200.GP26463@atomide.com>
+	<d613e06b28e16ab8da53af60e1e2ec56@mail.gmail.com>
+Message-ID: <20110311193554.GH10079@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 05:32:58PM +0000, Catalin Marinas wrote:
-> On Wed, 2011-03-09 at 18:35 +0000, Russell King - ARM Linux wrote:
-> > On Wed, Mar 09, 2011 at 03:40:05PM +0000, Catalin Marinas wrote:
-> > > The above call to tlb_add_flush() would only add a PAGE_SIZE. But
-> > > since we free an entire PTE, shouldn't the range cover addr ..
-> > > addr+PTRS_PER_PTE*PAGE_SIZE?
-> > 
-> > Why do we need to?  We're not flushing away the individual PTE entries
-> > when we remove an entire page table - we will have already walked the
-> > page table removing those entries, which will already have been added.
+* Sricharan R <r.sricharan@ti.com> [110310 22:10]:
+> Tony,
+> >>Look OK to me, but let's make things a bit easier to read
+> >>and maintain with the following patch. Can you please
+> >>update your patches to use this macro?
+> >>
+> >>Each line then just becomes something like:
+> >>
+> >>OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
+> >>		OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
+> >>
+> >Ok thanks. I will update and send again.
 > 
-> Ah, I missed the fact that tlb_flush() invalidates the whole TLB when
-> there is no tlb->vma (the shift_arg_pages case). We could optimise this
-> to add the range covered by the PTE page and avoid the !tlb->vma check
-> (and a flush_tlb_mm), though not sure it's worth.
-
-If we're removing pte entries then tlb->vma is non-NULL.  Please look at
-the comments - I've documented the three modes of use there along with
-how things are setup for each of those modes, and what we do with each.
-I don't add comments just for the hell of it.
-
-> > This code is to cover the case with LPAE where we need to flush out the
-> > L1 entries.  It's nothing to do with the TLB itself.
+> 4430SDP:
+> http://marc.info/?l=linux-omap&m=129982347622340&w=2
 > 
-> This would happen even with the classic page tables on Cortex-A15, L1
-> entries are cached.
+> omap4panda:
+> http://marc.info/?l=linux-omap&m=129982347722344&w=2
+> 
+> 3430sdp:
+> http://marc.info/?l=linux-omap&m=129982347822347&w=2
+> 
+> I have reworked the patches using your MACRO.
+> 
+> I have applied on top of the omap-for-linus branch and
+> tested them on 4430sdp, 3430sdp, omap4panda.
 
-That's why its there at pte level.  On classic page tables there's no pmds
-or puds to consider.
+OK thanks, applying them.
+
+Tony
