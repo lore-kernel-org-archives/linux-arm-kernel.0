@@ -1,34 +1,24 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 11 Mar 2011 15:09:32 +0200
-Subject: [PATCH v2] z2-battery: Fix count of properties
-In-Reply-To: <4D7A1181.2000802@ru.mvista.com>
-References: <4D7A1181.2000802@ru.mvista.com>
-Message-ID: <1299848972-25596-1-git-send-email-anarsoul@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 11 Mar 2011 13:15:20 +0000
+Subject: [PATCH 8/8] macb: support data bus widths > 32 bits
+In-Reply-To: <20110311125523.GN9351@game.jcrosoft.org>
+References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
+	<1299751843-9743-9-git-send-email-jamie@jamieiles.com>
+	<20110311125523.GN9351@game.jcrosoft.org>
+Message-ID: <20110311131520.GC7357@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PROP_STATUS property was not counted, as result
-VOLTAGE_MIN property is missing in sysfs. Fix it.
+On Fri, Mar 11, 2011 at 01:55:23PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:10 Thu 10 Mar     , Jamie Iles wrote:
+> > Some GEM implementations may support data bus widths up to 128 bits.
+> > Allow the platform data to specify the data bus width and let the driver
+> > program it up.
+> > 
+> can we detect it?
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
-v2: Align comment properly
+Well, the first design configuration register will tell you what the 
+maximum data bus width is so we could probably always go with that.  I 
+can't think of a good reason why you wouldn't want to do that.
 
- drivers/power/z2_battery.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
-index 81304c0..2a9ab89 100644
---- a/drivers/power/z2_battery.c
-+++ b/drivers/power/z2_battery.c
-@@ -134,6 +134,8 @@ static int z2_batt_ps_init(struct z2_charger *charger, int props)
- 	enum power_supply_property *prop;
- 	struct z2_battery_info *info = charger->info;
- 
-+	if (info->charge_gpio >= 0)
-+		props++;	/* POWER_SUPPLY_PROP_STATUS */
- 	if (info->batt_tech >= 0)
- 		props++;	/* POWER_SUPPLY_PROP_TECHNOLOGY */
- 	if (info->batt_I2C_reg >= 0)
--- 
-1.7.4.1
+Jamie
