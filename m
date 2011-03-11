@@ -1,84 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Mar 2011 15:48:12 +0000
-Subject: memmap_valid_within problem with sparsely populated sections
-Message-ID: <1299858492.11981.6.camel@e102144-lin.cambridge.arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Mar 2011 07:52:13 -0800
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 11 Mar 2011 11:22:26 +0530")
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+	<87d3lycu0h.fsf@ti.com>
+	<3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
+Message-ID: <871v2dd58y.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-In commit eb33575c ("[ARM] Double check memmap is actually valid with a memmap
-has unexpected holes V2"), a new function, memmap_valid_within, was introduced
-to mmzone.h so that holes in the memmap which pass pfn_valid in SPARSEMEM
-configurations can be detected and avoided.
+>> -----Original Message-----
+>> From: Kevin Hilman [mailto:khilman at ti.com]
+>> Sent: Friday, March 11, 2011 7:13 AM
+>> To: Santosh Shilimkar
+>> Cc: linux-omap at vger.kernel.org; rnayak at ti.com; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
+>> CPUilde support.
+>>
+>> Hi Santosh,
+>>
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> [....]
+>
+>>
+>> This series doesn't boot on ES1 (boot log below.)  Do we need to
+>> totally prevent WFI on ES1?
+>>
+>> Also, if we want a CPUidle enabled kernel to boot on all silicon, it
+>> will need a omap_rev() check during init to ensure it doesn't
+>> override the default idle path.
+>>
+> Make sense. Will try it on ES1.0 silicon.
+>
+>
+> [....]
+>
+>> > off-mode debugfs control:
+>> > 	enable: $echo 1 > /proc/sys/debug/pm_debug/enable_off_mode
+>> > 	disable: $echo 0 > /proc/sys/debug/pm_debug/enable_off_mode
+>>
+>> Without enabling off-mode, I took CPU1 offline and see that it
+>> immediatly goes off.  This makes sense based on the HW, but not in
+>> light
+>> of the enable_off_mode flag.  For OMAP4, maybe it makes sense to not
+>> have the enable_off_mode flag at all?   We'll be getting rid of it
+>> on OMAP3 as soon as the constraints framework is ready, so maybe it
+>> makes sense to just go without it for OMAP4?
+>>
+> Actually that's expected since enable_off_mode flag doesn't manage CPUX
+> power domain states and they are always hit OFF. CSWR isn't
+> supported on CPUX power domains as captured in the series. But
+> I agree with you that it might be confusing.
+>
+> [...]
+>> More confusion: another test (also with CPUidle enabled), I see that
+>> the MPU and DSS are also hitting off-mode:
+>>
+> This behavior changed when we dropped enable_off_mode flag to updated
+> C-states in favor of prepare() hooks. DSS showing OFF mode is because
+> of debug counter issue. DSS PD doesn't support previous power state
+> which these counter code is trying to read. There are couple of
+> patches from Rajendra and Thara do address this counter issues but
+> they are bit of hacky. May be we can get them on the list to discuss
+> further.
+>
+> So just to summaries, on OMAP$ 'enable_off_mode' flag is
+> used __only__ in Suspend. CPUx power domain always hit OFF
+> mode no matter what is state of this flag because CSWR isn't
+> supported on these PD's.
 
-The fix to this problem checks that the pfn <-> page linkages are correct by
-calculating the page for the pfn and then checking that page_to_pfn on that
-page returns the original pfn. Unfortunately, in SPARSEMEM configurations, this
-results in reading from the page flags to determine the correct section. Since
-the memmap here has been freed, junk is read from memory and the check is no
-longer robust.
+If it's useful only in suspend, then it's redundant with the
+<debugfs>/pm_debug/*_pwrdm/suspend controls which allow per-pwrdm
+control over next states.
 
-In the best case, reading from /proc/pagetypeinfo will give you the wrong
-answer. In the worst case, you get SEGVs, Kernel OOPses and hung CPUs.
+> We could remove this flag as well but thought that this might be
+> useful especially when we add CORE RET, DEVICE OFF support.
 
-It seems that the only code which can really tell you if the pfn has a valid
-corresponding page is architecture-specific. Indeed, the ARM implementation of
-pfn_valid will give you the correct answer. I think that memmap_valid_within
-needs to check whether the pfn has a struct page associated with it before
-blindly reading the page flags:
+I'd rather see working off-mode be a requirement for getting OMAP4
+drivers supported.
 
+Also, we can still test suspend/resume with off-mode disabled by using
+the above debugfs controls.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index cddd684..ce406e5 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -273,6 +273,13 @@ static void arm_memory_present(void)
- }
- #endif
- 
-+#ifdef CONFIG_ARCH_HAS_HOLES_MEMORYMODEL
-+int arch_has_mapping(phys_addr_t paddr)
-+{
-+       return memblock_is_memory(paddr);
-+}
-+#endif
-+
- static int __init meminfo_cmp(const void *_a, const void *_b)
- {
-        const struct membank *a = _a, *b = _b;
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 02ecb01..0a17c9b 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1130,6 +1130,7 @@ unsigned long __init node_memmap_size_bytes(int, unsigned long, unsigned long);
-  * the zone and PFN linkages are still valid. This is expensive, but walkers
-  * of the full memmap are extremely rare.
-  */
-+int arch_has_mapping(phys_addr_t paddr);
- int memmap_valid_within(unsigned long pfn,
-                                        struct page *page, struct zone *zone);
- #else
-diff --git a/mm/mmzone.c b/mm/mmzone.c
-index f5b7d17..9f14b8e 100644
---- a/mm/mmzone.c
-+++ b/mm/mmzone.c
-@@ -78,6 +78,9 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
- int memmap_valid_within(unsigned long pfn,
-                                        struct page *page, struct zone *zone)
- {
-+       if (!arch_has_mapping(pfn << PAGE_SHIFT))
-+               return 0;
-+
-        if (page_to_pfn(page) != pfn)
-                return 0;
- 
+> May be we keep this till the constraint frameworks comes in and
+> then drop it once for all. I am ok with whatever direction you
+> decide here.
 
-It may be that we can leave the architecture code to define memmap_valid_within
-in its entirety, but maybe the page_to_pfn stuff is useful in some scenarios.
+I prefer to drop it completely for OMAP4.
 
-Any thoughts on the above?
-
-Cheers,
-
-Will
+Kevin
