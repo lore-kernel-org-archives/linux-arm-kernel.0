@@ -1,56 +1,81 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Fri, 11 Mar 2011 06:47:15 +0100
-Subject: [PATCH] kbuild: reenable section mismatch analysis
-In-Reply-To: <20110310164100.5af81e3b.akpm@linux-foundation.org>
-References: <20110216200734.GA25184@merkur.ravnborg.org>
-	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110310164100.5af81e3b.akpm@linux-foundation.org>
-Message-ID: <20110311054715.GA32246@merkur.ravnborg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Mar 2011 11:22:26 +0530
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <87d3lycu0h.fsf@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+	<87d3lycu0h.fsf@ti.com>
+Message-ID: <3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 04:41:00PM -0800, Andrew Morton wrote:
-> On Fri, 18 Feb 2011 21:47:20 +0100
-> Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > This was disabled in commit
-> > 
-> > 	e5f95c8 (kbuild: print only total number of section mismatces found)
-> > 
-> > because there were too many warnings.  Now we're down to a reasonable
-> > number again, so we start scaring people with the details.
-> > 
-> > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  lib/Kconfig.debug |    4 ----
-> >  1 files changed, 0 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> > index 2b97418..0f77ed1 100644
-> > --- a/lib/Kconfig.debug
-> > +++ b/lib/Kconfig.debug
-> > @@ -102,11 +102,7 @@ config HEADERS_CHECK
-> >  
-> >  config DEBUG_SECTION_MISMATCH
-> >  	bool "Enable full Section mismatch analysis"
-> > -	depends on UNDEFINED || (BLACKFIN)
-> >  	default y
-> > -	# This option is on purpose disabled for now.
-> > -	# It will be enabled when we are down to a reasonable number
-> > -	# of section mismatch warnings (< 10 for an allyesconfig build)
-> >  	help
-> >  	  The section mismatch analysis checks if there are illegal
-> >  	  references from one section to another section.
-> 
-> eaaaargh!  650 lines of crap added to my i386 allmodconfig build output.
-> 
-> I'll be locally opting out of this one, thanks.
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Friday, March 11, 2011 7:13 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; rnayak at ti.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
+> CPUilde support.
+>
+> Hi Santosh,
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+[....]
 
-How about that we enable this in the merge window.
-And if it continue to be unreasonable then drop it again
-around rc5 time?
+>
+> This series doesn't boot on ES1 (boot log below.)  Do we need to
+> totally prevent WFI on ES1?
+>
+> Also, if we want a CPUidle enabled kernel to boot on all silicon, it
+> will need a omap_rev() check during init to ensure it doesn't
+> override the default idle path.
+>
+Make sense. Will try it on ES1.0 silicon.
 
-The likelyhood that warnings are fixed is bigger if people
-see them and get annoyed.
 
-	Sam
+[....]
+
+> > off-mode debugfs control:
+> > 	enable: $echo 1 > /proc/sys/debug/pm_debug/enable_off_mode
+> > 	disable: $echo 0 > /proc/sys/debug/pm_debug/enable_off_mode
+>
+> Without enabling off-mode, I took CPU1 offline and see that it
+> immediatly goes off.  This makes sense based on the HW, but not in
+> light
+> of the enable_off_mode flag.  For OMAP4, maybe it makes sense to not
+> have the enable_off_mode flag at all?   We'll be getting rid of it
+> on OMAP3 as soon as the constraints framework is ready, so maybe it
+> makes sense to just go without it for OMAP4?
+>
+Actually that's expected since enable_off_mode flag doesn't manage CPUX
+power domain states and they are always hit OFF. CSWR isn't
+supported on CPUX power domains as captured in the series. But
+I agree with you that it might be confusing.
+
+[...]
+> More confusion: another test (also with CPUidle enabled), I see that
+> the MPU and DSS are also hitting off-mode:
+>
+This behavior changed when we dropped enable_off_mode flag to updated
+C-states in favor of prepare() hooks. DSS showing OFF mode is because
+of debug counter issue. DSS PD doesn't support previous power state
+which these counter code is trying to read. There are couple of
+patches from Rajendra and Thara do address this counter issues but
+they are bit of hacky. May be we can get them on the list to discuss
+further.
+
+So just to summaries, on OMAP$ 'enable_off_mode' flag is
+used __only__ in Suspend. CPUx power domain always hit OFF
+mode no matter what is state of this flag because CSWR isn't
+supported on these PD's.
+
+We could remove this flag as well but thought that this might be
+useful especially when we add CORE RET, DEVICE OFF support.
+
+May be we keep this till the constraint frameworks comes in and
+then drop it once for all. I am ok with whatever direction you
+decide here.
+
+Regards,
+Santosh
