@@ -1,44 +1,51 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Mar 2011 08:56:05 +0000
-Subject: [PATCH 1/8] macb: unify at91 and avr32 platform data
-In-Reply-To: <20110311014140.GI9351@game.jcrosoft.org>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-2-git-send-email-jamie@jamieiles.com>
-	<4D78CCBC.2010807@atmel.com>
-	<20110310131724.GG6198@pulham.picochip.com>
-	<20110311014140.GI9351@game.jcrosoft.org>
-Message-ID: <20110311085605.GK6198@pulham.picochip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Mar 2011 10:04:36 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201103101552.15536.arnd@arndb.de>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<1299254660-15765-1-git-send-email-m.szyprowski@samsung.com>
+	<201103101552.15536.arnd@arndb.de>
+Message-ID: <002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 02:41:40AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:17 Thu 10 Mar     , Jamie Iles wrote:
-> > On Thu, Mar 10, 2011 at 02:06:04PM +0100, Nicolas Ferre wrote:
-> > > On 3/10/2011 11:10 AM, Jamie Iles :
-> > > > --- a/drivers/net/macb.c
-> > > > +++ b/drivers/net/macb.c
-> > > > @@ -18,12 +18,10 @@
-> > > >  #include <linux/netdevice.h>
-> > > >  #include <linux/etherdevice.h>
-> > > >  #include <linux/dma-mapping.h>
-> > > > +#include <linux/platform_data/macb.h>
-> > > >  #include <linux/platform_device.h>
-> > > >  #include <linux/phy.h>
-> > > >  
-> > > > -#include <mach/board.h>
-> > > > -#include <mach/cpu.h>
-> > > 
-> > > I did not bouble check but do we need no more cpu_is_ macros?
-> > 
-> > No, I couldn't see any in there and it builds for all of the AT91 
-> > targets and all of the AVR32 ones that I tried.  I can't see any macros 
-> > in there that are likely to use cpu_is_* internally either.
->
-> keep as we need to remove the #ifdef AT91 to cpu_is
+Hello,
+
+On Thursday, March 10, 2011 3:52 PM Arnd Bergmann wrote:
+
+> On Friday 04 March 2011, Marek Szyprowski wrote:
+> > From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> >
+> > This patch performs a complete rewrite of sysmmu driver for Samsung platform:
+> > - the new version introduces an api to construct device private page
+> >   tables and enables to use device private address space mode
+> > - simplified the resource management: no more single platform
+> >   device with 32 resources is needed, better fits into linux driver model,
+> >   each sysmmu instance has it's own resource definition
+> > - added support for sysmmu clocks
+> > - some other minor API chages required by upcoming videobuf2 allocator
+> >
+> > Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > 
-> I've patch for this
+> Please explain why create a new IOMMU API when we already have two
+> generic ones (include/linux/iommu.h and include/linux/dma-mapping.h).
+> 
+> Is there something that cannot be done with the common code?
+> The first approach should be to extend the existing APIs to
+> do what you need.
 
-Is this for the user IO register where the value written is conditional 
-on both RMII/MII and arch type?
+We followed the style of iommu API for other mainline ARM platforms (both OMAP and MSM
+also have custom API for their iommu modules). I've briefly checked include/linux/iommu.h
+API and I've noticed that it has been designed mainly for KVM support. There is also
+include/linux/intel-iommu.h interface, but I it is very specific to intel gfx chips.
 
-Jamie
+Is there any example how include/linux/dma-mapping.h interface can be used for iommu
+mappings?
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
