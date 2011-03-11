@@ -1,42 +1,25 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 11 Mar 2011 22:39:53 +0100
-Subject: [PATCH 3/8] ARM: PXA: Z2: Fix battery pdata
-In-Reply-To: <1299839023-16601-3-git-send-email-anarsoul@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 11 Mar 2011 23:41:27 +0200
+Subject: [PATCH 6/8] ARM: PXA: Z2: Fix libertas init/tear down sequences
+In-Reply-To: <201103112237.43566.marek.vasut@gmail.com>
 References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-	<1299839023-16601-3-git-send-email-anarsoul@gmail.com>
-Message-ID: <201103112239.53828.marek.vasut@gmail.com>
+	<1299839023-16601-6-git-send-email-anarsoul@gmail.com>
+	<201103112237.43566.marek.vasut@gmail.com>
+Message-ID: <201103112341.27439.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011 11:23:38 Vasily Khoruzhick wrote:
-> Fix coefficients to get actual voltage, and make
-> voltage_max/voltage_min looks like values for LiIon battery.
+On Friday 11 March 2011 23:37:43 Marek Vasut wrote:
+> On Friday 11 March 2011 11:23:41 Vasily Khoruzhick wrote:
+> > GPIO15 seems to be not related to WiFi, so don't touch it.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-
-You can have my:
-
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-
-on this one.
-> ---
->  arch/arm/mach-pxa/z2.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+> What's GPIO14 then? Also check Z2 kernel sources aeronix released, iirc
+> that's where I found gpio14.
 > 
-> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index dde3f1c..bffb920 100644
-> --- a/arch/arm/mach-pxa/z2.c
-> +++ b/arch/arm/mach-pxa/z2.c
-> @@ -463,9 +463,9 @@ static struct z2_battery_info batt_chip_info = {
->  	.batt_I2C_addr	= 0x55,
->  	.batt_I2C_reg	= 2,
->  	.charge_gpio	= GPIO0_ZIPITZ2_AC_DETECT,
-> -	.min_voltage	= 2400000,
-> -	.max_voltage	= 3700000,
-> -	.batt_div	= 69,
-> +	.min_voltage	= 3475000,
-> +	.max_voltage	= 4190000,
-> +	.batt_div	= 59,
->  	.batt_mult	= 1000000,
->  	.batt_tech	= POWER_SUPPLY_TECHNOLOGY_LION,
->  	.batt_name	= "Z2",
+> Cheers
+
+Don't know what it is, but according to my investigations via qemu (I added 
+traces on gpio access), stock kernel does not touch this gpio at all.
+
+Regards
+Vasily
