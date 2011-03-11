@@ -1,102 +1,65 @@
-From: eduardo.valentin@nokia.com (Eduardo Valentin)
-Date: Fri, 11 Mar 2011 19:58:16 +0200
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <20110311155257.GA6711@kroah.com>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<1299846911-15782-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103111532.52393.arnd@arndb.de>
-	<20110311155257.GA6711@kroah.com>
-Message-ID: <20110311175816.GC7291@besouro.research.nokia.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Fri, 11 Mar 2011 11:02:17 -0800
+Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
+In-Reply-To: <alpine.LFD.2.00.1103111853480.2787@localhost6.localdomain6>
+References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
+	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
+	<alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
+	<4D770E47.6050402@codeaurora.org>
+	<alpine.LFD.2.00.1103101126100.2787@localhost6.localdomain6>
+	<4D79A85D.8000301@codeaurora.org>
+	<alpine.LFD.2.00.1103111853480.2787@localhost6.localdomain6>
+Message-ID: <4D7A71B9.9000306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Fri, Mar 11, 2011 at 07:52:57AM -0800, ext Greg KH wrote:
-> On Fri, Mar 11, 2011 at 03:32:51PM +0100, Arnd Bergmann wrote:
-> > On Friday 11 March 2011, Maxime Coquelin wrote:
-> > > Common base to export System-on-Chip related informations through sysfs.
-> > > 
-> > > Creation of a "socinfo" directory under /sys/.
-> > > Creation of SoC information entries.
-> > > 
-> > > Signed-off-by: Maxime COQUELIN <maxime.coquelin-nonst@stericsson.com>
-> > 
-> > I think it's better than the previous patch to create an
-> > artificial device in /sys/devices/system/socinfo, but I'd
-> > still prefer the information to be attached to a real device
-> > that represents the SOC, as I explained in the discussion with
-> > Linus Walleij.
-> > 
-> > You should definitely add Greg on Cc, as he's maintaining sysfs
-> > and certainly has an opininion here.
-> > 
-> > 	Arnd
-> > 
-> > > ---
-> > >  Documentation/ABI/testing/sysfs-socinfo |   16 ++++++
-> > >  drivers/base/Kconfig                    |    3 +
-> > >  drivers/base/Makefile                   |    1 +
-> > >  drivers/base/soc.c                      |   79 +++++++++++++++++++++++++++++++
-> > >  include/linux/sys_soc.h                 |   50 +++++++++++++++++++
-> > >  5 files changed, 149 insertions(+), 0 deletions(-)
-> > >  create mode 100644 Documentation/ABI/testing/sysfs-socinfo
-> > >  create mode 100644 drivers/base/soc.c
-> > >  create mode 100644 include/linux/sys_soc.h
-> > > 
-> > > diff --git a/Documentation/ABI/testing/sysfs-socinfo b/Documentation/ABI/testing/sysfs-socinfo
-> > > new file mode 100644
-> > > index 0000000..afd9da2
-> > > --- /dev/null
-> > > +++ b/Documentation/ABI/testing/sysfs-socinfo
-> > > @@ -0,0 +1,16 @@
-> > > +What:		/sys/socinfo
-> > > +Date:		March 2011
-> > > +contact:	Maxime Coquelin <maxime.coquelin-nonst@stericsson.com>
-> > > +Description:
-> > > +		The /sys/socinfo directory contains information about the
-> > > +		System-on-Chip.	It is only available if platform implements it.
-> > > +		This directory contains two kind of attributes :
-> > > +			- common attributes: 
-> > > +				* machine: the name of the machine.
-> > > +				* family: the family name of the SoC
-> > > +			- SoC-specific attributes: The SoC vendor can declare attributes
-> > > +			  to export some strings to user-space, like the serial-number for
-> > > +			  example.
-> > > +
-> > > +Users:
-> > > +		User-space applications which needs these kind of attributes.
+>> Yes however while updating the code I noticed that I would need to keep
+>> account of all the interrupts enabled and all the interrupts marked wakeup.
+>> This aids in switching to the wakeup set in the suspend callback and the
+>> enabled set in the resume callback. I will update the resume callback to
+>> enable the interrupts in irqs_allowed(the local state storage) in the next
+>> patch (my current patch does not do that).
+>>
+>> IOW I need to keep the local state storage.
 > 
-> I thought I rejected this the last time it came around?
-> 
+> Wrong. The interrupts are disabled and reenabled by the core code and
+> not by some extra suspend/resume callbacks in your driver. The core
+> checks those marked as IRQ_WAKE, the wake callback to the irq chip is
+> only there if you need to set up some hardware register in order to
+> make the wake functionality work. So again, you don't need local state
+> as the core tracks the state for you.
 
-Greg,
+Help me understand this, the core code calls disable on all the 
+interrupts while going to suspend. Notice that I have no disable 
+callback, which means those interrupts remain unmasked.
 
-Do you mind sharing the link of the thread where you have reject this?
+I could have a situation, when the system(a mobile phone) goes to 
+suspend we dont want to wake it up because of unnecessary interrupts. A 
+good example is, we want to wakeup the phone if the battery goes low, 
+but dont want to wake it up if an acceleromter interrupt triggers. The 
+drivers respectively mark the battery low interrupt as wakeup and the 
+accelerometer interrupt as a non-wake up interrupt. Assume both of them 
+are edge triggered interrupts.
 
-> I still fail to understand why this is needed, please provide more
-> information about why you feel this is something that the kernel needs.
+The genirq code does not mask the interrupt while going to suspend, it 
+only calls disable(), which I understand should not mask the interrupt 
+for check_wakeup_irqs() to work.
 
-In case of OMAP, there are few ids that we would expose to user space,
-like serial, revision and die id to quote some from top of my mind.
-I must emphasize  that these are not data from CPU at all, they belong
-to SoC itself.
+If I don't mask that accelerometer interrupts in the interrupt 
+controller's suspend() the phone will wakeup every time the user moves 
+around, draining the battery unnecessarily.
 
-This info can be useful to track buggy silicon misbehaving on products
-which are already on the market. For instance, one possible usage would
-be to collect from products which arrives on customer care centers.
+One might say that the accelerometer should be deactivated in the 
+suspend callback of the accelerometer driver. Yes this can be done and 
+we will not see an interrupt while suspended. However not all hardware 
+can be deactivated like that. There are some devices which simply 
+interrupt and the only way to keep from waking up is masking their 
+interrupts.
 
-That's obviously the view I have from OMAP perspective.
+How do you suggest I mask the accelerometer interrupt?
 
-But looks like if we had some common way to expose this data, not only
-OMAP socs would benefit of it, as you can see interest from other soc vendors
-in this thread (also on V1 of this patch set or on my original patch set over /proc)
-
-
-> 
-> thanks,
-> 
-> greg k-h
-
--- 
-Eduardo Valentin
+Abhijeet
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
