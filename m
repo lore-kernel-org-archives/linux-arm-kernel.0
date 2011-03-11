@@ -1,54 +1,85 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 22:53:29 +0530
-Subject: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
-In-Reply-To: <1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
-References: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
-	<1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <6a989dbef4ba595858b7f5b5754d78ef@mail.gmail.com>
+Date: Fri, 11 Mar 2011 22:56:41 +0530
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <871v2dd58y.fsf@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
+	<871v2dd58y.fsf@ti.com>
+Message-ID: <f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Kevin,
+
 > -----Original Message-----
 > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Friday, March 11, 2011 10:38 PM
-> To: Todd Poynor
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
->
-> On Wed, 2011-02-23 at 03:55 +0000, Todd Poynor wrote:
-> > Enable dynamic high level clock gating for Cortex-A9 CPUs, as
-> > described in 2.3.3 "Dynamic high level clock gating" of the
-> > Cortex-A9 TRM.  This may cut the clock of the integer core,
-> > system control block, and Data Engine in certain conditions.
-> >
-> > Add ARM errata 720791 to avoid corrupting the Jazelle
-> > instruction stream on earlier Cortex-A9 revisions.
-> >
-> > Signed-off-by: Todd Poynor <toddpoynor@google.com>
-> > ---
-> > Can anyone advise whether this feature should be selectively
-> > enabled (or otherwise modified) due to secured register access,
-> > introduced latencies observed, etc.?
-> >
-> > This has been tested on a few Tegra 2 boards without problems
-> > observed thus far, and some preliminary testing indicates it
-> > may result in fairly significant power savings.  Any additional
-> > testing greatly appreciated.
->
-> I haven't done any benchmarks on this, so can't comment on this.
->
-> My view is that something like the boot monitor/firmware should set
-> this
-> up, though that's not always the case. On some OMAP boards Linux
-> runs in
-> non-secure mode and it will fault when trying to set this bit.
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Kevin Hilman
+> Sent: Friday, March 11, 2011 9:22 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Rajendra Nayak
+> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend,CPU-hotplug and
+> CPUilde support.
 >
 
-Or this can be also enabled in the SOC PM initiliasation code
-instead of generic code so that the kernel is independent of
-boot loaders. Ofcourse downside to this is, every SOC will have
-this code duplicated.
+[....]
 
-Regards,
-Santosh
+> >
+> > So just to summaries, on OMAP$ 'enable_off_mode' flag is
+> > used __only__ in Suspend. CPUx power domain always hit OFF
+> > mode no matter what is state of this flag because CSWR isn't
+> > supported on these PD's.
+>
+> If it's useful only in suspend, then it's redundant with the
+> <debugfs>/pm_debug/*_pwrdm/suspend controls which allow per-pwrdm
+> control over next states.
+>
+> > We could remove this flag as well but thought that this might be
+> > useful especially when we add CORE RET, DEVICE OFF support.
+>
+> I'd rather see working off-mode be a requirement for getting OMAP4
+> drivers supported.
+>
+> Also, we can still test suspend/resume with off-mode disabled by
+> using the above debugfs controls.
+>
+> > May be we keep this till the constraint frameworks comes in and
+> > then drop it once for all. I am ok with whatever direction you
+> > decide here.
+>
+> I prefer to drop it completely for OMAP4.
+>
+OK. Lets do that.
+
+Just to not miss your point here, what I understood here
+is default suspend state on OMAP$B will be off mode.
+
+We still keep "enable_off_mode" flag for testing so that we
+can disable off mode to debug regressions.
+
+Is that right?
+If yes then only below update is needed.
+
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 2e18c1d..1a8cbdd 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -167,7 +167,7 @@ static int __init pwrdms_setup(struct powerdomain
+*pwrdm, void *unused)
+ 		return -ENOMEM;
+
+ 	pwrst->pwrdm = pwrdm;
+-	pwrst->next_state = PWRDM_POWER_RET;
++	pwrst->next_state = PWRDM_POWER_OFF;
+ 	list_add(&pwrst->node, &pwrst_list);
+
+ 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+@@ -253,6 +253,8 @@ static int __init omap4_pm_init(void)
+ 		pr_err("Failed to initialise OMAP4 MPUSS\n");
+ 		goto err2;
+ 	}
++	
++	enable_off_mode = 1;
+ #endif
+
+ #ifdef CONFIG_SUSPEND
