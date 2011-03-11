@@ -1,41 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Mar 2011 16:56:43 -0000
-Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for
-	chained handlers
-In-Reply-To: <alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-	<1299604405-12960-2-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
-Message-ID: <000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Fri, 11 Mar 2011 17:01:21 +0000
+Subject: [RFC] kprobes with thumb2 conditional code
+Message-ID: <1299862881.2512.314.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, 8 Mar 2011, Will Deacon wrote:
-> 
-> > Some chained IRQ handlers are written to cope with primary chips of
-> > potentially different flow types. Whether this a sensible thing to do
-> > is a point of contention.
-> 
-> That wants a comment that these functions are only dealing with
-> fasteoi and level type flow control.
-> 
-> Otherwise fine with me. Feel free to add my Acked-by.
+Hello All
 
-Thanks Thomas, reworded as followed:
+I'm about to start work on getting kprobes working with thumb2.
 
-    ARM: irq: introduce entry and exit functions for chained handlers
-    
-    Some chained IRQ handlers are written to cope with primary chips of
-    potentially different flow types. Whether this a sensible thing to do
-    is a point of contention.
-    
-    This patch introduces entry/exit functions for chained handlers which
-    infer the flow type of the primary chip as fasteoi or level-type by
-    checking whether or not the ->irq_eoi function pointer is present and
-    calling back to the primary chip as necessary. Other methods of flow
-    control are not considered.
+One of the issues I have is that when probes are placed onto
+conditionally executed instructions in a IT block, they may not fire if
+the condition is not met. This is because on ARM we use invalid
+instructions for breakpoints, and the ARM ARM says:
 
-I'll add your Ack and put this (patch 1) in Russell's patch system next
-week.
+  "it is IMPLEMENTATION DEFINED whether the instruction executes as a
+   NOP or causes an Undefined Instruction exception"
 
-Will
+This is a similar issue to that already encountered by GDB [1][2]
+
+If we take this code as an example...
+
+probe1:
+if(condition) {
+probe2:
+    some_code;
+}
+
+It seams reasonable at first sight that probe2 would only fire if the
+condition is true. This will always be the case if the compiler
+generates test-and-branch code, but if it generates conditionally
+executed instructions for 'some_code' then it gets complicated...
+
+The current arm kprobes implementation will always fire probe2 because
+it uses unconditional instructions for its breakpoints. With thumb
+instructions we can't force unconditional execution, so we would have an
+'implementation defined' situation whether it would fire or not when the
+condition is false. (Thought you would hope it would be consistent on a
+particular device.)
+
+Some options for dealing with this, in increasing order of
+complexity... 
+
+1. Accept the situation as described.
+
+2. Change arm probes to use conditional instructions so we would
+(hopefully) have consistent undefined behaviour in both arm and thumb
+code. (If that isn't an oxymoron :-)
+
+3. Do 2, and modify kprobe_handler to test for false firings (breakpoint
+when condition false) and not execute the probe's callback functions in
+these cases. E.g. consistently make probe2 appear to not fire when
+condition is false.
+
+4. Make thumb probes fire unconditionally like current arm
+implementation...
+
+4a. Use breakpoint instructions rather than undefined instructions for
+kprobes. Apparently this doesn't play nicely with hardware debuggers [2]
+though I don't have enough experience in this area to otherwise comment.
+
+4b. Rewrite IT blocks when probes are inserted into them to make the
+breakpoint unconditional. This would require parsing backwards through
+the instruction stream to find the IT instruction, which I don't believe
+is possible with variable length thumb instructions. Or, another
+possibility which was suggested to me, use the unwind table to find the
+start of the containing function and parse forwards to find the IT
+instruction. Though the kernel doesn't currently have enough information
+to skip things like inline data that may be the function.
+
+The effort, complexity and bloat involved in 4b seems to be rather
+excessive to me, even before getting into the book-keeping required to
+handle multiple probes in the same IT block. So 4b is a bit of a straw
+man.
+
+BTW, does anyone know of any test code for kprobes, particularly with
+regard to checking emulation/single-stepping of the different CPU
+instructions?
+
+Thanks for any feedback
+
+-- 
+Tixy
+
+
+[1] http://permalink.gmane.org/gmane.comp.gdb.patches/54862  
+[2]
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/72199/focus=73489
