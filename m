@@ -1,40 +1,43 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 11 Mar 2011 23:55:28 +0200
-Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
-In-Reply-To: <201103112250.56967.marek.vasut@gmail.com>
-References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
-	<201103112349.13252.anarsoul@gmail.com>
-	<201103112250.56967.marek.vasut@gmail.com>
-Message-ID: <201103112355.29081.anarsoul@gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 11 Mar 2011 14:03:33 -0800
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <201103112242.43962.arnd@arndb.de>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<20110311175816.GC7291@besouro.research.nokia.com>
+	<20110311193330.GA14204@kroah.com>
+	<201103112242.43962.arnd@arndb.de>
+Message-ID: <20110311220333.GA30232@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011 23:50:56 Marek Vasut wrote:
-> On Friday 11 March 2011 22:49:13 Vasily Khoruzhick wrote:
-> > On Friday 11 March 2011 23:42:30 Marek Vasut wrote:
-> > > On Friday 11 March 2011 15:56:46 Vasily Khoruzhick wrote:
-> > > > This patch is a part of similar mozzwald's patch which was
-> > > > based on GPSFan and rkdavis work.
-> > > 
-> > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
-> > > comment for this patch is irelevant and has zero information value.
-> > 
-> > Heh, I can add 'from Zipit Z2 community', I don't know their actual names
-> > nor mail addresses.
+On Fri, Mar 11, 2011 at 10:42:43PM +0100, Arnd Bergmann wrote:
+> On Friday 11 March 2011 20:33:30 Greg KH wrote:
+> > Make this a "real" device not /sys/socinfo please.  It can be a platform
+> > device that export the needed information, that way you can have
+> > multiple ones.
 > 
-> That's not the point. The point is the comment has zero value, it doesn't
-> describe the change.
-> 
-> > > I also suspect, the pins on the back connector are USB UDC, not UHC ...
-> > > aka. the hardware has no UHC.
-> > 
-> > They are UHC, check http://www.mozzwald.com/node/60
-> 
-> So it is compliant or is it a hack ?
+> Note that the version 1 of this patch had a device, and I argued against
+> that patch on the basis that anything under /sys/devices/ should
+> reflect an actual part of the hardware, which socinfo by itself
+> does not.
 
-PXA27x has OHCI (check datasheet), and it's wired to expansion connector, so 
-you can use it with self-powered USB devices (Zipit Z2 provides only 3.3V on 
-expansion connector). It's definitely not a hack.
+Why is the overall SoC not a device?  cpus are (well, they will be in a
+few kernel versions in the future), so what makes the other bits somehow
+"special"?
 
-Regards
-Vasily
+> I believe the best way to represent this really is to have
+> a device (platform or other, I don't care) that:
+> 
+> * represents the SOC in its entirety
+> * has the subdevices that are part of the SOC as direct
+>   or indirect children
+> * can be identified easily as a SOC (through one of
+>   its name, its place in the hierarchy or its bus_type)
+> * has the standard device attributes proposed in Maxime's
+>   patch.
+
+That's fine, as it would be a real "struct device" :)
+
+thanks,
+
+greg k-h
