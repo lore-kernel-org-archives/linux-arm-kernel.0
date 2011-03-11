@@ -1,32 +1,42 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 11 Mar 2011 16:29:27 +0000
-Subject: [PATCH] arm: realview: Fix secondary GIC initialisation for EB with
-	MPCore tile
-Message-ID: <1299860967-31330-1-git-send-email-pawel.moll@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Mar 2011 08:32:24 -0800
+Subject: [GIT PULL] OMAP PM updates for 2.6.39
+In-Reply-To: <AANLkTimMsYhCqqRjcBDCMDT4=iTwBG_qLHWjuxVZTmXE@mail.gmail.com>
+	(Jean Pihet's message of "Fri, 11 Mar 2011 16:33:40 +0100")
+References: <87k4g6eakw.fsf@ti.com>
+	<AANLkTimMsYhCqqRjcBDCMDT4=iTwBG_qLHWjuxVZTmXE@mail.gmail.com>
+Message-ID: <87k4g5botj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second GIC, present when EB board is used with a MPCore tile,
-was initialised starting with irq number 64, which made interrupts
-64-95 in the primary GIC unusable.
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mach-realview/realview_eb.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> Hi Kevin,
+>
+> On Fri, Mar 11, 2011 at 1:59 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Tony,
+>>
+>> Please pull the following OMAP PM related changes for the upcoming
+>> 2.6.39 merge window.
+>>
+>> Kevin
+>>
+>> The following changes since commit a5abba989deceb731047425812d268daf7536575:
+>>
+>> ?Linux 2.6.38-rc8 (2011-03-07 21:09:37 -0800)
+>>
+>> are available in the git repository at:
+>> ?ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.39/pm-misc
+>
+> Waht about the following patch? IIUC it is scheduled for .39.
+>
+>     perf: add OMAP support for the new power events
+>
 
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 6ef5c5e..7b5557b 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -369,7 +369,7 @@ static void __init gic_init_irq(void)
- 
- #ifndef CONFIG_REALVIEW_EB_ARM11MP_REVB
- 		/* board GIC, secondary */
--		gic_init(1, 64, __io_address(REALVIEW_EB_GIC_DIST_BASE),
-+		gic_init(1, 96, __io_address(REALVIEW_EB_GIC_DIST_BASE),
- 			 __io_address(REALVIEW_EB_GIC_CPU_BASE));
- 		gic_cascade_irq(1, IRQ_EB11MP_EB_IRQ1);
- #endif
--- 
-1.6.3.3
+I have another branch (for_2.6.39/pm-integration) that is based on
+Paul's integration branch and includes your perf patch.
+
+Once Tony pulls Paul's integration branch, I will send Tony a 2nd pull
+request for this branch.
+
+Kevin
