@@ -1,38 +1,51 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 11 Mar 2011 12:23:43 +0200
-Subject: [PATCH 8/8] ARM: PXA: Z2: Add default triggers for LEDs
-In-Reply-To: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1299839023-16601-8-git-send-email-anarsoul@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Mar 2011 12:50:51 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103101552.15536.arnd@arndb.de>
+	<002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
+Message-ID: <201103111250.51252.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So user can see if there's any mmc activity and if device's
-charging.
+On Friday 11 March 2011, Marek Szyprowski wrote:
+> 
+> We followed the style of iommu API for other mainline ARM platforms (both OMAP and MSM
+> also have custom API for their iommu modules). I've briefly checked include/linux/iommu.h
+> API and I've noticed that it has been designed mainly for KVM support. There is also
+> include/linux/intel-iommu.h interface, but I it is very specific to intel gfx chips.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-pxa/z2.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+The MSM code actually uses the generic iommu.h code, using register_iommu, so
+the drivers can use the regular iommu_map.
 
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 2fac54d..7314a79 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -315,12 +315,12 @@ struct gpio_led z2_gpio_leds[] = {
- 	.active_low		= 1,
- }, {
- 	.name			= "z2:green:charged",
--	.default_trigger	= "none",
-+	.default_trigger	= "mmc0",
- 	.gpio			= GPIO85_ZIPITZ2_LED_CHARGED,
- 	.active_low		= 1,
- }, {
- 	.name			= "z2:amber:charging",
--	.default_trigger	= "none",
-+	.default_trigger	= "Z2-charging-or-full",
- 	.gpio			= GPIO83_ZIPITZ2_LED_CHARGING,
- 	.active_low		= 1,
- },
--- 
-1.7.4.1
+I believe the omap code predates the iommu API, and should really be changed
+to use that. At least it was added before I started reviewing the code.
+
+The iommu API is not really meant to be KVM specific, it's just that the
+in-tree users are basically limited to KVM at the moment. Another user that
+is coming up soon is the vmio device driver that can be used to transparently
+pass devices to user space. The idea behind the IOMMU API is that you can
+map arbitrary bus addresses to physical memory addresses, but it does not
+deal with allocating the bus addresses or providing buffer management such
+as cache flushes.
+
+> Is there any example how include/linux/dma-mapping.h interface can be used for iommu
+> mappings?
+
+The dma-mapping API is the normal interface that you should use for IOMMUs
+that sit between DMA devices and kernel memory. The idea is that you
+completely abstract the concept of an IOMMU so the device driver uses
+the same code for talking to a device with an IOMMU and another device with
+a linear mapping or an swiotlb bounce buffer.
+
+This means that the user of the dma-mapping API does not get to choose the
+bus addresses, but instead you use the API to get a bus address for a
+chunk of memory, and then you can pass that address to a device.
+
+See arch/powerpc/kernel/iommu.c and arch/x86/kernel/amd_iommu.c for common
+examples of how this is implemented. The latter one actually implements
+both the iommu_ops for iommu.h and dma_map_ops for dma-mapping.h.
+
+	Arnd
