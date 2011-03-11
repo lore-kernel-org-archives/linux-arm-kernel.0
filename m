@@ -1,222 +1,111 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 11 Mar 2011 16:08:05 -0700
-Subject: [PATCH 03/10] ux500: Adding custom pin configuration file for
-	snowball. - Adding dependency in Makefile. - Adding init
-	function call to board-snowball.c - New header file.
+Date: Fri, 11 Mar 2011 16:08:07 -0700
+Subject: [PATCH 05/10] smsc911x: use shifted register access
 In-Reply-To: <1299884892-6766-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1299884892-6766-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1299884892-6766-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1299884892-6766-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
+From: Alessandro Rubini <rubini@gnudd.com>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+At least one of the boards using this chip needs a shift in
+register access. This adds a "shift" field in the platform data
+to have the chip working in all cases without special ifdef.
+The approach is similaro to the one used in serial_8250 and other
+places.  Performance-wise no difference is reported.
+
+Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 ---
- arch/arm/mach-ux500/Makefile              |    1 +
- arch/arm/mach-ux500/board-snowball-pins.c |  133 +++++++++++++++++++++++++++++
- arch/arm/mach-ux500/board-snowball.c      |    4 +-
- arch/arm/mach-ux500/board-snowball.h      |   18 ++++
- 4 files changed, 155 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-ux500/board-snowball-pins.c
- create mode 100644 arch/arm/mach-ux500/board-snowball.h
+ drivers/net/smsc911x.c   |   27 ++++++++++++++++++---------
+ include/linux/smsc911x.h |    1 +
+ 2 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 60c26c6..d74f303 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
- 				board-mop500-u8500uib.o \
- 				board-mop500-pins.o
- obj-$(CONFIG_MACH_U8500_SNOWBALL) += board-snowball.o \
-+				board-snowball-pins.o \
- 				board-mop500-regulators.o
- obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-diff --git a/arch/arm/mach-ux500/board-snowball-pins.c b/arch/arm/mach-ux500/board-snowball-pins.c
-new file mode 100644
-index 0000000..216fd50
---- /dev/null
-+++ b/arch/arm/mach-ux500/board-snowball-pins.c
-@@ -0,0 +1,133 @@
-+/*
-+ * Copyright (C) 2011-2012 ST-Ericsson
-+ *
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/gpio.h>
-+
-+#include <plat/pincfg.h>
-+
-+#include <mach/hardware.h>
-+
-+#include "pins-db8500.h"
-+
-+static pin_cfg_t snowball_pins[] = {
-+	/* I2C */
-+	GPIO147_I2C0_SCL,
-+	GPIO148_I2C0_SDA,
-+	GPIO16_I2C1_SCL,
-+	GPIO17_I2C1_SDA,
-+	GPIO10_I2C2_SDA,
-+	GPIO11_I2C2_SCL,
-+	GPIO229_I2C3_SDA,
-+	GPIO230_I2C3_SCL,
-+
-+        /* SSP0, to AB8500 */
-+	GPIO143_SSP0_CLK,
-+	GPIO144_SSP0_FRM,
-+	GPIO145_SSP0_RXD	| PIN_PULL_DOWN,
-+	GPIO146_SSP0_TXD,
-+
-+	/* MSP0: BT */
-+	GPIO12_MSP0_TXD,
-+	GPIO13_MSP0_TFS,
-+	GPIO14_MSP0_TCK,
-+	GPIO15_MSP0_RXD,
-+
-+	/* MSP2: HDMI */
-+	GPIO193_MSP2_TXD,
-+	GPIO194_MSP2_TCK,
-+	GPIO195_MSP2_TFS,
-+	GPIO196_MSP2_RXD	| PIN_OUTPUT_LOW,
-+
-+	/* MMC0: MicroSD card */
-+	GPIO18_MC0_CMDDIR	| PIN_OUTPUT_HIGH,
-+	GPIO19_MC0_DAT0DIR	| PIN_OUTPUT_HIGH,
-+	GPIO20_MC0_DAT2DIR	| PIN_OUTPUT_HIGH,
-+	GPIO21_MC0_DAT31DIR	| PIN_OUTPUT_HIGH,
-+	GPIO22_MC0_FBCLK	| PIN_INPUT_NOPULL,
-+	GPIO23_MC0_CLK		| PIN_OUTPUT_LOW,
-+	GPIO24_MC0_CMD		| PIN_INPUT_PULLUP,
-+	GPIO25_MC0_DAT0		| PIN_INPUT_PULLUP,
-+	GPIO26_MC0_DAT1		| PIN_INPUT_PULLUP,
-+	GPIO27_MC0_DAT2		| PIN_INPUT_PULLUP,
-+	GPIO28_MC0_DAT3		| PIN_INPUT_PULLUP,
-+
-+	/* SDI1: WLAN */
-+	GPIO208_MC1_CLK		| PIN_OUTPUT_LOW,
-+	GPIO209_MC1_FBCLK	| PIN_INPUT_NOPULL,
-+	GPIO210_MC1_CMD		| PIN_INPUT_PULLUP,
-+	GPIO211_MC1_DAT0	| PIN_INPUT_PULLUP,
-+	GPIO212_MC1_DAT1	| PIN_INPUT_PULLUP,
-+	GPIO213_MC1_DAT2	| PIN_INPUT_PULLUP,
-+	GPIO214_MC1_DAT3	| PIN_INPUT_PULLUP,
-+
-+	/* MMC2: LAN */
-+	GPIO86_SM_ADQ0,
-+	GPIO87_SM_ADQ1,
-+	GPIO88_SM_ADQ2,
-+	GPIO89_SM_ADQ3,
-+	GPIO90_SM_ADQ4,
-+	GPIO91_SM_ADQ5,
-+	GPIO92_SM_ADQ6,
-+	GPIO93_SM_ADQ7,
-+
-+	GPIO94_SM_ADVn,
-+	GPIO95_SM_CS0n,
-+	GPIO96_SM_OEn,
-+	GPIO97_SM_WEn,
-+
-+	GPIO128_SM_CKO,
-+	GPIO130_SM_FBCLK,
-+	GPIO131_SM_ADQ8,
-+	GPIO132_SM_ADQ9,
-+	GPIO133_SM_ADQ10,
-+	GPIO134_SM_ADQ11,
-+	GPIO135_SM_ADQ12,
-+	GPIO136_SM_ADQ13,
-+	GPIO137_SM_ADQ14,
-+	GPIO138_SM_ADQ15,
-+
-+	/* RSTn_LAN */
-+	GPIO141_GPIO		| PIN_OUTPUT_HIGH,
-+
-+	/* MMC4: eMMC */
-+	GPIO197_MC4_DAT3	| PIN_INPUT_PULLUP,
-+	GPIO198_MC4_DAT2	| PIN_INPUT_PULLUP,
-+	GPIO199_MC4_DAT1	| PIN_INPUT_PULLUP,
-+	GPIO200_MC4_DAT0	| PIN_INPUT_PULLUP,
-+	GPIO201_MC4_CMD		| PIN_INPUT_PULLUP,
-+	GPIO202_MC4_FBCLK	| PIN_INPUT_NOPULL,
-+	GPIO203_MC4_CLK		| PIN_OUTPUT_LOW,
-+	GPIO204_MC4_DAT7	| PIN_INPUT_PULLUP,
-+	GPIO205_MC4_DAT6	| PIN_INPUT_PULLUP,
-+	GPIO206_MC4_DAT5	| PIN_INPUT_PULLUP,
-+	GPIO207_MC4_DAT4	| PIN_INPUT_PULLUP,
-+
-+	GPIO141_GPIO		| PIN_OUTPUT_HIGH, /* RSTn_LAN */
-+
-+	/* UART: WLAN */
-+	GPIO0_U0_CTSn	| PIN_INPUT_PULLUP,
-+	GPIO1_U0_RTSn	| PIN_OUTPUT_HIGH,
-+	GPIO2_U0_RXD	| PIN_INPUT_PULLUP,
-+	GPIO3_U0_TXD	| PIN_OUTPUT_HIGH,
-+
-+	/* UART: DBG port */
-+	GPIO29_U2_RXD	| PIN_INPUT_PULLUP,
-+	GPIO30_U2_TXD	| PIN_OUTPUT_HIGH,
-+	GPIO31_U2_CTSn	| PIN_INPUT_PULLUP,
-+	GPIO32_U2_RTSn	| PIN_OUTPUT_HIGH,
-+};
-+
-+void __init snowball_pins_init(void)
-+{
-+	nmk_config_pins(snowball_pins,
-+				ARRAY_SIZE(snowball_pins));
-+}
-diff --git a/arch/arm/mach-ux500/board-snowball.c b/arch/arm/mach-ux500/board-snowball.c
-index 620f132..3b351ef 100644
---- a/arch/arm/mach-ux500/board-snowball.c
-+++ b/arch/arm/mach-ux500/board-snowball.c
-@@ -36,7 +36,7 @@
+diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+index 64bfdae..a21c551 100644
+--- a/drivers/net/smsc911x.c
++++ b/drivers/net/smsc911x.c
+@@ -120,12 +120,15 @@ struct smsc911x_data {
  
- #include "ste-dma40-db8500.h"
- #include "devices-db8500.h"
--#include "board-mop500.h"
-+#include "board-snowball.h"
- #include "board-mop500-regulators.h"
- 
- static struct ab8500_platform_data ab8500_platdata = {
-@@ -238,6 +238,8 @@ static void __init mop500_init_machine(void)
+ static inline u32 __smsc911x_reg_read(struct smsc911x_data *pdata, u32 reg)
  {
- 	u8500_init_devices();
++	void __iomem *addr = pdata->ioaddr;
++	int shift = pdata->config.shift;
++
+ 	if (pdata->config.flags & SMSC911X_USE_32BIT)
+-		return readl(pdata->ioaddr + reg);
++		return readl(addr + (reg << shift));
  
-+	snowball_pins_init();
-+
- 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+ 	if (pdata->config.flags & SMSC911X_USE_16BIT)
+-		return ((readw(pdata->ioaddr + reg) & 0xFFFF) |
+-			((readw(pdata->ioaddr + reg + 2) & 0xFFFF) << 16));
++		return ((readw(addr + (reg << shift)) & 0xFFFF) |
++			((readw(addr + ((reg + 2) << shift)) & 0xFFFF) << 16));
  
- 	mop500_i2c_init();
-diff --git a/arch/arm/mach-ux500/board-snowball.h b/arch/arm/mach-ux500/board-snowball.h
-new file mode 100644
-index 0000000..fe08f7e
---- /dev/null
-+++ b/arch/arm/mach-ux500/board-snowball.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
+ 	BUG();
+ 	return 0;
+@@ -146,14 +149,17 @@ static inline u32 smsc911x_reg_read(struct smsc911x_data *pdata, u32 reg)
+ static inline void __smsc911x_reg_write(struct smsc911x_data *pdata, u32 reg,
+ 					u32 val)
+ {
++	void __iomem *addr = pdata->ioaddr;
++	int shift = pdata->config.shift;
 +
-+#ifndef __BOARD_SNOWBALL_H
-+#define __BOARD_SNOWBALL_H
-+
-+struct i2c_board_info;
-+
-+extern void mop500_sdi_init(void);
-+void __init snowball_pins_init(void);
-+
-+void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
-+		unsigned n);
-+
-+#endif
+ 	if (pdata->config.flags & SMSC911X_USE_32BIT) {
+-		writel(val, pdata->ioaddr + reg);
++		writel(val, addr + (reg << shift));
+ 		return;
+ 	}
+ 
+ 	if (pdata->config.flags & SMSC911X_USE_16BIT) {
+-		writew(val & 0xFFFF, pdata->ioaddr + reg);
+-		writew((val >> 16) & 0xFFFF, pdata->ioaddr + reg + 2);
++		writew(val & 0xFFFF, addr + (reg << shift));
++		writew((val >> 16) & 0xFFFF, addr + ((reg + 2) << shift));
+ 		return;
+ 	}
+ 
+@@ -187,7 +193,8 @@ smsc911x_tx_writefifo(struct smsc911x_data *pdata, unsigned int *buf,
+ 	}
+ 
+ 	if (pdata->config.flags & SMSC911X_USE_32BIT) {
+-		writesl(pdata->ioaddr + TX_DATA_FIFO, buf, wordcount);
++		writesl(pdata->ioaddr + (TX_DATA_FIFO << pdata->config.shift),
++			buf, wordcount);
+ 		goto out;
+ 	}
+ 
+@@ -219,7 +226,8 @@ smsc911x_rx_readfifo(struct smsc911x_data *pdata, unsigned int *buf,
+ 	}
+ 
+ 	if (pdata->config.flags & SMSC911X_USE_32BIT) {
+-		readsl(pdata->ioaddr + RX_DATA_FIFO, buf, wordcount);
++		readsl(pdata->ioaddr + (RX_DATA_FIFO << pdata->config.shift),
++					buf, wordcount);
+ 		goto out;
+ 	}
+ 
+@@ -2003,7 +2011,8 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 
+ 	dev->irq = irq_res->start;
+ 	irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+-	pdata->ioaddr = ioremap_nocache(res->start, res_size);
++	pdata->ioaddr = ioremap_nocache(res->start,
++					(res_size << config->shift));
+ 
+ 	/* copy config parameters across to pdata */
+ 	memcpy(&pdata->config, config, sizeof(pdata->config));
+diff --git a/include/linux/smsc911x.h b/include/linux/smsc911x.h
+index 7144e8a..cff97bc 100644
+--- a/include/linux/smsc911x.h
++++ b/include/linux/smsc911x.h
+@@ -29,6 +29,7 @@ struct smsc911x_platform_config {
+ 	unsigned int irq_polarity;
+ 	unsigned int irq_type;
+ 	unsigned int flags;
++	unsigned int shift; /* for register access */
+ 	phy_interface_t phy_interface;
+ 	unsigned char mac[6];
+ };
 -- 
 1.7.1
