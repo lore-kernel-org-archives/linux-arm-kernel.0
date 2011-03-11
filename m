@@ -1,76 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 18:01:12 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: 3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com> 3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com
-Message-ID: <49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Mar 2011 13:35:21 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201103111250.51252.arnd@arndb.de>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103101552.15536.arnd@arndb.de>
+	<002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
+	<201103111250.51252.arnd@arndb.de>
+Message-ID: <000001cbdfe8$ce444b20$6acce160$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-> -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Friday, March 11, 2011 11:22 AM
-> To: Kevin Hilman
-> Cc: 'linux-omap at vger.kernel.org'; Rajendra Nayak; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: RE: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
-> CPUilde support.
->
-> > -----Original Message-----
-> > From: Kevin Hilman [mailto:khilman at ti.com]
-> > Sent: Friday, March 11, 2011 7:13 AM
-> > To: Santosh Shilimkar
-> > Cc: linux-omap at vger.kernel.org; rnayak at ti.com; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
-> > CPUilde support.
+Hello,
+
+On Friday, March 11, 2011 12:51 PM Arnd Bergmann wrote:
+
+> On Friday 11 March 2011, Marek Szyprowski wrote:
 > >
-> > Hi Santosh,
-> >
-> > Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> [....]
->
-> >
-> > This series doesn't boot on ES1 (boot log below.)  Do we need to
-> > totally prevent WFI on ES1?
-> >
-Nope. WFI is ok.
-The ES1.0 boot issue on pm-core branch doesn't seems to
-be related to this series. Without this series as well
-OMAP4 ES1.0 is not booting for me. When I disable
-CONFIG_PM + WATCHDOG fix, it booted ok. I will
-git-bisect this later on pm-core branch.
+> > We followed the style of iommu API for other mainline ARM platforms (both OMAP and MSM
+> > also have custom API for their iommu modules). I've briefly checked include/linux/iommu.h
+> > API and I've noticed that it has been designed mainly for KVM support. There is also
+> > include/linux/intel-iommu.h interface, but I it is very specific to intel gfx chips.
+> 
+> The MSM code actually uses the generic iommu.h code, using register_iommu, so
+> the drivers can use the regular iommu_map.
+> 
+> I believe the omap code predates the iommu API, and should really be changed
+> to use that. At least it was added before I started reviewing the code.
+> 
+> The iommu API is not really meant to be KVM specific, it's just that the
+> in-tree users are basically limited to KVM at the moment. Another user that
+> is coming up soon is the vmio device driver that can be used to transparently
+> pass devices to user space. The idea behind the IOMMU API is that you can
+> map arbitrary bus addresses to physical memory addresses, but it does not
+> deal with allocating the bus addresses or providing buffer management such
+> as cache flushes.
 
-> > Also, if we want a CPUidle enabled kernel to boot on all silicon,
-> > it will need a omap_rev() check during init to ensure it doesn't
-> > override the default idle path.
-> >
-OMAP4 PM series already takes care of not overriding
-the default idle path for ES1.0. The omap4_mpuss_init()
-fails on ES1.0 and hence the CPUidle init is skipped in
-that case.
+Yea, I've noticed this and this basically what we expect from iommu driver. 
+However the iommu.h API requires a separate call to map each single memory page.
+This is quite ineffective approach and imho the API need to be extended to allow
+mapping of the arbitrary set of pages.
 
-Just to further check, I pulled the latest omap-for-linus
-branch and merged Paul's pull-request into it. Then
-applied OMAP4 PM series and I got a boot crash, a different
-one. This was again related to clock-domain initialization
-and static deps. I fixed this issue by avoiding omap4_pm_init()
-code running on ES1.0. With this boot on ES1.0 works fine now
-with OMAP4 PM series.
+> > Is there any example how include/linux/dma-mapping.h interface can be used for iommu
+> > mappings?
+> 
+> The dma-mapping API is the normal interface that you should use for IOMMUs
+> that sit between DMA devices and kernel memory. The idea is that you
+> completely abstract the concept of an IOMMU so the device driver uses
+> the same code for talking to a device with an IOMMU and another device with
+> a linear mapping or an swiotlb bounce buffer.
+> 
+> This means that the user of the dma-mapping API does not get to choose the
+> bus addresses, but instead you use the API to get a bus address for a
+> chunk of memory, and then you can pass that address to a device.
+> 
+> See arch/powerpc/kernel/iommu.c and arch/x86/kernel/amd_iommu.c for common
+> examples of how this is implemented. The latter one actually implements
+> both the iommu_ops for iommu.h and dma_map_ops for dma-mapping.h.
 
-Posted the patch for the same.
-https://patchwork.kernel.org/patch/628231/
+Thanks for your comments! We will check how is it suitable for our case.
 
-
-The rebased series against
-	Latest 'omap-for-linus + Paul's pull-request'
-have pushed to below branch.
-
-git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-omap4_pm_for-next_v3
-
-Regards,
-Santosh
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
