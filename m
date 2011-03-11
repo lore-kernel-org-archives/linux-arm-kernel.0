@@ -1,57 +1,97 @@
-From: ramaxlo@gmail.com (Ramax Lo)
-Date: Fri, 11 Mar 2011 23:33:55 +0800
-Subject: [PATCH RESEND] S3C2440: AT2440EVB: Add touchscreen support
-Message-ID: <1299857635-19384-1-git-send-email-ramaxlo@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Mar 2011 16:39:01 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201103111615.01829.arnd@arndb.de>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103111507.59825.arnd@arndb.de>
+	<000101cbdffb$e1844b00$a48ce100$%szyprowski@samsung.com>
+	<201103111615.01829.arnd@arndb.de>
+Message-ID: <000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add touchscreen support for AT2440EVB board.
+Hello,
 
-Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
----
- arch/arm/mach-s3c2440/mach-at2440evb.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+On Friday, March 11, 2011 4:15 PM Arnd Bergmann wrote:
 
-diff --git a/arch/arm/mach-s3c2440/mach-at2440evb.c b/arch/arm/mach-s3c2440/mach-at2440evb.c
-index 6c98b78..1bcba00 100644
---- a/arch/arm/mach-s3c2440/mach-at2440evb.c
-+++ b/arch/arm/mach-s3c2440/mach-at2440evb.c
-@@ -36,6 +36,7 @@
- #include <mach/regs-gpio.h>
- #include <mach/regs-mem.h>
- #include <mach/regs-lcd.h>
-+#include <plat/ts.h>
- #include <plat/nand.h>
- #include <plat/iic.h>
+> On Friday 11 March 2011, Marek Szyprowski wrote:
+> > On Friday, March 11, 2011 3:08 PM Arnd Bergmann wrote:
+> >
+> > > On Friday 11 March 2011, Marek Szyprowski wrote:
+> > > > > The iommu API is not really meant to be KVM specific, it's just that the
+> > > > > in-tree users are basically limited to KVM at the moment. Another user that
+> > > > > is coming up soon is the vmio device driver that can be used to transparently
+> > > > > pass devices to user space. The idea behind the IOMMU API is that you can
+> > > > > map arbitrary bus addresses to physical memory addresses, but it does not
+> > > > > deal with allocating the bus addresses or providing buffer management such
+> > > > > as cache flushes.
+> > > >
+> > > > Yea, I've noticed this and this basically what we expect from iommu driver.
+> > > > However the iommu.h API requires a separate call to map each single memory page.
+> > > > This is quite ineffective approach and imho the API need to be extended to allow
+> > > > mapping of the arbitrary set of pages.
+> > >
+> > > We can always discuss extensions to the existing infrastructure, adding
+> > > an interface for mapping an array of page pointers in the iommu API
+> > > sounds like a good idea.
+> >
+> > We will investigate this API further. From the first sight it looks it won't take
+> > much work to port/rewrite our driver to fit into iommu.h API.
+> 
+> Ok, sounds good.
+> 
+> > > I also think that we should not really have separate iommu and dma-mapping
+> > > interfaces, but rather have a portable way to define an iommu so that it
+> > > can be used through the dma-mapping interfaces. I'm not asking you to
+> > > do that as a prerequisite to merging your driver, but it may be good to
+> > > keep in mind that the current situation is still lacking and that any
+> > > suggestion for improving this as part of your work to support the
+> > > samsung IOMMU is welcome.
+> >
+> > Well creating a portable iommu framework and merging it with dma-mapping interface
+> > looks like a much harder (and time consuming) task. There is definitely a need for
+> > it. I hope that it can be developed incrementally starting from the current iommu.h
+> > and dma-mapping.h interfaces.
+> 
+> Yes, that is the idea. Maybe we should add it to the list things that the
+> Linaro kernel working group can target for the November release?
+> 
+> > Please note that there might be some subtle differences
+> > in the hardware that such framework must be aware. The first obvious one is the
+> > hardware design. Some platform has central iommu unit, other (like Samsung Exynos4)
+> > has a separate iommu unit per each device driver (this is still a simplification,
+> > because a video codec device has 2 memory interfaces and 2 iommu units). Currently
+> > I probably have not enough knowledge to predict the other possible issues that need
+> > to be taken into account in the portable and generic iommu/dma-mapping frame-work.
+> 
+> The dma-mapping API can deal well with one IOMMU per device, but would
+> need some tricks to work with one device that has two separate IOMMUs.
+
+We need to investigate the internals of dma-mapping API first. Right now I know too
+little in this area.
  
-@@ -202,6 +203,12 @@ static struct s3c2410fb_mach_info at2440evb_fb_info __initdata = {
- 	.default_display = 0,
- };
+> I'm not very familar with the iommu API, but in the common KVM scenario,
+> you need one IOMMU per device, so it should handle that just fine as well.
+
+Well, afair there are also systems with one central iommu module, which is shared 
+between devices. I have no idea how such model will fit into the dma-mapping API.
  
-+static struct s3c2410_ts_mach_info at2440evb_ts_info __initdata = {
-+	.delay			= 10000,
-+	.presc			= 49,
-+	.oversampling_shift	= 2,
-+};
-+
- static struct platform_device *at2440evb_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_wdt,
-@@ -211,6 +218,7 @@ static struct platform_device *at2440evb_devices[] __initdata = {
- 	&s3c_device_nand,
- 	&s3c_device_sdi,
- 	&s3c_device_lcd,
-+	&s3c_device_ts,
- 	&at2440evb_device_eth,
- };
- 
-@@ -227,6 +235,7 @@ static void __init at2440evb_init(void)
- 	s3c24xx_mci_set_platdata(&at2440evb_mci_pdata);
- 	s3c_nand_set_platdata(&at2440evb_nand_info);
- 	s3c_i2c0_set_platdata(NULL);
-+	s3c24xx_ts_set_platdata(&at2440evb_ts_info);
- 
- 	platform_add_devices(at2440evb_devices, ARRAY_SIZE(at2440evb_devices));
- }
--- 
-1.7.0.4
+> > > Note that the ARM implementation of the dma-mapping.h interface currently
+> > > does not support IOMMUs, but that could be changed by wrapping it
+> > > using the include/asm-generic/dma-mapping-common.h infrastructure.
+> >
+> > ARM dma-mapping framework also requires some additional research for better DMA
+> > support (there are still issues with multiple mappings to be resolved).
+> 
+> You mean mapping the same memory into multiple devices, or a different problem?
+
+Mapping the same memory area multiple times with different cache settings is not
+legal on ARMv7+ systems. Currently the problems might caused by the low-memory
+kernel linear mapping and second mapping created for example by dma_alloc_coherent()
+function.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
