@@ -1,48 +1,48 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 11 Mar 2011 18:57:47 +0100 (CET)
-Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <4D79A85D.8000301@codeaurora.org>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
-	<alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
-	<4D770E47.6050402@codeaurora.org>
-	<alpine.LFD.2.00.1103101126100.2787@localhost6.localdomain6>
-	<4D79A85D.8000301@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1103111853480.2787@localhost6.localdomain6>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Mar 2011 23:28:33 +0530
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <87k4g5a6n5.fsf@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com><871v2dd58y.fsf@ti.com><f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com>
+	<87k4g5a6n5.fsf@ti.com>
+Message-ID: <420e5c6f0aff0bbd23b7f3e9c190ca97@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Mar 2011, Abhijeet Dharmapurikar wrote:
-> Thomas Gleixner wrote:
-> > On Tue, 8 Mar 2011, Abhijeet Dharmapurikar wrote:
-> > > > ack is called before mask and it
-> > > > should never be called when the interrupt is masked.
-> > > I didnt quite understand this comment. handle_level_irq calls mask_ack
-> > > which
-> > > masks the interrupt and then acks it. In this case the ack is called after
-> > > the
-> > 
-> > Indeed, sorry. So the right way to deal with that is to provide a
-> > mask_ack() callback which does it in the correct order for your
-> > HW. That way you avoid all the local state storage.
-> 
-> 
-> Yes however while updating the code I noticed that I would need to keep
-> account of all the interrupts enabled and all the interrupts marked wakeup.
-> This aids in switching to the wakeup set in the suspend callback and the
-> enabled set in the resume callback. I will update the resume callback to
-> enable the interrupts in irqs_allowed(the local state storage) in the next
-> patch (my current patch does not do that).
-> 
-> IOW I need to keep the local state storage.
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Friday, March 11, 2011 11:20 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Rajendra Nayak
+> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend,CPU-hotplug and
+> CPUilde support.
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+[...]
 
-Wrong. The interrupts are disabled and reenabled by the core code and
-not by some extra suspend/resume callbacks in your driver. The core
-checks those marked as IRQ_WAKE, the wake callback to the irq chip is
-only there if you need to set up some hardware register in order to
-make the wake functionality work. So again, you don't need local state
-as the core tracks the state for you.
+> >> I prefer to drop it completely for OMAP4.
+> >>
+> > OK. Lets do that.
+> >
+> > Just to not miss your point here, what I understood here
+> > is default suspend state on OMAP$B will be off mode.
+> >
+> > We still keep "enable_off_mode" flag for testing so that we
+> > can disable off mode to debug regressions.
+> >
+> > Is that right?
+>
+> No, I want to drop "enable_off_mode" all together for OMAP4.
+>
+> If you want to change any powerdomain's default next_state, you can
+> use
+> the <debugfs>/pm_debug/*_pwrdm/suspend controls.
+>
+Thanks for clarification. The change is quite trivial. Will
+update the branch with this change.
+After testing it, will intimate you
 
-Thanks,
-
-	tglx
+Regards
+Santosh
