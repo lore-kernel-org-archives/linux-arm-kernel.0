@@ -1,73 +1,87 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Mar 2011 09:50:22 -0800
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com> (Santosh
-	Shilimkar's message of "Fri, 11 Mar 2011 22:56:41 +0530")
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-	<3b3d5e28815aa8bcedf6f43688f403b5@mail.gmail.com>
-	<871v2dd58y.fsf@ti.com>
-	<f1ee9adb49c6dbc49205c5ba70007e9a@mail.gmail.com>
-Message-ID: <87k4g5a6n5.fsf@ti.com>
+From: eduardo.valentin@nokia.com (Eduardo Valentin)
+Date: Fri, 11 Mar 2011 19:35:48 +0200
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <4D7A4255.6030603@stericsson.com>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<1299846911-15782-2-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<20110311135043.GA9320@besouro.research.nokia.com>
+	<4D7A4255.6030603@stericsson.com>
+Message-ID: <20110311173548.GA7291@besouro.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Fri, Mar 11, 2011 at 04:40:05PM +0100, ext Maxime Coquelin wrote:
+> 
+> 
+> 
+> >>+
+> >>+int __init register_sysfs_soc_info(struct sysfs_soc_info *info, int nb_info)
+> >>+{
+> >>+	int i, ret;
+> >>+
+> >>+	for (i = 0; i<  nb_info; i++) {
+> >>+		ret = sysfs_create_file(soc_object,&info[i].attr.attr);
+> >>+		if (ret) {
+> >>+			for (i -= 1; i>= 0; i--)
+> >>+				sysfs_remove_file(soc_object,&info[i].attr.attr);
+> >>+			break;
+> >>+		}
+> >>+	}
+> >>+
+> >>+	return ret;
+> >>+}
+> > From functional perspective, this looks like a sysfs_create_group.
+> >Now it makes me wonder if this thing would make sense. Maybe it's
+> >better to create a node under platform and then add attributes to it, as suggested
+> >in V1 thread. I don't know, this could still be done by the socinfo code.
+> >I mean, location is still an issue it seams :-)
+> >
+> >Another thing, what could be done is, instead of creating new data structures to hold
+> >the attributes, a struct  attribute_group could be pass instead during registration time.
+> >What do you think??
+> 
+> It would be cleaner indeed.
+> 
+> >>+
+> >>+static struct attribute *soc_attrs[] = {
+> >>+	NULL,
+> >>+};
+> >>+
+> >>+static struct attribute_group soc_attr_group = {
+> >>+	.attrs = soc_attrs,
+> >>+};
+> >
+> >What is the point of the above two ?
+> 
+> sysfs_create_group() requires attributes.
 
-> Kevin,
->
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
->> arm-kernel-bounces at lists.infradead.org] On Behalf Of Kevin Hilman
->> Sent: Friday, March 11, 2011 9:22 PM
->> To: Santosh Shilimkar
->> Cc: linux-omap at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Rajendra Nayak
->> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend,CPU-hotplug and
->> CPUilde support.
->>
->
-> [....]
->
->> >
->> > So just to summaries, on OMAP$ 'enable_off_mode' flag is
->> > used __only__ in Suspend. CPUx power domain always hit OFF
->> > mode no matter what is state of this flag because CSWR isn't
->> > supported on these PD's.
->>
->> If it's useful only in suspend, then it's redundant with the
->> <debugfs>/pm_debug/*_pwrdm/suspend controls which allow per-pwrdm
->> control over next states.
->>
->> > We could remove this flag as well but thought that this might be
->> > useful especially when we add CORE RET, DEVICE OFF support.
->>
->> I'd rather see working off-mode be a requirement for getting OMAP4
->> drivers supported.
->>
->> Also, we can still test suspend/resume with off-mode disabled by
->> using the above debugfs controls.
->>
->> > May be we keep this till the constraint frameworks comes in and
->> > then drop it once for all. I am ok with whatever direction you
->> > decide here.
->>
->> I prefer to drop it completely for OMAP4.
->>
-> OK. Lets do that.
->
-> Just to not miss your point here, what I understood here
-> is default suspend state on OMAP$B will be off mode.
->
-> We still keep "enable_off_mode" flag for testing so that we
-> can disable off mode to debug regressions.
->
-> Is that right?
+Indeed, it does. but you call it with an empty set of attributes.
+So, what's the point?
 
-No, I want to drop "enable_off_mode" all together for OMAP4.
+> 
+> >>+
+> >>+int __init register_sysfs_soc(struct sysfs_soc_info *info, size_t num)
+> >>+{
+> >>+	int ret;
+> >>+
+> >>+	soc_object = kobject_create_and_add("socinfo", NULL);
+> >>+	if (!soc_object) {
+> >>+		ret = -ENOMEM;
+> >>+		goto exit;
+> >>+	}
+> >>+
+> >>+	ret = sysfs_create_group(soc_object,&soc_attr_group);
+> >>+	if (ret)
+> >>+		goto kset_exit;
+> >You add an empty group here.
+> >
+> >>+
+> >>+	ret = register_sysfs_soc_info(info, num);
+> >>+	if (ret)
+> >>+		goto group_exit;
+> >But the real thing happens here.
+> >
+> 
 
-If you want to change any powerdomain's default next_state, you can use
-the <debugfs>/pm_debug/*_pwrdm/suspend controls.
-
-Kevin
+-- 
+Eduardo Valentin
