@@ -1,56 +1,53 @@
-From: rdunlap@xenotime.net (Randy Dunlap)
-Date: Thu, 10 Mar 2011 16:44:14 -0800
-Subject: [PATCH] kbuild: reenable section mismatch analysis
-In-Reply-To: <20110310164100.5af81e3b.akpm@linux-foundation.org>
-References: <20110216200734.GA25184@merkur.ravnborg.org>
-	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110310164100.5af81e3b.akpm@linux-foundation.org>
-Message-ID: <20110310164414.2892219e.rdunlap@xenotime.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Mar 2011 16:49:48 -0800
+Subject: [PATCH] OMAP2+: voltage: don't build voltage layer when !CONFIG_PM
+Message-ID: <1299804588-13544-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Mar 2011 16:41:00 -0800 Andrew Morton wrote:
+commit 47cfef (OMAP2+: voltage: reorganize, split code from data)
+moved voltage.c to it's own section in the Makefile.  The original
+section was wrapped by ifeq CONFIG_PM, but the new section was not.
 
-> On Fri, 18 Feb 2011 21:47:20 +0100
-> Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > This was disabled in commit
-> > 
-> > 	e5f95c8 (kbuild: print only total number of section mismatces found)
-> > 
-> > because there were too many warnings.  Now we're down to a reasonable
-> > number again, so we start scaring people with the details.
-> > 
-> > Signed-off-by: Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  lib/Kconfig.debug |    4 ----
-> >  1 files changed, 0 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> > index 2b97418..0f77ed1 100644
-> > --- a/lib/Kconfig.debug
-> > +++ b/lib/Kconfig.debug
-> > @@ -102,11 +102,7 @@ config HEADERS_CHECK
-> >  
-> >  config DEBUG_SECTION_MISMATCH
-> >  	bool "Enable full Section mismatch analysis"
-> > -	depends on UNDEFINED || (BLACKFIN)
-> >  	default y
-> > -	# This option is on purpose disabled for now.
-> > -	# It will be enabled when we are down to a reasonable number
-> > -	# of section mismatch warnings (< 10 for an allyesconfig build)
-> >  	help
-> >  	  The section mismatch analysis checks if there are illegal
-> >  	  references from one section to another section.
-> 
-> eaaaargh!  650 lines of crap added to my i386 allmodconfig build output.
+Wrap new voltage section with conditional compile for CONFIG_PM
 
-Each message is a bit longish, yes.
+Fixes the following compile error when !CONFIG_PM
 
-> I'll be locally opting out of this one, thanks.
-> --
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.c:957:5: error: redefinition of 'omap_voltage_register_pmic'
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.h:167:50: note: previous definition of 'omap_voltage_register_pmic' was here
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.c:1009:6: error: redefinition of 'omap_change_voltscale_method'
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.h:172:51: note: previous definition of 'omap_change_voltscale_method' was here
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.c:1043:23: error: redefinition of 'omap_voltage_domain_lookup'
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.h:178:68: note: previous definition of 'omap_voltage_domain_lookup' was here
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.c:1073:115: error: redefinition of 'omap_voltage_late_init'
+/work/kernel/omap/pm/arch/arm/mach-omap2/voltage.h:174:50: note: previous definition of 'omap_voltage_late_init' was here
 
-
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+Paul, feel free to fold into the original patch in your
+integration-2.6.39 branch.
+
+ arch/arm/mach-omap2/Makefile |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 4edac5d..82b2a67 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -89,12 +89,14 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
+ 					   vp44xx_data.o
+ 
+ # OMAP voltage domains
++ifeq ($(CONFIG_PM),y)
+ voltagedomain-common			:= voltage.o
+ obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common)
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
+ 					   voltagedomains3xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
+ 					   voltagedomains44xx_data.o
++endif
+ 
+ # OMAP powerdomain framework
+ powerdomain-common			+= powerdomain.o powerdomain-common.o
+-- 
+1.7.4
