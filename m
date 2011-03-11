@@ -1,51 +1,83 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 11 Mar 2011 10:04:36 +0100
-Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <201103101552.15536.arnd@arndb.de>
-References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
-	<1299254660-15765-1-git-send-email-m.szyprowski@samsung.com>
-	<201103101552.15536.arnd@arndb.de>
-Message-ID: <002101cbdfcb$5c657820$15306860$%szyprowski@samsung.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 11 Mar 2011 10:16:44 +0100
+Subject: [PATCHv2 2/2] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1299281399-32304-2-git-send-email-Dinh.Nguyen@freescale.com>
+	(Dinh Nguyen's message of "Fri, 4 Mar 2011 17:29:59 -0600")
+References: <1299281399-32304-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1299281399-32304-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <871v2euidf.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+<Dinh.Nguyen@freescale.com> writes:
 
-On Thursday, March 10, 2011 3:52 PM Arnd Bergmann wrote:
+Hi,
 
-> On Friday 04 March 2011, Marek Szyprowski wrote:
-> > From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> >
-> > This patch performs a complete rewrite of sysmmu driver for Samsung platform:
-> > - the new version introduces an api to construct device private page
-> >   tables and enables to use device private address space mode
-> > - simplified the resource management: no more single platform
-> >   device with 32 resources is needed, better fits into linux driver model,
-> >   each sysmmu instance has it's own resource definition
-> > - added support for sysmmu clocks
-> > - some other minor API chages required by upcoming videobuf2 allocator
-> >
-> > Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> 
-> Please explain why create a new IOMMU API when we already have two
-> generic ones (include/linux/iommu.h and include/linux/dma-mapping.h).
-> 
-> Is there something that cannot be done with the common code?
-> The first approach should be to extend the existing APIs to
-> do what you need.
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>
+> Adds initial low power suspend functionality to MX51.
+> Supports "mem" and "standby" modes.
+>
+> Tested on mx51-babbage.
+>
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Makefile   |    1 +
+>  arch/arm/mach-mx5/pm-imx51.c |   62 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/pm-imx51.c
+>
+> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+> index 1106acd..2f6258e 100644
+> --- a/arch/arm/mach-mx5/Makefile
+> +++ b/arch/arm/mach-mx5/Makefile
+> @@ -6,6 +6,7 @@
+>  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o system.o
+>  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
+>  
+> +obj-$(CONFIG_PM) += pm-imx51.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+>  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+> diff --git a/arch/arm/mach-mx5/pm-imx51.c b/arch/arm/mach-mx5/pm-imx51.c
+> new file mode 100644
+> index 0000000..6bb76e2
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/pm-imx51.c
+> @@ -0,0 +1,62 @@
+> +/*
+> + *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +#include <linux/suspend.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/tlb.h>
+> +#include <mach/system.h>
+> +#include "crm_regs.h"
+> +
+> +static int mx5_suspend_enter(suspend_state_t state)
+> +{
 
-We followed the style of iommu API for other mainline ARM platforms (both OMAP and MSM
-also have custom API for their iommu modules). I've briefly checked include/linux/iommu.h
-API and I've noticed that it has been designed mainly for KVM support. There is also
-include/linux/intel-iommu.h interface, but I it is very specific to intel gfx chips.
+In your tree, here the gpc clock is enabled with a comment saying:
 
-Is there any example how include/linux/dma-mapping.h interface can be used for iommu
-mappings?
+/* gpc clock is needed for SRPG */
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+and someone choose to not handle that, I guess because your uboot or
+someone else is already enabling it. Assuming that all boards will
+behave like yours is not a good idea because enabling the clock here
+allowed me to get suspend to mem work.
+
+I'll do more tests over the week end to confirm this because I've done
+some other changes in my tree (in this version, you removed the
+tzic_enable_wake() call here so I added it back) and keep you
+informed. At least, it really looks like enabling the gpc clock was the
+missing piece.
+
+Arnaud
