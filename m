@@ -1,62 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 22:36:21 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <87pqpxbqho.fsf@ti.com>
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
-	<87pqpxbqho.fsf@ti.com>
-Message-ID: <253b4eb553a3bf28584eccdb2e3bd9ed@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Mar 2011 17:08:07 +0000
+Subject: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
+In-Reply-To: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
+References: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
+Message-ID: <1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Friday, March 11, 2011 9:26 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; Rajendra Nayak; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
-> CPUilde support.
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> [...]
->
-> >> >
-> >> > This series doesn't boot on ES1 (boot log below.)  Do we need
-> to
-> >> > totally prevent WFI on ES1?
-> >> >
-> > Nope. WFI is ok.
-> > The ES1.0 boot issue on pm-core branch doesn't seems to
-> > be related to this series. Without this series as well
-> > OMAP4 ES1.0 is not booting for me. When I disable
-> > CONFIG_PM + WATCHDOG fix, it booted ok. I will
-> > git-bisect this later on pm-core branch.
-> >
-> >> > Also, if we want a CPUidle enabled kernel to boot on all
-> silicon,
-> >> > it will need a omap_rev() check during init to ensure it
-> doesn't
-> >> > override the default idle path.
-> >> >
-> > OMAP4 PM series already takes care of not overriding
-> > the default idle path for ES1.0. The omap4_mpuss_init()
-> > fails on ES1.0 and hence the CPUidle init is skipped in
-> > that case.
-> >
-> > Just to further check, I pulled the latest omap-for-linus
-> > branch and merged Paul's pull-request into it. Then
-> > applied OMAP4 PM series and I got a boot crash, a different
-> > one. This was again related to clock-domain initialization
-> > and static deps. I fixed this issue by avoiding omap4_pm_init()
-> > code running on ES1.0. With this boot on ES1.0 works fine now
-> > with OMAP4 PM series.
->
-> Thanks for finding this.  I just tested your v3 branch together with
-> my pm-core and it's now booting fine on ES1.
->
-Thanks Kevin for test.
+On Wed, 2011-02-23 at 03:55 +0000, Todd Poynor wrote:
+> Enable dynamic high level clock gating for Cortex-A9 CPUs, as
+> described in 2.3.3 "Dynamic high level clock gating" of the
+> Cortex-A9 TRM.  This may cut the clock of the integer core,
+> system control block, and Data Engine in certain conditions.
+> 
+> Add ARM errata 720791 to avoid corrupting the Jazelle
+> instruction stream on earlier Cortex-A9 revisions.
+> 
+> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> ---
+> Can anyone advise whether this feature should be selectively
+> enabled (or otherwise modified) due to secured register access,
+> introduced latencies observed, etc.?
+> 
+> This has been tested on a few Tegra 2 boards without problems
+> observed thus far, and some preliminary testing indicates it
+> may result in fairly significant power savings.  Any additional
+> testing greatly appreciated.
 
-Regards,
-Santosh
+I haven't done any benchmarks on this, so can't comment on this.
+
+My view is that something like the boot monitor/firmware should set this
+up, though that's not always the case. On some OMAP boards Linux runs in
+non-secure mode and it will fault when trying to set this bit.
+
+-- 
+Catalin
