@@ -1,42 +1,34 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Mar 2011 13:08:26 +0000
-Subject: [PATCH 2/8] macb: detect hclk presence from platform data
-In-Reply-To: <20110311124757.GK9351@game.jcrosoft.org>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-3-git-send-email-jamie@jamieiles.com>
-	<20110311014400.GJ9351@game.jcrosoft.org>
-	<20110311085443.GJ6198@pulham.picochip.com>
-	<20110311124757.GK9351@game.jcrosoft.org>
-Message-ID: <20110311130826.GB7357@pulham.picochip.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 11 Mar 2011 15:09:32 +0200
+Subject: [PATCH v2] z2-battery: Fix count of properties
+In-Reply-To: <4D7A1181.2000802@ru.mvista.com>
+References: <4D7A1181.2000802@ru.mvista.com>
+Message-ID: <1299848972-25596-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 01:47:57PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:54 Fri 11 Mar     , Jamie Iles wrote:
-> > On Fri, Mar 11, 2011 at 02:44:00AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 10:10 Thu 10 Mar     , Jamie Iles wrote:
-> > > > +#ifdef CONFIG_ARCH_AT91
-> > > > +#define PCLK_NAME	"macb_clk"
-> > > > +#else /* CONFIG_ARCH_AT91 */
-> > > > +#define PCLK_NAME	"pclk"
-> > > > +#endif
-> > > 
-> > > we need change the clock name and avoid the ifdef
-> > > so this will be generic
-> > > 
-> > > nb I work on the switch to clkdev currently for avr32 and at91
-> > 
-> > This should be gone now.  Russell made the suggestion to have a fake clk 
-> > for hclk on AT91 so I think I've solved that now.  There's an updated 
-> > patch in my reply to Russell's message but essentially I'm using 
-> > at91_clock_associate() to turn "macb_pclk" into "hclk" and "pclk".  Does 
-> > this seem reasonable?
-> please do not use at91_clock_associate as I'm going to remove it as use static
-> clock as done on shmobile as example
-> so if it's a fake clock please as ochi_clk on 9g45
+PROP_STATUS property was not counted, as result
+VOLTAGE_MIN property is missing in sysfs. Fix it.
 
-Ok, that's fine.  How about for the "macb_plk" though, won't that need 
-an at91_clock_associate() or is it OK to rename all of the macb_clk 
-definitions to have be called "pclk"?
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: Align comment properly
 
-Jamie
+ drivers/power/z2_battery.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
+index 81304c0..2a9ab89 100644
+--- a/drivers/power/z2_battery.c
++++ b/drivers/power/z2_battery.c
+@@ -134,6 +134,8 @@ static int z2_batt_ps_init(struct z2_charger *charger, int props)
+ 	enum power_supply_property *prop;
+ 	struct z2_battery_info *info = charger->info;
+ 
++	if (info->charge_gpio >= 0)
++		props++;	/* POWER_SUPPLY_PROP_STATUS */
+ 	if (info->batt_tech >= 0)
+ 		props++;	/* POWER_SUPPLY_PROP_TECHNOLOGY */
+ 	if (info->batt_I2C_reg >= 0)
+-- 
+1.7.4.1
