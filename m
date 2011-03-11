@@ -1,71 +1,162 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Mar 2011 02:44:00 +0100
-Subject: [PATCH 2/8] macb: detect hclk presence from platform data
-In-Reply-To: <1299751843-9743-3-git-send-email-jamie@jamieiles.com>
-References: <1299751843-9743-1-git-send-email-jamie@jamieiles.com>
-	<1299751843-9743-3-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110311014400.GJ9351@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 11 Mar 2011 11:30:48 +0900
+Subject: [PATCH] Exynos4: Add HSMMC channel 4 support
+In-Reply-To: <20110308025340.GA25712@july>
+References: <20110308025340.GA25712@july>
+Message-ID: <00d601cbdf94$59254640$0b6fd2c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:10 Thu 10 Mar     , Jamie Iles wrote:
-> Rather than detecting whether we need to do a clk_get() and enable on
-> the "hclk" based on the kernel configuration, add an extra field to the
-> platform data.  This makes it cleaner to add more supported
-> architectures without lots of ifdeffery.
+Kyungmin Park wrote:
 > 
-> This requires that all instantiations of the device have platform data
-> defined but that is the case currently anyway.
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> Exynos4 has the DesignWare Host controller at channel 4.
+> 
+Yeah, Exynos4210 has it but it can be happened problem when used your
+approach later.
+Because, we can't assume hsmmc4 to be used for dw_mmc on other SoCs.
+
+I mean, other file, eg., dev-dwmmc.c or dev-dwmci.c should be added for its
+platform devices.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/avr32/mach-at32ap/at32ap700x.c |    2 +
->  drivers/net/macb.c                  |   77 ++++++++++++++++++-----------------
->  include/linux/platform_data/macb.h  |    1 +
->  3 files changed, 43 insertions(+), 37 deletions(-)
+> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
+> exynos4/include/mach/irqs.h
+> index 2dc5900..aa32679 100644
+> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
+> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+> @@ -104,6 +104,7 @@
+>  #define IRQ_HSMMC1		COMBINER_IRQ(29, 1)
+>  #define IRQ_HSMMC2		COMBINER_IRQ(29, 2)
+>  #define IRQ_HSMMC3		COMBINER_IRQ(29, 3)
+> +#define IRQ_HSMMC4		COMBINER_IRQ(29, 4)
 > 
-> diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-> index 2747cde..2abcafd 100644
-> --- a/arch/avr32/mach-at32ap/at32ap700x.c
-> +++ b/arch/avr32/mach-at32ap/at32ap700x.c
-> @@ -1088,6 +1088,8 @@ at32_add_device_eth(unsigned int id, struct eth_platform_data *data)
->  	struct platform_device *pdev;
->  	u32 pin_mask;
->  
-> +	data->have_hclk = 1;
+>  #define IRQ_MIPI_CSIS0		COMBINER_IRQ(30, 0)
+>  #define IRQ_MIPI_CSIS1		COMBINER_IRQ(30, 1)
+> diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-
+> exynos4/include/mach/map.h
+> index 80a41e0..ea79962 100644
+> --- a/arch/arm/mach-exynos4/include/mach/map.h
+> +++ b/arch/arm/mach-exynos4/include/mach/map.h
+> @@ -107,6 +107,7 @@
+>  #define S3C_PA_HSMMC1			EXYNOS4_PA_HSMMC(1)
+>  #define S3C_PA_HSMMC2			EXYNOS4_PA_HSMMC(2)
+>  #define S3C_PA_HSMMC3			EXYNOS4_PA_HSMMC(3)
+> +#define S3C_PA_HSMMC4			EXYNOS4_PA_HSMMC(4)
+>  #define S3C_PA_IIC			EXYNOS4_PA_IIC(0)
+>  #define S3C_PA_IIC1			EXYNOS4_PA_IIC(1)
+>  #define S3C_PA_IIC2			EXYNOS4_PA_IIC(2)
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index be72100..f816985 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -171,6 +171,11 @@ config S3C_DEV_HSMMC3
+>  	help
+>  	  Compile in platform device definitions for HSMMC channel 3
+> 
+> +config S3C_DEV_HSMMC4
+> +	bool
+> +	help
+> +	  Compile in platform device definitions for HSMMC channel 4
 > +
->  	switch (id) {
->  	case 0:
->  		pdev = &macb0_device;
-> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-> index bfd3601..ae98fee 100644
-> --- a/drivers/net/macb.c
-> +++ b/drivers/net/macb.c
-> @@ -246,9 +246,7 @@ static int macb_mii_init(struct macb *bp)
->  	bp->mii_bus->parent = &bp->dev->dev;
->  	pdata = bp->pdev->dev.platform_data;
->  
-> -	if (pdata)
-> -		bp->mii_bus->phy_mask = pdata->phy_mask;
-> -
-> +	bp->mii_bus->phy_mask = pdata->phy_mask;
->  	bp->mii_bus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
->  	if (!bp->mii_bus->irq) {
->  		err = -ENOMEM;
-> @@ -1103,9 +1101,14 @@ static const struct net_device_ops macb_netdev_ops = {
->  #endif
->  };
->  
-> +#ifdef CONFIG_ARCH_AT91
-> +#define PCLK_NAME	"macb_clk"
-> +#else /* CONFIG_ARCH_AT91 */
-> +#define PCLK_NAME	"pclk"
-> +#endif
-
-we need change the clock name and avoid the ifdef
-so this will be generic
-
-nb I work on the switch to clkdev currently for avr32 and at91
-
-Best Regards,
-J.
+>  config S3C_DEV_HWMON
+>  	bool
+>  	help
+> diff --git a/arch/arm/plat-samsung/Makefile
+b/arch/arm/plat-samsung/Makefile
+> index e9de58a..7ddba03 100644
+> --- a/arch/arm/plat-samsung/Makefile
+> +++ b/arch/arm/plat-samsung/Makefile
+> @@ -37,6 +37,7 @@ obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
+>  obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
+>  obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
+>  obj-$(CONFIG_S3C_DEV_HSMMC3)	+= dev-hsmmc3.o
+> +obj-$(CONFIG_S3C_DEV_HSMMC4)	+= dev-hsmmc4.o
+>  obj-$(CONFIG_S3C_DEV_HWMON)	+= dev-hwmon.o
+>  obj-y				+= dev-i2c0.o
+>  obj-$(CONFIG_S3C_DEV_I2C1)	+= dev-i2c1.o
+> diff --git a/arch/arm/plat-samsung/dev-hsmmc4.c
+b/arch/arm/plat-samsung/dev-
+> hsmmc4.c
+> new file mode 100644
+> index 0000000..c69a78f
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/dev-hsmmc4.c
+> @@ -0,0 +1,54 @@
+> +/* linux/arch/arm/plat-samsung/dev-hsmmc4.c
+> + *
+> + * Copyright (C) 2011 Samsung Electronics Co., Ltd.
+> + *
+> + * Samsung device definition for hsmmc device 4
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mmc/host.h>
+> +#include <linux/mmc/dw_mmc.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +#include <mach/map.h>
+> +#include <plat/sdhci.h>
+> +#include <plat/devs.h>
+> +
+> +#define S3C_SZ_HSMMC		0x1000
+> +
+> +static struct resource s3c_hsmmc4_resource[] = {
+> +	[0] = {
+> +		.start	= S3C_PA_HSMMC4,
+> +		.end	= S3C_PA_HSMMC4 + S3C_SZ_HSMMC - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= IRQ_HSMMC4,
+> +		.end	= IRQ_HSMMC4,
+> +		.flags	= IORESOURCE_IRQ,
+> +	}
+> +};
+> +
+> +static u64 s3c_device_hsmmc4_dmamask = DMA_BIT_MASK(32);
+> +
+> +struct platform_device s3c_device_hsmmc4 = {
+> +	.name			= "dw_mmc",
+> +	.id			= -1,
+> +	.num_resources		= ARRAY_SIZE(s3c_hsmmc4_resource),
+> +	.resource		= s3c_hsmmc4_resource,
+> +	.dev			= {
+> +		.dma_mask		= &s3c_device_hsmmc4_dmamask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +void s3c_hsmmc4_set_platdata(struct dw_mci_board *pdata)
+> +{
+> +	s3c_set_platdata(pdata, sizeof(struct dw_mci_board),
+> +			 &s3c_device_hsmmc4);
+> +}
+> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+> samsung/include/plat/devs.h
+> index e2b3ab9..4e198ba 100644
+> --- a/arch/arm/plat-samsung/include/plat/devs.h
+> +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> @@ -65,6 +65,7 @@ extern struct platform_device s3c_device_hsmmc0;
+>  extern struct platform_device s3c_device_hsmmc1;
+>  extern struct platform_device s3c_device_hsmmc2;
+>  extern struct platform_device s3c_device_hsmmc3;
+> +extern struct platform_device s3c_device_hsmmc4;
+>  extern struct platform_device s3c_device_cfcon;
+> 
+>  extern struct platform_device s3c_device_spi0;
