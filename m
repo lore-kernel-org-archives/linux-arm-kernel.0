@@ -1,43 +1,36 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 11 Mar 2011 14:03:33 -0800
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <201103112242.43962.arnd@arndb.de>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<20110311175816.GC7291@besouro.research.nokia.com>
-	<20110311193330.GA14204@kroah.com>
-	<201103112242.43962.arnd@arndb.de>
-Message-ID: <20110311220333.GA30232@kroah.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 11 Mar 2011 23:08:58 +0100
+Subject: [PATCH 5/8] ARM: PXA: Z2: Add poweroff function
+In-Reply-To: <201103112353.11261.anarsoul@gmail.com>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103112239.03751.marek.vasut@gmail.com>
+	<201103112353.11261.anarsoul@gmail.com>
+Message-ID: <201103112308.59017.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 10:42:43PM +0100, Arnd Bergmann wrote:
-> On Friday 11 March 2011 20:33:30 Greg KH wrote:
-> > Make this a "real" device not /sys/socinfo please.  It can be a platform
-> > device that export the needed information, that way you can have
-> > multiple ones.
+On Friday 11 March 2011 22:53:11 Vasily Khoruzhick wrote:
+> On Friday 11 March 2011 23:39:03 Marek Vasut wrote:
+> > On Friday 11 March 2011 11:23:40 Vasily Khoruzhick wrote:
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > 
+> > This looks bogus to me as you cannot power down the thing. Besides, where
+> > do you resume to from this so-called "powerdown" ? Since the bootloader
+> > will consider it as a legitimate deepsleep resume.
 > 
-> Note that the version 1 of this patch had a device, and I argued against
-> that patch on the basis that anything under /sys/devices/ should
-> reflect an actual part of the hardware, which socinfo by itself
-> does not.
+> It eats only 0.7mA in deepsleep, but 6.7mA in sleep (PXA2xx has 2 sleep
+> modes), so deepsleep is pretty close to poweroff.
 
-Why is the overall SoC not a device?  cpus are (well, they will be in a
-few kernel versions in the future), so what makes the other bits somehow
-"special"?
+So the power to the CPU is actually cut? It isn't, right ?
 
-> I believe the best way to represent this really is to have
-> a device (platform or other, I don't care) that:
-> 
-> * represents the SOC in its entirety
-> * has the subdevices that are part of the SOC as direct
->   or indirect children
-> * can be identified easily as a SOC (through one of
->   its name, its place in the hierarchy or its bus_type)
-> * has the standard device attributes proposed in Maxime's
->   patch.
+> Bootloader behaves
+> correctly (at least u-boot binary I'm using)
 
-That's fine, as it would be a real "struct device" :)
+Mine (I use mainline uboot) doesn't.
 
-thanks,
+> - it starts boot process
+> after deepsleep. Looks like hardware is somehow configured to disable
+> almost everything in deepsleep mode, RAM content is not preserved anyway,
+> so we can't resume properly.
 
-greg k-h
+PSPR is preserved though, right ? So you end up in a really deep crap I guess ?
