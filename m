@@ -1,10 +1,8 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Mar 2011 14:29:20 +0000
+Date: Fri, 11 Mar 2011 14:29:19 +0000
 Subject: [PATCH v2 REPOST] ARM: Thumb-2: Add local symbols to work around gas
 	behaviour
-In-Reply-To: <1299853760-3041-1-git-send-email-dave.martin@linaro.org>
-References: <1299853760-3041-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1299853760-3041-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <1299853760-3041-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
