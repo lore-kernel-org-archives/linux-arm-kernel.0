@@ -1,41 +1,31 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Mar 2011 09:37:37 -0800
-Subject: [GIT PULL] another set of OMAP PM updates for 2.6.39
-Message-ID: <87r5ada78e.fsf@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 11 Mar 2011 18:24:36 +0100
+Subject: [RFC PATCHv2 2/2] ux500: Export U8500 SoC info through sysfs
+In-Reply-To: <AANLkTimghAL=mzY0EXoWL+64NB-fQfw8SvjVDOS0-RP9@mail.gmail.com>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<1299846911-15782-3-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<20110311141110.GS9351@game.jcrosoft.org>
+	<AANLkTimghAL=mzY0EXoWL+64NB-fQfw8SvjVDOS0-RP9@mail.gmail.com>
+Message-ID: <20110311172436.GA14548@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On 16:20 Fri 11 Mar     , Linus Walleij wrote:
+> On Fri, Mar 11, 2011 at 3:11 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 13:35 Fri 11 Mar ? ? , Maxime Coquelin wrote:
+> >> ST-Ericsson's U8500 implementation.
+> >> Register sysfs SoC interface, and exports:
+> >> ? ? ? - Machine name
+> >> ? ? ? - Family name
+> >> ? ? ? - SoC ID
+> >> ? ? ? - Silicon process
+> >> ? ? ? - Silicon revision number.
+> > I propose some weeks ago exactly the same kind of patch
+> 
+> Could you tell which Subject: and mailing list so I can find it?
+> If it was private can you forward it to the list?
+ 892   F Dec14 To linux-kernel [PATCH] base: add sysfs socs info
 
-Please pull this additional set of OMAP PM updates for 2.6.39.
-
-These changes had dependencies on Paul's integration branch so were
-awaiting the merge of that before they could merge.
-
-Kevin
-
-The following changes since commit a08572ae529b1e8de12393eeced661feae8fd44c:
-
-  Merge remote branch 'remotes/origin/voltage_split_2.6.39' into tmp-integration-2.6.39-20110310-024 (2011-03-10 22:43:32 -0700)
-
-are available in the git repository at:
-
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.39/pm-integration
-
-Jean Pihet (1):
-      perf: add OMAP support for the new power events
-
-Shweta Gulati (3):
-      OMAP4: Enable 800 MHz and 1 GHz MPU-OPP
-      OMAP4: Update Voltage Rail Values for MPU, IVA and CORE
-      OMAP4: Add IVA OPP enteries.
-
-Vishwanath BS (1):
-      OMAP3+: OPP: Replace voltage values with Macros
-
- arch/arm/mach-omap2/clock.c        |   11 +++++++-
- arch/arm/mach-omap2/opp3xxx_data.c |   46 ++++++++++++++++++------------------
- arch/arm/mach-omap2/opp4xxx_data.c |   38 +++++++++++++++++------------
- arch/arm/mach-omap2/pm34xx.c       |    7 +++++
- arch/arm/mach-omap2/powerdomain.c  |   26 ++++++++++++++++++--
- 5 files changed, 84 insertions(+), 44 deletions(-)
+Best Regards,
+J.
