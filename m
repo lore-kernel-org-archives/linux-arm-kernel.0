@@ -1,35 +1,42 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 11 Mar 2011 22:39:36 +0100
-Subject: [PATCH 4/8] ARM: PXA: Z2: Add mtd partition with logo
-In-Reply-To: <1299839023-16601-4-git-send-email-anarsoul@gmail.com>
+Date: Fri, 11 Mar 2011 22:39:53 +0100
+Subject: [PATCH 3/8] ARM: PXA: Z2: Fix battery pdata
+In-Reply-To: <1299839023-16601-3-git-send-email-anarsoul@gmail.com>
 References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-	<1299839023-16601-4-git-send-email-anarsoul@gmail.com>
-Message-ID: <201103112239.36682.marek.vasut@gmail.com>
+	<1299839023-16601-3-git-send-email-anarsoul@gmail.com>
+Message-ID: <201103112239.53828.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 March 2011 11:23:39 Vasily Khoruzhick wrote:
+On Friday 11 March 2011 11:23:38 Vasily Khoruzhick wrote:
+> Fix coefficients to get actual voltage, and make
+> voltage_max/voltage_min looks like values for LiIon battery.
+> 
 > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-I guess you can rather supply the MTD layout on kernel command line (see 
-Drivers/MTD).
+You can have my:
 
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+
+on this one.
 > ---
->  arch/arm/mach-pxa/z2.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
+>  arch/arm/mach-pxa/z2.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index bffb920..aec87f7 100644
+> index dde3f1c..bffb920 100644
 > --- a/arch/arm/mach-pxa/z2.c
 > +++ b/arch/arm/mach-pxa/z2.c
-> @@ -169,6 +169,10 @@ static struct mtd_partition z2_flash_parts[] = {
->  	}, {
->  		.name	= "Flash",
->  		.offset	= 0x60000,
-> +		.size	= 0x780000,
-> +	}, {
-> +		.name	= "U-Boot Logo",
-> +		.offset = 0x7e0000,
->  		.size	= MTDPART_SIZ_FULL,
->  	},
->  };
+> @@ -463,9 +463,9 @@ static struct z2_battery_info batt_chip_info = {
+>  	.batt_I2C_addr	= 0x55,
+>  	.batt_I2C_reg	= 2,
+>  	.charge_gpio	= GPIO0_ZIPITZ2_AC_DETECT,
+> -	.min_voltage	= 2400000,
+> -	.max_voltage	= 3700000,
+> -	.batt_div	= 69,
+> +	.min_voltage	= 3475000,
+> +	.max_voltage	= 4190000,
+> +	.batt_div	= 59,
+>  	.batt_mult	= 1000000,
+>  	.batt_tech	= POWER_SUPPLY_TECHNOLOGY_LION,
+>  	.batt_name	= "Z2",
