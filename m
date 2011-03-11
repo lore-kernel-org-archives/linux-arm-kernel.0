@@ -1,41 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Mar 2011 15:59:30 -0000
-Subject: [PATCH v3 0/7] Migrate GIC to fasteoi flow control
-In-Reply-To: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-Message-ID: <000301cbe005$4ea20390$ebe60ab0$@deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Mar 2011 17:00:17 +0100
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103111615.01829.arnd@arndb.de>
+	<000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
+Message-ID: <201103111700.17373.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* I wrote:
- 
-> Hello,
+On Friday 11 March 2011, Marek Szyprowski wrote:
+> > > > does not support IOMMUs, but that could be changed by wrapping it
+> > > > using the include/asm-generic/dma-mapping-common.h infrastructure.
+> > >
+> > > ARM dma-mapping framework also requires some additional research for better DMA
+> > > support (there are still issues with multiple mappings to be resolved).
+> > 
+> > You mean mapping the same memory into multiple devices, or a different problem?
 > 
-> This is version 3 of the patch series originally posted here:
-> 
-> v1.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043083.html
-> v2.) http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043984.html
-> 
-> Changes since v2:
-> 
-> 	* Added chained_irq_{enter,exit} functions to work with chained
-> 	  handlers that support multiple primary chips and to aid in
-> 	  bisectibility
-> 	* Based on 2.6.38-rc8
-> 
-> As a result of these changes, all of the BSP code has been reworked so
-> I'm afraid I need some fresh acks and tested-bys because the old ones
-> are no longer valid.
-> 
-> I appreciate there is some debate concerning the sanity of chained
-> handlers with potentially multiple primary chips, but I can't think of
-> a way to fix these without considering the handlers on a case-by-case
-> basis which is not the intent of this patch series.
+> Mapping the same memory area multiple times with different cache settings is not
+> legal on ARMv7+ systems. Currently the problems might caused by the low-memory
+> kernel linear mapping and second mapping created for example by dma_alloc_coherent()
+> function.
 
-Well, I've not had any feedback on this lot but I'd like to
-get the first patch merged so that the rest of it can go in
-easily with no ordering dependencies.
+Yes, I know this problem, but I don't think the case you describe is a serious
+limitation (there are more interesting cases, though): dma_map_single() etc
+will create additional *bus* addresses for a physical address, not additional
+virtual addresses.
 
-Any comments on the first patch are more than welcome.
+dma_alloc_coherent should allocate memory that is not also mapped cached,
+which is what I thought we do correctly.
 
-Will
+	Arnd
