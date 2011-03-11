@@ -1,43 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Mar 2011 17:26:41 +0530
-Subject: [PATCH] OMAP4: PM: Avoid omap4_pm_init() on OMAP4430 ES1.0
-Message-ID: <1299844601-13248-1-git-send-email-santosh.shilimkar@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 11 Mar 2011 15:11:45 +0300
+Subject: [PATCH] z2-battery: Fix count of properties
+In-Reply-To: <1299837813-14952-1-git-send-email-anarsoul@gmail.com>
+References: <1299837813-14952-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <4D7A1181.2000802@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4430 ES1.0, Power Management features are not supported.
-Avoid omap4_pm_init() on ES1.0 silicon so that we can continue
-to use same kernel binary to boot on all OMAP4 silicons.
+Hello.
 
-The ES1.0 boot failure with OMAP4 PM series was because of
-the clockdomain initialisation code. Hardware supervised
-clockdomain mode isn't functional for all clockdomains
-on OMAP4430 ES1.0 silicon so avoid the same.
+On 11-03-2011 13:03, Vasily Khoruzhick wrote:
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reported-by: Kevin Hilman <khilman@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
-Patch applies on top of OMAP4 PM series
+> PROP_STATUS property was not counted, as result
+> VOLTAGE_MIN property is missing in sysfs. Fix it.
 
- arch/arm/mach-omap2/pm44xx.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+> Signed-off-by: Vasily Khoruzhick<anarsoul@gmail.com>
+> ---
+>   drivers/power/z2_battery.c |    2 ++
+>   1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index e887a5d..2e18c1d 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -203,6 +203,11 @@ static int __init omap4_pm_init(void)
- 	if (!cpu_is_omap44xx())
- 		return -ENODEV;
- 
-+	if (omap_rev() == OMAP4430_REV_ES1_0) {
-+		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-+		return -ENODEV;
-+	}
-+
- 	pr_err("Power Management for TI OMAP4.\n");
- 
- #ifdef CONFIG_PM
--- 
-1.6.0.4
+> diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
+> index e5ed52d..551d7bf 100644
+> --- a/drivers/power/z2_battery.c
+> +++ b/drivers/power/z2_battery.c
+> @@ -134,6 +134,8 @@ static int z2_batt_ps_init(struct z2_charger *charger, int props)
+>   	enum power_supply_property *prop;
+>   	struct z2_battery_info *info = charger->info;
+>
+> +	if (info->charge_gpio>= 0)
+> +		props++; /* POWER_SUPPLY_PROP_STATUS */
+
+    Why not align this comment with the below one?
+
+>   	if (info->batt_tech>= 0)
+>   		props++;	/* POWER_SUPPLY_PROP_TECHNOLOGY */
+>   	if (info->batt_I2C_reg>= 0)
+
+WBR, Sergei
