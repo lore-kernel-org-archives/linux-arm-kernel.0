@@ -1,49 +1,46 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 11 Mar 2011 20:19:03 +0100 (CET)
-Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for
-	chained handlers
-In-Reply-To: <000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-	<1299604405-12960-2-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
-	<000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1103112017500.2787@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Mar 2011 19:24:55 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
+	tables
+In-Reply-To: <1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
+References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
+	<20110215103127.GC4152@n2100.arm.linux.org.uk>
+	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
+	<20110215113242.GD4152@n2100.arm.linux.org.uk>
+	<20110215121437.GG4152@n2100.arm.linux.org.uk>
+	<AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
+	<20110309183507.GB11273@n2100.arm.linux.org.uk>
+	<1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110311192455.GA23109@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Mar 2011, Will Deacon wrote:
-
-> > On Tue, 8 Mar 2011, Will Deacon wrote:
+On Fri, Mar 11, 2011 at 05:32:58PM +0000, Catalin Marinas wrote:
+> On Wed, 2011-03-09 at 18:35 +0000, Russell King - ARM Linux wrote:
+> > On Wed, Mar 09, 2011 at 03:40:05PM +0000, Catalin Marinas wrote:
+> > > The above call to tlb_add_flush() would only add a PAGE_SIZE. But
+> > > since we free an entire PTE, shouldn't the range cover addr ..
+> > > addr+PTRS_PER_PTE*PAGE_SIZE?
 > > 
-> > > Some chained IRQ handlers are written to cope with primary chips of
-> > > potentially different flow types. Whether this a sensible thing to do
-> > > is a point of contention.
-> > 
-> > That wants a comment that these functions are only dealing with
-> > fasteoi and level type flow control.
-> > 
-> > Otherwise fine with me. Feel free to add my Acked-by.
+> > Why do we need to?  We're not flushing away the individual PTE entries
+> > when we remove an entire page table - we will have already walked the
+> > page table removing those entries, which will already have been added.
 > 
-> Thanks Thomas, reworded as followed:
+> Ah, I missed the fact that tlb_flush() invalidates the whole TLB when
+> there is no tlb->vma (the shift_arg_pages case). We could optimise this
+> to add the range covered by the PTE page and avoid the !tlb->vma check
+> (and a flush_tlb_mm), though not sure it's worth.
+
+If we're removing pte entries then tlb->vma is non-NULL.  Please look at
+the comments - I've documented the three modes of use there along with
+how things are setup for each of those modes, and what we do with each.
+I don't add comments just for the hell of it.
+
+> > This code is to cover the case with LPAE where we need to flush out the
+> > L1 entries.  It's nothing to do with the TLB itself.
 > 
->     ARM: irq: introduce entry and exit functions for chained handlers
->     
->     Some chained IRQ handlers are written to cope with primary chips of
->     potentially different flow types. Whether this a sensible thing to do
->     is a point of contention.
->     
->     This patch introduces entry/exit functions for chained handlers which
->     infer the flow type of the primary chip as fasteoi or level-type by
->     checking whether or not the ->irq_eoi function pointer is present and
->     calling back to the primary chip as necessary. Other methods of flow
->     control are not considered.
-> 
-> I'll add your Ack and put this (patch 1) in Russell's patch system next
-> week.
+> This would happen even with the classic page tables on Cortex-A15, L1
+> entries are cached.
 
-Having it in the changelog is nice, but the code itself would like a
-comment as well.
-
-Thanks,
-
-	tglx
+That's why its there at pte level.  On classic page tables there's no pmds
+or puds to consider.
