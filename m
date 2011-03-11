@@ -1,37 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Mar 2011 17:08:07 +0000
-Subject: [RFC] ARM: Cortex-A9: Enable dynamic clock gating
-In-Reply-To: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
-References: <1298433325-16810-1-git-send-email-toddpoynor@google.com>
-Message-ID: <1299863287.7239.37.camel@e102109-lin.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 11 Mar 2011 17:18:07 +0000
+Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
+Message-ID: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-02-23 at 03:55 +0000, Todd Poynor wrote:
-> Enable dynamic high level clock gating for Cortex-A9 CPUs, as
-> described in 2.3.3 "Dynamic high level clock gating" of the
-> Cortex-A9 TRM.  This may cut the clock of the integer core,
-> system control block, and Data Engine in certain conditions.
-> 
-> Add ARM errata 720791 to avoid corrupting the Jazelle
-> instruction stream on earlier Cortex-A9 revisions.
-> 
-> Signed-off-by: Todd Poynor <toddpoynor@google.com>
-> ---
-> Can anyone advise whether this feature should be selectively
-> enabled (or otherwise modified) due to secured register access,
-> introduced latencies observed, etc.?
-> 
-> This has been tested on a few Tegra 2 boards without problems
-> observed thus far, and some preliminary testing indicates it
-> may result in fairly significant power savings.  Any additional
-> testing greatly appreciated.
+New IO FPGA implementation for Versatile Express boards contain
+MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
 
-I haven't done any benchmarks on this, so can't comment on this.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/mmc/host/mmci.c |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
-My view is that something like the boot monitor/firmware should set this
-up, though that's not always the case. On some OMAP boards Linux runs in
-non-secure mode and it will fault when trying to set this bit.
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 2d6de3e..e7197b0 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -66,6 +66,12 @@ static struct variant_data variant_arm = {
+ 	.datalength_bits	= 16,
+ };
+ 
++static struct variant_data variant_arm_extended_fifo = {
++	.fifosize		= 128 * 4,
++	.fifohalfsize		= 64 * 4,
++	.datalength_bits	= 16,
++};
++
+ static struct variant_data variant_u300 = {
+ 	.fifosize		= 16 * 4,
+ 	.fifohalfsize		= 8 * 4,
+@@ -1019,10 +1025,15 @@ static int mmci_resume(struct amba_device *dev)
+ static struct amba_id mmci_ids[] = {
+ 	{
+ 		.id	= 0x00041180,
+-		.mask	= 0x000fffff,
++		.mask	= 0xff0fffff,
+ 		.data	= &variant_arm,
+ 	},
+ 	{
++		.id	= 0x01041180,
++		.mask	= 0xff0fffff,
++		.data	= &variant_arm_extended_fifo,
++	},
++	{
+ 		.id	= 0x00041181,
+ 		.mask	= 0x000fffff,
+ 		.data	= &variant_arm,
 -- 
-Catalin
+1.6.3.3
