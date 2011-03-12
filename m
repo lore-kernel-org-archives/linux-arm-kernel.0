@@ -1,71 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 12 Mar 2011 12:23:45 +0900
-Subject: [PATCH 0/5] S5PC210/S5PV310/EXYNOS4 interrupts update
-In-Reply-To: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
-References: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <002c01cbe064$ea048fb0$be0daf10$%kim@samsung.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sat, 12 Mar 2011 03:27:22 +0000
+Subject: [PATCH] arm: Fix .size directive for xscale_dma_a0_map_area
+Message-ID: <1299900442.4146.79.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-> This patch series perform an update on interrupts support for
-> S5PC210/S5PV310/EXYNOS4 platform. Two optional features have been added.
-> The first one is GPIO interrupts handler, a second is support for board
-> specific interrupts. The patches have been prepared to maximise the code
-> reuse, so common code for gpio interrupts for s5pc100, s5pc110 & s5pc210
-> have been prepared.
-> 
-> The patches have been prepared against
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> for-next branch (commit 857ddb87db).
-> 
-> Patches that make use of these 2 optional features for universal c210
-> board will follow soon.
-> 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> 
-> 
-> Patch summary:
-> 
-> Marek Szyprowski (5):
->   ARM: S5PV310: Add missing GPYx banks.
->   ARM: Samsung: cleanup S5P gpio interrupt code
->   ARM: Samsung: add function to register gpio interrupt bank data
->   ARM: S5PC210: add support for gpio interrupts
->   ARM: S5PC210: add a placeholder for board specific interrupts
-> 
->  arch/arm/mach-s5pc100/gpiolib.c               |    1 +
->  arch/arm/mach-s5pv210/gpiolib.c               |    1 +
->  arch/arm/mach-s5pv310/gpiolib.c               |   67 ++++++++++-
->  arch/arm/mach-s5pv310/include/mach/gpio.h     |   23 ++++-
->  arch/arm/mach-s5pv310/include/mach/irqs.h     |   16 ++-
->  arch/arm/plat-s5p/irq-gpioint.c               |  169
-+++++++++++++++--------
-> --
->  arch/arm/plat-samsung/include/plat/gpio-cfg.h |   16 +++
->  7 files changed, 220 insertions(+), 73 deletions(-)
-> 
-> --
-> 1.7.1.569.g6f426
+gas used to accept (and ignore?) .size directives which referred to
+undefined symbols, as this does.  In binutils 2.21 these are treated
+as fatal errors.
 
-Marek,
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+I missed this one previously because my 5-minute script didn't recognise
+the ENDPROC macro as generating a .size directive.
 
-Could you please re-send this based on my latest for-next which includes
-Exynos4 changes?
-And would be better to be separate gpio interrupt and board specific
-interrupt.
+Ben.
 
-Thanks.
+ arch/arm/mm/proc-xscale.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index 5a37c5e..ab00b59 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+ 	teq	r2, #DMA_TO_DEVICE
+ 	beq	xscale_dma_clean_range
+ 	b	xscale_dma_flush_range
+-ENDPROC(xscsale_dma_a0_map_area)
++ENDPROC(xscale_dma_a0_map_area)
+ 
+ /*
+  *	dma_unmap_area(start, size, dir)
+-- 
+1.7.4.1
