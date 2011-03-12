@@ -1,27 +1,25 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Sat, 12 Mar 2011 22:46:07 +0100
-Subject: [PATCH] arm: mach-kirkwood: add led in sheevaplug-setup.c
-In-Reply-To: <1299943965-8626-1-git-send-email-robin@reportlab.com> (Robin
-	Becker's message of "Sat, 12 Mar 2011 15:32:45 +0000")
-References: <1299943965-8626-1-git-send-email-robin@reportlab.com>
-Message-ID: <87y64k8128.fsf@macbook.be.48ers.dk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 12 Mar 2011 23:29:51 +0100
+Subject: [PATCH 5/8] ARM: PXA: Z2: Add poweroff function
+In-Reply-To: <201103122234.01568.anarsoul@gmail.com>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103121416.19327.marek.vasut@gmail.com>
+	<201103122234.01568.anarsoul@gmail.com>
+Message-ID: <201103122329.51319.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Robin" == Robin Becker <replabrobin@gmail.com> writes:
+On Saturday 12 March 2011 21:34:01 Vasily Khoruzhick wrote:
+> On Saturday 12 March 2011 15:16:19 Marek Vasut wrote:
+> > Besides, this is nonsense, you're doing a hack and you're trying to
+> > justify it. You cannot powerdown the device, period. You should rather
+> > patch the bootloader to implement this para-powerdown behaviour than
+> > bloat kernel with this workaround.
+> 
+> And, btw, there's same code in mainline kernel for zeus machine.
 
- Robin> From: Robin Becker <replabrobin@gmail.com>
- Robin> This patch adds a second, red, led for the standard sheevaplug.
- Robin> The sheeva_esata mpp config is left unchanged.
+Doesn't mean it's correct. CCing maintainer. Eric, can you also please comment 
+on it ? I really don't like the idea of abusing poweroff and making people 
+misunderstand.
 
- Robin> Tested on a standard sheevaplug
-
- Robin> Signed-off-by: Robin Becker <robin@reportlab.com>
-
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
-I had a look at this 2nd LED just the other week and was going to send a
-patch to add it.
-
--- 
-Bye, Peter Korsgaard
+Cheers
