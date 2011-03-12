@@ -1,96 +1,219 @@
-From: vb@vsbe.com (vb at vsbe.com)
-Date: Fri, 11 Mar 2011 16:14:44 -0800
-Subject: compiling 2.6.37 kernel in THUMB2 mode
-In-Reply-To: <AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
-References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
-	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
-	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
-	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
-	<AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
-	<AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
-	<AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
-	<AANLkTi=3s6ZRkaBG4uaS=7kaLWD-q2MgN0cN1otBrcmy@mail.gmail.com>
-	<AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
-Message-ID: <AANLkTintEi=JO222wQARaacpfHPor5usnz-qhNAAFXjm@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 12 Mar 2011 09:27:31 +0900
+Subject: [PATCH 1/7] ARM: S5PV310: Add platform definitions for FIMC
+In-Reply-To: <1299229274-9753-2-git-send-email-m.szyprowski@samsung.com>
+References: <1299229274-9753-1-git-send-email-m.szyprowski@samsung.com>
+	<1299229274-9753-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <002601cbe04c$489287d0$d9b79770$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 2:44 PM,  <vb@vsbe.com> wrote:
->
-> boot.ok:usb 3-1.4: SerialNumber: 07A80C01174E078E
-> boot.th:usb 3-1.4: SerialNumber: 07AA08011D51D473
->
+Marek Szyprowski wrote:
+> 
+> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> Add support for fourth FIMC platform device definition and define
+> resources for FIMC modules on S5PV310 machines.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/cpu.c                    |    7 ++++
+>  arch/arm/mach-s5pv310/include/mach/irqs.h      |    4 ++
+>  arch/arm/mach-s5pv310/include/mach/map.h       |    8 ++++
+>  arch/arm/plat-s5p/Kconfig                      |    5 +++
+>  arch/arm/plat-s5p/Makefile                     |    1 +
+>  arch/arm/plat-s5p/dev-fimc3.c                  |   43
+> ++++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/devs.h      |    1 +
+>  arch/arm/plat-samsung/include/plat/fimc-core.h |    5 +++
+>  8 files changed, 74 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-s5p/dev-fimc3.c
+> 
+> diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+> index 0db0fb6..0bdb0b0 100644
+> --- a/arch/arm/mach-s5pv310/cpu.c
+> +++ b/arch/arm/mach-s5pv310/cpu.c
+> @@ -21,6 +21,8 @@
+>  #include <plat/clock.h>
+>  #include <plat/s5pv310.h>
+>  #include <plat/sdhci.h>
+> +#include <plat/devs.h>
+> +#include <plat/fimc-core.h>
+> 
+>  #include <mach/regs-irq.h>
+> 
+> @@ -114,6 +116,11 @@ void __init s5pv310_map_io(void)
+>  	s5pv310_default_sdhci1();
+>  	s5pv310_default_sdhci2();
+>  	s5pv310_default_sdhci3();
+> +
+> +	s3c_fimc_setname(0, "s5pv310-fimc");
+> +	s3c_fimc_setname(1, "s5pv310-fimc");
+> +	s3c_fimc_setname(2, "s5pv310-fimc");
+> +	s3c_fimc_setname(3, "s5pv310-fimc");
+>  }
+> 
+>  void __init s5pv310_init_clocks(int xtal)
+> diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-
+> s5pv310/include/mach/irqs.h
+> index 536b0b5..0e99968 100644
+> --- a/arch/arm/mach-s5pv310/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+> @@ -107,6 +107,10 @@
+> 
+>  #define IRQ_MIPI_CSIS0		COMBINER_IRQ(30, 0)
+>  #define IRQ_MIPI_CSIS1		COMBINER_IRQ(30, 1)
+> +#define IRQ_FIMC0		COMBINER_IRQ(32, 0)
+> +#define IRQ_FIMC1		COMBINER_IRQ(32, 1)
+> +#define IRQ_FIMC2		COMBINER_IRQ(33, 0)
+> +#define IRQ_FIMC3		COMBINER_IRQ(33, 1)
+> 
+>  #define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
+> 
+> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-
+> s5pv310/include/mach/map.h
+> index 901657f..0db3a47 100644
+> --- a/arch/arm/mach-s5pv310/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
+> @@ -25,6 +25,10 @@
+> 
+>  #define S5PV310_PA_SYSRAM		0x02025000
+> 
+> +#define S5PV310_PA_FIMC0		0x11800000
+> +#define S5PV310_PA_FIMC1		0x11810000
+> +#define S5PV310_PA_FIMC2		0x11820000
+> +#define S5PV310_PA_FIMC3		0x11830000
+>  #define S5PV310_PA_I2S0			0x03830000
+>  #define S5PV310_PA_I2S1			0xE3100000
+>  #define S5PV310_PA_I2S2			0xE2A00000
+> @@ -121,6 +125,10 @@
+>  #define S5P_PA_CHIPID			S5PV310_PA_CHIPID
+>  #define S5P_PA_MIPI_CSIS0		S5PV310_PA_MIPI_CSIS0
+>  #define S5P_PA_MIPI_CSIS1		S5PV310_PA_MIPI_CSIS1
+> +#define S5P_PA_FIMC0			S5PV310_PA_FIMC0
+> +#define S5P_PA_FIMC1			S5PV310_PA_FIMC1
+> +#define S5P_PA_FIMC2			S5PV310_PA_FIMC2
+> +#define S5P_PA_FIMC3			S5PV310_PA_FIMC3
+>  #define S5P_PA_ONENAND			S5PC210_PA_ONENAND
+>  #define S5P_PA_ONENAND_DMA		S5PC210_PA_ONENAND_DMA
+>  #define S5P_PA_SDRAM			S5PV310_PA_SDRAM
+> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+> index 557f8c5..0db2a7a 100644
+> --- a/arch/arm/plat-s5p/Kconfig
+> +++ b/arch/arm/plat-s5p/Kconfig
+> @@ -60,6 +60,11 @@ config S5P_DEV_FIMC2
+>  	help
+>  	  Compile in platform device definitions for FIMC controller 2
+> 
+> +config S5P_DEV_FIMC3
+> +	bool
+> +	help
+> +	  Compile in platform device definitions for FIMC controller 3
+> +
+>  config S5P_DEV_ONENAND
+>  	bool
+>  	help
+> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+> index ce5a0a7..cfcd1db 100644
+> --- a/arch/arm/plat-s5p/Makefile
+> +++ b/arch/arm/plat-s5p/Makefile
+> @@ -28,6 +28,7 @@ obj-$(CONFIG_SUSPEND)		+= irq-pm.o
+>  obj-$(CONFIG_S5P_DEV_FIMC0)	+= dev-fimc0.o
+>  obj-$(CONFIG_S5P_DEV_FIMC1)	+= dev-fimc1.o
+>  obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
+> +obj-$(CONFIG_S5P_DEV_FIMC3)	+= dev-fimc3.o
+>  obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
+>  obj-$(CONFIG_S5P_DEV_CSIS0)	+= dev-csis0.o
+>  obj-$(CONFIG_S5P_DEV_CSIS1)	+= dev-csis1.o
+> diff --git a/arch/arm/plat-s5p/dev-fimc3.c b/arch/arm/plat-s5p/dev-fimc3.c
+> new file mode 100644
+> index 0000000..ef31bec
+> --- /dev/null
+> +++ b/arch/arm/plat-s5p/dev-fimc3.c
+> @@ -0,0 +1,43 @@
+> +/* linux/arch/arm/plat-s5p/dev-fimc3.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics
+> + *
+> + * Base S5P FIMC3 resource and device definitions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/ioport.h>
+> +#include <mach/map.h>
+> +
+> +static struct resource s5p_fimc3_resource[] = {
+> +	[0] = {
+> +		.start	= S5P_PA_FIMC3,
+> +		.end	= S5P_PA_FIMC3 + SZ_4K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= IRQ_FIMC3,
+> +		.end	= IRQ_FIMC3,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static u64 s5p_fimc3_dma_mask = DMA_BIT_MASK(32);
+> +
+> +struct platform_device s5p_device_fimc3 = {
+> +	.name		= "s5p-fimc",
+> +	.id		= 3,
+> +	.num_resources	= ARRAY_SIZE(s5p_fimc3_resource),
+> +	.resource	= s5p_fimc3_resource,
+> +	.dev		= {
+> +		.dma_mask		= &s5p_fimc3_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +};
+> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+> samsung/include/plat/devs.h
+> index b4d208b..b0123f3 100644
+> --- a/arch/arm/plat-samsung/include/plat/devs.h
+> +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> @@ -133,6 +133,7 @@ extern struct platform_device samsung_device_keypad;
+>  extern struct platform_device s5p_device_fimc0;
+>  extern struct platform_device s5p_device_fimc1;
+>  extern struct platform_device s5p_device_fimc2;
+> +extern struct platform_device s5p_device_fimc3;
+> 
+>  extern struct platform_device s5p_device_mipi_csis0;
+>  extern struct platform_device s5p_device_mipi_csis1;
+> diff --git a/arch/arm/plat-samsung/include/plat/fimc-core.h
+b/arch/arm/plat-
+> samsung/include/plat/fimc-core.h
+> index 81a3bfe..945a99d 100644
+> --- a/arch/arm/plat-samsung/include/plat/fimc-core.h
+> +++ b/arch/arm/plat-samsung/include/plat/fimc-core.h
+> @@ -38,6 +38,11 @@ static inline void s3c_fimc_setname(int id, char *name)
+>  		s5p_device_fimc2.name = name;
+>  		break;
+>  #endif
+> +#ifdef CONFIG_S5P_DEV_FIMC3
+> +	case 3:
+> +		s5p_device_fimc3.name = name;
+> +		break;
+> +#endif
+>  	}
+>  }
+> 
+> --
 
-oh, geez, this is embarrassing - please disregard this 'clue', but th
-rest of mystery remains - linux does not boot all the way...
+Ok, applied this based on my for-next.
+Thanks.
 
-cheers,
-/vb
-
-
-> I wonder if this is an indication of some USB problems (which would
-> explain why the file system fails to mount), but find it hard to come
-> up with a theory.
->
-> I wonder if this rings a bell with anyone,
->
-> thank you in advance,
->
-> Vadim
->
->
-> On Fri, Feb 18, 2011 at 1:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
->> On Thu, Feb 17, 2011 at 5:30 PM, ?<vb@vsbe.com> wrote:
->>
->> [...]
->>
->>>
->>> Hi Dave,
->>>
->>> thank you again for the hints.
->>>
->>> I am trying to build an image for a Tegra2 based platform, it s a
->>> 2.6.37 based tree with a fair amount of private additions (to be
->>> upstreamed at some point), which does now come up and run in ARM mode.
->>> I am trying to see if it can run in Thumb mode.
->>>
->>> It looks like certain files need to be compiled in ARM mode even when
->>> THUMB2_KERNEL is enabled, but I don't see this happening in 2.6.37, I
->>> was wondering how this is done in your tree.
->>
->> Generally, this can be kept to a minimum.
->>
->> On OMAP, the low-level PM code calls into firmware which cannot cope
->> with interworking between ARM and Thumb. ?The PM code on the ARM side
->> could be made to work with this even if it is mostly built in Thumb,
->> but that would be complex and not really worth the pain.
->>
->> You may have this problem if you're trying to communicate with
->> firmware, but it's best if you port everything else to be buildable in
->> Thumb-2: the primary reason is that for backwards compatibility
->> reasons, much of the assembler code in the kernel doesn't support
->> ARM/Thumb interworking either. ?This means that mixing ARM and Thumb
->> code in the kernel will lead to problems unless you're careful.
->>
->>>
->>> I tried building an OMAP image, but it does not build in Thumb mode,
->>> and Thumb can't even be enabled for it because CPU_V6 configured in.
->>> So I was wondering if this tree has some other working config which
->>> does use Thumb mode. I'll look at the config files you mentioned, but
->>> any suggestions/warnings about converting a kernel to work in Thumb
->>> mode are welcome,
->>
->> Assuming you started with omap2plus_defconfig, you need to remove
->> CONFIG_ARCH_OMAP2 from the config. ?It's not possible to incorporate
->> support for omap2 with CONFIG_THUMB2_KERNEL enabled because ARMv6
->> doesn't support Thumb-2.
->>
->> Here's the config I was using:
->> http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config (based on
->> the linaro config-- note: you don't need to build all the modules!
->> Just make zImage or uImage)
->>
->> Hope that helps!
->> ---Dave
->>
->
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
