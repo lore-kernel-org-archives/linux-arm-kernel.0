@@ -1,98 +1,96 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 11 Mar 2011 16:13:17 -0800
-Subject: [Qualcomm PM8921 MFD v2 2/6] mfd: pm8xxx: Add irq support
-In-Reply-To: <alpine.LFD.2.00.1103112112310.2787@localhost6.localdomain6>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-3-git-send-email-adharmap@codeaurora.org>
-	<alpine.LFD.2.00.1103081201520.2787@localhost6.localdomain6>
-	<4D770E47.6050402@codeaurora.org>
-	<alpine.LFD.2.00.1103101126100.2787@localhost6.localdomain6>
-	<4D79A85D.8000301@codeaurora.org>
-	<alpine.LFD.2.00.1103111853480.2787@localhost6.localdomain6>
-	<4D7A71B9.9000306@codeaurora.org>
-	<alpine.LFD.2.00.1103112020370.2787@localhost6.localdomain6>
-	<4D7A80DD.7000909@codeaurora.org>
-	<alpine.LFD.2.00.1103112112310.2787@localhost6.localdomain6>
-Message-ID: <4D7ABA9D.8070705@codeaurora.org>
+From: vb@vsbe.com (vb at vsbe.com)
+Date: Fri, 11 Mar 2011 16:14:44 -0800
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+In-Reply-To: <AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
+References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
+	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
+	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
+	<AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+	<AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
+	<AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
+	<AANLkTi=3s6ZRkaBG4uaS=7kaLWD-q2MgN0cN1otBrcmy@mail.gmail.com>
+	<AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
+Message-ID: <AANLkTintEi=JO222wQARaacpfHPor5usnz-qhNAAFXjm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner wrote:
-> So I deduce, that your HW has no way to mark the wakeup
-> interrupts. Whack your HW designer on my behalf, please! :)
-> 
-> Patch below against:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip.git irq/core
-> 
-> It's 8 lines, but that's still at least an order of magnitude less
-> than solving this with an workaround. :)
-> 
-> Thanks,
-> 
-> 	tglx
-> 
-> ---------->
-> Subject: genirq-force-mask-on-suspend.patch
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Fri, 11 Mar 2011 21:22:14 +0100
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  include/linux/irq.h |    2 ++
->  kernel/irq/pm.c     |   14 ++++++++++----
->  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> Index: linux-2.6-tip/include/linux/irq.h
-> ===================================================================
-> --- linux-2.6-tip.orig/include/linux/irq.h
-> +++ linux-2.6-tip/include/linux/irq.h
-> @@ -330,10 +330,12 @@ struct irq_chip {
->   *
->   * IRQCHIP_SET_TYPE_MASKED:	Mask before calling chip.irq_set_type()
->   * IRQCHIP_EOI_IF_HANDLED:	Only issue irq_eoi() when irq was handled
-> + * IRQCHIP_MASK_ON_SUSPEND:	Mask non wake irqs in the suspend path
->   */
->  enum {
->  	IRQCHIP_SET_TYPE_MASKED		= (1 <<  0),
->  	IRQCHIP_EOI_IF_HANDLED		= (1 <<  1),
-> +	IRQCHIP_MASK_ON_SUSPEND		= (2 <<  1),
->  };
->  
->  /* This include will go away once we isolated irq_desc usage to core code */
-> Index: linux-2.6-tip/kernel/irq/pm.c
-> ===================================================================
-> --- linux-2.6-tip.orig/kernel/irq/pm.c
-> +++ linux-2.6-tip/kernel/irq/pm.c
-> @@ -68,10 +68,16 @@ int check_wakeup_irqs(void)
->  	struct irq_desc *desc;
->  	int irq;
->  
-> -	for_each_irq_desc(irq, desc)
-> -		if (irqd_is_wakeup_set(&desc->irq_data) &&
-> -		    (desc->istate & IRQS_PENDING))
-> -			return -EBUSY;
-> +	for_each_irq_desc(irq, desc) {
-> +		if (irqd_is_wakeup_set(&desc->irq_data)) {
-> +			if (desc->istate & IRQS_PENDING)
-> +				return -EBUSY;
-> +			continue;
-> +		}
-> +		if (desc->istate & IRQS_SUSPENDED &&
-> +		    irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
-> +			mask_irq(desc);
-> +	}
->  
->  	return 0;
->  }
+On Fri, Mar 11, 2011 at 2:44 PM,  <vb@vsbe.com> wrote:
+>
+> boot.ok:usb 3-1.4: SerialNumber: 07A80C01174E078E
+> boot.th:usb 3-1.4: SerialNumber: 07AA08011D51D473
+>
 
-Awesome. This addresses the suspend/resume concerns. Thanks so much.
-Reviewed-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+oh, geez, this is embarrassing - please disregard this 'clue', but th
+rest of mystery remains - linux does not boot all the way...
 
-To avoid compile time issues, I will add
-.flags = IRQCHIP_MASK_ON_SUSPEND
-in my driver at a later time (after this change is pulled in).
+cheers,
+/vb
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+> I wonder if this is an indication of some USB problems (which would
+> explain why the file system fails to mount), but find it hard to come
+> up with a theory.
+>
+> I wonder if this rings a bell with anyone,
+>
+> thank you in advance,
+>
+> Vadim
+>
+>
+> On Fri, Feb 18, 2011 at 1:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>> On Thu, Feb 17, 2011 at 5:30 PM, ?<vb@vsbe.com> wrote:
+>>
+>> [...]
+>>
+>>>
+>>> Hi Dave,
+>>>
+>>> thank you again for the hints.
+>>>
+>>> I am trying to build an image for a Tegra2 based platform, it s a
+>>> 2.6.37 based tree with a fair amount of private additions (to be
+>>> upstreamed at some point), which does now come up and run in ARM mode.
+>>> I am trying to see if it can run in Thumb mode.
+>>>
+>>> It looks like certain files need to be compiled in ARM mode even when
+>>> THUMB2_KERNEL is enabled, but I don't see this happening in 2.6.37, I
+>>> was wondering how this is done in your tree.
+>>
+>> Generally, this can be kept to a minimum.
+>>
+>> On OMAP, the low-level PM code calls into firmware which cannot cope
+>> with interworking between ARM and Thumb. ?The PM code on the ARM side
+>> could be made to work with this even if it is mostly built in Thumb,
+>> but that would be complex and not really worth the pain.
+>>
+>> You may have this problem if you're trying to communicate with
+>> firmware, but it's best if you port everything else to be buildable in
+>> Thumb-2: the primary reason is that for backwards compatibility
+>> reasons, much of the assembler code in the kernel doesn't support
+>> ARM/Thumb interworking either. ?This means that mixing ARM and Thumb
+>> code in the kernel will lead to problems unless you're careful.
+>>
+>>>
+>>> I tried building an OMAP image, but it does not build in Thumb mode,
+>>> and Thumb can't even be enabled for it because CPU_V6 configured in.
+>>> So I was wondering if this tree has some other working config which
+>>> does use Thumb mode. I'll look at the config files you mentioned, but
+>>> any suggestions/warnings about converting a kernel to work in Thumb
+>>> mode are welcome,
+>>
+>> Assuming you started with omap2plus_defconfig, you need to remove
+>> CONFIG_ARCH_OMAP2 from the config. ?It's not possible to incorporate
+>> support for omap2 with CONFIG_THUMB2_KERNEL enabled because ARMv6
+>> doesn't support Thumb-2.
+>>
+>> Here's the config I was using:
+>> http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config (based on
+>> the linaro config-- note: you don't need to build all the modules!
+>> Just make zImage or uImage)
+>>
+>> Hope that helps!
+>> ---Dave
+>>
+>
