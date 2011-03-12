@@ -1,92 +1,70 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Sat, 12 Mar 2011 09:59:19 -0600
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <20101205112813.GB12542@viiv.ffwll.ch>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
-	<201011251747.48365.arnd@arndb.de>
-	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
-	<201011261224.59490.arnd@arndb.de>
-	<AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
-	<20101205112813.GB12542@viiv.ffwll.ch>
-Message-ID: <AANLkTi=B=_3tHXgG02pQA=zE=i8TOz0BZ=Pe9ZZwGLh3@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 12 Mar 2011 17:11:17 +0100
+Subject: [PATCH] net/fec: check id_entry pointer before using it
+In-Reply-To: <AANLkTimMEup3ThmMpfGAWVTgsCSEyK=5Ke=+ZjJd169R@mail.gmail.com>
+References: <1299639004-21546-1-git-send-email-jason.hui@linaro.org>
+	<20110309082601.GA3145@pengutronix.de>
+	<AANLkTimMEup3ThmMpfGAWVTgsCSEyK=5Ke=+ZjJd169R@mail.gmail.com>
+Message-ID: <20110312161117.GA26263@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 5, 2010 at 5:28 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Sat, Dec 04, 2010 at 04:34:22PM -0500, Alex Deucher wrote:
->> This doesn't seem that different from the graphics chips we support
->> with kms. ?I don't think it would require much work to use KMS. ?One
->> thing we considered, but never ended up implementing was a generic
->> overlay API for KMS. ?Most PC hardware still has overlays, but we
->> don't use them much any more on the desktop side. ?It may be
->> worthwhile to design an appropriate API for them for these type of
->> hardware.
->
-> Just fyi about a generic overlay api: I've looked a bit into this when
-> doing the intel overlay support and I think adding special overlay crtcs
-> that can be attached real crtcs gives a nice clean api. We could the reuse
-> the existing framebuffer/pageflipping api to get the buffers to the
-> overlay engine.
+On Thu, Mar 10, 2011 at 10:41:37AM +0800, Jason Liu wrote:
+> Hi, Wolfram Sang,
+> 
+> 2011/3/9 Wolfram Sang <w.sang@pengutronix.de>:
+> > On Wed, Mar 09, 2011 at 10:50:04AM +0800, Jason Liu wrote:
+> >> The id_entry will possibly be NULL, So, need check
+> >> id_entry and make sure it not NULL before using it.
+> >
+> > When does it become NULL?
+> 
+> look at the code:drivers/base/platform.c
+> 
+> static int platform_match(struct device *dev, struct device_driver *drv)
+> {
+>         struct platform_device *pdev = to_platform_device(dev);
+>         struct platform_driver *pdrv = to_platform_driver(drv);
+> 
+>         /* Attempt an OF style match first */
+>         if (of_driver_match_device(dev, drv))
+>                 return 1;
+> 
+>         /* Then try to match against the id table */
+>         if (pdrv->id_table)
+>                 return platform_match_id(pdrv->id_table, pdev) != NULL;
+> 
+>         /* fall-back to driver name match */
+>         return (strcmp(pdev->name, drv->name) == 0);
+> }
+> 
+> If OF style match first succeed, the function will return and the
+> pdev->id_entry will not get set and it's NULL.
 
-btw, has there been any further thought/discussion on this topic..
-I've been experimenting with a drm driver interface on the OMAP SoC.
-It is working well now for framebuffer type usage (mode setting,
-virtual framebuffer spanning multiple diplays, and those types of
-xrandr things)..  the next step that I've started thinking about is
-overlay (or underlay.. the z-order is flexible) support..
+This is correct. Yet, OF might be interested in using the flags from the
+fec-driver, too. If there will be a user (there is none yet), part of the
+update patch probably should add something like this to probe:
 
-I was thinking in a similar direction (ie. a special, or maybe not so
-special, sort of crtc) and came across this thread, so I thought I'd
-resurrect the topic.
+if (id_entry)
+	fec_flags = id_entry->driver_data;
+else if (of_id)
+	fec_flags = of_id->data;
+else
+	/* Deal with it... */
 
-In our case, most of the CRTCs in our driver could be used either with
-(A)RGB buffers as a traditional framebuffer, or with a few different
-formats of YUV as video under/overlays.  So if you had one display
-attached, you might only use one CRTC for traditional GUI/gfx layer,
-and the rest are available for video.  If you had two displays, then
-you'd steal one of the video CRTCs and use it for the gfx layer on the
-second display.  And so on.
+Makes sense?
 
-Rough thinking:
-+ add some 'caps' to the CRTC to indicate whether it can handle YUV,
-ARGB, scaling
-+ add an x/y offset relative to the encoder (as opposed to the
-existing x/y offset relative to the framebuffer)
-+ add a z-order parameter
+Regards,
 
-Not sure about intel hw if it is supporting clip-rects.. if so, maybe
-need to add something about that.  In our case we jut put the video
-behind the gfx layer and use the alpha channel in the gfx framebuffer
-to clip/blend rather than using clip-rects.
+   Wolfram
 
-
-> The real pain starts when we want format discovery from userspace with all
-> the alignement/size/layout constrains. Add in tiling support and its
-> almost impossible to do in a generic way. But also for kms userspace needs
-> to know these constrains (implemented for generic use in libkms). I favor
-> such an approach for overlays, too (if it ever happens) - i.e. a few
-> helpers in libkms that allocate an appropriate buffer for a given format
-> and size and returns the buffer, strides and offsets for the different
-> planes.
-
-hmm, I guess I know about the OMAP display subsystem, and it's overlay
-formats/capabilities.. but not enough about other hw to say anything
-intelligent here.  But I guess even if we ignore the format of the
-data in the buffer, at least the APIs to setup/attach overlay CRTCs at
-various positions could maybe be something we can start with as a
-first step.  At least standardizing this part seems like a good first
-step.  But I'm definitely interested if someone has some ideas.
-
-BR,
--R
-
-> -Daniel
-> --
-> Daniel Vetter
-> Mail: daniel at ffwll.ch
-> Mobile: +41 (0)79 365 57 48
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110312/4b2d6f44/attachment.sig>
