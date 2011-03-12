@@ -1,35 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Mar 2011 11:05:14 +0100
-Subject: [PATCH 09/10] ux500: Addressing irq header file dependency for
-	snowball.
-In-Reply-To: <1299884892-6766-10-git-send-email-mathieu.poirier@linaro.org>
-References: <1299884892-6766-1-git-send-email-mathieu.poirier@linaro.org>
-	<1299884892-6766-10-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <201103121105.14621.arnd@arndb.de>
+From: shweta.gulati@ti.com (Shweta Gulati)
+Date: Sat, 12 Mar 2011 16:09:21 +0530
+Subject: [PATCH V2] OMAP4: Intialize IVA Device in addition to DSP device.
+Message-ID: <1299926361-28482-1-git-send-email-shweta.gulati@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 March 2011 00:08:11 mathieu.poirier at linaro.org wrote:
-> --- a/arch/arm/mach-ux500/include/mach/irqs.h
-> +++ b/arch/arm/mach-ux500/include/mach/irqs.h
-> @@ -36,7 +36,7 @@
->  /* This will be overridden by board-specific irq headers */
->  #define IRQ_BOARD_END                  IRQ_BOARD_START
->  
-> -#ifdef CONFIG_MACH_U8500
-> +#if defined CONFIG_MACH_U8500 || CONFIG_MACH_U8500_SNOWBALL
->  #include <mach/irqs-board-mop500.h>
->  #endif
+OMAP4 has two different Devices IVA and DSP. DSP is bound
+with IVA for DVFS. The registration of IVA dev in API
+'omap2_init_processor_devices' was missing. Init dev for
+'iva_dev' is added.
 
-Can't you just remove the #ifdef entirely? If you want to
-be able to build a common kernel, these build-time conditionals
-don't work anyway, so the irqs-* files need to be distinct.
+This also fixes the following error seen during boot as
+omap2_set_init_voltage can now find the iva device
 
-The other option would be to remove the #include and directly
-include the board specific irqs header from the board file.
+	omap2_set_init_voltage: Invalid parameters!
+	omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
 
-In either case, the change would belong in the same patch as
-the code that requires it. Just add a short notice about it
-in the changelog.
+Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+---
 
-	Arnd
+Tested on OMAP4430 SDP Board.
+Baseline:
+http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+Branch :pm-core
+
+V2:
+Rephrased the Commit log.
+
+ arch/arm/mach-omap2/pm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 30af335..49486f5 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -89,6 +89,7 @@ static void omap2_init_processor_devices(void)
+ 	if (cpu_is_omap44xx()) {
+ 		_init_omap_device("l3_main_1", &l3_dev);
+ 		_init_omap_device("dsp", &dsp_dev);
++		_init_omap_device("iva", &iva_dev);
+ 	} else {
+ 		_init_omap_device("l3_main", &l3_dev);
+ 	}
+-- 
+1.7.0.4
