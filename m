@@ -1,29 +1,46 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 12 Mar 2011 14:28:40 +0100
-Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
-In-Reply-To: <201103121332.22136.anarsoul@gmail.com>
-References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
-	<201103120107.58907.marek.vasut@gmail.com>
-	<201103121332.22136.anarsoul@gmail.com>
-Message-ID: <201103121428.40368.marek.vasut@gmail.com>
+From: replabrobin@gmail.com (Robin Becker)
+Date: Sat, 12 Mar 2011 15:32:45 +0000
+Subject: [PATCH] arm: mach-kirkwood: add led in sheevaplug-setup.c
+Message-ID: <1299943965-8626-1-git-send-email-robin@reportlab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 March 2011 12:32:21 Vasily Khoruzhick wrote:
-> On Saturday 12 March 2011 02:07:58 Marek Vasut wrote:
-> > > AFAIK UDC pins are separate from UHC, so you can't use it as UDC. If
-> > > I'm wrong, please correct me. Because UDC on Zipit is much more
-> > > usefull for me than UHC :)
-> > 
-> > Check datasheet, they're likely the same pins.
-> 
-> I still see no reason to drop this patch - USB host works pretty well on
-> Zipit Z2.
+From: Robin Becker <replabrobin@gmail.com>
 
-http://esd.cs.ucr.edu/webres/usb11.pdf try reading for example here. The 
-discussion's getting into loop, so I'm pulling out. Someone else should comment 
-on this too.
+This patch adds a second, red, led for the standard sheevaplug.
+The sheeva_esata mpp config is left unchanged.
 
-> 
-> Regards
-> Vasily
+Tested on a standard sheevaplug
+
+Signed-off-by: Robin Becker <robin@reportlab.com>
+---
+ arch/arm/mach-kirkwood/sheevaplug-setup.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index d2eec35..247aa92 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -58,6 +58,12 @@ static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
+ 
+ static struct gpio_led sheevaplug_led_pins[] = {
+ 	{
++		.name			= "plug:red:misc",
++		.default_trigger	= "none",
++		.gpio			= 46,
++		.active_low		= 1,
++	},
++	{
+ 		.name			= "plug:green:health",
+ 		.default_trigger	= "default-on",
+ 		.gpio			= 49,
+@@ -80,6 +86,7 @@ static struct platform_device sheevaplug_leds = {
+ 
+ static unsigned int sheevaplug_mpp_config[] __initdata = {
+ 	MPP29_GPIO,	/* USB Power Enable */
++	MPP46_GPIO,	/* LED Red */
+ 	MPP49_GPIO,	/* LED */
+ 	0
+ };
+-- 
+1.7.4.1
