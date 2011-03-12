@@ -1,40 +1,24 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 12 Mar 2011 13:30:22 +0200
-Subject: [PATCH 5/8] ARM: PXA: Z2: Add poweroff function
-In-Reply-To: <201103121206.13251.marek.vasut@gmail.com>
-References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-	<201103121006.12614.anarsoul@gmail.com>
-	<201103121206.13251.marek.vasut@gmail.com>
-Message-ID: <201103121330.22949.anarsoul@gmail.com>
+Date: Sat, 12 Mar 2011 13:32:21 +0200
+Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
+In-Reply-To: <201103120107.58907.marek.vasut@gmail.com>
+References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
+	<201103120034.18406.anarsoul@gmail.com>
+	<201103120107.58907.marek.vasut@gmail.com>
+Message-ID: <201103121332.22136.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 March 2011 13:06:13 Marek Vasut wrote:
- 
-> You have a problem with suspend then ? That'd need a different solution.
+On Saturday 12 March 2011 02:07:58 Marek Vasut wrote:
 
-I'm still not sure if resume from deepsleep is possible on Zipit Z2, so using 
-deepsleep as poweroff is the only solution we know for now.
-
-> > Ok, I can clear PSPR before going to deepsleep, would it be enough?
+> > AFAIK UDC pins are separate from UHC, so you can't use it as UDC. If I'm
+> > wrong, please correct me. Because UDC on Zipit is much more usefull for
+> > me than UHC :)
 > 
-> As Eric pointed out, the wake-up scenario is bootloader-specific ... taking
-> into acount only your own version of bootloader is a no-no
+> Check datasheet, they're likely the same pins.
 
-That will work with mainline u-boot, here's pseudocode:
-
-1. PSPR = 0x0;
-2. Put_PXA270_Into_DeepSleep();
-.......
-Wake-up
-.......
-3. Load RCSR to temporary var
-4. Clear RCSR bits
-5. If we resumed from suspend jump to location pointed by PSPR
-
-Steps 3-5 are already implemented in u-boot, so it'll jump to 0x0 (NOR), to 
-the u-boot entry point. RCSR bits are already cleared, so it just continues 
-regular boot process.
+I still see no reason to drop this patch - USB host works pretty well on Zipit 
+Z2.
 
 Regards
 Vasily
