@@ -1,38 +1,40 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 13 Mar 2011 17:19:21 +0200
-Subject: [PATCH v2 5/6] ARM: PXA: Z2: Add default triggers for LEDs
+Date: Sun, 13 Mar 2011 17:19:22 +0200
+Subject: [PATCH v2 6/6] ARM: PXA: Z2: Use switch event for lid
 In-Reply-To: <1300029562-8400-1-git-send-email-anarsoul@gmail.com>
 References: <1300029562-8400-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1300029562-8400-6-git-send-email-anarsoul@gmail.com>
+Message-ID: <1300029562-8400-7-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So user can see if there's any mmc activity and if device's
-charging.
+Otherwise userspace might be confused.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-pxa/z2.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/z2.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index eb52444..5869f65 100644
+index 5869f65..3d3f019 100644
 --- a/arch/arm/mach-pxa/z2.c
 +++ b/arch/arm/mach-pxa/z2.c
-@@ -308,12 +308,12 @@ struct gpio_led z2_gpio_leds[] = {
- 	.active_low		= 1,
- }, {
- 	.name			= "z2:green:charged",
--	.default_trigger	= "none",
-+	.default_trigger	= "mmc0",
- 	.gpio			= GPIO85_ZIPITZ2_LED_CHARGED,
- 	.active_low		= 1,
- }, {
- 	.name			= "z2:amber:charging",
--	.default_trigger	= "none",
-+	.default_trigger	= "Z2-charging-or-full",
- 	.gpio			= GPIO83_ZIPITZ2_LED_CHARGING,
- 	.active_low		= 1,
- },
+@@ -435,12 +435,12 @@ static struct gpio_keys_button z2_pxa_buttons[] = {
+ 		.type		= EV_KEY,
+ 	},
+ 	{
+-		.code		= KEY_CLOSE,
++		.code		= SW_LID,
+ 		.gpio		= GPIO98_ZIPITZ2_LID_BUTTON,
+-		.active_low	= 0,
+-		.desc		= "Lid Button",
+-		.wakeup		= 0
+-		.type		= EV_KEY,
++		.active_low	= 1,
++		.desc		= "Lid Switch",
++		.wakeup		= 0,
++		.type		= EV_SW,
+ 	},
+ };
+ 
 -- 
 1.7.4.1
