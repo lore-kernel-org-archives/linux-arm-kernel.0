@@ -1,45 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 13 Mar 2011 19:34:02 +0100
-Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
-In-Reply-To: <20110313171033.GA1413@ucw.cz>
-References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
-	<201103131329.19793.marek.vasut@gmail.com>
-	<20110313171033.GA1413@ucw.cz>
-Message-ID: <201103131934.02152.marek.vasut@gmail.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Sun, 13 Mar 2011 23:06:59 +0300
+Subject: [PATCH] DM644x EVM: register MUSB device earlier
+Message-ID: <201103132306.59986.sshtylyov@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 March 2011 18:10:34 Pavel Machek wrote:
-> Hi!
-> 
-> > > > > > > This patch is a part of similar mozzwald's patch which was
-> > > > > > > based on GPSFan and rkdavis work.
-> > > > > > 
-> > > > > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
-> > > > > > comment for this patch is irelevant and has zero information
-> > > > > > value.
-> > > > > 
-> > > > > Heh, I can add 'from Zipit Z2 community', I don't know their actual
-> > > > > names nor mail addresses.
-> > > > 
-> > > > That's not the point. The point is the comment has zero value, it
-> > > > doesn't describe the change.
-> > > 
-> > > Credit where credit is due. Yes, it is polite to thank original
-> > > authors.
-> > 
-> > Doesn't it remind you of something ... ?
-> > 
-> > http://lwn.net/Articles/195643/
-> > 
-> > Maybe their true identity should be there as well.
-> 
-> This is credits, not signed-off-by, and I don't think this has similar
-> trade secrets risks...
+The MUSB driver doesn't see its platform device on DM644x EVM board anymore
+since commit 73b089b052a69020b953312a624a6e1eb5b81fab (usb: musb: split davinci
+to its own platform_driver) because the new probe is called as subsys_initcall()
+now, and the device is registered later than that by the board code.  Move the
+registration to davinci_evm_init() -- it's safe to do so because the MUSB core
+device still gets initialized as fs_initcall() -- which is late enough for the
+I2C GPIO expander (which controls VBUS) to be initialized.
 
-Actually it does ... how to connect the USB UDC is under Aeronix NDA (even the 
-fact the UHC pins are on the connector is under NDA ;-) )
+Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
-Cheers
+---
+The patch is against the recent DaVinci tree.
+It fixes post 2.6.38-rc1 regression, so should be applied immediately!
 
-> 								Pavel
+ arch/arm/mach-davinci/board-dm644x-evm.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+Index: linux-davinci/arch/arm/mach-davinci/board-dm644x-evm.c
+===================================================================
+--- linux-davinci.orig/arch/arm/mach-davinci/board-dm644x-evm.c
++++ linux-davinci/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -440,11 +440,6 @@ evm_u35_setup(struct i2c_client *client,
+ 	gpio_request(gpio + 7, "nCF_SEL");
+ 	gpio_direction_output(gpio + 7, 1);
+ 
+-	/* irlml6401 switches over 1A, in under 8 msec;
+-	 * now it can be managed by nDRV_VBUS ...
+-	 */
+-	davinci_setup_usb(1000, 8);
+-
+ 	return 0;
+ }
+ 
+@@ -705,6 +700,9 @@ static __init void davinci_evm_init(void
+ 	davinci_serial_init(&uart_config);
+ 	dm644x_init_asp(&dm644x_evm_snd_data);
+ 
++	/* irlml6401 switches over 1A, in under 8 msec */
++	davinci_setup_usb(1000, 8);
++
+ 	soc_info->emac_pdata->phy_id = DM644X_EVM_PHY_ID;
+ 	/* Register the fixup for PHY on DaVinci */
+ 	phy_register_fixup_for_uid(LXT971_PHY_ID, LXT971_PHY_MASK,
