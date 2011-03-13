@@ -1,36 +1,46 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 13 Mar 2011 13:29:19 +0100
-Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
-In-Reply-To: <20110313101808.GB1827@ucw.cz>
-References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
-	<201103112250.56967.marek.vasut@gmail.com>
-	<20110313101808.GB1827@ucw.cz>
-Message-ID: <201103131329.19793.marek.vasut@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 13 Mar 2011 15:53:28 +0200
+Subject: [PATCH 1/2] i2c-pxa2xx: Fix register offsets
+Message-ID: <1300024409-32587-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 March 2011 11:18:08 Pavel Machek wrote:
-> On Fri 2011-03-11 22:50:56, Marek Vasut wrote:
-> > On Friday 11 March 2011 22:49:13 Vasily Khoruzhick wrote:
-> > > On Friday 11 March 2011 23:42:30 Marek Vasut wrote:
-> > > > On Friday 11 March 2011 15:56:46 Vasily Khoruzhick wrote:
-> > > > > This patch is a part of similar mozzwald's patch which was
-> > > > > based on GPSFan and rkdavis work.
-> > > > 
-> > > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
-> > > > comment for this patch is irelevant and has zero information value.
-> > > 
-> > > Heh, I can add 'from Zipit Z2 community', I don't know their actual
-> > > names nor mail addresses.
-> > 
-> > That's not the point. The point is the comment has zero value, it doesn't
-> > describe the change.
-> 
-> Credit where credit is due. Yes, it is polite to thank original
-> authors.
+Fix regression that was introduced by dynamic register layout.
 
-Doesn't it remind you of something ... ?
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/i2c/busses/i2c-pxa.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-http://lwn.net/Articles/195643/
-
-Maybe their true identity should be there as well.
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index a90739b..312d369 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -66,18 +66,18 @@ enum pxa_i2c_types {
+ static struct pxa_reg_layout pxa_reg_layout[] = {
+ 	[REGS_PXA2XX] = {
+ 		.ibmr =	0x00,
+-		.idbr =	0x10,
+-		.icr =	0x20,
+-		.isr =	0x30,
+-		.isar =	0x40,
+-	},
+-	[REGS_PXA3XX] = {
+-		.ibmr =	0x00,
+ 		.idbr =	0x08,
+ 		.icr =	0x10,
+ 		.isr =	0x18,
+ 		.isar =	0x20,
+ 	},
++	[REGS_PXA3XX] = {
++		.ibmr =	0x00,
++		.idbr =	0x04,
++		.icr =	0x08,
++		.isr =	0x0c,
++		.isar =	0x10,
++	},
+ 	[REGS_CE4100] = {
+ 		.ibmr =	0x14,
+ 		.idbr =	0x0c,
+-- 
+1.7.4.1
