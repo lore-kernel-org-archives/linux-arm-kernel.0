@@ -1,33 +1,45 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 13 Mar 2011 18:35:13 +0100
-Subject: [PULL] PXA marex/devel-fix
-Message-ID: <201103131835.13226.marek.vasut@gmail.com>
+Date: Sun, 13 Mar 2011 19:34:02 +0100
+Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
+In-Reply-To: <20110313171033.GA1413@ucw.cz>
+References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
+	<201103131329.19793.marek.vasut@gmail.com>
+	<20110313171033.GA1413@ucw.cz>
+Message-ID: <201103131934.02152.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sunday 13 March 2011 18:10:34 Pavel Machek wrote:
+> Hi!
+> 
+> > > > > > > This patch is a part of similar mozzwald's patch which was
+> > > > > > > based on GPSFan and rkdavis work.
+> > > > > > 
+> > > > > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
+> > > > > > comment for this patch is irelevant and has zero information
+> > > > > > value.
+> > > > > 
+> > > > > Heh, I can add 'from Zipit Z2 community', I don't know their actual
+> > > > > names nor mail addresses.
+> > > > 
+> > > > That's not the point. The point is the comment has zero value, it
+> > > > doesn't describe the change.
+> > > 
+> > > Credit where credit is due. Yes, it is polite to thank original
+> > > authors.
+> > 
+> > Doesn't it remind you of something ... ?
+> > 
+> > http://lwn.net/Articles/195643/
+> > 
+> > Maybe their true identity should be there as well.
+> 
+> This is credits, not signed-off-by, and I don't think this has similar
+> trade secrets risks...
 
-Eric, can you please ... thanks.
+Actually it does ... how to connect the USB UDC is under Aeronix NDA (even the 
+fact the UHC pins are on the connector is under NDA ;-) )
 
-The following changes since commit a4ee3fbac8f3afe99fa91d97f7c9597b3f5b83ea:
+Cheers
 
-  ARM: pxa/colibri: use correct SD detect pin (2011-01-17 08:51:58 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/marex/pxa-linux-2.6 devel-fix
-
-Marek Vasut (1):
-      ARM: pxa: Properly configure PWM period for palm27x
-
-Vasily Khoruzhick (6):
-      ARM: PXA: Z2: Use only power button as wake source
-      ARM: PXA: Z2: Fix battery pdata
-      ARM: PXA: Z2: Fix libertas init/tear down sequences
-      ARM: PXA: Z2: Keep kbd backlight disabled by default
-      ARM: PXA: Z2: Add default triggers for LEDs
-      ARM: PXA: Z2: Use switch event for lid
-
- arch/arm/mach-pxa/include/mach/z2.h |    3 +-
- arch/arm/mach-pxa/palm27x.c         |    2 +-
- arch/arm/mach-pxa/z2.c              |   75 +++++++++++++++++------------------
- 3 files changed, 39 insertions(+), 41 deletions(-)
+> 								Pavel
