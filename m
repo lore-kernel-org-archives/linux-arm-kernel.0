@@ -1,30 +1,40 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 12 Mar 2011 17:05:10 -0800
-Subject: [RFC PATCH 1/5] OMAP2+: Panda introduce async platform data
-	definition
-In-Reply-To: <20110312225039.27728.24017.stgit@otae.warmcat.com>
-References: <20110312224440.27728.60593.stgit@otae.warmcat.com>
-	<20110312225039.27728.24017.stgit@otae.warmcat.com>
-Message-ID: <20110313010510.GC20396@kroah.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 13 Mar 2011 09:07:23 +0530
+Subject: [PATCH] OMAP4: PM: remove redundant #ifdef CONFIG_PM
+Message-ID: <1299987443-27275-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2011 at 10:50:39PM +0000, Andy Green wrote:
-> This is part of an RFC patch series introducing asynchronous platform
-> data, which may be attached to discovered bus devices at probe time
-> based on the device path.
-> 
-> As part of the series, platform_data is enabled in usbnet layer.
-> 
-> This patch defines the usbnet platform data, allowing the panda board
-> definition file to assert the naming of the usbnet network interface
-> should be eth%d instead of usb%d.
+pm44xx.c is built only when CONFIG_PM is setup,
+remove redundant CONFIG_PM check.
 
-Why is this?  If you want to do this, it should be done in userspace
-today, no need to involve the kernel in this type of thing.
+This also fixes:
+https://bugzilla.kernel.org/show_bug.cgi?id=25022
 
-So I don't see the point of this patch.
+Reported-by: Martin Etti <ettl.martin@gmx.de>
 
-thanks,
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/pm44xx.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 76cfff2..59a870b 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -105,13 +105,11 @@ static int __init omap4_pm_init(void)
+ 
+ 	pr_err("Power Management for TI OMAP4.\n");
+ 
+-#ifdef CONFIG_PM
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		pr_err("Failed to setup powerdomains\n");
+ 		goto err2;
+ 	}
+-#endif
+ 
+ #ifdef CONFIG_SUSPEND
+ 	suspend_set_ops(&omap_pm_ops);
+-- 
+1.7.1
