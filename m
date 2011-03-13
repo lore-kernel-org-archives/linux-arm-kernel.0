@@ -1,33 +1,31 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 14 Mar 2011 00:27:10 +0200
-Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
-Message-ID: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Mon, 14 Mar 2011 00:40:48 +0100
+Subject: [PATCH V12 3/4] ptp: Added a clock driver for the IXP46x.
+In-Reply-To: <cd6ddff0dcca60ac88b35660505d7bf54ad32405.1298878618.git.richard.cochran@omicron.at>
+	(Richard Cochran's message of "Mon, 28 Feb 2011 08:58:27 +0100")
+References: <cover.1298878618.git.richard.cochran@omicron.at>
+	<cd6ddff0dcca60ac88b35660505d7bf54ad32405.1298878618.git.richard.cochran@omicron.at>
+Message-ID: <m3ei6azj0f.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a race condition in stop_queue(),
-if drv_data->queue is empty, but drv_data->busy is still set
-(or opposite situation) stop_queue will return -EBUSY.
-So fix loop condition to check that both drv_data->queue is empty
-and drv_data->busy is not set.
+Richard Cochran <richardcochran@gmail.com> writes:
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/spi/pxa2xx_spi.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> This patch adds a driver for the hardware time stamping unit found on the
+> IXP465. The basic clock operations and an external trigger are implemented.
+>
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+> Acked-by: John Stultz <johnstul@us.ibm.com>
+> ---
+>  arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h |   78 ++++++
+>  drivers/net/arm/ixp4xx_eth.c                  |  192 ++++++++++++++-
+>  drivers/ptp/Kconfig                           |   13 +
+>  drivers/ptp/Makefile                          |    1 +
+>  drivers/ptp/ptp_ixp46x.c                      |  332 +++++++++++++++++++++++++
 
-diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index a429b01..3aa7820 100644
---- a/drivers/spi/pxa2xx_spi.c
-+++ b/drivers/spi/pxa2xx_spi.c
-@@ -1493,7 +1493,7 @@ static int stop_queue(struct driver_data *drv_data)
- 	 * execution path (pump_messages) would be required to call wake_up or
- 	 * friends on every SPI message. Do this instead */
- 	drv_data->run = QUEUE_STOPPED;
--	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
-+	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
- 		spin_unlock_irqrestore(&drv_data->lock, flags);
- 		msleep(10);
- 		spin_lock_irqsave(&drv_data->lock, flags);
+I can't see any obvious problem in this code, though I don't have IXP46x
+hardware.
+
+Acked-by: Krzysztof Halasa <khc@pm.waw.pl>
 -- 
-1.7.4.1
+Krzysztof Halasa
