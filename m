@@ -1,20 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 13 Mar 2011 18:09:27 +0100
-Subject: [PATCH v2 0/6] ARM: PXA: Z2: Zipit Z2 improvements series
-In-Reply-To: <1300029562-8400-1-git-send-email-anarsoul@gmail.com>
-References: <1300029562-8400-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201103131809.27765.marek.vasut@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 13 Mar 2011 18:10:34 +0100
+Subject: [PATCH v2 2/8] ARM: PXA: Z2: Enable OHCI on Zipit Z2
+In-Reply-To: <201103131329.19793.marek.vasut@gmail.com>
+References: <1299839023-16601-2-git-send-email-anarsoul@gmail.com>
+	<201103112250.56967.marek.vasut@gmail.com>
+	<20110313101808.GB1827@ucw.cz>
+	<201103131329.19793.marek.vasut@gmail.com>
+Message-ID: <20110313171033.GA1413@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 March 2011 16:19:16 Vasily Khoruzhick wrote:
-> This series attempts to improve Zipit Z2 support.
-> 
-> Changes since v1:
->  - Removed OHCI and poweroff patches
->  - Removed commented out stuff from 1st patch
->  - Added patch to handle lid switch gracefully (it's switch, not button!)
+Hi!
 
-You can have my Acked-by: Marek Vasut <marek.vasut@gmail.com> an all these 6 
-patches. I applied them on top of my devel-fix, will send Eric a pull rq later 
-today.
+> > > > > > This patch is a part of similar mozzwald's patch which was
+> > > > > > based on GPSFan and rkdavis work.
+> > > > > 
+> > > > > Noone knows what/who is "mozzwald" or "rkdavis" or "GPSFan", the
+> > > > > comment for this patch is irelevant and has zero information value.
+> > > > 
+> > > > Heh, I can add 'from Zipit Z2 community', I don't know their actual
+> > > > names nor mail addresses.
+> > > 
+> > > That's not the point. The point is the comment has zero value, it doesn't
+> > > describe the change.
+> > 
+> > Credit where credit is due. Yes, it is polite to thank original
+> > authors.
+> 
+> Doesn't it remind you of something ... ?
+> 
+> http://lwn.net/Articles/195643/
+> 
+> Maybe their true identity should be there as well.
+
+This is credits, not signed-off-by, and I don't think this has similar
+trade secrets risks...
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
