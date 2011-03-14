@@ -1,31 +1,34 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 14 Mar 2011 00:40:48 +0100
-Subject: [PATCH V12 3/4] ptp: Added a clock driver for the IXP46x.
-In-Reply-To: <cd6ddff0dcca60ac88b35660505d7bf54ad32405.1298878618.git.richard.cochran@omicron.at>
-	(Richard Cochran's message of "Mon, 28 Feb 2011 08:58:27 +0100")
-References: <cover.1298878618.git.richard.cochran@omicron.at>
-	<cd6ddff0dcca60ac88b35660505d7bf54ad32405.1298878618.git.richard.cochran@omicron.at>
-Message-ID: <m3ei6azj0f.fsf@intrepid.localdomain>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Mar 2011 11:57:11 +0900
+Subject: [PATCH 0/4] [rfc v3] mmc,
+	ARM: Add zboot from eSD support for SuperH Mobile ARM
+Message-ID: <1300071435-26759-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Cochran <richardcochran@gmail.com> writes:
+This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
+ARM to boot directly from the SDHI hardware block.
 
-> This patch adds a driver for the hardware time stamping unit found on the
-> IXP465. The basic clock operations and an external trigger are implemented.
->
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> Acked-by: John Stultz <johnstul@us.ibm.com>
-> ---
->  arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h |   78 ++++++
->  drivers/net/arm/ixp4xx_eth.c                  |  192 ++++++++++++++-
->  drivers/ptp/Kconfig                           |   13 +
->  drivers/ptp/Makefile                          |    1 +
->  drivers/ptp/ptp_ixp46x.c                      |  332 +++++++++++++++++++++++++
+The first three patches shuffle some code around.
+The fourth patch has the new boot code and the bulk of the code.
 
-I can't see any obvious problem in this code, though I don't have IXP46x
-hardware.
-
-Acked-by: Krzysztof Halasa <khc@pm.waw.pl>
--- 
-Krzysztof Halasa
+ Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt       |   43 +
+ arch/arm/Kconfig                                     |   35 -
+ arch/arm/boot/compressed/Makefile                    |    9 
+ arch/arm/boot/compressed/head-shmobile.S             |   12 
+ arch/arm/boot/compressed/mmcif-sh7372.c              |   14 
+ arch/arm/boot/compressed/sdhi-shmobile.c             |  501 ++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h      |   29 +
+ arch/arm/mach-shmobile/include/mach/mmc-mackerel.h   |   38 +
+ arch/arm/mach-shmobile/include/mach/mmc.h            |   18 
+ arch/arm/mach-shmobile/include/mach/mmcif-ap4eb.h    |   29 -
+ arch/arm/mach-shmobile/include/mach/mmcif-mackerel.h |   39 -
+ arch/arm/mach-shmobile/include/mach/mmcif.h          |   18 
+ arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h    |   58 ++
+ arch/arm/mach-shmobile/include/mach/sdhi.h           |   16 
+ arch/sh/boot/romimage/mmcif-sh7724.c                 |   10 
+ drivers/mmc/host/tmio_mmc.c                          |   46 -
+ include/linux/mmc/boot.h                             |    7 
+ include/linux/mmc/sh_mmcif.h                         |    3 
+ include/linux/mmc/tmio.h                             |   49 +
+ 19 files changed, 812 insertions(+), 162 deletions(-)
