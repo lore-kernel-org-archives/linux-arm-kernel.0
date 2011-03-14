@@ -1,48 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Mar 2011 12:38:48 -0700
+From: mailinglists@openelec.tv (Stephan Raue)
+Date: Mon, 14 Mar 2011 20:51:28 +0100
 Subject: [GIT PULL] OMAP PM updates for 2.6.39
-In-Reply-To: <4D7E6DCF.1060703@openelec.tv>
-References: <87k4g6eakw.fsf@ti.com>
- <4D7E6DCF.1060703@openelec.tv>
-Message-ID: <20110314193848.GI7258@atomide.com>
+In-Reply-To: <20110314193848.GI7258@atomide.com>
+References: <87k4g6eakw.fsf@ti.com> <4D7E6DCF.1060703@openelec.tv>
+	<20110314193848.GI7258@atomide.com>
+Message-ID: <4D7E71C0.4010808@openelec.tv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephan Raue <mailinglists@openelec.tv> [110314 12:32]:
-> Hi,
-> 
-> Am 11.03.2011 01:59, schrieb Kevin Hilman:
-> >Dave Martin (5):
-> >       ARM: omap4: Provide do_wfi() for Thumb-2
-> >       ARM: omap4: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
-> >       ARM: omap3: Remove hand-encoded SMC instructions
-> 
-> "ARM: omap3: Remove hand-encoded SMC instructions" fails for me with:
-> 
-> /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/bin/arm-openelec-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-omap2/.sleep34xx.o.d  -nostdinc -isystem /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/lib/gcc/arm-openelec-linux-gnueabi/4.5.2/include -I/home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/linux-2.6.38-rc8/arch/arm/include -Iinclude  -include include/generated/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -mthumb -Wa,-mimplicit-it=always -Wa,-mno-warn-deprecated -Wa,-mthumb -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=armv7-a   -c -o arch/arm/mach-omap2/sleep34xx.o arch/arm/mach-omap2/sleep34xx.S
-> arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
-> arch/arm/mach-omap2/sleep34xx.S:149: Error: selected processor does not support ARM mode `smc #1'
-> arch/arm/mach-omap2/sleep34xx.S:416: Error: selected processor does not support ARM mode `smc #1'
-> arch/arm/mach-omap2/sleep34xx.S:427: Error: selected processor does not support ARM mode `smc #1'
-> arch/arm/mach-omap2/sleep34xx.S:452: Error: selected processor does not support ARM mode `smc #0'
-> arch/arm/mach-omap2/sleep34xx.S:458: Error: selected processor does not support ARM mode `smc #0'
-> arch/arm/mach-omap2/sleep34xx.S:463: Error: selected processor does not support ARM mode `smc #0'
-> make[2]: *** [arch/arm/mach-omap2/sleep34xx.o] Error 1
-> make[1]: *** [arch/arm/mach-omap2] Error 2
-> 
-> 
-> replacing in arch/arm/mach-omap2/Makefile:
-> 
-> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
-> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a
-> 
-> to:
-> 
-> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
-> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a$(plus_sec)
-> 
-> helps compiling (see also: https://patchwork.kernel.org/patch/369681/)
+Am 14.03.2011 20:38, schrieb Tony Lindgren:
+> * Stephan Raue<mailinglists@openelec.tv>  [110314 12:32]:
+>> Hi,
+>>
+>> Am 11.03.2011 01:59, schrieb Kevin Hilman:
+>>> Dave Martin (5):
+>>>        ARM: omap4: Provide do_wfi() for Thumb-2
+>>>        ARM: omap4: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
+>>>        ARM: omap3: Remove hand-encoded SMC instructions
+>> "ARM: omap3: Remove hand-encoded SMC instructions" fails for me with:
+>>
+>> /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/bin/arm-openelec-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-omap2/.sleep34xx.o.d  -nostdinc -isystem /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/lib/gcc/arm-openelec-linux-gnueabi/4.5.2/include -I/home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/linux-2.6.38-rc8/arch/arm/include -Iinclude  -include include/generated/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -mthumb -Wa,-mimplicit-it=always -Wa,-mno-warn-deprecated -Wa,-mthumb -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=armv7-a   -c -o arch/arm/mach-omap2/sleep34xx.o arch/arm/mach-omap2/sleep34xx.S
+>> arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
+>> arch/arm/mach-omap2/sleep34xx.S:149: Error: selected processor does not support ARM mode `smc #1'
+>> arch/arm/mach-omap2/sleep34xx.S:416: Error: selected processor does not support ARM mode `smc #1'
+>> arch/arm/mach-omap2/sleep34xx.S:427: Error: selected processor does not support ARM mode `smc #1'
+>> arch/arm/mach-omap2/sleep34xx.S:452: Error: selected processor does not support ARM mode `smc #0'
+>> arch/arm/mach-omap2/sleep34xx.S:458: Error: selected processor does not support ARM mode `smc #0'
+>> arch/arm/mach-omap2/sleep34xx.S:463: Error: selected processor does not support ARM mode `smc #0'
+>> make[2]: *** [arch/arm/mach-omap2/sleep34xx.o] Error 1
+>> make[1]: *** [arch/arm/mach-omap2] Error 2
+>>
+>>
+>> replacing in arch/arm/mach-omap2/Makefile:
+>>
+>> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
+>> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a
+>>
+>> to:
+>>
+>> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
+>> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a$(plus_sec)
+>>
+>> helps compiling (see also: https://patchwork.kernel.org/patch/369681/)
+> Care to post a patch for this and mention your compiler version too?
+>
+> Tony
+patch attached.
 
-Care to post a patch for this and mention your compiler version too?
+i am using http://gitorious.org/linux-omap-dss2/linux with gcc-4.5.2, 
+binutils-2.21
 
-Tony
+thanks
+
+Stephan
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: linux-2.6.38-rc8-321-linux_omap_dss2_fix_SMC_instructions.patch
+Type: text/x-patch
+Size: 572 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110314/66bfc97f/attachment.bin>
