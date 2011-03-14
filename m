@@ -1,143 +1,41 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Mon, 14 Mar 2011 19:25:47 +0530
-Subject: [PATCH 2/7] davinci: eliminate use of IO_ADDRESS() on sysmod
-Message-ID: <1300110947-16229-1-git-send-email-manjunath.hadli@ti.com>
+Date: Mon, 14 Mar 2011 19:26:08 +0530
+Subject: [PATCH 3/7] davinci: dm644x: Replace register base value with a
+	defined macro
+Message-ID: <1300110968-16350-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current devices.c file has a number of instances where
-IO_ADDRESS() is used for system module register
-access. Eliminate this in favor of a ioremap()
-based access.
-
-Consequent to this, a new global pointer davinci_sysmodbase
-has been introduced which gets initialized during
-the initialization of each relevant SoC
+Replace hard coded value of vpss register base to a define macro
+DM644X_VPSS_REG_BASE for proper readability
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
 ---
- arch/arm/mach-davinci/devices.c               |   23 ++++++++++++++---------
- arch/arm/mach-davinci/dm355.c                 |    1 +
- arch/arm/mach-davinci/dm365.c                 |    1 +
- arch/arm/mach-davinci/dm644x.c                |    1 +
- arch/arm/mach-davinci/dm646x.c                |    1 +
- arch/arm/mach-davinci/include/mach/hardware.h |    6 ++++++
- 6 files changed, 24 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/dm644x.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index d3b2040..66a948d 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -33,6 +33,14 @@
- #define DM365_MMCSD0_BASE	     0x01D11000
- #define DM365_MMCSD1_BASE	     0x01D00000
- 
-+void __iomem  *davinci_sysmodbase;
-+
-+void davinci_map_sysmod(void)
-+{
-+	davinci_sysmodbase = ioremap_nocache(DAVINCI_SYSTEM_MODULE_BASE, 0x800);
-+	WARN_ON(!davinci_sysmodbase);
-+}
-+
- static struct resource i2c_resources[] = {
- 	{
- 		.start		= DAVINCI_I2C_BASE,
-@@ -210,12 +218,12 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
- 			davinci_cfg_reg(DM355_SD1_DATA2);
- 			davinci_cfg_reg(DM355_SD1_DATA3);
- 		} else if (cpu_is_davinci_dm365()) {
--			void __iomem *pupdctl1 =
--				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE + 0x7c);
--
- 			/* Configure pull down control */
--			__raw_writel((__raw_readl(pupdctl1) & ~0xfc0),
--					pupdctl1);
-+			void __iomem *pupdctl1 = DAVINCI_SYSMODULE_VIRT(0x7c);
-+			unsigned v;
-+
-+			v = readl(pupdctl1);
-+			writel(v & ~0xfc0, pupdctl1);
- 
- 			mmcsd1_resources[0].start = DM365_MMCSD1_BASE;
- 			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
-@@ -244,11 +252,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
- 			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT0;
- 		} else if (cpu_is_davinci_dm644x()) {
- 			/* REVISIT: should this be in board-init code? */
--			void __iomem *base =
--				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE);
--
- 			/* Power-on 3.3V IO cells */
--			__raw_writel(0, base + DM64XX_VDD3P3V_PWDN);
-+			writel(0, DAVINCI_SYSMODULE_VIRT(DM64XX_VDD3P3V_PWDN));
- 			/*Set up the pull regiter for MMC */
- 			davinci_cfg_reg(DM644X_MSTK);
- 		}
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index a5f8a80..1baab94 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -874,6 +874,7 @@ void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata)
- void __init dm355_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm355);
-+	davinci_map_sysmod();
- }
- 
- static int __init dm355_init_devices(void)
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 02d2cc3..a788980 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -1127,6 +1127,7 @@ void __init dm365_init_rtc(void)
- void __init dm365_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm365);
-+	davinci_map_sysmod();
- }
- 
- static struct resource dm365_vpss_resources[] = {
 diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 9a2376b..77dea11 100644
+index 77dea11..73e74d0 100644
 --- a/arch/arm/mach-davinci/dm644x.c
 +++ b/arch/arm/mach-davinci/dm644x.c
-@@ -779,6 +779,7 @@ void __init dm644x_init_asp(struct snd_platform_data *pdata)
- void __init dm644x_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm644x);
-+	davinci_map_sysmod();
- }
+@@ -586,13 +586,15 @@ static struct platform_device dm644x_asp_device = {
+ 	.resource	= dm644x_asp_resources,
+ };
  
- static int __init dm644x_init_devices(void)
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 1e0f809..ce93b83 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -903,6 +903,7 @@ void __init dm646x_init(void)
- {
- 	dm646x_board_setup_refclk(&ref_clk);
- 	davinci_common_init(&davinci_soc_info_dm646x);
-+	davinci_map_sysmod();
- }
- 
- static int __init dm646x_init_devices(void)
-diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
-index 414e0b9..5296025 100644
---- a/arch/arm/mach-davinci/include/mach/hardware.h
-+++ b/arch/arm/mach-davinci/include/mach/hardware.h
-@@ -21,6 +21,12 @@
-  */
- #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
- 
-+#ifndef __ASSEMBLER__
-+extern void __iomem  *davinci_sysmodbase;
-+#define DAVINCI_SYSMODULE_VIRT(x)	(davinci_sysmodbase + (x))
-+void davinci_map_sysmod(void);
-+#endif
++#define DM644X_VPSS_REG_BASE           0x01c73400
 +
- /*
-  * I/O mapping
-  */
+ static struct resource dm644x_vpss_resources[] = {
+ 	{
+ 		/* VPSS Base address */
+ 		.name		= "vpss",
+-		.start          = 0x01c73400,
+-		.end            = 0x01c73400 + 0xff,
+-		.flags          = IORESOURCE_MEM,
++		.start		= DM644X_VPSS_REG_BASE,
++		.end		= DM644X_VPSS_REG_BASE + 0xff,
++		.flags		= IORESOURCE_MEM,
+ 	},
+ };
+ 
 -- 
 1.6.2.4
