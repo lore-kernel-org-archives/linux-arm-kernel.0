@@ -1,26 +1,60 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 14 Mar 2011 09:42:54 -0700
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <20110314085248.GA2285@legolas.emea.dhcp.ti.com> (Felipe Balbi's
-	message of "Mon, 14 Mar 2011 10:52:49 +0200")
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-Message-ID: <87oc5dlkkx.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Mar 2011 09:59:23 -0700
+Subject: [PATCH 2/2] omap4: mux: Remove duplicate mux modes
+In-Reply-To: <4D7DD4BC.7080104@ti.com>
+References: <20110311203317.26901.67180.stgit@baageli.muru.com>
+	<20110311203420.26901.36271.stgit@baageli.muru.com>
+	<4D7DD4BC.7080104@ti.com>
+Message-ID: <20110314165922.GA7258@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
+* Cousson, Benoit <b-cousson@ti.com> [110314 01:39]:
+> Hi Tony,
+> 
+> On 3/11/2011 9:34 PM, Tony Lindgren wrote:
+> >Remove duplicate mux modes to make the binary smaller:
+> >
+> >text    data     bss     dec     hex filename
+> >9378   24472       0   33850    843a mux44xx.o
+> >9378   19104       0   28482    6f42 mux44xx.o
+> >
+> >Cc: Benoit Cousson<b-cousson@ti.com>
+> >Signed-off-by: Tony Lindgren<tony@atomide.com>
+> >---
+> >  arch/arm/mach-omap2/mux44xx.c |  282 +----------------------------------------
+> >  1 files changed, 6 insertions(+), 276 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-omap2/mux44xx.c b/arch/arm/mach-omap2/mux44xx.c
+> >index c322e7b..9a66445 100644
+> >--- a/arch/arm/mach-omap2/mux44xx.c
+> >+++ b/arch/arm/mach-omap2/mux44xx.c
+> >@@ -755,25 +755,9 @@ static struct omap_ball __initdata omap4_core_cbl_ball[] = {
+> >  #endif
+> >
+> >  /*
+> >- * Superset of all mux modes for omap4 ES2.0
+> >+ * Signals different on ES2.0 compared to superset
+> 
+> I didn't do it originally due to the huge amount of differences
+> between the two versions and the impact at runtime it will imply to
+> fix the modified entries at boot time. It might still be interesting
+> to measure it.
 
-[...]
+A quick test shows the difference is 0.007324218 - 0.007202148 seconds.. :)
+ 
+> Since ES1 is no longer used on any board except the early one, that
+> you probably still have :-), it might be better to consider ES2 as
+> the superset and then store ES1 diff as the subset. It will avoid
+> any performance impact for the latest devices.
 
->
-> Kevin feel free to take this into your tree:
->
-> Acked-by: Felipe Balbi <balbi@ti.com>
->
+Well the performance impact is minimal in this case. But from cutting
+down the size point of view that makes sense as then we could later on
+optionally compile out OMAP_PACKAGE_CBL.
 
-OK, will queue for 2.6.39.
+Sounds like that's a separate incremental patch on top of this one
+though.
 
-Thanks,
+Regards,
 
-Kevin
+Tony
