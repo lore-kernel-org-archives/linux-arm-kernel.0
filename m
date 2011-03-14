@@ -1,71 +1,49 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 14 Mar 2011 16:28:25 +0530
-Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
-In-Reply-To: <4D7B2688.9040506@ti.com>
-References: <1299245123-23444-1-git-send-email-rnayak@ti.com>	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>	<4D775418.6050105@ti.com>	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>	<4D7A22F6.5050806@ti.com>
-	<871v2dbo3q.fsf@ti.com> <4D7B2688.9040506@ti.com>
-Message-ID: <4D7DF4D1.1030209@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Mar 2011 11:15:45 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
+	tables
+In-Reply-To: <20110311192455.GA23109@n2100.arm.linux.org.uk>
+References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
+	<20110215103127.GC4152@n2100.arm.linux.org.uk>
+	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
+	<20110215113242.GD4152@n2100.arm.linux.org.uk>
+	<20110215121437.GG4152@n2100.arm.linux.org.uk>
+	<AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
+	<20110309183507.GB11273@n2100.arm.linux.org.uk>
+	<1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
+	<20110311192455.GA23109@n2100.arm.linux.org.uk>
+Message-ID: <1300101345.3907.4.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/12/2011 1:23 PM, Rajendra Nayak wrote:
-> Hi Kevin,
->
-> On 3/11/2011 10:17 PM, Kevin Hilman wrote:
->> Rajendra Nayak<rnayak@ti.com>  writes:
->>
->> [...]
->>
->>>>
->>>> It's also breaking boot on OMAP35xx BeagleBoard rev C2.  The kernel
->>>> boot messages are below - omap2plus_defconfig + DEBUG_LL.  Reverting
->>>> the patch fixes it.  Could you please take a look?
->>>
->>> I got hold of a Beagle, a sticker on which says rev C1D.
->>> Not sure if there is a better way to identify the rev, but
->>> this one seems to boot fine for me even with this patch.
->>> I just applied this one patch on top of the the tag
->>> 'integration-2.6.39-20110310-008' of git://git.pwsan.com/linux-
->>> integration.
->>
->> In the process of testing Santosh's OMAP4 PM series (which includes
->> $SUBJECT patch) on OMAP3, I also noticed some problems on beagle (mine
->> is a C3.)
->>
->> Specifially, with $SUBJECT patch applied, none of the powerdomains ever
->> reach inactive or RET during idle (suspend seems to work fine.)
->>
->> Just reverting $SUBJECT patch makes things go back to working normally.
->>
->> I pushed the test branch I used which is a merge of Santosh's v3 branch
->> with my pm branch (branch: tmp/santosh-omap4-pm)
->>
->> I tested by first doing a suspend test and confirming all the
->> powerdomains hit retention.  That worked fine.  Then I did an idle test:
->>
->>    echo 5>  /sys/devices/platform/omap/omap_uart.0/sleep_timeout
->>    echo 5>  /sys/devices/platform/omap/omap_uart.1/sleep_timeout
->>    echo 5>  /sys/devices/platform/omap/omap_uart.2/sleep_timeout
->>    echo 1>  /debug/pm_debug/sleep_while_idle
->>
->> and waited for the UARTs to timeout.
->>
->> Well after the UART timeouts expired, I do not see any powerdomains
->> transitioning from ON.
->>
->> What's even more strange is that the same thing is working fine on all
->> the other OMAP3 platforms I tested: 3430/n900, 3630/zoom3 and even a
->> different 3530-based platform, the OMAP3EVM.
->
-> I probably know whats going wrong with this patch, even though I
-> haven't really been able to reproduce any of these issues myself.
->
-> The below change which should be the only one affecting non-OMAP4
-> platforms actually is calling clkdm_allow_idle() for all clkdms
-> without really checking for a CLKDM_CAN_ENABLE_AUTO flag, which
-> seems wrong. I was somehow under the impression that the
-> clkdm_allow_idle() function would internally do this check but
-> that does not seem to be the case.
+On Fri, 2011-03-11 at 19:24 +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 11, 2011 at 05:32:58PM +0000, Catalin Marinas wrote:
+> > On Wed, 2011-03-09 at 18:35 +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Mar 09, 2011 at 03:40:05PM +0000, Catalin Marinas wrote:
+> > > > The above call to tlb_add_flush() would only add a PAGE_SIZE. But
+> > > > since we free an entire PTE, shouldn't the range cover addr ..
+> > > > addr+PTRS_PER_PTE*PAGE_SIZE?
+> > >
+> > > Why do we need to?  We're not flushing away the individual PTE entries
+> > > when we remove an entire page table - we will have already walked the
+> > > page table removing those entries, which will already have been added.
+> >
+> > Ah, I missed the fact that tlb_flush() invalidates the whole TLB when
+> > there is no tlb->vma (the shift_arg_pages case). We could optimise this
+> > to add the range covered by the PTE page and avoid the !tlb->vma check
+> > (and a flush_tlb_mm), though not sure it's worth.
+> 
+> If we're removing pte entries then tlb->vma is non-NULL.  Please look at
+> the comments - I've documented the three modes of use there along with
+> how things are setup for each of those modes, and what we do with each.
 
-Actually I was wrong, clkdm_allow_idle() does seem to have a
-check for the CLKDM_CAN_ENABLE_AUTO flag.
+Yes, I read them (they are useful) and I was only referring to point 3
+in the comments, shift_arg_pages(). In this case tlb->vma is NULL and we
+flush the full mm in tlb_flush(). Can we have a smaller address range
+since we can get the from pte_free_tlb()?
+
+This would mean removing the !tlb->vma check in tlb_flush() and change
+tlb_add_flush() to take a range rather than just an address.
+
+-- 
+Catalin
