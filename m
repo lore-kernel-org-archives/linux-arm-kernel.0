@@ -1,57 +1,61 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Mar 2011 11:19:22 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <1300101345.3907.4.camel@e102109-lin.cambridge.arm.com>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-	<20110215103127.GC4152@n2100.arm.linux.org.uk>
-	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
-	<20110215113242.GD4152@n2100.arm.linux.org.uk>
-	<20110215121437.GG4152@n2100.arm.linux.org.uk>
-	<AANLkTindKihW3Hv4gdWakPcBAfFCrnd5wzSXN7K=Ac0h@mail.gmail.com>
-	<20110309183507.GB11273@n2100.arm.linux.org.uk>
-	<1299864778.7239.57.camel@e102109-lin.cambridge.arm.com>
-	<20110311192455.GA23109@n2100.arm.linux.org.uk>
-	<1300101345.3907.4.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110314111922.GC26085@n2100.arm.linux.org.uk>
+Date: Mon, 14 Mar 2011 11:22:12 +0000
+Subject: [GIT PULL] u300, ux500 and Nomadik changes for v2.6.39
+In-Reply-To: <20110313214835.GA24370@n2100.arm.linux.org.uk>
+References: <AANLkTikgMq4QbRGZ_3kkzeNBp9aD4YKa-0CRCfs1K57u@mail.gmail.com>
+	<20110313214835.GA24370@n2100.arm.linux.org.uk>
+Message-ID: <20110314112212.GD26085@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 11:15:45AM +0000, Catalin Marinas wrote:
-> On Fri, 2011-03-11 at 19:24 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Mar 11, 2011 at 05:32:58PM +0000, Catalin Marinas wrote:
-> > > On Wed, 2011-03-09 at 18:35 +0000, Russell King - ARM Linux wrote:
-> > > > On Wed, Mar 09, 2011 at 03:40:05PM +0000, Catalin Marinas wrote:
-> > > > > The above call to tlb_add_flush() would only add a PAGE_SIZE. But
-> > > > > since we free an entire PTE, shouldn't the range cover addr ..
-> > > > > addr+PTRS_PER_PTE*PAGE_SIZE?
-> > > >
-> > > > Why do we need to?  We're not flushing away the individual PTE entries
-> > > > when we remove an entire page table - we will have already walked the
-> > > > page table removing those entries, which will already have been added.
-> > >
-> > > Ah, I missed the fact that tlb_flush() invalidates the whole TLB when
-> > > there is no tlb->vma (the shift_arg_pages case). We could optimise this
-> > > to add the range covered by the PTE page and avoid the !tlb->vma check
-> > > (and a flush_tlb_mm), though not sure it's worth.
+On Sun, Mar 13, 2011 at 09:48:35PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 11, 2011 at 09:18:43PM +0100, Linus Walleij wrote:
+> > Hi Russell,
 > > 
-> > If we're removing pte entries then tlb->vma is non-NULL.  Please look at
-> > the comments - I've documented the three modes of use there along with
-> > how things are setup for each of those modes, and what we do with each.
+> > if your harddrive is feeling better could you please pull:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> > for-rmk
+> > 
+> > Based on commit dd9c1549edef02290edced639f67b54a25abbe0e:
+> > Linux 2.6.38-rc7 (2011-03-01 13:55:12 -0800)
+> > 
+> > For this set of patches that in short contain:
+> > - Numerous Nomadik GPIO pin updates for advaced stuff like
+> >   power management
+> > - Platform configuration of MUSB for ux500
+> > - Many platform data updates and refactorings, completing
+> >   the work to have a single kernel booting across all the
+> >   ux500 board variants.
+> > 
+> > All have been reviewed on the list before.
+> > Three of these patches may be duplicates of patches
 > 
-> Yes, I read them (they are useful) and I was only referring to point 3
-> in the comments, shift_arg_pages(). In this case tlb->vma is NULL and we
-> flush the full mm in tlb_flush(). Can we have a smaller address range
-> since we can get the from pte_free_tlb()?
+> I'm not merging trees which duplicate the patches in my tree.
 > 
-> This would mean removing the !tlb->vma check in tlb_flush() and change
-> tlb_add_flush() to take a range rather than just an address.
+> > already merged in your tree:
+> >       ARM: 6644/1: mach-ux500: update the U8500 defconfig
+> >       ARM: perf_event: allow platform-specific interrupt handler
+> >       mach-ux500: DB8500 PMU support
+> 
+> This is annoying.  These are spread across three entirely different
+> branches:
+> "ARM: 6644/1" is part of the defcfg branch.
+> "ARM: perf_event" is part of someone elses tree merged into devel-stable.
+> "mach-ux500:" is "ARM: 6776/1:" and is part of the ux500 branch.
+> 
+> I'm intending sending some of these branches as entirely separate pulls
+> to Linus - particularly the defconfig and devel-stable branches (so that
+> Linus can see what code outside arch/arm is being modified by other
+> people and target his complaints about that more appropriately).
+> 
+> Merging your tree is going to destroy my ability to keep this stuff
+> strictly separate.
+> 
+> I don't mind merging the ux500 branch into devel-stable provided you're
+> not going to send any further ux500 patches?
 
-And the reason for doing so being what exactly?
+Linus,
 
-We have very little in the way of userspace TLB entries (we shouldn't have
-any other than for the existing arg pages).  So I don't see any benefit to
-issuing several individual page TLB invalidates over a range for the arg
-pages vs issuing one TLB invalidate for the entire ASID.
-
-The latter seems to me to be the most efficient solution.
+You may want to respond to this sooner rather than later (like today)
+because we're getting really close to the merge window opening.
