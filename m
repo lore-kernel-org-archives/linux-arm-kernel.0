@@ -1,19 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Mar 2011 11:12:59 -0700
-Subject: [PATCH] omap: zoom: host should not pull up wl1271's irq line
-In-Reply-To: <1300112665-6253-1-git-send-email-ohad@wizery.com>
-References: <1300112665-6253-1-git-send-email-ohad@wizery.com>
-Message-ID: <20110314181259.GF7258@atomide.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 14 Mar 2011 15:21:08 -0300
+Subject: [PATCH 1/2] ARM: mx5/babbage: Remove unneeded gpio_set_value call
+Message-ID: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110314 07:29]:
-> The wl1271's irq line is completely controlled by the 1271 device, and
-> the host does not not need to pull it up.
-> 
-> While there's no functional effect, letting the host pull this line up is
-> just redundant, and wastes power.
+gpio_direction_output has already set the port at low logical level, so it is not needed
+to call gpio_set_value to set the port to 0 again.
 
-Applying.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index b2ecd19..9b6c868 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -234,7 +234,6 @@ static inline void babbage_fec_reset(void)
+ 		return;
+ 	}
+ 	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
+-	gpio_set_value(BABBAGE_FEC_PHY_RESET, 0);
+ 	msleep(1);
+ 	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
+ }
+-- 
+1.6.0.4
