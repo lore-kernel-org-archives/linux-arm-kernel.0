@@ -1,35 +1,29 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 14 Mar 2011 23:14:37 +0530
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <87oc5dlkkx.fsf@ti.com>
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-	<87oc5dlkkx.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C246AD3@dbde02.ent.ti.com>
+From: andy@warmcat.com (Andy Green)
+Date: Mon, 14 Mar 2011 17:57:27 +0000
+Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from
+	driver
+In-Reply-To: <20110314174209.GC7258@atomide.com>
+References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
+	<4D76A164.2060801@ti.com> <20110308233820.GJ26463@atomide.com>
+	<4D778873.4070308@ti.com> <20110309191115.GM26463@atomide.com>
+	<20110314174209.GC7258@atomide.com>
+Message-ID: <4D7E5707.5030305@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 22:12:54, Hilman, Kevin wrote:
-> Felipe Balbi <balbi@ti.com> writes:
-> 
-> [...]
-> 
-> >
-> > Kevin feel free to take this into your tree:
-> >
-> > Acked-by: Felipe Balbi <balbi@ti.com>
-> >
-> 
-> OK, will queue for 2.6.39.
+On 03/14/2011 05:42 PM, Somebody in the thread at some point said:
 
-This will need to make into 2.6.38.
+Hi -
 
-Hi Russell,
+> It looks like this series can be rebased on v2.6.38-rc8
+> and should merge just fine with what we have queued in
+> omap-for-linus. I guess I forgot we already did the i2c-omap
+> hwmod conversion last merge window :)
+>
+> Andy, please repost the related patches against v2.6.38-rc8 with
+> the acks posted earlier.
 
-Without this fix, USB will remain broken on 2.6.38
-on DM644x EVM. Any chance of this making into 2.6.38?
+Alright, I will do that with the reordered patch from Benoit and the 
+change to BIT() instead of constants.  Thanks.
 
-Shall I check this into your patch system?
-
-Thanks,
-Sekhar
+-Andy
