@@ -1,18 +1,33 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Mon, 14 Mar 2011 14:29:02 +0000
-Subject: [PATCH 1/2] i2c-pxa2xx: Fix register offsets
-In-Reply-To: <1300024409-32587-1-git-send-email-anarsoul@gmail.com>
-References: <1300024409-32587-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <20110314142902.GM15795@trinity.fluff.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 14 Mar 2011 16:24:25 +0200
+Subject: [PATCH] omap: zoom: host should not pull up wl1271's irq line
+Message-ID: <1300112665-6253-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 13, 2011 at 03:53:28PM +0200, Vasily Khoruzhick wrote:
-> Fix regression that was introduced by dynamic register layout.
+The wl1271's irq line is completely controlled by the 1271 device, and
+the host does not not need to pull it up.
 
-applied both to the relevant -next branch
+While there's no functional effect, letting the host pull this line up is
+just redundant, and wastes power.
 
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ arch/arm/mach-omap2/board-zoom.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
+index e26754c..c59d07b 100644
+--- a/arch/arm/mach-omap2/board-zoom.c
++++ b/arch/arm/mach-omap2/board-zoom.c
+@@ -49,7 +49,7 @@ static void __init omap_zoom_init_irq(void)
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
+ 	/* WLAN IRQ - GPIO 162 */
+-	OMAP3_MUX(MCBSP1_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(MCBSP1_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
+ 	/* WLAN POWER ENABLE - GPIO 101 */
+ 	OMAP3_MUX(CAM_D2, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+ 	/* WLAN SDIO: MMC3 CMD */
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+1.7.1
