@@ -1,62 +1,164 @@
-From: mailinglists@openelec.tv (Stephan Raue)
-Date: Mon, 14 Mar 2011 20:51:28 +0100
-Subject: [GIT PULL] OMAP PM updates for 2.6.39
-In-Reply-To: <20110314193848.GI7258@atomide.com>
-References: <87k4g6eakw.fsf@ti.com> <4D7E6DCF.1060703@openelec.tv>
-	<20110314193848.GI7258@atomide.com>
-Message-ID: <4D7E71C0.4010808@openelec.tv>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 14 Mar 2011 15:35:52 -0500
+Subject: [PATCH 09/10] MCDE: Add build files and bus
+In-Reply-To: <4D7E204E.7010303@stericsson.com>
+References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>
+	<201011251747.48365.arnd@arndb.de>
+	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>
+	<201011261224.59490.arnd@arndb.de>
+	<AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>
+	<20101205112813.GB12542@viiv.ffwll.ch>
+	<AANLkTi=B=_3tHXgG02pQA=zE=i8TOz0BZ=Pe9ZZwGLh3@mail.gmail.com>
+	<4D7E204E.7010303@stericsson.com>
+Message-ID: <AANLkTimV3=VS1moXOt07d1XRJ72Sr6AVyUa6GFFJBX6D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.03.2011 20:38, schrieb Tony Lindgren:
-> * Stephan Raue<mailinglists@openelec.tv>  [110314 12:32]:
->> Hi,
+On Mon, Mar 14, 2011 at 9:03 AM, Marcus Lorentzon
+<marcus.xm.lorentzon@stericsson.com> wrote:
+> On 03/12/2011 04:59 PM, Rob Clark wrote:
 >>
->> Am 11.03.2011 01:59, schrieb Kevin Hilman:
->>> Dave Martin (5):
->>>        ARM: omap4: Provide do_wfi() for Thumb-2
->>>        ARM: omap4: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
->>>        ARM: omap3: Remove hand-encoded SMC instructions
->> "ARM: omap3: Remove hand-encoded SMC instructions" fails for me with:
+>> On Sun, Dec 5, 2010 at 5:28 AM, Daniel Vetter<daniel@ffwll.ch> ?wrote:
 >>
->> /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/bin/arm-openelec-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-omap2/.sleep34xx.o.d  -nostdinc -isystem /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/lib/gcc/arm-openelec-linux-gnueabi/4.5.2/include -I/home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/linux-2.6.38-rc8/arch/arm/include -Iinclude  -include include/generated/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -mthumb -Wa,-mimplicit-it=always -Wa,-mno-warn-deprecated -Wa,-mthumb -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=armv7-a   -c -o arch/arm/mach-omap2/sleep34xx.o arch/arm/mach-omap2/sleep34xx.S
->> arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
->> arch/arm/mach-omap2/sleep34xx.S:149: Error: selected processor does not support ARM mode `smc #1'
->> arch/arm/mach-omap2/sleep34xx.S:416: Error: selected processor does not support ARM mode `smc #1'
->> arch/arm/mach-omap2/sleep34xx.S:427: Error: selected processor does not support ARM mode `smc #1'
->> arch/arm/mach-omap2/sleep34xx.S:452: Error: selected processor does not support ARM mode `smc #0'
->> arch/arm/mach-omap2/sleep34xx.S:458: Error: selected processor does not support ARM mode `smc #0'
->> arch/arm/mach-omap2/sleep34xx.S:463: Error: selected processor does not support ARM mode `smc #0'
->> make[2]: *** [arch/arm/mach-omap2/sleep34xx.o] Error 1
->> make[1]: *** [arch/arm/mach-omap2] Error 2
+>>>
+>>> On Sat, Dec 04, 2010 at 04:34:22PM -0500, Alex Deucher wrote:
+>>>
+>>>>
+>>>> This doesn't seem that different from the graphics chips we support
+>>>> with kms. ?I don't think it would require much work to use KMS. ?One
+>>>> thing we considered, but never ended up implementing was a generic
+>>>> overlay API for KMS. ?Most PC hardware still has overlays, but we
+>>>> don't use them much any more on the desktop side. ?It may be
+>>>> worthwhile to design an appropriate API for them for these type of
+>>>> hardware.
+>>>>
+>>>
+>>> Just fyi about a generic overlay api: I've looked a bit into this when
+>>> doing the intel overlay support and I think adding special overlay crtcs
+>>> that can be attached real crtcs gives a nice clean api. We could the
+>>> reuse
+>>> the existing framebuffer/pageflipping api to get the buffers to the
+>>> overlay engine.
+>>>
+>>
+>> btw, has there been any further thought/discussion on this topic..
+>> I've been experimenting with a drm driver interface on the OMAP SoC.
+>> It is working well now for framebuffer type usage (mode setting,
+>> virtual framebuffer spanning multiple diplays, and those types of
+>> xrandr things).. ?the next step that I've started thinking about is
+>> overlay (or underlay.. the z-order is flexible) support..
+>>
+>> I was thinking in a similar direction (ie. a special, or maybe not so
+>> special, sort of crtc) and came across this thread, so I thought I'd
+>> resurrect the topic.
+>>
+>> In our case, most of the CRTCs in our driver could be used either with
+>> (A)RGB buffers as a traditional framebuffer, or with a few different
+>> formats of YUV as video under/overlays. ?So if you had one display
+>> attached, you might only use one CRTC for traditional GUI/gfx layer,
+>> and the rest are available for video. ?If you had two displays, then
+>> you'd steal one of the video CRTCs and use it for the gfx layer on the
+>> second display. ?And so on.
 >>
 >>
->> replacing in arch/arm/mach-omap2/Makefile:
->>
->> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
->> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a
->>
->> to:
->>
->> AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
->> AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a$(plus_sec)
->>
->> helps compiling (see also: https://patchwork.kernel.org/patch/369681/)
-> Care to post a patch for this and mention your compiler version too?
 >
-> Tony
-patch attached.
+> We have similar HW and are also interested in finding some common ground for
+> overlays in KMS. Just as you describe, we have no hard connection between a
+> CRTC and output. Instead we only have overlays. Normal gfx use case is then
+> of course one of these overlays dedicated to one display. And when adding
+> video overlays, we also prefer YUV "underlays" with fullscreen ARGB gfx on
+> top.
+>
+> The problem with mapping this to the CRTCs in KMS today, is that there is no
+> differentiation between framebuffer width/height and crt width/height. And
+> of course YUV formats and fb position etc are missing.
+>
+> One advantage of the set CRTC ioctl is that all information needed to switch
+> mode is contained in one atomic set mode ioctl. So we have to think about if
+> we want a new more advanced set crtc including overlay config. Or if we want
+> to split mode setup into several requests. And then we must decide if
+> multiple setup ioctls will need some type of "commit" to get the atomic mode
+> switch we have today. For example I don't want to have to do a set_crtc
+> enabling blending without overlay being setup. It should be just as glitch
+> free as KMS is today.
+>>
+>> Rough thinking:
+>> + add some 'caps' to the CRTC to indicate whether it can handle YUV,
+>> ARGB, scaling
+>> + add an x/y offset relative to the encoder (as opposed to the
+>> existing x/y offset relative to the framebuffer)
+>> + add a z-order parameter
+>>
+>>
+>
+> Exactly what I would like to have. Especially the caps for scaling, since we
+> have one HW that can't do scaling.
+>>
+>> Not sure about intel hw if it is supporting clip-rects.. if so, maybe
+>> need to add something about that. ?In our case we jut put the video
+>> behind the gfx layer and use the alpha channel in the gfx framebuffer
+>> to clip/blend rather than using clip-rects.
+>>
+>>
+>
+> If this is common ground, I would like to have one clip rect per
+> CRTC/overlay to enable framebuffers larger than overlay viewport. That makes
+> it easier to reuse a large buffer for multiple overlays/framebuffers without
+> having to stress memory management driver. But this is just a "nice to have"
+> feature. Maybe this can be mapped to stride/start address mappings on HW
+> without clip rect. But that will probably include alignment requirements on
+> position and size.
 
-i am using http://gitorious.org/linux-omap-dss2/linux with gcc-4.5.2, 
-binutils-2.21
 
-thanks
+Good point, I had overlooked that but we do have same requirement for
+cropping as well.. although in the crtc we already specify an x/y
+offset within the drm_framebuffer that the crtc is attached to.. so I
+guess if we have an input width/height (output is implied I guess by
+the encoder/connector) then we should be fine for cropping
 
-Stephan
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: linux-2.6.38-rc8-321-linux_omap_dss2_fix_SMC_instructions.patch
-Type: text/x-patch
-Size: 572 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110314/66bfc97f/attachment.bin>
+Although in some cases top/left crop offset could be changing frame by
+frame (think use cases like zero-copy video stabilization or pan/scan)
+so might be nice to have a way to specify new x/y offset when
+flipping.  I guess that would be an extension/change to existing page
+flip ioctl.
+
+BR,
+-R
+
+>>>
+>>> The real pain starts when we want format discovery from userspace with
+>>> all
+>>> the alignement/size/layout constrains. Add in tiling support and its
+>>> almost impossible to do in a generic way. But also for kms userspace
+>>> needs
+>>> to know these constrains (implemented for generic use in libkms). I favor
+>>> such an approach for overlays, too (if it ever happens) - i.e. a few
+>>> helpers in libkms that allocate an appropriate buffer for a given format
+>>> and size and returns the buffer, strides and offsets for the different
+>>> planes.
+>>>
+>>
+>> hmm, I guess I know about the OMAP display subsystem, and it's overlay
+>> formats/capabilities.. but not enough about other hw to say anything
+>> intelligent here. ?But I guess even if we ignore the format of the
+>> data in the buffer, at least the APIs to setup/attach overlay CRTCs at
+>> various positions could maybe be something we can start with as a
+>> first step. ?At least standardizing this part seems like a good first
+>> step. ?But I'm definitely interested if someone has some ideas.
+>>
+>>
+>
+> Yes, so we could try and find some common ground and add support for that.
+> But still enable drivers to extend that with the features where we find no
+> common ground. Just as GEM doesn't provide allocation ioctl, only free.
+>
+> And in the end we have to see if the common ground is enough to actually
+> build an application on. If not, there's not much use for a partial common
+> API. Maybe that's why there's no overlay API in KMS tiday?
+>
+> Maybe vendor libkms can be used to fill in the gaps?
+>
+> /BR
+> /Marcus
+>
+>
