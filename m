@@ -1,25 +1,44 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 14 Mar 2011 14:50:29 +0200 (EET)
-Subject: [PATCH] arm: plat-omap: iommu: fix request_mem_region() error path
-In-Reply-To: <1300105712-12656-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1300105712-12656-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20110314.145029.848855634033118142.Hiroshi.DOYU@nokia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Mar 2011 13:04:41 -0000
+Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for
+	chained handlers
+In-Reply-To: <alpine.LFD.2.00.1103112017500.2787@localhost6.localdomain6>
+References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
+	<1299604405-12960-2-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
+	<000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
+	<alpine.LFD.2.00.1103112017500.2787@localhost6.localdomain6>
+Message-ID: <000201cbe248$622585a0$267090e0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aaro,
-
-From: Aaro Koskinen <aaro.koskinen@nokia.com>
-Subject: [PATCH] arm: plat-omap: iommu: fix request_mem_region() error path
-Date: Mon, 14 Mar 2011 14:28:32 +0200
-
-> request_mem_region() error exit will leak ioremapped memory. Fix this
-> by moving the ioremap() after request_mem_region(), which is the proper
-> order to do this anyway.
+> > > That wants a comment that these functions are only dealing with
+> > > fasteoi and level type flow control.
+> > >
+> > > Otherwise fine with me. Feel free to add my Acked-by.
+> >
+> > Thanks Thomas, reworded as followed:
+> >
+> >     ARM: irq: introduce entry and exit functions for chained handlers
+> >
+> >     Some chained IRQ handlers are written to cope with primary chips of
+> >     potentially different flow types. Whether this a sensible thing to do
+> >     is a point of contention.
+> >
+> >     This patch introduces entry/exit functions for chained handlers which
+> >     infer the flow type of the primary chip as fasteoi or level-type by
+> >     checking whether or not the ->irq_eoi function pointer is present and
+> >     calling back to the primary chip as necessary. Other methods of flow
+> >     control are not considered.
+> >
+> > I'll add your Ack and put this (patch 1) in Russell's patch system next
+> > week.
 > 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
->  arch/arm/plat-omap/iommu.c |   14 ++++++++------
->  1 files changed, 8 insertions(+), 6 deletions(-)
+> Having it in the changelog is nice, but the code itself would like a
+> comment as well.
 
-True. Thank you for catching this.
+Rightio, submitted to Russell's patch system with code comment as 6806/1.
+
+Thanks,
+
+Will
