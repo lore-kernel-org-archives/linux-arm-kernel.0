@@ -1,21 +1,16 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 14 Mar 2011 18:34:53 -0500
-Subject: [PATCH] arm/dt: Add dtb make rule
-In-Reply-To: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
-References: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4D7EA61D.4030403@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 14 Mar 2011 16:49:39 -0700 (PDT)
+Subject: [PATCH v2 0/2] CS89x0: add QQ2440 networking support
+In-Reply-To: <20110314134627.GA11935@dandreoli.com>
+References: <20110314134627.GA11935@dandreoli.com>
+Message-ID: <20110314.164939.214240209.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+From: Domenico Andreoli <cavokz@gmail.com>
+Date: Mon, 14 Mar 2011 13:46:27 +0000
 
-On 03/10/2011 01:46 PM, Rob Herring wrote:
-> From: Rob Herring<rob.herring@calxeda.com>
->
-> Add a make rule to compile dt blobs for ARM.
->
-> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>   this patchset cleans some bit left from the CS89x0_NONISA_IRQ
+> transition and then enables the support of CS89x0 on QQ2440.
 
-Can you pick this one up in your ARM tree.
-
-Rob
+Both patches applied, thanks.
