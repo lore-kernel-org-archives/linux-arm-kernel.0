@@ -1,29 +1,31 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 14 Mar 2011 17:57:27 +0000
-Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from
-	driver
-In-Reply-To: <20110314174209.GC7258@atomide.com>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
-	<4D76A164.2060801@ti.com> <20110308233820.GJ26463@atomide.com>
-	<4D778873.4070308@ti.com> <20110309191115.GM26463@atomide.com>
-	<20110314174209.GC7258@atomide.com>
-Message-ID: <4D7E5707.5030305@warmcat.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 14 Mar 2011 15:21:09 -0300
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2011 05:42 PM, Somebody in the thread at some point said:
+gpio_direction_output has already set the port at low logical level, so it is not needed
+to call gpio_set_value to set the port to 0 again.
 
-Hi -
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_evk.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-> It looks like this series can be rebased on v2.6.38-rc8
-> and should merge just fine with what we have queued in
-> omap-for-linus. I guess I forgot we already did the i2c-omap
-> hwmod conversion last merge window :)
->
-> Andy, please repost the related patches against v2.6.38-rc8 with
-> the acks posted earlier.
-
-Alright, I will do that with the reordered patch from Benoit and the 
-change to BIT() instead of constants.  Thanks.
-
--Andy
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index 652e1e0..78abce6 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -90,7 +90,6 @@ static inline void mx53_evk_fec_reset(void)
+ 		return;
+ 	}
+ 	gpio_direction_output(SMD_FEC_PHY_RST, 0);
+-	gpio_set_value(SMD_FEC_PHY_RST, 0);
+ 	msleep(1);
+ 	gpio_set_value(SMD_FEC_PHY_RST, 1);
+ }
+-- 
+1.6.0.4
