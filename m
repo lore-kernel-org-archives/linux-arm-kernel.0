@@ -1,32 +1,32 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Mar 2011 10:52:49 +0200
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <201103132306.59986.sshtylyov@ru.mvista.com>
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-Message-ID: <20110314085248.GA2285@legolas.emea.dhcp.ti.com>
+From: rubini-list@gnudd.com (Alessandro Rubini)
+Date: Mon, 14 Mar 2011 10:04:44 +0100
+Subject: [PATCH 06/10] ux500: added snowball-netev with latest fixes
+In-Reply-To: <201103121058.05897.arnd@arndb.de>
+References: <201103121058.05897.arnd@arndb.de>
+	<1299884892-6766-1-git-send-email-mathieu.poirier@linaro.org>
+	<1299884892-6766-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20110314090444.GA25815@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 13, 2011 at 11:06:59PM +0300, Sergei Shtylyov wrote:
-> The MUSB driver doesn't see its platform device on DM644x EVM board anymore
-> since commit 73b089b052a69020b953312a624a6e1eb5b81fab (usb: musb: split davinci
-> to its own platform_driver) because the new probe is called as subsys_initcall()
-> now, and the device is registered later than that by the board code.  Move the
-> registration to davinci_evm_init() -- it's safe to do so because the MUSB core
-> device still gets initialized as fs_initcall() -- which is late enough for the
-> I2C GPIO expander (which controls VBUS) to be initialized.
+Hello Arnd.
+
+>> +       volatile u32 *ptr = ioremap(0x80000000, 0x10000);
 > 
-> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+> I suppose you mean "u32 __iomem *" here, not "volatile u32 *ptr".
 
-Kevin feel free to take this into your tree:
+Yes, full ack. And also for the rest (as you note, the comment
+says "horribly").
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Actually, this patch was a quick fix to make things work and proceed
+with the board. While other people were working on other devices, I
+preferred to (temporarily) have a self-contained hack.
 
-> ---
-> The patch is against the recent DaVinci tree.
-> It fixes post 2.6.38-rc1 regression, so should be applied immediately!
+Then I forgot to make it clear to Mathieu that this was not, in my
+opinion, ready to get submitted.  Please wait for us to sort this out;
+currently I think the patch set should be parked.
 
-I wonder how noone has noticed that from -rc1 until now.
+> Better use platform_device_register_simple() instead of
+> the static device.
 
--- 
-balbi
+Thanks, I didn't know about this.
