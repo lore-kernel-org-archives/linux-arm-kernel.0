@@ -1,23 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Mar 2011 11:51:28 +0000
-Subject: [GIT PULL] u300, ux500 and Nomadik changes for v2.6.39
-In-Reply-To: <AANLkTinjp4HDu7+hKXP7X2ELBrNAuVc4LXVBiRn720yj@mail.gmail.com>
-References: <AANLkTikgMq4QbRGZ_3kkzeNBp9aD4YKa-0CRCfs1K57u@mail.gmail.com>
-	<20110313214835.GA24370@n2100.arm.linux.org.uk>
-	<AANLkTinjp4HDu7+hKXP7X2ELBrNAuVc4LXVBiRn720yj@mail.gmail.com>
-Message-ID: <20110314115128.GE26085@n2100.arm.linux.org.uk>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 14 Mar 2011 17:41:17 +0530
+Subject: [PATCH V6 00/11] SPEAr3xx & SPEAr6xx: Single Image solution and
+	padmux updates
+In-Reply-To: <cover.1298977709.git.viresh.kumar@st.com>
+References: <cover.1298977709.git.viresh.kumar@st.com>
+Message-ID: <4D7E05E5.9050602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 12:46:14PM +0100, Linus Walleij wrote:
-> I created a branch named "for-rmk-devel-stable" without the defconfig stuff,
-> that lands entirely inside the arch/arm/* tree, it duplicates the two PMU
-> patches and nothing else from your tree:
->       ARM: perf_event: allow platform-specific interrupt handler
->       mach-ux500: DB8500 PMU support
+On 03/01/2011 04:56 PM, Viresh KUMAR wrote:
+> This patchset contains following updates for SPEAr3xx & SPEAr6xx:
+> - Pad multiplexing updates
+> - Single Image solution
+> 
+> Note: These patches were earlier sent as part of a larger patchset:
+> "Updating SPEAr Support"
+> 
+> Now it is divided into smaller patchsets. In order to apply these patches
+> cleanly following order of patchsets must be maintained.
+> - SPEAr3xx & SPEAr6xx Fixes
+> - SPEAr3xx & SPEAr6xx: Single Image solution and padmux updates
+> - Adding SPEAr13xx support
+> - Adding devices support for all spear machines
+> - Clock Framework & CPU Freq Updates
+> 
+> Ryan Mallon (5):
+>   ST SPEAr3xx: Make local shirq structures static
+>   ST SPEAR3xx: Rename register/irq defines to remove naming conflicts
+>   ST SPEAr3xx: Rework pmx_dev code to remove conflicts
+>   ST SPEAr3xx: Rework KConfig to allow all boards to be compiled in
+>   ST SPEAr3xx: Replace defconfigs with single unified defconfig
+> 
+> Vipin Kumar (1):
+>   ST SPEAr: Pad multiplexing handling modified
+> 
+> Viresh Kumar (5):
+>   ST SPEAr clock: Define common clk_init routine in plat/clock.c
+>   ST SPEAr Clock: Updating for single image solution
+>   ST SPEAr3xx: Appending spear3** with global device structures
+>   ST SPEAr6xx: Rework Kconfig for single image solution
+>   ST SPEAR6xx: renaming spear600_defconfig as spear6xx_defconfig
 
-Don't want duplicated commits - its something that Linus has complained
-about in the past with other people.
+Russell,
 
-Why not base your tree off my devel-stable if the commits are already in
-that branch?
+Should i push this patch-set to tracker?
+
+-- 
+viresh
