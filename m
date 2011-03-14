@@ -1,85 +1,47 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 14 Mar 2011 13:47:07 +0000
-Subject: [PATCH v2 2/2] CS89x0: Add networking support for QQ2440
-References: <20110314133302.137497490@gmail.com>
-Message-ID: <20110314134707.GC11935@dandreoli.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Mar 2011 12:46:52 +0000
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU
+	(IOMMU) driver
+In-Reply-To: <AANLkTimagS1vBXEYjXQDx=OGhTRm=n0yO4n+kHTAqBOz@mail.gmail.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103111615.01829.arnd@arndb.de>
+	<000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
+	<201103111700.17373.arnd@arndb.de>
+	<AANLkTimagS1vBXEYjXQDx=OGhTRm=n0yO4n+kHTAqBOz@mail.gmail.com>
+Message-ID: <20110314124652.GF26085@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <cavokz@gmail.com>
+On Mon, Mar 14, 2011 at 09:37:51PM +0900, KyongHo Cho wrote:
+> I have also noticed that dma_map_single/page/sg() can map physical
+> memory into an arbitrary device address region.
+> But it is not enough solution for various kinds of IOMMUs.
+> As Kukjin Kim addressed, we need to support larger page size than 4KB
+> because we can reduce TLB miss when we have larger page size.
+> 
+> Our IOMMU(system mmu) supports all page size of ARM architecture
+> including 16MB, 1MB, 64KB and 4KB.
+> Since the largest size supported by buddy system of 32-bit architecture is 4MB,
+> our system support all page sizes except 16MB.
+> We proved that larger page size is helpful for DMA performance
+> significantly (more than 10%, approximately).
+> Big page size is not a problem for peripheral devices
+> because their address space is not suffer from external fragmentation.
 
-QQ2440 is only another non-ISA board using CS89x0. This patch adds the
-minimum bits required to make QQ2440 work with CS89x0.
+1. dma_map_single() et.al. is used for mapping *system* *RAM* for devices
+   using whatever is necessary.  It must not be used for trying to setup
+   arbitary other mappings.
 
-Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+2. It doesn't matter where the memory for dma_map_single() et.al. comes
+   from provided the virtual address is a valid system RAM address or
+   the struct page * is a valid struct page in the memory map (iow, you
+   can't create this yourself.)
 
----
+3. In the case of an IOMMU, the DMA API does not limit you to only using
+   4K pages to setup the IOMMU mappings.  You can use whatever you like
+   provided the hardware can cope with it.  You can coalesce several
+   existing entries together provided you track what you're doing and can
+   undo what's been done when the mapping is no longer required.
 
-I'm working on another series that brings CS89x0 to the third millenium,
-it properly uses the modern ISA and platform drivers model. That series
-is a little more invasive and will require more testing than this one.
-
- arch/arm/mach-s3c2440/include/mach/qq2440.h |   22 ++++++++++++
- arch/arm/mach-s3c2440/mach-qq2440.c         |   16 ++++++++
- drivers/net/Kconfig                         |    4 +-
- drivers/net/cs89x0.c                        |   33 ++++++++++++------
- 4 files changed, 61 insertions(+), 14 deletions(-)
-
-Index: arm-2.6.git/drivers/net/cs89x0.c
-===================================================================
---- arm-2.6.git.orig/drivers/net/cs89x0.c	2011-02-07 17:04:06.000000000 +0000
-+++ arm-2.6.git/drivers/net/cs89x0.c	2011-02-07 17:07:36.000000000 +0000
-@@ -95,6 +95,9 @@
-   Dmitry Pervushin  : dpervushin at ru.mvista.com
-                     : PNX010X platform support
- 
-+  Domenico Andreoli : cavokz at gmail.com
-+                    : QQ2440 platform support
-+
- */
- 
- /* Always include 'config.h' first in case the user wants to turn on
-@@ -176,6 +179,10 @@
- #elif defined(CONFIG_ARCH_IXDP2X01)
- static unsigned int netcard_portlist[] __used __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
- static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
-+#elif defined(CONFIG_MACH_QQ2440)
-+#include <mach/qq2440.h>
-+static unsigned int netcard_portlist[] __used __initdata = { QQ2440_CS8900_VIRT_BASE + 0x300, 0 };
-+static unsigned int cs8900_irq_map[] = { QQ2440_CS8900_IRQ, 0, 0, 0 };
- #elif defined(CONFIG_MACH_MX31ADS)
- #include <mach/board-mx31ads.h>
- static unsigned int netcard_portlist[] __used __initdata = {
-@@ -521,6 +528,10 @@
- #endif
- 		lp->force = g_cs89x0_media__force;
- #endif
-+
-+#if defined(CONFIG_MACH_QQ2440)
-+		lp->force |= FORCE_RJ45 | FORCE_FULL;
-+#endif
-         }
- 
- 	/* Grab the region so we can find another board if autoIRQ fails. */
-Index: arm-2.6.git/drivers/net/Kconfig
-===================================================================
---- arm-2.6.git.orig/drivers/net/Kconfig	2011-02-07 17:04:06.000000000 +0000
-+++ arm-2.6.git/drivers/net/Kconfig	2011-02-07 17:04:42.000000000 +0000
-@@ -1498,7 +1498,7 @@
- config CS89x0
- 	tristate "CS89x0 support"
- 	depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
--		|| ARCH_IXDP2X01 || MACH_MX31ADS)
-+		|| ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
- 	---help---
- 	  Support for CS89x0 chipset based Ethernet cards. If you have a
- 	  network (Ethernet) card of this type, say Y and read the
-@@ -1512,7 +1512,7 @@
- config CS89x0_NONISA_IRQ
- 	def_bool y
- 	depends on CS89x0 != n
--	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS
-+	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
- 
- config TC35815
- 	tristate "TOSHIBA TC35815 Ethernet support"
+So really there's no reason not to use 64K, 1M and 16M IOMMU entries if
+that's the size of buffer which has been passed to the DMA API.
