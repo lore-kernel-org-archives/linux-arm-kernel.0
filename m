@@ -1,47 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 Mar 2011 11:16:12 +0100
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <1299134429.100626.661279191478.0.gpush@pororo>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<1299134429.100626.661279191478.0.gpush@pororo>
-Message-ID: <20110314101612.GD28960@pengutronix.de>
+From: ratbert.chuang@gmail.com (Po-Yu Chuang)
+Date: Mon, 14 Mar 2011 18:28:36 +0800
+Subject: [PATCH] arm: cmpxchg syscall should data abort if page not write or
+	not young
+Message-ID: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 02:40:29PM +0800, Jeremy Kerr wrote:
-> Hi all,
-> 
-> These patches are an attempt to allow platforms to share clock code. At
-> present, the definitions of 'struct clk' are local to platform code,
-> which makes allocating and initialising cross-platform clock sources
-> difficult, and makes it impossible to compile a single image containing
-> support for two ARM platforms with different struct clks.
-> 
-> The three patches are for the architecture-independent kernel code,
-> introducing the common clk infrastructure. The changelog for the first
-> patch includes details about the new clock definitions.
-> 
-> Many thanks to the following for their input:
->  * Benjamin Herrenschmidt <benh@kernel.crashing.org>
->  * Ben Dooks <ben-linux@fluff.org>
->  * Baruch Siach <baruch@tkos.co.il>
->  * Russell King <linux@arm.linux.org.uk>
->  * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->  * Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->  * Vincent Guittot <vincent.guittot@linaro.org>
->  * Sascha Hauer <s.hauer@pengutronix.de>
->  * Ryan Mallon <ryan@bluewatersys.com>
->  * Colin Cross <ccross@google.com>
->  * Jassi Brar <jassisinghbrar@gmail.com>
->  * Saravana Kannan <skannan@codeaurora.org>
+From: Po-Yu Chuang <ratbert@faraday-tech.com>
 
-Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+If the page to cmpxchg is user mode read only (not write)
+or invalid (not young), we should simulate a data abort first.
 
-who is responsible to take this patch?  Russell?
+Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
+---
+ arch/arm/kernel/traps.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 446aee9..53c8852 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -563,7 +563,8 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		if (!pmd_present(*pmd))
+ 			goto bad_access;
+ 		pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
+-		if (!pte_present(*pte) || !pte_dirty(*pte)) {
++		if (!pte_present(*pte) || !pte_write(*pte) ||
++		    !pte_dirty(*pte) || !pte_young(*pte)) {
+ 			pte_unmap_unlock(pte, ptl);
+ 			goto bad_access;
+ 		}
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
