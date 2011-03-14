@@ -1,123 +1,220 @@
-From: marcus.xm.lorentzon@stericsson.com (Marcus Lorentzon)
-Date: Mon, 14 Mar 2011 15:03:58 +0100
-Subject: [PATCH 09/10] MCDE: Add build files and bus
-In-Reply-To: <AANLkTi=B=_3tHXgG02pQA=zE=i8TOz0BZ=Pe9ZZwGLh3@mail.gmail.com>
-References: <F45880696056844FA6A73F415B568C6953604E802E@EXDCVYMBSTM006.EQ1STM.local>	<201011251747.48365.arnd@arndb.de>	<C832F8F5D375BD43BFA11E82E0FE9FE0082586F430@EXDCVYMBSTM005.EQ1STM.local>	<201011261224.59490.arnd@arndb.de>	<AANLkTinSb-9=xzX3LfZVYcKiDt5Qkm=qV6CiFGUyq+fC@mail.gmail.com>	<20101205112813.GB12542@viiv.ffwll.ch>
-	<AANLkTi=B=_3tHXgG02pQA=zE=i8TOz0BZ=Pe9ZZwGLh3@mail.gmail.com>
-Message-ID: <4D7E204E.7010303@stericsson.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Mon, 14 Mar 2011 17:55:43 +0800
+Subject: [RFC PATCH 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
+Message-ID: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2011 04:59 PM, Rob Clark wrote:
-> On Sun, Dec 5, 2010 at 5:28 AM, Daniel Vetter<daniel@ffwll.ch>  wrote:
->    
->> On Sat, Dec 04, 2010 at 04:34:22PM -0500, Alex Deucher wrote:
->>      
->>> This doesn't seem that different from the graphics chips we support
->>> with kms.  I don't think it would require much work to use KMS.  One
->>> thing we considered, but never ended up implementing was a generic
->>> overlay API for KMS.  Most PC hardware still has overlays, but we
->>> don't use them much any more on the desktop side.  It may be
->>> worthwhile to design an appropriate API for them for these type of
->>> hardware.
->>>        
->> Just fyi about a generic overlay api: I've looked a bit into this when
->> doing the intel overlay support and I think adding special overlay crtcs
->> that can be attached real crtcs gives a nice clean api. We could the reuse
->> the existing framebuffer/pageflipping api to get the buffers to the
->> overlay engine.
->>      
-> btw, has there been any further thought/discussion on this topic..
-> I've been experimenting with a drm driver interface on the OMAP SoC.
-> It is working well now for framebuffer type usage (mode setting,
-> virtual framebuffer spanning multiple diplays, and those types of
-> xrandr things)..  the next step that I've started thinking about is
-> overlay (or underlay.. the z-order is flexible) support..
->
-> I was thinking in a similar direction (ie. a special, or maybe not so
-> special, sort of crtc) and came across this thread, so I thought I'd
-> resurrect the topic.
->
-> In our case, most of the CRTCs in our driver could be used either with
-> (A)RGB buffers as a traditional framebuffer, or with a few different
-> formats of YUV as video under/overlays.  So if you had one display
-> attached, you might only use one CRTC for traditional GUI/gfx layer,
-> and the rest are available for video.  If you had two displays, then
-> you'd steal one of the video CRTCs and use it for the gfx layer on the
-> second display.  And so on.
->
->    
-We have similar HW and are also interested in finding some common ground 
-for overlays in KMS. Just as you describe, we have no hard connection 
-between a CRTC and output. Instead we only have overlays. Normal gfx use 
-case is then of course one of these overlays dedicated to one display. 
-And when adding video overlays, we also prefer YUV "underlays" with 
-fullscreen ARGB gfx on top.
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c             |   11 +++++
+ arch/arm/mach-mx5/devices-imx53.h               |    4 ++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-ahci-imx.c   |   55 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/ahci_sata.h      |   51 +++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 ++++
+ 7 files changed, 136 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
 
-The problem with mapping this to the CRTCs in KMS today, is that there 
-is no differentiation between framebuffer width/height and crt 
-width/height. And of course YUV formats and fb position etc are missing.
-
-One advantage of the set CRTC ioctl is that all information needed to 
-switch mode is contained in one atomic set mode ioctl. So we have to 
-think about if we want a new more advanced set crtc including overlay 
-config. Or if we want to split mode setup into several requests. And 
-then we must decide if multiple setup ioctls will need some type of 
-"commit" to get the atomic mode switch we have today. For example I 
-don't want to have to do a set_crtc enabling blending without overlay 
-being setup. It should be just as glitch free as KMS is today.
-> Rough thinking:
-> + add some 'caps' to the CRTC to indicate whether it can handle YUV,
-> ARGB, scaling
-> + add an x/y offset relative to the encoder (as opposed to the
-> existing x/y offset relative to the framebuffer)
-> + add a z-order parameter
->
->    
-Exactly what I would like to have. Especially the caps for scaling, 
-since we have one HW that can't do scaling.
-> Not sure about intel hw if it is supporting clip-rects.. if so, maybe
-> need to add something about that.  In our case we jut put the video
-> behind the gfx layer and use the alpha channel in the gfx framebuffer
-> to clip/blend rather than using clip-rects.
->
->    
-If this is common ground, I would like to have one clip rect per 
-CRTC/overlay to enable framebuffers larger than overlay viewport. That 
-makes it easier to reuse a large buffer for multiple 
-overlays/framebuffers without having to stress memory management driver. 
-But this is just a "nice to have" feature. Maybe this can be mapped to 
-stride/start address mappings on HW without clip rect. But that will 
-probably include alignment requirements on position and size.
->> The real pain starts when we want format discovery from userspace with all
->> the alignement/size/layout constrains. Add in tiling support and its
->> almost impossible to do in a generic way. But also for kms userspace needs
->> to know these constrains (implemented for generic use in libkms). I favor
->> such an approach for overlays, too (if it ever happens) - i.e. a few
->> helpers in libkms that allocate an appropriate buffer for a given format
->> and size and returns the buffer, strides and offsets for the different
->> planes.
->>      
-> hmm, I guess I know about the OMAP display subsystem, and it's overlay
-> formats/capabilities.. but not enough about other hw to say anything
-> intelligent here.  But I guess even if we ignore the format of the
-> data in the buffer, at least the APIs to setup/attach overlay CRTCs at
-> various positions could maybe be something we can start with as a
-> first step.  At least standardizing this part seems like a good first
-> step.  But I'm definitely interested if someone has some ideas.
->
->    
-
-Yes, so we could try and find some common ground and add support for 
-that. But still enable drivers to extend that with the features where we 
-find no common ground. Just as GEM doesn't provide allocation ioctl, 
-only free.
-
-And in the end we have to see if the common ground is enough to actually 
-build an application on. If not, there's not much use for a partial 
-common API. Maybe that's why there's no overlay API in KMS tiday?
-
-Maybe vendor libkms can be used to fill in the gaps?
-
-/BR
-/Marcus
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 652ace4..2b3d27c 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1380,6 +1380,14 @@ static struct clk esdhc4_mx53_clk = {
+ 	.secondary = &esdhc4_ipg_clk,
+ };
+ 
++static struct clk sata_clk = {
++	.parent = &ipg_clk,
++	.enable = _clk_max_enable,
++	.enable_reg = MXC_CCM_CCGR4,
++	.enable_shift = MXC_CCM_CCGRx_CG1_OFFSET,
++	.disable = _clk_max_disable,
++};
++
+ DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
+ DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
+ DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
+@@ -1468,6 +1476,9 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
++	_REGISTER_CLOCK(NULL, "imx_sata_clk", sata_clk)
++	_REGISTER_CLOCK(NULL, "usb_phy1", usb_phy1_clk)
++	_REGISTER_CLOCK(NULL, "ahb_clk", ahb_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index 9251008..09ebb43 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -33,3 +33,7 @@ extern const struct imx_spi_imx_data imx53_ecspi_data[] __initconst;
+ extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
+ #define imx53_add_imx2_wdt(id, pdata)	\
+ 	imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
++
++extern const struct imx_ahci_imx_data imx53_ahci_imx_data[] __initconst;
++#define imx53_add_ahci_imx(id, pdata)   \
++	imx_add_ahci_imx(&imx53_ahci_imx_data[id], pdata)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index b9ab1d5..087595a 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 
+ config IMX_HAVE_PLATFORM_SPI_IMX
+ 	bool
++
++config IMX_HAVE_PLATFORM_SATA_AHCI
++	bool
++	default y if SOC_IMX53
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 75cd2ec..e0b7fa3 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_SATA_AHCI) +=  platform-ahci-imx.o
+diff --git a/arch/arm/plat-mxc/devices/platform-ahci-imx.c b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
+new file mode 100644
+index 0000000..a3ed6f7
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <asm/sizes.h>
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx_ahci_data_entry_single(soc)					\
++	{								\
++		.iobase = soc ## _SATA_BASE_ADDR,			\
++		.irq = soc ## _INT_SATA,				\
++	}
++
++#ifdef CONFIG_SOC_IMX53
++const struct imx_ahci_imx_data imx53_ahci_imx_data __initconst =
++	imx_ahci_data_entry_single(MX53);
++#endif
++
++struct platform_device *__init imx_add_ahci_imx(
++		const struct imx_ahci_imx_data *data,
++		const struct ahci_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobase,
++			.end = data->iobase + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irq,
++			.end = data->irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device_dmamask("ahci", 0 /* -1? */,
++			res, ARRAY_SIZE(res),
++			pdata, sizeof(*pdata),  DMA_BIT_MASK(32));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/ahci_sata.h b/arch/arm/plat-mxc/include/mach/ahci_sata.h
+new file mode 100644
+index 0000000..25df23e
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/ahci_sata.h
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifndef __PLAT_MXC_AHCI_SATA_H__
++#define __PLAT_MXC_AHCI_SATA_H__
++
++enum {
++	HOST_CAP = 0x00,
++	HOST_CAP_SSS = (1 << 27), /* Staggered Spin-up */
++	HOST_PORTS_IMPL	= 0x0c,
++	HOST_TIMER1MS = 0xe0, /* Timer 1-ms */
++	/* Offest used to control the MPLL input clk */
++	PHY_CR_CLOCK_FREQ_OVRD = 0x12,
++	/* Port0 SATA Status */
++	PORT_SATA_SR = 0x128,
++	/* Port0 PHY Control */
++	PORT_PHY_CTL = 0x178,
++	/* PORT_PHY_CTL bits */
++	PORT_PHY_CTL_CAP_ADR_LOC = 0x10000,
++	PORT_PHY_CTL_CAP_DAT_LOC = 0x20000,
++	PORT_PHY_CTL_WRITE_LOC = 0x40000,
++	PORT_PHY_CTL_READ_LOC = 0x80000,
++	/* Port0 PHY Status */
++	PORT_PHY_SR = 0x17c,
++	/* PORT_PHY_SR */
++	PORT_PHY_STAT_DATA_LOC = 0,
++	PORT_PHY_STAT_ACK_LOC = 18,
++	/* SATA PHY Register */
++	SATA_PHY_CR_CLOCK_CRCMP_LT_LIMIT = 0x0001,
++	SATA_PHY_CR_CLOCK_DAC_CTL = 0x0008,
++	SATA_PHY_CR_CLOCK_RTUNE_CTL = 0x0009,
++	SATA_PHY_CR_CLOCK_ADC_OUT = 0x000A,
++	SATA_PHY_CR_CLOCK_MPLL_TST = 0x0017,
++};
++
++#endif /* __PLAT_MXC_AHCI_SATA_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8658c9c..81baca6 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -264,3 +264,13 @@ struct imx_spi_imx_data {
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
++
++#include <linux/ahci_platform.h>
++struct imx_ahci_imx_data {
++	int id;
++	resource_size_t iobase;
++	resource_size_t irq;
++};
++struct platform_device *__init imx_add_ahci_imx(
++		const struct imx_ahci_imx_data *data,
++		const struct ahci_platform_data *pdata);
+-- 
+1.7.1
