@@ -1,62 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Mar 2011 10:42:09 -0700
-Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from
-	driver
-In-Reply-To: <20110309191115.GM26463@atomide.com>
-References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
-	<4D76A164.2060801@ti.com> <20110308233820.GJ26463@atomide.com>
-	<4D778873.4070308@ti.com> <20110309191115.GM26463@atomide.com>
-Message-ID: <20110314174209.GC7258@atomide.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 14 Mar 2011 23:14:37 +0530
+Subject: [PATCH] DM644x EVM: register MUSB device earlier
+In-Reply-To: <87oc5dlkkx.fsf@ti.com>
+References: <201103132306.59986.sshtylyov@ru.mvista.com>
+	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
+	<87oc5dlkkx.fsf@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C246AD3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben & Andy,
-
-* Tony Lindgren <tony@atomide.com> [110309 11:09]:
-> * Cousson, Benoit <b-cousson@ti.com> [110309 06:00]:
-> > Hi Tony,
-> > 
-> > On 3/9/2011 12:38 AM, Tony Lindgren wrote:
-> > >* Cousson, Benoit<b-cousson@ti.com>  [110308 13:34]:
-> > >>Hi Andy,
-> > >>
-> > >>Thanks for that really fast update. That looks pretty good at first
-> > >>glance. I still have to review in details.
-> > >
-> > >Yes nice job!
-> > >
-> > >>And we need to find some volunteers for OMAP1&  2 testing.
-> > >
-> > >I gave it a quick try on osk5912, seems to work just fine.
-> > >Will apply these for testing purposes to linux-omap tree while
-> > >waiting for the minor fixes.
-> > >
-> > >Looks like Benoit should take the arch/arm/*omap*/*hwmod*
-> > >patches, the rest should go throug Ben. So for all of them:
-> > 
-> > Paul and I already acked the hwmod data, but the whole series should
-> > maybe go through Ben, because the hwmod files will need some defines
-> > added in the i2c header file. So we cannot separate the hwmod*
-> > patches from the driver files patches.
+On Mon, Mar 14, 2011 at 22:12:54, Hilman, Kevin wrote:
+> Felipe Balbi <balbi@ti.com> writes:
 > 
-> Unfortunately the hwmod patches depend on omap-for-linus branch..
+> [...]
 > 
-> Considering this, it's probably best that I queue the whole series
-> assuming we get acks from Ben for the driver related changes.
+> >
+> > Kevin feel free to take this into your tree:
+> >
+> > Acked-by: Felipe Balbi <balbi@ti.com>
+> >
+> 
+> OK, will queue for 2.6.39.
 
-After looking at this again, I've changed my mind.
+This will need to make into 2.6.38.
 
-It looks like this series can be rebased on v2.6.38-rc8
-and should merge just fine with what we have queued in
-omap-for-linus. I guess I forgot we already did the i2c-omap
-hwmod conversion last merge window :)
+Hi Russell,
 
-Andy, please repost the related patches against v2.6.38-rc8 with
-the acks posted earlier.
+Without this fix, USB will remain broken on 2.6.38
+on DM644x EVM. Any chance of this making into 2.6.38?
 
-Then Ben, please feel free to queue it after you get the rebased
-series. We've had this series applied for testing for a while.
+Shall I check this into your patch system?
 
-Regards,
-
-Tony
+Thanks,
+Sekhar
