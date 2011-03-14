@@ -1,100 +1,144 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 14 Mar 2011 11:46:29 +0100
-Subject: [PATCH 0/2] ARM: EXYNOS4: Enhancement of System MMU
-In-Reply-To: <AANLkTimT_DOX3OqOnGF3X8fFEJsoHDANsMZ3cj5R9mw_@mail.gmail.com>
-References: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
-	<000701cbdd9b$634c3840$29e4a8c0$%szyprowski@samsung.com>
-	<AANLkTimT_DOX3OqOnGF3X8fFEJsoHDANsMZ3cj5R9mw_@mail.gmail.com>
-Message-ID: <000e01cbe235$16812ea0$43838be0$%szyprowski@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Mar 2011 12:46:14 +0100
+Subject: [GIT PULL] u300, ux500 and Nomadik changes for v2.6.39
+In-Reply-To: <20110313214835.GA24370@n2100.arm.linux.org.uk>
+References: <AANLkTikgMq4QbRGZ_3kkzeNBp9aD4YKa-0CRCfs1K57u@mail.gmail.com>
+	<20110313214835.GA24370@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinjp4HDu7+hKXP7X2ELBrNAuVc4LXVBiRn720yj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, Mar 13, 2011 at 10:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-On Monday, March 14, 2011 10:54 AM KyongHo Cho wrote:
+> I'm intending sending some of these branches as entirely separate pulls
+> to Linus - particularly the defconfig and devel-stable branches (so that
+> Linus can see what code outside arch/arm is being modified by other
+> people and target his complaints about that more appropriately).
+>
+> Merging your tree is going to destroy my ability to keep this stuff
+> strictly separate.
 
-> 2011/3/8 Marek Szyprowski <m.szyprowski@samsung.com>:
-> > Hello,
-> >
-> > On Monday, March 07, 2011 2:19 AM KyongHo Cho wrote:
-> >
-> >> This patch includes the following enhancements for System MMU:
-> >> - Enhanced readability
-> >> - Removal of unused data structures or their members
-> >> - Simplified function definitions
-> >> - Corrections of some logical errors
-> >> - Full compliance with Linux coding style
-> >> - Simpler way of registering callback functions of System MMU faults
-> >> - Add clock gating for System MMU
-> >
-> > Thanks for updating the driver, I have however some comments.
-> >
-> > EXYNOS4 platform has total of 16 sysmmu blocks. Each of them is exactly the
-> > same - each has a register region, an interrupt and clock. However your driver
-> > uses a single platform device for all 16 units and a large resource array (see
-> > arch/arm/mach-exynos4). This approach also complicates the clock management
-> > (you need to create custom names for sysmmu clocks, this will cause a lot of
-> > problems in the future update to clkdev!). This also heavily complicates the
-> > driver (you need the arrays of all the resources all over the driver) and is
-> > against the Linux driver model. In the proper model one should create a
-> > platform driver for a single module and instantiate it many times for each hw
-> > module found in the system. For a reference please take a look at the sysmmu
-> > Andrzej has developed in parallel to You:
-> > http://www.mail-archive.com/linux-media at vger.kernel.org/msg28871.html
-> >
-> > For a reference please also check the Samsung Power Domains driver
-> > (arch/arm/mach-exynos4/dev-pd.c and arch/arm/plat-s5p/pd.c).
-> >
-> I've also noticed that it is not enough.
-> Thanks for your advice.
-> 
-> > The second problem I've noticed is the s5p_sysmmu_set_tablebase_pgd() call.
-> > In my opinion it simplifies the sysmmu api too much. This function assumes
-> > that the sysmmu client (i.e. a multimedia device driver or videobuf2-allocator
-> > or vcmm) has a knowledge about the pgd/pte descriptors format. As you know the
-> > format of pgd/pte descriptors is hardware dependent (it may even change in the
-> > future version of SoCs), so constructing the pgd and pte tables is a low-level
-> > operation that should be performed by sysmmu driver. Keeping this call in the
-> > current form results in a requirement that each sysmmu client MUST know the
-> > hardware details of the sysmmu module. In my opinion SysMMU client should only
-> > manage the virtual space and have the ability to add or remove a mapping for
-> > particular range of pages/memory on particular sysmmu chip.
-> >
-> 
-> The user of the system MMU must not know the details of system MMU
-> such as specifications of page table, details control registers and so
-> on.
-> We need to consider some possibilities:
->  - To reduce TLB miss rate, we need to support larger page size for system MMUs
->  - To support multiple page sizes including 1MB, 64KB and 4KB, we need
-> a scatter-gather list of pages or contiguous physical chunks.
+Aha I get it... The defconfig can wait for sure.
 
-Right, definitely adding support for a larger page sizes is an important thing,
-however the first version of the iommu driver and its clients can operate correctly
-even without it. I agree that the drivers will not operate on highest possible
-speed in such case. 
+> I don't mind merging the ux500 branch into devel-stable provided you're
+> not going to send any further ux500 patches?
 
-IMHO we need to merge some simple driver first with the basic functionality without
-external dependences first (even without all possible functionalities) and then,
-once it gets in, gradually extend it with a new features and improve the speed.
+No hurries atleast. We have some minor drivers pending but I will request
+subsystems to take the bulk of these drivers and have the platform data
+come in the next merge window or directly to Torvalds.
 
-I've noticed that mm subsystem is getting support for larger page sizes, so I expect
-that one day there will be interfaces for different page sizes available.
+I created a branch named "for-rmk-devel-stable" without the defconfig stuff,
+that lands entirely inside the arch/arm/* tree, it duplicates the two PMU
+patches and nothing else from your tree:
+      ARM: perf_event: allow platform-specific interrupt handler
+      mach-ux500: DB8500 PMU support
 
-> There may be another construct to manage page tables because it is
-> very complex task.
-> VCMM may be one of the construct.
+The following changes since commit dd9c1549edef02290edced639f67b54a25abbe0e:
 
-VCMM is still not yet merged. It might be the solution, but I would like to
-avoid the dependence on it in the first version of the iommu driver.
+  Linux 2.6.38-rc7 (2011-03-01 13:55:12 -0800)
 
-> Yet, I also agree with you about that the sysmmu driver must provide a
-> primary operation to deal with page tables
-> even though it is less efficient.
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+for-rmk-devel-stable
 
-Thanks :)
+Bibek Basu (1):
+      mach-ux500: add hrefv60 GPIO pins
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Jonas Aaberg (1):
+      plat-nomadik: pull-up/down settings for GPIO resume
+
+Lee Jones (1):
+      mach-ux500: Add Rohm BH1780GLI Light Sensor to i2c_board_info
+
+Linus Walleij (9):
+      mach-ux500: add DB5500 PMU resources
+      mach-ux500: add a few AB8500 regulator consumers v3
+      mach-ux500: delete old keypad board file
+      mach-u300: use mmci driver for GPIO card detect
+      mach-u300: config U300 PL180 PL011 PL022 for DMA
+      mach-ux500: config Ux500 PL011 PL022 PL180 for DMA
+      plat-nomadik: fix compilation warning
+      mach-ux500: basic HREFv60 support v2
+      mach-u300: define a dummy filter function for coh901318
+
+Mian Yousaf Kaukab (4):
+      mach-ux500: add platform data for musb
+      mach-ux500: update MUSB clock configurations
+      mach-ux500: add MUSB to db8500 devices
+      mach-ux500: add MUSB to db5500 devices
+
+Philippe Langlais (4):
+      mach-ux500: platform data for SFH7741 proximity sensor driver
+      mach-ux500: platform data for LP5521 leds driver
+      mach-ux500: set sd/mmc clock rate to 100MHz
+      mach-ux500: fix inverted SD-card GPIO pin
+
+Rabin Vincent (12):
+      ARM: perf_event: allow platform-specific interrupt handler
+      mach-ux500: DB8500 PMU support
+      mach-ux500: dynamic UIB (user interface boards) detection
+      plat-nomadik: support varying number of GPIOs per block
+      plat-nomadik: add custom dbg_show for GPIO
+      plat-nomadik: implement suspend/resume for GPIO
+      plat-nomadik: support secondary GPIO interrupts
+      plat-nomadik: set altfunc to GPIO when enabling the sleep config
+      plat-nomadik: implement safe switch sequence for Alt-C
+      plat-nomadik: get rid of unused GPIO PM code
+      mach-ux500: move MOP500 pins to separate file
+      plat-nomadik: make GPIO interrupts work with cpuidle ApSleep
+
+Rikard Olsson (1):
+      plat-nomadik: change sleep/wakeup setting in GPIO SLPM register
+
+Sundar Iyer (3):
+      mach-ux500: fix ux500 build error
+      mach-ux500: add ST-UIB platform data
+      mach-ux500: add U8500 UIB platform data
+
+Virupax Sadashivpetimath (1):
+      plat-nomadik: type secondary IRQ correctly
+
+ arch/arm/include/asm/pmu.h                    |   14 +
+ arch/arm/kernel/perf_event.c                  |   17 +-
+ arch/arm/mach-u300/core.c                     |  179 ++++++++-
+ arch/arm/mach-u300/include/mach/coh901318.h   |    7 +
+ arch/arm/mach-u300/mmc.c                      |  160 ++-------
+ arch/arm/mach-u300/spi.c                      |   21 +-
+ arch/arm/mach-ux500/Makefile                  |    8 +-
+ arch/arm/mach-ux500/board-mop500-keypads.c    |  229 ------------
+ arch/arm/mach-ux500/board-mop500-pins.c       |  241 ++++++++++++
+ arch/arm/mach-ux500/board-mop500-regulators.c |   62 ++++
+ arch/arm/mach-ux500/board-mop500-sdi.c        |  184 ++++++----
+ arch/arm/mach-ux500/board-mop500-stuib.c      |  205 +++++++++++
+ arch/arm/mach-ux500/board-mop500-u8500uib.c   |  111 ++++++
+ arch/arm/mach-ux500/board-mop500-uib.c        |  135 +++++++
+ arch/arm/mach-ux500/board-mop500.c            |  328 ++++++++++++++----
+ arch/arm/mach-ux500/board-mop500.h            |   25 ++-
+ arch/arm/mach-ux500/board-u5500-sdi.c         |   25 ++
+ arch/arm/mach-ux500/board-u5500.c             |    6 +-
+ arch/arm/mach-ux500/clock.c                   |    6 +-
+ arch/arm/mach-ux500/cpu-db5500.c              |   53 +++-
+ arch/arm/mach-ux500/cpu-db8500.c              |   76 ++++-
+ arch/arm/mach-ux500/devices-common.c          |    1 +
+ arch/arm/mach-ux500/devices-common.h          |    7 +-
+ arch/arm/mach-ux500/devices-db5500.h          |   19 +-
+ arch/arm/mach-ux500/devices-db8500.c          |   67 ++++-
+ arch/arm/mach-ux500/devices-db8500.h          |   15 +-
+ arch/arm/mach-ux500/dma-db5500.c              |   16 +
+ arch/arm/mach-ux500/include/mach/uncompress.h |    6 +-
+ arch/arm/mach-ux500/include/mach/usb.h        |   25 ++
+ arch/arm/mach-ux500/usb.c                     |  160 ++++++++
+ arch/arm/plat-nomadik/gpio.c                  |  487 +++++++++++++++++++++----
+ arch/arm/plat-nomadik/include/plat/gpio.h     |    6 +
+ 32 files changed, 2269 insertions(+), 632 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-keypads.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-pins.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-stuib.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-u8500uib.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-uib.c
+ create mode 100644 arch/arm/mach-ux500/include/mach/usb.h
+ create mode 100644 arch/arm/mach-ux500/usb.c
+
+Yours,
+Linus Walleij
