@@ -1,40 +1,24 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Mar 2011 22:52:23 +0800
-Subject: [PATCH] ARM: mx5: fix clk id for a few DEFINE_CLOCK
-Message-ID: <1300114343-3736-1-git-send-email-shawn.guo@freescale.com>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Mon, 14 Mar 2011 10:50:46 -0400
+Subject: [RFC PATCH 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
+In-Reply-To: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <4D7E2B46.6010605@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+On 03/14/2011 05:55 AM, Richard Zhu wrote:
+> Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
+> ---
+>   arch/arm/mach-mx5/clock-mx51-mx53.c             |   11 +++++
+>   arch/arm/mach-mx5/devices-imx53.h               |    4 ++
+>   arch/arm/plat-mxc/devices/Kconfig               |    4 ++
+>   arch/arm/plat-mxc/devices/Makefile              |    1 +
+>   arch/arm/plat-mxc/devices/platform-ahci-imx.c   |   55 +++++++++++++++++++++++
+>   arch/arm/plat-mxc/include/mach/ahci_sata.h      |   51 +++++++++++++++++++++
+>   arch/arm/plat-mxc/include/mach/devices-common.h |   10 ++++
+>   7 files changed, 136 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+>   create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 652ace4..b25dba6 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1301,10 +1301,10 @@ DEFINE_CLOCK_FULL(ecspi1_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG9_OFFSET,
- 		&ipg_clk, &spba_clk);
- DEFINE_CLOCK(ecspi1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG10_OFFSET,
- 		NULL, NULL, &ecspi_main_clk, &ecspi1_ipg_clk);
--DEFINE_CLOCK_FULL(ecspi2_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG11_OFFSET,
-+DEFINE_CLOCK_FULL(ecspi2_ipg_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG11_OFFSET,
- 		NULL, NULL, _clk_ccgr_enable_inrun, _clk_ccgr_disable,
- 		&ipg_clk, &aips_tz2_clk);
--DEFINE_CLOCK(ecspi2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG12_OFFSET,
-+DEFINE_CLOCK(ecspi2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG12_OFFSET,
- 		NULL, NULL, &ecspi_main_clk, &ecspi2_ipg_clk);
- 
- /* CSPI */
-@@ -1314,7 +1314,7 @@ DEFINE_CLOCK(cspi_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG13_OFFSET,
- 		NULL, NULL, &ipg_clk, &cspi_ipg_clk);
- 
- /* SDMA */
--DEFINE_CLOCK(sdma_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG15_OFFSET,
-+DEFINE_CLOCK(sdma_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG15_OFFSET,
- 		NULL, NULL, &ahb_clk, NULL);
- 
- /* eSDHC */
--- 
-1.7.1
+Acked-by: Jeff Garzik <jgarzik@redhat.com>
