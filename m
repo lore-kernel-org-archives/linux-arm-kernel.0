@@ -1,74 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 14 Mar 2011 18:24:14 +0100
-Subject: [PATCH] macb: detect IP version to determin if we are on at91
-	or avr32
-In-Reply-To: <20110314101512.GA26085@n2100.arm.linux.org.uk>
-References: <1299863585-17263-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110314101512.GA26085@n2100.arm.linux.org.uk>
-Message-ID: <20110314172414.GB14548@game.jcrosoft.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Mar 2011 10:42:09 -0700
+Subject: [PATCH 2 00/18] I2C: OMAP: Fixes and removal of cpu_... from
+	driver
+In-Reply-To: <20110309191115.GM26463@atomide.com>
+References: <20110308105934.23531.83540.stgit@otae.warmcat.com>
+	<4D76A164.2060801@ti.com> <20110308233820.GJ26463@atomide.com>
+	<4D778873.4070308@ti.com> <20110309191115.GM26463@atomide.com>
+Message-ID: <20110314174209.GC7258@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:15 Mon 14 Mar     , Russell King - ARM Linux wrote:
-> On Fri, Mar 11, 2011 at 06:13:05PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > +	if (macb_is_at91(bp)) {
-> > +		bp->pclk = clk_get(&pdev->dev, "macb_clk");
-> > +		if (IS_ERR(bp->pclk)) {
-> > +			dev_err(&pdev->dev, "failed to get macb_clk\n");
-> > +			goto err_out_free_dev;
-> > +		}
-> > +		clk_enable(bp->pclk);
-> > +	} else {
-> > +		bp->pclk = clk_get(&pdev->dev, "pclk");
-> > +		if (IS_ERR(bp->pclk)) {
-> > +			dev_err(&pdev->dev, "failed to get pclk\n");
-> > +			goto err_out_free_dev;
-> > +		}
-> > +		bp->hclk = clk_get(&pdev->dev, "hclk");
-> > +		if (IS_ERR(bp->hclk)) {
-> > +			dev_err(&pdev->dev, "failed to get hclk\n");
-> > +			goto err_out_put_pclk;
-> > +		}
-> > +
-> > +		clk_enable(bp->pclk);
-> > +		clk_enable(bp->hclk);
-> > +	}
-> 
-> This is the same kind of sillyness that started getting OMAP into problems
-> with the clk API.  Just do this instead:
-> 
-> 	bp->pclk = clk_get(&pdev->dev, "pclk");
-> 	if (IS_ERR(bp->pclk)) {
-> 		dev_err(&pdev->dev, "failed to get pclk\n");
-> 		goto err_out_free_dev;
-> 	}
-> 	bp->hclk = clk_get(&pdev->dev, "hclk");
-> 	if (IS_ERR(bp->hclk)) {
-> 		dev_err(&pdev->dev, "failed to get hclk\n");
-> 		goto err_out_put_pclk;
-> 	}
-> 
-> 	clk_enable(bp->pclk);
-> 	clk_enable(bp->hclk);
-> 
-> And then require _all_ platforms using this driver to provide a pclk and
-> a hclk for this device, whether they exist in the SoC or not.  Where they
-> don't, provide dummy clocks for it.
-> 
-> This probably means you end up with _less_ bloat overall because you're
-> not having to build the above code.  You've less lines of source code to
-> maintain.  You have a simplified dirver with consistent requirements
-> across all platforms.  You don't need to read the version register, and
-> you don't need macb_is_at91() and macb_is_avr32().
-no we do need it for some of the register IP implementation related to the MII
-at least
-> 
-> With clkdev it's _cheap_ to provide these dummy clocks once you have one
-> dummy clock already in place.
-I known and already agree about the clock, Jamie Patches will take care about it
+Hi Ben & Andy,
 
-this patch remove the ifdef ARCH and now detect the IP revision to determin
-the IP specific implementation
+* Tony Lindgren <tony@atomide.com> [110309 11:09]:
+> * Cousson, Benoit <b-cousson@ti.com> [110309 06:00]:
+> > Hi Tony,
+> > 
+> > On 3/9/2011 12:38 AM, Tony Lindgren wrote:
+> > >* Cousson, Benoit<b-cousson@ti.com>  [110308 13:34]:
+> > >>Hi Andy,
+> > >>
+> > >>Thanks for that really fast update. That looks pretty good at first
+> > >>glance. I still have to review in details.
+> > >
+> > >Yes nice job!
+> > >
+> > >>And we need to find some volunteers for OMAP1&  2 testing.
+> > >
+> > >I gave it a quick try on osk5912, seems to work just fine.
+> > >Will apply these for testing purposes to linux-omap tree while
+> > >waiting for the minor fixes.
+> > >
+> > >Looks like Benoit should take the arch/arm/*omap*/*hwmod*
+> > >patches, the rest should go throug Ben. So for all of them:
+> > 
+> > Paul and I already acked the hwmod data, but the whole series should
+> > maybe go through Ben, because the hwmod files will need some defines
+> > added in the i2c header file. So we cannot separate the hwmod*
+> > patches from the driver files patches.
+> 
+> Unfortunately the hwmod patches depend on omap-for-linus branch..
+> 
+> Considering this, it's probably best that I queue the whole series
+> assuming we get acks from Ben for the driver related changes.
 
-Best Regards,
-J.
+After looking at this again, I've changed my mind.
+
+It looks like this series can be rebased on v2.6.38-rc8
+and should merge just fine with what we have queued in
+omap-for-linus. I guess I forgot we already did the i2c-omap
+hwmod conversion last merge window :)
+
+Andy, please repost the related patches against v2.6.38-rc8 with
+the acks posted earlier.
+
+Then Ben, please feel free to queue it after you get the rebased
+series. We've had this series applied for testing for a while.
+
+Regards,
+
+Tony
