@@ -1,26 +1,21 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 14 Mar 2011 15:18:32 -0700
-Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
-In-Reply-To: <AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
-Message-ID: <20110314151832.3a6e3072.akpm@linux-foundation.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 14 Mar 2011 18:34:53 -0500
+Subject: [PATCH] arm/dt: Add dtb make rule
+In-Reply-To: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
+References: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4D7EA61D.4030403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Mar 2011 23:23:06 +0300
-Vasiliy Kulikov <segoon@openwall.com> wrote:
+Grant,
 
-> > Vasiliy Kulikov (20):
-> >  mach-ux500: mbox-db5500: world-writable sysfs fifo file
-> >  leds: lp5521: world-writable sysfs engine* files
-> >  leds: lp5523: world-writable engine* sysfs files
-> >  misc: ep93xx_pwm: world-writable sysfs files
-> >  rtc: rtc-ds1511: world-writable sysfs nvram file
-> >  scsi: aic94xx: world-writable sysfs update_bios file
-> >  scsi: iscsi: world-writable sysfs priv_sess file
-> 
-> These are still not merged :(
+On 03/10/2011 01:46 PM, Rob Herring wrote:
+> From: Rob Herring<rob.herring@calxeda.com>
+>
+> Add a make rule to compile dt blobs for ARM.
+>
+> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
 
-I grabbed them and shall merge some and send others at relevant
-maintainers, thanks.
+Can you pick this one up in your ARM tree.
+
+Rob
