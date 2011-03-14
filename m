@@ -1,63 +1,60 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 14 Mar 2011 18:22:18 +0100
-Subject: [PATCH 2/2] omap4: mux: Remove duplicate mux modes
-In-Reply-To: <20110314165922.GA7258@atomide.com>
-References: <20110311203317.26901.67180.stgit@baageli.muru.com>
-	<20110311203420.26901.36271.stgit@baageli.muru.com>
-	<4D7DD4BC.7080104@ti.com> <20110314165922.GA7258@atomide.com>
-Message-ID: <4D7E4ECA.5010200@ti.com>
+From: prasadjoshi124@gmail.com (Prasad Joshi)
+Date: Mon, 14 Mar 2011 17:29:41 +0000
+Subject: [RFC][PATCH v2 02/23] (armho) __vmalloc: add gfp flags variant of pte
+	and pmd allocation
+Message-ID: <AANLkTikpM6RRNoT1nPk0Jws3SKff81wJRbJUnJAi3J=3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2011 5:59 PM, Tony Lindgren wrote:
-> * Cousson, Benoit<b-cousson@ti.com>  [110314 01:39]:
->> Hi Tony,
->>
->> On 3/11/2011 9:34 PM, Tony Lindgren wrote:
->>> Remove duplicate mux modes to make the binary smaller:
->>>
->>> text    data     bss     dec     hex filename
->>> 9378   24472       0   33850    843a mux44xx.o
->>> 9378   19104       0   28482    6f42 mux44xx.o
->>>
->>> Cc: Benoit Cousson<b-cousson@ti.com>
->>> Signed-off-by: Tony Lindgren<tony@atomide.com>
->>> ---
->>>   arch/arm/mach-omap2/mux44xx.c |  282 +----------------------------------------
->>>   1 files changed, 6 insertions(+), 276 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/mux44xx.c b/arch/arm/mach-omap2/mux44xx.c
->>> index c322e7b..9a66445 100644
->>> --- a/arch/arm/mach-omap2/mux44xx.c
->>> +++ b/arch/arm/mach-omap2/mux44xx.c
->>> @@ -755,25 +755,9 @@ static struct omap_ball __initdata omap4_core_cbl_ball[] = {
->>>   #endif
->>>
->>>   /*
->>> - * Superset of all mux modes for omap4 ES2.0
->>> + * Signals different on ES2.0 compared to superset
->>
->> I didn't do it originally due to the huge amount of differences
->> between the two versions and the impact at runtime it will imply to
->> fix the modified entries at boot time. It might still be interesting
->> to measure it.
->
-> A quick test shows the difference is 0.007324218 - 0.007202148 seconds.. :)
+__vmalloc: propagating GFP allocation flag.
 
-Whaoo, 122us, that chip is really fast :-)
+- adds functions to allow caller to pass the GFP flag for memory allocation
+- helps in fixing the Bug 30702 (__vmalloc(GFP_NOFS) can callback
+		  file system evict_inode).
 
->> Since ES1 is no longer used on any board except the early one, that
->> you probably still have :-), it might be better to consider ES2 as
->> the superset and then store ES1 diff as the subset. It will avoid
->> any performance impact for the latest devices.
->
-> Well the performance impact is minimal in this case. But from cutting
-> down the size point of view that makes sense as then we could later on
-> optionally compile out OMAP_PACKAGE_CBL.
->
-> Sounds like that's a separate incremental patch on top of this one
-> though.
+Signed-off-by: Anand Mitra <mitra@kqinfotech.com>
+Signed-off-by: Prasad Joshi <prasadjoshi124@gmail.com>
+---
+Chnagelog:
+arch/arm/include/asm/pgalloc.h |   11 +++++++++--
+1 files changed, 9 insertions(+), 2 deletions(-)
+---
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 22de005..0696068 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -28,6 +28,7 @@
+ /*
+  * Since we have only two-level page tables, these are trivial
+  */
++#define __pmd_alloc_one(mm,addr,mask)	({ BUG(); ((pmd_t *)2); })
+ #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
+ #define pmd_free(mm, pmd)		do { } while (0)
+ #define pgd_populate(mm,pmd,pte)	BUG()
+@@ -59,17 +60,23 @@ static inline void clean_pte_table(pte_t *pte)
+  *  +------------+
+  */
+ static inline pte_t *
+-pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
++__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr,
+gfp_t gfp_mask)
+ {
+ 	pte_t *pte;
 
-OK, I'll try to make that for 2.6.40.
+-	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
++	pte = (pte_t *)__get_free_page(gfp_mask | __GFP_NOTRACK | __GFP_ZERO);
+ 	if (pte)
+ 		clean_pte_table(pte);
 
-Benoit
+ 	return pte;
+ }
+
++static inline pte_t *
++pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
++{
++	return __pte_alloc_one_kernel(mm, addr, GFP_KERNEL | __GFP_REPEAT);
++}
++
+ static inline pgtable_t
+ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
