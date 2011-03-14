@@ -1,14 +1,68 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Mon, 14 Mar 2011 10:50:59 -0400
-Subject: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <4D7E2B53.7030800@pobox.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Mar 2011 22:54:25 +0800
+Subject: [PATCH] mmc: change CONFIG of MMC_SDHCI based drivers from 'bool' to
+	'tristate'
+Message-ID: <1300114465-3769-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2011 05:55 AM, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
+The MMC_SDHCI based driver is either based on MMC_SDHCI_PLTFM or
+MMC_SDHCI_OF.  As both parent CONFIG are 'tristate', it may make
+sense to get all children drivers CONFIG as 'tristate'.
 
-Acked-by: Jeff Garzik <jgarzik@redhat.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ drivers/mmc/host/Kconfig |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index afe8c6f..f98adbf 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -91,7 +91,7 @@ config MMC_SDHCI_OF
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_OF_ESDHC
+-	bool "SDHCI OF support for the Freescale eSDHC controller"
++	tristate "SDHCI OF support for the Freescale eSDHC controller"
+ 	depends on MMC_SDHCI_OF
+ 	depends on PPC_OF
+ 	select MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
+@@ -101,7 +101,7 @@ config MMC_SDHCI_OF_ESDHC
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_OF_HLWD
+-	bool "SDHCI OF support for the Nintendo Wii SDHCI controllers"
++	tristate "SDHCI OF support for the Nintendo Wii SDHCI controllers"
+ 	depends on MMC_SDHCI_OF
+ 	depends on PPC_OF
+ 	select MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
+@@ -124,7 +124,7 @@ config MMC_SDHCI_PLTFM
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_CNS3XXX
+-	bool "SDHCI support on the Cavium Networks CNS3xxx SoC"
++	tristate "SDHCI support on the Cavium Networks CNS3xxx SoC"
+ 	depends on ARCH_CNS3XXX
+ 	depends on MMC_SDHCI_PLTFM
+ 	help
+@@ -133,7 +133,7 @@ config MMC_SDHCI_CNS3XXX
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_ESDHC_IMX
+-	bool "SDHCI platform support for the Freescale eSDHC i.MX controller"
++	tristate "SDHCI platform support for the Freescale eSDHC i.MX controller"
+ 	depends on MMC_SDHCI_PLTFM && (ARCH_MX25 || ARCH_MX35 || ARCH_MX5)
+ 	select MMC_SDHCI_IO_ACCESSORS
+ 	help
+@@ -143,7 +143,7 @@ config MMC_SDHCI_ESDHC_IMX
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_DOVE
+-	bool "SDHCI support on Marvell's Dove SoC"
++	tristate "SDHCI support on Marvell's Dove SoC"
+ 	depends on ARCH_DOVE
+ 	depends on MMC_SDHCI_PLTFM
+ 	select MMC_SDHCI_IO_ACCESSORS
+-- 
+1.7.1
