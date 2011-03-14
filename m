@@ -1,79 +1,18 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 14 Mar 2011 19:55:54 +0530
-Subject: [PATCH] omap3: alsa-soc: Remove restrictive check for cpu type
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C2469DA@dbde02.ent.ti.com>
-References: <1300109513-29002-1-git-send-email-premi@ti.com>
-	<20110314155542.b60bd852.jhnikula@gmail.com>
-	<20110314160040.c15c0c8d.jhnikula@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C2469DA@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C2469E6@dbde02.ent.ti.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Mon, 14 Mar 2011 14:29:02 +0000
+Subject: [PATCH 1/2] i2c-pxa2xx: Fix register offsets
+In-Reply-To: <1300024409-32587-1-git-send-email-anarsoul@gmail.com>
+References: <1300024409-32587-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20110314142902.GM15795@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Sun, Mar 13, 2011 at 03:53:28PM +0200, Vasily Khoruzhick wrote:
+> Fix regression that was introduced by dynamic register layout.
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Premi, Sanjeev
-> Sent: Monday, March 14, 2011 7:47 PM
-> To: Jarkko Nikula
-> Cc: linux-omap at vger.kernel.org; alsa-devel at alsa-project.org; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH] omap3: alsa-soc: Remove restrictive 
-> check for cpu type
-> 
-> > -----Original Message-----
-> > From: Jarkko Nikula [mailto:jhnikula at gmail.com] 
-> > Sent: Monday, March 14, 2011 7:31 PM
-> > To: Premi, Sanjeev
-> > Cc: linux-omap at vger.kernel.org; alsa-devel at alsa-project.org; 
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH] omap3: alsa-soc: Remove restrictive 
-> > check for cpu type
-> > 
-> > On Mon, 14 Mar 2011 15:55:42 +0200
-> > Jarkko Nikula <jhnikula@gmail.com> wrote:
-> > 
-> > > On Mon, 14 Mar 2011 19:01:53 +0530
-> > > Sanjeev Premi <premi@ti.com> wrote:
-> > > 
-> > > > Current check for cpu type is too restrictive leading to
-> > > > failures for other silicons in same family.
-> > > > 
-> > > > The problem was found while testing audio playback on
-> > > > AM37x and AM35x processors. But should exist on OMAP36xx
-> > > > as well.
-> > > > 
-> > > > Signed-off-by: Sanjeev Premi <premi@ti.com>
-> > > > ---
-> > > >  sound/soc/omap/omap-mcbsp.c |    2 +-
-> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > 
-> > > There are two other cpu_is_omap343x tests as well. Care to 
-> > check them
-> > > too?
-> > > 
-> > Sorry, only one additional test. I forgot the commit 2686e07 "ASoC:
-> > McBSP: get hw params from McBSP driver" that is coming via 
-> linux-omap
-> > and which removes one test.
-> 
-> Checking now...
+applied both to the relevant -next branch
 
-Other check shouldn't be there are well... Had asked someone (off-this
--list) to help me test the change - but seems to be in todo.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Will test it myself and post updated patch today...
-
-> 
-> ~sanjeev
-> 
-> > 
-> > -- 
-> > Jarkko
-> > --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
