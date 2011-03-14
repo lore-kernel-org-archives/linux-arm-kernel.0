@@ -1,44 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Mar 2011 13:04:41 -0000
-Subject: [PATCH 1/7] ARM: irq: introduce entry and exit functions for
-	chained handlers
-In-Reply-To: <alpine.LFD.2.00.1103112017500.2787@localhost6.localdomain6>
-References: <1299604405-12960-1-git-send-email-will.deacon@arm.com>
-	<1299604405-12960-2-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1103111731440.2787@localhost6.localdomain6>
-	<000601cbe00d$4d1acdb0$e7506910$@deacon@arm.com>
-	<alpine.LFD.2.00.1103112017500.2787@localhost6.localdomain6>
-Message-ID: <000201cbe248$622585a0$267090e0$@deacon@arm.com>
+From: arno.steffen@googlemail.com (Arno Steffen)
+Date: Mon, 14 Mar 2011 14:26:35 +0100
+Subject: IRQ handler under load - slow response
+In-Reply-To: <20110309152252.GB333@e-circ.dyndns.org>
+References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+	<20110309152252.GB333@e-circ.dyndns.org>
+Message-ID: <AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > That wants a comment that these functions are only dealing with
-> > > fasteoi and level type flow control.
-> > >
-> > > Otherwise fine with me. Feel free to add my Acked-by.
-> >
-> > Thanks Thomas, reworded as followed:
-> >
-> >     ARM: irq: introduce entry and exit functions for chained handlers
-> >
-> >     Some chained IRQ handlers are written to cope with primary chips of
-> >     potentially different flow types. Whether this a sensible thing to do
-> >     is a point of contention.
-> >
-> >     This patch introduces entry/exit functions for chained handlers which
-> >     infer the flow type of the primary chip as fasteoi or level-type by
-> >     checking whether or not the ->irq_eoi function pointer is present and
-> >     calling back to the primary chip as necessary. Other methods of flow
-> >     control are not considered.
-> >
-> > I'll add your Ack and put this (patch 1) in Russell's patch system next
-> > week.
-> 
-> Having it in the changelog is nice, but the code itself would like a
-> comment as well.
+Sorry for delay with resonse.
+Thanks for your help. Most of this options for ps doesn't work on my
+busybox embedded system.
+Also chrt is not implemented currently. But that inspired me to
+another idea. I just announced the irqs in a sperate process:
+Is this what you proposed in b) ?
 
-Rightio, submitted to Russell's patch system with code comment as 6806/1.
+	i = fork();
+	if (i == 0) {
+		printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
+		setpriority(PRIO_PROCESS, getpid(), -10);
+		printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
+		gpio_irq_setup(GPI_IN1, GPIOCFG_FALLINGDETECT_INTR, &irq_handler);
+		gpio_irq_setup(GPI_IN2, GPIOCFG_RISINGDETECT_INTR, &irq_handler );
+		printf("all IRQ handlers are setup !\n");
+		do {sleep(1);} while(1);
+		exit(0);
+	}
 
-Thanks,
+This helps me reducing the delay to 2ms. Not very fast, but much
+better than before.
+Setting the priority doesn't have any effect by the way.
 
-Will
+Best regards
+Arno
+
+
+2011/3/9 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+> On Wed, Mar 09, 2011 at 03:02:06PM +0100, Arno Steffen wrote:
+>
+>> ------------------
+>>
+>> What have I done wrong?
+> You put code with different scheduling needs in the same scheduling pool.
+>> Do I have a chance to speed up the response
+>> from changing inputs?
+>
+> I've been playing with scheduling policies before (I'm not the expert).
+> My hint:
+> your tasklet is executed in the softirq handler. This will run at normal
+> priority (see '$ ps -jefHc' for example)
+>
+> a)
+> You could 'chrt --rr PID' of your softirqd
+>
+> b)
+> replace your tasklet with a threaded irq handler, which you can
+> 'chrt --rr PID'. This has the effect that only your own piece of code
+> is raised in priority.
+>>
+>> best regards
+>> Steffen
+> Hope this will help.
+> Kurt
+>
