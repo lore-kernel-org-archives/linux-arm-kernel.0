@@ -1,40 +1,46 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 14 Mar 2011 21:52:58 +0300
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-Message-ID: <4D7E640A.9090908@mvista.com>
+From: mailinglists@openelec.tv (Stephan Raue)
+Date: Mon, 14 Mar 2011 20:34:39 +0100
+Subject: [GIT PULL] OMAP PM updates for 2.6.39
+In-Reply-To: <87k4g6eakw.fsf@ti.com>
+References: <87k4g6eakw.fsf@ti.com>
+Message-ID: <4D7E6DCF.1060703@openelec.tv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-Felipe Balbi wrote:
+Am 11.03.2011 01:59, schrieb Kevin Hilman:
+> Dave Martin (5):
+>        ARM: omap4: Provide do_wfi() for Thumb-2
+>        ARM: omap4: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
+>        ARM: omap3: Remove hand-encoded SMC instructions
 
->> The MUSB driver doesn't see its platform device on DM644x EVM board anymore
->> since commit 73b089b052a69020b953312a624a6e1eb5b81fab (usb: musb: split davinci
->> to its own platform_driver) because the new probe is called as subsys_initcall()
->> now, and the device is registered later than that by the board code.  Move the
->> registration to davinci_evm_init() -- it's safe to do so because the MUSB core
->> device still gets initialized as fs_initcall() -- which is late enough for the
->> I2C GPIO expander (which controls VBUS) to be initialized.
+"ARM: omap3: Remove hand-encoded SMC instructions" fails for me with:
 
->> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+/home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/bin/arm-openelec-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-omap2/.sleep34xx.o.d  -nostdinc -isystem /home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/toolchain/lib/gcc/arm-openelec-linux-gnueabi/4.5.2/include -I/home/stephan/projects/openelec/build.OpenELEC-panda.arm-devel/linux-2.6.38-rc8/arch/arm/include -Iinclude  -include include/generated/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-omap2/include -Iarch/arm/plat-omap/include -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -mthumb -Wa,-mimplicit-it=always -Wa,-mno-warn-deprecated -Wa,-mthumb -D__LINUX_ARM_ARCH__=7 -march=armv7-a  -include asm/unified.h -msoft-float -gdwarf-2     -Wa,-march=armv7-a   -c -o arch/arm/mach-omap2/sleep34xx.o arch/arm/mach-omap2/sleep34xx.S
+arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
+arch/arm/mach-omap2/sleep34xx.S:149: Error: selected processor does not support ARM mode `smc #1'
+arch/arm/mach-omap2/sleep34xx.S:416: Error: selected processor does not support ARM mode `smc #1'
+arch/arm/mach-omap2/sleep34xx.S:427: Error: selected processor does not support ARM mode `smc #1'
+arch/arm/mach-omap2/sleep34xx.S:452: Error: selected processor does not support ARM mode `smc #0'
+arch/arm/mach-omap2/sleep34xx.S:458: Error: selected processor does not support ARM mode `smc #0'
+arch/arm/mach-omap2/sleep34xx.S:463: Error: selected processor does not support ARM mode `smc #0'
+make[2]: *** [arch/arm/mach-omap2/sleep34xx.o] Error 1
+make[1]: *** [arch/arm/mach-omap2] Error 2
 
-> Kevin feel free to take this into your tree:
 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+replacing in arch/arm/mach-omap2/Makefile:
 
-    Thanks.
+AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
+AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a
 
->> ---
->> The patch is against the recent DaVinci tree.
->> It fixes post 2.6.38-rc1 regression, so should be applied immediately!
+to:
 
-> I wonder how noone has noticed that from -rc1 until now.
+AFLAGS_sleep24xx.o                      :=-Wa,-march=armv6
+AFLAGS_sleep34xx.o                      :=-Wa,-march=armv7-a$(plus_sec)
 
-    I don't think many people run the most current DaVinci kernel. Most people 
-probably use the Arago project kernels or even older MV-based TI's stuff...
+helps compiling (see also: https://patchwork.kernel.org/patch/369681/)
 
-WBR, Sergei
+thanks
+
+Stephan
