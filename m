@@ -1,166 +1,44 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Mon, 14 Mar 2011 17:55:44 +0800
-Subject: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: manjunath.hadli@ti.com (Manjunath Hadli)
+Date: Mon, 14 Mar 2011 19:25:18 +0530
+Subject: [PATCH 1/7] davinci: move DM64XX_VDD3P3V_PWDN to devices.c
+Message-ID: <1300110918-15928-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_loco.c |  120 +++++++++++++++++++++++++++++++++++
- 1 files changed, 120 insertions(+), 0 deletions(-)
+Move the definition of DM64XX_VDD3P3V_PWDN from hardware.h
+to devices.c since it is used only there.
 
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 0a18f8d..9a7bbea 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -23,11 +23,13 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/ahci_platform.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx53.h>
-+#include <mach/ahci_sata.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -203,6 +205,123 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
- 	.bitrate = 100000,
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+---
+ arch/arm/mach-davinci/devices.c               |    1 +
+ arch/arm/mach-davinci/include/mach/hardware.h |    3 ---
+ 2 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index 22ebc64..d3b2040 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -182,6 +182,7 @@ static struct platform_device davinci_mmcsd1_device = {
+ 	.resource = mmcsd1_resources,
  };
  
-+/* HW Initialization, if return 0, initialization is successful. */
-+static int sata_init(struct device *dev, void __iomem *addr)
-+{
-+	void __iomem *mmio;
-+	struct clk *clk;
-+	int ret = 0;
-+	u32 tmpdata;
-+
-+	clk = clk_get(dev, "imx_sata_clk");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+		return ret;
-+	}
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't enable clock.\n");
-+		clk_put(clk);
-+		return ret;
-+	}
-+
-+	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-+	clk = clk_get(dev, "usb_phy1");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+		goto no_input_clk;
-+	}
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI Can't enable USB PHY1 clock.\n");
-+		clk_put(clk);
-+		goto no_input_clk;
-+	}
-+
-+	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-+	clk = clk_get(NULL, "ahb_clk");
-+	ret = IS_ERR(clk);
-+	if (ret) {
-+		printk(KERN_ERR "IMX AHCI can't get AHB clock.\n");
-+		goto no_clk;
-+	}
-+
-+	mmio = ioremap(MX53_SATA_BASE_ADDR, SZ_2K);
-+	if (mmio == NULL) {
-+		printk(KERN_ERR "Failed to map SATA REGS\n");
-+		goto no_clk;
-+	}
-+
-+	tmpdata = readl(mmio + HOST_CAP);
-+	if (!(tmpdata & HOST_CAP_SSS)) {
-+		tmpdata |= HOST_CAP_SSS;
-+		writel(tmpdata, mmio + HOST_CAP);
-+	}
-+
-+	if (!(readl(mmio + HOST_PORTS_IMPL) & 0x1))
-+		writel((readl(mmio + HOST_PORTS_IMPL) | 0x1),
-+			mmio + HOST_PORTS_IMPL);
-+
-+	tmpdata = clk_get_rate(clk) / 1000;
-+	writel(tmpdata, mmio + HOST_TIMER1MS);
-+
-+	iounmap(mmio);
-+
-+	return ret;
-+
-+no_clk:
-+	clk = clk_get(dev, "usb_phy1");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+no_input_clk:
-+	clk = clk_get(dev, "imx_sata_clk");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+	return ret;
-+}
-+
-+static void sata_exit(struct device *dev)
-+{
-+	struct clk *clk;
-+
-+	clk = clk_get(dev, "usb_phy1");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+
-+	clk = clk_get(dev, "imx_sata_clk");
-+	if (IS_ERR(clk)) {
-+		clk = NULL;
-+		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-+	} else {
-+		clk_disable(clk);
-+		clk_put(clk);
-+	}
-+}
-+
-+static struct ahci_platform_data sata_data = {
-+	.init = sata_init,
-+	.exit = sata_exit,
-+};
-+
- static void __init mx53_loco_board_init(void)
- {
- 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-@@ -215,6 +334,7 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(2, NULL);
-+	imx53_add_ahci_imx(0, &sata_data);
- }
++#define DM64XX_VDD3P3V_PWDN     0x48
  
- static void __init mx53_loco_timer_init(void)
+ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ {
+diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
+index c45ba1f..414e0b9 100644
+--- a/arch/arm/mach-davinci/include/mach/hardware.h
++++ b/arch/arm/mach-davinci/include/mach/hardware.h
+@@ -21,9 +21,6 @@
+  */
+ #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
+ 
+-/* System control register offsets */
+-#define DM64XX_VDD3P3V_PWDN	0x48
+-
+ /*
+  * I/O mapping
+  */
 -- 
-1.7.1
+1.6.2.4
