@@ -1,50 +1,40 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Mon, 14 Mar 2011 21:32:38 +0530
-Subject: [PATCH 1/7] davinci: move DM64XX_VDD3P3V_PWDN to devices.c
-In-Reply-To: <1300110918-15928-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF729@dbde02.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Mar 2011 17:21:51 +0100
+Subject: [PATCH 2/7] davinci: eliminate use of IO_ADDRESS() on sysmod
+In-Reply-To: <1300110947-16229-1-git-send-email-manjunath.hadli@ti.com>
+References: <1300110947-16229-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <201103141721.52033.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this platform patch series. I will repost it with the core driver patch series as well.
-
-Thx,
--Manju
-
-
-On Mon, Mar 14, 2011 at 19:25:18, Hadli, Manjunath wrote:
-> Move the definition of DM64XX_VDD3P3V_PWDN from hardware.h to devices.c since it is used only there.
+On Monday 14 March 2011, Manjunath Hadli wrote:
+> Current devices.c file has a number of instances where
+> IO_ADDRESS() is used for system module register
+> access. Eliminate this in favor of a ioremap()
+> based access.
+> 
+> Consequent to this, a new global pointer davinci_sysmodbase
+> has been introduced which gets initialized during
+> the initialization of each relevant SoC
 > 
 > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> ---
->  arch/arm/mach-davinci/devices.c               |    1 +
->  arch/arm/mach-davinci/include/mach/hardware.h |    3 ---
->  2 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c index 22ebc64..d3b2040 100644
-> --- a/arch/arm/mach-davinci/devices.c
-> +++ b/arch/arm/mach-davinci/devices.c
-> @@ -182,6 +182,7 @@ static struct platform_device davinci_mmcsd1_device = {
->  	.resource = mmcsd1_resources,
->  };
->  
-> +#define DM64XX_VDD3P3V_PWDN     0x48
->  
->  void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)  { diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
-> index c45ba1f..414e0b9 100644
-> --- a/arch/arm/mach-davinci/include/mach/hardware.h
-> +++ b/arch/arm/mach-davinci/include/mach/hardware.h
-> @@ -21,9 +21,6 @@
->   */
->  #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
->  
-> -/* System control register offsets */
-> -#define DM64XX_VDD3P3V_PWDN	0x48
-> -
->  /*
->   * I/O mapping
->   */
-> --
-> 1.6.2.4
-> 
-> 
+
+The change looks good, it's definitely a step in the right
+direction.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+
+I think you can go even further:
+
+* A straightforward change would be to move davinci_sysmodbase
+  into a local variable of the davinci_setup_mmc function,
+  which I believe is the only user. Then you can ioremap
+  and iounmap it directly there.
+
+* If you need to access sysmod in multiple places, a nicer
+  way would be to make the virtual address pointer static,
+  and export the accessor functions for it, rather than
+  having a global pointer.
+
+	Arnd
