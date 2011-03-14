@@ -1,63 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Mar 2011 10:15:13 +0000
-Subject: [PATCH] macb: detect IP version to determin if we are on at91
-	or avr32
-In-Reply-To: <1299863585-17263-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1299863585-17263-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110314101512.GA26085@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Mar 2011 11:16:12 +0100
+Subject: [PATCH 0/2] Common struct clk implementation, v14
+In-Reply-To: <1299134429.100626.661279191478.0.gpush@pororo>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<1299134429.100626.661279191478.0.gpush@pororo>
+Message-ID: <20110314101612.GD28960@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 06:13:05PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> +	if (macb_is_at91(bp)) {
-> +		bp->pclk = clk_get(&pdev->dev, "macb_clk");
-> +		if (IS_ERR(bp->pclk)) {
-> +			dev_err(&pdev->dev, "failed to get macb_clk\n");
-> +			goto err_out_free_dev;
-> +		}
-> +		clk_enable(bp->pclk);
-> +	} else {
-> +		bp->pclk = clk_get(&pdev->dev, "pclk");
-> +		if (IS_ERR(bp->pclk)) {
-> +			dev_err(&pdev->dev, "failed to get pclk\n");
-> +			goto err_out_free_dev;
-> +		}
-> +		bp->hclk = clk_get(&pdev->dev, "hclk");
-> +		if (IS_ERR(bp->hclk)) {
-> +			dev_err(&pdev->dev, "failed to get hclk\n");
-> +			goto err_out_put_pclk;
-> +		}
-> +
-> +		clk_enable(bp->pclk);
-> +		clk_enable(bp->hclk);
-> +	}
+On Thu, Mar 03, 2011 at 02:40:29PM +0800, Jeremy Kerr wrote:
+> Hi all,
+> 
+> These patches are an attempt to allow platforms to share clock code. At
+> present, the definitions of 'struct clk' are local to platform code,
+> which makes allocating and initialising cross-platform clock sources
+> difficult, and makes it impossible to compile a single image containing
+> support for two ARM platforms with different struct clks.
+> 
+> The three patches are for the architecture-independent kernel code,
+> introducing the common clk infrastructure. The changelog for the first
+> patch includes details about the new clock definitions.
+> 
+> Many thanks to the following for their input:
+>  * Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>  * Ben Dooks <ben-linux@fluff.org>
+>  * Baruch Siach <baruch@tkos.co.il>
+>  * Russell King <linux@arm.linux.org.uk>
+>  * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>  * Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+>  * Vincent Guittot <vincent.guittot@linaro.org>
+>  * Sascha Hauer <s.hauer@pengutronix.de>
+>  * Ryan Mallon <ryan@bluewatersys.com>
+>  * Colin Cross <ccross@google.com>
+>  * Jassi Brar <jassisinghbrar@gmail.com>
+>  * Saravana Kannan <skannan@codeaurora.org>
 
-This is the same kind of sillyness that started getting OMAP into problems
-with the clk API.  Just do this instead:
+Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-	bp->pclk = clk_get(&pdev->dev, "pclk");
-	if (IS_ERR(bp->pclk)) {
-		dev_err(&pdev->dev, "failed to get pclk\n");
-		goto err_out_free_dev;
-	}
-	bp->hclk = clk_get(&pdev->dev, "hclk");
-	if (IS_ERR(bp->hclk)) {
-		dev_err(&pdev->dev, "failed to get hclk\n");
-		goto err_out_put_pclk;
-	}
+who is responsible to take this patch?  Russell?
 
-	clk_enable(bp->pclk);
-	clk_enable(bp->hclk);
+Best regards
+Uwe
 
-And then require _all_ platforms using this driver to provide a pclk and
-a hclk for this device, whether they exist in the SoC or not.  Where they
-don't, provide dummy clocks for it.
-
-This probably means you end up with _less_ bloat overall because you're
-not having to build the above code.  You've less lines of source code to
-maintain.  You have a simplified dirver with consistent requirements
-across all platforms.  You don't need to read the version register, and
-you don't need macb_is_at91() and macb_is_avr32().
-
-With clkdev it's _cheap_ to provide these dummy clocks once you have one
-dummy clock already in place.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
