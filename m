@@ -1,70 +1,150 @@
-From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Tue, 15 Mar 2011 19:26:28 +0530
-Subject: [PATCH v17 00/13] davinci vpbe: dm6446 v4l2 driver
-Message-ID: <1300197388-3704-1-git-send-email-manjunath.hadli@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Mar 2011 22:57:03 +0900
+Subject: [PATCH] ARM: EXYNOS4: CPUIDLE Support
+In-Reply-To: <1299635302-27759-1-git-send-email-jc.lee@samsung.com>
+References: <1299635302-27759-1-git-send-email-jc.lee@samsung.com>
+Message-ID: <011c01cbe318$df3d2e00$9db78a00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-version17:
-The more important among the patch history from previous comments 
-1. Replacing _raw_readl() with readl().
-2. Removal of platform resource overlap.
-3. Removal of unused macros.
-4. Fixing the module params typo.
-5. Minor changes in the GPL licensing header.
-6. Removed the initializer for field inversion parameter.
-7. Changing the Field inversion #ifdef to platform 
-   based implementation.
-8. Interchanged platform and board specific patches due to dependencies.
+Jaecheol Lee wrote:
+> 
+> This patch supports cpuidle framework for EXYNOS4210. Currently,
+> Only one idle state is possible to use, but more idle states can
+> be added following by this patch.
+> 
+> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/Makefile  |    1 +
+>  arch/arm/mach-exynos4/cpuidle.c |   87
+> +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 88 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos4/cpuidle.c
+> 
+> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-
+exynos4/Makefile
+> index 461ae57..bf206fa 100644
+> --- a/arch/arm/mach-exynos4/Makefile
+> +++ b/arch/arm/mach-exynos4/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o
+clock.o
+> irq-combiner.o
+>  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+>  obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o time.o gpiolib.o irq-eint.o
+> dma.o
+>  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+> +obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+> 
+>  obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+>  obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+> diff --git a/arch/arm/mach-exynos4/cpuidle.c b/arch/arm/mach-
+> exynos4/cpuidle.c
+> new file mode 100644
+> index 0000000..a543a18
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos4/cpuidle.c
+> @@ -0,0 +1,87 @@
+> +/* linux/arch/arm/mach-exynos4/cpuidle.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/io.h>
+> +
+> +#include <asm/proc-fns.h>
+> +
+> +static int exynos4_enter_idle(struct cpuidle_device *dev,
+> +			      struct cpuidle_state *state);
+> +
+> +static struct cpuidle_state exynos4_cpuidle_set[] = {
+> +	[0] = {
+> +		.enter			= exynos4_enter_idle,
+> +		.exit_latency		= 1,
+> +		.target_residency	= 100000,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +		.name			= "IDLE",
+> +		.desc			= "ARM clock gating(WFI)",
+> +	},
+> +};
+> +
+> +static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+> +
+> +static struct cpuidle_driver exynos4_idle_driver = {
+> +	.name		= "exynos4_idle",
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int exynos4_enter_idle(struct cpuidle_device *dev,
+> +			      struct cpuidle_state *state)
+> +{
+> +	struct timeval before, after;
+> +	int idle_time;
+> +
+> +	local_irq_disable();
+> +	do_gettimeofday(&before);
+> +
+> +	cpu_do_idle();
+> +
+> +	do_gettimeofday(&after);
+> +	local_irq_enable();
+> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> +		    (after.tv_usec - before.tv_usec);
+> +
+> +	return idle_time;
+> +}
+> +
+> +static int __init exynos4_init_cpuidle(void)
+> +{
+> +	int i, max_cpuidle_state, cpu_id;
+> +	struct cpuidle_device *device;
+> +
+> +	cpuidle_register_driver(&exynos4_idle_driver);
+> +
+> +	for_each_cpu(cpu_id, cpu_online_mask) {
+> +		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+> +		device->cpu = cpu_id;
+> +
+> +		device->state_count = (sizeof(exynos4_cpuidle_set) /
+> +					       sizeof(struct
+cpuidle_state));
+> +
+> +		max_cpuidle_state = device->state_count;
+> +
+> +		for (i = 0; i < max_cpuidle_state; i++) {
+> +			memcpy(&device->states[i], &exynos4_cpuidle_set[i],
+> +					sizeof(struct cpuidle_state));
+> +		}
+> +
+> +		if (cpuidle_register_device(device)) {
+> +			printk(KERN_ERR "CPUidle register device
+failed\n,");
+> +			return -EIO;
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +device_initcall(exynos4_init_cpuidle);
+> --
+> 1.7.1
 
-Manjunath Hadli (13):
-  davinci vpbe: V4L2 display driver for DM644X SoC
-  davinci vpbe: VPBE display driver
-  davinci vpbe: OSD(On Screen Display) block
-  davinci vpbe: VENC( Video Encoder) implementation
-  davinci vpbe: Build infrastructure for VPBE driver
-  davinci vpbe: Readme text for Dm6446 vpbe
-  davinci: move DM64XX_VDD3P3V_PWDN to devices.c
-  davinci: eliminate use of IO_ADDRESS() on sysmod
-  davinci: dm644x: Replace register base value with a defined macro
-  davinci: dm644x: change vpfe capture structure variables for
-    consistency
-  davinci: dm644x: move vpfe init from soc to board specific files
-  davinci: dm644x: add support for v4l2 video display
-  davinci: dm644x EVM: add support for VPBE display
+Cc'ed Kyungmin Park.
 
- Documentation/video4linux/README.davinci-vpbe |   93 ++
- arch/arm/mach-davinci/board-dm644x-evm.c      |  131 ++-
- arch/arm/mach-davinci/devices.c               |   24 +-
- arch/arm/mach-davinci/dm355.c                 |    1 +
- arch/arm/mach-davinci/dm365.c                 |    1 +
- arch/arm/mach-davinci/dm644x.c                |  172 ++-
- arch/arm/mach-davinci/dm646x.c                |    1 +
- arch/arm/mach-davinci/include/mach/dm644x.h   |    7 +-
- arch/arm/mach-davinci/include/mach/hardware.h |    7 +-
- drivers/media/video/davinci/Kconfig           |   22 +
- drivers/media/video/davinci/Makefile          |    2 +
- drivers/media/video/davinci/vpbe.c            |  826 ++++++++++
- drivers/media/video/davinci/vpbe_display.c    | 2084 +++++++++++++++++++++++++
- drivers/media/video/davinci/vpbe_osd.c        | 1216 ++++++++++++++
- drivers/media/video/davinci/vpbe_osd_regs.h   |  364 +++++
- drivers/media/video/davinci/vpbe_venc.c       |  556 +++++++
- drivers/media/video/davinci/vpbe_venc_regs.h  |  177 +++
- include/media/davinci/vpbe.h                  |  185 +++
- include/media/davinci/vpbe_display.h          |  146 ++
- include/media/davinci/vpbe_osd.h              |  397 +++++
- include/media/davinci/vpbe_types.h            |   91 ++
- include/media/davinci/vpbe_venc.h             |   41 +
- 22 files changed, 6500 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/video4linux/README.davinci-vpbe
- create mode 100644 drivers/media/video/davinci/vpbe.c
- create mode 100644 drivers/media/video/davinci/vpbe_display.c
- create mode 100644 drivers/media/video/davinci/vpbe_osd.c
- create mode 100644 drivers/media/video/davinci/vpbe_osd_regs.h
- create mode 100644 drivers/media/video/davinci/vpbe_venc.c
- create mode 100644 drivers/media/video/davinci/vpbe_venc_regs.h
- create mode 100644 include/media/davinci/vpbe.h
- create mode 100644 include/media/davinci/vpbe_display.h
- create mode 100644 include/media/davinci/vpbe_osd.h
- create mode 100644 include/media/davinci/vpbe_types.h
- create mode 100644 include/media/davinci/vpbe_venc.h
+Hmm...I'm thinking that we need more discussion on this CPUIDLE later,
+about method, IDLE states and so on.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
