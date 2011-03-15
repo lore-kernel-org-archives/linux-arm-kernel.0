@@ -1,44 +1,41 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Tue, 15 Mar 2011 19:28:30 +0530
-Subject: [PATCH v17 07/13] davinci: move DM64XX_VDD3P3V_PWDN to devices.c
-Message-ID: <1300197510-4467-1-git-send-email-manjunath.hadli@ti.com>
+Date: Tue, 15 Mar 2011 19:28:57 +0530
+Subject: [PATCH v17 09/13] davinci: dm644x: Replace register base value with a
+	defined macro
+Message-ID: <1300197537-4672-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the definition of DM64XX_VDD3P3V_PWDN from hardware.h
-to devices.c since it is used only there.
+Replace hard coded value of vpss register base to a define macro
+DM644X_VPSS_REG_BASE for proper readability
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
 ---
- arch/arm/mach-davinci/devices.c               |    1 +
- arch/arm/mach-davinci/include/mach/hardware.h |    3 ---
- 2 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/dm644x.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index 22ebc64..d3b2040 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -182,6 +182,7 @@ static struct platform_device davinci_mmcsd1_device = {
- 	.resource = mmcsd1_resources,
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 77dea11..73e74d0 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -586,13 +586,15 @@ static struct platform_device dm644x_asp_device = {
+ 	.resource	= dm644x_asp_resources,
  };
  
-+#define DM64XX_VDD3P3V_PWDN     0x48
++#define DM644X_VPSS_REG_BASE           0x01c73400
++
+ static struct resource dm644x_vpss_resources[] = {
+ 	{
+ 		/* VPSS Base address */
+ 		.name		= "vpss",
+-		.start          = 0x01c73400,
+-		.end            = 0x01c73400 + 0xff,
+-		.flags          = IORESOURCE_MEM,
++		.start		= DM644X_VPSS_REG_BASE,
++		.end		= DM644X_VPSS_REG_BASE + 0xff,
++		.flags		= IORESOURCE_MEM,
+ 	},
+ };
  
- void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
- {
-diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
-index c45ba1f..414e0b9 100644
---- a/arch/arm/mach-davinci/include/mach/hardware.h
-+++ b/arch/arm/mach-davinci/include/mach/hardware.h
-@@ -21,9 +21,6 @@
-  */
- #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
- 
--/* System control register offsets */
--#define DM64XX_VDD3P3V_PWDN	0x48
--
- /*
-  * I/O mapping
-  */
 -- 
 1.6.2.4
