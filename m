@@ -1,87 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Mar 2011 10:32:56 +0100
-Subject: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110315093256.GN29521@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 15 Mar 2011 11:33:34 +0200
+Subject: [PATCH] DM644x EVM: register MUSB device earlier
+In-Reply-To: <4D7E640A.9090908@mvista.com>
+References: <201103132306.59986.sshtylyov@ru.mvista.com>
+	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
+	<4D7E640A.9090908@mvista.com>
+Message-ID: <20110315093332.GA3602@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 05:55:44PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx53_loco.c |  120 +++++++++++++++++++++++++++++++++++
->  1 files changed, 120 insertions(+), 0 deletions(-)
+Hi,
+
+On Mon, Mar 14, 2011 at 09:52:58PM +0300, Sergei Shtylyov wrote:
+> >I wonder how noone has noticed that from -rc1 until now.
 > 
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 0a18f8d..9a7bbea 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,11 +23,13 @@
->  #include <linux/fec.h>
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
-> +#include <linux/ahci_platform.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/iomux-mx53.h>
-> +#include <mach/ahci_sata.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -203,6 +205,123 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +/* HW Initialization, if return 0, initialization is successful. */
-> +static int sata_init(struct device *dev, void __iomem *addr)
+>    I don't think many people run the most current DaVinci kernel.
+> Most people probably use the Arago project kernels or even older
+> MV-based TI's stuff...
 
-Isn't this addr pointer exactly the address you remap again below?
-
-> +{
-> +	void __iomem *mmio;
-> +	struct clk *clk;
-> +	int ret = 0;
-> +	u32 tmpdata;
-> +
-> +	clk = clk_get(dev, "imx_sata_clk");
-
-This one is associated with the device, so passing in dev here is ok,
-but...
-
-> +	ret = IS_ERR(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-> +		return ret;
-> +	}
-> +	ret = clk_enable(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't enable clock.\n");
-> +		clk_put(clk);
-> +		return ret;
-> +	}
-> +
-> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> +	clk = clk_get(dev, "usb_phy1");
-
-... this clock is not associated with the device, it just happens to be
-used for this purpose on LOCO. Or is this this really not LOCO specific
-but i.MX53 specific? If this is LOCO specific you should pass NULL as
-the device pointer. If this is i.MX53 specific we should discuss about
-adding a imx53_init_sata as then all of this function is not LOCO
-specific.
-
-
-Have these patches undergone some Linaro internal review? These are
-really not ready for the wider world.
-
-Sascha
+that's nasty :-p All those hacks on a 2.6.18 kernel... Oh well, thanks
+for noticing and sending a patch :-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
