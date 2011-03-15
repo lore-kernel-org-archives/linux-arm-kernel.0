@@ -1,62 +1,171 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Tue, 15 Mar 2011 08:31:00 -0600
-Subject: When does mach-types get updated in a tree?
-In-Reply-To: <20110228151100.GB1937@n2100.arm.linux.org.uk>
-References: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
-	<20110228101030.GB29843@n2100.arm.linux.org.uk>
-	<0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
-	<20110228151100.GB1937@n2100.arm.linux.org.uk>
-Message-ID: <f28f8e74-394e-457f-b5d0-edbf43ae4807@VA3EHSMHS029.ehs.local>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 15 Mar 2011 23:36:05 +0900
+Subject: [PATCH] ARM: EXYNOS4: CPUIDLE Support
+In-Reply-To: <011c01cbe318$df3d2e00$9db78a00$%kim@samsung.com>
+References: <1299635302-27759-1-git-send-email-jc.lee@samsung.com>
+	<011c01cbe318$df3d2e00$9db78a00$%kim@samsung.com>
+Message-ID: <AANLkTik2nRq9LsKjZSSFkV_-x=tnG4s3k-S1d651YGvW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, February 28, 2011 8:11 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca
-> Subject: Re: When does mach-types get updated in a tree?
-> 
-> On Mon, Feb 28, 2011 at 07:35:57AM -0700, John Linn wrote:
-> > What is your suggestion to people with regards to patches that need
-the
-> > update?
-> 
-> The only suggestion I can make is: don't wait until the last minute
-before
-> putting something into the machine registry, because you will get into
-> these kinds of problems.
-> 
-> If I do an update now, it'll be the second time it's happened in
-February.
-> It's likely it will need another update just before the merge window
-too
-> in 3-4 weeks time.
-> 
-> So really all that I can say is that people need to ensure that they
-get
-> stuff from the machine registry earlier rather than later.
-> 
-> I do think we're heading for a major problem with the mach-types file
-> becoming too big inspite of its brevity.  I think I may start marking
-> entries as 'inactive' and therefore omitted from the kernel's tree if
-> they don't appear in mainline within one year of being allocated (or
-> some similar rule.)
-> 
-> > I'm open to suggestions, just trying to work with everyone the best
-way
-> > to get Xilinx patches into the system.
-> 
-> The only thing I can think is to wait a couple more weeks and I'll see
-> about doing an update mid-March.  Maybe by then we can have a smaller
-> file...
+On Tue, Mar 15, 2011 at 10:57 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Jaecheol Lee wrote:
+>>
+>> This patch supports cpuidle framework for EXYNOS4210. Currently,
+>> Only one idle state is possible to use, but more idle states can
+>> be added following by this patch.
+>>
+>> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+>> ---
+>> ?arch/arm/mach-exynos4/Makefile ?| ? ?1 +
+>> ?arch/arm/mach-exynos4/cpuidle.c | ? 87
+>> +++++++++++++++++++++++++++++++++++++++
+>> ?2 files changed, 88 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-exynos4/cpuidle.c
+>>
+>> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-
+> exynos4/Makefile
+>> index 461ae57..bf206fa 100644
+>> --- a/arch/arm/mach-exynos4/Makefile
+>> +++ b/arch/arm/mach-exynos4/Makefile
+>> @@ -16,6 +16,7 @@ obj-$(CONFIG_CPU_EXYNOS4210) ? ? ? ?+= cpu.o init.o
+> clock.o
+>> irq-combiner.o
+>> ?obj-$(CONFIG_CPU_EXYNOS4210) += cpu.o init.o clock.o irq-combiner.o
+>> ?obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o time.o gpiolib.o irq-eint.o
+>> dma.o
+>> ?obj-$(CONFIG_CPU_FREQ) ? ? ? ? ? ? ? += cpufreq.o
+>> +obj-$(CONFIG_CPU_IDLE) ? ? ? ? ? ? ? += cpuidle.o
+>>
+>> ?obj-$(CONFIG_SMP) ? ? ? ? ? ?+= platsmp.o headsmp.o
+>> ?obj-$(CONFIG_LOCAL_TIMERS) ? += localtimer.o
+>> diff --git a/arch/arm/mach-exynos4/cpuidle.c b/arch/arm/mach-
+>> exynos4/cpuidle.c
+>> new file mode 100644
+>> index 0000000..a543a18
+>> --- /dev/null
+>> +++ b/arch/arm/mach-exynos4/cpuidle.c
+>> @@ -0,0 +1,87 @@
+>> +/* linux/arch/arm/mach-exynos4/cpuidle.c
+>> + *
+>> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+>> + * ? ? ? ? ? http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/io.h>
+>> +
+>> +#include <asm/proc-fns.h>
+>> +
+>> +static int exynos4_enter_idle(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_state *state);
+>> +
+>> +static struct cpuidle_state exynos4_cpuidle_set[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
+>> + ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
+>> + ? ? ? ? ? ? .target_residency ? ? ? = 100000,
+>> + ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+>> + ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IDLE",
+>> + ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
+>> + ? ? },
+>> +};
+>> +
+>> +static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+>> +
+>> +static struct cpuidle_driver exynos4_idle_driver = {
+>> + ? ? .name ? ? ? ? ? = "exynos4_idle",
+>> + ? ? .owner ? ? ? ? ?= THIS_MODULE,
+>> +};
+>> +
+>> +static int exynos4_enter_idle(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_state *state)
+>> +{
+>> + ? ? struct timeval before, after;
+>> + ? ? int idle_time;
+>> +
+>> + ? ? local_irq_disable();
+>> + ? ? do_gettimeofday(&before);
+>> +
+>> + ? ? cpu_do_idle();
+>> +
+>> + ? ? do_gettimeofday(&after);
+>> + ? ? local_irq_enable();
+>> + ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+>> + ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
+>> +
+>> + ? ? return idle_time;
+>> +}
+>> +
+>> +static int __init exynos4_init_cpuidle(void)
+>> +{
+>> + ? ? int i, max_cpuidle_state, cpu_id;
+>> + ? ? struct cpuidle_device *device;
+>> +
+>> + ? ? cpuidle_register_driver(&exynos4_idle_driver);
+>> +
+>> + ? ? for_each_cpu(cpu_id, cpu_online_mask) {
+>> + ? ? ? ? ? ? device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+>> + ? ? ? ? ? ? device->cpu = cpu_id;
+>> +
+>> + ? ? ? ? ? ? device->state_count = (sizeof(exynos4_cpuidle_set) /
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct
+> cpuidle_state));
+>> +
+>> + ? ? ? ? ? ? max_cpuidle_state = device->state_count;
+>> +
+>> + ? ? ? ? ? ? for (i = 0; i < max_cpuidle_state; i++) {
+>> + ? ? ? ? ? ? ? ? ? ? memcpy(&device->states[i], &exynos4_cpuidle_set[i],
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(struct cpuidle_state));
+>> + ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? if (cpuidle_register_device(device)) {
+>> + ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "CPUidle register device
+> failed\n,");
+>> + ? ? ? ? ? ? ? ? ? ? return -EIO;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> + ? ? return 0;
+>> +}
+>> +
+>> +device_initcall(exynos4_init_cpuidle);
+>> --
+>> 1.7.1
+>
+> Cc'ed Kyungmin Park.
+>
+> Hmm...I'm thinking that we need more discussion on this CPUIDLE later,
+> about method, IDLE states and so on.
 
-Hi Russell,
+It's not good decision. As cpufreq, support the basic cpuidle at
+mainline kernel, and add it more states at later.
+Except the state name "IDLE", I hope it will be changed to "C1" for
+support cpuidle tool.
 
-Any chance you'll be able to do the update of mach-types for the merge?
+Mr. Lee will support the C states soon.
 
-Thanks,
-John
+I'm okay with Mr. Lee patch.
 
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Thank you,
+Kyungmin Park
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
