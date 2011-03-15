@@ -1,48 +1,18 @@
-From: samuel.ortiz@intel.com (Samuel Ortiz)
-Date: Tue, 22 Mar 2011 12:03:10 +0100
-Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052
-	regulator v2
-In-Reply-To: <AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
-References: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
-	<20110317234241.GB32168@sortiz-mobl>
-	<AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
-Message-ID: <20110322110309.GC2347@sortiz-mobl>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Tue, 15 Mar 2011 22:07:00 +0900
+Subject: [PATCH v2] ARM: EXYNOS4: add a placeholder for board specific
+	interrupts
+In-Reply-To: <011301cbe310$41381f10$c3a85d30$%kim@samsung.com>
+References: <1300086405-9895-1-git-send-email-m.szyprowski@samsung.com>
+	<011301cbe310$41381f10$c3a85d30$%kim@samsung.com>
+Message-ID: <AANLkTim0Ld63n5raA0107yq_eQXY4__acd7rx7CaQOjo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Now pmic8998, 8997 requires extra interrupts.
 
-On Fri, Mar 18, 2011 at 08:26:23AM +0000, Linus Walleij wrote:
-> On Fri, Mar 18, 2011 at 12:42 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
-> > On Wed, Mar 09, 2011 at 12:03:16PM +0000, Linus Walleij wrote:
-> >> From: Linus Walleij <linus.walleij@linaro.org>
-> >>
-> >> This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
-> >
-> > Patch applied as well.
-> 
-> Oh no please skip that patch for now.
->
-> It will just collide with Russell's tree in -next and wreak havoc.
-> 
-> I will take that platform data in the next merge window or through
-> Torvalds' tree after Russells and yours is merged, safest path.
-Sounds good to me. I dropped the patch.
+If you don't want to extends irqs, the sparse irq can be used at each board.
 
-Cheers,
-Samuel.
+Of course, in case of exynos4210, need some patch for sparse irq support.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+Kyungmin Park
