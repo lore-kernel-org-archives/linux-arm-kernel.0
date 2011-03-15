@@ -1,34 +1,29 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Tue, 15 Mar 2011 01:14:14 +0100 (CET)
-Subject: [PATCH][Trivial] ARM: Remove duplicate linux/sched.h include from
-	arch/arm/plat-iop/time.c
-Message-ID: <alpine.LNX.2.00.1103150108510.26293@swampdragon.chaosbits.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 15 Mar 2011 08:53:03 +0800
+Subject: [PATCH] arm/dt: Add dtb make rule
+In-Reply-To: <4D7EA61D.4030403@gmail.com>
+References: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
+	<4D7EA61D.4030403@gmail.com>
+Message-ID: <20110315005302.GA11098@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to include linux/sched.h more than once 
-in arch/arm/plat-iop/time.c
+On Mon, Mar 14, 2011 at 06:34:53PM -0500, Rob Herring wrote:
+> Grant,
+> 
+> On 03/10/2011 01:46 PM, Rob Herring wrote:
+> >From: Rob Herring<rob.herring@calxeda.com>
+> >
+> >Add a make rule to compile dt blobs for ARM.
+> >
+> >Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> 
+> Can you pick this one up in your ARM tree.
+> 
++1
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- time.c |    1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-index 07f23bb..7cdc516 100644
---- a/arch/arm/plat-iop/time.c
-+++ b/arch/arm/plat-iop/time.c
-@@ -17,7 +17,6 @@
- #include <linux/interrupt.h>
- #include <linux/time.h>
- #include <linux/init.h>
--#include <linux/sched.h>
- #include <linux/timex.h>
- #include <linux/sched.h>
- #include <linux/io.h>
-
+It's handy.
 
 -- 
-Jesper Juhl <jj@chaosbits.net>            http://www.chaosbits.net/
-Plain text mails only, please.
-Don't top-post http://www.catb.org/~esr/jargon/html/T/top-post.html
+Regards,
+Shawn
