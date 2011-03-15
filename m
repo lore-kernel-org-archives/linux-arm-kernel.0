@@ -1,171 +1,33 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 15 Mar 2011 23:36:05 +0900
-Subject: [PATCH] ARM: EXYNOS4: CPUIDLE Support
-In-Reply-To: <011c01cbe318$df3d2e00$9db78a00$%kim@samsung.com>
-References: <1299635302-27759-1-git-send-email-jc.lee@samsung.com>
-	<011c01cbe318$df3d2e00$9db78a00$%kim@samsung.com>
-Message-ID: <AANLkTik2nRq9LsKjZSSFkV_-x=tnG4s3k-S1d651YGvW@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Mar 2011 15:39:57 +0100
+Subject: [PATCH 4/8] ARM: PXA: Z2: Add mtd partition with logo
+In-Reply-To: <201103120105.50159.marek.vasut@gmail.com>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103112239.36682.marek.vasut@gmail.com>
+	<201103120031.28301.anarsoul@gmail.com>
+	<201103120105.50159.marek.vasut@gmail.com>
+Message-ID: <20110315143957.GA1361@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 10:57 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Jaecheol Lee wrote:
->>
->> This patch supports cpuidle framework for EXYNOS4210. Currently,
->> Only one idle state is possible to use, but more idle states can
->> be added following by this patch.
->>
->> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
->> ---
->> ?arch/arm/mach-exynos4/Makefile ?| ? ?1 +
->> ?arch/arm/mach-exynos4/cpuidle.c | ? 87
->> +++++++++++++++++++++++++++++++++++++++
->> ?2 files changed, 88 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-exynos4/cpuidle.c
->>
->> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-
-> exynos4/Makefile
->> index 461ae57..bf206fa 100644
->> --- a/arch/arm/mach-exynos4/Makefile
->> +++ b/arch/arm/mach-exynos4/Makefile
->> @@ -16,6 +16,7 @@ obj-$(CONFIG_CPU_EXYNOS4210) ? ? ? ?+= cpu.o init.o
-> clock.o
->> irq-combiner.o
->> ?obj-$(CONFIG_CPU_EXYNOS4210) += cpu.o init.o clock.o irq-combiner.o
->> ?obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o time.o gpiolib.o irq-eint.o
->> dma.o
->> ?obj-$(CONFIG_CPU_FREQ) ? ? ? ? ? ? ? += cpufreq.o
->> +obj-$(CONFIG_CPU_IDLE) ? ? ? ? ? ? ? += cpuidle.o
->>
->> ?obj-$(CONFIG_SMP) ? ? ? ? ? ?+= platsmp.o headsmp.o
->> ?obj-$(CONFIG_LOCAL_TIMERS) ? += localtimer.o
->> diff --git a/arch/arm/mach-exynos4/cpuidle.c b/arch/arm/mach-
->> exynos4/cpuidle.c
->> new file mode 100644
->> index 0000000..a543a18
->> --- /dev/null
->> +++ b/arch/arm/mach-exynos4/cpuidle.c
->> @@ -0,0 +1,87 @@
->> +/* linux/arch/arm/mach-exynos4/cpuidle.c
->> + *
->> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
->> + * ? ? ? ? ? http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/cpuidle.h>
->> +#include <linux/io.h>
->> +
->> +#include <asm/proc-fns.h>
->> +
->> +static int exynos4_enter_idle(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_state *state);
->> +
->> +static struct cpuidle_state exynos4_cpuidle_set[] = {
->> + ? ? [0] = {
->> + ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
->> + ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
->> + ? ? ? ? ? ? .target_residency ? ? ? = 100000,
->> + ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> + ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IDLE",
->> + ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
->> + ? ? },
->> +};
->> +
->> +static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
->> +
->> +static struct cpuidle_driver exynos4_idle_driver = {
->> + ? ? .name ? ? ? ? ? = "exynos4_idle",
->> + ? ? .owner ? ? ? ? ?= THIS_MODULE,
->> +};
->> +
->> +static int exynos4_enter_idle(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_state *state)
->> +{
->> + ? ? struct timeval before, after;
->> + ? ? int idle_time;
->> +
->> + ? ? local_irq_disable();
->> + ? ? do_gettimeofday(&before);
->> +
->> + ? ? cpu_do_idle();
->> +
->> + ? ? do_gettimeofday(&after);
->> + ? ? local_irq_enable();
->> + ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->> + ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
->> +
->> + ? ? return idle_time;
->> +}
->> +
->> +static int __init exynos4_init_cpuidle(void)
->> +{
->> + ? ? int i, max_cpuidle_state, cpu_id;
->> + ? ? struct cpuidle_device *device;
->> +
->> + ? ? cpuidle_register_driver(&exynos4_idle_driver);
->> +
->> + ? ? for_each_cpu(cpu_id, cpu_online_mask) {
->> + ? ? ? ? ? ? device = &per_cpu(exynos4_cpuidle_device, cpu_id);
->> + ? ? ? ? ? ? device->cpu = cpu_id;
->> +
->> + ? ? ? ? ? ? device->state_count = (sizeof(exynos4_cpuidle_set) /
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct
-> cpuidle_state));
->> +
->> + ? ? ? ? ? ? max_cpuidle_state = device->state_count;
->> +
->> + ? ? ? ? ? ? for (i = 0; i < max_cpuidle_state; i++) {
->> + ? ? ? ? ? ? ? ? ? ? memcpy(&device->states[i], &exynos4_cpuidle_set[i],
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(struct cpuidle_state));
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? if (cpuidle_register_device(device)) {
->> + ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "CPUidle register device
-> failed\n,");
->> + ? ? ? ? ? ? ? ? ? ? return -EIO;
->> + ? ? ? ? ? ? }
->> + ? ? }
->> + ? ? return 0;
->> +}
->> +
->> +device_initcall(exynos4_init_cpuidle);
->> --
->> 1.7.1
->
-> Cc'ed Kyungmin Park.
->
-> Hmm...I'm thinking that we need more discussion on this CPUIDLE later,
-> about method, IDLE states and so on.
+On Sat 2011-03-12 01:05:50, Marek Vasut wrote:
+> On Friday 11 March 2011 23:31:28 Vasily Khoruzhick wrote:
+> > On Friday 11 March 2011 23:39:36 Marek Vasut wrote:
+> > > On Friday 11 March 2011 11:23:39 Vasily Khoruzhick wrote:
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > 
+> > > I guess you can rather supply the MTD layout on kernel command line (see
+> > > Drivers/MTD).
+> > 
+> > Yeah, I know, just want to make default layout look like this.
+> 
+> Why not like what's already there ? I don't see any point in changing this, NAK, 
+> use command line partitioning.
 
-It's not good decision. As cpufreq, support the basic cpuidle at
-mainline kernel, and add it more states at later.
-Except the state name "IDLE", I hope it will be changed to "C1" for
-support cpuidle tool.
+Of course, you can use command line.
 
-Mr. Lee will support the C states soon.
+But, the default kernel partitioning should match what hw expects.
 
-I'm okay with Mr. Lee patch.
-
-Thank you,
-Kyungmin Park
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
