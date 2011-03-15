@@ -1,78 +1,99 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 15 Mar 2011 10:14:56 +0000
-Subject: [PATCHv2 9/9] macb: allow GEM to have configurable receive buffer size
-In-Reply-To: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1300184096-13937-10-git-send-email-jamie@jamieiles.com>
+Date: Tue, 15 Mar 2011 10:14:47 +0000
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+Message-ID: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GEM has configurable receive buffer sizes so requires this to be
-programmed up.  Any size < 2048 and a multiple of 64 bytes is permitted.
+This patch series extends the Atmel MACB driver to support the Cadence
+GEM (Gigabit Ethernet MAC) to support 10/100 operation.  The GEM is
+based on the MACB block but has a few moved registers and bitfields.
+This patch series attempts to use the MACB accessors where block
+functionallity is identical and only overrides to GEM specific
+acccessors when needed.
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- drivers/net/macb.c |   17 +++++++++++++++++
- drivers/net/macb.h |    5 +++++
- 2 files changed, 22 insertions(+), 0 deletions(-)
+This has been runtested on a board with a Cadence GEM and compile tested
+for all at91 configurations and a number of avr32 configurations.
 
-diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-index db9f403..52ad367 100644
---- a/drivers/net/macb.c
-+++ b/drivers/net/macb.c
-@@ -843,6 +843,21 @@ static u32 macb_dbw(struct macb *bp)
- 	}
- }
- 
-+/*
-+ * Configure the receive DMA engine to use the correct receive buffer size.
-+ * This is a configurable parameter for GEM.
-+ */
-+static void macb_configure_dma(struct macb *bp)
-+{
-+	u32 dmacfg;
-+
-+	if (bp->is_gem) {
-+		dmacfg = gem_readl(bp, DMACFG) & ~GEM_BF(RXBS, -1L);
-+		dmacfg |= GEM_BF(RXBS, RX_BUFFER_SIZE / 64);
-+		gem_writel(bp, DMACFG, dmacfg);
-+	}
-+}
-+
- static void macb_init_hw(struct macb *bp)
- {
- 	u32 config;
-@@ -861,6 +876,8 @@ static void macb_init_hw(struct macb *bp)
- 	config |= macb_dbw(bp);
- 	macb_writel(bp, NCFGR, config);
- 
-+	macb_configure_dma(bp);
-+
- 	/* Initialize TX and RX buffers */
- 	macb_writel(bp, RBQP, bp->rx_ring_dma);
- 	macb_writel(bp, TBQP, bp->tx_ring_dma);
-diff --git a/drivers/net/macb.h b/drivers/net/macb.h
-index 5f93bab..d743d3e 100644
---- a/drivers/net/macb.h
-+++ b/drivers/net/macb.h
-@@ -64,6 +64,7 @@
- /* GEM register offsets. */
- #define GEM_NCFGR				0x0004
- #define GEM_USRIO				0x000c
-+#define GEM_DMACFG				0x0010
- #define GEM_HRB					0x0080
- #define GEM_HRT					0x0084
- #define GEM_SA1B				0x0088
-@@ -154,6 +155,10 @@
- #define GEM_DBW64				1
- #define GEM_DBW128				2
- 
-+/* Bitfields in DMACFG. */
-+#define GEM_RXBS_OFFSET				16
-+#define GEM_RXBS_SIZE				8
-+
- /* Bitfields in NSR */
- #define MACB_NSR_LINK_OFFSET			0
- #define MACB_NSR_LINK_SIZE			1
+Changes since v1:
+	- AT91 now provides a fake "hclk" and "macb_clk" has been
+	renamed to "pclk" to be consistent with AVR32.
+	- Configurable GEM receive buffer size support has been added.
+	- pr_foo() and dev_foo() have been converted to netdev_foo()
+	where appropriate.
+	- New conditional accessors (macb_or_gem_{read,write}l) have
+	been introduced that do the conditional accesses dependent on
+	macb/gem type.
+	- GEM is now dynamically detected from the module ID rather than
+	platform device name.
+
+Jean-Christophe, I haven't based this on your conditional clock patch as
+I wasn't sure what decision had been made on that and whether the
+at91/avr32 detection is reliable.
+
+Jamie Iles (9):
+  at91: provide macb clks with "pclk" and "hclk" name
+  macb: remove conditional clk handling
+  macb: unify at91 and avr32 platform data
+  macb: convert printk to netdev_ and friends
+  macb: initial support for Cadence GEM
+  macb: support higher rate GEM MDIO clock divisors
+  macb: support statistics for GEM devices
+  macb: support DMA bus widths > 32 bits
+  macb: allow GEM to have configurable receive buffer size
+
+ arch/arm/mach-at91/at572d940hf.c            |    8 +-
+ arch/arm/mach-at91/at572d940hf_devices.c    |    6 +-
+ arch/arm/mach-at91/at91cap9.c               |    8 +-
+ arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
+ arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
+ arch/arm/mach-at91/at91sam9260.c            |    8 +-
+ arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9263.c            |    8 +-
+ arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9g45.c            |    8 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
+ arch/arm/mach-at91/board-1arm.c             |    2 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
+ arch/arm/mach-at91/board-at572d940hf_ek.c   |    2 +-
+ arch/arm/mach-at91/board-cam60.c            |    2 +-
+ arch/arm/mach-at91/board-cap9adk.c          |    2 +-
+ arch/arm/mach-at91/board-carmeva.c          |    2 +-
+ arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
+ arch/arm/mach-at91/board-cpuat91.c          |    2 +-
+ arch/arm/mach-at91/board-csb337.c           |    2 +-
+ arch/arm/mach-at91/board-csb637.c           |    2 +-
+ arch/arm/mach-at91/board-eb9200.c           |    2 +-
+ arch/arm/mach-at91/board-ecbat91.c          |    2 +-
+ arch/arm/mach-at91/board-eco920.c           |    2 +-
+ arch/arm/mach-at91/board-foxg20.c           |    2 +-
+ arch/arm/mach-at91/board-gsia18s.c          |    2 +-
+ arch/arm/mach-at91/board-kafa.c             |    2 +-
+ arch/arm/mach-at91/board-kb9202.c           |    2 +-
+ arch/arm/mach-at91/board-neocore926.c       |    2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
+ arch/arm/mach-at91/board-picotux200.c       |    2 +-
+ arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
+ arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
+ arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
+ arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
+ arch/arm/mach-at91/board-snapper9260.c      |    2 +-
+ arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
+ arch/arm/mach-at91/board-usb-a9260.c        |    2 +-
+ arch/arm/mach-at91/board-usb-a9263.c        |    2 +-
+ arch/arm/mach-at91/board-yl-9200.c          |    2 +-
+ arch/arm/mach-at91/include/mach/board.h     |   14 +-
+ arch/avr32/mach-at32ap/include/mach/board.h |    5 +-
+ drivers/net/Kconfig                         |    8 +-
+ drivers/net/macb.c                          |  331 ++++++++++++++++++---------
+ drivers/net/macb.h                          |  146 ++++++++++++-
+ include/linux/platform_data/macb.h          |   10 +
+ 50 files changed, 466 insertions(+), 190 deletions(-)
+ create mode 100644 include/linux/platform_data/macb.h
+
 -- 
 1.7.4
