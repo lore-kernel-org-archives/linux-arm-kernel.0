@@ -1,53 +1,62 @@
-From: James.Bottomley@suse.de (James Bottomley)
-Date: Tue, 15 Mar 2011 10:25:51 -0400
-Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
-In-Reply-To: <20110315141859.GA19442@kroah.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
-	<1300155965.5665.15.camel@mulgrave.site>
-	<20110315030956.GA2234@kroah.com>
-	<1300189828.4017.2.camel@mulgrave.site>
-	<20110315141859.GA19442@kroah.com>
-Message-ID: <1300199151.7744.12.camel@mulgrave.site>
+From: John.Linn@xilinx.com (John Linn)
+Date: Tue, 15 Mar 2011 08:31:00 -0600
+Subject: When does mach-types get updated in a tree?
+In-Reply-To: <20110228151100.GB1937@n2100.arm.linux.org.uk>
+References: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
+	<20110228101030.GB29843@n2100.arm.linux.org.uk>
+	<0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
+	<20110228151100.GB1937@n2100.arm.linux.org.uk>
+Message-ID: <f28f8e74-394e-457f-b5d0-edbf43ae4807@VA3EHSMHS029.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-15 at 07:18 -0700, Greg KH wrote:
-> On Tue, Mar 15, 2011 at 07:50:28AM -0400, James Bottomley wrote:
-> > On Mon, 2011-03-14 at 20:09 -0700, Greg KH wrote:
-> > > There are no capability checks on sysfs files right now, so these all
-> > > need to be fixed.
-> > 
-> > That statement is true but irrelevant, isn't it?  There can't be
-> > capabilities within sysfs files because the system that does them has no
-> > idea what the capabilities would be.  If there were capabilities checks,
-> > they'd have to be in the implementing routines.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, February 28, 2011 8:11 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca
+> Subject: Re: When does mach-types get updated in a tree?
 > 
-> Ah, you are correct, sorry for the misunderstanding.
+> On Mon, Feb 28, 2011 at 07:35:57AM -0700, John Linn wrote:
+> > What is your suggestion to people with regards to patches that need
+the
+> > update?
 > 
-> > I think the questions are twofold:
-> > 
-> >      1. Did anyone actually check for capabilities before assuming world
-> >         writeable files were wrong?
+> The only suggestion I can make is: don't wait until the last minute
+before
+> putting something into the machine registry, because you will get into
+> these kinds of problems.
 > 
-> I do not think so as the majority (i.e. all the ones that I looked at)
-> did no such checks.
+> If I do an update now, it'll be the second time it's happened in
+February.
+> It's likely it will need another update just before the merge window
+too
+> in 3-4 weeks time.
+> 
+> So really all that I can say is that people need to ensure that they
+get
+> stuff from the machine registry earlier rather than later.
+> 
+> I do think we're heading for a major problem with the mach-types file
+> becoming too big inspite of its brevity.  I think I may start marking
+> entries as 'inactive' and therefore omitted from the kernel's tree if
+> they don't appear in mainline within one year of being allocated (or
+> some similar rule.)
+> 
+> > I'm open to suggestions, just trying to work with everyone the best
+way
+> > to get Xilinx patches into the system.
+> 
+> The only thing I can think is to wait a couple more weeks and I'll see
+> about doing an update mid-March.  Maybe by then we can have a smaller
+> file...
 
-OK, as long as someone checked, I'm happy.
+Hi Russell,
 
-> >      2. Even if there aren't any capabilities checks in the implementing
-> >         routines, should there be (are we going the separated
-> >         capabilities route vs the monolithic root route)?
-> 
-> I think the general consensus is that we go the monolithic root route
-> for sysfs files in that we do not allow them to be world writable.
-> 
-> Do you have any exceptions that you know of that do these checks?
+Any chance you'll be able to do the update of mach-types for the merge?
 
-Heh, I didn't call our security vacillations a dizzying ride for
-nothing.  I know the goal once was to try to run a distro without root
-daemons (which is what required the capabilities stuff).  I'm actually
-trying to avoid the issue ... I just want to make sure that people who
-care aren't all moving in different directions.
+Thanks,
+John
 
-James
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
