@@ -1,188 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Mar 2011 10:02:40 +0100
-Subject: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110315090240.GL29521@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 15 Mar 2011 10:06:56 +0100
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110315090656.GC13316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 05:55:44PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+[added Julia Lawall to Cc:]
+
+Hello Fabio,
+
+ack for both.
+
+Julia: Maybe coccinelle can find more of these?
+
+Best regards
+Uwe
+
+On Mon, Mar 14, 2011 at 03:21:09PM -0300, Fabio Estevam wrote:
+> gpio_direction_output has already set the port at low logical level, so it is not needed
+> to call gpio_set_value to set the port to 0 again.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-mx5/board-mx53_loco.c |  120 +++++++++++++++++++++++++++++++++++
->  1 files changed, 120 insertions(+), 0 deletions(-)
+>  arch/arm/mach-mx5/board-mx53_evk.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 0a18f8d..9a7bbea 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,11 +23,13 @@
->  #include <linux/fec.h>
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
-> +#include <linux/ahci_platform.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/iomux-mx53.h>
-> +#include <mach/ahci_sata.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -203,6 +205,123 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +/* HW Initialization, if return 0, initialization is successful. */
-> +static int sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	void __iomem *mmio;
-> +	struct clk *clk;
-> +	int ret = 0;
-> +	u32 tmpdata;
-> +
-> +	clk = clk_get(dev, "imx_sata_clk");
-> +	ret = IS_ERR(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-> +		return ret;
-> +	}
-
-IS_ERR returns 0 or 1 which is not a valid return value here.
-
-> +	ret = clk_enable(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't enable clock.\n");
-
-You have a struct device *, so you should use dev_err.
-
-> +		clk_put(clk);
-> +		return ret;
-> +	}
-> +
-> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> +	clk = clk_get(dev, "usb_phy1");
-> +	ret = IS_ERR(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-> +		goto no_input_clk;
-> +	}
-> +	ret = clk_enable(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI Can't enable USB PHY1 clock.\n");
-> +		clk_put(clk);
-> +		goto no_input_clk;
-> +	}
-> +
-> +	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-> +	clk = clk_get(NULL, "ahb_clk");
-> +	ret = IS_ERR(clk);
-> +	if (ret) {
-> +		printk(KERN_ERR "IMX AHCI can't get AHB clock.\n");
-> +		goto no_clk;
-> +	}
-> +
-> +	mmio = ioremap(MX53_SATA_BASE_ADDR, SZ_2K);
-> +	if (mmio == NULL) {
-> +		printk(KERN_ERR "Failed to map SATA REGS\n");
-> +		goto no_clk;
-> +	}
-> +
-> +	tmpdata = readl(mmio + HOST_CAP);
-> +	if (!(tmpdata & HOST_CAP_SSS)) {
-> +		tmpdata |= HOST_CAP_SSS;
-> +		writel(tmpdata, mmio + HOST_CAP);
-> +	}
-> +
-> +	if (!(readl(mmio + HOST_PORTS_IMPL) & 0x1))
-> +		writel((readl(mmio + HOST_PORTS_IMPL) | 0x1),
-> +			mmio + HOST_PORTS_IMPL);
-> +
-> +	tmpdata = clk_get_rate(clk) / 1000;
-> +	writel(tmpdata, mmio + HOST_TIMER1MS);
-> +
-> +	iounmap(mmio);
-> +
-> +	return ret;
-> +
-> +no_clk:
-> +	clk = clk_get(dev, "usb_phy1");
-
-While technically not strictly necessary at the moment you should
-balance your clk_get / clk_put calls. Everything else is bad taste.
-
-
-> +	if (IS_ERR(clk)) {
-> +		clk = NULL;
-> +		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-> +	} else {
-> +		clk_disable(clk);
-> +		clk_put(clk);
-> +	}
-> +
-> +no_input_clk:
-> +	clk = clk_get(dev, "imx_sata_clk");
-> +	if (IS_ERR(clk)) {
-> +		clk = NULL;
-> +		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-> +	} else {
-> +		clk_disable(clk);
-> +		clk_put(clk);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void sata_exit(struct device *dev)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = clk_get(dev, "usb_phy1");
-> +	if (IS_ERR(clk)) {
-> +		clk = NULL;
-> +		printk(KERN_ERR "IMX AHCI can't get USB PHY1 CLK.\n");
-> +	} else {
-> +		clk_disable(clk);
-> +		clk_put(clk);
-> +	}
-> +
-> +	clk = clk_get(dev, "imx_sata_clk");
-> +	if (IS_ERR(clk)) {
-> +		clk = NULL;
-> +		printk(KERN_ERR "IMX AHCI can't get clock.\n");
-> +	} else {
-> +		clk_disable(clk);
-> +		clk_put(clk);
-> +	}
-> +}
-> +
-> +static struct ahci_platform_data sata_data = {
-> +	.init = sata_init,
-> +	.exit = sata_exit,
-> +};
-> +
->  static void __init mx53_loco_board_init(void)
->  {
->  	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-> @@ -215,6 +334,7 @@ static void __init mx53_loco_board_init(void)
->  	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
->  	imx53_add_sdhci_esdhc_imx(0, NULL);
->  	imx53_add_sdhci_esdhc_imx(2, NULL);
-> +	imx53_add_ahci_imx(0, &sata_data);
+> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+> index 652e1e0..78abce6 100644
+> --- a/arch/arm/mach-mx5/board-mx53_evk.c
+> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
+> @@ -90,7 +90,6 @@ static inline void mx53_evk_fec_reset(void)
+>  		return;
+>  	}
+>  	gpio_direction_output(SMD_FEC_PHY_RST, 0);
+> -	gpio_set_value(SMD_FEC_PHY_RST, 0);
+>  	msleep(1);
+>  	gpio_set_value(SMD_FEC_PHY_RST, 1);
 >  }
->  
->  static void __init mx53_loco_timer_init(void)
 > -- 
-> 1.7.1
-> 
-> 
-> 
+> 1.6.0.4
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
