@@ -1,115 +1,148 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Tue, 15 Mar 2011 19:29:27 +0530
-Subject: [PATCH v17 11/13] davinci: dm644x: move vpfe init from soc to board
-	specific files
-Message-ID: <1300197567-4903-1-git-send-email-manjunath.hadli@ti.com>
+Date: Tue, 15 Mar 2011 19:28:43 +0530
+Subject: [PATCH v17 08/13] davinci: eliminate use of IO_ADDRESS() on sysmod
+Message-ID: <1300197523-4574-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move all vpfe platform device registrations to the board specific
-file like the rest of the devices, and have all of them together.
+Current devices.c file has a number of instances where
+IO_ADDRESS() is used for system module register
+access. Eliminate this in favor of a ioremap()
+based access.
 
-This would remove the  restriction of inclusion and registration of
-vpfe platform devices for non-vpfe boards.
+Consequent to this, a new global pointer davinci_sysmodbase
+has been introduced which gets initialized during
+the initialization of each relevant SoC.
+
+In this patch davinci_sysmodbase is used by davinci_setup_mmc
+but the later patches in the series use the same in different
+places using DAVINCI_SYSMODULE_VIRT.This patch lays the
+foundation for that.
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c    |    3 +-
- arch/arm/mach-davinci/dm644x.c              |   29 +++++++++++++++-----------
- arch/arm/mach-davinci/include/mach/dm644x.h |    2 +-
- 3 files changed, 19 insertions(+), 15 deletions(-)
+ arch/arm/mach-davinci/devices.c               |   23 ++++++++++++++---------
+ arch/arm/mach-davinci/dm355.c                 |    1 +
+ arch/arm/mach-davinci/dm365.c                 |    1 +
+ arch/arm/mach-davinci/dm644x.c                |    1 +
+ arch/arm/mach-davinci/dm646x.c                |    1 +
+ arch/arm/mach-davinci/include/mach/hardware.h |    6 ++++++
+ 6 files changed, 24 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 6919f28..d1542b1 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -628,8 +628,6 @@ static struct davinci_uart_config uart_config __initdata = {
- static void __init
- davinci_evm_map_io(void)
- {
--	/* setup input configuration for VPFE input devices */
--	dm644x_set_vpfe_config(&dm644xevm_capture_cfg);
- 	dm644x_init();
- }
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index d3b2040..b7ef950 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -33,6 +33,14 @@
+ #define DM365_MMCSD0_BASE	     0x01D11000
+ #define DM365_MMCSD1_BASE	     0x01D00000
  
-@@ -701,6 +699,7 @@ static __init void davinci_evm_init(void)
- 	evm_init_i2c();
- 
- 	davinci_setup_mmc(0, &dm6446evm_mmc_config);
-+	dm644x_init_video(&dm644xevm_capture_cfg);
- 
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_evm_snd_data);
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 8ff5d5f..41e8866 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -651,11 +651,6 @@ static struct platform_device dm644x_vpfe_dev = {
- 	},
- };
- 
--void dm644x_set_vpfe_config(struct vpfe_config *cfg)
--{
--	dm644x_vpfe_dev.dev.platform_data = cfg;
--}
--
- /*----------------------------------------------------------------------*/
- 
- static struct map_desc dm644x_io_desc[] = {
-@@ -784,14 +779,28 @@ void __init dm644x_init(void)
- 	davinci_map_sysmod();
- }
- 
-+static struct platform_device *dm644x_video_devices[] __initdata = {
-+	&dm644x_vpss_device,
-+	&dm644x_ccdc_dev,
-+	&dm644x_vpfe_dev,
-+};
++void __iomem  *davinci_sysmodbase;
 +
-+int __init dm644x_init_video(struct vpfe_config *vpfe_cfg)
++void davinci_map_sysmod(void)
 +{
-+	dm644x_vpfe_dev.dev.platform_data = vpfe_cfg;
-+	/* Add ccdc clock aliases */
-+	clk_add_alias("master", dm644x_ccdc_dev.name, "vpss_master", NULL);
-+	clk_add_alias("slave", dm644x_ccdc_dev.name, "vpss_slave", NULL);
-+	platform_add_devices(dm644x_video_devices,
-+				ARRAY_SIZE(dm644x_video_devices));
-+	return 0;
++	davinci_sysmodbase = ioremap_nocache(DAVINCI_SYSTEM_MODULE_BASE, 0x800);
++	WARN_ON(!davinci_sysmodbase);
 +}
 +
- static int __init dm644x_init_devices(void)
- {
- 	if (!cpu_is_davinci_dm644x())
- 		return 0;
- 
--	/* Add ccdc clock aliases */
--	clk_add_alias("master", dm644x_ccdc_dev.name, "vpss_master", NULL);
--	clk_add_alias("slave", dm644x_ccdc_dev.name, "vpss_slave", NULL);
- 	platform_device_register(&dm644x_edma_device);
- 
- 	platform_device_register(&dm644x_mdio_device);
-@@ -799,10 +808,6 @@ static int __init dm644x_init_devices(void)
- 	clk_add_alias(NULL, dev_name(&dm644x_mdio_device.dev),
- 		      NULL, &dm644x_emac_device.dev);
- 
--	platform_device_register(&dm644x_vpss_device);
--	platform_device_register(&dm644x_ccdc_dev);
--	platform_device_register(&dm644x_vpfe_dev);
+ static struct resource i2c_resources[] = {
+ 	{
+ 		.start		= DAVINCI_I2C_BASE,
+@@ -210,12 +218,12 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ 			davinci_cfg_reg(DM355_SD1_DATA2);
+ 			davinci_cfg_reg(DM355_SD1_DATA3);
+ 		} else if (cpu_is_davinci_dm365()) {
+-			void __iomem *pupdctl1 =
+-				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE + 0x7c);
 -
- 	return 0;
+ 			/* Configure pull down control */
+-			__raw_writel((__raw_readl(pupdctl1) & ~0xfc0),
+-					pupdctl1);
++			void __iomem *pupdctl1 = DAVINCI_SYSMODULE_VIRT(0x7c);
++			unsigned v;
++
++			v = __raw_readl(pupdctl1);
++			__raw_writel(v & ~0xfc0, pupdctl1);
+ 
+ 			mmcsd1_resources[0].start = DM365_MMCSD1_BASE;
+ 			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
+@@ -244,11 +252,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ 			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT0;
+ 		} else if (cpu_is_davinci_dm644x()) {
+ 			/* REVISIT: should this be in board-init code? */
+-			void __iomem *base =
+-				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE);
+-
+ 			/* Power-on 3.3V IO cells */
+-			__raw_writel(0, base + DM64XX_VDD3P3V_PWDN);
++			writel(0, DAVINCI_SYSMODULE_VIRT(DM64XX_VDD3P3V_PWDN));
+ 			/*Set up the pull regiter for MMC */
+ 			davinci_cfg_reg(DM644X_MSTK);
+ 		}
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index a5f8a80..1baab94 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -874,6 +874,7 @@ void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata)
+ void __init dm355_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm355);
++	davinci_map_sysmod();
  }
- postcore_initcall(dm644x_init_devices);
-diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
-index 5a1b26d..29a9e24 100644
---- a/arch/arm/mach-davinci/include/mach/dm644x.h
-+++ b/arch/arm/mach-davinci/include/mach/dm644x.h
-@@ -42,6 +42,6 @@
  
- void __init dm644x_init(void);
- void __init dm644x_init_asp(struct snd_platform_data *pdata);
--void dm644x_set_vpfe_config(struct vpfe_config *cfg);
-+int __init dm644x_init_video(struct vpfe_config *);
+ static int __init dm355_init_devices(void)
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 02d2cc3..a788980 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -1127,6 +1127,7 @@ void __init dm365_init_rtc(void)
+ void __init dm365_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm365);
++	davinci_map_sysmod();
+ }
  
- #endif /* __ASM_ARCH_DM644X_H */
+ static struct resource dm365_vpss_resources[] = {
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 9a2376b..77dea11 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -779,6 +779,7 @@ void __init dm644x_init_asp(struct snd_platform_data *pdata)
+ void __init dm644x_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm644x);
++	davinci_map_sysmod();
+ }
+ 
+ static int __init dm644x_init_devices(void)
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 1e0f809..ce93b83 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -903,6 +903,7 @@ void __init dm646x_init(void)
+ {
+ 	dm646x_board_setup_refclk(&ref_clk);
+ 	davinci_common_init(&davinci_soc_info_dm646x);
++	davinci_map_sysmod();
+ }
+ 
+ static int __init dm646x_init_devices(void)
+diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
+index 414e0b9..5296025 100644
+--- a/arch/arm/mach-davinci/include/mach/hardware.h
++++ b/arch/arm/mach-davinci/include/mach/hardware.h
+@@ -21,6 +21,12 @@
+  */
+ #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
+ 
++#ifndef __ASSEMBLER__
++extern void __iomem  *davinci_sysmodbase;
++#define DAVINCI_SYSMODULE_VIRT(x)	(davinci_sysmodbase + (x))
++void davinci_map_sysmod(void);
++#endif
++
+ /*
+  * I/O mapping
+  */
 -- 
 1.6.2.4
