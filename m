@@ -1,21 +1,52 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Mar 2011 13:36:51 +0100
-Subject: [PATCHv2 4/9] macb: convert printk to netdev_ and friends
-In-Reply-To: <1300184096-13937-5-git-send-email-jamie@jamieiles.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 15 Mar 2011 12:44:16 +0000
+Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
+In-Reply-To: <20110315123539.GD14548@game.jcrosoft.org>
 References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-5-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110315123651.GF14548@game.jcrosoft.org>
+	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
+	<20110315123539.GD14548@game.jcrosoft.org>
+Message-ID: <20110315124416.GG2914@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:14 Tue 15 Mar     , Jamie Iles wrote:
-> macb is already using the dev_dbg() and friends helpers so use netdev_()
-> along with a pr_fmt() definition to make the printing a little cleaner.
+On Tue, Mar 15, 2011 at 01:35:39PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:14 Tue 15 Mar     , Jamie Iles wrote:
+> > The macb driver expects clocks with the names "pclk" and "hclk".  We
+> > currently provide "macb_clk" but to fit in line with other
+> > architectures (namely AVR32), provide "pclk" and a fake "hclk".
+> > 
+> > Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > ---
+> >  arch/arm/mach-at91/at572d940hf.c |    8 +++++++-
+> >  arch/arm/mach-at91/at91cap9.c    |    8 +++++++-
+> >  arch/arm/mach-at91/at91sam9260.c |    8 +++++++-
+> >  arch/arm/mach-at91/at91sam9263.c |    8 +++++++-
+> >  arch/arm/mach-at91/at91sam9g45.c |    8 +++++++-
+> >  5 files changed, 35 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
+> > index a6b9c68..9b3a37e 100644
+> > --- a/arch/arm/mach-at91/at572d940hf.c
+> > +++ b/arch/arm/mach-at91/at572d940hf.c
+> > @@ -71,10 +71,15 @@ static struct clk pioC_clk = {
+> >  	.type		= CLK_TYPE_PERIPHERAL,
+> >  };
+> >  static struct clk macb_clk = {
+> > -	.name		= "macb_clk",
+> > +	.name		= "pclk",
+> >  	.pmc_mask	= 1 << AT572D940HF_ID_EMAC,
+> >  	.type		= CLK_TYPE_PERIPHERAL,
+> >  };
+> > +static struct clk macb_hclk = {
+> > +	.name		= "hclk",
+> > +	.pmc_mask	= 0,
+> > +	.type		= CLK_TYPE_PERIPHERAL,
+> > +};
+> for the fake clock you must specify the parent as macb_clk
 > 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-looks fine
+> take a look on the tcb1_clk for the 9g45
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Ok, will do.  Thanks for the pointer!
 
-Best Regards,
-J.
+Jamie
