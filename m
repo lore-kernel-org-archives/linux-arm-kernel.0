@@ -1,125 +1,64 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Tue, 15 Mar 2011 11:19:53 +0100 (CET)
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 15 Mar 2011 11:29:22 +0100
 Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <20110315094946.GD13316@pengutronix.de>
+In-Reply-To: <Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
 References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
 	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
 	<20110315090656.GC13316@pengutronix.de>
 	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
 	<20110315094946.GD13316@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+Message-ID: <20110315102922.GB16793@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
-
-> On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
-> > I tried the following
-> > 
-> > @@
-> > expression E1,E2;
-> > @@
-> > 
-> >       gpio_direction_output(E1,E2);
-> >       ...
-> > -     gpio_set_value(E1,E2);
-> > 
-> > and found occurrences in 15 files.  In some cases there seems to be some 
-> > delay before the call to gpio_set_value.  Does that have any impacton 
-> > whether it is needed?
-> gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
-> there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
-> noop.
+On Tue, Mar 15, 2011 at 11:19:53AM +0100, Julia Lawall wrote:
+> On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
 > 
-> I still don't know how to work with coccinelle, so if you point me to a
-> concrete location I can be more specific.
+> > On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
+> > > I tried the following
+> > > 
+> > > @@
+> > > expression E1,E2;
+> > > @@
+> > > 
+> > >       gpio_direction_output(E1,E2);
+> > >       ...
+> > > -     gpio_set_value(E1,E2);
+> > > 
+> > > and found occurrences in 15 files.  In some cases there seems to be some 
+> > > delay before the call to gpio_set_value.  Does that have any impacton 
+> > > whether it is needed?
+> > gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
+> > there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
+> > noop.
+> > 
+> > I still don't know how to work with coccinelle, so if you point me to a
+> > concrete location I can be more specific.
+> 
+> OK.  I have changed the semantic patch to the following:
+> 
+> @@
+> expression E1,E2,E3;
+> @@
+> 
+>       gpio_direction_output(E1,E2);
+>       ... when != gpio_set_value(E1,E3)
+> -     gpio_set_value(E1,E2);
+> 
+> Now it doesn't do all the cases where there is an earlier set ofr some 
+> other value.  The patch I obtain is below.  This only concerns 5 files.  
+> I haven't checked the result at all.
 
-OK.  I have changed the semantic patch to the following:
+It should also be checked if gpio_request_one is the better solution.
 
-@@
-expression E1,E2,E3;
-@@
-
-      gpio_direction_output(E1,E2);
-      ... when != gpio_set_value(E1,E3)
--     gpio_set_value(E1,E2);
-
-Now it doesn't do all the cases where there is an earlier set ofr some 
-other value.  The patch I obtain is below.  This only concerns 5 files.  
-I haven't checked the result at all.
-
-julia
-
-
-diff -u -p a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
---- a/arch/arm/mach-mx5/board-mx51_babbage.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c 2011-03-15 11:17:03.000000000 +0100
-@@ -218,7 +218,6 @@ static inline void babbage_usbhub_reset(
- 
- 	/* USB HUB RESET - De-assert USB HUB RESET_N */
- 	msleep(1);
--	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
- 	msleep(1);
- 	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
- }
-@@ -234,7 +233,6 @@ static inline void babbage_fec_reset(voi
- 		return;
- 	}
- 	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
--	gpio_set_value(BABBAGE_FEC_PHY_RESET, 0);
- 	msleep(1);
- 	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
- }
-diff -u -p a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
---- a/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-15 11:17:03.000000000 +0100
-@@ -88,7 +88,6 @@ static inline void mx53_evk_fec_reset(vo
- 		return;
- 	}
- 	gpio_direction_output(SMD_FEC_PHY_RST, 0);
--	gpio_set_value(SMD_FEC_PHY_RST, 0);
- 	msleep(1);
- 	gpio_set_value(SMD_FEC_PHY_RST, 1);
- }
-diff -u -p a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
---- a/arch/arm/mach-omap2/board-omap3evm.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3evm.c 2011-03-15 11:17:04.000000000 +0100
-@@ -860,7 +860,6 @@ static void __init omap3_evm_init(void)
- 		omap_mux_init_gpio(61, OMAP_PIN_INPUT_PULLUP);
- 		gpio_request(OMAP3_EVM_EHCI_SELECT, "select EHCI port");
- 		gpio_direction_output(OMAP3_EVM_EHCI_SELECT, 0);
--		gpio_set_value(OMAP3_EVM_EHCI_SELECT, 0);
- 
- 		/* setup EHCI phy reset config */
- 		omap_mux_init_gpio(21, OMAP_PIN_INPUT_PULLUP);
-diff -u -p a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
---- a/arch/arm/mach-omap2/board-omap4panda.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap4panda.c 2011-03-15 11:17:04.000000000 +0100
-@@ -129,7 +129,6 @@ static void __init omap4_ehci_init(void)
- 	}
- 	gpio_export(GPIO_HUB_POWER, 0);
- 	gpio_direction_output(GPIO_HUB_POWER, 0);
--	gpio_set_value(GPIO_HUB_POWER, 0);
- 
- 	/* reset phy+hub */
- 	ret = gpio_request(GPIO_HUB_NRESET, "hub_nreset");
-@@ -139,7 +138,6 @@ static void __init omap4_ehci_init(void)
- 	}
- 	gpio_export(GPIO_HUB_NRESET, 0);
- 	gpio_direction_output(GPIO_HUB_NRESET, 0);
--	gpio_set_value(GPIO_HUB_NRESET, 0);
- 	gpio_set_value(GPIO_HUB_NRESET, 1);
- 
- 	usbhs_init(&usbhs_bdata);
-diff -u -p a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
---- a/arch/arm/mach-pxa/am300epd.c 2010-03-18 09:06:45.000000000 +0100
-+++ b/arch/arm/mach-pxa/am300epd.c 2011-03-15 11:17:04.000000000 +0100
-@@ -150,8 +150,6 @@ static int am300_init_gpio_regs(struct b
- 		gpio_direction_output(i, 0);
- 
- 	/* go into command mode */
--	gpio_set_value(CFG_GPIO_PIN, 1);
--	gpio_set_value(RST_GPIO_PIN, 0);
- 	msleep(10);
- 	gpio_set_value(RST_GPIO_PIN, 1);
- 	msleep(10);
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110315/cf54587d/attachment.sig>
