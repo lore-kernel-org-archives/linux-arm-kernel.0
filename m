@@ -1,37 +1,61 @@
-From: andy@warmcat.com (Andy Green)
-Date: Tue, 15 Mar 2011 19:58:04 +0000
-Subject: [PATCH 3 18/18] I2C: OMAP1/OMAP2+: prepend I2C IP version to probed
-	version shown in dev_info
-In-Reply-To: <20110315195147.30000.86184.stgit@otae.warmcat.com>
-References: <20110315195147.30000.86184.stgit@otae.warmcat.com>
-Message-ID: <20110315195804.30000.70399.stgit@otae.warmcat.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 15 Mar 2011 22:11:17 +0200
+Subject: [PATCH v2] ARM: PXA: Z2: Add poweroff function
+In-Reply-To: <AANLkTi=2XH2X53H=3qBhhUbiY_Cnc50u0gg3JM7kRRhk@mail.gmail.com>
+References: <AANLkTi=2XH2X53H=3qBhhUbiY_Cnc50u0gg3JM7kRRhk@mail.gmail.com>
+Message-ID: <1300219877-32160-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IP version is prepended to the existing printed probed
-version as an "epoch" version.
-
-Cc: patches at linaro.org
-Cc: Ben Dooks <ben-linux@fluff.org>
-Reported-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
+v2:
+ - clear PSPR before going deep sleep
 
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/z2.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index c997c55..d53cd61 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1093,8 +1093,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_unuse_clocks;
- 	}
+diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+index 3d3f019..a9ab8c1 100644
+--- a/arch/arm/mach-pxa/z2.c
++++ b/arch/arm/mach-pxa/z2.c
+@@ -40,6 +40,7 @@
+ #include <mach/pxafb.h>
+ #include <mach/mmc.h>
+ #include <plat/pxa27x_keypad.h>
++#include <mach/pm.h>
  
--	dev_info(dev->dev, "bus %d rev%d.%d at %d kHz\n",
--		 pdev->id, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-+	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
-+		 pdata->rev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+ #include "generic.h"
+ #include "devices.h"
+@@ -677,6 +678,20 @@ static void __init z2_pmic_init(void)
+ static inline void z2_pmic_init(void) {}
+ #endif
  
- 	omap_i2c_idle(dev);
++#ifdef CONFIG_PM
++static void z2_power_off(void)
++{
++	/* We're using deep sleep as poweroff, so clear PSPR to ensure that
++	 * bootloader will jump to its entry point in resume handler
++	 */
++	PSPR = 0x0;
++	local_irq_disable();
++	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP, PLAT_PHYS_OFFSET - PAGE_OFFSET);
++}
++#else
++#define z2_power_off   NULL
++#endif
++
+ /******************************************************************************
+  * Machine init
+  ******************************************************************************/
+@@ -698,6 +713,8 @@ static void __init z2_init(void)
+ 	z2_leds_init();
+ 	z2_keys_init();
+ 	z2_pmic_init();
++
++	pm_power_off = z2_power_off;
+ }
  
+ MACHINE_START(ZIPIT2, "Zipit Z2")
+-- 
+1.7.4.1
