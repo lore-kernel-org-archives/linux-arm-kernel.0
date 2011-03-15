@@ -1,37 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Mar 2011 22:42:08 +0000
-Subject: [PATCH] ARMv7: Flush the vectors page using the base address
-In-Reply-To: <20110315184519.GA3620@n2100.arm.linux.org.uk>
-References: <20110315181314.26384.97754.stgit@e102109-lin.cambridge.arm.com>
-	<20110315184519.GA3620@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTingxwvRwKP_Q0o-+XZwoGtzGeGg-goiCgF9cqf0@mail.gmail.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 16 Mar 2011 00:53:14 +0200
+Subject: [PATCH 02/13] plat-spear: use list_move() instead of
+	list_del()/list_add() combination
+In-Reply-To: <1300229605-14499-1-git-send-email-kirill@shutemov.name>
+References: <1300229605-14499-1-git-send-email-kirill@shutemov.name>
+Message-ID: <1300229605-14499-2-git-send-email-kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, 15 March 2011, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 15, 2011 at 06:13:15PM +0000, Catalin Marinas wrote:
->> With the domains removal patch, the vectors page is populated using the
->> kernel linear mapping address. However, the flush_icache_range()
->> function must be called on the high vectors address because the I-cache
->> is allowed to have aliases (or can even be ASID-tagged VIVT).
->
-> This is exactly one of the issues I raised when we went down this hacky
-> path of always doing this crap.
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+Cc: Viresh Kumar <viresh.kumar@st.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/plat-spear/clock.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-I don't think we have better options but feel free to rewrite it.
-
-> What you're now doing is missing the D-cache flush in the case of an
-> aliasing D-cache. ?It's no better than it was before.
-
-In cases where we have domains disabled (ARMv7), the D-cache is
-non-aliasing, so there is no issue.
-
-Even if we enable this code for other cache configurations, we can
-always flush both aliases. This only happen during boot and I doubt
-you would notice any delay.
-
-Catalin
-
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index ee4f90e..1d24faf 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -267,9 +267,7 @@ static void change_parent(struct clk *cclk, struct clk *pclk)
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+-	list_del(&cclk->sibling);
+-	list_add(&cclk->sibling, &pclk->children);
+-
++	list_move(&cclk->sibling, &pclk->children);
+ 	cclk->pclk = pclk;
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
 -- 
-Catalin
+1.7.4.1
