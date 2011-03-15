@@ -1,99 +1,125 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 15 Mar 2011 10:14:47 +0000
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-Message-ID: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Tue, 15 Mar 2011 11:19:53 +0100 (CET)
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <20110315094946.GD13316@pengutronix.de>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+	<20110315090656.GC13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
+	<20110315094946.GD13316@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series extends the Atmel MACB driver to support the Cadence
-GEM (Gigabit Ethernet MAC) to support 10/100 operation.  The GEM is
-based on the MACB block but has a few moved registers and bitfields.
-This patch series attempts to use the MACB accessors where block
-functionallity is identical and only overrides to GEM specific
-acccessors when needed.
+On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
 
-This has been runtested on a board with a Cadence GEM and compile tested
-for all at91 configurations and a number of avr32 configurations.
+> On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
+> > I tried the following
+> > 
+> > @@
+> > expression E1,E2;
+> > @@
+> > 
+> >       gpio_direction_output(E1,E2);
+> >       ...
+> > -     gpio_set_value(E1,E2);
+> > 
+> > and found occurrences in 15 files.  In some cases there seems to be some 
+> > delay before the call to gpio_set_value.  Does that have any impacton 
+> > whether it is needed?
+> gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
+> there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
+> noop.
+> 
+> I still don't know how to work with coccinelle, so if you point me to a
+> concrete location I can be more specific.
 
-Changes since v1:
-	- AT91 now provides a fake "hclk" and "macb_clk" has been
-	renamed to "pclk" to be consistent with AVR32.
-	- Configurable GEM receive buffer size support has been added.
-	- pr_foo() and dev_foo() have been converted to netdev_foo()
-	where appropriate.
-	- New conditional accessors (macb_or_gem_{read,write}l) have
-	been introduced that do the conditional accesses dependent on
-	macb/gem type.
-	- GEM is now dynamically detected from the module ID rather than
-	platform device name.
+OK.  I have changed the semantic patch to the following:
 
-Jean-Christophe, I haven't based this on your conditional clock patch as
-I wasn't sure what decision had been made on that and whether the
-at91/avr32 detection is reliable.
+@@
+expression E1,E2,E3;
+@@
 
-Jamie Iles (9):
-  at91: provide macb clks with "pclk" and "hclk" name
-  macb: remove conditional clk handling
-  macb: unify at91 and avr32 platform data
-  macb: convert printk to netdev_ and friends
-  macb: initial support for Cadence GEM
-  macb: support higher rate GEM MDIO clock divisors
-  macb: support statistics for GEM devices
-  macb: support DMA bus widths > 32 bits
-  macb: allow GEM to have configurable receive buffer size
+      gpio_direction_output(E1,E2);
+      ... when != gpio_set_value(E1,E3)
+-     gpio_set_value(E1,E2);
 
- arch/arm/mach-at91/at572d940hf.c            |    8 +-
- arch/arm/mach-at91/at572d940hf_devices.c    |    6 +-
- arch/arm/mach-at91/at91cap9.c               |    8 +-
- arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
- arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
- arch/arm/mach-at91/at91sam9260.c            |    8 +-
- arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
- arch/arm/mach-at91/at91sam9263.c            |    8 +-
- arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
- arch/arm/mach-at91/at91sam9g45.c            |    8 +-
- arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
- arch/arm/mach-at91/board-1arm.c             |    2 +-
- arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
- arch/arm/mach-at91/board-at572d940hf_ek.c   |    2 +-
- arch/arm/mach-at91/board-cam60.c            |    2 +-
- arch/arm/mach-at91/board-cap9adk.c          |    2 +-
- arch/arm/mach-at91/board-carmeva.c          |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
- arch/arm/mach-at91/board-cpuat91.c          |    2 +-
- arch/arm/mach-at91/board-csb337.c           |    2 +-
- arch/arm/mach-at91/board-csb637.c           |    2 +-
- arch/arm/mach-at91/board-eb9200.c           |    2 +-
- arch/arm/mach-at91/board-ecbat91.c          |    2 +-
- arch/arm/mach-at91/board-eco920.c           |    2 +-
- arch/arm/mach-at91/board-foxg20.c           |    2 +-
- arch/arm/mach-at91/board-gsia18s.c          |    2 +-
- arch/arm/mach-at91/board-kafa.c             |    2 +-
- arch/arm/mach-at91/board-kb9202.c           |    2 +-
- arch/arm/mach-at91/board-neocore926.c       |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
- arch/arm/mach-at91/board-picotux200.c       |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
- arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
- arch/arm/mach-at91/board-snapper9260.c      |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
- arch/arm/mach-at91/board-usb-a9260.c        |    2 +-
- arch/arm/mach-at91/board-usb-a9263.c        |    2 +-
- arch/arm/mach-at91/board-yl-9200.c          |    2 +-
- arch/arm/mach-at91/include/mach/board.h     |   14 +-
- arch/avr32/mach-at32ap/include/mach/board.h |    5 +-
- drivers/net/Kconfig                         |    8 +-
- drivers/net/macb.c                          |  331 ++++++++++++++++++---------
- drivers/net/macb.h                          |  146 ++++++++++++-
- include/linux/platform_data/macb.h          |   10 +
- 50 files changed, 466 insertions(+), 190 deletions(-)
- create mode 100644 include/linux/platform_data/macb.h
+Now it doesn't do all the cases where there is an earlier set ofr some 
+other value.  The patch I obtain is below.  This only concerns 5 files.  
+I haven't checked the result at all.
 
--- 
-1.7.4
+julia
+
+
+diff -u -p a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c 2011-02-19 08:28:51.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c 2011-03-15 11:17:03.000000000 +0100
+@@ -218,7 +218,6 @@ static inline void babbage_usbhub_reset(
+ 
+ 	/* USB HUB RESET - De-assert USB HUB RESET_N */
+ 	msleep(1);
+-	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
+ 	msleep(1);
+ 	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
+ }
+@@ -234,7 +233,6 @@ static inline void babbage_fec_reset(voi
+ 		return;
+ 	}
+ 	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
+-	gpio_set_value(BABBAGE_FEC_PHY_RESET, 0);
+ 	msleep(1);
+ 	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
+ }
+diff -u -p a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+--- a/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-15 11:17:03.000000000 +0100
+@@ -88,7 +88,6 @@ static inline void mx53_evk_fec_reset(vo
+ 		return;
+ 	}
+ 	gpio_direction_output(SMD_FEC_PHY_RST, 0);
+-	gpio_set_value(SMD_FEC_PHY_RST, 0);
+ 	msleep(1);
+ 	gpio_set_value(SMD_FEC_PHY_RST, 1);
+ }
+diff -u -p a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+--- a/arch/arm/mach-omap2/board-omap3evm.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3evm.c 2011-03-15 11:17:04.000000000 +0100
+@@ -860,7 +860,6 @@ static void __init omap3_evm_init(void)
+ 		omap_mux_init_gpio(61, OMAP_PIN_INPUT_PULLUP);
+ 		gpio_request(OMAP3_EVM_EHCI_SELECT, "select EHCI port");
+ 		gpio_direction_output(OMAP3_EVM_EHCI_SELECT, 0);
+-		gpio_set_value(OMAP3_EVM_EHCI_SELECT, 0);
+ 
+ 		/* setup EHCI phy reset config */
+ 		omap_mux_init_gpio(21, OMAP_PIN_INPUT_PULLUP);
+diff -u -p a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+--- a/arch/arm/mach-omap2/board-omap4panda.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap4panda.c 2011-03-15 11:17:04.000000000 +0100
+@@ -129,7 +129,6 @@ static void __init omap4_ehci_init(void)
+ 	}
+ 	gpio_export(GPIO_HUB_POWER, 0);
+ 	gpio_direction_output(GPIO_HUB_POWER, 0);
+-	gpio_set_value(GPIO_HUB_POWER, 0);
+ 
+ 	/* reset phy+hub */
+ 	ret = gpio_request(GPIO_HUB_NRESET, "hub_nreset");
+@@ -139,7 +138,6 @@ static void __init omap4_ehci_init(void)
+ 	}
+ 	gpio_export(GPIO_HUB_NRESET, 0);
+ 	gpio_direction_output(GPIO_HUB_NRESET, 0);
+-	gpio_set_value(GPIO_HUB_NRESET, 0);
+ 	gpio_set_value(GPIO_HUB_NRESET, 1);
+ 
+ 	usbhs_init(&usbhs_bdata);
+diff -u -p a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
+--- a/arch/arm/mach-pxa/am300epd.c 2010-03-18 09:06:45.000000000 +0100
++++ b/arch/arm/mach-pxa/am300epd.c 2011-03-15 11:17:04.000000000 +0100
+@@ -150,8 +150,6 @@ static int am300_init_gpio_regs(struct b
+ 		gpio_direction_output(i, 0);
+ 
+ 	/* go into command mode */
+-	gpio_set_value(CFG_GPIO_PIN, 1);
+-	gpio_set_value(RST_GPIO_PIN, 0);
+ 	msleep(10);
+ 	gpio_set_value(RST_GPIO_PIN, 1);
+ 	msleep(10);
