@@ -1,55 +1,62 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Mon, 14 Mar 2011 22:01:03 -0700
-Subject: [PATCH 00/11] Support for msm8660 and msm8960 dma
-Message-ID: <1300165274-8544-1-git-send-email-johlstei@codeaurora.org>
+Date: Mon, 14 Mar 2011 22:01:06 -0700
+Subject: [PATCH 03/11] msm: dma: support using dma from modules
+In-Reply-To: <1300165274-8544-1-git-send-email-johlstei@codeaurora.org>
+References: <1300165274-8544-1-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1300165274-8544-4-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series does cleanup on the msm dma driver, and adds support for two
-new targets, msm8660 and msm8960.
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/mach-msm/dma.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-Jeff Ohlstein (9):
-  msm: dma: Add support for flushing dma channels
-  msm: dma: support using dma from modules
-  msm: dma: Toggle adm_pclk along with adm_clk
-  msm: dma: Remove register macros from header file
-  msm: dma: use a platform device for msm_dmov
-  msm: dma: Support multiple adms
-  msm: dma: Handle probe failure in dma function
-  msm: dma: Support msm8x60 dma
-  msm: dma: support msm8960 dma
-
-Stepan Moskovchenko (1):
-  msm: 8960: Split out common initialization code
-
-Subhash Jadavani (1):
-  msm: dma: Guard for multiple file inclusion
-
- arch/arm/mach-msm/Makefile                      |    5 +-
- arch/arm/mach-msm/board-halibut.c               |    1 +
- arch/arm/mach-msm/board-mahimahi.c              |    1 +
- arch/arm/mach-msm/board-msm7x30.c               |    1 +
- arch/arm/mach-msm/board-msm8960.c               |   14 +-
- arch/arm/mach-msm/board-msm8x60.c               |    9 +-
- arch/arm/mach-msm/board-qsd8x50.c               |    1 +
- arch/arm/mach-msm/board-trout.c                 |    1 +
- arch/arm/mach-msm/devices-msm7x00.c             |   21 ++-
- arch/arm/mach-msm/devices-msm7x30.c             |   21 ++-
- arch/arm/mach-msm/devices-msm8960.c             |   21 ++
- arch/arm/mach-msm/devices-msm8x60.c             |   56 ++++
- arch/arm/mach-msm/devices-qsd8x50.c             |   21 ++-
- arch/arm/mach-msm/devices.h                     |    5 +
- arch/arm/mach-msm/dma.c                         |  391 ++++++++++++++++++-----
- arch/arm/mach-msm/include/mach/dma.h            |   84 +++---
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h |    3 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +
- arch/arm/mach-msm/io.c                          |    3 -
- 22 files changed, 545 insertions(+), 135 deletions(-)
- create mode 100644 arch/arm/mach-msm/devices-msm8x60.c
-
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+index 8e4d46e..1f487b8 100644
+--- a/arch/arm/mach-msm/dma.c
++++ b/arch/arm/mach-msm/dma.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
+ #include <linux/completion.h>
++#include <linux/module.h>
+ #include <mach/dma.h>
+ 
+ #define MSM_DMOV_CHANNEL_COUNT 16
+@@ -52,6 +53,7 @@ void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
+ {
+ 	writel((graceful << 31), DMOV_FLUSH0(id));
+ }
++EXPORT_SYMBOL(msm_dmov_stop_cmd);
+ 
+ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
+ {
+@@ -90,6 +92,7 @@ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
+ 	}
+ 	spin_unlock_irqrestore(&msm_dmov_lock, irq_flags);
+ }
++EXPORT_SYMBOL(msm_dmov_enqueue_cmd);
+ 
+ void msm_dmov_flush(unsigned int id)
+ {
+@@ -102,6 +105,7 @@ void msm_dmov_flush(unsigned int id)
+ 	}
+ 	spin_unlock_irqrestore(&msm_dmov_lock, flags);
+ }
++EXPORT_SYMBOL(msm_dmov_flush);
+ 
+ struct msm_dmov_exec_cmdptr_cmd {
+ 	struct msm_dmov_cmd dmov_cmd;
+@@ -148,7 +152,7 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr)
+ 	PRINT_FLOW("dmov_exec_cmdptr(%d, %x) done\n", id, cmdptr);
+ 	return 0;
+ }
+-
++EXPORT_SYMBOL(msm_dmov_exec_cmd);
+ 
+ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
+ {
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
