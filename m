@@ -1,71 +1,77 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 15 Mar 2011 10:32:49 +0800
-Subject: [PATCH] ARM: mxs/tx28: fix up LCD pads
-In-Reply-To: <19834.19154.967544.735547@ipc1.ka-ro>
-References: <1299342440-30620-1-git-send-email-shawn.guo@freescale.com>
-	<19834.19154.967544.735547@ipc1.ka-ro>
-Message-ID: <20110315023248.GD11098@S2100-06.ap.freescale.net>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 14 Mar 2011 19:35:36 -0700
+Subject: [PATCH v3 6/7] ARM: smp_twd: add clock api support
+In-Reply-To: <1299627277-20311-7-git-send-email-robherring2@gmail.com>
+References: <1299627277-20311-1-git-send-email-robherring2@gmail.com>
+	<1299627277-20311-7-git-send-email-robherring2@gmail.com>
+Message-ID: <AANLkTi=NnwEwo4XYbvevqp2zDyGPypBz9yHgozrn2jEy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 05:16:18PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > * In any case, LCD only needs one group of VSYNC, HSYNC, and DOTCLK.
-> >   So remove the redundant and useless one.
-> > * LCD_ENABLE pad should not work as a GPIO for LCD, and there must be
-> >   one pad for ENABLE function.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> > Hi Lothar, Uwe,
-> > 
-> > I do not have the schematics of TX28 board, and I'm guessing the fix.
-> > So it really needs your comments here.
-> > 
-> > Regards,
-> > Shawn
-> > 
-> >  arch/arm/mach-mxs/mach-tx28.c |    6 +-----
-> >  1 files changed, 1 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-> > index b65e371..16a0059 100644
-> > --- a/arch/arm/mach-mxs/mach-tx28.c
-> > +++ b/arch/arm/mach-mxs/mach-tx28.c
-> > @@ -61,11 +61,7 @@ static const iomux_cfg_t tx28_stk5v3_pads[] __initconst = {
-> >  	MX28_PAD_LCD_RD_E__LCD_VSYNC | LCD_MODE,
-> >  	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | LCD_MODE,
-> >  	MX28_PAD_LCD_RS__LCD_DOTCLK | LCD_MODE,
-> > -	MX28_PAD_LCD_CS__LCD_CS | LCD_MODE,
-> >
-> This one is correct as it stands (i.e. the suggested change is wrong).
-> 
-So your panel is using LCD_CS without using LCD_RS as a couple?
+On Tue, Mar 8, 2011 at 3:34 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> The private timer freq is currently dynamically detected
+> using jiffies count to determine the rate. This method adds
+> a delay to boot-up, so use the clock api instead to get the
+> clock rate.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> v3: Save struct clk pointer for later use (cpufreq).
+>
+> ?arch/arm/include/asm/smp_twd.h | ? ?1 +
+> ?arch/arm/kernel/smp_twd.c ? ? ?| ? 14 ++++++++++++++
+> ?2 files changed, 15 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+> index fed9981..6b0f591 100644
+> --- a/arch/arm/include/asm/smp_twd.h
+> +++ b/arch/arm/include/asm/smp_twd.h
+> @@ -24,5 +24,6 @@ extern void __iomem *twd_base;
+>
+> ?int twd_timer_ack(void);
+> ?void twd_timer_setup(struct clock_event_device *);
+> +void twd_timer_init(void __iomem *base);
+>
+> ?#endif
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 60636f4..cce1171 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -8,6 +8,8 @@
+> ?* it under the terms of the GNU General Public License version 2 as
+> ?* published by the Free Software Foundation.
+> ?*/
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> ?#include <linux/init.h>
+> ?#include <linux/kernel.h>
+> ?#include <linux/delay.h>
+> @@ -24,6 +26,7 @@
+> ?/* set up by the platform code */
+> ?void __iomem *twd_base;
+>
+> +static struct clk *twd_clk;
+> ?static unsigned long twd_timer_rate;
+>
+> ?static void twd_set_mode(enum clock_event_mode mode,
+> @@ -142,3 +145,14 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>
+> ? ? ? ?clockevents_register_device(clk);
+> ?}
+> +
+> +void __init twd_timer_init(void __iomem *base)
+> +{
+> + ? ? ? twd_clk = clk_get_sys("smp_twd", NULL);
+> + ? ? ? if (!IS_ERR(twd_clk))
+> + ? ? ? ? ? ? ? twd_timer_rate = clk_get_rate(twd_clk);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? twd_clk = NULL;
+> +
+> + ? ? ? twd_base = base;
+> +}
+Why not leave the old twd_base intitialization and put the clock stuff
+in twd_timer_setup?
 
-> > -	MX28_PAD_LCD_VSYNC__LCD_VSYNC | LCD_MODE,
-> > -	MX28_PAD_LCD_HSYNC__LCD_HSYNC | LCD_MODE,
-> > -	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | LCD_MODE,
-> >
-> These should be removed from the pin list, as suggested.
-> 
-> > -	MX28_PAD_LCD_ENABLE__GPIO_1_31 | LCD_MODE,
-> > +	MX28_PAD_LCD_CS__LCD_ENABLE | LCD_MODE,
-> >
-> This change is also wrong. The pad is used as a (power) enable pin for
-> a certain family of LCDs that we recommend for use with our
-> modules. It should be configured as GPIO and pulled high/low whenever
-> the LCD is activated/deactivated (just like the LCD_RESET pad below).
-> 
-This pad is not designed for a power enable pin but DATA_ENABLE
-signal.  Why does your panel need two power enable pins here, LCD_CS
-and LCD_RESET?
-
-> >  	MX28_PAD_LCD_RESET__GPIO_3_30 | LCD_MODE,
-> >  	MX28_PAD_PWM0__PWM_0 | LCD_MODE,
-> >  
-
--- 
-Regards,
-Shawn
+Would it make sense to drop twd_calibrate_rate entirely and require a twd clock?
