@@ -1,19 +1,22 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Mar 2011 09:39:12 +0100
-Subject: [PATCH V1] mx51 enchance the sd/mmc HW timing compatibility on
-	mx51 boards.
-In-Reply-To: <1300159804-2095-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300159804-2095-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110315083912.GJ29521@pengutronix.de>
+Date: Tue, 15 Mar 2011 09:43:20 +0100
+Subject: [PATCH] ARM: mx5: fix clk id for a few DEFINE_CLOCK
+In-Reply-To: <1300114343-3736-1-git-send-email-shawn.guo@freescale.com>
+References: <1300114343-3736-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110315084319.GK29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 11:30:04AM +0800, Richard Zhu wrote:
-> Some cards have the CRC errors in read on mx51 BBG board.
-> Configure the eSDHC pad configurations to level up the
-> compatibility to fix this issue.
+On Mon, Mar 14, 2011 at 10:52:23PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 
-This one is already applied.
+Wouldn't it make more sense to remove the id field completely? It is
+unused. Additionally, I see fundamental changes in the i.MX clock
+framework in the not-so-far future, so I wouldn't make cosmetic patches
+now.
 
 Sascha
 
