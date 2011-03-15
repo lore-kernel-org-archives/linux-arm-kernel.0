@@ -1,56 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Mar 2011 21:50:36 +0900
-Subject: [PATCH v2 0/4] S5PC210/S5PV310/EXYNOS4 interrupts update
-In-Reply-To: <1300086286-9006-1-git-send-email-m.szyprowski@samsung.com>
-References: <1300086286-9006-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <011201cbe30f$9728d000$c57a7000$%kim@samsung.com>
+Date: Tue, 15 Mar 2011 21:55:20 +0900
+Subject: [PATCH v2] ARM: EXYNOS4: add a placeholder for board specific
+	interrupts
+In-Reply-To: <1300086405-9895-1-git-send-email-m.szyprowski@samsung.com>
+References: <1300086405-9895-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <011301cbe310$41381f10$c3a85d30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Hello,
+> This patch adds a placeholder for board specific interrupts on S5PC210
+> platform.
 > 
-> This patch series perform an update on interrupts support for
-> S5PC210/S5PV310/EXYNOS4 platform. An optional support for GPIO
-> interrupts handler has been added The patches have been prepared to
-> maximise the code reuse, so common code for gpio interrupts for s5pc100,
-> s5pc110 & s5pc210 have been prepared.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/include/mach/irqs.h |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
 > 
-> The patches have been prepared against
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> for-next branch (commit be7004f73d0).
+> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
+> exynos4/include/mach/irqs.h
+> index 5d03730..cc2186d 100644
+> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
+> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+> @@ -154,7 +154,11 @@
+>  #define IRQ_GPIO2_NR_GROUPS	9
+>  #define IRQ_GPIO_END		(S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
 > 
-> Patches that make use of these optional features for universal c210
-> board will follow soon.
+> +/* optional board specific irqs */
+> +#define IRQ_BOARD_START		IRQ_GPIO_END
+> +#define IRQ_NR_BOARD		16
+> +
+>  /* Set the default NR_IRQS */
+> -#define NR_IRQS			(IRQ_GPIO_END)
+> +#define NR_IRQS			(IRQ_GPIO_END + IRQ_NR_BOARD)
 > 
-> Changes since v1:
-> - rebased onto latest version of kgene/for-next kernel tree (with s5pv310
->   to exynos4 rename)
-> - removed machine specific interrupt patch from this patch series
-> 
-> Patch summary:
-> 
-> Marek Szyprowski (4):
->   ARM: EXYNOS4: Add missing GPYx banks.
->   ARM: Samsung: cleanup S5P gpio interrupt code
->   ARM: Samsung: add function to register gpio interrupt bank data
->   ARM: EXYNOS4: add support for gpio interrupts
-> 
->  arch/arm/mach-exynos4/gpiolib.c               |   67 ++++++++++-
->  arch/arm/mach-exynos4/include/mach/gpio.h     |   23 ++++-
->  arch/arm/mach-exynos4/include/mach/irqs.h     |   12 ++-
->  arch/arm/mach-s5pc100/gpiolib.c               |    1 +
->  arch/arm/mach-s5pv210/gpiolib.c               |    1 +
->  arch/arm/plat-s5p/irq-gpioint.c               |  169
-+++++++++++++++--------
+>  #endif /* __ASM_ARCH_IRQS_H */
 > --
->  arch/arm/plat-samsung/include/plat/gpio-cfg.h |   16 +++
->  7 files changed, 216 insertions(+), 73 deletions(-)
-> 
-> --
+> 1.7.1.569.g6f426
 
-Ok, applied.
+I have no idea that we need specific interrupt on EXYNOS4 now.
+As you know, this can affect all machines of EXYNOS4 SoC even though there
+is EXYNOS4210 now.
+
+If required, we need something like SAMSUNG_GPIO_EXTRA for compatibility.
+Anyway need more discussion on this :)
+
 Thanks.
 
 Best regards,
