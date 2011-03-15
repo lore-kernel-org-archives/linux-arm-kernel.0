@@ -1,48 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Mar 2011 10:00:10 +0100
-Subject: [PATCH 2/7] davinci: eliminate use of IO_ADDRESS() on sysmod
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C246CB1@dbde02.ent.ti.com>
-References: <1300110947-16229-1-git-send-email-manjunath.hadli@ti.com>
-	<201103141721.52033.arnd@arndb.de>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C246CB1@dbde02.ent.ti.com>
-Message-ID: <201103151000.10350.arnd@arndb.de>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Tue, 15 Mar 2011 17:04:10 +0800
+Subject: [PATCH 1/1 v3] ARM: mx53_loco: Add GPIO Keypad support
+Message-ID: <1300179850-12183-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 March 2011 07:00:44 Nori, Sekhar wrote:
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+v3: remove <linux/gpio_keys.h>
+    add const __initconst
 
-> > * If you need to access sysmod in multiple places, a nicer
-> >   way would be to make the virtual address pointer static,
-> >   and export the accessor functions for it, rather than
-> >   having a global pointer.
-> 
-> Seems like opinion is divided on this. A while back
-> I submitted a patch with such an accessor function and
-> was asked to do the opposite of what you are asking here.
-> 
-> https://patchwork.kernel.org/patch/366501/
-> 
-> It can be changed to the way you are asking, but would
-> like to know what is more universally acceptable (if
-> at all there is such a thing).
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |   25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
 
-One difference is that the base address pointer here
-can be treated as read-only by using an accessor function,
-which was not possible for the case you cited. Doing
-an inline function would also let you make the access
-more type-safe, e.g forcing the right kind of readl/writel
-variant and possibly locking if necessary.
-
-I would also argue against Sergei's point for the other
-patch -- the current solution is not better than the originally
-suggested one IMHO. I believe a better way would have
-been to pass the maximum frequency as an argument to
-da850_register_cpufreq() in that case.
-
-However, neither of these discussion is really important,
-and we don't have a strict rule for doing it one way
-or the other. Just use common sense and decide case-by-case,
-as I said in the previous comment, you got the important
-parts right.
-
-	Arnd
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 83ee088..159340d 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -165,6 +165,7 @@ config MACH_MX53_LOCO
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
++	select IMX_HAVE_PLATFORM_GPIO_KEYS
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 0a18f8d..10a1bea 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -36,6 +36,9 @@
+ #include "crm_regs.h"
+ #include "devices-imx53.h"
+ 
++#define MX53_LOCO_POWER			IMX_GPIO_NR(1, 8)
++#define MX53_LOCO_UI1			IMX_GPIO_NR(2, 14)
++#define MX53_LOCO_UI2			IMX_GPIO_NR(2, 15)
+ #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+ 
+ static iomux_v3_cfg_t mx53_loco_pads[] = {
+@@ -180,6 +183,27 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
+ 	MX53_PAD_GPIO_8__GPIO1_8,
+ };
+ 
++#define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake)	\
++{								\
++	.gpio		= gpio_num,				\
++	.type		= EV_KEY,				\
++	.code		= ev_code,				\
++	.active_low	= act_low,				\
++	.desc		= "btn " descr,				\
++	.wakeup		= wake,					\
++}
++
++static const struct gpio_keys_button loco_buttons[] __initconst = {
++	GPIO_BUTTON(MX53_LOCO_POWER, KEY_POWER, 1, "power", 0),
++	GPIO_BUTTON(MX53_LOCO_UI1, KEY_VOLUMEUP, 1, "volume-up", 0),
++	GPIO_BUTTON(MX53_LOCO_UI2, KEY_VOLUMEDOWN, 1, "volume-down", 0),
++};
++
++static const struct gpio_keys_platform_data loco_button_data __initconst = {
++	.buttons        = loco_buttons,
++	.nbuttons       = ARRAY_SIZE(loco_buttons),
++};
++
+ static inline void mx53_loco_fec_reset(void)
+ {
+ 	int ret;
+@@ -215,6 +239,7 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+ 	imx53_add_sdhci_esdhc_imx(0, NULL);
+ 	imx53_add_sdhci_esdhc_imx(2, NULL);
++	imx_add_gpio_keys(&loco_button_data);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
+-- 
+1.7.1
