@@ -1,52 +1,61 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 15 Mar 2011 10:48:37 +0530
-Subject: [PATCH V2] OMAP4: Intialize IVA Device in addition to DSP device.
-In-Reply-To: <1299926361-28482-1-git-send-email-shweta.gulati@ti.com>
-References: <1299926361-28482-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <AANLkTinympnok4Qw_n15ukDNE2L5yp9xvuhoP64B=2wJ@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 15 Mar 2011 11:30:44 +0530
+Subject: [PATCH 2/7] davinci: eliminate use of IO_ADDRESS() on sysmod
+In-Reply-To: <201103141721.52033.arnd@arndb.de>
+References: <1300110947-16229-1-git-send-email-manjunath.hadli@ti.com>
+	<201103141721.52033.arnd@arndb.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C246CB1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2011 at 16:09, Shweta Gulati <shweta.gulati@ti.com> wrote:
-> OMAP4 has two different Devices IVA and DSP. DSP is bound
-> with IVA for DVFS. The registration of IVA dev in API
-> 'omap2_init_processor_devices' was missing. Init dev for
-> 'iva_dev' is added.
->
-> This also fixes the following error seen during boot as
-> omap2_set_init_voltage can now find the iva device
->
-> ? ? ? ?omap2_set_init_voltage: Invalid parameters!
-> ? ? ? ?omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
->
-> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
-> ---
->
-> Tested on OMAP4430 SDP Board.
-> Baseline:
-> http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
-> Branch :pm-core
->
-> V2:
-> Rephrased the Commit log.
->
-> ?arch/arm/mach-omap2/pm.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 30af335..49486f5 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -89,6 +89,7 @@ static void omap2_init_processor_devices(void)
-> ? ? ? ?if (cpu_is_omap44xx()) {
-> ? ? ? ? ? ? ? ?_init_omap_device("l3_main_1", &l3_dev);
-> ? ? ? ? ? ? ? ?_init_omap_device("dsp", &dsp_dev);
-> + ? ? ? ? ? ? ? _init_omap_device("iva", &iva_dev);
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?_init_omap_device("l3_main", &l3_dev);
-> ? ? ? ?}
-> --
-Looks fine to me.
+Hi Arnd,
 
-Regards,
-Nishanth Menon
+On Mon, Mar 14, 2011 at 21:51:51, Arnd Bergmann wrote:
+> On Monday 14 March 2011, Manjunath Hadli wrote:
+> > Current devices.c file has a number of instances where
+> > IO_ADDRESS() is used for system module register
+> > access. Eliminate this in favor of a ioremap()
+> > based access.
+> > 
+> > Consequent to this, a new global pointer davinci_sysmodbase
+> > has been introduced which gets initialized during
+> > the initialization of each relevant SoC
+> > 
+> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> 
+> The change looks good, it's definitely a step in the right
+> direction.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> 
+> I think you can go even further:
+> 
+> * A straightforward change would be to move davinci_sysmodbase
+>   into a local variable of the davinci_setup_mmc function,
+>   which I believe is the only user. Then you can ioremap
+>   and iounmap it directly there.
+
+This patch accesses sysmodule only in davinci_setup_mmc,
+but follow-on patches use it in other places. So, this patch
+sort of lays the foundation for that. This is not really
+evident in this patch so the patch description should have
+captured that.
+
+> * If you need to access sysmod in multiple places, a nicer
+>   way would be to make the virtual address pointer static,
+>   and export the accessor functions for it, rather than
+>   having a global pointer.
+
+Seems like opinion is divided on this. A while back
+I submitted a patch with such an accessor function and
+was asked to do the opposite of what you are asking here.
+
+https://patchwork.kernel.org/patch/366501/
+
+It can be changed to the way you are asking, but would
+like to know what is more universally acceptable (if
+at all there is such a thing).
+
+Thanks,
+Sekhar
