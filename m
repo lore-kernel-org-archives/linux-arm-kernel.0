@@ -1,45 +1,45 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 15 Mar 2011 16:17:49 +0530
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <20110315100856.GE3921@n2100.arm.linux.org.uk>
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-	<87oc5dlkkx.fsf@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C246AD3@dbde02.ent.ti.com>
-	<20110315100856.GE3921@n2100.arm.linux.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C246F25@dbde02.ent.ti.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 15 Mar 2011 12:14:31 +0100
+Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
+In-Reply-To: <1300184096-13937-4-git-send-email-jamie@jamieiles.com> (Jamie
+	Iles's message of "Tue, 15 Mar 2011 10:14:50 +0000")
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
+Message-ID: <87vczkmy94.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 15:38:56, Russell King - ARM Linux wrote:
-> On Mon, Mar 14, 2011 at 11:14:37PM +0530, Nori, Sekhar wrote:
-> > On Mon, Mar 14, 2011 at 22:12:54, Hilman, Kevin wrote:
-> > > Felipe Balbi <balbi@ti.com> writes:
-> > > 
-> > > [...]
-> > > 
-> > > >
-> > > > Kevin feel free to take this into your tree:
-> > > >
-> > > > Acked-by: Felipe Balbi <balbi@ti.com>
-> > > >
-> > > 
-> > > OK, will queue for 2.6.39.
-> > 
-> > This will need to make into 2.6.38.
-> > 
-> > Hi Russell,
-> > 
-> > Without this fix, USB will remain broken on 2.6.38
-> > on DM644x EVM. Any chance of this making into 2.6.38?
-> > 
-> > Shall I check this into your patch system?
-> 
-> The answer to that is in Kevin's reply.  Kevin is handling the patch as
-> current maintainer of Davinci.
+>>>>> "Jamie" == Jamie Iles <jamie@jamieiles.com> writes:
 
-Okay. Linus has already released 2.6.38; will queue this
-for Kevin to send for 2.6.39.
+Hi,
 
-Thanks,
-Sekhar
+ Jamie> Both at91 and avr32 defines its own platform data structure for
+ Jamie> the macb driver and both share common structures though at91
+ Jamie> includes a currently unused phy_irq_pin.  Create a common
+ Jamie> eth_platform_data for macb that both at91 and avr32 can use.  In
+ Jamie> future we can use this to support other architectures that use the
+ Jamie> same IP block with the macb driver.
+
+Nice!
+
+ Jamie> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+
+ Jamie> +++ b/include/linux/platform_data/macb.h
+ Jamie> @@ -0,0 +1,17 @@
+ Jamie> +/*
+ Jamie> + * Copyright (C) 2004-2006 Atmel Corporation
+ Jamie> + *
+ Jamie> + * This program is free software; you can redistribute it and/or modify
+ Jamie> + * it under the terms of the GNU General Public License version 2 as
+ Jamie> + * published by the Free Software Foundation.
+ Jamie> + */
+ Jamie> +#ifndef __MACB_PDATA_H__
+ Jamie> +#define __MACB_PDATA_H__
+ Jamie> +
+ Jamie> +struct eth_platform_data {
+
+How about at the same time renaming it to something a bit less generic
+like macb_platform_data?
+
+-- 
+Bye, Peter Korsgaard
