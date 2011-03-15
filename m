@@ -1,289 +1,430 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Mon, 14 Mar 2011 22:01:12 -0700
-Subject: [PATCH 09/11] msm: dma: Support msm8x60 dma
+Date: Mon, 14 Mar 2011 22:01:09 -0700
+Subject: [PATCH 06/11] msm: dma: use a platform device for msm_dmov
 In-Reply-To: <1300165274-8544-1-git-send-email-johlstei@codeaurora.org>
 References: <1300165274-8544-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1300165274-8544-10-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1300165274-8544-7-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike previous targets, 8x60 has two different ADMs, which are managed
-separately.
+Switching to a platform device allows us to add hooks for power
+management, along with providing a way to do per-SoC configuration of
+the device.
 
 Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 ---
- arch/arm/mach-msm/Makefile                      |    3 +-
- arch/arm/mach-msm/board-msm8x60.c               |    9 +++-
- arch/arm/mach-msm/devices-msm8x60.c             |   56 +++++++++++++++++++++++
+ arch/arm/mach-msm/board-halibut.c               |    1 +
+ arch/arm/mach-msm/board-mahimahi.c              |    1 +
+ arch/arm/mach-msm/board-msm7x30.c               |    1 +
+ arch/arm/mach-msm/board-qsd8x50.c               |    1 +
+ arch/arm/mach-msm/board-trout.c                 |    1 +
+ arch/arm/mach-msm/devices-msm7x00.c             |   21 ++++++-
+ arch/arm/mach-msm/devices-msm7x30.c             |   21 ++++++-
+ arch/arm/mach-msm/devices-qsd8x50.c             |   21 ++++++-
  arch/arm/mach-msm/devices.h                     |    2 +
- arch/arm/mach-msm/dma.c                         |   17 +++++--
- arch/arm/mach-msm/include/mach/dma.h            |   55 ++++++++++++++++------
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    6 +++
- 7 files changed, 126 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/mach-msm/devices-msm8x60.c
+ arch/arm/mach-msm/dma.c                         |   78 +++++++++++++++++------
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    5 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |    5 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |    5 +-
+ arch/arm/mach-msm/io.c                          |    3 -
+ 14 files changed, 131 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 86acfa3..9998f75 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_MSM_IOMMU) += iommu.o iommu_dev.o devices-iommu.o
- obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o acpuclock-arm11.o
- obj-$(CONFIG_ARCH_MSM7X30) += dma.o
- obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
-+obj-$(CONFIG_ARCH_MSM8X60) += dma.o
- obj-$(CONFIG_ARCH_MSM8960) += clock-dummy.o
+diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
+index 18a3c97..4d264eb 100644
+--- a/arch/arm/mach-msm/board-halibut.c
++++ b/arch/arm/mach-msm/board-halibut.c
+@@ -59,6 +59,7 @@ static struct platform_device smc91x_device = {
  
- obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
-@@ -24,7 +25,7 @@ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o b
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
- obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
--obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
-+obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o devices-msm8x60.o
- obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o devices-msm8960.o
- 
- obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-v1.o gpiomux.o
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index b3c55f1..92105c4 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -1,4 +1,4 @@
--/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -28,12 +28,18 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
- 
-+#include <devices.h>
- 
- static void __init msm8x60_map_io(void)
- {
- 	msm_map_msm8x60_io();
- }
- 
-+static struct platform_device *devices[] __initdata = {
-+	&msm_device_dmov_adm0,
-+	&msm_device_dmov_adm1,
-+};
-+
- static void __init msm8x60_init_irq(void)
- {
- 	unsigned int i;
-@@ -62,6 +68,7 @@ static void __init msm8x60_init_irq(void)
- 
- static void __init msm8x60_init(void)
- {
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
- }
- 
- MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
-diff --git a/arch/arm/mach-msm/devices-msm8x60.c b/arch/arm/mach-msm/devices-msm8x60.c
-new file mode 100644
-index 0000000..33c236c
---- /dev/null
-+++ b/arch/arm/mach-msm/devices-msm8x60.c
-@@ -0,0 +1,56 @@
-+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/board.h>
-+#include <mach/msm_iomap.h>
-+#include <mach/dma.h>
-+
-+static struct resource resources_dmov_adm0[] = {
-+	{
-+		.start = MSM8X60_DMOV_ADM0_PHYS,
-+		.end = MSM8X60_DMOV_ADM0_PHYS + MSM8X60_DMOV_ADM0_SIZE - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	{
-+		.start = INT_ADM0_AARM,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct resource resources_dmov_adm1[] = {
-+	{
-+		.start = MSM8X60_DMOV_ADM1_PHYS,
-+		.end = MSM8X60_DMOV_ADM1_PHYS + MSM8X60_DMOV_ADM1_SIZE - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	{
-+		.start = INT_ADM1_AARM,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device msm_device_dmov_adm0 = {
-+	.name	= "msm_dmov",
-+	.id	= 0,
-+	.num_resources = ARRAY_SIZE(resources_dmov_adm0),
-+	.resource = resources_dmov_adm0,
-+};
-+
-+struct platform_device msm_device_dmov_adm1 = {
-+	.name	= "msm_dmov",
-+	.id	= 1,
-+	.num_resources = ARRAY_SIZE(resources_dmov_adm1),
-+	.resource = resources_dmov_adm1,
-+};
-diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
-index 54ebfee..0abf25f 100644
---- a/arch/arm/mach-msm/devices.h
-+++ b/arch/arm/mach-msm/devices.h
-@@ -41,6 +41,8 @@ extern struct platform_device msm_device_i2c;
- extern struct platform_device msm_device_smd;
- 
- extern struct platform_device msm_device_dmov;
-+extern struct platform_device msm_device_dmov_adm0;
-+extern struct platform_device msm_device_dmov_adm1;
- 
- extern struct platform_device msm_device_nand;
- 
-diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
-index 5510c61..44d9621 100644
---- a/arch/arm/mach-msm/dma.c
-+++ b/arch/arm/mach-msm/dma.c
-@@ -51,17 +51,24 @@ struct msm_dmov_conf {
- static struct msm_dmov_conf dmov_conf[MSM_DMOV_MAX_ADMS];
- static int nr_adms;
- 
--#define DMOV_SD0(off, ch) (0x0000 + (off) + ((ch) << 2))
--#define DMOV_SD1(off, ch) (0x0400 + (off) + ((ch) << 2))
--#define DMOV_SD2(off, ch) (0x0800 + (off) + ((ch) << 2))
--#define DMOV_SD3(off, ch) (0x0C00 + (off) + ((ch) << 2))
--
- #if defined(CONFIG_ARCH_MSM7X30)
- #define DMOV_SD_AARM DMOV_SD2
-+#define DMOV_SD_SIZE 0x400
-+#elif defined(CONFIG_ARCH_MSM8X60)
-+#define DMOV_SD_AARM DMOV_SD1
-+#define DMOV_SD_SIZE 0x800
- #else
- #define DMOV_SD_AARM DMOV_SD3
-+#define DMOV_SD_SIZE 0x400
+ static struct platform_device *devices[] __initdata = {
+ 	&msm_device_uart3,
++	&msm_device_dmov,
+ 	&msm_device_smd,
+ 	&msm_device_nand,
+ 	&msm_device_hsusb,
+diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+index 7a9a03e..db3201a 100644
+--- a/arch/arm/mach-msm/board-mahimahi.c
++++ b/arch/arm/mach-msm/board-mahimahi.c
+@@ -44,6 +44,7 @@ static struct platform_device *devices[] __initdata = {
+ #if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
+ 	&msm_device_uart1,
  #endif
++	&msm_device_dmov,
+ 	&msm_device_uart_dm1,
+ 	&msm_device_nand,
+ };
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index cf15889..cfd6172 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -79,6 +79,7 @@ static struct platform_device *devices[] __initdata = {
+ #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
+         &msm_device_uart2,
+ #endif
++	&msm_device_dmov,
+ 	&msm_device_smd,
+ 	&msm_device_otg,
+ 	&msm_device_hsusb,
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 127ee6d..50b9dd0 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -93,6 +93,7 @@ static struct msm_otg_platform_data msm_otg_pdata = {
  
-+#define DMOV_ADDR(sd, off, ch) (((sd) * DMOV_SD_SIZE) + (off) + ((ch) << 2))
-+
-+#define DMOV_SD0(off, ch) DMOV_ADDR(0, off, ch)
-+#define DMOV_SD1(off, ch) DMOV_ADDR(1, off, ch)
-+#define DMOV_SD2(off, ch) DMOV_ADDR(2, off, ch)
-+#define DMOV_SD3(off, ch) DMOV_ADDR(3, off, ch)
-+
- #define DMOV_CMD_PTR(ch)      DMOV_SD_AARM(0x000, ch)
- #define DMOV_RSLT(ch)         DMOV_SD_AARM(0x040, ch)
- #define DMOV_FLUSH0(ch)       DMOV_SD_AARM(0x080, ch)
-diff --git a/arch/arm/mach-msm/include/mach/dma.h b/arch/arm/mach-msm/include/mach/dma.h
-index 23041c7..3d67773 100644
---- a/arch/arm/mach-msm/include/mach/dma.h
-+++ b/arch/arm/mach-msm/include/mach/dma.h
-@@ -34,24 +34,10 @@ struct msm_dmov_cmd {
- 	void *data;
+ static struct platform_device *devices[] __initdata = {
+ 	&msm_device_uart3,
++	&msm_device_dmov,
+ 	&msm_device_smd,
+ 	&msm_device_otg,
+ 	&msm_device_hsusb,
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 8143867..5831ce5 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -35,6 +35,7 @@ extern int trout_init_mmc(unsigned int);
+ 
+ static struct platform_device *devices[] __initdata = {
+ 	&msm_device_uart3,
++	&msm_device_dmov,
+ 	&msm_device_smd,
+ 	&msm_device_nand,
+ 	&msm_device_hsusb,
+diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
+index c4f5e26..3ef38a5 100644
+--- a/arch/arm/mach-msm/devices-msm7x00.c
++++ b/arch/arm/mach-msm/devices-msm7x00.c
+@@ -418,8 +418,27 @@ struct platform_device msm_device_mdp = {
+ 	.resource = resources_mdp,
  };
  
--#ifndef CONFIG_ARCH_MSM8X60
- int msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
- int msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
- int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
- int msm_dmov_flush(unsigned int id);
--#else
--static inline
--int msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd) { return -EIO; }
--static inline
--int msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful)
--{
--	return -EIO;
--}
--static inline
--int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr) { return -EIO; }
--static inline
--int msm_dmov_flush(unsigned int id) { return -EIO; }
--#endif
++static struct resource resources_dmov[] = {
++	{
++		.start = MSM7X00_DMOV_PHYS,
++		.end = MSM7X00_DMOV_PHYS + MSM7X00_DMOV_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = INT_ADM_AARM,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device msm_device_dmov = {
++	.name	= "msm_dmov",
++	.id	= -1,
++	.num_resources = ARRAY_SIZE(resources_dmov),
++	.resource = resources_dmov,
++};
++
+ struct clk_lookup msm_clocks_7x01a[] = {
+-	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_PCOM("adm_clk",	ADM_CLK,	"msm_dmov", 0),
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, 0),
+ 	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
+diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+index 09b4f14..f803fcd 100644
+--- a/arch/arm/mach-msm/devices-msm7x30.c
++++ b/arch/arm/mach-msm/devices-msm7x30.c
+@@ -130,8 +130,27 @@ struct platform_device msm_device_hsusb_host = {
+ 	},
+ };
  
- #define DMOV_CMD_LIST         (0 << 29) /* does not work */
- #define DMOV_CMD_PTR_LIST     (1 << 29) /* works */
-@@ -76,8 +62,47 @@ int msm_dmov_flush(unsigned int id) { return -EIO; }
- #define DMOV_CONFIG_FORCE_FLUSH_RSLT   (1 << 1)
- #define DMOV_CONFIG_IRQ_EN             (1 << 0)
++static struct resource resources_dmov[] = {
++	{
++		.start = MSM7X30_DMOV_PHYS,
++		.end = MSM7X30_DMOV_PHYS + MSM7X30_DMOV_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = INT_ADM_AARM,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device msm_device_dmov = {
++	.name	= "msm_dmov",
++	.id	= -1,
++	.num_resources = ARRAY_SIZE(resources_dmov),
++	.resource = resources_dmov,
++};
++
+ struct clk_lookup msm_clocks_7x30[] = {
+-	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_PCOM("adm_clk",	ADM_CLK,	"msm_dmov", 0),
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
+ 	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index 12d8deb..730982f 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -315,8 +315,27 @@ int __init msm_add_sdcc(unsigned int controller,
+ 	return platform_device_register(pdev);
+ }
  
--/* channel assignments */
-+#define DMOV_8X60_GP_CHAN           16
++static struct resource resources_dmov[] = {
++	{
++		.start = QSD8X50_DMOV_PHYS,
++		.end = QSD8X50_DMOV_PHYS + QSD8X50_DMOV_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	{
++		.start = INT_ADM_AARM,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+#define DMOV_8X60_CE_IN_CHAN        2
-+#define DMOV_8X60_CE_IN_CRCI        4
++struct platform_device msm_device_dmov = {
++	.name	= "msm_dmov",
++	.id	= -1,
++	.num_resources = ARRAY_SIZE(resources_dmov),
++	.resource = resources_dmov,
++};
 +
-+#define DMOV_8X60_CE_OUT_CHAN       3
-+#define DMOV_8X60_CE_OUT_CRCI       5
-+
-+#define DMOV_8X60_CE_HASH_CRCI      15
-+
-+#define DMOV_8X60_SDC1_CHAN         18
-+#define DMOV_8X60_SDC1_CRCI         1
-+
-+#define DMOV_8X60_SDC2_CHAN         19
-+#define DMOV_8X60_SDC2_CRCI         4
-+
-+#define DMOV_8X60_SDC3_CHAN         20
-+#define DMOV_8X60_SDC3_CRCI         2
-+
-+#define DMOV_8X60_SDC4_CHAN         21
-+#define DMOV_8X60_SDC4_CRCI         5
-+
-+#define DMOV_8X60_SDC5_CHAN         21
-+#define DMOV_8X60_SDC5_CRCI         14
-+
-+#define DMOV_8X60_TSIF_CHAN         4
-+#define DMOV_8X60_TSIF_CRCI         6
-+
-+#define DMOV_8X60_HSUART1_TX_CHAN   22
-+#define DMOV_8X60_HSUART1_TX_CRCI   8
-+
-+#define DMOV_8X60_HSUART1_RX_CHAN   23
-+#define DMOV_8X60_HSUART1_RX_CRCI   9
-+
-+#define DMOV_8X60_HSUART2_TX_CHAN   8
-+#define DMOV_8X60_HSUART2_TX_CRCI   13
-+
-+#define DMOV_8X60_HSUART2_RX_CHAN   8
-+#define DMOV_8X60_HSUART2_RX_CRCI   14
+ struct clk_lookup msm_clocks_8x50[] = {
+-	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_PCOM("adm_clk",	ADM_CLK,	"msm_dmov", 0),
+ 	CLK_PCOM("ce_clk",	CE_CLK,		NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+ 	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index e7a0cb0..54ebfee 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -40,6 +40,8 @@ extern struct platform_device msm_device_i2c;
  
-+/* channel assignments before 8x60 */
- #define DMOV_NAND_CHAN        7
- #define DMOV_NAND_CRCI_CMD    5
- #define DMOV_NAND_CRCI_DATA   4
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-index 3b19b8f..87a26c6 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-@@ -56,6 +56,12 @@
- #define MSM_SHARED_RAM_BASE	IOMEM(0xF0100000)
- #define MSM_SHARED_RAM_SIZE	SZ_1M
+ extern struct platform_device msm_device_smd;
  
-+#define MSM8X60_DMOV_ADM0_PHYS	0x18320000
-+#define MSM8X60_DMOV_ADM0_SIZE	SZ_1M
++extern struct platform_device msm_device_dmov;
 +
-+#define MSM8X60_DMOV_ADM1_PHYS	0x18420000
-+#define MSM8X60_DMOV_ADM1_SIZE	SZ_1M
-+
- #define MSM8X60_TMR_PHYS	0x02000000
- #define MSM8X60_TMR_SIZE	SZ_4K
+ extern struct platform_device msm_device_nand;
  
+ extern struct platform_device msm_device_mddi0;
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+index 3ff31f9..3bafee9 100644
+--- a/arch/arm/mach-msm/dma.c
++++ b/arch/arm/mach-msm/dma.c
+@@ -20,10 +20,13 @@
+ #include <linux/interrupt.h>
+ #include <linux/completion.h>
+ #include <linux/module.h>
++#include <linux/platform_device.h>
+ #include <mach/dma.h>
+ 
+ #define MSM_DMOV_CHANNEL_COUNT 16
+ 
++#define MODULE_NAME "msm_dmov"
++
+ enum {
+ 	MSM_DMOV_PRINT_ERRORS = 1,
+ 	MSM_DMOV_PRINT_IO = 2,
+@@ -37,11 +40,13 @@ static unsigned int channel_active;
+ static struct list_head ready_commands[MSM_DMOV_CHANNEL_COUNT];
+ static struct list_head active_commands[MSM_DMOV_CHANNEL_COUNT];
+ unsigned int msm_dmov_print_mask = MSM_DMOV_PRINT_ERRORS;
++static void __iomem *msm_dmov_base;
++static unsigned msm_dmov_irq;
+ 
+-#define DMOV_SD0(off, ch) (MSM_DMOV_BASE + 0x0000 + (off) + ((ch) << 2))
+-#define DMOV_SD1(off, ch) (MSM_DMOV_BASE + 0x0400 + (off) + ((ch) << 2))
+-#define DMOV_SD2(off, ch) (MSM_DMOV_BASE + 0x0800 + (off) + ((ch) << 2))
+-#define DMOV_SD3(off, ch) (MSM_DMOV_BASE + 0x0C00 + (off) + ((ch) << 2))
++#define DMOV_SD0(off, ch) (msm_dmov_base + 0x0000 + (off) + ((ch) << 2))
++#define DMOV_SD1(off, ch) (msm_dmov_base + 0x0400 + (off) + ((ch) << 2))
++#define DMOV_SD2(off, ch) (msm_dmov_base + 0x0800 + (off) + ((ch) << 2))
++#define DMOV_SD3(off, ch) (msm_dmov_base + 0x0C00 + (off) + ((ch) << 2))
+ 
+ #if defined(CONFIG_ARCH_MSM7X30)
+ #define DMOV_SD_AARM DMOV_SD2
+@@ -127,7 +132,7 @@ void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd)
+ 		PRINT_IO("msm_dmov_enqueue_cmd(%d), start command, status %x\n", id, status);
+ 		list_add_tail(&cmd->list, &active_commands[id]);
+ 		if (!channel_active)
+-			enable_irq(INT_ADM_AARM);
++			enable_irq(msm_dmov_irq);
+ 		channel_active |= 1U << id;
+ 		writel(cmd->cmdptr, DMOV_CMD_PTR(id));
+ 	} else {
+@@ -303,7 +308,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
+ 	}
+ 
+ 	if (!channel_active) {
+-		disable_irq_nosync(INT_ADM_AARM);
++		disable_irq_nosync(msm_dmov_irq);
+ 		msm_dmov_clocks_off();
+ 	}
+ 
+@@ -319,46 +324,79 @@ static void __init msm_dmov_deinit_clocks(void)
+ 		clk_put(msm_dmov_pclk);
+ }
+ 
+-static int __init msm_dmov_init_clocks(void)
++static int __devinit msm_dmov_init_clocks(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 
+-	msm_dmov_clk = clk_get(NULL, "adm_clk");
++	msm_dmov_clk = clk_get(&pdev->dev, "adm_clk");
+ 	if (IS_ERR(msm_dmov_clk)) {
+ 		PRINT_ERROR("%s: Error getting adm_clk\n", __func__);
+ 		ret = PTR_ERR(msm_dmov_clk);
+ 	}
+ 
+-	msm_dmov_pclk = clk_get(NULL, "adm_pclk");
++	msm_dmov_pclk = clk_get(&pdev->dev, "adm_pclk");
+ 	/* pclk not present on all SoCs, don't return error on failure */
+ 
+ 	return ret;
+ }
+ 
+-static int __init msm_init_datamover(void)
++static int __devinit msm_dmov_probe(struct platform_device *pdev)
+ {
+ 	int i;
+ 	int ret;
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENXIO;
++
++	msm_dmov_base = ioremap_nocache(res->start, resource_size(res));
++	if (!msm_dmov_base)
++		return -ENOMEM;
+ 
+ 	for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {
+ 		INIT_LIST_HEAD(&ready_commands[i]);
+ 		INIT_LIST_HEAD(&active_commands[i]);
+-		writel(DMOV_CONFIG_IRQ_EN | DMOV_CONFIG_FORCE_TOP_PTR_RSLT | DMOV_CONFIG_FORCE_FLUSH_RSLT, DMOV_CONFIG(i));
++		writel(DMOV_CONFIG_IRQ_EN | DMOV_CONFIG_FORCE_TOP_PTR_RSLT |
++		       DMOV_CONFIG_FORCE_FLUSH_RSLT, DMOV_CONFIG(i));
+ 	}
+ 
+-	ret = msm_dmov_init_clocks();
++	ret = msm_dmov_init_clocks(pdev);
+ 	if (ret)
+-		return ret;
++		goto out_map;
+ 
+-	ret = request_irq(INT_ADM_AARM, msm_datamover_irq_handler, 0,
+-			  "msmdatamover", NULL);
+-	if (ret) {
+-		msm_dmov_deinit_clocks();
+-		return ret;
++	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!res) {
++		ret = -EINVAL;
++		goto out_clock;
+ 	}
+-	disable_irq(INT_ADM_AARM);
++
++	msm_dmov_irq = res->start;
++	ret = request_irq(msm_dmov_irq, msm_datamover_irq_handler, 0,
++			  "msmdatamover", NULL);
++	if (ret)
++		goto out_clock;
++	disable_irq(msm_dmov_irq);
++
+ 	return 0;
++out_clock:
++	msm_dmov_deinit_clocks();
++out_map:
++	iounmap(msm_dmov_base);
++	return ret;
+ }
+ 
+-arch_initcall(msm_init_datamover);
++static struct platform_driver msm_dmov_driver = {
++	.probe = msm_dmov_probe,
++	.driver = {
++		.name = MODULE_NAME,
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init msm_init_datamover(void)
++{
++	return platform_driver_register(&msm_dmov_driver);
++}
+ 
++arch_initcall(msm_init_datamover);
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+index 8f99d97..d6540e1 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+@@ -51,9 +51,8 @@
+ #define MSM7X00_CSR_PHYS      0xC0100000
+ #define MSM7X00_CSR_SIZE      SZ_4K
+ 
+-#define MSM_DMOV_BASE         IOMEM(0xE0002000)
+-#define MSM_DMOV_PHYS         0xA9700000
+-#define MSM_DMOV_SIZE         SZ_4K
++#define MSM7X00_DMOV_PHYS     0xA9700000
++#define MSM7X00_DMOV_SIZE     SZ_4K
+ 
+ #define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+ #define MSM_GPIO1_PHYS        0xA9200000
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+index 4d84be1..23912e5 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+@@ -42,9 +42,8 @@
+ #define MSM7X30_CSR_PHYS      0xC0100000
+ #define MSM7X30_CSR_SIZE      SZ_4K
+ 
+-#define MSM_DMOV_BASE         IOMEM(0xE0002000)
+-#define MSM_DMOV_PHYS         0xAC400000
+-#define MSM_DMOV_SIZE         SZ_4K
++#define MSM7X30_DMOV_PHYS     0xAC400000
++#define MSM7X30_DMOV_SIZE     SZ_4K
+ 
+ #define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+ #define MSM_GPIO1_PHYS        0xAC001000
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+index d414320..fc36b82 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+@@ -42,9 +42,8 @@
+ #define QSD8X50_CSR_PHYS      0xAC100000
+ #define QSD8X50_CSR_SIZE      SZ_4K
+ 
+-#define MSM_DMOV_BASE         IOMEM(0xE0002000)
+-#define MSM_DMOV_PHYS         0xA9700000
+-#define MSM_DMOV_SIZE         SZ_4K
++#define QSD8X50_DMOV_PHYS     0xA9700000
++#define QSD8X50_DMOV_SIZE     SZ_4K
+ 
+ #define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+ #define MSM_GPIO1_PHYS        0xA9000000
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index cec6ed1..1c86cda 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -42,7 +42,6 @@
+ static struct map_desc msm_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, MSM7X00),
+-	MSM_DEVICE(DMOV),
+ 	MSM_DEVICE(GPIO1),
+ 	MSM_DEVICE(GPIO2),
+ 	MSM_DEVICE(CLK_CTL),
+@@ -75,7 +74,6 @@ void __init msm_map_common_io(void)
+ static struct map_desc qsd8x50_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, QSD8X50),
+-	MSM_DEVICE(DMOV),
+ 	MSM_DEVICE(GPIO1),
+ 	MSM_DEVICE(GPIO2),
+ 	MSM_DEVICE(CLK_CTL),
+@@ -134,7 +132,6 @@ void __init msm_map_msm8960_io(void)
+ static struct map_desc msm7x30_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, MSM7X30),
+-	MSM_DEVICE(DMOV),
+ 	MSM_DEVICE(GPIO1),
+ 	MSM_DEVICE(GPIO2),
+ 	MSM_DEVICE(CLK_CTL),
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
