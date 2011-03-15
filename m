@@ -1,35 +1,49 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 15 Mar 2011 11:34:27 +0000
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <87vczkmy94.fsf@macbook.be.48ers.dk>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
-	<87vczkmy94.fsf@macbook.be.48ers.dk>
-Message-ID: <20110315113427.GE2914@pulham.picochip.com>
+From: James.Bottomley@suse.de (James Bottomley)
+Date: Tue, 15 Mar 2011 07:50:28 -0400
+Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
+In-Reply-To: <20110315030956.GA2234@kroah.com>
+References: <cover.1296818921.git.segoon@openwall.com>
+	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
+	<1300155965.5665.15.camel@mulgrave.site>
+	<20110315030956.GA2234@kroah.com>
+Message-ID: <1300189828.4017.2.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Tue, Mar 15, 2011 at 12:14:31PM +0100, Peter Korsgaard wrote:
-> >>>>> "Jamie" == Jamie Iles <jamie@jamieiles.com> writes:
->  Jamie> +++ b/include/linux/platform_data/macb.h
->  Jamie> @@ -0,0 +1,17 @@
->  Jamie> +/*
->  Jamie> + * Copyright (C) 2004-2006 Atmel Corporation
->  Jamie> + *
->  Jamie> + * This program is free software; you can redistribute it and/or modify
->  Jamie> + * it under the terms of the GNU General Public License version 2 as
->  Jamie> + * published by the Free Software Foundation.
->  Jamie> + */
->  Jamie> +#ifndef __MACB_PDATA_H__
->  Jamie> +#define __MACB_PDATA_H__
->  Jamie> +
->  Jamie> +struct eth_platform_data {
+On Mon, 2011-03-14 at 20:09 -0700, Greg KH wrote:
+> On Mon, Mar 14, 2011 at 10:26:05PM -0400, James Bottomley wrote:
+> > On Sat, 2011-03-12 at 23:23 +0300, Vasiliy Kulikov wrote:
+> > > > Vasiliy Kulikov (20):
+> > > >  mach-ux500: mbox-db5500: world-writable sysfs fifo file
+> > > >  leds: lp5521: world-writable sysfs engine* files
+> > > >  leds: lp5523: world-writable engine* sysfs files
+> > > >  misc: ep93xx_pwm: world-writable sysfs files
+> > > >  rtc: rtc-ds1511: world-writable sysfs nvram file
+> > > >  scsi: aic94xx: world-writable sysfs update_bios file
+> > > >  scsi: iscsi: world-writable sysfs priv_sess file
+> > > 
+> > > These are still not merged :(
+> > 
+> > OK, so I've not been tracking where we are in the dizzying ride on
+> > security systems.  However, I thought we landed up in the privilege
+> > separation arena using capabilities.  That means that world writeable
+> > files aren't necessarily a problem as long as the correct capabilities
+> > checks are in place, right?
 > 
-> How about at the same time renaming it to something a bit less generic
-> like macb_platform_data?
+> There are no capability checks on sysfs files right now, so these all
+> need to be fixed.
 
-Yes, that's a fair point.
+That statement is true but irrelevant, isn't it?  There can't be
+capabilities within sysfs files because the system that does them has no
+idea what the capabilities would be.  If there were capabilities checks,
+they'd have to be in the implementing routines.
 
-Jamie
+I think the questions are twofold:
+
+     1. Did anyone actually check for capabilities before assuming world
+        writeable files were wrong?
+     2. Even if there aren't any capabilities checks in the implementing
+        routines, should there be (are we going the separated
+        capabilities route vs the monolithic root route)?
+
+James
