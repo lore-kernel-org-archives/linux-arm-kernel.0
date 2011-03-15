@@ -1,52 +1,60 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 15 Mar 2011 12:44:16 +0000
-Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
-In-Reply-To: <20110315123539.GD14548@game.jcrosoft.org>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
-	<20110315123539.GD14548@game.jcrosoft.org>
-Message-ID: <20110315124416.GG2914@pulham.picochip.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Mar 2011 21:50:36 +0900
+Subject: [PATCH v2 0/4] S5PC210/S5PV310/EXYNOS4 interrupts update
+In-Reply-To: <1300086286-9006-1-git-send-email-m.szyprowski@samsung.com>
+References: <1300086286-9006-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <011201cbe30f$9728d000$c57a7000$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 01:35:39PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:14 Tue 15 Mar     , Jamie Iles wrote:
-> > The macb driver expects clocks with the names "pclk" and "hclk".  We
-> > currently provide "macb_clk" but to fit in line with other
-> > architectures (namely AVR32), provide "pclk" and a fake "hclk".
-> > 
-> > Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> > ---
-> >  arch/arm/mach-at91/at572d940hf.c |    8 +++++++-
-> >  arch/arm/mach-at91/at91cap9.c    |    8 +++++++-
-> >  arch/arm/mach-at91/at91sam9260.c |    8 +++++++-
-> >  arch/arm/mach-at91/at91sam9263.c |    8 +++++++-
-> >  arch/arm/mach-at91/at91sam9g45.c |    8 +++++++-
-> >  5 files changed, 35 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-> > index a6b9c68..9b3a37e 100644
-> > --- a/arch/arm/mach-at91/at572d940hf.c
-> > +++ b/arch/arm/mach-at91/at572d940hf.c
-> > @@ -71,10 +71,15 @@ static struct clk pioC_clk = {
-> >  	.type		= CLK_TYPE_PERIPHERAL,
-> >  };
-> >  static struct clk macb_clk = {
-> > -	.name		= "macb_clk",
-> > +	.name		= "pclk",
-> >  	.pmc_mask	= 1 << AT572D940HF_ID_EMAC,
-> >  	.type		= CLK_TYPE_PERIPHERAL,
-> >  };
-> > +static struct clk macb_hclk = {
-> > +	.name		= "hclk",
-> > +	.pmc_mask	= 0,
-> > +	.type		= CLK_TYPE_PERIPHERAL,
-> > +};
-> for the fake clock you must specify the parent as macb_clk
+Marek Szyprowski wrote:
 > 
-> take a look on the tcb1_clk for the 9g45
+> Hello,
+> 
+> This patch series perform an update on interrupts support for
+> S5PC210/S5PV310/EXYNOS4 platform. An optional support for GPIO
+> interrupts handler has been added The patches have been prepared to
+> maximise the code reuse, so common code for gpio interrupts for s5pc100,
+> s5pc110 & s5pc210 have been prepared.
+> 
+> The patches have been prepared against
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> for-next branch (commit be7004f73d0).
+> 
+> Patches that make use of these optional features for universal c210
+> board will follow soon.
+> 
+> Changes since v1:
+> - rebased onto latest version of kgene/for-next kernel tree (with s5pv310
+>   to exynos4 rename)
+> - removed machine specific interrupt patch from this patch series
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (4):
+>   ARM: EXYNOS4: Add missing GPYx banks.
+>   ARM: Samsung: cleanup S5P gpio interrupt code
+>   ARM: Samsung: add function to register gpio interrupt bank data
+>   ARM: EXYNOS4: add support for gpio interrupts
+> 
+>  arch/arm/mach-exynos4/gpiolib.c               |   67 ++++++++++-
+>  arch/arm/mach-exynos4/include/mach/gpio.h     |   23 ++++-
+>  arch/arm/mach-exynos4/include/mach/irqs.h     |   12 ++-
+>  arch/arm/mach-s5pc100/gpiolib.c               |    1 +
+>  arch/arm/mach-s5pv210/gpiolib.c               |    1 +
+>  arch/arm/plat-s5p/irq-gpioint.c               |  169
++++++++++++++++--------
+> --
+>  arch/arm/plat-samsung/include/plat/gpio-cfg.h |   16 +++
+>  7 files changed, 216 insertions(+), 73 deletions(-)
+> 
+> --
 
-Ok, will do.  Thanks for the pointer!
+Ok, applied.
+Thanks.
 
-Jamie
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
