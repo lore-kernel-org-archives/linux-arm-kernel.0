@@ -1,49 +1,54 @@
-From: James.Bottomley@suse.de (James Bottomley)
-Date: Tue, 15 Mar 2011 07:50:28 -0400
-Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
-In-Reply-To: <20110315030956.GA2234@kroah.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
-	<1300155965.5665.15.camel@mulgrave.site>
-	<20110315030956.GA2234@kroah.com>
-Message-ID: <1300189828.4017.2.camel@mulgrave.site>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Mar 2011 21:04:36 +0900
+Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
+References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <010e01cbe309$29e73460$7db59d20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-03-14 at 20:09 -0700, Greg KH wrote:
-> On Mon, Mar 14, 2011 at 10:26:05PM -0400, James Bottomley wrote:
-> > On Sat, 2011-03-12 at 23:23 +0300, Vasiliy Kulikov wrote:
-> > > > Vasiliy Kulikov (20):
-> > > >  mach-ux500: mbox-db5500: world-writable sysfs fifo file
-> > > >  leds: lp5521: world-writable sysfs engine* files
-> > > >  leds: lp5523: world-writable engine* sysfs files
-> > > >  misc: ep93xx_pwm: world-writable sysfs files
-> > > >  rtc: rtc-ds1511: world-writable sysfs nvram file
-> > > >  scsi: aic94xx: world-writable sysfs update_bios file
-> > > >  scsi: iscsi: world-writable sysfs priv_sess file
-> > > 
-> > > These are still not merged :(
-> > 
-> > OK, so I've not been tracking where we are in the dizzying ride on
-> > security systems.  However, I thought we landed up in the privilege
-> > separation arena using capabilities.  That means that world writeable
-> > files aren't necessarily a problem as long as the correct capabilities
-> > checks are in place, right?
+Kukjin Kim wrote:
 > 
-> There are no capability checks on sysfs files right now, so these all
-> need to be fixed.
+> Mark Brown wrote:
+> >
+> > The cpufreq init function is referenced from the driver structure and
+> > we don't appear to have annotations which allow us to mark that it'll
+> > never be called after system init, causing the linker consistency
+> > infrastructure to complain. Just remove the __init annotation to avoid
+> > noise from the build.
+> >
+> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > ---
+> >  arch/arm/mach-s3c64xx/cpufreq.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-
+> > s3c64xx/cpufreq.c
+> > index 74c0e83..4375b97 100644
+> > --- a/arch/arm/mach-s3c64xx/cpufreq.c
+> > +++ b/arch/arm/mach-s3c64xx/cpufreq.c
+> > @@ -181,7 +181,7 @@ static void __init
+> s3c64xx_cpufreq_config_regulator(void)
+> >  }
+> >  #endif
+> >
+> > -static int __init s3c64xx_cpufreq_driver_init(struct cpufreq_policy
+> *policy)
+> > +static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+> >  {
+> >  	int ret;
+> >  	struct cpufreq_frequency_table *freq;
+> > --
+> 
+> Looks ok, applied into s5p-fixes-for-linus for 38 :)
+> Thanks.
+> 
+Oops, I missed 'pull request' before 38 :(
+So will apply this into for-next...
 
-That statement is true but irrelevant, isn't it?  There can't be
-capabilities within sysfs files because the system that does them has no
-idea what the capabilities would be.  If there were capabilities checks,
-they'd have to be in the implementing routines.
+Thanks.
 
-I think the questions are twofold:
-
-     1. Did anyone actually check for capabilities before assuming world
-        writeable files were wrong?
-     2. Even if there aren't any capabilities checks in the implementing
-        routines, should there be (are we going the separated
-        capabilities route vs the monolithic root route)?
-
-James
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
