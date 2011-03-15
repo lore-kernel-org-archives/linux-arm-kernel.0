@@ -1,39 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 15 Mar 2011 10:49:46 +0100
-Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
-References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
-	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
-	<20110315090656.GC13316@pengutronix.de>
-	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
-Message-ID: <20110315094946.GD13316@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Mar 2011 09:53:41 +0000
+Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <4D7F32B2.6020905@samsung.com>
+References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
+	<201103111615.01829.arnd@arndb.de>
+	<000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
+	<201103111700.17373.arnd@arndb.de>
+	<AANLkTimagS1vBXEYjXQDx=OGhTRm=n0yO4n+kHTAqBOz@mail.gmail.com>
+	<20110314124652.GF26085@n2100.arm.linux.org.uk>
+	<AANLkTinzBvkcB111UZd2rJ9raaXkh2TqmTw5Y+4WFd48@mail.gmail.com>
+	<20110315083515.GA3921@n2100.arm.linux.org.uk>
+	<4D7F32B2.6020905@samsung.com>
+Message-ID: <20110315095341.GD3921@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
-> I tried the following
-> 
-> @@
-> expression E1,E2;
-> @@
-> 
->       gpio_direction_output(E1,E2);
->       ...
-> -     gpio_set_value(E1,E2);
-> 
-> and found occurrences in 15 files.  In some cases there seems to be some 
-> delay before the call to gpio_set_value.  Does that have any impacton 
-> whether it is needed?
-gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
-there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
-noop.
+On Tue, Mar 15, 2011 at 06:34:42PM +0900, daeinki wrote:
+> Russell King - ARM Linux ? ?:
+>> On Tue, Mar 15, 2011 at 10:45:50AM +0900, InKi Dae wrote:
+>>> 2011/3/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>>>> On Mon, Mar 14, 2011 at 09:37:51PM +0900, KyongHo Cho wrote:
+>>>>> I have also noticed that dma_map_single/page/sg() can map physical
+>>>>> memory into an arbitrary device address region.
+>>>>> But it is not enough solution for various kinds of IOMMUs.
+>>>>> As Kukjin Kim addressed, we need to support larger page size than 4KB
+>>>>> because we can reduce TLB miss when we have larger page size.
+>>>>>
+>>>>> Our IOMMU(system mmu) supports all page size of ARM architecture
+>>>>> including 16MB, 1MB, 64KB and 4KB.
+>>>>> Since the largest size supported by buddy system of 32-bit architecture is 4MB,
+>>>>> our system support all page sizes except 16MB.
+>>>>> We proved that larger page size is helpful for DMA performance
+>>>>> significantly (more than 10%, approximately).
+>>>>> Big page size is not a problem for peripheral devices
+>>>>> because their address space is not suffer from external fragmentation.
+>>>> 1. dma_map_single() et.al. is used for mapping *system* *RAM* for devices
+>>>>   using whatever is necessary.  It must not be used for trying to setup
+>>>>   arbitary other mappings.
+>>>>
+>>>> 2. It doesn't matter where the memory for dma_map_single() et.al. comes
+>>>>   from provided the virtual address is a valid system RAM address or
+>>>>   the struct page * is a valid struct page in the memory map (iow, you
+>>>>   can't create this yourself.)
+>>> You mean that we cannot have arbitrary virtual address mapping for
+>>> iommu based device?
+>>
+>> No.  I mean exactly what I said - I'm talking about the DMA API in the
+>> above two points.  The implication is that you can not create arbitary
+>> mappings of non-system RAM with the DMA API.
+>>
+> sorry but I couldn't understand exactly what you said. could you give me  
+> your answer one more time?
+> does non-system RAM mean reserved memory regions? if not, is it  
+> arbitrary virtual address space that isn't kernel or user virtual  
+> address space and is the space for iommu based deivce?
 
-I still don't know how to work with coccinelle, so if you point me to a
-concrete location I can be more specific.
+For dma_map_single(dev, addr, size, dir), basically:
 
-Best regards
-Uwe
+	for (a = addr; a < addr + size; a += PAGE_SIZE)
+		BUG_ON(!virt_addr_valid(a));
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+For dma_map_page(dev, page, offset, size, dir), 'page' must be something
+obtained from one of the page-based kernel allocators (so either refering
+to a page in the *existing* lowmem or highmem memory) _and_ you must not
+use offset/size to then point@something outside that.
+
+So, if you take something out of the kernel's knowledge of what is memory,
+you can't then use the DMA API with it.
