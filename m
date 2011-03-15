@@ -1,50 +1,21 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Mar 2011 13:36:16 +0100
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <87vczkmy94.fsf@macbook.be.48ers.dk>
+Date: Tue, 15 Mar 2011 13:36:51 +0100
+Subject: [PATCHv2 4/9] macb: convert printk to netdev_ and friends
+In-Reply-To: <1300184096-13937-5-git-send-email-jamie@jamieiles.com>
 References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
-	<87vczkmy94.fsf@macbook.be.48ers.dk>
-Message-ID: <20110315123616.GE14548@game.jcrosoft.org>
+	<1300184096-13937-5-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110315123651.GF14548@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:14 Tue 15 Mar     , Peter Korsgaard wrote:
-> >>>>> "Jamie" == Jamie Iles <jamie@jamieiles.com> writes:
+On 10:14 Tue 15 Mar     , Jamie Iles wrote:
+> macb is already using the dev_dbg() and friends helpers so use netdev_()
+> along with a pr_fmt() definition to make the printing a little cleaner.
 > 
-> Hi,
-> 
->  Jamie> Both at91 and avr32 defines its own platform data structure for
->  Jamie> the macb driver and both share common structures though at91
->  Jamie> includes a currently unused phy_irq_pin.  Create a common
->  Jamie> eth_platform_data for macb that both at91 and avr32 can use.  In
->  Jamie> future we can use this to support other architectures that use the
->  Jamie> same IP block with the macb driver.
-> 
-> Nice!
-> 
->  Jamie> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> 
->  Jamie> +++ b/include/linux/platform_data/macb.h
->  Jamie> @@ -0,0 +1,17 @@
->  Jamie> +/*
->  Jamie> + * Copyright (C) 2004-2006 Atmel Corporation
->  Jamie> + *
->  Jamie> + * This program is free software; you can redistribute it and/or modify
->  Jamie> + * it under the terms of the GNU General Public License version 2 as
->  Jamie> + * published by the Free Software Foundation.
->  Jamie> + */
->  Jamie> +#ifndef __MACB_PDATA_H__
->  Jamie> +#define __MACB_PDATA_H__
->  Jamie> +
->  Jamie> +struct eth_platform_data {
-> 
-> How about at the same time renaming it to something a bit less generic
-> like macb_platform_data?
-agreed
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+looks fine
+
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Best Regards,
 J.
-> 
-> -- 
-> Bye, Peter Korsgaard
