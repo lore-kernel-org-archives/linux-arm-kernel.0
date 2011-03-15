@@ -1,42 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Mar 2011 22:35:50 +0900
-Subject: [PATCH 0/2] ARM: EXYNOS4: Enhancement of System MMU
-In-Reply-To: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
-References: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
-Message-ID: <011701cbe315$e9677140$bc3653c0$%kim@samsung.com>
+From: manjunath.hadli@ti.com (Manjunath Hadli)
+Date: Tue, 15 Mar 2011 19:26:28 +0530
+Subject: [PATCH v17 00/13] davinci vpbe: dm6446 v4l2 driver
+Message-ID: <1300197388-3704-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KyongHo Cho wrote:
-> 
-> This patch includes the following enhancements for System MMU:
-> - Enhanced readability
-> - Removal of unused data structures or their members
-> - Simplified function definitions
-> - Corrections of some logical errors
-> - Full compliance with Linux coding style
-> - Simpler way of registering callback functions of System MMU faults
-> - Add clock gating for System MMU
-> 
-> [PATCH 1/2] ARM: EXYNOS4: Enhancement of System MMU driver
-> [PATCH 2/2] ARM: EXYNOS4: Implement Clock gating for System MMU
+version17:
+The more important among the patch history from previous comments 
+1. Replacing _raw_readl() with readl().
+2. Removal of platform resource overlap.
+3. Removal of unused macros.
+4. Fixing the module params typo.
+5. Minor changes in the GPL licensing header.
+6. Removed the initializer for field inversion parameter.
+7. Changing the Field inversion #ifdef to platform 
+   based implementation.
+8. Interchanged platform and board specific patches due to dependencies.
 
-Cc'ed Marek.
+Manjunath Hadli (13):
+  davinci vpbe: V4L2 display driver for DM644X SoC
+  davinci vpbe: VPBE display driver
+  davinci vpbe: OSD(On Screen Display) block
+  davinci vpbe: VENC( Video Encoder) implementation
+  davinci vpbe: Build infrastructure for VPBE driver
+  davinci vpbe: Readme text for Dm6446 vpbe
+  davinci: move DM64XX_VDD3P3V_PWDN to devices.c
+  davinci: eliminate use of IO_ADDRESS() on sysmod
+  davinci: dm644x: Replace register base value with a defined macro
+  davinci: dm644x: change vpfe capture structure variables for
+    consistency
+  davinci: dm644x: move vpfe init from soc to board specific files
+  davinci: dm644x: add support for v4l2 video display
+  davinci: dm644x EVM: add support for VPBE display
 
-As I said before, Marek's SystemMMU driver has some problems.
-
-One is that it allocates 4MB virtual memory at once. It is really a problem
-because, the device memory manager must knows the peculiarity and handles
-it. Otherwise, page tables can be overwritten...
-
-Anyway, I think Marek's initial idea is good esp., clock handling.
-But now, this looks better for its enhancement and as we know if required,
-we can improve this later.
-
-Applied, thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ Documentation/video4linux/README.davinci-vpbe |   93 ++
+ arch/arm/mach-davinci/board-dm644x-evm.c      |  131 ++-
+ arch/arm/mach-davinci/devices.c               |   24 +-
+ arch/arm/mach-davinci/dm355.c                 |    1 +
+ arch/arm/mach-davinci/dm365.c                 |    1 +
+ arch/arm/mach-davinci/dm644x.c                |  172 ++-
+ arch/arm/mach-davinci/dm646x.c                |    1 +
+ arch/arm/mach-davinci/include/mach/dm644x.h   |    7 +-
+ arch/arm/mach-davinci/include/mach/hardware.h |    7 +-
+ drivers/media/video/davinci/Kconfig           |   22 +
+ drivers/media/video/davinci/Makefile          |    2 +
+ drivers/media/video/davinci/vpbe.c            |  826 ++++++++++
+ drivers/media/video/davinci/vpbe_display.c    | 2084 +++++++++++++++++++++++++
+ drivers/media/video/davinci/vpbe_osd.c        | 1216 ++++++++++++++
+ drivers/media/video/davinci/vpbe_osd_regs.h   |  364 +++++
+ drivers/media/video/davinci/vpbe_venc.c       |  556 +++++++
+ drivers/media/video/davinci/vpbe_venc_regs.h  |  177 +++
+ include/media/davinci/vpbe.h                  |  185 +++
+ include/media/davinci/vpbe_display.h          |  146 ++
+ include/media/davinci/vpbe_osd.h              |  397 +++++
+ include/media/davinci/vpbe_types.h            |   91 ++
+ include/media/davinci/vpbe_venc.h             |   41 +
+ 22 files changed, 6500 insertions(+), 44 deletions(-)
+ create mode 100644 Documentation/video4linux/README.davinci-vpbe
+ create mode 100644 drivers/media/video/davinci/vpbe.c
+ create mode 100644 drivers/media/video/davinci/vpbe_display.c
+ create mode 100644 drivers/media/video/davinci/vpbe_osd.c
+ create mode 100644 drivers/media/video/davinci/vpbe_osd_regs.h
+ create mode 100644 drivers/media/video/davinci/vpbe_venc.c
+ create mode 100644 drivers/media/video/davinci/vpbe_venc_regs.h
+ create mode 100644 include/media/davinci/vpbe.h
+ create mode 100644 include/media/davinci/vpbe_display.h
+ create mode 100644 include/media/davinci/vpbe_osd.h
+ create mode 100644 include/media/davinci/vpbe_types.h
+ create mode 100644 include/media/davinci/vpbe_venc.h
