@@ -1,41 +1,47 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Tue, 15 Mar 2011 08:59:09 +0200
-Subject: [PATCH v2 0/3] Harmony PCI-e and regulators
-In-Reply-To: <cover.1299680416.git.mike@compulab.co.il>
-References: <cover.1299680416.git.mike@compulab.co.il>
-Message-ID: <4D7F0E3D.1090005@compulab.co.il>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Tue, 15 Mar 2011 12:53:47 +0530
+Subject: [PATCH v3 7/7] tty: add pruss SUART driver
+In-Reply-To: <20110308104757.0f75409b.randy.dunlap@oracle.com>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com><1299592667-21367-8-git-send-email-subhasish@mistralsolutions.com>
+	<20110308104757.0f75409b.randy.dunlap@oracle.com>
+Message-ID: <99FA4F65346D4615AC7C8CFEF72133E7@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any update on this?
+Hello,
 
-On 03/09/11 16:31, Mike Rapoport wrote:
-> These patches provide update for Harmony PCI-e intialization and add
-> registration of the TPS65862 PMIC.
-> Additionally, there are several tegra_defconfig updates. These updates
-> allow booting the Harmony with PCI-e enabled and add ability to boot
-> TrimSlice with root on NFS.
-> 
-> v2 changes:
->    * rework the TPS65862 PMIC initialization as suggested by Mark
->    * rebase the patches on top of Olof's board-for-next branch
-> 
-> Mike Rapoport (3):
->   ARM: tegra: harmony: update PCI-e initialization sequence
->   ARM: tegra: harmony: initialize the TPS65862 PMIC
->   ARM: tegra: update defconfig
-> 
->  arch/arm/configs/tegra_defconfig          |   12 +++-
->  arch/arm/mach-tegra/Makefile              |    1 +
->  arch/arm/mach-tegra/board-harmony-pcie.c  |   24 ++++++-
->  arch/arm/mach-tegra/board-harmony-power.c |  117 +++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/board-harmony.c       |    1 +
->  arch/arm/mach-tegra/board-harmony.h       |    1 +
->  6 files changed, 153 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/board-harmony-power.c
-> 
+Thank you for your comments.
+Would really appreciate more comments and ways to fix this patch and bring 
+it
+up to Linux Standards.
+If I have missed something/misunderstood then please let me know.
 
 
--- 
-Sincerely yours,
-Mike.
+>> +config SERIAL_PRUSS_SUART
+>> + depends on ARCH_DAVINCI && ARCH_DAVINCI_DA850
+>> + select SERIAL_CORE
+>> + tristate "PRUSS based SoftUART emulation on DA8XX"
+>> + ---help---
+>> + This driver emulates upto eight different UARTs on the PRUSS.
+>
+>                      up to
+>
+SG -- Ok Will do.
+
+
+>> + You may modify the NR_SUARTS macro in the driver to emulate
+>> + less number of UARTS as per your requirement.
+>> + If not sure, mark N
+>
+>              mark N.
+>
+SG -- Ok Will do.
+
+
+>> +    Enter the McASP number to use with SUART (0, 1 or 2).
+>> + You will need to recompile the kernel if this is changed.
+>
+> The 2 help text lines should be indented the same.
+>
+SG - Ok will do.
+ 
