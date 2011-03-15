@@ -1,42 +1,29 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Tue, 15 Mar 2011 10:21:26 +0800
-Subject: [PATCH] arm/dt: Add dtb make rule
-In-Reply-To: <4D7EA61D.4030403@gmail.com>
-References: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
-	<4D7EA61D.4030403@gmail.com>
-Message-ID: <AANLkTin8AoX23GkkVTe1OFLcyx72Fpb6Vfgf=Q4Pes2V@mail.gmail.com>
+From: James.Bottomley@suse.de (James Bottomley)
+Date: Mon, 14 Mar 2011 22:26:05 -0400
+Subject: [PATCH 00/20] world-writable files in sysfs and debugfs
+In-Reply-To: <AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
+References: <cover.1296818921.git.segoon@openwall.com>
+	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
+Message-ID: <1300155965.5665.15.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/15 Rob Herring <robherring2@gmail.com>:
-> Grant,
->
-> On 03/10/2011 01:46 PM, Rob Herring wrote:
->>
->> From: Rob Herring<rob.herring@calxeda.com>
->>
->> Add a make rule to compile dt blobs for ARM.
->>
->> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
->
-> Can you pick this one up in your ARM tree.
+On Sat, 2011-03-12 at 23:23 +0300, Vasiliy Kulikov wrote:
+> > Vasiliy Kulikov (20):
+> >  mach-ux500: mbox-db5500: world-writable sysfs fifo file
+> >  leds: lp5521: world-writable sysfs engine* files
+> >  leds: lp5523: world-writable engine* sysfs files
+> >  misc: ep93xx_pwm: world-writable sysfs files
+> >  rtc: rtc-ds1511: world-writable sysfs nvram file
+> >  scsi: aic94xx: world-writable sysfs update_bios file
+> >  scsi: iscsi: world-writable sysfs priv_sess file
+> 
+> These are still not merged :(
 
-Test result on i.MX51 babbage board:
+OK, so I've not been tracking where we are in the dizzying ride on
+security systems.  However, I thought we landed up in the privilege
+separation arena using capabilities.  That means that world writeable
+files aren't necessarily a problem as long as the correct capabilities
+checks are in place, right?
 
-gcl/linux-2.6$ make babbage.dtb  ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
-DTC     arch/arm/boot/babbage.dtb
-DTC: dts->dtb  on file "arch/arm/boot/dts/babbage.dts"
-
-
-Tested-by: Jason Liu <jason.hui@linaro.org>
-
-Jason
-
->
-> Rob
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+James
