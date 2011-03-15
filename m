@@ -1,60 +1,38 @@
-From: sheetals@codeaurora.org (Sheetal Sahasrabudhe)
-Date: Tue, 15 Mar 2011 08:58:31 -0700 (PDT)
-Subject: [PATCH v4 2/3] [ARM] perfevents: Add support for Scorpion
-	performance monitors
-In-Reply-To: <4D7EC274.4020407@codeaurora.org>
-References: <1299608733-28514-1-git-send-email-sheetals@codeaurora.org>
-	<1299691007-13470-1-git-send-email-sheetals@codeaurora.org>
-	<4D7EC274.4020407@codeaurora.org>
-Message-ID: <cabe5c85f32b7eb41504225acfcc87df.squirrel@www.codeaurora.org>
+From: segoon@openwall.com (Vasiliy Kulikov)
+Date: Tue, 15 Mar 2011 19:08:06 +0300
+Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
+In-Reply-To: <1300189828.4017.2.camel@mulgrave.site>
+References: <cover.1296818921.git.segoon@openwall.com>
+	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
+	<1300155965.5665.15.camel@mulgrave.site>
+	<20110315030956.GA2234@kroah.com>
+	<1300189828.4017.2.camel@mulgrave.site>
+Message-ID: <20110315160804.GA3380@albatros>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Jean,
+On Tue, Mar 15, 2011 at 07:50 -0400, James Bottomley wrote:
+>      1. Did anyone actually check for capabilities before assuming world
+>         writeable files were wrong?
 
-On Mon, March 14, 2011 6:35 pm, Bryan Huntsman wrote:
-> On 03/09/2011 09:16 AM, Sheetal Sahasrabudhe wrote:
->> This commit adds support for performance monitors provided by
->> Qualcomm Scorpion and ScorpionMP processor to perfevents.
->>
->> Signed-off-by: Sheetal Sahasrabudhe <sheetals@codeaurora.org>
->> Reviewed-by: Jean Pihet <j-pihet@ti.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  arch/arm/include/asm/perf_event.h |    2 +
->>  arch/arm/kernel/perf_event.c      |   11 +
->>  arch/arm/kernel/perf_event_msm.c  |  679 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 692 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/kernel/perf_event_msm.c
->>
->
-> ...
->
->> diff --git a/arch/arm/kernel/perf_event_msm.c b/arch/arm/kernel/perf_event_msm.c
->> new file mode 100644
->> index 0000000..4e42f27
->> --- /dev/null
->> +++ b/arch/arm/kernel/perf_event_msm.c
-[...]
+I didn't check all these files as I haven't got these hardware :-)  But
+as I can "chmod a+w" all sysfs files on my machine and they all become
+sensible to nonroot writes, I suppose there is nothing preventing
+nonroot users from writing to these buggy sysfs files.  As you can see,
+there are no capable() checks in these drivers in open() or write().
 
->> +#include <asm/vfp.h>
->> +#include <asm/system.h>
->> +#include "../vfp/vfpinstr.h"
->
-> Sorry I didn't see this earlier.  Is there another way to get the info
-> you need that wouldn't use a relative include path?  If the info from
-> vfpinstr.h is now needed outside of the vfp directory, can it be moved
-> to a common header instead?  Thanks.
->
-> - Bryan
+>      2. Even if there aren't any capabilities checks in the implementing
+>         routines, should there be (are we going the separated
+>         capabilities route vs the monolithic root route)?
 
-I see other files under vfp that include this header.
-So if we were to implement Bryan's suggestion, I think a separate patch that moves the header and updates all the depdendencies would be more appropriate.
-Are you okay with the relative include path for vfpinstr.h in this patch for now or would you want to see an update to move vfpinstr.h to include/asm?.
+IMO, In any case old good DAC security model must not be obsoleted just
+because someone thinks that MAC or anything else is more convenient for
+him.  If sysfs is implemented via filesystem then it must support POSIX
+permissions semantic.  MAC is very good in _some_ cases, but not instead
+of DAC.
 
 Thanks,
-Sheetal
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Vasiliy Kulikov
+http://www.openwall.com - bringing security into open computing environments
