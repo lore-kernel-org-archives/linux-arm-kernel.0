@@ -1,26 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Mar 2011 15:55:32 +0100
-Subject: [PATCH 1/4] amba: add name based matching
-In-Reply-To: <20110315144925.GG3921@n2100.arm.linux.org.uk>
-References: <1300200116-12185-1-git-send-email-philippe.langlais@stericsson.com>
-	<1300200116-12185-2-git-send-email-philippe.langlais@stericsson.com>
-	<20110315144925.GG3921@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTineh_XDPgkf04R61PHkiGBE2=Mc0cw6fvt3AuNL@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Mar 2011 15:12:45 +0000
+Subject: [RFC PATCHv2 02/20] ARM: omap2: remove stubbed twd_timer_setup call
+In-Reply-To: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1300201983-26124-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 3:49 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-omap2/timer-mpu.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-> I really hate the idea of matching AMBA stuff by name. ?Isn't there any
-> other solution to this?
-
-The second option I would try is to add a field to the platform data
-for pl022 and mmci/pl180 such as "u8 silicon_revision" and encode
-that with some 0x01, 0x02, 0x03... for the silicon revisions that
-matter to behaviour.
-
-Would you prefer this approach?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+index 31c0ac4..02feaff 100644
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ b/arch/arm/mach-omap2/timer-mpu.c
+@@ -17,10 +17,8 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/init.h>
+-#include <linux/smp.h>
+ #include <linux/clockchips.h>
+ #include <asm/irq.h>
+-#include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+ 
+ /*
+@@ -33,7 +31,6 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ 		return -ENXIO;
+ 
+ 	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
