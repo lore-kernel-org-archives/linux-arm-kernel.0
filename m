@@ -1,18 +1,50 @@
-From: B20596@freescale.com (Li Frank-B20596)
-Date: Tue, 15 Mar 2011 07:47:41 +0000
-Subject: [PATCH 1/1] ARM: mx53_loco: Add GPIO Keypad support
-In-Reply-To: <20110315061400.GA13316@pengutronix.de>
-References: <1300157900-21171-1-git-send-email-Frank.Li@freescale.com>
-	<20110315061400.GA13316@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D69191FA5@039-SN1MPN1-003.039d.mgd.msft.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 15 Mar 2011 15:52:32 +0800
+Subject: [PATCH] ARM:boot:device tree: Allow the device tree binary to
+	be appended to zImage
+In-Reply-To: <20110315034421.GE11098@S2100-06.ap.freescale.net>
+References: <20110309215800.26377.43925.stgit@riker>
+	<20110315034421.GE11098@S2100-06.ap.freescale.net>
+Message-ID: <20110315075231.GH11098@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 15, 2011 at 11:44:22AM +0800, Shawn Guo wrote:
+> On Wed, Mar 09, 2011 at 01:58:00PM -0800, John Bonesio wrote:
+> > This patch provides the ability to boot using a device tree that is appended
+> > to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+> > 
+> > Signed-off-by: John Bonesio <bones@secretlab.ca>
+> > ---
+> > 
+> >  arch/arm/Kconfig                |    7 ++++
+> >  arch/arm/boot/compressed/head.S |   75 +++++++++++++++++++++++++++++++++++++--
+> >  2 files changed, 79 insertions(+), 3 deletions(-)
+> > 
+> I played this patch on mx51 babbage a little bit, and noticed that it
+> introduces one difference on both non-dt and dt kernel booting.  The
 
-> There is a function imx_add_gpio_keys that you should use instead of
-> providing a local platform_device.
+To be clear, the difference is being seen when I do not even enable
+CONFIG_ARM_APPENDED_DTB.
 
-I will update patch.
+-- 
+Regards,
+Shawn
 
-Best regards
-Frank Li
+> serial terminal stalls for a few seconds after printing
+> 'Uncompressing Linux...', and then continue to work with all message
+> output.  That's something like:
+> 
+> Uncompressing Linux... (stall for seconds) done, booting the kernel.
+> Linux version 2.6.38-rc6+ (r65073 at S2101-09) (gcc version 4.4.5 (Ubuntu/Linaro 4.
+> 4.4-14ubuntu4) ) #91 Tue Mar 15 11:29:03 CST 2011
+> CPU: ARMv7 Processor [412fc085] revision 5 (ARMv7), cr=10c53c7f
+> CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine: Freescale MX51 Babbage Board
+> Machine: Freescale MX51 Babbage Board
+> Memory policy: ECC disabled, Data cache writeback
+> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
+> ......
+> 
+> I'm unsure if this is expected ...
+> 
