@@ -1,45 +1,38 @@
-From: James.Bottomley@suse.de (James Bottomley)
-Date: Tue, 15 Mar 2011 12:32:31 -0400
-Subject: [Security] [PATCH 00/20] world-writable files in sysfs and debugfs
-In-Reply-To: <20110315160804.GA3380@albatros>
-References: <cover.1296818921.git.segoon@openwall.com>
-	<AANLkTikE-A=Fe-yRrN0opWwJGQ0f4uOzkyB3XCcEUrFE@mail.gmail.com>
-	<1300155965.5665.15.camel@mulgrave.site>
-	<20110315030956.GA2234@kroah.com>
-	<1300189828.4017.2.camel@mulgrave.site>
-	<20110315160804.GA3380@albatros>
-Message-ID: <1300206751.11313.3.camel@mulgrave.site>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Mar 2011 00:42:20 +0800
+Subject: [PATCH 5/8] ARM: PXA: Z2: Add poweroff function
+In-Reply-To: <201103151757.13374.anarsoul@gmail.com>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103122329.51319.marek.vasut@gmail.com>
+	<AANLkTi=FggbKjaLMU9rWG+cG=Jq18tDu8KHHy4KZLJe9@mail.gmail.com>
+	<201103151757.13374.anarsoul@gmail.com>
+Message-ID: <AANLkTi=2XH2X53H=3qBhhUbiY_Cnc50u0gg3JM7kRRhk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-15 at 19:08 +0300, Vasiliy Kulikov wrote:
-> On Tue, Mar 15, 2011 at 07:50 -0400, James Bottomley wrote:
-> >      1. Did anyone actually check for capabilities before assuming world
-> >         writeable files were wrong?
-> 
-> I didn't check all these files as I haven't got these hardware :-)
+On Tue, Mar 15, 2011 at 11:57 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Tuesday 15 March 2011 17:49:26 Eric Miao wrote:
+>> 2011/3/13 Marek Vasut <marek.vasut@gmail.com>:
+>> > On Saturday 12 March 2011 21:34:01 Vasily Khoruzhick wrote:
+>> >> On Saturday 12 March 2011 15:16:19 Marek Vasut wrote:
+>> >> > Besides, this is nonsense, you're doing a hack and you're trying to
+>> >> > justify it. You cannot powerdown the device, period. You should rather
+>> >> > patch the bootloader to implement this para-powerdown behaviour than
+>> >> > bloat kernel with this workaround.
+>> >>
+>> >> And, btw, there's same code in mainline kernel for zeus machine.
+>> >
+>> > Doesn't mean it's correct. CCing maintainer. Eric, can you also please
+>> > comment on it ? I really don't like the idea of abusing poweroff and
+>> > making people misunderstand.
+>>
+>> I'm actually quite OK with the idea of using deep sleep as a way
+>> for shutdown. As some of the device has no way for a "correct"
+>> shutdown without pulling out the battery. A fake one is at least
+>> better than none, provided it works as expected.
+>
+> So should I send updated version of this patch? (Need to clear PSPR before
+> going to deepsleep)
+>
 
-You don't need the hardware to check ... the question becomes is a
-capabilities test sitting in the implementation or not.
-
->   But
-> as I can "chmod a+w" all sysfs files on my machine and they all become
-> sensible to nonroot writes, I suppose there is nothing preventing
-> nonroot users from writing to these buggy sysfs files.  As you can see,
-> there are no capable() checks in these drivers in open() or write().
-> 
-> >      2. Even if there aren't any capabilities checks in the implementing
-> >         routines, should there be (are we going the separated
-> >         capabilities route vs the monolithic root route)?
-> 
-> IMO, In any case old good DAC security model must not be obsoleted just
-> because someone thinks that MAC or anything else is more convenient for
-> him.  If sysfs is implemented via filesystem then it must support POSIX
-> permissions semantic.  MAC is very good in _some_ cases, but not instead
-> of DAC.
-
-Um, I'm not sure that's even an issue.  capabilities have CAP_ADMIN
-which is precisely the same check as owner == root.  We use this a lot
-because ioctls ignore the standard unix DAC model.
-
-James
+Yes, please. Better to add a comment to the clearing of PSPR.
