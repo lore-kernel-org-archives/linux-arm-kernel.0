@@ -1,51 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Mar 2011 15:13:03 +0000
-Subject: [RFC PATCHv2 20/20] ARM: simplify percpu_timer_ack
-In-Reply-To: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
-References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1300201983-26124-21-git-send-email-marc.zyngier@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 15 Mar 2011 08:35:25 -0700
+Subject: [GIT PULL] final davinci updates for 2.6.39
+Message-ID: <87k4g0jt1e.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no provider of local_timer_ack anymore after the conversion
-of msm to the percpu_timer interface. Remove the weak local_timer_ack
-symbol and directly call percpu_timer_ack.
+Russell,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/percpu_timer.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+A final pull request for davinci for 2.6.39 (based on the previous one.)
 
-diff --git a/arch/arm/kernel/percpu_timer.c b/arch/arm/kernel/percpu_timer.c
-index 85af863..6e1942b 100644
---- a/arch/arm/kernel/percpu_timer.c
-+++ b/arch/arm/kernel/percpu_timer.c
-@@ -60,24 +60,18 @@ void percpu_timer_register(struct local_timer_ops *ops)
-  *
-  * If a local timer interrupt has occurred, acknowledge and return 1.
-  * Otherwise, return 0.
-- *
-- * This can be overloaded by platform code that doesn't provide its
-- * timer in timer_fns way (msm at the moment). Once all platforms have
-- * migrated, the weak alias can be removed.
-  */
- static int percpu_timer_ack(void)
- {
- 	return timer_ops->ack();
- }
- 
--int local_timer_ack(void) __attribute__ ((weak, alias("percpu_timer_ack")));
--
- asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 	int cpu = smp_processor_id();
- 
--	if (local_timer_ack()) {
-+	if (percpu_timer_ack()) {
- 		__inc_irq_stat(cpu, local_timer_irqs);
- 		percpu_timer_run();
- 	}
--- 
-1.7.0.4
+This is a series that Sekhar Nori (davinci co-maintaier) has been
+tracking and that I had mistakenly not added to my previous pull request.
+
+Thanks,
+
+Kevin
+
+The following changes since commit 9a9fb12a4832bdf22751e21df298ef3559643b43:
+
+  davinci: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS. (2011-03-11 10:48:29 -0800)
+
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-next-2
+
+Cyril Chemparathy (5):
+      mfd: add driver for sequencer serial port
+      spi: add ti-ssp spi master driver
+      davinci: add tnetv107x ssp platform device
+      davinci: add ssp config for tnetv107x evm board
+      davinci: add spi devices on tnetv107x evm
+
+Sergei Shtylyov (1):
+      davinci: DM644x EVM: register MUSB device earlier
+
+ arch/arm/mach-davinci/board-dm644x-evm.c       |    8 +-
+ arch/arm/mach-davinci/board-tnetv107x-evm.c    |   57 +++
+ arch/arm/mach-davinci/devices-tnetv107x.c      |   25 ++
+ arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
+ arch/arm/mach-davinci/tnetv107x.c              |    2 +-
+ drivers/mfd/Kconfig                            |   11 +
+ drivers/mfd/Makefile                           |    1 +
+ drivers/mfd/ti-ssp.c                           |  476 ++++++++++++++++++++++++
+ drivers/spi/Kconfig                            |   10 +
+ drivers/spi/Makefile                           |    1 +
+ drivers/spi/ti-ssp-spi.c                       |  402 ++++++++++++++++++++
+ include/linux/mfd/ti_ssp.h                     |   93 +++++
+ 12 files changed, 1082 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/mfd/ti-ssp.c
+ create mode 100644 drivers/spi/ti-ssp-spi.c
+ create mode 100644 include/linux/mfd/ti_ssp.h
