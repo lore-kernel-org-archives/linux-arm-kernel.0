@@ -1,30 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Mar 2011 18:13:15 +0000
-Subject: [PATCH] ARMv7: Flush the vectors page using the base address
-Message-ID: <20110315181314.26384.97754.stgit@e102109-lin.cambridge.arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 15 Mar 2011 19:36:45 +0100
+Subject: [PATCH v2 1/1] Add core support for QQ2440.
+In-Reply-To: <20110314132312.GB11441@dandreoli.com>
+References: <20110314131837.540942890@gmail.com>
+	<20110314132312.GB11441@dandreoli.com>
+Message-ID: <4D7FB1BD.6000304@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the domains removal patch, the vectors page is populated using the
-kernel linear mapping address. However, the flush_icache_range()
-function must be called on the high vectors address because the I-cache
-is allowed to have aliases (or can even be ASID-tagged VIVT).
+On 03/14/2011 02:23 PM, Domenico Andreoli wrote:
+>+static void qq2440_udc_pullup(enum s3c2410_udc_cmd_e cmd)
+>+{
+>+	pr_debug("udc: pullup(%d)\n", cmd);
+>+
+>+	switch (cmd) {
+>+	case S3C2410_UDC_P_ENABLE:
+>+		gpio_set_value(S3C2410_GPG(12), 1);
+>+		break;
+>+	case S3C2410_UDC_P_DISABLE:
+>+		gpio_set_value(S3C2410_GPG(12), 0);
+>+		break;
+>+	case S3C2410_UDC_P_RESET:
+>+		break;
+>+	default:
+>+		break;
+>+	}
+>+}
+>+
+>+static struct s3c2410_udc_mach_info qq2440_udc_cfg __initdata = {
+>+	.udc_command = qq2440_udc_pullup,
+>+};
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: <stable@kernel.org>
----
- arch/arm/kernel/traps.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I've recently added support to the s3c2410_udc driver to handle controlling the
+pullup itself if an gpio is used[1].
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ee57640..3d520c8 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -791,6 +791,6 @@ void __init early_trap_init(void)
- 	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
- 	       syscall_restart_code, sizeof(syscall_restart_code));
- 
--	flush_icache_range(vectors, vectors + PAGE_SIZE);
-+	flush_icache_range(CONFIG_VECTORS_BASE, CONFIG_VECTORS_BASE+PAGE_SIZE);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
- }
+ You should be able to simplify this part to:
+
++static struct s3c2410_udc_mach_info qq2440_udc_cfg __initdata = {
++	.pullup_pin = S3C2410_GPG(12),
++};
+
+- Lars
+
+[1]
+http://git.kernel.org/?p=linux/kernel/git/gregkh/usb-2.6.git;a=commit;h=a74022a55e44fe2044ac3660452cafecb300aece
