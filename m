@@ -1,119 +1,144 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Tue, 15 Mar 2011 19:28:15 +0530
-Subject: [PATCH v15 06/13] davinci vpbe: Readme text for Dm6446 vpbe
-Message-ID: <1300197495-4365-1-git-send-email-manjunath.hadli@ti.com>
+Date: Tue, 15 Mar 2011 19:29:12 +0530
+Subject: [PATCH v17 10/13] davinci: dm644x: change vpfe capture structure
+	variables for consistency
+Message-ID: <1300197552-4780-1-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please refer to this file for detailed documentation of
-davinci vpbe v4l2 driver.
+change the vpfe capture related configuration structure variables from
+<config> to dm644xevm_<config> to make it consistent with the rest of
+the file.
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Acked-by: Muralidharan Karicheri <m-karicheri2@ti.com>
-Acked-by: Hans Verkuil <hverkuil@xs4all.nl>
 ---
- Documentation/video4linux/README.davinci-vpbe |   93 +++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/video4linux/README.davinci-vpbe
+ arch/arm/mach-davinci/board-dm644x-evm.c |   24 ++++++++++++------------
+ arch/arm/mach-davinci/dm644x.c           |   12 ++++++------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/video4linux/README.davinci-vpbe b/Documentation/video4linux/README.davinci-vpbe
-new file mode 100644
-index 0000000..7a460b0
---- /dev/null
-+++ b/Documentation/video4linux/README.davinci-vpbe
-@@ -0,0 +1,93 @@
-+
-+                VPBE V4L2 driver design
-+ ======================================================================
-+
-+ File partitioning
-+ -----------------
-+ V4L2 display device driver
-+         drivers/media/video/davinci/vpbe_display.c
-+         drivers/media/video/davinci/vpbe_display.h
-+
-+ VPBE display controller
-+         drivers/media/video/davinci/vpbe.c
-+         drivers/media/video/davinci/vpbe.h
-+
-+ VPBE venc sub device driver
-+         drivers/media/video/davinci/vpbe_venc.c
-+         drivers/media/video/davinci/vpbe_venc.h
-+         drivers/media/video/davinci/vpbe_venc_regs.h
-+
-+ VPBE osd driver
-+         drivers/media/video/davinci/vpbe_osd.c
-+         drivers/media/video/davinci/vpbe_osd.h
-+         drivers/media/video/davinci/vpbe_osd_regs.h
-+
-+ Functional partitioning
-+ -----------------------
-+
-+ Consists of the following (in the same order as the list under file
-+ partitioning):-
-+
-+ 1. V4L2 display driver
-+    Implements creation of video2 and video3 device nodes and
-+    provides v4l2 device interface to manage VID0 and VID1 layers.
-+
-+ 2. Display controller
-+    Loads up VENC, OSD and external encoders such as ths8200. It provides
-+    a set of API calls to V4L2 drivers to set the output/standards
-+    in the VENC or external sub devices. It also provides
-+    a device object to access the services from OSD subdevice
-+    using sub device ops. The connection of external encoders to VENC LCD
-+    controller port is done at init time based on default output and standard
-+    selection or at run time when application change the output through
-+    V4L2 IOCTLs.
-+
-+    When connected to an external encoder, vpbe controller is also responsible
-+    for setting up the interface between VENC and external encoders based on
-+    board specific settings (specified in board-xxx-evm.c). This allows
-+    interfacing external encoders such as ths8200. The setup_if_config()
-+    is implemented for this as well as configure_venc() (part of the next patch)
-+    API to set timings in VENC for a specific display resolution. As of this
-+    patch series, the interconnection and enabling and setting of the external
-+    encoders is not present, and would be a part of the next patch series.
-+
-+ 3. VENC subdevice module
-+    Responsible for setting outputs provided through internal DACs and also
-+    setting timings at LCD controller port when external encoders are connected
-+    at the port or LCD panel timings required. When external encoder/LCD panel
-+    is connected, the timings for a specific standard/preset is retrieved from
-+    the board specific table and the values are used to set the timings in
-+    venc using non-standard timing mode.
-+
-+    Support LCD Panel displays using the VENC. For example to support a Logic
-+    PD display, it requires setting up the LCD controller port with a set of
-+    timings for the resolution supported and setting the dot clock. So we could
-+    add the available outputs as a board specific entry (i.e add the "LogicPD"
-+    output name to board-xxx-evm.c). A table of timings for various LCDs
-+    supported can be maintained in the board specific setup file to support
-+    various LCD displays.As of this patch a basic driver is present, and this
-+    support for external encoders and displays forms a part of the next
-+    patch series.
-+
-+ 4. OSD module
-+    OSD module implements all OSD layer management and hardware specific
-+    features. The VPBE module interacts with the OSD for enabling and
-+    disabling appropriate features of the OSD.
-+
-+ Current status:-
-+
-+ A fully functional working version of the V4L2 driver is available. This
-+ driver has been tested with NTSC and PAL standards and buffer streaming.
-+
-+ Following are TBDs.
-+
-+ vpbe display controller
-+    - Add support for external encoders.
-+    - add support for selecting external encoder as default at probe time.
-+
-+ vpbe venc sub device
-+    - add timings for supporting ths8200
-+    - add support for LogicPD LCD.
-+
-+ FB drivers
-+    - Add support for fbdev drivers.- Ready and part of subsequent patches.
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 0ca90b8..6919f28 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -188,7 +188,7 @@ static struct platform_device davinci_fb_device = {
+ 	.num_resources = 0,
+ };
+ 
+-static struct tvp514x_platform_data tvp5146_pdata = {
++static struct tvp514x_platform_data dm644xevm_tvp5146_pdata = {
+ 	.clk_polarity = 0,
+ 	.hs_polarity = 1,
+ 	.vs_polarity = 1
+@@ -196,7 +196,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
+ 
+ #define TVP514X_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
+ /* Inputs available at the TVP5146 */
+-static struct v4l2_input tvp5146_inputs[] = {
++static struct v4l2_input dm644xevm_tvp5146_inputs[] = {
+ 	{
+ 		.index = 0,
+ 		.name = "Composite",
+@@ -216,7 +216,7 @@ static struct v4l2_input tvp5146_inputs[] = {
+  * ouput that goes to vpfe. There is a one to one correspondence
+  * with tvp5146_inputs
+  */
+-static struct vpfe_route tvp5146_routes[] = {
++static struct vpfe_route dm644xevm_tvp5146_routes[] = {
+ 	{
+ 		.input = INPUT_CVBS_VI2B,
+ 		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+@@ -227,13 +227,13 @@ static struct vpfe_route tvp5146_routes[] = {
+ 	},
+ };
+ 
+-static struct vpfe_subdev_info vpfe_sub_devs[] = {
++static struct vpfe_subdev_info dm644xevm_vpfe_sub_devs[] = {
+ 	{
+ 		.name = "tvp5146",
+ 		.grp_id = 0,
+-		.num_inputs = ARRAY_SIZE(tvp5146_inputs),
+-		.inputs = tvp5146_inputs,
+-		.routes = tvp5146_routes,
++		.num_inputs = ARRAY_SIZE(dm644xevm_tvp5146_inputs),
++		.inputs = dm644xevm_tvp5146_inputs,
++		.routes = dm644xevm_tvp5146_routes,
+ 		.can_route = 1,
+ 		.ccdc_if_params = {
+ 			.if_type = VPFE_BT656,
+@@ -242,15 +242,15 @@ static struct vpfe_subdev_info vpfe_sub_devs[] = {
+ 		},
+ 		.board_info = {
+ 			I2C_BOARD_INFO("tvp5146", 0x5d),
+-			.platform_data = &tvp5146_pdata,
++			.platform_data = &dm644xevm_tvp5146_pdata,
+ 		},
+ 	},
+ };
+ 
+-static struct vpfe_config vpfe_cfg = {
+-	.num_subdevs = ARRAY_SIZE(vpfe_sub_devs),
++static struct vpfe_config dm644xevm_capture_cfg = {
++	.num_subdevs = ARRAY_SIZE(dm644xevm_vpfe_sub_devs),
+ 	.i2c_adapter_id = 1,
+-	.sub_devs = vpfe_sub_devs,
++	.sub_devs = dm644xevm_vpfe_sub_devs,
+ 	.card_name = "DM6446 EVM",
+ 	.ccdc = "DM6446 CCDC",
+ };
+@@ -629,7 +629,7 @@ static void __init
+ davinci_evm_map_io(void)
+ {
+ 	/* setup input configuration for VPFE input devices */
+-	dm644x_set_vpfe_config(&vpfe_cfg);
++	dm644x_set_vpfe_config(&dm644xevm_capture_cfg);
+ 	dm644x_init();
+ }
+ 
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 73e74d0..8ff5d5f 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -606,7 +606,7 @@ static struct platform_device dm644x_vpss_device = {
+ 	.resource		= dm644x_vpss_resources,
+ };
+ 
+-static struct resource vpfe_resources[] = {
++static struct resource dm644x_vpfe_resources[] = {
+ 	{
+ 		.start          = IRQ_VDINT0,
+ 		.end            = IRQ_VDINT0,
+@@ -640,11 +640,11 @@ static struct platform_device dm644x_ccdc_dev = {
+ 	},
+ };
+ 
+-static struct platform_device vpfe_capture_dev = {
++static struct platform_device dm644x_vpfe_dev = {
+ 	.name		= CAPTURE_DRV_NAME,
+ 	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(vpfe_resources),
+-	.resource	= vpfe_resources,
++	.num_resources	= ARRAY_SIZE(dm644x_vpfe_resources),
++	.resource	= dm644x_vpfe_resources,
+ 	.dev = {
+ 		.dma_mask		= &vpfe_capture_dma_mask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+@@ -653,7 +653,7 @@ static struct platform_device vpfe_capture_dev = {
+ 
+ void dm644x_set_vpfe_config(struct vpfe_config *cfg)
+ {
+-	vpfe_capture_dev.dev.platform_data = cfg;
++	dm644x_vpfe_dev.dev.platform_data = cfg;
+ }
+ 
+ /*----------------------------------------------------------------------*/
+@@ -801,7 +801,7 @@ static int __init dm644x_init_devices(void)
+ 
+ 	platform_device_register(&dm644x_vpss_device);
+ 	platform_device_register(&dm644x_ccdc_dev);
+-	platform_device_register(&vpfe_capture_dev);
++	platform_device_register(&dm644x_vpfe_dev);
+ 
+ 	return 0;
+ }
 -- 
 1.6.2.4
