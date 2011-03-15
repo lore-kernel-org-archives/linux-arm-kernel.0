@@ -1,49 +1,50 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Mar 2011 13:35:39 +0100
-Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
-In-Reply-To: <1300184096-13937-2-git-send-email-jamie@jamieiles.com>
+Date: Tue, 15 Mar 2011 13:36:16 +0100
+Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
+In-Reply-To: <87vczkmy94.fsf@macbook.be.48ers.dk>
 References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110315123539.GD14548@game.jcrosoft.org>
+	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
+	<87vczkmy94.fsf@macbook.be.48ers.dk>
+Message-ID: <20110315123616.GE14548@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:14 Tue 15 Mar     , Jamie Iles wrote:
-> The macb driver expects clocks with the names "pclk" and "hclk".  We
-> currently provide "macb_clk" but to fit in line with other
-> architectures (namely AVR32), provide "pclk" and a fake "hclk".
+On 12:14 Tue 15 Mar     , Peter Korsgaard wrote:
+> >>>>> "Jamie" == Jamie Iles <jamie@jamieiles.com> writes:
 > 
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
->  arch/arm/mach-at91/at572d940hf.c |    8 +++++++-
->  arch/arm/mach-at91/at91cap9.c    |    8 +++++++-
->  arch/arm/mach-at91/at91sam9260.c |    8 +++++++-
->  arch/arm/mach-at91/at91sam9263.c |    8 +++++++-
->  arch/arm/mach-at91/at91sam9g45.c |    8 +++++++-
->  5 files changed, 35 insertions(+), 5 deletions(-)
+> Hi,
 > 
-> diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-> index a6b9c68..9b3a37e 100644
-> --- a/arch/arm/mach-at91/at572d940hf.c
-> +++ b/arch/arm/mach-at91/at572d940hf.c
-> @@ -71,10 +71,15 @@ static struct clk pioC_clk = {
->  	.type		= CLK_TYPE_PERIPHERAL,
->  };
->  static struct clk macb_clk = {
-> -	.name		= "macb_clk",
-> +	.name		= "pclk",
->  	.pmc_mask	= 1 << AT572D940HF_ID_EMAC,
->  	.type		= CLK_TYPE_PERIPHERAL,
->  };
-> +static struct clk macb_hclk = {
-> +	.name		= "hclk",
-> +	.pmc_mask	= 0,
-> +	.type		= CLK_TYPE_PERIPHERAL,
-> +};
-for the fake clock you must specify the parent as macb_clk
-
-take a look on the tcb1_clk for the 9g45
+>  Jamie> Both at91 and avr32 defines its own platform data structure for
+>  Jamie> the macb driver and both share common structures though at91
+>  Jamie> includes a currently unused phy_irq_pin.  Create a common
+>  Jamie> eth_platform_data for macb that both at91 and avr32 can use.  In
+>  Jamie> future we can use this to support other architectures that use the
+>  Jamie> same IP block with the macb driver.
+> 
+> Nice!
+> 
+>  Jamie> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> 
+>  Jamie> +++ b/include/linux/platform_data/macb.h
+>  Jamie> @@ -0,0 +1,17 @@
+>  Jamie> +/*
+>  Jamie> + * Copyright (C) 2004-2006 Atmel Corporation
+>  Jamie> + *
+>  Jamie> + * This program is free software; you can redistribute it and/or modify
+>  Jamie> + * it under the terms of the GNU General Public License version 2 as
+>  Jamie> + * published by the Free Software Foundation.
+>  Jamie> + */
+>  Jamie> +#ifndef __MACB_PDATA_H__
+>  Jamie> +#define __MACB_PDATA_H__
+>  Jamie> +
+>  Jamie> +struct eth_platform_data {
+> 
+> How about at the same time renaming it to something a bit less generic
+> like macb_platform_data?
+agreed
 
 Best Regards,
 J.
+> 
+> -- 
+> Bye, Peter Korsgaard
