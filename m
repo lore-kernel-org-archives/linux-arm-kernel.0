@@ -1,70 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Mar 2011 09:53:41 +0000
-Subject: [PATCH 3/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <4D7F32B2.6020905@samsung.com>
-References: <1299229274-9753-4-git-send-email-m.szyprowski@samsung.com>
-	<201103111615.01829.arnd@arndb.de>
-	<000201cbe002$768d9de0$63a8d9a0$%szyprowski@samsung.com>
-	<201103111700.17373.arnd@arndb.de>
-	<AANLkTimagS1vBXEYjXQDx=OGhTRm=n0yO4n+kHTAqBOz@mail.gmail.com>
-	<20110314124652.GF26085@n2100.arm.linux.org.uk>
-	<AANLkTinzBvkcB111UZd2rJ9raaXkh2TqmTw5Y+4WFd48@mail.gmail.com>
-	<20110315083515.GA3921@n2100.arm.linux.org.uk>
-	<4D7F32B2.6020905@samsung.com>
-Message-ID: <20110315095341.GD3921@n2100.arm.linux.org.uk>
+Date: Tue, 15 Mar 2011 10:08:56 +0000
+Subject: [PATCH] DM644x EVM: register MUSB device earlier
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C246AD3@dbde02.ent.ti.com>
+References: <201103132306.59986.sshtylyov@ru.mvista.com>
+	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
+	<87oc5dlkkx.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C246AD3@dbde02.ent.ti.com>
+Message-ID: <20110315100856.GE3921@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2011 at 06:34:42PM +0900, daeinki wrote:
-> Russell King - ARM Linux ? ?:
->> On Tue, Mar 15, 2011 at 10:45:50AM +0900, InKi Dae wrote:
->>> 2011/3/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->>>> On Mon, Mar 14, 2011 at 09:37:51PM +0900, KyongHo Cho wrote:
->>>>> I have also noticed that dma_map_single/page/sg() can map physical
->>>>> memory into an arbitrary device address region.
->>>>> But it is not enough solution for various kinds of IOMMUs.
->>>>> As Kukjin Kim addressed, we need to support larger page size than 4KB
->>>>> because we can reduce TLB miss when we have larger page size.
->>>>>
->>>>> Our IOMMU(system mmu) supports all page size of ARM architecture
->>>>> including 16MB, 1MB, 64KB and 4KB.
->>>>> Since the largest size supported by buddy system of 32-bit architecture is 4MB,
->>>>> our system support all page sizes except 16MB.
->>>>> We proved that larger page size is helpful for DMA performance
->>>>> significantly (more than 10%, approximately).
->>>>> Big page size is not a problem for peripheral devices
->>>>> because their address space is not suffer from external fragmentation.
->>>> 1. dma_map_single() et.al. is used for mapping *system* *RAM* for devices
->>>>   using whatever is necessary.  It must not be used for trying to setup
->>>>   arbitary other mappings.
->>>>
->>>> 2. It doesn't matter where the memory for dma_map_single() et.al. comes
->>>>   from provided the virtual address is a valid system RAM address or
->>>>   the struct page * is a valid struct page in the memory map (iow, you
->>>>   can't create this yourself.)
->>> You mean that we cannot have arbitrary virtual address mapping for
->>> iommu based device?
->>
->> No.  I mean exactly what I said - I'm talking about the DMA API in the
->> above two points.  The implication is that you can not create arbitary
->> mappings of non-system RAM with the DMA API.
->>
-> sorry but I couldn't understand exactly what you said. could you give me  
-> your answer one more time?
-> does non-system RAM mean reserved memory regions? if not, is it  
-> arbitrary virtual address space that isn't kernel or user virtual  
-> address space and is the space for iommu based deivce?
+On Mon, Mar 14, 2011 at 11:14:37PM +0530, Nori, Sekhar wrote:
+> On Mon, Mar 14, 2011 at 22:12:54, Hilman, Kevin wrote:
+> > Felipe Balbi <balbi@ti.com> writes:
+> > 
+> > [...]
+> > 
+> > >
+> > > Kevin feel free to take this into your tree:
+> > >
+> > > Acked-by: Felipe Balbi <balbi@ti.com>
+> > >
+> > 
+> > OK, will queue for 2.6.39.
+> 
+> This will need to make into 2.6.38.
+> 
+> Hi Russell,
+> 
+> Without this fix, USB will remain broken on 2.6.38
+> on DM644x EVM. Any chance of this making into 2.6.38?
+> 
+> Shall I check this into your patch system?
 
-For dma_map_single(dev, addr, size, dir), basically:
-
-	for (a = addr; a < addr + size; a += PAGE_SIZE)
-		BUG_ON(!virt_addr_valid(a));
-
-For dma_map_page(dev, page, offset, size, dir), 'page' must be something
-obtained from one of the page-based kernel allocators (so either refering
-to a page in the *existing* lowmem or highmem memory) _and_ you must not
-use offset/size to then point@something outside that.
-
-So, if you take something out of the kernel's knowledge of what is memory,
-you can't then use the DMA API with it.
+The answer to that is in Kevin's reply.  Kevin is handling the patch as
+current maintainer of Davinci.
