@@ -1,30 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Mar 2011 16:34:48 +0000
-Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
-In-Reply-To: <4D80E46C.3010103@canonical.com>
-References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
-	<4D80E46C.3010103@canonical.com>
-Message-ID: <20110316163448.GA16538@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 16 Mar 2011 17:51:54 +0100
+Subject: [PATCH 4/8] ARM: PXA: Z2: Add mtd partition with logo
+In-Reply-To: <201103161511.14377.marek.vasut@gmail.com>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103120105.50159.marek.vasut@gmail.com>
+	<20110315143957.GA1361@ucw.cz>
+	<201103161511.14377.marek.vasut@gmail.com>
+Message-ID: <20110316165154.GA9269@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 10:25:16AM -0600, Matt Waddel wrote:
-> On 03/11/2011 10:18 AM, Pawel Moll wrote:
-> > New IO FPGA implementation for Versatile Express boards contain
-> > MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
+On Wed 2011-03-16 15:11:14, Marek Vasut wrote:
+> On Tuesday 15 March 2011 15:39:57 Pavel Machek wrote:
+> > On Sat 2011-03-12 01:05:50, Marek Vasut wrote:
+> > > On Friday 11 March 2011 23:31:28 Vasily Khoruzhick wrote:
+> > > > On Friday 11 March 2011 23:39:36 Marek Vasut wrote:
+> > > > > On Friday 11 March 2011 11:23:39 Vasily Khoruzhick wrote:
+> > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > > 
+> > > > > I guess you can rather supply the MTD layout on kernel command line
+> > > > > (see Drivers/MTD).
+> > > > 
+> > > > Yeah, I know, just want to make default layout look like this.
+> > > 
+> > > Why not like what's already there ? I don't see any point in changing
+> > > this, NAK, use command line partitioning.
 > > 
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > Of course, you can use command line.
+> > 
+> > But, the default kernel partitioning should match what hw expects.
 > 
-> Tested-by: Matt Waddel <matt.waddel@linaro.org>
-> 
-> This patch improves MMC performance on my vexpress system. Also
-> fixes "mmcblk0: error -5 transferring data" errors.
+> But of course ... it matches the mainline uboot. I know what I let
+> in there :)
 
-You should use the patch I sent to do dynamic clocking if you're
-concerned about performance.  That patch improves performance by
-a factor of 8 compared to anything possible by increasing the FIFO
-depth.
-
-I am very much of the opinion that deepening the FIFOs is just a
-sticky plaster over the problem - and I said as much when it was
-first proposed, pointing out that there's other better solutions.
+Aha, I did not understand that from the messages. Sorry for the noise.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
