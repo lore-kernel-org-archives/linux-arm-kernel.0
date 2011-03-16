@@ -1,29 +1,53 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Wed, 16 Mar 2011 16:55:02 +0300
-Subject: [PATCH v2] z2-battery: Fix count of properties
-In-Reply-To: <201103112236.14261.marek.vasut@gmail.com>
-References: <4D7A1181.2000802@ru.mvista.com>
-	<1299848972-25596-1-git-send-email-anarsoul@gmail.com>
-	<201103112236.14261.marek.vasut@gmail.com>
-Message-ID: <20110316135502.GA18052@oksana.dev.rtsoft.ru>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 16 Mar 2011 15:06:10 +0100
+Subject: [PATCH v2 0/3] ARM: Add Scorpion/ScorpionMP support to perf
+	and Oprofile
+In-Reply-To: <1299534404-25346-1-git-send-email-sheetals@codeaurora.org>
+References: <1299534404-25346-1-git-send-email-sheetals@codeaurora.org>
+Message-ID: <20110316140610.GN31407@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2011 at 10:36:14PM +0100, Marek Vasut wrote:
-> On Friday 11 March 2011 14:09:32 Vasily Khoruzhick wrote:
-> > PROP_STATUS property was not counted, as result
-> > VOLTAGE_MIN property is missing in sysfs. Fix it.
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On 07.03.11 16:46:44, Sheetal Sahasrabudhe wrote:
+> This patchset contains the following features:
+> It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
+> and Oprofile.
+> It adds PMU support for Scorpion and ScorpionMP.
+> It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
 > 
-> You can have my:
+> Sheetal Sahasrabudhe (3):
+>   msm: Add support for Scorpion and ScorpionMP PMU
+>   [ARM] perfevents: Add support for Scorpion performance monitors
+>   [ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
 > 
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> on this one.
+>  arch/arm/include/asm/perf_event.h          |    2 +
+>  arch/arm/kernel/perf_event.c               |   11 +
+>  arch/arm/kernel/perf_event_msm.c           |  665 ++++++++++++++++++++++++++++
+>  arch/arm/mach-msm/Makefile                 |    2 +
+>  arch/arm/mach-msm/include/mach/irqs-7x30.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8960.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8x50.h |    2 +-
+>  arch/arm/mach-msm/include/mach/irqs-8x60.h |    2 +-
+>  arch/arm/mach-msm/pmu.c                    |   35 ++
+>  arch/arm/oprofile/common.c                 |    4 +
 
-Applied, thanks guys!
+Oprofile changes ...
+
+Acked-by: Robert Richter <robert.richter@amd.com>
+
+>  10 files changed, 723 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/kernel/perf_event_msm.c
+>  create mode 100644 arch/arm/mach-msm/pmu.c
+> 
+> -- 
+> 1.7.4.1
+> 
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+> 
+> 
 
 -- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Advanced Micro Devices, Inc.
+Operating System Research Center
