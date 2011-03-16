@@ -1,79 +1,90 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Mar 2011 14:35:57 +0900
-Subject: [PATCH 4/4 v4] mmc, ARM: Add zboot from eSD support for SuperH
-	Mobile ARM
-In-Reply-To: <AANLkTikwet++Dwz17C+MO2vH0tSuvNh-u0o8GKF814iF@mail.gmail.com>
-References: <1300071435-26759-1-git-send-email-horms@verge.net.au>
-	<1300071435-26759-5-git-send-email-horms@verge.net.au>
-	<20110315222738.GA23288@verge.net.au>
-	<AANLkTimgwpP-WTGF-E=KO3TAXDX7FP4WnW3XQiHi0Ton@mail.gmail.com>
-	<20110316011427.GB6724@verge.net.au>
-	<AANLkTimBOc2+Ryq+fwas0SPmYqbnJH6_b28DTPJx_p99@mail.gmail.com>
-	<20110316051604.GF27684@verge.net.au>
-	<AANLkTikwet++Dwz17C+MO2vH0tSuvNh-u0o8GKF814iF@mail.gmail.com>
-Message-ID: <20110316053542.GG27684@verge.net.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 16 Mar 2011 11:25:10 +0530
+Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
+	timersetup function
+In-Reply-To: <1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
+References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+	<1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 02:26:05PM +0900, Magnus Damm wrote:
-> On Wed, Mar 16, 2011 at 2:16 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Mar 16, 2011 at 11:20:46AM +0900, Magnus Damm wrote:
-> >> On Wed, Mar 16, 2011 at 10:14 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > How do you envisage that the hardware block would be selected?
-> >> > At compile time through Kconfig? If so the current #define mechanism
-> >> > might be sufficient.
-> >>
-> >> Not through Kconfig. I think you should use Kconfig to enable the SDHI
-> >> loader, but you should be able to select the SDHI base address during
-> >> run-time. Similar to how we enable platform device drivers with
-> >> Kconfig but put the instance information in the platform device
-> >> resource and data outside the driver.
-> >>
-> >> So for instance, on some board we may want to read a GPIO pin at boot
-> >> up time to select if we should boot from SDHI0 or SDHI1. I would like
-> >> the SDHI loader to be designed so we can have support for multiple
-> >> instances complied-in. Because of that I'd like to see the fixed
-> >> SDHI_BASE disappear from the header, and letting the mmc_loader()
-> >> function take the base address as an argument, or simply move the
-> >> mmc_loader() function out of the SDHI loader code to give CPU specific
-> >> and/or board specific code freedom to select which ever SDHI hardware
-> >> block instance(s) they want to load from.
-> >>
-> >> Perhaps this would require some serious refactoring?
-> >
-> > Either making mmc_loader() CPU specific or allowing it
-> > to take an argument should be pretty straight forward.
-> 
-> Good!
-> 
-> > However, it is entirely unclear to me how the argument to mmc_loader()
-> > would be supplied or alternatively the variant of mmc_loader() be
-> > selected at run-time.
-> 
-> At this point, the sh7372 specific could would simply pass the same
-> SDHI base address that your code is using. No special selection
-> needed. Just compile it in.
+Marc,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc Zyngier
+> Sent: Tuesday, March 15, 2011 8:43 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Tony Lindgren
+> Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
+> timersetup function
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-omap2/Makefile    |    1 -
+>  arch/arm/mach-omap2/timer-gp.c  |   13 ++++++++++++-
+>  arch/arm/mach-omap2/timer-mpu.c |   36 ----------------------------
+> --------
+>  3 files changed, 12 insertions(+), 38 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+>
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
+> omap2/Makefile
+> index a45cd64..41f8b67 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+>
+>  # SMP support ONLY available for OMAP4
+>  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+> -obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
+>
+> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
+> omap2/timer-gp.c
+> index 3b9cf85..98d03c5 100644
+> --- a/arch/arm/mach-omap2/timer-gp.c
+> +++ b/arch/arm/mach-omap2/timer-gp.c
+> @@ -39,6 +39,7 @@
+>  #include <asm/mach/time.h>
+>  #include <plat/dmtimer.h>
+>  #include <asm/localtimer.h>
+> +#include <asm/smp_twd.h>
+>  #include <asm/sched_clock.h>
+>  #include <plat/common.h>
+>  #include <plat/omap_hwmod.h>
+> @@ -247,12 +248,22 @@ static void __init
+> omap2_gp_clocksource_init(void)
+>  }
+>  #endif
+>
+> +#ifdef CONFIG_LOCAL_TIMERS
+> +static int __cpuinit omap4_local_timer_setup(struct
+> clock_event_device *evt)
+> +{
+> +	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static void __init omap2_gp_timer_init(void)
+>  {
+>  #ifdef CONFIG_LOCAL_TIMERS
+> -	if (cpu_is_omap44xx()) {
+> +	if (cpu_is_omap44xx() && omap_rev() != OMAP4430_REV_ES1_0)
 
-Understood
+I see one problem here. The reason we changed the signature of
+local_timer_setup() is in case where the local timer isn't
+available on a specific SOC versions, the kernel will switch
+to broad-cast timers.
 
-> In the future we may want to read out the boot mode pins and select
-> base address accordingly. It's too early to tell exactly what to do
-> with the CPU specific bits for future processors, but at least we can
-> make sure that the SDHI loader isn't tied to a single SDHI instance by
-> design.
+This way the kernel built with CONFIG_LOCAL_TIMERS can still work
+on SoCs where twd isn't supported.
 
-Ok, that is fine. I agree its too early to tell exactly what to
-do beyond refactoring mmc_loader() at this point.
+Looks like your patch breaks that unless and until I am missing
+something.
 
-> > This code runs in very early boot. And as such I think that the two major
-> > options are to either compile code in or pull it out of a register somehow.
-> > We really don't have a whole lot of code that runs before mmc_loader() that
-> > could do any kind of setup.
-> 
-> Compiling in the base address is fine for sh7372, but please put that
-> base address in the CPU specific code and feed that to the more
-> generic SDHI loader using a function argument.
-> 
-> Do you understand what I'm trying to do, or am I just going in circles? =)
-
-I feared we would be going in circles, but I think we have averted that :-)
+Regards,
+Santosh
