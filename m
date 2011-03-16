@@ -1,53 +1,31 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 16 Mar 2011 15:06:10 +0100
-Subject: [PATCH v2 0/3] ARM: Add Scorpion/ScorpionMP support to perf
-	and Oprofile
-In-Reply-To: <1299534404-25346-1-git-send-email-sheetals@codeaurora.org>
-References: <1299534404-25346-1-git-send-email-sheetals@codeaurora.org>
-Message-ID: <20110316140610.GN31407@erda.amd.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 16 Mar 2011 15:11:14 +0100
+Subject: [PATCH 4/8] ARM: PXA: Z2: Add mtd partition with logo
+In-Reply-To: <20110315143957.GA1361@ucw.cz>
+References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
+	<201103120105.50159.marek.vasut@gmail.com>
+	<20110315143957.GA1361@ucw.cz>
+Message-ID: <201103161511.14377.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.03.11 16:46:44, Sheetal Sahasrabudhe wrote:
-> This patchset contains the following features:
-> It adds support for Qualcomm Scorpion and ScorpionMP processors to perfevents
-> and Oprofile.
-> It adds PMU support for Scorpion and ScorpionMP.
-> It also updates PMU IRQ identifiers for various Scorpion and ScorpionMP targets.
+On Tuesday 15 March 2011 15:39:57 Pavel Machek wrote:
+> On Sat 2011-03-12 01:05:50, Marek Vasut wrote:
+> > On Friday 11 March 2011 23:31:28 Vasily Khoruzhick wrote:
+> > > On Friday 11 March 2011 23:39:36 Marek Vasut wrote:
+> > > > On Friday 11 March 2011 11:23:39 Vasily Khoruzhick wrote:
+> > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > 
+> > > > I guess you can rather supply the MTD layout on kernel command line
+> > > > (see Drivers/MTD).
+> > > 
+> > > Yeah, I know, just want to make default layout look like this.
+> > 
+> > Why not like what's already there ? I don't see any point in changing
+> > this, NAK, use command line partitioning.
 > 
-> Sheetal Sahasrabudhe (3):
->   msm: Add support for Scorpion and ScorpionMP PMU
->   [ARM] perfevents: Add support for Scorpion performance monitors
->   [ARM] Oprofile: Add Qualcomm Scorpion and ScorpionMP CPU type
+> Of course, you can use command line.
 > 
->  arch/arm/include/asm/perf_event.h          |    2 +
->  arch/arm/kernel/perf_event.c               |   11 +
->  arch/arm/kernel/perf_event_msm.c           |  665 ++++++++++++++++++++++++++++
->  arch/arm/mach-msm/Makefile                 |    2 +
->  arch/arm/mach-msm/include/mach/irqs-7x30.h |    2 +-
->  arch/arm/mach-msm/include/mach/irqs-8960.h |    2 +-
->  arch/arm/mach-msm/include/mach/irqs-8x50.h |    2 +-
->  arch/arm/mach-msm/include/mach/irqs-8x60.h |    2 +-
->  arch/arm/mach-msm/pmu.c                    |   35 ++
->  arch/arm/oprofile/common.c                 |    4 +
+> But, the default kernel partitioning should match what hw expects.
 
-Oprofile changes ...
-
-Acked-by: Robert Richter <robert.richter@amd.com>
-
->  10 files changed, 723 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/kernel/perf_event_msm.c
->  create mode 100644 arch/arm/mach-msm/pmu.c
-> 
-> -- 
-> 1.7.4.1
-> 
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
-> 
-> 
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+But of course ... it matches the mainline uboot. I know what I let in there :)
