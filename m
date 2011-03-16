@@ -1,25 +1,40 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Mar 2011 01:51:59 -0600
-Subject: [PATCH] arm/dt: Add dtb make rule
-In-Reply-To: <4D7EA61D.4030403@gmail.com>
-References: <1299786381-8925-1-git-send-email-robherring2@gmail.com>
-	<4D7EA61D.4030403@gmail.com>
-Message-ID: <20110316075159.GB9950@angua.secretlab.ca>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Wed, 16 Mar 2011 13:58:13 +0530
+Subject: [PATCHv2] omap3: alsa-soc: Remove restrictive checks for cpu type
+In-Reply-To: <1300116162-25488-1-git-send-email-premi@ti.com>
+References: <1300116162-25488-1-git-send-email-premi@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C30799E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2011 at 06:34:53PM -0500, Rob Herring wrote:
-> Grant,
+> -----Original Message-----
+> From: Premi, Sanjeev 
+> Sent: Monday, March 14, 2011 8:53 PM
+> To: linux-omap at vger.kernel.org; alsa-devel at alsa-project.org; 
+> linux-arm-kernel at lists.infradead.org
+> Cc: Premi, Sanjeev
+> Subject: [PATCHv2] omap3: alsa-soc: Remove restrictive checks 
+> for cpu type
 > 
-> On 03/10/2011 01:46 PM, Rob Herring wrote:
-> >From: Rob Herring<rob.herring@calxeda.com>
-> >
-> >Add a make rule to compile dt blobs for ARM.
-> >
-> >Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> Current checks for cpu type were too restrictive leading
+> to failures for other silicons in same family.
 > 
-> Can you pick this one up in your ARM tree.
+> The problem was found while testing audio playback on
+> AM37x and AM35x processors. But should exist on OMAP36xx
+> as well.
+> 
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> ---
+>  Changes in this version:
+>  1) Added one more check to the changes.
+>  2) Updated commit message to use plurals.
+> 
+>  sound/soc/omap/omap-mcbsp.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 
-Done.  Will be pushed out alter tonight.
+[sp] This patch didn't seem to be lost in transit!
+     Sending it again.
 
-g.
+     Did anyone else ever face this issue?
+
+~sanjeev
