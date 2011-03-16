@@ -1,37 +1,36 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 16 Mar 2011 09:42:50 +0800
-Subject: [PATCH 4/7] add GPMI support for imx23
+Date: Wed, 16 Mar 2011 09:42:51 +0800
+Subject: [PATCH 5/7] add GPMI support for imx28
 In-Reply-To: <1300239773-4222-1-git-send-email-b32955@freescale.com>
 References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-Message-ID: <1300239773-4222-5-git-send-email-b32955@freescale.com>
+Message-ID: <1300239773-4222-6-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files contain the code to implement the GPMI in the imx23.
+These files contain the code to implement the GPMI in the imx28.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h  |  550 ++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h |  416 ++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/hal-imx23.c       |  556 +++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/rom-imx23.c       |  300 +++++++++++++++
- 4 files changed, 1822 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h
- create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h
- create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx23.c
- create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx23.c
+ drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h  |  557 +++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h |  421 ++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/hal-imx28.c       |  503 ++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/rom-imx28.c       |   66 ++++
+ 4 files changed, 1547 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx28.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx28.c
 
-diff --git a/drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h
+diff --git a/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
 new file mode 100644
-index 0000000..9af4feb
+index 0000000..692db08
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h
-@@ -0,0 +1,550 @@
++++ b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
+@@ -0,0 +1,557 @@
 +/*
 + * Freescale GPMI NFC NAND Flash Driver
 + *
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc.
-+ * Copyright 2008 Embedded Alley Solutions, Inc.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -43,9 +42,12 @@ index 0000000..9af4feb
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
++ *
++ * Xml Revision: 2.5
++ * Template revision: 26195
 + */
 +
 +#ifndef __GPMI_NFC_BCH_REGS_H
@@ -66,25 +68,30 @@ index 0000000..9af4feb
 +#define BV_BCH_CTRL_CLKGATE__NO_CLKS 0x1
 +#define BP_BCH_CTRL_RSVD5	23
 +#define BM_BCH_CTRL_RSVD5	0x3F800000
-+#define BF_BCH_CTRL_RSVD5(v) (((v) << 23) & BM_BCH_CTRL_RSVD5)
++#define BF_BCH_CTRL_RSVD5(v)  \
++		(((v) << 23) & BM_BCH_CTRL_RSVD5)
 +#define BM_BCH_CTRL_DEBUGSYNDROME	0x00400000
 +#define BP_BCH_CTRL_RSVD4	20
 +#define BM_BCH_CTRL_RSVD4	0x00300000
-+#define BF_BCH_CTRL_RSVD4(v) (((v) << 20) & BM_BCH_CTRL_RSVD4)
++#define BF_BCH_CTRL_RSVD4(v)  \
++		(((v) << 20) & BM_BCH_CTRL_RSVD4)
 +#define BP_BCH_CTRL_M2M_LAYOUT	18
 +#define BM_BCH_CTRL_M2M_LAYOUT	0x000C0000
-+#define BF_BCH_CTRL_M2M_LAYOUT(v) (((v) << 18) & BM_BCH_CTRL_M2M_LAYOUT)
++#define BF_BCH_CTRL_M2M_LAYOUT(v)  \
++		(((v) << 18) & BM_BCH_CTRL_M2M_LAYOUT)
 +#define BM_BCH_CTRL_M2M_ENCODE	0x00020000
 +#define BM_BCH_CTRL_M2M_ENABLE	0x00010000
 +#define BP_BCH_CTRL_RSVD3	11
 +#define BM_BCH_CTRL_RSVD3	0x0000F800
-+#define BF_BCH_CTRL_RSVD3(v) (((v) << 11) & BM_BCH_CTRL_RSVD3)
++#define BF_BCH_CTRL_RSVD3(v)  \
++		(((v) << 11) & BM_BCH_CTRL_RSVD3)
 +#define BM_BCH_CTRL_DEBUG_STALL_IRQ_EN	0x00000400
 +#define BM_BCH_CTRL_RSVD2	0x00000200
 +#define BM_BCH_CTRL_COMPLETE_IRQ_EN	0x00000100
 +#define BP_BCH_CTRL_RSVD1	4
 +#define BM_BCH_CTRL_RSVD1	0x000000F0
-+#define BF_BCH_CTRL_RSVD1(v) (((v) << 4) & BM_BCH_CTRL_RSVD1)
++#define BF_BCH_CTRL_RSVD1(v)  \
++		(((v) << 4) & BM_BCH_CTRL_RSVD1)
 +#define BM_BCH_CTRL_BM_ERROR_IRQ	0x00000008
 +#define BM_BCH_CTRL_DEBUG_STALL_IRQ	0x00000004
 +#define BM_BCH_CTRL_RSVD0	0x00000002
@@ -577,17 +584,16 @@ index 0000000..9af4feb
 +/*============================================================================*/
 +
 +#endif
-diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h
+diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
 new file mode 100644
-index 0000000..2f9fce6
+index 0000000..dcb3b7d
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h
-@@ -0,0 +1,416 @@
++++ b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
+@@ -0,0 +1,421 @@
 +/*
 + * Freescale GPMI NFC NAND Flash Driver
 + *
-+ * Copyright 2008-2010 Freescale Semiconductor, Inc.
-+ * Copyright 2008 Embedded Alley Solutions, Inc.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -599,9 +605,12 @@ index 0000000..2f9fce6
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
++ *
++ * Xml Revision: 2.2
++ * Template revision: 26195
 + */
 +
 +#ifndef __GPMI_NFC_GPMI_REGS_H
@@ -609,168 +618,162 @@ index 0000000..2f9fce6
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_CTRL0      (0x00000000)
-+#define HW_GPMI_CTRL0_SET  (0x00000004)
-+#define HW_GPMI_CTRL0_CLR  (0x00000008)
-+#define HW_GPMI_CTRL0_TOG  (0x0000000c)
++#define HW_GPMI_CTRL0	(0x00000000)
++#define HW_GPMI_CTRL0_SET	(0x00000004)
++#define HW_GPMI_CTRL0_CLR	(0x00000008)
++#define HW_GPMI_CTRL0_TOG	(0x0000000c)
 +
-+#define BM_GPMI_CTRL0_SFTRST	     0x80000000
-+#define BV_GPMI_CTRL0_SFTRST__RUN    0x0
-+#define BV_GPMI_CTRL0_SFTRST__RESET  0x1
-+#define BM_GPMI_CTRL0_CLKGATE           0x40000000
-+#define BV_GPMI_CTRL0_CLKGATE__RUN      0x0
-+#define BV_GPMI_CTRL0_CLKGATE__NO_CLKS  0x1
-+#define BM_GPMI_CTRL0_RUN        0x20000000
-+#define BV_GPMI_CTRL0_RUN__IDLE  0x0
-+#define BV_GPMI_CTRL0_RUN__BUSY  0x1
-+#define BM_GPMI_CTRL0_DEV_IRQ_EN     0x10000000
-+#define BM_GPMI_CTRL0_TIMEOUT_IRQ_EN 0x08000000
-+#define BM_GPMI_CTRL0_UDMA           0x04000000
++#define BM_GPMI_CTRL0_SFTRST	0x80000000
++#define BV_GPMI_CTRL0_SFTRST__RUN   0x0
++#define BV_GPMI_CTRL0_SFTRST__RESET 0x1
++#define BM_GPMI_CTRL0_CLKGATE	0x40000000
++#define BV_GPMI_CTRL0_CLKGATE__RUN     0x0
++#define BV_GPMI_CTRL0_CLKGATE__NO_CLKS 0x1
++#define BM_GPMI_CTRL0_RUN	0x20000000
++#define BV_GPMI_CTRL0_RUN__IDLE 0x0
++#define BV_GPMI_CTRL0_RUN__BUSY 0x1
++#define BM_GPMI_CTRL0_DEV_IRQ_EN	0x10000000
++#define BM_GPMI_CTRL0_LOCK_CS	0x08000000
++#define BV_GPMI_CTRL0_LOCK_CS__DISABLED 0x0
++#define BV_GPMI_CTRL0_LOCK_CS__ENABLED  0x1
++#define BM_GPMI_CTRL0_UDMA	0x04000000
 +#define BV_GPMI_CTRL0_UDMA__DISABLED 0x0
 +#define BV_GPMI_CTRL0_UDMA__ENABLED  0x1
-+#define BP_GPMI_CTRL0_COMMAND_MODE    24
-+#define BM_GPMI_CTRL0_COMMAND_MODE    0x03000000
-+#define BF_GPMI_CTRL0_COMMAND_MODE(v) \
-+	(((v) << 24) & BM_GPMI_CTRL0_COMMAND_MODE)
++#define BP_GPMI_CTRL0_COMMAND_MODE	24
++#define BM_GPMI_CTRL0_COMMAND_MODE	0x03000000
++#define BF_GPMI_CTRL0_COMMAND_MODE(v)  \
++		(((v) << 24) & BM_GPMI_CTRL0_COMMAND_MODE)
 +#define BV_GPMI_CTRL0_COMMAND_MODE__WRITE            0x0
 +#define BV_GPMI_CTRL0_COMMAND_MODE__READ             0x1
 +#define BV_GPMI_CTRL0_COMMAND_MODE__READ_AND_COMPARE 0x2
 +#define BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY   0x3
-+#define BM_GPMI_CTRL0_WORD_LENGTH	   0x00800000
-+#define BV_GPMI_CTRL0_WORD_LENGTH__16_BIT  0x0
-+#define BV_GPMI_CTRL0_WORD_LENGTH__8_BIT   0x1
-+#define BM_GPMI_CTRL0_LOCK_CS            0x00400000
-+#define BV_GPMI_CTRL0_LOCK_CS__DISABLED  0x0
-+#define BV_GPMI_CTRL0_LOCK_CS__ENABLED   0x1
-+#define BP_GPMI_CTRL0_CS     20
-+#define BM_GPMI_CTRL0_CS     0x00300000
-+#define BF_GPMI_CTRL0_CS(v)  (((v) << 20) & BM_GPMI_CTRL0_CS)
-+#define BP_GPMI_CTRL0_ADDRESS	  17
-+#define BM_GPMI_CTRL0_ADDRESS	  0x000E0000
-+#define BF_GPMI_CTRL0_ADDRESS(v)  (((v) << 17) & BM_GPMI_CTRL0_ADDRESS)
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_DATA  0x0
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_CLE   0x1
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_ALE   0x2
-+#define BM_GPMI_CTRL0_ADDRESS_INCREMENT	  0x00010000
-+#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__DISABLED  0x0
-+#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__ENABLED   0x1
-+#define BP_GPMI_CTRL0_XFER_COUNT    0
-+#define BM_GPMI_CTRL0_XFER_COUNT    0x0000FFFF
-+#define BF_GPMI_CTRL0_XFER_COUNT(v) \
-+	(((v) << 0) & BM_GPMI_CTRL0_XFER_COUNT)
++#define BM_GPMI_CTRL0_WORD_LENGTH	0x00800000
++#define BV_GPMI_CTRL0_WORD_LENGTH__16_BIT 0x0
++#define BV_GPMI_CTRL0_WORD_LENGTH__8_BIT  0x1
++#define BP_GPMI_CTRL0_CS	20
++#define BM_GPMI_CTRL0_CS	0x00700000
++#define BF_GPMI_CTRL0_CS(v)  \
++		(((v) << 20) & BM_GPMI_CTRL0_CS)
++#define BP_GPMI_CTRL0_ADDRESS	17
++#define BM_GPMI_CTRL0_ADDRESS	0x000E0000
++#define BF_GPMI_CTRL0_ADDRESS(v)  \
++		(((v) << 17) & BM_GPMI_CTRL0_ADDRESS)
++#define BV_GPMI_CTRL0_ADDRESS__NAND_DATA 0x0
++#define BV_GPMI_CTRL0_ADDRESS__NAND_CLE  0x1
++#define BV_GPMI_CTRL0_ADDRESS__NAND_ALE  0x2
++#define BM_GPMI_CTRL0_ADDRESS_INCREMENT	0x00010000
++#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__DISABLED 0x0
++#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__ENABLED  0x1
++#define BP_GPMI_CTRL0_XFER_COUNT	0
++#define BM_GPMI_CTRL0_XFER_COUNT	0x0000FFFF
++#define BF_GPMI_CTRL0_XFER_COUNT(v)  \
++		(((v) << 0) & BM_GPMI_CTRL0_XFER_COUNT)
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_COMPARE  (0x00000010)
++#define HW_GPMI_COMPARE	(0x00000010)
 +
-+#define BP_GPMI_COMPARE_MASK	 16
-+#define BM_GPMI_COMPARE_MASK	 0xFFFF0000
-+#define BF_GPMI_COMPARE_MASK(v)  (((v) << 16) & BM_GPMI_COMPARE_MASK)
-+#define BP_GPMI_COMPARE_REFERENCE    0
-+#define BM_GPMI_COMPARE_REFERENCE    0x0000FFFF
-+#define BF_GPMI_COMPARE_REFERENCE(v) \
-+	(((v) << 0) & BM_GPMI_COMPARE_REFERENCE)
++#define BP_GPMI_COMPARE_MASK	16
++#define BM_GPMI_COMPARE_MASK	0xFFFF0000
++#define BF_GPMI_COMPARE_MASK(v) \
++		(((v) << 16) & BM_GPMI_COMPARE_MASK)
++#define BP_GPMI_COMPARE_REFERENCE	0
++#define BM_GPMI_COMPARE_REFERENCE	0x0000FFFF
++#define BF_GPMI_COMPARE_REFERENCE(v)  \
++		(((v) << 0) & BM_GPMI_COMPARE_REFERENCE)
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_ECCCTRL  (0x00000020)
-+#define HW_GPMI_ECCCTRL_SET  (0x00000024)
-+#define HW_GPMI_ECCCTRL_CLR  (0x00000028)
-+#define HW_GPMI_ECCCTRL_TOG  (0x0000002c)
++#define HW_GPMI_ECCCTRL	(0x00000020)
++#define HW_GPMI_ECCCTRL_SET	(0x00000024)
++#define HW_GPMI_ECCCTRL_CLR	(0x00000028)
++#define HW_GPMI_ECCCTRL_TOG	(0x0000002c)
 +
-+#define BP_GPMI_ECCCTRL_HANDLE	   16
-+#define BM_GPMI_ECCCTRL_HANDLE	   0xFFFF0000
-+#define BF_GPMI_ECCCTRL_HANDLE(v)  (((v) << 16) & BM_GPMI_ECCCTRL_HANDLE)
-+#define BM_GPMI_ECCCTRL_RSVD2  0x00008000
-+#define BP_GPMI_ECCCTRL_ECC_CMD  13
-+#define BM_GPMI_ECCCTRL_ECC_CMD  0x00006000
-+#define BF_GPMI_ECCCTRL_ECC_CMD(v) (((v) << 13) & BM_GPMI_ECCCTRL_ECC_CMD)
-+#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE_4_BIT 0x0
-+#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE_4_BIT 0x1
-+#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE_8_BIT 0x2
-+#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE_8_BIT 0x3
-+#define BV_GPMI_ECCCTRL_ECC_CMD__BCH_DECODE 0x0
-+#define BV_GPMI_ECCCTRL_ECC_CMD__BCH_ENCODE 0x1
-+#define BM_GPMI_ECCCTRL_ENABLE_ECC           0x00001000
-+#define BV_GPMI_ECCCTRL_ENABLE_ECC__ENABLE   0x1
-+#define BV_GPMI_ECCCTRL_ENABLE_ECC__DISABLE  0x0
-+#define BP_GPMI_ECCCTRL_RSVD1      9
-+#define BM_GPMI_ECCCTRL_RSVD1      0x00000E00
-+#define BF_GPMI_ECCCTRL_RSVD1(v)   (((v) << 9) & BM_GPMI_ECCCTRL_RSVD1)
++#define BP_GPMI_ECCCTRL_HANDLE	16
++#define BM_GPMI_ECCCTRL_HANDLE	0xFFFF0000
++#define BF_GPMI_ECCCTRL_HANDLE(v) \
++		(((v) << 16) & BM_GPMI_ECCCTRL_HANDLE)
++#define BM_GPMI_ECCCTRL_RSVD2	0x00008000
++#define BP_GPMI_ECCCTRL_ECC_CMD	13
++#define BM_GPMI_ECCCTRL_ECC_CMD	0x00006000
++#define BF_GPMI_ECCCTRL_ECC_CMD(v)  \
++		(((v) << 13) & BM_GPMI_ECCCTRL_ECC_CMD)
++#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE   0x0
++#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE   0x1
++#define BV_GPMI_ECCCTRL_ECC_CMD__RESERVE2 0x2
++#define BV_GPMI_ECCCTRL_ECC_CMD__RESERVE3 0x3
++#define BM_GPMI_ECCCTRL_ENABLE_ECC	0x00001000
++#define BV_GPMI_ECCCTRL_ENABLE_ECC__ENABLE  0x1
++#define BV_GPMI_ECCCTRL_ENABLE_ECC__DISABLE 0x0
++#define BP_GPMI_ECCCTRL_RSVD1	9
++#define BM_GPMI_ECCCTRL_RSVD1	0x00000E00
++#define BF_GPMI_ECCCTRL_RSVD1(v)  \
++		(((v) << 9) & BM_GPMI_ECCCTRL_RSVD1)
 +#define BP_GPMI_ECCCTRL_BUFFER_MASK	0
 +#define BM_GPMI_ECCCTRL_BUFFER_MASK	0x000001FF
 +#define BF_GPMI_ECCCTRL_BUFFER_MASK(v)  \
 +		(((v) << 0) & BM_GPMI_ECCCTRL_BUFFER_MASK)
 +#define BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY 0x100
 +#define BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE    0x1FF
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__AUXILIARY   0x100
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER7     0x080
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER6     0x040
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER5     0x020
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER4     0x010
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER3     0x008
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER2     0x004
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER1     0x002
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BUFFER0     0x001
 +
 +/*============================================================================*/
 +
 +#define HW_GPMI_ECCCOUNT	(0x00000030)
 +
-+#define BP_GPMI_ECCCOUNT_RSVD2     16
-+#define BM_GPMI_ECCCOUNT_RSVD2     0xFFFF0000
-+#define BF_GPMI_ECCCOUNT_RSVD2(v)  (((v) << 16) & BM_GPMI_ECCCOUNT_RSVD2)
-+#define BP_GPMI_ECCCOUNT_COUNT     0
-+#define BM_GPMI_ECCCOUNT_COUNT     0x0000FFFF
-+#define BF_GPMI_ECCCOUNT_COUNT(v)  (((v) << 0) & BM_GPMI_ECCCOUNT_COUNT)
++#define BP_GPMI_ECCCOUNT_RSVD2	16
++#define BM_GPMI_ECCCOUNT_RSVD2	0xFFFF0000
++#define BF_GPMI_ECCCOUNT_RSVD2(v) \
++		(((v) << 16) & BM_GPMI_ECCCOUNT_RSVD2)
++#define BP_GPMI_ECCCOUNT_COUNT	0
++#define BM_GPMI_ECCCOUNT_COUNT	0x0000FFFF
++#define BF_GPMI_ECCCOUNT_COUNT(v)  \
++		(((v) << 0) & BM_GPMI_ECCCOUNT_COUNT)
 +
 +/*============================================================================*/
 +
 +#define HW_GPMI_PAYLOAD	(0x00000040)
 +
-+#define BP_GPMI_PAYLOAD_ADDRESS	    2
-+#define BM_GPMI_PAYLOAD_ADDRESS	    0xFFFFFFFC
-+#define BF_GPMI_PAYLOAD_ADDRESS(v)  (((v) << 2) & BM_GPMI_PAYLOAD_ADDRESS)
-+#define BP_GPMI_PAYLOAD_RSVD0     0
-+#define BM_GPMI_PAYLOAD_RSVD0     0x00000003
-+#define BF_GPMI_PAYLOAD_RSVD0(v)  (((v) << 0) & BM_GPMI_PAYLOAD_RSVD0)
++#define BP_GPMI_PAYLOAD_ADDRESS	2
++#define BM_GPMI_PAYLOAD_ADDRESS	0xFFFFFFFC
++#define BF_GPMI_PAYLOAD_ADDRESS(v) \
++		(((v) << 2) & BM_GPMI_PAYLOAD_ADDRESS)
++#define BP_GPMI_PAYLOAD_RSVD0	0
++#define BM_GPMI_PAYLOAD_RSVD0	0x00000003
++#define BF_GPMI_PAYLOAD_RSVD0(v)  \
++		(((v) << 0) & BM_GPMI_PAYLOAD_RSVD0)
 +
 +/*============================================================================*/
 +
 +#define HW_GPMI_AUXILIARY	(0x00000050)
 +
-+#define BP_GPMI_AUXILIARY_ADDRESS    2
-+#define BM_GPMI_AUXILIARY_ADDRESS    0xFFFFFFFC
++#define BP_GPMI_AUXILIARY_ADDRESS	2
++#define BM_GPMI_AUXILIARY_ADDRESS	0xFFFFFFFC
 +#define BF_GPMI_AUXILIARY_ADDRESS(v) \
-+	(((v) << 2) & BM_GPMI_AUXILIARY_ADDRESS)
-+#define BP_GPMI_AUXILIARY_RSVD0     0
-+#define BM_GPMI_AUXILIARY_RSVD0     0x00000003
-+#define BF_GPMI_AUXILIARY_RSVD0(v)  (((v) << 0) & BM_GPMI_AUXILIARY_RSVD0)
++		(((v) << 2) & BM_GPMI_AUXILIARY_ADDRESS)
++#define BP_GPMI_AUXILIARY_RSVD0	0
++#define BM_GPMI_AUXILIARY_RSVD0	0x00000003
++#define BF_GPMI_AUXILIARY_RSVD0(v)  \
++		(((v) << 0) & BM_GPMI_AUXILIARY_RSVD0)
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_CTRL1  (0x00000060)
-+#define HW_GPMI_CTRL1_SET  (0x00000064)
-+#define HW_GPMI_CTRL1_CLR  (0x00000068)
-+#define HW_GPMI_CTRL1_TOG  (0x0000006c)
++#define HW_GPMI_CTRL1	(0x00000060)
++#define HW_GPMI_CTRL1_SET	(0x00000064)
++#define HW_GPMI_CTRL1_CLR	(0x00000068)
++#define HW_GPMI_CTRL1_TOG	(0x0000006c)
 +
-+#define BP_GPMI_CTRL1_RSVD2	24
-+#define BM_GPMI_CTRL1_RSVD2	0xFF000000
++#define BP_GPMI_CTRL1_RSVD2	25
++#define BM_GPMI_CTRL1_RSVD2	0xFE000000
 +#define BF_GPMI_CTRL1_RSVD2(v) \
-+		(((v) << 24) & BM_GPMI_CTRL1_RSVD2)
-+#define BM_GPMI_CTRL1_CE3_SEL	0x00800000
-+#define BM_GPMI_CTRL1_CE2_SEL	0x00400000
-+#define BM_GPMI_CTRL1_CE1_SEL	0x00200000
-+#define BM_GPMI_CTRL1_CE0_SEL	0x00100000
++		(((v) << 25) & BM_GPMI_CTRL1_RSVD2)
++#define BM_GPMI_CTRL1_DECOUPLE_CS	0x01000000
++#define BP_GPMI_CTRL1_WRN_DLY_SEL	22
++#define BM_GPMI_CTRL1_WRN_DLY_SEL	0x00C00000
++#define BF_GPMI_CTRL1_WRN_DLY_SEL(v)  \
++		(((v) << 22) & BM_GPMI_CTRL1_WRN_DLY_SEL)
++#define BM_GPMI_CTRL1_RSVD1	0x00200000
++#define BM_GPMI_CTRL1_TIMEOUT_IRQ_EN	0x00100000
 +#define BM_GPMI_CTRL1_GANGED_RDYBUSY	0x00080000
-+#define BM_GPMI_CTRL1_GPMI_MODE	0x00000001
-+#define BP_GPMI_CTRL1_GPMI_MODE	0
-+#define BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY	0x00000004
-+#define BM_GPMI_CTRL1_DEV_RESET	0x00000008
-+#define BM_GPMI_CTRL1_TIMEOUT_IRQ	0x00000200
-+#define BM_GPMI_CTRL1_DEV_IRQ	0x00000400
-+#define BM_GPMI_CTRL1_RDN_DELAY	0x0000F000
-+#define BP_GPMI_CTRL1_RDN_DELAY	12
 +#define BM_GPMI_CTRL1_BCH_MODE	0x00040000
 +#define BP_GPMI_CTRL1_DLL_ENABLE	17
 +#define BM_GPMI_CTRL1_DLL_ENABLE	0x00020000
@@ -784,10 +787,11 @@ index 0000000..2f9fce6
 +#define BM_GPMI_CTRL1_DEV_IRQ	0x00000400
 +#define BM_GPMI_CTRL1_TIMEOUT_IRQ	0x00000200
 +#define BM_GPMI_CTRL1_BURST_EN	0x00000100
-+#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY3	0x00000080
-+#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY2	0x00000040
-+#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY1	0x00000020
-+#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY0	0x00000010
++#define BM_GPMI_CTRL1_ABORT_WAIT_REQUEST	0x00000080
++#define BP_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL	4
++#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL	0x00000070
++#define BF_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL(v)  \
++		(((v) << 4) & BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL)
 +#define BM_GPMI_CTRL1_DEV_RESET	0x00000008
 +#define BV_GPMI_CTRL1_DEV_RESET__ENABLED  0x0
 +#define BV_GPMI_CTRL1_DEV_RESET__DISABLED 0x1
@@ -862,114 +866,120 @@ index 0000000..2f9fce6
 +#define BM_GPMI_DATA_DATA	0xFFFFFFFF
 +#define BF_GPMI_DATA_DATA(v)	(v)
 +
-+/*============================================================================*/
-+
 +#define HW_GPMI_STAT	(0x000000b0)
 +
-+#define BM_GPMI_STAT_PRESENT	0x80000000
-+#define BV_GPMI_STAT_PRESENT__UNAVAILABLE 0x0
-+#define BV_GPMI_STAT_PRESENT__AVAILABLE   0x1
-+#define BP_GPMI_STAT_RSVD1	12
-+#define BM_GPMI_STAT_RSVD1	0x7FFFF000
-+#define BF_GPMI_STAT_RSVD1(v)  \
-+		(((v) << 12) & BM_GPMI_STAT_RSVD1)
-+#define BP_GPMI_STAT_RDY_TIMEOUT	8
-+#define BM_GPMI_STAT_RDY_TIMEOUT	0x00000F00
++#define BP_GPMI_STAT_READY_BUSY	24
++#define BM_GPMI_STAT_READY_BUSY	0xFF000000
++#define BF_GPMI_STAT_READY_BUSY(v) \
++		(((v) << 24) & BM_GPMI_STAT_READY_BUSY)
++#define BP_GPMI_STAT_RDY_TIMEOUT	16
++#define BM_GPMI_STAT_RDY_TIMEOUT	0x00FF0000
 +#define BF_GPMI_STAT_RDY_TIMEOUT(v)  \
-+		(((v) << 8) & BM_GPMI_STAT_RDY_TIMEOUT)
-+#define BM_GPMI_STAT_ATA_IRQ	0x00000080
-+#define BM_GPMI_STAT_INVALID_BUFFER_MASK	0x00000040
-+#define BM_GPMI_STAT_FIFO_EMPTY	0x00000020
++		(((v) << 16) & BM_GPMI_STAT_RDY_TIMEOUT)
++#define BM_GPMI_STAT_DEV7_ERROR	0x00008000
++#define BM_GPMI_STAT_DEV6_ERROR	0x00004000
++#define BM_GPMI_STAT_DEV5_ERROR	0x00002000
++#define BM_GPMI_STAT_DEV4_ERROR	0x00001000
++#define BM_GPMI_STAT_DEV3_ERROR	0x00000800
++#define BM_GPMI_STAT_DEV2_ERROR	0x00000400
++#define BM_GPMI_STAT_DEERROR	0x00000200
++#define BM_GPMI_STAT_DEV0_ERROR	0x00000100
++#define BP_GPMI_STAT_RSVD1	5
++#define BM_GPMI_STAT_RSVD1	0x000000E0
++#define BF_GPMI_STAT_RSVD1(v)  \
++		(((v) << 5) & BM_GPMI_STAT_RSVD1)
++#define BM_GPMI_STAT_ATA_IRQ	0x00000010
++#define BM_GPMI_STAT_INVALID_BUFFER_MASK	0x00000008
++#define BM_GPMI_STAT_FIFO_EMPTY	0x00000004
 +#define BV_GPMI_STAT_FIFO_EMPTY__NOT_EMPTY 0x0
 +#define BV_GPMI_STAT_FIFO_EMPTY__EMPTY     0x1
-+#define BM_GPMI_STAT_FIFO_FULL	0x00000010
++#define BM_GPMI_STAT_FIFO_FULL	0x00000002
 +#define BV_GPMI_STAT_FIFO_FULL__NOT_FULL 0x0
 +#define BV_GPMI_STAT_FIFO_FULL__FULL     0x1
-+#define BM_GPMI_STAT_DEV3_ERROR	0x00000008
-+#define BM_GPMI_STAT_DEV2_ERROR	0x00000004
-+#define BM_GPMI_STAT_DEV1_ERROR	0x00000002
-+#define BM_GPMI_STAT_DEERROR	0x00000001
++#define BM_GPMI_STAT_PRESENT	0x00000001
++#define BV_GPMI_STAT_PRESENT__UNAVAILABLE 0x0
++#define BV_GPMI_STAT_PRESENT__AVAILABLE   0x1
 +
 +/*============================================================================*/
 +
 +#define HW_GPMI_DEBUG	(0x000000c0)
 +
-+#define BM_GPMI_DEBUG_READY3	0x80000000
-+#define BM_GPMI_DEBUG_READY2	0x40000000
-+#define BM_GPMI_DEBUG_READY1	0x20000000
-+#define BM_GPMI_DEBUG_READY0	0x10000000
-+#define BM_GPMI_DEBUG_WAIT_FOR_READY_END3	0x08000000
-+#define BM_GPMI_DEBUG_WAIT_FOR_READY_END2	0x04000000
-+#define BM_GPMI_DEBUG_WAIT_FOR_READY_END1	0x02000000
-+#define BM_GPMI_DEBUG_WAIT_FOR_READY_END0	0x01000000
-+#define BM_GPMI_DEBUG_SENSE3	0x00800000
-+#define BM_GPMI_DEBUG_SENSE2	0x00400000
-+#define BM_GPMI_DEBUG_SENSE1	0x00200000
-+#define BM_GPMI_DEBUG_SENSE0	0x00100000
-+#define BM_GPMI_DEBUG_DMAREQ3	0x00080000
-+#define BM_GPMI_DEBUG_DMAREQ2	0x00040000
-+#define BM_GPMI_DEBUG_DMAREQ1	0x00020000
-+#define BM_GPMI_DEBUG_DMAREQ0	0x00010000
-+#define BP_GPMI_DEBUG_CMD_END	12
-+#define BM_GPMI_DEBUG_CMD_END	0x0000F000
++#define BP_GPMI_DEBUG_WAIT_FOR_READY_END	24
++#define BM_GPMI_DEBUG_WAIT_FOR_READY_END	0xFF000000
++#define BF_GPMI_DEBUG_WAIT_FOR_READY_END(v) \
++		(((v) << 24) & BM_GPMI_DEBUG_WAIT_FOR_READY_END)
++#define BP_GPMI_DEBUG_DMA_SENSE	16
++#define BM_GPMI_DEBUG_DMA_SENSE	0x00FF0000
++#define BF_GPMI_DEBUG_DMA_SENSE(v)  \
++		(((v) << 16) & BM_GPMI_DEBUG_DMA_SENSE)
++#define BP_GPMI_DEBUG_DMAREQ	8
++#define BM_GPMI_DEBUG_DMAREQ	0x0000FF00
++#define BF_GPMI_DEBUG_DMAREQ(v)  \
++		(((v) << 8) & BM_GPMI_DEBUG_DMAREQ)
++#define BP_GPMI_DEBUG_CMD_END	0
++#define BM_GPMI_DEBUG_CMD_END	0x000000FF
 +#define BF_GPMI_DEBUG_CMD_END(v)  \
-+		(((v) << 12) & BM_GPMI_DEBUG_CMD_END)
-+#define BP_GPMI_DEBUG_UDMA_STATE	8
-+#define BM_GPMI_DEBUG_UDMA_STATE	0x00000F00
-+#define BF_GPMI_DEBUG_UDMA_STATE(v)  \
-+		(((v) << 8) & BM_GPMI_DEBUG_UDMA_STATE)
-+#define BM_GPMI_DEBUG_BUSY	0x00000080
-+#define BV_GPMI_DEBUG_BUSY__DISABLED 0x0
-+#define BV_GPMI_DEBUG_BUSY__ENABLED  0x1
-+#define BP_GPMI_DEBUG_PIN_STATE	4
-+#define BM_GPMI_DEBUG_PIN_STATE	0x00000070
-+#define BF_GPMI_DEBUG_PIN_STATE(v)  \
-+		(((v) << 4) & BM_GPMI_DEBUG_PIN_STATE)
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_IDLE   0x0
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_BYTCNT 0x1
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_ADDR   0x2
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_STALL  0x3
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_STROBE 0x4
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_ATARDY 0x5
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_DHOLD  0x6
-+#define BV_GPMI_DEBUG_PIN_STATE__PSM_DONE   0x7
-+#define BP_GPMI_DEBUG_MAIN_STATE	0
-+#define BM_GPMI_DEBUG_MAIN_STATE	0x0000000F
-+#define BF_GPMI_DEBUG_MAIN_STATE(v)  \
-+		(((v) << 0) & BM_GPMI_DEBUG_MAIN_STATE)
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_IDLE   0x0
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_BYTCNT 0x1
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_WAITFE 0x2
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_WAITFR 0x3
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_DMAREQ 0x4
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_DMAACK 0x5
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_WAITFF 0x6
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_LDFIFO 0x7
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_LDDMAR 0x8
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_RDCMP  0x9
-+#define BV_GPMI_DEBUG_MAIN_STATE__MSM_DONE   0xA
++		(((v) << 0) & BM_GPMI_DEBUG_CMD_END)
 +
 +/*============================================================================*/
 +
 +#define HW_GPMI_VERSION	(0x000000d0)
 +
-+#define BP_GPMI_VERSION_MAJOR     24
-+#define BM_GPMI_VERSION_MAJOR     0xFF000000
-+#define BF_GPMI_VERSION_MAJOR(v)  (((v) << 24) & BM_GPMI_VERSION_MAJOR)
-+#define BP_GPMI_VERSION_MINOR     16
-+#define BM_GPMI_VERSION_MINOR     0x00FF0000
-+#define BF_GPMI_VERSION_MINOR(v)  (((v) << 16) & BM_GPMI_VERSION_MINOR)
-+#define BP_GPMI_VERSION_STEP      0
-+#define BM_GPMI_VERSION_STEP      0x0000FFFF
-+#define BF_GPMI_VERSION_STEP(v)   (((v) << 0) & BM_GPMI_VERSION_STEP)
++#define BP_GPMI_VERSION_MAJOR	24
++#define BM_GPMI_VERSION_MAJOR	0xFF000000
++#define BF_GPMI_VERSION_MAJOR(v) \
++		(((v) << 24) & BM_GPMI_VERSION_MAJOR)
++#define BP_GPMI_VERSION_MINOR	16
++#define BM_GPMI_VERSION_MINOR	0x00FF0000
++#define BF_GPMI_VERSION_MINOR(v)  \
++		(((v) << 16) & BM_GPMI_VERSION_MINOR)
++#define BP_GPMI_VERSION_STEP	0
++#define BM_GPMI_VERSION_STEP	0x0000FFFF
++#define BF_GPMI_VERSION_STEP(v)  \
++		(((v) << 0) & BM_GPMI_VERSION_STEP)
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_DEBUG2       (0x000000e0)
++#define HW_GPMI_DEBUG2	(0x000000e0)
 +
-+#define BP_GPMI_DEBUG2_RSVD1	16
-+#define BM_GPMI_DEBUG2_RSVD1	0xFFFF0000
-+#define BF_GPMI_DEBUG2_RSVD1(v)	(((v) << 16) & BM_GPMI_DEBUG2_RSVD1)
++#define BP_GPMI_DEBUG2_RSVD1	28
++#define BM_GPMI_DEBUG2_RSVD1	0xF0000000
++#define BF_GPMI_DEBUG2_RSVD1(v) \
++		(((v) << 28) & BM_GPMI_DEBUG2_RSVD1)
++#define BP_GPMI_DEBUG2_UDMA_STATE	24
++#define BM_GPMI_DEBUG2_UDMA_STATE	0x0F000000
++#define BF_GPMI_DEBUG2_UDMA_STATE(v)  \
++		(((v) << 24) & BM_GPMI_DEBUG2_UDMA_STATE)
++#define BM_GPMI_DEBUG2_BUSY	0x00800000
++#define BV_GPMI_DEBUG2_BUSY__DISABLED 0x0
++#define BV_GPMI_DEBUG2_BUSY__ENABLED  0x1
++#define BP_GPMI_DEBUG2_PIN_STATE	20
++#define BM_GPMI_DEBUG2_PIN_STATE	0x00700000
++#define BF_GPMI_DEBUG2_PIN_STATE(v)  \
++		(((v) << 20) & BM_GPMI_DEBUG2_PIN_STATE)
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_IDLE   0x0
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_BYTCNT 0x1
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_ADDR   0x2
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_STALL  0x3
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_STROBE 0x4
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_ATARDY 0x5
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_DHOLD  0x6
++#define BV_GPMI_DEBUG2_PIN_STATE__PSM_DONE   0x7
++#define BP_GPMI_DEBUG2_MAIN_STATE	16
++#define BM_GPMI_DEBUG2_MAIN_STATE	0x000F0000
++#define BF_GPMI_DEBUG2_MAIN_STATE(v)  \
++		(((v) << 16) & BM_GPMI_DEBUG2_MAIN_STATE)
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_IDLE   0x0
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_BYTCNT 0x1
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFE 0x2
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFR 0x3
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DMAREQ 0x4
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DMAACK 0x5
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFF 0x6
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_LDFIFO 0x7
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_LDDMAR 0x8
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_RDCMP  0x9
++#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DONE   0xA
 +#define BP_GPMI_DEBUG2_SYND2GPMI_BE	12
 +#define BM_GPMI_DEBUG2_SYND2GPMI_BE	0x0000F000
 +#define BF_GPMI_DEBUG2_SYND2GPMI_BE(v)  \
@@ -980,13 +990,14 @@ index 0000000..2f9fce6
 +#define BM_GPMI_DEBUG2_SYND2GPMI_READY	0x00000100
 +#define BM_GPMI_DEBUG2_VIEW_DELAYED_RDN	0x00000080
 +#define BM_GPMI_DEBUG2_UPDATE_WINDOW	0x00000040
-+#define BP_GPMI_DEBUG2_RDN_TAP     0
-+#define BM_GPMI_DEBUG2_RDN_TAP     0x0000003F
-+#define BF_GPMI_DEBUG2_RDN_TAP(v)  (((v) << 0) & BM_GPMI_DEBUG2_RDN_TAP)
++#define BP_GPMI_DEBUG2_RDN_TAP	0
++#define BM_GPMI_DEBUG2_RDN_TAP	0x0000003F
++#define BF_GPMI_DEBUG2_RDN_TAP(v)  \
++		(((v) << 0) & BM_GPMI_DEBUG2_RDN_TAP)
 +
 +/*============================================================================*/
 +
-+#define HW_GPMI_DEBUG3       (0x000000f0)
++#define HW_GPMI_DEBUG3	(0x000000f0)
 +
 +#define BP_GPMI_DEBUG3_APB_WORD_CNTR	16
 +#define BM_GPMI_DEBUG3_APB_WORD_CNTR	0xFFFF0000
@@ -998,17 +1009,18 @@ index 0000000..2f9fce6
 +		(((v) << 0) & BM_GPMI_DEBUG3_DEV_WORD_CNTR)
 +
 +/*============================================================================*/
++
 +#endif
-diff --git a/drivers/mtd/nand/gpmi-nfc/hal-imx23.c b/drivers/mtd/nand/gpmi-nfc/hal-imx23.c
+diff --git a/drivers/mtd/nand/gpmi-nfc/hal-imx28.c b/drivers/mtd/nand/gpmi-nfc/hal-imx28.c
 new file mode 100644
-index 0000000..155ad67
+index 0000000..ff87d7f
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/hal-imx23.c
-@@ -0,0 +1,556 @@
++++ b/drivers/mtd/nand/gpmi-nfc/hal-imx28.c
+@@ -0,0 +1,503 @@
 +/*
 + * Freescale GPMI NFC NAND Flash Driver
 + *
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ * Copyright (C) 2011 Freescale Semiconductor, Inc.
 + * Copyright (C) 2008 Embedded Alley Solutions, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -1026,14 +1038,14 @@ index 0000000..155ad67
 + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +#include "gpmi-nfc.h"
-+#include "gpmi-regs-imx23.h"
-+#include "bch-regs-imx23.h"
++#include "gpmi-regs-imx28.h"
++#include "bch-regs-imx28.h"
 +
-+static int init_hal_imx23(struct gpmi_nfc_data *this)
++static int init_hal_imx28(struct gpmi_nfc_data *this)
 +{
 +	struct resources  *resources = &this->resources;
 +
-+	/* Enable the clock */
++	/* Enable the clock. */
 +	clk_enable(resources->clock);
 +
 +	/* Reset the GPMI block. */
@@ -1057,6 +1069,7 @@ index 0000000..155ad67
 +
 +	/* Disable the clock. */
 +	clk_disable(resources->clock);
++
 +	return 0;
 +}
 +
@@ -1071,22 +1084,27 @@ index 0000000..155ad67
 +	unsigned int         ecc_strength;
 +	unsigned int         page_size;
 +
++	/* We make the abstract choices in a common function. */
 +	if (common_nfc_set_geometry(this))
 +		return !0;
 +
++	/* Translate the abstract choices into register fields. */
 +	block_count   = nfc->ecc_chunk_count - 1;
 +	block_size    = nfc->ecc_chunk_size_in_bytes;
 +	metadata_size = nfc->metadata_size_in_bytes;
 +	ecc_strength  = nfc->ecc_strength >> 1;
 +	page_size     = nfc->page_size_in_bytes;
 +
++	/* Enable the clock. */
 +	clk_enable(resources->clock);
 +
 +	/*
 +	 * Reset the BCH block. Notice that we pass in true for the just_enable
 +	 * flag. This is because the soft reset for the version 0 BCH block
-+	 * doesn't work. If you try to soft reset the BCH block, it becomes
-+	 * unusable until the next hard reset.
++	 * doesn't work and the version 1 BCH block is similar enough that we
++	 * suspect the same (though this has not been officially tested). If you
++	 * try to soft reset a version 0 BCH block, it becomes unusable until
++	 * the next hard reset.
 +	 */
 +	mxs_reset_block(resources->bch_regs);
 +
@@ -1111,7 +1129,9 @@ index 0000000..155ad67
 +	__raw_writel(BM_BCH_CTRL_COMPLETE_IRQ_EN,
 +				resources->bch_regs + HW_BCH_CTRL_SET);
 +
++	/* Disable the clock. */
 +	clk_disable(resources->clock);
++
 +	return 0;
 +}
 +
@@ -1186,75 +1206,12 @@ index 0000000..155ad67
 +{
 +}
 +
-+/* Begin the I/O */
 +static void begin(struct gpmi_nfc_data *this)
 +{
 +	struct resources                 *resources = &this->resources;
-+	struct nfc_hal                   *nfc       =  this->nfc;
-+	struct gpmi_nfc_hardware_timing  hw;
-+	unsigned char                    *gpmi_regs = resources->gpmi_regs;
-+	unsigned int                     clock_period_in_ns;
-+	uint32_t                         register_image;
-+	unsigned int                     dll_wait_time_in_us;
 +
 +	/* Enable the clock. */
 +	clk_enable(resources->clock);
-+
-+	/* Get the timing information we need. */
-+	nfc->clock_frequency_in_hz = clk_get_rate(resources->clock);
-+	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
-+
-+	gpmi_nfc_compute_hardware_timing(this, &hw);
-+
-+	/* Set up all the simple timing parameters. */
-+	register_image =
-+		BF_GPMI_TIMING0_ADDRESS_SETUP(hw.address_setup_in_cycles) |
-+		BF_GPMI_TIMING0_DATA_HOLD(hw.data_hold_in_cycles)         |
-+		BF_GPMI_TIMING0_DATA_SETUP(hw.data_setup_in_cycles)       ;
-+
-+	__raw_writel(register_image, gpmi_regs + HW_GPMI_TIMING0);
-+
-+	/*
-+	 * HEY - PAY ATTENTION!
-+	 *
-+	 * DLL_ENABLE must be set to zero when setting RDN_DELAY or HALF_PERIOD.
-+	 */
-+	__raw_writel(BM_GPMI_CTRL1_DLL_ENABLE, gpmi_regs + HW_GPMI_CTRL1_CLR);
-+
-+	/* Clear out the DLL control fields. */
-+	__raw_writel(BM_GPMI_CTRL1_RDN_DELAY,   gpmi_regs + HW_GPMI_CTRL1_CLR);
-+	__raw_writel(BM_GPMI_CTRL1_HALF_PERIOD, gpmi_regs + HW_GPMI_CTRL1_CLR);
-+
-+	/* If no sample delay is called for, return immediately. */
-+	if (!hw.sample_delay_factor)
-+		return;
-+
-+	/* Configure the HALF_PERIOD flag. */
-+
-+	if (hw.use_half_periods)
-+		__raw_writel(BM_GPMI_CTRL1_HALF_PERIOD,
-+						gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/* Set the delay factor. */
-+	__raw_writel(BF_GPMI_CTRL1_RDN_DELAY(hw.sample_delay_factor),
-+						gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/* Enable the DLL. */
-+	__raw_writel(BM_GPMI_CTRL1_DLL_ENABLE, gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/*
-+	 * After we enable the GPMI DLL, we have to wait 64 clock cycles before
-+	 * we can use the GPMI.
-+	 *
-+	 * Calculate the amount of time we need to wait, in microseconds.
-+	 */
-+	dll_wait_time_in_us = (clock_period_in_ns * 64) / 1000;
-+
-+	if (!dll_wait_time_in_us)
-+		dll_wait_time_in_us = 1;
-+
-+	/* Wait for the DLL to settle. */
-+	udelay(dll_wait_time_in_us);
 +}
 +
 +static void end(struct gpmi_nfc_data *this)
@@ -1267,6 +1224,7 @@ index 0000000..155ad67
 +static void clear_bch(struct gpmi_nfc_data *this)
 +{
 +	struct resources  *r = &this->resources;
++
 +	__raw_writel(BM_BCH_CTRL_COMPLETE_IRQ, r->bch_regs + HW_BCH_CTRL_CLR);
 +}
 +
@@ -1277,11 +1235,13 @@ index 0000000..155ad67
 +	uint32_t          mask;
 +	uint32_t          register_image;
 +
-+	mask = BM_GPMI_DEBUG_READY0 << chip;
-+	register_image = __raw_readl(resources->gpmi_regs + HW_GPMI_DEBUG);
++	/* Extract and return the status. */
++	mask = BF_GPMI_STAT_READY_BUSY(1 << chip);
++	register_image = __raw_readl(resources->gpmi_regs + HW_GPMI_STAT);
 +	return !!(register_image & mask);
 +}
 +
++/* Sends a command and associated addresses. */
 +static int send_command(struct gpmi_nfc_data *this)
 +{
 +	struct dma_chan *channel = get_dma_chan(this);
@@ -1333,7 +1293,6 @@ index 0000000..155ad67
 +	uint32_t address;
 +	u32 pio[2];
 +
-+	log();
 +	/* [1] PIO */
 +	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WRITE;
 +	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
@@ -1353,7 +1312,7 @@ index 0000000..155ad67
 +		return -1;
 +	}
 +
-+	/* step 2 : send DMA request */
++	/* [2] : send DMA request */
 +	prepare_data_dma(this, DMA_TO_DEVICE);
 +	desc = channel->device->device_prep_slave_sg(channel, &mil->data_sgl,
 +						1, DMA_TO_DEVICE, 1);
@@ -1361,7 +1320,7 @@ index 0000000..155ad67
 +		log("step 2 error");
 +		return -1;
 +	}
-+	/* [2] submit the DMA */
++	/* [3] submit the DMA */
 +	this->dma_type = DMA_FOR_WRITE_DATA;
 +	start_dma_without_bch_irq(this, desc);
 +	return 0;
@@ -1374,7 +1333,7 @@ index 0000000..155ad67
 +	struct mil *mil = &this->mil;
 +	u32 pio[2];
 +
-+	/* step 1 : send PIO */
++	/* [1] : send PIO */
 +	pio[0] = BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__READ)
 +		| BM_GPMI_CTRL0_WORD_LENGTH
 +		| BF_GPMI_CTRL0_CS(mil->current_chip)
@@ -1389,7 +1348,7 @@ index 0000000..155ad67
 +		return -1;
 +	}
 +
-+	/* step 2 : send DMA request */
++	/* [2] : setup DMA buffer */
 +	prepare_data_dma(this, DMA_FROM_DEVICE);
 +	desc = channel->device->device_prep_slave_sg(channel, &mil->data_sgl,
 +						1, DMA_FROM_DEVICE, 1);
@@ -1398,14 +1357,14 @@ index 0000000..155ad67
 +		return -1;
 +	}
 +
-+	/* [3] submit the DMA */
++	/* [3] : submit the DMA */
 +	this->dma_type = DMA_FOR_READ_DATA;
 +	start_dma_without_bch_irq(this, desc);
 +	return 0;
 +}
 +
 +static int send_page(struct gpmi_nfc_data *this,
-+			dma_addr_t payload, dma_addr_t auxiliary)
++				dma_addr_t payload, dma_addr_t auxiliary)
 +{
 +	struct nfc_geometry  *geo   = &this->nfc_geometry;
 +	uint32_t             command_mode;
@@ -1421,7 +1380,7 @@ index 0000000..155ad67
 +	/* A DMA descriptor that does an ECC page read. */
 +	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WRITE;
 +	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__BCH_ENCODE;
++	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__ENCODE;
 +	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE |
 +				BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
 +
@@ -1486,7 +1445,7 @@ index 0000000..155ad67
 +	/* [2] Enable the BCH block and read. */
 +	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__READ;
 +	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__BCH_DECODE;
++	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__DECODE;
 +	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE
 +			| BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
 +
@@ -1534,11 +1493,11 @@ index 0000000..155ad67
 +	return start_dma_with_bch_irq(this, desc);
 +}
 +
-+/* The NFC HAL for IMX23 */
-+struct nfc_hal  gpmi_nfc_hal_imx23 = {
-+	.version                     = 0,
-+	.description                 = "4-chip GPMI and BCH for IMX23",
-+	.max_chip_count              = 4,
++/* This structure represents the NFC HAL for this version of the hardware. */
++struct nfc_hal  gpmi_nfc_hal_imx28 = {
++	.version                     = 1,
++	.description                 = "8-chip GPMI and BCH",
++	.max_chip_count              = 8,
 +	.max_data_setup_cycles       = (BM_GPMI_TIMING0_DATA_SETUP >>
 +						BP_GPMI_TIMING0_DATA_SETUP),
 +	.internal_data_setup_in_ns   = 0,
@@ -1546,7 +1505,7 @@ index 0000000..155ad67
 +						BP_GPMI_CTRL1_RDN_DELAY),
 +	.max_dll_clock_period_in_ns  = 32,
 +	.max_dll_delay_in_ns         = 16,
-+	.init                        = init_hal_imx23,
++	.init                        = init_hal_imx28,
 +	.set_geometry                = set_geometry,
 +	.set_timing                  = set_timing,
 +	.get_timing                  = get_timing,
@@ -1558,15 +1517,15 @@ index 0000000..155ad67
 +	.send_command                = send_command,
 +	.read_data                   = read_data,
 +	.send_data                   = send_data,
-+	.read_page                   = read_page,
 +	.send_page                   = send_page,
++	.read_page                   = read_page,
 +};
-diff --git a/drivers/mtd/nand/gpmi-nfc/rom-imx23.c b/drivers/mtd/nand/gpmi-nfc/rom-imx23.c
+diff --git a/drivers/mtd/nand/gpmi-nfc/rom-imx28.c b/drivers/mtd/nand/gpmi-nfc/rom-imx28.c
 new file mode 100644
-index 0000000..8193874
+index 0000000..03be07f
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/rom-imx23.c
-@@ -0,0 +1,300 @@
++++ b/drivers/mtd/nand/gpmi-nfc/rom-imx28.c
+@@ -0,0 +1,66 @@
 +/*
 + * Freescale GPMI NFC NAND Flash Driver
 + *
@@ -1589,283 +1548,49 @@ index 0000000..8193874
 + */
 +#include "gpmi-nfc.h"
 +
-+/* Useful variables for Boot ROM Helper version 0.  */
-+static const char  *fingerprint = "STMP";
-+
 +/* Sets geometry for the Boot ROM Helper. */
 +static int set_geometry(struct gpmi_nfc_data *this)
 +{
-+	struct gpmi_nfc_platform_data	*pdata    =  this->pdata;
-+	struct boot_rom_geometry	*geometry = &this->rom_geometry;
-+	struct nand_chip		*nand     = &this->mil.nand;
-+	int                             error;
++	struct gpmi_nfc_platform_data  *pdata    =  this->pdata;
++	struct boot_rom_geometry       *geometry = &this->rom_geometry;
++	int                            error;
 +
++	/* Version-independent geometry. */
 +	error = gpmi_nfc_rom_helper_set_geometry(this);
 +	if (error)
 +		return error;
 +
++	/*
++	 * Check if the platform data indicates we are to protect the boot area.
++	 */
 +	if (!pdata->boot_area_size_in_bytes) {
 +		geometry->boot_area_count         = 0;
 +		geometry->boot_area_size_in_bytes = 0;
 +		return 0;
 +	}
 +
-+	if (nand->numchips == 1) {
-+		geometry->boot_area_count = 1;
-+		geometry->boot_area_size_in_bytes =
-+					pdata->boot_area_size_in_bytes * 2;
-+	} else {
-+		geometry->boot_area_count = 2;
-+		geometry->boot_area_size_in_bytes =
-+					pdata->boot_area_size_in_bytes;
-+	}
-+	return 0;
-+}
-+
-+static int check_transcription_stamp(struct gpmi_nfc_data *this)
-+{
-+	struct boot_rom_geometry  *rom_geo  = &this->rom_geometry;
-+	struct mil                *mil      = &this->mil;
-+	struct mtd_info           *mtd      = &mil->mtd;
-+	struct nand_chip          *nand     = &mil->nand;
-+	unsigned int              search_area_size_in_strides;
-+	unsigned int              stride;
-+	unsigned int              page;
-+	loff_t                    byte;
-+	uint8_t                   *buffer = nand->buffers->databuf;
-+	int                       saved_chip_number;
-+	int                       found_an_ncb_fingerprint = false;
-+
-+	/* Compute the number of strides in a search area. */
-+	search_area_size_in_strides = 1 << rom_geo->search_area_stride_exponent;
-+
-+	/* Select chip 0. */
-+	saved_chip_number = mil->current_chip;
-+	nand->select_chip(mtd, 0);
++	/*
++	 * If control arrives here, we are supposed to set up partitions to
++	 * protect the boot areas. In this version of the ROM, we support only
++	 * one boot area.
++	 */
++	geometry->boot_area_count = 1;
 +
 +	/*
-+	 * Loop through the first search area, looking for the NCB fingerprint.
++	 * Use the platform's boot area size.
 +	 */
-+	pr_info("Scanning for an NCB fingerprint...\n");
++	geometry->boot_area_size_in_bytes = pdata->boot_area_size_in_bytes;
 +
-+	for (stride = 0; stride < search_area_size_in_strides; stride++) {
-+		/* Compute the page and byte addresses. */
-+		page = stride * rom_geo->stride_size_in_pages;
-+		byte = page   * mtd->writesize;
-+
-+		pr_info("  Looking for a fingerprint in page 0x%x\n", page);
-+
-+		/*
-+		 * Read the NCB fingerprint. The fingerprint is four bytes long
-+		 * and starts in the 12th byte of the page.
-+		 */
-+		nand->cmdfunc(mtd, NAND_CMD_READ0, 12, page);
-+		nand->read_buf(mtd, buffer, strlen(fingerprint));
-+
-+		/* Look for the fingerprint. */
-+		if (!memcmp(buffer, fingerprint, strlen(fingerprint))) {
-+			found_an_ncb_fingerprint = true;
-+			break;
-+		}
-+
-+	}
-+
-+	/* Deselect chip 0. */
-+	nand->select_chip(mtd, saved_chip_number);
-+
-+	if (found_an_ncb_fingerprint)
-+		pr_info("  Found a fingerprint\n");
-+	else
-+		pr_info("  No fingerprint found\n");
-+	return found_an_ncb_fingerprint;
-+}
-+
-+/* Writes a transcription stamp. */
-+static int write_transcription_stamp(struct gpmi_nfc_data *this)
-+{
-+	struct device             *dev      =  this->dev;
-+	struct boot_rom_geometry  *rom_geo  = &this->rom_geometry;
-+	struct nand_device_info	  *info     = &this->device_info;
-+	struct mil                *mil      = &this->mil;
-+	struct mtd_info           *mtd      = &mil->mtd;
-+	struct nand_chip          *nand     = &mil->nand;
-+	unsigned int              block_size_in_pages;
-+	unsigned int              search_area_size_in_strides;
-+	unsigned int              search_area_size_in_pages;
-+	unsigned int              search_area_size_in_blocks;
-+	unsigned int              block;
-+	unsigned int              stride;
-+	unsigned int              page;
-+	loff_t                    byte;
-+	uint8_t                   *buffer = nand->buffers->databuf;
-+	int                       saved_chip_number;
-+	int                       status;
-+
-+	/* Compute the search area geometry. */
-+	block_size_in_pages = info->attr.block_size_in_pages;
-+	search_area_size_in_strides = 1 << rom_geo->search_area_stride_exponent;
-+	search_area_size_in_pages = search_area_size_in_strides *
-+					rom_geo->stride_size_in_pages;
-+	search_area_size_in_blocks =
-+		  (search_area_size_in_pages + (block_size_in_pages - 1)) /
-+				    block_size_in_pages;
-+
-+	pr_info("-------------------------------------------\n");
-+	pr_info("Search Area Geometry\n");
-+	pr_info("-------------------------------------------\n");
-+	pr_info("Search Area Size in Blocks : %u", search_area_size_in_blocks);
-+	pr_info("Search Area Size in Strides: %u", search_area_size_in_strides);
-+	pr_info("Search Area Size in Pages  : %u", search_area_size_in_pages);
-+
-+	/* Select chip 0. */
-+	saved_chip_number = mil->current_chip;
-+	nand->select_chip(mtd, 0);
-+
-+	/* Loop over blocks in the first search area, erasing them. */
-+	pr_info("Erasing the search area...\n");
-+
-+	for (block = 0; block < search_area_size_in_blocks; block++) {
-+		/* Compute the page address. */
-+		page = block * block_size_in_pages;
-+
-+		/* Erase this block. */
-+		pr_info("  Erasing block 0x%x\n", block);
-+		nand->cmdfunc(mtd, NAND_CMD_ERASE1, -1, page);
-+		nand->cmdfunc(mtd, NAND_CMD_ERASE2, -1, -1);
-+
-+		/* Wait for the erase to finish. */
-+		status = nand->waitfunc(mtd, nand);
-+		if (status & NAND_STATUS_FAIL)
-+			dev_err(dev, "[%s] Erase failed.\n", __func__);
-+	}
-+
-+	/* Write the NCB fingerprint into the page buffer. */
-+	memset(buffer, ~0, mtd->writesize);
-+	memset(nand->oob_poi, ~0, mtd->oobsize);
-+	memcpy(buffer + 12, fingerprint, strlen(fingerprint));
-+
-+	/* Loop through the first search area, writing NCB fingerprints. */
-+	pr_info("Writing NCB fingerprints...\n");
-+	for (stride = 0; stride < search_area_size_in_strides; stride++) {
-+		/* Compute the page and byte addresses. */
-+		page = stride * rom_geo->stride_size_in_pages;
-+		byte = page   * mtd->writesize;
-+
-+		/* Write the first page of the current stride. */
-+		pr_info("  Writing an NCB fingerprint in page 0x%x\n", page);
-+		nand->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
-+		nand->ecc.write_page_raw(mtd, nand, buffer);
-+		nand->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-+
-+		/* Wait for the write to finish. */
-+		status = nand->waitfunc(mtd, nand);
-+		if (status & NAND_STATUS_FAIL)
-+			dev_err(dev, "[%s] Write failed.\n", __func__);
-+	}
-+
-+	/* Deselect chip 0. */
-+	nand->select_chip(mtd, saved_chip_number);
-+	return 0;
-+}
-+
-+static int imx23_rom_extra_init(struct gpmi_nfc_data  *this)
-+{
-+	struct device             *dev      =  this->dev;
-+	struct mil                *mil      = &this->mil;
-+	struct nand_chip          *nand     = &mil->nand;
-+	struct mtd_info           *mtd      = &mil->mtd;
-+	struct nand_device_info	  *info     = &this->device_info;
-+	unsigned int              block_count;
-+	unsigned int              block;
-+	int                       chip;
-+	int                       page;
-+	loff_t                    byte;
-+	uint8_t                   block_mark;
-+	int                       error = 0;
-+
-+	/*
-+	 * If control arrives here, we can't use block mark swapping, which
-+	 * means we're forced to use transcription. First, scan for the
-+	 * transcription stamp. If we find it, then we don't have to do
-+	 * anything -- the block marks are already transcribed.
-+	 */
-+	if (check_transcription_stamp(this))
-+		return 0;
-+
-+	/*
-+	 * If control arrives here, we couldn't find a transcription stamp, so
-+	 * so we presume the block marks are in the conventional location.
-+	 */
-+	pr_info("Transcribing bad block marks...\n");
-+
-+	/* Compute the number of blocks in the entire medium. */
-+	block_count = info->attr.chip_size_in_bytes >> nand->phys_erase_shift;
-+
-+	/*
-+	 * Loop over all the blocks in the medium, transcribing block marks as
-+	 * we go.
-+	 */
-+	for (block = 0; block < block_count; block++) {
-+		/*
-+		 * Compute the chip, page and byte addresses for this block's
-+		 * conventional mark.
-+		 */
-+		chip = block >> (nand->chip_shift - nand->phys_erase_shift);
-+		page = block << (nand->phys_erase_shift - nand->page_shift);
-+		byte = block <<  nand->phys_erase_shift;
-+
-+		/* Select the chip. */
-+		nand->select_chip(mtd, chip);
-+
-+		/* Send the command to read the conventional block mark. */
-+		nand->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
-+
-+		/* Read the conventional block mark. */
-+		block_mark = nand->read_byte(mtd);
-+
-+		/*
-+		 * Check if the block is marked bad. If so, we need to mark it
-+		 * again, but this time the result will be a mark in the
-+		 * location where we transcribe block marks.
-+		 *
-+		 * Notice that we have to explicitly set the marking_a_bad_block
-+		 * member before we call through the block_markbad function
-+		 * pointer in the owning struct nand_chip. If we could call
-+		 * though the block_markbad function pointer in the owning
-+		 * struct mtd_info, which we have hooked, then this would be
-+		 * taken care of for us. Unfortunately, we can't because that
-+		 * higher-level code path will do things like consulting the
-+		 * in-memory bad block table -- which doesn't even exist yet!
-+		 * So, we have to call at a lower level and handle some details
-+		 * ourselves.
-+		 */
-+		if (block_mark != 0xff) {
-+			pr_info("Transcribing mark in block %u\n", block);
-+			mil->marking_a_bad_block = true;
-+			error = nand->block_markbad(mtd, byte);
-+			mil->marking_a_bad_block = false;
-+			if (error)
-+				dev_err(dev, "Failed to mark block bad with "
-+							"error %d\n", error);
-+		}
-+
-+		/* Deselect the chip. */
-+		nand->select_chip(mtd, -1);
-+	}
-+
-+	/* Write the stamp that indicates we've transcribed the block marks. */
-+	write_transcription_stamp(this);
 +	return 0;
 +}
 +
 +/* This structure represents the Boot ROM Helper for this version. */
-+struct boot_rom_helper  gpmi_nfc_boot_rom_imx23 = {
-+	.version                   = 0,
-+	.description               = "Single/dual-chip boot area, "
-+					"no block mark swapping",
-+	.swap_block_mark           = false,
++struct boot_rom_helper  gpmi_nfc_boot_rom_imx28 = {
++	.version                   = 1,
++	.description               = "Single-chip boot area, "
++						"block mark swapping supported",
++	.swap_block_mark           = true,
 +	.set_geometry              = set_geometry,
-+	.rom_extra_init		   = imx23_rom_extra_init,
 +};
 -- 
 1.7.0.4
