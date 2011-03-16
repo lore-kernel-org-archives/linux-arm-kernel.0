@@ -1,359 +1,517 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 16 Mar 2011 09:42:49 +0800
-Subject: [PATCH 3/7] add the database for the NANDs
+Date: Wed, 16 Mar 2011 09:42:47 +0800
+Subject: [PATCH 1/7] ARM: add GPMI support for imx23/imx28
 In-Reply-To: <1300239773-4222-1-git-send-email-b32955@freescale.com>
 References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-Message-ID: <1300239773-4222-4-git-send-email-b32955@freescale.com>
+Message-ID: <1300239773-4222-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a database for the NANDs which is now supported by imx23 and imx28.
+add the clock and iomux initialization for GPMI in the imx23 and imx28.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nfc/nand_device_info.c |  181 ++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/nand_device_info.h |  145 +++++++++++++++++++++
- 2 files changed, 326 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/nand/gpmi-nfc/nand_device_info.c
- create mode 100644 drivers/mtd/nand/gpmi-nfc/nand_device_info.h
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    3 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    3 +
+ arch/arm/mach-mxs/devices-mx23.h                |    3 +
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-gpmi.c       |  144 +++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
+ arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   75 ++++++++++++
+ arch/arm/mach-mxs/mach-mx23evk.c                |   37 ++++++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   37 ++++++
+ 12 files changed, 315 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
 
-diff --git a/drivers/mtd/nand/gpmi-nfc/nand_device_info.c b/drivers/mtd/nand/gpmi-nfc/nand_device_info.c
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 4f6f174..8ab0fcb 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -22,6 +22,7 @@ config MACH_MX23EVK
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
++	select MXS_HAVE_PLATFORM_GPMI
+ 	select MXS_HAVE_PLATFORM_MXSFB
+ 	default y
+ 	help
+@@ -33,6 +34,7 @@ config MACH_MX28EVK
+ 	select SOC_IMX28
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
++	select MXS_HAVE_PLATFORM_GPMI
+ 	select MXS_HAVE_PLATFORM_FEC
+ 	select MXS_HAVE_PLATFORM_FLEXCAN
+ 	select MXS_HAVE_PLATFORM_MXSFB
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index d133c7f..c8ecc1b 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -29,6 +29,7 @@
+ #include <mach/mx23.h>
+ #include <mach/common.h>
+ #include <mach/clock.h>
++#include <mach/gpmi-nfc.h>
+ 
+ #include "regs-clkctrl-mx23.h"
+ 
+@@ -442,6 +443,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("duart", "apb_pclk", xbus_clk)
+ 	/* for amba-pl011 driver */
+ 	_REGISTER_CLOCK("duart", NULL, uart_clk)
++	_REGISTER_CLOCK(GPMI_NFC_DRIVER_NAME, GPMI_NFC_CLOCK_NAME, gpmi_clk)
+ 	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+ 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+ 	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+@@ -533,6 +535,7 @@ int __init mx23_clocks_init(void)
+ 	clk_enable(&xbus_clk);
+ 	clk_enable(&emi_clk);
+ 	clk_enable(&uart_clk);
++	clk_enable(&gpmi_clk);
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5e489a2..5123e32 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -29,6 +29,7 @@
+ #include <mach/mx28.h>
+ #include <mach/common.h>
+ #include <mach/clock.h>
++#include <mach/gpmi-nfc.h>
+ 
+ #include "regs-clkctrl-mx28.h"
+ 
+@@ -607,6 +608,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("duart", "apb_pclk", xbus_clk)
+ 	/* for amba-pl011 driver */
+ 	_REGISTER_CLOCK("duart", NULL, uart_clk)
++	_REGISTER_CLOCK(GPMI_NFC_DRIVER_NAME, GPMI_NFC_CLOCK_NAME, gpmi_clk)
+ 	_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+ 	_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
+ 	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+@@ -749,6 +751,7 @@ int __init mx28_clocks_init(void)
+ 	clk_enable(&xbus_clk);
+ 	clk_enable(&emi_clk);
+ 	clk_enable(&uart_clk);
++	clk_enable(&gpmi_clk);
+ 
+ 	clk_set_parent(&lcdif_clk, &ref_pix_clk);
+ 
+diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+index c7e14f4..349fb1d 100644
+--- a/arch/arm/mach-mxs/devices-mx23.h
++++ b/arch/arm/mach-mxs/devices-mx23.h
+@@ -16,6 +16,9 @@ extern const struct amba_device mx23_duart_device __initconst;
+ #define mx23_add_duart() \
+ 	mxs_add_duart(&mx23_duart_device)
+ 
++extern const struct gpmi_nfc_platform_data gpmi_platform_data_imx23 __initconst;
++#define mx23_add_gpmi() mxs_add_gpmi(&gpmi_platform_data_imx23)
++
+ extern const struct mxs_auart_data mx23_auart_data[] __initconst;
+ #define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
+ #define mx23_add_auart0()		mx23_add_auart(0)
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 9d08555..ed6427b 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -16,6 +16,9 @@ extern const struct amba_device mx28_duart_device __initconst;
+ #define mx28_add_duart() \
+ 	mxs_add_duart(&mx28_duart_device)
+ 
++extern const struct gpmi_nfc_platform_data gpmi_platform_data_imx28 __initconst;
++#define	mx28_add_gpmi()	mxs_add_gpmi(&gpmi_platform_data_imx28)
++
+ extern const struct mxs_auart_data mx28_auart_data[] __initconst;
+ #define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
+ #define mx28_add_auart0()		mx28_add_auart(0)
+diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+index 1451ad0..81e99ce 100644
+--- a/arch/arm/mach-mxs/devices/Kconfig
++++ b/arch/arm/mach-mxs/devices/Kconfig
+@@ -5,6 +5,9 @@ config MXS_HAVE_AMBA_DUART
+ config MXS_HAVE_PLATFORM_AUART
+ 	bool
+ 
++config MXS_HAVE_PLATFORM_GPMI
++	bool
++
+ config MXS_HAVE_PLATFORM_FEC
+ 	bool
+ 
+diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+index 0d9bea3..8a7c2c8 100644
+--- a/arch/arm/mach-mxs/devices/Makefile
++++ b/arch/arm/mach-mxs/devices/Makefile
+@@ -2,6 +2,7 @@ obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+ obj-y += platform-dma.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
++obj-$(CONFIG_MXS_HAVE_PLATFORM_GPMI) += platform-gpmi.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_I2C) += platform-mxs-i2c.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
+diff --git a/arch/arm/mach-mxs/devices/platform-gpmi.c b/arch/arm/mach-mxs/devices/platform-gpmi.c
 new file mode 100644
-index 0000000..aa0813a
+index 0000000..038226b
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/nand_device_info.c
-@@ -0,0 +1,181 @@
++++ b/arch/arm/mach-mxs/devices/platform-gpmi.c
+@@ -0,0 +1,144 @@
 +/*
 + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
-+
 +#include <asm/sizes.h>
-+#include <linux/mtd/nand.h>
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++#include <mach/gpmi-nfc.h>
++#include <mach/devices-common.h>
 +
-+#include "nand_device_info.h"
++#ifdef CONFIG_SOC_IMX23
++const struct gpmi_nfc_platform_data  gpmi_platform_data_imx23 __initconst = {
++	.chip_version		= CHIP_VERSION_IMX23,
++	.clock_name		= GPMI_NFC_CLOCK_NAME,
++	.min_prop_delay_in_ns	= 5,
++	.max_prop_delay_in_ns	= 9,
++	.max_chip_count		= 1,
++	.boot_area_size_in_bytes = 20 * SZ_1M,
++};
 +
-+static struct nand_device_info samsung_nand[] __initdata = {
-+	{
-+		.id	= { 0xec, 0xd3, 0x14, 0x25, 0x64, 0xec, 0xd3, 0x14 },
-+		.desc	= "K9G8G08U0M, K9HAG08U1M",
-+		.attr	= ATTR(MLC, 1LL * SZ_1G, 128, 2 * SZ_1K + 64, 4, 512),
-+		.timing	= TIMING(20, 15, 20, 6, -1, -1, -1),
++const struct resource res_imx23[] __initconst = {
++	{	/* GPMI */
++		.start = MX23_GPMI_BASE_ADDR,
++		.end   = MX23_GPMI_BASE_ADDR + SZ_8K - 1,
++		.name  = GPMI_NFC_GPMI_REGS_ADDR_RES_NAME,
++		.flags = IORESOURCE_MEM,
 +	}, {
-+		.id	= { 0xec, 0xd7, 0xd5, 0x29, 0x38, 0x41, 0xec, 0xd7 },
-+		.desc	= "K9LBG08U0D",
-+		.attr	= ATTR(MLC, 4LL * SZ_1G, 128, 4 * SZ_1K + 218, 8, 512),
-+		.timing	= TIMING(20, 10, 25, 6, 20, 5, 15),
++		.start = MX23_INT_GPMI_ATTENTION,
++		.end   = MX23_INT_GPMI_ATTENTION,
++		.name  = GPMI_NFC_GPMI_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
++	}, {	/* BCH */
++		.start = MX23_BCH_BASE_ADDR,
++		.end   = MX23_BCH_BASE_ADDR + SZ_8K - 1,
++		.name  = GPMI_NFC_BCH_REGS_ADDR_RES_NAME,
++		.flags = IORESOURCE_MEM,
 +	}, {
-+		.id	= { 0xec, 0xd5, 0x14, 0xb6, 0x74, 0xec, 0xd5, 0x14 },
-+		.desc	= "K9GAG08U0M",
-+		.attr	= ATTR(MLC, 2LL * SZ_1G, 128, 4 * SZ_1K + 218, 4, 512),
-+		.timing	= TIMING(15, 10, 20, 6, -1, -1, -1),
++		.start = MX23_INT_BCH,
++		.end   = MX23_INT_BCH,
++		.name  = GPMI_NFC_BCH_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
++	}, {	/* DMA */
++		.start	= MX23_DMA_GPMI0,
++		.end	= MX23_DMA_GPMI3,
++		.name  = GPMI_NFC_DMA_CHANNELS_RES_NAME,
++		.flags = IORESOURCE_DMA,
 +	}, {
-+		/* end of the table. */
-+		.id	= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
++		.start = MX23_INT_GPMI_DMA,
++		.end   = MX23_INT_GPMI_DMA,
++		.name  = GPMI_NFC_DMA_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
 +	},
 +};
-+
-+/* macro to get the id bytes */
-+#define ID_GET_MFR_CODE(id)  ((id)[0])
-+
-+void nand_device_print_info(struct nand_device_info *info)
-+{
-+	unsigned    i;
-+	const char  *mfr_name;
-+	const char  *cell_technology_name;
-+	uint64_t    chip_size;
-+	const char  *chip_size_units;
-+	unsigned    page_data_size_in_bytes;
-+	unsigned    page_oob_size_in_bytes;
-+	struct nand_attr *attr		= &info->attr;
-+	struct nand_timing *timing	= &info->timing;
-+
-+	/* Prepare the manufacturer name. */
-+	mfr_name = "Unknown";
-+	for (i = 0; nand_manuf_ids[i].id; i++) {
-+		if (nand_manuf_ids[i].id == ID_GET_MFR_CODE(info->id)) {
-+			mfr_name = nand_manuf_ids[i].name;
-+			break;
-+		}
-+	}
-+
-+	/* Prepare the name of the cell technology. */
-+	switch (attr->cell_technology) {
-+	case SLC:
-+		cell_technology_name = "SLC";
-+		break;
-+	case MLC:
-+		cell_technology_name = "MLC";
-+		break;
-+	default:
-+		cell_technology_name = "Unknown";
-+		break;
-+	}
-+
-+	/* Prepare the chip size. */
-+	if ((attr->chip_size_in_bytes >= SZ_1G) &&
-+					!(attr->chip_size_in_bytes % SZ_1G)) {
-+		chip_size       = attr->chip_size_in_bytes / ((uint64_t) SZ_1G);
-+		chip_size_units = "GiB";
-+	} else if ((attr->chip_size_in_bytes >= SZ_1M) &&
-+					!(attr->chip_size_in_bytes % SZ_1M)) {
-+		chip_size       = attr->chip_size_in_bytes / ((uint64_t) SZ_1M);
-+		chip_size_units = "MiB";
-+	} else {
-+		chip_size       = attr->chip_size_in_bytes;
-+		chip_size_units = "B";
-+	}
-+
-+	/* Prepare the page geometry. */
-+	page_data_size_in_bytes = (1<<(fls(attr->page_total_size_in_bytes)-1));
-+	page_oob_size_in_bytes  = attr->page_total_size_in_bytes -
-+					page_data_size_in_bytes;
-+
-+	/* Print the infomation. */
-+	printk(KERN_INFO "--------------------------------------\n");
-+	printk(KERN_INFO "	NAND device infomation (RAW)\n");
-+	printk(KERN_INFO "--------------------------------------\n");
-+	printk(KERN_INFO "Manufacturer      : %s (0x%02x)\n", mfr_name,
-+							info->id[0]);
-+	printk(KERN_INFO "Device Code       : 0x%02x\n", info->id[1]);
-+	printk(KERN_INFO "Cell Technology   : %s\n", cell_technology_name);
-+	printk(KERN_INFO "Chip Size         : %llu %s\n", chip_size,
-+							chip_size_units);
-+	printk(KERN_INFO "Pages per Block   : %u\n", attr->block_size_in_pages);
-+	printk(KERN_INFO "Page Geometry     : %u+%u\n", page_data_size_in_bytes,
-+							page_oob_size_in_bytes);
-+	printk(KERN_INFO "ECC Strength      : %u bits\n",
-+						attr->ecc_strength_in_bits);
-+	printk(KERN_INFO "ECC Size          : %u B\n", attr->ecc_size_in_bytes);
-+	printk(KERN_INFO "Data Setup Time   : %u ns\n",
-+						timing->data_setup_in_ns);
-+	printk(KERN_INFO "Data Hold Time    : %u ns\n",
-+						timing->data_hold_in_ns);
-+	printk(KERN_INFO "Address Setup Time: %u ns\n",
-+						timing->address_setup_in_ns);
-+	printk(KERN_INFO "GPMI Sample Delay : %u ns\n",
-+					timing->gpmi_sample_delay_in_ns);
-+	printk(KERN_INFO "tREA              : %d ns\n",
-+						(timing->tREA_in_ns >= 0 ?
-+						timing->tREA_in_ns : -1));
-+	printk(KERN_INFO "tRLOH             : %d ns\n",
-+						(timing->tRLOH_in_ns >= 0 ?
-+						timing->tRLOH_in_ns : -1));
-+	printk(KERN_INFO "tRHOH             : %d ns\n",
-+						(timing->tRHOH_in_ns >= 0 ?
-+						timing->tRHOH_in_ns : -1));
-+	printk(KERN_INFO "Description       : %s\n", info->desc);
-+}
-+
-+static struct nand_device_info * __init
-+search_table(struct nand_device_info *table, const uint8_t id[])
-+{
-+	struct nand_device_info *info = table;
-+
-+	while (ID_GET_MFR_CODE(info->id)) {
-+		int i;
-+
-+		/* match all the ids. Is it too strict? */
-+		for (i = 0; i < ID_BYTES; i++)
-+			if (info->id[i] != id[i])
-+				break;
-+
-+		/* found it */
-+		if (i == ID_BYTES) {
-+			nand_device_print_info(info);
-+			return info;
-+		}
-+
-+		info++;
-+	}
-+	return NULL;
-+}
-+
-+struct nand_device_mfr_info {
-+	uint8_t                  id;
-+	struct nand_device_info  *table;
-+};
-+
-+static struct nand_device_mfr_info  nand_device_mfr_directory[] __initdata = {
-+	{ NAND_MFR_SAMSUNG, samsung_nand },
-+	{ 0, NULL },
-+};
-+
-+struct nand_device_info * __init nand_device_get_info(const uint8_t id[])
-+{
-+	uint8_t mfr_id = ID_GET_MFR_CODE(id);
-+	unsigned i;
-+
-+	for (i = 0; nand_device_mfr_directory[i].id; i++) {
-+		if (nand_device_mfr_directory[i].id == mfr_id) {
-+			struct nand_device_info  *table;
-+
-+			table = nand_device_mfr_directory[i].table;
-+			return search_table(table, id);
-+		}
-+	}
-+	return NULL;
-+}
-diff --git a/drivers/mtd/nand/gpmi-nfc/nand_device_info.h b/drivers/mtd/nand/gpmi-nfc/nand_device_info.h
-new file mode 100644
-index 0000000..e606705
---- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/nand_device_info.h
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#ifndef __DRIVERS_NAND_DEVICE_INFO_H
-+#define __DRIVERS_NAND_DEVICE_INFO_H
-+
-+enum nand_device_cell_technology {
-+	SLC = 0,
-+	MLC = 1,
-+};
-+
-+/**
-+ *
-+ *
-+ * @cell_technology:           The storage cell technology.
-+ * @chip_size_in_bytes:        The total size of the storage behind a single
-+ *                             chip select, in bytes. Notice that this is *not*
-+ *                             necessarily the total size of the storage in a
-+ *                             *package*, which may contain several chips.
-+ * @block_size_in_pages:       The number of pages in a block.
-+ * @page_total_size_in_bytes:  The total size of a page, in bytes, including
-+ *                             both the data and the OOB.
-+ * @ecc_strength_in_bits:      The strength of the ECC called for by the
-+ *                             manufacturer, in number of correctable bits.
-+ * @ecc_size_in_bytes:         The size of the data block over which the
-+ *                             manufacturer calls for the given ECC algorithm
-+ *                             and strength.
-+ * @is_ddr_ok:                 Is this nand an ONFI nand or a TOGGLE nand ?
-+ */
-+struct nand_attr {
-+	/* Technology */
-+	enum nand_device_cell_technology  cell_technology;
-+
-+	/* Geometry */
-+	uint64_t	chip_size_in_bytes;
-+	uint32_t	block_size_in_pages;
-+	uint32_t	page_total_size_in_bytes;
-+
-+	/* ECC */
-+	uint16_t	ecc_size_in_bytes;
-+	uint16_t	ecc_strength_in_bits;
-+
-+	/* Does the nand support DDR? (ONFI or TOGGLE) */
-+	bool		is_ddr_ok;
-+};
-+
-+/**
-+ * This structure contains the fundamental timing attributes for NAND.
-+ *
-+ * @data_setup_in_ns:         The data setup time, in nanoseconds. Usually the
-+ *                            maximum of tDS and tWP. A negative value
-+ *                            indicates this characteristic isn't known.
-+ * @data_hold_in_ns:          The data hold time, in nanoseconds. Usually the
-+ *                            maximum of tDH, tWH and tREH. A negative value
-+ *                            indicates this characteristic isn't known.
-+ * @address_setup_in_ns:      The address setup time, in nanoseconds. Usually
-+ *                            the maximum of tCLS, tCS and tALS. A negative
-+ *                            value indicates this characteristic isn't known.
-+ * @gpmi_sample_delay_in_ns:  A GPMI-specific timing parameter. A negative value
-+ *                            indicates this characteristic isn't known.
-+ * @tREA_in_ns:               tREA, in nanoseconds, from the data sheet. A
-+ *                            negative value indicates this characteristic isn't
-+ *                            known.
-+ * @tRLOH_in_ns:              tRLOH, in nanoseconds, from the data sheet. A
-+ *                            negative value indicates this characteristic isn't
-+ *                            known.
-+ * @tRHOH_in_ns:              tRHOH, in nanoseconds, from the data sheet. A
-+ *                            negative value indicates this characteristic isn't
-+ *                            known.
-+ */
-+struct nand_timing {
-+	int8_t  data_setup_in_ns;
-+	int8_t  data_hold_in_ns;
-+	int8_t  address_setup_in_ns;
-+	int8_t  gpmi_sample_delay_in_ns;
-+	int8_t  tREA_in_ns;
-+	int8_t  tRLOH_in_ns;
-+	int8_t  tRHOH_in_ns;
-+};
-+
-+#define ID_BYTES	(8)
-+/*
-+ * struct nand_device_info - Information about a single NAND Flash device.
-+ *
-+ * This structure contains all the *essential* information about a NAND Flash
-+ * device, derived from the device's data sheet.
-+ */
-+struct nand_device_info {
-+	/* id */
-+	uint8_t			id[ID_BYTES];
-+
-+	/* Description */
-+	const char		*desc;
-+
-+	/* attribute*/
-+	struct nand_attr	attr;
-+
-+	/* timing */
-+	struct nand_timing	timing;
-+};
-+
-+/* macro for the NAND attribute */
-+#define ATTR(_a, _b, _c, _d, _e, _f)			\
-+	{						\
-+		.cell_technology          = (_a),	\
-+		.chip_size_in_bytes       = (_b),	\
-+		.block_size_in_pages      = (_c),	\
-+		.page_total_size_in_bytes = (_d),	\
-+		.ecc_strength_in_bits     = (_e),	\
-+		.ecc_size_in_bytes        = (_f),	\
-+	}
-+
-+/* macro for the NAND timing */
-+#define TIMING(_a, _b, _c, _d, _e, _f, _h)		\
-+	{						\
-+		.data_setup_in_ns         = (_a),	\
-+		.data_hold_in_ns          = (_b),	\
-+		.address_setup_in_ns      = (_c),	\
-+		.gpmi_sample_delay_in_ns  = (_d),	\
-+		.tREA_in_ns               = (_e),	\
-+		.tRLOH_in_ns              = (_f),	\
-+		.tRHOH_in_ns              = (_h),	\
-+	}
-+
-+struct nand_device_info *nand_device_get_info(const uint8_t id_bytes[]);
-+void nand_device_print_info(struct nand_device_info *info);
-+
-+/*
-+ * Check the NAND whether it supports the DDR mode.
-+ * Only the ONFI nand and TOGGLE nand support the DDR now.
-+ */
-+static inline bool is_ddr_nand(struct nand_device_info *info)
-+{
-+	return info->attr.is_ddr_ok;
-+}
 +#endif
++
++#ifdef CONFIG_SOC_IMX28
++const struct gpmi_nfc_platform_data  gpmi_platform_data_imx28 __initconst = {
++	.chip_version		= CHIP_VERSION_IMX28,
++	.clock_name		= GPMI_NFC_CLOCK_NAME,
++	.min_prop_delay_in_ns	= 5,
++	.max_prop_delay_in_ns	= 9,
++	.max_chip_count		= 1,
++	.boot_area_size_in_bytes = 20 * SZ_1M,
++};
++
++const struct resource res_imx28[] __initconst = {
++	{	/* GPMI */
++		.start = MX28_GPMI_BASE_ADDR,
++		.end   = MX28_GPMI_BASE_ADDR + SZ_8K - 1,
++		.name  = GPMI_NFC_GPMI_REGS_ADDR_RES_NAME,
++		.flags = IORESOURCE_MEM,
++	 }, {
++		.start = MX28_INT_GPMI,
++		.end   = MX28_INT_GPMI,
++		.name  = GPMI_NFC_GPMI_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
++	}, {	/* BCH */
++		.start = MX28_BCH_BASE_ADDR,
++		.end   = MX28_BCH_BASE_ADDR + SZ_8K - 1,
++		.name  = GPMI_NFC_BCH_REGS_ADDR_RES_NAME,
++		.flags = IORESOURCE_MEM,
++	 }, {
++		.start = MX28_INT_BCH,
++		.end   = MX28_INT_BCH,
++		.name  = GPMI_NFC_BCH_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
++	 }, {	/* DMA */
++		.start	= MX28_DMA_GPMI0,
++		.end	= MX28_DMA_GPMI7,
++		.name	= GPMI_NFC_DMA_CHANNELS_RES_NAME,
++		.flags	= IORESOURCE_DMA,
++	 }, {
++		.start = MX28_INT_GPMI_DMA,
++		.end   = MX28_INT_GPMI_DMA,
++		.name  = GPMI_NFC_DMA_INTERRUPT_RES_NAME,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++#endif
++
++static struct resource *__init get_res(int *res_size)
++{
++#ifdef CONFIG_SOC_IMX23
++	if (cpu_is_mx23()) {
++		*res_size = ARRAY_SIZE(res_imx23);
++		return (struct resource *)res_imx23;
++	}
++#endif
++
++#ifdef CONFIG_SOC_IMX28
++	if (cpu_is_mx28()) {
++		*res_size = ARRAY_SIZE(res_imx28);
++		return (struct resource *)res_imx28;
++	}
++#endif
++	BUG();
++	return NULL;
++}
++
++struct platform_device *__init
++mxs_add_gpmi(const struct gpmi_nfc_platform_data *data)
++{
++	struct resource *res;
++	int res_size;
++
++	res = get_res(&res_size);
++
++	return mxs_add_platform_device_dmamask(GPMI_NFC_DRIVER_NAME, -1,
++				res, res_size,
++				data, sizeof(*data), DMA_BIT_MASK(32));
++}
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index 71f2448..1f05503 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -30,6 +30,10 @@ int __init mxs_add_amba_device(const struct amba_device *dev);
+ /* duart */
+ int __init mxs_add_duart(const struct amba_device *dev);
+ 
++/* GPMI */
++#include <mach/gpmi-nfc.h>
++struct platform_device *__init mxs_add_gpmi(
++				const struct gpmi_nfc_platform_data *data);
+ /* auart */
+ struct mxs_auart_data {
+ 	int id;
+diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+new file mode 100644
+index 0000000..2f2d663
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#ifndef __INCLUDE_LINUX_DEVICE_H
++#define __INCLUDE_LINUX_DEVICE_H
++
++#define GPMI_NFC_DRIVER_NAME	"gpmi-nfc"
++#define GPMI_NFC_CLOCK_NAME	"gpmi-clock"
++
++/* Resource names for the GPMI NFC driver. */
++#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
++#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
++#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
++#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
++#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
++#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
++
++/**
++ * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
++ *
++ * This structure communicates platform-specific information to the GPMI NFC
++ * driver that can't be expressed as resources.
++ *
++ * @chip_version:            The version of the hardware.
++ * @clock_name:              The name of the clock that drives the NFC.
++ * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
++ *                           from the NAND Flash device, in nanoseconds.
++ * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
++ *                           from the NAND Flash device, in nanoseconds.
++ * @max_chip_count:          The maximum number of chips for which the driver
++ *                           should configure the hardware. This value most
++ *                           likely reflects the number of pins that are
++ *                           connected to a NAND Flash device. If this is
++ *                           greater than the SoC hardware can support, the
++ *                           driver will print a message and fail to initialize.
++ * @boot_area_size_in_bytes: The amount of space reserved for each boot area.
++ *                           Note that some Boot ROMs call for multiple boot
++ *                           areas. If this value is zero, the driver will not
++ *                           construct special partitions for boot areas.
++ */
++struct gpmi_nfc_platform_data {
++	unsigned int          chip_version;
++
++	/* SoC hardware information. */
++	char                  *clock_name;
++
++	/* NAND Flash information. */
++	unsigned int          min_prop_delay_in_ns;
++	unsigned int          max_prop_delay_in_ns;
++	unsigned int          max_chip_count;
++
++	/* boot area */
++	uint32_t		boot_area_size_in_bytes;
++};
++
++enum {
++	CHIP_VERSION_IMX23 = 0,
++	CHIP_VERSION_IMX28,
++};
++#endif
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index a66994f..db715f9 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -34,6 +34,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+ 	MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+ 	MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+ 
++	/* gpmi */
++	MX23_PAD_GPMI_D00__GPMI_D00 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D01__GPMI_D01 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D02__GPMI_D02 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D03__GPMI_D03 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D04__GPMI_D04 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D05__GPMI_D05 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D06__GPMI_D06 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_D07__GPMI_D07 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_CLE__GPMI_CLE |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_ALE__GPMI_ALE |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_WPN__GPMI_WPN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_WRN__GPMI_WRN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_RDN__GPMI_RDN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_RDY0__GPMI_RDY0 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_RDY1__GPMI_RDY1 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_CE0N__GPMI_CE0N |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_GPMI_CE1N__GPMI_CE1N |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++
+ 	/* auart */
+ 	MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+ 	MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+@@ -108,6 +144,7 @@ static void __init mx23evk_init(void)
+ 	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+ 
+ 	mx23_add_duart();
++	mx23_add_gpmi();
+ 	mx23_add_auart0();
+ 
+ 	ret = gpio_request_one(MX23EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index 08002d0..cf8ddcb 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -39,6 +39,42 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+ 	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+ 	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+ 
++	/* gpmi */
++	MX28_PAD_GPMI_D00__GPMI_D0 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D01__GPMI_D1 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D02__GPMI_D2 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D03__GPMI_D3 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D04__GPMI_D4 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D05__GPMI_D5 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D06__GPMI_D6 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_D07__GPMI_D7 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_CE0N__GPMI_CE0N |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_CE1N__GPMI_CE1N |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_RDY0__GPMI_READY0 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_RDY1__GPMI_READY1 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_RDN__GPMI_RDN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_WRN__GPMI_WRN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_ALE__GPMI_ALE |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_CLE__GPMI_CLE |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_GPMI_RESETN__GPMI_RESETN |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++
+ 	/* auart0 */
+ 	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+ 	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+@@ -265,6 +301,7 @@ static void __init mx28evk_init(void)
+ 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+ 
+ 	mx28_add_duart();
++	mx28_add_gpmi();
+ 	mx28_add_auart0();
+ 	mx28_add_auart3();
+ 
 -- 
 1.7.0.4
