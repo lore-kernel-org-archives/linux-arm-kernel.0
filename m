@@ -1,31 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 16 Mar 2011 15:11:14 +0100
-Subject: [PATCH 4/8] ARM: PXA: Z2: Add mtd partition with logo
-In-Reply-To: <20110315143957.GA1361@ucw.cz>
-References: <1299839023-16601-1-git-send-email-anarsoul@gmail.com>
-	<201103120105.50159.marek.vasut@gmail.com>
-	<20110315143957.GA1361@ucw.cz>
-Message-ID: <201103161511.14377.marek.vasut@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Mar 2011 11:19:51 -0300
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <20110316083326.GF13316@pengutronix.de>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+	<20110315090656.GC13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
+	<20110315094946.GD13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+	<20110316083326.GF13316@pengutronix.de>
+Message-ID: <AANLkTik8J6geSa1E==otDfsYDaBj5FQMcOzPmXqOGO7t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 March 2011 15:39:57 Pavel Machek wrote:
-> On Sat 2011-03-12 01:05:50, Marek Vasut wrote:
-> > On Friday 11 March 2011 23:31:28 Vasily Khoruzhick wrote:
-> > > On Friday 11 March 2011 23:39:36 Marek Vasut wrote:
-> > > > On Friday 11 March 2011 11:23:39 Vasily Khoruzhick wrote:
-> > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > 
-> > > > I guess you can rather supply the MTD layout on kernel command line
-> > > > (see Drivers/MTD).
-> > > 
-> > > Yeah, I know, just want to make default layout look like this.
-> > 
-> > Why not like what's already there ? I don't see any point in changing
-> > this, NAK, use command line partitioning.
-> 
-> Of course, you can use command line.
-> 
-> But, the default kernel partitioning should match what hw expects.
+Hi Uwe,
 
-But of course ... it matches the mainline uboot. I know what I let in there :)
+2011/3/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+> This function is a bit confusing:
+>
+> ? ? ? ?/* Bring USB hub out of reset */
+> ? ? ? ?ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+> ? ? ? ?gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
+> ? ? ? ?/* USB HUB RESET - De-assert USB HUB RESET_N */
+> ? ? ? ?msleep(1);
+> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
+> ? ? ? ?msleep(1);
+> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
+>
+> IMHO the comments are misleading. ?I'd suggest:
+>
+> ? ? ? ?ret = gpio_request_one(BABBAGE_USB_HUB_RESET,
+> ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_DIR_OUT | GPIOF_INIT_LOW, "USB hub reset#");
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?pr_err("failed to request gpio for USB hub reset#: %d\n", ret);
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+> ? ? ? ?msleep(2);
+> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
+>
+> Fabio?
+
+Ok, I was not the author of this original code, but will send a new
+patch for fixing it.
+
+Thanks for the review.
+
+Regards,
+
+Fabio Estevam
