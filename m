@@ -1,117 +1,73 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 16 Mar 2011 11:13:23 +0100
-Subject: [PATCH 1/7] ARM: add GPMI support for imx23/imx28
-In-Reply-To: <1300239773-4222-2-git-send-email-b32955@freescale.com>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-	<1300239773-4222-2-git-send-email-b32955@freescale.com>
-Message-ID: <19840.36163.967469.53941@ipc1.ka-ro>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 16 Mar 2011 03:20:19 -0700
+Subject: [PATCH 2/3] msm: Peripheral Image Loader (PIL) driver
+In-Reply-To: <1299732274-10742-3-git-send-email-sboyd@codeaurora.org>
+References: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>
+	<1299732274-10742-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1300270820.13755.14.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie writes:
-> add the clock and iomux initialization for GPMI in the imx23 and imx28.
+On Wed, 2011-03-09 at 20:44 -0800, Stephen Boyd wrote:
+> On 8660, the modem, dsp, and sensors peripherals require their
+> firmware to be loaded into memory before they can be properly
+> taken out of reset.
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Drivers are expected to call pil_get() when they wish to load a
+> peripheral. This will initiate multiple firmware_request()s for
+> the metadata and image blobs for a peripheral. Once the image has
+> been loaded into memory, it is validated and brought out of reset
+> via the peripheral reset driver.
+
+Why can't this be part of the generic firmware request API ?
+
+> Change-Id: I041139464bbd3b646b82370ab540f40b0ac9af6b
+
+Can't have Change-Id's ..
+
+> Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  arch/arm/mach-mxs/Kconfig                       |    2 +
->  arch/arm/mach-mxs/clock-mx23.c                  |    3 +
->  arch/arm/mach-mxs/clock-mx28.c                  |    3 +
->  arch/arm/mach-mxs/devices-mx23.h                |    3 +
->  arch/arm/mach-mxs/devices-mx28.h                |    3 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-gpmi.c       |  144 +++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
->  arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   75 ++++++++++++
->  arch/arm/mach-mxs/mach-mx23evk.c                |   37 ++++++
->  arch/arm/mach-mxs/mach-mx28evk.c                |   37 ++++++
->  12 files changed, 315 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
->  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>  arch/arm/mach-msm/Kconfig                          |   13 +
+>  arch/arm/mach-msm/Makefile                         |    2 +
+>  arch/arm/mach-msm/include/mach/peripheral-loader.h |   23 +
+>  arch/arm/mach-msm/peripheral-loader.c              |  402
+> +++++++++++++++
+>  arch/arm/mach-msm/peripheral-loader.h              |   38 ++
+>  arch/arm/mach-msm/peripheral-reset.c               |  528
+> ++++++++++++++++++++
+>  6 files changed, 1006 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-msm/include/mach/peripheral-loader.h
+>  create mode 100644 arch/arm/mach-msm/peripheral-loader.c
+>  create mode 100644 arch/arm/mach-msm/peripheral-loader.h
+>  create mode 100644 arch/arm/mach-msm/peripheral-reset.c
 > 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4f6f174..8ab0fcb 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -22,6 +22,7 @@ config MACH_MX23EVK
->  	select SOC_IMX23
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_GPMI
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	default y
->  	help
-> @@ -33,6 +34,7 @@ config MACH_MX28EVK
->  	select SOC_IMX28
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_GPMI
->  	select MXS_HAVE_PLATFORM_FEC
->
-In my alphabet 'F' sorts before 'G', so please keep this list sorted
-alphabetically!
-
-> diff --git a/arch/arm/mach-mxs/devices/platform-gpmi.c b/arch/arm/mach-mxs/devices/platform-gpmi.c
-> new file mode 100644
-> index 0000000..038226b
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/devices/platform-gpmi.c
-> @@ -0,0 +1,144 @@
-> +/*
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +#include <asm/sizes.h>
-> +#include <mach/mx23.h>
-> +#include <mach/mx28.h>
-> +#include <mach/gpmi-nfc.h>
-> +#include <mach/devices-common.h>
+> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+> index 997c5bd..25b73b0 100644
+> --- a/arch/arm/mach-msm/Kconfig
+> +++ b/arch/arm/mach-msm/Kconfig
+> @@ -210,4 +210,17 @@ config IOMMU_API
+>  
+>  config MSM_SCM
+>         bool
 > +
-> +#ifdef CONFIG_SOC_IMX23
-> +const struct gpmi_nfc_platform_data  gpmi_platform_data_imx23 __initconst = {
-> +	.chip_version		= CHIP_VERSION_IMX23,
-> +	.clock_name		= GPMI_NFC_CLOCK_NAME,
->
-The same abuse of the clock infrastructure, that Russell has pointed
-out several times already. There is no need to pass around clock names
-to drivers. The correct clock can be determined from the
-platform_device name!
+> +config MSM_PIL
+> +       bool "Peripheral image loading (PIL)"
+> +       select FW_LOADER
+> +       select MSM_SCM
+> +       depends on ARCH_MSM8X60
+> +       help
+> +         Some peripherals need to be loaded into memory before they
+> can be
+> +         brought out of reset.
+> +
+> +         Say yes to support these devices.
+> +
+> +
 
-All in all I do not like this driver in any way. I already vomitted
-over it, when I saw it in the Freescale BSP.
-There is no need for the multiple layers of abstraction that are
-papered over the MTD layer.
-There is no need for spilling the driver over a dozen files.
-There is no need for two versions of the 'HAL' (for i.MX23 and i.MX28)
-that differ only marginally.
-...
+You shouldn't be adding anything like this to the Kconfig. To me if you
+add stuff like this it's a big red flag.
 
-BTW: patch 2/7 seems to be missing from the patch series.
+I didn't review the rest sign it might be wasted effort on my part..
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Daniel
