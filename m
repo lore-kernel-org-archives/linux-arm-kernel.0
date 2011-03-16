@@ -1,38 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Mar 2011 16:34:15 -0000
-Subject: [PATCH 2/2] ARM: perf: add required isbs() to ARMv7 backend
-In-Reply-To: <AANLkTinQJ_1Ym8jVHjRP80XzC0PKzR+o9-Fdk56WzEF8@mail.gmail.com>
-References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>	<1300289898-2720-2-git-send-email-will.deacon@arm.com>
-	<AANLkTinQJ_1Ym8jVHjRP80XzC0PKzR+o9-Fdk56WzEF8@mail.gmail.com>
-Message-ID: <001c01cbe3f7$fdbe1030$f93a3090$@deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Mar 2011 16:34:48 +0000
+Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
+In-Reply-To: <4D80E46C.3010103@canonical.com>
+References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
+	<4D80E46C.3010103@canonical.com>
+Message-ID: <20110316163448.GA16538@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-> On Wed, Mar 16, 2011 at 4:38 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > The ARMv7 architecture does not guarantee that effects from co-processor
-> > writes are immediately visible to following instructions.
-> >
-> > This patch adds two isbs to the ARMv7 perf code:
-> >
-> > (1) Immediately after selecting an event register, so that the PMU state
-> > ? ?following this instruction is consistent with the new event.
-> Ok
+On Wed, Mar 16, 2011 at 10:25:16AM -0600, Matt Waddel wrote:
+> On 03/11/2011 10:18 AM, Pawel Moll wrote:
+> > New IO FPGA implementation for Versatile Express boards contain
+> > MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
+> > 
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > 
-> >
-> > (2) Immediately before writing to the PMCR, so that any previous writes
-> > ? ?to the PMU have taken effect before (typically) enabling the
-> > ? ?counters.
-> Should the isb come _after_ the cp15 instruction so that the current
-> access is actually performed?
+> Tested-by: Matt Waddel <matt.waddel@linaro.org>
+> 
+> This patch improves MMC performance on my vexpress system. Also
+> fixes "mmcblk0: error -5 transferring data" errors.
 
-No. We want to ensure that the _other_ PMU registers are up-to-date before
-playing with the control register, otherwise we could end up in a horrible
-situation where we enable all the counters, but the writes to the counters
-themselves haven't yet made it.
+You should use the patch I sent to do dynamic clocking if you're
+concerned about performance.  That patch improves performance by
+a factor of 8 compared to anything possible by increasing the FIFO
+depth.
 
-The write to the control register will take effect before the next
-exception return, which is fine for what we want.
-
-Will
+I am very much of the opinion that deepening the FIFOs is just a
+sticky plaster over the problem - and I said as much when it was
+first proposed, pointing out that there's other better solutions.
