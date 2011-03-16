@@ -1,50 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Mar 2011 09:38:11 +0100
-Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
-In-Reply-To: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20110316083811.GG13316@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Mar 2011 08:38:44 +0000
+Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
+In-Reply-To: <AANLkTimwwUQGhncE7Att_9rAXhpT0n61HC4SW8ShSfAm@mail.gmail.com>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
+	<AANLkTimwwUQGhncE7Att_9rAXhpT0n61HC4SW8ShSfAm@mail.gmail.com>
+Message-ID: <20110316083844.GA13262@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2011 at 02:58:13PM +0000, Mark Brown wrote:
-> The cpufreq init function is referenced from the driver structure and
-> we don't appear to have annotations which allow us to mark that it'll
-> never be called after system init, causing the linker consistency
-> infrastructure to complain. Just remove the __init annotation to avoid
-> noise from the build.
+On Wed, Mar 16, 2011 at 08:53:47AM +0200, avictor.za at gmail.com wrote:
+> hi,
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/cpufreq.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> On Tue, Mar 15, 2011 at 12:14 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> > The macb driver expects clocks with the names "pclk" and "hclk". ?We
+> > currently provide "macb_clk" but to fit in line with other
+> > architectures (namely AVR32), provide "pclk" and a fake "hclk".
 > 
-> diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-s3c64xx/cpufreq.c
-> index 74c0e83..4375b97 100644
-> --- a/arch/arm/mach-s3c64xx/cpufreq.c
-> +++ b/arch/arm/mach-s3c64xx/cpufreq.c
-> @@ -181,7 +181,7 @@ static void __init s3c64xx_cpufreq_config_regulator(void)
->  }
->  #endif
->  
-> -static int __init s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
-> +static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
->  {
->  	int ret;
->  	struct cpufreq_frequency_table *freq;
-Actually this is warning is a false positive.  There is a section
-mismatch, but it is never a problem because the .init callback is only
-called by cpufreq_register_driver. To get rid of the warning the right
-fix is to remove the .init callback from struct cpufreq_driver and
-change the prototype of cpufreq_register_driver to
+> There is no reference to a "pclk" or "hclk" in the AT91 architecture.
+> So to avoid possible confusion, maybe create two "fake" clocks both
+> parented to "macb_clk", and add a comment they're only for
+> compatibility with the AVR32.
 
-	int cpufreq_register_driver(struct cpufreq_driver *, int (*)(struct cpufreq_policy *))
+It doesn't matter what's in the documentation.
 
-(that is pass the init callback to cpufreq_register_driver).
+There's no apb_pclk mentioned in the ARM platform documentation yet we
+have such a clock in the bus-level code for primecell support.  I'm sure
+many of the other early primecell using platforms are also the same.
 
-Best regards
-Uwe
+On OMAP1 there's no iclk yet OMAP drivers have had iclk and iclk is a
+dummy no-op clock for OMAP1 for compatibility with OMAP2.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What matters more than conforming to documentation is keeping the drivers
+in a clean and maintainable state without throwing lots of ifdefs into
+them.
