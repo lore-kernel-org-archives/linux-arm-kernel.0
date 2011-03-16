@@ -1,35 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Mar 2011 11:13:00 +0100
-Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
-In-Reply-To: <20110316094959.GB2688@opensource.wolfsonmicro.com>
-References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110316083811.GG13316@pengutronix.de>
-	<20110316094959.GB2688@opensource.wolfsonmicro.com>
-Message-ID: <20110316101259.GH13316@pengutronix.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 16 Mar 2011 11:13:32 +0100
+Subject: [PATCH 6/7] dmaengine: change the flags of request_irq()
+In-Reply-To: <1300239773-4222-7-git-send-email-b32955@freescale.com>
+References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
+	<1300239773-4222-7-git-send-email-b32955@freescale.com>
+Message-ID: <19840.36172.759509.889358@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 09:49:59AM +0000, Mark Brown wrote:
-> On Wed, Mar 16, 2011 at 09:38:11AM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Mar 10, 2011 at 02:58:13PM +0000, Mark Brown wrote:
-> > > we don't appear to have annotations which allow us to mark that it'll
-> > > never be called after system init, causing the linker consistency
-> 
-> > Actually this is warning is a false positive.  There is a section
-> > mismatch, but it is never a problem because the .init callback is only
-> > called by cpufreq_register_driver. To get rid of the warning the right
-> > fix is to remove the .init callback from struct cpufreq_driver and
-> > change the prototype of cpufreq_register_driver to
-> 
-> That's what I said above, pretty much.  Ideally we'd have a way of
-> annotating the call sites so that the linker infrastructure rather than
-> having to faff about splitting the structures like this.
-You can mark the driver struct using __ref. But IMHO not saving a
-reference to a function only used once is cleaner.
+Hi,
 
-Best regards
-Uwe
+Huang Shijie writes:
+> The GPMI may have many DMA channels, such as the imx23 has
+> four DMA channels. All these DMA channels share the same interrupt.
+> So change the flags from '0' to IRQF_SHARED, else there will be
+> an EBUSY error returns.
+> 
+Problem is, that the mxs_dma_int_handler() need to be rewritten
+for that since it currently does not support shared interrupts (as you
+can easily find out by enabling CONFIG_DEBUG_SHIRQ.
 
+
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
