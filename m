@@ -1,48 +1,29 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Mar 2011 21:16:42 +0800
-Subject: [PATCH 4/4] ARM: PXA: PXAFB: don't disable controller on cpufreq
-	transition if overlay is in use
-In-Reply-To: <1299835250-11095-4-git-send-email-anarsoul@gmail.com>
-References: <201103060030.59584.anarsoul@gmail.com>
-	<1299835250-11095-1-git-send-email-anarsoul@gmail.com>
-	<1299835250-11095-4-git-send-email-anarsoul@gmail.com>
-Message-ID: <AANLkTi=g+Qtm=n+M0c0FxBrqgNy2gt=x46QzeJyDCG9L@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Wed, 16 Mar 2011 16:55:02 +0300
+Subject: [PATCH v2] z2-battery: Fix count of properties
+In-Reply-To: <201103112236.14261.marek.vasut@gmail.com>
+References: <4D7A1181.2000802@ru.mvista.com>
+	<1299848972-25596-1-git-send-email-anarsoul@gmail.com>
+	<201103112236.14261.marek.vasut@gmail.com>
+Message-ID: <20110316135502.GA18052@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied.
+On Fri, Mar 11, 2011 at 10:36:14PM +0100, Marek Vasut wrote:
+> On Friday 11 March 2011 14:09:32 Vasily Khoruzhick wrote:
+> > PROP_STATUS property was not counted, as result
+> > VOLTAGE_MIN property is missing in sysfs. Fix it.
+> > 
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> 
+> You can have my:
+> 
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
+> 
+> on this one.
 
-On Fri, Mar 11, 2011 at 5:20 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> It's not safe to disable controller if overlay(s) is enabled (results in
-> system hang). So we avoid to disable controller in this case. Userspace
-> should choose proper governor to avoid freq changing when overlay is in
-> use, otherwise LCD may blink.
->
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
-> ?drivers/video/pxafb.c | ? ?3 ++-
-> ?1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index a3bdcc1..a2e5b51 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -1648,7 +1648,8 @@ pxafb_freq_transition(struct notifier_block *nb, unsigned long val, void *data)
->
-> ? ? ? ?switch (val) {
-> ? ? ? ?case CPUFREQ_PRECHANGE:
-> - ? ? ? ? ? ? ? set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
-> + ? ? ? ? ? ? ? if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
-> + ? ? ? ? ? ? ? ? ? ? ? set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
-> ? ? ? ? ? ? ? ?break;
->
-> ? ? ? ?case CPUFREQ_POSTCHANGE:
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Applied, thanks guys!
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
