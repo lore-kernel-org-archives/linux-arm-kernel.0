@@ -1,81 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Mar 2011 14:54:23 +0200
-Subject: [PATCH] DM644x EVM: register MUSB device earlier
-In-Reply-To: <20110316124731.GH2325@legolas.emea.dhcp.ti.com>
-References: <201103132306.59986.sshtylyov@ru.mvista.com>
-	<20110314085248.GA2285@legolas.emea.dhcp.ti.com>
-	<4D7E640A.9090908@mvista.com>
-	<20110315093332.GA3602@legolas.emea.dhcp.ti.com>
-	<4D80A228.7000602@mvista.com>
-	<20110316124731.GH2325@legolas.emea.dhcp.ti.com>
-Message-ID: <20110316125421.GJ2325@legolas.emea.dhcp.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Mar 2011 21:15:45 +0800
+Subject: [PATCH 3/4] ARM: PXA: PXAFB: Fix typo in ypos assignment
+In-Reply-To: <1299835250-11095-3-git-send-email-anarsoul@gmail.com>
+References: <201103060030.59584.anarsoul@gmail.com>
+	<1299835250-11095-1-git-send-email-anarsoul@gmail.com>
+	<1299835250-11095-3-git-send-email-anarsoul@gmail.com>
+Message-ID: <AANLkTimzgvGTru1-YHB=uT5qhgCvVy2DxW1G6Xsk7hmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 02:47:33PM +0200, Felipe Balbi wrote:
-> On Wed, Mar 16, 2011 at 02:42:32PM +0300, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > On 15-03-2011 12:33, Felipe Balbi wrote:
-> > 
-> > >>>I wonder how noone has noticed that from -rc1 until now.
-> > 
-> > >>    I don't think many people run the most current DaVinci kernel.
-> > >>Most people probably use the Arago project kernels or even older
-> > >>MV-based TI's stuff...
-> > 
-> > >that's nasty :-p All those hacks on a 2.6.18 kernel...
-> > 
-> >    If not 2.6.10... :-)
-> > 
-> > >Oh well, thanks for noticing and sending a patch :-)
-> > 
-> >    I have noticed that back when testing your patch series, if you
-> > remember. And I really should have fixed it earlier, so that it could
-> > get into 2.6.38 (damn my illness that caused a week delay). BTW, you
-> > haven't done anything about the broken MUSB modules, have you?
-> 
-> You mean building musb as module ? Patch is coming:
-> 
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index b423bb1..15df745 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -66,7 +66,7 @@ obj-$(CONFIG_TC)              += tc/
->  obj-$(CONFIG_UWB)              += uwb/
->  obj-$(CONFIG_USB_OTG_UTILS)    += usb/otg/
->  obj-$(CONFIG_USB)              += usb/
-> -obj-$(CONFIG_USB_MUSB_HDRC)    += usb/musb/
-> +obj-$(CONFIG_USB_MUSB)         += usb/musb/
->  obj-$(CONFIG_PCI)              += usb/
->  obj-$(CONFIG_USB_GADGET)       += usb/gadget/
->  obj-$(CONFIG_SERIO)            += input/serio/
-> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> index 4cbb7e4..32136c4 100644
-> --- a/drivers/usb/musb/Kconfig
-> +++ b/drivers/usb/musb/Kconfig
-> @@ -6,10 +6,14 @@
->  comment "Enable Host or Gadget support to see Inventra options"
->         depends on !USB && USB_GADGET=n
->  
-> +config USB_MUSB
-> +       bool
-> +
->  # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
->  config USB_MUSB_HDRC
->         depends on (USB || USB_GADGET)
->         depends on (ARM || (BF54x && !BF544) || (BF52x && !BF522 && !BF523))
-> +       select USB_MUSB
->         select NOP_USB_XCEIV if (ARCH_DAVINCI || MACH_OMAP3EVM || BLACKFIN)
->         select TWL4030_USB if MACH_OMAP_3430SDP
->         select TWL6030_USB if MACH_OMAP_4430SDP || MACH_OMAP4_PANDA
-> 
-> compiling and testing a jiffy.
+Applied.
 
-aaaa, had forgotten. The debug part of musb needs rework too. I guess
-for now it's better to push a patch making musb bool and fix that for
-2.6.40. A bigger re-work would be needed, so it's better to keep it
-working for now.
-
--- 
-balbi
+On Fri, Mar 11, 2011 at 5:20 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> pointed that
+> ypos takes value of xpos due to typo.
+>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+> ?drivers/video/pxafb.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> index e2f643e..a3bdcc1 100644
+> --- a/drivers/video/pxafb.c
+> +++ b/drivers/video/pxafb.c
+> @@ -761,7 +761,7 @@ static int overlayfb_check_var(struct fb_var_screeninfo *var,
+> ? ? ? ?int xpos, ypos, pfor, bpp;
+>
+> ? ? ? ?xpos = NONSTD_TO_XPOS(var->nonstd);
+> - ? ? ? ypos = NONSTD_TO_XPOS(var->nonstd);
+> + ? ? ? ypos = NONSTD_TO_YPOS(var->nonstd);
+> ? ? ? ?pfor = NONSTD_TO_PFOR(var->nonstd);
+>
+> ? ? ? ?bpp = pxafb_var_to_bpp(var);
+> @@ -842,7 +842,7 @@ static int overlayfb_set_par(struct fb_info *info)
+>
+> ? ? ? ?bpp ?= pxafb_var_to_bpp(var);
+> ? ? ? ?xpos = NONSTD_TO_XPOS(var->nonstd);
+> - ? ? ? ypos = NONSTD_TO_XPOS(var->nonstd);
+> + ? ? ? ypos = NONSTD_TO_YPOS(var->nonstd);
+> ? ? ? ?pfor = NONSTD_TO_PFOR(var->nonstd);
+>
+> ? ? ? ?ofb->control[0] = OVLxC1_PPL(var->xres) | OVLxC1_LPO(var->yres) |
+> --
+> 1.7.4.1
+>
+>
