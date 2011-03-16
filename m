@@ -1,34 +1,51 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 16 Mar 2011 09:55:20 +0800
-Subject: [PATCH 6/7] dmaengine: change the flags of request_irq()
+Date: Wed, 16 Mar 2011 09:55:21 +0800
+Subject: [PATCH 7/7] MTD : add GPMI driver in the config and Makefile
 In-Reply-To: <1300240521-4344-1-git-send-email-b32955@freescale.com>
 References: <1300240521-4344-1-git-send-email-b32955@freescale.com>
-Message-ID: <1300240521-4344-7-git-send-email-b32955@freescale.com>
+Message-ID: <1300240521-4344-8-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPMI may have many DMA channels, such as the imx23 has
-four DMA channels. All these DMA channels share the same interrupt.
-So change the flags from '0' to IRQF_SHARED, else there will be
-an EBUSY error returns.
+add the GPMI driver in the relevant Kconfig and Makefile in the MTD.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/dma/mxs-dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/Kconfig  |   10 ++++++++++
+ drivers/mtd/nand/Makefile |    1 +
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 88aad4f..0ee5b52 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -328,7 +328,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 	memset(mxs_chan->ccw, 0, PAGE_SIZE);
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 450afc5..86effe8 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -426,6 +426,16 @@ config MTD_NAND_NANDSIM
+ 	  The simulator may simulate various NAND flash chips for the
+ 	  MTD nand layer.
  
- 	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
--				0, "mxs-dma", mxs_dma);
-+				IRQF_SHARED, "mxs-dma", mxs_dma);
- 	if (ret)
- 		goto err_irq;
++config MTD_NAND_GPMI_NFC
++        bool "GPMI NAND Flash Controller driver"
++        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
++	select MTD_PARTITIONS
++        help
++	 Enables NAND Flash support for IMX23 or IMX28.
++	 The GPMI controller is very powerful, with the help of BCH
++	 module, it can do the hardware ECC. The GPMI supports several
++	 NAND flashs at the same time.
++
+ config MTD_NAND_PLATFORM
+ 	tristate "Support for generic platform NAND driver"
+ 	help
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index 8ad6fae..80d1f08 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -48,5 +48,6 @@ obj-$(CONFIG_MTD_NAND_BCM_UMI)		+= bcm_umi_nand.o nand_bcm_umi.o
+ obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
+ obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
+ obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
++obj-$(CONFIG_MTD_NAND_GPMI_NFC)		+= gpmi-nfc/
  
+ nand-objs := nand_base.o nand_bbt.o
 -- 
 1.7.0.4
