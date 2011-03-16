@@ -1,26 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 16 Mar 2011 10:53:47 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
-In-Reply-To: <20110316101259.GH13316@pengutronix.de>
-References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110316083811.GG13316@pengutronix.de>
-	<20110316094959.GB2688@opensource.wolfsonmicro.com>
-	<20110316101259.GH13316@pengutronix.de>
-Message-ID: <20110316105346.GA14125@opensource.wolfsonmicro.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Mar 2011 19:17:25 +0800
+Subject: [PATCH 1/4] ARM: PXA: PXAFB: rework pxafb overlay memory
+	management
+In-Reply-To: <201103112346.51471.anarsoul@gmail.com>
+References: <201103060030.59584.anarsoul@gmail.com>
+	<1299835250-11095-1-git-send-email-anarsoul@gmail.com>
+	<201103112234.10904.marek.vasut@gmail.com>
+	<201103112346.51471.anarsoul@gmail.com>
+Message-ID: <AANLkTi=FctYRCNQV3Sa8m6R3qfwSKoqHBZ7T5riRCA95@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 11:13:00AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Mar 16, 2011 at 09:49:59AM +0000, Mark Brown wrote:
+2011/3/12 Vasily Khoruzhick <anarsoul@gmail.com>:
+> On Friday 11 March 2011 23:34:10 Marek Vasut wrote:
+>> > + ? if (ofb->usage++ == 0)
+>>
+>> TBH I don't like this notation, it feels hard to read. Can you split that
+>> ofb-
+>>
+>> >usage++ into two parts ?
+>>
+>> Cheers
+>
+> It's not deprecated by kernel codestyle, looks ok and works ok, but I'll
+> change it if one more person argues against it :)
+>
 
-> > That's what I said above, pretty much.  Ideally we'd have a way of
-> > annotating the call sites so that the linker infrastructure rather than
-> > having to faff about splitting the structures like this.
+I'm OK with the it. The whole series merged into -devel.
 
-> You can mark the driver struct using __ref. But IMHO not saving a
-> reference to a function only used once is cleaner.
-
-It's pretty annoying to have to define two structs for the affected
-drivers (it's not like cpufreq is the only affected subsystem here) -
-there's good reasons why we use things like __devexit_p() rather than
-split structs for common cases like this.
+Thanks.
+- eric
