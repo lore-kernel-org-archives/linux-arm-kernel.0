@@ -1,90 +1,55 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 16 Mar 2011 11:25:10 +0530
-Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
-	timersetup function
-In-Reply-To: <1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
-References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
-	<1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Mar 2011 14:59:42 +0900
+Subject: [PATCH 0/2] ARM: EXYNOS4: Enhancement of System MMU
+In-Reply-To: <AANLkTin7w=KYuLYS=vtcQo3nbLAxJPxLTQCTRGt9x6VL@mail.gmail.com>
+References: <1299460768-4077-1-git-send-email-pullip.cho@samsung.com>
+	<011701cbe315$e9677140$bc3653c0$%kim@samsung.com>
+	<AANLkTin7w=KYuLYS=vtcQo3nbLAxJPxLTQCTRGt9x6VL@mail.gmail.com>
+Message-ID: <001801cbe39f$5b307a40$11916ec0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc Zyngier
-> Sent: Tuesday, March 15, 2011 8:43 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Tony Lindgren
-> Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
-> timersetup function
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-omap2/Makefile    |    1 -
->  arch/arm/mach-omap2/timer-gp.c  |   13 ++++++++++++-
->  arch/arm/mach-omap2/timer-mpu.c |   36 ----------------------------
-> --------
->  3 files changed, 12 insertions(+), 38 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
-> omap2/Makefile
-> index a45cd64..41f8b67 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
->
->  # SMP support ONLY available for OMAP4
->  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
-> -obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
->
-> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
-> omap2/timer-gp.c
-> index 3b9cf85..98d03c5 100644
-> --- a/arch/arm/mach-omap2/timer-gp.c
-> +++ b/arch/arm/mach-omap2/timer-gp.c
-> @@ -39,6 +39,7 @@
->  #include <asm/mach/time.h>
->  #include <plat/dmtimer.h>
->  #include <asm/localtimer.h>
-> +#include <asm/smp_twd.h>
->  #include <asm/sched_clock.h>
->  #include <plat/common.h>
->  #include <plat/omap_hwmod.h>
-> @@ -247,12 +248,22 @@ static void __init
-> omap2_gp_clocksource_init(void)
->  }
->  #endif
->
-> +#ifdef CONFIG_LOCAL_TIMERS
-> +static int __cpuinit omap4_local_timer_setup(struct
-> clock_event_device *evt)
-> +{
-> +	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
-> +	return 0;
-> +}
-> +#endif
-> +
->  static void __init omap2_gp_timer_init(void)
->  {
->  #ifdef CONFIG_LOCAL_TIMERS
-> -	if (cpu_is_omap44xx()) {
-> +	if (cpu_is_omap44xx() && omap_rev() != OMAP4430_REV_ES1_0)
+Kyungmin Park wrote:
+> 
+> > Cc'ed Marek.
+> >
+> > As I said before, Marek's SystemMMU driver has some problems.
+> >
+> > One is that it allocates 4MB virtual memory at once. It is really a
+problem
+> > because, the device memory manager must knows the peculiarity and
+handles
+> > it. Otherwise, page tables can be overwritten...
+> 
+> Are there device drivers using system MMU at mainline? or example codes?
+> In case of Marek's patches, he posted drivers codes and tested at
+> multimedia stack.
+> 
+> Another one is what's the difference between MFC drivers case and
+SystemMMU
+> one?
+> 
+This driver does not have dependency on other device drivers, I thought.
 
-I see one problem here. The reason we changed the signature of
-local_timer_setup() is in case where the local timer isn't
-available on a specific SOC versions, the kernel will switch
-to broad-cast timers.
+> and I hope you read this mail thread.
+> http://www.mentby.com/Group/linux-kernel/patch-maintainers-update-msm-
+> maintainers.html
+> 
+> Cite from Linus words.
+> Actually, "the community" (not that there really is any such cohesive
+> thing) generally asks that vendors be "involved". Not that vendors be
+> "exclusively in control". There's a big difference.
+> 
+Already I read his comments at that time.
 
-This way the kernel built with CONFIG_LOCAL_TIMERS can still work
-on SoCs where twd isn't supported.
+> I feel you control the s5p codes for vendor purpose.
+> 
+I'm afraid that you think so. I will try my best to advancement of Linux.
 
-Looks like your patch breaks that unless and until I am missing
-something.
+Thanks.
 
-Regards,
-Santosh
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
