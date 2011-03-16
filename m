@@ -1,174 +1,46 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Mar 2011 09:33:26 +0100
-Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
-References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
-	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
-	<20110315090656.GC13316@pengutronix.de>
-	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
-	<20110315094946.GD13316@pengutronix.de>
-	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
-Message-ID: <20110316083326.GF13316@pengutronix.de>
+Date: Wed, 16 Mar 2011 09:38:11 +0100
+Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
+In-Reply-To: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20110316083811.GG13316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added some people to Cc:]
-
-Hello Julia,
-
-On Tue, Mar 15, 2011 at 11:19:53AM +0100, Julia Lawall wrote:
-> On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
+On Thu, Mar 10, 2011 at 02:58:13PM +0000, Mark Brown wrote:
+> The cpufreq init function is referenced from the driver structure and
+> we don't appear to have annotations which allow us to mark that it'll
+> never be called after system init, causing the linker consistency
+> infrastructure to complain. Just remove the __init annotation to avoid
+> noise from the build.
 > 
-> > On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
-> > > I tried the following
-> > > 
-> > > @@
-> > > expression E1,E2;
-> > > @@
-> > > 
-> > >       gpio_direction_output(E1,E2);
-> > >       ...
-> > > -     gpio_set_value(E1,E2);
-> > > 
-> > > and found occurrences in 15 files.  In some cases there seems to be some 
-> > > delay before the call to gpio_set_value.  Does that have any impacton 
-> > > whether it is needed?
-> > gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
-> > there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
-> > noop.
-> > 
-> > I still don't know how to work with coccinelle, so if you point me to a
-> > concrete location I can be more specific.
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/cpufreq.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> OK.  I have changed the semantic patch to the following:
-> 
-> @@
-> expression E1,E2,E3;
-> @@
-> 
->       gpio_direction_output(E1,E2);
->       ... when != gpio_set_value(E1,E3)
-> -     gpio_set_value(E1,E2);
-> 
-> Now it doesn't do all the cases where there is an earlier set ofr some 
-> other value.  The patch I obtain is below.  This only concerns 5 files.  
-> I haven't checked the result at all.
-Thanks. So here comes the check.
-
-> diff -u -p a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c 2011-02-19 08:28:51.000000000 +0100
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c 2011-03-15 11:17:03.000000000 +0100
-> @@ -218,7 +218,6 @@ static inline void babbage_usbhub_reset(
->  
->  	/* USB HUB RESET - De-assert USB HUB RESET_N */
->  	msleep(1);
-> -	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
->  	msleep(1);
->  	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
+> diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-s3c64xx/cpufreq.c
+> index 74c0e83..4375b97 100644
+> --- a/arch/arm/mach-s3c64xx/cpufreq.c
+> +++ b/arch/arm/mach-s3c64xx/cpufreq.c
+> @@ -181,7 +181,7 @@ static void __init s3c64xx_cpufreq_config_regulator(void)
 >  }
-This function is a bit confusing:
-
-	/* Bring USB hub out of reset */
-	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
-	if (ret) {
-		...
-		return;
-	}
-	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
-	/* USB HUB RESET - De-assert USB HUB RESET_N */
-	msleep(1);
-	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
-	msleep(1);
-	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
-
-IMHO the comments are misleading.  I'd suggest:
-
-	ret = gpio_request_one(BABBAGE_USB_HUB_RESET,
-			GPIOF_DIR_OUT | GPIOF_INIT_LOW, "USB hub reset#");
-	if (ret) {
-		pr_err("failed to request gpio for USB hub reset#: %d\n", ret);
-		return;
-	}
-	msleep(2);
-	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
-
-Fabio?
-
-> @@ -234,7 +233,6 @@ static inline void babbage_fec_reset(voi
->  		return;
->  	}
->  	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
-> -	gpio_set_value(BABBAGE_FEC_PHY_RESET, 0);
->  	msleep(1);
->  	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
->  }
-should use
-	gpio_request_one(BABBAGE_FEC_PHY_RESET,
-		GPIOF_DIR_OUT | GPIOF_INIT_LOW, "fec-phy-reset");
-
-> diff -u -p a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-> --- a/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-14 17:19:13.000000000 +0100
-> +++ b/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-15 11:17:03.000000000 +0100
-> @@ -88,7 +88,6 @@ static inline void mx53_evk_fec_reset(vo
->  		return;
->  	}
->  	gpio_direction_output(SMD_FEC_PHY_RST, 0);
-> -	gpio_set_value(SMD_FEC_PHY_RST, 0);
->  	msleep(1);
->  	gpio_set_value(SMD_FEC_PHY_RST, 1);
->  }
-ditto
-
-> diff -u -p a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-> --- a/arch/arm/mach-omap2/board-omap3evm.c 2011-03-14 17:19:13.000000000 +0100
-> +++ b/arch/arm/mach-omap2/board-omap3evm.c 2011-03-15 11:17:04.000000000 +0100
-> @@ -860,7 +860,6 @@ static void __init omap3_evm_init(void)
->  		omap_mux_init_gpio(61, OMAP_PIN_INPUT_PULLUP);
->  		gpio_request(OMAP3_EVM_EHCI_SELECT, "select EHCI port");
->  		gpio_direction_output(OMAP3_EVM_EHCI_SELECT, 0);
-> -		gpio_set_value(OMAP3_EVM_EHCI_SELECT, 0);
+>  #endif
 >  
->  		/* setup EHCI phy reset config */
->  		omap_mux_init_gpio(21, OMAP_PIN_INPUT_PULLUP);
-ditto
+> -static int __init s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+> +static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+>  {
+>  	int ret;
+>  	struct cpufreq_frequency_table *freq;
+Actually this is warning is a false positive.  There is a section
+mismatch, but it is never a problem because the .init callback is only
+called by cpufreq_register_driver. To get rid of the warning the right
+fix is to remove the .init callback from struct cpufreq_driver and
+change the prototype of cpufreq_register_driver to
 
-> diff -u -p a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> --- a/arch/arm/mach-omap2/board-omap4panda.c 2011-03-14 17:19:13.000000000 +0100
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c 2011-03-15 11:17:04.000000000 +0100
-> @@ -129,7 +129,6 @@ static void __init omap4_ehci_init(void)
->  	}
->  	gpio_export(GPIO_HUB_POWER, 0);
->  	gpio_direction_output(GPIO_HUB_POWER, 0);
-> -	gpio_set_value(GPIO_HUB_POWER, 0);
-Should use gpio_request_one, too. And IMHO gpio_export should only be
-called after the direction is set (which is an obsolete comment when
-gpio_request_one is used).
-  
->  	/* reset phy+hub */
->  	ret = gpio_request(GPIO_HUB_NRESET, "hub_nreset");
-> @@ -139,7 +138,6 @@ static void __init omap4_ehci_init(void)
->  	}
->  	gpio_export(GPIO_HUB_NRESET, 0);
->  	gpio_direction_output(GPIO_HUB_NRESET, 0);
-> -	gpio_set_value(GPIO_HUB_NRESET, 0);
->  	gpio_set_value(GPIO_HUB_NRESET, 1);
->  
->  	usbhs_init(&usbhs_bdata);
-ditto
+	int cpufreq_register_driver(struct cpufreq_driver *, int (*)(struct cpufreq_policy *))
 
-> diff -u -p a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
-> --- a/arch/arm/mach-pxa/am300epd.c 2010-03-18 09:06:45.000000000 +0100
-> +++ b/arch/arm/mach-pxa/am300epd.c 2011-03-15 11:17:04.000000000 +0100
-> @@ -150,8 +150,6 @@ static int am300_init_gpio_regs(struct b
->  		gpio_direction_output(i, 0);
->  
->  	/* go into command mode */
-> -	gpio_set_value(CFG_GPIO_PIN, 1);
-> -	gpio_set_value(RST_GPIO_PIN, 0);
->  	msleep(10);
->  	gpio_set_value(RST_GPIO_PIN, 1);
->  	msleep(10);
-This can probably make use of gpio_request_array.
+(that is pass the init callback to cpufreq_register_driver).
 
 Best regards
 Uwe
