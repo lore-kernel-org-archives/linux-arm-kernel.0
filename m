@@ -1,9 +1,9 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 16 Mar 2011 09:42:48 +0800
+Date: Wed, 16 Mar 2011 09:55:16 +0800
 Subject: [PATCH 2/7] add the common code for GPMI driver
-In-Reply-To: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-Message-ID: <1300239773-4222-3-git-send-email-b32955@freescale.com>
+In-Reply-To: <1300240521-4344-1-git-send-email-b32955@freescale.com>
+References: <1300240521-4344-1-git-send-email-b32955@freescale.com>
+Message-ID: <1300240521-4344-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
