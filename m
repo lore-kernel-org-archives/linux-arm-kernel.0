@@ -1,40 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Mar 2011 16:21:09 -0000
-Subject: [PATCH 1/2] ARM: perf: reset counters on all CPUs during
-	initialisation
-In-Reply-To: <AANLkTim_XwErHv_Brkn5hXn7sAxvkd++C5wbKv9n4VXC@mail.gmail.com>
-References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>
-	<AANLkTim_XwErHv_Brkn5hXn7sAxvkd++C5wbKv9n4VXC@mail.gmail.com>
-Message-ID: <001b01cbe3f6$29365e40$7ba31ac0$@deacon@arm.com>
+From: matt.waddel@canonical.com (Matt Waddel)
+Date: Wed, 16 Mar 2011 10:25:16 -0600
+Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
+In-Reply-To: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
+References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <4D80E46C.3010103@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
-> On Wed, Mar 16, 2011 at 4:38 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > ARMv7 dictates that the interrupt-enable and count-enable registers for
-> > each PMU counter are UNKNOWN following core reset.
-> Great! Is this development driven by actual issues or by precaution?
-
-Just precautionary, but it's also a precursor to some power management
-work in ARM which might leave the registers in a funny state when they
-come out of a low-power state. This code at least gives them an entry
-hook for dealing with that.
- 
-> >
-> > This patch adds an arch_initcall to the ARMv7 perf events backend which
-> > disables the counters on each CPU prior to setting the Enable bit in the
-> > PMCR.
-> Also the function rename is a good thing.
-
-Yup.
-
-> >
-> > Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 03/11/2011 10:18 AM, Pawel Moll wrote:
+> New IO FPGA implementation for Versatile Express boards contain
+> MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
 > 
-> Acked-by: Jean Pihet <j-pihet@ti.com>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-Thanks for the Ack,
+Tested-by: Matt Waddel <matt.waddel@linaro.org>
 
-Will
+This patch improves MMC performance on my vexpress system. Also
+fixes "mmcblk0: error -5 transferring data" errors.
+
+> ---
+>  drivers/mmc/host/mmci.c |   13 ++++++++++++-
+>  1 files changed, 12 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 2d6de3e..e7197b0 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -66,6 +66,12 @@ static struct variant_data variant_arm = {
+>  	.datalength_bits	= 16,
+>  };
+>  
+> +static struct variant_data variant_arm_extended_fifo = {
+> +	.fifosize		= 128 * 4,
+> +	.fifohalfsize		= 64 * 4,
+> +	.datalength_bits	= 16,
+> +};
+> +
+>  static struct variant_data variant_u300 = {
+>  	.fifosize		= 16 * 4,
+>  	.fifohalfsize		= 8 * 4,
+> @@ -1019,10 +1025,15 @@ static int mmci_resume(struct amba_device *dev)
+>  static struct amba_id mmci_ids[] = {
+>  	{
+>  		.id	= 0x00041180,
+> -		.mask	= 0x000fffff,
+> +		.mask	= 0xff0fffff,
+>  		.data	= &variant_arm,
+>  	},
+>  	{
+> +		.id	= 0x01041180,
+> +		.mask	= 0xff0fffff,
+> +		.data	= &variant_arm_extended_fifo,
+> +	},
+> +	{
+>  		.id	= 0x00041181,
+>  		.mask	= 0x000fffff,
+>  		.data	= &variant_arm,
