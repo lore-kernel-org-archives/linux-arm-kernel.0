@@ -1,120 +1,104 @@
-From: R65037@freescale.com (Zhu Richard-R65037)
-Date: Wed, 16 Mar 2011 09:56:12 +0000
-Subject: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <20110315093256.GN29521@pengutronix.de>
-References: <1300096544-1946-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300096544-1946-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<20110315093256.GN29521@pengutronix.de>
-Message-ID: <010C9052C42A00499CE76D637FA5EE900CB026@039-SN1MPN1-001.039d.mgd.msft.net>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Mar 2011 10:03:41 +0000
+Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
+	timersetup function
+In-Reply-To: <f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
+References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+	<1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
+	<f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
+Message-ID: <1300269821.21713.37.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha:
+Hi Santosh,
 
-Best Regards
-Richard Zhu
-
-
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Tuesday, March 15, 2011 5:33 PM
-> To: Zhu Richard-R65037
-> Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com;
-> kernel at pengutronix.de; linux-ide at vger.kernel.org;
-> avorontsov at ru.mvista.com; eric at eukrea.com; eric.miao at linaro.org
-> Subject: Re: [RFC PATCH 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
->
-> On Mon, Mar 14, 2011 at 05:55:44PM +0800, Richard Zhu wrote:
-> > Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+On Wed, 2011-03-16 at 11:25 +0530, Santosh Shilimkar wrote:
+> Marc,
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> > arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc Zyngier
+> > Sent: Tuesday, March 15, 2011 8:43 PM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Tony Lindgren
+> > Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
+> > timersetup function
+> >
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > > ---
-> >  arch/arm/mach-mx5/board-mx53_loco.c |  120
-> > +++++++++++++++++++++++++++++++++++
-> >  1 files changed, 120 insertions(+), 0 deletions(-)
+> >  arch/arm/mach-omap2/Makefile    |    1 -
+> >  arch/arm/mach-omap2/timer-gp.c  |   13 ++++++++++++-
+> >  arch/arm/mach-omap2/timer-mpu.c |   36 ----------------------------
+> > --------
+> >  3 files changed, 12 insertions(+), 38 deletions(-)
+> >  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
 > >
-> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c
-> > b/arch/arm/mach-mx5/board-mx53_loco.c
-> > index 0a18f8d..9a7bbea 100644
-> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> > @@ -23,11 +23,13 @@
-> >  #include <linux/fec.h>
-> >  #include <linux/delay.h>
-> >  #include <linux/gpio.h>
-> > +#include <linux/ahci_platform.h>
+> > diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
+> > omap2/Makefile
+> > index a45cd64..41f8b67 100644
+> > --- a/arch/arm/mach-omap2/Makefile
+> > +++ b/arch/arm/mach-omap2/Makefile
+> > @@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
 > >
-> >  #include <mach/common.h>
-> >  #include <mach/hardware.h>
-> >  #include <mach/imx-uart.h>
-> >  #include <mach/iomux-mx53.h>
-> > +#include <mach/ahci_sata.h>
+> >  # SMP support ONLY available for OMAP4
+> >  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+> > -obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+> >  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+> >  obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
 > >
-> >  #include <asm/mach-types.h>
-> >  #include <asm/mach/arch.h>
-> > @@ -203,6 +205,123 @@ static const struct imxi2c_platform_data
-> mx53_loco_i2c_data __initconst = {
-> >     .bitrate = 100000,
-> >  };
+> > diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
+> > omap2/timer-gp.c
+> > index 3b9cf85..98d03c5 100644
+> > --- a/arch/arm/mach-omap2/timer-gp.c
+> > +++ b/arch/arm/mach-omap2/timer-gp.c
+> > @@ -39,6 +39,7 @@
+> >  #include <asm/mach/time.h>
+> >  #include <plat/dmtimer.h>
+> >  #include <asm/localtimer.h>
+> > +#include <asm/smp_twd.h>
+> >  #include <asm/sched_clock.h>
+> >  #include <plat/common.h>
+> >  #include <plat/omap_hwmod.h>
+> > @@ -247,12 +248,22 @@ static void __init
+> > omap2_gp_clocksource_init(void)
+> >  }
+> >  #endif
 > >
-> > +/* HW Initialization, if return 0, initialization is successful. */
-> > +static int sata_init(struct device *dev, void __iomem *addr)
->
-> Isn't this addr pointer exactly the address you remap again below?
-Yes, it is.
-Would re-use this parameter later.
-
->
+> > +#ifdef CONFIG_LOCAL_TIMERS
+> > +static int __cpuinit omap4_local_timer_setup(struct
+> > clock_event_device *evt)
 > > +{
-> > +   void __iomem *mmio;
-> > +   struct clk *clk;
-> > +   int ret = 0;
-> > +   u32 tmpdata;
+> > +	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+> > +	return 0;
+> > +}
+> > +#endif
 > > +
-> > +   clk = clk_get(dev, "imx_sata_clk");
->
-> This one is associated with the device, so passing in dev here is ok,
-> but...
->
-> > +   ret = IS_ERR(clk);
-> > +   if (ret) {
-> > +           printk(KERN_ERR "IMX AHCI can't get clock.\n");
-> > +           return ret;
-> > +   }
-> > +   ret = clk_enable(clk);
-> > +   if (ret) {
-> > +           printk(KERN_ERR "IMX AHCI can't enable clock.\n");
-> > +           clk_put(clk);
-> > +           return ret;
-> > +   }
-> > +
-> > +   /* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> > +   clk = clk_get(dev, "usb_phy1");
->
-> ... this clock is not associated with the device, it just happens to be
-> used for this purpose on LOCO. Or is this this really not LOCO specific
-> but i.MX53 specific? If this is LOCO specific you should pass NULL as the
-> device pointer. If this is i.MX53 specific we should discuss about adding
-> a imx53_init_sata as then all of this function is not LOCO specific.
->
-This is related to the HW design.
-On MX53 SOC, the AHCI bus clk can be sourced from internal USB_PHY1 clk, or one external
-crystal oscillator.
-I would create external two functions later, one used for internal clk initialization, and
-the other would be used when external crystal oscillator is used.
- and move these codes into the internal clk initialization function.
-How do you think about it?
+> >  static void __init omap2_gp_timer_init(void)
+> >  {
+> >  #ifdef CONFIG_LOCAL_TIMERS
+> > -	if (cpu_is_omap44xx()) {
+> > +	if (cpu_is_omap44xx() && omap_rev() != OMAP4430_REV_ES1_0)
+> 
+> I see one problem here. The reason we changed the signature of
+> local_timer_setup() is in case where the local timer isn't
+> available on a specific SOC versions, the kernel will switch
+> to broad-cast timers.
+> 
+> This way the kernel built with CONFIG_LOCAL_TIMERS can still work
+> on SoCs where twd isn't supported.
+> 
+> Looks like your patch breaks that unless and until I am missing
+> something.
 
->
-> Have these patches undergone some Linaro internal review? These are
-> really not ready for the wider world.
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+I think the bit you're missing is that when no local timer is
+registered, the code in percpu_timer.c::percpu_timer_setup() ensures
+that the broadcast timers are used as a default.
+
+In the OMAP4 case, twd is registered unless we detect a
+OMAP4430_REV_ES1_0. In that case, we let the magic happen and fall back
+to the broadcast timers. Tested on a PandaBoard with twd artificially
+disabled.
+
+	M.
+-- 
+Reality is an implementation detail.
