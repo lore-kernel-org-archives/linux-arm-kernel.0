@@ -1,133 +1,162 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Mar 2011 10:14:42 +0900
-Subject: [PATCH 4/4 v4] mmc, ARM: Add zboot from eSD support for SuperH
-	Mobile ARM
-In-Reply-To: <AANLkTimgwpP-WTGF-E=KO3TAXDX7FP4WnW3XQiHi0Ton@mail.gmail.com>
-References: <1300071435-26759-1-git-send-email-horms@verge.net.au>
-	<1300071435-26759-5-git-send-email-horms@verge.net.au>
-	<20110315222738.GA23288@verge.net.au>
-	<AANLkTimgwpP-WTGF-E=KO3TAXDX7FP4WnW3XQiHi0Ton@mail.gmail.com>
-Message-ID: <20110316011427.GB6724@verge.net.au>
+From: ccross@google.com (Colin Cross)
+Date: Tue, 15 Mar 2011 18:28:01 -0700
+Subject: ARM Tegra updates for 2.6.39
+Message-ID: <AANLkTikkb4RYxN2=HjpLgz-SWDKZ=ysE6HQuEEaDfiz8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hi Linus,
+Please pull updates for Tegra from:
 
-On Wed, Mar 16, 2011 at 09:37:50AM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> Thanks for your work on this!
+ git://android.git.kernel.org/kernel/tegra.git for-linus
 
-[ snip ]
+Thanks,
+Colin
 
-> 
-> On Wed, Mar 16, 2011 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
-> > This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
-> > ARM to boot directly from the SDHI hardware block.
-> >
-> > This is achieved by the MaskROM loading the first portion of the image into
-> > MERAM and then jumping to it. ?This portion contains loader code which
-> > copies the entire image to SDRAM and jumps to it. From there the zImage
-> > boot code proceeds as normal, uncompressing the image into its final
-> > location and then jumping to it.
-> >
-> > Cc: Paul Mundt <lethal@linux-sh.org>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> >
-> > ---
-> >
-> > This patch is based on the for-next branch of
-> > Russell King's linux-2.6-arm tree
-> >
-> > v2
-> > * Consistently use __raw_readw(). As pointed out by Paul Mundt
-> >
-> > v3
-> > * Remove mmcif_update_progress2(), it was for debugging during development
-> > * Move CPU specific code into mach/sdhi.h
-> > ?As requested by Magnus Damm
-> > * Use linux/mmc/tmio.h now that it exists
-> > * Remove SDHI_EXT_SWAP, it is unused
-> > * Replace use of MMCIF_PROGRESS_* with MMC_PROGRESS_*
-> > * Don't include linux/mmc/sh_mmcif.h
-> > ?+ Replace use of MMCIF_CE_RESP_CMD12 with RESP_CMD12
-> > ?+ Include linux/io.h
-> >
-> > v4
-> > * Move definition of SDHI_BASE into CPU-specific code.
-> > ?Thanks to Magnus Damm.
-> > ---
-> 
-> > +asmlinkage void mmc_loader(unsigned short *buf, unsigned long len)
-> > +{
-> > + ? ? ? int high_capacity;
-> > +
-> > + ? ? ? mmc_init_progress();
-> > +
-> > + ? ? ? mmc_update_progress(MMC_PROGRESS_ENTER);
-> > + ? ? ? sdhi_boot_enter();
-> > +
-> > + ? ? ? /* setup SDHI hardware */
-> > + ? ? ? mmc_update_progress(MMC_PROGRESS_INIT);
-> > + ? ? ? high_capacity = sdhi_boot_init(SDHI_BASE);
-> > + ? ? ? if (high_capacity < 0)
-> > + ? ? ? ? ? ? ? goto err;
-> > +
-> > + ? ? ? mmc_update_progress(MMC_PROGRESS_LOAD);
-> > + ? ? ? /* load kernel */
-> > + ? ? ? if (sdhi_boot_do_read(SDHI_BASE, high_capacity,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, /* Kernel is at block 1 */
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (len + TMIO_BBS - 1) / TMIO_BBS, buf))
-> > + ? ? ? ? ? ? ? goto err;
-> > +
-> > + ? ? ? sdhi_boot_cleanup();
-> > +
-> > + ? ? ? mmc_update_progress(MMC_PROGRESS_DONE);
-> > +
-> > + ? ? ? return;
-> > +err:
-> > + ? ? ? __raw_writel(__raw_readl(PORTR031_000DR) | 1, PORTR031_000DR);
-> > + ? ? ? for(;;);
-> > +
-> > +}
-> 
-> Sorry for not catching this earlier, but this __raw_writel() to
-> PORTR031_000DR is cpu specific as well. So please move that to the CPU
-> specific code.
+The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
 
-I will just remove that code, its was useful for development
-but I didn't mean to include it in my patch submission.
+  Linux 2.6.38-rc4 (2011-02-07 16:03:55 -0800)
 
-> Not sure if it makes sense at this point, but perhaps it's a good idea
-> to move the mmc_loader() function into the CPU specific portion. As
-> you know, the CPU itself has multiple SDHI hardware blocks, and
-> because of that we want the common SDHI loader to be written to
-> support any SDHI hardware block instance.
+are available in the git repository at:
+  git://android.git.kernel.org/kernel/tegra.git for-linus
 
-Wouldn't that mean moving all of
-arch/arm/boot/compressed/sdhi-shmobile.c into CPU specific code?
-That could easily be achived by just guarding its compilation with
-CONFIG_ARCH_SH7372 (as mmcif-sh7372.c already is) and perhaps
-renaming the file to sdhi-sh7372.c. We could probably move
-arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h back into
-sdhi-shmobile.c.
+Colin Cross (37):
+      ARM: tegra: Centralize macros to define debug uart base
+      ARM: tegra: Add api to control internal powergating
+      ARM: tegra: irqs: Update irq list
+      ARM: tegra: Add prototypes for subsystem suspend functions
+      ARM: tegra: clock: Suspend fixes, and add new clocks
+      ARM: tegra: timer: Add idle and suspend support to timers
+      ARM: tegra: irq: Add support for suspend wake sources
+      ARM: tegra: irq: Implement retrigger
+      ARM: tegra: cpufreq: Disable cpufreq during suspend
+      ARM: tegra: Allow overriding arch_reset
+      ARM: tegra: dma: Fix critical data corruption bugs
+      ARM: tegra: Use writel_relaxed in tegra_init_cache
+      Merge branch 'tegra-arch' of
+git://git.kernel.org/.../broonie/sound-2.6 into outside-for-next
+      ARM: tegra: clock: Don't BUG on changing an enabled PLL
+      ARM: tegra: clock: Drop debugging
+      ARM: tegra: clock: Don't use PLL lock bits
+      ARM: tegra: clock: Initialize clocks that have no enable
+      ARM: tegra: clock: Drop CPU dvfs
+      ARM: tegra: clock: Rearrange static clock tables
+      ARM: tegra: clock: Move unshared clk struct members into union
+      ARM: tegra: clock: Convert global lock to a lock per clock
+      ARM: tegra: cpufreq: Take an extra reference to pllx
+      ARM: tegra: clock: Add shared bus clock type
+      ARM: tegra: clock: Minor cleanups
+      ARM: tegra: Add external memory controller driver
+      ARM: tegra: clocks: Add emc scaling
+      ARM: tegra: cpufreq: Adjust memory frequency with cpu frequency
+      ARM: tegra: clock: Add function to set SDMMC tap delay
+      ARM: tegra: clock: Fix clock issues in suspend
+      ARM: tegra: clock: Miscellaneous clock updates
+      ARM: tegra: clock: Refcount periph clock enables
+      ARM: tegra: clock: Round rate before setting rate
+      ARM: tegra: clock: prevent accidental disables of cpu clock
+      ARM: tegra: Move tegra_common_init to tegra_init_early
+      ARM: tegra: timer: Enable timer and rtc clocks
+      ARM: tegra: common: Enable core clocks
+      Merge branch 'boards-for-next' of
+git://git.kernel.org/.../olof/tegra-2.6 into for-next
 
-> Right now the SDHI_BASE variable is limiting the shared SDHI loader
-> code to a fixed hardware block instance. That's fine because we only
-> boot from a single SDHI hardware block instance on sh7372, but future
-> processors most likely support selecting boot SDHI hardware block
-> instance.
+Dima Zavin (1):
+      ARM: tegra: clock: enable clk reset for non-peripheral clocks
 
-So mmc_loader() would need to take SDHI_BASE as an argument?
-That sounds like a fairly small amount of refactoring.
+Gary King (2):
+      ARM: tegra: pinmux: Add missing drive pingroups and fix suspend
+      ARM: tegra: iomap: Add missing devices
 
-How do you envisage that the hardware block would be selected?
-At compile time through Kconfig? If so the current #define mechanism
-might be sufficient.
+Mark Brown (1):
+      ARM: tegra: Hide EMC scaling config behind ARCH_TEGRA
 
-> Apart from those minor bits I think the code is getting into a really
-> good shape!
+Mike Rapoport (4):
+      ARM: tegra: add TrimSlice board
+      ARM: tegra: PCIE minor code refactoring
+      ARM: tegra: add PCI Express power gating
+      ARM: tegra: trimslice: initialize PCI-e only when running on TrimSlice
 
-Thanks
+Olof Johansson (8):
+      ARM: tegra: add tegra_defconfig
+      ARM: tegra: add tegra_gpio_table and tegra_gpio_config
+      ARM: tegra: harmony: move over to tegra_gpio_config
+      ARM: tegra: common device resources
+      ARM: tegra: remove stale nvidia atag handler
+      ARM: tegra: harmony: register sdhci devices
+      ARM: tegra: harmony: fix pinmux for MMC slot
+      ARM: tegra: add seaboard, wario and kaen boards
+
+Simon Glass (1):
+      ARM: tegra: Fix hang on reboot
+
+Stephen Warren (9):
+      ARM: tegra: Add Harmony sound platform data type
+      ARM: tegra: Add to struct harmony_audio_platform_data
+      ARM: tegra: Prevent requeuing in-progress DMA requests
+      ARM: tegra: APB DMA: Enable clock and remove reset.
+      ARM: tegra: Fix typo in TEGRA_IRQ_TO_GPIO
+      ARM: Tegra: Make tegra_dma_init a postcore_initcall
+      ARM: Tegra: Rename I2S clocks to match driver name
+      ARM: Tegra: Rename clk_dev1/2 to cdev1/2
+      ARM: Tegra: DMA: Fail safe if initialization fails
+
+ arch/arm/configs/tegra_defconfig                   |  123 +++
+ arch/arm/mach-tegra/Kconfig                        |   28 +
+ arch/arm/mach-tegra/Makefile                       |   10 +-
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |   19 +-
+ arch/arm/mach-tegra/board-harmony.c                |   62 +-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |  179 ++++
+ arch/arm/mach-tegra/board-seaboard.c               |  196 ++++
+ arch/arm/mach-tegra/board-seaboard.h               |   38 +
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |  145 +++
+ arch/arm/mach-tegra/board-trimslice.c              |  106 ++
+ .../{tegra2_dvfs.h => board-trimslice.h}           |   14 +-
+ arch/arm/mach-tegra/board.h                        |    4 +-
+ arch/arm/mach-tegra/clock.c                        |  532 +++++-----
+ arch/arm/mach-tegra/clock.h                        |  129 +--
+ arch/arm/mach-tegra/common.c                       |   27 +-
+ arch/arm/mach-tegra/cpu-tegra.c                    |  100 ++-
+ arch/arm/mach-tegra/devices.c                      |  505 +++++++++
+ arch/arm/mach-tegra/devices.h                      |   46 +
+ arch/arm/mach-tegra/dma.c                          |  243 +++--
+ arch/arm/mach-tegra/gpio.c                         |   15 +
+ arch/arm/mach-tegra/include/mach/clk.h             |    6 +-
+ arch/arm/mach-tegra/include/mach/debug-macro.S     |   25 +-
+ arch/arm/mach-tegra/include/mach/gpio.h            |    9 +-
+ .../mach/harmony_audio.h}                          |   14 +-
+ arch/arm/mach-tegra/include/mach/iomap.h           |   47 +
+ arch/arm/mach-tegra/include/mach/irqs.h            |   14 +-
+ arch/arm/mach-tegra/include/mach/legacy_irq.h      |    4 +
+ arch/arm/mach-tegra/include/mach/pinmux-t2.h       |   10 +
+ arch/arm/mach-tegra/include/mach/powergate.h       |   40 +
+ arch/arm/mach-tegra/include/mach/suspend.h         |   38 +
+ arch/arm/mach-tegra/include/mach/system.h          |   10 +-
+ arch/arm/mach-tegra/include/mach/uncompress.h      |   18 +-
+ arch/arm/mach-tegra/irq.c                          |  186 ++--
+ arch/arm/mach-tegra/legacy_irq.c                   |  109 ++-
+ arch/arm/mach-tegra/pcie.c                         |   38 +-
+ arch/arm/mach-tegra/pinmux-t2-tables.c             |   26 +-
+ arch/arm/mach-tegra/powergate.c                    |  212 ++++
+ arch/arm/mach-tegra/tegra2_clocks.c                | 1120 +++++++++++++++-----
+ arch/arm/mach-tegra/tegra2_dvfs.c                  |   86 --
+ arch/arm/mach-tegra/tegra2_emc.c                   |  178 ++++
+ .../arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} |   17 +-
+ arch/arm/mach-tegra/timer.c                        |   77 ++-
+ 42 files changed, 3755 insertions(+), 1050 deletions(-)
+ create mode 100644 arch/arm/configs/tegra_defconfig
+ create mode 100644 arch/arm/mach-tegra/board-seaboard-pinmux.c
+ create mode 100644 arch/arm/mach-tegra/board-seaboard.c
+ create mode 100644 arch/arm/mach-tegra/board-seaboard.h
+ create mode 100644 arch/arm/mach-tegra/board-trimslice-pinmux.c
+ create mode 100644 arch/arm/mach-tegra/board-trimslice.c
+ copy arch/arm/mach-tegra/{tegra2_dvfs.h => board-trimslice.h} (70%)
+ create mode 100644 arch/arm/mach-tegra/devices.c
+ create mode 100644 arch/arm/mach-tegra/devices.h
+ copy arch/arm/mach-tegra/{tegra2_dvfs.h => include/mach/harmony_audio.h} (69%)
+ create mode 100644 arch/arm/mach-tegra/include/mach/powergate.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/suspend.h
+ create mode 100644 arch/arm/mach-tegra/powergate.c
+ delete mode 100644 arch/arm/mach-tegra/tegra2_dvfs.c
+ create mode 100644 arch/arm/mach-tegra/tegra2_emc.c
+ rename arch/arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} (58%)
