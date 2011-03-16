@@ -1,102 +1,30 @@
-From: bryanh@codeaurora.org (Bryan Huntsman)
-Date: Wed, 16 Mar 2011 14:12:17 -0700
-Subject: [PATCH 2/3] msm: Peripheral Image Loader (PIL) driver
-In-Reply-To: <1300270820.13755.14.camel@desktop>
-References: <1299732274-10742-1-git-send-email-sboyd@codeaurora.org>	
-	<1299732274-10742-3-git-send-email-sboyd@codeaurora.org>
-	<1300270820.13755.14.camel@desktop>
-Message-ID: <4D8127B1.1030306@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 16 Mar 2011 17:06:03 -0600
+Subject: [Qualcomm PM8921 MFD v2 3/6] gpio: pm8xxx-gpio: Add pm8xxx gpio
+	driver
+In-Reply-To: <20110316195631.GD15605@opensource.wolfsonmicro.com>
+References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
+	<1299564590-30116-4-git-send-email-adharmap@codeaurora.org>
+	<20110312093645.GL9347@angua.secretlab.ca>
+	<4D810797.4090000@codeaurora.org>
+	<20110316195444.GB4000@angua.secretlab.ca>
+	<20110316195631.GD15605@opensource.wolfsonmicro.com>
+Message-ID: <20110316230603.GA15898@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2011 03:20 AM, Daniel Walker wrote:
-> On Wed, 2011-03-09 at 20:44 -0800, Stephen Boyd wrote:
->> On 8660, the modem, dsp, and sensors peripherals require their
->> firmware to be loaded into memory before they can be properly
->> taken out of reset.
->>
->> Drivers are expected to call pil_get() when they wish to load a
->> peripheral. This will initiate multiple firmware_request()s for
->> the metadata and image blobs for a peripheral. Once the image has
->> been loaded into memory, it is validated and brought out of reset
->> via the peripheral reset driver.
+On Wed, Mar 16, 2011 at 07:56:32PM +0000, Mark Brown wrote:
+> On Wed, Mar 16, 2011 at 01:54:44PM -0600, Grant Likely wrote:
 > 
-> Why can't this be part of the generic firmware request API ?
-
-The generic firmware request API gets a blob from userspace.  The PIL
-driver uses this interface to get blobs.  The additions here are:
-
-- ref counting, per-name
-- peripheral reset sequence, per-name
-- configurable loading mechanism, secure vs. non-secure
-- common format for retrieving metadata to verify image integrity
-
-Since several peripherals need this exact sequence, it made sense to
-create a small driver for this functionality.
-
+> > Yes, remove the comment.  I'll probably also remove the comment for
+> > MODULbus and AC97.
 > 
->> Change-Id: I041139464bbd3b646b82370ab540f40b0ac9af6b
-> 
-> Can't have Change-Id's ..
+> In theory there should be more AC'97 GPIO drivers - at least the wm97xx
+> chips have GPIOs (currently supported by a custom API).  I'm not sure if
+> anyone will ever have sufficient time and enthusiasm to move them over
+> to gpiolib, though.
 
-Dave noted this for the first patch in the series.  For subsequent
-postings, Steve will remove the Change-Ids.  Otherwise, Dave said he
-would remove them prior to adding them to the MSM tree.
+True, but it's easy to add back labels when there actually are more
+than one.  :)
 
->> Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/mach-msm/Kconfig                          |   13 +
->>  arch/arm/mach-msm/Makefile                         |    2 +
->>  arch/arm/mach-msm/include/mach/peripheral-loader.h |   23 +
->>  arch/arm/mach-msm/peripheral-loader.c              |  402
->> +++++++++++++++
->>  arch/arm/mach-msm/peripheral-loader.h              |   38 ++
->>  arch/arm/mach-msm/peripheral-reset.c               |  528
->> ++++++++++++++++++++
->>  6 files changed, 1006 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-msm/include/mach/peripheral-loader.h
->>  create mode 100644 arch/arm/mach-msm/peripheral-loader.c
->>  create mode 100644 arch/arm/mach-msm/peripheral-loader.h
->>  create mode 100644 arch/arm/mach-msm/peripheral-reset.c
->>
->> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
->> index 997c5bd..25b73b0 100644
->> --- a/arch/arm/mach-msm/Kconfig
->> +++ b/arch/arm/mach-msm/Kconfig
->> @@ -210,4 +210,17 @@ config IOMMU_API
->>  
->>  config MSM_SCM
->>         bool
->> +
->> +config MSM_PIL
->> +       bool "Peripheral image loading (PIL)"
->> +       select FW_LOADER
->> +       select MSM_SCM
->> +       depends on ARCH_MSM8X60
->> +       help
->> +         Some peripherals need to be loaded into memory before they
->> can be
->> +         brought out of reset.
->> +
->> +         Say yes to support these devices.
->> +
->> +
-> 
-> You shouldn't be adding anything like this to the Kconfig. To me if you
-> add stuff like this it's a big red flag.
-> 
-> I didn't review the rest sign it might be wasted effort on my part..
-> 
-> Daniel
-
-Would you elaborate on your objection here?  Should the Kconfig be
-dropped and the Makefile use 'obj-$(ARCH_MSM8X60)'?  That doesn't make
-sense to me since we already have a 2nd architecture, 8960, that uses
-PIL.  How do you think this should be handled?  Thanks.
-
-- Bryan
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+g.
