@@ -1,58 +1,38 @@
-From: matt.waddel@canonical.com (Matt Waddel)
-Date: Wed, 16 Mar 2011 10:25:16 -0600
-Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
-In-Reply-To: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
-References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <4D80E46C.3010103@canonical.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Mar 2011 16:34:15 -0000
+Subject: [PATCH 2/2] ARM: perf: add required isbs() to ARMv7 backend
+In-Reply-To: <AANLkTinQJ_1Ym8jVHjRP80XzC0PKzR+o9-Fdk56WzEF8@mail.gmail.com>
+References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>	<1300289898-2720-2-git-send-email-will.deacon@arm.com>
+	<AANLkTinQJ_1Ym8jVHjRP80XzC0PKzR+o9-Fdk56WzEF8@mail.gmail.com>
+Message-ID: <001c01cbe3f7$fdbe1030$f93a3090$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2011 10:18 AM, Pawel Moll wrote:
-> New IO FPGA implementation for Versatile Express boards contain
-> MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
+Hello,
+
+> On Wed, Mar 16, 2011 at 4:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > The ARMv7 architecture does not guarantee that effects from co-processor
+> > writes are immediately visible to following instructions.
+> >
+> > This patch adds two isbs to the ARMv7 perf code:
+> >
+> > (1) Immediately after selecting an event register, so that the PMU state
+> > ? ?following this instruction is consistent with the new event.
+> Ok
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> >
+> > (2) Immediately before writing to the PMCR, so that any previous writes
+> > ? ?to the PMU have taken effect before (typically) enabling the
+> > ? ?counters.
+> Should the isb come _after_ the cp15 instruction so that the current
+> access is actually performed?
 
-Tested-by: Matt Waddel <matt.waddel@linaro.org>
+No. We want to ensure that the _other_ PMU registers are up-to-date before
+playing with the control register, otherwise we could end up in a horrible
+situation where we enable all the counters, but the writes to the counters
+themselves haven't yet made it.
 
-This patch improves MMC performance on my vexpress system. Also
-fixes "mmcblk0: error -5 transferring data" errors.
+The write to the control register will take effect before the next
+exception return, which is fine for what we want.
 
-> ---
->  drivers/mmc/host/mmci.c |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 2d6de3e..e7197b0 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -66,6 +66,12 @@ static struct variant_data variant_arm = {
->  	.datalength_bits	= 16,
->  };
->  
-> +static struct variant_data variant_arm_extended_fifo = {
-> +	.fifosize		= 128 * 4,
-> +	.fifohalfsize		= 64 * 4,
-> +	.datalength_bits	= 16,
-> +};
-> +
->  static struct variant_data variant_u300 = {
->  	.fifosize		= 16 * 4,
->  	.fifohalfsize		= 8 * 4,
-> @@ -1019,10 +1025,15 @@ static int mmci_resume(struct amba_device *dev)
->  static struct amba_id mmci_ids[] = {
->  	{
->  		.id	= 0x00041180,
-> -		.mask	= 0x000fffff,
-> +		.mask	= 0xff0fffff,
->  		.data	= &variant_arm,
->  	},
->  	{
-> +		.id	= 0x01041180,
-> +		.mask	= 0xff0fffff,
-> +		.data	= &variant_arm_extended_fifo,
-> +	},
-> +	{
->  		.id	= 0x00041181,
->  		.mask	= 0x000fffff,
->  		.data	= &variant_arm,
+Will
