@@ -1,59 +1,79 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 16 Mar 2011 08:35:18 -0700
-Subject: [PATCH V2] OMAP4: Intialize IVA Device in addition to DSP device.
-In-Reply-To: <AANLkTinympnok4Qw_n15ukDNE2L5yp9xvuhoP64B=2wJ@mail.gmail.com>
-	(Nishanth Menon's message of "Tue, 15 Mar 2011 10:48:37 +0530")
-References: <1299926361-28482-1-git-send-email-shweta.gulati@ti.com>
-	<AANLkTinympnok4Qw_n15ukDNE2L5yp9xvuhoP64B=2wJ@mail.gmail.com>
-Message-ID: <8739mngjt5.fsf@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Mar 2011 15:38:17 +0000
+Subject: [PATCH 1/2] ARM: perf: reset counters on all CPUs during
+	initialisation
+Message-ID: <1300289898-2720-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Menon, Nishanth" <nm@ti.com> writes:
+ARMv7 dictates that the interrupt-enable and count-enable registers for
+each PMU counter are UNKNOWN following core reset.
 
-> On Sat, Mar 12, 2011 at 16:09, Shweta Gulati <shweta.gulati@ti.com> wrote:
->> OMAP4 has two different Devices IVA and DSP. DSP is bound
->> with IVA for DVFS. The registration of IVA dev in API
->> 'omap2_init_processor_devices' was missing. Init dev for
->> 'iva_dev' is added.
->>
->> This also fixes the following error seen during boot as
->> omap2_set_init_voltage can now find the iva device
->>
->> ? ? ? ?omap2_set_init_voltage: Invalid parameters!
->> ? ? ? ?omap2_set_init_voltage: Unable to put vdd_iva to its init voltage
->>
->> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
->> ---
->>
->> Tested on OMAP4430 SDP Board.
->> Baseline:
->> http://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
->> Branch :pm-core
->>
->> V2:
->> Rephrased the Commit log.
->>
->> ?arch/arm/mach-omap2/pm.c | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
->> index 30af335..49486f5 100644
->> --- a/arch/arm/mach-omap2/pm.c
->> +++ b/arch/arm/mach-omap2/pm.c
->> @@ -89,6 +89,7 @@ static void omap2_init_processor_devices(void)
->> ? ? ? ?if (cpu_is_omap44xx()) {
->> ? ? ? ? ? ? ? ?_init_omap_device("l3_main_1", &l3_dev);
->> ? ? ? ? ? ? ? ?_init_omap_device("dsp", &dsp_dev);
->> + ? ? ? ? ? ? ? _init_omap_device("iva", &iva_dev);
->> ? ? ? ?} else {
->> ? ? ? ? ? ? ? ?_init_omap_device("l3_main", &l3_dev);
->> ? ? ? ?}
->> --
-> Looks fine to me.
+This patch adds an arch_initcall to the ARMv7 perf events backend which
+disables the counters on each CPU prior to setting the Enable bit in the
+PMCR.
 
-Thanks, I'll take this as an ack.
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v7.c |   27 +++++++++++++++++++++++----
+ 1 files changed, 23 insertions(+), 4 deletions(-)
 
-Will queue as a fix for the .39-rc fixes cycle.
-
-Kevin
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 2e14025..3f42473 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -860,12 +860,31 @@ static struct arm_pmu armv7pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
+ 
+-static u32 __init armv7_reset_read_pmnc(void)
++static void armv7_reset_pmnc(void *info)
+ {
+-	u32 nb_cnt;
++	u32 idx, nb_cnt = armv7pmu.num_events;
++
++	/* The counter and interrupt enable registers are unknown@reset. */
++	for (idx = 1; idx < nb_cnt; ++idx)
++		armv7pmu_disable_event(NULL, idx);
+ 
+ 	/* Initialize & Reset PMNC: C and P bits */
+ 	armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
++}
++
++static int __init armv7_pmnc_init(void)
++{
++	/*
++	 * Reset the counter status on each CPU so that we don't receive
++	 * spurious interrupts when we set the E bit.
++	 */
++	return on_each_cpu(armv7_reset_pmnc, NULL, 1);
++}
++arch_initcall(armv7_pmnc_init);
++
++static u32 __init armv7_read_num_pmnc_events(void)
++{
++	u32 nb_cnt;
+ 
+ 	/* Read the nb of CNTx counters supported from PMNC */
+ 	nb_cnt = (armv7_pmnc_read() >> ARMV7_PMNC_N_SHIFT) & ARMV7_PMNC_N_MASK;
+@@ -880,7 +899,7 @@ static const struct arm_pmu *__init armv7_a8_pmu_init(void)
+ 	armv7pmu.name		= "ARMv7 Cortex-A8";
+ 	armv7pmu.cache_map	= &armv7_a8_perf_cache_map;
+ 	armv7pmu.event_map	= &armv7_a8_perf_map;
+-	armv7pmu.num_events	= armv7_reset_read_pmnc();
++	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+ 	return &armv7pmu;
+ }
+ 
+@@ -890,7 +909,7 @@ static const struct arm_pmu *__init armv7_a9_pmu_init(void)
+ 	armv7pmu.name		= "ARMv7 Cortex-A9";
+ 	armv7pmu.cache_map	= &armv7_a9_perf_cache_map;
+ 	armv7pmu.event_map	= &armv7_a9_perf_map;
+-	armv7pmu.num_events	= armv7_reset_read_pmnc();
++	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+ 	return &armv7pmu;
+ }
+ #else
+-- 
+1.7.0.4
