@@ -1,162 +1,79 @@
-From: ccross@google.com (Colin Cross)
-Date: Tue, 15 Mar 2011 18:28:01 -0700
-Subject: ARM Tegra updates for 2.6.39
-Message-ID: <AANLkTikkb4RYxN2=HjpLgz-SWDKZ=ysE6HQuEEaDfiz8@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 16 Mar 2011 09:42:46 +0800
+Subject: [PATCH 0/7] add the GPMI controller driver for IMX23/IMX28
+Message-ID: <1300239773-4222-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-Please pull updates for Tegra from:
+The general-purpose media interface(GPMI) controller is a flexible interface
+to up to several NAND flashs.
 
- git://android.git.kernel.org/kernel/tegra.git for-linus
+The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
 
-Thanks,
-Colin
+With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+not.
 
-The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+This driver is based the Shawn Guo's DMA patches for IMX23/IMX28,
+please refer to :
+	http://git.infradead.org/users/vkoul/slave-dma.git/commit/a580b8c5429a624d120cd603e1498bf676e2b4da
 
-  Linux 2.6.38-rc4 (2011-02-07 16:03:55 -0800)
 
-are available in the git repository at:
-  git://android.git.kernel.org/kernel/tegra.git for-linus
+Huang Shijie (7):
+  ARM: add GPMI support for imx23/imx28
+  add the common code for GPMI driver
+  add the database for the NANDs
+  add GPMI support for imx23
+  add GPMI support for imx28
+  dmaengine: change the flags of request_irq()
+  MTD : add GPMI driver in the config and Makefile
 
-Colin Cross (37):
-      ARM: tegra: Centralize macros to define debug uart base
-      ARM: tegra: Add api to control internal powergating
-      ARM: tegra: irqs: Update irq list
-      ARM: tegra: Add prototypes for subsystem suspend functions
-      ARM: tegra: clock: Suspend fixes, and add new clocks
-      ARM: tegra: timer: Add idle and suspend support to timers
-      ARM: tegra: irq: Add support for suspend wake sources
-      ARM: tegra: irq: Implement retrigger
-      ARM: tegra: cpufreq: Disable cpufreq during suspend
-      ARM: tegra: Allow overriding arch_reset
-      ARM: tegra: dma: Fix critical data corruption bugs
-      ARM: tegra: Use writel_relaxed in tegra_init_cache
-      Merge branch 'tegra-arch' of
-git://git.kernel.org/.../broonie/sound-2.6 into outside-for-next
-      ARM: tegra: clock: Don't BUG on changing an enabled PLL
-      ARM: tegra: clock: Drop debugging
-      ARM: tegra: clock: Don't use PLL lock bits
-      ARM: tegra: clock: Initialize clocks that have no enable
-      ARM: tegra: clock: Drop CPU dvfs
-      ARM: tegra: clock: Rearrange static clock tables
-      ARM: tegra: clock: Move unshared clk struct members into union
-      ARM: tegra: clock: Convert global lock to a lock per clock
-      ARM: tegra: cpufreq: Take an extra reference to pllx
-      ARM: tegra: clock: Add shared bus clock type
-      ARM: tegra: clock: Minor cleanups
-      ARM: tegra: Add external memory controller driver
-      ARM: tegra: clocks: Add emc scaling
-      ARM: tegra: cpufreq: Adjust memory frequency with cpu frequency
-      ARM: tegra: clock: Add function to set SDMMC tap delay
-      ARM: tegra: clock: Fix clock issues in suspend
-      ARM: tegra: clock: Miscellaneous clock updates
-      ARM: tegra: clock: Refcount periph clock enables
-      ARM: tegra: clock: Round rate before setting rate
-      ARM: tegra: clock: prevent accidental disables of cpu clock
-      ARM: tegra: Move tegra_common_init to tegra_init_early
-      ARM: tegra: timer: Enable timer and rtc clocks
-      ARM: tegra: common: Enable core clocks
-      Merge branch 'boards-for-next' of
-git://git.kernel.org/.../olof/tegra-2.6 into for-next
-
-Dima Zavin (1):
-      ARM: tegra: clock: enable clk reset for non-peripheral clocks
-
-Gary King (2):
-      ARM: tegra: pinmux: Add missing drive pingroups and fix suspend
-      ARM: tegra: iomap: Add missing devices
-
-Mark Brown (1):
-      ARM: tegra: Hide EMC scaling config behind ARCH_TEGRA
-
-Mike Rapoport (4):
-      ARM: tegra: add TrimSlice board
-      ARM: tegra: PCIE minor code refactoring
-      ARM: tegra: add PCI Express power gating
-      ARM: tegra: trimslice: initialize PCI-e only when running on TrimSlice
-
-Olof Johansson (8):
-      ARM: tegra: add tegra_defconfig
-      ARM: tegra: add tegra_gpio_table and tegra_gpio_config
-      ARM: tegra: harmony: move over to tegra_gpio_config
-      ARM: tegra: common device resources
-      ARM: tegra: remove stale nvidia atag handler
-      ARM: tegra: harmony: register sdhci devices
-      ARM: tegra: harmony: fix pinmux for MMC slot
-      ARM: tegra: add seaboard, wario and kaen boards
-
-Simon Glass (1):
-      ARM: tegra: Fix hang on reboot
-
-Stephen Warren (9):
-      ARM: tegra: Add Harmony sound platform data type
-      ARM: tegra: Add to struct harmony_audio_platform_data
-      ARM: tegra: Prevent requeuing in-progress DMA requests
-      ARM: tegra: APB DMA: Enable clock and remove reset.
-      ARM: tegra: Fix typo in TEGRA_IRQ_TO_GPIO
-      ARM: Tegra: Make tegra_dma_init a postcore_initcall
-      ARM: Tegra: Rename I2S clocks to match driver name
-      ARM: Tegra: Rename clk_dev1/2 to cdev1/2
-      ARM: Tegra: DMA: Fail safe if initialization fails
-
- arch/arm/configs/tegra_defconfig                   |  123 +++
- arch/arm/mach-tegra/Kconfig                        |   28 +
- arch/arm/mach-tegra/Makefile                       |   10 +-
- arch/arm/mach-tegra/board-harmony-pinmux.c         |   19 +-
- arch/arm/mach-tegra/board-harmony.c                |   62 +-
- arch/arm/mach-tegra/board-seaboard-pinmux.c        |  179 ++++
- arch/arm/mach-tegra/board-seaboard.c               |  196 ++++
- arch/arm/mach-tegra/board-seaboard.h               |   38 +
- arch/arm/mach-tegra/board-trimslice-pinmux.c       |  145 +++
- arch/arm/mach-tegra/board-trimslice.c              |  106 ++
- .../{tegra2_dvfs.h => board-trimslice.h}           |   14 +-
- arch/arm/mach-tegra/board.h                        |    4 +-
- arch/arm/mach-tegra/clock.c                        |  532 +++++-----
- arch/arm/mach-tegra/clock.h                        |  129 +--
- arch/arm/mach-tegra/common.c                       |   27 +-
- arch/arm/mach-tegra/cpu-tegra.c                    |  100 ++-
- arch/arm/mach-tegra/devices.c                      |  505 +++++++++
- arch/arm/mach-tegra/devices.h                      |   46 +
- arch/arm/mach-tegra/dma.c                          |  243 +++--
- arch/arm/mach-tegra/gpio.c                         |   15 +
- arch/arm/mach-tegra/include/mach/clk.h             |    6 +-
- arch/arm/mach-tegra/include/mach/debug-macro.S     |   25 +-
- arch/arm/mach-tegra/include/mach/gpio.h            |    9 +-
- .../mach/harmony_audio.h}                          |   14 +-
- arch/arm/mach-tegra/include/mach/iomap.h           |   47 +
- arch/arm/mach-tegra/include/mach/irqs.h            |   14 +-
- arch/arm/mach-tegra/include/mach/legacy_irq.h      |    4 +
- arch/arm/mach-tegra/include/mach/pinmux-t2.h       |   10 +
- arch/arm/mach-tegra/include/mach/powergate.h       |   40 +
- arch/arm/mach-tegra/include/mach/suspend.h         |   38 +
- arch/arm/mach-tegra/include/mach/system.h          |   10 +-
- arch/arm/mach-tegra/include/mach/uncompress.h      |   18 +-
- arch/arm/mach-tegra/irq.c                          |  186 ++--
- arch/arm/mach-tegra/legacy_irq.c                   |  109 ++-
- arch/arm/mach-tegra/pcie.c                         |   38 +-
- arch/arm/mach-tegra/pinmux-t2-tables.c             |   26 +-
- arch/arm/mach-tegra/powergate.c                    |  212 ++++
- arch/arm/mach-tegra/tegra2_clocks.c                | 1120 +++++++++++++++-----
- arch/arm/mach-tegra/tegra2_dvfs.c                  |   86 --
- arch/arm/mach-tegra/tegra2_emc.c                   |  178 ++++
- .../arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} |   17 +-
- arch/arm/mach-tegra/timer.c                        |   77 ++-
- 42 files changed, 3755 insertions(+), 1050 deletions(-)
- create mode 100644 arch/arm/configs/tegra_defconfig
- create mode 100644 arch/arm/mach-tegra/board-seaboard-pinmux.c
- create mode 100644 arch/arm/mach-tegra/board-seaboard.c
- create mode 100644 arch/arm/mach-tegra/board-seaboard.h
- create mode 100644 arch/arm/mach-tegra/board-trimslice-pinmux.c
- create mode 100644 arch/arm/mach-tegra/board-trimslice.c
- copy arch/arm/mach-tegra/{tegra2_dvfs.h => board-trimslice.h} (70%)
- create mode 100644 arch/arm/mach-tegra/devices.c
- create mode 100644 arch/arm/mach-tegra/devices.h
- copy arch/arm/mach-tegra/{tegra2_dvfs.h => include/mach/harmony_audio.h} (69%)
- create mode 100644 arch/arm/mach-tegra/include/mach/powergate.h
- create mode 100644 arch/arm/mach-tegra/include/mach/suspend.h
- create mode 100644 arch/arm/mach-tegra/powergate.c
- delete mode 100644 arch/arm/mach-tegra/tegra2_dvfs.c
- create mode 100644 arch/arm/mach-tegra/tegra2_emc.c
- rename arch/arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} (58%)
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    3 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    3 +
+ arch/arm/mach-mxs/devices-mx23.h                |    3 +
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-gpmi.c       |  144 +++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
+ arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   75 ++
+ arch/arm/mach-mxs/mach-mx23evk.c                |   37 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |   37 +
+ drivers/dma/mxs-dma.c                           |    2 +-
+ drivers/mtd/nand/Kconfig                        |   10 +
+ drivers/mtd/nand/Makefile                       |    1 +
+ drivers/mtd/nand/gpmi-nfc/Makefile              |   10 +
+ drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h      |  550 +++++++++++
+ drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h      |  557 ++++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c       |  524 +++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h            |  520 +++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h     |  416 +++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h     |  421 +++++++++
+ drivers/mtd/nand/gpmi-nfc/hal-common.c          |  816 +++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/hal-imx23.c           |  556 ++++++++++++
+ drivers/mtd/nand/gpmi-nfc/hal-imx28.c           |  503 +++++++++++
+ drivers/mtd/nand/gpmi-nfc/mil.c                 | 1104 +++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/nand_device_info.c    |  181 ++++
+ drivers/mtd/nand/gpmi-nfc/nand_device_info.h    |  145 +++
+ drivers/mtd/nand/gpmi-nfc/rom-common.c          |   48 +
+ drivers/mtd/nand/gpmi-nfc/rom-imx23.c           |  300 ++++++
+ drivers/mtd/nand/gpmi-nfc/rom-imx28.c           |   66 ++
+ 31 files changed, 7044 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/Makefile
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-common.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx23.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx28.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/mil.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/nand_device_info.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/nand_device_info.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-common.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx23.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx28.c
