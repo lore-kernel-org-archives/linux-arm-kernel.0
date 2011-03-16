@@ -1,154 +1,40 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 16 Mar 2011 11:20:46 +0900
-Subject: [PATCH 4/4 v4] mmc, ARM: Add zboot from eSD support for SuperH
-	Mobile ARM
-In-Reply-To: <20110316011427.GB6724@verge.net.au>
-References: <1300071435-26759-1-git-send-email-horms@verge.net.au>
-	<1300071435-26759-5-git-send-email-horms@verge.net.au>
-	<20110315222738.GA23288@verge.net.au>
-	<AANLkTimgwpP-WTGF-E=KO3TAXDX7FP4WnW3XQiHi0Ton@mail.gmail.com>
-	<20110316011427.GB6724@verge.net.au>
-Message-ID: <AANLkTimBOc2+Ryq+fwas0SPmYqbnJH6_b28DTPJx_p99@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 16 Mar 2011 09:19:39 +0530
+Subject: [PATCH 02/13] plat-spear: use list_move() instead of
+	list_del()/list_add() combination
+In-Reply-To: <1300229605-14499-2-git-send-email-kirill@shutemov.name>
+References: <1300229605-14499-1-git-send-email-kirill@shutemov.name>
+	<1300229605-14499-2-git-send-email-kirill@shutemov.name>
+Message-ID: <4D803353.7030004@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 10:14 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Mar 16, 2011 at 09:37:50AM +0900, Magnus Damm wrote:
->> On Wed, Mar 16, 2011 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
->> > This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
->> > ARM to boot directly from the SDHI hardware block.
->> >
->> > This is achieved by the MaskROM loading the first portion of the image into
->> > MERAM and then jumping to it. ?This portion contains loader code which
->> > copies the entire image to SDRAM and jumps to it. From there the zImage
->> > boot code proceeds as normal, uncompressing the image into its final
->> > location and then jumping to it.
->> >
->> > Cc: Paul Mundt <lethal@linux-sh.org>
->> > Cc: Magnus Damm <magnus.damm@gmail.com>
->> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> > Signed-off-by: Simon Horman <horms@verge.net.au>
->> >
->> > ---
->> >
->> > This patch is based on the for-next branch of
->> > Russell King's linux-2.6-arm tree
->> >
->> > v2
->> > * Consistently use __raw_readw(). As pointed out by Paul Mundt
->> >
->> > v3
->> > * Remove mmcif_update_progress2(), it was for debugging during development
->> > * Move CPU specific code into mach/sdhi.h
->> > ?As requested by Magnus Damm
->> > * Use linux/mmc/tmio.h now that it exists
->> > * Remove SDHI_EXT_SWAP, it is unused
->> > * Replace use of MMCIF_PROGRESS_* with MMC_PROGRESS_*
->> > * Don't include linux/mmc/sh_mmcif.h
->> > ?+ Replace use of MMCIF_CE_RESP_CMD12 with RESP_CMD12
->> > ?+ Include linux/io.h
->> >
->> > v4
->> > * Move definition of SDHI_BASE into CPU-specific code.
->> > ?Thanks to Magnus Damm.
->> > ---
->>
->> > +asmlinkage void mmc_loader(unsigned short *buf, unsigned long len)
->> > +{
->> > + ? ? ? int high_capacity;
->> > +
->> > + ? ? ? mmc_init_progress();
->> > +
->> > + ? ? ? mmc_update_progress(MMC_PROGRESS_ENTER);
->> > + ? ? ? sdhi_boot_enter();
->> > +
->> > + ? ? ? /* setup SDHI hardware */
->> > + ? ? ? mmc_update_progress(MMC_PROGRESS_INIT);
->> > + ? ? ? high_capacity = sdhi_boot_init(SDHI_BASE);
->> > + ? ? ? if (high_capacity < 0)
->> > + ? ? ? ? ? ? ? goto err;
->> > +
->> > + ? ? ? mmc_update_progress(MMC_PROGRESS_LOAD);
->> > + ? ? ? /* load kernel */
->> > + ? ? ? if (sdhi_boot_do_read(SDHI_BASE, high_capacity,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, /* Kernel is at block 1 */
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (len + TMIO_BBS - 1) / TMIO_BBS, buf))
->> > + ? ? ? ? ? ? ? goto err;
->> > +
->> > + ? ? ? sdhi_boot_cleanup();
->> > +
->> > + ? ? ? mmc_update_progress(MMC_PROGRESS_DONE);
->> > +
->> > + ? ? ? return;
->> > +err:
->> > + ? ? ? __raw_writel(__raw_readl(PORTR031_000DR) | 1, PORTR031_000DR);
->> > + ? ? ? for(;;);
->> > +
->> > +}
->>
->> Sorry for not catching this earlier, but this __raw_writel() to
->> PORTR031_000DR is cpu specific as well. So please move that to the CPU
->> specific code.
->
-> I will just remove that code, its was useful for development
-> but I didn't mean to include it in my patch submission.
+On 03/16/2011 04:23 AM, Kirill A. Shutemov wrote:
+> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/plat-spear/clock.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+> index ee4f90e..1d24faf 100644
+> --- a/arch/arm/plat-spear/clock.c
+> +++ b/arch/arm/plat-spear/clock.c
+> @@ -267,9 +267,7 @@ static void change_parent(struct clk *cclk, struct clk *pclk)
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&clocks_lock, flags);
+> -	list_del(&cclk->sibling);
+> -	list_add(&cclk->sibling, &pclk->children);
+> -
+> +	list_move(&cclk->sibling, &pclk->children);
+>  	cclk->pclk = pclk;
+>  	spin_unlock_irqrestore(&clocks_lock, flags);
+>  }
 
-Ok, good!
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
->> Not sure if it makes sense at this point, but perhaps it's a good idea
->> to move the mmc_loader() function into the CPU specific portion. As
->> you know, the CPU itself has multiple SDHI hardware blocks, and
->> because of that we want the common SDHI loader to be written to
->> support any SDHI hardware block instance.
->
-> Wouldn't that mean moving all of
-> arch/arm/boot/compressed/sdhi-shmobile.c into CPU specific code?
-> That could easily be achived by just guarding its compilation with
-> CONFIG_ARCH_SH7372 (as mmcif-sh7372.c already is) and perhaps
-> renaming the file to sdhi-sh7372.c. We could probably move
-> arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h back into
-> sdhi-shmobile.c.
-
-No, I didn't mean moving all the SDHI loader code into the CPU
-specific place - just the mmc_loader() function.
-
->> Right now the SDHI_BASE variable is limiting the shared SDHI loader
->> code to a fixed hardware block instance. That's fine because we only
->> boot from a single SDHI hardware block instance on sh7372, but future
->> processors most likely support selecting boot SDHI hardware block
->> instance.
->
-> So mmc_loader() would need to take SDHI_BASE as an argument?
-> That sounds like a fairly small amount of refactoring.
-
-Yes, that's maybe more realistic, I'm not sure. Please remember that
-you probably want to select different GPIO pins for different SDHI
-instances, so you also need to adjust the
-sdhi_boot_enter()/sdhi_boot_cleanup() to receive SDHI_BASE as an
-argument too if you go down that route.
-
-> How do you envisage that the hardware block would be selected?
-> At compile time through Kconfig? If so the current #define mechanism
-> might be sufficient.
-
-Not through Kconfig. I think you should use Kconfig to enable the SDHI
-loader, but you should be able to select the SDHI base address during
-run-time. Similar to how we enable platform device drivers with
-Kconfig but put the instance information in the platform device
-resource and data outside the driver.
-
-So for instance, on some board we may want to read a GPIO pin at boot
-up time to select if we should boot from SDHI0 or SDHI1. I would like
-the SDHI loader to be designed so we can have support for multiple
-instances complied-in. Because of that I'd like to see the fixed
-SDHI_BASE disappear from the header, and letting the mmc_loader()
-function take the base address as an argument, or simply move the
-mmc_loader() function out of the SDHI loader code to give CPU specific
-and/or board specific code freedom to select which ever SDHI hardware
-block instance(s) they want to load from.
-
-Perhaps this would require some serious refactoring?
-
-Thanks,
-
-/ magnus
+-- 
+viresh
