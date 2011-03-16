@@ -1,55 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Mar 2011 11:19:51 -0300
-Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <20110316083326.GF13316@pengutronix.de>
-References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
-	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
-	<20110315090656.GC13316@pengutronix.de>
-	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
-	<20110315094946.GD13316@pengutronix.de>
-	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
-	<20110316083326.GF13316@pengutronix.de>
-Message-ID: <AANLkTik8J6geSa1E==otDfsYDaBj5FQMcOzPmXqOGO7t@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 16 Mar 2011 15:26:03 +0100
+Subject: [PATCH V12 0/4] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <cover.1298878618.git.richard.cochran@omicron.at>
+References: <cover.1298878618.git.richard.cochran@omicron.at>
+Message-ID: <20110316142603.GC12435@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Mon, Feb 28, 2011 at 08:57:03AM +0100, Richard Cochran wrote:
+> * PHC Patch ChangeLog
+> ** v12
+> *** gianfar_ptp
+>    - fixed up device tree
+>    - inlined the header file
+>    - use platform_ calls instead of deprecated of_ calls
+>    - removed static global single instance
+>    - removed John Stultz's ack from this patch
 
-2011/3/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-...
-> This function is a bit confusing:
->
-> ? ? ? ?/* Bring USB hub out of reset */
-> ? ? ? ?ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
-> ? ? ? ?if (ret) {
-> ? ? ? ? ? ? ? ?...
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> ? ? ? ?gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
-> ? ? ? ?/* USB HUB RESET - De-assert USB HUB RESET_N */
-> ? ? ? ?msleep(1);
-> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
-> ? ? ? ?msleep(1);
-> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
->
-> IMHO the comments are misleading. ?I'd suggest:
->
-> ? ? ? ?ret = gpio_request_one(BABBAGE_USB_HUB_RESET,
-> ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_DIR_OUT | GPIOF_INIT_LOW, "USB hub reset#");
-> ? ? ? ?if (ret) {
-> ? ? ? ? ? ? ? ?pr_err("failed to request gpio for USB hub reset#: %d\n", ret);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
-> ? ? ? ?msleep(2);
-> ? ? ? ?gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
->
-> Fabio?
+@Thomas and John:
 
-Ok, I was not the author of this original code, but will send a new
-patch for fixing it.
+Can I get your acks on the remaining patches?
 
-Thanks for the review.
+Can this be merged for 2.6.39?
 
-Regards,
+Thanks,
 
-Fabio Estevam
+Richard
