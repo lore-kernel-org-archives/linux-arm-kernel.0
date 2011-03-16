@@ -1,104 +1,35 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Mar 2011 10:03:41 +0000
-Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
-	timersetup function
-In-Reply-To: <f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
-References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
-	<1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
-	<f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
-Message-ID: <1300269821.21713.37.camel@e102391-lin.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 16 Mar 2011 11:13:00 +0100
+Subject: [PATCH] ARM: S3C64XX: Fix section mismatch from cpufreq init
+In-Reply-To: <20110316094959.GB2688@opensource.wolfsonmicro.com>
+References: <1299769093-14516-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<20110316083811.GG13316@pengutronix.de>
+	<20110316094959.GB2688@opensource.wolfsonmicro.com>
+Message-ID: <20110316101259.GH13316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On Wed, 2011-03-16 at 11:25 +0530, Santosh Shilimkar wrote:
-> Marc,
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> > arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc Zyngier
-> > Sent: Tuesday, March 15, 2011 8:43 PM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: Tony Lindgren
-> > Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
-> > timersetup function
-> >
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/mach-omap2/Makefile    |    1 -
-> >  arch/arm/mach-omap2/timer-gp.c  |   13 ++++++++++++-
-> >  arch/arm/mach-omap2/timer-mpu.c |   36 ----------------------------
-> > --------
-> >  3 files changed, 12 insertions(+), 38 deletions(-)
-> >  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
-> >
-> > diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
-> > omap2/Makefile
-> > index a45cd64..41f8b67 100644
-> > --- a/arch/arm/mach-omap2/Makefile
-> > +++ b/arch/arm/mach-omap2/Makefile
-> > @@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
-> >
-> >  # SMP support ONLY available for OMAP4
-> >  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
-> > -obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
-> >  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
-> >  obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
-> >
-> > diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
-> > omap2/timer-gp.c
-> > index 3b9cf85..98d03c5 100644
-> > --- a/arch/arm/mach-omap2/timer-gp.c
-> > +++ b/arch/arm/mach-omap2/timer-gp.c
-> > @@ -39,6 +39,7 @@
-> >  #include <asm/mach/time.h>
-> >  #include <plat/dmtimer.h>
-> >  #include <asm/localtimer.h>
-> > +#include <asm/smp_twd.h>
-> >  #include <asm/sched_clock.h>
-> >  #include <plat/common.h>
-> >  #include <plat/omap_hwmod.h>
-> > @@ -247,12 +248,22 @@ static void __init
-> > omap2_gp_clocksource_init(void)
-> >  }
-> >  #endif
-> >
-> > +#ifdef CONFIG_LOCAL_TIMERS
-> > +static int __cpuinit omap4_local_timer_setup(struct
-> > clock_event_device *evt)
-> > +{
-> > +	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> >  static void __init omap2_gp_timer_init(void)
-> >  {
-> >  #ifdef CONFIG_LOCAL_TIMERS
-> > -	if (cpu_is_omap44xx()) {
-> > +	if (cpu_is_omap44xx() && omap_rev() != OMAP4430_REV_ES1_0)
+On Wed, Mar 16, 2011 at 09:49:59AM +0000, Mark Brown wrote:
+> On Wed, Mar 16, 2011 at 09:38:11AM +0100, Uwe Kleine-K?nig wrote:
+> > On Thu, Mar 10, 2011 at 02:58:13PM +0000, Mark Brown wrote:
+> > > we don't appear to have annotations which allow us to mark that it'll
+> > > never be called after system init, causing the linker consistency
 > 
-> I see one problem here. The reason we changed the signature of
-> local_timer_setup() is in case where the local timer isn't
-> available on a specific SOC versions, the kernel will switch
-> to broad-cast timers.
+> > Actually this is warning is a false positive.  There is a section
+> > mismatch, but it is never a problem because the .init callback is only
+> > called by cpufreq_register_driver. To get rid of the warning the right
+> > fix is to remove the .init callback from struct cpufreq_driver and
+> > change the prototype of cpufreq_register_driver to
 > 
-> This way the kernel built with CONFIG_LOCAL_TIMERS can still work
-> on SoCs where twd isn't supported.
-> 
-> Looks like your patch breaks that unless and until I am missing
-> something.
+> That's what I said above, pretty much.  Ideally we'd have a way of
+> annotating the call sites so that the linker infrastructure rather than
+> having to faff about splitting the structures like this.
+You can mark the driver struct using __ref. But IMHO not saving a
+reference to a function only used once is cleaner.
 
-I think the bit you're missing is that when no local timer is
-registered, the code in percpu_timer.c::percpu_timer_setup() ensures
-that the broadcast timers are used as a default.
+Best regards
+Uwe
 
-In the OMAP4 case, twd is registered unless we detect a
-OMAP4430_REV_ES1_0. In that case, we let the magic happen and fall back
-to the broadcast timers. Tested on a PandaBoard with twd artificially
-disabled.
-
-	M.
 -- 
-Reality is an implementation detail.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
