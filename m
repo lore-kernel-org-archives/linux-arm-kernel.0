@@ -1,80 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 17 Mar 2011 09:21:06 +0100
-Subject: [PATCHv3 3/3] ARM: mx51: Add support for low power suspend on MX51
-In-Reply-To: <1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20110317082106.GT29521@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 17 Mar 2011 17:23:09 +0900
+Subject: [PATCH 1/2] s5pc110: add clock gate for MIPI-DSI controller.
+In-Reply-To: <1294223690-31860-1-git-send-email-inki.dae@samsung.com>
+References: <1294223690-31860-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <00af01cbe47c$8fde0180$af9a0480$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 03:03:07PM -0500, Dinh.Nguyen at freescale.com wrote:
-> +
-> +struct clk *gpc_dvfs_clk;
-> +
-> +static int mx5_suspend_enter(suspend_state_t state)
-> +{
-> +	if (gpc_dvfs_clk == NULL)
-> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
-
-clk_get can fail and NULL can be a valid clock.
-
-Sascha
-
-> +
-> +	clk_enable(gpc_dvfs_clk);
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		mx5_cpu_lp_set(STOP_POWER_OFF);
-> +		break;
-> +	case PM_SUSPEND_STANDBY:
-> +		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (state == PM_SUSPEND_MEM) {
-> +		local_flush_tlb_all();
-> +		flush_cache_all();
-> +
-> +		/*clear the EMPGC0/1 bits */
-> +		__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
-> +		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
-> +	}
-> +	cpu_do_idle();
-> +	clk_disable(gpc_dvfs_clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mx5_pm_valid(suspend_state_t state)
-> +{
-> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-> +}
-> +
-> +static const struct platform_suspend_ops mx5_suspend_ops = {
-> +	.valid = mx5_pm_valid,
-> +	.enter = mx5_suspend_enter,
-> +};
-> +
-> +static int __init mx5_pm_init(void)
-> +{
-> +	if (cpu_is_mx51())
-> +		suspend_set_ops(&mx5_suspend_ops);
-> +
-> +	return 0;
-> +}
-> +device_initcall(mx5_pm_init);
-> -- 
-> 1.6.0.4
+Inki Dae wrote:
 > 
+> the clock gate for MIPI-DSI controller is placed at CLK_GATE_IP1[2]
+> so it adds a clock object to clock framework for MIPI-DSI clock gating.
 > 
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/clock.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index dab6ef3..a8d5235 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -365,6 +365,12 @@ static struct clk init_clocks_disable[] = {
+>  		.enable		= s5pv210_clk_ip1_ctrl,
+>  		.ctrlbit	= (1<<0),
+>  	}, {
+> +		.name		= "dsim",
+> +		.id		= -1,
+> +		.parent		= &clk_hclk_dsys.clk,
+> +		.enable		= s5pv210_clk_ip1_ctrl,
+> +		.ctrlbit	= (1<<2),
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+According to coding-style, should be added blank around "<<" like (1 << 2),
+even though there are wrong things to others.
+
+> +	}, {	
+>  		.name		= "cfcon",
+>  		.id		= 0,
+>  		.parent		= &clk_hclk_psys.clk,
+> --
+> 1.7.0.4
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
