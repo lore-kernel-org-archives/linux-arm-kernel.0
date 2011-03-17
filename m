@@ -1,119 +1,77 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Mar 2011 13:18:41 -0700
-Subject: [PATCH v2 3/7] OMAP: PM CONSTRAINTS: implement wake-up latency
-	constraints
-In-Reply-To: <1299779247-20511-4-git-send-email-j-pihet@ti.com> (Jean Pihet's
-	message of "Thu, 10 Mar 2011 18:47:23 +0100")
-References: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
-	<1299779247-20511-4-git-send-email-j-pihet@ti.com>
-Message-ID: <87r5a5zeji.fsf@ti.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Thu, 17 Mar 2011 13:27:22 -0700
+Subject: [PM8921 MFD V3 3/6] gpio: pm8xxx-gpio: Add pm8xxx gpio driver
+In-Reply-To: <20110317180013.GJ9597@angua.secretlab.ca>
+References: <1300328641-3855-1-git-send-email-adharmap@codeaurora.org>
+	<1300328641-3855-4-git-send-email-adharmap@codeaurora.org>
+	<20110317180013.GJ9597@angua.secretlab.ca>
+Message-ID: <4D826EAA.3070807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+Grant Likely wrote:
+> On Wed, Mar 16, 2011 at 07:23:58PM -0700, adharmap at codeaurora.org wrote:
+>> Add support for GPIO on Qualcomm PM8xxx PMIC chips.
+>>
+>> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> 
+> Minor points below, but otherwise:
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> Implement the wake-up latency constraints using an internal
-> unified function _set_dev_constraint at OMAP PM level,
-> which calls the corresponding function at omap device level.
->
-> The actual constraints management code is at the omap device level.
->
-> Note: the bus throughput function is implemented but currently is
-> a no-op.
->
-> Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-> on MPU, CORE and PER.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  arch/arm/plat-omap/omap-pm-constraints.c |  174 ++++++++++++++++--------------
->  1 files changed, 91 insertions(+), 83 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/omap-pm-constraints.c b/arch/arm/plat-omap/omap-pm-constraints.c
-> index c8b4e4c..c6735da 100644
-> --- a/arch/arm/plat-omap/omap-pm-constraints.c
-> +++ b/arch/arm/plat-omap/omap-pm-constraints.c
-> @@ -24,6 +24,7 @@
->  /* Interface documentation is in mach/omap-pm.h */
->  #include <plat/omap-pm.h>
->  #include <plat/omap_device.h>
-> +#include <plat/common.h>
->  
->  static bool off_mode_enabled;
->  static u32 dummy_context_loss_counter;
-> @@ -32,119 +33,126 @@ static u32 dummy_context_loss_counter;
->   * Device-driver-originated constraints (via board-*.c files)
->   */
->  
-> -int omap_pm_set_max_mpu_wakeup_lat(struct device *dev, long t)
-> +/*
-> + * Generic function to omap_device layer for the constraints API.
-> + */
-> +static int _set_dev_constraint(enum omap_pm_constraint_class class,
-> +			       struct device *req_dev, struct device *dev,
-> +			       long t)
->  {
-> -	if (!dev || t < -1) {
-> +	int ret = 0;
-> +
-> +	if (!req_dev || !dev || t < -1) {
->  		WARN(1, "OMAP PM: %s: invalid parameter(s)", __func__);
->  		return -EINVAL;
-> -	};
-> -
-> -	if (t == -1)
-> -		pr_debug("OMAP PM: remove max MPU wakeup latency constraint: "
-> -			 "dev %s\n", dev_name(dev));
-> -	else
-> -		pr_debug("OMAP PM: add max MPU wakeup latency constraint: "
-> -			 "dev %s, t = %ld usec\n", dev_name(dev), t);
-> +	}
->  
-> -	/*
-> -	 * For current Linux, this needs to map the MPU to a
-> -	 * powerdomain, then go through the list of current max lat
-> -	 * constraints on the MPU and find the smallest.  If
-> -	 * the latency constraint has changed, the code should
-> -	 * recompute the state to enter for the next powerdomain
-> -	 * state.
-> -	 *
-> -	 * TI CDP code can call constraint_set here.
-> -	 */
-> +	/* Try to catch non omap_device for dev */
+Thanks Grant, can you review (and ack) drivers/mfd/pm8xxx-mpp.c? Now 
+that I think, mpp is basically a gpio device, so should I move it to 
+drivers/gpio?
 
-comment should be 'only valid for omap_devices'
+mpp is the 4th patch in this series and can be found here.
+https://patchwork.kernel.org/patch/640891/
 
-> +	if (dev->parent == &omap_device_parent) {
-> +		if (t == -1)
-> +			pr_debug("OMAP PM: remove constraint of class %d "
-> +				 "from req_dev %s on dev %s\n",
-> +				 class, dev_name(req_dev), dev_name(dev));
-> +		else
-> +			pr_debug("OMAP PM: add constraint of class %d "
-> +				 "from req_dev %s on dev %s, t = %ld\n",
-> +				 class, dev_name(req_dev), dev_name(dev), t);
-> +
-> +		/* Call the omap_device API */
+>> diff --git a/drivers/gpio/pm8xxx-gpio.c b/drivers/gpio/pm8xxx-gpio.c
+>> new file mode 100644
+>> index 0000000..8995764
+>> --- /dev/null
+>> +++ b/drivers/gpio/pm8xxx-gpio.c
+>> @@ -0,0 +1,455 @@
+>> +/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+> 
+> Nit: first line should be '/*' and start the comments on the second
+> line.  It also helps for the first line of the comment block to be a
+> single line description of what the driver actually is.  (a
+> description, not a filename).
+> 
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +/*
+>> + * Qualcomm PMIC8XXX GPIO driver
+> 
+> Heh, this is the line I just was talking about should appear at the
+> top of the file.  :-)
 
-comment not needed
+Ok I will make this change for all the files in the patchset.
 
-> +		ret = omap_device_set_dev_constraint(class, req_dev, dev, t);
+>> +
+>> +static int __init pm_gpio_init(void)
+>> +{
+>> +	int rc = platform_driver_register(&pm_gpio_driver);
+>> +
+>> +	return rc;
+>> +}
+> 
+> Or simply:
+> 
+> 	return platform_driver_register(&pm_gpio_driver);
 
-Calling a function which doesn't yet exist. 
+yes  will do.
 
-Patches should be ordered such that the kernel still compiles after each patch.
-
-> +	} else {
-> +		pr_err("OMAP-PM set_wakeup_lat: Error: platform device "
-> +		       "not valid\n");
-
-comment should be 'Error: not an omap_device'.
-
-> +		return -EINVAL;
-> +	}
->  
-> -	return 0;
-> +	return ret;
->  }
-
-Kevin
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
