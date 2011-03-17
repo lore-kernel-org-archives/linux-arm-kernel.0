@@ -1,15 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Mar 2011 10:21:47 +0000
-Subject: [PATCHv3 2/3] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 17 Mar 2011 11:31:16 +0100
+Subject: [PATCHv3 3/3] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
 References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
 	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20110317102147.GG29758@n2100.arm.linux.org.uk>
+	<1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <19841.58100.335014.234927@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 03:03:06PM -0500, Dinh.Nguyen at freescale.com wrote:
-> +#include <linux/platform_device.h>
-> +#include <asm/io.h>
+Hi,
 
-linux/io.h please.
+Dinh.Nguyen at freescale.com writes:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> Adds initial low power suspend functionality to MX51.
+> Supports "mem" and "standby" modes.
+> 
+> Tested on mx51-babbage.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Makefile   |    1 +
+>  arch/arm/mach-mx5/pm-imx51.c |   69 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 70 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/pm-imx51.c
+> 
+> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+> index 0b9338c..787cb80 100644
+> --- a/arch/arm/mach-mx5/Makefile
+> +++ b/arch/arm/mach-mx5/Makefile
+> @@ -6,6 +6,7 @@
+>  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
+>  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
+>  
+> +obj-$(CONFIG_PM) += pm-imx51.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+>  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+> diff --git a/arch/arm/mach-mx5/pm-imx51.c b/arch/arm/mach-mx5/pm-imx51.c
+> new file mode 100644
+> index 0000000..4a1d915
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/pm-imx51.c
+> @@ -0,0 +1,69 @@
+> +/*
+> + *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +#include <linux/suspend.h>
+> +#include <linux/clk.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/tlb.h>
+> +#include <mach/system.h>
+> +#include "crm_regs.h"
+> +
+> +struct clk *gpc_dvfs_clk;
+> +
+static?
+
+> +static int mx5_suspend_enter(suspend_state_t state)
+> +{
+> +	if (gpc_dvfs_clk == NULL)
+> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
+> +
+> +	clk_enable(gpc_dvfs_clk);
+>
+error check?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
