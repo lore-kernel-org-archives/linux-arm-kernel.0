@@ -1,42 +1,87 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Thu, 17 Mar 2011 16:54:19 +0100
-Subject: [PATCH 4/9] lpc2k: generic time and clockevents
+Date: Thu, 17 Mar 2011 16:54:22 +0100
+Subject: [PATCH 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's Kit board
 In-Reply-To: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300377264-10843-5-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1300377264-10843-8-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code was mostly "borrowed" form the lpc32xx implementation.
+Add support for EmbeddedArtists LPC2478 Developer's Kit, consisting
+of the LPC2478OEM board, with QVGA base board. For details, see:
+
+http://www.embeddedartists.com/products/kits/lpc2478_kit.php
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
- arch/arm/mach-lpc2k/Makefile |    2 +-
- arch/arm/mach-lpc2k/time.c   |  174 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 175 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/time.c
+ arch/arm/mach-lpc2k/Kconfig           |    7 ++
+ arch/arm/mach-lpc2k/Makefile          |    2 +
+ arch/arm/mach-lpc2k/common.h          |   21 ++++++
+ arch/arm/mach-lpc2k/mach-lpc2478oem.c |  121 +++++++++++++++++++++++++++++++++
+ 4 files changed, 151 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/common.h
+ create mode 100644 arch/arm/mach-lpc2k/mach-lpc2478oem.c
 
+diff --git a/arch/arm/mach-lpc2k/Kconfig b/arch/arm/mach-lpc2k/Kconfig
+index fad47b8..162d616 100644
+--- a/arch/arm/mach-lpc2k/Kconfig
++++ b/arch/arm/mach-lpc2k/Kconfig
+@@ -2,4 +2,11 @@ if ARCH_LPC2K
+ 
+ comment "LPC2K machines"
+ 
++config MACH_LPC2478OEM
++	bool "Embedded Artists LPC2478 Developer's Kit"
++	help
++	  Say Y if you want the kernel to support the EmbeddedArtists
++	  LPC2478 Developer's Kit. For more hardware details, see:
++	  http://www.embeddedartists.com/products/kits/lpc2478_kit.php
++
+ endif
 diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 9eb0a6a..267432c 100644
+index 2c50bb9..a969f44 100644
 --- a/arch/arm/mach-lpc2k/Makefile
 +++ b/arch/arm/mach-lpc2k/Makefile
-@@ -1 +1 @@
--obj-y	:= clock.o irq.o
-+obj-y	:= clock.o irq.o time.o
-diff --git a/arch/arm/mach-lpc2k/time.c b/arch/arm/mach-lpc2k/time.c
+@@ -1 +1,3 @@
+ obj-y	:= clock.o irq.o gpio.o mfp.o time.o
++
++obj-$(CONFIG_MACH_LPC2478OEM) += mach-lpc2478oem.o
+diff --git a/arch/arm/mach-lpc2k/common.h b/arch/arm/mach-lpc2k/common.h
 new file mode 100644
-index 0000000..b430f7c
+index 0000000..6b775d9
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/time.c
-@@ -0,0 +1,174 @@
++++ b/arch/arm/mach-lpc2k/common.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright 2011 Team Embedded VOF
++ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef LPC2K_COMMON_H
++#define LPC2K_COMMON_H
++
++struct sys_timer;
++
++extern void lpc2k_init_clocks(unsigned long xtal, unsigned long rtc);
++extern void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num);
++extern void lpc2k_init_irq(void);
++
++extern struct sys_timer lpc2k_timer;
++
++#endif /* LPC2K_COMMON_H */
+diff --git a/arch/arm/mach-lpc2k/mach-lpc2478oem.c b/arch/arm/mach-lpc2k/mach-lpc2478oem.c
+new file mode 100644
+index 0000000..fec98e2
+--- /dev/null
++++ b/arch/arm/mach-lpc2k/mach-lpc2478oem.c
+@@ -0,0 +1,121 @@
 +/*
 + * Copyright (C) 2011 Team Embeded VOF
-+ * Copyright (C) 2009 - 2010 NXP Semiconductors
-+ * Copyright (C) 2009 Fontys University of Applied Sciences, Eindhoven
-+ *                    Ed Schouten <e.schouten@fontys.nl>
-+ *                    Laurens Timmermans <l.timmermans@fontys.nl>
-+ *
-+ * Based on timer code from plat-lpc32xx.
++ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -44,164 +89,116 @@ index 0000000..b430f7c
 + */
 +
 +#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/time.h>
-+#include <linux/err.h>
-+#include <linux/clockchips.h>
-+#include <linux/clk.h>
++#include <linux/io.h>
 +
-+#include <asm/mach/time.h>
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
 +
++#include <mach/mfp-lpc24xx.h>
 +#include <mach/hardware.h>
 +
-+#define IR		0x00
-+#define TCR		0x04
-+#define TC		0x08
-+#define PR		0x0c
-+#define PC		0x10
-+#define MCR		0x14
-+#define MR0		0x18
-+#define MR1		0x1c
-+#define MR2		0x20
-+#define CCR		0x28
-+#define CR0		0x2c
-+#define CR1		0x30
-+#define CR2		0x34
-+#define CR3		0x38
-+#define EMR		0x3c
-+#define CTCR		0x70
++#include "common.h"
 +
-+#define IR_MR_SHIFT	0
-+#define IR_CR_SHIFT	4
++#define EXTPOLAR	0x14c
 +
-+#define TCR_EN		(1 << 0)
-+#define TCR_RESET	(1 << 1)
-+
-+
-+static void __iomem *timer0 = (void __iomem *)APB_TIMER0_BASE;
-+static void __iomem *timer1 = (void __iomem *)APB_TIMER1_BASE;
-+
-+static cycle_t lpc2k_clksrc_read(struct clocksource *cs)
-+{
-+	return __raw_readl(timer1 + TC);
-+}
-+
-+static struct clocksource lpc2k_clksrc = {
-+	.name	= "lpc2k_clksrc",
-+	.rating	= 300,
-+	.read	= lpc2k_clksrc_read,
-+	.mask	= CLOCKSOURCE_MASK(32),
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++static unsigned long mfp_cfgs[] = {
++	/* UART0 */
++	GPIO2_TXD0,
++	GPIO3_RXD0,
++	/* USB Host */
++	GPIO12_USB_PPWR2,
++	GPIO13_USB_UP_LED2,
++	GPIO31_USB_Dp2,
++	GPIO62_VBUS,
++	GPIO63_USB_OVRCR2,
++	/* USB Gadget */
++	GPIO29_USB_Dp1,
++	GPIO30_USB_Dn1,
++	/* Ethernet */
++	GPIO32_ENET_TXD0,
++	GPIO33_ENET_TXD1,
++	GPIO36_ENET_TX_EN,
++	GPIO40_ENET_CRS,
++	GPIO41_ENET_RXD0,
++	GPIO42_ENET_RXD1,
++	GPIO46_ENET_RX_ERR,
++	GPIO47_ENET_REF_CLK,
++	GPIO48_ENET_MDC,
++	GPIO49_ENET_MDIO,
++	/* I2C0 */
++	GPIO27_SDA0,
++	GPIO28_SCL0,
++	/* SPI */
++	GPIO15_SCK,
++	GPIO17_MISO,
++	GPIO18_MOSI,
++	/* LCD */
++	GPIO4_LCDVD0,
++	GPIO5_LCDVD1,
++	GPIO6_LCDVD8,
++	GPIO7_LCDVD9,
++	GPIO8_LCDVD16,
++	GPIO9_LCDVD17,
++	GPIO52_LCDVD10,
++	GPIO53_LCDVD11,
++	GPIO54_LCDVD12,
++	GPIO55_LCDVD13,
++	GPIO56_LCDVD14,
++	GPIO57_LCDVD15,
++	GPIO58_LCDVD20,
++	GPIO59_LCDVD21,
++	GPIO60_LCDVD22,
++	GPIO61_LCDVD23,
++	GPIO64_LCDPWR,
++	GPIO65_LCDLE,
++	GPIO66_LCDDCLK,
++	GPIO67_LCDFP,
++	GPIO68_LCDM,
++	GPIO69_LCDLP,
++	GPIO70_LCDVP4,
++	GPIO71_LCDVP5,
++	GPIO72_LCDVP6,
++	GPIO73_LCDVP7,
++	GPIO75_LCDCLKIN,
++	GPIO76_LCDVP18,
++	GPIO77_LCDVP19,
++	GPIO156_LCDVP2,
++	GPIO157_LCDVP3,
++	/* Backlight */
++	GPIO50_PWM1,
++	/* MMC/SD */
++	GPIO34_MCICLK,
++	GPIO35_MCICMD,
++	GPIO37_MCIPWR,
++	GPIO38_MCIDAT0,
++	GPIO39_MCIDAT1,
++	GPIO43_MCIDAT2,
++	GPIO44_MCIDAT3,
 +};
 +
-+static int lpc2k_clkevt_next_event(unsigned long delta,
-+	struct clock_event_device *dev)
++void __init lpc2478oem_init_machine(void)
 +{
-+	__raw_writel(TCR_RESET, timer0 + TCR);
-+	__raw_writel(delta, timer0 + PR);
-+	__raw_writel(TCR_EN, timer0 + TCR);
-+
-+	return 0;
++	lpc2k_mfp_config(mfp_cfgs, ARRAY_SIZE(mfp_cfgs));
 +}
 +
-+static void lpc2k_clkevt_mode(enum clock_event_mode mode,
-+	struct clock_event_device *dev)
++static void __init lpc2478oem_init_irq(void)
 +{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		BUG();
-+		break;
++	/* XXX workaround for the fact that EINT3 is connected to high-active
++	 * signal, but can't be disabled. As the EINT3 interrupt is also used
++	 * for GPIO interrupts, this will cause an interrupt storm without
++	 * this setting.
++	 */
++	iowrite32(ioread32(APB_SCB_BASE + EXTPOLAR) | (1 << 3),
++		APB_SCB_BASE + EXTPOLAR);
 +
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		/*
-+		 * Disable the timer. When using oneshot, we must also
-+		 * disable the timer to wait for the first call to
-+		 * set_next_event().
-+		 */
-+		__raw_writel(0, timer0 + TCR);
-+		break;
-+
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	}
++	lpc2k_init_irq();
++	lpc2k_init_clocks(12000000UL, 32768000UL);
 +}
 +
-+static struct clock_event_device lpc2k_clkevt = {
-+	.name		= "lpc2k_clkevt",
-+	.features	= CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.rating		= 300,
-+	.set_next_event	= lpc2k_clkevt_next_event,
-+	.set_mode	= lpc2k_clkevt_mode,
-+};
-+
-+static irqreturn_t lpc2k_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &lpc2k_clkevt;
-+
-+	/* Clear match */
-+	__raw_writel((1 << IR_MR_SHIFT), timer0 + IR);
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction lpc2k_timer_irq = {
-+	.name		= "LPC2K Timer Tick",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= lpc2k_timer_interrupt,
-+};
-+
-+/*
-+ * The clock management driver isn't initialized at this point, so the
-+ * clocks need to be enabled here manually and then tagged as used in
-+ * the clock driver initialization
-+ */
-+static void __init lpc2k_timer_init(void)
-+{
-+	unsigned long rate;
-+	struct clk *clk;
-+
-+	clk = clk_get(NULL, "timer1");
-+	BUG_ON(IS_ERR(clk));
-+
-+	clk_enable(clk);
-+	rate = clk_get_rate(clk);
-+	clk_put(clk);
-+
-+	/* Initial timer setup */
-+	__raw_writel(0, timer0 + TCR);
-+	__raw_writel(1 << IR_MR_SHIFT, timer0 + IR);
-+	__raw_writel(1, timer0 + MR0);
-+	__raw_writel(3 << 0, timer0 + MCR);
-+
-+	/* Setup tick interrupt */
-+	setup_irq(IRQ_LPC2K_TIMER0, &lpc2k_timer_irq);
-+
-+	/* Setup the clockevent structure. */
-+	lpc2k_clkevt.mult = div_sc(rate, NSEC_PER_SEC,
-+		lpc2k_clkevt.shift);
-+	lpc2k_clkevt.max_delta_ns = clockevent_delta2ns(-1,
-+		&lpc2k_clkevt);
-+	lpc2k_clkevt.min_delta_ns = clockevent_delta2ns(1,
-+		&lpc2k_clkevt) + 1;
-+	lpc2k_clkevt.cpumask = cpumask_of(0);
-+	clockevents_register_device(&lpc2k_clkevt);
-+
-+	/* Use timer1 as clock source. */
-+	__raw_writel(TCR_RESET, timer1 + TCR);
-+	__raw_writel(0, timer1 + PR);
-+	__raw_writel(0, timer1 + MCR);
-+	__raw_writel(TCR_EN, timer1 + TCR);
-+	clocksource_register_hz(&lpc2k_clksrc, rate);
-+}
-+
-+struct sys_timer lpc2k_timer = {
-+	.init		= &lpc2k_timer_init,
-+};
++MACHINE_START(LPC2478OEM, "Embedded Artists LPC2478 OEM Board")
++	.init_irq	= lpc2478oem_init_irq,
++	.timer		= &lpc2k_timer,
++	.init_machine	= lpc2478oem_init_machine,
++MACHINE_END
 -- 
 1.7.1
