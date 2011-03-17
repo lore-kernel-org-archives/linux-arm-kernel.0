@@ -1,83 +1,166 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Thu, 17 Mar 2011 16:54:24 +0100
-Subject: [PATCH 9/9] lpc2k: defconfig for NXP LPC2K platform
-In-Reply-To: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300377264-10843-10-git-send-email-ithamar.adema@team-embedded.nl>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 17 Mar 2011 08:59:37 -0700
+Subject: [Git pull] MSM for v2.6.39
+Message-ID: <8yazkotpwk6.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a defconfig that is setup to support booting a uClinux based
-system. This enables ROMFS/CRAMFS, initrd, and FLAT binaries besides
-the drivers for the devices added in the previous patch.
+The following changes since commit 054cfaacf88865bff1dd58d305443d5d6c068a08:
 
-Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
----
- arch/arm/configs/lpc2k_defconfig |   56 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 56 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/lpc2k_defconfig
+  Merge branch 'mnt_devname' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs-2.6 (2011-03-16 19:09:57 -0700)
 
-diff --git a/arch/arm/configs/lpc2k_defconfig b/arch/arm/configs/lpc2k_defconfig
-new file mode 100644
-index 0000000..6278dd8
---- /dev/null
-+++ b/arch/arm/configs/lpc2k_defconfig
-@@ -0,0 +1,56 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_TINY_RCU=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
-+# CONFIG_COMPAT_BRK is not set
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_LPC2K=y
-+CONFIG_MACH_LPC2478OEM=y
-+CONFIG_PROCESSOR_ID=0x41007700
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_CMDLINE="root=/dev/ram initrd=0xa1a00000,4000k console=ttyS0,115200N8 debug rw earlyprintk"
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+# CONFIG_HWMON is not set
-+# CONFIG_MFD_SUPPORT is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_CRAMFS=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
+are available in the git repository at:
+
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git for-linus
+
+Arve Hj?nnev?g (1):
+      msm_fb: Fix framebuffer console
+
+David Brown (16):
+      msm: Add CPU queries
+      msm: Generalize timer register mappings
+      msm: Generalize QGIC registers
+      msm: Add MSM 8960 cpu_is check
+      Merge branch 'msm-uart' into for-next
+      Merge branch 'msm-8960' into for-next
+      Merge branch 'msm-sdcc' into for-next
+      Merge branch 'msm-fb' into for-next
+      Merge branch 'msm-8960' into msm-core
+      msm: Remove broken register definition from trout
+      msm: Warning fix in trout gpio board file
+      Merge branch 'msm-core' into for-next
+      Merge branch 'msm-core' into for-next
+      Merge branch 'msm-core' into for-next
+      msm: Use explicit GPLv2 licenses
+      Merge remote branch 'rmk/for-linus' into for-linus
+
+Dima Zavin (4):
+      ARM: msm: 7x30: don't force a gpiomux table for the whole arch
+      video: msmfb: Put the partial update magic value into the fix_screen struct.
+      msm: mdp: Add support for RGBX 8888 image format.
+      msm: mdp: Set the correct pack pattern for XRGB/ARGB
+
+Matt Wagantall (1):
+      msm: clock: Move debugfs code from clock.c to clock-debug.c
+
+Sahitya Tummala (2):
+      mmc: msm_sdcc: Add gpio handling function to driver
+      msm: 8x50: Add initial support for SDCC
+
+Stepan Moskovchenko (20):
+      msm: io: I/O register definitions for MSM8960
+      msm: Physical offset for MSM8960
+      msm: irqs-8960: Interrupt map for MSM8960
+      msm: timer: Timer support for MSM8960
+      msm: Makefile cleanup
+      msm: Support for the MSM8960 Simulator target
+      msm: Support for the MSM8960 RUMI3 target
+      msm: Add name field to UART resources
+      serial: msm: Add support for UARTDM cores
+      msm: Clean up useless ifdefs
+      msm: serial: Add MSM8960 serial support
+      msm: iommu: Create a Kconfig item for the IOMMU driver
+      msm: iommu: Generalize platform data for multiple targets
+      msm: iommu: Enable IOMMU support for MSM8960
+      msm: iommu: Clock control for the IOMMU driver
+      msm: iommu: Rework clock logic and add IOMMU bus clock control
+      msm: iommu: Use ASID tagging instead of VMID tagging
+      msm: iommu: Remove dependency on IDR
+      msm: iommu: Don't read from write-only registers
+      msm: iommu: Enable HTW L2 redirection on MSM8960
+
+Stephen Boyd (10):
+      msm: clock: Remove unused code and definitions
+      msm: clock: Remove 7x30 and pcom includes from clock.h
+      msm: clock: Invert debugfs directory layout
+      msm: clock: Add support for more proc_comm clocks
+      msm: headsmp.S: Fix section mismatch
+      msm: clock: Remove references to clk_ops_pcom
+      msm: clock: Migrate to clkdev
+      msm: scm: Mark inline asm as volatile
+      msm: scm: Fix improper register assignment
+      msm: scm: Check for interruption immediately
+
+Tejun Heo (1):
+      video/msm_fb: use system_wq instead of dedicated workqueues
+
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-msm/Kconfig                          |   37 +++-
+ arch/arm/mach-msm/Makefile                         |   29 +-
+ arch/arm/mach-msm/board-halibut.c                  |    2 -
+ arch/arm/mach-msm/board-mahimahi.c                 |    2 -
+ arch/arm/mach-msm/board-msm7x27.c                  |    8 -
+ arch/arm/mach-msm/board-msm7x30.c                  |   29 ++-
+ arch/arm/mach-msm/board-msm8960.c                  |   91 +++++++
+ arch/arm/mach-msm/board-msm8x60.c                  |    4 -
+ arch/arm/mach-msm/board-qsd8x50.c                  |   86 ++++++-
+ arch/arm/mach-msm/board-sapphire.c                 |    2 -
+ arch/arm/mach-msm/board-trout-gpio.c               |    2 -
+ arch/arm/mach-msm/board-trout.c                    |    3 +-
+ arch/arm/mach-msm/clock-7x30.h                     |   61 ++---
+ arch/arm/mach-msm/clock-debug.c                    |  130 +++++++++
+ arch/arm/mach-msm/clock-dummy.c                    |   54 ----
+ arch/arm/mach-msm/clock-pcom.c                     |    7 +
+ arch/arm/mach-msm/clock-pcom.h                     |   51 ++---
+ arch/arm/mach-msm/clock.c                          |  192 +------------
+ arch/arm/mach-msm/clock.h                          |   55 +----
+ .../{devices-msm8x60-iommu.c => devices-iommu.c}   |   85 +++---
+ arch/arm/mach-msm/devices-msm7x00.c                |   36 ++--
+ arch/arm/mach-msm/devices-msm7x30.c                |   11 +-
+ arch/arm/mach-msm/devices-msm8960.c                |   85 ++++++
+ arch/arm/mach-msm/devices-qsd8x50.c                |  213 ++++++++++++++-
+ arch/arm/mach-msm/devices.h                        |   11 +-
+ arch/arm/mach-msm/gpiomux-7x30.c                   |   38 ---
+ arch/arm/mach-msm/gpiomux-8x50.c                   |   23 ++
+ arch/arm/mach-msm/headsmp.S                        |    2 +-
+ arch/arm/mach-msm/include/mach/board.h             |    4 +-
+ arch/arm/mach-msm/include/mach/clk.h               |   31 +--
+ arch/arm/mach-msm/include/mach/clkdev.h            |   19 ++
+ arch/arm/mach-msm/include/mach/cpu.h               |   54 ++++
+ arch/arm/mach-msm/include/mach/io.h                |    1 +
+ arch/arm/mach-msm/include/mach/iommu.h             |   18 +-
+ arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h     |   32 +--
+ arch/arm/mach-msm/include/mach/irqs-7x30.h         |   31 +--
+ arch/arm/mach-msm/include/mach/irqs-8960.h         |  277 +++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs-8x50.h         |   31 +--
+ arch/arm/mach-msm/include/mach/irqs.h              |    3 +
+ arch/arm/mach-msm/include/mach/memory.h            |    2 +
+ arch/arm/mach-msm/include/mach/mmc.h               |   11 +
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h    |   16 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h    |   14 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |   48 ++++
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h    |   22 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |   61 +----
+ arch/arm/mach-msm/include/mach/msm_iomap.h         |    9 +-
+ arch/arm/mach-msm/include/mach/sirc.h              |   31 +--
+ arch/arm/mach-msm/include/mach/smp.h               |   30 +--
+ arch/arm/mach-msm/io.c                             |   41 ++-
+ arch/arm/mach-msm/iommu.c                          |   72 +++++-
+ arch/arm/mach-msm/iommu_dev.c                      |  230 ++++++++++-------
+ arch/arm/mach-msm/scm-boot.h                       |   30 +--
+ arch/arm/mach-msm/scm.c                            |   58 +++--
+ arch/arm/mach-msm/scm.h                            |   30 +--
+ arch/arm/mach-msm/timer.c                          |   46 ++--
+ drivers/mmc/host/msm_sdcc.c                        |   40 +++-
+ drivers/mmc/host/msm_sdcc.h                        |    1 +
+ drivers/tty/serial/msm_serial.c                    |  286 +++++++++++++++++---
+ drivers/tty/serial/msm_serial.h                    |   28 ++-
+ drivers/video/msm/mdp_hw.h                         |   11 +-
+ drivers/video/msm/mdp_ppp.c                        |    1 +
+ drivers/video/msm/msm_fb.c                         |   27 +-
+ include/linux/msm_mdp.h                            |    1 +
+ 65 files changed, 1976 insertions(+), 1021 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-msm8960.c
+ create mode 100644 arch/arm/mach-msm/clock-debug.c
+ delete mode 100644 arch/arm/mach-msm/clock-dummy.c
+ rename arch/arm/mach-msm/{devices-msm8x60-iommu.c => devices-iommu.c} (92%)
+ create mode 100644 arch/arm/mach-msm/devices-msm8960.c
+ delete mode 100644 arch/arm/mach-msm/gpiomux-7x30.c
+ create mode 100644 arch/arm/mach-msm/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-msm/include/mach/cpu.h
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-8960.h
+ create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
+
 -- 
-1.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
