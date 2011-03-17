@@ -1,30 +1,40 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Mar 2011 17:06:03 -0600
-Subject: [Qualcomm PM8921 MFD v2 3/6] gpio: pm8xxx-gpio: Add pm8xxx gpio
-	driver
-In-Reply-To: <20110316195631.GD15605@opensource.wolfsonmicro.com>
-References: <1299564590-30116-1-git-send-email-adharmap@codeaurora.org>
-	<1299564590-30116-4-git-send-email-adharmap@codeaurora.org>
-	<20110312093645.GL9347@angua.secretlab.ca>
-	<4D810797.4090000@codeaurora.org>
-	<20110316195444.GB4000@angua.secretlab.ca>
-	<20110316195631.GD15605@opensource.wolfsonmicro.com>
-Message-ID: <20110316230603.GA15898@angua.secretlab.ca>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Mar 2011 22:52:31 -0300
+Subject: [PATCH 1/4] ARM: mx5/babbage: Use gpio_request_one in
+	babbage_fec_reset
+Message-ID: <1300326754-4629-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2011 at 07:56:32PM +0000, Mark Brown wrote:
-> On Wed, Mar 16, 2011 at 01:54:44PM -0600, Grant Likely wrote:
-> 
-> > Yes, remove the comment.  I'll probably also remove the comment for
-> > MODULbus and AC97.
-> 
-> In theory there should be more AC'97 GPIO drivers - at least the wm97xx
-> chips have GPIOs (currently supported by a custom API).  I'm not sure if
-> anyone will ever have sufficient time and enthusiasm to move them over
-> to gpiolib, though.
+Current code inside babbage_fec_reset uses gpio_direction_output with initial value of the GPIO and also sets 
+the GPIO value via gpio_set_value to the same level right after. This is not needed. 
 
-True, but it's easy to add back labels when there actually are more
-than one.  :)
+By using gpio_request_one it is possible to set the direction and initial value in one shot.
 
-g.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index b2ecd19..ff79395 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -228,13 +228,12 @@ static inline void babbage_fec_reset(void)
+ 	int ret;
+ 
+ 	/* reset FEC PHY */
+-	ret = gpio_request(BABBAGE_FEC_PHY_RESET, "fec-phy-reset");
++	ret = gpio_request_one(BABBAGE_FEC_PHY_RESET, 
++					GPIOF_OUT_INIT_LOW, "fec-phy-reset");
+ 	if (ret) {
+ 		printk(KERN_ERR"failed to get GPIO_FEC_PHY_RESET: %d\n", ret);
+ 		return;
+ 	}
+-	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
+-	gpio_set_value(BABBAGE_FEC_PHY_RESET, 0);
+ 	msleep(1);
+ 	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
+ }
+-- 
+1.6.0.4
