@@ -1,110 +1,45 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Mar 2011 12:54:25 -0400 (EDT)
-Subject: [PATCH v2] ARM: Thumb-2: Add local symbols to work around gas
-	behaviour
-In-Reply-To: <1299238275-2883-1-git-send-email-dave.martin@linaro.org>
-References: <1299238275-2883-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1103171252310.26889@xanadu.home>
+Date: Thu, 17 Mar 2011 13:01:53 -0400 (EDT)
+Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
+	write
+In-Reply-To: <1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
+References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
+	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
+Message-ID: <alpine.LFD.2.00.1103171301030.26889@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Mar 2011, Dave Martin wrote:
+On Tue, 15 Mar 2011, Po-Yu Chuang wrote:
 
-> All current versions of gas at the time of writing have issues
-> fixing up pc-relative instructions which reference global symbols,
-> due to the potential need to support symbol preemption.
-> Even though symbol preemption is not relevant to the Linux kernel,
-> there is no way to inform the tools of this, so we get the problem.
+> From: Po-Yu Chuang <ratbert@faraday-tech.com>
 > 
-> Most pc-relative forms in ARM, and all pc-relative forms in
-> Thumb, will cause the assembler to fail with various fixup error
-> messages when used to reference global symbols.
+> If the page to cmpxchg is user mode read only (not write),
+> we should simulate a data abort first.
 > 
-> The legacy behaviour is for ADR and plain LDR instructions in ARM
-> which reference global symbols to be fixed up silently with no
-> relocation emitted.  This means that building the kernel in ARM
-> currently works without problems, but this behaviour may be a bug.
-> 
-> After discussion with Richard Earnshaw, it seems that there is
-> no single obvious remedy for this inconsistent behaviour,
-> so there is not likely to be a comprehensive upstream fix for
-> a while.
-> 
-> A workaround which should be valid for all past and all
-> foreseeable future versions of gas is to express the need for
-> a local fixup explicitly, by declaring a shadow local symbol
-> for any global symbol which needs to be addressed using ADR
-> or any pc-relative LDR variant.
-> 
-> This patch implements this workaround for the one part of the
-> main kernel currently known to be affected.  The resulting code
-> builds and works correctly in ARM and Thumb.
-> 
-> Similar fixes may be needed in mach-specific assembler.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
-> v2: Use .L* local symbols to avoid polluting the symbol table
-
-Personal preference: I'd use .L_* which is a tad more readable.
-
-Otherwise:
+> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
 
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-
->  arch/arm/kernel/relocate_kernel.S |   12 ++++++++----
->  1 files changed, 8 insertions(+), 4 deletions(-)
+> ---
+> v2:
+> remove !pte_young() check
 > 
-> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-> index 9cf4cbf..ec0320c 100644
-> --- a/arch/arm/kernel/relocate_kernel.S
-> +++ b/arch/arm/kernel/relocate_kernel.S
-> @@ -7,8 +7,8 @@
->  	.globl relocate_new_kernel
->  relocate_new_kernel:
->  
-> -	ldr	r0,kexec_indirection_page
-> -	ldr	r1,kexec_start_address
-> +	ldr	r0,.Lkexec_indirection_page
-> +	ldr	r1,.Lkexec_start_address
->  
->  	/*
->  	 * If there is no indirection page (we are doing crashdumps)
-> @@ -55,27 +55,31 @@ relocate_new_kernel:
->  	/* Jump to relocated kernel */
->  	mov lr,r1
->  	mov r0,#0
-> -	ldr r1,kexec_mach_type
-> -	ldr r2,kexec_boot_atags
-> +	ldr r1,.Lkexec_mach_type
-> +	ldr r2,.Lkexec_boot_atags
->  	mov pc,lr
->  
->  	.align
->  
->  	.globl kexec_start_address
->  kexec_start_address:
-> +.Lkexec_start_address:
->  	.long	0x0
->  
->  	.globl kexec_indirection_page
->  kexec_indirection_page:
-> +.Lkexec_indirection_page:
->  	.long	0x0
->  
->  	.globl kexec_mach_type
->  kexec_mach_type:
-> +.Lkexec_mach_type:
->  	.long	0x0
->  
->  	/* phy addr of the atags for the new kernel */
->  	.globl kexec_boot_atags
->  kexec_boot_atags:
-> +.Lkexec_boot_atags:
->  	.long	0x0
->  
->  relocate_new_kernel_end:
+>  arch/arm/kernel/traps.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 446aee9..eac7c05 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -563,7 +563,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+>  		if (!pmd_present(*pmd))
+>  			goto bad_access;
+>  		pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
+> -		if (!pte_present(*pte) || !pte_dirty(*pte)) {
+> +		if (!pte_present(*pte) || !pte_write(*pte) || !pte_dirty(*pte)) {
+>  			pte_unmap_unlock(pte, ptl);
+>  			goto bad_access;
+>  		}
 > -- 
-> 1.7.1
+> 1.6.3.3
 > 
