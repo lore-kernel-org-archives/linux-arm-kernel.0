@@ -1,87 +1,333 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 Mar 2011 14:35:05 -0600
-Subject: [PM8921 MFD V3 3/6] gpio: pm8xxx-gpio: Add pm8xxx gpio driver
-In-Reply-To: <4D826EAA.3070807@codeaurora.org>
-References: <1300328641-3855-1-git-send-email-adharmap@codeaurora.org>
-	<1300328641-3855-4-git-send-email-adharmap@codeaurora.org>
-	<20110317180013.GJ9597@angua.secretlab.ca>
-	<4D826EAA.3070807@codeaurora.org>
-Message-ID: <20110317203505.GI12824@angua.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 Mar 2011 13:36:29 -0700
+Subject: [PATCH v2 4/7] OMAP: PM CONSTRAINTS: implement the constraints
+	management code
+In-Reply-To: <1299779247-20511-5-git-send-email-j-pihet@ti.com> (Jean Pihet's
+	message of "Thu, 10 Mar 2011 18:47:24 +0100")
+References: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
+	<1299779247-20511-5-git-send-email-j-pihet@ti.com>
+Message-ID: <874o71zdpu.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 01:27:22PM -0700, Abhijeet Dharmapurikar wrote:
-> Grant Likely wrote:
-> >On Wed, Mar 16, 2011 at 07:23:58PM -0700, adharmap at codeaurora.org wrote:
-> >>Add support for GPIO on Qualcomm PM8xxx PMIC chips.
-> >>
-> >>Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> >
-> >Minor points below, but otherwise:
-> >
-> >Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> Thanks Grant, can you review (and ack) drivers/mfd/pm8xxx-mpp.c? Now
-> that I think, mpp is basically a gpio device, so should I move it to
-> drivers/gpio?
-> 
-> mpp is the 4th patch in this series and can be found here.
-> https://patchwork.kernel.org/patch/640891/
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-I've only looked briefly, but it appears to be fine.
+> The code at omap device level manages the constraints: storage,
+> tracking of requesters and dispatching to the low level
+> code (e.g. powerdomain for the wake-up latency constraints).
+>
+> Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
+> on MPU, CORE and PER.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-Yes, you should move it to drivers/gpio
+Subject prefix should be: OMAP2+: omap_device: ...
 
-g.
+> ---
+>  arch/arm/plat-omap/include/plat/omap_device.h |   14 ++
+>  arch/arm/plat-omap/omap_device.c              |  202 +++++++++++++++++++++++++
+>  2 files changed, 216 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+> index e4c349f..d4766c4 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_device.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
+> @@ -32,9 +32,11 @@
+>  #define __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_OMAP_DEVICE_H
+>  
+>  #include <linux/kernel.h>
+> +#include <linux/plist.h>
+>  #include <linux/platform_device.h>
+>  
+>  #include <plat/omap_hwmod.h>
+> +#include <plat/omap-pm.h>
+>  
+>  extern struct device omap_device_parent;
+>  
+> @@ -73,6 +75,15 @@ struct omap_device {
+>  	s8				pm_lat_level;
+>  	u8				hwmods_cnt;
+>  	u8				_state;
+> +
+> +};
+> +
+> +/* Linked list for the devices constraints entries */
+> +struct omap_device_constraints_entry {
+> +	struct device			*req_dev;
+> +	void				*target;
+> +	unsigned long			constraint_value;
 
-> 
-> >>diff --git a/drivers/gpio/pm8xxx-gpio.c b/drivers/gpio/pm8xxx-gpio.c
-> >>new file mode 100644
-> >>index 0000000..8995764
-> >>--- /dev/null
-> >>+++ b/drivers/gpio/pm8xxx-gpio.c
-> >>@@ -0,0 +1,455 @@
-> >>+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
-> >
-> >Nit: first line should be '/*' and start the comments on the second
-> >line.  It also helps for the first line of the comment block to be a
-> >single line description of what the driver actually is.  (a
-> >description, not a filename).
-> >
-> >>+ *
-> >>+ * This program is free software; you can redistribute it and/or modify
-> >>+ * it under the terms of the GNU General Public License version 2 and
-> >>+ * only version 2 as published by the Free Software Foundation.
-> >>+ *
-> >>+ * This program is distributed in the hope that it will be useful,
-> >>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>+ * GNU General Public License for more details.
-> >>+ */
-> >>+
-> >>+/*
-> >>+ * Qualcomm PMIC8XXX GPIO driver
-> >
-> >Heh, this is the line I just was talking about should appear at the
-> >top of the file.  :-)
-> 
-> Ok I will make this change for all the files in the patchset.
-> 
-> >>+
-> >>+static int __init pm_gpio_init(void)
-> >>+{
-> >>+	int rc = platform_driver_register(&pm_gpio_driver);
-> >>+
-> >>+	return rc;
-> >>+}
-> >
-> >Or simply:
-> >
-> >	return platform_driver_register(&pm_gpio_driver);
-> 
-> yes  will do.
-> 
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc. The
-> Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-> Forum.
+constratint_ prefix not needed
+
+Also, should this be 'long' (instead of unsigned long' to match the
+value from the API below?
+
+> +	struct plist_node		node;
+>  };
+>  
+>  /* Device driver interface (call via platform_data fn ptrs) */
+> @@ -107,6 +118,9 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od);
+>  int omap_device_align_pm_lat(struct platform_device *pdev,
+>  			     u32 new_wakeup_lat_limit);
+>  struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
+> +int omap_device_set_dev_constraint(enum omap_pm_constraint_class class,
+> +				   struct device *req_dev,
+> +				   struct device *dev, long t);
+>  u32 omap_device_get_context_loss_count(struct platform_device *pdev);
+>  
+>  /* Other */
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 9bbda9a..9199d3e 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -292,10 +292,205 @@ static void _add_optional_clock_clkdev(struct omap_device *od,
+>  	}
+>  }
+>  
+> +/* plist that stores the devices wake-up latency constraints */
+> +static struct plist_head _wkup_lat_constraints_list;
+> +/* Spinlock that protects the constraints lists */
+> +static spinlock_t _constraints_lock;
+> +/* Mutex that protects the constraints lists ops */
+> +static struct mutex _constraints_mutex;
+> +
+> +/*
+> + * _store_constraint: add/update/remove a constraint from a plist
+> + *
+> + * @constraints_list: plist to use
+> + * @req_dev: constraint requester, used to track the requests
+> + * @target: target which the constraint applies to (e.g. power domain ID or
+> + *  ptr for wake-up latency constraints)
+> + * @value: constraint value. The plist is sorted by the value. -1 remove the
+> + *  constraint from the list
+> + * @ascending: return the lowest constraint value if set to 1, return the
+> + *  highest value if not.
+> + *
+> + * Returns the strongest constraint value for the given target, 0 in the
+> + * case there is no constraint on the given target or a negative value in
+> + * case of error.
+> + * The caller must check the validity of the parameters.
+> + */
+> +static long _store_constraint(struct plist_head *constraints_list,
+> +			      struct device *req_dev, void *target,
+> +			      long value, int ascending)
+> +{
+> +	struct omap_device_constraints_entry *user;
+> +	int found = 0, ret = 0;
+> +
+> +	mutex_lock(&_constraints_mutex);
+> +
+> +	/* Check if the constraint requester is already in the list */
+> +	plist_for_each_entry(user, constraints_list, node) {
+> +		if (user->req_dev == req_dev) {
+> +			found = 1;
+> +			break;
+> +		}
+> +	}
+
+You should probably release the mutex here so it's not held over the
+kzalloc (which can sleep.)
+
+Minor: I'm not a fan of this common 'found = 1' technique.  Rather, use
+a temporary list iterator, e.g:
+
+	struct omap_device_constraints_entry *user = NULL, *tmp_user;
+
+	plist_for_each_entry(tmp_user, constraints_list, node) {
+		if (user->req_dev == req_dev) {
+			user = tmp_user;
+			break;
+		}
+	}
+
+Then, rather than checking 'found' below, check 'user'.
+
+> +	if (value >= 0) {
+> +		/* Add new entry to the list or update existing request */
+> +		if (found &&
+> +		    user->constraint_value == value &&
+> +		    user->target == target) {
+> +			goto exit_ok;
+> +		} else if (!found) {
+> +			user = kzalloc(
+> +				sizeof(struct omap_device_constraints_entry),
+> +				GFP_KERNEL);
+> +			if (!user) {
+> +				pr_err("%s: FATAL ERROR: kzalloc failed\n",
+> +				       __func__);
+> +				ret = -ENOMEM;
+> +				goto exit_error;
+> +			}
+> +			user->req_dev = req_dev;
+> +		} else {
+> +			plist_del(&user->node, constraints_list);
+> +		}
+> +
+> +		plist_node_init(&user->node, value);
+> +		plist_add(&user->node, constraints_list);
+> +		user->node.prio = user->constraint_value = value;
+> +		user->target = target;
+> +	} else {
+> +		/* Remove the constraint from the list */
+> +		if (!found) {
+> +			pr_err("%s: Error: no prior constraint to release\n",
+> +			       __func__);
+> +			ret = -EINVAL;
+> +			goto exit_error;
+> +		}
+> +
+> +		plist_del(&user->node, constraints_list);
+> +		kfree(user);
+> +	}
+> +
+> +exit_ok:
+> +	/* Find the strongest constraint for the given target */
+> +	ret = 0;
+> +	if (ascending) {
+> +		list_for_each_entry(user, &(constraints_list)->node_list,
+> +				    node.plist.node_list) {
+> +			/* Find the lowest (i.e. first) value for the target */
+> +			if (user->target == target) {
+> +				ret = user->constraint_value;
+> +				break;
+> +			}
+> +		}
+> +	} else {
+> +		list_for_each_entry_reverse(user,
+> +					    &(constraints_list)->node_list,
+> +					    node.plist.node_list) {
+> +			/* Find the highest (i.e. last) value for the target */
+> +			if (user->target == target) {
+> +				ret = user->constraint_value;
+> +				break;
+> +			}
+> +		}
+> +	}
+
+Hmm, why can't you use plist_first() and plist_last() here?
+
+> +exit_error:
+> +	mutex_unlock(&_constraints_mutex);
+> +
+> +	return ret;
+> +}
+>  
+>  /* Public functions for use by core code */
+>  
+>  /**
+> + * omap_device_set_dev_constraint - set/release a device constraint
+> + * @class: constraint class
+> + * @req_dev: constraint requester, used for tracking the constraints
+> + * @dev: device to apply the constraint to. Must have an associated omap_device
+> + * @t: constraint value. A value of -1 removes the constraint.
+> + *
+> + * Using the primary hwmod, set/release a device constraint for the dev
+> + * device, requested by the req_dev device. Depending of the constraint class
+> + * this code calls the appropriate low level code, e.g. power domain for
+> + * the wake-up latency constraints.
+> + *
+> + * If any hwmods exist for the omap_device assoiated with @dev,
+> + * set/release the constraint for the corresponding hwmods, otherwise return
+> + * -EINVAL.
+> + */
+> +int omap_device_set_dev_constraint(enum omap_pm_constraint_class class,
+> +				   struct device *req_dev,
+> +				   struct device *dev, long t)
+> +{
+> +	struct omap_device *od;
+> +	struct omap_hwmod *oh;
+> +	struct platform_device *pdev;
+> +	struct powerdomain *pwrdm = NULL;
+> +	u32 ret = -EINVAL;
+> +
+> +	/* Look for the platform device for dev */
+> +	pdev = to_platform_device(dev);
+> +
+> +	/* Try to catch non platform devices. */
+> +	if (pdev->name == NULL) {
+
+This should check for a valid omap_device, not platform_device.
+
+> +		pr_err("%s: Error: platform device for device %s not valid\n",
+> +		       __func__, dev_name(dev));
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Find the associated omap_device for dev */
+> +	od = _find_by_pdev(pdev);
+> +	if (!(od->hwmods_cnt)) {
+> +		pr_err("%s: Error: No hwmod for device %s\n",
+> +		       __func__, dev_name(dev));
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Find the associated omap_hwmod for dev */
+> +	oh = od->hwmods[0];
+> +
+> +	switch (class) {
+> +	case OMAP_PM_CONSTRAINT_WKUP_LAT:
+> +		/* Find the pwrdm associated to dev */
+
+comment doesn't add anything to code
+
+> +		pwrdm = omap_device_get_pwrdm(od);
+> +		if (!pwrdm) {
+> +			pr_err("%s: Error: No pwrdm for device %s\n",
+> +			       __func__, dev_name(dev));
+> +			ret = -EINVAL;
+> +			break;
+> +		}
+> +
+> +		/*
+> +		 * Store the constraint in the appropriate list and find the
+> +		 * strongest constraint for the given pwrdm
+> +		 */
+> +		ret = _store_constraint(&_wkup_lat_constraints_list,
+> +					req_dev, (void *) pwrdm, t, 1);
+> +
+> +		/* Apply the constraint to the corresponding pwrdm */
+> +		if (ret >= 0) {
+> +			ret = omap_hwmod_update_power_state(oh, ret);
+
+This function doesn't exist yet, so the series up to here will not
+compile.
+
+> +		} else {
+> +			pr_err("%s: Error storing the constraint for device "
+> +			       "%s\n", __func__, dev_name(dev));
+> +		}
+> +
+> +		break;
+> +	case OMAP_PM_CONSTRAINT_THROUGHPUT:
+> +		WARN(1, "OMAP PM: %s: Bus throughput constraint class \
+> +		     not implemented\n", __func__);
+> +		ret = -EINVAL;
+> +		break;
+> +	default:
+> +		WARN(1, "OMAP PM: %s: invalid constraint class %d",
+> +		     __func__, class);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+>   * omap_device_get_context_loss_count - get lost context count
+>   * @od: struct omap_device *
+>   *
+> @@ -824,6 +1019,13 @@ struct device omap_device_parent = {
+>  
+>  static int __init omap_device_init(void)
+>  {
+> +	/* Initialize priority ordered list for wakeup latency constraint */
+> +	spin_lock_init(&_constraints_lock);
+> +	plist_head_init(&_wkup_lat_constraints_list, &_constraints_lock);
+> +
+> +	/* res_mutex protects res_list add and del ops */
+> +	mutex_init(&_constraints_mutex);
+> +
+>  	return device_register(&omap_device_parent);
+>  }
+>  core_initcall(omap_device_init);
+
+Kevin
