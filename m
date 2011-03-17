@@ -1,33 +1,35 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Thu, 17 Mar 2011 23:00:22 +0100
-Subject: [PATCH 4/9] lpc2k: generic time and clockevents
-In-Reply-To: <20110317213824.GB2927@pulham.picochip.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Thu, 17 Mar 2011 23:33:25 +0100
+Subject: [PATCH 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's Kit
+	board
+In-Reply-To: <1300377264-10843-8-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300377264-10843-5-git-send-email-ithamar.adema@team-embedded.nl>
-	<20110317213824.GB2927@pulham.picochip.com>
-Message-ID: <1300399222.2138.96.camel@team-embedded-2>
+	<1300377264-10843-8-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <083DF309106F364B939360100EC290F80B15AC2B40@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-17 at 21:38 +0000, Jamie Iles wrote:
-> One pedantic nitpick, but otherwise looks nice to me.
+> +static void __init lpc2478oem_init_irq(void)
+> +{
+> +	/* XXX workaround for the fact that EINT3 is connected to high-
+> active
+> +	 * signal, but can't be disabled. As the EINT3 interrupt is also
+> used
+> +	 * for GPIO interrupts, this will cause an interrupt storm without
+> +	 * this setting.
+> +	 */
+> +	iowrite32(ioread32(APB_SCB_BASE + EXTPOLAR) | (1 << 3),
+> +		APB_SCB_BASE + EXTPOLAR);
+> +
+> +	lpc2k_init_irq();
+> +	lpc2k_init_clocks(12000000UL, 32768000UL);
 
-Thanks for reviewing, and pedantic nitpicks are always welcome ;)
+Should the RTC clock be 32768?
 
-> On Thu, Mar 17, 2011 at 04:54:19PM +0100, Ithamar R. Adema wrote:
-[....]
-> > +static struct clock_event_device lpc2k_clkevt = {
-> > +	.name		= "lpc2k_clkevt",
-> > +	.features	= CLOCK_EVT_FEAT_ONESHOT,
-> > +	.shift		= 32,
-> 
-> You shouldn't need to specify a shift if you use 
-> clockevents_calc_mult_shift() and let the core code calculate mult and 
-> shift for you.
-
-Good point, I should use that. Will include this in the next version of
-these patches!
-
-Regards,
-
-Ithamar.
+> +}
+> +
+> +MACHINE_START(LPC2478OEM, "Embedded Artists LPC2478 OEM Board")
+> +	.init_irq	= lpc2478oem_init_irq,
+> +	.timer		= &lpc2k_timer,
+> +	.init_machine	= lpc2478oem_init_machine,
+> +MACHINE_END
