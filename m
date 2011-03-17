@@ -1,32 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 17 Mar 2011 22:12:26 +0100
-Subject: [PATCHv3 2/3] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1B7F51@039-SN1MPN1-004.039d.mgd.msft.net>
-References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20110317081832.GS29521@pengutronix.de>
-	<56132A77AB93C141BF06E6B96CA6CFEA1B7F51@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <20110317211226.GC31219@pengutronix.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 17 Mar 2011 21:26:38 +0000
+Subject: [PATCH 1/9] lpc2k: Core support
+In-Reply-To: <1300377264-10843-2-git-send-email-ithamar.adema@team-embedded.nl>
+References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
+	<1300377264-10843-2-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <20110317212637.GA2927@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Hi,
 
-On Thu, Mar 17, 2011 at 04:52:44PM +0000, Nguyen Dinh-R00091 wrote:
-> Yes, I have and its build fine for mx3_defconfig. I did find a build issue with mx27_defconfig, but it's not related to this patch:
+On Thu, Mar 17, 2011 at 04:54:16PM +0100, Ithamar R. Adema wrote:
+> Core files (including IRQ handling) for NXP LPC2K architecture.
 > 
-> In file included from arch/arm/mm/init.c:27:
-> /arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
-> arch/arm/include/asm/tlb.h:104: error: implicit declaration of function 'release_pages'
-> arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
-> arch/arm/include/asm/tlb.h:168: error: implicit declaration of function 'page_cache_release'
-> make[1]: *** [arch/arm/mm/init.o] Error 1
-> make: *** [arch/arm/mm] Error 2
-This is already fixed in Russell's tree, and I guess in Linus', too.
+> Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
+> ---
+[...]
+> diff --git a/arch/arm/mach-lpc2k/include/mach/entry-macro.S b/arch/arm/mach-lpc2k/include/mach/entry-macro.S
+> new file mode 100644
+> index 0000000..f6c7a46
+> --- /dev/null
+> +++ b/arch/arm/mach-lpc2k/include/mach/entry-macro.S
+> @@ -0,0 +1,33 @@
+> +/*
+> + * Copyright 2011 Team Embedded VOF
+> + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <mach/hardware.h>
+> +
+> +        .macro  disable_fiq
+> +        .endm
+> +
+> +		.macro	get_irqnr_preamble, base, tmp
+> +		ldr	\base, =APH_VIC_BASE
+> +		.endm
+> +
+> +		.macro	arch_ret_to_user, tmp1, tmp2
+> +		.endm
+> +
+> +		.macro get_irqnr_and_base, irqnr, irqstat, base, tmp
+> +		ldr	\irqstat, [\base, #0]
+> +		mov     \irqnr, #0
+> +1001:
+> +		tst     \irqstat, #1
+> +		bne     1002f
+> +		add     \irqnr, \irqnr, #1
+> +		mov     \irqstat, \irqstat, lsr #1
+> +		cmp     \irqnr, #32
+> +		bcc     1001b
+> +1002:
 
-Best regards
-Uwe
+Could you adapt the code in arch/arm/include/asm/entry-macro-vic2.S for 
+a single VIC?  That eliminates the looping that you have here.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jamie
