@@ -1,131 +1,54 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Thu, 17 Mar 2011 13:01:59 -0700
-Subject: [PATCH] msm: iommu: Use relaxed register access functions
-Message-ID: <1300392119-8062-1-git-send-email-stepanm@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 Mar 2011 13:02:45 -0700
+Subject: [PATCH V3 11/19] OMAP3+: SR: fix cosmetic indentation
+In-Reply-To: <alpine.DEB.1.10.1103171939171.2634@esdhcp041196.research.nokia.com>
+	(Aaro Koskinen's message of "Thu, 17 Mar 2011 19:43:09 +0200 (EET)")
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-12-git-send-email-nm@ti.com> <874o718xyy.fsf@ti.com>
+	<alpine.DEB.1.10.1103171939171.2634@esdhcp041196.research.nokia.com>
+Message-ID: <87mxkt1pne.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the relaxed versions of readl/writel for IOMMU register
-access, inserting barriers where appropriate.
+Aaro Koskinen <aaro.koskinen@nokia.com> writes:
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
- arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h |   15 ++++++++-------
- arch/arm/mach-msm/iommu.c                      |    5 +++++
- arch/arm/mach-msm/iommu_dev.c                  |    4 ++++
- 3 files changed, 17 insertions(+), 7 deletions(-)
+> Hi,
+>
+> On Thu, 17 Mar 2011, Kevin Hilman wrote:
+>>
+>> Thanks, queuing for 2.6.40.
+>>
+> [...]
+>>
+>>> -		iounmap(sr_info->base);
+>>> -		mem = platform_get_resource(sr_info->pdev, IORESOURCE_MEM, 0);
+>>> -		release_mem_region(mem->start, resource_size(mem));
+>>> -		list_del(&sr_info->node);
+>>> -		dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
+>>> -			"interrupt handler. Smartreflex will"
+>>> -			"not function as desired\n", __func__);
+>>> -		kfree(name);
+>>> -		kfree(sr_info);
+>>> -		return ret;
+>>> +	iounmap(sr_info->base);
+>>> +	mem = platform_get_resource(sr_info->pdev, IORESOURCE_MEM, 0);
+>>> +	release_mem_region(mem->start, resource_size(mem));
+>>> +	list_del(&sr_info->node);
+>>> +	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
+>>> +		"interrupt handler. Smartreflex will"
+>>> +		"not function as desired\n", __func__);
+>>> +	kfree(name);
+>>> +	kfree(sr_info);
+>>> +	return ret;
+>
+> Just FYI, this code is partly broken and probably need to be fixed in .39.
 
-diff --git a/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h b/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
-index fc16010..6d097d5 100644
---- a/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
-+++ b/arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
-@@ -20,14 +20,14 @@
+OK
 
- #define CTX_SHIFT 12
+> Some of those resources are also freed by omap_sr_probe() when
+> sr_late_init() fails and that cannot be correct.
 
--#define GET_GLOBAL_REG(reg, base) (readl((base) + (reg)))
-+#define GET_GLOBAL_REG(reg, base) (readl_relaxed((base) + (reg)))
- #define GET_CTX_REG(reg, base, ctx) \
--				(readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
-+			(readl_relaxed((base) + (reg) + ((ctx) << CTX_SHIFT)))
+Got a patch around to fix that?  Sounds like something we should get
+into the .39-rc cycle.
 
--#define SET_GLOBAL_REG(reg, base, val)	writel((val), ((base) + (reg)))
-+#define SET_GLOBAL_REG(reg, base, val)	writel_relaxed((val), ((base) + (reg)))
-
- #define SET_CTX_REG(reg, base, ctx, val) \
--			writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
-+		writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
-
- /* Wrappers for numbered registers */
- #define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r) + (n << 2)), (v))
-@@ -43,12 +43,13 @@
- #define SET_CONTEXT_FIELD(b, c, r, F, v)	\
- 	SET_FIELD(((b) + (r) + ((c) << CTX_SHIFT)), F##_MASK, F##_SHIFT, (v))
-
--#define GET_FIELD(addr, mask, shift)  ((readl(addr) >> (shift)) & (mask))
-+#define GET_FIELD(addr, mask, shift) ((readl_relaxed(addr) >> (shift)) & (mask))
-
- #define SET_FIELD(addr, mask, shift, v) \
- do { \
--	int t = readl(addr); \
--	writel((t & ~((mask) << (shift))) + (((v) & (mask)) << (shift)), addr);\
-+	int t = readl_relaxed(addr); \
-+	writel_relaxed((t & ~((mask) << (shift))) + (((v) & \
-+		       (mask)) << (shift)), addr);\
- } while (0)
-
-
-diff --git a/arch/arm/mach-msm/iommu.c b/arch/arm/mach-msm/iommu.c
-index 1a584e0..262491d 100644
---- a/arch/arm/mach-msm/iommu.c
-+++ b/arch/arm/mach-msm/iommu.c
-@@ -97,6 +97,7 @@ static int __flush_iotlb(struct iommu_domain *domain)
- 	}
- #endif
-
-+	mb();
- 	list_for_each_entry(ctx_drvdata, &priv->list_attached, attached_elm) {
- 		if (!ctx_drvdata->pdev || !ctx_drvdata->pdev->dev.parent)
- 			BUG();
-@@ -137,6 +138,7 @@ static void __reset_context(void __iomem *base, int ctx)
- 	SET_TLBLKCR(base, ctx, 0);
- 	SET_PRRR(base, ctx, 0);
- 	SET_NMRR(base, ctx, 0);
-+	mb();
- }
-
- static void __program_context(void __iomem *base, int ctx, phys_addr_t pgtable)
-@@ -205,6 +207,7 @@ static void __program_context(void __iomem *base, int ctx, phys_addr_t pgtable)
-
- 	/* Enable the MMU */
- 	SET_M(base, ctx, 1);
-+	mb();
- }
-
- static int msm_iommu_domain_init(struct iommu_domain *domain)
-@@ -579,8 +582,10 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
-
- 	/* Invalidate context TLB */
- 	SET_CTX_TLBIALL(base, ctx, 0);
-+	mb();
- 	SET_V2PPR(base, ctx, va & V2Pxx_VA);
-
-+	mb();
- 	par = GET_PAR(base, ctx);
-
- 	/* We are dealing with a supersection */
-diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
-index 8e8fb07..a8976f7 100644
---- a/arch/arm/mach-msm/iommu_dev.c
-+++ b/arch/arm/mach-msm/iommu_dev.c
-@@ -124,6 +124,7 @@ static void msm_iommu_reset(void __iomem *base, int ncb)
- 		SET_NMRR(base, ctx, 0);
- 		SET_CONTEXTIDR(base, ctx, 0);
- 	}
-+	mb();
- }
-
- static int msm_iommu_probe(struct platform_device *pdev)
-@@ -216,9 +217,11 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 	SET_PAR(regs_base, 0, 0);
- 	SET_V2PCFG(regs_base, 0, 1);
- 	SET_V2PPR(regs_base, 0, 0);
-+	mb();
- 	par = GET_PAR(regs_base, 0);
- 	SET_V2PCFG(regs_base, 0, 0);
- 	SET_M(regs_base, 0, 0);
-+	mb();
-
- 	if (!par) {
- 		pr_err("%s: Invalid PAR value detected\n", iommu_dev->name);
-@@ -350,6 +353,7 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
- 		/* Set security bit override to be Non-secure */
- 		SET_NSCFG(drvdata->base, mid, 3);
- 	}
-+	mb();
-
- 	if (drvdata->clk)
- 		clk_disable(drvdata->clk);
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
