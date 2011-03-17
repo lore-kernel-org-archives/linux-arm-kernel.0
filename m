@@ -1,40 +1,33 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Thu, 17 Mar 2011 23:16:08 +0100
-Subject: [PATCH 3/9] lpc2k: clk API
-In-Reply-To: <1300377264-10843-4-git-send-email-ithamar.adema@team-embedded.nl>
+From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
+Date: Thu, 17 Mar 2011 23:00:22 +0100
+Subject: [PATCH 4/9] lpc2k: generic time and clockevents
+In-Reply-To: <20110317213824.GB2927@pulham.picochip.com>
 References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300377264-10843-4-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <083DF309106F364B939360100EC290F80B15AC2B3E@eu1rdcrdc1wx030.exi.nxp.com>
+	<1300377264-10843-5-git-send-email-ithamar.adema@team-embedded.nl>
+	<20110317213824.GB2927@pulham.picochip.com>
+Message-ID: <1300399222.2138.96.camel@team-embedded-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mach-lpc2k/include/mach/regs-clock.h
-> b/arch/arm/mach-lpc2k/include/mach/regs-clock.h
-> new file mode 100644
-> index 0000000..1c94582
-> --- /dev/null
-> +++ b/arch/arm/mach-lpc2k/include/mach/regs-clock.h
-> @@ -0,0 +1,36 @@
-> +/*
-> + * Copyright 2011 Team Embedded VOF
-> + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef MACH_LPC2K_REGS_CLOCK_H
-> +#define MACH_LPC2K_REGS_CLOCK_H
-> +
-> +#define CLKSRCSEL	0x10c
-> +#define CLKSRC(x)	((x) & 3)
-> +#define PLLCON		0x080
-> +#define PLLCFG		0x084
-> +#define PLLSTAT		0x088
-> +#define M(x)		(((x) & 0x7fff) + 1)
-> +#define N(x)		((((x) >> 16) & 0xf) + 1)
+On Thu, 2011-03-17 at 21:38 +0000, Jamie Iles wrote:
+> One pedantic nitpick, but otherwise looks nice to me.
 
-N has a field size of 8 bits? Mask should be 0xff
+Thanks for reviewing, and pedantic nitpicks are always welcome ;)
 
-> +#define PLLE		(1 << 24)
+> On Thu, Mar 17, 2011 at 04:54:19PM +0100, Ithamar R. Adema wrote:
+[....]
+> > +static struct clock_event_device lpc2k_clkevt = {
+> > +	.name		= "lpc2k_clkevt",
+> > +	.features	= CLOCK_EVT_FEAT_ONESHOT,
+> > +	.shift		= 32,
+> 
+> You shouldn't need to specify a shift if you use 
+> clockevents_calc_mult_shift() and let the core code calculate mult and 
+> shift for you.
+
+Good point, I should use that. Will include this in the next version of
+these patches!
+
+Regards,
+
+Ithamar.
