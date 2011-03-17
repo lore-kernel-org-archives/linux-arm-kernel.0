@@ -1,67 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 17 Mar 2011 17:10:47 +0100
-Subject: [PATCH v2 2/4] ARM: mx5/babbage: Use gpio_request_one in
-	babbage_usbhub_reset
-In-Reply-To: <1300377359-23212-2-git-send-email-fabio.estevam@freescale.com>
-References: <1300377359-23212-1-git-send-email-fabio.estevam@freescale.com>
-	<1300377359-23212-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110317161047.GO13316@pengutronix.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 17 Mar 2011 11:15:23 -0500
+Subject: [PATCH 2/3] ep93xx: add /proc/cpuinfo extension
+In-Reply-To: <AANLkTi=7hmWOFZFg_-zT3EO3uwzOXKkR+pCroc3UUTOV@mail.gmail.com>
+References: <AcrJ7vBVySpZbSYBQ1eQDb/9VrGf4Q==>
+	<0D753D10438DA54287A00B02708426976368DDCD38@AUSP01VMBX24.collaborationhost.net>
+	<AANLkTi=7hmWOFZFg_-zT3EO3uwzOXKkR+pCroc3UUTOV@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D14AB617@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 12:55:57PM -0300, Fabio Estevam wrote:
-> Current code inside babbage_usbhub_reset uses gpio_direction_output with initial value of the GPIO and also sets 
-> the GPIO value via gpio_set_value to the same level right after. This is not needed. 
-> 
-> By using gpio_request_one it is possible to set the direction and initial value in one shot.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Wednesday, March 16, 2011 8:30 PM, Martin Guy wrote:
+>
+> Just spotted an off-by-one error in this patch, if of very minor and
+> unlikely effect.
+>
+> On 22 March 2010 19:39, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
 
-Thanks
-Uwe
+Cool.. I time traveled...
 
-> ---
-> Changes since v1:
-> 
-> - Changed the comment about USB reset and Deassert reset
->  arch/arm/mach-mx5/board-mx51_babbage.c |   12 +++++-------
->  1 files changed, 5 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index bea4e41..ab50aa9 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -208,18 +208,16 @@ static inline void babbage_usbhub_reset(void)
->  {
->  	int ret;
->  
-> -	/* Bring USB hub out of reset */
-> -	ret = gpio_request(BABBAGE_USB_HUB_RESET, "GPIO1_7");
-> +	/* Reset USB hub */
-> +	ret = gpio_request_one(BABBAGE_USB_HUB_RESET,
-> +					GPIOF_OUT_INIT_LOW, "GPIO1_7");
->  	if (ret) {
->  		printk(KERN_ERR"failed to get GPIO_USB_HUB_RESET: %d\n", ret);
->  		return;
->  	}
-> -	gpio_direction_output(BABBAGE_USB_HUB_RESET, 0);
->  
-> -	/* USB HUB RESET - De-assert USB HUB RESET_N */
-> -	msleep(1);
-> -	gpio_set_value(BABBAGE_USB_HUB_RESET, 0);
-> -	msleep(1);
-> +	msleep(2);
-> +	/* Deassert reset */
->  	gpio_set_value(BABBAGE_USB_HUB_RESET, 1);
->  }
->  
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+Actually, I submitted this last year.  I think Russell NAK'ed it at that time since
+it modified the output of /proc/cpuinfo and he did not see a valid reason for it.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+There is some discussion going on right now to add a "socinfo" to sysfs where this
+information could be exposed.  When that gets worked out I will come up with a new
+patch.
+
+>> Add a callback to mach-ep93xx for the /proc/cpuinfo extension.
+>>
+>> This cpuinfo extension dumps the processor unique ID and Maverick
+>> Key as well as the processor silicon revision and a number of
+>> boot configuration options.
+>> ...
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index 90fb591..fe1eb7a 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>>...
+>> +static const char *ep93xx_rev[] = {
+>> + ? ? ? "A", "B", "C", "D0", "D1", "E0", "E1", "E2", "??"
+>> +};
+>>...
+>> + ? ? ? val = ep93xx_chip_revision();
+>> + ? ? ? if (val > ARRAY_SIZE(ep93xx_rev))
+>> + ? ? ? ? ? ? ? val = ARRAY_SIZE(ep93xx_rev) - 1;
+>> + ? ? ? seq_printf(m, "Silicon Rev\t: %s\n", ep93xx_rev[val]);
+>
+> Shouldn't that be
+>
+> +       if (val >= ARRAY_SIZE(ep93xx_rev))
+>
+
+Regardless, if I remember correctly, someone already pointed this out.  I'll
+keep it in mind when I re-do this patch based on the "socinfo" stuff.
+
+Thanks,
+Hartley
