@@ -1,81 +1,117 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Mar 2011 13:03:42 +0000
-Subject: [PATCH v4 1/7] MTD: Add integrator-flash feature to physmap
+Date: Thu, 17 Mar 2011 13:03:43 +0000
+Subject: [PATCH v4 2/7] ARM: Realview: Use physmap driver instead of
+	integrator-flash
 In-Reply-To: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
 References: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1300367028-3916-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1300367028-3916-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the process of moving platforms away from integrator-flash
-(aka armflash), add to physmap the few features that make
-armflash unique:
-
-- optionnal probing for the AFS partition type
-- init() and exit() methods, used by Integrator to control
-  write access to the various onboard programmable components
+Tested on a PB11-MPCore.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- drivers/mtd/maps/physmap.c  |   16 +++++++++++++++-
- include/linux/mtd/physmap.h |    2 ++
- 2 files changed, 17 insertions(+), 1 deletions(-)
+ arch/arm/configs/realview-smp_defconfig |    2 +-
+ arch/arm/configs/realview_defconfig     |    2 +-
+ arch/arm/mach-realview/core.c           |   31 ++++---------------------------
+ 3 files changed, 6 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/mtd/maps/physmap.c b/drivers/mtd/maps/physmap.c
-index 7522df4..49676b7 100644
---- a/drivers/mtd/maps/physmap.c
-+++ b/drivers/mtd/maps/physmap.c
-@@ -67,6 +67,10 @@ static int physmap_flash_remove(struct platform_device *dev)
- 		if (info->mtd[i] != NULL)
- 			map_destroy(info->mtd[i]);
- 	}
-+
-+	if (physmap_data->exit)
-+		physmap_data->exit(dev);
-+
- 	return 0;
+diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
+index 5ca7a61..abe61bf 100644
+--- a/arch/arm/configs/realview-smp_defconfig
++++ b/arch/arm/configs/realview-smp_defconfig
+@@ -38,7 +38,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index fcaa603..7079cbe 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -37,7 +37,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 75dbc87..d3f1dde 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -31,6 +31,7 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/gfp.h>
+ #include <linux/clkdev.h>
++#include <linux/mtd/physmap.h>
+ 
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+@@ -41,7 +42,6 @@
+ #include <asm/hardware/icst.h>
+ 
+ #include <asm/mach/arch.h>
+-#include <asm/mach/flash.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ 
+@@ -77,27 +77,7 @@ void __init realview_adjust_zones(unsigned long *size, unsigned long *hole)
+ 
+ #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
+ 
+-static int realview_flash_init(void)
+-{
+-	u32 val;
+-
+-	val = __raw_readl(REALVIEW_FLASHCTRL);
+-	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, REALVIEW_FLASHCTRL);
+-
+-	return 0;
+-}
+-
+-static void realview_flash_exit(void)
+-{
+-	u32 val;
+-
+-	val = __raw_readl(REALVIEW_FLASHCTRL);
+-	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, REALVIEW_FLASHCTRL);
+-}
+-
+-static void realview_flash_set_vpp(int on)
++static void realview_flash_set_vpp(struct map_info *map, int on)
+ {
+ 	u32 val;
+ 
+@@ -109,16 +89,13 @@ static void realview_flash_set_vpp(int on)
+ 	__raw_writel(val, REALVIEW_FLASHCTRL);
  }
  
-@@ -77,7 +81,11 @@ static const char *rom_probe_types[] = {
- 					"map_rom",
- 					NULL };
- #ifdef CONFIG_MTD_PARTITIONS
--static const char *part_probe_types[] = { "cmdlinepart", "RedBoot", NULL };
-+static const char *part_probe_types[] = { "cmdlinepart", "RedBoot",
-+#ifdef CONFIG_MTD_AFS_PARTS
-+					  "afs",
-+#endif
-+					  NULL };
- #endif
+-static struct flash_platform_data realview_flash_data = {
+-	.map_name		= "cfi_probe",
++static struct physmap_flash_data realview_flash_data = {
+ 	.width			= 4,
+-	.init			= realview_flash_init,
+-	.exit			= realview_flash_exit,
+ 	.set_vpp		= realview_flash_set_vpp,
+ };
  
- static int physmap_flash_probe(struct platform_device *dev)
-@@ -100,6 +108,12 @@ static int physmap_flash_probe(struct platform_device *dev)
- 		goto err_out;
- 	}
- 
-+	if (physmap_data->init) {
-+		err = physmap_data->init(dev);
-+		if (err)
-+			goto err_out;
-+	}
-+
- 	platform_set_drvdata(dev, info);
- 
- 	for (i = 0; i < dev->num_resources; i++) {
-diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
-index bcfd9f7..d37cca0 100644
---- a/include/linux/mtd/physmap.h
-+++ b/include/linux/mtd/physmap.h
-@@ -22,6 +22,8 @@ struct map_info;
- 
- struct physmap_flash_data {
- 	unsigned int		width;
-+	int			(*init)(struct platform_device *);
-+	void			(*exit)(struct platform_device *);
- 	void			(*set_vpp)(struct map_info *, int);
- 	unsigned int		nr_parts;
- 	unsigned int		pfow_base;
+ struct platform_device realview_flash_device = {
+-	.name			= "armflash",
++	.name			= "physmap-flash",
+ 	.id			= 0,
+ 	.dev			= {
+ 		.platform_data	= &realview_flash_data,
 -- 
 1.7.0.4
