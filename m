@@ -1,182 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Mar 2011 13:59:57 -0700
-Subject: [PATCH v2 7/7] OMAP: PM CONSTRAINTS: add power domains wake-up
-	latency figures
-In-Reply-To: <1299779247-20511-8-git-send-email-j-pihet@ti.com> (Jean Pihet's
-	message of "Thu, 10 Mar 2011 18:47:27 +0100")
-References: <1299779247-20511-1-git-send-email-j-pihet@ti.com>
-	<1299779247-20511-8-git-send-email-j-pihet@ti.com>
-Message-ID: <874o71xy2a.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Mar 2011 22:12:26 +0100
+Subject: [PATCHv3 2/3] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1B7F51@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<20110317081832.GS29521@pengutronix.de>
+	<56132A77AB93C141BF06E6B96CA6CFEA1B7F51@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20110317211226.GC31219@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+Hi Dinh,
 
-> Figures are added to the power domains structs.
->
-> Note: the figures are preliminary figures. More accurate measurements
-> are needed. Also the conditions of measurements shall be investigated
-> and described.
->
-> Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-> on MPU, CORE and PER.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+On Thu, Mar 17, 2011 at 04:52:44PM +0000, Nguyen Dinh-R00091 wrote:
+> Yes, I have and its build fine for mx3_defconfig. I did find a build issue with mx27_defconfig, but it's not related to this patch:
+> 
+> In file included from arch/arm/mm/init.c:27:
+> /arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
+> arch/arm/include/asm/tlb.h:104: error: implicit declaration of function 'release_pages'
+> arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
+> arch/arm/include/asm/tlb.h:168: error: implicit declaration of function 'page_cache_release'
+> make[1]: *** [arch/arm/mm/init.o] Error 1
+> make: *** [arch/arm/mm] Error 2
+This is already fixed in Russell's tree, and I guess in Linus', too.
 
-Subject should be: OMAP3: powerdomain data: ...
+Best regards
+Uwe
 
-> ---
->  arch/arm/mach-omap2/powerdomains3xxx_data.c |   63 +++++++++++++++++++++++++++
->  1 files changed, 63 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> index e1bec56..64973d1 100644
-> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> @@ -31,6 +31,9 @@
->  
->  /*
->   * Powerdomains
-> + *
-> + * The wakeup_lat values are derived from measurements on
-> + * the actual target.
-
-Which actual target.
-
-Exactly how were they measured?  and between which events?
-
-Kevin
-
->   */
->  
->  static struct powerdomain iva2_pwrdm = {
-> @@ -52,6 +55,12 @@ static struct powerdomain iva2_pwrdm = {
->  		[2] = PWRSTS_OFF_ON,
->  		[3] = PWRDM_POWER_ON,
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 1100,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 350,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain mpu_3xxx_pwrdm = {
-> @@ -68,6 +77,12 @@ static struct powerdomain mpu_3xxx_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRSTS_OFF_ON,
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 95,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 45,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  /*
-> @@ -98,6 +113,12 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
->  		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
->  		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 100,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 60,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain core_3xxx_es3_1_pwrdm = {
-> @@ -121,6 +142,12 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
->  		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
->  		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 100,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 60,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain dss_pwrdm = {
-> @@ -136,6 +163,12 @@ static struct powerdomain dss_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRDM_POWER_ON,  /* MEMONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 70,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 20,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  /*
-> @@ -157,6 +190,12 @@ static struct powerdomain sgx_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRDM_POWER_ON,  /* MEMONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 1000,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain cam_pwrdm = {
-> @@ -172,6 +211,12 @@ static struct powerdomain cam_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRDM_POWER_ON,  /* MEMONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 850,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 35,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain per_pwrdm = {
-> @@ -187,6 +232,12 @@ static struct powerdomain per_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRDM_POWER_ON,  /* MEMONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 200,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 110,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain emu_pwrdm = {
-> @@ -201,6 +252,12 @@ static struct powerdomain neon_pwrdm = {
->  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
->  	.pwrsts		  = PWRSTS_OFF_RET_ON,
->  	.pwrsts_logic_ret = PWRDM_POWER_RET,
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 200,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 35,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain usbhost_pwrdm = {
-> @@ -223,6 +280,12 @@ static struct powerdomain usbhost_pwrdm = {
->  	.pwrsts_mem_on	  = {
->  		[0] = PWRDM_POWER_ON,  /* MEMONSTATE */
->  	},
-> +	.wakeup_lat = {
-> +		[PWRDM_FUNC_PWRST_OFF] = 800,
-> +		[PWRDM_FUNC_PWRST_OSWR] = UNSUP_STATE,
-> +		[PWRDM_FUNC_PWRST_CSWR] = 150,
-> +		[PWRDM_FUNC_PWRST_ON] = 0,
-> +	},
->  };
->  
->  static struct powerdomain dpll1_pwrdm = {
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
