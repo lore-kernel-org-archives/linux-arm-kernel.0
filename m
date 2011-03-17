@@ -1,51 +1,80 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 17 Mar 2011 09:19:43 +0100
-Subject: [PATCH 1/2] arm: mach-omap2: devices: fix omap3_l3_init() return
-	value
-In-Reply-To: <324bffcaf53be55bd6f392af3f86fa10@mail.gmail.com>
-References: <1300295763-497-1-git-send-email-aaro.koskinen@nokia.com>
-	<324bffcaf53be55bd6f392af3f86fa10@mail.gmail.com>
-Message-ID: <4D81C41F.8090702@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 17 Mar 2011 09:21:06 +0100
+Subject: [PATCHv3 3/3] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20110317082106.GT29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Wed, Mar 16, 2011 at 03:03:07PM -0500, Dinh.Nguyen at freescale.com wrote:
+> +
+> +struct clk *gpc_dvfs_clk;
+> +
+> +static int mx5_suspend_enter(suspend_state_t state)
+> +{
+> +	if (gpc_dvfs_clk == NULL)
+> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
 
-On 3/17/2011 6:52 AM, Shilimkar, Santosh wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
->> arm-kernel-bounces at lists.infradead.org] On Behalf Of Aaro Koskinen
->> Sent: Wednesday, March 16, 2011 10:46 PM
->> To: linux-omap at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; tony at atomide.com
->> Cc: Aaro Koskinen
->> Subject: [PATCH 1/2] arm: mach-omap2: devices: fix omap3_l3_init()
->> return value
->>
->> Fix the return value for the successful case.
->>
->> Signed-off-by: Aaro Koskinen<aaro.koskinen@nokia.com>
->> ---
->>   arch/arm/mach-omap2/devices.c |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-
->> omap2/devices.c
->> index 0d2d6a9..d478f53 100644
->> --- a/arch/arm/mach-omap2/devices.c
->> +++ b/arch/arm/mach-omap2/devices.c
->> @@ -65,7 +65,7 @@ static int __init omap3_l3_init(void)
->>
->>   	WARN(IS_ERR(od), "could not build omap_device for %s\n",
->> oh_name);
->>
->> -	return PTR_ERR(od);
->> +	return IS_ERR(od) ? PTR_ERR(od) : 0;
->>   }
->>   postcore_initcall(omap3_l3_init);
+clk_get can fail and NULL can be a valid clock.
 
-Maybe we should initialize that before, because in theory the timer12 
-secure violation should have been captured easily with this code?
+Sascha
 
-Regards,
-Benoit
+> +
+> +	clk_enable(gpc_dvfs_clk);
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		mx5_cpu_lp_set(STOP_POWER_OFF);
+> +		break;
+> +	case PM_SUSPEND_STANDBY:
+> +		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (state == PM_SUSPEND_MEM) {
+> +		local_flush_tlb_all();
+> +		flush_cache_all();
+> +
+> +		/*clear the EMPGC0/1 bits */
+> +		__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
+> +		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
+> +	}
+> +	cpu_do_idle();
+> +	clk_disable(gpc_dvfs_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mx5_pm_valid(suspend_state_t state)
+> +{
+> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
+> +}
+> +
+> +static const struct platform_suspend_ops mx5_suspend_ops = {
+> +	.valid = mx5_pm_valid,
+> +	.enter = mx5_suspend_enter,
+> +};
+> +
+> +static int __init mx5_pm_init(void)
+> +{
+> +	if (cpu_is_mx51())
+> +		suspend_set_ops(&mx5_suspend_ops);
+> +
+> +	return 0;
+> +}
+> +device_initcall(mx5_pm_init);
+> -- 
+> 1.6.0.4
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
