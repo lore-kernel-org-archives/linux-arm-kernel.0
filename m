@@ -1,141 +1,205 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Thu, 17 Mar 2011 17:58:03 +0800
-Subject: [PATCH V2 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300355883-28484-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300355883-28484-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1300355883-28484-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 17 Mar 2011 10:59:02 +0100 (CET)
+Subject: [PM8921 MFD V3 2/6] mfd: pm8xxx: Add irq support
+In-Reply-To: <1300328641-3855-3-git-send-email-adharmap@codeaurora.org>
+References: <1300328641-3855-1-git-send-email-adharmap@codeaurora.org>
+	<1300328641-3855-3-git-send-email-adharmap@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1103171004460.2787@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_loco.c |   88 +++++++++++++++++++++++++++++++++++
- 1 files changed, 88 insertions(+), 0 deletions(-)
+On Wed, 16 Mar 2011, adharmap at codeaurora.org wrote:
+> +static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct pm_irq_chip *chip = get_irq_data(irq);
+> +	struct irq_chip *irq_chip = get_irq_chip(irq);
 
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 0a18f8d..336273b 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -23,11 +23,13 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/ahci_platform.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx53.h>
-+#include <mach/ahci_sata.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -38,6 +40,8 @@
- 
- #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
- 
-+static struct clk *sata_clk, *sata_ref_clk;
-+
- static iomux_v3_cfg_t mx53_loco_pads[] = {
- 	/* FEC */
- 	MX53_PAD_FEC_MDC__FEC_MDC,
-@@ -203,6 +207,89 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-+/* HW Initialization, if return 0, initialization is successful. */
-+static int sata_init(struct device *dev, void __iomem *addr)
-+{
-+	int ret = 0;
-+	u32 tmpdata;
-+	struct clk *clk;
-+
-+	sata_clk = clk_get(dev, NULL);
-+	if (IS_ERR(sata_clk)) {
-+		dev_err(dev, "no sata clock.\n");
-+		return PTR_ERR(sata_clk);
-+	}
-+	ret = clk_enable(sata_clk);
-+	if (ret) {
-+		dev_err(dev, "can't enable sata clock.\n");
-+		clk_put(sata_clk);
-+		return ret;
-+	}
-+
-+	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-+	sata_ref_clk = clk_get(NULL, "usb_phy1");
-+	if (IS_ERR(sata_ref_clk)) {
-+		dev_err(dev, "no sata ref clock.\n");
-+		ret = PTR_ERR(sata_ref_clk);
-+		goto release_sata_clk;
-+	}
-+	ret = clk_enable(sata_ref_clk);
-+	if (ret) {
-+		dev_err(dev, "can't enable sata ref clock.\n");
-+		clk_put(sata_ref_clk);
-+		goto release_sata_clk;
-+	}
-+
-+	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-+	clk = clk_get(NULL, "ahb");
-+	if (IS_ERR(clk)) {
-+		dev_err(dev, "no ahb clock.\n");
-+		ret = PTR_ERR(clk);
-+		goto release_sata_ref_clk;
-+	}
-+
-+	tmpdata = readl(addr + HOST_CAP);
-+	if (!(tmpdata & HOST_CAP_SSS)) {
-+		tmpdata |= HOST_CAP_SSS;
-+		writel(tmpdata, addr + HOST_CAP);
-+	}
-+
-+	if (!(readl(addr + HOST_PORTS_IMPL) & 0x1))
-+		writel((readl(addr + HOST_PORTS_IMPL) | 0x1),
-+			addr + HOST_PORTS_IMPL);
-+
-+	tmpdata = clk_get_rate(clk) / 1000;
-+	clk_put(clk);
-+	writel(tmpdata, addr + HOST_TIMER1MS);
-+
-+	clk = NULL;
-+	return ret;
-+
-+release_sata_ref_clk:
-+	clk_disable(sata_ref_clk);
-+	clk_put(sata_ref_clk);
-+
-+release_sata_clk:
-+	clk_disable(sata_clk);
-+	clk_put(sata_clk);
-+
-+	clk = NULL;
-+	return ret;
-+}
-+
-+static void sata_exit(struct device *dev)
-+{
-+	clk_disable(sata_ref_clk);
-+	clk_put(sata_ref_clk);
-+
-+	clk_disable(sata_clk);
-+	clk_put(sata_clk);
-+}
-+
-+static struct ahci_platform_data sata_data = {
-+	.init = sata_init,
-+	.exit = sata_exit, };
-+
- static void __init mx53_loco_board_init(void)
- {
- 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-@@ -215,6 +302,7 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(2, NULL);
-+	imx53_add_ahci_imx(0, &sata_data);
- }
- 
- static void __init mx53_loco_timer_init(void)
--- 
-1.7.1
+Sigh. You have a reference to irq_desc, so why want you to get the
+data with a sparse lookup ?
+
+     chip = irq_desc_get_handler_data(desc);
+     irq_chip = irq_desc_get_chip(desc);
+
+> +	u8	root;
+> +	int	i, ret, masters = 0;
+> +
+> +	ret = pm8xxx_read_root_irq(chip, &root);
+> +	if (ret) {
+> +		pr_err("Can't read root status ret=%d\n", ret);
+> +		return;
+> +	}
+> +
+> +	/* on pm8xxx series masters start from bit 1 of the root */
+> +	masters = root >> 1;
+> +
+> +	/* Read allowed masters for blocks. */
+> +	for (i = 0; i < chip->num_masters; i++)
+> +		if (masters & (1 << i))
+> +			pm8xxx_irq_master_handler(chip, i);
+> +
+> +	irq_chip->irq_ack(&desc->irq_data);
+> +}
+> +
+> +static void pm8xxx_irq_ack(struct irq_data *d)
+> +{
+> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> +	unsigned int pmirq = d->irq - chip->irq_base;
+> +	u8	block, config;
+> +
+> +	block = pmirq / 8;
+> +
+> +	config = chip->config[pmirq] | PM_IRQF_CLR;
+> +	/* Keep the mask */
+> +	if (!(chip->irqs_allowed[block] & (1 << (pmirq % 8))))
+> +		config |= PM_IRQF_MASK_ALL;
+
+Why do you insist to keep that state thing around? Implement a
+mask_ack() callback and get rid of it.
+
+> +	pm8xxx_config_irq(chip, block, config);
+> +}
+> +
+> +static int pm8xxx_irq_set_wake(struct irq_data *d, unsigned int on)
+> +{
+> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> +	unsigned int pmirq = d->irq - chip->irq_base;
+> +
+> +	if (on) {
+> +		set_bit(pmirq, chip->wake_enable);
+> +		chip->count_wakeable++;
+> +	} else {
+> +		clear_bit(pmirq, chip->wake_enable);
+> +		chip->count_wakeable--;
+> +	}
+
+This bitfield and the count are completely useless. Get rid of it.
+
+> +	return 0;
+> +}
+> +
+> +static struct irq_chip pm8xxx_irq_chip = {
+> +	.name		= "pm8xxx",
+> +	.irq_ack	= pm8xxx_irq_ack,
+> +	.irq_mask	= pm8xxx_irq_mask,
+> +	.irq_unmask	= pm8xxx_irq_unmask,
+> +	.irq_set_type	= pm8xxx_irq_set_type,
+> +	.irq_set_wake	= pm8xxx_irq_set_wake,
+> +	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+> +};
+> +
+> +/**
+> + * pm8xxx_get_irq_stat - get the status of the irq line
+> + * @dev: the interrupt device
+
+Please run this through the doc generator. dev is not an argument to
+this function.
+
+> + * @irq: the irq number
+> + *
+> + * The pm8xxx gpio and mpp rely on the interrupt block to read
+> + * the values on their pins. This function is to facilitate reading
+> + * the status of a gpio or an mpp line. The caller has to convert the
+> + * gpio number to irq number.
+> + *
+> + * RETURNS:
+> + * an int indicating the value read on that line
+> + */
+> +int pm8xxx_get_irq_stat(void *data, int irq)
+
+Why is this void * ?
+
+> +void * __devinit pm8xxx_irq_init(struct device *dev,
+> +				const struct pm8xxx_irq_platform_data *pdata)
+
+Please return struct pm_irq_chip *
+
+You don't have to make the struct definition public. All you need in
+the shared header file is a forward declaration.
+
+struct pm_irq_chip;
+
+The you can operate with type safe pointers at the callsites, but you
+cannot dereference them there.
+
+> +{
+> +	struct pm_irq_chip  *chip;
+> +	int devirq, rc;
+> +	unsigned int pmirq;
+> +
+> +	if (!pdata) {
+> +		pr_err("No platform data\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	devirq = pdata->devirq;
+> +	if (devirq < 0) {
+> +		pr_err("missing devirq\n");
+> +		rc = devirq;
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	chip = kzalloc(sizeof(struct pm_irq_chip), GFP_KERNEL);
+> +	if (!chip) {
+> +		pr_err("Cannot alloc pm_irq_chip struct\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	chip->dev = dev;
+> +	chip->devirq = devirq;
+> +	chip->irq_base = pdata->irq_base;
+> +	chip->num_irqs = pdata->irq_cdata.nirqs;
+> +	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
+> +	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
+> +	spin_lock_init(&chip->pm_irq_lock);
+> +
+> +	chip->irqs_allowed = kzalloc(sizeof(u8) * chip->num_blocks, GFP_KERNEL);
+> +	if (!chip->irqs_allowed) {
+> +		pr_err("Cannot alloc irqs_allowed array\n");
+> +		rc = -ENOMEM;
+> +		goto free_all;
+> +	}
+> +
+> +	chip->config = kzalloc(sizeof(u8) * chip->num_irqs, GFP_KERNEL);
+> +	if (!chip->config) {
+> +		pr_err("Cannot alloc config array\n");
+> +		rc = -ENOMEM;
+> +		goto free_all;
+> +	}
+> +	chip->wake_enable = kzalloc(sizeof(unsigned long)
+> +			* DIV_ROUND_UP(chip->num_irqs, BITS_PER_LONG),
+> +			GFP_KERNEL);
+> +	if (!chip->wake_enable) {
+> +		pr_err("Cannot alloc wake_enable array\n");
+> +		rc = -ENOMEM;
+> +		goto free_all;
+> +	}
+
+If you got rid of all that state crap, then you can do:
+
+struct pm_irq_chip {
+       ...
+       ...
+       u8       config[0];
+};
+
+and allocate the whole thing in one go.
+
+    chip = kzalloc(sizeof(struct pm_irq_chip) + sizeof(u8) * num_irqs, GFP_KERNEL);
+
+
+>  
+> +static inline int pm8xxx_read_irq_stat(const struct device *dev, int irq)
+> +{
+> +	struct pm8xxx_drvdata *dd = dev_get_drvdata(dev);
+> +
+> +	BUG_ON(!dd);
+
+No need for BUG_ON(). You can handle that gracefully with a proper
+return code.
+
+> +	return dd->pmic_read_irq_stat(dev, irq);
+> +}
+
+Thanks,
+
+	tglx
