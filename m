@@ -1,59 +1,59 @@
-From: anish198519851985@gmail.com (anish kumar)
-Date: Thu, 17 Mar 2011 23:57:24 +0900
-Subject: Questions about this patch: [PATCH] ARM: Use generic BUG() handler
-References: <1300307259-834-1-git-send-email-sjg@chromium.org>
-Message-ID: <92C2E94F6F494872A3D66D05E1AB76B7@your6c359a3bdc>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 17 Mar 2011 23:06:51 +0800
+Subject: [PATCH 2/2] [ARM] am300epd: fix resource leak in
+	am300_init_gpio_regs error path
+In-Reply-To: <1299477371.10486.2.camel@mola>
+References: <1299477315.10486.1.camel@mola> <1299477371.10486.2.camel@mola>
+Message-ID: <AANLkTikQiFxEhn5pMDQY6K_oB+i4r1Y64aA+98FyAxDk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-https://lkml.org/lkml/2011/2/28/565
+Applied.
 
-I have tested this patch on my system(linux 2.6.35-android) and it is 
-working
-perfectly fine so wanted to understand this patch.Will this patch be 
-included in
-mainline?
-
-I have few question from this thread.As my understanding of assembly is
-bit limited I would appreciate if someone can just say yes/no and probably 
-add
-bit of words.
-
-> This implementation uses an undefined instruction to implement BUG, and 
-> sets up
-> a bug table containing the relevant information. Many version of gcc do 
-> not
-> support %c properly for ARM (inserting a # when they shouldn't) so we work
-> around this using distasteful macro magic.
-
-This undefined instruction should cause data abort ?
-
-
-> +#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
-> +#define _BUG(file, line, value) __BUG(file, line, value)
-> +#define __BUG(__file, __line, __value) \
-> +do { \
-> + BUILD_BUG_ON(sizeof(struct bug_entry) != 12); \
-> + asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n" \
-> + ".pushsection .rodata.str, \"aMS\", 1\n" \
-> + "2:\t.asciz " #__file "\n" \
-> + ".popsection\n" \
-> + ".pushsection __bug_table,\"a\"\n" \
-> + "3:\t.word 1b, 2b\n" \
-> + "\t.hword " #__line ", 0\n" \
-> + ".popsection"); \
-> + unreachable(); \
-> +} while (0)
-
-Above piece of code i couldn't understand.As i understand this should do 
-same as
-original BUG() definition plus it should print the function where BUG() had 
-originally
-happened instead of "PC at _bug".I think in this code some 
-data(guess:function name
-,line no) is pushed on the stack and then popped but how this data is 
-printed on console?
-
-So kindly enlighten me on this piece of code or some pointers.Is there any 
-thread which
-explains about kernel fault process? 
+On Mon, Mar 7, 2011 at 1:56 PM, Axel Lin <axel.lin@gmail.com> wrote:
+> If gpio_request fails when i > 0, gpios[0] is not freed in current
+> implementation.
+>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/am300epd.c | ? 13 +++++++------
+> ?1 files changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
+> index 993d75e..fa8bad2 100644
+> --- a/arch/arm/mach-pxa/am300epd.c
+> +++ b/arch/arm/mach-pxa/am300epd.c
+> @@ -125,10 +125,7 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
+> ? ? ? ? ? ? ? ?if (err) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&am300_device->dev, "failed requesting "
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"gpio %d, err=%d\n", i, err);
+> - ? ? ? ? ? ? ? ? ? ? ? while (i >= DB0_GPIO_PIN)
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpio_free(i--);
+> - ? ? ? ? ? ? ? ? ? ? ? i = ARRAY_SIZE(gpios) - 1;
+> - ? ? ? ? ? ? ? ? ? ? ? goto err_req_gpio;
+> + ? ? ? ? ? ? ? ? ? ? ? goto err_req_gpio2;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> @@ -159,9 +156,13 @@ static int am300_init_gpio_regs(struct broadsheetfb_par *par)
+>
+> ? ? ? ?return 0;
+>
+> +err_req_gpio2:
+> + ? ? ? while (--i >= DB0_GPIO_PIN)
+> + ? ? ? ? ? ? ? gpio_free(i);
+> + ? ? ? i = ARRAY_SIZE(gpios);
+> ?err_req_gpio:
+> - ? ? ? while (i > 0)
+> - ? ? ? ? ? ? ? gpio_free(gpios[i--]);
+> + ? ? ? while (--i >= 0)
+> + ? ? ? ? ? ? ? gpio_free(gpios[i]);
+>
+> ? ? ? ?return err;
+> ?}
+> --
+> 1.7.2
+>
+>
+>
+>
