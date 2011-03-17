@@ -1,39 +1,72 @@
 From: balajitk@ti.com (Balaji T K)
-Date: Thu, 17 Mar 2011 21:30:05 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: GPMC set dummy irq chip
+Date: Thu, 17 Mar 2011 21:30:06 +0530
+Subject: [PATCH 3/3] ARM: OMAP4: correct GPMC IRQ number
 In-Reply-To: <1300377606-16616-1-git-send-email-balajitk@ti.com>
 References: <1300377606-16616-1-git-send-email-balajitk@ti.com>
-Message-ID: <1300377606-16616-3-git-send-email-balajitk@ti.com>
+Message-ID: <1300377606-16616-4-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolve following warning messages in boot when irq chip is not set
-[    0.429229] Trying to install interrupt handler for IRQ402
-[    0.429229] Trying to install interrupt handler for IRQ403
-[    0.429229] Trying to install interrupt handler for IRQ404
-[    0.429260] Trying to install interrupt handler for IRQ405
-[    0.429260] Trying to install interrupt handler for IRQ406
-[    0.429260] Trying to install interrupt handler for IRQ407
-[    0.429290] Trying to install interrupt handler for IRQ408
+OMAP4 GPMC IRQ is not same as OMAP3 IRQ. Fix it.
+
+Resolve following warning in OMAP4
+[    0.429290] gpmc: irq-20 could not claim: err -22
 
 Signed-off-by: Balaji T K <balajitk@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 6741743..d81d536 100644
+index d81d536..493505c 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -739,7 +739,8 @@ static int __init gpmc_init(void)
- 	/* initalize the irq_chained */
- 	irq = OMAP_GPMC_IRQ_BASE;
- 	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
--		set_irq_handler(irq, handle_simple_irq);
-+		set_irq_chip_and_handler(irq, &dummy_irq_chip,
-+						handle_simple_irq);
- 		set_irq_flags(irq, IRQF_VALID);
+@@ -693,6 +693,7 @@ static int __init gpmc_init(void)
+ {
+ 	u32 l, irq;
+ 	int cs, ret = -EINVAL;
++	int gpmc_irq;
+ 	char *ck = NULL;
+ 
+ 	if (cpu_is_omap24xx()) {
+@@ -701,12 +702,15 @@ static int __init gpmc_init(void)
+ 			l = OMAP2420_GPMC_BASE;
+ 		else
+ 			l = OMAP34XX_GPMC_BASE;
++		gpmc_irq = INT_34XX_GPMC_IRQ;
+ 	} else if (cpu_is_omap34xx()) {
+ 		ck = "gpmc_fck";
+ 		l = OMAP34XX_GPMC_BASE;
++		gpmc_irq = INT_34XX_GPMC_IRQ;
+ 	} else if (cpu_is_omap44xx()) {
+ 		ck = "gpmc_ck";
+ 		l = OMAP44XX_GPMC_BASE;
++		gpmc_irq = OMAP44XX_IRQ_GPMC;
+ 	}
+ 
+ 	if (WARN_ON(!ck))
+@@ -745,11 +749,11 @@ static int __init gpmc_init(void)
  		irq++;
  	}
+ 
+-	ret = request_irq(INT_34XX_GPMC_IRQ,
++	ret = request_irq(gpmc_irq,
+ 			gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
+ 	if (ret)
+ 		pr_err("gpmc: irq-%d could not claim: err %d\n",
+-						INT_34XX_GPMC_IRQ, ret);
++						gpmc_irq, ret);
+ 	return ret;
+ }
+ postcore_initcall(gpmc_init);
+@@ -758,8 +762,6 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
+ {
+ 	u8 cs;
+ 
+-	if (irq != INT_34XX_GPMC_IRQ)
+-		return IRQ_HANDLED;
+ 	/* check cs to invoke the irq */
+ 	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
+ 	if (OMAP_GPMC_IRQ_BASE+cs <= OMAP_GPMC_IRQ_END)
 -- 
 1.7.0.4
