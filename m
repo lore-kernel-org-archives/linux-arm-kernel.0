@@ -1,25 +1,39 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Thu, 17 Mar 2011 22:50:52 +0100
-Subject: [PATCH 1/9] lpc2k: Core support
-In-Reply-To: <AANLkTik1fJKs81fRW+a6N24tFf-wmG+c4p68kVOAxqeA@mail.gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Thu, 17 Mar 2011 23:07:46 +0100
+Subject: [PATCH 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's Kit
+	board
+In-Reply-To: <1300377264-10843-8-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300377264-10843-2-git-send-email-ithamar.adema@team-embedded.nl>
-	<AANLkTik1fJKs81fRW+a6N24tFf-wmG+c4p68kVOAxqeA@mail.gmail.com>
-Message-ID: <1300398652.2138.92.camel@team-embedded-2>
+	<1300377264-10843-8-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <083DF309106F364B939360100EC290F80B15AC2B39@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-17 at 22:32 +0100, Vitaly Wool wrote:
-> is there any good reason why you don't add your stuff to lpc32xx?
+> +
+> +#define EXTPOLAR	0x14c
+> +
+> +static unsigned long mfp_cfgs[] = {
 
-Most of the code (interrupt controller, clocks, etc) are completely
-different on the ARM7TDMI based LPC2K socs compared to the ARM9 based
-LPC3K SoCs. One of the only things that is fairly similar is the timers
-block ;-)
+Should this be initdata?
 
-I've looked at solutions introducing a plat-lpc directory but it ended
-up introducing more "red tape" then actual shared code...
+> +
+> +MACHINE_START(LPC2478OEM, "Embedded Artists LPC2478 OEM Board")
 
-Regards,
+Just a nit, but the machine ID should probably be unique to this
+board and not the 2478, ie EA2478OEM. If someone else releases a
+LPC2478 based board, it can't use this same id. This would apply
+to the filename too (lpc2478oem.c) - the name is somewhat generic
+and might be better named something like plat-ea2478oem.c.
 
-Ithamar.
+> +	.init_irq	= lpc2478oem_init_irq,
+> +	.timer		= &lpc2k_timer,
+> +	.init_machine	= lpc2478oem_init_machine,
+> +MACHINE_END
+> --
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
