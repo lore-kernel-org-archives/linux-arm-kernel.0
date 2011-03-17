@@ -1,46 +1,60 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 17 Mar 2011 09:34:03 +0000
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <87wrjyksnm.fsf@macbook.be.48ers.dk>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
-	<87vczkmy94.fsf@macbook.be.48ers.dk>
-	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
-	<871v26m8tf.fsf@macbook.be.48ers.dk>
-	<20110317085835.GC29758@n2100.arm.linux.org.uk>
-	<87wrjyksnm.fsf@macbook.be.48ers.dk>
-Message-ID: <20110317093403.GA15396@pulham.picochip.com>
+From: R65037@freescale.com (Zhu Richard-R65037)
+Date: Thu, 17 Mar 2011 09:48:28 +0000
+Subject: [PATCH V1 1/3] ahci_platform: add two clk pointer member into
+	ahci_platform_data struct
+In-Reply-To: <20110317083724.GV29521@pengutronix.de>
+References: <1300345860-16574-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110317083724.GV29521@pengutronix.de>
+Message-ID: <010C9052C42A00499CE76D637FA5EE900D26FD@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 10:22:53AM +0100, Peter Korsgaard wrote:
-> >>>>> "Russell" == Russell King <- ARM Linux <linux@arm.linux.org.uk>> writes:
-> 
-> Hi,
-> 
->  >> That should probably be cleaned up as well then. Sharing platform_data
->  >> structures between unrelated drivers seems like quite a mess to me.
-> 
->  Russell> Why should every driver have a separate platform data structure?
->  Russell> Is it right to end up with thousands of unique data structures each
->  Russell> specific to a particular driver?  To me, that sounds like a headache
->  Russell> waiting to happen.
-> 
-> Well, the point of the platform data is to provide driver specific
-> (E.G. not generic) data to the driver, so in general it will be
-> different for different hardware.
-> 
-> The current situation with 2 different structure defination depending on
-> arch, macro magic and 1 of these structures also used for a 2nd driver
-> isn't optimal.
-> 
-> But ok, I don't feel strongly about struct macb_platform_data also being
-> used for the old at91_ether driver, but it shouldn't be called
-> eth_platform_data as it isn't really a generic structure.
+Hi Sascha:
+Thanks for your comments.
 
-Ok, I'll rename to macb_platform_data and update at91_ether to use that 
-with a comment describing that we're sharing the platform data with 
-macb.  At least that gets rid of the preprocessor stuff in board.h for 
-at91 too.
+Best Regards
+Richard Zhu
 
-Jamie
+
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Thursday, March 17, 2011 4:37 PM
+> To: Zhu Richard-R65037
+> Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com;
+> kernel at pengutronix.de; linux-ide at vger.kernel.org;
+> avorontsov at ru.mvista.com; eric at eukrea.com; eric.miao at linaro.org
+> Subject: Re: [PATCH V1 1/3] ahci_platform: add two clk pointer member
+> into ahci_platform_data struct
+>
+> On Thu, Mar 17, 2011 at 03:10:58PM +0800, Richard Zhu wrote:
+> > Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+> > ---
+> >  include/linux/ahci_platform.h |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/linux/ahci_platform.h
+> > b/include/linux/ahci_platform.h index be3d9a7..86b5e24 100644
+> > --- a/include/linux/ahci_platform.h
+> > +++ b/include/linux/ahci_platform.h
+> > @@ -26,6 +26,8 @@ struct ahci_platform_data {
+> >     const struct ata_port_info *ata_port_info;
+> >     unsigned int force_port_map;
+> >     unsigned int mask_port_map;
+> > +   struct clk *sata_clk;
+> > +   struct clk *sata_ref_clk;
+>
+> No, ahci_platform_data shouldn't be the dump place for arbitrary board
+> data. Keep this to your board.
+Accepted, these modifications would be discarded.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
