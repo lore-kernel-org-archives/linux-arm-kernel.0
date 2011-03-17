@@ -1,165 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Mar 2011 10:28:36 -0700
-Subject: [PATCH V3 14/19] OMAP3+: SR: introduce notifiers flags
-In-Reply-To: <1299338962-5602-15-git-send-email-nm@ti.com> (Nishanth Menon's
-	message of "Sat, 5 Mar 2011 20:59:17 +0530")
-References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-15-git-send-email-nm@ti.com>
-Message-ID: <87k4fx7j23.fsf@ti.com>
+From: ashbertslists@gmail.com (Ashwin Chaugule)
+Date: Thu, 17 Mar 2011 13:37:49 -0400
+Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
+	write
+In-Reply-To: <alpine.LFD.2.00.1103171301030.26889@xanadu.home>
+References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
+	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
+	<alpine.LFD.2.00.1103171301030.26889@xanadu.home>
+Message-ID: <AANLkTik1oEkLX3R-adK9-_2W+ku4j9YDikr+Z4vzfGtb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
-
-> SmartReflex IP V1 and V2 have different registers and offsets.
-> Currently, we pass the status as is to the class driver. However,
-> since we don't pass the version of the underlying SR hardware
-> to the Class driver, it will not be unable to make consistent
-> sense of the status bits coming over to it.
+On Thu, Mar 17, 2011 at 1:01 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 15 Mar 2011, Po-Yu Chuang wrote:
 >
-> A class driver should be able to function without dependency
-> on the exact IP version it is actually running on. We hence
-> introduce our own translation in software level for a generic
-> notification flag.
+>> From: Po-Yu Chuang <ratbert@faraday-tech.com>
+>>
+>> If the page to cmpxchg is user mode read only (not write),
+>> we should simulate a data abort first.
+>>
+>> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
 >
-> As part of this change, we will now call the notifier iff we get
-> a match with the notifier flags that the class driver requested.
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 >
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>> v2:
+>> remove !pte_young() check
+>>
+>> ?arch/arm/kernel/traps.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index 446aee9..eac7c05 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -563,7 +563,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+>> ? ? ? ? ? ? ? if (!pmd_present(*pmd))
+>> ? ? ? ? ? ? ? ? ? ? ? goto bad_access;
+>> ? ? ? ? ? ? ? pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
+>> - ? ? ? ? ? ? if (!pte_present(*pte) || !pte_dirty(*pte)) {
+>> + ? ? ? ? ? ? if (!pte_present(*pte) || !pte_write(*pte) || !pte_dirty(*pte)) {
+>> ? ? ? ? ? ? ? ? ? ? ? pte_unmap_unlock(pte, ptl);
+>> ? ? ? ? ? ? ? ? ? ? ? goto bad_access;
+>> ? ? ? ? ? ? ? }
+>> --
+>> 1.6.3.3
+>>
 
-Patch is mostly fine, minor coding style comments below.
 
-Kevin
+Just beginning to understand the subtleties involved, so please
+correct me if I'm wrong.
+Wont this patch also fix the problem that was brought up with futexes
+on ARM SMP ?
 
-> ---
->  arch/arm/mach-omap2/smartreflex.c |   73 +++++++++++++++++++++++++++++++++++--
->  arch/arm/mach-omap2/smartreflex.h |    6 +++
->  2 files changed, 76 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index d839fa6..21944e2 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -123,27 +123,94 @@ static struct omap_sr *_sr_lookup(struct voltagedomain *voltdm)
->  	return ERR_PTR(-ENODATA);
->  }
->  
-> +static inline u32 notifier_to_irqen_v1(u8 notify_flags)
-> +{
-> +	u32 val;
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017374.html
 
-insert blank line
-
-> +	val = (notify_flags & SR_NOTIFY_MCUACCUM) ?
-> +		ERRCONFIG_MCUACCUMINTEN : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUVALID) ?
-> +		ERRCONFIG_MCUVALIDINTEN : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUBOUND) ?
-> +		ERRCONFIG_MCUBOUNDINTEN : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUDISACK) ?
-> +		ERRCONFIG_MCUDISACKINTEN : 0;
-
-insert blank line
-
-same for all tehe functions below
-
-> +	return val;
-> +}
-> +
-> +static inline u32 notifier_to_irqen_v2(u8 notify_flags)
-> +{
-> +	u32 val;
-> +	val = (notify_flags & SR_NOTIFY_MCUACCUM) ?
-> +		IRQENABLE_MCUACCUMINT : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUVALID) ?
-> +		IRQENABLE_MCUVALIDINT : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUBOUND) ?
-> +		IRQENABLE_MCUBOUNDSINT : 0;
-> +	val |= (notify_flags & SR_NOTIFY_MCUDISACK) ?
-> +		IRQENABLE_MCUDISABLEACKINT : 0;
-> +	return val;
-> +}
-> +
-> +static inline u8 irqstat_to_notifier_v1(u32 status)
-> +{
-> +	u8 val;
-> +	val = (status & ERRCONFIG_MCUACCUMINTST) ?
-> +		SR_NOTIFY_MCUACCUM : 0;
-> +	val |= (status & ERRCONFIG_MCUVALIDINTEN) ?
-> +		SR_NOTIFY_MCUVALID : 0;
-> +	val |= (status & ERRCONFIG_MCUBOUNDINTEN) ?
-> +		SR_NOTIFY_MCUBOUND : 0;
-> +	val |= (status & ERRCONFIG_MCUDISACKINTEN) ?
-> +		SR_NOTIFY_MCUDISACK : 0;
-> +	return val;
-> +}
-> +
-> +static inline u8 irqstat_to_notifier_v2(u32 status)
-> +{
-> +	u8 val;
-> +	val = (status & IRQENABLE_MCUACCUMINT) ?
-> +		SR_NOTIFY_MCUACCUM : 0;
-> +	val |= (status & IRQENABLE_MCUVALIDINT) ?
-> +		SR_NOTIFY_MCUVALID : 0;
-> +	val |= (status & IRQENABLE_MCUBOUNDSINT) ?
-> +		SR_NOTIFY_MCUBOUND : 0;
-> +	val |= (status & IRQENABLE_MCUDISABLEACKINT) ?
-> +		SR_NOTIFY_MCUDISACK : 0;
-> +	return val;
-> +}
-> +
-> +
->  static irqreturn_t sr_interrupt(int irq, void *data)
->  {
->  	struct omap_sr *sr_info = (struct omap_sr *)data;
->  	u32 status = 0;
-> +	u32 value = 0;
->  
->  	if (sr_info->ip_type == SR_TYPE_V1) {
-> +		/* Status bits are one bit before enable bits in v1 */
-> +		value = notifier_to_irqen_v1(sr_class->notify_flags) >> 1;
-> +
->  		/* Read the status bits */
->  		status = sr_read_reg(sr_info, ERRCONFIG_V1);
-> +		status &= value;
->  
->  		/* Clear them by writing back */
-> -		sr_write_reg(sr_info, ERRCONFIG_V1, status);
-> +		sr_modify_reg(sr_info, ERRCONFIG_V1, value, status);
-> +
-> +		value = irqstat_to_notifier_v1(status);
->  	} else if (sr_info->ip_type == SR_TYPE_V2) {
-> +		value = notifier_to_irqen_v2(sr_class->notify_flags);
->  		/* Read the status bits */
-> -		sr_read_reg(sr_info, IRQSTATUS);
-> +		status = sr_read_reg(sr_info, IRQSTATUS);
-> +		status &= value;
->  
->  		/* Clear them by writing back */
->  		sr_write_reg(sr_info, IRQSTATUS, status);
-> +		value = irqstat_to_notifier_v2(status);
->  	}
->  
->  	if (sr_class->notify)
-> -		sr_class->notify(sr_info->voltdm, status);
-> +		sr_class->notify(sr_info->voltdm, value);
->  
->  	return IRQ_HANDLED;
->  }
-> diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
-> index d4b8bee..2976bf6 100644
-> --- a/arch/arm/mach-omap2/smartreflex.h
-> +++ b/arch/arm/mach-omap2/smartreflex.h
-> @@ -142,6 +142,12 @@
->  #define OMAP3430_SR_ERRWEIGHT		0x04
->  #define OMAP3430_SR_ERRMAXLIMIT		0x02
->  
-> +/* Smart reflex notifiers for class drivers to use */
-> +#define SR_NOTIFY_MCUDISACK		BIT(3)
-> +#define SR_NOTIFY_MCUBOUND		BIT(2)
-> +#define SR_NOTIFY_MCUVALID		BIT(1)
-> +#define SR_NOTIFY_MCUACCUM		BIT(0)
-> +
->  /**
->   * struct omap_sr_pmic_data - Strucutre to be populated by pmic code to pass
->   *				pmic specific info to smartreflex driver
+Cheers,
+Ashwin
