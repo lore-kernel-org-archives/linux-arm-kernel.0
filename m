@@ -1,159 +1,44 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 17 Mar 2011 07:09:38 +0200
-Subject: [PATCH] mtd/mxc_nand: add support for multiple chips on V21
-	devices
-In-Reply-To: <2731521d2fd2224b7b28cc9ced044fc026d4fdb7.1300085993.git.baruch@tkos.co.il>
-References: <2731521d2fd2224b7b28cc9ced044fc026d4fdb7.1300085993.git.baruch@tkos.co.il>
-Message-ID: <20110317050938.GA2731@jasper.tkos.co.il>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 17 Mar 2011 11:22:00 +0530
+Subject: [PATCH 1/2] arm: mach-omap2: devices: fix omap3_l3_init() return
+	value
+In-Reply-To: <1300295763-497-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1300295763-497-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <324bffcaf53be55bd6f392af3f86fa10@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi linux-mtd, Shascha,
-
-On Mon, Mar 14, 2011 at 09:01:56AM +0200, Baruch Siach wrote:
-> Do the following to add support for up to 4 chips on V21 devices (i.MX25 and
-> i.MX35):
-> 
-> * implement .select_chip for V21
-> * adjust existing NFC_V1_V2_BUF_ADDR writes to take chip select into account
-> * unlock all chip selects at preset_v1_v2()
-> * scan up to 4 devices at .probe
-> 
-> This has been tested on i.MX25 with two attached NAND chip (on one die).
-
-Ping?
-Anything wrong with this patch?
-
-baruch
-
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Aaro Koskinen
+> Sent: Wednesday, March 16, 2011 10:46 PM
+> To: linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; tony at atomide.com
+> Cc: Aaro Koskinen
+> Subject: [PATCH 1/2] arm: mach-omap2: devices: fix omap3_l3_init()
+> return value
+>
+> Fix the return value for the successful case.
+>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 > ---
->  drivers/mtd/nand/mxc_nand.c |   51 +++++++++++++++++++++++++++----------------
->  1 files changed, 32 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 0fc80db..55c5ac4 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -56,8 +56,14 @@
->  #define NFC_V1_V2_WRPROT		(host->regs + 0x12)
->  #define NFC_V1_UNLOCKSTART_BLKADDR	(host->regs + 0x14)
->  #define NFC_V1_UNLOCKEND_BLKADDR	(host->regs + 0x16)
-> -#define NFC_V21_UNLOCKSTART_BLKADDR	(host->regs + 0x20)
-> -#define NFC_V21_UNLOCKEND_BLKADDR	(host->regs + 0x22)
-> +#define NFC_V21_UNLOCKSTART_BLKADDR0	(host->regs + 0x20)
-> +#define NFC_V21_UNLOCKSTART_BLKADDR1	(host->regs + 0x24)
-> +#define NFC_V21_UNLOCKSTART_BLKADDR2	(host->regs + 0x28)
-> +#define NFC_V21_UNLOCKSTART_BLKADDR3	(host->regs + 0x2c)
-> +#define NFC_V21_UNLOCKEND_BLKADDR0	(host->regs + 0x22)
-> +#define NFC_V21_UNLOCKEND_BLKADDR1	(host->regs + 0x26)
-> +#define NFC_V21_UNLOCKEND_BLKADDR2	(host->regs + 0x2a)
-> +#define NFC_V21_UNLOCKEND_BLKADDR3	(host->regs + 0x2e)
->  #define NFC_V1_V2_NF_WRPRST		(host->regs + 0x18)
->  #define NFC_V1_V2_CONFIG1		(host->regs + 0x1a)
->  #define NFC_V1_V2_CONFIG2		(host->regs + 0x1c)
-> @@ -152,6 +158,7 @@ struct mxc_nand_host {
->  	int			clk_act;
->  	int			irq;
->  	int			eccsize;
-> +	int			active_cs;
->  
->  	struct completion	op_completion;
->  
-> @@ -445,7 +452,7 @@ static void send_page_v1_v2(struct mtd_info *mtd, unsigned int ops)
->  	for (i = 0; i < bufs; i++) {
->  
->  		/* NANDFC buffer 0 is used for page read/write */
-> -		writew(i, NFC_V1_V2_BUF_ADDR);
-> +		writew((host->active_cs << 4) | i, NFC_V1_V2_BUF_ADDR);
->  
->  		writew(ops, NFC_V1_V2_CONFIG2);
->  
-> @@ -470,7 +477,7 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
->  	struct nand_chip *this = &host->nand;
->  
->  	/* NANDFC buffer 0 is used for device ID output */
-> -	writew(0x0, NFC_V1_V2_BUF_ADDR);
-> +	writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
->  
->  	writew(NFC_ID, NFC_V1_V2_CONFIG2);
->  
-> @@ -505,7 +512,7 @@ static uint16_t get_dev_status_v1_v2(struct mxc_nand_host *host)
->  	uint32_t store;
->  	uint16_t ret;
->  
-> -	writew(0x0, NFC_V1_V2_BUF_ADDR);
-> +	writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
->  
->  	/*
->  	 * The device status is stored in main_area0. To
-> @@ -686,24 +693,24 @@ static void mxc_nand_select_chip(struct mtd_info *mtd, int chip)
->  	struct nand_chip *nand_chip = mtd->priv;
->  	struct mxc_nand_host *host = nand_chip->priv;
->  
-> -	switch (chip) {
-> -	case -1:
-> +	if (chip == -1) {
->  		/* Disable the NFC clock */
->  		if (host->clk_act) {
->  			clk_disable(host->clk);
->  			host->clk_act = 0;
->  		}
-> -		break;
-> -	case 0:
-> +		return;
-> +	}
-> +
-> +	if (!host->clk_act) {
->  		/* Enable the NFC clock */
-> -		if (!host->clk_act) {
-> -			clk_enable(host->clk);
-> -			host->clk_act = 1;
-> -		}
-> -		break;
-> +		clk_enable(host->clk);
-> +		host->clk_act = 1;
-> +	}
->  
-> -	default:
-> -		break;
-> +	if (nfc_is_v21()) {
-> +		host->active_cs = chip;
-> +		writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
->  	}
+>  arch/arm/mach-omap2/devices.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-
+> omap2/devices.c
+> index 0d2d6a9..d478f53 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -65,7 +65,7 @@ static int __init omap3_l3_init(void)
+>
+>  	WARN(IS_ERR(od), "could not build omap_device for %s\n",
+> oh_name);
+>
+> -	return PTR_ERR(od);
+> +	return IS_ERR(od) ? PTR_ERR(od) : 0;
 >  }
->  
-> @@ -835,8 +842,14 @@ static void preset_v1_v2(struct mtd_info *mtd)
->  
->  	/* Blocks to be unlocked */
->  	if (nfc_is_v21()) {
-> -		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR);
-> -		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR);
-> +		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR0);
-> +		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR1);
-> +		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR2);
-> +		writew(0x0, NFC_V21_UNLOCKSTART_BLKADDR3);
-> +		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR0);
-> +		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR1);
-> +		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR2);
-> +		writew(0xffff, NFC_V21_UNLOCKEND_BLKADDR3);
->  	} else if (nfc_is_v1()) {
->  		writew(0x0, NFC_V1_UNLOCKSTART_BLKADDR);
->  		writew(0x4000, NFC_V1_UNLOCKEND_BLKADDR);
-> @@ -1201,7 +1214,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
->  		irq_control_v1_v2(host, 1);
->  
->  	/* first scan to find the device and get the page size */
-> -	if (nand_scan_ident(mtd, 1, NULL)) {
-> +	if (nand_scan_ident(mtd, nfc_is_v21() ? 4 : 1, NULL)) {
->  		err = -ENXIO;
->  		goto escan;
->  	}
-> -- 
-> 1.7.2.3
-> 
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>  postcore_initcall(omap3_l3_init);
+>
+Looks good.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
