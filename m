@@ -1,38 +1,31 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Thu, 17 Mar 2011 21:24:56 +0900
-Subject: Why don't we have atomic_set_mask()?
-In-Reply-To: <20110317120950.GI29758@n2100.arm.linux.org.uk>
-References: <AANLkTi=V5mHHibKftXZ1A+s6xiuqH5X0pqYPMjZod6EV@mail.gmail.com>
-	<20110317120950.GI29758@n2100.arm.linux.org.uk>
-Message-ID: <000f01cbe49e$56cbbeb0$04633c10$%cho@samsung.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Thu, 17 Mar 2011 13:44:50 +0100
+Subject: [PATCH] omap3: beaglexm: fix user button.
+Message-ID: <1300365890-28544-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Thu, Mar 17, 2011 at 08:36:15PM +0900, KyongHo Cho wrote:
-> > Hi.
-> >
-> > arch/arm/asm/atomic.h defines atomic_clear_mask() but its counterpart,
-> > atomic_set_mask() is not defined.
-> >
-> > Don't we need it?
-> 
-> I can't reply to you:
-> 
-> | A message that you sent could not be delivered to one or more of its
-> | recipients. This is a permanent error. The following address(es) failed:
-> |
-> |   pullip.cho at samsung.com
-> |     SMTP error from remote mail server after end of data:
-> |     host mailin.samsung.com [203.254.224.12]: 550 esmtp:
-> |     protocol deviation
-> 
-> Which basically means that Samsung's MTA is currently broken.
+User push button in Beagleboard xM is 4 instead of 7.
 
-I think it is currently ok because I just sent an email from gmail to
-@samsung.com.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Thank you!
-
-KyongHo.
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 46d814a..abf87d1 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -615,6 +615,10 @@ static void __init omap3_beagle_init(void)
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	omap3_beagle_init_rev();
+ 	omap3_beagle_i2c_init();
++	/* xM version uses pin 4 instead of 7 for user button */
++	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
++		gpio_buttons[0].gpio = 4;
++	}
+ 	platform_add_devices(omap3_beagle_devices,
+ 			ARRAY_SIZE(omap3_beagle_devices));
+ 	omap_serial_init();
+-- 
+1.7.0.4
