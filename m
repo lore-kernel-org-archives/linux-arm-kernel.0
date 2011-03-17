@@ -1,55 +1,41 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 17 Mar 2011 10:09:10 +0000
-Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
-In-Reply-To: <20110317100010.GF29758@n2100.arm.linux.org.uk>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
-	<AANLkTimwwUQGhncE7Att_9rAXhpT0n61HC4SW8ShSfAm@mail.gmail.com>
-	<20110316083844.GA13262@n2100.arm.linux.org.uk>
-	<AANLkTin9FH2orOaV-6feGDikCGvb3C-Q2CnRzp-Y2S4X@mail.gmail.com>
-	<20110317100010.GF29758@n2100.arm.linux.org.uk>
-Message-ID: <20110317100910.GB15396@pulham.picochip.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 17 Mar 2011 15:42:02 +0530
+Subject: [RFC PATCHv2 14/20] ARM: omap4: dynamically register local
+	timersetup function
+In-Reply-To: <1300269821.21713.37.camel@e102391-lin.cambridge.arm.com>
+References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+	<1300201983-26124-15-git-send-email-marc.zyngier@arm.com>
+	<f77caa44aa0205d3687b0dcae796c42b@mail.gmail.com>
+	<1300269821.21713.37.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <5f23aa9c1bf56777271c8619ddeb212c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 10:00:10AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 17, 2011 at 11:22:37AM +0200, Andrew Victor wrote:
-> > hi Russell,
-> > 
-> > >> There is no reference to a "pclk" or "hclk" in the AT91 architecture.
-> > >> So to avoid possible confusion, maybe create two "fake" clocks both
-> > >> parented to "macb_clk", and add a comment they're only for
-> > >> compatibility with the AVR32.
-> > >
-> > > It doesn't matter what's in the documentation.
-> > >
-> > > What matters more than conforming to documentation is keeping the drivers
-> > > in a clean and maintainable state without throwing lots of ifdefs into
-> > > them.
-> > 
-> > I'm not saying the drivers need ifdefs, they should request both
-> > "pclk" and "hclk" as suggested.
-> > 
-> > What I was suggesting is the platform clock setup on AT91 as:
-> >     macb_clk
-> >         |
-> >         +-- hclk
-> >         +-- pclk
-> > 
-> > rather than:
-> >     pclk
-> >         |
-> >         +-- hclk
-> 
-> And what I've been saying all along is to make pclk a _dummy_ clock on
-> the platform it doesn't exist for, rather than making it related in some
-> way to another clock given to the peripheral.
+> -----Original Message-----
+> From: Marc Zyngier [mailto:Marc.Zyngier at arm.com]
+> Sent: Wednesday, March 16, 2011 3:34 PM
+> To: Santosh Shilimkar
+> Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren
+> Subject: RE: [RFC PATCHv2 14/20] ARM: omap4: dynamically register
+> local timersetup function
+>
+[....]
 
-Ok, so just to summarize, before my patches, at91 provides "macb_clk", 
-whereas avr32 provides "pclk" and "hclk".
-
-I've renamed at91's "macb_clk" to "pclk" and added a fake, unrelated 
-"hclk".  It was suggested that the fake "hclk" should be a child of 
-"pclk" but you're saying to leave it as I have it right?
-
-Jamie
+> > This way the kernel built with CONFIG_LOCAL_TIMERS can still work
+> > on SoCs where twd isn't supported.
+> >
+> > Looks like your patch breaks that unless and until I am missing
+> > something.
+>
+> I think the bit you're missing is that when no local timer is
+> registered, the code in percpu_timer.c::percpu_timer_setup() ensures
+> that the broadcast timers are used as a default.
+>
+> In the OMAP4 case, twd is registered unless we detect a
+> OMAP4430_REV_ES1_0. In that case, we let the magic happen and fall
+> back
+> to the broadcast timers. Tested on a PandaBoard with twd
+> artificially disabled.
+>
+Cool.
+Thanks for the update.
