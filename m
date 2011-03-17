@@ -1,45 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Mar 2011 13:01:53 -0400 (EDT)
-Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
-	write
-In-Reply-To: <1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
-	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-Message-ID: <alpine.LFD.2.00.1103171301030.26889@xanadu.home>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Thu, 17 Mar 2011 10:07:12 -0700
+Subject: reboot/kexec in 2.6.38
+In-Reply-To: <20110317125839.GB21290@atrey.karlin.mff.cuni.cz> (Cyril Hrubis's
+	message of "Thu, 17 Mar 2011 13:58:39 +0100")
+References: <20110317064523.GA1995@ucw.cz>
+	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
+	<20110317125839.GB21290@atrey.karlin.mff.cuni.cz>
+Message-ID: <m1d3lpbrr3.fsf@fess.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Mar 2011, Po-Yu Chuang wrote:
+Cyril Hrubis <metan@ucw.cz> writes:
 
-> From: Po-Yu Chuang <ratbert@faraday-tech.com>
-> 
-> If the page to cmpxchg is user mode read only (not write),
-> we should simulate a data abort first.
-> 
-> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
+> Hi!
+>> > I got report that ?reboot/kexec does not work in recent kernels.
+>> >
+>> > I tried both kexec and reboot in 2.6.38, and it worked ok. Maybe
+>> > config issue?
+>> 
+>> I think it's config issue. Never heard of this.
+>>
+>
+> I've seen that on my zaurus a month or two ago. When kexeced to pxa-linux-2.6
+> then tried to kexec again. The last thing I've seen was Bye on the framebuffer
+> console and the machine freezed.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+The basic kexec code has been stable and solid for a long time so kexec
+failures are almost always hardware interaction problems.
 
-> ---
-> v2:
-> remove !pte_young() check
-> 
->  arch/arm/kernel/traps.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 446aee9..eac7c05 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -563,7 +563,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
->  		if (!pmd_present(*pmd))
->  			goto bad_access;
->  		pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
-> -		if (!pte_present(*pte) || !pte_dirty(*pte)) {
-> +		if (!pte_present(*pte) || !pte_write(*pte) || !pte_dirty(*pte)) {
->  			pte_unmap_unlock(pte, ptl);
->  			goto bad_access;
->  		}
-> -- 
-> 1.6.3.3
-> 
+Someone not stopping dma, or someone not putting the hardware in a state
+that the next kernel can figure out how to initialize it.
+
+Eric
