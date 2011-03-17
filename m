@@ -1,180 +1,26 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 17 Mar 2011 09:55:54 +0100
-Subject: [PATCH V1 2/3] AHCI Add the AHCI SATA feature on MX53 platforms
-In-Reply-To: <1300345860-16574-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300345860-16574-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300345860-16574-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110317085554.GW29521@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Mar 2011 09:58:21 +0100
+Subject: [PATCH 1/4] amba: add name based matching
+In-Reply-To: <20110317084858.GB29758@n2100.arm.linux.org.uk>
+References: <1300200116-12185-1-git-send-email-philippe.langlais@stericsson.com>
+	<1300200116-12185-2-git-send-email-philippe.langlais@stericsson.com>
+	<20110315144925.GG3921@n2100.arm.linux.org.uk>
+	<AANLkTinrVeaGXhE8mUqMJCw0fzeEB7Ko+p6ViD3JWePX@mail.gmail.com>
+	<20110317084858.GB29758@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimrez46PsnfRzh-j8-ONFBV5mu_KywhvX=3UeDy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 03:10:59PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c             |   11 +++
->  arch/arm/mach-mx5/devices-imx53.h               |    4 +
->  arch/arm/plat-mxc/devices/Kconfig               |    4 +
->  arch/arm/plat-mxc/devices/Makefile              |    1 +
->  arch/arm/plat-mxc/devices/platform-ahci-imx.c   |  109 +++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/ahci_sata.h      |   53 +++++++++++
->  arch/arm/plat-mxc/include/mach/devices-common.h |   10 ++
->  7 files changed, 192 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
->  create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index 652ace4..8bf2bab 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -1380,6 +1380,14 @@ static struct clk esdhc4_mx53_clk = {
->  	.secondary = &esdhc4_ipg_clk,
->  };
->  
-> +static struct clk sata_clk = {
-> +	.parent = &ipg_clk,
-> +	.enable = _clk_max_enable,
-> +	.enable_reg = MXC_CCM_CCGR4,
-> +	.enable_shift = MXC_CCM_CCGRx_CG1_OFFSET,
-> +	.disable = _clk_max_disable,
-> +};
-> +
->  DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
->  DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
->  DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
-> @@ -1468,6 +1476,9 @@ static struct clk_lookup mx53_lookups[] = {
->  	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
->  	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
->  	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
-> +	_REGISTER_CLOCK("ahci.0", NULL, sata_clk)
-> +	_REGISTER_CLOCK(NULL, "usb_phy1", usb_phy1_clk)
-> +	_REGISTER_CLOCK(NULL, "ahb", ahb_clk)
->  };
->  
->  static void clk_tree_init(void)
-> diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-> index 9251008..09ebb43 100644
-> --- a/arch/arm/mach-mx5/devices-imx53.h
-> +++ b/arch/arm/mach-mx5/devices-imx53.h
-> @@ -33,3 +33,7 @@ extern const struct imx_spi_imx_data imx53_ecspi_data[] __initconst;
->  extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
->  #define imx53_add_imx2_wdt(id, pdata)	\
->  	imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
-> +
-> +extern const struct imx_ahci_imx_data imx53_ahci_imx_data[] __initconst;
-> +#define imx53_add_ahci_imx(id, pdata)   \
-> +	imx_add_ahci_imx(&imx53_ahci_imx_data[id], pdata)
-> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-> index b9ab1d5..087595a 100644
-> --- a/arch/arm/plat-mxc/devices/Kconfig
-> +++ b/arch/arm/plat-mxc/devices/Kconfig
-> @@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->  
->  config IMX_HAVE_PLATFORM_SPI_IMX
->  	bool
-> +
-> +config IMX_HAVE_PLATFORM_SATA_AHCI
-> +	bool
-> +	default y if SOC_IMX53
-> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-> index 75cd2ec..e0b7fa3 100644
-> --- a/arch/arm/plat-mxc/devices/Makefile
-> +++ b/arch/arm/plat-mxc/devices/Makefile
-> @@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
-> +obj-$(CONFIG_IMX_HAVE_PLATFORM_SATA_AHCI) +=  platform-ahci-imx.o
-> diff --git a/arch/arm/plat-mxc/devices/platform-ahci-imx.c b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-> new file mode 100644
-> index 0000000..6ef3a91
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-> @@ -0,0 +1,109 @@
-> +/*
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + */
-> +
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> +
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> +
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#include <asm/sizes.h>
-> +#include <mach/hardware.h>
-> +#include <mach/devices-common.h>
-> +
-> +#include <linux/clk.h>
-> +
-> +#define imx_ahci_data_entry_single(soc)					\
-> +	{								\
-> +		.iobase = soc ## _SATA_BASE_ADDR,			\
-> +		.irq = soc ## _INT_SATA,				\
-> +	}
-> +
-> +#ifdef CONFIG_SOC_IMX53
-> +const struct imx_ahci_imx_data imx53_ahci_imx_data __initconst =
-> +	imx_ahci_data_entry_single(MX53);
-> +#endif
-> +
-> +struct platform_device *__init imx_add_ahci_imx(
-> +		const struct imx_ahci_imx_data *data,
-> +		const struct ahci_platform_data *pdata)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + SZ_4K - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irq,
-> +			.end = data->irq,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +
-> +	return imx_add_platform_device_dmamask("ahci", 0,
-> +			res, ARRAY_SIZE(res),
-> +			pdata, sizeof(*pdata),  DMA_BIT_MASK(32));
-> +}
-> +
-> +/*****************************************************************************\
-> + *                                                                           *
-> + * FSL AHCI SATA low level functions                                         *
-> + * return value 0 success                                                    *
-> + *                                                                           *
-> +\*****************************************************************************/
-> +	
-> +int internal_clk_initialization(struct device *dev)
+On Thu, Mar 17, 2011 at 9:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Step back. Imagine you awake at morning and stumble upon a function with
-this name. Would this name give you a hint what it's good for? You
-should use your time to give functions a descriptive name rather than
-doing ascii art in comments.
+> This means we don't pick up on the hardware configuration when platforms
+> have set the ID, and since we always provide the ID that would be bad.
 
-> +{
-> +	int ret = 0;
-> +	struct ahci_platform_data *pdata = dev->platform_data;
-> +
-> +	pdata->sata_ref_clk = clk_get(NULL, "usb_phy1");
-> +	if (IS_ERR(pdata->sata_ref_clk)) {
-> +		dev_err(dev, "IMX AHCI can't get SATA REF CLK.\n");
+Yes, so I don't put in this one patch, but also take a grep
+and check through the kernel tree and try to find and eleminate those, so
+that the possibility of hardcoding the ID is only used when it is proper,
+i.e. when it should have been something else than what is in the hardware.
 
-The dev_* functions have been introduced to give printk a context. So
-you don't need to repeat it in your string.
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
