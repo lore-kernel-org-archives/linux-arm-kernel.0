@@ -1,31 +1,57 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 17 Mar 2011 09:48:28 +0100
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
-	(avictor's message of "Thu, 17 Mar 2011 10:43:09 +0200")
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<1300184096-13937-4-git-send-email-jamie@jamieiles.com>
-	<87vczkmy94.fsf@macbook.be.48ers.dk>
-	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
-Message-ID: <871v26m8tf.fsf@macbook.be.48ers.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Mar 2011 08:48:58 +0000
+Subject: [PATCH 1/4] amba: add name based matching
+In-Reply-To: <AANLkTinrVeaGXhE8mUqMJCw0fzeEB7Ko+p6ViD3JWePX@mail.gmail.com>
+References: <1300200116-12185-1-git-send-email-philippe.langlais@stericsson.com>
+	<1300200116-12185-2-git-send-email-philippe.langlais@stericsson.com>
+	<20110315144925.GG3921@n2100.arm.linux.org.uk>
+	<AANLkTinrVeaGXhE8mUqMJCw0fzeEB7Ko+p6ViD3JWePX@mail.gmail.com>
+Message-ID: <20110317084858.GB29758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "avictor" == avictor za at gmail com <avictor.za@gmail.com> writes:
+On Thu, Mar 17, 2011 at 09:47:35AM +0100, Linus Walleij wrote:
+> 2011/3/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> 
+> > I really hate the idea of matching AMBA stuff by name. ?Isn't there any
+> > other solution to this?
+> 
+> What do you think about this:
+> 
+> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> index 6d2bb25..fcf355c 100644
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -603,6 +603,10 @@ int amba_device_register(struct amba_device *dev,
+> struct resource *parent)
+>         if (ret)
+>                 goto err_out;
+> 
+> +       /* Hard-coded primecell ID instead of plug-n-play */
+> +       if (dev->periphid != 0)
+> +               goto skip_probe;
+> +
+>         /*
+>          * Dynamically calculate the size of the resource
+>          * and use this for iomap
+> @@ -643,6 +647,7 @@ int amba_device_register(struct amba_device *dev,
+> struct resource *parent)
+>         if (ret)
+>                 goto err_release;
+> 
+> + skip_probe:
+>         ret = device_add(&dev->dev);
+>         if (ret)
+>                 goto err_release;
+> 
+> This way, if we hardcode periphid in the platform, it will take
+> precedence. Currently hardware will override such hard-codec
+> values.
+> 
+> There are a few instances using this in the kernel I think, but
+> to my memory they are all of the type where the hardcoded
+> number and the ID found in hardware are actually identical,
+> and eiher make no harm or should be patched away with.
 
-Hi,
-
- >> How about at the same time renaming it to something a bit less
- >> generic like macb_platform_data?
-
- avictor> The AT91RM9200 uses the same platform_data structure, but has a
- avictor> different Ethernet peripheral (ie, not the MACB)
-
- avictor> The phy_irq_pin is used in the AT91RM9200 ethernet driver.
- avictor> (drivers/net/arm/at91_ether.c)
-
-That should probably be cleaned up as well then. Sharing platform_data
-structures between unrelated drivers seems like quite a mess to me.
-
--- 
-Bye, Peter Korsgaard
+This means we don't pick up on the hardware configuration when platforms
+have set the ID, and since we always provide the ID that would be bad.
