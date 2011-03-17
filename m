@@ -1,54 +1,81 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Mar 2011 13:03:41 +0000
-Subject: [PATCH v4 0/7] Switch ARM platforms from integrator-flash to physmap
-Message-ID: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 17 Mar 2011 13:03:42 +0000
+Subject: [PATCH v4 1/7] MTD: Add integrator-flash feature to physmap
+In-Reply-To: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
+References: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1300367028-3916-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the integrator-flash driver is mostly a duplicate of physmap,
-move all users of this driver to physmap and get rid of the
-then unused driver.
+In the process of moving platforms away from integrator-flash
+(aka armflash), add to physmap the few features that make
+armflash unique:
 
-This patch set has been ok'ed by RMK, but the merge path seems
-unclear. David Woodhouse cc-ed on the whole patch set in case he'd
-prefer to merge it via his MTD tree.
+- optionnal probing for the AFS partition type
+- init() and exit() methods, used by Integrator to control
+  write access to the various onboard programmable components
 
-Changes since v3:
-- Dropped patch for aaec2000 platform (removed from tree)
-- Rebased against next-20110317
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+---
+ drivers/mtd/maps/physmap.c  |   16 +++++++++++++++-
+ include/linux/mtd/physmap.h |    2 ++
+ 2 files changed, 17 insertions(+), 1 deletions(-)
 
-Changes since v2:
-- Add integrator-flash's init()/exit() methods in order to control
-  write access to the various onboard programmable components, as
-  per RMK request.
-- Rebased against 2.6.38-rc2
-
-Changes since initial revision:
-- Rebased against linux-next (20110107). It should apply cleanly
-  on top of Linus' tree, except for a small conflict in the last
-  patch of the serie.
-
-Marc Zyngier (7):
-  MTD: Add integrator-flash feature to physmap
-  ARM: Realview: Use physmap driver instead of integrator-flash
-  ARM: Versatile: Use physmap driver instead of integrator-flash
-  ARM: VExpress: Use physmap driver instead of integrator-flash
-  ARM: Integrator/AP: Use physmap driver instead of integrator-flash
-  ARM: Integrator/CP: Use physmap driver instead of integrator-flash
-  MTD: Remove integrator-flash
-
- arch/arm/configs/realview-smp_defconfig  |    2 +-
- arch/arm/configs/realview_defconfig      |    2 +-
- arch/arm/configs/versatile_defconfig     |    2 +-
- arch/arm/mach-integrator/integrator_ap.c |   13 +-
- arch/arm/mach-integrator/integrator_cp.c |   13 +-
- arch/arm/mach-realview/core.c            |   31 +---
- arch/arm/mach-versatile/core.c           |   31 +---
- arch/arm/mach-vexpress/v2m.c             |   22 +--
- drivers/mtd/Kconfig                      |    3 +-
- drivers/mtd/maps/Makefile                |    1 -
- drivers/mtd/maps/integrator-flash.c      |  309 ------------------------------
- drivers/mtd/maps/physmap.c               |   16 ++-
- include/linux/mtd/physmap.h              |    2 +
- 13 files changed, 45 insertions(+), 402 deletions(-)
- delete mode 100644 drivers/mtd/maps/integrator-flash.c
+diff --git a/drivers/mtd/maps/physmap.c b/drivers/mtd/maps/physmap.c
+index 7522df4..49676b7 100644
+--- a/drivers/mtd/maps/physmap.c
++++ b/drivers/mtd/maps/physmap.c
+@@ -67,6 +67,10 @@ static int physmap_flash_remove(struct platform_device *dev)
+ 		if (info->mtd[i] != NULL)
+ 			map_destroy(info->mtd[i]);
+ 	}
++
++	if (physmap_data->exit)
++		physmap_data->exit(dev);
++
+ 	return 0;
+ }
+ 
+@@ -77,7 +81,11 @@ static const char *rom_probe_types[] = {
+ 					"map_rom",
+ 					NULL };
+ #ifdef CONFIG_MTD_PARTITIONS
+-static const char *part_probe_types[] = { "cmdlinepart", "RedBoot", NULL };
++static const char *part_probe_types[] = { "cmdlinepart", "RedBoot",
++#ifdef CONFIG_MTD_AFS_PARTS
++					  "afs",
++#endif
++					  NULL };
+ #endif
+ 
+ static int physmap_flash_probe(struct platform_device *dev)
+@@ -100,6 +108,12 @@ static int physmap_flash_probe(struct platform_device *dev)
+ 		goto err_out;
+ 	}
+ 
++	if (physmap_data->init) {
++		err = physmap_data->init(dev);
++		if (err)
++			goto err_out;
++	}
++
+ 	platform_set_drvdata(dev, info);
+ 
+ 	for (i = 0; i < dev->num_resources; i++) {
+diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
+index bcfd9f7..d37cca0 100644
+--- a/include/linux/mtd/physmap.h
++++ b/include/linux/mtd/physmap.h
+@@ -22,6 +22,8 @@ struct map_info;
+ 
+ struct physmap_flash_data {
+ 	unsigned int		width;
++	int			(*init)(struct platform_device *);
++	void			(*exit)(struct platform_device *);
+ 	void			(*set_vpp)(struct map_info *, int);
+ 	unsigned int		nr_parts;
+ 	unsigned int		pfow_base;
+-- 
+1.7.0.4
