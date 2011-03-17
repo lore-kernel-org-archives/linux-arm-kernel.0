@@ -1,72 +1,83 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Thu, 17 Mar 2011 21:30:06 +0530
-Subject: [PATCH 3/3] ARM: OMAP4: correct GPMC IRQ number
-In-Reply-To: <1300377606-16616-1-git-send-email-balajitk@ti.com>
-References: <1300377606-16616-1-git-send-email-balajitk@ti.com>
-Message-ID: <1300377606-16616-4-git-send-email-balajitk@ti.com>
+From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
+Date: Thu, 17 Mar 2011 16:54:24 +0100
+Subject: [PATCH 9/9] lpc2k: defconfig for NXP LPC2K platform
+In-Reply-To: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
+References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1300377264-10843-10-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 GPMC IRQ is not same as OMAP3 IRQ. Fix it.
+Add a defconfig that is setup to support booting a uClinux based
+system. This enables ROMFS/CRAMFS, initrd, and FLAT binaries besides
+the drivers for the devices added in the previous patch.
 
-Resolve following warning in OMAP4
-[    0.429290] gpmc: irq-20 could not claim: err -22
-
-Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
- arch/arm/mach-omap2/gpmc.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/configs/lpc2k_defconfig |   56 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/lpc2k_defconfig
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index d81d536..493505c 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -693,6 +693,7 @@ static int __init gpmc_init(void)
- {
- 	u32 l, irq;
- 	int cs, ret = -EINVAL;
-+	int gpmc_irq;
- 	char *ck = NULL;
- 
- 	if (cpu_is_omap24xx()) {
-@@ -701,12 +702,15 @@ static int __init gpmc_init(void)
- 			l = OMAP2420_GPMC_BASE;
- 		else
- 			l = OMAP34XX_GPMC_BASE;
-+		gpmc_irq = INT_34XX_GPMC_IRQ;
- 	} else if (cpu_is_omap34xx()) {
- 		ck = "gpmc_fck";
- 		l = OMAP34XX_GPMC_BASE;
-+		gpmc_irq = INT_34XX_GPMC_IRQ;
- 	} else if (cpu_is_omap44xx()) {
- 		ck = "gpmc_ck";
- 		l = OMAP44XX_GPMC_BASE;
-+		gpmc_irq = OMAP44XX_IRQ_GPMC;
- 	}
- 
- 	if (WARN_ON(!ck))
-@@ -745,11 +749,11 @@ static int __init gpmc_init(void)
- 		irq++;
- 	}
- 
--	ret = request_irq(INT_34XX_GPMC_IRQ,
-+	ret = request_irq(gpmc_irq,
- 			gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
- 	if (ret)
- 		pr_err("gpmc: irq-%d could not claim: err %d\n",
--						INT_34XX_GPMC_IRQ, ret);
-+						gpmc_irq, ret);
- 	return ret;
- }
- postcore_initcall(gpmc_init);
-@@ -758,8 +762,6 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
- {
- 	u8 cs;
- 
--	if (irq != INT_34XX_GPMC_IRQ)
--		return IRQ_HANDLED;
- 	/* check cs to invoke the irq */
- 	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
- 	if (OMAP_GPMC_IRQ_BASE+cs <= OMAP_GPMC_IRQ_END)
+diff --git a/arch/arm/configs/lpc2k_defconfig b/arch/arm/configs/lpc2k_defconfig
+new file mode 100644
+index 0000000..6278dd8
+--- /dev/null
++++ b/arch/arm/configs/lpc2k_defconfig
+@@ -0,0 +1,56 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_TINY_RCU=y
++# CONFIG_UTS_NS is not set
++# CONFIG_PID_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_LPC2K=y
++CONFIG_MACH_LPC2478OEM=y
++CONFIG_PROCESSOR_ID=0x41007700
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_CMDLINE="root=/dev/ram initrd=0xa1a00000,4000k console=ttyS0,115200N8 debug rw earlyprintk"
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_SUSPEND is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++# CONFIG_HWMON is not set
++# CONFIG_MFD_SUPPORT is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_ARMMMCI=y
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
 -- 
-1.7.0.4
+1.7.1
