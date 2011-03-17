@@ -1,79 +1,57 @@
 From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 17 Mar 2011 11:31:16 +0100
-Subject: [PATCHv3 3/3] ARM: mx51: Add support for low power suspend on MX51
-In-Reply-To: <1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <19841.58100.335014.234927@ipc1.ka-ro>
+Date: Thu, 17 Mar 2011 11:36:22 +0100
+Subject: [PATCH 1/7] ARM: add GPMI support for imx23/imx28
+In-Reply-To: <4D816FA3.2080202@freescale.com>
+References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
+	<1300239773-4222-2-git-send-email-b32955@freescale.com>
+	<19840.36163.967469.53941@ipc1.ka-ro>
+	<4D809453.4090603@freescale.com>
+	<19840.43943.592336.854865@ipc1.ka-ro>
+	<4D816FA3.2080202@freescale.com>
+Message-ID: <19841.58406.756435.967812@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Dinh.Nguyen at freescale.com writes:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Huang Shijie writes:
+> Hi:
 > 
-> Adds initial low power suspend functionality to MX51.
-> Supports "mem" and "standby" modes.
+> > Huang Shijie writes:
+> >> Hi Lothar:
+> >>> Hi,
+> >>>
+> >>> All in all I do not like this driver in any way. I already vomitted
+> >>> over it, when I saw it in the Freescale BSP.
+> >> :)  I have already removed a lot of code.
+> >>
+> >>> There is no need for the multiple layers of abstraction that are
+> >>> papered over the MTD layer.
+> >> I think this is good. Make the code clear.
+> >>
+> > I'll comment when the remaining patch has got through.
+> >
+> thanks a lot .
 > 
-> Tested on mx51-babbage.
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/Makefile   |    1 +
->  arch/arm/mach-mx5/pm-imx51.c |   69 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/pm-imx51.c
+> >>> There is no need for spilling the driver over a dozen files.
+> >> I can merge some files into one. thanks.
+> >>
+> > IMO all the source code could be kept in one file (except for the
+> > include files of course) and the gpmi-nfc subdirectory removed.
+> I really can merge some files, but IMHO, it's not a good solution to 
+> keep all in one file.
 > 
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index 0b9338c..787cb80 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -6,6 +6,7 @@
->  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
->  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
->  
-> +obj-$(CONFIG_PM) += pm-imx51.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
->  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-> diff --git a/arch/arm/mach-mx5/pm-imx51.c b/arch/arm/mach-mx5/pm-imx51.c
-> new file mode 100644
-> index 0000000..4a1d915
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/pm-imx51.c
-> @@ -0,0 +1,69 @@
-> +/*
-> + *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <linux/suspend.h>
-> +#include <linux/clk.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/tlb.h>
-> +#include <mach/system.h>
-> +#include "crm_regs.h"
-> +
-> +struct clk *gpc_dvfs_clk;
-> +
-static?
-
-> +static int mx5_suspend_enter(suspend_state_t state)
-> +{
-> +	if (gpc_dvfs_clk == NULL)
-> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
-> +
-> +	clk_enable(gpc_dvfs_clk);
->
-error check?
+> The reasons are :
+> [1] The GPMI support the NAND boot mode,but the imx23 and imx28 is a 
+> little different in
+> the NAND boot procedure due the different firmwares in the chips. If I 
+> merge the rom-imx23.c
+> rom-imx28.c to one file, the code will very mess. ugly enough!
+> 
+You can use platform_ids to differentiate between the versions and
+have separate functions for imx23 and imx28 where appropriate and
+select between those depending on the platform_id.
 
 
 Lothar Wa?mann
