@@ -1,78 +1,41 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Thu, 17 Mar 2011 17:18:00 +0800
-Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
-	write
-In-Reply-To: <1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
-	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-Message-ID: <AANLkTimOakgzK9LB6g8ibEZ_rr9=ZJw+4aS5Xz3F=J7Z@mail.gmail.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Thu, 17 Mar 2011 11:22:37 +0200
+Subject: [PATCHv2 1/9] at91: provide macb clks with "pclk" and "hclk" name
+In-Reply-To: <20110316083844.GA13262@n2100.arm.linux.org.uk>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<1300184096-13937-2-git-send-email-jamie@jamieiles.com>
+	<AANLkTimwwUQGhncE7Att_9rAXhpT0n61HC4SW8ShSfAm@mail.gmail.com>
+	<20110316083844.GA13262@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin9FH2orOaV-6feGDikCGvb3C-Q2CnRzp-Y2S4X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King,
+hi Russell,
 
-On Tue, Mar 15, 2011 at 2:13 PM, Po-Yu Chuang <ratbert.chuang@gmail.com> wrote:
+>> There is no reference to a "pclk" or "hclk" in the AT91 architecture.
+>> So to avoid possible confusion, maybe create two "fake" clocks both
+>> parented to "macb_clk", and add a comment they're only for
+>> compatibility with the AVR32.
 >
-> From: Po-Yu Chuang <ratbert@faraday-tech.com>
+> It doesn't matter what's in the documentation.
 >
-> If the page to cmpxchg is user mode read only (not write),
-> we should simulate a data abort first.
->
-> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
-> ---
-> v2:
-> remove !pte_young() check
->
-> ?arch/arm/kernel/traps.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 446aee9..eac7c05 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -563,7 +563,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
-> ? ? ? ? ? ? ? ?if (!pmd_present(*pmd))
-> ? ? ? ? ? ? ? ? ? ? ? ?goto bad_access;
-> ? ? ? ? ? ? ? ?pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
-> - ? ? ? ? ? ? ? if (!pte_present(*pte) || !pte_dirty(*pte)) {
-> + ? ? ? ? ? ? ? if (!pte_present(*pte) || !pte_write(*pte) || !pte_dirty(*pte)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?pte_unmap_unlock(pte, ptl);
-> ? ? ? ? ? ? ? ? ? ? ? ?goto bad_access;
-> ? ? ? ? ? ? ? ?}
-> --
-> 1.6.3.3
->
+> What matters more than conforming to documentation is keeping the drivers
+> in a clean and maintainable state without throwing lots of ifdefs into
+> them.
 
-I think maybe I should describe more details of the problem.
-Here is the story.
+I'm not saying the drivers need ifdefs, they should request both
+"pclk" and "hclk" as suggested.
 
-There is a lock with value 0. After fork(), the page containing the lock
-becomes user mode read only for COW later. Process 0 writes 1 to
-the lock with cmpxchg syscall. This write should cause COW.
-The value of lock of Process 0 should become 1 and the value of lock
-of Porcess 1 should still be 0 in the COWed page.
+What I was suggesting is the platform clock setup on AT91 as:
+    macb_clk
+        |
+        +-- hclk
+        +-- pclk
 
-(CORRECT)
+rather than:
+    pclk
+        |
+        +-- hclk
 
-P0:lock=0
-P0:fork
-P0:cmpxchg -> COW
-P0:lock=1	P1:lock=0
-
-However, because cmpxchg syscall did not check user mode read only,
-it wrote 1 to the lock value directly. After returning to user mode,
-Process 0 wrote another variable, say foo, on the same page and
-caused COW. The value of lock of Process 1 became 1 which is
-incorrect.
-
-(INCORRECT)
-
-P0:lock=0
-P0:fork
-P0:cmpxchg
-P0:lock=1
-P0:foo=123 -> COW
-P0:lock=1	P1:lock=1
-
-best regards,
-Po-Yu Chuang
+Regards,
+  Andrew Victor
