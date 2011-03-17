@@ -1,50 +1,48 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Thu, 17 Mar 2011 22:32:43 +0100
-Subject: [PATCH 1/9] lpc2k: Core support
-In-Reply-To: <1300377264-10843-2-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300377264-10843-2-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <AANLkTik1fJKs81fRW+a6N24tFf-wmG+c4p68kVOAxqeA@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 Mar 2011 14:43:31 -0700
+Subject: [PATCH] OMAP4: PM: remove redundant #ifdef CONFIG_PM
+In-Reply-To: <1299987443-27275-1-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Sun, 13 Mar 2011 09:07:23 +0530")
+References: <1299987443-27275-1-git-send-email-nm@ti.com>
+Message-ID: <878vwdv2ws.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Nishanth Menon <nm@ti.com> writes:
 
-On Thu, Mar 17, 2011 at 4:54 PM, Ithamar R. Adema
-<ithamar.adema@team-embedded.nl> wrote:
-> Core files (including IRQ handling) for NXP LPC2K architecture.
-
-<snip>
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e34bf02..331540d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -490,6 +490,18 @@ config ARCH_LOKI
-> ? ? ? ?help
-> ? ? ? ? ?Support for the Marvell Loki (88RC8480) SoC.
+> pm44xx.c is built only when CONFIG_PM is setup,
+> remove redundant CONFIG_PM check.
 >
-> +config ARCH_LPC2K
-> + ? ? ? bool "NXP LPC2K Family"
-> + ? ? ? depends on !MMU
-> + ? ? ? select CPU_ARM7TDMI
-> + ? ? ? select ARM_VIC
-> + ? ? ? select GENERIC_TIME
-> + ? ? ? select GENERIC_CLOCKEVENTS
-> + ? ? ? help
-> + ? ? ? ? Support for NXP LPC2K family of SoCs. These SoCs are based on
-> + ? ? ? ? an ARM7TDMI-S core, and have optional on-chip flash and SRAM,
-> + ? ? ? ? also UART, I2C, SPI, SSP, CAN, RTC, and other peripherals.
-> +
-> ?config ARCH_LPC32XX
-> ? ? ? ?bool "NXP LPC32XX"
-> ? ? ? ?select CPU_ARM926T
-> @@ -928,6 +940,8 @@ source "arch/arm/mach-ks8695/Kconfig"
+> This also fixes:
+> https://bugzilla.kernel.org/show_bug.cgi?id=25022
 >
-> ?source "arch/arm/mach-loki/Kconfig"
+> Reported-by: Martin Etti <ettl.martin@gmx.de>
 >
-> +source "arch/arm/mach-lpc2k/Kconfig"
-> +
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-is there any good reason why you don't add your stuff to lpc32xx?
+Thanks, queuing for 2.6.39-rc fixes cycle (branch: for_2.6.39/pm-fixes)
 
-~Vitaly
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/pm44xx.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index 76cfff2..59a870b 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -105,13 +105,11 @@ static int __init omap4_pm_init(void)
+>  
+>  	pr_err("Power Management for TI OMAP4.\n");
+>  
+> -#ifdef CONFIG_PM
+>  	ret = pwrdm_for_each(pwrdms_setup, NULL);
+>  	if (ret) {
+>  		pr_err("Failed to setup powerdomains\n");
+>  		goto err2;
+>  	}
+> -#endif
+>  
+>  #ifdef CONFIG_SUSPEND
+>  	suspend_set_ops(&omap_pm_ops);
