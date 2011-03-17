@@ -1,83 +1,71 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 17 Mar 2011 10:19:15 +0800
-Subject: [PATCH 1/7] ARM: add GPMI support for imx23/imx28
-In-Reply-To: <19840.43943.592336.854865@ipc1.ka-ro>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>	<1300239773-4222-2-git-send-email-b32955@freescale.com>	<19840.36163.967469.53941@ipc1.ka-ro>	<4D809453.4090603@freescale.com>
-	<19840.43943.592336.854865@ipc1.ka-ro>
-Message-ID: <4D816FA3.2080202@freescale.com>
+From: adharmap@codeaurora.org (adharmap at codeaurora.org)
+Date: Wed, 16 Mar 2011 19:23:55 -0700
+Subject: [PM8921 MFD V3 0/6]  pmic8921 core and subdevices
+Message-ID: <1300328641-3855-1-git-send-email-adharmap@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
+This patch series adds support for pmic 8921 chip and its subdevices.
+The pmic 8921 chip is used as a power management ic for 8960 based boards. It
+communicates over the ssbi bus, ssbi bus can be found here
 
-> Huang Shijie writes:
->> Hi Lothar:
->>> Hi,
->>>
->>> All in all I do not like this driver in any way. I already vomitted
->>> over it, when I saw it in the Freescale BSP.
->> :)  I have already removed a lot of code.
->>
->>> There is no need for the multiple layers of abstraction that are
->>> papered over the MTD layer.
->> I think this is good. Make the code clear.
->>
-> I'll comment when the remaining patch has got through.
->
-thanks a lot .
+https://patchwork.kernel.org/patch/601771/
 
+The patch set contains support for interrupt, gpio and mpp (multi purpose pin)
+subdevices.
 
->>> There is no need for spilling the driver over a dozen files.
->> I can merge some files into one. thanks.
->>
-> IMO all the source code could be kept in one file (except for the
-> include files of course) and the gpmi-nfc subdirectory removed.
-I really can merge some files, but IMHO, it's not a good solution to 
-keep all in one file.
+Note that gpio and mpp subdevices need the interrupt subdevice to
+be operational, this is becuase the reading the the value of gpio/mpp lines
+happens by doing a transaction over registers managed by the interrupt subdev.
+The code invokes a call on interrupt subdevice, rather than writing to those
+registers directly, avoiding race conditions.
 
-The reasons are :
-[1] The GPMI support the NAND boot mode,but the imx23 and imx28 is a 
-little different in
-the NAND boot procedure due the different firmwares in the chips. If I 
-merge the rom-imx23.c
-rom-imx28.c to one file, the code will very mess. ugly enough!
+Upates from v2
+Thomas Gleixner's code cleanup comments, use of IRQCHIP_MASK_ON_SUSPEND.
+Randy Dunlap's Kconfig cleanup comments.
+Mark Brown's suggestion to move pm8921.h in include/linux/mfd/pm8xxx/pm8921.h
+Grant Likely's suggestion of locking around the chip's list.
 
-[2]The GPMI driver is just a mini version against the version in the 
-FREESCALE BSP.
-The original GPMI driver also support the IMX508 which is different from 
-the imx23 and imx28.
-The imx508 supports the ONFI NAND and TOGGLE NAND which are DDR mode 
-NAND.So the implement of
-ECC read_page/write_page is much different from the IMX23/IMX28. Because 
-I want to support the
-IMX508 in future, this is why the hal-imx23.c and hal-imx28.c share most 
-the same code,but i still
-remain them in separate, the reason is simple : I will add a 
-hal-imx508.c in future.
-
-[3]The GPMI driver is a little complicated. The GPMI controller needs 
-other two hardware module to
-work :the BCH module, and the DMA mode.
-      Yes, i can merge the DMA code into other files, but the BCH module 
-should occupy a separate file to
-make the logic clear.
-
-[4] If i packet all the code in one, the gentlemen of MTD mailist, such 
-as David Woodhouse, Artem Bityutskiy ,
-will kill me, :).  what's more the big boy even can not be emailed to 
-arm-kernel maillist.
+Thanks a lot for reviewing these patches.
 
 
-> I've been working on this too, but had to abandone it for other tasks
-> several times. :(
->
-I really apreciate for your review and comments. I just want to make the 
-drive tidy and grace.
+Abhijeet Dharmapurikar (5):
+  mfd: pm8921: Add PMIC 8921 core driver
+  mfd: pm8xxx: Add irq support
+  gpio: pm8xxx-gpio: Add pm8xxx gpio driver
+  MAINTAINERS: Add patterns for pmic 8921 files to MSM subsystem
+  msm: board-8960: Add support for pm8921
 
-Please point out the ugly part that you regards in free.
+David Collins (1):
+  mfd: pm8xxx-mpp: Add pm8xxx MPP driver
 
-I am very glad you had ever tried to work on this. :)
+ MAINTAINERS                                |    2 +
+ arch/arm/mach-msm/board-msm8960.c          |   47 +++-
+ arch/arm/mach-msm/include/mach/irqs-8960.h |    9 +-
+ drivers/gpio/Kconfig                       |    8 +
+ drivers/gpio/Makefile                      |    1 +
+ drivers/gpio/pm8xxx-gpio.c                 |  455 ++++++++++++++++++++++++++++
+ drivers/mfd/Kconfig                        |   36 +++
+ drivers/mfd/Makefile                       |    3 +
+ drivers/mfd/pm8921-core.c                  |  278 +++++++++++++++++
+ drivers/mfd/pm8xxx-irq.c                   |  436 ++++++++++++++++++++++++++
+ drivers/mfd/pm8xxx-mpp.c                   |  327 ++++++++++++++++++++
+ include/linux/mfd/pm8xxx/core.h            |   75 +++++
+ include/linux/mfd/pm8xxx/gpio.h            |  132 ++++++++
+ include/linux/mfd/pm8xxx/irq.h             |   69 +++++
+ include/linux/mfd/pm8xxx/mpp.h             |  233 ++++++++++++++
+ include/linux/mfd/pm8xxx/pm8921.h          |   48 +++
+ 16 files changed, 2144 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/gpio/pm8xxx-gpio.c
+ create mode 100644 drivers/mfd/pm8921-core.c
+ create mode 100644 drivers/mfd/pm8xxx-irq.c
+ create mode 100644 drivers/mfd/pm8xxx-mpp.c
+ create mode 100644 include/linux/mfd/pm8xxx/core.h
+ create mode 100644 include/linux/mfd/pm8xxx/gpio.h
+ create mode 100644 include/linux/mfd/pm8xxx/irq.h
+ create mode 100644 include/linux/mfd/pm8xxx/mpp.h
+ create mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 
-
-Best Regards
-Huang Shijie
+ --
+ Sent by an employee of the Qualcomm Innovation Center, Inc.
+ The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
