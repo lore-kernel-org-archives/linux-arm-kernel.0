@@ -1,39 +1,59 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Mar 2011 07:55:00 -0700
-Subject: [PATCH V3 04/19] OMAP3+: voltage: remove spurious pr_notice for
-	debugfs
-In-Reply-To: <1299338962-5602-5-git-send-email-nm@ti.com> (Nishanth Menon's
-	message of "Sat, 5 Mar 2011 20:59:07 +0530")
-References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-5-git-send-email-nm@ti.com>
-Message-ID: <8762rhbxvf.fsf@ti.com>
+From: anish198519851985@gmail.com (anish kumar)
+Date: Thu, 17 Mar 2011 23:57:24 +0900
+Subject: Questions about this patch: [PATCH] ARM: Use generic BUG() handler
+References: <1300307259-834-1-git-send-email-sjg@chromium.org>
+Message-ID: <92C2E94F6F494872A3D66D05E1AB76B7@your6c359a3bdc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+https://lkml.org/lkml/2011/2/28/565
 
-> cat of debugfs entry for vp_volt provides voltage. The additional pr_notice
-> is just spam on console and provides no additional information.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+I have tested this patch on my system(linux 2.6.35-android) and it is 
+working
+perfectly fine so wanted to understand this patch.Will this patch be 
+included in
+mainline?
 
-Thanks, queueing for 2.6.39-rc fixes cycle.
+I have few question from this thread.As my understanding of assembly is
+bit limited I would appreciate if someone can just say yes/no and probably 
+add
+bit of words.
 
-Kevin
+> This implementation uses an undefined instruction to implement BUG, and 
+> sets up
+> a bug table containing the relevant information. Many version of gcc do 
+> not
+> support %c properly for ARM (inserting a # when they shouldn't) so we work
+> around this using distasteful macro magic.
 
-> ---
->  arch/arm/mach-omap2/voltage.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-> index 1b40aa0..53c399f 100644
-> --- a/arch/arm/mach-omap2/voltage.c
-> +++ b/arch/arm/mach-omap2/voltage.c
-> @@ -150,7 +150,6 @@ static int vp_volt_debug_get(void *data, u64 *val)
->  	}
->  
->  	vsel = vdd->read_reg(prm_mod_offs, vdd->vp_data->voltage);
-> -	pr_notice("curr_vsel = %x\n", vsel);
->  
->  	if (!vdd->pmic_info->vsel_to_uv) {
->  		pr_warning("PMIC function to convert vsel to voltage"
+This undefined instruction should cause data abort ?
+
+
+> +#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
+> +#define _BUG(file, line, value) __BUG(file, line, value)
+> +#define __BUG(__file, __line, __value) \
+> +do { \
+> + BUILD_BUG_ON(sizeof(struct bug_entry) != 12); \
+> + asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n" \
+> + ".pushsection .rodata.str, \"aMS\", 1\n" \
+> + "2:\t.asciz " #__file "\n" \
+> + ".popsection\n" \
+> + ".pushsection __bug_table,\"a\"\n" \
+> + "3:\t.word 1b, 2b\n" \
+> + "\t.hword " #__line ", 0\n" \
+> + ".popsection"); \
+> + unreachable(); \
+> +} while (0)
+
+Above piece of code i couldn't understand.As i understand this should do 
+same as
+original BUG() definition plus it should print the function where BUG() had 
+originally
+happened instead of "PC at _bug".I think in this code some 
+data(guess:function name
+,line no) is pushed on the stack and then popped but how this data is 
+printed on console?
+
+So kindly enlighten me on this piece of code or some pointers.Is there any 
+thread which
+explains about kernel fault process? 
