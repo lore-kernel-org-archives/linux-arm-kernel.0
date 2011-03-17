@@ -1,33 +1,37 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 17 Mar 2011 09:29:03 +0100
-Subject: [PATCHv3 3/3] ARM: mx51: Add support for low power suspend on MX51
-In-Reply-To: <20110317082106.GT29521@pengutronix.de> (Sascha Hauer's message
-	of "Thu, 17 Mar 2011 09:21:06 +0100")
-References: <1300305787-7970-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300305787-7970-3-git-send-email-Dinh.Nguyen@freescale.com>
-	<20110317082106.GT29521@pengutronix.de>
-Message-ID: <87sjumrvzk.fsf@lebrac.rtp-net.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 17 Mar 2011 09:37:24 +0100
+Subject: [PATCH V1 1/3] ahci_platform: add two clk pointer member into
+	ahci_platform_data struct
+In-Reply-To: <1300345860-16574-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1300345860-16574-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20110317083724.GV29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Thu, Mar 17, 2011 at 03:10:58PM +0800, Richard Zhu wrote:
+> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+> ---
+>  include/linux/ahci_platform.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
+> index be3d9a7..86b5e24 100644
+> --- a/include/linux/ahci_platform.h
+> +++ b/include/linux/ahci_platform.h
+> @@ -26,6 +26,8 @@ struct ahci_platform_data {
+>  	const struct ata_port_info *ata_port_info;
+>  	unsigned int force_port_map;
+>  	unsigned int mask_port_map;
+> +	struct clk *sata_clk;
+> +	struct clk *sata_ref_clk;
 
-Hi,
+No, ahci_platform_data shouldn't be the dump place for arbitrary board
+data. Keep this to your board.
 
-> On Wed, Mar 16, 2011 at 03:03:07PM -0500, Dinh.Nguyen at freescale.com wrote:
->> +
->> +struct clk *gpc_dvfs_clk;
->> +
->> +static int mx5_suspend_enter(suspend_state_t state)
->> +{
->> +	if (gpc_dvfs_clk == NULL)
->> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
->
-> clk_get can fail and NULL can be a valid clock.
+Sascha
 
-So, I guess one may want to fail here if one can't get the clock. The
-suspend will fail in hard to debug way if this clock is not enabled
-at this point.
-
-Arnaud
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
