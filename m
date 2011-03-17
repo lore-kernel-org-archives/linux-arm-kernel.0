@@ -1,58 +1,171 @@
-From: ashbertslists@gmail.com (Ashwin Chaugule)
-Date: Thu, 17 Mar 2011 13:37:49 -0400
-Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
-	write
-In-Reply-To: <alpine.LFD.2.00.1103171301030.26889@xanadu.home>
-References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
-	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-	<alpine.LFD.2.00.1103171301030.26889@xanadu.home>
-Message-ID: <AANLkTik1oEkLX3R-adK9-_2W+ku4j9YDikr+Z4vzfGtb@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 Mar 2011 10:41:04 -0700
+Subject: [PATCH V3 17/19] OMAP3+: SR: make enable path use volt_data
+	pointer
+In-Reply-To: <1299338962-5602-18-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Sat, 5 Mar 2011 20:59:20 +0530")
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-18-git-send-email-nm@ti.com>
+Message-ID: <87y64d63wv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 1:01 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 15 Mar 2011, Po-Yu Chuang wrote:
+Nishanth Menon <nm@ti.com> writes:
+
+> Passing the volt_data pointers across allows us to save us the effort
+> of looking up the voltage data pointer from the voltage value at
+> multiple layers, we need to look at the voltage data in DVFS layer
+> for further processing, so modify the APIs to pass the voltage data
+> pointer all the way through to lower layers to the SmartReflex AVS class
+> drivers.
 >
->> From: Po-Yu Chuang <ratbert@faraday-tech.com>
->>
->> If the page to cmpxchg is user mode read only (not write),
->> we should simulate a data abort first.
->>
->> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+
+Isn't volt_data already reachable from voltdm?
+
+I'd rather than clutter up the APIs with another argument, especially
+one that should be derivable from the current one
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/smartreflex-class3.c |   13 +++----------
+>  arch/arm/mach-omap2/smartreflex.c        |   22 ++++++++++------------
+>  arch/arm/mach-omap2/smartreflex.h        |    8 +++++---
+>  3 files changed, 18 insertions(+), 25 deletions(-)
 >
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->
->> ---
->> v2:
->> remove !pte_young() check
->>
->> ?arch/arm/kernel/traps.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 446aee9..eac7c05 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -563,7 +563,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
->> ? ? ? ? ? ? ? if (!pmd_present(*pmd))
->> ? ? ? ? ? ? ? ? ? ? ? goto bad_access;
->> ? ? ? ? ? ? ? pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
->> - ? ? ? ? ? ? if (!pte_present(*pte) || !pte_dirty(*pte)) {
->> + ? ? ? ? ? ? if (!pte_present(*pte) || !pte_write(*pte) || !pte_dirty(*pte)) {
->> ? ? ? ? ? ? ? ? ? ? ? pte_unmap_unlock(pte, ptl);
->> ? ? ? ? ? ? ? ? ? ? ? goto bad_access;
->> ? ? ? ? ? ? ? }
->> --
->> 1.6.3.3
->>
-
-
-Just beginning to understand the subtleties involved, so please
-correct me if I'm wrong.
-Wont this patch also fix the problem that was brought up with futexes
-on ARM SMP ?
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017374.html
-
-Cheers,
-Ashwin
+> diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
+> index 2ee48af..1d3eb11 100644
+> --- a/arch/arm/mach-omap2/smartreflex-class3.c
+> +++ b/arch/arm/mach-omap2/smartreflex-class3.c
+> @@ -13,19 +13,12 @@
+>  
+>  #include "smartreflex.h"
+>  
+> -static int sr_class3_enable(struct voltagedomain *voltdm)
+> +static int sr_class3_enable(struct voltagedomain *voltdm,
+> +		struct omap_volt_data *volt_data)
+>  {
+> -	unsigned long volt = omap_get_operation_voltage(
+> -		omap_voltage_get_nom_volt(voltdm));
+> -
+> -	if (!volt) {
+> -		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
+> -				__func__, voltdm->name);
+> -		return -ENODATA;
+> -	}
+>  
+>  	omap_vp_enable(voltdm);
+> -	return sr_enable(voltdm, volt);
+> +	return sr_enable(voltdm, volt_data);
+>  }
+>  
+>  static int sr_class3_disable(struct voltagedomain *voltdm, int is_volt_reset)
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index b1a7cfe..5c549b9 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -306,7 +306,7 @@ static void sr_start_vddautocomp(struct omap_sr *sr, bool class_start)
+>  		return;
+>  	}
+>  
+> -	r = sr_class->enable(sr->voltdm);
+> +	r = sr_class->enable(sr->voltdm, omap_voltage_get_nom_volt(sr->voltdm));
+>  	if (!r && class_start)
+>  		sr->autocomp_active = true;
+>  }
+> @@ -626,7 +626,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
+>  /**
+>   * sr_enable() - Enables the smartreflex module.
+>   * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+> - * @volt:	The voltage at which the Voltage domain associated with
+> + * @volt_data:	The voltage at which the Voltage domain associated with
+>   *		the smartreflex module is operating at.
+>   *		This is required only to program the correct Ntarget value.
+>   *
+> @@ -634,10 +634,9 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
+>   * enable a smartreflex module. Returns 0 on success. Returns error
+>   * value if the voltage passed is wrong or if ntarget value is wrong.
+>   */
+> -int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
+> +int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data)
+>  {
+>  	u32 nvalue_reciprocal;
+> -	struct omap_volt_data *volt_data;
+>  	struct omap_sr *sr = _sr_lookup(voltdm);
+>  	int ret;
+>  
+> @@ -647,19 +646,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
+>  		return -EINVAL;
+>  	}
+>  
+> -	volt_data = omap_voltage_get_voltdata(sr->voltdm, volt);
+> -
+> -	if (IS_ERR(volt_data)) {
+> -		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
+> -			"for nominal voltage %ld\n", __func__, volt);
+> -		return -ENODATA;
+> +	if (IS_ERR_OR_NULL(volt_data)) {
+> +		dev_warn(&sr->pdev->dev, "%s: bad voltage data\n", __func__);
+> +		return -EINVAL;
+>  	}
+>  
+>  	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
+>  
+>  	if (!nvalue_reciprocal) {
+>  		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
+> -			__func__, volt);
+> +			__func__, omap_get_operation_voltage(volt_data));
+>  		return -ENODATA;
+>  	}
+>  
+> @@ -816,13 +812,15 @@ int sr_register_class(struct omap_sr_class_data *class_data)
+>   * omap_sr_enable() -  API to enable SR clocks and to call into the
+>   *			registered smartreflex class enable API.
+>   * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+> + * @volt_data:	Voltage data to go to
+>   *
+>   * This API is to be called from the kernel in order to enable
+>   * a particular smartreflex module. This API will do the initial
+>   * configurations to turn on the smartreflex module and in turn call
+>   * into the registered smartreflex class enable API.
+>   */
+> -void omap_sr_enable(struct voltagedomain *voltdm)
+> +void omap_sr_enable(struct voltagedomain *voltdm,
+> +			struct omap_volt_data *volt_data)
+>  {
+>  	struct omap_sr *sr = _sr_lookup(voltdm);
+>  
+> diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+> index 4a1ada4..812e86d 100644
+> --- a/arch/arm/mach-omap2/smartreflex.h
+> +++ b/arch/arm/mach-omap2/smartreflex.h
+> @@ -186,7 +186,8 @@ struct omap_sr_pmic_data {
+>   * @class_priv_data:	Class specific private data (optional)
+>   */
+>  struct omap_sr_class_data {
+> -	int (*enable)(struct voltagedomain *voltdm);
+> +	int (*enable)(struct voltagedomain *voltdm,
+> +			struct omap_volt_data *volt_data);
+>  	int (*disable)(struct voltagedomain *voltdm, int is_volt_reset);
+>  	int (*start)(struct voltagedomain *voltdm, void *class_priv_data);
+>  	int (*stop)(struct voltagedomain *voltdm, void *class_priv_data);
+> @@ -232,7 +233,8 @@ struct omap_sr_data {
+>  };
+>  
+>  /* Smartreflex module enable/disable interface */
+> -void omap_sr_enable(struct voltagedomain *voltdm);
+> +void omap_sr_enable(struct voltagedomain *voltdm,
+> +			struct omap_volt_data *volt_data);
+>  void omap_sr_disable(struct voltagedomain *voltdm);
+>  void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
+>  
+> @@ -240,7 +242,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
+>  void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
+>  
+>  /* Smartreflex driver hooks to be called from Smartreflex class driver */
+> -int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
+> +int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data);
+>  void sr_disable(struct voltagedomain *voltdm);
+>  int sr_notifier_control(struct voltagedomain *voltdm, bool enable);
+>  int sr_configure_errgen(struct voltagedomain *voltdm);
