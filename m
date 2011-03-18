@@ -1,27 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2011 15:21:49 +0000
-Subject: [PATCH v2 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's
-	Kit board
-In-Reply-To: <1300461116-6028-8-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300461116-6028-8-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <20110318152149.GN29758@n2100.arm.linux.org.uk>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 18 Mar 2011 10:21:22 -0500
+Subject: [PATCHv4 1/3] ARM: mx51: Add entry for gpc_dvfs_clk
+Message-ID: <1300461684-21775-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 04:11:54PM +0100, Ithamar R. Adema wrote:
-> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-> index 9d6feaa..570a990 100644
-> --- a/arch/arm/tools/mach-types
-> +++ b/arch/arm/tools/mach-types
-> @@ -2667,7 +2667,7 @@ msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
->  micro2440		MACH_MICRO2440		MICRO2440		2680
->  am2440			MACH_AM2440		AM2440			2681
->  tq2440			MACH_TQ2440		TQ2440			2682
-> -lpc2478oem		MACH_LPC2478OEM		LPC2478OEM		2683
-> +ea2478devkit		MACH_EA2478DEVKIT	EA2478DEVKIT		2683
->  ak880x			MACH_AK880X		AK880X			2684
->  cobra3530		MACH_COBRA3530		COBRA3530		2685
->  pmppb			MACH_PMPPB		PMPPB			2686
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-NAK.  When I or anyone else updates this file this change wil get reverted.
+For MX51 SRPG, we need to turn on the GPC clock in order to set the
+SRPG registers.
+
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 652ace4..3eb1c6e 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -865,6 +865,13 @@ static struct clk aips_tz2_clk = {
+ 	.disable = _clk_ccgr_disable_inwait,
+ };
+ 
++static struct clk gpc_dvfs_clk = {
++	.enable_reg = MXC_CCM_CCGR5,
++	.enable_shift = MXC_CCM_CCGRx_CG12_OFFSET,
++	.enable = _clk_ccgr_enable,
++	.disable = _clk_ccgr_disable,
++};
++
+ static struct clk gpt_32k_clk = {
+ 	.id = 0,
+ 	.parent = &ckil_clk,
+@@ -1448,6 +1455,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
+ 	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+ 	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
++	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+ };
+ 
+ static struct clk_lookup mx53_lookups[] = {
+-- 
+1.6.0.4
