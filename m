@@ -1,43 +1,53 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Fri, 18 Mar 2011 16:44:44 +0800
-Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
-	write
-In-Reply-To: <alpine.LFD.2.00.1103171344270.26889@xanadu.home>
-References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
-	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-	<alpine.LFD.2.00.1103171301030.26889@xanadu.home>
-	<AANLkTik1oEkLX3R-adK9-_2W+ku4j9YDikr+Z4vzfGtb@mail.gmail.com>
-	<alpine.LFD.2.00.1103171344270.26889@xanadu.home>
-Message-ID: <AANLkTi=Zq0fiVf+GcRC8M+CPakwmEWn1rrqq_U4OehNy@mail.gmail.com>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 18 Mar 2011 08:49:59 +0000
+Subject: [RFC PATCH 2/5] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <201103180934.39997.arnd@arndb.de>
+References: <20110312224440.27728.60593.stgit@otae.warmcat.com>
+	<20110312225047.27728.1835.stgit@otae.warmcat.com>
+	<201103180934.39997.arnd@arndb.de>
+Message-ID: <4D831CB7.7060509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nicolas Pitre,
+On 03/18/2011 08:34 AM, Somebody in the thread at some point said:
 
-On Fri, Mar 18, 2011 at 1:57 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 17 Mar 2011, Ashwin Chaugule wrote:
->>
->> Just beginning to understand the subtleties involved, so please
->> correct me if I'm wrong.
->> Wont this patch also fix the problem that was brought up with futexes
->> on ARM SMP ?
+>> +void omap2_die_id_to_mac(u8 *mac, int length)
+>> +{
+>> +       struct omap_die_id odi;
+>> +
+>> +       omap_get_die_id(&odi);
+>> +       memcpy(mac,&odi.id_0, length);
+>> +
+>> +       /* mark it as not multicast and outside official 80211 MAC namespace */
+>> +
+>> +       mac[0] = (mac[0]&  ~1) | 2;
+>> +}
 >
-> Nope. ?The code being fixed here was suptly broken so it needs fixing.
-> However this code is almost never used, if at all, as it is a fall-back
-> solution for when all the better alternatives are not available for some
-> reasons (and I'm still wondering what those reasons are for Po-Yu Chuang
-> to actually use that code). ?In practice this bug should have affected
-> no one.
+> This is a pretty clever trick, but it's not an official globally unique MAC
+> address, right? Maybe we can ask TI to officially request a MAC address range
+> for OMAP SoCs and document an official procedure to compute it.
 
-We met this problem while porting an v5 SMP processor because kernel
-selects NEEDS_SYSCALL_FOR_CMPXCHG by default if CPU_32v5.
+This was an idea from Loic Minier.  80211 allows local namespace MACs, 
+this one is marked up as such, so it is as OK as the CPU ID bits are 
+reasonably well distributed in terms of collision.
 
-After we added our own implementation of __kuser_cmpxchg, this code
-is not needed anymore. But since this is actually a bug, it is still a good
-idea to submit a patch. :-)
+You are right though the overall correct solution from the board side is 
+to have paid for two (WLAN has the same problem -- worse right now it 
+comes up with 00:00:00:00:00:00) proper namespace MACs.  That's still 
+not enough because there must be somewhere on the board to store it, I 
+call this "board identity" storage, and there is nowhere on Panda.  If 
+you put it on SD card, it has the effect that your MAC address moves 
+with the SD card between boards which is less than ideal, you have to 
+make sure if he rewrites his SD card somehow it knows to use the right 
+mac address... it's not credible.
 
-> If you have SMP then this code is definitively not what you should be
-> using.
+The problem with what you suggested is that CPU ID is just a static 
+token chosen arbitrarily by TI in the factory so you can't somehow 
+"compute" the MAC which is assigned by IEEE, which is also an arbitrary 
+range chosen by them, from the unrelated CPU ID content.
 
-Best regards,
-Po-Yu Chuang
+It is interesting to use CPU ID though because it will not vary 
+per-board.  So this is why the patch arrives at what it is doing using 
+the legal private namespace concept.
+
+-Andy
