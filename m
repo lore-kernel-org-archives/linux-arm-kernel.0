@@ -1,13 +1,13 @@
 From: carlv@codeaurora.org (Carl Vanderlip)
-Date: Fri, 18 Mar 2011 14:53:58 -0700
-Subject: [PATCH 03/20] video: msm: add locked_enable_mdp_irq function
+Date: Fri, 18 Mar 2011 14:54:16 -0700
+Subject: [PATCH 04/20] video: msm: Move clk to mdp_info struct
 In-Reply-To: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
 References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-Message-ID: <1300485238-27004-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <1300485256-27044-1-git-send-email-carlv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a version of this fuction to be called in a locked context.
+Move local clock variable into mdp_info struct for easier access.
 
 Authors:
 Dima Zavin <dima@android.com>
@@ -16,48 +16,86 @@ Colin Cross <ccross@android.com>
 
 Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
 ---
- drivers/video/msm/mdp.c |   16 ++++++++++++----
- 1 files changed, 12 insertions(+), 4 deletions(-)
+ drivers/video/msm/mdp.c    |   17 +++++++++--------
+ drivers/video/msm/mdp_hw.h |    1 +
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
-index a078028..9fb9f1a 100644
+index 9fb9f1a..e68df14 100644
 --- a/drivers/video/msm/mdp.c
 +++ b/drivers/video/msm/mdp.c
-@@ -47,14 +47,12 @@ static struct clk *clk;
+@@ -43,7 +43,6 @@ static uint16_t mdp_default_ccs[] = {
+ static DECLARE_WAIT_QUEUE_HEAD(mdp_dma2_waitqueue);
+ static DECLARE_WAIT_QUEUE_HEAD(mdp_ppp_waitqueue);
+ static struct msmfb_callback *dma_callback;
+-static struct clk *clk;
  static unsigned int mdp_irq_mask;
  DEFINE_MUTEX(mdp_mutex);
  
--static int enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
-+static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
- {
--	unsigned long irq_flags;
- 	int ret = 0;
+@@ -62,8 +61,7 @@ static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
+ 	}
+ 	/* if the mdp irq is not already enabled enable it */
+ 	if (!mdp_irq_mask) {
+-		if (clk)
+-			clk_enable(clk);
++		clk_enable(mdp->clk);
+ 		enable_irq(mdp->irq);
+ 	}
  
- 	BUG_ON(!mask);
- 
--	spin_lock_irqsave(&mdp->lock, irq_flags);
- 	/* if the mask bits are already set return an error, this interrupt
- 	 * is already enabled */
- 	if (mdp_irq_mask & mask) {
-@@ -72,7 +70,17 @@ static int enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
- 	/* update the irq mask to reflect the fact that the interrupt is
- 	 * enabled */
- 	mdp_irq_mask |= mask;
--	spin_unlock_irqrestore(&mdp->lock, irq_flags);
-+	return 0;
-+}
-+
-+static int enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
-+{
-+	unsigned long flags;
-+	int ret;
-+
-+	spin_lock_irqsave(&mdp->lock, flags);
-+	ret = locked_enable_mdp_irq(mdp, mask);
-+	spin_unlock_irqrestore(&mdp->lock, flags);
- 	return ret;
+@@ -98,8 +96,8 @@ static int locked_disable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
+ 	/* if no one is waiting on the interrupt, disable it */
+ 	if (!mdp_irq_mask) {
+ 		disable_irq_nosync(mdp->irq);
+-		if (clk)
+-			clk_disable(clk);
++		if (mdp->clk)
++			clk_disable(mdp->clk);
+ 	}
+ 	return 0;
  }
+@@ -428,10 +426,11 @@ int mdp_probe(struct platform_device *pdev)
+ 	mdp->mdp_dev.blit = mdp_blit;
+ 	mdp->mdp_dev.set_grp_disp = mdp_set_grp_disp;
  
+-	clk = clk_get(&pdev->dev, "mdp_clk");
+-	if (IS_ERR(clk)) {
++	mdp->clk = clk_get(&pdev->dev, "mdp_clk");
++	if (IS_ERR(mdp->clk)) {
+ 		printk(KERN_INFO "mdp: failed to get mdp clk");
+-		return PTR_ERR(clk);
++		ret = PTR_ERR(mdp->clk);
++		goto error_get_mdp_clk;
+ 	}
+ 
+ 	ret = request_irq(mdp->irq, mdp_isr, IRQF_DISABLED, "msm_mdp", mdp);
+@@ -467,6 +466,7 @@ int mdp_probe(struct platform_device *pdev)
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x0174);
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x017c);
+ 
++	clk_enable(mdp->clk);
+ 	/* comp.plane 2 & 3 */
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x0114);
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x0118);
+@@ -505,6 +505,7 @@ int mdp_probe(struct platform_device *pdev)
+ error_device_register:
+ 	free_irq(mdp->irq, mdp);
+ error_request_irq:
++error_get_mdp_clk:
+ 	iounmap(mdp->base);
+ error_get_irq:
+ error_ioremap:
+diff --git a/drivers/video/msm/mdp_hw.h b/drivers/video/msm/mdp_hw.h
+index 05a3164..54b3934 100644
+--- a/drivers/video/msm/mdp_hw.h
++++ b/drivers/video/msm/mdp_hw.h
+@@ -23,6 +23,7 @@ struct mdp_info {
+ 	struct mdp_device mdp_dev;
+ 	char * __iomem base;
+ 	int irq;
++	struct clk *clk;
+ };
+ struct mdp_blit_req;
+ struct mdp_device;
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
