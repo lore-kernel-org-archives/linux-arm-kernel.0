@@ -1,72 +1,56 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Fri, 18 Mar 2011 16:11:55 +0100
-Subject: [PATCH v2 8/9] lpc2k: Add UART, SSP, and MCI devices
+Date: Fri, 18 Mar 2011 16:11:53 +0100
+Subject: [PATCH v2 6/9] lpc2k: multifunction pin configuration
 In-Reply-To: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300461116-6028-9-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1300461116-6028-7-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds devices for which the drivers are already in the tree. For
-the relevant devices, let the ea2478devkit board set them up.
+Inspired by the mfp support in PXA. Includes definition of pins
+for NXP LPC2468/78.
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
 no changes since v1.
 ---
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-lpc2k/Makefile                |    2 +-
- arch/arm/mach-lpc2k/common.h                |    4 +
- arch/arm/mach-lpc2k/devices.c               |  174 +++++++++++++++++++++++++++
- arch/arm/mach-lpc2k/include/mach/hardware.h |    6 +
- arch/arm/mach-lpc2k/mach-ea2478devkit.c     |   20 +++
- 6 files changed, 206 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/devices.c
+ arch/arm/mach-lpc2k/Makefile                   |    2 +-
+ arch/arm/mach-lpc2k/include/mach/hardware.h    |    1 +
+ arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h |   98 +++++++++++
+ arch/arm/mach-lpc2k/include/mach/mfp.h         |  209 ++++++++++++++++++++++++
+ arch/arm/mach-lpc2k/mfp.c                      |   99 +++++++++++
+ 5 files changed, 408 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
+ create mode 100644 arch/arm/mach-lpc2k/include/mach/mfp.h
+ create mode 100644 arch/arm/mach-lpc2k/mfp.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index de826e9..603839f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -496,6 +496,7 @@ config ARCH_LPC2K
- 	depends on !MMU
- 	select CPU_ARM7TDMI
- 	select ARM_VIC
-+	select ARM_AMBA
- 	select CLKDEV_LOOKUP
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
 diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 93e27fb..aa2b353 100644
+index 89596a7..2c50bb9 100644
 --- a/arch/arm/mach-lpc2k/Makefile
 +++ b/arch/arm/mach-lpc2k/Makefile
-@@ -1,3 +1,3 @@
- obj-y	:= clock.o irq.o gpio.o mfp.o time.o
+@@ -1 +1 @@
+-obj-y	:= clock.o irq.o gpio.o time.o
++obj-y	:= clock.o irq.o gpio.o mfp.o time.o
+diff --git a/arch/arm/mach-lpc2k/include/mach/hardware.h b/arch/arm/mach-lpc2k/include/mach/hardware.h
+index b8c471b..1a20126 100644
+--- a/arch/arm/mach-lpc2k/include/mach/hardware.h
++++ b/arch/arm/mach-lpc2k/include/mach/hardware.h
+@@ -21,6 +21,7 @@
+ #define APB_TIMER1_BASE		0xe0008000
+ #define APB_UART0_BASE		0xe000c000
+ #define APB_GPIO_BASE		0xe0028000
++#define APB_PINSEL_BASE		0xe002c000
+ #define APB_SCB_BASE		0xe01fc000
+ #define APH_VIC_BASE		0xfffff000
  
--obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o
-+obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o devices.o
-diff --git a/arch/arm/mach-lpc2k/common.h b/arch/arm/mach-lpc2k/common.h
-index 6b775d9..1d4c21e 100644
---- a/arch/arm/mach-lpc2k/common.h
-+++ b/arch/arm/mach-lpc2k/common.h
-@@ -16,6 +16,10 @@ extern void lpc2k_init_clocks(unsigned long xtal, unsigned long rtc);
- extern void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num);
- extern void lpc2k_init_irq(void);
- 
-+extern void lpc2k_add_uart(int nr);
-+extern void lpc2k_add_ssp(int nr, void *platform_data);
-+extern void lpc2k_add_mci(void *platform_data, int pwr_high);
-+
- extern struct sys_timer lpc2k_timer;
- 
- #endif /* LPC2K_COMMON_H */
-diff --git a/arch/arm/mach-lpc2k/devices.c b/arch/arm/mach-lpc2k/devices.c
+diff --git a/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h b/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
 new file mode 100644
-index 0000000..8855e8a
+index 0000000..9b6bec4
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/devices.c
-@@ -0,0 +1,174 @@
++++ b/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
+@@ -0,0 +1,98 @@
 +/*
-+ * Copyright (C) 2011 Team Embeded VOF
++ * Copyright 2011 Team Embedded VOF
 + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -74,230 +58,414 @@ index 0000000..8855e8a
 + * published by the Free Software Foundation.
 + */
 +
++#ifndef MACH_LPC2K_MFP_LPC24XX_H
++#define MACH_LPC2K_MFP_LPC24XX_H
++
++#include <mach/mfp.h>
++
++#define GPIO0_RD1		MFP_CFG(GPIO0, AF1)
++#define GPIO0_TXD3		MFP_CFG(GPIO0, AF2)
++#define GPIO0_SDA1		MFP_CFG(GPIO0, AF3)
++#define GPIO1_TD1		MFP_CFG(GPIO1, AF1)
++#define GPIO1_RXD3		MFP_CFG(GPIO1, AF2)
++#define GPIO1_SCL1		MFP_CFG(GPIO1, AF3)
++#define GPIO2_TXD0		MFP_CFG(GPIO2, AF1)
++#define GPIO3_RXD0		MFP_CFG(GPIO3, AF1)
++#define GPIO4_LCDVD0		MFP_CFG(GPIO4, AF1)
++#define GPIO5_LCDVD1		MFP_CFG(GPIO5, AF1)
++#define GPIO6_LCDVD8		MFP_CFG(GPIO6, AF1)
++#define GPIO7_LCDVD9		MFP_CFG(GPIO7, AF1)
++#define GPIO8_LCDVD16		MFP_CFG(GPIO8, AF1)
++#define GPIO9_LCDVD17		MFP_CFG(GPIO9, AF1)
++#define GPIO10_TXD2		MFP_CFG(GPIO10, AF1)
++#define GPIO11_RXD2		MFP_CFG(GPIO11, AF1)
++#define GPIO12_USB_PPWR2	MFP_CFG(GPIO12, AF1)
++#define GPIO13_USB_UP_LED2	MFP_CFG(GPIO13, AF1)
++#define GPIO15_SCK		MFP_CFG(GPIO15, AF3)
++#define GPIO17_MISO		MFP_CFG(GPIO17, AF3)
++#define GPIO18_MOSI		MFP_CFG(GPIO18, AF3)
++#define GPIO27_SDA0		MFP_CFG(GPIO27, AF1)
++#define GPIO28_SCL0		MFP_CFG(GPIO28, AF1)
++#define GPIO29_USB_Dp1		MFP_CFG(GPIO29, AF1)
++#define GPIO30_USB_Dn1		MFP_CFG(GPIO30, AF1)
++#define GPIO31_USB_Dp2		MFP_CFG(GPIO31, AF1)
++#define GPIO32_ENET_TXD0	MFP_CFG(GPIO32, AF1)
++#define GPIO33_ENET_TXD1	MFP_CFG(GPIO33, AF1)
++#define GPIO34_MCICLK		MFP_CFG(GPIO34, AF2)
++#define GPIO35_MCICMD		MFP_CFG(GPIO35, AF2)
++#define GPIO36_ENET_TX_EN	MFP_CFG(GPIO36, AF1)
++#define GPIO37_MCIPWR		MFP_CFG(GPIO37, AF2)
++#define GPIO38_ENET_TX_CLK	MFP_CFG(GPIO38, AF1)
++#define GPIO38_MCIDAT0		MFP_CFG(GPIO38, AF2)
++#define GPIO39_MCIDAT1		MFP_CFG(GPIO39, AF2)
++#define GPIO40_ENET_CRS		MFP_CFG(GPIO40, AF1)
++#define GPIO41_ENET_RXD0	MFP_CFG(GPIO41, AF1)
++#define GPIO42_ENET_RXD1	MFP_CFG(GPIO42, AF1)
++#define GPIO43_MCIDAT2		MFP_CFG(GPIO43, AF2)
++#define GPIO44_MCIDAT3		MFP_CFG(GPIO44, AF2)
++#define GPIO46_ENET_RX_ERR	MFP_CFG(GPIO46, AF1)
++#define GPIO47_ENET_REF_CLK	MFP_CFG(GPIO47, AF1)
++#define GPIO48_ENET_MDC		MFP_CFG(GPIO48, AF1)
++#define GPIO49_ENET_MDIO	MFP_CFG(GPIO49, AF1)
++#define GPIO50_PWM1		MFP_CFG(GPIO50, AF2)
++#define GPIO52_LCDVD10		MFP_CFG(GPIO52, AF1)
++#define GPIO53_LCDVD11		MFP_CFG(GPIO53, AF1)
++#define GPIO54_LCDVD12		MFP_CFG(GPIO54, AF1)
++#define GPIO55_LCDVD13		MFP_CFG(GPIO55, AF1)
++#define GPIO56_LCDVD14		MFP_CFG(GPIO56, AF1)
++#define GPIO57_LCDVD15		MFP_CFG(GPIO57, AF1)
++#define GPIO58_LCDVD20		MFP_CFG(GPIO58, AF1)
++#define GPIO59_LCDVD21		MFP_CFG(GPIO59, AF1)
++#define GPIO60_LCDVD22		MFP_CFG(GPIO60, AF1)
++#define GPIO61_LCDVD23		MFP_CFG(GPIO61, AF1)
++#define GPIO62_VBUS		MFP_CFG(GPIO62, AF2)
++#define GPIO63_USB_OVRCR2	MFP_CFG(GPIO63, AF1)
++#define GPIO64_LCDPWR		MFP_CFG(GPIO64, AF3)
++#define GPIO65_LCDLE		MFP_CFG(GPIO65, AF3)
++#define GPIO66_LCDDCLK		MFP_CFG(GPIO66, AF3)
++#define GPIO67_LCDFP		MFP_CFG(GPIO67, AF3)
++#define GPIO68_LCDM		MFP_CFG(GPIO68, AF3)
++#define GPIO69_LCDLP		MFP_CFG(GPIO69, AF3)
++#define GPIO70_LCDVP4		MFP_CFG(GPIO70, AF3)
++#define GPIO71_LCDVP5		MFP_CFG(GPIO71, AF3)
++#define GPIO72_LCDVP6		MFP_CFG(GPIO72, AF3)
++#define GPIO73_LCDVP7		MFP_CFG(GPIO73, AF3)
++#define GPIO75_LCDCLKIN		MFP_CFG(GPIO75, AF1)
++#define GPIO76_LCDVP18		MFP_CFG(GPIO76, AF1)
++#define GPIO77_LCDVP19		MFP_CFG(GPIO77, AF1)
++#define GPIO112_TXD1		MFP_CFG(GPIO112, AF3)
++#define GPIO113_RXD1		MFP_CFG(GPIO113, AF3)
++#define GPIO114_CTS1		MFP_CFG(GPIO114, AF3)
++#define GPIO115_DCD1		MFP_CFG(GPIO115, AF3)
++#define GPIO116_DSR1		MFP_CFG(GPIO116, AF3)
++#define GPIO117_DR1		MFP_CFG(GPIO117, AF3)
++#define GPIO118_RI1		MFP_CFG(GPIO118, AF3)
++#define GPIO126_RTS1		MFP_CFG(GPIO126, AF3)
++#define GPIO156_TXD3		MFP_CFG(GPIO156, AF3)
++#define GPIO156_LCDVP2		MFP_CFG(GPIO156, AF2)
++#define GPIO157_RXD3		MFP_CFG(GPIO157, AF3)
++#define GPIO157_LCDVP3		MFP_CFG(GPIO157, AF2)
++
++#endif /* MACH_LPC2K_MFP_LPC24XX_H */
+diff --git a/arch/arm/mach-lpc2k/include/mach/mfp.h b/arch/arm/mach-lpc2k/include/mach/mfp.h
+new file mode 100644
+index 0000000..3c919c8
+--- /dev/null
++++ b/arch/arm/mach-lpc2k/include/mach/mfp.h
+@@ -0,0 +1,209 @@
++/*
++ * Copyright 2011 Team Embedded VOF
++ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef ARCH_LPC2K_MFP_H
++#define ARCH_LPC2K_MFP_H
++
++#define mfp_to_gpio(m)	((m) % 160)
++
++/* list of all the configurable MFP pins */
++enum {
++	MFP_PIN_INVALID = -1,
++
++	MFP_PIN_GPIO0 = 0,
++	MFP_PIN_GPIO1,
++	MFP_PIN_GPIO2,
++	MFP_PIN_GPIO3,
++	MFP_PIN_GPIO4,
++	MFP_PIN_GPIO5,
++	MFP_PIN_GPIO6,
++	MFP_PIN_GPIO7,
++	MFP_PIN_GPIO8,
++	MFP_PIN_GPIO9,
++	MFP_PIN_GPIO10,
++	MFP_PIN_GPIO11,
++	MFP_PIN_GPIO12,
++	MFP_PIN_GPIO13,
++	MFP_PIN_GPIO14,
++	MFP_PIN_GPIO15,
++	MFP_PIN_GPIO16,
++	MFP_PIN_GPIO17,
++	MFP_PIN_GPIO18,
++	MFP_PIN_GPIO19,
++	MFP_PIN_GPIO20,
++	MFP_PIN_GPIO21,
++	MFP_PIN_GPIO22,
++	MFP_PIN_GPIO23,
++	MFP_PIN_GPIO24,
++	MFP_PIN_GPIO25,
++	MFP_PIN_GPIO26,
++	MFP_PIN_GPIO27,
++	MFP_PIN_GPIO28,
++	MFP_PIN_GPIO29,
++	MFP_PIN_GPIO30,
++	MFP_PIN_GPIO31,
++	MFP_PIN_GPIO32,
++	MFP_PIN_GPIO33,
++	MFP_PIN_GPIO34,
++	MFP_PIN_GPIO35,
++	MFP_PIN_GPIO36,
++	MFP_PIN_GPIO37,
++	MFP_PIN_GPIO38,
++	MFP_PIN_GPIO39,
++	MFP_PIN_GPIO40,
++	MFP_PIN_GPIO41,
++	MFP_PIN_GPIO42,
++	MFP_PIN_GPIO43,
++	MFP_PIN_GPIO44,
++	MFP_PIN_GPIO45,
++	MFP_PIN_GPIO46,
++	MFP_PIN_GPIO47,
++	MFP_PIN_GPIO48,
++	MFP_PIN_GPIO49,
++	MFP_PIN_GPIO50,
++	MFP_PIN_GPIO51,
++	MFP_PIN_GPIO52,
++	MFP_PIN_GPIO53,
++	MFP_PIN_GPIO54,
++	MFP_PIN_GPIO55,
++	MFP_PIN_GPIO56,
++	MFP_PIN_GPIO57,
++	MFP_PIN_GPIO58,
++	MFP_PIN_GPIO59,
++	MFP_PIN_GPIO60,
++	MFP_PIN_GPIO61,
++	MFP_PIN_GPIO62,
++	MFP_PIN_GPIO63,
++	MFP_PIN_GPIO64,
++	MFP_PIN_GPIO65,
++	MFP_PIN_GPIO66,
++	MFP_PIN_GPIO67,
++	MFP_PIN_GPIO68,
++	MFP_PIN_GPIO69,
++	MFP_PIN_GPIO70,
++	MFP_PIN_GPIO71,
++	MFP_PIN_GPIO72,
++	MFP_PIN_GPIO73,
++	MFP_PIN_GPIO74,
++	MFP_PIN_GPIO75,
++	MFP_PIN_GPIO76,
++	MFP_PIN_GPIO77,
++	MFP_PIN_GPIO78,
++	MFP_PIN_GPIO79,
++	MFP_PIN_GPIO80,
++	MFP_PIN_GPIO81,
++	MFP_PIN_GPIO82,
++	MFP_PIN_GPIO83,
++	MFP_PIN_GPIO84,
++	MFP_PIN_GPIO85,
++	MFP_PIN_GPIO86,
++	MFP_PIN_GPIO87,
++	MFP_PIN_GPIO88,
++	MFP_PIN_GPIO89,
++	MFP_PIN_GPIO90,
++	MFP_PIN_GPIO91,
++	MFP_PIN_GPIO92,
++	MFP_PIN_GPIO93,
++	MFP_PIN_GPIO94,
++	MFP_PIN_GPIO95,
++	MFP_PIN_GPIO96,
++	MFP_PIN_GPIO97,
++	MFP_PIN_GPIO98,
++	MFP_PIN_GPIO99,
++	MFP_PIN_GPIO100,
++	MFP_PIN_GPIO101,
++	MFP_PIN_GPIO102,
++	MFP_PIN_GPIO103,
++	MFP_PIN_GPIO104,
++	MFP_PIN_GPIO105,
++	MFP_PIN_GPIO106,
++	MFP_PIN_GPIO107,
++	MFP_PIN_GPIO108,
++	MFP_PIN_GPIO109,
++	MFP_PIN_GPIO110,
++	MFP_PIN_GPIO111,
++	MFP_PIN_GPIO112,
++	MFP_PIN_GPIO113,
++	MFP_PIN_GPIO114,
++	MFP_PIN_GPIO115,
++	MFP_PIN_GPIO116,
++	MFP_PIN_GPIO117,
++	MFP_PIN_GPIO118,
++	MFP_PIN_GPIO119,
++	MFP_PIN_GPIO120,
++	MFP_PIN_GPIO121,
++	MFP_PIN_GPIO122,
++	MFP_PIN_GPIO123,
++	MFP_PIN_GPIO124,
++	MFP_PIN_GPIO125,
++	MFP_PIN_GPIO126,
++	MFP_PIN_GPIO127,
++	MFP_PIN_GPIO128,
++	MFP_PIN_GPIO129,
++	MFP_PIN_GPIO130,
++	MFP_PIN_GPIO131,
++	MFP_PIN_GPIO132,
++	MFP_PIN_GPIO133,
++	MFP_PIN_GPIO134,
++	MFP_PIN_GPIO135,
++	MFP_PIN_GPIO136,
++	MFP_PIN_GPIO137,
++	MFP_PIN_GPIO138,
++	MFP_PIN_GPIO139,
++	MFP_PIN_GPIO140,
++	MFP_PIN_GPIO141,
++	MFP_PIN_GPIO142,
++	MFP_PIN_GPIO143,
++	MFP_PIN_GPIO144,
++	MFP_PIN_GPIO145,
++	MFP_PIN_GPIO146,
++	MFP_PIN_GPIO147,
++	MFP_PIN_GPIO148,
++	MFP_PIN_GPIO149,
++	MFP_PIN_GPIO150,
++	MFP_PIN_GPIO151,
++	MFP_PIN_GPIO152,
++	MFP_PIN_GPIO153,
++	MFP_PIN_GPIO154,
++	MFP_PIN_GPIO155,
++	MFP_PIN_GPIO156,
++	MFP_PIN_GPIO157,
++	MFP_PIN_GPIO158,
++	MFP_PIN_GPIO159,
++};
++
++/* pin number; currently only 0-159 are used */
++#define MFP_PIN(x)	((x) & 0x3ff)
++
++/* Alternate functions, currently only 0-3 are used */
++#define MFP_AF0		(0x0 << 10)
++#define MFP_AF1		(0x1 << 10)
++#define MFP_AF2		(0x2 << 10)
++#define MFP_AF3		(0x3 << 10)
++#define MFP_AF_MASK	(0x3 << 10)
++#define MFP_AF(x)	(((x) >> 10) & 0x3)
++
++/* Pullup/down configuration, currently only none/high/low are used */
++#define MFP_PULL_NONE	(0x2 << 21)
++#define MFP_PULL_LOW	(0x3 << 21)
++#define MFP_PULL_HIGH	(0x0 << 21)
++#define MFP_PULL_MASK	(0x3 << 21)
++#define MFP_PULL(x)	(((x) >> 21) & 0x3)
++
++#define MFP_CFG_DEFAULT	(MFP_PULL_HIGH | MFP_AF0)
++
++#define MFP_CFG(pin, af)		\
++	((MFP_CFG_DEFAULT & ~MFP_AF_MASK) |\
++	 (MFP_PIN(MFP_PIN_##pin) | MFP_##af))
++
++#define MFP_CFG_PULL(pin, af, pull)	\
++	((MFP_CFG_DEFAULT & ~(MFP_AF_MASK | MFP_PULL_MASK)) |\
++	 (MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_##pull))
++
++#endif /* ARCH_LPC2K_MFP_H */
+diff --git a/arch/arm/mach-lpc2k/mfp.c b/arch/arm/mach-lpc2k/mfp.c
+new file mode 100644
+index 0000000..6e4779d
+--- /dev/null
++++ b/arch/arm/mach-lpc2k/mfp.c
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (C) 2011 Team Embeded VOF
++ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++ *
++ * Based on MFP code from mach-pxa.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
 +#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
-+#include <linux/clk.h>
 +#include <linux/io.h>
 +
-+#include <linux/amba/bus.h>
-+#include <linux/amba/mmci.h>
-+#include <linux/amba/pl022.h>
-+
 +#include <mach/hardware.h>
++#include <mach/mfp.h>
 +
-+/* System Control Block - System Controls and Status register */
-+#define SCS		0x1a0
++#define PINSEL(bank)	(0x00 + (bank)*4)
++#define PINMODE(bank)	(0x40 + (bank)*4)
 +
-+#define __IORESOURCE_MEM_16K(x)	{	\
-+	.start = x,			\
-+	.end   = x + SZ_16K - 1,	\
-+	.flags = IORESOURCE_MEM,	\
++struct gpio_desc {
++	unsigned valid:1;
++	unsigned long config;
++};
++
++static struct gpio_desc gpio_desc[MFP_PIN_GPIO159 + 1];
++
++static int __mfp_config_gpio(unsigned gpio, unsigned long c)
++{
++	unsigned bank = gpio >> 4;
++	unsigned shift = (gpio & 0xf) * 2;
++	unsigned val;
++
++	/* Configure alternate function */
++	val = __raw_readl(APB_PINSEL_BASE + PINSEL(bank));
++	if ((val & (3 << shift)) &&
++	    (val & (3 << shift)) != (MFP_AF(c) << shift))
++		pr_warning
++		    ("GPIO%d is already configured (%x), not reconfigured!\n",
++		     gpio, (val & (3 << shift)) >> shift);
++	else {
++		val &= ~(0x3 << shift);
++		val |= MFP_AF(c) << shift;
++		__raw_writel(val, APB_PINSEL_BASE + PINSEL(bank));
 +	}
 +
-+#define __IORESOURCE_IRQ(x)	{	\
-+	.start = x,			\
-+	. end  = x,			\
++	/* Configuration pullup/dn */
++	val = __raw_readl(APB_PINSEL_BASE + PINMODE(bank));
++	val &= ~(0x3 << shift);
++	val |= MFP_PULL(c) << shift;
++	__raw_writel(val, APB_PINSEL_BASE + PINMODE(bank));
++
++	return 0;
++}
++
++static inline int __mfp_validate(int mfp)
++{
++	int gpio = mfp_to_gpio(mfp);
++
++	if (!gpio_desc[gpio].valid) {
++		pr_warning("%s: GPIO%d is invalid pin\n", __func__, gpio);
++		return -1;
 +	}
 +
-+/* UARTs
-+ *   0/1 are available on all LPC2Ks
-+ *   2/3 are available on LPC23XX and up.
-+ *
-+ * NOTE: the dev.init_name assignment is there so we can use the clk API to
-+ *       retrieve and enable the clock, since dev_name() is called from
-+ *       the clk_get implementation before the platform device is registered.
-+ */
++	return gpio;
++}
 +
-+#define LPC2K_UART(uartnum) \
-+	static struct plat_serial8250_port lpc2k_pdata_uart##uartnum[] = { \
-+		{ \
-+			.mapbase	= APB_UART##uartnum##_BASE, \
-+			.membase	= (void __iomem *) \
-+						APB_UART##uartnum##_BASE, \
-+			.irq		= IRQ_LPC2K_UART##uartnum, \
-+			.flags		= UPF_SKIP_TEST | UPF_BOOT_AUTOCONF, \
-+			.iotype		= UPIO_MEM, \
-+			.regshift	= 2, \
-+			.uartclk	= 0, \
-+		}, \
-+		{ }, \
-+	}; \
-+	static struct resource lpc2k_resources_uart##uartnum[] = { \
-+		[0] = __IORESOURCE_MEM_16K(APB_UART##uartnum##_BASE), \
-+		[1] = __IORESOURCE_IRQ(IRQ_LPC2K_UART##uartnum), \
-+	}; \
-+	static struct platform_device lpc2k_device_uart##uartnum = { \
-+		.dev = { \
-+			.init_name = "serial8250." __stringify(uartnum), \
-+			.platform_data = lpc2k_pdata_uart##uartnum, \
-+		}, \
-+		.name		= "serial8250", \
-+		.id		= uartnum, \
-+		.resource	= lpc2k_resources_uart##uartnum, \
-+		.num_resources	= ARRAY_SIZE(lpc2k_resources_uart##uartnum), \
++void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num)
++{
++	unsigned long flags;
++	unsigned long *c;
++	int i, gpio;
++
++	for (i = 0, c = mfp_cfgs; i < num; i++, c++) {
++
++		gpio = __mfp_validate(MFP_PIN(*c));
++		if (gpio < 0)
++			continue;
++
++		local_irq_save(flags);
++
++		gpio_desc[gpio].config = *c;
++		__mfp_config_gpio(gpio, *c);
++
++		local_irq_restore(flags);
 +	}
-+
-+
-+LPC2K_UART(0);
-+LPC2K_UART(1);
-+LPC2K_UART(2);
-+LPC2K_UART(3);
-+
-+static struct platform_device *uarts[] __initdata = {
-+	&lpc2k_device_uart0,
-+	&lpc2k_device_uart1,
-+	&lpc2k_device_uart2,
-+	&lpc2k_device_uart3,
-+};
-+
-+void __init lpc2k_add_uart(int nr)
-+{
-+	struct platform_device *pdev;
-+	struct clk *clk;
-+	int res;
-+
-+	BUG_ON(nr < 0 || nr > ARRAY_SIZE(uarts));
-+	pdev = uarts[nr];
-+
-+	clk = clk_get(&pdev->dev, NULL);
-+	BUG_ON(IS_ERR(clk));
-+	clk_enable(clk);
-+	((struct plat_serial8250_port *)pdev->dev.platform_data)->uartclk =
-+		clk_get_rate(clk);
-+	clk_put(clk);
-+
-+	res = platform_device_register(pdev);
-+	if (res)
-+		dev_err(&pdev->dev, "Unable to register: %d\n", res);
 +}
 +
-+/* SSP, aka pl022
-+ *
-+ * 1-only available on enhanced LPC21XX and LPC22XX.
-+ * 0/1 available on LPC23XX and up.
-+ */
-+
-+static struct amba_device lpc2k_device_ssp0 = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+		.init_name = "ssp0",
-+	},
-+	.res = __IORESOURCE_MEM_16K(APB_SSP0_BASE),
-+	.irq = { IRQ_LPC2K_SPI0, NO_IRQ },
-+};
-+
-+static struct amba_device lpc2k_device_ssp1 = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+		.init_name = "ssp1",
-+	},
-+	.res = __IORESOURCE_MEM_16K(APB_SSP1_BASE),
-+	.irq = { IRQ_LPC2K_SPI1, NO_IRQ },
-+};
-+
-+void __init lpc2k_add_ssp(int nr, void *platform_data)
++static int __init lpc2k_mfp_init(void)
 +{
-+	struct amba_device *adev;
-+	int res;
++	int i;
 +
-+	BUG_ON(nr < 0 || nr > 1);
-+	adev = nr ? &lpc2k_device_ssp1 : &lpc2k_device_ssp0;
-+	adev->dev.platform_data = platform_data;
++	for (i = MFP_PIN_GPIO0; i <= MFP_PIN_GPIO159; i++)
++		gpio_desc[i].valid = 1;
 +
-+	res = amba_device_register(adev, &iomem_resource);
-+	if (res)
-+		dev_err(&adev->dev, "Unable to register: %d\n", res);
++	return 0;
 +}
 +
-+/* SD/MMC, aka pl180/1
-+ *
-+ * Available on LPC23XX and up.
-+ */
-+
-+static struct amba_device lpc2k_device_mci = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+		.init_name = "mci",
-+	},
-+	.res = __IORESOURCE_MEM_16K(APB_MCI_BASE),
-+	.irq = { IRQ_LPC2K_MCI, NO_IRQ },
-+};
-+
-+void __init lpc2k_add_mci(void *platform_data, int pwr_high)
-+{
-+	int res;
-+	u32 scs;
-+
-+	/* Set MCIPWR pin to be active high or low */
-+	scs = ioread32(APB_SCB_BASE + SCS);
-+	scs = pwr_high ? scs | (1 << 3) : scs & ~(1 << 3);
-+	iowrite32(scs, APB_SCB_BASE + SCS);
-+
-+	lpc2k_device_mci.dev.platform_data = platform_data;
-+	res = amba_device_register(&lpc2k_device_mci, &iomem_resource);
-+	if (res)
-+		dev_err(&lpc2k_device_mci.dev, "Unable to register: %d\n", res);
-+}
-diff --git a/arch/arm/mach-lpc2k/include/mach/hardware.h b/arch/arm/mach-lpc2k/include/mach/hardware.h
-index 1a20126..b2e3a18 100644
---- a/arch/arm/mach-lpc2k/include/mach/hardware.h
-+++ b/arch/arm/mach-lpc2k/include/mach/hardware.h
-@@ -20,8 +20,14 @@
- #define APB_TIMER0_BASE		0xe0004000
- #define APB_TIMER1_BASE		0xe0008000
- #define APB_UART0_BASE		0xe000c000
-+#define APB_UART1_BASE		0xe0010000
- #define APB_GPIO_BASE		0xe0028000
- #define APB_PINSEL_BASE		0xe002c000
-+#define APB_SSP1_BASE		0xe0030000
-+#define APB_SSP0_BASE		0xe0068000
-+#define APB_UART2_BASE		0xe0078000
-+#define APB_UART3_BASE		0xe007c000
-+#define APB_MCI_BASE		0xe008c000
- #define APB_SCB_BASE		0xe01fc000
- #define APH_VIC_BASE		0xfffff000
- 
-diff --git a/arch/arm/mach-lpc2k/mach-ea2478devkit.c b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
-index bc9c980..3685eb2 100644
---- a/arch/arm/mach-lpc2k/mach-ea2478devkit.c
-+++ b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
-@@ -8,6 +8,8 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/amba/pl022.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <asm/mach/arch.h>
-@@ -95,9 +97,27 @@ static unsigned long mfp_cfgs[] __initdata = {
- 	GPIO44_MCIDAT3,
- };
- 
-+static struct pl022_ssp_controller ssp0_plat_data = {
-+	.bus_id = 0,
-+	.enable_dma = 0,
-+	.num_chipselect = 1,
-+};
-+
-+static struct mmci_platform_data mci_plat_data = {
-+	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.capabilities = MMC_CAP_4_BIT_DATA,
-+	.f_max = 200000,
-+	.gpio_cd = -1,
-+	.gpio_wp = -1,
-+};
-+
- void __init ea2478devkit_init_machine(void)
- {
- 	lpc2k_mfp_config(mfp_cfgs, ARRAY_SIZE(mfp_cfgs));
-+
-+	lpc2k_add_uart(0);
-+	lpc2k_add_ssp(0, &ssp0_plat_data);
-+	lpc2k_add_mci(&mci_plat_data, 0 /* active low */);
- }
- 
- static void __init ea2478devkit_init_irq(void)
++postcore_initcall(lpc2k_mfp_init);
 -- 
 1.7.1
