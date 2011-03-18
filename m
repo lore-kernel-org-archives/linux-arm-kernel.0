@@ -1,43 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2011 11:12:58 +0000
-Subject: compiling 2.6.37 kernel in THUMB2 mode
-In-Reply-To: <AANLkTinywQZtCpUppZ-2eSqV6s+b+5kDZ6hRVJ36ewgi@mail.gmail.com>
-References: <AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
-	<AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
-	<AANLkTi=3s6ZRkaBG4uaS=7kaLWD-q2MgN0cN1otBrcmy@mail.gmail.com>
-	<AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
-	<AANLkTintEi=JO222wQARaacpfHPor5usnz-qhNAAFXjm@mail.gmail.com>
-	<AANLkTi=RQ3-ZkDKPOByGsey-E45cVA-5Rj3zWOjLutiy@mail.gmail.com>
-	<AANLkTik7i9Q9ctdMYno3VcJvcAHpN8g_3KifV+aen9-n@mail.gmail.com>
-	<AANLkTim+f5PyGshq5jppzyk=W9t4R8Yw6jxU6VstvH55@mail.gmail.com>
-	<AANLkTimjit3ZqwjDDrpw+iBfaq34QAQr0JCDnQuBybGZ@mail.gmail.com>
-	<AANLkTinywQZtCpUppZ-2eSqV6s+b+5kDZ6hRVJ36ewgi@mail.gmail.com>
-Message-ID: <20110318111258.GK29758@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 18 Mar 2011 12:13:19 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110318101512.GA15375@n2100.arm.linux.org.uk>
+References: <20110317183048.GW7258@atomide.com>
+	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+	<20110318101512.GA15375@n2100.arm.linux.org.uk>
+Message-ID: <20110318111319.GB27124@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 07:03:06AM -0400, Vincent Palatin wrote:
-> >> > Just one more question: whats Russell's tree?
-> >>
-> >> AFAIK: That one :
-> >> http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
-> >>
-> >
-> > this does not seem to be a pointer to a valid git repo, or am I missing
-> > something?
+Hello Russell,
+
+On Fri, Mar 18, 2011 at 10:15:12AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 17, 2011 at 07:50:36PM -0700, Linus Torvalds wrote:
+> > The pure amount of crazy churn is annoying in itself,
+> > but when I then get these "independent" pull requests from four
+> > different people, and they touch the same files, that indicates that
+> > something is wrong.
 > 
-> The URL is unusual but
-> git clone http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
-> works for me.
-> 
-> by the way this server connectivity has limited bandwidth, you would
-> rather clone the linus Tree and add this one as another remote :
+> I have already complained to Uwe and Sascha about the IMX/MXC conflicts.
+> It already struck me that there's something seriously wrong at
+> pengutronix.com as both Uwe and Sascha work in the same area, yet don't
+> coordinate their efforts.  It seems to me that Uwe is completely
+> independent of everyone else.
+I feel blamed wrongly here. My part of the "crazy churn" in
+v2.6.38..$todayslinus/master is that I touched drivers/net/Kconfig[1] and
+arch/arm/mach-mxs/gpio.c[2]. The former went in via the net tree; the
+latter via Russell's tree with Sascha's Ack. Please correct me if I'm
+wrong but I think this was the correct thing to do. I don't know how
+that qualifies as "completely independent of everyone else".
 
-No it doesn't.  It's very close to the UK backbone.
+IMHO the cooperation between Sascha and me works fine. In fact nearly
+all[3] of my patches that touch imx related things under arch/arm/ go in
+via Sascha's tree.
 
-http://www.arm.linux.org.uk/developer/git-arm.php
+Best regards
+Uwe
 
-That page includes an explaination of the issues, which has more to do
-with your internet connectivity and your monthly data allowance than
-the server.  Then again, maybe I'm old fashioned and the idea of pulling
-450MB to gain a few KB of updates is the in-thing today.
+[1] 085e79e (net/fec: consolidate all i.MX options to CONFIG_ARM)
+[2] bf0c111 (ARM: 6744/1: mxs: irq_data conversion)
+[3] Some exceptions I found are:
+	bf0c111 ARM: 6744/1: mxs: irq_data conversion
+	4df772d ARM: 6322/1: imx/pca100: Fix name of spi platform data
+	868003c ARM: 6280/1: imx: Fix build failure when including <mach/gpio.h> without <linux/spinlock.h>
+    All of these are OK IMHO.
+
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
