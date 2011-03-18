@@ -1,34 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Mar 2011 16:00:03 +0300
-Subject: [PATCH] omap3: beaglexm: fix user button.
-In-Reply-To: <1300365890-28544-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1300365890-28544-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <4D835753.1040308@ru.mvista.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 18 Mar 2011 14:52:48 +0100
+Subject: [PATCH V7 3/4] mmc: sdhci-esdhc: make the writel/readl as the
+	general APIs
+In-Reply-To: <1300442217-1060-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1300442217-1060-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1300442217-1060-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20110318135248.GF2155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Mar 18, 2011 at 05:56:56PM +0800, Richard Zhu wrote:
+> Add one flag to indicate the GPIO CD/WP is enabled or not
+> on imx platforms, and reuse the writel/readl as the general
+> APIs for imx SOCs.
+> 
+> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
 
-On 17-03-2011 15:44, Javier Martin wrote:
+You addressed 2 out of 3 comments nicely. But you still cast the void*
+back and forth which is unnecessary. After that, I think we are finally
+done.
 
-> User push button in Beagleboard xM is 4 instead of 7.
-
-> Signed-off-by: Javier Martin<javier.martin@vista-silicon.com>
-[...]
-
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 46d814a..abf87d1 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -615,6 +615,10 @@ static void __init omap3_beagle_init(void)
->   	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->   	omap3_beagle_init_rev();
->   	omap3_beagle_i2c_init();
-> +	/* xM version uses pin 4 instead of 7 for user button */
-> +	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-> +		gpio_buttons[0].gpio = 4;
-> +	}
-
-    I think checkpatch.pl should warn about unneeded {}.
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110318/4684863e/attachment-0001.sig>
