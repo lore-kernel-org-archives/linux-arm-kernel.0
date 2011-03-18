@@ -1,33 +1,34 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Fri, 18 Mar 2011 18:06:14 +0100
-Subject: [PATCH v2 2/9] lpc2k: Exception vector handling
-In-Reply-To: <20110318151650.GL29758@n2100.arm.linux.org.uk>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Fri, 18 Mar 2011 18:15:26 +0100
+Subject: [PATCH v2 4/9] lpc2k: generic time and clockevents
+In-Reply-To: <20110318152012.GM29758@n2100.arm.linux.org.uk>
 References: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300461116-6028-3-git-send-email-ithamar.adema@team-embedded.nl>
-	<20110318151650.GL29758@n2100.arm.linux.org.uk>
-Message-ID: <1300467974.2138.164.camel@team-embedded-2>
+	<1300461116-6028-5-git-send-email-ithamar.adema@team-embedded.nl>
+	<20110318152012.GM29758@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F80B15C9BD57@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-03-18 at 15:16 +0000, Russell King - ARM Linux wrote:
-> On Fri, Mar 18, 2011 at 04:11:49PM +0100, Ithamar R. Adema wrote:
-> > Since the LPC2K does not have an MMU (ARM7TDMI based), it expects the vectors to be
-> > stored in on-chip SRAM. However, this moves the vectors too far away from the stubs
-> > page, requiring the vector jumps to be indirect.
+
+
 > 
-> Why not copy the vectors and stubs just like we do for MMU-based kernels?
+> On Fri, Mar 18, 2011 at 04:11:51PM +0100, Ithamar R. Adema wrote:
+> > +	clk = clk_get(NULL, "timer1");
+> > +	BUG_ON(IS_ERR(clk));
 
-The problem here is the remapping of the low vectors that the LPC2K SoC
-does. Although we store the vectors (and stubs) @ 0x40000000 (SRAM) the
-SoC remaps only the first 64 bytes of that to address 0x00000000 (low
-vectors).
+I didn't see a specific enable for timer0, it seems to work for me
+because my boot loader leaves it on when booting the kernel, but
+maybe it's also needed.
 
-This means that although the vectors are accessible, the stubs are not.
-The 64 bytes cover the vectors itself, and the 1-word per vector address
-variable stored directly after the vectors.
 
-I'll update the commit log to be a bit more clear on this.
-
-Regards,
-
-Ithamar.
+> > +
+> > +	clk_enable(clk);
+> > +	rate = clk_get_rate(clk);
+> > +	clk_put(clk);
+> 
+> Don't put a clock that you continue to use.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
