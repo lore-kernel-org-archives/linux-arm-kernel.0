@@ -1,116 +1,62 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Fri, 18 Mar 2011 17:56:57 +0800
-Subject: [PATCH V7 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <1300442217-1060-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300442217-1060-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1300442217-1060-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Mar 2011 10:15:12 +0000
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+References: <20110317183048.GW7258@atomide.com>
+	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+Message-ID: <20110318101512.GA15375@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the NO INT in the Multi-BLK IO in SD/MMC, and Multi-BLK
-read in SDIO on imx53.
+On Thu, Mar 17, 2011 at 07:50:36PM -0700, Linus Torvalds wrote:
+> On Thu, Mar 17, 2011 at 11:30 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > Please pull omap changes for this merge window from:
+> 
+> Gaah. Guys, this whole ARM thing is a f*cking pain in the ass.
 
-The CMDTYPE of the CMD register (offset 0xE) should be set to
-"11" when the STOP CMD12 is issued on imx53 to abort one
-open ended multi-blk IO. Otherwise one the TC INT wouldn't
-be generated.
+Please be more specific.  ARM is not small.  ARM as an architecture is
+_massive_, with lots of people working in it.  By blaming 'ARM', it's a
+bit like blaming the entire planet for problems in one country.
 
-In exact block transfer, the controller doesn't complete the
-operations automatically as required at the end of the
-transfer and remains on hold if the abort command is not sent on
-imx53.
-As a result, the TC flag is not asserted and SW  received timeout
-exeception. set bit1 of Vendor Spec registor to fix it.
+You've only had merge conflicts with IMX/MXC and OMAP so far, and that
+hardly warrants taring the "whole ARM thing" with the same brush.
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   42 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+Most people are trying very hard to do the right thing.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index a558d86..fac0204 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -19,13 +19,31 @@
- #include <linux/slab.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
-+#include <linux/mmc/mmc.h>
-+#include <linux/mmc/sdio.h>
- #include <mach/hardware.h>
- #include <mach/esdhc.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
- 
-+/* VENDOR SPEC register */
-+#define SDHCI_VENDOR_SPEC		0xC0
-+#define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-+/*
-+ * The CMDTYPE of the CMD register (offset 0xE) should be set to
-+ * "11" when the STOP CMD12 is issued on imx53 to abort one
-+ * open ended multi-blk IO. Otherwise the TC INT wouldn't
-+ * be generated.
-+ * In exact block transfer, the controller doesn't complete the
-+ * operations automatically as required@the end of the
-+ * transfer and remains on hold if the abort command is not sent.
-+ * As a result, the TC flag is not asserted and SW  received timeout
-+ * exeception. Bit1 of Vendor Spec registor is used to fix it.
-+ */
-+#define ESDHC_FLAG_MULTIBLK_NO_INT	(1 << 1)
- 
- struct pltfm_imx_data {
- 	int flags;
-@@ -80,6 +98,15 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 		 */
- 		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
- 
-+	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (reg == SDHCI_INT_STATUS)
-+				&& (val & SDHCI_INT_DATA_END))) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v &= ~SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+	}
-+
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -103,9 +130,21 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		 * Postpone this write, we must do it together with a
- 		 * command write that is down below.
- 		 */
-+		if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
-+				&& (host->cmd->data->blocks > 1)
-+				&& (host->cmd->data->flags & MMC_DATA_READ)) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v |= SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+		}
- 		imx_data->scratchpad = val;
- 		return;
- 	case SDHCI_COMMAND:
-+		if ((host->cmd->opcode == MMC_STOP_TRANSMISSION)
-+			&& (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
-+			val |= SDHCI_CMD_ABORTCMD;
- 		writel(val << 16 | imx_data->scratchpad,
- 			host->ioaddr + SDHCI_TRANSFER_MODE);
- 		return;
-@@ -213,6 +252,9 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
- 	}
- 
-+	if (!(cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()))
-+		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
-+
- 	if (boarddata) {
- 		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
- 		if (err) {
--- 
-1.7.1
+> Somebody needs to get a grip in the ARM community. I do want to do
+> these merges, just to see how screwed up things are, but guys, this is
+> just ridiculous.
+
+It isn't as bad as you think it is for the majority of ARM stuff.
+
+> The pure amount of crazy churn is annoying in itself,
+> but when I then get these "independent" pull requests from four
+> different people, and they touch the same files, that indicates that
+> something is wrong.
+
+I have already complained to Uwe and Sascha about the IMX/MXC conflicts.
+It already struck me that there's something seriously wrong at
+pengutronix.com as both Uwe and Sascha work in the same area, yet don't
+coordinate their efforts.  It seems to me that Uwe is completely
+independent of everyone else.
+
+As for anything else, I really don't see a problem.  There are changes
+in core ARM code which have impacts on _every_ ARM platform.  It's just
+a fact of life that there could be conflicts between core changes and
+platform changes.  That's not because things are uncoordinated - I do
+try to ensure that such patches receive as many acks from maintainers
+as possible.
+
+> Somebody in the ARM community really needs to step up and tell people
+> to stop dicking around.
+
+You mean like I've already done with Uwe and Sascha?
+
+I do get the impression that you're extremely unhappy with the way ARM
+stuff works, and I've no real idea how to solve that.  I think much of
+it is down to perception rather than anything tangible.
+
+Maybe the only solution is for ARM to fork the kernel, which is something
+I really don't want to do - but from what I'm seeing its the only solution
+which could come close to making you happy.
