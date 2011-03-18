@@ -1,20 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2011 15:27:41 +0000
-Subject: [PATCH v2 1/9] lpc2k: Core support
-In-Reply-To: <1300461116-6028-2-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300461116-6028-2-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <20110318152741.GP29758@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 18 Mar 2011 12:30:55 -0300
+Subject: [PATCHv4 2/3] ARM: mx51: Implement code to allow mx51 to enter WFI
+In-Reply-To: <1300461684-21775-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300461684-21775-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300461684-21775-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <AANLkTimg6uc9cq53e54BqLsRzPXH1DNBF9cThHavdJs=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 04:11:48PM +0100, Ithamar R. Adema wrote:
-> +config ARCH_LPC2K
-> +	bool "NXP LPC2K Family"
-> +	depends on !MMU
-> +	select CPU_ARM7TDMI
-> +	select ARM_VIC
-> +	select GENERIC_TIME
+Hi Dinh,
 
-GENERIC_TIME no longer exists as a valid configuration symbol, so please
-remove this.
+On Fri, Mar 18, 2011 at 12:21 PM,  <Dinh.Nguyen@freescale.com> wrote:
+...
+> + ? ? ? /* Enable NEON SRPG for all but MX50TO1.0. */
+> + ? ? ? if (cpu_is_mx51() || cpu_is_mx53())
+> + ? ? ? ? ? ? ? __raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
+
+The comment says that NEON SRPG should not be enabled for MX50 TO1.0,
+but your code does not check the MX50 silicon revision.
+
+Regards,
+
+Fabio Estevam
