@@ -1,62 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2011 10:15:12 +0000
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-Message-ID: <20110318101512.GA15375@n2100.arm.linux.org.uk>
+From: vincent.palatin_lkml@m4x.org (Vincent Palatin)
+Date: Fri, 18 Mar 2011 07:03:06 -0400
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+In-Reply-To: <AANLkTimjit3ZqwjDDrpw+iBfaq34QAQr0JCDnQuBybGZ@mail.gmail.com>
+References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
+	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
+	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
+	<AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+	<AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
+	<AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
+	<AANLkTi=3s6ZRkaBG4uaS=7kaLWD-q2MgN0cN1otBrcmy@mail.gmail.com>
+	<AANLkTikG=euGb1f4v50p9xwYtSuZ78aRgJ6XTfxy0TPR@mail.gmail.com>
+	<AANLkTintEi=JO222wQARaacpfHPor5usnz-qhNAAFXjm@mail.gmail.com>
+	<AANLkTi=RQ3-ZkDKPOByGsey-E45cVA-5Rj3zWOjLutiy@mail.gmail.com>
+	<AANLkTik7i9Q9ctdMYno3VcJvcAHpN8g_3KifV+aen9-n@mail.gmail.com>
+	<AANLkTim+f5PyGshq5jppzyk=W9t4R8Yw6jxU6VstvH55@mail.gmail.com>
+	<AANLkTimjit3ZqwjDDrpw+iBfaq34QAQr0JCDnQuBybGZ@mail.gmail.com>
+Message-ID: <AANLkTinywQZtCpUppZ-2eSqV6s+b+5kDZ6hRVJ36ewgi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 07:50:36PM -0700, Linus Torvalds wrote:
-> On Thu, Mar 17, 2011 at 11:30 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > Please pull omap changes for this merge window from:
-> 
-> Gaah. Guys, this whole ARM thing is a f*cking pain in the ass.
+>> > Just one more question: whats Russell's tree?
+>>
+>> AFAIK: That one :
+>> http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
+>>
+>
+> this does not seem to be a pointer to a valid git repo, or am I missing
+> something?
 
-Please be more specific.  ARM is not small.  ARM as an architecture is
-_massive_, with lots of people working in it.  By blaming 'ARM', it's a
-bit like blaming the entire planet for problems in one country.
+The URL is unusual but
+git clone http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
+works for me.
 
-You've only had merge conflicts with IMX/MXC and OMAP so far, and that
-hardly warrants taring the "whole ARM thing" with the same brush.
+by the way this server connectivity has limited bandwidth, you would
+rather clone the linus Tree and add this one as another remote :
 
-Most people are trying very hard to do the right thing.
+git remote add arm
+http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
+git remote update
+git checkout -b arm-devel arm/devel
 
-> Somebody needs to get a grip in the ARM community. I do want to do
-> these merges, just to see how screwed up things are, but guys, this is
-> just ridiculous.
-
-It isn't as bad as you think it is for the majority of ARM stuff.
-
-> The pure amount of crazy churn is annoying in itself,
-> but when I then get these "independent" pull requests from four
-> different people, and they touch the same files, that indicates that
-> something is wrong.
-
-I have already complained to Uwe and Sascha about the IMX/MXC conflicts.
-It already struck me that there's something seriously wrong at
-pengutronix.com as both Uwe and Sascha work in the same area, yet don't
-coordinate their efforts.  It seems to me that Uwe is completely
-independent of everyone else.
-
-As for anything else, I really don't see a problem.  There are changes
-in core ARM code which have impacts on _every_ ARM platform.  It's just
-a fact of life that there could be conflicts between core changes and
-platform changes.  That's not because things are uncoordinated - I do
-try to ensure that such patches receive as many acks from maintainers
-as possible.
-
-> Somebody in the ARM community really needs to step up and tell people
-> to stop dicking around.
-
-You mean like I've already done with Uwe and Sascha?
-
-I do get the impression that you're extremely unhappy with the way ARM
-stuff works, and I've no real idea how to solve that.  I think much of
-it is down to perception rather than anything tangible.
-
-Maybe the only solution is for ARM to fork the kernel, which is something
-I really don't want to do - but from what I'm seeing its the only solution
-which could come close to making you happy.
+-- 
+Vincent
