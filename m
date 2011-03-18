@@ -1,27 +1,47 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Fri, 18 Mar 2011 10:44:22 +0100
-Subject: [PATCH 3/9] lpc2k: clk API
-In-Reply-To: <083DF309106F364B939360100EC290F80B15AC2B3B@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300377264-10843-4-git-send-email-ithamar.adema@team-embedded.nl>
-	<083DF309106F364B939360100EC290F80B15AC2B3B@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <1300441462.2138.129.camel@team-embedded-2>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Fri, 18 Mar 2011 17:56:54 +0800
+Subject: [PATCH V7 1/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET
+	from ESDHC_DEFAULT_QUIRKS
+Message-ID: <1300442217-1060-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET. Make it OF-specific.
 
-On Thu, 2011-03-17 at 23:08 +0100, Kevin Wells wrote:
-> > +static DEFINE_MUTEX(clocks_mutex);
-> 
-> I tried this lock mechanism and occasionally I get warnings when mutex
-> checking is enabled and multiple calls occur to the clk_* functions
-> with active clock management. Spinlocks might be better, but maybe
-> some one else can chime in here.
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/mmc/host/sdhci-esdhc.h    |    3 +--
+ drivers/mmc/host/sdhci-of-esdhc.c |    3 ++-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Looking at the other mach-*/clock.c implementations, most seem to agree
-on spinlocks. Will change for v2.
-
-Regards,
-
-Ithamar.
+diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+index c55aae8..c3b08f1 100644
+--- a/drivers/mmc/host/sdhci-esdhc.h
++++ b/drivers/mmc/host/sdhci-esdhc.h
+@@ -23,8 +23,7 @@
+ 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
+ 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+ 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
+-				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
+-				SDHCI_QUIRK_NO_CARD_NO_RESET)
++				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+ 
+ #define ESDHC_SYSTEM_CONTROL	0x2c
+ #define ESDHC_CLOCK_MASK	0x0000fff0
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index 08161f6..ba40d6d 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -74,7 +74,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+ 
+ struct sdhci_of_data sdhci_esdhc = {
+ 	/* card detection could be handled via GPIO */
+-	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
++	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION
++		| SDHCI_QUIRK_NO_CARD_NO_RESET,
+ 	.ops = {
+ 		.read_l = sdhci_be32bs_readl,
+ 		.read_w = esdhc_readw,
+-- 
+1.7.1
