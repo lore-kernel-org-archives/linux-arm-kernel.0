@@ -1,42 +1,27 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 18 Mar 2011 09:11:40 +0100
-Subject: [PATCH 1/2] drivers/watchdog/s3c2410_wdt.c: Convert
-	release_resource to release_region/release_mem_region
-In-Reply-To: <Pine.LNX.4.64.1102281110090.14560@pc-004.diku.dk>
-References: <1298738079-28893-1-git-send-email-julia@diku.dk>
-	<002e01cbd72f$448ac150$cda043f0$%kim@samsung.com>
-	<Pine.LNX.4.64.1102281110090.14560@pc-004.diku.dk>
-Message-ID: <20110318081140.GS1751@infomag.iguana.be>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Mar 2011 09:26:23 +0100
+Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052
+	regulator v2
+In-Reply-To: <20110317234241.GB32168@sortiz-mobl>
+References: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
+	<20110317234241.GB32168@sortiz-mobl>
+Message-ID: <AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia, Kukjin Kim,
+On Fri, Mar 18, 2011 at 12:42 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
+> On Wed, Mar 09, 2011 at 12:03:16PM +0000, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
+>
+> Patch applied as well.
 
-> > Hmm...I think, 'res' is better for platform_get_resource().
-> > Do we _really_ need to change the name?...
-> 
-> wdt_mem is a global variable.  Is res a good name for a global variable?  
-> One could say wdt_mem = res, if that seems better.
+Oh no please skip that patch for now.
 
-If you look at the code then you have:
-static struct resource  *wdt_mem;
-static struct resource  *wdt_irq;
+It will just collide with Russell's tree in -next and wreak havoc.
 
-and in the probe function you have:
-        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	...
-	wdt_mem = request_mem_region(res->start, size, pdev->name);
-	...
-	wdt_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+I will take that platform data in the next merge window or through
+Torvalds' tree after Russells and yours is merged, safest path.
 
-So doing Julia's:
-	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	...
-	if (!request_mem_region(wdt_mem->start, size, pdev->name)) {
-	...
-	wdt_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0)
-
-seems the best solution to me (since you then have both resources being polulated via platform_get_resource(pdev,... ).
-
-Kind regards,
-Wim.
+Linus Walleij
