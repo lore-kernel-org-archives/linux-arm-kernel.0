@@ -1,27 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Mar 2011 09:26:23 +0100
-Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052
-	regulator v2
-In-Reply-To: <20110317234241.GB32168@sortiz-mobl>
-References: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
-	<20110317234241.GB32168@sortiz-mobl>
-Message-ID: <AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Fri, 18 Mar 2011 09:31:46 +0100
+Subject: [PATCH] MX51: Add AUDMUX ports definitions
+Message-ID: <1300437106-16960-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 12:42 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
-> On Wed, Mar 09, 2011 at 12:03:16PM +0000, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
->
-> Patch applied as well.
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-Oh no please skip that patch for now.
 
-It will just collide with Russell's tree in -next and wreak havoc.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+ arch/arm/plat-mxc/include/mach/audmux.h |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
-I will take that platform data in the next merge window or through
-Torvalds' tree after Russells and yours is merged, safest path.
-
-Linus Walleij
+diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/arch/arm/plat-mxc/include/mach/audmux.h
+index 5cd6466..6fda788 100644
+--- a/arch/arm/plat-mxc/include/mach/audmux.h
++++ b/arch/arm/plat-mxc/include/mach/audmux.h
+@@ -15,6 +15,14 @@
+ #define MX31_AUDMUX_PORT5_SSI_PINS_5	4
+ #define MX31_AUDMUX_PORT6_SSI_PINS_6	5
+ 
++#define MX51_AUDMUX_PORT1_SSI0		0
++#define MX51_AUDMUX_PORT2_SSI1		1
++#define MX51_AUDMUX_PORT3		2
++#define MX51_AUDMUX_PORT4		3
++#define MX51_AUDMUX_PORT5		4
++#define MX51_AUDMUX_PORT6		5
++#define MX51_AUDMUX_PORT7		6
++
+ /* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
+ #define MXC_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
+ #define MXC_AUDMUX_V1_PCR_INMEN		(1 << 8)
+@@ -28,7 +36,7 @@
+ #define MXC_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
+ #define MXC_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
+ 
+-/* Register definitions for the i.MX25/31/35 Digital Audio Multiplexer */
++/* Register definitions for the i.MX25/31/35/51 Digital Audio Multiplexer */
+ #define MXC_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
+ #define MXC_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
+ #define MXC_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
+-- 
+1.6.0.4
