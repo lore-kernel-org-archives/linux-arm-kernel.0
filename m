@@ -1,71 +1,43 @@
-From: prasadjoshi124@gmail.com (Prasad Joshi)
-Date: Fri, 18 Mar 2011 20:09:22 +0000
-Subject: [RFC][PATCH v3 21/22] mm, arm: add gfp flags variant of pmd
-	and pte allocations
-In-Reply-To: <20110318200825.GU4746@prasad-kvm>
-References: <20110318195926.GL4746@prasad-kvm>
-	<20110318200045.GM4746@prasad-kvm>
-	<20110318200150.GN4746@prasad-kvm>
-	<20110318200254.GO4746@prasad-kvm>
-	<20110318200401.GP4746@prasad-kvm>
-	<20110318200452.GQ4746@prasad-kvm>
-	<20110318200547.GR4746@prasad-kvm>
-	<20110318200638.GS4746@prasad-kvm>
-	<20110318200731.GT4746@prasad-kvm>
-	<20110318200825.GU4746@prasad-kvm>
-Message-ID: <20110318200922.GV4746@prasad-kvm>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 18 Mar 2011 14:38:26 -0700
+Subject: [PATCH] msm: uncompress.h: Fix putc unused warning
+Message-ID: <1300484306-4480-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+arch/arm/mach-msm/include/mach/uncompress.h:22:
+warning: 'putc' defined but not used
 
- - Added __pmd_alloc_one, which is same as pmd_alloc_one, but has extra parameter to specify the allocation flag
- - Added __pte_alloc_one_kernel to allocate page using specified GFP flag
- - Changed pte_alloc_one_kernel to call __pte_alloc_one_kernel newly added function using GFP_KERNEL allocation flag
- - Helps in fixing the Bug 30702
+When DEBUG_ICEDCC=y putc is redefined to icedcc_putc(). This
+leaves the putc implemtation in uncompress.h as unused,
+triggering this warning. Fix it by not compiling putc() when
+DEBUG_ICEDCC=y.
 
-Signed-off-by: Prasad Joshi <prasadjoshi124@gmail.com>
-Signed-off-by: Anand Mitra <mitra@kqinfotech.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/pgalloc.h |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-msm/include/mach/uncompress.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 22de005..0696068 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -28,6 +28,7 @@
- /*
-  * Since we have only two-level page tables, these are trivial
-  */
-+#define __pmd_alloc_one(mm,addr,mask)	({ BUG(); ((pmd_t *)2); })
- #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
- #define pmd_free(mm, pmd)		do { } while (0)
- #define pgd_populate(mm,pmd,pte)	BUG()
-@@ -59,17 +60,23 @@ static inline void clean_pte_table(pte_t *pte)
-  *  +------------+
-  */
- static inline pte_t *
--pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
-+__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr, gfp_t gfp_mask)
+diff --git a/arch/arm/mach-msm/include/mach/uncompress.h b/arch/arm/mach-msm/include/mach/uncompress.h
+index d94292c..47a5579 100644
+--- a/arch/arm/mach-msm/include/mach/uncompress.h
++++ b/arch/arm/mach-msm/include/mach/uncompress.h
+@@ -19,6 +19,7 @@
+ #include "linux/io.h"
+ #include "mach/msm_iomap.h"
+ 
++#ifndef CONFIG_DEBUG_ICEDCC
+ static void putc(int c)
  {
- 	pte_t *pte;
- 
--	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-+	pte = (pte_t *)__get_free_page(gfp_mask | __GFP_NOTRACK | __GFP_ZERO);
- 	if (pte)
- 		clean_pte_table(pte);
- 
- 	return pte;
+ #if defined(MSM_DEBUG_UART_PHYS)
+@@ -27,6 +28,7 @@ static void putc(int c)
+ 	writel(c, base + 0x0c);
+ #endif
  }
++#endif
  
-+static inline pte_t *
-+pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
-+{
-+	return __pte_alloc_one_kernel(mm, addr, GFP_KERNEL | __GFP_REPEAT);
-+}
-+
- static inline pgtable_t
- pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+ static inline void flush(void)
  {
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
