@@ -1,17 +1,16 @@
 From: carlv@codeaurora.org (Carl Vanderlip)
-Date: Fri, 18 Mar 2011 14:59:34 -0700
-Subject: [PATCH 17/20] video: msm: Prevent framebuffer glitch during
-	initialization
+Date: Fri, 18 Mar 2011 14:59:45 -0700
+Subject: [PATCH 18/20] video: msm: Prevent DMA lockups when switching bit
+	depths
 In-Reply-To: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
 References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-Message-ID: <1300485574-27600-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <1300485585-27640-1-git-send-email-carlv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Holds a reference to the mdp_clk until lateinit, and moves the frambuffer
-initialization to device_init.  The framebuffer lcdc driver will grab a
-reference to mdp_clk, which prevents the clock from being disabled by
-clock_late_init.
+Forces the lcdc off and waits a frame vsync period to prevent the MDP DMA
+engine crashing if the DMA bit depth is changed.  A sleep cannot be used
+because lcdc_dma_start is called in irq context.
 
 Authors:
 Dima Zavin <dima@android.com>
@@ -20,48 +19,27 @@ Colin Cross <ccross@android.com>
 
 Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
 ---
- drivers/video/msm/mdp.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/video/msm/mdp.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
-index 0bb19fa..b3f334ad 100644
+index b3f334ad..49d956a 100644
 --- a/drivers/video/msm/mdp.c
 +++ b/drivers/video/msm/mdp.c
-@@ -38,6 +38,7 @@ struct class *mdp_class;
+@@ -564,6 +564,13 @@ void mdp_hw_init(struct mdp_info *mdp)
+ 	mdp_writel(mdp, 1, 0x60);
+ 	mdp_writel(mdp, 1, MDP_EBI2_PORTMAP_MODE);
  
- static DECLARE_WAIT_QUEUE_HEAD(mdp_ppp_waitqueue);
- static unsigned int mdp_irq_mask;
-+struct clk *mdp_clk_to_disable_later;
- DEFINE_MUTEX(mdp_mutex);
- 
- static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
-@@ -670,6 +671,7 @@ int mdp_probe(struct platform_device *pdev)
- 	disable_irq(mdp->irq);
- 
- 	clk_enable(mdp->clk);
-+	mdp_clk_to_disable_later = mdp->clk;
- 	mdp_hw_init(mdp);
- 
- 	/* register mdp device */
-@@ -706,6 +708,13 @@ static struct platform_driver msm_mdp_driver = {
- 	.driver = {.name = "msm_mdp"},
- };
- 
-+static int __init mdp_lateinit(void)
-+{
-+	if (mdp_clk_to_disable_later)
-+		clk_disable(mdp_clk_to_disable_later);
-+	return 0;
-+}
++	/* disable lcdc */
++	mdp_writel(mdp, 0, MDP_LCDC_CTL);
++	/* enable auto clock gating for all blocks by default */
++	mdp_writel(mdp, 0xffffffff, MDP_CGC_EN);
++	/* reset color/gamma correct parms */
++	mdp_writel(mdp, 0, MDP_DMA_P_COLOR_CORRECT_CONFIG);
 +
- static int __init mdp_init(void)
- {
- 	mdp_class = class_create(THIS_MODULE, "msm_mdp");
-@@ -717,3 +726,4 @@ static int __init mdp_init(void)
- }
- 
- subsys_initcall(mdp_init);
-+late_initcall(mdp_lateinit);
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x01f8);
+ 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x01fc);
+ 	mdp_writel(mdp, 1, 0x60);
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
