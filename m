@@ -1,35 +1,81 @@
-From: samuel.ortiz@intel.com (Samuel Ortiz)
-Date: Fri, 18 Mar 2011 00:42:42 +0100
-Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052
-	regulator v2
-In-Reply-To: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
-References: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110317234241.GB32168@sortiz-mobl>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Fri, 18 Mar 2011 10:43:22 +1000
+Subject: [PATCH 2/9] lpc2k: Exception vector handling
+In-Reply-To: <1300379337.2138.88.camel@team-embedded-2>
+References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>	<1300377264-10843-3-git-send-email-ithamar.adema@team-embedded.nl>	<20110317161825.GA31219@pengutronix.de>
+	<1300379337.2138.88.camel@team-embedded-2>
+Message-ID: <4D82AAAA.1070804@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 18/03/11 02:28, Ithamar R. Adema wrote:
+> On Thu, 2011-03-17 at 17:18 +0100, Uwe Kleine-K??nig wrote:
+>> On Thu, Mar 17, 2011 at 04:54:17PM +0100, Ithamar R. Adema wrote:
+>>> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>>> index e8d8856..618a971 100644
+>>> --- a/arch/arm/kernel/entry-armv.S
+>>> +++ b/arch/arm/kernel/entry-armv.S
+>>> @@ -1208,6 +1208,7 @@ __stubs_end:
+>>>
+>>>   	.globl	__vectors_start
+>>>   __vectors_start:
+>>> +#ifndef CONFIG_ARCH_LPC2K
+>>>    ARM(	swi	SYS_ERROR0	)
+>>>    THUMB(	svc	#0		)
+>>>    THUMB(	nop			)
+>>> @@ -1218,6 +1219,23 @@ __vectors_start:
+>>>   	W(b)	vector_addrexcptn + stubs_offset
+>>>   	W(b)	vector_irq + stubs_offset
+>>>   	W(b)	vector_fiq + stubs_offset
+>>> +#else /* CONFIG_ARCH_LPC2K */
+>> The description from the commit log should be repeated here.
+>
+> OK, will include the description as comment there in the next version.
+>
+>> And I wonder if this shouldn't depend on CONFIG_ARCH_LPC2K but
+>> CONFIG_MMU.
+>
+> Well, looking at th uClinux kernel tree, it seems this was only done for
+> the NXP LPC2K range, so that's why I kept it under CONFIG_ARCH_LPC2K.
 
-On Wed, Mar 09, 2011 at 12:03:16PM +0000, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
-Patch applied as well.
+IIRC most of the non-MMU ARMs had the vectors in normal RAM, so they
+would end up close to the code. That is why this may have been the
+only one with the vectors ending up a long way away. So it is not
+specific to non-MMU, but one day there may be other types that need
+to do this too.
 
-Cheers,
-Samuel.
+Regards
+Greg
+
+
+>>> +	swi	SYS_ERROR0
+>> I think arm7tdmi doesn't have thumb2, does it? If it has you need to do
+>> ARM(swi SYS_ERROR0)
+>> THUMB(svc ..)
+>> ...
+>>
+>> as above
+>
+> Correct, the ARM7TDMI-S only supports Thumb, not Thumb2.
+>
+> Thanks for reviewing!
+>
+> Ithamar.
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
