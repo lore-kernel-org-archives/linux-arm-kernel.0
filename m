@@ -1,53 +1,67 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Fri, 18 Mar 2011 16:11:50 +0100
-Subject: [PATCH v2 3/9] lpc2k: clk API
+Date: Fri, 18 Mar 2011 16:11:54 +0100
+Subject: [PATCH v2 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's Kit
+	board
 In-Reply-To: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1300461116-6028-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300461116-6028-4-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1300461116-6028-8-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements clock API using the CLKDEV_LOOKUP common code.
+Add support for EmbeddedArtists LPC2478 Developer's Kit, consisting
+of the LPC2478OEM board, with QVGA base board. For details, see:
+
+http://www.embeddedartists.com/products/kits/lpc2478_kit.php
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
 changes since v1:
-	* changed mutex into spinlock
-	* simplified clk_readl/clk_writel macros
----
- arch/arm/Kconfig                          |    1 +
- arch/arm/mach-lpc2k/Makefile              |    2 +-
- arch/arm/mach-lpc2k/clock.c               |  360 +++++++++++++++++++++++++++++
- arch/arm/mach-lpc2k/include/mach/clkdev.h |   17 ++
- 4 files changed, 379 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/clock.c
- create mode 100644 arch/arm/mach-lpc2k/include/mach/clkdev.h
+	* Fixed RTC clock rate
+	* Marked mfp_cfgs as __initdata.
+	* renamed LPC2478OEM to more appropriate EA2478DEVKIT.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 99afdeb..ddec518 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -496,6 +496,7 @@ config ARCH_LPC2K
- 	depends on !MMU
- 	select CPU_ARM7TDMI
- 	select ARM_VIC
-+	select CLKDEV_LOOKUP
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	help
+since the machine ID was not used anywhere yet, this rename is
+harmless.
+---
+ arch/arm/mach-lpc2k/Kconfig             |    7 ++
+ arch/arm/mach-lpc2k/Makefile            |    2 +
+ arch/arm/mach-lpc2k/common.h            |   21 ++++++
+ arch/arm/mach-lpc2k/mach-ea2478devkit.c |  121 +++++++++++++++++++++++++++++++
+ arch/arm/tools/mach-types               |    2 +-
+ 5 files changed, 152 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/common.h
+ create mode 100644 arch/arm/mach-lpc2k/mach-ea2478devkit.c
+
+diff --git a/arch/arm/mach-lpc2k/Kconfig b/arch/arm/mach-lpc2k/Kconfig
+index fad47b8..210b641 100644
+--- a/arch/arm/mach-lpc2k/Kconfig
++++ b/arch/arm/mach-lpc2k/Kconfig
+@@ -2,4 +2,11 @@ if ARCH_LPC2K
+ 
+ comment "LPC2K machines"
+ 
++config MACH_EA2478DEVKIT
++	bool "Embedded Artists LPC2478 Developer's Kit"
++	help
++	  Say Y if you want the kernel to support the EmbeddedArtists
++	  LPC2478 Developer's Kit. For more hardware details, see:
++	  http://www.embeddedartists.com/products/kits/lpc2478_kit.php
++
+ endif
 diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 546666b..9eb0a6a 100644
+index 2c50bb9..93e27fb 100644
 --- a/arch/arm/mach-lpc2k/Makefile
 +++ b/arch/arm/mach-lpc2k/Makefile
-@@ -1 +1 @@
--obj-y	:= irq.o
-+obj-y	:= clock.o irq.o
-diff --git a/arch/arm/mach-lpc2k/clock.c b/arch/arm/mach-lpc2k/clock.c
+@@ -1 +1,3 @@
+ obj-y	:= clock.o irq.o gpio.o mfp.o time.o
++
++obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o
+diff --git a/arch/arm/mach-lpc2k/common.h b/arch/arm/mach-lpc2k/common.h
 new file mode 100644
-index 0000000..7631c89
+index 0000000..6b775d9
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/clock.c
-@@ -0,0 +1,360 @@
++++ b/arch/arm/mach-lpc2k/common.h
+@@ -0,0 +1,21 @@
 +/*
 + * Copyright 2011 Team Embedded VOF
 + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
@@ -57,379 +71,157 @@ index 0000000..7631c89
 + * published by the Free Software Foundation.
 + */
 +
++#ifndef LPC2K_COMMON_H
++#define LPC2K_COMMON_H
 +
-+#include <linux/module.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
++struct sys_timer;
 +
-+#include <linux/clkdev.h>
++extern void lpc2k_init_clocks(unsigned long xtal, unsigned long rtc);
++extern void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num);
++extern void lpc2k_init_irq(void);
 +
-+#include <mach/hardware.h>
-+#include <mach/regs-scb.h>
++extern struct sys_timer lpc2k_timer;
 +
-+#define clk_readl(a)	\
-+	ioread32(APB_SCB_BASE + (a))
-+#define clk_writel(v, a)	\
-+	iowrite32(v, APB_SCB_BASE + (a))
-+
-+struct clk {
-+	int		refcount;
-+	struct clk	*parent;
-+	unsigned long	rate;
-+
-+	u32		enable_mask;
-+
-+	long		(*round_rate)(struct clk *clk, unsigned long rate);
-+	int		(*set_rate)(struct clk *clk, unsigned long rate);
-+	unsigned long	(*get_rate)(struct clk *clk);
-+	int		(*set_parent)(struct clk *clk, struct clk *parent);
-+};
-+
-+static DEFINE_SPINLOCK(clk_lock);
-+
-+/*-------------------------------------------------------------------------
-+ * Standard clock functions defined in include/linux/clk.h
-+ *-------------------------------------------------------------------------*/
-+
-+static void __clk_disable(struct clk *clk)
-+{
-+	BUG_ON(clk->refcount == 0);
-+
-+	if (!(--clk->refcount)) {
-+		if (clk->parent)
-+			__clk_disable(clk->parent);
-+
-+		if (clk->enable_mask) {
-+			/* Unconditionally disable the clock in hardware */
-+			u32 value = clk_readl(PCONP);
-+			clk_writel(value & ~clk->enable_mask, PCONP);
-+		}
-+	}
-+}
-+
-+static int __clk_enable(struct clk *clk)
-+{
-+	int ret = 0;
-+
-+	if (clk->refcount++ == 0) {
-+		if (clk->parent)
-+			ret = __clk_enable(clk->parent);
-+		if (ret)
-+			return ret;
-+		else if (clk->enable_mask) {
-+			u32 value = clk_readl(PCONP);
-+			clk_writel(value | clk->enable_mask, PCONP);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+/* This function increments the reference count on the clock and enables the
-+ * clock if not already enabled. The parent clock tree is recursively enabled
-+ */
-+int clk_enable(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (!clk)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	ret = __clk_enable(clk);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_enable);
-+
-+/* This function decrements the reference count on the clock and disables
-+ * the clock when reference count is 0. The parent clock tree is
-+ * recursively disabled
-+ */
-+void clk_disable(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	if (!clk)
-+		return;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	__clk_disable(clk);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable);
-+
-+/* Retrieve the *current* clock rate. If the clock itself
-+ * does not provide a special calculation routine, ask
-+ * its parent and so on, until one is able to return
-+ * a valid clock rate
-+ */
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	if (!clk)
-+		return 0UL;
-+
-+	if (clk->get_rate)
-+		return clk->get_rate(clk);
-+
-+	if (clk->parent)
-+		return clk_get_rate(clk->parent);
-+
-+	return clk->rate;
-+}
-+EXPORT_SYMBOL_GPL(clk_get_rate);
-+
-+/* Round the requested clock rate to the nearest supported
-+ * rate that is less than or equal to the requested rate.
-+ * This is dependent on the clock's current parent.
-+ */
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (!clk)
-+		return 0;
-+	if (!clk->round_rate)
-+		return 0;
-+
-+	return clk->round_rate(clk, rate);
-+}
-+EXPORT_SYMBOL_GPL(clk_round_rate);
-+
-+/* Set the clock to the requested clock rate. The rate must
-+ * match a supported rate exactly based on what clk_round_rate returns
-+ */
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long flags;
-+	int ret = -EINVAL;
-+
-+	if (!clk)
-+		return ret;
-+	if (!clk->set_rate || !rate)
-+		return ret;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	ret = clk->set_rate(clk, rate);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_rate);
-+
-+/* Set the clock's parent to another clock source */
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	unsigned long flags;
-+	struct clk *old;
-+	int ret = -EINVAL;
-+
-+	if (!clk)
-+		return ret;
-+	if (!clk->set_parent || !parent)
-+		return ret;
-+
-+	spin_lock_irqsave(&clk_lock, flags);
-+	old = clk->parent;
-+	if (clk->refcount)
-+		__clk_enable(parent);
-+	ret = clk->set_parent(clk, parent);
-+	if (ret)
-+		old = parent;
-+	if (clk->refcount)
-+		__clk_disable(old);
-+	spin_unlock_irqrestore(&clk_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_parent);
-+
-+/* Retrieve the clock's parent clock source */
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	if (!clk)
-+		return NULL;
-+
-+	return clk->parent;
-+}
-+EXPORT_SYMBOL_GPL(clk_get_parent);
-+
-+static struct clk clk_irc = {
-+	.rate = 4000000
-+};
-+
-+static struct clk clk_xtal;
-+static struct clk clk_xrtc;
-+
-+static unsigned long pll_get_rate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	u32 pll_stat = clk_readl(PLLSTAT);
-+
-+	if (pll_stat & PLLE && pll_stat & PLLC)
-+		rate = (2 * M(pll_stat) * rate) / N(pll_stat);
-+
-+	return rate;
-+}
-+
-+static struct clk clk_pll = {
-+	.parent = NULL,
-+	.get_rate = pll_get_rate,
-+};
-+
-+static unsigned long cpu_get_rate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	return rate / (CCLKSEL(clk_readl(CCLKCFG)) + 1);
-+}
-+
-+static struct clk clk_cpu = {
-+	.parent = &clk_pll,
-+	.get_rate = cpu_get_rate,
-+};
-+
-+static unsigned long usb_get_rate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	return rate / (USBSEL(clk_readl(USBCLKCFG)) + 1);
-+}
-+
-+static struct clk clk_usb = {
-+	.enable_mask = (1 << 31),
-+	.parent = &clk_pll,
-+	.get_rate = usb_get_rate,
-+};
-+
-+static struct clk clk_apbpclk;
-+
-+static unsigned long pclkdiv[] = { 4, 1, 2, 8 };
-+
-+#define PERCLK(name, pnum)	\
-+	static unsigned long name ## _get_rate(struct clk *clk) \
-+	{	\
-+		unsigned long rate = clk_get_rate(clk->parent);	\
-+		u32 val = clk_readl((pnum < 16) ? PCLKSEL0 : PCLKSEL1); \
-+		val >>= (pnum < 16) ? pnum * 2 : (pnum - 16) * 2;	\
-+		return rate / pclkdiv[val & 3];	\
-+	}	\
-+	struct clk clk_ ## name = {	\
-+		.parent = &clk_cpu,	\
-+		.enable_mask = (1 << pnum),	\
-+		.get_rate = name ## _get_rate,	\
-+	}
-+
-+PERCLK(timer0, 1);
-+PERCLK(timer1, 2);
-+PERCLK(uart0, 3);
-+PERCLK(uart1, 4);
-+PERCLK(pwm0, 5);
-+PERCLK(pwm1, 6);
-+PERCLK(i2c0, 7);
-+PERCLK(spi, 8);
-+PERCLK(prtc, 9);
-+PERCLK(ssp1, 10);
-+PERCLK(emc, 11);
-+PERCLK(adc, 12);
-+PERCLK(can1, 13);
-+PERCLK(can2, 14);
-+PERCLK(i2c1, 19);
-+PERCLK(lcd, 20);
-+PERCLK(ssp0, 21);
-+PERCLK(timer2, 22);
-+PERCLK(timer3, 23);
-+PERCLK(uart2, 24);
-+PERCLK(uart3, 25);
-+PERCLK(i2c2, 26);
-+PERCLK(i2s, 27);
-+PERCLK(mci, 28);
-+PERCLK(dma, 29);
-+PERCLK(eth, 30);
-+
-+#define INIT_CK(dev, con, ck)	\
-+	{ .dev_id = dev, .con_id = con, .clk = ck }
-+
-+
-+/* clk_rtc is a virtual clock used as glue to adjust at runtime
-+ * if we're using the normal peripheral clock or an extern osc.
-+ */
-+static struct clk clk_rtc;
-+
-+static struct clk_lookup clocks[] = {
-+	INIT_CK(NULL, "apb_pclk", &clk_apbpclk),
-+	INIT_CK(NULL, "irc", &clk_irc),
-+	INIT_CK(NULL, "xtal", &clk_xtal),
-+	INIT_CK(NULL, "pll", &clk_pll),
-+	INIT_CK(NULL, "cpu", &clk_cpu),
-+	INIT_CK(NULL, "usb", &clk_usb),
-+	INIT_CK(NULL, "timer0", &clk_timer0),
-+	INIT_CK(NULL, "timer1", &clk_timer1),
-+	INIT_CK(NULL, "timer2", &clk_timer2),
-+	INIT_CK(NULL, "timer3", &clk_timer3),
-+	INIT_CK("lpc2k-pwm.0", NULL, &clk_pwm0),
-+	INIT_CK("lpc2k-pwm.1", NULL, &clk_pwm1),
-+	INIT_CK("lpc2k-adc", NULL, &clk_adc),
-+	INIT_CK("lpc2k-i2c.0", NULL, &clk_i2c0),
-+	INIT_CK("lpc2k-i2c.1", NULL, &clk_i2c1),
-+	INIT_CK("lpc2k-i2c.2", NULL, &clk_i2c2),
-+	INIT_CK("serial8250.0", NULL, &clk_uart0),
-+	INIT_CK("serial8250.1", NULL, &clk_uart1),
-+	INIT_CK("serial8250.2", NULL, &clk_uart2),
-+	INIT_CK("serial8250.3", NULL, &clk_uart3),
-+	INIT_CK("lpc2k-ohci", NULL, &clk_usb),
-+	INIT_CK("lpc2k-spi.0", NULL, &clk_ssp0),
-+	INIT_CK("lpc2k-spi.1", NULL, &clk_ssp1),
-+	INIT_CK("lpc2k-eth", NULL, &clk_eth),
-+	INIT_CK("lpc2k-rtc", NULL, &clk_rtc),
-+	INIT_CK("ssp0", NULL, &clk_ssp0),
-+	INIT_CK("ssp1", NULL, &clk_ssp1),
-+	INIT_CK("mci", NULL, &clk_mci),
-+	INIT_CK("lcd", NULL, &clk_lcd),
-+	INIT_CK("dma", NULL, &clk_dma),
-+};
-+
-+void __init lpc2k_init_clocks(unsigned long xtal, unsigned long rtc)
-+{
-+	struct clk *pll_src_clk[] = { &clk_irc, &clk_xtal, &clk_xrtc };
-+	int i;
-+
-+	clk_xtal.rate = xtal;
-+
-+	clk_pll.parent = pll_src_clk[CLKSRC(clk_readl(CLKSRCSEL))];
-+	clk_xrtc.rate = rtc;
-+	/* If no external RTC osc. is specified, make RTC clock child
-+	   of peripheral RTC (CPU) clock */
-+	clk_rtc.parent = rtc ? &clk_xrtc : &clk_prtc;
-+
-+	for (i = 0; i < ARRAY_SIZE(clocks); i++) {
-+		pr_debug("clock '%s', rate %luHz\n",
-+			clocks[i].con_id ? clocks[i].con_id : clocks[i].dev_id,
-+			clk_get_rate(clocks[i].clk));
-+
-+		clkdev_add(&clocks[i]);
-+	}
-+}
-diff --git a/arch/arm/mach-lpc2k/include/mach/clkdev.h b/arch/arm/mach-lpc2k/include/mach/clkdev.h
++#endif /* LPC2K_COMMON_H */
+diff --git a/arch/arm/mach-lpc2k/mach-ea2478devkit.c b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
 new file mode 100644
-index 0000000..92267cc
+index 0000000..bc9c980
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/include/mach/clkdev.h
-@@ -0,0 +1,17 @@
++++ b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
+@@ -0,0 +1,121 @@
 +/*
-+ *  Copyright (C) 2011 Team Embedded VOF
++ * Copyright (C) 2011 Team Embeded VOF
 + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#ifndef MACH_LPC2K_CLKDEV_H
-+#define MACH_LPC2K_CLKDEV_H
++#include <linux/module.h>
++#include <linux/io.h>
 +
-+#define __clk_get(clk) ({ 1; })
-+#define __clk_put(clk) do { } while (0)
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
 +
-+#endif /* MACH_LPC2K_CLKDEV_H */
++#include <mach/mfp-lpc24xx.h>
++#include <mach/hardware.h>
++
++#include "common.h"
++
++#define EXTPOLAR	0x14c
++
++static unsigned long mfp_cfgs[] __initdata = {
++	/* UART0 */
++	GPIO2_TXD0,
++	GPIO3_RXD0,
++	/* USB Host */
++	GPIO12_USB_PPWR2,
++	GPIO13_USB_UP_LED2,
++	GPIO31_USB_Dp2,
++	GPIO62_VBUS,
++	GPIO63_USB_OVRCR2,
++	/* USB Gadget */
++	GPIO29_USB_Dp1,
++	GPIO30_USB_Dn1,
++	/* Ethernet */
++	GPIO32_ENET_TXD0,
++	GPIO33_ENET_TXD1,
++	GPIO36_ENET_TX_EN,
++	GPIO40_ENET_CRS,
++	GPIO41_ENET_RXD0,
++	GPIO42_ENET_RXD1,
++	GPIO46_ENET_RX_ERR,
++	GPIO47_ENET_REF_CLK,
++	GPIO48_ENET_MDC,
++	GPIO49_ENET_MDIO,
++	/* I2C0 */
++	GPIO27_SDA0,
++	GPIO28_SCL0,
++	/* SPI */
++	GPIO15_SCK,
++	GPIO17_MISO,
++	GPIO18_MOSI,
++	/* LCD */
++	GPIO4_LCDVD0,
++	GPIO5_LCDVD1,
++	GPIO6_LCDVD8,
++	GPIO7_LCDVD9,
++	GPIO8_LCDVD16,
++	GPIO9_LCDVD17,
++	GPIO52_LCDVD10,
++	GPIO53_LCDVD11,
++	GPIO54_LCDVD12,
++	GPIO55_LCDVD13,
++	GPIO56_LCDVD14,
++	GPIO57_LCDVD15,
++	GPIO58_LCDVD20,
++	GPIO59_LCDVD21,
++	GPIO60_LCDVD22,
++	GPIO61_LCDVD23,
++	GPIO64_LCDPWR,
++	GPIO65_LCDLE,
++	GPIO66_LCDDCLK,
++	GPIO67_LCDFP,
++	GPIO68_LCDM,
++	GPIO69_LCDLP,
++	GPIO70_LCDVP4,
++	GPIO71_LCDVP5,
++	GPIO72_LCDVP6,
++	GPIO73_LCDVP7,
++	GPIO75_LCDCLKIN,
++	GPIO76_LCDVP18,
++	GPIO77_LCDVP19,
++	GPIO156_LCDVP2,
++	GPIO157_LCDVP3,
++	/* Backlight */
++	GPIO50_PWM1,
++	/* MMC/SD */
++	GPIO34_MCICLK,
++	GPIO35_MCICMD,
++	GPIO37_MCIPWR,
++	GPIO38_MCIDAT0,
++	GPIO39_MCIDAT1,
++	GPIO43_MCIDAT2,
++	GPIO44_MCIDAT3,
++};
++
++void __init ea2478devkit_init_machine(void)
++{
++	lpc2k_mfp_config(mfp_cfgs, ARRAY_SIZE(mfp_cfgs));
++}
++
++static void __init ea2478devkit_init_irq(void)
++{
++	/* XXX workaround for the fact that EINT3 is connected to high-active
++	 * signal, but can't be disabled. As the EINT3 interrupt is also used
++	 * for GPIO interrupts, this will cause an interrupt storm without
++	 * this setting.
++	 */
++	iowrite32(ioread32(APB_SCB_BASE + EXTPOLAR) | (1 << 3),
++		APB_SCB_BASE + EXTPOLAR);
++
++	lpc2k_init_irq();
++	lpc2k_init_clocks(12000000UL, 32768UL);
++}
++
++MACHINE_START(EA2478DEVKIT, "Embedded Artists LPC2478 Developer's Kit")
++	.init_irq	= ea2478devkit_init_irq,
++	.timer		= &lpc2k_timer,
++	.init_machine	= ea2478devkit_init_machine,
++MACHINE_END
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 9d6feaa..570a990 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -2667,7 +2667,7 @@ msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
+ micro2440		MACH_MICRO2440		MICRO2440		2680
+ am2440			MACH_AM2440		AM2440			2681
+ tq2440			MACH_TQ2440		TQ2440			2682
+-lpc2478oem		MACH_LPC2478OEM		LPC2478OEM		2683
++ea2478devkit		MACH_EA2478DEVKIT	EA2478DEVKIT		2683
+ ak880x			MACH_AK880X		AK880X			2684
+ cobra3530		MACH_COBRA3530		COBRA3530		2685
+ pmppb			MACH_PMPPB		PMPPB			2686
 -- 
 1.7.1
