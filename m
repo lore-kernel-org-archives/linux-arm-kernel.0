@@ -1,45 +1,48 @@
-From: julien.boibessot@free.fr (julien.boibessot at free.fr)
-Date: Fri, 18 Mar 2011 09:31:46 +0100
-Subject: [PATCH] MX51: Add AUDMUX ports definitions
-Message-ID: <1300437106-16960-1-git-send-email-julien.boibessot@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Mar 2011 09:34:39 +0100
+Subject: [RFC PATCH 2/5] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <20110312225047.27728.1835.stgit@otae.warmcat.com>
+References: <20110312224440.27728.60593.stgit@otae.warmcat.com>
+	<20110312225047.27728.1835.stgit@otae.warmcat.com>
+Message-ID: <201103180934.39997.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Boibessot <julien.boibessot@armadeus.com>
+On Saturday 12 March 2011, Andy Green wrote:
+> Introduce a generic helper function that can set a MAC address using
+> data from the OMAP unqiue CPU ID register.
+> 
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> ---
+> 
+>  arch/arm/mach-omap2/id.c              |   13 +++++++++++++
+>  arch/arm/mach-omap2/include/mach/id.h |    1 +
+>  2 files changed, 14 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 5f9086c..fc69ec5 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -506,3 +506,16 @@ void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
+>         else
+>                 tap_prod_id = 0x0208;
+>  }
+> +
+> +
+> +void omap2_die_id_to_mac(u8 *mac, int length)
+> +{
+> +       struct omap_die_id odi;
+> +
+> +       omap_get_die_id(&odi);
+> +       memcpy(mac, &odi.id_0, length);
+> +
+> +       /* mark it as not multicast and outside official 80211 MAC namespace */
+> +
+> +       mac[0] = (mac[0] & ~1) | 2;
+> +}
 
+This is a pretty clever trick, but it's not an official globally unique MAC
+address, right? Maybe we can ask TI to officially request a MAC address range
+for OMAP SoCs and document an official procedure to compute it.
 
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
----
- arch/arm/plat-mxc/include/mach/audmux.h |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/arch/arm/plat-mxc/include/mach/audmux.h
-index 5cd6466..6fda788 100644
---- a/arch/arm/plat-mxc/include/mach/audmux.h
-+++ b/arch/arm/plat-mxc/include/mach/audmux.h
-@@ -15,6 +15,14 @@
- #define MX31_AUDMUX_PORT5_SSI_PINS_5	4
- #define MX31_AUDMUX_PORT6_SSI_PINS_6	5
- 
-+#define MX51_AUDMUX_PORT1_SSI0		0
-+#define MX51_AUDMUX_PORT2_SSI1		1
-+#define MX51_AUDMUX_PORT3		2
-+#define MX51_AUDMUX_PORT4		3
-+#define MX51_AUDMUX_PORT5		4
-+#define MX51_AUDMUX_PORT6		5
-+#define MX51_AUDMUX_PORT7		6
-+
- /* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
- #define MXC_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
- #define MXC_AUDMUX_V1_PCR_INMEN		(1 << 8)
-@@ -28,7 +36,7 @@
- #define MXC_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
- #define MXC_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
- 
--/* Register definitions for the i.MX25/31/35 Digital Audio Multiplexer */
-+/* Register definitions for the i.MX25/31/35/51 Digital Audio Multiplexer */
- #define MXC_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
- #define MXC_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
- #define MXC_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
--- 
-1.6.0.4
+	Arnd
