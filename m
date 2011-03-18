@@ -1,16 +1,14 @@
 From: carlv@codeaurora.org (Carl Vanderlip)
-Date: Fri, 18 Mar 2011 14:59:45 -0700
-Subject: [PATCH 18/20] video: msm: Prevent DMA lockups when switching bit
-	depths
+Date: Fri, 18 Mar 2011 14:59:59 -0700
+Subject: [PATCH 19/20] video: msm: Separate calculation of base and offset
 In-Reply-To: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
 References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-Message-ID: <1300485585-27640-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <1300485599-27680-1-git-send-email-carlv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forces the lcdc off and waits a frame vsync period to prevent the MDP DMA
-engine crashing if the DMA bit depth is changed.  A sleep cannot be used
-because lcdc_dma_start is called in irq context.
+Separating the calculation of base and offset for luma and chroma allows
+for easier specialization for HW targets.
 
 Authors:
 Dima Zavin <dima@android.com>
@@ -19,27 +17,105 @@ Colin Cross <ccross@android.com>
 
 Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
 ---
- drivers/video/msm/mdp.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ drivers/video/msm/mdp_ppp.c |   56 ++++++++++++++++++++++--------------------
+ 1 files changed, 29 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
-index b3f334ad..49d956a 100644
---- a/drivers/video/msm/mdp.c
-+++ b/drivers/video/msm/mdp.c
-@@ -564,6 +564,13 @@ void mdp_hw_init(struct mdp_info *mdp)
- 	mdp_writel(mdp, 1, 0x60);
- 	mdp_writel(mdp, 1, MDP_EBI2_PORTMAP_MODE);
+diff --git a/drivers/video/msm/mdp_ppp.c b/drivers/video/msm/mdp_ppp.c
+index 290c29a..6d14c4f 100644
+--- a/drivers/video/msm/mdp_ppp.c
++++ b/drivers/video/msm/mdp_ppp.c
+@@ -100,6 +100,17 @@ static void rotate_dst_addr_y(struct mdp_blit_req *req,
+ 		       regs->dst_ystride;
+ }
  
-+	/* disable lcdc */
-+	mdp_writel(mdp, 0, MDP_LCDC_CTL);
-+	/* enable auto clock gating for all blocks by default */
-+	mdp_writel(mdp, 0xffffffff, MDP_CGC_EN);
-+	/* reset color/gamma correct parms */
-+	mdp_writel(mdp, 0, MDP_DMA_P_COLOR_CORRECT_CONFIG);
++static uint32_t get_luma_offset(struct mdp_img *img,
++				struct mdp_rect *rect, uint32_t bpp)
++{
++	return 0;
++}
 +
- 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x01f8);
- 	mdp_writel(mdp, 0, MDP_CMD_DEBUG_ACCESS_BASE + 0x01fc);
- 	mdp_writel(mdp, 1, 0x60);
++static uint32_t get_chroma_offset(struct mdp_img *img,
++				  struct mdp_rect *rect, uint32_t bpp)
++{
++	return 0;
++}
+ static void blit_rotate(struct mdp_blit_req *req,
+ 			struct ppp_regs *regs)
+ {
+@@ -311,24 +322,14 @@ static void flush_imgs(struct mdp_blit_req *req, struct ppp_regs *regs,
+ {
+ }
+ 
+-static void get_chroma_addr(struct mdp_img *img, struct mdp_rect *rect,
+-			    uint32_t base, uint32_t bpp, uint32_t cfg,
+-			    uint32_t *addr, uint32_t *ystride)
++static uint32_t get_chroma_base(struct mdp_img *img, uint32_t base,
++				uint32_t bpp)
+ {
+-	uint32_t compress_v = Y_TO_CRCB_RATIO(img->format);
+-	uint32_t compress_h = 2;
+-	uint32_t  offset;
+-
+-	if (IS_PSEUDOPLNR(img->format)) {
+-		offset = (rect->x / compress_h) * compress_h;
+-		offset += rect->y == 0 ? 0 :
+-			  ((rect->y + 1) / compress_v) * img->width;
+-		*addr = base + (img->width * img->height * bpp);
+-		*addr += offset * bpp;
+-		*ystride |= *ystride << 16;
+-	} else {
+-		*addr = 0;
+-	}
++	uint32_t addr = 0;
++
++	if (IS_PSEUDOPLNR(img->format))
++		addr = base + (img->width * img->height * bpp);
++	return addr;
+ }
+ 
+ #define mdp_writel_dbg(mdp, val, reg) mdp_writel((mdp), (val), (reg))
+@@ -381,6 +382,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct mdp_blit_req *req,
+ 		 struct file *dst_file, unsigned long dst_start, unsigned long dst_len)
+ {
+ 	struct ppp_regs regs = {0};
++	uint32_t luma_base;
+ 
+ 	if (unlikely(req->src.format >= MDP_IMGTYPE_LIMIT ||
+ 		     req->dst.format >= MDP_IMGTYPE_LIMIT)) {
+@@ -416,23 +418,23 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct mdp_blit_req *req,
+ 
+ 	/* set src, bpp, start pixel and ystride */
+ 	regs.src_bpp = bytes_per_pixel[req->src.format];
+-	regs.src0 = src_start + req->src.offset;
++	luma_base = src_start + req->src.offset;
++	regs.src0 = luma_base +
++		get_luma_offset(&req->src, &req->src_rect, regs.src_bpp);
++	regs.src1 = get_chroma_base(&req->src, luma_base, regs.src_bpp);
++	regs.src1 += get_chroma_offset(&req->src, &req->src_rect, regs.src_bpp);
+ 	regs.src_ystride = req->src.width * regs.src_bpp;
+ 	set_src_region(&req->src, &req->src_rect, &regs);
+-	get_chroma_addr(&req->src, &req->src_rect, regs.src0, regs.src_bpp,
+-			regs.src_cfg, &regs.src1, &regs.src_ystride);
+-	regs.src0 += (req->src_rect.x + (req->src_rect.y * req->src.width)) *
+-		      regs.src_bpp;
+ 
+ 	/* set dst, bpp, start pixel and ystride */
+ 	regs.dst_bpp = bytes_per_pixel[req->dst.format];
+-	regs.dst0 = dst_start + req->dst.offset;
++	luma_base = dst_start + req->dst.offset;
++	regs.dst0 = luma_base +
++		get_luma_offset(&req->dst, &req->dst_rect, regs.dst_bpp);
++	regs.dst1 = get_chroma_base(&req->dst, luma_base, regs.dst_bpp);
++	regs.dst1 += get_chroma_offset(&req->dst, &req->dst_rect, regs.dst_bpp);
+ 	regs.dst_ystride = req->dst.width * regs.dst_bpp;
+ 	set_dst_region(&req->dst_rect, &regs);
+-	get_chroma_addr(&req->dst, &req->dst_rect, regs.dst0, regs.dst_bpp,
+-			regs.dst_cfg, &regs.dst1, &regs.dst_ystride);
+-	regs.dst0 += (req->dst_rect.x + (req->dst_rect.y * req->dst.width)) *
+-		      regs.dst_bpp;
+ 
+ 	if (!valid_src_dst(src_start, src_len, dst_start, dst_len, req,
+ 			   &regs)) {
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
