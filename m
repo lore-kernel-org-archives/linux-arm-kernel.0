@@ -1,28 +1,34 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Fri, 18 Mar 2011 10:45:34 +1000
-Subject: [PATCH 0/9] Support for NXP LPC2K SoCs
-In-Reply-To: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300377264-10843-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <4D82AB2E.6010202@snapgear.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 18 Mar 2011 10:06:04 +0800
+Subject: [PATCH 1/7] ARM: add GPMI support for imx23/imx28
+In-Reply-To: <19841.58406.756435.967812@ipc1.ka-ro>
+References: <1300239773-4222-1-git-send-email-b32955@freescale.com>	<1300239773-4222-2-git-send-email-b32955@freescale.com>	<19840.36163.967469.53941@ipc1.ka-ro>	<4D809453.4090603@freescale.com>	<19840.43943.592336.854865@ipc1.ka-ro>	<4D816FA3.2080202@freescale.com>
+	<19841.58406.756435.967812@ipc1.ka-ro>
+Message-ID: <4D82BE0C.5050106@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/11 01:54, Ithamar R. Adema wrote:
-> The following patch series implements support for the ARM7TDMI-S based
-> NXP LPC2K System-on-Chips, and, as first board, the EmbeddedArtists
-> LPC2478 Developer's Kit.
+hi:
+
+>>> IMO all the source code could be kept in one file (except for the
+>>> include files of course) and the gpmi-nfc subdirectory removed.
+>> I really can merge some files, but IMHO, it's not a good solution to
+>> keep all in one file.
+>>
+>> The reasons are :
+>> [1] The GPMI support the NAND boot mode,but the imx23 and imx28 is a
+>> little different in
+>> the NAND boot procedure due the different firmwares in the chips. If I
+>> merge the rom-imx23.c
+>> rom-imx28.c to one file, the code will very mess. ugly enough!
+>>
+> You can use platform_ids to differentiate between the versions and
+> have separate functions for imx23 and imx28 where appropriate and
+> select between those depending on the platform_id.
 >
-> This code will work on the LPC23XX and LPC24XX ranges of chips, but will
-> need some more work for LPC21XX and LPC22XX chips.
-
-Nice to see some more non-MMU SoC parts getting pushed towards mainline!
-
-Regards
-Greg
+>
+thanks a lot.
 
 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Best Regards.
+Huang Shijie
