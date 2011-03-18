@@ -1,45 +1,84 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 18 Mar 2011 10:21:22 -0500
-Subject: [PATCHv4 1/3] ARM: mx51: Add entry for gpc_dvfs_clk
-Message-ID: <1300461684-21775-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Mar 2011 15:25:02 +0000
+Subject: [PATCHv4 3/3] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1300461684-21775-3-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300461684-21775-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300461684-21775-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300461684-21775-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20110318152502.GO29758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On Fri, Mar 18, 2011 at 10:21:24AM -0500, Dinh.Nguyen at freescale.com wrote:
+> +#include <linux/suspend.h>
+> +#include <linux/clk.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/tlb.h>
+> +#include <mach/system.h>
+> +#include "crm_regs.h"
 
-For MX51 SRPG, we need to turn on the GPC clock in order to set the
-SRPG registers.
+Why does the code below require asm/mach/map.h ?
+Why does it require asm/tlb.h ?
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 652ace4..3eb1c6e 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -865,6 +865,13 @@ static struct clk aips_tz2_clk = {
- 	.disable = _clk_ccgr_disable_inwait,
- };
- 
-+static struct clk gpc_dvfs_clk = {
-+	.enable_reg = MXC_CCM_CCGR5,
-+	.enable_shift = MXC_CCM_CCGRx_CG12_OFFSET,
-+	.enable = _clk_ccgr_enable,
-+	.disable = _clk_ccgr_disable,
-+};
-+
- static struct clk gpt_32k_clk = {
- 	.id = 0,
- 	.parent = &ckil_clk,
-@@ -1448,6 +1455,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
- 	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
- 	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
-+	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
- };
- 
- static struct clk_lookup mx53_lookups[] = {
--- 
-1.6.0.4
+> +
+> +static struct clk *gpc_dvfs_clk;
+> +
+> +static int mx5_suspend_enter(suspend_state_t state)
+> +{
+> +	if (gpc_dvfs_clk == NULL)
+> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+> +
+> +	if (gpc_dvfs_clk) {
+> +		clk_enable(gpc_dvfs_clk);
+> +		switch (state) {
+> +		case PM_SUSPEND_MEM:
+> +			mx5_cpu_lp_set(STOP_POWER_OFF);
+> +			break;
+> +		case PM_SUSPEND_STANDBY:
+> +			mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+> +			break;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +
+> +		if (state == PM_SUSPEND_MEM) {
+> +			local_flush_tlb_all();
+> +			flush_cache_all();
+> +
+> +			/*clear the EMPGC0/1 bits */
+> +			__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
+> +			__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
+> +		}
+> +		cpu_do_idle();
+> +		clk_disable(gpc_dvfs_clk);
+> +	}else {
+> +		printk(KERN_ERR "Cannot enter SRPG suspend -no gpc_dvfs clock!\n");
+> +		return -EPERM;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mx5_pm_valid(suspend_state_t state)
+> +{
+> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
+> +}
+> +
+> +static const struct platform_suspend_ops mx5_suspend_ops = {
+> +	.valid = mx5_pm_valid,
+> +	.enter = mx5_suspend_enter,
+> +};
+> +
+> +static int __init mx5_pm_init(void)
+> +{
+> +	if (cpu_is_mx51())
+> +		suspend_set_ops(&mx5_suspend_ops);
+> +
+> +	return 0;
+> +}
+> +device_initcall(mx5_pm_init);
+> -- 
+> 1.6.0.4
+> 
+> 
