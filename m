@@ -1,20 +1,53 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 18 Mar 2011 10:06:41 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110318070935.GC3555@atomide.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTik_Y1uMfVTVVEdPFG0sjW2uYpeeUMKfymho3sd+@mail.gmail.com>
-	<20110318070935.GC3555@atomide.com>
-Message-ID: <AANLkTin-dwhmFjF=g90tMvGMS1hv-cod9WrQiaLfYygS@mail.gmail.com>
+Date: Fri, 18 Mar 2011 10:01:11 +0200
+Subject: [PATCH] hwspinlock: depend on OMAP4
+Message-ID: <mailman.175.1300435625.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 9:09 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Torvalds <torvalds@linux-foundation.org> [110317 20:00]:
->> Make platforms that need it "select" it or something. It looks like
->> nobody but an OMAP4 could _possibly_ ever want to answer 'y' to that
->> question, SO DON'T ASK IT!
->
-> No problem, let's make it depends on OMAP4.
+Currently only OMAP4 supports hwspinlocks, so don't bother asking
+anyone else.
 
-(patch also attached in case gmail eats my whitespace)
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/hwspinlock/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+index eb4af28..1f29bab 100644
+--- a/drivers/hwspinlock/Kconfig
++++ b/drivers/hwspinlock/Kconfig
+@@ -4,6 +4,7 @@
+
+ config HWSPINLOCK
+ 	tristate "Generic Hardware Spinlock framework"
++	depends on ARCH_OMAP4
+ 	help
+ 	  Say y here to support the generic hardware spinlock framework.
+ 	  You only need to enable this if you have hardware spinlock module
+-- 
+1.7.1
+
+--0016e6d2722740c2ce049ebd4387
+Content-Type: text/x-patch; charset=US-ASCII; name="0001-hwspinlock-depend-on-OMAP4.patch"
+Content-Disposition: attachment; 
+	filename="0001-hwspinlock-depend-on-OMAP4.patch"
+Content-Transfer-Encoding: base64
+X-Attachment-Id: f_gletqugf0
+
+RnJvbSBkMDg2ZThmOTk0YjkyNzJmOGM5OTlhZjBhNGQzMmQ4NzA3NDljNzdhIE1vbiBTZXAgMTcg
+MDA6MDA6MDAgMjAwMQpGcm9tOiBPaGFkIEJlbi1Db2hlbiA8b2hhZEB3aXplcnkuY29tPgpEYXRl
+OiBGcmksIDE4IE1hciAyMDExIDEwOjAxOjExICswMjAwClN1YmplY3Q6IFtQQVRDSF0gaHdzcGlu
+bG9jazogZGVwZW5kIG9uIE9NQVA0CgpDdXJyZW50bHkgb25seSBPTUFQNCBzdXBwb3J0cyBod3Nw
+aW5sb2Nrcywgc28gZG9uJ3QgYm90aGVyIGFza2luZwphbnlvbmUgZWxzZS4KClNpZ25lZC1vZmYt
+Ynk6IE9oYWQgQmVuLUNvaGVuIDxvaGFkQHdpemVyeS5jb20+Ci0tLQogZHJpdmVycy9od3NwaW5s
+b2NrL0tjb25maWcgfCAgICAxICsKIDEgZmlsZXMgY2hhbmdlZCwgMSBpbnNlcnRpb25zKCspLCAw
+IGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBhL2RyaXZlcnMvaHdzcGlubG9jay9LY29uZmlnIGIv
+ZHJpdmVycy9od3NwaW5sb2NrL0tjb25maWcKaW5kZXggZWI0YWYyOC4uMWYyOWJhYiAxMDA2NDQK
+LS0tIGEvZHJpdmVycy9od3NwaW5sb2NrL0tjb25maWcKKysrIGIvZHJpdmVycy9od3NwaW5sb2Nr
+L0tjb25maWcKQEAgLTQsNiArNCw3IEBACiAKIGNvbmZpZyBIV1NQSU5MT0NLCiAJdHJpc3RhdGUg
+IkdlbmVyaWMgSGFyZHdhcmUgU3BpbmxvY2sgZnJhbWV3b3JrIgorCWRlcGVuZHMgb24gQVJDSF9P
+TUFQNAogCWhlbHAKIAkgIFNheSB5IGhlcmUgdG8gc3VwcG9ydCB0aGUgZ2VuZXJpYyBoYXJkd2Fy
+ZSBzcGlubG9jayBmcmFtZXdvcmsuCiAJICBZb3Ugb25seSBuZWVkIHRvIGVuYWJsZSB0aGlzIGlm
+IHlvdSBoYXZlIGhhcmR3YXJlIHNwaW5sb2NrIG1vZHVsZQotLSAKMS43LjEKCg==
+--0016e6d2722740c2ce049ebd4387--
