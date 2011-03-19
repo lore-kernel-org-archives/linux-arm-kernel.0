@@ -1,38 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Mar 2011 17:34:11 -0700
-Subject: [GIT PULL] OMAP PM updates for 2.6.39
-In-Reply-To: <4D7E71C0.4010808@openelec.tv>
-References: <87k4g6eakw.fsf@ti.com> <4D7E6DCF.1060703@openelec.tv>
-	<20110314193848.GI7258@atomide.com> <4D7E71C0.4010808@openelec.tv>
-Message-ID: <20110319003411.GG18583@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 18 Mar 2011 23:00:02 -0400 (EDT)
+Subject: [PATCH] ARM: kernel/sleep.S: fix Thumb2 compilation issues
+Message-ID: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephan Raue <mailinglists@openelec.tv> [110314 12:49]:
-> >
-> >Tony
-> patch attached.
-> 
-> i am using http://gitorious.org/linux-omap-dss2/linux with
-> gcc-4.5.2, binutils-2.21
 
-Still need a proper patch description and your Signed-off-by line :)
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-See Documentation/Submit* files in your kernel directory for
-more info.
-
-Tony
-
- 
-> diff -Naur linux-2.6.38-rc8/arch/arm/mach-omap2/Makefile linux-2.6.38-rc8.patch/arch/arm/mach-omap2/Makefile
-> --- linux-2.6.38-rc8/arch/arm/mach-omap2/Makefile	2011-03-14 20:38:21.039926899 +0100
-> +++ linux-2.6.38-rc8.patch/arch/arm/mach-omap2/Makefile	2011-03-14 20:39:01.679108209 +0100
-> @@ -68,7 +68,7 @@
->  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
->  
->  AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
-> -AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
-> +AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
->  
->  ifeq ($(CONFIG_PM_VERBOSE),y)
->  CFLAGS_pm_bus.o				+= -DDEBUG
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index bfad698..6398ead 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -119,11 +119,19 @@ ENTRY(cpu_resume)
+ #else
+ 	ldr	r0, sleep_save_sp	@ stack phys addr
+ #endif
+-	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
++	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+ #ifdef MULTI_CPU
+-	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
++	@ load v:p, stack, return fn, resume fn
++  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
++THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
++THUMB(	mov	sp, r2			)
++THUMB(	mov	lr, r3			)
++THUMB(	bx	r4			)
+ #else
+-	ldmia	r0!, {r1, sp, lr}	@ load v:p, stack, return fn
++	@ load v:p, stack, return fn
++  ARM(	ldmia	r0!, {r1, sp, lr}	)
++THUMB(	ldmia	r0!, {r1, r2, lr}	)
++THUMB(	mov	sp, r2			)
+ 	b	cpu_do_resume
+ #endif
+ ENDPROC(cpu_resume)
