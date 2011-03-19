@@ -1,21 +1,70 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sat, 19 Mar 2011 11:14:12 +0100
-Subject: [PATCH V12 0/4] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <cover.1298878618.git.richard.cochran@omicron.at>
-References: <cover.1298878618.git.richard.cochran@omicron.at>
-Message-ID: <20110319101412.GA14207@riccoc20.at.omicron.at>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sat, 19 Mar 2011 23:49:56 +0800
+Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
+In-Reply-To: <20110318155428.GA22087@n2100.arm.linux.org.uk>
+References: <1300184096-13937-4-git-send-email-jamie@jamieiles.com>
+	<87vczkmy94.fsf@macbook.be.48ers.dk>
+	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
+	<871v26m8tf.fsf@macbook.be.48ers.dk>
+	<20110317085835.GC29758@n2100.arm.linux.org.uk>
+	<87wrjyksnm.fsf@macbook.be.48ers.dk>
+	<20110317093403.GA15396@pulham.picochip.com>
+	<20110317215101.GC2927@pulham.picochip.com>
+	<20110318154118.GQ29758@n2100.arm.linux.org.uk>
+	<20110318154839.GB3393@pulham.picochip.com>
+	<20110318155428.GA22087@n2100.arm.linux.org.uk>
+Message-ID: <4D84D0A4.5000308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all those interested in the user space aspect, I have posted some
-patches to ptpd project showing how the API works.
+On 3/18/2011 11:54 PM, Russell King - ARM Linux :
+> On Fri, Mar 18, 2011 at 03:48:39PM +0000, Jamie Iles wrote:
+>> On Fri, Mar 18, 2011 at 03:41:18PM +0000, Russell King - ARM Linux wrote:
+>>> On Thu, Mar 17, 2011 at 09:51:01PM +0000, Jamie Iles wrote:
+>>>> On Thu, Mar 17, 2011 at 09:34:03AM +0000, Jamie Iles wrote:
+>>>>> Ok, I'll rename to macb_platform_data and update at91_ether to use 
+>>>>> that with a comment describing that we're sharing the platform data 
+>>>>> with macb.  At least that gets rid of the preprocessor stuff in 
+>>>>> board.h for at91 too.
+>>>>
+>>>> So here's the updated patch with changes to the at91_ether driver to 
+>>>> share the data with macb.
+>>>>
+>>>> Russell, are you happy to take this series?  If so, how would you prefer 
+>>>> it, in the patch system or as a git pull?
+>>>
+>>> As Nicolas Ferre is listed in MAINTAINERS as being responsible for the
+>>> MACB driver, I think he should at last Ack these patches first.
+>>
+>> OK, that's absolutely fine with me.
+>>
+>>> I'm also concious of the fact that Linus complains if my tree contains
+>>> changes for drivers/ stuff as well as ARM stuff, so I'm nervous about
+>>> taking it as-is.  So, I'd rather see drivers stuff separated as much
+>>> as possible from the arch updates.
+>>
+>> I happy to split the driver and arch updates, but I'm not sure that it 
+>> can be done in such a way that platforms would build between the arch 
+>> and driver merges.
+>>
+>>> I'm also concious that this has become ready for potentially merging
+>>> during the merge window, and therefore hasn't had previous exposure
+>>> in linux-next, and so should wait until the next merge window.  I do
+>>> feel that I'm going to be yelled at for saying that... but I'm sure
+>>> I'll also be yelled at if I did take it.
+>>
+>> I don't have any problem with waiting until the next merge window, and 
+>> to be honest I'd like see these patches have some time in next as I 
+>> can't test them on devices with a MACB.
+> 
+> Okay, that sounds like a very good reason to wait until Nicolas can
+> review them and provide an ack.
 
-https://sourceforge.net/tracker/?group_id=139814&atid=744634
+Be sure that I am silently following this series in the background (too
+silently ? ;-) ). I will provide an ack after a last review and testing
+but as you have all fruitfully discussed main aspects I am very happy
+with the way it is going.
 
-3225599 [PATCH 1/3] Convert to POSIX clock API.
-3225603 [PATCH 2/3] Adapted to use the Linux PTP Hardware Clock API.
-3225607 [PATCH 3/3] Adapted to use the newer SO_TIMESTAMPING Linux API.
-
-Enjoy,
-
-Richard
+Thanks to all of you, best regards,
+-- 
+Nicolas Ferre
