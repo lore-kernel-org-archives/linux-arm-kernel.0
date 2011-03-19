@@ -1,36 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Mar 2011 16:43:18 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTin-dwhmFjF=g90tMvGMS1hv-cod9WrQiaLfYygS@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTik_Y1uMfVTVVEdPFG0sjW2uYpeeUMKfymho3sd+@mail.gmail.com>
-	<20110318070935.GC3555@atomide.com>
-	<AANLkTin-dwhmFjF=g90tMvGMS1hv-cod9WrQiaLfYygS@mail.gmail.com>
-Message-ID: <20110318234318.GC18583@atomide.com>
+Date: Fri, 18 Mar 2011 17:34:11 -0700
+Subject: [GIT PULL] OMAP PM updates for 2.6.39
+In-Reply-To: <4D7E71C0.4010808@openelec.tv>
+References: <87k4g6eakw.fsf@ti.com> <4D7E6DCF.1060703@openelec.tv>
+	<20110314193848.GI7258@atomide.com> <4D7E71C0.4010808@openelec.tv>
+Message-ID: <20110319003411.GG18583@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110318 01:04]:
-> On Fri, Mar 18, 2011 at 9:09 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Torvalds <torvalds@linux-foundation.org> [110317 20:00]:
-> >> Make platforms that need it "select" it or something. It looks like
-> >> nobody but an OMAP4 could _possibly_ ever want to answer 'y' to that
-> >> question, SO DON'T ASK IT!
+* Stephan Raue <mailinglists@openelec.tv> [110314 12:49]:
 > >
-> > No problem, let's make it depends on OMAP4.
+> >Tony
+> patch attached.
 > 
-> From d086e8f994b9272f8c999af0a4d32d870749c77a Mon Sep 17 00:00:00 2001
-> From: Ohad Ben-Cohen <ohad@wizery.com>
-> Date: Fri, 18 Mar 2011 10:01:11 +0200
-> Subject: [PATCH] hwspinlock: depend on OMAP4
-> 
-> Currently only OMAP4 supports hwspinlocks, so don't bother asking
-> anyone else.
-> 
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> i am using http://gitorious.org/linux-omap-dss2/linux with
+> gcc-4.5.2, binutils-2.21
 
-Thanks I'll queue this.
+Still need a proper patch description and your Signed-off-by line :)
 
-Regards,
+See Documentation/Submit* files in your kernel directory for
+more info.
 
 Tony
+
+ 
+> diff -Naur linux-2.6.38-rc8/arch/arm/mach-omap2/Makefile linux-2.6.38-rc8.patch/arch/arm/mach-omap2/Makefile
+> --- linux-2.6.38-rc8/arch/arm/mach-omap2/Makefile	2011-03-14 20:38:21.039926899 +0100
+> +++ linux-2.6.38-rc8.patch/arch/arm/mach-omap2/Makefile	2011-03-14 20:39:01.679108209 +0100
+> @@ -68,7 +68,7 @@
+>  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+>  
+>  AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+> -AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
+> +AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
+>  
+>  ifeq ($(CONFIG_PM_VERBOSE),y)
+>  CFLAGS_pm_bus.o				+= -DDEBUG
