@@ -1,70 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 19 Mar 2011 23:49:56 +0800
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <20110318155428.GA22087@n2100.arm.linux.org.uk>
-References: <1300184096-13937-4-git-send-email-jamie@jamieiles.com>
-	<87vczkmy94.fsf@macbook.be.48ers.dk>
-	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
-	<871v26m8tf.fsf@macbook.be.48ers.dk>
-	<20110317085835.GC29758@n2100.arm.linux.org.uk>
-	<87wrjyksnm.fsf@macbook.be.48ers.dk>
-	<20110317093403.GA15396@pulham.picochip.com>
-	<20110317215101.GC2927@pulham.picochip.com>
-	<20110318154118.GQ29758@n2100.arm.linux.org.uk>
-	<20110318154839.GB3393@pulham.picochip.com>
-	<20110318155428.GA22087@n2100.arm.linux.org.uk>
-Message-ID: <4D84D0A4.5000308@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 19 Mar 2011 21:14:04 +0100
+Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
+In-Reply-To: <AANLkTimPoEi+XLUJgza-b_gXbd4kCGpF93MySAR0ZRvT@mail.gmail.com>
+References: <AANLkTi=T=QM_GmYYnd8yXJz37LOKqt+AFWk7EEw-7uaN@mail.gmail.com>
+	<AANLkTimPoEi+XLUJgza-b_gXbd4kCGpF93MySAR0ZRvT@mail.gmail.com>
+Message-ID: <201103192114.05164.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/18/2011 11:54 PM, Russell King - ARM Linux :
-> On Fri, Mar 18, 2011 at 03:48:39PM +0000, Jamie Iles wrote:
->> On Fri, Mar 18, 2011 at 03:41:18PM +0000, Russell King - ARM Linux wrote:
->>> On Thu, Mar 17, 2011 at 09:51:01PM +0000, Jamie Iles wrote:
->>>> On Thu, Mar 17, 2011 at 09:34:03AM +0000, Jamie Iles wrote:
->>>>> Ok, I'll rename to macb_platform_data and update at91_ether to use 
->>>>> that with a comment describing that we're sharing the platform data 
->>>>> with macb.  At least that gets rid of the preprocessor stuff in 
->>>>> board.h for at91 too.
->>>>
->>>> So here's the updated patch with changes to the at91_ether driver to 
->>>> share the data with macb.
->>>>
->>>> Russell, are you happy to take this series?  If so, how would you prefer 
->>>> it, in the patch system or as a git pull?
->>>
->>> As Nicolas Ferre is listed in MAINTAINERS as being responsible for the
->>> MACB driver, I think he should at last Ack these patches first.
->>
->> OK, that's absolutely fine with me.
->>
->>> I'm also concious of the fact that Linus complains if my tree contains
->>> changes for drivers/ stuff as well as ARM stuff, so I'm nervous about
->>> taking it as-is.  So, I'd rather see drivers stuff separated as much
->>> as possible from the arch updates.
->>
->> I happy to split the driver and arch updates, but I'm not sure that it 
->> can be done in such a way that platforms would build between the arch 
->> and driver merges.
->>
->>> I'm also concious that this has become ready for potentially merging
->>> during the merge window, and therefore hasn't had previous exposure
->>> in linux-next, and so should wait until the next merge window.  I do
->>> feel that I'm going to be yelled at for saying that... but I'm sure
->>> I'll also be yelled at if I did take it.
->>
->> I don't have any problem with waiting until the next merge window, and 
->> to be honest I'd like see these patches have some time in next as I 
->> can't test them on devices with a MACB.
+On Saturday 19 March 2011, Geert Uytterhoeven wrote:
+> On Sat, Mar 19, 2011 at 10:53, Madhavi Manchala <madhavi.linux@gmail.com> wrote:
+> > I have one basic question about the architecture files in Linux
+> > kernels. We have a board with Samsung S3C2510A MCU (ARM940T core)
+> > which is a no-mmu based CPU. I heard that "there was not a lot of ARM
+> > no-mmu support at the moment" from Ben Dooks.
+> >
+> > So, I started developing the architecture files for my Samsung
+> > S3C2510A MCU (ARM940T core) by looking at the existing S3C2410A
+> > (ARM920 core) architecture files. Is this my porting (developing the
+> > architecture files) correct?
+> >
+> > How can I port the Linux on to my board which has a Samsung S3C2510A
+> > MCU (ARM940T core) which is a NO-MMU based CPU?
+> >
+> > Please suggest me. It would be appreciated your help / suggestions.
 > 
-> Okay, that sounds like a very good reason to wait until Nicolas can
-> review them and provide an ack.
+> I think the uClinux mailing list (CCed) is a more appropriate mailing list for
+> your questions.
 
-Be sure that I am silently following this series in the background (too
-silently ? ;-) ). I will provide an ack after a last review and testing
-but as you have all fruitfully discussed main aspects I am very happy
-with the way it is going.
+It depends. Any questions regarding the ARM kernel should be on the
+arm-linux-kernel (also CCed now), since the nommu support is merged
+with the mainline kernel.
 
-Thanks to all of you, best regards,
--- 
-Nicolas Ferre
+uClinux seems to be rather focused on m68knommu (coldfire) these days,
+and contains both a kernel and user space. The last uClinux release
+containst some changes for Samsung platforms (s3c24a0, s3c3410,
+s3c44b0x and s5c7375). It's probably a good idea to look at that
+code for reference, but I would suggest integrating the code for
+your platform in the upstream  tree directly.
+
+I could not find a git tree for uClinux that contains any recent
+kernel. Does that exist?
+
+	Arnd
