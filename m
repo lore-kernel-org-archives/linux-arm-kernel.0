@@ -1,60 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Mar 2011 11:41:37 +0000
-Subject: Updated mach-types update
-In-Reply-To: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-Message-ID: <20110320114137.GD16646@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 20 Mar 2011 23:35:59 +0800
+Subject: [GIT PULL] pxa: patches for 2.6.39
+In-Reply-To: <AANLkTimz35P6exFUt+JsezVHN-iFR7VCHtS5z7YpTC+1@mail.gmail.com>
+References: <AANLkTimz35P6exFUt+JsezVHN-iFR7VCHtS5z7YpTC+1@mail.gmail.com>
+Message-ID: <AANLkTi=Mr8c2FNq9r7CV4SCwxRT6muyhRqP9ZQ1zqMk7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2011 at 11:03:22AM +0000, Russell King - ARM Linux wrote:
-> Some may notice that the mach-types update in my tree has been replaced
-> by a new update to the file, but with a difference:
-> 
->  arch/arm/tools/mach-types | 2406 ++-------------------------------------------
->  1 files changed, 89 insertions(+), 2317 deletions(-)
-> 
-> It deletes a lot of entries.
-> 
-> For a while now, I've been running a script each day after a pull from
-> mainline which updates a flag in the machine database indicating whether
-> an entry has existed in mainline at any point in time.  The database also
-> tracks the time which the last change made to any entry.
-> 
-> Coupling these two bits of data together means that we can select entries
-> from the machine database which are or have been in mainline, and which
-> have been updated within the last twelve months.  The above file reflects
-> that, and reduces the file down to 1090 lines (including header).
-> 
-> What this means is that any platform in the machine database which has not
-> been submitted to mainline for 12 months since it was registered will be
-> automatically dropped from the file, and the platform maintainer will need
-> to either talk to me to get it reinstated before submission, or update the
-> entry in some way to 'freshen' it.
-> 
-> This does have the potential to go wrong if people start randomly changing
-> the format of how they write the MACHINE_START() macro.  If it's not found
-> by:
-> 
-> grep -rh --exclude=include --include='*.c' MACHINE_START arch/arm |
->  grep -v '^#' | sed "s@[^(]*(\([^,]*\).*@ ('\1')@;2,\$s@^@,@"
-> 
-> (which generates a subset of SQL) then it won't be kept.  In other words,
-> one line containing _at least_ this is the safest way:
-> 
-> MACHINE_START(NAME,
-> 
-> but this definitely won't work:
-> 
-> MACHINE_START(
-> 	NAME,
-> 	"Gobovision's Funky Platform")
-
-Note that OMAP references machine_is_omap2evm() yet this has never been
-merged.
-
-arch/arm/plat-omap/include/plat/uncompress.h:
-
-                DEBUG_LL_OMAP2(1, omap2evm);
-
-so this entry needs to be removed.
+On Thu, Mar 17, 2011 at 11:09 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> The following changes since commit a5abba989deceb731047425812d268daf7536575:
+>
+> ?Linux 2.6.38-rc8 (2011-03-07 21:09:37 -0800)
+>
+> are available in the git repository at:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+>
+> Axel Lin (2):
+> ? ? ?ARM: pxa/am200epd: fix leak in am200_init_gpio_regs error path
+> ? ? ?ARM: pxa/am300epd: fix leak in am300_init_gpio_regs error path
+>
+> Dmitry Eremin-Solenikov (5):
+> ? ? ?ARM: pxa/eseries: switch to using gpio-vbus transceiver
+> ? ? ?ARM: pxa/gumstix: switch to using gpio-vbus transceiver
+> ? ? ?ARM: pxa/tosa: switch to using gpio-vbus transceiver
+> ? ? ?ARM: pxa25x_udc: stop handling gpio-vbus internally
+> ? ? ?ARM: pxa: drop gpio_vbus field from pxa2xx_udc_mach_info
+>
+> Haojian Zhuang (1):
+> ? ? ?ARM: pxa: auto compute shift and mult of timer
+>
+> Marek Vasut (9):
+> ? ? ?ARM: pxa: PalmTE2: Use gpio arrays in backlight init
+> ? ? ?ARM: pxa: Use gpio arrays in colibri_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmld_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmtc_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmtx_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in vpac270_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmld_hdd driver
+> ? ? ?ARM: pxa: Update copyright notices for Palm devices
+> ? ? ?ARM: pxa: PalmZ72: Add OV9640 camera support
+>
+> Russell King - ARM Linux (1):
+> ? ? ?ARM: pxa: clean up set_pxa_fb_info
+>
+> Vasily Khoruzhick (10):
+> ? ? ?ARM: pxafb: rework pxafb overlay memory management
+> ? ? ?ARM: pxafb: fix plane Z-ordering problem
+> ? ? ?ARM: pxafb: fix typo in ypos assignment
+> ? ? ?ARM: pxafb: don't disable controller on cpufreq transition if
+> overlay in use
+> ? ? ?ARM: PXA: Z2: Use only power button as wake source
+> ? ? ?ARM: PXA: Z2: Fix battery pdata
+> ? ? ?ARM: PXA: Z2: Fix libertas init/tear down sequences
+> ? ? ?ARM: PXA: Z2: Keep kbd backlight disabled by default
+> ? ? ?ARM: PXA: Z2: Add default triggers for LEDs
+> ? ? ?ARM: PXA: Z2: Use switch event for lid
+>
+> ?arch/arm/include/asm/mach/udc_pxa2xx.h ? ?| ? ?2 -
+> ?arch/arm/mach-pxa/am200epd.c ? ? ? ? ? ? ?| ? ?8 +-
+> ?arch/arm/mach-pxa/am300epd.c ? ? ? ? ? ? ?| ? 13 ++--
+> ?arch/arm/mach-pxa/balloon3.c ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/cm-x2xx.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/colibri-pxa270-income.c | ? ?2 +-
+> ?arch/arm/mach-pxa/colibri-pxa3xx.c ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/corgi.c ? ? ? ? ? ? ? ? | ? ?1 -
+> ?arch/arm/mach-pxa/devices.c ? ? ? ? ? ? ? | ? ?9 +--
+> ?arch/arm/mach-pxa/em-x270.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/eseries.c ? ? ? ? ? ? ? | ? 36 ++++++--
+> ?arch/arm/mach-pxa/ezx.c ? ? ? ? ? ? ? ? ? | ? 12 ++--
+> ?arch/arm/mach-pxa/gumstix.c ? ? ? ? ? ? ? | ? 13 +++-
+> ?arch/arm/mach-pxa/idp.c ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/include/mach/palmz72.h ?| ? ?5 +
+> ?arch/arm/mach-pxa/include/mach/pxafb.h ? ?| ? ?4 +-
+> ?arch/arm/mach-pxa/include/mach/z2.h ? ? ? | ? ?3 +-
+> ?arch/arm/mach-pxa/littleton.c ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/lpd270.c ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/lubbock.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/magician.c ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/mainstone.c ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/mioa701.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/palm27x.c ? ? ? ? ? ? ? | ? ?5 +-
+> ?arch/arm/mach-pxa/palmtc.c ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/palmte2.c ? ? ? ? ? ? ? | ? 33 ++-----
+> ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ? | ?127 +++++++++++++++++++++++++++
+> ?arch/arm/mach-pxa/pcm990-baseboard.c ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/poodle.c ? ? ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/mach-pxa/raumfeld.c ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/saar.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/spitz.c ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/tavorevb.c ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/time.c ? ? ? ? ? ? ? ? ?| ? ?5 +-
+> ?arch/arm/mach-pxa/tosa.c ? ? ? ? ? ? ? ? ?| ? 13 +++-
+> ?arch/arm/mach-pxa/trizeps4.c ? ? ? ? ? ? ?| ? ?4 +-
+> ?arch/arm/mach-pxa/viper.c ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/vpac270.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/z2.c ? ? ? ? ? ? ? ? ? ?| ? 77 ++++++++--------
+> ?arch/arm/mach-pxa/zeus.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/zylonite.c ? ? ? ? ? ? ?| ? ?4 +-
+> ?drivers/ata/pata_palmld.c ? ? ? ? ? ? ? ? | ? 43 +++++-----
+> ?drivers/pcmcia/pxa2xx_colibri.c ? ? ? ? ? | ?133 ++++++++++------------------
+> ?drivers/pcmcia/pxa2xx_palmld.c ? ? ? ? ? ?| ? 42 ++-------
+> ?drivers/pcmcia/pxa2xx_palmtc.c ? ? ? ? ? ?| ? 75 +++-------------
+> ?drivers/pcmcia/pxa2xx_palmtx.c ? ? ? ? ? ?| ? 57 +++----------
+> ?drivers/pcmcia/pxa2xx_vpac270.c ? ? ? ? ? | ?110 +++++++-----------------
+> ?drivers/usb/gadget/pxa25x_udc.c ? ? ? ? ? | ? 76 ++---------------
+> ?drivers/video/pxafb.c ? ? ? ? ? ? ? ? ? ? | ?136 +++++++++++++++++++----------
+> ?drivers/video/pxafb.h ? ? ? ? ? ? ? ? ? ? | ? ?3 +-
+> ?51 files changed, 514 insertions(+), 582 deletions(-)
+>
