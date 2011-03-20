@@ -1,20 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 20 Mar 2011 16:57:39 +0100
-Subject: [PATCH] ARM: mxc: fix buggy '.end' of IORESOURCE_MEM in device
-	codes
-In-Reply-To: <1300591079-1675-1-git-send-email-shawn.guo@linaro.org>
-References: <1300591079-1675-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110320155739.GD27124@pengutronix.de>
+From: julia@diku.dk (Julia Lawall)
+Date: Sun, 20 Mar 2011 18:56:59 +0100 (CET)
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <20110316083326.GF13316@pengutronix.de>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+	<20110315090656.GC13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
+	<20110315094946.GD13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+	<20110316083326.GF13316@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1103201850250.27008@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2011 at 11:17:59AM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+What is the degree of interest in having gpio_request_one be used?  Right 
+now, it is very little used.  But there seem to be over 900 places where 
+it could be used.
 
-Thanks
-Uwe
+One advantage of gpio_request_one is that it manages error handling.  
+However a number of current calls to gpio_request and 
+gpio_direction_input/output don't save or test the return value.  Are 
+there cases where these operations cannot fail?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+julia
