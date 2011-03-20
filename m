@@ -1,13 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Mar 2011 15:50:02 +0000
-Subject: [GIT PULL] pxa: patches for 2.6.39
-In-Reply-To: <AANLkTi=Mr8c2FNq9r7CV4SCwxRT6muyhRqP9ZQ1zqMk7@mail.gmail.com>
-References: <AANLkTimz35P6exFUt+JsezVHN-iFR7VCHtS5z7YpTC+1@mail.gmail.com>
-	<AANLkTi=Mr8c2FNq9r7CV4SCwxRT6muyhRqP9ZQ1zqMk7@mail.gmail.com>
-Message-ID: <20110320155002.GF16646@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 20 Mar 2011 16:57:39 +0100
+Subject: [PATCH] ARM: mxc: fix buggy '.end' of IORESOURCE_MEM in device
+	codes
+In-Reply-To: <1300591079-1675-1-git-send-email-shawn.guo@linaro.org>
+References: <1300591079-1675-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110320155739.GD27124@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've not pulled this as I've not finished sending the first set of stuff
-merged before the window opened to Linus.  So I'm waiting until that's
-complete before pulling in anything else.
+On Sun, Mar 20, 2011 at 11:17:59AM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
