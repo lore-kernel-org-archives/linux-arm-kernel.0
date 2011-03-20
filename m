@@ -1,532 +1,2639 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Sun, 20 Mar 2011 21:30:07 +0100
-Subject: [PATCH v3 7/9] lpc2k: Add EmbeddedArtists LPC2478 Developer's Kit
-	board
-In-Reply-To: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300653009-11675-8-git-send-email-ithamar.adema@team-embedded.nl>
+From: julia@diku.dk (Julia Lawall)
+Date: Sun, 20 Mar 2011 22:04:37 +0100 (CET)
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <20110320192451.GA19808@pengutronix.de>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+	<20110315090656.GC13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
+	<20110315094946.GD13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+	<20110316083326.GF13316@pengutronix.de>
+	<Pine.LNX.4.64.1103201850250.27008@ask.diku.dk>
+	<20110320192451.GA19808@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1103202201060.27008@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for EmbeddedArtists LPC2478 Developer's Kit, consisting
-of the LPC2478OEM board, with QVGA base board. For details, see:
+In this case, I also ignore the !GPIOLIB issue.  This semantic patch 
+considers the case where the direction call has some error handling code.  
+In this case, it just deletes that error handling code, so most of these 
+cases are likely to need some manual cleanup, eg to get rid of unreachable 
+error labels or to change the error message.
 
-http://www.embeddedartists.com/products/kits/lpc2478_kit.php
+The semantic patch is as follows.  It modifies over 150 occurrences, as 
+shown below.
 
-The mach-types change included is simply one generated from
-http://www.arm.linux.org.uk/developer/machines/, and is only
-included so this patch can be build.
+@@
+expression E1,E2,ret,E;
+statement S;
+@@
 
-Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
----
-changes since v2:
-        * Changed machine name from web interface, and
-          included mach-types update generated from there.
+-      gpio_request(E1,E2)
++      gpio_request_one(E1,GPIOF_IN,E2)
+       ... when != E1
+-      ret = gpio_direction_input(E1);
+       ... when != ret = E
+-      if (\(ret != 0 \| ret < 0\)) S
 
-changes since v1:
-        * Fixed RTC clock rate
-        * Marked mfp_cfgs as __initdata.
-        * renamed LPC2478OEM to more appropriate EA2478DEVKIT.
----
- arch/arm/mach-lpc2k/Kconfig             |    7 ++
- arch/arm/mach-lpc2k/Makefile            |    2 +
- arch/arm/mach-lpc2k/common.h            |   21 +++++
- arch/arm/mach-lpc2k/mach-ea2478devkit.c |  122 +++++++++++++++++++++++++++++++
- arch/arm/tools/mach-types               |  113 +++++++++++++++++++++-------
- 5 files changed, 237 insertions(+), 28 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/common.h
- create mode 100644 arch/arm/mach-lpc2k/mach-ea2478devkit.c
+@@
+expression E1,E2,ret,E;
+statement S;
+@@
 
-diff --git a/arch/arm/mach-lpc2k/Kconfig b/arch/arm/mach-lpc2k/Kconfig
-index fad47b8..210b641 100644
---- a/arch/arm/mach-lpc2k/Kconfig
-+++ b/arch/arm/mach-lpc2k/Kconfig
-@@ -2,4 +2,11 @@ if ARCH_LPC2K
+-      gpio_request(E1,E2)
++      gpio_request_one(E1,GPIOF_OUT_INIT_LOW,E2)
+       ... when != E1
+-      ret = gpio_direction_output(E1,0);
+       ... when != ret = E
+-      if (\(ret != 0 \| ret < 0\)) S
+
+@@
+expression E1,E2,ret,E;
+statement S;
+@@
+
+-      gpio_request(E1,E2)
++      gpio_request_one(E1,GPIOF_OUT_INIT_HIGH,E2)
+       ... when != E1
+-      ret = gpio_direction_output(E1,1);
+       ... when != ret = E
+-      if (\(ret != 0 \| ret < 0\)) S
+
+julia
+
+
+diff -u -p a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
+--- a/arch/arm/mach-at91/board-gsia18s.c 2011-01-19 18:51:18.000000000 +0100
++++ b/arch/arm/mach-at91/board-gsia18s.c 2011-03-20 22:00:24.000000000 +0100
+@@ -458,18 +458,13 @@ static int pcf8574x_0x20_setup(struct i2
+ {
+ 	int status;
  
- comment "LPC2K machines"
+-	status = gpio_request(gpio + PCF_GPIO_ETH_DETECT, "eth_det");
++	status = gpio_request_one(gpio + PCF_GPIO_ETH_DETECT, GPIOF_IN,
++				  "eth_det");
+ 	if (status < 0) {
+ 		pr_err("error: can't request GPIO%d\n",
+ 			gpio + PCF_GPIO_ETH_DETECT);
+ 		return status;
+ 	}
+-	status = gpio_direction_input(gpio + PCF_GPIO_ETH_DETECT);
+-	if (status < 0) {
+-		pr_err("error: can't setup GPIO%d as input\n",
+-			gpio + PCF_GPIO_ETH_DETECT);
+-		return status;
+-	}
+ 	status = gpio_export(gpio + PCF_GPIO_ETH_DETECT, false);
+ 	if (status < 0) {
+ 		pr_err("error: can't export GPIO%d\n",
+diff -u -p a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+--- a/arch/arm/mach-ep93xx/core.c 2011-02-11 10:53:31.000000000 +0100
++++ b/arch/arm/mach-ep93xx/core.c 2011-03-20 22:00:22.000000000 +0100
+@@ -598,13 +598,11 @@ int ep93xx_pwm_acquire_gpio(struct platf
+ 	if (pdev->id == 0) {
+ 		err = 0;
+ 	} else if (pdev->id == 1) {
+-		err = gpio_request(EP93XX_GPIO_LINE_EGPIO14,
+-				   dev_name(&pdev->dev));
++		err = gpio_request_one(EP93XX_GPIO_LINE_EGPIO14,
++				       GPIOF_OUT_INIT_LOW,
++				       dev_name(&pdev->dev));
+ 		if (err)
+ 			return err;
+-		err = gpio_direction_output(EP93XX_GPIO_LINE_EGPIO14, 0);
+-		if (err)
+-			goto fail;
  
-+config MACH_EA2478DEVKIT
-+	bool "Embedded Artists LPC2478 Developer's Kit"
-+	help
-+	  Say Y if you want the kernel to support the EmbeddedArtists
-+	  LPC2478 Developer's Kit. For more hardware details, see:
-+	  http://www.embeddedartists.com/products/kits/lpc2478_kit.php
-+
- endif
-diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 2c50bb9..93e27fb 100644
---- a/arch/arm/mach-lpc2k/Makefile
-+++ b/arch/arm/mach-lpc2k/Makefile
-@@ -1 +1,3 @@
- obj-y	:= clock.o irq.o gpio.o mfp.o time.o
-+
-+obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o
-diff --git a/arch/arm/mach-lpc2k/common.h b/arch/arm/mach-lpc2k/common.h
-new file mode 100644
-index 0000000..6b775d9
---- /dev/null
-+++ b/arch/arm/mach-lpc2k/common.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright 2011 Team Embedded VOF
-+ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef LPC2K_COMMON_H
-+#define LPC2K_COMMON_H
-+
-+struct sys_timer;
-+
-+extern void lpc2k_init_clocks(unsigned long xtal, unsigned long rtc);
-+extern void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num);
-+extern void lpc2k_init_irq(void);
-+
-+extern struct sys_timer lpc2k_timer;
-+
-+#endif /* LPC2K_COMMON_H */
-diff --git a/arch/arm/mach-lpc2k/mach-ea2478devkit.c b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
-new file mode 100644
-index 0000000..d59f5ba
---- /dev/null
-+++ b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright (C) 2011 Team Embeded VOF
-+ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/mfp-lpc24xx.h>
-+#include <mach/hardware.h>
-+
-+#include "common.h"
-+
-+#define EXTPOLAR	0x14c
-+
-+static unsigned long mfp_cfgs[] __initdata = {
-+	/* UART0 */
-+	P0_2_TXD0,
-+	P0_3_RXD0,
-+	/* USB Host */
-+	P0_12_USB_PPWR2,
-+	P0_13_USB_UP_LED2,
-+	P0_31_USB_Dp2,
-+	P1_30_VBUS,
-+	P1_31_USB_OVRCR2,
-+	/* USB Gadget */
-+	P0_29_USB_Dp1,
-+	P0_30_USB_Dn1,
-+	/* Ethernet */
-+	P1_0_ENET_TXD0,
-+	P1_1_ENET_TXD1,
-+	P1_4_ENET_TX_EN,
-+	P1_8_ENET_CRS,
-+	P1_9_ENET_RXD0,
-+	P1_10_ENET_RXD1,
-+	P1_14_ENET_RX_ERR,
-+	P1_15_ENET_REF_CLK,
-+	P1_16_ENET_MDC,
-+	P1_17_ENET_MDIO,
-+	/* I2C0 */
-+	P0_27_SDA0,
-+	P0_28_SCL0,
-+	/* SPI */
-+	P0_15_SCK,
-+	P0_17_MISO,
-+	P0_18_MOSI,
-+	/* LCD */
-+	P0_4_LCDVD0,
-+	P0_5_LCDVD1,
-+	P0_6_LCDVD8,
-+	P0_7_LCDVD9,
-+	P0_8_LCDVD16,
-+	P0_9_LCDVD17,
-+	P1_20_LCDVD10,
-+	P1_21_LCDVD11,
-+	P1_22_LCDVD12,
-+	P1_23_LCDVD13,
-+	P1_24_LCDVD14,
-+	P1_25_LCDVD15,
-+	P1_26_LCDVD20,
-+	P1_27_LCDVD21,
-+	P1_28_LCDVD22,
-+	P1_29_LCDVD23,
-+	P2_0_LCDPWR,
-+	P2_1_LCDLE,
-+	P2_2_LCDDCLK,
-+	P2_3_LCDFP,
-+	P2_4_LCDM,
-+	P2_5_LCDLP,
-+	P2_6_LCDVP4,
-+	P2_7_LCDVP5,
-+	P2_8_LCDVP6,
-+	P2_9_LCDVP7,
-+	P2_11_LCDCLKIN,
-+	P2_12_LCDVP18,
-+	P2_13_LCDVP19,
-+	P4_28_LCDVP2,
-+	P4_29_LCDVP3,
-+	/* Backlight */
-+	P1_18_PWM1,
-+	/* MMC/SD */
-+	P1_2_MCICLK,
-+	P1_3_MCICMD,
-+	P1_5_MCIPWR,
-+	P1_6_MCIDAT0,
-+	P1_7_MCIDAT1,
-+	P1_11_MCIDAT2,
-+	P1_12_MCIDAT3,
-+};
-+
-+void __init ea2478devkit_init_machine(void)
-+{
-+	lpc2k_mfp_config(mfp_cfgs, ARRAY_SIZE(mfp_cfgs));
-+}
-+
-+static void __init ea2478devkit_init_irq(void)
-+{
-+	/* XXX workaround for the fact that EINT3 is connected to high-active
-+	 * signal, but can't be disabled. As the EINT3 interrupt is also used
-+	 * for GPIO interrupts, this will cause an interrupt storm without
-+	 * this setting.
-+	 */
-+	iowrite32(ioread32(APB_SCB_BASE + EXTPOLAR) | (1 << 3),
-+		APB_SCB_BASE + EXTPOLAR);
-+
-+	lpc2k_init_irq();
-+	lpc2k_init_clocks(12000000UL, 32768UL);
-+}
-+
-+MACHINE_START(EA2478DEVKIT, "Embedded Artists LPC2478 Developer's Kit")
-+	.init_irq	= ea2478devkit_init_irq,
-+	.timer		= &lpc2k_timer,
-+	.init_machine	= ea2478devkit_init_machine,
-+MACHINE_END
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index 9d6feaa..852cc95 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -12,7 +12,7 @@
- #
- #   http://www.arm.linux.org.uk/developer/machines/?action=new
- #
--# Last update: Mon Feb 7 08:59:27 2011
-+# Last update: Fri Mar 18 20:55:51 2011
- #
- # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
- #
-@@ -1319,7 +1319,6 @@ mistral			MACH_MISTRAL		MISTRAL			1315
- msm			MACH_MSM		MSM			1316
- ct5910			MACH_CT5910		CT5910			1317
- ct5912			MACH_CT5912		CT5912			1318
--hynet_ine		MACH_HYNET_INE		HYNET_INE		1319
- hynet_app		MACH_HYNET_APP		HYNET_APP		1320
- msm7200			MACH_MSM7200		MSM7200			1321
- msm7600			MACH_MSM7600		MSM7600			1322
-@@ -1777,7 +1776,6 @@ wdg002			MACH_WDG002		WDG002			1785
- sg560adsl		MACH_SG560ADSL		SG560ADSL		1786
- nextio_n2800_ica	MACH_NEXTIO_N2800_ICA	NEXTIO_N2800_ICA	1787
- dove_db			MACH_DOVE_DB		DOVE_DB			1788
--marvell_newdb		MACH_MARVELL_NEWDB	MARVELL_NEWDB		1789
- vandihud		MACH_VANDIHUD		VANDIHUD		1790
- magx_e8			MACH_MAGX_E8		MAGX_E8			1791
- magx_z6			MACH_MAGX_Z6		MAGX_Z6			1792
-@@ -1877,7 +1875,6 @@ ued			MACH_UED		UED			1885
- esiblade		MACH_ESIBLADE		ESIBLADE		1886
- eye02			MACH_EYE02		EYE02			1887
- imx27kbd		MACH_IMX27KBD		IMX27KBD		1888
--sst61vc010_fpga		MACH_SST61VC010_FPGA	SST61VC010_FPGA		1889
- kixvp435		MACH_KIXVP435		KIXVP435		1890
- kixnp435		MACH_KIXNP435		KIXNP435		1891
- africa			MACH_AFRICA		AFRICA			1892
-@@ -2308,7 +2305,6 @@ ecac2378		MACH_ECAC2378		ECAC2378		2319
- tazkiosk		MACH_TAZKIOSK		TAZKIOSK		2320
- whiterabbit_mch		MACH_WHITERABBIT_MCH	WHITERABBIT_MCH		2321
- sbox9263		MACH_SBOX9263		SBOX9263		2322
--oreo			MACH_OREO		OREO			2323
- smdk6442		MACH_SMDK6442		SMDK6442		2324
- openrd_base		MACH_OPENRD_BASE	OPENRD_BASE		2325
- incredible		MACH_INCREDIBLE		INCREDIBLE		2326
-@@ -2374,7 +2370,6 @@ sch_m490		MACH_SCH_M490		SCH_M490		2386
- rbl01			MACH_RBL01		RBL01			2387
- omnifi			MACH_OMNIFI		OMNIFI			2388
- otavalo			MACH_OTAVALO		OTAVALO			2389
--sienna			MACH_SIENNA		SIENNA			2390
- htc_excalibur_s620	MACH_HTC_EXCALIBUR_S620	HTC_EXCALIBUR_S620	2391
- htc_opal		MACH_HTC_OPAL		HTC_OPAL		2392
- touchbook		MACH_TOUCHBOOK		TOUCHBOOK		2393
-@@ -2446,7 +2441,6 @@ siogentoo1		MACH_SIOGENTOO1		SIOGENTOO1		2458
- siogentoo2		MACH_SIOGENTOO2		SIOGENTOO2		2459
- sm3k			MACH_SM3K		SM3K			2460
- acer_tempo_f900		MACH_ACER_TEMPO_F900	ACER_TEMPO_F900		2461
--sst61vc010_dev		MACH_SST61VC010_DEV	SST61VC010_DEV		2462
- glittertind		MACH_GLITTERTIND	GLITTERTIND		2463
- omap_zoom3		MACH_OMAP_ZOOM3		OMAP_ZOOM3		2464
- omap_3630sdp		MACH_OMAP_3630SDP	OMAP_3630SDP		2465
-@@ -2498,7 +2492,6 @@ hiram			MACH_HIRAM		HIRAM			2510
- phy3250			MACH_PHY3250		PHY3250			2511
- ea3250			MACH_EA3250		EA3250			2512
- fdi3250			MACH_FDI3250		FDI3250			2513
--whitestone		MACH_WHITESTONE		WHITESTONE		2514
- at91sam9263nit		MACH_AT91SAM9263NIT	AT91SAM9263NIT		2515
- ccmx51			MACH_CCMX51		CCMX51			2516
- ccmx51js		MACH_CCMX51JS		CCMX51JS		2517
-@@ -2561,7 +2554,6 @@ magnolia2		MACH_MAGNOLIA2		MAGNOLIA2		2573
- emxx			MACH_EMXX		EMXX			2574
- outlaw			MACH_OUTLAW		OUTLAW			2575
- riot_bei2		MACH_RIOT_BEI2		RIOT_BEI2		2576
--riot_vox		MACH_RIOT_VOX		RIOT_VOX		2577
- riot_x37		MACH_RIOT_X37		RIOT_X37		2578
- mega25mx		MACH_MEGA25MX		MEGA25MX		2579
- benzina2		MACH_BENZINA2		BENZINA2		2580
-@@ -2582,7 +2574,6 @@ omap3_bulldog		MACH_OMAP3_BULLDOG	OMAP3_BULLDOG		2594
- pca101			MACH_PCA101		PCA101			2595
- buzzc			MACH_BUZZC		BUZZC			2596
- sasie2			MACH_SASIE2		SASIE2			2597
--davinci_cio		MACH_DAVINCI_CIO	DAVINCI_CIO		2598
- smartmeter_dl		MACH_SMARTMETER_DL	SMARTMETER_DL		2599
- wzl6410			MACH_WZL6410		WZL6410			2600
- wzl6410m		MACH_WZL6410M		WZL6410M		2601
-@@ -2591,7 +2582,6 @@ wzl6410i		MACH_WZL6410I		WZL6410I		2603
- spacecom1		MACH_SPACECOM1		SPACECOM1		2604
- pingu920		MACH_PINGU920		PINGU920		2605
- bravoc			MACH_BRAVOC		BRAVOC			2606
--cybo2440		MACH_CYBO2440		CYBO2440		2607
- vdssw			MACH_VDSSW		VDSSW			2608
- romulus			MACH_ROMULUS		ROMULUS			2609
- omap_magic		MACH_OMAP_MAGIC		OMAP_MAGIC		2610
-@@ -2667,7 +2657,7 @@ msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
- micro2440		MACH_MICRO2440		MICRO2440		2680
- am2440			MACH_AM2440		AM2440			2681
- tq2440			MACH_TQ2440		TQ2440			2682
--lpc2478oem		MACH_LPC2478OEM		LPC2478OEM		2683
-+ea2478devkit		MACH_EA2478DEVKIT	EA2478DEVKIT		2683
- ak880x			MACH_AK880X		AK880X			2684
- cobra3530		MACH_COBRA3530		COBRA3530		2685
- pmppb			MACH_PMPPB		PMPPB			2686
-@@ -2683,7 +2673,6 @@ lkevm			MACH_LKEVM		LKEVM			2695
- mw6410			MACH_MW6410		MW6410			2696
- terastation_wxl		MACH_TERASTATION_WXL	TERASTATION_WXL		2697
- cpu8000e		MACH_CPU8000E		CPU8000E		2698
--catania			MACH_CATANIA		CATANIA			2699
- tokyo			MACH_TOKYO		TOKYO			2700
- msm7201a_surf		MACH_MSM7201A_SURF	MSM7201A_SURF		2701
- msm7201a_ffa		MACH_MSM7201A_FFA	MSM7201A_FFA		2702
-@@ -2741,7 +2730,6 @@ wbd222			MACH_WBD222		WBD222			2753
- mt65xx			MACH_MT65XX		MT65XX			2754
- msm8x60_surf		MACH_MSM8X60_SURF	MSM8X60_SURF		2755
- msm8x60_sim		MACH_MSM8X60_SIM	MSM8X60_SIM		2756
--vmc300			MACH_VMC300		VMC300			2757
- tcc8000_sdk		MACH_TCC8000_SDK	TCC8000_SDK		2758
- nanos			MACH_NANOS		NANOS			2759
- stamp9g10		MACH_STAMP9G10		STAMP9G10		2760
-@@ -2750,7 +2738,6 @@ h6053			MACH_H6053		H6053			2762
- smint01			MACH_SMINT01		SMINT01			2763
- prtlvt2			MACH_PRTLVT2		PRTLVT2			2764
- ap420			MACH_AP420		AP420			2765
--htcshift		MACH_HTCSHIFT		HTCSHIFT		2766
- davinci_dm365_fc	MACH_DAVINCI_DM365_FC	DAVINCI_DM365_FC	2767
- msm8x55_surf		MACH_MSM8X55_SURF	MSM8X55_SURF		2768
- msm8x55_ffa		MACH_MSM8X55_FFA	MSM8X55_FFA		2769
-@@ -2761,7 +2748,6 @@ oreo_controller		MACH_OREO_CONTROLLER	OREO_CONTROLLER		2773
- kopin_models		MACH_KOPIN_MODELS	KOPIN_MODELS		2774
- ttc_vision2		MACH_TTC_VISION2	TTC_VISION2		2775
- cns3420vb		MACH_CNS3420VB		CNS3420VB		2776
--lpc2			MACH_LPC2		LPC2			2777
- olympus			MACH_OLYMPUS		OLYMPUS			2778
- vortex			MACH_VORTEX		VORTEX			2779
- s5pc200			MACH_S5PC200		S5PC200			2780
-@@ -2788,7 +2774,6 @@ ti8168evm		MACH_TI8168EVM		TI8168EVM		2800
- neocoreomap		MACH_NEOCOREOMAP	NEOCOREOMAP		2801
- withings_wbp		MACH_WITHINGS_WBP	WITHINGS_WBP		2802
- dbps			MACH_DBPS		DBPS			2803
--sbc9261			MACH_SBC9261		SBC9261			2804
- pcbfp0001		MACH_PCBFP0001		PCBFP0001		2805
- speedy			MACH_SPEEDY		SPEEDY			2806
- chrysaor		MACH_CHRYSAOR		CHRYSAOR		2807
-@@ -2812,7 +2797,6 @@ p565			MACH_P565		P565			2824
- acer_a4			MACH_ACER_A4		ACER_A4			2825
- davinci_dm368_bip	MACH_DAVINCI_DM368_BIP	DAVINCI_DM368_BIP	2826
- eshare			MACH_ESHARE		ESHARE			2827
--hw_omapl138_europa	MACH_HW_OMAPL138_EUROPA	HW_OMAPL138_EUROPA	2828
- wlbargn			MACH_WLBARGN		WLBARGN			2829
- bm170			MACH_BM170		BM170			2830
- netspace_mini_v2	MACH_NETSPACE_MINI_V2	NETSPACE_MINI_V2	2831
-@@ -2879,7 +2863,6 @@ davinci_picto		MACH_DAVINCI_PICTO	DAVINCI_PICTO		2891
- mecha			MACH_MECHA		MECHA			2892
- bubba3			MACH_BUBBA3		BUBBA3			2893
- pupitre			MACH_PUPITRE		PUPITRE			2894
--tegra_harmony		MACH_TEGRA_HARMONY	TEGRA_HARMONY		2895
- tegra_vogue		MACH_TEGRA_VOGUE	TEGRA_VOGUE		2896
- tegra_e1165		MACH_TEGRA_E1165	TEGRA_E1165		2897
- simplenet		MACH_SIMPLENET		SIMPLENET		2898
-@@ -2969,7 +2952,6 @@ netspace_lite_v2	MACH_NETSPACE_LITE_V2	NETSPACE_LITE_V2	2983
- ssc			MACH_SSC		SSC			2984
- premierwave_en		MACH_PREMIERWAVE_EN	PREMIERWAVE_EN		2985
- wasabi			MACH_WASABI		WASABI			2986
--vivow			MACH_VIVOW		VIVOW			2987
- mx50_rdp		MACH_MX50_RDP		MX50_RDP		2988
- universal_c210		MACH_UNIVERSAL_C210	UNIVERSAL_C210		2989
- real6410		MACH_REAL6410		REAL6410		2990
-@@ -3017,12 +2999,10 @@ remus			MACH_REMUS		REMUS			3031
- at91cap7xdk		MACH_AT91CAP7XDK	AT91CAP7XDK		3032
- at91cap7stk		MACH_AT91CAP7STK	AT91CAP7STK		3033
- kt_sbc_sam9_1		MACH_KT_SBC_SAM9_1	KT_SBC_SAM9_1		3034
--oratisrouter		MACH_ORATISROUTER	ORATISROUTER		3035
- armada_xp_db		MACH_ARMADA_XP_DB	ARMADA_XP_DB		3036
- spdm			MACH_SPDM		SPDM			3037
- gtib			MACH_GTIB		GTIB			3038
- dgm3240			MACH_DGM3240		DGM3240			3039
--atlas_i_lpe		MACH_ATLAS_I_LPE	ATLAS_I_LPE		3040
- htcmega			MACH_HTCMEGA		HTCMEGA			3041
- tricorder		MACH_TRICORDER		TRICORDER		3042
- tx28			MACH_TX28		TX28			3043
-@@ -3062,7 +3042,6 @@ clod			MACH_CLOD		CLOD			3077
- rump			MACH_RUMP		RUMP			3078
- tenderloin		MACH_TENDERLOIN		TENDERLOIN		3079
- shortloin		MACH_SHORTLOIN		SHORTLOIN		3080
--crespo			MACH_CRESPO		CRESPO			3081
- antares			MACH_ANTARES		ANTARES			3082
- wb40n			MACH_WB40N		WB40N			3083
- herring			MACH_HERRING		HERRING			3084
-@@ -3111,7 +3090,6 @@ smartqv3		MACH_SMARTQV3		SMARTQV3		3126
- smartqv7		MACH_SMARTQV7		SMARTQV7		3127
- paz00			MACH_PAZ00		PAZ00			3128
- acmenetusfoxg20		MACH_ACMENETUSFOXG20	ACMENETUSFOXG20		3129
--htcwillow		MACH_HTCWILLOW		HTCWILLOW		3130
- fwbd_0404		MACH_FWBD_0404		FWBD_0404		3131
- hdgu			MACH_HDGU		HDGU			3132
- pyramid			MACH_PYRAMID		PYRAMID			3133
-@@ -3162,7 +3140,6 @@ b5500			MACH_B5500		B5500			3177
- s5500			MACH_S5500		S5500			3178
- icon			MACH_ICON		ICON			3179
- elephant		MACH_ELEPHANT		ELEPHANT		3180
--msm8x60_fusion		MACH_MSM8X60_FUSION	MSM8X60_FUSION		3181
- shooter			MACH_SHOOTER		SHOOTER			3182
- spade_lte		MACH_SPADE_LTE		SPADE_LTE		3183
- philhwani		MACH_PHILHWANI		PHILHWANI		3184
-@@ -3174,13 +3151,11 @@ ag5evm			MACH_AG5EVM		AG5EVM			3189
- sc575plc		MACH_SC575PLC		SC575PLC		3190
- sc575hmi		MACH_SC575IPC		SC575IPC		3191
- omap3_tdm3730		MACH_OMAP3_TDM3730	OMAP3_TDM3730		3192
--g7			MACH_G7			G7			3193
- top9000_eval		MACH_TOP9000_EVAL	TOP9000_EVAL		3194
- top9000_su		MACH_TOP9000_SU		TOP9000_SU		3195
- utm300			MACH_UTM300		UTM300			3196
- tsunagi			MACH_TSUNAGI		TSUNAGI			3197
- ts75xx			MACH_TS75XX		TS75XX			3198
--msm8x60_fusn_ffa	MACH_MSM8X60_FUSN_FFA	MSM8X60_FUSN_FFA	3199
- ts47xx			MACH_TS47XX		TS47XX			3200
- da850_k5		MACH_DA850_K5		DA850_K5		3201
- ax502			MACH_AX502		AX502			3202
-@@ -3285,7 +3260,7 @@ rfl109145_ssrv		MACH_RFL109145_SSRV	RFL109145_SSRV		3304
- nmh			MACH_NMH		NMH			3305
- wn802t			MACH_WN802T		WN802T			3306
- dragonet		MACH_DRAGONET		DRAGONET		3307
--geneva_b		MACH_GENEVA_B		GENEVA_B		3308
-+geneva_b4		MACH_GENEVA_B		GENEVA_B		3308
- at91sam9263desk16l	MACH_AT91SAM9263DESK16L	AT91SAM9263DESK16L	3309
- bcmhana_sv		MACH_BCMHANA_SV		BCMHANA_SV		3310
- bcmhana_tablet		MACH_BCMHANA_TABLET	BCMHANA_TABLET		3311
-@@ -3316,3 +3291,85 @@ rover_g8		MACH_ROVER_G8		ROVER_G8		3335
- t5388p			MACH_T5388P		T5388P			3336
- dingo			MACH_DINGO		DINGO			3337
- goflexhome		MACH_GOFLEXHOME		GOFLEXHOME		3338
-+lanreadyfn511		MACH_LANREADYFN511	LANREADYFN511		3340
-+omap3_baia		MACH_OMAP3_BAIA		OMAP3_BAIA		3341
-+omap3smartdisplay	MACH_OMAP3SMARTDISPLAY	OMAP3SMARTDISPLAY	3342
-+xilinx			MACH_XILINX		XILINX			3343
-+a2f			MACH_A2F		A2F			3344
-+sky25			MACH_SKY25		SKY25			3345
-+ccmx53			MACH_CCMX53		CCMX53			3346
-+ccmx53js		MACH_CCMX53JS		CCMX53JS		3347
-+ccwmx53			MACH_CCWMX53		CCWMX53			3348
-+ccwmx53js		MACH_CCWMX53JS		CCWMX53JS		3349
-+frisms			MACH_FRISMS		FRISMS			3350
-+msm7x27a_ffa		MACH_MSM7X27A_FFA	MSM7X27A_FFA		3351
-+msm7x27a_surf		MACH_MSM7X27A_SURF	MSM7X27A_SURF		3352
-+msm7x27a_rumi3		MACH_MSM7X27A_RUMI3	MSM7X27A_RUMI3		3353
-+dimmsam9g20		MACH_DIMMSAM9G20	DIMMSAM9G20		3354
-+dimm_imx28		MACH_DIMM_IMX28		DIMM_IMX28		3355
-+amk_a4			MACH_AMK_A4		AMK_A4			3356
-+gnet_sgme		MACH_GNET_SGME		GNET_SGME		3357
-+shooter_u		MACH_SHOOTER_U		SHOOTER_U		3358
-+vmx53			MACH_VMX53		VMX53			3359
-+rhino			MACH_RHINO		RHINO			3360
-+armlex4210		MACH_ARMLEX4210		ARMLEX4210		3361
-+swarcoextmodem		MACH_SWARCOEXTMODEM	SWARCOEXTMODEM		3362
-+snowball		MACH_SNOWBALL		SNOWBALL		3363
-+pcm049			MACH_PCM049		PCM049			3364
-+vigor			MACH_VIGOR		VIGOR			3365
-+oslo_amundsen		MACH_OSLO_AMUNDSEN	OSLO_AMUNDSEN		3366
-+gsl_diamond		MACH_GSL_DIAMOND	GSL_DIAMOND		3367
-+cv2201			MACH_CV2201		CV2201			3368
-+cv2202			MACH_CV2202		CV2202			3369
-+cv2203			MACH_CV2203		CV2203			3370
-+vit_ibox		MACH_VIT_IBOX		VIT_IBOX		3371
-+dm6441_esp		MACH_DM6441_ESP		DM6441_ESP		3372
-+at91sam9x5ek		MACH_AT91SAM9X5EK	AT91SAM9X5EK		3373
-+libra			MACH_LIBRA		LIBRA			3374
-+easycrrh		MACH_EASYCRRH		EASYCRRH		3375
-+tripel			MACH_TRIPEL		TRIPEL			3376
-+endian_mini		MACH_ENDIAN_MINI	ENDIAN_MINI		3377
-+xilinx_ep107		MACH_XILINX_EP107	XILINX_EP107		3378
-+nuri			MACH_NURI		NURI			3379
-+janus			MACH_JANUS		JANUS			3380
-+ddnas			MACH_DDNAS		DDNAS			3381
-+tag			MACH_TAG		TAG			3382
-+tagw			MACH_TAGW		TAGW			3383
-+nitrogen_vm_imx51	MACH_NITROGEN_VM_IMX51	NITROGEN_VM_IMX51	3384
-+viprinet		MACH_VIPRINET		VIPRINET		3385
-+bockw			MACH_BOCKW		BOCKW			3386
-+eva2000			MACH_EVA2000		EVA2000			3387
-+steelyard		MACH_STEELYARD		STEELYARD		3388
-+ea2468devkit		MACH_LPC2468OEM		LPC2468OEM		3389
-+sdh001			MACH_MACH_SDH001	MACH_SDH001		3390
-+fe2478microblox		MACH_LPC2478MICROBLOX	LPC2478MICROBLOX	3391
-+nsslsboard		MACH_NSSLSBOARD		NSSLSBOARD		3392
-+geneva_b5		MACH_GENEVA_B5		GENEVA_B5		3393
-+spear1340		MACH_SPEAR1340		SPEAR1340		3394
-+rexmas			MACH_REXMAS		REXMAS			3395
-+msm8960_cdp		MACH_MSM8960_CDP	MSM8960_CDP		3396
-+msm8960_mdp		MACH_MSM8960_MDP	MSM8960_MDP		3397
-+msm8960_fluid		MACH_MSM8960_FLUID	MSM8960_FLUID		3398
-+msm8960_apq		MACH_MSM8960_APQ	MSM8960_APQ		3399
-+helios_v2		MACH_HELIOS_V2		HELIOS_V2		3400
-+mif10p			MACH_MIF10P		MIF10P			3401
-+iam28			MACH_IAM28		IAM28			3402
-+picasso			MACH_PICASSO		PICASSO			3403
-+mr301a			MACH_MR301A		MR301A			3404
-+notle			MACH_NOTLE		NOTLE			3405
-+eelx2			MACH_EELX2		EELX2			3406
-+moon			MACH_MOON		MOON			3407
-+ruby			MACH_RUBY		RUBY			3408
-+goldengate		MACH_GOLDENGATE		GOLDENGATE		3409
-+ctbu_gen2		MACH_CTBU_GEN2		CTBU_GEN2		3410
-+kmp_am17_01		MACH_KMP_AM17_01	KMP_AM17_01		3411
-+wtplug			MACH_WTPLUG		WTPLUG			3412
-+mx27su2			MACH_MX27SU2		MX27SU2			3413
-+nb31			MACH_NB31		NB31			3414
-+hjsdu			MACH_HJSDU		HJSDU			3415
-+td3_rev1		MACH_TD3_REV1		TD3_REV1		3416
-+eag_ci4000		MACH_EAG_CI4000		EAG_CI4000		3417
-+net5big_nand_v2		MACH_NET5BIG_NAND_V2	NET5BIG_NAND_V2		3418
-+cpx2			MACH_CPX2		CPX2			3419
-+net2big_nand_v2		MACH_NET2BIG_NAND_V2	NET2BIG_NAND_V2		3420
-+ecuv5			MACH_ECUV5		ECUV5			3421
--- 
-1.7.1
+ 		/* PWM 1 output on EGPIO[14] */
+ 		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_PONG);
+diff -u -p a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
+--- a/arch/arm/mach-mx3/mach-armadillo5x0.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-armadillo5x0.c 2011-03-20 22:00:21.000000000 +0100
+@@ -160,18 +160,13 @@ static int usbotg_init(struct platform_d
+ 
+ 	/* Chip already enabled by hardware */
+ 	/* OTG phy reset*/
+-	err = gpio_request(OTG_RESET, "USB-OTG-RESET");
++	err = gpio_request_one(OTG_RESET, GPIOF_OUT_INIT_HIGH,
++			       "USB-OTG-RESET");
+ 	if (err) {
+ 		pr_err("Failed to request the usb otg reset gpio\n");
+ 		return err;
+ 	}
+ 
+-	err = gpio_direction_output(OTG_RESET, 1/*HIGH*/);
+-	if (err) {
+-		pr_err("Failed to reset the usb otg phy\n");
+-		goto otg_free_reset;
+-	}
+-
+ 	gpio_set_value(OTG_RESET, 0/*LOW*/);
+ 	mdelay(5);
+ 	gpio_set_value(OTG_RESET, 1/*HIGH*/);
+@@ -206,31 +201,20 @@ static int usbh2_init(struct platform_de
+ 
+ 
+ 	/* Enable the chip */
+-	err = gpio_request(USBH2_CS, "USB-H2-CS");
++	err = gpio_request_one(USBH2_CS, GPIOF_OUT_INIT_LOW, "USB-H2-CS");
+ 	if (err) {
+ 		pr_err("Failed to request the usb host 2 CS gpio\n");
+ 		return err;
+ 	}
+ 
+-	err = gpio_direction_output(USBH2_CS, 0/*Enabled*/);
+-	if (err) {
+-		pr_err("Failed to drive the usb host 2 CS gpio\n");
+-		goto h2_free_cs;
+-	}
+-
+ 	/* H2 phy reset*/
+-	err = gpio_request(USBH2_RESET, "USB-H2-RESET");
++	err = gpio_request_one(USBH2_RESET, GPIOF_OUT_INIT_HIGH,
++			       "USB-H2-RESET");
+ 	if (err) {
+ 		pr_err("Failed to request the usb host 2 reset gpio\n");
+ 		goto h2_free_cs;
+ 	}
+ 
+-	err = gpio_direction_output(USBH2_RESET, 1/*HIGH*/);
+-	if (err) {
+-		pr_err("Failed to reset the usb host 2 phy\n");
+-		goto h2_free_reset;
+-	}
+-
+ 	gpio_set_value(USBH2_RESET, 0/*LOW*/);
+ 	mdelay(5);
+ 	gpio_set_value(USBH2_RESET, 1/*HIGH*/);
+diff -u -p a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c 2011-03-20 22:00:21.000000000 +0100
+@@ -574,18 +574,13 @@ static int mx31_3ds_usbotg_init(void)
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
+ 	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
+ 
+-	err = gpio_request(USBOTG_RST_B, "otgusb-reset");
++	err = gpio_request_one(USBOTG_RST_B, GPIOF_OUT_INIT_LOW,
++			       "otgusb-reset");
+ 	if (err) {
+ 		pr_err("Failed to request the USB OTG reset gpio\n");
+ 		return err;
+ 	}
+ 
+-	err = gpio_direction_output(USBOTG_RST_B, 0);
+-	if (err) {
+-		pr_err("Failed to drive the USB OTG reset gpio\n");
+-		goto usbotg_free_reset;
+-	}
+-
+ 	mdelay(1);
+ 	gpio_set_value(USBOTG_RST_B, 1);
+ 	return 0;
+@@ -617,18 +612,12 @@ static int mx31_3ds_host2_init(struct pl
+ 	mxc_iomux_set_pad(MX31_PIN_IOIS16, USB_PAD_CFG);
+ 	mxc_iomux_set_pad(MX31_PIN_PC_RW_B, USB_PAD_CFG);
+ 
+-	err = gpio_request(USBH2_RST_B, "usbh2-reset");
++	err = gpio_request_one(USBH2_RST_B, GPIOF_OUT_INIT_LOW, "usbh2-reset");
+ 	if (err) {
+ 		pr_err("Failed to request the USB Host 2 reset gpio\n");
+ 		return err;
+ 	}
+ 
+-	err = gpio_direction_output(USBH2_RST_B, 0);
+-	if (err) {
+-		pr_err("Failed to drive the USB Host 2 reset gpio\n");
+-		goto usbotg_free_reset;
+-	}
+-
+ 	mdelay(1);
+ 	gpio_set_value(USBH2_RST_B, 1);
+ 
+diff -u -p a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+--- a/arch/arm/mach-mx3/mach-mx31moboard.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-mx31moboard.c 2011-03-20 22:00:22.000000000 +0100
+@@ -123,14 +123,11 @@ static struct platform_device mx31moboar
+ 
+ static int moboard_uart0_init(struct platform_device *pdev)
+ {
+-	int ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CTS1), "uart0-cts-hack");
++	int ret = gpio_request_one(IOMUX_TO_GPIO(MX31_PIN_CTS1),
++				   GPIOF_OUT_INIT_LOW, "uart0-cts-hack");
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CTS1), 0);
+-	if (ret)
+-		gpio_free(IOMUX_TO_GPIO(MX31_PIN_CTS1));
+-
+ 	return ret;
+ }
+ 
+diff -u -p a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+--- a/arch/arm/mach-mxs/mach-mx28evk.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mxs/mach-mx28evk.c 2011-03-20 22:00:22.000000000 +0100
+@@ -129,18 +129,13 @@ static void __init mx28evk_fec_reset(voi
+ 		clk_enable(clk);
+ 
+ 	/* Power up fec phy */
+-	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
++	ret = gpio_request_one(MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW,
++			       "fec-phy-power");
+ 	if (ret) {
+ 		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
+ 		return;
+ 	}
+ 
+-	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+-	if (ret) {
+-		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+-		return;
+-	}
+-
+ 	/* Reset fec phy */
+ 	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+ 	if (ret) {
+diff -u -p a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+--- a/arch/arm/mach-mxs/module-tx28.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-mxs/module-tx28.c 2011-03-20 22:00:23.000000000 +0100
+@@ -72,19 +72,13 @@ int __init tx28_add_fec0(void)
+ 		unsigned int gpio = MXS_GPIO_NR(PAD_BANK(tx28_fec_gpio_pads[i]),
+ 			PAD_PIN(tx28_fec_gpio_pads[i]));
+ 
+-		ret = gpio_request(gpio, "FEC");
++		ret = gpio_request_one(gpio, GPIOF_OUT_INIT_LOW, "FEC");
+ 		if (ret) {
+ 			pr_err("Failed to request GPIO_%d_%d: %d\n",
+ 				PAD_BANK(tx28_fec_gpio_pads[i]),
+ 				PAD_PIN(tx28_fec_gpio_pads[i]), ret);
+ 			goto free_gpios;
+ 		}
+-		ret = gpio_direction_output(gpio, 0);
+-		if (ret) {
+-			pr_err("Failed to set direction of GPIO_%d_%d to output: %d\n",
+-					gpio / 32 + 1, gpio % 32, ret);
+-			goto free_gpios;
+-		}
+ 	}
+ 
+ 	/* Power up fec phy */
+diff -u -p a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+--- a/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 18:17:22.000000000 +0100
++++ b/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 22:00:22.000000000 +0100
+@@ -257,44 +257,26 @@ static int omap_ethernet_init(void)
+ 
+ 	/* Request of GPIO lines */
+ 
+-	status = gpio_request(ETH_KS8851_POWER_ON, "eth_power");
++	status = gpio_request_one(ETH_KS8851_POWER_ON, GPIOF_OUT_INIT_HIGH,
++				  "eth_power");
+ 	if (status) {
+ 		pr_err("Cannot request GPIO %d\n", ETH_KS8851_POWER_ON);
+ 		return status;
+ 	}
+ 
+-	status = gpio_request(ETH_KS8851_QUART, "quart");
++	status = gpio_request_one(ETH_KS8851_QUART, GPIOF_OUT_INIT_HIGH,
++				  "quart");
+ 	if (status) {
+ 		pr_err("Cannot request GPIO %d\n", ETH_KS8851_QUART);
+ 		goto error1;
+ 	}
+ 
+-	status = gpio_request(ETH_KS8851_IRQ, "eth_irq");
++	status = gpio_request_one(ETH_KS8851_IRQ, GPIOF_IN, "eth_irq");
+ 	if (status) {
+ 		pr_err("Cannot request GPIO %d\n", ETH_KS8851_IRQ);
+ 		goto error2;
+ 	}
+ 
+-	/* Configuration of requested GPIO lines */
+-
+-	status = gpio_direction_output(ETH_KS8851_POWER_ON, 1);
+-	if (status) {
+-		pr_err("Cannot set output GPIO %d\n", ETH_KS8851_IRQ);
+-		goto error3;
+-	}
+-
+-	status = gpio_direction_output(ETH_KS8851_QUART, 1);
+-	if (status) {
+-		pr_err("Cannot set output GPIO %d\n", ETH_KS8851_QUART);
+-		goto error3;
+-	}
+-
+-	status = gpio_direction_input(ETH_KS8851_IRQ);
+-	if (status) {
+-		pr_err("Cannot set input GPIO %d\n", ETH_KS8851_IRQ);
+-		goto error3;
+-	}
+-
+ 	return 0;
+ 
+ error3:
+@@ -616,19 +598,13 @@ static void __init omap_sfh7741prox_init
+ {
+ 	int  error;
+ 
+-	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
++	error = gpio_request_one(OMAP4_SFH7741_ENABLE_GPIO,
++				 GPIOF_OUT_INIT_LOW, "sfh7741");
+ 	if (error < 0) {
+ 		pr_err("%s:failed to request GPIO %d, error %d\n",
+ 			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+ 		return;
+ 	}
+-
+-	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
+-	if (error < 0) {
+-		pr_err("%s: GPIO configuration failed: GPIO %d,error %d\n",
+-			 __func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+-		gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
+-	}
+ }
+ 
+ static void sdp4430_hdmi_mux_init(void)
+diff -u -p a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+--- a/arch/arm/mach-omap2/board-am3517crane.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-am3517crane.c 2011-03-20 22:00:23.000000000 +0100
+@@ -89,19 +89,13 @@ static void __init am3517_crane_init(voi
+ 		return;
+ 	}
+ 
+-	ret = gpio_request(GPIO_USB_POWER, "usb_ehci_enable");
++	ret = gpio_request_one(GPIO_USB_POWER, GPIOF_OUT_INIT_HIGH,
++			       "usb_ehci_enable");
+ 	if (ret < 0) {
+ 		pr_err("Can not request GPIO %d\n", GPIO_USB_POWER);
+ 		return;
+ 	}
+ 
+-	ret = gpio_direction_output(GPIO_USB_POWER, 1);
+-	if (ret < 0) {
+-		gpio_free(GPIO_USB_POWER);
+-		pr_err("Unable to initialize EHCI power\n");
+-		return;
+-	}
+-
+ 	usbhs_init(&usbhs_bdata);
+ }
+ 
+diff -u -p a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+--- a/arch/arm/mach-omap2/board-am3517evm.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-am3517evm.c 2011-03-20 22:00:24.000000000 +0100
+@@ -174,19 +174,12 @@ static void __init am3517_evm_rtc_init(v
+ 	int r;
+ 
+ 	omap_mux_init_gpio(GPIO_RTCS35390A_IRQ, OMAP_PIN_INPUT_PULLUP);
+-	r = gpio_request(GPIO_RTCS35390A_IRQ, "rtcs35390a-irq");
++	r = gpio_request_one(GPIO_RTCS35390A_IRQ, GPIOF_IN, "rtcs35390a-irq");
+ 	if (r < 0) {
+ 		printk(KERN_WARNING "failed to request GPIO#%d\n",
+ 				GPIO_RTCS35390A_IRQ);
+ 		return;
+ 	}
+-	r = gpio_direction_input(GPIO_RTCS35390A_IRQ);
+-	if (r < 0) {
+-		printk(KERN_WARNING "GPIO#%d cannot be configured as input\n",
+-				GPIO_RTCS35390A_IRQ);
+-		gpio_free(GPIO_RTCS35390A_IRQ);
+-		return;
+-	}
+ 	am3517evm_i2c1_boardinfo[0].irq = gpio_to_irq(GPIO_RTCS35390A_IRQ);
+ }
+ 
+diff -u -p a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+--- a/arch/arm/mach-omap2/board-omap3pandora.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3pandora.c 2011-03-20 22:00:23.000000000 +0100
+@@ -305,18 +305,12 @@ static int omap3pandora_twl_gpio_setup(s
+ 
+ 	/* gpio + 13 drives 32kHz buffer for wifi module */
+ 	gpio_32khz = gpio + 13;
+-	ret = gpio_request(gpio_32khz, "wifi 32kHz");
++	ret = gpio_request_one(gpio_32khz, GPIOF_OUT_INIT_HIGH, "wifi 32kHz");
+ 	if (ret < 0) {
+ 		pr_err("Cannot get GPIO line %d, ret=%d\n", gpio_32khz, ret);
+ 		goto fail;
+ 	}
+ 
+-	ret = gpio_direction_output(gpio_32khz, 1);
+-	if (ret < 0) {
+-		pr_err("Cannot set GPIO line %d, ret=%d\n", gpio_32khz, ret);
+-		goto fail_direction;
+-	}
+-
+ 	return 0;
+ 
+ fail_direction:
+@@ -639,14 +633,10 @@ static void __init pandora_wl1251_init(v
+ 
+ 	memset(&pandora_wl1251_pdata, 0, sizeof(pandora_wl1251_pdata));
+ 
+-	ret = gpio_request(PANDORA_WIFI_IRQ_GPIO, "wl1251 irq");
++	ret = gpio_request_one(PANDORA_WIFI_IRQ_GPIO, GPIOF_IN, "wl1251 irq");
+ 	if (ret < 0)
+ 		goto fail;
+ 
+-	ret = gpio_direction_input(PANDORA_WIFI_IRQ_GPIO);
+-	if (ret < 0)
+-		goto fail_irq;
+-
+ 	pandora_wl1251_pdata.irq = gpio_to_irq(PANDORA_WIFI_IRQ_GPIO);
+ 	if (pandora_wl1251_pdata.irq < 0)
+ 		goto fail_irq;
+diff -u -p a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c 2011-03-20 22:00:21.000000000 +0100
+@@ -925,22 +925,15 @@ static void __init rx51_init_wl1251(void
+ {
+ 	int irq, ret;
+ 
+-	ret = gpio_request(RX51_WL1251_POWER_GPIO, "wl1251 power");
++	ret = gpio_request_one(RX51_WL1251_POWER_GPIO, GPIOF_OUT_INIT_LOW,
++			       "wl1251 power");
+ 	if (ret < 0)
+ 		goto error;
+ 
+-	ret = gpio_direction_output(RX51_WL1251_POWER_GPIO, 0);
++	ret = gpio_request_one(RX51_WL1251_IRQ_GPIO, GPIOF_IN, "wl1251 irq");
+ 	if (ret < 0)
+ 		goto err_power;
+ 
+-	ret = gpio_request(RX51_WL1251_IRQ_GPIO, "wl1251 irq");
+-	if (ret < 0)
+-		goto err_power;
+-
+-	ret = gpio_direction_input(RX51_WL1251_IRQ_GPIO);
+-	if (ret < 0)
+-		goto err_irq;
+-
+ 	irq = gpio_to_irq(RX51_WL1251_IRQ_GPIO);
+ 	if (irq < 0)
+ 		goto err_irq;
+diff -u -p a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+--- a/arch/arm/mach-pxa/balloon3.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/balloon3.c 2011-03-20 22:00:21.000000000 +0100
+@@ -250,18 +250,13 @@ static void __init balloon3_lcd_init(voi
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(balloon3_lcd_pin_config));
+ 
+-	ret = gpio_request(BALLOON3_GPIO_RUN_BACKLIGHT, "BKL-ON");
++	ret = gpio_request_one(BALLOON3_GPIO_RUN_BACKLIGHT,
++			       GPIOF_OUT_INIT_HIGH, "BKL-ON");
+ 	if (ret) {
+ 		pr_err("Requesting BKL-ON GPIO failed!\n");
+ 		goto err;
+ 	}
+ 
+-	ret = gpio_direction_output(BALLOON3_GPIO_RUN_BACKLIGHT, 1);
+-	if (ret) {
+-		pr_err("Setting BKL-ON GPIO direction failed!\n");
+-		goto err2;
+-	}
+-
+ 	balloon3_lcd_screen.pxafb_backlight_power = balloon3_backlight_power;
+ 	set_pxa_fb_info(&balloon3_lcd_screen);
+ 	return;
+@@ -635,14 +630,11 @@ static int balloon3_nand_probe(struct pl
+ 			"NAND support might be broken in this version!", ver);
+ 
+ 	/* Power up the NAND chips */
+-	ret = gpio_request(BALLOON3_GPIO_RUN_NAND, "NAND");
++	ret = gpio_request_one(BALLOON3_GPIO_RUN_NAND, GPIOF_OUT_INIT_HIGH,
++			       "NAND");
+ 	if (ret)
+ 		goto err1;
+ 
+-	ret = gpio_direction_output(BALLOON3_GPIO_RUN_NAND, 1);
+-	if (ret)
+-		goto err2;
+-
+ 	gpio_set_value(BALLOON3_GPIO_RUN_NAND, 1);
+ 
+ 	/* Deassert all nCE lines and write protect line */
+diff -u -p a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
+--- a/arch/arm/mach-pxa/cm-x270.c 2010-12-31 15:18:30.000000000 +0100
++++ b/arch/arm/mach-pxa/cm-x270.c 2011-03-20 22:00:23.000000000 +0100
+@@ -327,22 +327,18 @@ static unsigned long cm_x270_libertas_pi
+ 
+ static int cm_x270_libertas_setup(struct spi_device *spi)
+ {
+-	int err = gpio_request(GPIO19_WLAN_STRAP, "WLAN STRAP");
++	int err = gpio_request_one(GPIO19_WLAN_STRAP, GPIOF_OUT_INIT_HIGH,
++				   "WLAN STRAP");
+ 	if (err)
+ 		return err;
+ 
+-	err = gpio_request(GPIO102_WLAN_RST, "WLAN RST");
++	err = gpio_request_one(GPIO102_WLAN_RST, GPIOF_OUT_INIT_LOW,
++			       "WLAN RST");
+ 	if (err)
+ 		goto err_free_strap;
+ 
+-	err = gpio_direction_output(GPIO102_WLAN_RST, 0);
+-	if (err)
+-		goto err_free_strap;
+ 	msleep(100);
+ 
+-	err = gpio_direction_output(GPIO19_WLAN_STRAP, 1);
+-	if (err)
+-		goto err_free_strap;
+ 	msleep(100);
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(cm_x270_libertas_pin_config));
+diff -u -p a/arch/arm/mach-pxa/gumstix.c b/arch/arm/mach-pxa/gumstix.c
+--- a/arch/arm/mach-pxa/gumstix.c 2010-12-28 18:26:02.000000000 +0100
++++ b/arch/arm/mach-pxa/gumstix.c 2011-03-20 22:00:24.000000000 +0100
+@@ -152,17 +152,13 @@ static void __init gumstix_bluetooth_ini
+ 
+ 	gumstix_setup_bt_clock();
+ 
+-	err = gpio_request(GPIO_GUMSTIX_BTRESET, "BTRST");
++	err = gpio_request_one(GPIO_GUMSTIX_BTRESET, GPIOF_OUT_INIT_HIGH,
++			       "BTRST");
+ 	if (err) {
+ 		pr_err("gumstix: failed request gpio for bluetooth reset\n");
+ 		return;
+ 	}
+ 
+-	err = gpio_direction_output(GPIO_GUMSTIX_BTRESET, 1);
+-	if (err) {
+-		pr_err("gumstix: can't reset bluetooth\n");
+-		return;
+-	}
+ 	gpio_set_value(GPIO_GUMSTIX_BTRESET, 0);
+ 	udelay(100);
+ 	gpio_set_value(GPIO_GUMSTIX_BTRESET, 1);
+diff -u -p a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
+--- a/arch/arm/mach-pxa/palm27x.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/palm27x.c 2011-03-20 22:00:24.000000000 +0100
+@@ -278,20 +278,15 @@ static int palm27x_backlight_init(struct
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(palm_bl_power, "BL POWER");
++	ret = gpio_request_one(palm_bl_power, GPIOF_OUT_INIT_LOW, "BL POWER");
+ 	if (ret)
+ 		goto err;
+-	ret = gpio_direction_output(palm_bl_power, 0);
+-	if (ret)
+-		goto err2;
+ 
+ 	if (gpio_is_valid(palm_lcd_power)) {
+-		ret = gpio_request(palm_lcd_power, "LCD POWER");
++		ret = gpio_request_one(palm_lcd_power, GPIOF_OUT_INIT_LOW,
++				       "LCD POWER");
+ 		if (ret)
+ 			goto err2;
+-		ret = gpio_direction_output(palm_lcd_power, 0);
+-		if (ret)
+-			goto err3;
+ 	}
+ 
+ 	return 0;
+@@ -355,20 +350,14 @@ static int palm27x_power_supply_init(str
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(palm_ac_state, "AC state");
++	ret = gpio_request_one(palm_ac_state, GPIOF_IN, "AC state");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_input(palm_ac_state);
+-	if (ret)
+-		goto err2;
+ 
+ 	if (gpio_is_valid(palm_usb_state)) {
+-		ret = gpio_request(palm_usb_state, "USB state");
++		ret = gpio_request_one(palm_usb_state, GPIOF_IN, "USB state");
+ 		if (ret)
+ 			goto err2;
+-		ret = gpio_direction_input(palm_usb_state);
+-		if (ret)
+-			goto err3;
+ 	}
+ 
+ 	return 0;
+diff -u -p a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+--- a/arch/arm/mach-pxa/palmtc.c 2010-12-28 18:26:02.000000000 +0100
++++ b/arch/arm/mach-pxa/palmtc.c 2011-03-20 22:00:23.000000000 +0100
+@@ -171,12 +171,10 @@ static int palmtc_backlight_init(struct 
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_BL_POWER, "BL POWER");
++	ret = gpio_request_one(GPIO_NR_PALMTC_BL_POWER, GPIOF_OUT_INIT_HIGH,
++			       "BL POWER");
+ 	if (ret)
+ 		goto err;
+-	ret = gpio_direction_output(GPIO_NR_PALMTC_BL_POWER, 1);
+-	if (ret)
+-		goto err2;
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/arm/mach-pxa/palmte2.c b/arch/arm/mach-pxa/palmte2.c
+--- a/arch/arm/mach-pxa/palmte2.c 2010-12-28 18:26:02.000000000 +0100
++++ b/arch/arm/mach-pxa/palmte2.c 2011-03-20 22:00:22.000000000 +0100
+@@ -140,18 +140,14 @@ static int palmte2_backlight_init(struct
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTE2_BL_POWER, "BL POWER");
++	ret = gpio_request_one(GPIO_NR_PALMTE2_BL_POWER, GPIOF_OUT_INIT_LOW,
++			       "BL POWER");
+ 	if (ret)
+ 		goto err;
+-	ret = gpio_direction_output(GPIO_NR_PALMTE2_BL_POWER, 0);
++	ret = gpio_request_one(GPIO_NR_PALMTE2_LCD_POWER, GPIOF_OUT_INIT_LOW,
++			       "LCD POWER");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_request(GPIO_NR_PALMTE2_LCD_POWER, "LCD POWER");
+-	if (ret)
+-		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMTE2_LCD_POWER, 0);
+-	if (ret)
+-		goto err3;
+ 
+ 	return 0;
+ err3:
+@@ -225,12 +221,10 @@ static int power_supply_init(struct devi
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTE2_POWER_DETECT, "CABLE_STATE_AC");
++	ret = gpio_request_one(GPIO_NR_PALMTE2_POWER_DETECT, GPIOF_IN,
++			       "CABLE_STATE_AC");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_input(GPIO_NR_PALMTE2_POWER_DETECT);
+-	if (ret)
+-		goto err2;
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/arm/mach-pxa/tosa-bt.c b/arch/arm/mach-pxa/tosa-bt.c
+--- a/arch/arm/mach-pxa/tosa-bt.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/tosa-bt.c 2011-03-20 22:00:23.000000000 +0100
+@@ -61,18 +61,14 @@ static int tosa_bt_probe(struct platform
+ 
+ 	struct tosa_bt_data *data = dev->dev.platform_data;
+ 
+-	rc = gpio_request(data->gpio_reset, "Bluetooth reset");
++	rc = gpio_request_one(data->gpio_reset, GPIOF_OUT_INIT_LOW,
++			      "Bluetooth reset");
+ 	if (rc)
+ 		goto err_reset;
+-	rc = gpio_direction_output(data->gpio_reset, 0);
+-	if (rc)
+-		goto err_reset_dir;
+-	rc = gpio_request(data->gpio_pwr, "Bluetooth power");
++	rc = gpio_request_one(data->gpio_pwr, GPIOF_OUT_INIT_LOW,
++			      "Bluetooth power");
+ 	if (rc)
+ 		goto err_pwr;
+-	rc = gpio_direction_output(data->gpio_pwr, 0);
+-	if (rc)
+-		goto err_pwr_dir;
+ 
+ 	rfk = rfkill_alloc("tosa-bt", &dev->dev, RFKILL_TYPE_BLUETOOTH,
+ 			   &tosa_bt_rfkill_ops, data);
+diff -u -p a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+--- a/arch/arm/mach-pxa/tosa.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/tosa.c 2011-03-20 22:00:23.000000000 +0100
+@@ -253,14 +253,11 @@ static int tosa_mci_init(struct device *
+ {
+ 	int err;
+ 
+-	err = gpio_request(TOSA_GPIO_nSD_INT, "SD Int");
++	err = gpio_request_one(TOSA_GPIO_nSD_INT, GPIOF_IN, "SD Int");
+ 	if (err) {
+ 		printk(KERN_ERR "tosa_mci_init: can't request SD_PWR gpio\n");
+ 		goto err_gpio_int;
+ 	}
+-	err = gpio_direction_input(TOSA_GPIO_nSD_INT);
+-	if (err)
+-		goto err_gpio_int_dir;
+ 
+ 	return 0;
+ 
+@@ -304,21 +301,16 @@ static int tosa_irda_startup(struct devi
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(TOSA_GPIO_IRDA_TX, "IrDA TX");
++	ret = gpio_request_one(TOSA_GPIO_IRDA_TX, GPIOF_OUT_INIT_LOW,
++			       "IrDA TX");
+ 	if (ret)
+ 		goto err_tx;
+-	ret = gpio_direction_output(TOSA_GPIO_IRDA_TX, 0);
+-	if (ret)
+-		goto err_tx_dir;
+ 
+-	ret = gpio_request(TOSA_GPIO_IR_POWERDWN, "IrDA powerdown");
++	ret = gpio_request_one(TOSA_GPIO_IR_POWERDWN, GPIOF_OUT_INIT_LOW,
++			       "IrDA powerdown");
+ 	if (ret)
+ 		goto err_pwr;
+ 
+-	ret = gpio_direction_output(TOSA_GPIO_IR_POWERDWN, 0);
+-	if (ret)
+-		goto err_pwr_dir;
+-
+ 	tosa_irda_transceiver_mode(dev, IR_SIRMODE | IR_OFF);
+ 
+ 	return 0;
+@@ -352,14 +344,10 @@ static struct pxaficp_platform_data tosa
+  */
+ static int tosa_power_init(struct device *dev)
+ {
+-	int ret = gpio_request(TOSA_GPIO_AC_IN, "ac in");
++	int ret = gpio_request_one(TOSA_GPIO_AC_IN, GPIOF_IN, "ac in");
+ 	if (ret)
+ 		goto err_gpio_req;
+ 
+-	ret = gpio_direction_input(TOSA_GPIO_AC_IN);
+-	if (ret)
+-		goto err_gpio_in;
+-
+ 	return 0;
+ 
+ err_gpio_in:
+@@ -622,24 +610,18 @@ static int tosa_tc6393xb_enable(struct p
+ {
+ 	int rc;
+ 
+-	rc = gpio_request(TOSA_GPIO_TC6393XB_REST_IN, "tc6393xb #pclr");
++	rc = gpio_request_one(TOSA_GPIO_TC6393XB_REST_IN, GPIOF_OUT_INIT_LOW,
++			      "tc6393xb #pclr");
+ 	if (rc)
+ 		goto err_req_pclr;
+-	rc = gpio_request(TOSA_GPIO_TC6393XB_SUSPEND, "tc6393xb #suspend");
++	rc = gpio_request_one(TOSA_GPIO_TC6393XB_SUSPEND, GPIOF_OUT_INIT_LOW,
++			      "tc6393xb #suspend");
+ 	if (rc)
+ 		goto err_req_suspend;
+-	rc = gpio_request(TOSA_GPIO_TC6393XB_L3V_ON, "tc6393xb l3v");
++	rc = gpio_request_one(TOSA_GPIO_TC6393XB_L3V_ON, GPIOF_OUT_INIT_LOW,
++			      "tc6393xb l3v");
+ 	if (rc)
+ 		goto err_req_l3v;
+-	rc = gpio_direction_output(TOSA_GPIO_TC6393XB_L3V_ON, 0);
+-	if (rc)
+-		goto err_dir_l3v;
+-	rc = gpio_direction_output(TOSA_GPIO_TC6393XB_SUSPEND, 0);
+-	if (rc)
+-		goto err_dir_suspend;
+-	rc = gpio_direction_output(TOSA_GPIO_TC6393XB_REST_IN, 0);
+-	if (rc)
+-		goto err_dir_pclr;
+ 
+ 	mdelay(1);
+ 
+@@ -726,14 +708,11 @@ static int tosa_tc6393xb_setup(struct pl
+ {
+ 	int rc;
+ 
+-	rc = gpio_request(TOSA_GPIO_CARD_VCC_ON, "CARD_VCC_ON");
++	rc = gpio_request_one(TOSA_GPIO_CARD_VCC_ON, GPIOF_OUT_INIT_HIGH,
++			      "CARD_VCC_ON");
+ 	if (rc)
+ 		goto err_req;
+ 
+-	rc = gpio_direction_output(TOSA_GPIO_CARD_VCC_ON, 1);
+-	if (rc)
+-		goto err_dir;
+-
+ 	return rc;
+ 
+ err_dir:
+diff -u -p a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+--- a/arch/arm/mach-pxa/viper.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/viper.c 2011-03-20 22:00:22.000000000 +0100
+@@ -353,22 +353,15 @@ static int viper_backlight_init(struct d
+ 	int ret;
+ 
+ 	/* GPIO9 and 10 control FB backlight. Initialise to off */
+-	ret = gpio_request(VIPER_BCKLIGHT_EN_GPIO, "Backlight");
++	ret = gpio_request_one(VIPER_BCKLIGHT_EN_GPIO, GPIOF_OUT_INIT_LOW,
++			       "Backlight");
+ 	if (ret)
+ 		goto err_request_bckl;
+ 
+-	ret = gpio_request(VIPER_LCD_EN_GPIO, "LCD");
++	ret = gpio_request_one(VIPER_LCD_EN_GPIO, GPIOF_OUT_INIT_LOW, "LCD");
+ 	if (ret)
+ 		goto err_request_lcd;
+ 
+-	ret = gpio_direction_output(VIPER_BCKLIGHT_EN_GPIO, 0);
+-	if (ret)
+-		goto err_dir;
+-
+-	ret = gpio_direction_output(VIPER_LCD_EN_GPIO, 0);
+-	if (ret)
+-		goto err_dir;
+-
+ 	return 0;
+ 
+ err_dir:
+diff -u -p a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+--- a/arch/arm/mach-pxa/vpac270.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/vpac270.c 2011-03-20 22:00:23.000000000 +0100
+@@ -559,18 +559,13 @@ static void __init vpac270_lcd_init(void
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO81_VPAC270_BKL_ON, "BKL-ON");
++	ret = gpio_request_one(GPIO81_VPAC270_BKL_ON, GPIOF_OUT_INIT_HIGH,
++			       "BKL-ON");
+ 	if (ret) {
+ 		pr_err("Requesting BKL-ON GPIO failed!\n");
+ 		goto err;
+ 	}
+ 
+-	ret = gpio_direction_output(GPIO81_VPAC270_BKL_ON, 1);
+-	if (ret) {
+-		pr_err("Setting BKL-ON GPIO direction failed!\n");
+-		goto err2;
+-	}
+-
+ 	vpac270_lcd_screen.pxafb_lcd_power = vpac270_lcd_power;
+ 	set_pxa_fb_info(&vpac270_lcd_screen);
+ 	return;
+diff -u -p a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+--- a/arch/arm/mach-pxa/z2.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/z2.c 2011-03-20 22:00:22.000000000 +0100
+@@ -497,22 +497,16 @@ static int z2_lbs_spi_setup(struct spi_d
+ {
+ 	int ret = 0;
+ 
+-	ret = gpio_request(GPIO15_ZIPITZ2_WIFI_POWER, "WiFi Power");
++	ret = gpio_request_one(GPIO15_ZIPITZ2_WIFI_POWER,
++			       GPIOF_OUT_INIT_HIGH, "WiFi Power");
+ 	if (ret)
+ 		goto err;
+ 
+-	ret = gpio_direction_output(GPIO15_ZIPITZ2_WIFI_POWER, 1);
++	ret = gpio_request_one(GPIO14_ZIPITZ2_WIFI_RESET, GPIOF_OUT_INIT_LOW,
++			       "WiFi Reset");
+ 	if (ret)
+ 		goto err2;
+ 
+-	ret = gpio_request(GPIO14_ZIPITZ2_WIFI_RESET, "WiFi Reset");
+-	if (ret)
+-		goto err2;
+-
+-	ret = gpio_direction_output(GPIO14_ZIPITZ2_WIFI_RESET, 0);
+-	if (ret)
+-		goto err3;
+-
+ 	/* Reset the card */
+ 	mdelay(180);
+ 	gpio_set_value(GPIO14_ZIPITZ2_WIFI_RESET, 1);
+diff -u -p a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+--- a/arch/arm/mach-pxa/zeus.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/arm/mach-pxa/zeus.c 2011-03-20 22:00:23.000000000 +0100
+@@ -393,16 +393,11 @@ static int zeus_mcp2515_setup(struct spi
+ {
+ 	int err;
+ 
+-	err = gpio_request(ZEUS_CAN_SHDN_GPIO, "CAN shutdown");
++	err = gpio_request_one(ZEUS_CAN_SHDN_GPIO, GPIOF_OUT_INIT_HIGH,
++			       "CAN shutdown");
+ 	if (err)
+ 		return err;
+ 
+-	err = gpio_direction_output(ZEUS_CAN_SHDN_GPIO, 1);
+-	if (err) {
+-		gpio_free(ZEUS_CAN_SHDN_GPIO);
+-		return err;
+-	}
+-
+ 	return 0;
+ }
+ 
+diff -u -p a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+--- a/arch/arm/mach-sa1100/collie.c 2011-02-19 08:28:51.000000000 +0100
++++ b/arch/arm/mach-sa1100/collie.c 2011-03-20 22:00:24.000000000 +0100
+@@ -95,14 +95,10 @@ static struct mcp_plat_data collie_mcp_d
+  */
+ static int collie_power_init(struct device *dev)
+ {
+-	int ret = gpio_request(COLLIE_GPIO_AC_IN, "ac in");
++	int ret = gpio_request_one(COLLIE_GPIO_AC_IN, GPIOF_IN, "ac in");
+ 	if (ret)
+ 		goto err_gpio_req;
+ 
+-	ret = gpio_direction_input(COLLIE_GPIO_AC_IN);
+-	if (ret)
+-		goto err_gpio_in;
+-
+ 	return 0;
+ 
+ err_gpio_in:
+@@ -273,14 +269,11 @@ static struct mtd_partition collie_parti
+ 
+ static int collie_flash_init(void)
+ {
+-	int rc = gpio_request(COLLIE_GPIO_VPEN, "flash Vpp enable");
++	int rc = gpio_request_one(COLLIE_GPIO_VPEN, GPIOF_OUT_INIT_HIGH,
++				  "flash Vpp enable");
+ 	if (rc)
+ 		return rc;
+ 
+-	rc = gpio_direction_output(COLLIE_GPIO_VPEN, 1);
+-	if (rc)
+-		gpio_free(COLLIE_GPIO_VPEN);
+-
+ 	return rc;
+ }
+ 
+diff -u -p a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
+--- a/arch/arm/mach-sa1100/h3600.c 2010-10-23 19:40:31.000000000 +0200
++++ b/arch/arm/mach-sa1100/h3600.c 2011-03-20 22:00:24.000000000 +0100
+@@ -79,18 +79,14 @@ static void h3600_irda_set_speed(struct 
+ 
+ static int h3600_irda_startup(struct device *dev)
+ {
+-	int err = gpio_request(H3600_EGPIO_IR_ON, "IrDA power");
++	int err = gpio_request_one(H3600_EGPIO_IR_ON, GPIOF_OUT_INIT_LOW,
++				   "IrDA power");
+ 	if (err)
+ 		goto err1;
+-	err = gpio_direction_output(H3600_EGPIO_IR_ON, 0);
++	err = gpio_request_one(H3600_EGPIO_IR_FSEL, GPIOF_OUT_INIT_LOW,
++			       "IrDA fsel");
+ 	if (err)
+ 		goto err2;
+-	err = gpio_request(H3600_EGPIO_IR_FSEL, "IrDA fsel");
+-	if (err)
+-		goto err2;
+-	err = gpio_direction_output(H3600_EGPIO_IR_FSEL, 0);
+-	if (err)
+-		goto err3;
+ 	return 0;
+ 
+ err3:	gpio_free(H3600_EGPIO_IR_FSEL);
+diff -u -p a/arch/arm/mach-sa1100/h3xxx.c b/arch/arm/mach-sa1100/h3xxx.c
+--- a/arch/arm/mach-sa1100/h3xxx.c 2009-12-03 14:09:46.000000000 +0100
++++ b/arch/arm/mach-sa1100/h3xxx.c 2011-03-20 22:00:24.000000000 +0100
+@@ -82,16 +82,13 @@ static void h3xxx_set_vpp(int vpp)
+ 
+ static int h3xxx_flash_init(void)
+ {
+-	int err = gpio_request(H3XXX_EGPIO_VPP_ON, "Flash Vpp");
++	int err = gpio_request_one(H3XXX_EGPIO_VPP_ON, GPIOF_OUT_INIT_LOW,
++				   "Flash Vpp");
+ 	if (err) {
+ 		pr_err("%s: can't request H3XXX_EGPIO_VPP_ON\n", __func__);
+ 		return err;
+ 	}
+ 
+-	err = gpio_direction_output(H3XXX_EGPIO_VPP_ON, 0);
+-	if (err)
+-		gpio_free(H3XXX_EGPIO_VPP_ON);
+-
+ 	return err;
+ }
+ 
+diff -u -p a/arch/arm/mach-ux500/board-mop500-stuib.c b/arch/arm/mach-ux500/board-mop500-stuib.c
+--- a/arch/arm/mach-ux500/board-mop500-stuib.c 2011-02-19 08:28:51.000000000 +0100
++++ b/arch/arm/mach-ux500/board-mop500-stuib.c 2011-03-20 22:00:22.000000000 +0100
+@@ -100,17 +100,12 @@ static int bu21013_gpio_board_init(int r
+ 
+ 	bu21013_devices++;
+ 	if (bu21013_devices == 1) {
+-		retval = gpio_request(reset_pin, "touchp_reset");
++		retval = gpio_request_one(reset_pin, GPIOF_OUT_INIT_HIGH,
++					  "touchp_reset");
+ 		if (retval) {
+ 			printk(KERN_ERR "Unable to request gpio reset_pin");
+ 			return retval;
+ 		}
+-		retval = gpio_direction_output(reset_pin, 1);
+-		if (retval < 0) {
+-			printk(KERN_ERR "%s: gpio direction failed\n",
+-					__func__);
+-			return retval;
+-		}
+ 	}
+ 
+ 	return retval;
+diff -u -p a/arch/m68knommu/platform/520x/config.c b/arch/m68knommu/platform/520x/config.c
+--- a/arch/m68knommu/platform/520x/config.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/m68knommu/platform/520x/config.c 2011-03-20 22:00:24.000000000 +0100
+@@ -99,38 +99,26 @@ static int m520x_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/m68knommu/platform/523x/config.c b/arch/m68knommu/platform/523x/config.c
+--- a/arch/m68knommu/platform/523x/config.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/m68knommu/platform/523x/config.c 2011-03-20 22:00:24.000000000 +0100
+@@ -101,49 +101,33 @@ static int m523x_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS3, "MCFQSPI_CS3");
++	status = gpio_request_one(MCFQSPI_CS3, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS3");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS3 failed\n");
+ 		goto fail3;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS3, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS3 failed\n");
+-		goto fail4;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/m68knommu/platform/5249/config.c b/arch/m68knommu/platform/5249/config.c
+--- a/arch/m68knommu/platform/5249/config.c 2010-05-27 15:47:03.000000000 +0200
++++ b/arch/m68knommu/platform/5249/config.c 2011-03-20 22:00:21.000000000 +0100
+@@ -87,49 +87,33 @@ static int m5249_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS3, "MCFQSPI_CS3");
++	status = gpio_request_one(MCFQSPI_CS3, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS3");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS3 failed\n");
+ 		goto fail3;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS3, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS3 failed\n");
+-		goto fail4;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/m68knommu/platform/527x/config.c b/arch/m68knommu/platform/527x/config.c
+--- a/arch/m68knommu/platform/527x/config.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/m68knommu/platform/527x/config.c 2011-03-20 22:00:21.000000000 +0100
+@@ -139,49 +139,33 @@ static int m527x_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS3, "MCFQSPI_CS3");
++	status = gpio_request_one(MCFQSPI_CS3, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS3");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS3 failed\n");
+ 		goto fail3;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS3, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS3 failed\n");
+-		goto fail4;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/m68knommu/platform/528x/config.c b/arch/m68knommu/platform/528x/config.c
+--- a/arch/m68knommu/platform/528x/config.c 2011-03-14 17:19:13.000000000 +0100
++++ b/arch/m68knommu/platform/528x/config.c 2011-03-20 22:00:24.000000000 +0100
+@@ -102,49 +102,33 @@ static int m528x_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS3, "MCFQSPI_CS3");
++	status = gpio_request_one(MCFQSPI_CS3, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS3");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS3 failed\n");
+ 		goto fail3;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS3, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS3 failed\n");
+-		goto fail4;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/arch/m68knommu/platform/532x/config.c b/arch/m68knommu/platform/532x/config.c
+--- a/arch/m68knommu/platform/532x/config.c 2010-01-29 18:29:07.000000000 +0100
++++ b/arch/m68knommu/platform/532x/config.c 2011-03-20 22:00:24.000000000 +0100
+@@ -107,38 +107,26 @@ static int m532x_cs_setup(struct mcfqspi
+ {
+ 	int status;
+ 
+-	status = gpio_request(MCFQSPI_CS0, "MCFQSPI_CS0");
++	status = gpio_request_one(MCFQSPI_CS0, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS0");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS0 failed\n");
+ 		goto fail0;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS0, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS0 failed\n");
+-		goto fail1;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS1, "MCFQSPI_CS1");
++	status = gpio_request_one(MCFQSPI_CS1, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS1");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS1 failed\n");
+ 		goto fail1;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS1, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS1 failed\n");
+-		goto fail2;
+-	}
+ 
+-	status = gpio_request(MCFQSPI_CS2, "MCFQSPI_CS2");
++	status = gpio_request_one(MCFQSPI_CS2, GPIOF_OUT_INIT_HIGH,
++				  "MCFQSPI_CS2");
+ 	if (status) {
+ 		pr_debug("gpio_request for MCFQSPI_CS2 failed\n");
+ 		goto fail2;
+ 	}
+-	status = gpio_direction_output(MCFQSPI_CS2, 1);
+-	if (status) {
+-		pr_debug("gpio_direction_output for MCFQSPI_CS2 failed\n");
+-		goto fail3;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/drivers/ata/pata_palmld.c b/drivers/ata/pata_palmld.c
+--- a/drivers/ata/pata_palmld.c 2011-02-19 08:28:51.000000000 +0100
++++ b/drivers/ata/pata_palmld.c 2011-03-20 22:00:21.000000000 +0100
+@@ -61,19 +61,15 @@ static __devinit int palmld_pata_probe(s
+ 		return -ENOMEM;
+ 
+ 	/* request and activate power GPIO, IRQ GPIO */
+-	ret = gpio_request(GPIO_NR_PALMLD_IDE_PWEN, "HDD PWR");
++	ret = gpio_request_one(GPIO_NR_PALMLD_IDE_PWEN, GPIOF_OUT_INIT_HIGH,
++			       "HDD PWR");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_IDE_PWEN, 1);
+-	if (ret)
+-		goto err2;
+ 
+-	ret = gpio_request(GPIO_NR_PALMLD_IDE_RESET, "HDD RST");
++	ret = gpio_request_one(GPIO_NR_PALMLD_IDE_RESET, GPIOF_OUT_INIT_LOW,
++			       "HDD RST");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_IDE_RESET, 0);
+-	if (ret)
+-		goto err3;
+ 
+ 	/* reset the drive */
+ 	gpio_set_value(GPIO_NR_PALMLD_IDE_RESET, 0);
+diff -u -p a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
+--- a/drivers/hwmon/gpio-fan.c 2010-11-13 10:26:37.000000000 +0100
++++ b/drivers/hwmon/gpio-fan.c 2011-03-20 22:00:23.000000000 +0100
+@@ -95,14 +95,10 @@ static int fan_alarm_init(struct gpio_fa
+ 
+ 	fan_data->alarm = alarm;
+ 
+-	err = gpio_request(alarm->gpio, "GPIO fan alarm");
++	err = gpio_request_one(alarm->gpio, GPIOF_IN, "GPIO fan alarm");
+ 	if (err)
+ 		return err;
+ 
+-	err = gpio_direction_input(alarm->gpio);
+-	if (err)
+-		goto err_free_gpio;
+-
+ 	err = device_create_file(&pdev->dev, &dev_attr_fan1_alarm);
+ 	if (err)
+ 		goto err_free_gpio;
+diff -u -p a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+--- a/drivers/input/keyboard/gpio_keys.c 2011-02-02 17:27:38.000000000 +0100
++++ b/drivers/input/keyboard/gpio_keys.c 2011-03-20 22:00:23.000000000 +0100
+@@ -371,21 +371,13 @@ static int __devinit gpio_keys_setup_key
+ 	setup_timer(&bdata->timer, gpio_keys_timer, (unsigned long)bdata);
+ 	INIT_WORK(&bdata->work, gpio_keys_work_func);
+ 
+-	error = gpio_request(button->gpio, desc);
++	error = gpio_request_one(button->gpio, GPIOF_IN, desc);
+ 	if (error < 0) {
+ 		dev_err(dev, "failed to request GPIO %d, error %d\n",
+ 			button->gpio, error);
+ 		goto fail2;
+ 	}
+ 
+-	error = gpio_direction_input(button->gpio);
+-	if (error < 0) {
+-		dev_err(dev, "failed to configure"
+-			" direction for GPIO %d, error %d\n",
+-			button->gpio, error);
+-		goto fail3;
+-	}
+-
+ 	if (button->debounce_interval) {
+ 		error = gpio_set_debounce(button->gpio,
+ 					  button->debounce_interval * 1000);
+diff -u -p a/drivers/input/keyboard/gpio_keys_polled.c b/drivers/input/keyboard/gpio_keys_polled.c
+--- a/drivers/input/keyboard/gpio_keys_polled.c 2010-12-26 10:19:06.000000000 +0100
++++ b/drivers/input/keyboard/gpio_keys_polled.c 2011-03-20 22:00:22.000000000 +0100
+@@ -158,22 +158,14 @@ static int __devinit gpio_keys_polled_pr
+ 			goto err_free_gpio;
+ 		}
+ 
+-		error = gpio_request(gpio,
+-				     button->desc ? button->desc : DRV_NAME);
++		error = gpio_request_one(gpio, GPIOF_IN,
++					 button->desc ? button->desc : DRV_NAME);
+ 		if (error) {
+ 			dev_err(dev, "unable to claim gpio %u, err=%d\n",
+ 				gpio, error);
+ 			goto err_free_gpio;
+ 		}
+ 
+-		error = gpio_direction_input(gpio);
+-		if (error) {
+-			dev_err(dev,
+-				"unable to set direction on gpio %u, err=%d\n",
+-				gpio, error);
+-			goto err_free_gpio;
+-		}
+-
+ 		bdata->can_sleep = gpio_cansleep(gpio);
+ 		bdata->last_state = -1;
+ 		bdata->threshold = DIV_ROUND_UP(button->debounce_interval,
+diff -u -p a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
+--- a/drivers/input/misc/rotary_encoder.c 2011-02-11 10:53:32.000000000 +0100
++++ b/drivers/input/misc/rotary_encoder.c 2011-03-20 22:00:22.000000000 +0100
+@@ -146,34 +146,20 @@ static int __devinit rotary_encoder_prob
+ 	}
+ 
+ 	/* request the GPIOs */
+-	err = gpio_request(pdata->gpio_a, DRV_NAME);
++	err = gpio_request_one(pdata->gpio_a, GPIOF_IN, DRV_NAME);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "unable to request GPIO %d\n",
+ 			pdata->gpio_a);
+ 		goto exit_unregister_input;
+ 	}
+ 
+-	err = gpio_direction_input(pdata->gpio_a);
+-	if (err) {
+-		dev_err(&pdev->dev, "unable to set GPIO %d for input\n",
+-			pdata->gpio_a);
+-		goto exit_unregister_input;
+-	}
+-
+-	err = gpio_request(pdata->gpio_b, DRV_NAME);
++	err = gpio_request_one(pdata->gpio_b, GPIOF_IN, DRV_NAME);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "unable to request GPIO %d\n",
+ 			pdata->gpio_b);
+ 		goto exit_free_gpio_a;
+ 	}
+ 
+-	err = gpio_direction_input(pdata->gpio_b);
+-	if (err) {
+-		dev_err(&pdev->dev, "unable to set GPIO %d for input\n",
+-			pdata->gpio_b);
+-		goto exit_free_gpio_a;
+-	}
+-
+ 	/* request the IRQs */
+ 	err = request_irq(encoder->irq_a, &rotary_encoder_irq,
+ 			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+diff -u -p a/drivers/input/touchscreen/cy8ctmg110_ts.c b/drivers/input/touchscreen/cy8ctmg110_ts.c
+--- a/drivers/input/touchscreen/cy8ctmg110_ts.c 2011-01-19 18:51:19.000000000 +0100
++++ b/drivers/input/touchscreen/cy8ctmg110_ts.c 2011-03-20 22:00:22.000000000 +0100
+@@ -223,7 +223,7 @@ static int __devinit cy8ctmg110_probe(st
+ 	cy8ctmg110_power(ts, true);
+ 	cy8ctmg110_set_sleepmode(ts, false);
+ 
+-	err = gpio_request(ts->irq_pin, "touch_irq_key");
++	err = gpio_request_one(ts->irq_pin, GPIOF_IN, "touch_irq_key");
+ 	if (err < 0) {
+ 		dev_err(&client->dev,
+ 			"Failed to request GPIO %d, error %d\n",
+@@ -231,14 +231,6 @@ static int __devinit cy8ctmg110_probe(st
+ 		goto err_shutoff_device;
+ 	}
+ 
+-	err = gpio_direction_input(ts->irq_pin);
+-	if (err < 0) {
+-		dev_err(&client->dev,
+-			"Failed to configure input direction for GPIO %d, error %d\n",
+-			ts->irq_pin, err);
+-		goto err_free_irq_gpio;
+-	}
+-
+ 	client->irq = gpio_to_irq(ts->irq_pin);
+ 	if (client->irq < 0) {
+ 		err = client->irq;
+diff -u -p a/drivers/input/touchscreen/mainstone-wm97xx.c b/drivers/input/touchscreen/mainstone-wm97xx.c
+--- a/drivers/input/touchscreen/mainstone-wm97xx.c 2010-02-03 15:05:01.000000000 +0100
++++ b/drivers/input/touchscreen/mainstone-wm97xx.c 2011-03-20 22:00:22.000000000 +0100
+@@ -208,16 +208,10 @@ static int wm97xx_acc_startup(struct wm9
+ 		irq = 4;
+ 
+ 	if (irq) {
+-		ret = gpio_request(irq, "Touchscreen IRQ");
++		ret = gpio_request_one(irq, GPIOF_IN, "Touchscreen IRQ");
+ 		if (ret)
+ 			goto out;
+ 
+-		ret = gpio_direction_input(irq);
+-		if (ret) {
+-			gpio_free(irq);
+-			goto out;
+-		}
+-
+ 		wm->pen_irq = gpio_to_irq(irq);
+ 		set_irq_type(wm->pen_irq, IRQ_TYPE_EDGE_BOTH);
+ 	} else /* pen irq not supported */
+diff -u -p a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
+--- a/drivers/leds/leds-netxbig.c 2010-10-14 18:30:04.000000000 +0200
++++ b/drivers/leds/leds-netxbig.c 2011-03-20 22:00:21.000000000 +0100
+@@ -81,35 +81,23 @@ static int __devinit gpio_ext_init(struc
+ 
+ 	/* Configure address GPIOs. */
+ 	for (i = 0; i < gpio_ext->num_addr; i++) {
+-		err = gpio_request(gpio_ext->addr[i], "GPIO extension addr");
++		err = gpio_request_one(gpio_ext->addr[i], GPIOF_OUT_INIT_LOW,
++				       "GPIO extension addr");
+ 		if (err)
+ 			goto err_free_addr;
+-		err = gpio_direction_output(gpio_ext->addr[i], 0);
+-		if (err) {
+-			gpio_free(gpio_ext->addr[i]);
+-			goto err_free_addr;
+-		}
+ 	}
+ 	/* Configure data GPIOs. */
+ 	for (i = 0; i < gpio_ext->num_data; i++) {
+-		err = gpio_request(gpio_ext->data[i], "GPIO extension data");
++		err = gpio_request_one(gpio_ext->data[i], GPIOF_OUT_INIT_LOW,
++				       "GPIO extension data");
+ 		if (err)
+ 			goto err_free_data;
+-		err = gpio_direction_output(gpio_ext->data[i], 0);
+-		if (err) {
+-			gpio_free(gpio_ext->data[i]);
+-			goto err_free_data;
+-		}
+ 	}
+ 	/* Configure "enable select" GPIO. */
+-	err = gpio_request(gpio_ext->enable, "GPIO extension enable");
++	err = gpio_request_one(gpio_ext->enable, GPIOF_OUT_INIT_LOW,
++			       "GPIO extension enable");
+ 	if (err)
+ 		goto err_free_data;
+-	err = gpio_direction_output(gpio_ext->enable, 0);
+-	if (err) {
+-		gpio_free(gpio_ext->enable);
+-		goto err_free_data;
+-	}
+ 
+ 	return 0;
+ 
+diff -u -p a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+--- a/drivers/mmc/host/omap_hsmmc.c 2011-03-14 17:19:15.000000000 +0100
++++ b/drivers/mmc/host/omap_hsmmc.c 2011-03-20 22:00:24.000000000 +0100
+@@ -506,23 +506,19 @@ static int omap_hsmmc_gpio_init(struct o
+ 			pdata->slots[0].card_detect = omap_hsmmc_card_detect;
+ 		pdata->slots[0].card_detect_irq =
+ 				gpio_to_irq(pdata->slots[0].switch_pin);
+-		ret = gpio_request(pdata->slots[0].switch_pin, "mmc_cd");
++		ret = gpio_request_one(pdata->slots[0].switch_pin, GPIOF_IN,
++				       "mmc_cd");
+ 		if (ret)
+ 			return ret;
+-		ret = gpio_direction_input(pdata->slots[0].switch_pin);
+-		if (ret)
+-			goto err_free_sp;
+ 	} else
+ 		pdata->slots[0].switch_pin = -EINVAL;
+ 
+ 	if (gpio_is_valid(pdata->slots[0].gpio_wp)) {
+ 		pdata->slots[0].get_ro = omap_hsmmc_get_wp;
+-		ret = gpio_request(pdata->slots[0].gpio_wp, "mmc_wp");
++		ret = gpio_request_one(pdata->slots[0].gpio_wp, GPIOF_IN,
++				       "mmc_wp");
+ 		if (ret)
+ 			goto err_free_cd;
+-		ret = gpio_direction_input(pdata->slots[0].gpio_wp);
+-		if (ret)
+-			goto err_free_wp;
+ 	} else
+ 		pdata->slots[0].gpio_wp = -EINVAL;
+ 
+diff -u -p a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+--- a/drivers/mmc/host/sdhci-spear.c 2010-05-29 09:25:20.000000000 +0200
++++ b/drivers/mmc/host/sdhci-spear.c 2011-03-20 22:00:23.000000000 +0100
+@@ -182,19 +182,14 @@ static int __devinit sdhci_probe(struct 
+ 	}
+ 
+ 	if (sdhci->data->card_int_gpio >= 0) {
+-		ret = gpio_request(sdhci->data->card_int_gpio, "sdhci");
++		ret = gpio_request_one(sdhci->data->card_int_gpio, GPIOF_IN,
++				       "sdhci");
+ 		if (ret < 0) {
+ 			dev_dbg(&pdev->dev, "gpio request fail: %d\n",
+ 					sdhci->data->card_int_gpio);
+ 			goto err_igpio_request;
+ 		}
+ 
+-		ret = gpio_direction_input(sdhci->data->card_int_gpio);
+-		if (ret) {
+-			dev_dbg(&pdev->dev, "gpio set direction fail: %d\n",
+-					sdhci->data->card_int_gpio);
+-			goto err_igpio_direction;
+-		}
+ 		ret = request_irq(gpio_to_irq(sdhci->data->card_int_gpio),
+ 				sdhci_gpio_irq, IRQF_TRIGGER_LOW,
+ 				mmc_hostname(host->mmc), pdev);
+diff -u -p a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
+--- a/drivers/pcmcia/pxa2xx_colibri.c 2011-03-14 17:19:16.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_colibri.c 2011-03-20 22:00:21.000000000 +0100
+@@ -54,47 +54,35 @@ static int colibri_pcmcia_hw_init(struct
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.detect_gpio, "DETECT");
++	ret = gpio_request_one(colibri_pcmcia_gpio.detect_gpio, GPIOF_IN,
++			       "DETECT");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_input(colibri_pcmcia_gpio.detect_gpio);
+-	if (ret)
+-		goto err2;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.ready_gpio, "READY");
++	ret = gpio_request_one(colibri_pcmcia_gpio.ready_gpio, GPIOF_IN,
++			       "READY");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_direction_input(colibri_pcmcia_gpio.ready_gpio);
+-	if (ret)
+-		goto err3;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.bvd1_gpio, "BVD1");
++	ret = gpio_request_one(colibri_pcmcia_gpio.bvd1_gpio, GPIOF_IN,
++			       "BVD1");
+ 	if (ret)
+ 		goto err3;
+-	ret = gpio_direction_input(colibri_pcmcia_gpio.bvd1_gpio);
+-	if (ret)
+-		goto err4;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.bvd2_gpio, "BVD2");
++	ret = gpio_request_one(colibri_pcmcia_gpio.bvd2_gpio, GPIOF_IN,
++			       "BVD2");
+ 	if (ret)
+ 		goto err4;
+-	ret = gpio_direction_input(colibri_pcmcia_gpio.bvd2_gpio);
+-	if (ret)
+-		goto err5;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.ppen_gpio, "PPEN");
++	ret = gpio_request_one(colibri_pcmcia_gpio.ppen_gpio,
++			       GPIOF_OUT_INIT_LOW, "PPEN");
+ 	if (ret)
+ 		goto err5;
+-	ret = gpio_direction_output(colibri_pcmcia_gpio.ppen_gpio, 0);
+-	if (ret)
+-		goto err6;
+ 
+-	ret = gpio_request(colibri_pcmcia_gpio.reset_gpio, "RESET");
++	ret = gpio_request_one(colibri_pcmcia_gpio.reset_gpio,
++			       GPIOF_OUT_INIT_HIGH, "RESET");
+ 	if (ret)
+ 		goto err6;
+-	ret = gpio_direction_output(colibri_pcmcia_gpio.reset_gpio, 1);
+-	if (ret)
+-		goto err7;
+ 
+ 	colibri_irqs[0].irq = gpio_to_irq(colibri_pcmcia_gpio.detect_gpio);
+ 	skt->socket.pci_irq = gpio_to_irq(colibri_pcmcia_gpio.ready_gpio);
+diff -u -p a/drivers/pcmcia/pxa2xx_palmld.c b/drivers/pcmcia/pxa2xx_palmld.c
+--- a/drivers/pcmcia/pxa2xx_palmld.c 2009-11-08 21:45:05.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_palmld.c 2011-03-20 22:00:25.000000000 +0100
+@@ -24,26 +24,20 @@ static int palmld_pcmcia_hw_init(struct 
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMLD_PCMCIA_POWER, "PCMCIA PWR");
++	ret = gpio_request_one(GPIO_NR_PALMLD_PCMCIA_POWER,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_PCMCIA_POWER, 0);
+-	if (ret)
+-		goto err2;
+ 
+-	ret = gpio_request(GPIO_NR_PALMLD_PCMCIA_RESET, "PCMCIA RST");
++	ret = gpio_request_one(GPIO_NR_PALMLD_PCMCIA_RESET,
++			       GPIOF_OUT_INIT_HIGH, "PCMCIA RST");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_PCMCIA_RESET, 1);
+-	if (ret)
+-		goto err3;
+ 
+-	ret = gpio_request(GPIO_NR_PALMLD_PCMCIA_READY, "PCMCIA RDY");
++	ret = gpio_request_one(GPIO_NR_PALMLD_PCMCIA_READY, GPIOF_IN,
++			       "PCMCIA RDY");
+ 	if (ret)
+ 		goto err3;
+-	ret = gpio_direction_input(GPIO_NR_PALMLD_PCMCIA_READY);
+-	if (ret)
+-		goto err4;
+ 
+ 	skt->socket.pci_irq = IRQ_GPIO(GPIO_NR_PALMLD_PCMCIA_READY);
+ 	return 0;
+diff -u -p a/drivers/pcmcia/pxa2xx_palmtc.c b/drivers/pcmcia/pxa2xx_palmtc.c
+--- a/drivers/pcmcia/pxa2xx_palmtc.c 2009-12-17 08:30:14.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_palmtc.c 2011-03-20 22:00:21.000000000 +0100
+@@ -25,47 +25,35 @@ static int palmtc_pcmcia_hw_init(struct 
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_POWER1, "PCMCIA PWR1");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_POWER1,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR1");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_output(GPIO_NR_PALMTC_PCMCIA_POWER1, 0);
+-	if (ret)
+-		goto err2;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_POWER2, "PCMCIA PWR2");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_POWER2,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR2");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMTC_PCMCIA_POWER2, 0);
+-	if (ret)
+-		goto err3;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_POWER3, "PCMCIA PWR3");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_POWER3,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR3");
+ 	if (ret)
+ 		goto err3;
+-	ret = gpio_direction_output(GPIO_NR_PALMTC_PCMCIA_POWER3, 0);
+-	if (ret)
+-		goto err4;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_RESET, "PCMCIA RST");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_RESET,
++			       GPIOF_OUT_INIT_HIGH, "PCMCIA RST");
+ 	if (ret)
+ 		goto err4;
+-	ret = gpio_direction_output(GPIO_NR_PALMTC_PCMCIA_RESET, 1);
+-	if (ret)
+-		goto err5;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_READY, "PCMCIA RDY");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_READY, GPIOF_IN,
++			       "PCMCIA RDY");
+ 	if (ret)
+ 		goto err5;
+-	ret = gpio_direction_input(GPIO_NR_PALMTC_PCMCIA_READY);
+-	if (ret)
+-		goto err6;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTC_PCMCIA_PWRREADY, "PCMCIA PWRRDY");
++	ret = gpio_request_one(GPIO_NR_PALMTC_PCMCIA_PWRREADY, GPIOF_IN,
++			       "PCMCIA PWRRDY");
+ 	if (ret)
+ 		goto err6;
+-	ret = gpio_direction_input(GPIO_NR_PALMTC_PCMCIA_PWRREADY);
+-	if (ret)
+-		goto err7;
+ 
+ 	skt->socket.pci_irq = IRQ_GPIO(GPIO_NR_PALMTC_PCMCIA_READY);
+ 	return 0;
+diff -u -p a/drivers/pcmcia/pxa2xx_palmtx.c b/drivers/pcmcia/pxa2xx_palmtx.c
+--- a/drivers/pcmcia/pxa2xx_palmtx.c 2009-11-08 21:45:05.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_palmtx.c 2011-03-20 22:00:25.000000000 +0100
+@@ -25,33 +25,25 @@ static int palmtx_pcmcia_hw_init(struct 
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTX_PCMCIA_POWER1, "PCMCIA PWR1");
++	ret = gpio_request_one(GPIO_NR_PALMTX_PCMCIA_POWER1,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR1");
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_output(GPIO_NR_PALMTX_PCMCIA_POWER1, 0);
+-	if (ret)
+-		goto err2;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTX_PCMCIA_POWER2, "PCMCIA PWR2");
++	ret = gpio_request_one(GPIO_NR_PALMTX_PCMCIA_POWER2,
++			       GPIOF_OUT_INIT_LOW, "PCMCIA PWR2");
+ 	if (ret)
+ 		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMTX_PCMCIA_POWER2, 0);
+-	if (ret)
+-		goto err3;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTX_PCMCIA_RESET, "PCMCIA RST");
++	ret = gpio_request_one(GPIO_NR_PALMTX_PCMCIA_RESET,
++			       GPIOF_OUT_INIT_HIGH, "PCMCIA RST");
+ 	if (ret)
+ 		goto err3;
+-	ret = gpio_direction_output(GPIO_NR_PALMTX_PCMCIA_RESET, 1);
+-	if (ret)
+-		goto err4;
+ 
+-	ret = gpio_request(GPIO_NR_PALMTX_PCMCIA_READY, "PCMCIA RDY");
++	ret = gpio_request_one(GPIO_NR_PALMTX_PCMCIA_READY, GPIOF_IN,
++			       "PCMCIA RDY");
+ 	if (ret)
+ 		goto err4;
+-	ret = gpio_direction_input(GPIO_NR_PALMTX_PCMCIA_READY);
+-	if (ret)
+-		goto err5;
+ 
+ 	skt->socket.pci_irq = gpio_to_irq(GPIO_NR_PALMTX_PCMCIA_READY);
+ 	return 0;
+diff -u -p a/drivers/pcmcia/pxa2xx_vpac270.c b/drivers/pcmcia/pxa2xx_vpac270.c
+--- a/drivers/pcmcia/pxa2xx_vpac270.c 2010-05-19 22:36:14.000000000 +0200
++++ b/drivers/pcmcia/pxa2xx_vpac270.c 2011-03-20 22:00:25.000000000 +0100
+@@ -40,33 +40,25 @@ static int vpac270_pcmcia_hw_init(struct
+ 	int ret;
+ 
+ 	if (skt->nr == 0) {
+-		ret = gpio_request(GPIO84_VPAC270_PCMCIA_CD, "PCMCIA CD");
++		ret = gpio_request_one(GPIO84_VPAC270_PCMCIA_CD, GPIOF_IN,
++				       "PCMCIA CD");
+ 		if (ret)
+ 			goto err1;
+-		ret = gpio_direction_input(GPIO84_VPAC270_PCMCIA_CD);
+-		if (ret)
+-			goto err2;
+ 
+-		ret = gpio_request(GPIO35_VPAC270_PCMCIA_RDY, "PCMCIA RDY");
++		ret = gpio_request_one(GPIO35_VPAC270_PCMCIA_RDY, GPIOF_IN,
++				       "PCMCIA RDY");
+ 		if (ret)
+ 			goto err2;
+-		ret = gpio_direction_input(GPIO35_VPAC270_PCMCIA_RDY);
+-		if (ret)
+-			goto err3;
+ 
+-		ret = gpio_request(GPIO107_VPAC270_PCMCIA_PPEN, "PCMCIA PPEN");
++		ret = gpio_request_one(GPIO107_VPAC270_PCMCIA_PPEN,
++				       GPIOF_OUT_INIT_LOW, "PCMCIA PPEN");
+ 		if (ret)
+ 			goto err3;
+-		ret = gpio_direction_output(GPIO107_VPAC270_PCMCIA_PPEN, 0);
+-		if (ret)
+-			goto err4;
+ 
+-		ret = gpio_request(GPIO11_VPAC270_PCMCIA_RESET, "PCMCIA RESET");
++		ret = gpio_request_one(GPIO11_VPAC270_PCMCIA_RESET,
++				       GPIOF_OUT_INIT_LOW, "PCMCIA RESET");
+ 		if (ret)
+ 			goto err4;
+-		ret = gpio_direction_output(GPIO11_VPAC270_PCMCIA_RESET, 0);
+-		if (ret)
+-			goto err5;
+ 
+ 		skt->socket.pci_irq = gpio_to_irq(GPIO35_VPAC270_PCMCIA_RDY);
+ 
+@@ -84,26 +76,20 @@ err1:
+ 		return ret;
+ 
+ 	} else {
+-		ret = gpio_request(GPIO17_VPAC270_CF_CD, "CF CD");
++		ret = gpio_request_one(GPIO17_VPAC270_CF_CD, GPIOF_IN,
++				       "CF CD");
+ 		if (ret)
+ 			goto err6;
+-		ret = gpio_direction_input(GPIO17_VPAC270_CF_CD);
+-		if (ret)
+-			goto err7;
+ 
+-		ret = gpio_request(GPIO12_VPAC270_CF_RDY, "CF RDY");
++		ret = gpio_request_one(GPIO12_VPAC270_CF_RDY, GPIOF_IN,
++				       "CF RDY");
+ 		if (ret)
+ 			goto err7;
+-		ret = gpio_direction_input(GPIO12_VPAC270_CF_RDY);
+-		if (ret)
+-			goto err8;
+ 
+-		ret = gpio_request(GPIO16_VPAC270_CF_RESET, "CF RESET");
++		ret = gpio_request_one(GPIO16_VPAC270_CF_RESET,
++				       GPIOF_OUT_INIT_LOW, "CF RESET");
+ 		if (ret)
+ 			goto err8;
+-		ret = gpio_direction_output(GPIO16_VPAC270_CF_RESET, 0);
+-		if (ret)
+-			goto err9;
+ 
+ 		skt->socket.pci_irq = gpio_to_irq(GPIO12_VPAC270_CF_RDY);
+ 
+diff -u -p a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
+--- a/drivers/pcmcia/sa1100_h3600.c 2010-11-13 10:26:38.000000000 +0100
++++ b/drivers/pcmcia/sa1100_h3600.c 2011-03-20 22:00:25.000000000 +0100
+@@ -30,65 +30,50 @@ static int h3600_pcmcia_hw_init(struct s
+ 
+ 	switch (skt->nr) {
+ 	case 0:
+-		err = gpio_request(H3XXX_GPIO_PCMCIA_IRQ0, "PCMCIA IRQ0");
++		err = gpio_request_one(H3XXX_GPIO_PCMCIA_IRQ0, GPIOF_IN,
++				       "PCMCIA IRQ0");
+ 		if (err)
+ 			goto err00;
+-		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_IRQ0);
+-		if (err)
+-			goto err01;
+ 		skt->socket.pci_irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_IRQ0);
+ 
+-		err = gpio_request(H3XXX_GPIO_PCMCIA_CD0, "PCMCIA CD0");
++		err = gpio_request_one(H3XXX_GPIO_PCMCIA_CD0, GPIOF_IN,
++				       "PCMCIA CD0");
+ 		if (err)
+ 			goto err01;
+-		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_CD0);
+-		if (err)
+-			goto err02;
+ 		irqs[0].irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_CD0);
+ 
+-		err = gpio_request(H3XXX_EGPIO_OPT_NVRAM_ON, "OPT NVRAM ON");
++		err = gpio_request_one(H3XXX_EGPIO_OPT_NVRAM_ON,
++				       GPIOF_OUT_INIT_LOW, "OPT NVRAM ON");
+ 		if (err)
+ 			goto err02;
+-		err = gpio_direction_output(H3XXX_EGPIO_OPT_NVRAM_ON, 0);
++		err = gpio_request_one(H3XXX_EGPIO_OPT_ON,
++				       GPIOF_OUT_INIT_LOW, "OPT ON");
+ 		if (err)
+ 			goto err03;
+-		err = gpio_request(H3XXX_EGPIO_OPT_ON, "OPT ON");
+-		if (err)
+-			goto err03;
+-		err = gpio_direction_output(H3XXX_EGPIO_OPT_ON, 0);
+-		if (err)
+-			goto err04;
+-		err = gpio_request(H3XXX_EGPIO_OPT_RESET, "OPT RESET");
++		err = gpio_request_one(H3XXX_EGPIO_OPT_RESET,
++				       GPIOF_OUT_INIT_LOW, "OPT RESET");
+ 		if (err)
+ 			goto err04;
+-		err = gpio_direction_output(H3XXX_EGPIO_OPT_RESET, 0);
++		err = gpio_request_one(H3XXX_EGPIO_CARD_RESET,
++				       GPIOF_OUT_INIT_LOW,
++				       "PCMCIA CARD RESET");
+ 		if (err)
+ 			goto err05;
+-		err = gpio_request(H3XXX_EGPIO_CARD_RESET, "PCMCIA CARD RESET");
+-		if (err)
+-			goto err05;
+-		err = gpio_direction_output(H3XXX_EGPIO_CARD_RESET, 0);
+-		if (err)
+-			goto err06;
+ 		err = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+ 		if (err)
+ 			goto err06;
+ 		break;
+ 	case 1:
+-		err = gpio_request(H3XXX_GPIO_PCMCIA_IRQ1, "PCMCIA IRQ1");
++		err = gpio_request_one(H3XXX_GPIO_PCMCIA_IRQ1, GPIOF_IN,
++				       "PCMCIA IRQ1");
+ 		if (err)
+ 			goto err10;
+-		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_IRQ1);
+-		if (err)
+-			goto err11;
+ 		skt->socket.pci_irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_IRQ1);
+ 
+-		err = gpio_request(H3XXX_GPIO_PCMCIA_CD1, "PCMCIA CD1");
++		err = gpio_request_one(H3XXX_GPIO_PCMCIA_CD1, GPIOF_IN,
++				       "PCMCIA CD1");
+ 		if (err)
+ 			goto err11;
+-		err = gpio_direction_input(H3XXX_GPIO_PCMCIA_CD1);
+-		if (err)
+-			goto err12;
+ 		irqs[1].irq = gpio_to_irq(H3XXX_GPIO_PCMCIA_CD1);
+ 
+ 		err = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+diff -u -p a/drivers/power/bq20z75.c b/drivers/power/bq20z75.c
+--- a/drivers/power/bq20z75.c 2011-03-20 18:17:23.000000000 +0100
++++ b/drivers/power/bq20z75.c 2011-03-20 22:00:24.000000000 +0100
+@@ -578,21 +578,14 @@ static int __devinit bq20z75_probe(struc
+ 	if (!bq20z75_device->gpio_detect)
+ 		goto skip_gpio;
+ 
+-	rc = gpio_request(pdata->battery_detect, dev_name(&client->dev));
++	rc = gpio_request_one(pdata->battery_detect, GPIOF_IN,
++			      dev_name(&client->dev));
+ 	if (rc) {
+ 		dev_warn(&client->dev, "Failed to request gpio: %d\n", rc);
+ 		bq20z75_device->gpio_detect = false;
+ 		goto skip_gpio;
+ 	}
+ 
+-	rc = gpio_direction_input(pdata->battery_detect);
+-	if (rc) {
+-		dev_warn(&client->dev, "Failed to get gpio as input: %d\n", rc);
+-		gpio_free(pdata->battery_detect);
+-		bq20z75_device->gpio_detect = false;
+-		goto skip_gpio;
+-	}
+-
+ 	irq = gpio_to_irq(pdata->battery_detect);
+ 	if (irq <= 0) {
+ 		dev_warn(&client->dev, "Failed to get gpio as irq: %d\n", irq);
+diff -u -p a/drivers/power/gpio-charger.c b/drivers/power/gpio-charger.c
+--- a/drivers/power/gpio-charger.c 2010-12-28 18:26:04.000000000 +0100
++++ b/drivers/power/gpio-charger.c 2011-03-20 22:00:24.000000000 +0100
+@@ -102,16 +102,11 @@ static int __devinit gpio_charger_probe(
+ 	charger->supplied_to = pdata->supplied_to;
+ 	charger->num_supplicants = pdata->num_supplicants;
+ 
+-	ret = gpio_request(pdata->gpio, dev_name(&pdev->dev));
++	ret = gpio_request_one(pdata->gpio, GPIOF_IN, dev_name(&pdev->dev));
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to request gpio pin: %d\n", ret);
+ 		goto err_free;
+ 	}
+-	ret = gpio_direction_input(pdata->gpio);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Failed to set gpio to input: %d\n", ret);
+-		goto err_gpio_free;
+-	}
+ 
+ 	gpio_charger->pdata = pdata;
+ 
+diff -u -p a/drivers/power/jz4740-battery.c b/drivers/power/jz4740-battery.c
+--- a/drivers/power/jz4740-battery.c 2011-03-14 17:19:16.000000000 +0100
++++ b/drivers/power/jz4740-battery.c 2011-03-20 22:00:24.000000000 +0100
+@@ -316,16 +316,12 @@ static int __devinit jz_battery_probe(st
+ 	disable_irq(jz_battery->irq);
+ 
+ 	if (gpio_is_valid(pdata->gpio_charge)) {
+-		ret = gpio_request(pdata->gpio_charge, dev_name(&pdev->dev));
++		ret = gpio_request_one(pdata->gpio_charge, GPIOF_IN,
++				       dev_name(&pdev->dev));
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "charger state gpio request failed.\n");
+ 			goto err_free_irq;
+ 		}
+-		ret = gpio_direction_input(pdata->gpio_charge);
+-		if (ret) {
+-			dev_err(&pdev->dev, "charger state gpio set direction failed.\n");
+-			goto err_free_gpio;
+-		}
+ 
+ 		jz_battery->charge_irq = gpio_to_irq(pdata->gpio_charge);
+ 
+diff -u -p a/drivers/power/wm97xx_battery.c b/drivers/power/wm97xx_battery.c
+--- a/drivers/power/wm97xx_battery.c 2010-12-28 18:26:04.000000000 +0100
++++ b/drivers/power/wm97xx_battery.c 2011-03-20 22:00:25.000000000 +0100
+@@ -189,12 +189,10 @@ static int __devinit wm97xx_bat_probe(st
+ 	}
+ 
+ 	if (gpio_is_valid(pdata->charge_gpio)) {
+-		ret = gpio_request(pdata->charge_gpio, "BATT CHRG");
++		ret = gpio_request_one(pdata->charge_gpio, GPIOF_IN,
++				       "BATT CHRG");
+ 		if (ret)
+ 			goto err;
+-		ret = gpio_direction_input(pdata->charge_gpio);
+-		if (ret)
+-			goto err2;
+ 		ret = request_irq(gpio_to_irq(pdata->charge_gpio),
+ 				wm97xx_chrg_irq, IRQF_DISABLED,
+ 				"AC Detect", dev);
+diff -u -p a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
+--- a/drivers/power/z2_battery.c 2011-03-20 18:17:23.000000000 +0100
++++ b/drivers/power/z2_battery.c 2011-03-20 22:00:24.000000000 +0100
+@@ -207,14 +207,11 @@ static int __devinit z2_batt_probe(struc
+ 	mutex_init(&charger->work_lock);
+ 
+ 	if (info->charge_gpio >= 0 && gpio_is_valid(info->charge_gpio)) {
+-		ret = gpio_request(info->charge_gpio, "BATT CHRG");
++		ret = gpio_request_one(info->charge_gpio, GPIOF_IN,
++				       "BATT CHRG");
+ 		if (ret)
+ 			goto err;
+ 
+-		ret = gpio_direction_input(info->charge_gpio);
+-		if (ret)
+-			goto err2;
+-
+ 		set_irq_type(gpio_to_irq(info->charge_gpio),
+ 				IRQ_TYPE_EDGE_BOTH);
+ 		ret = request_irq(gpio_to_irq(info->charge_gpio),
+diff -u -p a/drivers/staging/cptm1217/clearpad_tm1217.c b/drivers/staging/cptm1217/clearpad_tm1217.c
+--- a/drivers/staging/cptm1217/clearpad_tm1217.c 2010-11-24 07:55:12.000000000 +0100
++++ b/drivers/staging/cptm1217/clearpad_tm1217.c 2011-03-20 22:00:24.000000000 +0100
+@@ -378,22 +378,13 @@ static int cp_tm1217_setup_gpio_irq(stru
+ 	int retval;
+ 
+ 	/* Hook up the irq handler */
+-	retval = gpio_request(ts->gpio, "cp_tm1217_touch");
++	retval = gpio_request_one(ts->gpio, GPIOF_IN, "cp_tm1217_touch");
+ 	if (retval < 0) {
+ 		dev_err(ts->dev, "cp_tm1217: GPIO request failed error %d\n",
+ 								retval);
+ 		return retval;
+ 	}
+ 
+-	retval = gpio_direction_input(ts->gpio);
+-	if (retval < 0) {
+-		dev_err(ts->dev,
+-		"cp_tm1217: GPIO direction configuration failed, error %d\n",
+-								retval);
+-		gpio_free(ts->gpio);
+-		return retval;
+-	}
+-
+ 	retval = gpio_to_irq(ts->gpio);
+ 	if (retval < 0) {
+ 		dev_err(ts->dev, "cp_tm1217: GPIO to IRQ failedi,"
+diff -u -p a/drivers/staging/iio/magnetometer/ak8975.c b/drivers/staging/iio/magnetometer/ak8975.c
+--- a/drivers/staging/iio/magnetometer/ak8975.c 2010-09-18 08:59:06.000000000 +0200
++++ b/drivers/staging/iio/magnetometer/ak8975.c 2011-03-20 22:00:24.000000000 +0100
+@@ -460,20 +460,13 @@ static int ak8975_probe(struct i2c_clien
+ 		goto exit_free;
+ 	}
+ 
+-	err = gpio_request(data->eoc_gpio, "ak_8975");
++	err = gpio_request_one(data->eoc_gpio, GPIOF_IN, "ak_8975");
+ 	if (err < 0) {
+ 		dev_err(&client->dev, "failed to request GPIO %d, error %d\n",
+ 			data->eoc_gpio, err);
+ 		goto exit_free;
+ 	}
+ 
+-	err = gpio_direction_input(data->eoc_gpio);
+-	if (err < 0) {
+-		dev_err(&client->dev, "Failed to configure input direction for"
+-			" GPIO %d, error %d\n", data->eoc_gpio, err);
+-		goto exit_gpio;
+-	}
+-
+ 	/* Perform some basic start-of-day setup of the device. */
+ 	err = ak8975_setup(client);
+ 	if (err < 0) {
+diff -u -p a/drivers/video/backlight/l4f00242t03.c b/drivers/video/backlight/l4f00242t03.c
+--- a/drivers/video/backlight/l4f00242t03.c 2011-01-19 18:51:19.000000000 +0100
++++ b/drivers/video/backlight/l4f00242t03.c 2011-03-20 22:00:21.000000000 +0100
+@@ -178,29 +178,22 @@ static int __devinit l4f00242t03_probe(s
+ 
+ 	priv->spi = spi;
+ 
+-	ret = gpio_request(pdata->reset_gpio, "lcd l4f00242t03 reset");
++	ret = gpio_request_one(pdata->reset_gpio, GPIOF_OUT_INIT_HIGH,
++			       "lcd l4f00242t03 reset");
+ 	if (ret) {
+ 		dev_err(&spi->dev,
+ 			"Unable to get the lcd l4f00242t03 reset gpio.\n");
+ 		goto err;
+ 	}
+ 
+-	ret = gpio_direction_output(pdata->reset_gpio, 1);
+-	if (ret)
+-		goto err2;
+-
+-	ret = gpio_request(pdata->data_enable_gpio,
+-				"lcd l4f00242t03 data enable");
++	ret = gpio_request_one(pdata->data_enable_gpio, GPIOF_OUT_INIT_LOW,
++			       "lcd l4f00242t03 data enable");
+ 	if (ret) {
+ 		dev_err(&spi->dev,
+ 			"Unable to get the lcd l4f00242t03 data en gpio.\n");
+ 		goto err2;
+ 	}
+ 
+-	ret = gpio_direction_output(pdata->data_enable_gpio, 0);
+-	if (ret)
+-		goto err3;
+-
+ 	if (pdata->io_supply) {
+ 		priv->io_reg = regulator_get(NULL, pdata->io_supply);
+ 
+diff -u -p a/drivers/video/backlight/tosa_bl.c b/drivers/video/backlight/tosa_bl.c
+--- a/drivers/video/backlight/tosa_bl.c 2010-06-04 16:56:16.000000000 +0200
++++ b/drivers/video/backlight/tosa_bl.c 2011-03-20 22:00:21.000000000 +0100
+@@ -89,14 +89,12 @@ static int __devinit tosa_bl_probe(struc
+ 
+ 	data->comadj = sharpsl_param.comadj == -1 ? COMADJ_DEFAULT : sharpsl_param.comadj;
+ 
+-	ret = gpio_request(TOSA_GPIO_BL_C20MA, "backlight");
++	ret = gpio_request_one(TOSA_GPIO_BL_C20MA, GPIOF_OUT_INIT_LOW,
++			       "backlight");
+ 	if (ret) {
+ 		dev_dbg(&data->bl->dev, "Unable to request gpio!\n");
+ 		goto err_gpio_bl;
+ 	}
+-	ret = gpio_direction_output(TOSA_GPIO_BL_C20MA, 0);
+-	if (ret)
+-		goto err_gpio_dir;
+ 
+ 	i2c_set_clientdata(client, data);
+ 	data->i2c = client;
+diff -u -p a/drivers/video/backlight/tosa_lcd.c b/drivers/video/backlight/tosa_lcd.c
+--- a/drivers/video/backlight/tosa_lcd.c 2010-03-29 19:27:58.000000000 +0200
++++ b/drivers/video/backlight/tosa_lcd.c 2011-03-20 22:00:21.000000000 +0100
+@@ -192,16 +192,12 @@ static int __devinit tosa_lcd_probe(stru
+ 	data->spi = spi;
+ 	dev_set_drvdata(&spi->dev, data);
+ 
+-	ret = gpio_request(TOSA_GPIO_TG_ON, "tg #pwr");
++	ret = gpio_request_one(TOSA_GPIO_TG_ON, GPIOF_OUT_INIT_LOW, "tg #pwr");
+ 	if (ret < 0)
+ 		goto err_gpio_tg;
+ 
+ 	mdelay(60);
+ 
+-	ret = gpio_direction_output(TOSA_GPIO_TG_ON, 0);
+-	if (ret < 0)
+-		goto err_gpio_dir;
+-
+ 	mdelay(60);
+ 	tosa_lcd_tg_init(data);
+ 
+diff -u -p a/drivers/video/msm/mddi_client_nt35399.c b/drivers/video/msm/mddi_client_nt35399.c
+--- a/drivers/video/msm/mddi_client_nt35399.c 2010-03-29 19:27:59.000000000 +0200
++++ b/drivers/video/msm/mddi_client_nt35399.c 2011-03-20 22:00:26.000000000 +0100
+@@ -155,14 +155,10 @@ static int setup_vsync(struct panel_info
+ 		ret = 0;
+ 		goto uninit;
+ 	}
+-	ret = gpio_request(gpio, "vsync");
++	ret = gpio_request_one(gpio, GPIOF_IN, "vsync");
+ 	if (ret)
+ 		goto err_request_gpio_failed;
+ 
+-	ret = gpio_direction_input(gpio);
+-	if (ret)
+-		goto err_gpio_direction_input_failed;
+-
+ 	ret = irq = gpio_to_irq(gpio);
+ 	if (ret < 0)
+ 		goto err_get_irq_num_failed;
+diff -u -p a/drivers/video/msm/mddi_client_toshiba.c b/drivers/video/msm/mddi_client_toshiba.c
+--- a/drivers/video/msm/mddi_client_toshiba.c 2010-03-29 19:27:59.000000000 +0200
++++ b/drivers/video/msm/mddi_client_toshiba.c 2011-03-20 22:00:26.000000000 +0100
+@@ -186,14 +186,10 @@ static int setup_vsync(struct panel_info
+ 		ret = 0;
+ 		goto uninit;
+ 	}
+-	ret = gpio_request(gpio, "vsync");
++	ret = gpio_request_one(gpio, GPIOF_IN, "vsync");
+ 	if (ret)
+ 		goto err_request_gpio_failed;
+ 
+-	ret = gpio_direction_input(gpio);
+-	if (ret)
+-		goto err_gpio_direction_input_failed;
+-
+ 	ret = irq = gpio_to_irq(gpio);
+ 	if (ret < 0)
+ 		goto err_get_irq_num_failed;
+diff -u -p a/drivers/video/omap2/displays/panel-tpo-td043mtea1.c b/drivers/video/omap2/displays/panel-tpo-td043mtea1.c
+--- a/drivers/video/omap2/displays/panel-tpo-td043mtea1.c 2010-10-23 19:40:32.000000000 +0200
++++ b/drivers/video/omap2/displays/panel-tpo-td043mtea1.c 2011-03-20 22:00:26.000000000 +0100
+@@ -406,17 +406,12 @@ static int tpo_td043_probe(struct omap_d
+ 	}
+ 
+ 	if (gpio_is_valid(nreset_gpio)) {
+-		ret = gpio_request(nreset_gpio, "lcd reset");
++		ret = gpio_request_one(nreset_gpio, GPIOF_OUT_INIT_LOW,
++				       "lcd reset");
+ 		if (ret < 0) {
+ 			dev_err(&dssdev->dev, "couldn't request reset GPIO\n");
+ 			goto fail_gpio_req;
+ 		}
+-
+-		ret = gpio_direction_output(nreset_gpio, 0);
+-		if (ret < 0) {
+-			dev_err(&dssdev->dev, "couldn't set GPIO direction\n");
+-			goto fail_gpio_direction;
+-		}
+ 	}
+ 
+ 	ret = sysfs_create_group(&dssdev->dev.kobj, &tpo_td043_attr_group);
+diff -u -p a/drivers/watchdog/wm831x_wdt.c b/drivers/watchdog/wm831x_wdt.c
+--- a/drivers/watchdog/wm831x_wdt.c 2010-03-05 23:55:32.000000000 +0100
++++ b/drivers/watchdog/wm831x_wdt.c 2011-03-20 22:00:25.000000000 +0100
+@@ -350,8 +350,9 @@ static int __devinit wm831x_wdt_probe(st
+ 		reg |= pdata->software << WM831X_WDOG_RST_SRC_SHIFT;
+ 
+ 		if (pdata->update_gpio) {
+-			ret = gpio_request(pdata->update_gpio,
+-					   "Watchdog update");
++			ret = gpio_request_one(pdata->update_gpio,
++					       GPIOF_OUT_INIT_LOW,
++					       "Watchdog update");
+ 			if (ret < 0) {
+ 				dev_err(wm831x->dev,
+ 					"Failed to request update GPIO: %d\n",
+@@ -359,14 +360,6 @@ static int __devinit wm831x_wdt_probe(st
+ 				goto err;
+ 			}
+ 
+-			ret = gpio_direction_output(pdata->update_gpio, 0);
+-			if (ret != 0) {
+-				dev_err(wm831x->dev,
+-					"gpio_direction_output returned: %d\n",
+-					ret);
+-				goto err_gpio;
+-			}
+-
+ 			update_gpio = pdata->update_gpio;
+ 
+ 			/* Make sure the watchdog takes hardware updates */
+diff -u -p a/sound/soc/codecs/twl6040.c b/sound/soc/codecs/twl6040.c
+--- a/sound/soc/codecs/twl6040.c 2011-02-02 17:27:40.000000000 +0100
++++ b/sound/soc/codecs/twl6040.c 2011-03-20 22:00:23.000000000 +0100
+@@ -1641,14 +1641,11 @@ static int twl6040_probe(struct snd_soc_
+ 	init_completion(&priv->handsfree.ramp_done);
+ 
+ 	if (gpio_is_valid(audpwron)) {
+-		ret = gpio_request(audpwron, "audpwron");
++		ret = gpio_request_one(audpwron, GPIOF_OUT_INIT_LOW,
++				       "audpwron");
+ 		if (ret)
+ 			goto gpio1_err;
+ 
+-		ret = gpio_direction_output(audpwron, 0);
+-		if (ret)
+-			goto gpio2_err;
+-
+ 		priv->codec_powered = 0;
+ 
+ 		/* enable only codec ready interrupt */
+diff -u -p a/sound/soc/codecs/uda1380.c b/sound/soc/codecs/uda1380.c
+--- a/sound/soc/codecs/uda1380.c 2010-12-31 15:18:31.000000000 +0100
++++ b/sound/soc/codecs/uda1380.c 2011-03-20 22:00:24.000000000 +0100
+@@ -732,21 +732,17 @@ static int uda1380_probe(struct snd_soc_
+ 		return -EINVAL;
+ 
+ 	if (gpio_is_valid(pdata->gpio_reset)) {
+-		ret = gpio_request(pdata->gpio_reset, "uda1380 reset");
++		ret = gpio_request_one(pdata->gpio_reset, GPIOF_OUT_INIT_LOW,
++				       "uda1380 reset");
+ 		if (ret)
+ 			goto err_out;
+-		ret = gpio_direction_output(pdata->gpio_reset, 0);
+-		if (ret)
+-			goto err_gpio_reset_conf;
+ 	}
+ 
+ 	if (gpio_is_valid(pdata->gpio_power)) {
+-		ret = gpio_request(pdata->gpio_power, "uda1380 power");
++		ret = gpio_request_one(pdata->gpio_power, GPIOF_OUT_INIT_LOW,
++				       "uda1380 power");
+ 		if (ret)
+ 			goto err_gpio;
+-		ret = gpio_direction_output(pdata->gpio_power, 0);
+-		if (ret)
+-			goto err_gpio_power_conf;
+ 	} else {
+ 		ret = uda1380_reset(codec);
+ 		if (ret) {
+diff -u -p a/sound/soc/omap/omap3pandora.c b/sound/soc/omap/omap3pandora.c
+--- a/sound/soc/omap/omap3pandora.c 2010-12-04 18:54:36.000000000 +0100
++++ b/sound/soc/omap/omap3pandora.c 2011-03-20 22:00:22.000000000 +0100
+@@ -263,30 +263,20 @@ static int __init omap3pandora_soc_init(
+ 
+ 	pr_info("OMAP3 Pandora SoC init\n");
+ 
+-	ret = gpio_request(OMAP3_PANDORA_DAC_POWER_GPIO, "dac_power");
++	ret = gpio_request_one(OMAP3_PANDORA_DAC_POWER_GPIO,
++			       GPIOF_OUT_INIT_LOW, "dac_power");
+ 	if (ret) {
+ 		pr_err(PREFIX "Failed to get DAC power GPIO\n");
+ 		return ret;
+ 	}
+ 
+-	ret = gpio_direction_output(OMAP3_PANDORA_DAC_POWER_GPIO, 0);
+-	if (ret) {
+-		pr_err(PREFIX "Failed to set DAC power GPIO direction\n");
+-		goto fail0;
+-	}
+-
+-	ret = gpio_request(OMAP3_PANDORA_AMP_POWER_GPIO, "amp_power");
++	ret = gpio_request_one(OMAP3_PANDORA_AMP_POWER_GPIO,
++			       GPIOF_OUT_INIT_LOW, "amp_power");
+ 	if (ret) {
+ 		pr_err(PREFIX "Failed to get amp power GPIO\n");
+ 		goto fail0;
+ 	}
+ 
+-	ret = gpio_direction_output(OMAP3_PANDORA_AMP_POWER_GPIO, 0);
+-	if (ret) {
+-		pr_err(PREFIX "Failed to set amp power GPIO direction\n");
+-		goto fail1;
+-	}
+-
+ 	omap3pandora_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (omap3pandora_snd_device == NULL) {
+ 		pr_err(PREFIX "Platform device allocation failed\n");
+diff -u -p a/sound/soc/pxa/e740_wm9705.c b/sound/soc/pxa/e740_wm9705.c
+--- a/sound/soc/pxa/e740_wm9705.c 2011-03-14 17:19:19.000000000 +0100
++++ b/sound/soc/pxa/e740_wm9705.c 2011-03-20 22:00:22.000000000 +0100
+@@ -148,29 +148,21 @@ static int __init e740_init(void)
+ 	if (!machine_is_e740())
+ 		return -ENODEV;
+ 
+-	ret = gpio_request(GPIO_E740_MIC_ON,  "Mic amp");
++	ret = gpio_request_one(GPIO_E740_MIC_ON, GPIOF_OUT_INIT_LOW,
++			       "Mic amp");
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = gpio_request(GPIO_E740_AMP_ON, "Output amp");
++	ret = gpio_request_one(GPIO_E740_AMP_ON, GPIOF_OUT_INIT_LOW,
++			       "Output amp");
+ 	if (ret)
+ 		goto free_mic_amp_gpio;
+ 
+-	ret = gpio_request(GPIO_E740_WM9705_nAVDD2, "Audio power");
++	ret = gpio_request_one(GPIO_E740_WM9705_nAVDD2, GPIOF_OUT_INIT_HIGH,
++			       "Audio power");
+ 	if (ret)
+ 		goto free_op_amp_gpio;
+ 
+-	/* Disable audio */
+-	ret = gpio_direction_output(GPIO_E740_MIC_ON, 0);
+-	if (ret)
+-		goto free_apwr_gpio;
+-	ret = gpio_direction_output(GPIO_E740_AMP_ON, 0);
+-	if (ret)
+-		goto free_apwr_gpio;
+-	ret = gpio_direction_output(GPIO_E740_WM9705_nAVDD2, 1);
+-	if (ret)
+-		goto free_apwr_gpio;
+-
+ 	e740_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!e740_snd_device) {
+ 		ret = -ENOMEM;
+diff -u -p a/sound/soc/pxa/e750_wm9705.c b/sound/soc/pxa/e750_wm9705.c
+--- a/sound/soc/pxa/e750_wm9705.c 2011-03-14 17:19:19.000000000 +0100
++++ b/sound/soc/pxa/e750_wm9705.c 2011-03-20 22:00:22.000000000 +0100
+@@ -131,22 +131,16 @@ static int __init e750_init(void)
+ 	if (!machine_is_e750())
+ 		return -ENODEV;
+ 
+-	ret = gpio_request(GPIO_E750_HP_AMP_OFF,  "Headphone amp");
++	ret = gpio_request_one(GPIO_E750_HP_AMP_OFF, GPIOF_OUT_INIT_HIGH,
++			       "Headphone amp");
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = gpio_request(GPIO_E750_SPK_AMP_OFF, "Speaker amp");
++	ret = gpio_request_one(GPIO_E750_SPK_AMP_OFF, GPIOF_OUT_INIT_HIGH,
++			       "Speaker amp");
+ 	if (ret)
+ 		goto free_hp_amp_gpio;
+ 
+-	ret = gpio_direction_output(GPIO_E750_HP_AMP_OFF, 1);
+-	if (ret)
+-		goto free_spk_amp_gpio;
+-
+-	ret = gpio_direction_output(GPIO_E750_SPK_AMP_OFF, 1);
+-	if (ret)
+-		goto free_spk_amp_gpio;
+-
+ 	e750_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!e750_snd_device) {
+ 		ret = -ENOMEM;
+diff -u -p a/sound/soc/pxa/e800_wm9712.c b/sound/soc/pxa/e800_wm9712.c
+--- a/sound/soc/pxa/e800_wm9712.c 2011-03-14 17:19:19.000000000 +0100
++++ b/sound/soc/pxa/e800_wm9712.c 2011-03-20 22:00:22.000000000 +0100
+@@ -120,22 +120,16 @@ static int __init e800_init(void)
+ 	if (!machine_is_e800())
+ 		return -ENODEV;
+ 
+-	ret = gpio_request(GPIO_E800_HP_AMP_OFF,  "Headphone amp");
++	ret = gpio_request_one(GPIO_E800_HP_AMP_OFF, GPIOF_OUT_INIT_HIGH,
++			       "Headphone amp");
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = gpio_request(GPIO_E800_SPK_AMP_ON, "Speaker amp");
++	ret = gpio_request_one(GPIO_E800_SPK_AMP_ON, GPIOF_OUT_INIT_HIGH,
++			       "Speaker amp");
+ 	if (ret)
+ 		goto free_hp_amp_gpio;
+ 
+-	ret = gpio_direction_output(GPIO_E800_HP_AMP_OFF, 1);
+-	if (ret)
+-		goto free_spk_amp_gpio;
+-
+-	ret = gpio_direction_output(GPIO_E800_SPK_AMP_ON, 1);
+-	if (ret)
+-		goto free_spk_amp_gpio;
+-
+ 	e800_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!e800_snd_device)
+ 		return -ENOMEM;
+diff -u -p a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
+--- a/sound/soc/pxa/tosa.c 2011-03-14 17:19:19.000000000 +0100
++++ b/sound/soc/pxa/tosa.c 2011-03-20 22:00:22.000000000 +0100
+@@ -241,12 +241,10 @@ static int tosa_probe(struct snd_soc_car
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(TOSA_GPIO_L_MUTE, "Headphone Jack");
++	ret = gpio_request_one(TOSA_GPIO_L_MUTE, GPIOF_OUT_INIT_LOW,
++			       "Headphone Jack");
+ 	if (ret)
+ 		return ret;
+-	ret = gpio_direction_output(TOSA_GPIO_L_MUTE, 0);
+-	if (ret)
+-		gpio_free(TOSA_GPIO_L_MUTE);
+ 
+ 	return ret;
+ }
+diff -u -p a/sound/soc/samsung/h1940_uda1380.c b/sound/soc/samsung/h1940_uda1380.c
+--- a/sound/soc/samsung/h1940_uda1380.c 2011-01-24 08:53:37.000000000 +0100
++++ b/sound/soc/samsung/h1940_uda1380.c 2011-03-20 22:00:24.000000000 +0100
+@@ -239,14 +239,11 @@ static int __init h1940_init(void)
+ 		return -ENODEV;
+ 
+ 	/* configure some gpios */
+-	ret = gpio_request(H1940_LATCH_AUDIO_POWER, "speaker-power");
++	ret = gpio_request_one(H1940_LATCH_AUDIO_POWER, GPIOF_OUT_INIT_LOW,
++			       "speaker-power");
+ 	if (ret)
+ 		goto err_out;
+ 
+-	ret = gpio_direction_output(H1940_LATCH_AUDIO_POWER, 0);
+-	if (ret)
+-		goto err_gpio;
+-
+ 	s3c24xx_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!s3c24xx_snd_device) {
+ 		ret = -ENOMEM;
+diff -u -p a/sound/soc/samsung/rx1950_uda1380.c b/sound/soc/samsung/rx1950_uda1380.c
+--- a/sound/soc/samsung/rx1950_uda1380.c 2011-01-24 08:53:37.000000000 +0100
++++ b/sound/soc/samsung/rx1950_uda1380.c 2011-03-20 22:00:24.000000000 +0100
+@@ -259,14 +259,11 @@ static int __init rx1950_init(void)
+ 		return -ENODEV;
+ 
+ 	/* configure some gpios */
+-	ret = gpio_request(S3C2410_GPA(1), "speaker-power");
++	ret = gpio_request_one(S3C2410_GPA(1), GPIOF_OUT_INIT_LOW,
++			       "speaker-power");
+ 	if (ret)
+ 		goto err_gpio;
+ 
+-	ret = gpio_direction_output(S3C2410_GPA(1), 0);
+-	if (ret)
+-		goto err_gpio_conf;
+-
+ 	s3c24xx_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!s3c24xx_snd_device) {
+ 		ret = -ENOMEM;
+diff -u -p a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+--- a/sound/soc/samsung/smartq_wm8987.c 2011-01-24 08:53:37.000000000 +0100
++++ b/sound/soc/samsung/smartq_wm8987.c 2011-03-20 22:00:24.000000000 +0100
+@@ -243,19 +243,13 @@ static int __init smartq_init(void)
+ 	}
+ 
+ 	/* Initialise GPIOs used by amplifiers */
+-	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
++	ret = gpio_request_one(S3C64XX_GPK(12), GPIOF_OUT_INIT_HIGH,
++			       "amplifiers shutdown");
+ 	if (ret) {
+ 		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
+ 		goto err_unregister_device;
+ 	}
+ 
+-	/* Disable amplifiers */
+-	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
+-	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
+-		goto err_free_gpio_amp_shut;
+-	}
+-
+ 	return 0;
+ 
+ err_free_gpio_amp_shut:
+diff -u -p a/sound/soc/soc-jack.c b/sound/soc/soc-jack.c
+--- a/sound/soc/soc-jack.c 2011-03-14 17:19:19.000000000 +0100
++++ b/sound/soc/soc-jack.c 2011-03-20 22:00:25.000000000 +0100
+@@ -310,14 +310,10 @@ int snd_soc_jack_add_gpios(struct snd_so
+ 			goto undo;
+ 		}
+ 
+-		ret = gpio_request(gpios[i].gpio, gpios[i].name);
++		ret = gpio_request_one(gpios[i].gpio, GPIOF_IN, gpios[i].name);
+ 		if (ret)
+ 			goto undo;
+ 
+-		ret = gpio_direction_input(gpios[i].gpio);
+-		if (ret)
+-			goto err;
+-
+ 		INIT_DELAYED_WORK(&gpios[i].work, gpio_work);
+ 		gpios[i].jack = jack;
+ 
