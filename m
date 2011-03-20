@@ -1,89 +1,18 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Sun, 20 Mar 2011 21:30:09 +0100
-Subject: [PATCH v3 9/9] lpc2k: defconfig for NXP LPC2K platform
-In-Reply-To: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1300653009-11675-10-git-send-email-ithamar.adema@team-embedded.nl>
+Date: Sun, 20 Mar 2011 21:30:00 +0100
+Subject: [PATCH v3 0/9] Support for NXP LPC2K SoCs
+Message-ID: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a defconfig that is setup to support booting a uClinux based
-system. This enables ROMFS/CRAMFS, initrd, and FLAT binaries besides
-the drivers for the devices added in the previous patch.
+The following patch series implements support for the ARM7TDMI-S based
+NXP LPC2K System-on-Chips, and, as first board, the EmbeddedArtists
+LPC2478 Developer's Kit.
 
-Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
+This code will work on the LPC23XX and LPC24XX ranges of chips, but will
+need some more work for LPC21XX and LPC22XX chips.
 ---
-no changes since v2.
+v3 incorporates comments from Russell King and Kevin Wells.
 
-changes since v1:
-        * enabled CONFIG_MAGIC_SYSRQ for testing arch_reset.
----
- arch/arm/configs/lpc2k_defconfig |   57 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 57 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/lpc2k_defconfig
-
-diff --git a/arch/arm/configs/lpc2k_defconfig b/arch/arm/configs/lpc2k_defconfig
-new file mode 100644
-index 0000000..47a7bcf
---- /dev/null
-+++ b/arch/arm/configs/lpc2k_defconfig
-@@ -0,0 +1,57 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_TINY_RCU=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
-+# CONFIG_COMPAT_BRK is not set
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_LPC2K=y
-+CONFIG_MACH_EA2478DEVKIT=y
-+CONFIG_PROCESSOR_ID=0x41007700
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_CMDLINE="root=/dev/ram initrd=0xa1a00000,4000k console=ttyS0,115200N8 debug rw earlyprintk"
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+# CONFIG_HWMON is not set
-+# CONFIG_MFD_SUPPORT is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_CRAMFS=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
--- 
-1.7.1
+v2 incorporates comments from Kevin Wells, Jamie Iles,
+and Uwe Kleine-K??nig.
