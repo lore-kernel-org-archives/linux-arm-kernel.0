@@ -1,45 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Mar 2011 21:14:04 +0100
-Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
-In-Reply-To: <AANLkTimPoEi+XLUJgza-b_gXbd4kCGpF93MySAR0ZRvT@mail.gmail.com>
-References: <AANLkTi=T=QM_GmYYnd8yXJz37LOKqt+AFWk7EEw-7uaN@mail.gmail.com>
-	<AANLkTimPoEi+XLUJgza-b_gXbd4kCGpF93MySAR0ZRvT@mail.gmail.com>
-Message-ID: <201103192114.05164.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 20 Mar 2011 11:17:59 +0800
+Subject: [PATCH] ARM: mxc: fix buggy '.end' of IORESOURCE_MEM in device codes
+Message-ID: <1300591079-1675-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 March 2011, Geert Uytterhoeven wrote:
-> On Sat, Mar 19, 2011 at 10:53, Madhavi Manchala <madhavi.linux@gmail.com> wrote:
-> > I have one basic question about the architecture files in Linux
-> > kernels. We have a board with Samsung S3C2510A MCU (ARM940T core)
-> > which is a no-mmu based CPU. I heard that "there was not a lot of ARM
-> > no-mmu support at the moment" from Ben Dooks.
-> >
-> > So, I started developing the architecture files for my Samsung
-> > S3C2510A MCU (ARM940T core) by looking at the existing S3C2410A
-> > (ARM920 core) architecture files. Is this my porting (developing the
-> > architecture files) correct?
-> >
-> > How can I port the Linux on to my board which has a Samsung S3C2510A
-> > MCU (ARM940T core) which is a NO-MMU based CPU?
-> >
-> > Please suggest me. It would be appreciated your help / suggestions.
-> 
-> I think the uClinux mailing list (CCed) is a more appropriate mailing list for
-> your questions.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/plat-mxc/devices/platform-fec.c       |    2 +-
+ arch/arm/plat-mxc/devices/platform-imxdi_rtc.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-It depends. Any questions regarding the ARM kernel should be on the
-arm-linux-kernel (also CCed now), since the nommu support is merged
-with the mainline kernel.
-
-uClinux seems to be rather focused on m68knommu (coldfire) these days,
-and contains both a kernel and user space. The last uClinux release
-containst some changes for Samsung platforms (s3c24a0, s3c3410,
-s3c44b0x and s5c7375). It's probably a good idea to look at that
-code for reference, but I would suggest integrating the code for
-your platform in the upstream  tree directly.
-
-I could not find a git tree for uClinux that contains any recent
-kernel. Does that exist?
-
-	Arnd
+diff --git a/arch/arm/plat-mxc/devices/platform-fec.c b/arch/arm/plat-mxc/devices/platform-fec.c
+index 6561c9d..ccc789e 100644
+--- a/arch/arm/plat-mxc/devices/platform-fec.c
++++ b/arch/arm/plat-mxc/devices/platform-fec.c
+@@ -53,7 +53,7 @@ struct platform_device *__init imx_add_fec(
+ 	struct resource res[] = {
+ 		{
+ 			.start = data->iobase,
+-			.end = data->iobase + SZ_4K,
++			.end = data->iobase + SZ_4K - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		}, {
+ 			.start = data->irq,
+diff --git a/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c b/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c
+index 10653cc..805336f 100644
+--- a/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c
++++ b/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c
+@@ -27,7 +27,7 @@ struct platform_device *__init imx_add_imxdi_rtc(
+ 	struct resource res[] = {
+ 		{
+ 			.start = data->iobase,
+-			.end = data->iobase + SZ_16K,
++			.end = data->iobase + SZ_16K - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		}, {
+ 			.start = data->irq,
+-- 
+1.7.1
