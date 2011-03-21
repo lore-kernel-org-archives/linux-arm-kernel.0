@@ -1,61 +1,100 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 21 Mar 2011 16:43:34 +0000
-Subject: i.MX31 suspend and VSTBY question
-In-Reply-To: <4D877A9F.4010108@hale.at>
-References: <4D874A69.9010209@hale.at>
-	<56132A77AB93C141BF06E6B96CA6CFEA1BC28F@039-SN1MPN1-004.039d.mgd.msft.net>
-	<4D877A9F.4010108@hale.at>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA1BC3AB@039-SN1MPN1-004.039d.mgd.msft.net>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Mon, 21 Mar 2011 17:48:05 +0100
+Subject: [PATCH 1/2] ARM: mxs: configure and register the second FEC device on
+	TX28/STK5-V4
+Message-ID: <1300726086-23297-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Helmut,
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/mach-mxs/module-tx28.c |   41 +++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-mxs/module-tx28.h |    1 +
+ 2 files changed, 36 insertions(+), 6 deletions(-)
 
->-----Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-
->bounces at lists.infradead.org] On Behalf Of Helmut Raiger
->Sent: Monday, March 21, 2011 11:20 AM
->To: linux-arm-kernel at lists.infradead.org
->Subject: Re: i.MX31 suspend and VSTBY question
->
->Thanks for your response! Your CCMR register setting does not change the
->behaviour on my board.
->
->A few questions:
->
->1) What kernel version are you running?
-
-Unfortunately our last fully tested version was on 2.6.24. I'll dig around some more to see if there's something that might be useful to you.
-
-Dinh
-
->2) Did you verify the VSTBY pin action (i.e. pin changes to high in
->state retention mode and the pmic changes the voltages to their
->programmed standby mode) ?
->3) As I already mentioned in my first post, the VSTBY signal is
->asserted, when I use a LTIB 2.6.21 build, but not in 2.6.38-rc1+
->
->> For our release that has LPM working:
->> 		/* Enable Well Bias and set VSTBY
->> 		  * VSTBY pin will be asserted during SR mode. This asks the
->> 		  * PM IC to set the core voltage to the standby voltage
->> 		  * Must clear the MXC_CCM_CCMR_SBYCS bit as well  */
->> 		mxc_ccm_modify_reg(MXC_CCM_CCMR,
->> 				   MXC_CCM_CCMR_WBEN | MXC_CCM_CCMR_VSTBY |
->> 					MXC_CCM_CCMR_SBYCS,
->> 				   MXC_CCM_CCMR_WBEN | MXC_CCM_CCMR_VSTBY);
->>
->> Dinh
->>
->
->Helmut
->
->
->--
->Scanned by MailScanner.
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+index 7510057..7d44936 100644
+--- a/arch/arm/mach-mxs/module-tx28.c
++++ b/arch/arm/mach-mxs/module-tx28.c
+@@ -45,7 +45,7 @@ static const iomux_cfg_t tx28_fec_gpio_pads[] __initconst = {
+ };
+ 
+ #define FEC_MODE (MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3)
+-static const iomux_cfg_t tx28_fec_pads[] __initconst = {
++static const iomux_cfg_t tx28_fec0_pads[] __initconst = {
+ 	MX28_PAD_ENET0_MDC__ENET0_MDC | FEC_MODE,
+ 	MX28_PAD_ENET0_MDIO__ENET0_MDIO | FEC_MODE,
+ 	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | FEC_MODE,
+@@ -57,7 +57,20 @@ static const iomux_cfg_t tx28_fec_pads[] __initconst = {
+ 	MX28_PAD_ENET_CLK__CLKCTRL_ENET | FEC_MODE,
+ };
+ 
+-static const struct fec_platform_data tx28_fec_data __initconst = {
++static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
++	MX28_PAD_ENET0_RXD2__ENET1_RXD0,
++	MX28_PAD_ENET0_RXD3__ENET1_RXD1,
++	MX28_PAD_ENET0_TXD2__ENET1_TXD0,
++	MX28_PAD_ENET0_TXD3__ENET1_TXD1,
++	MX28_PAD_ENET0_COL__ENET1_TX_EN,
++	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
++};
++
++static struct fec_platform_data tx28_fec0_data = {
++	.phy = PHY_INTERFACE_MODE_RMII,
++};
++
++static struct fec_platform_data tx28_fec1_data = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
+@@ -119,15 +132,15 @@ int __init tx28_add_fec0(void)
+ 	pr_debug("%s: Deasserting FEC PHY RESET\n", __func__);
+ 	gpio_set_value(TX28_FEC_PHY_RESET, 1);
+ 
+-	ret = mxs_iomux_setup_multiple_pads(tx28_fec_pads,
+-			ARRAY_SIZE(tx28_fec_pads));
++	ret = mxs_iomux_setup_multiple_pads(tx28_fec0_pads,
++			ARRAY_SIZE(tx28_fec0_pads));
+ 	if (ret) {
+ 		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
+ 				__func__, ret);
+ 		goto free_gpios;
+ 	}
+-	pr_debug("%s: Registering FEC device\n", __func__);
+-	mx28_add_fec(0, &tx28_fec_data);
++	pr_debug("%s: Registering FEC0 device\n", __func__);
++	mx28_add_fec(0, &tx28_fec0_data);
+ 	return 0;
+ 
+ free_gpios:
+@@ -140,3 +153,19 @@ free_gpios:
+ 
+ 	return ret;
+ }
++
++int __init tx28_add_fec1(void)
++{
++	int ret;
++
++	ret = mxs_iomux_setup_multiple_pads(tx28_fec1_pads,
++			ARRAY_SIZE(tx28_fec1_pads));
++	if (ret) {
++		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
++				__func__, ret);
++		return ret;
++	}
++	pr_debug("%s: Registering FEC1 device\n", __func__);
++	mx28_add_fec(1, &tx28_fec1_data);
++	return 0;
++}
+diff --git a/arch/arm/mach-mxs/module-tx28.h b/arch/arm/mach-mxs/module-tx28.h
+index df9e1b6..8ed4254 100644
+--- a/arch/arm/mach-mxs/module-tx28.h
++++ b/arch/arm/mach-mxs/module-tx28.h
+@@ -7,3 +7,4 @@
+  * Free Software Foundation.
+  */
+ int __init tx28_add_fec0(void);
++int __init tx28_add_fec1(void);
+-- 
+1.5.6.5
