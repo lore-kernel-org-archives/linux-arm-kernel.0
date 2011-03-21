@@ -1,80 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 21 Mar 2011 14:38:18 +0800
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-In-Reply-To: <20110316.131734.242138246.davem@davemloft.net>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<20110316.131734.242138246.davem@davemloft.net>
-Message-ID: <4D86F25A.7060405@atmel.com>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Mon, 21 Mar 2011 12:09:17 +0530
+Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
+	standalone.
+In-Reply-To: <4D766A2F.9080001@codeaurora.org>
+References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
+	<1299570622.2754.4.camel@localhost>
+	<4D766A2F.9080001@codeaurora.org>
+Message-ID: <4D86F295.8040409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2011 4:17 AM, David Miller :
-> From: Jamie Iles <jamie@jamieiles.com>
-> Date: Tue, 15 Mar 2011 10:14:47 +0000
-> 
->> This patch series extends the Atmel MACB driver to support the Cadence
->> GEM (Gigabit Ethernet MAC) to support 10/100 operation.  The GEM is
->> based on the MACB block but has a few moved registers and bitfields.
->> This patch series attempts to use the MACB accessors where block
->> functionallity is identical and only overrides to GEM specific
->> acccessors when needed.
+On 3/8/2011 11:11 PM, Murali Nalajala wrote:
+> On 3/8/2011 12:50 AM, Artem Bityutskiy wrote:
+>> On Tue, 2011-03-08 at 05:38 +0530, Murali Nalajala wrote:
+>>> Lets non-standard NAND drivers take advantage of known NAND
+>>> chip information.
+>>>
+>>> The initial development of msm nand driver, driver uses the supported
+>>> NAND devices information as a hardcoded table. Remove the existing
+>>> hardcoded supported flash device table and read the flash device
+>>> information from the flash id table which are part of the mtd subsystem.
 >>
->> This has been runtested on a board with a Cadence GEM and compile tested
->> for all at91 configurations and a number of avr32 configurations.
+>> Why this initial version should be upstream? Why wouldn't you make it
+>> "standard" first?
 >>
->> Changes since v1:
->> 	- AT91 now provides a fake "hclk" and "macb_clk" has been
->> 	renamed to "pclk" to be consistent with AVR32.
->> 	- Configurable GEM receive buffer size support has been added.
->> 	- pr_foo() and dev_foo() have been converted to netdev_foo()
->> 	where appropriate.
->> 	- New conditional accessors (macb_or_gem_{read,write}l) have
->> 	been introduced that do the conditional accesses dependent on
->> 	macb/gem type.
->> 	- GEM is now dynamically detected from the module ID rather than
->> 	platform device name.
->>
->> Jean-Christophe, I haven't based this on your conditional clock patch as
->> I wasn't sure what decision had been made on that and whether the
->> at91/avr32 detection is reliable.
-> 
-> I'm happy to ACK this so you guys can merge this via one of the
-> ARM trees:
-> 
-> Acked-by: David S. Miller <davem@davemloft.net>
+>
+> Currently we are not fully using the MTD nand subsystem. That's the
+> intention author has introduced "non-standard" here!!!
+>
+> Thanks,
+> Murali N
+>
 
-I add my:
+Any reviews comments on this change?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thanks,
+Murali N
 
-Now, tell me if we need to setup a git tree with this and make it handled by linux-next (we do not have for at91 yet)?
-or Russell can take the series in a "devel" branch?
-
-I have tested the series with the v2 patches. It is working good with some modification that were discussed (hclk, pclk clocks). I attach modifications I have made to make it work so that you have an idea of my testbed (not a patch as you should already have this and it is on a development platform):
-
-+/* One additional fake clock for macb interfaces */
-+static struct clk hclk = {
-+       .name           = "hclk",
-+       .pmc_mask       = 0,
-+       .type           = CLK_TYPE_PERIPHERAL,
-+};
-
-@@ -247,6 +254,7 @@ static struct clk *periph_clocks[] __initdata = {
-        // irq0
-        &ohci_clk,
-        &tcb1_clk,
-+       &hclk,
- };
-
-[..]
-
-                /* Clock */
--               at91_clock_associate("macb0_clk", &at91sam9x5_eth0_device.dev, "macb_clk");
-+               at91_clock_associate("macb0_clk", &at91sam9x5_eth0_device.dev, "pclk");
-
-                eth0_data = *data;
-                platform_device_register(&at91sam9x5_eth0_device);
-
-Thanks, best regards,
 -- 
-Nicolas Ferre
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
