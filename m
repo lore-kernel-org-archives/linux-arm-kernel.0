@@ -1,44 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 21 Mar 2011 18:49:53 -0400 (EDT)
-Subject: [PATCH v2] ARM:boot:device tree: Allow the device tree binary to
-	be appended to zImage
-In-Reply-To: <20110321221930.19756.36549.stgit@riker>
-References: <20110321221930.19756.36549.stgit@riker>
-Message-ID: <alpine.LFD.2.00.1103211844500.11889@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Mar 2011 23:10:13 +0000
+Subject: Updated mach-types update
+In-Reply-To: <20110321234150.23936e8f.dv@vollmann.ch>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+	<20110321234150.23936e8f.dv@vollmann.ch>
+Message-ID: <20110321231013.GH4340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Mar 2011, John Bonesio wrote:
-
-> This patch provides the ability to boot using a device tree that is appended
-> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+On Mon, Mar 21, 2011 at 11:41:50PM +0100, Detlef Vollmann wrote:
+> On Sun, 20 Mar 2011 11:03:22 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 > 
-> Signed-off-by: John Bonesio <bones@secretlab.ca>
+> > What this means is that any platform in the machine database which has not
+> > been submitted to mainline for 12 months since it was registered will be
+> > automatically dropped from the file, and the platform maintainer will need
+> > to either talk to me to get it reinstated before submission, or update the
+> > entry in some way to 'freshen' it.
+>
+> So what happens to the number that was allocated for a platform that
+> got dropped?  Will it be recycled for another platform or is it safe
+> to use it in code that is not intended to go mainline (to avoid cluttering
+> mainline with code that doesn't need to be mainline)?
 
-One minor glitch still...  ;-)
+You've completely misunderstood what I said.  Nothing has been deleted
+from the database.  The file downloadable off the website continues to
+give the full set of entries.
 
-> @@ -288,12 +344,28 @@ wont_overwrite:
->  
->  		/*
->  		 * Relocate all entries in the GOT table.
-> +		 * Bump bss entries to _edata + dtb size
->  		 */
->  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
-> -		add	r1, r1, r0		@ table.  This fixes up the
-> -		str	r1, [r11], #4		@ C references.
-> +		add	r1, r1, r0		@ This fixes up C references
-> +		cmp	r1, r2			@ if entry >= bss_start &&
-> +		cmphs	r3, r1			@       bss_end > entry
-> +		addhi	r1, lr			@    entry += dtb size
-
-Some toolchains won't accept this shortened version unless you compile 
-for Thumb.  You should instead use:
-
-		addhi	r1, r1, lr
-
-Otherwise...
-
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-
-Nicolas
+All that's happened is some filtering on the version I include in the
+mainline kernel to make it saner.  There's no point including 2000
+lines (which expand to about 700K of generated file) which aren't used
+in the mainline kernel.
