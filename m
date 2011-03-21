@@ -1,43 +1,42 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 21 Mar 2011 18:41:50 +0530
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <4D874169.9010202@acn-group.ch>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-	<4D5BDA3D.5080905@acn-group.ch>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
-	<4D749A09.8050101@acn-group.ch>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C0E5EC7@dbde02.ent.ti.com>
-	<4D762FEB.3010003@acn-group.ch> <4D870A59.9050004@acn-group.ch>
-	<FCCFB4CDC6E5564B9182F639FC3560870370B2BA32@dbde02.ent.ti.com>
-	<4D874169.9010202@acn-group.ch>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370B2BAEA@dbde02.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Mar 2011 13:19:07 +0000
+Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
+	format definitions
+In-Reply-To: <20110321125606.GC22222@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
+	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
+	<20110124214225.GO24104@n2100.arm.linux.org.uk>
+	<AANLkTikH9tBTGCiJ-+dvhh1tajMVq_6ua41MMZmq48sC@mail.gmail.com>
+	<20110321125606.GC22222@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimZ+b_yNf1-72AGUMcPbFRFuHVPtvf24VigRWK-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 21, 2011 5:46 PM, Christophe Aeschlimann wrote:
-[...]
-> 
-> The symptoms were slightly different on our custom board which
-> uses a 
-> TLV320AIC3107 codec :
-> 
-> After every cold boot the system would take ~7 seconds to
-> start recording. Recording a second time just after the first
-> time would behave normally (without delay).  
-> 
-> This delay was because the ADC (audio input) starts working
-> when the volts reach 1.35V (common mode) on the ADC. But a
-> 10uF series capacitor was delaying the ramp-up by 7 seconds.
-> Reducing the capacitor size changed the delay to something
-> more reasonable (ms range).    
-> 
-> This "issue" is described in the TLV320AIC3107 codec under
-> "INPUT IMPEDANCE AND VCM CONTROL" the 2nd paragraph. (they
-> also offer a workaround but this was not of a practical use in
-> our case).   
-> 
+On 21 March 2011 12:56, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 21, 2011 at 12:36:55PM +0000, Catalin Marinas wrote:
+>> Any plans for the nopmd patches? I haven't seen them in -next or on the list.
+>
+> I dropped them again because of those pesky warnings, so again I'm not
+> planning to push them this window as I don't wish to be deluged in
+> people reporting the warnings.
+>
+> They really need fixing once we know how the LPAE stuff interacts with
+> the change. ?At the moment I've no idea whether the existing section
+> support ends up at pgd or pmd level with LPAE.
 
-Thanks for the info.
+With LPAE, the section should be at the pmd level (2nd level page
+table) as the PGDIR_SHIFT is 30. But if we standardise on using the
+pmd in both cases, macros like pmd_val() would expand to the right
+level with classic page tables (it goes up to pgd_val).
 
-Regards,
-Vaibhav
+PMD_SHIFT also gets defined as PGDIR_SHIFT for the classic page
+tables. One of my patches in the series converts the existing code to
+PMD_SHIFT from PGDIR_SHIFT.
+
+I'm happy to give this a try if you have some existing patches for the
+classic page tables (I can even start from scratch but I don't want to
+duplicate work).
+
+-- 
+Catalin
