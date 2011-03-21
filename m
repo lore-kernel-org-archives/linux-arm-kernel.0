@@ -1,116 +1,86 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Mon, 21 Mar 2011 13:22:16 +0800
-Subject: [PATCH V7 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <1300684936-8218-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300684936-8218-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1300684936-8218-5-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: mayur@ti.com (Janorkar, Mayuresh)
+Date: Mon, 21 Mar 2011 10:52:37 +0530
+Subject: [PATCH 15/20] video: msm: convert printk to pr_*
+In-Reply-To: <1300485552-27519-1-git-send-email-carlv@codeaurora.org>
+References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
+	<1300485552-27519-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB033D22EB7F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the NO INT in the Multi-BLK IO in SD/MMC, and Multi-BLK
-read in SDIO on imx53.
 
-The CMDTYPE of the CMD register (offset 0xE) should be set to
-"11" when the STOP CMD12 is issued on imx53 to abort one
-open ended multi-blk IO. Otherwise one the TC INT wouldn't
-be generated.
 
-In exact block transfer, the controller doesn't complete the
-operations automatically as required at the end of the
-transfer and remains on hold if the abort command is not sent on
-imx53.
-As a result, the TC flag is not asserted and SW  received timeout
-exeception. set bit1 of Vendor Spec registor to fix it.
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
+> owner at vger.kernel.org] On Behalf Of Carl Vanderlip
+> Sent: Saturday, March 19, 2011 3:29 AM
+> To: David Brown; Daniel Walker; Bryan Huntsman
+> Cc: Brian Swetland; Dima Zavin; Rebecca Schultz Zavin; Colin Cross; linux-
+> fbdev at vger.kernel.org; Carl Vanderlip; linux-arm-
+> kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; linux-
+> kernel at vger.kernel.org
+> Subject: [PATCH 15/20] video: msm: convert printk to pr_*
+> 
+> Reword debugging messages to use pr_err and pr_warning
+> 
+> Authors:
+> Dima Zavin <dima@android.com>
+> Rebecca Schultz Zavin <rebecca@android.com>
+> Colin Cross <ccross@android.com>
+> 
+> Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
+> ---
+>  drivers/video/msm/mdp.c |   11 ++++-------
+>  1 files changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
+> index 8184ca9..b03204d 100644
+> --- a/drivers/video/msm/mdp.c
+> +++ b/drivers/video/msm/mdp.c
+> @@ -42,16 +42,13 @@ DEFINE_MUTEX(mdp_mutex);
+> 
+>  static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
+>  {
+> -	int ret = 0;
+> -
+>  	BUG_ON(!mask);
+> 
+>  	/* if the mask bits are already set return an error, this interrupt
+>  	 * is already enabled */
+>  	if (mdp_irq_mask & mask) {
+> -		printk(KERN_ERR "mdp irq already on already on %x %x\n",
+> -		       mdp_irq_mask, mask);
+> -		ret = -1;
+> +		pr_err("mdp irq already on %x %x\n", mdp_irq_mask, mask);
+> +		return -1;
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   42 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+Please use standard error codes.
+http://lxr.linux.no/#linux+v2.6.38/include/asm-generic/errno-base.h
+The code would be more readable.
+Plus it would help in debugging.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 372455b..1791da3 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -19,13 +19,31 @@
- #include <linux/slab.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
-+#include <linux/mmc/mmc.h>
-+#include <linux/mmc/sdio.h>
- #include <mach/hardware.h>
- #include <mach/esdhc.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
- 
-+/* VENDOR SPEC register */
-+#define SDHCI_VENDOR_SPEC		0xC0
-+#define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-+/*
-+ * The CMDTYPE of the CMD register (offset 0xE) should be set to
-+ * "11" when the STOP CMD12 is issued on imx53 to abort one
-+ * open ended multi-blk IO. Otherwise the TC INT wouldn't
-+ * be generated.
-+ * In exact block transfer, the controller doesn't complete the
-+ * operations automatically as required@the end of the
-+ * transfer and remains on hold if the abort command is not sent.
-+ * As a result, the TC flag is not asserted and SW  received timeout
-+ * exeception. Bit1 of Vendor Spec registor is used to fix it.
-+ */
-+#define ESDHC_FLAG_MULTIBLK_NO_INT	(1 << 1)
- 
- struct pltfm_imx_data {
- 	int flags;
-@@ -78,6 +96,15 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 		 */
- 		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
- 
-+	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (reg == SDHCI_INT_STATUS)
-+				&& (val & SDHCI_INT_DATA_END))) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v &= ~SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+	}
-+
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -100,9 +127,21 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		 * Postpone this write, we must do it together with a
- 		 * command write that is down below.
- 		 */
-+		if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
-+				&& (host->cmd->data->blocks > 1)
-+				&& (host->cmd->data->flags & MMC_DATA_READ)) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v |= SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+		}
- 		imx_data->scratchpad = val;
- 		return;
- 	case SDHCI_COMMAND:
-+		if ((host->cmd->opcode == MMC_STOP_TRANSMISSION)
-+			&& (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
-+			val |= SDHCI_CMD_ABORTCMD;
- 		writel(val << 16 | imx_data->scratchpad,
- 			host->ioaddr + SDHCI_TRANSFER_MODE);
- 		return;
-@@ -210,6 +249,9 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
- 	}
- 
-+	if (!(cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()))
-+		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
-+
- 	if (boarddata) {
- 		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
- 		if (err) {
--- 
-1.7.1
+>  	}
+>  	/* if the mdp irq is not already enabled enable it */
+>  	if (!mdp_irq_mask) {
+> @@ -172,9 +169,9 @@ static int mdp_wait(struct mdp_info *mdp, uint32_t
+> mask, wait_queue_head_t *wq)
+> 
+>  	spin_lock_irqsave(&mdp->lock, irq_flags);
+>  	if (mdp_irq_mask & mask) {
+> +		pr_warning("%s: timeout waiting for mdp to complete 0x%x\n",
+> +			   __func__, mask);
+>  		locked_disable_mdp_irq(mdp, mask);
+> -		printk(KERN_WARNING "timeout waiting for mdp to complete
+> %x\n",
+> -		       mask);
+>  		ret = -ETIMEDOUT;
+>  	}
+>  	spin_unlock_irqrestore(&mdp->lock, irq_flags);
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
