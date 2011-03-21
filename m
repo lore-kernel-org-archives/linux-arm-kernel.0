@@ -1,44 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Mar 2011 10:32:28 +0000
-Subject: Booting Integrator/AP with ARM920T
-In-Reply-To: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
-References: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
-Message-ID: <20110321103228.GA22222@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 21 Mar 2011 11:01:05 +0000
+Subject: Build warning in todays linus/master
+Message-ID: <20110321110105.GB2610@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2011 at 11:17:19AM +0100, Linus Walleij wrote:
-> Does anyone beside me *ever* try to actually boot a recent kernel
-> on this thing?
-> 
-> How do you do it? Do I need patched U-boots etc, or can I just load
-> a Z-record image of vmlinux into RAM over the serial console?
-> 
-> Needless to say, ARM Ltd. has deleted the web pages for official
-> support of this thing as far as I can see. I was going to try out a
-> few patches affecting mach-integrator...
+Hi Will,
 
-That's going back quite a few years... and yes, it wasn't trivial.  How
-it used to be done was with a boot loader called 'milo' which read the
-kernel out of flash - you had to program it and the kernel using 'afu'
-via the debugger.
+I'm getting a build warning on todays master build for my V6K platform:
 
-Looking at the various scripts I have around, the other way I did it was
-using Angel (and presumably armsd).  I have this .angelrc file:
+  CC      arch/arm/mm/mmu.o
+arch/arm/mm/mmu.c: In function 'create_36bit_mapping':
+arch/arm/mm/mmu.c:601:10: warning: format '%08llx' expects type 'long long unsigned int', but argument 2 has type 'unsigned int'
+arch/arm/mm/mmu.c:614:10: warning: format '%08llx' expects type 'long long unsigned int', but argument 2 has type 'unsigned int'
+arch/arm/mm/mmu.c:621:10: warning: format '%08llx' expects type 'long long unsigned int', but argument 2 has type 'unsigned int'
+arch/arm/mm/mmu.c: In function 'create_mapping':
+arch/arm/mm/mmu.c:662:10: warning: format '%08llx' expects type 'long long unsigned int', but argument 2 has type 'unsigned int'
+arch/arm/mm/mmu.c:670:10: warning: format '%08llx' expects type 'long long unsigned int', but argument 2 has type 'unsigned int'
+arch/arm/mm/mmu.c:690:10: warning: format '%08lx' expects type 'long unsigned int', but argument 2 has type 'unsigned int'
 
-device /dev/ttyS3
-options "9600 8N1"
-baud 115200
-base 0x00008000
-entry 0x00008000
-#otherfile ramdisk_img.gz
-#otherbase 0xc0800000
-r0 0x00
-r1 21
-exec .start-minicom
+Which is introduced by (3a6b16 [ARM: 6675/1: use phys_addr_t instead of 
+unsigned long in conversion code]), because phys_addr_t is a u32 
+(!CONFIG_PHYS_ADDR_T_64BIT).  I guess a cast to u64 in the printk()'s in 
+arch/arm/mm/mmu.c would fix these up, is that the right approach?
 
-and .start-minicom is:
-#!/bin/sh
-exec ~/bin/start-minicom int
-
-Not sure if any of this helps, but might provide some hints.
+Jamie
