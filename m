@@ -1,15 +1,49 @@
 From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Mon, 21 Mar 2011 11:32:37 +0800
-Subject: [PATCH V7 0/4] mmc: one comment is missing addressed in the previous
-	review.
-Message-ID: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Date: Mon, 21 Mar 2011 11:32:38 +0800
+Subject: [PATCH V7 1/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET
+	from ESDHC_DEFAULT_QUIRKS
+In-Reply-To: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <1300678361-6259-2-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One comment is missing addressed in the previous review round,
-complement it into this review round.
+sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET. Make it OF-specific.
 
-[PATCH V7 1/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET from ESDHC_DEFAULT_QUIRKS
-[PATCH V7 2/4] mmc: add the abort CMDTYE bits definition
-[PATCH V7 3/4] mmc: sdhci-esdhc: make the writel/readl as the general APIs
-[PATCH V7 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/mmc/host/sdhci-esdhc.h    |    3 +--
+ drivers/mmc/host/sdhci-of-esdhc.c |    3 ++-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+index c55aae8..c3b08f1 100644
+--- a/drivers/mmc/host/sdhci-esdhc.h
++++ b/drivers/mmc/host/sdhci-esdhc.h
+@@ -23,8 +23,7 @@
+ 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
+ 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+ 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
+-				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
+-				SDHCI_QUIRK_NO_CARD_NO_RESET)
++				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+ 
+ #define ESDHC_SYSTEM_CONTROL	0x2c
+ #define ESDHC_CLOCK_MASK	0x0000fff0
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index 08161f6..ba40d6d 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -74,7 +74,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+ 
+ struct sdhci_of_data sdhci_esdhc = {
+ 	/* card detection could be handled via GPIO */
+-	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
++	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION
++		| SDHCI_QUIRK_NO_CARD_NO_RESET,
+ 	.ops = {
+ 		.read_l = sdhci_be32bs_readl,
+ 		.read_w = esdhc_readw,
+-- 
+1.7.1
