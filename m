@@ -1,58 +1,30 @@
-From: c.aeschlimann@acn-group.ch (Christophe Aeschlimann)
-Date: Mon, 21 Mar 2011 13:15:37 +0100
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC3560870370B2BA32@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>	<4D5BDA3D.5080905@acn-group.ch>	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>	<4D749A09.8050101@acn-group.ch>	<B85A65D85D7EB246BE421B3FB0FBB593024C0E5EC7@dbde02.ent.ti.com>	<4D762FEB.3010003@acn-group.ch>
-	<4D870A59.9050004@acn-group.ch>
-	<FCCFB4CDC6E5564B9182F639FC3560870370B2BA32@dbde02.ent.ti.com>
-Message-ID: <4D874169.9010202@acn-group.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Mar 2011 13:20:38 +0100
+Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
+In-Reply-To: <4D873890.5000302@snapgear.com>
+References: <AANLkTi=T=QM_GmYYnd8yXJz37LOKqt+AFWk7EEw-7uaN@mail.gmail.com>
+	<201103192114.05164.arnd@arndb.de> <4D873890.5000302@snapgear.com>
+Message-ID: <201103211320.38227.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2011 12:24, Bedia, Vaibhav wrote:
-> On Monday, March 21, 2011 1:51 PM, Christophe Aeschlimann wrote:
-> [...]
->> In this end it was a HW issue.
->>
->> Problem solved.
->>
+On Monday 21 March 2011, Greg Ungerer wrote:
+> > I could not find a git tree for uClinux that contains any recent
+> > kernel. Does that exist?
 > 
-> If you don't mind, can you please elaborate on what the h/w issue was and how you fixed it?
+> I used to keep one on git.kernel.org for promoting non-architectural
+> but non-MMU specific changes to mainline.
 > 
-> Regards,
-> Vaibhav
+> http://git.kernel.org/?p=linux/kernel/git/gerg/uclinux.git;a=summary
+> 
+> But I have had so few changes that fit in that category that I
+> haven't used it in quite a while.
 
-The symptoms were slightly different on our custom board which uses a
-TLV320AIC3107 codec :
+Yes, I found that tree when I looked last week. I was wondering
+if there is any git or other repo for the files that are in
+http://sourceforge.net/projects/uclinux/files/uClinux%20Stable/
 
-After every cold boot the system would take ~7 seconds to start
-recording. Recording a second time just after the first time would
-behave normally (without delay).
+The kernel sources there are newer than the ones from uclinux.git,
+but I could not find a pointer to who maintains them or how.
 
-This delay was because the ADC (audio input) starts working when the
-volts reach 1.35V (common mode) on the ADC. But a 10uF series capacitor
-was delaying the ramp-up by 7 seconds. Reducing the capacitor size
-changed the delay to something more reasonable (ms range).
-
-This "issue" is described in the TLV320AIC3107 codec under "INPUT
-IMPEDANCE AND VCM CONTROL" the 2nd paragraph. (they also offer a
-workaround but this was not of a practical use in our case).
-
-Hope this helps.
-
-Regards,
-
-
--- 
-Christophe Aeschlimann
-
-Embedded Software Engineer & IT Manager
-
-ACN Advanced Communications Networks S.A.
-
-Rue du Puits-Godet 8a
-2000 Neuch?tel, Switzerland
-
-T?l. +41 32 724 74 31
-
-c.aeschlimann at acn-group.ch
+	Arnd
