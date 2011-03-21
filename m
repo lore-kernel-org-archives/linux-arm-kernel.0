@@ -1,120 +1,61 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 21 Mar 2011 01:43:34 -0600
+Date: Mon, 21 Mar 2011 01:48:58 -0600
 Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <Pine.LNX.4.64.1103202201060.27008@ask.diku.dk>
+In-Reply-To: <Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
 References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
 	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
 	<20110315090656.GC13316@pengutronix.de>
 	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
 	<20110315094946.GD13316@pengutronix.de>
 	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
-	<20110316083326.GF13316@pengutronix.de>
-	<Pine.LNX.4.64.1103201850250.27008@ask.diku.dk>
-	<20110320192451.GA19808@pengutronix.de>
-	<Pine.LNX.4.64.1103202201060.27008@ask.diku.dk>
-Message-ID: <AANLkTinponAhPonKeZ9rE1boqJEsVqyvBLKfHCt84Shm@mail.gmail.com>
+Message-ID: <AANLkTi=NSKcj7MYFE=xPj=Am=OxydXdOUEk8XJJyUCpC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2011 at 3:04 PM, Julia Lawall <julia@diku.dk> wrote:
-> In this case, I also ignore the !GPIOLIB issue. ?This semantic patch
-> considers the case where the direction call has some error handling code.
-> In this case, it just deletes that error handling code, so most of these
-> cases are likely to need some manual cleanup, eg to get rid of unreachable
-> error labels or to change the error message.
+2011/3/15 Julia Lawall <julia@diku.dk>:
+> On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
 >
-[...]
-> diff -u -p a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> --- a/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 18:17:22.000000000 +0100
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 22:00:22.000000000 +0100
-> @@ -257,44 +257,26 @@ static int omap_ethernet_init(void)
+>> On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
+>> > I tried the following
+>> >
+>> > @@
+>> > expression E1,E2;
+>> > @@
+>> >
+>> > ? ? ? gpio_direction_output(E1,E2);
+>> > ? ? ? ...
+>> > - ? ? gpio_set_value(E1,E2);
+>> >
+>> > and found occurrences in 15 files. ?In some cases there seems to be some
+>> > delay before the call to gpio_set_value. ?Does that have any impacton
+>> > whether it is needed?
+>> gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
+>> there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
+>> noop.
+>>
+>> I still don't know how to work with coccinelle, so if you point me to a
+>> concrete location I can be more specific.
 >
-> ? ? ? ?/* Request of GPIO lines */
+> OK. ?I have changed the semantic patch to the following:
 >
-> - ? ? ? status = gpio_request(ETH_KS8851_POWER_ON, "eth_power");
-> + ? ? ? status = gpio_request_one(ETH_KS8851_POWER_ON, GPIOF_OUT_INIT_HIGH,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "eth_power");
-> ? ? ? ?if (status) {
-> ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_POWER_ON);
-> ? ? ? ? ? ? ? ?return status;
-> ? ? ? ?}
+> @@
+> expression E1,E2,E3;
+> @@
 >
-> - ? ? ? status = gpio_request(ETH_KS8851_QUART, "quart");
-> + ? ? ? status = gpio_request_one(ETH_KS8851_QUART, GPIOF_OUT_INIT_HIGH,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "quart");
-> ? ? ? ?if (status) {
-> ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_QUART);
-> ? ? ? ? ? ? ? ?goto error1;
-> ? ? ? ?}
+> ? ? ?gpio_direction_output(E1,E2);
+> ? ? ?... when != gpio_set_value(E1,E3)
+> - ? ? gpio_set_value(E1,E2);
 >
-> - ? ? ? status = gpio_request(ETH_KS8851_IRQ, "eth_irq");
-> + ? ? ? status = gpio_request_one(ETH_KS8851_IRQ, GPIOF_IN, "eth_irq");
-> ? ? ? ?if (status) {
-> ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_IRQ);
-> ? ? ? ? ? ? ? ?goto error2;
-> ? ? ? ?}
+> Now it doesn't do all the cases where there is an earlier set ofr some
+> other value. ?The patch I obtain is below. ?This only concerns 5 files.
+> I haven't checked the result at all.
 >
-> - ? ? ? /* Configuration of requested GPIO lines */
-> -
-> - ? ? ? status = gpio_direction_output(ETH_KS8851_POWER_ON, 1);
-> - ? ? ? if (status) {
-> - ? ? ? ? ? ? ? pr_err("Cannot set output GPIO %d\n", ETH_KS8851_IRQ);
-> - ? ? ? ? ? ? ? goto error3;
-> - ? ? ? }
-> -
-> - ? ? ? status = gpio_direction_output(ETH_KS8851_QUART, 1);
-> - ? ? ? if (status) {
-> - ? ? ? ? ? ? ? pr_err("Cannot set output GPIO %d\n", ETH_KS8851_QUART);
-> - ? ? ? ? ? ? ? goto error3;
-> - ? ? ? }
-> -
-> - ? ? ? status = gpio_direction_input(ETH_KS8851_IRQ);
-> - ? ? ? if (status) {
-> - ? ? ? ? ? ? ? pr_err("Cannot set input GPIO %d\n", ETH_KS8851_IRQ);
-> - ? ? ? ? ? ? ? goto error3;
-> - ? ? ? }
-> -
-> ? ? ? ?return 0;
+> julia
 
-This hunk is probably wrong.  If gpio pins are being requested, it is
-important to verify that all gpios have been requested successfully
-before actively changing the state on any of them.  This hunk changes
-the behaviour.
+Hi Julia,
 
-> diff -u -p a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
-> --- a/arch/arm/mach-pxa/cm-x270.c 2010-12-31 15:18:30.000000000 +0100
-> +++ b/arch/arm/mach-pxa/cm-x270.c 2011-03-20 22:00:23.000000000 +0100
-> @@ -327,22 +327,18 @@ static unsigned long cm_x270_libertas_pi
->
-> ?static int cm_x270_libertas_setup(struct spi_device *spi)
-> ?{
-> - ? ? ? int err = gpio_request(GPIO19_WLAN_STRAP, "WLAN STRAP");
-> + ? ? ? int err = gpio_request_one(GPIO19_WLAN_STRAP, GPIOF_OUT_INIT_HIGH,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"WLAN STRAP");
-> ? ? ? ?if (err)
-> ? ? ? ? ? ? ? ?return err;
->
-> - ? ? ? err = gpio_request(GPIO102_WLAN_RST, "WLAN RST");
-> + ? ? ? err = gpio_request_one(GPIO102_WLAN_RST, GPIOF_OUT_INIT_LOW,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"WLAN RST");
-> ? ? ? ?if (err)
-> ? ? ? ? ? ? ? ?goto err_free_strap;
->
-> - ? ? ? err = gpio_direction_output(GPIO102_WLAN_RST, 0);
-> - ? ? ? if (err)
-> - ? ? ? ? ? ? ? goto err_free_strap;
-> ? ? ? ?msleep(100);
->
-> - ? ? ? err = gpio_direction_output(GPIO19_WLAN_STRAP, 1);
-> - ? ? ? if (err)
-> - ? ? ? ? ? ? ? goto err_free_strap;
-> ? ? ? ?msleep(100);
-
-Ditto here, and it also loses the msleep delays.
-
-Overall, I'm nervious about this change.  Most of the *should* be
-okay, but the original code isn't exactly wrong either.  I'd rather
-just leave them be unless it can be tested.  I certainly don't want to
-change them all wholesale.
+Similar to my other reply, even though this patch is much smaller, I'm
+not particularly excited about changing all the drivers wholesale
+unless someone with hardware can give it a test.
 
 g.
