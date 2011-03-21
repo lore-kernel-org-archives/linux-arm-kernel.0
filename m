@@ -1,134 +1,70 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 21 Mar 2011 00:20:47 -0700
-Subject: [PATCHv2] ARM: Merge v6 and v7 DEBUG_LL DCC support
-In-Reply-To: <20110320092629.GB16646@n2100.arm.linux.org.uk>
-References: <20110320092629.GB16646@n2100.arm.linux.org.uk>
-Message-ID: <1300692047-32445-1-git-send-email-sboyd@codeaurora.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 21 Mar 2011 15:21:24 +0800
+Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
+In-Reply-To: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+References: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+Message-ID: <AANLkTimGBGNdBa2NzYDTOXxNF-1MgOOC502a-ATfNoBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inline assembly differences for v6 vs. v7 are purely
-optimizations. On a v7 processor, an mrc with the pc sets the
-condition codes to the 28-31 bits of the register being read. It
-just so happens that the TX/RX full bits the DCC support code is
-testing for are high enough in the register to be put into the
-condition codes. On a v6 processor, this "feature" isn't
-implemented and thus we have to do the usual read, mask, test
-operations to check for TX/RX full. Thus, we can drop the v7
-implementation and just use the v6 implementation for both.
+Hrm... checked again. The IXP4xx build regression seems to have been fixed
+by the below commits:
 
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+88a5810 ARM: fix IXP4xx build failure
+710224f arm: fix "arm: fix pci_set_consistent_dma_mask for dmabounce devices"
 
-Russell King wrote:
-> This patch needs updating for the changes that were in my tree for many
-> months, and are now in mainline.
+Yet the simple introduction of dma_set_coherent_mask() doesn't look
+like to be a correct fix to this particular issue.
 
-Yes sorry. I noticed this when rebasing against linus' tree. I'll base
-patches of your for-next tree when sending to you next time.
+Barry,
 
-Changes since v1:
- * Refreshed against rmk/for-next
+You may want to follow the lead more and help come up with a proper fix.
 
- arch/arm/boot/compressed/head.S |   10 +---------
- arch/arm/boot/compressed/misc.c |   12 +-----------
- arch/arm/kernel/debug.S         |   19 +------------------
- 3 files changed, 3 insertions(+), 38 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 84ac4d6..adf583c 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -21,20 +21,12 @@
- 
- #if defined(CONFIG_DEBUG_ICEDCC)
- 
--#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
-+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
- 		.macro	loadsp, rb, tmp
- 		.endm
- 		.macro	writeb, ch, rb
- 		mcr	p14, 0, \ch, c0, c5, 0
- 		.endm
--#elif defined(CONFIG_CPU_V7)
--		.macro	loadsp, rb, tmp
--		.endm
--		.macro	writeb, ch, rb
--wait:		mrc	p14, 0, pc, c0, c1, 0
--		bcs	wait
--		mcr	p14, 0, \ch, c0, c5, 0
--		.endm
- #elif defined(CONFIG_CPU_XSCALE)
- 		.macro	loadsp, rb, tmp
- 		.endm
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 4657e87..2df3826 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -36,7 +36,7 @@ extern void error(char *x);
- 
- #ifdef CONFIG_DEBUG_ICEDCC
- 
--#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
-+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
- 
- static void icedcc_putc(int ch)
- {
-@@ -52,16 +52,6 @@ static void icedcc_putc(int ch)
- 	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
- }
- 
--#elif defined(CONFIG_CPU_V7)
--
--static void icedcc_putc(int ch)
--{
--	asm(
--	"wait:	mrc	p14, 0, pc, c0, c1, 0			\n\
--		bcs	wait					\n\
--		mcr     p14, 0, %0, c0, c5, 0			"
--	: : "r" (ch));
--}
- 
- #elif defined(CONFIG_CPU_XSCALE)
- 
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index d2d983b..bcd66e0 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -25,7 +25,7 @@
- 		.macro	addruart, rp, rv
- 		.endm
- 
--#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
-+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
- 
- 		.macro	senduart, rd, rx
- 		mcr	p14, 0, \rd, c0, c5, 0
-@@ -49,23 +49,6 @@
- 1002:
- 		.endm
- 
--#elif defined(CONFIG_CPU_V7)
--
--		.macro	senduart, rd, rx
--		mcr	p14, 0, \rd, c0, c5, 0
--		.endm
--
--		.macro	busyuart, rd, rx
--busy:		mrc	p14, 0, pc, c0, c1, 0
--		bcs	busy
--		.endm
--
--		.macro	waituart, rd, rx
--wait:		mrc	p14, 0, pc, c0, c1, 0
--		bcs	wait
--
--		.endm
--
- #elif defined(CONFIG_CPU_XSCALE)
- 
- 		.macro	senduart, rd, rx
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+- eric
+On Mon, Mar 21, 2011 at 2:12 PM, Barry Song <21cnbao@gmail.com> wrote:
+> Hi Eric/Fujita/Russell,
+> As i checked the "remove now unnecessary dma_needs_bounce()" patches
+> of Eric, I found you were all involved. Due to compiling error of
+> IXP4xx platforms, the patch was reverted by Russell in
+> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=commit;h=0485e18bc4112a3b548baa314c24bfbece4d156b
+>
+> But I think Eric's patch made much sense. dma_needs_bounce() is very
+> ambiguous in the whole arm arch, if devices use dma_mask right,
+> map_single() will decide whether it needs DMA bounce by the following
+> logic:
+> ? ? ? ?if (dev->dma_mask) {
+> ? ? ? ? ? ? ? ?unsigned long mask = *dev->dma_mask;
+> ? ? ? ? ? ? ? ?unsigned long limit;
+>
+> ? ? ? ? ? ? ? ?limit = (mask + 1) & ~mask;
+> ? ? ? ? ? ? ? ?if (limit && size > limit) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(dev, "DMA mapping too big (requested %#x "
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"mask %#Lx)\n", size, *dev->dma_mask);
+> ? ? ? ? ? ? ? ? ? ? ? ?return ~0;
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ?/*
+> ? ? ? ? ? ? ? ? * Figure out if we need to bounce from the DMA mask.
+> ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ?needs_bounce = (dma_addr | (dma_addr + size - 1)) & ~mask;
+> ? ? ? ?}
+>
+> Basically, we don't need dma_needs_bounce() for all chips at all. For
+> saa1111, it is needed only because a bug in the SoC.
+> For ?assabet and pfs168 machines, it gave a workaound by self-defined
+> a dma_needs_bounce function.
+> return ((machine_is_assabet() || machine_is_pfs168()) &&
+> ? ? ? ? ? ? ? ?(addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
+>
+> I think the right workaround for saa1111 should be setting dma_mask of
+> related devices to 0xc8000000 for the assabet and pfs168 machines but
+> not add a unnecessary APIs, ?which will cause other SoCs need to
+> finish the function if they use dma bounce too.
+>
+> Eric's path make much sense, we should delete the unnecessary
+> dma_needs_bounce() from the whole arm arch at all. If all related
+> people agree, we need another patch to fix it.
+>
+> Thanks
+> Barry
+>
