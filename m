@@ -1,38 +1,41 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 21 Mar 2011 16:52:54 +0100
-Subject: Enable UART3 on TX28
-In-Reply-To: <201103211627.12922.arnd@arndb.de>
-References: <1300718213-9908-1-git-send-email-LW@KARO-electronics.de>
-	<201103211627.12922.arnd@arndb.de>
-Message-ID: <19847.29782.578106.44656@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Mar 2011 16:37:59 +0000
+Subject: [PATCH] ARM: Remove bouncing author email from
+	arch/arm/plat-iop/time.c
+In-Reply-To: <alpine.LNX.2.00.1103150236500.26293@swampdragon.chaosbits.net>
+References: <alpine.LNX.2.00.1103150236500.26293@swampdragon.chaosbits.net>
+Message-ID: <20110321163759.GE4340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Deepak, are you happy with this?
 
-> On Monday 21 March 2011, Lothar Wa?mann wrote:
-> > +       /* UART3 */
-> > +       MX28_PAD_AUART3_RX__AUART3_RX,
-> > +       MX28_PAD_AUART3_TX__AUART3_TX,
-> > +       MX28_PAD_AUART3_RTS__AUART3_RTS,
-> > +       MX28_PAD_AUART3_CTS__AUART3_CTS,
-> > +
+On Tue, Mar 15, 2011 at 02:39:19AM +0100, Jesper Juhl wrote:
+> Mr. Deepak Saxena's email address, listed at the head of 
+> arch/arm/plat-iop/time.c, bounces. Remove it.
 > 
-> The patch is missing changelog, signed-off-by and diff header.
-> Content-wise, it seems ok.
+> Signed-off-by: Jesper Juhl <jj@chaosbits.net>
+> ---
+>  time.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-I know. Rogue git-send-email...
-I already resent it.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
+> index 07f23bb..af6139d 100644
+> --- a/arch/arm/plat-iop/time.c
+> +++ b/arch/arm/plat-iop/time.c
+> @@ -3,7 +3,7 @@
+>   *
+>   * Timer code for IOP32x and IOP33x based systems
+>   *
+> - * Author: Deepak Saxena <dsaxena@mvista.com>
+> + * Author: Deepak Saxena
+>   *
+>   * Copyright 2002-2003 MontaVista Software Inc.
+>   *
+> 
+> 
+> -- 
+> Jesper Juhl <jj@chaosbits.net>            http://www.chaosbits.net/
+> Don't top-post http://www.catb.org/~esr/jargon/html/T/top-post.html
+> Plain text mails only, please.
+> 
