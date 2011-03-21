@@ -1,22 +1,15 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 21 Mar 2011 10:33:18 +0800
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <201103151231.10106.jeremy.kerr@canonical.com>
-References: <1299134429.100626.661279191478.0.gpush@pororo>
-	<201103151231.10106.jeremy.kerr@canonical.com>
-Message-ID: <201103211033.19206.jeremy.kerr@canonical.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Mon, 21 Mar 2011 11:32:37 +0800
+Subject: [PATCH V7 0/4] mmc: one comment is missing addressed in the previous
+	review.
+Message-ID: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+One comment is missing addressed in the previous review round,
+complement it into this review round.
 
-> Any thughts on merging this? Would you like me to add to your patch
-> tracking system, or would you prefer it to go through some other path?
-
-I haven't heard anything yet, so have added these two to the patch-tracking 
-system. Let me know if you'd prefer some other method of submission instead.
-
-Cheers,
-
-
-Jeremy
+[PATCH V7 1/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET from ESDHC_DEFAULT_QUIRKS
+[PATCH V7 2/4] mmc: add the abort CMDTYE bits definition
+[PATCH V7 3/4] mmc: sdhci-esdhc: make the writel/readl as the general APIs
+[PATCH V7 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
