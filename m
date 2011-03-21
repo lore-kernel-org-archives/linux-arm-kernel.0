@@ -1,40 +1,38 @@
-From: helmut.raiger@hale.at (Helmut Raiger)
-Date: Mon, 21 Mar 2011 17:19:43 +0100
-Subject: i.MX31 suspend and VSTBY question
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1BC28F@039-SN1MPN1-004.039d.mgd.msft.net>
-References: <4D874A69.9010209@hale.at>
-	<56132A77AB93C141BF06E6B96CA6CFEA1BC28F@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <4D877A9F.4010108@hale.at>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 21 Mar 2011 16:52:54 +0100
+Subject: Enable UART3 on TX28
+In-Reply-To: <201103211627.12922.arnd@arndb.de>
+References: <1300718213-9908-1-git-send-email-LW@KARO-electronics.de>
+	<201103211627.12922.arnd@arndb.de>
+Message-ID: <19847.29782.578106.44656@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your response! Your CCMR register setting does not change the 
-behaviour on my board.
+Hi,
 
-A few questions:
-
-1) What kernel version are you running?
-2) Did you verify the VSTBY pin action (i.e. pin changes to high in 
-state retention mode and the pmic changes the voltages to their 
-programmed standby mode) ?
-3) As I already mentioned in my first post, the VSTBY signal is 
-asserted, when I use a LTIB 2.6.21 build, but not in 2.6.38-rc1+
-
-> For our release that has LPM working:
-> 		/* Enable Well Bias and set VSTBY
-> 		  * VSTBY pin will be asserted during SR mode. This asks the
-> 		  * PM IC to set the core voltage to the standby voltage
-> 		  * Must clear the MXC_CCM_CCMR_SBYCS bit as well  */
-> 		mxc_ccm_modify_reg(MXC_CCM_CCMR,
-> 				   MXC_CCM_CCMR_WBEN | MXC_CCM_CCMR_VSTBY |
-> 					MXC_CCM_CCMR_SBYCS,
-> 				   MXC_CCM_CCMR_WBEN | MXC_CCM_CCMR_VSTBY);
->
-> Dinh
->
-
-Helmut
+> On Monday 21 March 2011, Lothar Wa?mann wrote:
+> > +       /* UART3 */
+> > +       MX28_PAD_AUART3_RX__AUART3_RX,
+> > +       MX28_PAD_AUART3_TX__AUART3_TX,
+> > +       MX28_PAD_AUART3_RTS__AUART3_RTS,
+> > +       MX28_PAD_AUART3_CTS__AUART3_CTS,
+> > +
+> 
+> The patch is missing changelog, signed-off-by and diff header.
+> Content-wise, it seems ok.
+> 
+I know. Rogue git-send-email...
+I already resent it.
 
 
---
-Scanned by MailScanner.
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
