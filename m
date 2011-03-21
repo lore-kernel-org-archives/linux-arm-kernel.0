@@ -1,55 +1,75 @@
-From: bones@secretlab.ca (John Bonesio)
-Date: Mon, 21 Mar 2011 16:42:24 -0700
-Subject: [PATCH v2] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <alpine.LFD.2.00.1103211844500.11889@xanadu.home>
-References: <20110321221930.19756.36549.stgit@riker>
-	<alpine.LFD.2.00.1103211844500.11889@xanadu.home>
-Message-ID: <4D87E260.6050902@secretlab.ca>
+From: carlv@codeaurora.org (Carl Vanderlip)
+Date: Mon, 21 Mar 2011 16:49:46 -0700 (PDT)
+Subject: [PATCH 17/20] video: msm: Prevent framebuffer glitch
+	during	initialization
+In-Reply-To: <4D87552D.4070205@ru.mvista.com>
+References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
+	<1300485574-27600-1-git-send-email-carlv@codeaurora.org>
+	<4D87552D.4070205@ru.mvista.com>
+Message-ID: <1f9ceab007818b26e65019950985fe88.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
 
-Is this addhi instruction the only one, or do I need to go through and
-find other instructions to update as well?
+> Carl Vanderlip wrote:
+>
+>> Holds a reference to the mdp_clk until lateinit, and moves the
+>> frambuffer
+>> initialization to device_init.
+>
+>     Maybe I'm just blind but I don't see where the patch does the
+> latter...
+>
+>> The framebuffer lcdc driver will grab a
+>> reference to mdp_clk, which prevents the clock from being disabled by
+>> clock_late_init.
+>
+>> Authors:
+>> Dima Zavin <dima@android.com>
+>> Rebecca Schultz Zavin <rebecca@android.com>
+>> Colin Cross <ccross@android.com>
+>
 
-Thanks for being patient as I learn.
+Fear not. You are not going blind :P, I got a bit overzealous when trying
+to re-use the commit text that was available from the squashed patch that
+this patch set is spawned from (hence why [18/20] also has this same
+issue.
+I will be re-writing this commit text for v2 (unless this c-text is
+desired to be kept for "historical" purposes).
 
-- John
-
-On 03/21/2011 03:49 PM, Nicolas Pitre wrote:
-> On Mon, 21 Mar 2011, John Bonesio wrote:
-> 
->> This patch provides the ability to boot using a device tree that is appended
->> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+>> ---
+>>  drivers/video/msm/mdp.c |   10 ++++++++++
+>>  1 files changed, 10 insertions(+), 0 deletions(-)
+>
+>> diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
+>> index 0bb19fa..b3f334ad 100644
+>> --- a/drivers/video/msm/mdp.c
+>> +++ b/drivers/video/msm/mdp.c
+>> @@ -38,6 +38,7 @@ struct class *mdp_class;
 >>
->> Signed-off-by: John Bonesio <bones@secretlab.ca>
-> 
-> One minor glitch still...  ;-)
-> 
->> @@ -288,12 +344,28 @@ wont_overwrite:
->>  
->>  		/*
->>  		 * Relocate all entries in the GOT table.
->> +		 * Bump bss entries to _edata + dtb size
->>  		 */
->>  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
->> -		add	r1, r1, r0		@ table.  This fixes up the
->> -		str	r1, [r11], #4		@ C references.
->> +		add	r1, r1, r0		@ This fixes up C references
->> +		cmp	r1, r2			@ if entry >= bss_start &&
->> +		cmphs	r3, r1			@       bss_end > entry
->> +		addhi	r1, lr			@    entry += dtb size
-> 
-> Some toolchains won't accept this shortened version unless you compile 
-> for Thumb.  You should instead use:
-> 
-> 		addhi	r1, r1, lr
-> 
-> Otherwise...
-> 
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> 
-> Nicolas
+>>  static DECLARE_WAIT_QUEUE_HEAD(mdp_ppp_waitqueue);
+>>  static unsigned int mdp_irq_mask;
+>> +struct clk *mdp_clk_to_disable_later;
+>
+>     Why not just 'mdp_clk'? :-)
+>
+
+I was not the original author for these variable names, though I do see
+some reason behind the naming of this variable. I'd be more willing to
+change this name, to "mdp_clk" if it weren't so visually similar to
+mdp->clk (tired programmer eyes/brain could read (or write) the wrong
+one).
+
+As it is, the name is a little long, but it makes it extraordinarily clear
+what its purpose is (i.e. you know exactly what it is being used for
+without having to go searching for other places it is used).
+
+So while I don't like the name as it is, I don't really like 'mdp_clk'
+either (though would be willing to change it if anyone feels like being
+stubborn :-)).
+
+    -Carl V.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
