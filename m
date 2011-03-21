@@ -1,47 +1,134 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 21 Mar 2011 09:12:31 +0200
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <4D86F295.8040409@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-	<1299570622.2754.4.camel@localhost> <4D766A2F.9080001@codeaurora.org>
-	<4D86F295.8040409@codeaurora.org>
-Message-ID: <1300691551.2761.8.camel@localhost>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 21 Mar 2011 00:20:47 -0700
+Subject: [PATCHv2] ARM: Merge v6 and v7 DEBUG_LL DCC support
+In-Reply-To: <20110320092629.GB16646@n2100.arm.linux.org.uk>
+References: <20110320092629.GB16646@n2100.arm.linux.org.uk>
+Message-ID: <1300692047-32445-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-03-21 at 12:09 +0530, Murali Nalajala wrote:
-> On 3/8/2011 11:11 PM, Murali Nalajala wrote:
-> > On 3/8/2011 12:50 AM, Artem Bityutskiy wrote:
-> >> On Tue, 2011-03-08 at 05:38 +0530, Murali Nalajala wrote:
-> >>> Lets non-standard NAND drivers take advantage of known NAND
-> >>> chip information.
-> >>>
-> >>> The initial development of msm nand driver, driver uses the supported
-> >>> NAND devices information as a hardcoded table. Remove the existing
-> >>> hardcoded supported flash device table and read the flash device
-> >>> information from the flash id table which are part of the mtd subsystem.
-> >>
-> >> Why this initial version should be upstream? Why wouldn't you make it
-> >> "standard" first?
-> >>
-> >
-> > Currently we are not fully using the MTD nand subsystem. That's the
-> > intention author has introduced "non-standard" here!!!
-> >
-> > Thanks,
-> > Murali N
-> >
-> 
-> Any reviews comments on this change?
+The inline assembly differences for v6 vs. v7 are purely
+optimizations. On a v7 processor, an mrc with the pc sets the
+condition codes to the 28-31 bits of the register being read. It
+just so happens that the TX/RX full bits the DCC support code is
+testing for are high enough in the register to be put into the
+condition codes. On a v6 processor, this "feature" isn't
+implemented and thus we have to do the usual read, mask, test
+operations to check for TX/RX full. Thus, we can drop the v7
+implementation and just use the v6 implementation for both.
 
-No, I think you should "sell" your driver better than that. Indeed,
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Q: "Why this initial version should be upstream? Why wouldn't you make
-it "standard" first?"
-A: Currently we are not fully using the MTD nand subsystem. That's the
-intention author has introduced "non-standard" here!!!
+Russell King wrote:
+> This patch needs updating for the changes that were in my tree for many
+> months, and are now in mainline.
 
+Yes sorry. I noticed this when rebasing against linus' tree. I'll base
+patches of your for-next tree when sending to you next time.
+
+Changes since v1:
+ * Refreshed against rmk/for-next
+
+ arch/arm/boot/compressed/head.S |   10 +---------
+ arch/arm/boot/compressed/misc.c |   12 +-----------
+ arch/arm/kernel/debug.S         |   19 +------------------
+ 3 files changed, 3 insertions(+), 38 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 84ac4d6..adf583c 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -21,20 +21,12 @@
+ 
+ #if defined(CONFIG_DEBUG_ICEDCC)
+ 
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+ 		.macro	loadsp, rb, tmp
+ 		.endm
+ 		.macro	writeb, ch, rb
+ 		mcr	p14, 0, \ch, c0, c5, 0
+ 		.endm
+-#elif defined(CONFIG_CPU_V7)
+-		.macro	loadsp, rb, tmp
+-		.endm
+-		.macro	writeb, ch, rb
+-wait:		mrc	p14, 0, pc, c0, c1, 0
+-		bcs	wait
+-		mcr	p14, 0, \ch, c0, c5, 0
+-		.endm
+ #elif defined(CONFIG_CPU_XSCALE)
+ 		.macro	loadsp, rb, tmp
+ 		.endm
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 4657e87..2df3826 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -36,7 +36,7 @@ extern void error(char *x);
+ 
+ #ifdef CONFIG_DEBUG_ICEDCC
+ 
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+ 
+ static void icedcc_putc(int ch)
+ {
+@@ -52,16 +52,6 @@ static void icedcc_putc(int ch)
+ 	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
+ }
+ 
+-#elif defined(CONFIG_CPU_V7)
+-
+-static void icedcc_putc(int ch)
+-{
+-	asm(
+-	"wait:	mrc	p14, 0, pc, c0, c1, 0			\n\
+-		bcs	wait					\n\
+-		mcr     p14, 0, %0, c0, c5, 0			"
+-	: : "r" (ch));
+-}
+ 
+ #elif defined(CONFIG_CPU_XSCALE)
+ 
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index d2d983b..bcd66e0 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -25,7 +25,7 @@
+ 		.macro	addruart, rp, rv
+ 		.endm
+ 
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+ 
+ 		.macro	senduart, rd, rx
+ 		mcr	p14, 0, \rd, c0, c5, 0
+@@ -49,23 +49,6 @@
+ 1002:
+ 		.endm
+ 
+-#elif defined(CONFIG_CPU_V7)
+-
+-		.macro	senduart, rd, rx
+-		mcr	p14, 0, \rd, c0, c5, 0
+-		.endm
+-
+-		.macro	busyuart, rd, rx
+-busy:		mrc	p14, 0, pc, c0, c1, 0
+-		bcs	busy
+-		.endm
+-
+-		.macro	waituart, rd, rx
+-wait:		mrc	p14, 0, pc, c0, c1, 0
+-		bcs	wait
+-
+-		.endm
+-
+ #elif defined(CONFIG_CPU_XSCALE)
+ 
+ 		.macro	senduart, rd, rx
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
