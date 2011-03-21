@@ -1,10 +1,11 @@
 From: mayur@ti.com (Janorkar, Mayuresh)
-Date: Mon, 21 Mar 2011 09:54:00 +0530
-Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
-In-Reply-To: <1300485095-26923-1-git-send-email-carlv@codeaurora.org>
+Date: Mon, 21 Mar 2011 10:10:09 +0530
+Subject: [PATCH 07/20] video: msm: Allow users to request a larger x and
+	y virtual fb
+In-Reply-To: <1300485381-27201-1-git-send-email-carlv@codeaurora.org>
 References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-	<1300485095-26923-1-git-send-email-carlv@codeaurora.org>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB033D22EABA@dbde02.ent.ti.com>
+	<1300485381-27201-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB033D22EAE7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +14,20 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > -----Original Message-----
 > From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
 > owner at vger.kernel.org] On Behalf Of Carl Vanderlip
-> Sent: Saturday, March 19, 2011 3:22 AM
-> To: Russell King; David Brown; Daniel Walker; Bryan Huntsman
+> Sent: Saturday, March 19, 2011 3:26 AM
+> To: David Brown; Daniel Walker; Bryan Huntsman
 > Cc: Brian Swetland; Dima Zavin; Rebecca Schultz Zavin; Colin Cross; linux-
-> fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-arm-
-> msm at vger.kernel.org; linux-kernel at vger.kernel.org; Carl Vanderlip
-> Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
+> fbdev at vger.kernel.org; Carl Vanderlip; linux-arm-
+> kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; linux-
+> kernel at vger.kernel.org
+> Subject: [PATCH 07/20] video: msm: Allow users to request a larger x and y
+> virtual fb
 > 
-> From: Brian Swetland <swetland@google.com>
-> 
-> Trivial fix
-
-The Subject line states that you are only changing a typo from mpd to mdp.
-The description doesn't state anything more.
-But the patch is changing Copyright info also.
+> As long as the total size fits inside the memory allocated to the
+> framebuffer
+> users can request a larger size. This change allows users to request a
+> triple
+> buffered fb.
 > 
 > Authors:
 > Dima Zavin <dima@android.com>
@@ -35,141 +36,173 @@ But the patch is changing Copyright info also.
 > 
 > Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
 > ---
->  arch/arm/mach-msm/include/mach/msm_fb.h |    2 +-
->  drivers/video/msm/mdp.c                 |    8 ++++----
->  drivers/video/msm/mdp_ppp.c             |   10 +++++-----
->  drivers/video/msm/msm_fb.c              |    1 -
->  4 files changed, 10 insertions(+), 11 deletions(-)
+>  drivers/video/msm/msm_fb.c |   63 ++++++++++++++++++++++++++++++++++-----
+> ----
+>  1 files changed, 50 insertions(+), 13 deletions(-)
 > 
-> diff --git a/arch/arm/mach-msm/include/mach/msm_fb.h b/arch/arm/mach-
-> msm/include/mach/msm_fb.h
-> index 1f4fc81..da11719 100644
-> --- a/arch/arm/mach-msm/include/mach/msm_fb.h
-> +++ b/arch/arm/mach-msm/include/mach/msm_fb.h
-> @@ -114,7 +114,7 @@ struct mdp_blit_req;
->  struct fb_info;
->  struct mdp_device {
->  	struct device dev;
-> -	void (*dma)(struct mdp_device *mpd, uint32_t addr,
-> +	void (*dma)(struct mdp_device *mdp, uint32_t addr,
->  		    uint32_t stride, uint32_t w, uint32_t h, uint32_t x,
->  		    uint32_t y, struct msmfb_callback *callback, int
-> interface);
->  	void (*dma_wait)(struct mdp_device *mdp);
-> diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
-> index c3636d5..45af97d 100644
-> --- a/drivers/video/msm/mdp.c
-> +++ b/drivers/video/msm/mdp.c
-> @@ -2,7 +2,7 @@
->   *
->   * MSM MDP Interface (used by framebuffer core)
->   *
-> - * Copyright (C) 2007 QUALCOMM Incorporated
-> + * Copyright (C) 2007, 2011 Code Aurora Forum. All rights reserved.
-
-It is a change from 2007 to 2011 and the company name is being changed.
-I think it should be mentioned in the Subject/Description.
-
->   * Copyright (C) 2007 Google Incorporated
->   *
->   * This software is licensed under the terms of the GNU General Public
-> @@ -288,7 +288,7 @@ int mdp_blit(struct mdp_device *mdp_dev, struct
-> fb_info *fb,
->  	/* WORKAROUND FOR HARDWARE BUG IN BG TILE FETCH */
->  	if (unlikely(req->src_rect.h == 0 ||
->  		     req->src_rect.w == 0)) {
-> -		printk(KERN_ERR "mpd_ppp: src img of zero size!\n");
-> +		printk(KERN_ERR "mdp_ppp: src img of zero size!\n");
->  		return -EINVAL;
->  	}
->  	if (unlikely(req->dst_rect.h == 0 ||
-> @@ -298,13 +298,13 @@ int mdp_blit(struct mdp_device *mdp_dev, struct
-> fb_info *fb,
->  	/* do this first so that if this fails, the caller can always
->  	 * safely call put_img */
->  	if (unlikely(get_img(&req->src, fb, &src_start, &src_len,
-> &src_file))) {
-> -		printk(KERN_ERR "mpd_ppp: could not retrieve src image from "
-> +		printk(KERN_ERR "mdp_ppp: could not retrieve src image from "
->  				"memory\n");
->  		return -EINVAL;
->  	}
-> 
->  	if (unlikely(get_img(&req->dst, fb, &dst_start, &dst_len,
-> &dst_file))) {
-> -		printk(KERN_ERR "mpd_ppp: could not retrieve dst image from "
-> +		printk(KERN_ERR "mdp_ppp: could not retrieve dst image from "
->  				"memory\n");
->  		return -EINVAL;
->  	}
-> diff --git a/drivers/video/msm/mdp_ppp.c b/drivers/video/msm/mdp_ppp.c
-> index 4ff001f..2b04027 100644
-> --- a/drivers/video/msm/mdp_ppp.c
-> +++ b/drivers/video/msm/mdp_ppp.c
-> @@ -1,6 +1,6 @@
->  /* drivers/video/msm/mdp_ppp.c
->   *
-> - * Copyright (C) 2007 QUALCOMM Incorporated
-> + * Copyright (C) 2007, 2011 Code Aurora Forum. All rights reserved.
-
-Same here.
-
->   * Copyright (C) 2007 Google Incorporated
->   *
->   * This software is licensed under the terms of the GNU General Public
-> @@ -650,7 +650,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
-> mdp_blit_req *req,
-> 
->  	if (unlikely(req->src.format >= MDP_IMGTYPE_LIMIT ||
->  		     req->dst.format >= MDP_IMGTYPE_LIMIT)) {
-> -		printk(KERN_ERR "mpd_ppp: img is of wrong format\n");
-> +		printk(KERN_ERR "mdp_ppp: img is of wrong format\n");
->  		return -EINVAL;
->  	}
-> 
-> @@ -658,7 +658,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
-> mdp_blit_req *req,
->  		     req->src_rect.y > req->src.height ||
->  		     req->dst_rect.x > req->dst.width ||
->  		     req->dst_rect.y > req->dst.height)) {
-> -		printk(KERN_ERR "mpd_ppp: img rect is outside of img!\n");
-> +		printk(KERN_ERR "mdp_ppp: img rect is outside of img!\n");
->  		return -EINVAL;
->  	}
-> 
-> @@ -694,7 +694,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
-> mdp_blit_req *req,
-> 
->  	if (!valid_src_dst(src_start, src_len, dst_start, dst_len, req,
->  			   &regs)) {
-> -		printk(KERN_ERR "mpd_ppp: final src or dst location is "
-> +		printk(KERN_ERR "mdp_ppp: final src or dst location is "
->  			"invalid, are you trying to make an image too large "
->  			"or to place it outside the screen?\n");
->  		return -EINVAL;
-> @@ -708,7 +708,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
-> mdp_blit_req *req,
->  		regs.op |= PPP_OP_DITHER_EN;
->  	blit_blend(req, &regs);
->  	if (blit_scale(mdp, req, &regs)) {
-> -		printk(KERN_ERR "mpd_ppp: error computing scale for img.\n");
-> +		printk(KERN_ERR "mdp_ppp: error computing scale for img.\n");
->  		return -EINVAL;
->  	}
->  	blit_blur(mdp, req, &regs);
 > diff --git a/drivers/video/msm/msm_fb.c b/drivers/video/msm/msm_fb.c
-> index 5436aeb..04d0067 100644
+> index 04d0067..6af8b41 100644
 > --- a/drivers/video/msm/msm_fb.c
 > +++ b/drivers/video/msm/msm_fb.c
-> @@ -321,7 +321,6 @@ error:
->  	mutex_unlock(&msmfb->panel_init_lock);
->  }
+> @@ -53,6 +53,9 @@ do { \
+>  		printk(KERN_INFO "msmfb: "fmt, ##args); \
+>  } while (0)
 > 
-> -
+> +#define BITS_PER_PIXEL(info) (info->fb->var.bits_per_pixel)
+> +#define BYTES_PER_PIXEL(info) (info->fb->var.bits_per_pixel >> 3)
+> +
+>  static int msmfb_debug_mask;
+>  module_param_named(msmfb_debug_mask, msmfb_debug_mask, int,
+>  		   S_IRUGO | S_IWUSR | S_IWGRP);
+> @@ -161,9 +164,10 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
+>  	}
+>  	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+> 
+> -	addr = ((msmfb->xres * (yoffset + y) + x) * 2);
+> +	addr = ((msmfb->xres * (yoffset + y) + x) * BYTES_PER_PIXEL(msmfb));
+>  	mdp->dma(mdp, addr + msmfb->fb->fix.smem_start,
+> -		 msmfb->xres * 2, w, h, x, y, &msmfb->dma_callback,
+> +		 msmfb->xres * BYTES_PER_PIXEL(msmfb), w, h, x, y,
+> +		 &msmfb->dma_callback,
+>  		 panel->interface_type);
+>  	return 0;
+>  error:
+> @@ -323,14 +327,46 @@ error:
+> 
 >  static int msmfb_check_var(struct fb_var_screeninfo *var, struct fb_info
 > *info)
 >  {
+> +	u32 size;
+> +
 >  	if ((var->xres != info->var.xres) ||
+>  	    (var->yres != info->var.yres) ||
+> -	    (var->xres_virtual != info->var.xres_virtual) ||
+> -	    (var->yres_virtual != info->var.yres_virtual) ||
+>  	    (var->xoffset != info->var.xoffset) ||
+>  	    (var->bits_per_pixel != info->var.bits_per_pixel) ||
+>  	    (var->grayscale != info->var.grayscale))
+>  		 return -EINVAL;
+> +
+> +	size = var->xres_virtual * var->yres_virtual *
+> +		(var->bits_per_pixel >> 3);
+
+How about defining a new macro BYTES_PER_PIXEL_VAR for fb_var_screeninfo also? That would make code more readable.
+
+> +	if (size > info->fix.smem_len)
+> +		return -EINVAL;
+> +	return 0;
+> +}
+> +
+> +static int msmfb_set_par(struct fb_info *info)
+> +{
+> +	struct fb_var_screeninfo *var = &info->var;
+> +	struct fb_fix_screeninfo *fix = &info->fix;
+> +
+> +	/* we only support RGB ordering for now */
+> +	if (var->bits_per_pixel == 32 || var->bits_per_pixel == 24) {
+> +		var->red.offset = 0;
+> +		var->red.length = 8;
+> +		var->green.offset = 8;
+> +		var->green.length = 8;
+> +		var->blue.offset = 16;
+> +		var->blue.length = 8;
+
+var->red is a fb_bitfield variable.
+It provides offset, length and msb_right.
+
+struct fb_bitfield {
+    __u32 offset;                   /* beginning of bitfield        */
+    __u32 length;                   /* length of bitfield           */
+    __u32 msb_right;                /* != 0 : Most significant bit is */ 
+                                    /* right */ 
+}
+Please don't keep msb_right unassigned.
+
+> +	} else if (var->bits_per_pixel == 16) {
+> +		var->red.offset = 11;
+> +		var->red.length = 5;
+> +		var->green.offset = 5;
+> +		var->green.length = 6;
+> +		var->blue.offset = 0;
+> +		var->blue.length = 5;
+> +	} else
+> +		return -1;
+
+Please use standard error code provided by Linux kernel -EINVAL
+(-22 Invalid argument)
+
+> +	fix->line_length = var->xres * var->bits_per_pixel / 8;
+Why to divide by 8? Atleast use >>3, bitwise operations that would take less cpu cycles)
+As I stated earlier define a new macro for var also.
+
+> +
+>  	return 0;
+>  }
+> 
+> @@ -427,6 +463,7 @@ static struct fb_ops msmfb_ops = {
+>  	.fb_open = msmfb_open,
+>  	.fb_release = msmfb_release,
+>  	.fb_check_var = msmfb_check_var,
+> +	.fb_set_par = msmfb_set_par,
+>  	.fb_pan_display = msmfb_pan_display,
+>  	.fb_fillrect = msmfb_fillrect,
+>  	.fb_copyarea = msmfb_copyarea,
+> @@ -438,8 +475,6 @@ static unsigned PP[16];
+> 
+> 
+> 
+> -#define BITS_PER_PIXEL 16
+> -
+>  static void setup_fb_info(struct msmfb_info *msmfb)
+>  {
+>  	struct fb_info *fb_info = msmfb->fb;
+> @@ -462,7 +497,7 @@ static void setup_fb_info(struct msmfb_info *msmfb)
+>  	fb_info->var.height = msmfb->panel->fb_data->height;
+>  	fb_info->var.xres_virtual = msmfb->xres;
+>  	fb_info->var.yres_virtual = msmfb->yres * 2;
+> -	fb_info->var.bits_per_pixel = BITS_PER_PIXEL;
+> +	fb_info->var.bits_per_pixel = 16;
+>  	fb_info->var.accel_flags = 0;
+> 
+>  	fb_info->var.yoffset = 0;
+> @@ -497,28 +532,30 @@ static int setup_fbmem(struct msmfb_info *msmfb,
+> struct platform_device *pdev)
+>  	struct fb_info *fb = msmfb->fb;
+>  	struct resource *resource;
+>  	unsigned long size = msmfb->xres * msmfb->yres *
+> -			     (BITS_PER_PIXEL >> 3) * 2;
+> +		BYTES_PER_PIXEL(msmfb) * 2;
+> +	unsigned long resource_size;
+>  	unsigned char *fbram;
+> 
+>  	/* board file might have attached a resource describing an fb */
+>  	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!resource)
+>  		return -EINVAL;
+> +	resource_size = resource->end - resource->start + 1;
+> 
+>  	/* check the resource is large enough to fit the fb */
+> -	if (resource->end - resource->start < size) {
+> -		printk(KERN_ERR "allocated resource is too small for "
+> +	if (resource_size < size) {
+> +		printk(KERN_ERR "msmfb: allocated resource is too small for "
+>  				"fb\n");
+>  		return -ENOMEM;
+>  	}
+>  	fb->fix.smem_start = resource->start;
+> -	fb->fix.smem_len = resource->end - resource->start;
+> -	fbram = ioremap(resource->start,
+> -			resource->end - resource->start);
+> +	fb->fix.smem_len = resource_size;
+> +	fbram = ioremap(resource->start, resource_size);
+>  	if (fbram == 0) {
+>  		printk(KERN_ERR "msmfb: cannot allocate fbram!\n");
+>  		return -ENOMEM;
+>  	}
+> +
+>  	fb->screen_base = fbram;
+>  	return 0;
+>  }
 > --
 > Sent by an employee of the Qualcomm Innovation Center, Inc.
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
