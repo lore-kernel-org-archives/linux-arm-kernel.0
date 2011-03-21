@@ -1,36 +1,119 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 21 Mar 2011 16:41:19 -0400 (EDT)
-Subject: [PATCH v2] arm: cmpxchg syscall should data abort if page not
-	write
-In-Reply-To: <AANLkTi=Zq0fiVf+GcRC8M+CPakwmEWn1rrqq_U4OehNy@mail.gmail.com>
-References: <1300098516-1601-1-git-send-email-ratbert.chuang@gmail.com>
-	<1300169637-1628-1-git-send-email-ratbert.chuang@gmail.com>
-	<alpine.LFD.2.00.1103171301030.26889@xanadu.home>
-	<AANLkTik1oEkLX3R-adK9-_2W+ku4j9YDikr+Z4vzfGtb@mail.gmail.com>
-	<alpine.LFD.2.00.1103171344270.26889@xanadu.home>
-	<AANLkTi=Zq0fiVf+GcRC8M+CPakwmEWn1rrqq_U4OehNy@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103211639470.11889@xanadu.home>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Mon, 21 Mar 2011 16:30:38 -0500
+Subject: [PATCHv5 4/4] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1300743038-3901-3-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300743038-3901-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300743038-3901-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300743038-3901-3-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1300743038-3901-4-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Mar 2011, Po-Yu Chuang wrote:
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-> On Fri, Mar 18, 2011 at 1:57 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > Nope. ?The code being fixed here was suptly broken so it needs fixing.
-> > However this code is almost never used, if at all, as it is a fall-back
-> > solution for when all the better alternatives are not available for some
-> > reasons (and I'm still wondering what those reasons are for Po-Yu Chuang
-> > to actually use that code). ?In practice this bug should have affected
-> > no one.
-> 
-> We met this problem while porting an v5 SMP processor because kernel
-> selects NEEDS_SYSCALL_FOR_CMPXCHG by default if CPU_32v5.
-> 
-> After we added our own implementation of __kuser_cmpxchg, this code
-> is not needed anymore. But since this is actually a bug, it is still a good
-> idea to submit a patch. :-)
+Adds initial low power suspend functionality to MX51.
+Supports "mem" and "standby" modes.
 
-Yes.  Please send to RMK's patch system with my ACK.
+Tested on mx51-babbage.
 
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/Makefile   |    1 +
+ arch/arm/mach-mx5/pm-imx51.c |   74 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 75 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/pm-imx51.c
 
-Nicolas
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 0b9338c..787cb80 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -6,6 +6,7 @@
+ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
+ obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
+ 
++obj-$(CONFIG_PM) += pm-imx51.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+ obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+diff --git a/arch/arm/mach-mx5/pm-imx51.c b/arch/arm/mach-mx5/pm-imx51.c
+new file mode 100644
+index 0000000..f5164b2
+--- /dev/null
++++ b/arch/arm/mach-mx5/pm-imx51.c
+@@ -0,0 +1,74 @@
++/*
++ *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/suspend.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <asm/cacheflush.h>
++#include <asm/tlbflush.h>
++#include <mach/system.h>
++#include "crm_regs.h"
++
++static struct clk *gpc_dvfs_clk;
++
++static int mx5_suspend_enter(suspend_state_t state)
++{
++	if (gpc_dvfs_clk == NULL)
++		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
++
++	if (gpc_dvfs_clk) {
++		clk_enable(gpc_dvfs_clk);
++		switch (state) {
++		case PM_SUSPEND_MEM:
++			mx5_cpu_lp_set(STOP_POWER_OFF);
++			break;
++		case PM_SUSPEND_STANDBY:
++			mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++			break;
++		default:
++			return -EINVAL;
++		}
++
++		if (state == PM_SUSPEND_MEM) {
++			local_flush_tlb_all();
++			flush_cache_all();
++
++			/*clear the EMPGC0/1 bits */
++			__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
++			__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
++		}
++		cpu_do_idle();
++		clk_disable(gpc_dvfs_clk);
++	}else {
++		printk(KERN_ERR "Cannot enter SRPG suspend -no gpc_dvfs clock!\n");
++		return -EPERM;
++	}
++
++	return 0;
++}
++
++static int mx5_pm_valid(suspend_state_t state)
++{
++	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
++}
++
++static const struct platform_suspend_ops mx5_suspend_ops = {
++	.valid = mx5_pm_valid,
++	.enter = mx5_suspend_enter,
++};
++
++static int __init mx5_pm_init(void)
++{
++	if (cpu_is_mx51())
++		suspend_set_ops(&mx5_suspend_ops);
++
++	return 0;
++}
++device_initcall(mx5_pm_init);
+-- 
+1.6.0.4
