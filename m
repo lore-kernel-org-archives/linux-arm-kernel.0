@@ -1,107 +1,33 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 21 Mar 2011 14:21:49 +0530
-Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
-In-Reply-To: <871v2dbo3q.fsf@ti.com>
-References: <1299245123-23444-1-git-send-email-rnayak@ti.com>	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>	<4D775418.6050105@ti.com>	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>	<4D7A22F6.5050806@ti.com>
-	<871v2dbo3q.fsf@ti.com>
-Message-ID: <4D8711A5.6070301@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Mar 2011 11:17:19 +0100
+Subject: Booting Integrator/AP with ARM920T
+Message-ID: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin/Paul,
+I have this Integrator/AP development board here in my office:
 
-On 3/11/2011 10:17 PM, Kevin Hilman wrote:
-> Rajendra Nayak<rnayak@ti.com>  writes:
->
-> [...]
->
->>>
->>> It's also breaking boot on OMAP35xx BeagleBoard rev C2.  The kernel
->>> boot messages are below - omap2plus_defconfig + DEBUG_LL.  Reverting
->>> the patch fixes it.  Could you please take a look?
->>
->> I got hold of a Beagle, a sticker on which says rev C1D.
->> Not sure if there is a better way to identify the rev, but
->> this one seems to boot fine for me even with this patch.
->> I just applied this one patch on top of the the tag
->> 'integration-2.6.39-20110310-008' of git://git.pwsan.com/linux-
->> integration.
->
-> In the process of testing Santosh's OMAP4 PM series (which includes
-> $SUBJECT patch) on OMAP3, I also noticed some problems on beagle (mine
-> is a C3.)
->
-> Specifially, with $SUBJECT patch applied, none of the powerdomains ever
-> reach inactive or RET during idle (suspend seems to work fine.)
->
-> Just reverting $SUBJECT patch makes things go back to working normally.
->
-> I pushed the test branch I used which is a merge of Santosh's v3 branch
-> with my pm branch (branch: tmp/santosh-omap4-pm)
->
-> I tested by first doing a suspend test and confirming all the
-> powerdomains hit retention.  That worked fine.  Then I did an idle test:
->
->    echo 5>  /sys/devices/platform/omap/omap_uart.0/sleep_timeout
->    echo 5>  /sys/devices/platform/omap/omap_uart.1/sleep_timeout
->    echo 5>  /sys/devices/platform/omap/omap_uart.2/sleep_timeout
->    echo 1>  /debug/pm_debug/sleep_while_idle
->
-> and waited for the UARTs to timeout.
->
-> Well after the UART timeouts expired, I do not see any powerdomains
-> transitioning from ON.
->
-> What's even more strange is that the same thing is working fine on all
-> the other OMAP3 platforms I tested: 3430/n900, 3630/zoom3 and even a
-> different 3530-based platform, the OMAP3EVM.
+Initialising Boot Monitor System Information Block
+boot Monitor > i
+ARM bootPROM [Version 1.3] Rebuilt on Jun 26 2001 at 22:04:10
+Running on a Integrator Evaluation Board
+Board Revision V1.0, ARM920T Processor
+Memory Size is 128MBytes, Flash Size is 32MBytes
+Copyright (c) ARM Limited 1999 - 2001. All rights reserved.
+Board designed by ARM Limited
+Hardware support provided at http://www.arm.com/
+For help on the available commands type ? or h
+boot Monitor >
 
-I tried to reproduce this on a Beagle rev C3, but I don't seem
-to be seeing this issue. I was able to hit OFF mode in both
-suspend and idle.
+Does anyone beside me *ever* try to actually boot a recent kernel
+on this thing?
 
-I also tried removing autodeps completely on OMAP3 and ran
-into some issues/aborts with GPIO restore path with
-OFF mode enabled.
+How do you do it? Do I need patched U-boots etc, or can I just load
+a Z-record image of vmlinux into RAM over the serial console?
 
-Besides these, debugging some McBSP related crashes showed
-up another issue with this patch.
-Since the clockdomain is programmed back to HW_AUTO (if supported)
-in the clock framework, this happens *before* waiting for the
-module to become accessible. (On OMAP4, the check to make sure
-the module is accessible happens in the hwmod framework, unlike
-in older OMAP's, where it was part of the clock framework)
+Needless to say, ARM Ltd. has deleted the web pages for official
+support of this thing as far as I can see. I was going to try out a
+few patches affecting mach-integrator...
 
-So instead of implementing the recommended sequence of
--1- Force clkdm to SW_WKUP
--2- Configure desired module mode to "enable" or "auto"
--3- Wait for the desired module idle status to be FUNC
--4- Program clkdm in HW_AUTO(if supported)
-
-..it was actually implementing the wrong sequence as below
--1- Force clkdm to SW_WKUP
--2- Configure desired module mode to "enable" or "auto"
--3- Program clkdm in HW_AUTO(if supported)
--4- Wait for the desired module idle status to be FUNC
-
-This however was only a problem on OMAP4.
-
-Fixing this would require moving the clockdomain programming
-back to HW_AUTO as part of the hwmod framework.
-However this sequence is recommended even for optional
-clock enabling, and hence might have to be handled at
-the clock framework as well. (Since optional clocks
-are still controlled by drivers using clock framework
-directly).
-Any suggestions on how to handle this without duplicating
-much of this across clock and hwmod framework?
-
-regards,
-Rajendra
-
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yours,
+Linus Walleij
