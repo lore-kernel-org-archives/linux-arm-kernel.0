@@ -1,77 +1,46 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Mon, 21 Mar 2011 21:37:52 +1000
-Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
-In-Reply-To: <201103192114.05164.arnd@arndb.de>
-References: <AANLkTi=T=QM_GmYYnd8yXJz37LOKqt+AFWk7EEw-7uaN@mail.gmail.com>
-	<AANLkTimPoEi+XLUJgza-b_gXbd4kCGpF93MySAR0ZRvT@mail.gmail.com>
-	<201103192114.05164.arnd@arndb.de>
-Message-ID: <4D873890.5000302@snapgear.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 21 Mar 2011 11:50:41 +0000
+Subject: Build warning in todays linus/master
+In-Reply-To: <002101cbe7bc$d547c6f0$7fd754d0$@deacon@arm.com>
+References: <20110321110105.GB2610@pulham.picochip.com>
+	<002101cbe7bc$d547c6f0$7fd754d0$@deacon@arm.com>
+Message-ID: <20110321115041.GA29724@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 21, 2011 at 11:40:52AM -0000, Will Deacon wrote:
+> Hi Jamie,
+> 
+> > I'm getting a build warning on todays master build for my V6K platform:
+> > 
+> >   CC      arch/arm/mm/mmu.o
+> > arch/arm/mm/mmu.c: In function 'create_36bit_mapping':
+> > arch/arm/mm/mmu.c:601:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> > 2 has type 'unsigned int'
+> > arch/arm/mm/mmu.c:614:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> > 2 has type 'unsigned int'
+> > arch/arm/mm/mmu.c:621:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> > 2 has type 'unsigned int'
+> > arch/arm/mm/mmu.c: In function 'create_mapping':
+> > arch/arm/mm/mmu.c:662:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> > 2 has type 'unsigned int'
+> > arch/arm/mm/mmu.c:670:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> > 2 has type 'unsigned int'
+> > arch/arm/mm/mmu.c:690:10: warning: format '%08lx' expects type 'long unsigned int', but argument 2 has
+> > type 'unsigned int'
+> > 
+> > Which is introduced by (3a6b16 [ARM: 6675/1: use phys_addr_t instead of
+> > unsigned long in conversion code]), because phys_addr_t is a u32
+> > (!CONFIG_PHYS_ADDR_T_64BIT).  I guess a cast to u64 in the printk()'s in
+> > arch/arm/mm/mmu.c would fix these up, is that the right approach?
+> 
+> It looks like one of the LPAE preparation patches has been merged
+> (i.e. the one which replaces unsigned long with phys_addr_t) but the
+> conversion specifier fixes are not yet in mainline, although they do
+> live in -next.
 
-Hi Arnd,
+Ahh, I thought I'd seen something like that on the lists before but 
+obviously couldn't find the right one!  Thanks for pointing me at the 
+right patches though.
 
-On 20/03/11 06:14, Arnd Bergmann wrote:
-> On Saturday 19 March 2011, Geert Uytterhoeven wrote:
->> On Sat, Mar 19, 2011 at 10:53, Madhavi Manchala<madhavi.linux@gmail.com>  wrote:
->>> I have one basic question about the architecture files in Linux
->>> kernels. We have a board with Samsung S3C2510A MCU (ARM940T core)
->>> which is a no-mmu based CPU. I heard that "there was not a lot of ARM
->>> no-mmu support at the moment" from Ben Dooks.
->>>
->>> So, I started developing the architecture files for my Samsung
->>> S3C2510A MCU (ARM940T core) by looking at the existing S3C2410A
->>> (ARM920 core) architecture files. Is this my porting (developing the
->>> architecture files) correct?
->>>
->>> How can I port the Linux on to my board which has a Samsung S3C2510A
->>> MCU (ARM940T core) which is a NO-MMU based CPU?
->>>
->>> Please suggest me. It would be appreciated your help / suggestions.
->>
->> I think the uClinux mailing list (CCed) is a more appropriate mailing list for
->> your questions.
->
-> It depends. Any questions regarding the ARM kernel should be on the
-> arm-linux-kernel (also CCed now), since the nommu support is merged
-> with the mainline kernel.
->
-> uClinux seems to be rather focused on m68knommu (coldfire) these days,
-
-That is more a factor of who shows interest and is active on
-the uclinux-dev mailing list more than anything else though.
-Quite of few different groups of people interested in non-MMU
-ARM platforms have shown up over the years, but none seem to stay
-active for long.
-
-
-> and contains both a kernel and user space. The last uClinux release
-> containst some changes for Samsung platforms (s3c24a0, s3c3410,
-> s3c44b0x and s5c7375). It's probably a good idea to look at that
-> code for reference, but I would suggest integrating the code for
-> your platform in the upstream  tree directly.
-
-Yes, highly encourage this.
-
-
-> I could not find a git tree for uClinux that contains any recent
-> kernel. Does that exist?
-
-I used to keep one on git.kernel.org for promoting non-architectural
-but non-MMU specific changes to mainline.
-
-http://git.kernel.org/?p=linux/kernel/git/gerg/uclinux.git;a=summary
-
-But I have had so few changes that fit in that category that I
-haven't used it in quite a while.
-
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Jamie
