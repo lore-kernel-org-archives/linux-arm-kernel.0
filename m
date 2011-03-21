@@ -1,116 +1,180 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Mon, 21 Mar 2011 11:32:41 +0800
-Subject: [PATCH V7 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300678361-6259-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1300678361-6259-5-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: mayur@ti.com (Janorkar, Mayuresh)
+Date: Mon, 21 Mar 2011 09:54:00 +0530
+Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
+In-Reply-To: <1300485095-26923-1-git-send-email-carlv@codeaurora.org>
+References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
+	<1300485095-26923-1-git-send-email-carlv@codeaurora.org>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB033D22EABA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the NO INT in the Multi-BLK IO in SD/MMC, and Multi-BLK
-read in SDIO on imx53.
 
-The CMDTYPE of the CMD register (offset 0xE) should be set to
-"11" when the STOP CMD12 is issued on imx53 to abort one
-open ended multi-blk IO. Otherwise one the TC INT wouldn't
-be generated.
 
-In exact block transfer, the controller doesn't complete the
-operations automatically as required at the end of the
-transfer and remains on hold if the abort command is not sent on
-imx53.
-As a result, the TC flag is not asserted and SW  received timeout
-exeception. set bit1 of Vendor Spec registor to fix it.
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
+> owner at vger.kernel.org] On Behalf Of Carl Vanderlip
+> Sent: Saturday, March 19, 2011 3:22 AM
+> To: Russell King; David Brown; Daniel Walker; Bryan Huntsman
+> Cc: Brian Swetland; Dima Zavin; Rebecca Schultz Zavin; Colin Cross; linux-
+> fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-arm-
+> msm at vger.kernel.org; linux-kernel at vger.kernel.org; Carl Vanderlip
+> Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
+> 
+> From: Brian Swetland <swetland@google.com>
+> 
+> Trivial fix
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   42 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+The Subject line states that you are only changing a typo from mpd to mdp.
+The description doesn't state anything more.
+But the patch is changing Copyright info also.
+> 
+> Authors:
+> Dima Zavin <dima@android.com>
+> Rebecca Schultz Zavin <rebecca@android.com>
+> Colin Cross <ccross@android.com>
+> 
+> Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/include/mach/msm_fb.h |    2 +-
+>  drivers/video/msm/mdp.c                 |    8 ++++----
+>  drivers/video/msm/mdp_ppp.c             |   10 +++++-----
+>  drivers/video/msm/msm_fb.c              |    1 -
+>  4 files changed, 10 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/include/mach/msm_fb.h b/arch/arm/mach-
+> msm/include/mach/msm_fb.h
+> index 1f4fc81..da11719 100644
+> --- a/arch/arm/mach-msm/include/mach/msm_fb.h
+> +++ b/arch/arm/mach-msm/include/mach/msm_fb.h
+> @@ -114,7 +114,7 @@ struct mdp_blit_req;
+>  struct fb_info;
+>  struct mdp_device {
+>  	struct device dev;
+> -	void (*dma)(struct mdp_device *mpd, uint32_t addr,
+> +	void (*dma)(struct mdp_device *mdp, uint32_t addr,
+>  		    uint32_t stride, uint32_t w, uint32_t h, uint32_t x,
+>  		    uint32_t y, struct msmfb_callback *callback, int
+> interface);
+>  	void (*dma_wait)(struct mdp_device *mdp);
+> diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
+> index c3636d5..45af97d 100644
+> --- a/drivers/video/msm/mdp.c
+> +++ b/drivers/video/msm/mdp.c
+> @@ -2,7 +2,7 @@
+>   *
+>   * MSM MDP Interface (used by framebuffer core)
+>   *
+> - * Copyright (C) 2007 QUALCOMM Incorporated
+> + * Copyright (C) 2007, 2011 Code Aurora Forum. All rights reserved.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index f315cd0..534ad14 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -19,13 +19,31 @@
- #include <linux/slab.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
-+#include <linux/mmc/mmc.h>
-+#include <linux/mmc/sdio.h>
- #include <mach/hardware.h>
- #include <mach/esdhc.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
- 
-+/* VENDOR SPEC register */
-+#define SDHCI_VENDOR_SPEC		0xC0
-+#define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-+/*
-+ * The CMDTYPE of the CMD register (offset 0xE) should be set to
-+ * "11" when the STOP CMD12 is issued on imx53 to abort one
-+ * open ended multi-blk IO. Otherwise the TC INT wouldn't
-+ * be generated.
-+ * In exact block transfer, the controller doesn't complete the
-+ * operations automatically as required@the end of the
-+ * transfer and remains on hold if the abort command is not sent.
-+ * As a result, the TC flag is not asserted and SW  received timeout
-+ * exeception. Bit1 of Vendor Spec registor is used to fix it.
-+ */
-+#define ESDHC_FLAG_MULTIBLK_NO_INT	(1 << 1)
- 
- struct pltfm_imx_data {
- 	int flags;
-@@ -80,6 +98,15 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 		 */
- 		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
- 
-+	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (reg == SDHCI_INT_STATUS)
-+				&& (val & SDHCI_INT_DATA_END))) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v &= ~SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+	}
-+
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -103,9 +130,21 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		 * Postpone this write, we must do it together with a
- 		 * command write that is down below.
- 		 */
-+		if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
-+				&& (host->cmd->data->blocks > 1)
-+				&& (host->cmd->data->flags & MMC_DATA_READ)) {
-+			u32 v;
-+			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-+			v |= SDHCI_VENDOR_SPEC_SDIO_QUIRK;
-+			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-+		}
- 		imx_data->scratchpad = val;
- 		return;
- 	case SDHCI_COMMAND:
-+		if ((host->cmd->opcode == MMC_STOP_TRANSMISSION)
-+			&& (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
-+			val |= SDHCI_CMD_ABORTCMD;
- 		writel(val << 16 | imx_data->scratchpad,
- 			host->ioaddr + SDHCI_TRANSFER_MODE);
- 		return;
-@@ -213,6 +252,9 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
- 	}
- 
-+	if (!(cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()))
-+		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
-+
- 	if (boarddata) {
- 		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
- 		if (err) {
--- 
-1.7.1
+It is a change from 2007 to 2011 and the company name is being changed.
+I think it should be mentioned in the Subject/Description.
+
+>   * Copyright (C) 2007 Google Incorporated
+>   *
+>   * This software is licensed under the terms of the GNU General Public
+> @@ -288,7 +288,7 @@ int mdp_blit(struct mdp_device *mdp_dev, struct
+> fb_info *fb,
+>  	/* WORKAROUND FOR HARDWARE BUG IN BG TILE FETCH */
+>  	if (unlikely(req->src_rect.h == 0 ||
+>  		     req->src_rect.w == 0)) {
+> -		printk(KERN_ERR "mpd_ppp: src img of zero size!\n");
+> +		printk(KERN_ERR "mdp_ppp: src img of zero size!\n");
+>  		return -EINVAL;
+>  	}
+>  	if (unlikely(req->dst_rect.h == 0 ||
+> @@ -298,13 +298,13 @@ int mdp_blit(struct mdp_device *mdp_dev, struct
+> fb_info *fb,
+>  	/* do this first so that if this fails, the caller can always
+>  	 * safely call put_img */
+>  	if (unlikely(get_img(&req->src, fb, &src_start, &src_len,
+> &src_file))) {
+> -		printk(KERN_ERR "mpd_ppp: could not retrieve src image from "
+> +		printk(KERN_ERR "mdp_ppp: could not retrieve src image from "
+>  				"memory\n");
+>  		return -EINVAL;
+>  	}
+> 
+>  	if (unlikely(get_img(&req->dst, fb, &dst_start, &dst_len,
+> &dst_file))) {
+> -		printk(KERN_ERR "mpd_ppp: could not retrieve dst image from "
+> +		printk(KERN_ERR "mdp_ppp: could not retrieve dst image from "
+>  				"memory\n");
+>  		return -EINVAL;
+>  	}
+> diff --git a/drivers/video/msm/mdp_ppp.c b/drivers/video/msm/mdp_ppp.c
+> index 4ff001f..2b04027 100644
+> --- a/drivers/video/msm/mdp_ppp.c
+> +++ b/drivers/video/msm/mdp_ppp.c
+> @@ -1,6 +1,6 @@
+>  /* drivers/video/msm/mdp_ppp.c
+>   *
+> - * Copyright (C) 2007 QUALCOMM Incorporated
+> + * Copyright (C) 2007, 2011 Code Aurora Forum. All rights reserved.
+
+Same here.
+
+>   * Copyright (C) 2007 Google Incorporated
+>   *
+>   * This software is licensed under the terms of the GNU General Public
+> @@ -650,7 +650,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
+> mdp_blit_req *req,
+> 
+>  	if (unlikely(req->src.format >= MDP_IMGTYPE_LIMIT ||
+>  		     req->dst.format >= MDP_IMGTYPE_LIMIT)) {
+> -		printk(KERN_ERR "mpd_ppp: img is of wrong format\n");
+> +		printk(KERN_ERR "mdp_ppp: img is of wrong format\n");
+>  		return -EINVAL;
+>  	}
+> 
+> @@ -658,7 +658,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
+> mdp_blit_req *req,
+>  		     req->src_rect.y > req->src.height ||
+>  		     req->dst_rect.x > req->dst.width ||
+>  		     req->dst_rect.y > req->dst.height)) {
+> -		printk(KERN_ERR "mpd_ppp: img rect is outside of img!\n");
+> +		printk(KERN_ERR "mdp_ppp: img rect is outside of img!\n");
+>  		return -EINVAL;
+>  	}
+> 
+> @@ -694,7 +694,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
+> mdp_blit_req *req,
+> 
+>  	if (!valid_src_dst(src_start, src_len, dst_start, dst_len, req,
+>  			   &regs)) {
+> -		printk(KERN_ERR "mpd_ppp: final src or dst location is "
+> +		printk(KERN_ERR "mdp_ppp: final src or dst location is "
+>  			"invalid, are you trying to make an image too large "
+>  			"or to place it outside the screen?\n");
+>  		return -EINVAL;
+> @@ -708,7 +708,7 @@ int mdp_ppp_blit(const struct mdp_info *mdp, struct
+> mdp_blit_req *req,
+>  		regs.op |= PPP_OP_DITHER_EN;
+>  	blit_blend(req, &regs);
+>  	if (blit_scale(mdp, req, &regs)) {
+> -		printk(KERN_ERR "mpd_ppp: error computing scale for img.\n");
+> +		printk(KERN_ERR "mdp_ppp: error computing scale for img.\n");
+>  		return -EINVAL;
+>  	}
+>  	blit_blur(mdp, req, &regs);
+> diff --git a/drivers/video/msm/msm_fb.c b/drivers/video/msm/msm_fb.c
+> index 5436aeb..04d0067 100644
+> --- a/drivers/video/msm/msm_fb.c
+> +++ b/drivers/video/msm/msm_fb.c
+> @@ -321,7 +321,6 @@ error:
+>  	mutex_unlock(&msmfb->panel_init_lock);
+>  }
+> 
+> -
+>  static int msmfb_check_var(struct fb_var_screeninfo *var, struct fb_info
+> *info)
+>  {
+>  	if ((var->xres != info->var.xres) ||
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
