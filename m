@@ -1,25 +1,56 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 21 Mar 2011 16:54:23 +0530
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <4D870A59.9050004@acn-group.ch>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-	<4D5BDA3D.5080905@acn-group.ch>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
-	<4D749A09.8050101@acn-group.ch>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C0E5EC7@dbde02.ent.ti.com>
-	<4D762FEB.3010003@acn-group.ch> <4D870A59.9050004@acn-group.ch>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370B2BA32@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Mar 2011 11:40:52 -0000
+Subject: Build warning in todays linus/master
+In-Reply-To: <20110321110105.GB2610@pulham.picochip.com>
+References: <20110321110105.GB2610@pulham.picochip.com>
+Message-ID: <002101cbe7bc$d547c6f0$7fd754d0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 21, 2011 1:51 PM, Christophe Aeschlimann wrote:
-[...]
-> In this end it was a HW issue.
-> 
-> Problem solved.
-> 
+Hi Jamie,
 
-If you don't mind, can you please elaborate on what the h/w issue was and how you fixed it?
+> I'm getting a build warning on todays master build for my V6K platform:
+> 
+>   CC      arch/arm/mm/mmu.o
+> arch/arm/mm/mmu.c: In function 'create_36bit_mapping':
+> arch/arm/mm/mmu.c:601:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> 2 has type 'unsigned int'
+> arch/arm/mm/mmu.c:614:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> 2 has type 'unsigned int'
+> arch/arm/mm/mmu.c:621:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> 2 has type 'unsigned int'
+> arch/arm/mm/mmu.c: In function 'create_mapping':
+> arch/arm/mm/mmu.c:662:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> 2 has type 'unsigned int'
+> arch/arm/mm/mmu.c:670:10: warning: format '%08llx' expects type 'long long unsigned int', but argument
+> 2 has type 'unsigned int'
+> arch/arm/mm/mmu.c:690:10: warning: format '%08lx' expects type 'long unsigned int', but argument 2 has
+> type 'unsigned int'
+> 
+> Which is introduced by (3a6b16 [ARM: 6675/1: use phys_addr_t instead of
+> unsigned long in conversion code]), because phys_addr_t is a u32
+> (!CONFIG_PHYS_ADDR_T_64BIT).  I guess a cast to u64 in the printk()'s in
+> arch/arm/mm/mmu.c would fix these up, is that the right approach?
 
-Regards,
-Vaibhav
+It looks like one of the LPAE preparation patches has been merged
+(i.e. the one which replaces unsigned long with phys_addr_t) but the
+conversion specifier fixes are not yet in mainline, although they do
+live in -next.
+
+It's unfortunate that this generates warnings but I don't think you
+can avoid the ordering requirements of these patches.
+
+For now, you could try cherry-picking the rest of that patch series
+from -next:
+
+ad6b9c9 ARM: 6671/1: LPAE: use phys_addr_t instead of unsigned long in outercache functions
+cae6292 ARM: 6672/1: LPAE: use phys_addr_t instead of unsigned long in mapping functions
+f60892d ARM: 6673/1: LPAE: use phys_addr_t instead of unsigned long for start of membanks
+29a3819 ARM: 6674/1: LPAE: use long long format when printing physical addresses and ptes
+
+These are all in Russell's -devel branch so hopefully they'll find their
+way upstream soon.
+
+Thanks for spotting this,
+
+Will
