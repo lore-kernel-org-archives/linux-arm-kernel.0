@@ -1,96 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 21 Mar 2011 11:33:50 -0700
-Subject: [PATCHv2 4/4] msm: scm: Get cacheline size from CTR
-Message-ID: <1300732430-13189-1-git-send-email-sboyd@codeaurora.org>
+From: bones@secretlab.ca (John Bonesio)
+Date: Mon, 21 Mar 2011 11:36:56 -0700
+Subject: [PATCH] ARM:boot:device tree: Allow the device tree binary to
+	be appended to zImage
+In-Reply-To: <alpine.LFD.2.00.1103211413560.11889@xanadu.home>
+References: <20110309215800.26377.43925.stgit@riker>
+	<alpine.LFD.2.00.1103171422500.26889@xanadu.home>
+	<4D878C63.6080205@secretlab.ca>
+	<alpine.LFD.2.00.1103211413560.11889@xanadu.home>
+Message-ID: <4D879AC8.9080901@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding the cacheline size as 32, get the cacheline
-size from the CTR register. Use an early_initcall because
-scm_call() is used to boot the secondary CPUs.
+Comments below.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+- John
 
-Changes since v1:
- * Use an early_initcall to get cacheline size (tglx)
- * Pull the end assignment out of the for loop
+On 03/21/2011 11:22 AM, Nicolas Pitre wrote:
+> On Mon, 21 Mar 2011, John Bonesio wrote:
+> 
+>> Hi Nicolas,
+>>
+>> Thanks for the comments. I have a question (below).
+>>
+> [...]
 
- arch/arm/mach-msm/scm.c |   26 ++++++++++++++++++++------
- 1 files changed, 20 insertions(+), 6 deletions(-)
+[snip]
 
-diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-index cfa808d..3103f3a 100644
---- a/arch/arm/mach-msm/scm.c
-+++ b/arch/arm/mach-msm/scm.c
-@@ -21,14 +21,12 @@
- #include <linux/mutex.h>
- #include <linux/errno.h>
- #include <linux/err.h>
-+#include <linux/init.h>
- 
- #include <asm/cacheflush.h>
- 
- #include "scm.h"
- 
--/* Cache line size for msm8x60 */
--#define CACHELINESIZE 32
--
- #define SCM_ENOMEM		-5
- #define SCM_EOPNOTSUPP		-4
- #define SCM_EINVAL_ADDR		-3
-@@ -207,6 +205,8 @@ static int __scm_call(const struct scm_command *cmd)
- 	return ret;
- }
- 
-+static u32 cacheline_size;
-+
- /**
-  * scm_call() - Send an SCM command
-  * @svc_id: service identifier
-@@ -224,6 +224,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
- 	int ret;
- 	struct scm_command *cmd;
- 	struct scm_response *rsp;
-+	u32 end;
- 
- 	cmd = alloc_scm_command(cmd_len, resp_len);
- 	if (!cmd)
-@@ -240,14 +241,16 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
- 		goto out;
- 
- 	rsp = scm_command_to_response(cmd);
-+	end = (u32)scm_get_response_buffer(rsp) + resp_len;
-+
- 	do {
- 		u32 start = (u32)rsp;
--		u32 end = (u32)scm_get_response_buffer(rsp) + resp_len;
--		start &= ~(CACHELINESIZE - 1);
-+		start &= ~(cacheline_size - 1);
-+
- 		while (start < end) {
- 			asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
- 			     : "memory");
--			start += CACHELINESIZE;
-+			start += cacheline_size;
- 		}
- 	} while (!rsp->is_complete);
- 
-@@ -291,3 +294,14 @@ u32 scm_get_version(void)
- 	return version;
- }
- EXPORT_SYMBOL(scm_get_version);
-+
-+static int __init scm_init(void)
-+{
-+	u32 ctr;
-+
-+	asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-+	cacheline_size =  4 << ((ctr >> 16) & 0xf);
-+
-+	return 0;
-+}
-+early_initcall(scm_init);
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>>>
+>>> Now if no dtb was found, or if that code is not configured, then lr 
+>>> contains garbage and that may have random consequences with the code 
+>>> that follows, which would explain the reported bad behaviors with this 
+>>> patch applied even if not configured in the kernel.
+>>
+>> I'm probably not understanding something here. When I look at the code
+>> prior to my patch, it looks like lr is not initialized by head.S.
+> 
+> Exact.
+> 
+>> It also looks like this code makes use of lr when it relocates the 
+>> code and leaves it uninitialized when it jumps back to 'restart'.
+> 
+> Exact.
+> 
+>> Is this a bug in the previous code too?
+> 
+> No.
+> 
+>> What should lr be initialized to, or should we just be preserving it's
+>> value?
+> 
+> No.  The problem is that you do use lr further down in your patch when 
+> adjusting GOT entries, assuming it contains the size of the dtb.  If no 
+> DTB is found then lr contains random stuff that will mess up the GOT for 
+> .bss references.
+
+Oh! Good catch. Thanks.
+
+> 
+>> I saw the comment about the performance is different with this patch -
+>> something about a pause between 'Uncompressing Linux...' and the kernel
+>> boot output. I'm not sure what's going on here. By the time
+>> 'Uncompressing Linux...' comes out all relocations and dtb discovery is
+>> complete. Do you really think having lr uninitialized would cause this?
+> 
+> Certainly.  See above.
+> 
+> 
+> Nicolas
