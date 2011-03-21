@@ -1,43 +1,117 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Mar 2011 12:36:55 +0000
-Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <20110124214225.GO24104@n2100.arm.linux.org.uk>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
-	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
-	<20110124214225.GO24104@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikH9tBTGCiJ-+dvhh1tajMVq_6ua41MMZmq48sC@mail.gmail.com>
+From: helmut.raiger@hale.at (Helmut Raiger)
+Date: Mon, 21 Mar 2011 13:54:01 +0100
+Subject: i.MX31 suspend and VSTBY question
+Message-ID: <4D874A69.9010209@hale.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
+     I'm currently testing 'suspend to memory' on our i.MX31 platform, 
+therefore I created a file named pm-imx31.c in arch/arm/plat-mxc. It 
+contains some debugging code for the PMIC registers, that was hacked 
+into mc13xxx_core.c.
 
-On 24 January 2011 21:42, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 25, 2011 at 08:26:42AM +1100, Nick Piggin wrote:
->> Too bad about the PAE thing; my condolences.
->>
->>
->> On Tue, Jan 25, 2011 at 4:55 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > This patch introduces the pgtable-3level*.h files with definitions
->> > specific to the LPAE page table format (3 levels of page tables).
->>
->> Seeing as you're shaking up these definitions, what do you think about
->> switching from 4level-fixup.h to pgtable-nopud.h / pgtable-nopmd.h headers?
->> One day eventually it would be nice to get rid of the fixup mode.
->
-> I have patches to do this which I de-queued for the last merge window.
-> It's not entirely trivial and without problem. ?You can find the patches
-> in linux-next now.
->
-> I was waiting for the new set of patches from Catalin before going back
-> and working out the solutions to some of those problems.
+------------------- snip: pm-imx31.c --------------------------
 
-Any plans for the nopmd patches? I haven't seen them in -next or on the list.
+#include <linux/kernel.h>
+#include <linux/err.h>
+#include <linux/suspend.h>
+#include <linux/regulator/machine.h>
 
-Thanks.
+#include <mach/system.h>
+// HACK
+#include "../mach-mx3/crm_regs.h"
 
--- 
-Catalin
+extern void mc13xxx_dump_registers(void);
+
+static void mxc_modify_reg(void *reg_offset, unsigned int mask,
+                         unsigned int data)
+{
+     u32 reg;
+
+     reg = __raw_readl(reg_offset);
+     reg = (reg & (~mask)) | data;
+     __raw_writel(reg, reg_offset);
+}
+
+static int mx31_suspend_prepare(void)
+{
+#ifdef CONFIG_PM_DEBUG
+     mc13xxx_dump_registers();
+#endif
+     return 0;
+}
+
+static int mx31_suspend_enter(suspend_state_t state)
+{
+     unsigned long *reg;
+
+     switch (state) {
+     case PM_SUSPEND_MEM:
+         /* TODO: Enable Well Bias, disable core clock in standby */
+         mxc_modify_reg(MXC_CCM_CCMR,
+                 MXC_CCM_CCMR_WBEN | MXC_CCM_CCMR_SBYCS,
+                 MXC_CCM_CCMR_SBYCS);
+
+         mxc_modify_reg(MXC_CCM_CCMR,
+                 MXC_CCM_CCMR_LPM_MASK,
+                 2 << MXC_CCM_CCMR_LPM_OFFSET);
+
+         /* enable VSTBY signalling */
+         mxc_modify_reg(MXC_CCM_CCMR, MXC_CCM_CCMR_VSTBY, 
+MXC_CCM_CCMR_VSTBY);
+
+         printk(KERN_INFO "Now supsending! CCMR=0x%x\n", 
+__raw_readl(MXC_CCM_CCMR));
+
+         for (reg = MXC_CCM_CCMR; reg <= MXC_CCM_PDR2; reg++)
+             printk(KERN_INFO "0x%p: 0x%08lx\n", reg, *reg);
+
+         arch_idle();
+
+         printk(KERN_INFO "Now resuming\n");
+         break;
+     default:
+         return -EINVAL;
+     }
+     return 0;
+}
+
+static void mx31_resume_done(void)
+{
+#ifdef CONFIG_PM_DEBUG
+     mc13xxx_dump_registers();
+#endif
+
+}
+
+struct platform_suspend_ops mx31_suspend_ops = {
+       .valid = suspend_valid_only_mem,
+       .prepare = mx31_suspend_prepare,
+       .enter = mx31_suspend_enter,
+       .end = mx31_resume_done,
+};
+
+static int __init mx31_pm_init(void)
+{
+       printk(KERN_INFO "Power Management for Freescale MX31\n");
+       suspend_set_ops(&mx31_suspend_ops);
+
+       return 0;
+}
+
+------------------- snip --------------------------
+
+'echo mem >/sys/power/state' does what is expected, however the VSTBY 
+line is not asserted.
+
+We had this platform running with a 2.6.21 LTIB based kernel. When I use 
+this image (hardly comparable)  the signal appears as expected. I'm 
+running out of ideas, so any pointers would be very much appreciated.
+
+Helmut
+
+
+
+--
+Scanned by MailScanner.
