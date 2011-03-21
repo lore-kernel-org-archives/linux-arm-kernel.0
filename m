@@ -1,27 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Mar 2011 12:56:06 +0000
-Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <AANLkTikH9tBTGCiJ-+dvhh1tajMVq_6ua41MMZmq48sC@mail.gmail.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
-	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
-	<20110124214225.GO24104@n2100.arm.linux.org.uk>
-	<AANLkTikH9tBTGCiJ-+dvhh1tajMVq_6ua41MMZmq48sC@mail.gmail.com>
-Message-ID: <20110321125606.GC22222@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 21 Mar 2011 14:06:30 +0100
+Subject: [PATCH V7 3/4] mmc: sdhci-esdhc: make the writel/readl as the
+	general APIs
+In-Reply-To: <1300684936-8218-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1300684936-8218-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1300684936-8218-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20110321130630.GF9686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2011 at 12:36:55PM +0000, Catalin Marinas wrote:
-> Any plans for the nopmd patches? I haven't seen them in -next or on the list.
+On Mon, Mar 21, 2011 at 01:22:15PM +0800, Richard Zhu wrote:
+> Add one flag to indicate the GPIO CD/WP is enabled or not
+> on imx platforms, and reuse the writel/readl as the general
+> APIs for imx SOCs.
+> 
+> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
 
-I dropped them again because of those pesky warnings, so again I'm not
-planning to push them this window as I don't wish to be deluged in
-people reporting the warnings.
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-They really need fixing once we know how the LPAE stuff interacts with
-the change.  At the moment I've no idea whether the existing section
-support ends up at pgd or pmd level with LPAE.
+Thanks!
 
-Obviously that matters as with LPAE, pgd and pmd are different hardware
-levels, but without LPAE they're the same hardware level.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110321/5fc91d21/attachment-0001.sig>
