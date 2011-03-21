@@ -1,60 +1,68 @@
-From: mnalajal@codeaurora.org (Murali Nalajala)
-Date: Mon, 21 Mar 2011 13:28:50 +0530
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <1300691551.2761.8.camel@localhost>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>	
-	<1299570622.2754.4.camel@localhost>
-	<4D766A2F.9080001@codeaurora.org>	
-	<4D86F295.8040409@codeaurora.org>
-	<1300691551.2761.8.camel@localhost>
-Message-ID: <4D87053A.70701@codeaurora.org>
+From: julia@diku.dk (Julia Lawall)
+Date: Mon, 21 Mar 2011 09:01:12 +0100 (CET)
+Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
+In-Reply-To: <AANLkTi=NSKcj7MYFE=xPj=Am=OxydXdOUEk8XJJyUCpC@mail.gmail.com>
+References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
+	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
+	<20110315090656.GC13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151039030.11859@ask.diku.dk>
+	<20110315094946.GD13316@pengutronix.de>
+	<Pine.LNX.4.64.1103151113420.8560@pc-004.diku.dk>
+	<AANLkTi=NSKcj7MYFE=xPj=Am=OxydXdOUEk8XJJyUCpC@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1103210900080.4323@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/21/2011 12:42 PM, Artem Bityutskiy wrote:
-> On Mon, 2011-03-21 at 12:09 +0530, Murali Nalajala wrote:
->> On 3/8/2011 11:11 PM, Murali Nalajala wrote:
->>> On 3/8/2011 12:50 AM, Artem Bityutskiy wrote:
->>>> On Tue, 2011-03-08 at 05:38 +0530, Murali Nalajala wrote:
->>>>> Lets non-standard NAND drivers take advantage of known NAND
->>>>> chip information.
->>>>>
->>>>> The initial development of msm nand driver, driver uses the supported
->>>>> NAND devices information as a hardcoded table. Remove the existing
->>>>> hardcoded supported flash device table and read the flash device
->>>>> information from the flash id table which are part of the mtd subsystem.
->>>>
->>>> Why this initial version should be upstream? Why wouldn't you make it
->>>> "standard" first?
->>>>
->>>
->>> Currently we are not fully using the MTD nand subsystem. That's the
->>> intention author has introduced "non-standard" here!!!
->>>
->>> Thanks,
->>> Murali N
->>>
->>
->> Any reviews comments on this change?
->
-> No, I think you should "sell" your driver better than that. Indeed,
->
-> Q: "Why this initial version should be upstream? Why wouldn't you make
-> it "standard" first?"
-> A: Currently we are not fully using the MTD nand subsystem. That's the
-> intention author has introduced "non-standard" here!!!
->
+On Mon, 21 Mar 2011, Grant Likely wrote:
 
-The driver (msm_nand.c) is in align to MTD specification.
-But this commit text is bit misleading, initially the driver
-didn't make use of nand flash devices information from the
-flash id table which are part of the MTD subsystem. Hence
-we have enabled this config option to make use of it.
+> 2011/3/15 Julia Lawall <julia@diku.dk>:
+> > On Tue, 15 Mar 2011, Uwe Kleine-K?nig wrote:
+> >
+> >> On Tue, Mar 15, 2011 at 10:41:37AM +0100, Julia Lawall wrote:
+> >> > I tried the following
+> >> >
+> >> > @@
+> >> > expression E1,E2;
+> >> > @@
+> >> >
+> >> > ? ? ? gpio_direction_output(E1,E2);
+> >> > ? ? ? ...
+> >> > - ? ? gpio_set_value(E1,E2);
+> >> >
+> >> > and found occurrences in 15 files. ?In some cases there seems to be some
+> >> > delay before the call to gpio_set_value. ?Does that have any impacton
+> >> > whether it is needed?
+> >> gpio_direction_output(E1,E2) implies gpio_set_value(E1,E2), so unless
+> >> there is a gpio_set_value(E1,!E2) before gpio_set_value(E1,E2) is a
+> >> noop.
+> >>
+> >> I still don't know how to work with coccinelle, so if you point me to a
+> >> concrete location I can be more specific.
+> >
+> > OK. ?I have changed the semantic patch to the following:
+> >
+> > @@
+> > expression E1,E2,E3;
+> > @@
+> >
+> > ? ? ?gpio_direction_output(E1,E2);
+> > ? ? ?... when != gpio_set_value(E1,E3)
+> > - ? ? gpio_set_value(E1,E2);
+> >
+> > Now it doesn't do all the cases where there is an earlier set ofr some
+> > other value. ?The patch I obtain is below. ?This only concerns 5 files.
+> > I haven't checked the result at all.
+> >
+> > julia
+> 
+> Hi Julia,
+> 
+> Similar to my other reply, even though this patch is much smaller, I'm
+> not particularly excited about changing all the drivers wholesale
+> unless someone with hardware can give it a test.
 
-Thanks,
-Murali N
+I wasn't proposing either as an actual patch.  Only as a way to see what 
+the actual code looks like and what issues should be taken into account.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+thanks,
+julia
