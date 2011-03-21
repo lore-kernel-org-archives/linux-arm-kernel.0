@@ -1,32 +1,38 @@
-From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon, 21 Mar 2011 15:36:50 +0100
-Subject: Enable UART3 on TX28
-Message-ID: <1300718213-9908-1-git-send-email-LW@KARO-electronics.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Mar 2011 14:54:34 +0000
+Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
+In-Reply-To: <AANLkTimGBGNdBa2NzYDTOXxNF-1MgOOC502a-ATfNoBA@mail.gmail.com>
+References: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+	<AANLkTimGBGNdBa2NzYDTOXxNF-1MgOOC502a-ATfNoBA@mail.gmail.com>
+Message-ID: <20110321145434.GB4340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+	/* UART3 */
-+	MX28_PAD_AUART3_RX__AUART3_RX,
-+	MX28_PAD_AUART3_TX__AUART3_TX,
-+	MX28_PAD_AUART3_RTS__AUART3_RTS,
-+	MX28_PAD_AUART3_CTS__AUART3_CTS,
-+
- 	/* CAN */
- 	MX28_PAD_GPMI_RDY2__CAN0_TX,
- 	MX28_PAD_GPMI_RDY3__CAN0_RX,
-@@ -322,6 +328,7 @@
- 
- 	mx28_add_duart(); /* UART1 */
- 	mx28_add_auart(1); /* UART2 */
-+	mx28_add_auart(3); /* UART3 */
- 
- 	tx28_add_fec0();
- 	/* spi via ssp will be added when available */
-@@ -343,6 +350,7 @@
- 
- 	mx28_add_duart(); /* UART1 */
- 	mx28_add_auart(1); /* UART2 */
-+	mx28_add_auart(3); /* UART3 */
- 
- 	tx28_add_fec0();
- 	/* spi via ssp will be added later */
+On Mon, Mar 21, 2011 at 03:21:24PM +0800, Eric Miao wrote:
+> Hrm... checked again. The IXP4xx build regression seems to have been fixed
+> by the below commits:
+> 
+> 88a5810 ARM: fix IXP4xx build failure
+> 710224f arm: fix "arm: fix pci_set_consistent_dma_mask for dmabounce devices"
+
+Annoyingly, no one reported what the actual error messages with IXP4xx
+were, so we can only guess at this point.
+
+Eric's patch (4fa5518) did this:
+
++#ifdef CONFIG_SA1111
+ extern int dma_needs_bounce(struct device*, dma_addr_t, size_t);
++#else
++static inline int dma_needs_bounce(struct device *dev, dma_addr_t addr,
++                                  size_t size)
++{
++       return 0;
++}
++#endif
+
+which assumes that SA1111 is the _only_ user of the dma_needs_bounce()
+function.  This is incorrect as IXP4xx also has an implementation.
+
+So, reapplying the original patch will immediately reintroduce the
+IXP4xx build failure as we end up with two functions called
+dma_needs_bounce().
