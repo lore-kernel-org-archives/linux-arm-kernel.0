@@ -1,176 +1,144 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Mon, 21 Mar 2011 16:30:37 -0500
-Subject: [PATCHv5 3/4] ARM: mx51: Implement code to allow mx51 to enter WFI
-In-Reply-To: <1300743038-3901-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1300743038-3901-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1300743038-3901-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1300743038-3901-3-git-send-email-Dinh.Nguyen@freescale.com>
+From: bones@secretlab.ca (John Bonesio)
+Date: Mon, 21 Mar 2011 15:19:45 -0700
+Subject: [PATCH v2] ARM:boot:device tree: Allow the device tree binary to be
+	appended to zImage
+Message-ID: <20110321221930.19756.36549.stgit@riker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+This patch provides the ability to boot using a device tree that is appended
+to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
 
-Implement code for MX51 that allows the SoC to enter WFI when
-arch_idle is called.
-
-This patch is also necessary for correctly suspending the system.
-
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Signed-off-by: John Bonesio <bones@secretlab.ca>
 ---
- arch/arm/mach-mx5/Makefile              |    2 +-
- arch/arm/mach-mx5/system.c              |   85 +++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mxc.h    |    9 +++
- arch/arm/plat-mxc/include/mach/system.h |    6 ++-
- 4 files changed, 100 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-mx5/system.c
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 4f63048..0b9338c 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -3,7 +3,7 @@
- #
+ arch/arm/Kconfig                |    7 ++++
+ arch/arm/boot/compressed/head.S |   78 ++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 82 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 92bae09..3556aea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1651,6 +1651,13 @@ config ZBOOT_ROM
+ 	  Say Y here if you intend to execute your compressed kernel image
+ 	  (zImage) directly from ROM or flash.  If unsure, say N.
  
- # Object file lists.
--obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o
-+obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
- obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
- 
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
-diff --git a/arch/arm/mach-mx5/system.c b/arch/arm/mach-mx5/system.c
-new file mode 100644
-index 0000000..f09c17f
---- /dev/null
-+++ b/arch/arm/mach-mx5/system.c
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
++config ARM_APPENDED_DTB
++	bool "Use appended device tree blob"
++	depends on OF && !ZBOOT_ROM
++	help
++	  With this option, the boot code will look for a device tree binary
++	  (dtb) appended to zImage.
 +
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <mach/hardware.h>
-+#include "crm_regs.h"
-+
-+/* set cpu low power mode before WFI instruction. This function is called
-+  * mx5 because it can be used for mx50, mx51, and mx53.*/
-+void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
-+{
-+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-+	u32 empgc0, empgc1;
-+	int stop_mode = 0;
-+
-+	/* always allow platform to issue a deep sleep mode request */
-+	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-+	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
-+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
-+	empgc0 = __raw_readl(MXC_SRPG_EMPGC0_SRPGCR) & ~(MXC_SRPGCR_PCR);
-+	empgc1 = __raw_readl(MXC_SRPG_EMPGC1_SRPGCR) & ~(MXC_SRPGCR_PCR);
-+
-+	switch (mode) {
-+	case WAIT_CLOCKED:
-+		break;
-+	case WAIT_UNCLOCKED:
-+		ccm_clpcr |= 0x1 << MXC_CCM_CLPCR_LPM_OFFSET;
-+		break;
-+	case WAIT_UNCLOCKED_POWER_OFF:
-+	case STOP_POWER_OFF:
-+		plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-+			    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-+		if (mode == WAIT_UNCLOCKED_POWER_OFF) {
-+			ccm_clpcr |= 0x1 << MXC_CCM_CLPCR_LPM_OFFSET;
-+			ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-+			ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-+			stop_mode = 0;
-+		} else {
-+			ccm_clpcr |= 0x2 << MXC_CCM_CLPCR_LPM_OFFSET;
-+			ccm_clpcr |= 0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET;
-+			ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-+			ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-+			stop_mode = 1;
-+		}
-+		arm_srpgcr |= MXC_SRPGCR_PCR;
-+
-+		if (tzic_enable_wake(1) != 0)
-+			return;
-+		break;
-+	case STOP_POWER_ON:
-+		ccm_clpcr |= 0x2 << MXC_CCM_CLPCR_LPM_OFFSET;
-+		break;
-+	default:
-+		printk(KERN_WARNING "UNKNOWN cpu power mode: %d\n", mode);
-+		return;
-+	}
-+
-+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-+
-+	/* Enable NEON SRPG for all but MX50TO1.0. */
-+	if (mx50_revision() != IMX_CHIP_REVISION_1_0)
-+		__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
-+
-+	if (stop_mode) {
-+		empgc0 |= MXC_SRPGCR_PCR;
-+		empgc1 |= MXC_SRPGCR_PCR;
-+
-+		__raw_writel(empgc0, MXC_SRPG_EMPGC0_SRPGCR);
-+		__raw_writel(empgc1, MXC_SRPG_EMPGC1_SRPGCR);
-+	}
-+}
-+
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index 7e07263..6c2a371 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -181,6 +181,15 @@ struct cpu_op {
- 	u32 cpu_rate;
- };
- 
-+int tzic_enable_wake(int is_idle);
-+enum mxc_cpu_pwr_mode {
-+	WAIT_CLOCKED,		/* wfi only */
-+	WAIT_UNCLOCKED,		/* WAIT */
-+	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
-+	STOP_POWER_ON,		/* just STOP */
-+	STOP_POWER_OFF,		/* STOP + SRPG */
-+};
-+
- extern struct cpu_op *(*get_cpu_op)(int *op);
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 200625c..4f8bd65 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -211,6 +211,61 @@ restart:	adr	r0, LC0
+ 		mov	r10, r6
  #endif
  
-diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-index 95be51b..0417da9 100644
---- a/arch/arm/plat-mxc/include/mach/system.h
-+++ b/arch/arm/plat-mxc/include/mach/system.h
-@@ -20,6 +20,8 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- 
-+extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
++		mov	lr, #0			@ init lr (dtb size) to 0
++#ifdef CONFIG_ARM_APPENDED_DTB
++/*
++ *   r0  = delta
++ *   r2  = BSS start
++ *   r3  = BSS end
++ *   r4  = final kernel address
++ *   r5  = start of this image
++ *   r6  = _edata
++ *   r7  = architecture ID
++ *   r8  = atags/device tree pointer
++ *   r9  = size of decompressed image
++ *   r10 = end of this image, including  bss/stack/malloc space if non XIP
++ *   r11 = GOT start
++ *   r12 = GOT end
++ *
++ * if there are device trees (dtb) appended to zImage, advance r10 so that the
++ * dtb data will get relocated along with the kernel if necessary.
++ */
 +
- static inline void arch_idle(void)
- {
- #ifdef CONFIG_ARCH_MXC91231
-@@ -54,7 +56,9 @@ static inline void arch_idle(void)
- 			"orr %0, %0, #0x00000004\n"
- 			"mcr p15, 0, %0, c1, c0, 0\n"
- 			: "=r" (reg));
--	} else
-+	} else if (cpu_is_mx51())
-+		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+	else
- 		cpu_do_idle();
- }
++		ldr	lr, [r6, #0]
++#ifndef __ARMEB__
++		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
++#else
++		ldr	r1, =0xd00dfeed
++#endif
++		cmp	lr, r1
++		mov	lr, #0			@ dtb not found, it's size is 0
++		bne	dtb_check_done
++
++		mov	r8, r6			@ use the appended device tree
++
++		/* Get the dtb's size */
++		ldr	lr, [r6, #4]
++
++#ifndef __ARMEB__
++		/* convert lr (dtb size) to little endian */
++		eor	r1, lr, lr, ror #16
++		bic	r1, r1, #0x00ff0000
++		mov	lr, lr, ror #8
++		eor	lr, lr, r1, lsr #8
++#endif
++		/*
++		 * dtb size rounded up to a multiple of 8 bytes so a
++		 * misaligned GOT entry doesn't cause the end of the
++		 * dtb binary to be overwritten.
++		 */
++		add	lr, lr, #7
++		bic	lr, lr, #7
++
++		add	r10, r10, lr
++		add	r6, r6, lr
++dtb_check_done:
++#endif
++
+ /*
+  * Check to see if we will overwrite ourselves.
+  *   r4  = final kernel address
+@@ -271,8 +326,9 @@ wont_overwrite:
+  *   r11 = GOT start
+  *   r12 = GOT end
+  *   sp  = stack pointer
++ *   lr  = appended dtb size (0 if not present)
+  */
+-		teq	r0, #0
++		orrs	r1, r0, lr
+ 		beq	not_relocated
+ 		add	r11, r11, r0
+ 		add	r12, r12, r0
+@@ -288,12 +344,28 @@ wont_overwrite:
  
--- 
-1.6.0.4
+ 		/*
+ 		 * Relocate all entries in the GOT table.
++		 * Bump bss entries to _edata + dtb size
+ 		 */
+ 1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
+-		add	r1, r1, r0		@ table.  This fixes up the
+-		str	r1, [r11], #4		@ C references.
++		add	r1, r1, r0		@ This fixes up C references
++		cmp	r1, r2			@ if entry >= bss_start &&
++		cmphs	r3, r1			@       bss_end > entry
++		addhi	r1, lr			@    entry += dtb size
++		str	r1, [r11], #4		@ next entry
+ 		cmp	r11, r12
+ 		blo	1b
++
++		/* bump our bss registers too */
++		add	r2, r2, lr
++		add	r3, r3, lr
++
++		/*
++		 * bump the stack pinter
++		 *
++ 		 * If the linker script changes so the stack is not after
++		 * the bss section, this code will be wrong.
++		 */
++		add	sp, sp, lr
+ #else
+ 
+ 		/*
