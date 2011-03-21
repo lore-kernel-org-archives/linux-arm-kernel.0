@@ -1,47 +1,94 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Mon, 21 Mar 2011 16:30:36 -0500
-Subject: [PATCHv5 2/4] ARM: mx51: Add entry for gpc_dvfs_clk
-In-Reply-To: <1300743038-3901-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1300743038-3901-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1300743038-3901-2-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Mon, 21 Mar 2011 16:30:35 -0500
+Subject: [PATCHv5 1/4] ARM: mx50: Add support to get the silicon revision
+Message-ID: <1300743038-3901-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-For MX51 SRPG, we need to turn on the GPC clock in order to set the
-SRPG registers.
+For MX50, the HW_ADADIG_DIGPROG register in the ANATOP module will
+have the correct silicon revision:
+
+Major       Minor   Description
+0x50        0x0     TO1.0
+0x50        0x1     TO1.1
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/cpu.c               |   39 +++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mx50.h |    4 +++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 652ace4..3eb1c6e 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -865,6 +865,13 @@ static struct clk aips_tz2_clk = {
- 	.disable = _clk_ccgr_disable_inwait,
- };
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index df46b5e..c205494 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -21,6 +21,7 @@
+ static int cpu_silicon_rev = -1;
  
-+static struct clk gpc_dvfs_clk = {
-+	.enable_reg = MXC_CCM_CCGR5,
-+	.enable_shift = MXC_CCM_CCGRx_CG12_OFFSET,
-+	.enable = _clk_ccgr_enable,
-+	.disable = _clk_ccgr_disable,
-+};
+ #define IIM_SREV 0x24
++#define MX50_HW_ADADIG_DIGPROG	0xB0
+ 
+ static int get_mx51_srev(void)
+ {
+@@ -107,6 +108,44 @@ int mx53_revision(void)
+ }
+ EXPORT_SYMBOL(mx53_revision);
+ 
++static int get_mx50_srev(void)
++{
++	void __iomem *anatop = ioremap(MX50_ANATOP_BASE_ADDR, SZ_8K);
++	u32 rev;
 +
- static struct clk gpt_32k_clk = {
- 	.id = 0,
- 	.parent = &ckil_clk,
-@@ -1448,6 +1455,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
- 	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
- 	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
-+	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
- };
++	if (!anatop) {
++		cpu_silicon_rev = -EINVAL;
++		return 0;
++	}
++
++	rev = readl(anatop + MX50_HW_ADADIG_DIGPROG);
++	rev &= 0xff;
++
++	iounmap(anatop);
++	if (rev == 0x0)
++		return IMX_CHIP_REVISION_1_0;
++	else if (rev == 0x1)
++		return IMX_CHIP_REVISION_1_1;
++	return 0;
++}
++
++/*
++ * Returns:
++ *	the silicon revision of the cpu
++ *	-EINVAL - not a mx50
++ */
++int mx50_revision(void)
++{
++	if (!cpu_is_mx50())
++		return -EINVAL;
++
++	if (cpu_silicon_rev == -1)
++		cpu_silicon_rev = get_mx50_srev();
++
++	return cpu_silicon_rev;
++}
++EXPORT_SYMBOL(mx50_revision);
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
+diff --git a/arch/arm/plat-mxc/include/mach/mx50.h b/arch/arm/plat-mxc/include/mach/mx50.h
+index aaec2a6..5f2da75 100644
+--- a/arch/arm/plat-mxc/include/mach/mx50.h
++++ b/arch/arm/plat-mxc/include/mach/mx50.h
+@@ -282,4 +282,8 @@
+ #define MX50_INT_APBHDMA_CHAN6	116
+ #define MX50_INT_APBHDMA_CHAN7	117
  
- static struct clk_lookup mx53_lookups[] = {
++#if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
++extern int mx50_revision(void);
++#endif
++
+ #endif /* ifndef __MACH_MX50_H__ */
 -- 
 1.6.0.4
