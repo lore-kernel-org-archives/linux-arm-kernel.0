@@ -1,52 +1,80 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 20 Mar 2011 23:12:29 -0700
-Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
-Message-ID: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 21 Mar 2011 14:38:18 +0800
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110316.131734.242138246.davem@davemloft.net>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<20110316.131734.242138246.davem@davemloft.net>
+Message-ID: <4D86F25A.7060405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric/Fujita/Russell,
-As i checked the "remove now unnecessary dma_needs_bounce()" patches
-of Eric, I found you were all involved. Due to compiling error of
-IXP4xx platforms, the patch was reverted by Russell in
-http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=commit;h=0485e18bc4112a3b548baa314c24bfbece4d156b
+On 3/17/2011 4:17 AM, David Miller :
+> From: Jamie Iles <jamie@jamieiles.com>
+> Date: Tue, 15 Mar 2011 10:14:47 +0000
+> 
+>> This patch series extends the Atmel MACB driver to support the Cadence
+>> GEM (Gigabit Ethernet MAC) to support 10/100 operation.  The GEM is
+>> based on the MACB block but has a few moved registers and bitfields.
+>> This patch series attempts to use the MACB accessors where block
+>> functionallity is identical and only overrides to GEM specific
+>> acccessors when needed.
+>>
+>> This has been runtested on a board with a Cadence GEM and compile tested
+>> for all at91 configurations and a number of avr32 configurations.
+>>
+>> Changes since v1:
+>> 	- AT91 now provides a fake "hclk" and "macb_clk" has been
+>> 	renamed to "pclk" to be consistent with AVR32.
+>> 	- Configurable GEM receive buffer size support has been added.
+>> 	- pr_foo() and dev_foo() have been converted to netdev_foo()
+>> 	where appropriate.
+>> 	- New conditional accessors (macb_or_gem_{read,write}l) have
+>> 	been introduced that do the conditional accesses dependent on
+>> 	macb/gem type.
+>> 	- GEM is now dynamically detected from the module ID rather than
+>> 	platform device name.
+>>
+>> Jean-Christophe, I haven't based this on your conditional clock patch as
+>> I wasn't sure what decision had been made on that and whether the
+>> at91/avr32 detection is reliable.
+> 
+> I'm happy to ACK this so you guys can merge this via one of the
+> ARM trees:
+> 
+> Acked-by: David S. Miller <davem@davemloft.net>
 
-But I think Eric's patch made much sense. dma_needs_bounce() is very
-ambiguous in the whole arm arch, if devices use dma_mask right,
-map_single() will decide whether it needs DMA bounce by the following
-logic:
-        if (dev->dma_mask) {
-                unsigned long mask = *dev->dma_mask;
-                unsigned long limit;
+I add my:
 
-                limit = (mask + 1) & ~mask;
-                if (limit && size > limit) {
-                        dev_err(dev, "DMA mapping too big (requested %#x "
-                                "mask %#Lx)\n", size, *dev->dma_mask);
-                        return ~0;
-                }
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-                /*
-                 * Figure out if we need to bounce from the DMA mask.
-                 */
-                needs_bounce = (dma_addr | (dma_addr + size - 1)) & ~mask;
-        }
+Now, tell me if we need to setup a git tree with this and make it handled by linux-next (we do not have for at91 yet)?
+or Russell can take the series in a "devel" branch?
 
-Basically, we don't need dma_needs_bounce() for all chips at all. For
-saa1111, it is needed only because a bug in the SoC.
-For  assabet and pfs168 machines, it gave a workaound by self-defined
-a dma_needs_bounce function.
-return ((machine_is_assabet() || machine_is_pfs168()) &&
-                (addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
+I have tested the series with the v2 patches. It is working good with some modification that were discussed (hclk, pclk clocks). I attach modifications I have made to make it work so that you have an idea of my testbed (not a patch as you should already have this and it is on a development platform):
 
-I think the right workaround for saa1111 should be setting dma_mask of
-related devices to 0xc8000000 for the assabet and pfs168 machines but
-not add a unnecessary APIs,  which will cause other SoCs need to
-finish the function if they use dma bounce too.
++/* One additional fake clock for macb interfaces */
++static struct clk hclk = {
++       .name           = "hclk",
++       .pmc_mask       = 0,
++       .type           = CLK_TYPE_PERIPHERAL,
++};
 
-Eric's path make much sense, we should delete the unnecessary
-dma_needs_bounce() from the whole arm arch at all. If all related
-people agree, we need another patch to fix it.
+@@ -247,6 +254,7 @@ static struct clk *periph_clocks[] __initdata = {
+        // irq0
+        &ohci_clk,
+        &tcb1_clk,
++       &hclk,
+ };
 
-Thanks
-Barry
+[..]
+
+                /* Clock */
+-               at91_clock_associate("macb0_clk", &at91sam9x5_eth0_device.dev, "macb_clk");
++               at91_clock_associate("macb0_clk", &at91sam9x5_eth0_device.dev, "pclk");
+
+                eth0_data = *data;
+                platform_device_register(&at91sam9x5_eth0_device);
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
