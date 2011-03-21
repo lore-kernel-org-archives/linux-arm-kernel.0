@@ -1,75 +1,85 @@
-From: carlv@codeaurora.org (Carl Vanderlip)
-Date: Mon, 21 Mar 2011 16:49:46 -0700 (PDT)
-Subject: [PATCH 17/20] video: msm: Prevent framebuffer glitch
-	during	initialization
-In-Reply-To: <4D87552D.4070205@ru.mvista.com>
-References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-	<1300485574-27600-1-git-send-email-carlv@codeaurora.org>
-	<4D87552D.4070205@ru.mvista.com>
-Message-ID: <1f9ceab007818b26e65019950985fe88.squirrel@www.codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 21 Mar 2011 16:51:02 -0700
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+Message-ID: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
+introduced a generic sizes.h. Use that instead of the ARM specific
+version.
 
-> Carl Vanderlip wrote:
->
->> Holds a reference to the mdp_clk until lateinit, and moves the
->> frambuffer
->> initialization to device_init.
->
->     Maybe I'm just blind but I don't see where the patch does the
-> latter...
->
->> The framebuffer lcdc driver will grab a
->> reference to mdp_clk, which prevents the clock from being disabled by
->> clock_late_init.
->
->> Authors:
->> Dima Zavin <dima@android.com>
->> Rebecca Schultz Zavin <rebecca@android.com>
->> Colin Cross <ccross@android.com>
->
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/sizes.h |   60 +-----------------------------------------
+ 1 files changed, 1 insertions(+), 59 deletions(-)
 
-Fear not. You are not going blind :P, I got a bit overzealous when trying
-to re-use the commit text that was available from the squashed patch that
-this patch set is spawned from (hence why [18/20] also has this same
-issue.
-I will be re-writing this commit text for v2 (unless this c-text is
-desired to be kept for "historical" purposes).
-
->> ---
->>  drivers/video/msm/mdp.c |   10 ++++++++++
->>  1 files changed, 10 insertions(+), 0 deletions(-)
->
->> diff --git a/drivers/video/msm/mdp.c b/drivers/video/msm/mdp.c
->> index 0bb19fa..b3f334ad 100644
->> --- a/drivers/video/msm/mdp.c
->> +++ b/drivers/video/msm/mdp.c
->> @@ -38,6 +38,7 @@ struct class *mdp_class;
->>
->>  static DECLARE_WAIT_QUEUE_HEAD(mdp_ppp_waitqueue);
->>  static unsigned int mdp_irq_mask;
->> +struct clk *mdp_clk_to_disable_later;
->
->     Why not just 'mdp_clk'? :-)
->
-
-I was not the original author for these variable names, though I do see
-some reason behind the naming of this variable. I'd be more willing to
-change this name, to "mdp_clk" if it weren't so visually similar to
-mdp->clk (tired programmer eyes/brain could read (or write) the wrong
-one).
-
-As it is, the name is a little long, but it makes it extraordinarily clear
-what its purpose is (i.e. you know exactly what it is being used for
-without having to go searching for other places it is used).
-
-So while I don't like the name as it is, I don't really like 'mdp_clk'
-either (though would be willing to change it if anyone feels like being
-stubborn :-)).
-
-    -Carl V.
-
+diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
+index 316bb2b..dd248c2 100644
+--- a/arch/arm/include/asm/sizes.h
++++ b/arch/arm/include/asm/sizes.h
+@@ -1,59 +1 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-/*  Size definitions
+- *  Copyright (C) ARM Limited 1998. All rights reserved.
+- */
+-
+-#ifndef __sizes_h
+-#define __sizes_h                       1
+-
+-/* handy sizes */
+-#define SZ_16				0x00000010
+-#define SZ_32				0x00000020
+-#define SZ_64				0x00000040
+-#define SZ_128				0x00000080
+-#define SZ_256				0x00000100
+-#define SZ_512				0x00000200
+-
+-#define SZ_1K                           0x00000400
+-#define SZ_2K                           0x00000800
+-#define SZ_4K                           0x00001000
+-#define SZ_8K                           0x00002000
+-#define SZ_16K                          0x00004000
+-#define SZ_32K                          0x00008000
+-#define SZ_64K                          0x00010000
+-#define SZ_128K                         0x00020000
+-#define SZ_256K                         0x00040000
+-#define SZ_512K                         0x00080000
+-
+-#define SZ_1M                           0x00100000
+-#define SZ_2M                           0x00200000
+-#define SZ_4M                           0x00400000
+-#define SZ_8M                           0x00800000
+-#define SZ_16M                          0x01000000
+-#define SZ_32M                          0x02000000
+-#define SZ_48M                          0x03000000
+-#define SZ_64M                          0x04000000
+-#define SZ_128M                         0x08000000
+-#define SZ_256M                         0x10000000
+-#define SZ_512M                         0x20000000
+-
+-#define SZ_1G                           0x40000000
+-#define SZ_2G                           0x80000000
+-
+-#endif
+-
+-/*         END */
++#include <asm-generic/sizes.h>
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
