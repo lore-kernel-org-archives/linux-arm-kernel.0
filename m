@@ -1,69 +1,47 @@
-From: bones@secretlab.ca (John Bonesio)
-Date: Mon, 21 Mar 2011 11:36:56 -0700
-Subject: [PATCH] ARM:boot:device tree: Allow the device tree binary to
-	be appended to zImage
-In-Reply-To: <alpine.LFD.2.00.1103211413560.11889@xanadu.home>
-References: <20110309215800.26377.43925.stgit@riker>
-	<alpine.LFD.2.00.1103171422500.26889@xanadu.home>
-	<4D878C63.6080205@secretlab.ca>
-	<alpine.LFD.2.00.1103211413560.11889@xanadu.home>
-Message-ID: <4D879AC8.9080901@secretlab.ca>
+From: dongas86@gmail.com (Dongas)
+Date: Tue, 22 Mar 2011 02:52:19 +0800
+Subject: dma cache coherency issue
+Message-ID: <AANLkTi=ZdiZATPde6W8bStZCwu05Am6Z216+LxaEzaTj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Comments below.
+Hi All,
 
-- John
+Similar as stated in the following articles,
+http://lwn.net/Articles/2265/
+The issue is that i got a SDIO WiFi dirver which has the folliowing
+structure definitions:
+??? struct iostruct {
+        ...
+?       int ifield;
+        char dma_buffer[SMALL_SIZE];
+        ...
+??? };
+And the ifield may share the same cache line with dma_buffer which is
+used for dma transfer.
+Consider the case that if CPU accesses ifield during the DMA transfer,
+then the CPU cache line may get the stale data from dma buffer.
+After DMA completes, in current kernel code(2.6.38), the dma_unmap_sg
+will finally call v7_dma_unmap_area and v7_dma_inv_range to clean and
+invalidate cache again for DMA_FROM_DEVICE operation.
+However, since the cache line already contains the stale data of dma
+buffer, the clean to write back the cache line to memory may cause
+data corruption.
+My question is:
+Is it a bug of current linux kernel or still as above old article
+said, there's no better solutions for it?
+If not for both, how does kernel handle such an issue?
 
-On 03/21/2011 11:22 AM, Nicolas Pitre wrote:
-> On Mon, 21 Mar 2011, John Bonesio wrote:
-> 
->> Hi Nicolas,
->>
->> Thanks for the comments. I have a question (below).
->>
-> [...]
+One solution i know is that changing the driver to use
+dma_alloc_coherency to guarantee the buffer is cache line alignment.
+But the problem is that it's hard for me to do that because this type
+of definition is widely used in that driver.
+The current solution is to use DMABOUNCE to fix this issue.But the dma
+bounce buffer has performance issues due to large number of extra
+memory copies for allocating safe buffer.
+Therefore, i wonder if there's any other way to fix this issue?
 
-[snip]
+Thanks
 
->>>
->>> Now if no dtb was found, or if that code is not configured, then lr 
->>> contains garbage and that may have random consequences with the code 
->>> that follows, which would explain the reported bad behaviors with this 
->>> patch applied even if not configured in the kernel.
->>
->> I'm probably not understanding something here. When I look at the code
->> prior to my patch, it looks like lr is not initialized by head.S.
-> 
-> Exact.
-> 
->> It also looks like this code makes use of lr when it relocates the 
->> code and leaves it uninitialized when it jumps back to 'restart'.
-> 
-> Exact.
-> 
->> Is this a bug in the previous code too?
-> 
-> No.
-> 
->> What should lr be initialized to, or should we just be preserving it's
->> value?
-> 
-> No.  The problem is that you do use lr further down in your patch when 
-> adjusting GOT entries, assuming it contains the size of the dtb.  If no 
-> DTB is found then lr contains random stuff that will mess up the GOT for 
-> .bss references.
-
-Oh! Good catch. Thanks.
-
-> 
->> I saw the comment about the performance is different with this patch -
->> something about a pause between 'Uncompressing Linux...' and the kernel
->> boot output. I'm not sure what's going on here. By the time
->> 'Uncompressing Linux...' comes out all relocations and dtb discovery is
->> complete. Do you really think having lr uninitialized would cause this?
-> 
-> Certainly.  See above.
-> 
-> 
-> Nicolas
+Regards
+Dongas
