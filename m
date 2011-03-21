@@ -1,7 +1,7 @@
 From: julia@diku.dk (Julia Lawall)
-Date: Sun, 20 Mar 2011 21:51:32 +0100 (CET)
+Date: Mon, 21 Mar 2011 08:59:52 +0100 (CET)
 Subject: [PATCH 2/2] ARM: mx5/mx53_evk: Remove unneeded gpio_set_value call
-In-Reply-To: <20110320192451.GA19808@pengutronix.de>
+In-Reply-To: <AANLkTinponAhPonKeZ9rE1boqJEsVqyvBLKfHCt84Shm@mail.gmail.com>
 References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
 	<1300126869-14587-2-git-send-email-fabio.estevam@freescale.com>
 	<20110315090656.GC13316@pengutronix.de>
@@ -11,23 +11,93 @@ References: <1300126869-14587-1-git-send-email-fabio.estevam@freescale.com>
 	<20110316083326.GF13316@pengutronix.de>
 	<Pine.LNX.4.64.1103201850250.27008@ask.diku.dk>
 	<20110320192451.GA19808@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1103202143070.27008@ask.diku.dk>
+	<Pine.LNX.4.64.1103202201060.27008@ask.diku.dk>
+	<AANLkTinponAhPonKeZ9rE1boqJEsVqyvBLKfHCt84Shm@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1103210855560.4323@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I guess that the !GPIOLIB issue is related to a configuration option, that 
-can't very easily be detected from looking at the C file alone?
+On Mon, 21 Mar 2011, Grant Likely wrote:
 
-Ignoring that issue, the following semantic patch addresses the common 
-case where there is no error checking for the input or output call, but 
-there may be error checking for the gpio_request call.  This transforms 
-over 500 occurrences.
+> On Sun, Mar 20, 2011 at 3:04 PM, Julia Lawall <julia@diku.dk> wrote:
+> > In this case, I also ignore the !GPIOLIB issue. ?This semantic patch
+> > considers the case where the direction call has some error handling code.
+> > In this case, it just deletes that error handling code, so most of these
+> > cases are likely to need some manual cleanup, eg to get rid of unreachable
+> > error labels or to change the error message.
+> >
+> [...]
+> > diff -u -p a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> > --- a/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 18:17:22.000000000 +0100
+> > +++ b/arch/arm/mach-omap2/board-4430sdp.c 2011-03-20 22:00:22.000000000 +0100
+> > @@ -257,44 +257,26 @@ static int omap_ethernet_init(void)
+> >
+> > ? ? ? ?/* Request of GPIO lines */
+> >
+> > - ? ? ? status = gpio_request(ETH_KS8851_POWER_ON, "eth_power");
+> > + ? ? ? status = gpio_request_one(ETH_KS8851_POWER_ON, GPIOF_OUT_INIT_HIGH,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "eth_power");
+> > ? ? ? ?if (status) {
+> > ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_POWER_ON);
+> > ? ? ? ? ? ? ? ?return status;
+> > ? ? ? ?}
+> >
+> > - ? ? ? status = gpio_request(ETH_KS8851_QUART, "quart");
+> > + ? ? ? status = gpio_request_one(ETH_KS8851_QUART, GPIOF_OUT_INIT_HIGH,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "quart");
+> > ? ? ? ?if (status) {
+> > ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_QUART);
+> > ? ? ? ? ? ? ? ?goto error1;
+> > ? ? ? ?}
+> >
+> > - ? ? ? status = gpio_request(ETH_KS8851_IRQ, "eth_irq");
+> > + ? ? ? status = gpio_request_one(ETH_KS8851_IRQ, GPIOF_IN, "eth_irq");
+> > ? ? ? ?if (status) {
+> > ? ? ? ? ? ? ? ?pr_err("Cannot request GPIO %d\n", ETH_KS8851_IRQ);
+> > ? ? ? ? ? ? ? ?goto error2;
+> > ? ? ? ?}
+> >
+> > - ? ? ? /* Configuration of requested GPIO lines */
+> > -
+> > - ? ? ? status = gpio_direction_output(ETH_KS8851_POWER_ON, 1);
+> > - ? ? ? if (status) {
+> > - ? ? ? ? ? ? ? pr_err("Cannot set output GPIO %d\n", ETH_KS8851_IRQ);
+> > - ? ? ? ? ? ? ? goto error3;
+> > - ? ? ? }
+> > -
+> > - ? ? ? status = gpio_direction_output(ETH_KS8851_QUART, 1);
+> > - ? ? ? if (status) {
+> > - ? ? ? ? ? ? ? pr_err("Cannot set output GPIO %d\n", ETH_KS8851_QUART);
+> > - ? ? ? ? ? ? ? goto error3;
+> > - ? ? ? }
+> > -
+> > - ? ? ? status = gpio_direction_input(ETH_KS8851_IRQ);
+> > - ? ? ? if (status) {
+> > - ? ? ? ? ? ? ? pr_err("Cannot set input GPIO %d\n", ETH_KS8851_IRQ);
+> > - ? ? ? ? ? ? ? goto error3;
+> > - ? ? ? }
+> > -
+> > ? ? ? ?return 0;
+> 
+> This hunk is probably wrong.  If gpio pins are being requested, it is
+> important to verify that all gpios have been requested successfully
+> before actively changing the state on any of them.  This hunk changes
+> the behaviour.
 
-These rules also require that the first argument to gpio_request should 
-not be used at all before the direction call.  This may be too 
-conservative.  For example there are some intervening references in
-drivers/staging/olpc_dcon/olpc_dcon_xo_1.c
-in calls to cs5535_gpio_clear and cs5535_gpio_isset.
+Thanks for the feedback.  I can also check that there is no call to 
+gpio_request or either of the direction functions between the call to 
+gpio_request and the call to the direction function to transform.  The 
+semantic patch and the result for the case where there is no error 
+handling on the direction function are below.
+
+On the other hand, the constraint that everything should be requested 
+before initialization is not always respected, eg:
+
+arch/arm/mach-mx3/mx31moboard-smartbot.c
+
+Perhaps code like this should be changed to move up the requests?
+
+julia
 
 @@
 expression E1,E2;
@@ -36,7 +106,11 @@ expression E1,E2;
 -      gpio_request(E1,E2)
 +      gpio_request_one(E1,GPIOF_IN,E2)
        ... when != E1
+           when != gpio_request(...)
+           when != gpio_direction_output(...)
+           when != gpio_direction_input(...)
 -      gpio_direction_input(E1);
+
 
 @@
 expression E1,E2;
@@ -45,6 +119,9 @@ expression E1,E2;
 -      gpio_request(E1,E2)
 +      gpio_request_one(E1,GPIOF_OUT_INIT_LOW,E2)
        ... when != E1
+           when != gpio_request(...)
+           when != gpio_direction_output(...)
+           when != gpio_direction_input(...)
 -      gpio_direction_output(E1,0);
 
 @@
@@ -54,15 +131,16 @@ expression E1,E2;
 -      gpio_request(E1,E2)
 +      gpio_request_one(E1,GPIOF_OUT_INIT_HIGH,E2)
        ... when != E1
+           when != gpio_request(...)
+           when != gpio_direction_output(...)
+           when != gpio_direction_input(...)
 -      gpio_direction_output(E1,1);
 
-The results are below.
-
-julia
+----------------------------------
 
 diff -u -p a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
 --- a/arch/arm/mach-davinci/board-da830-evm.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-davinci/board-da830-evm.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-davinci/board-da830-evm.c 2011-03-21 08:55:21.000000000 +0100
 @@ -163,21 +163,20 @@ static __init void da830_evm_usb_init(vo
  		return;
  	}
@@ -124,72 +202,9 @@ diff -u -p a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/boa
  
  	da830_evm_init_lcdc(gpio + 6);
  
-diff -u -p a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
---- a/arch/arm/mach-davinci/board-da850-evm.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-davinci/board-da850-evm.c 2011-03-20 21:01:50.000000000 +0100
-@@ -429,29 +429,27 @@ static int da850_evm_ui_expander_setup(s
- 	sel_b = gpio + DA850_EVM_UI_EXP_SEL_B;
- 	sel_c = gpio + DA850_EVM_UI_EXP_SEL_C;
- 
--	ret = gpio_request(sel_a, da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_A]);
-+	ret = gpio_request_one(sel_a, GPIOF_OUT_INIT_HIGH,
-+			       da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_A]);
- 	if (ret) {
- 		pr_warning("Cannot open UI expander pin %d\n", sel_a);
- 		goto exp_setup_sela_fail;
- 	}
- 
--	ret = gpio_request(sel_b, da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_B]);
-+	ret = gpio_request_one(sel_b, GPIOF_OUT_INIT_HIGH,
-+			       da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_B]);
- 	if (ret) {
- 		pr_warning("Cannot open UI expander pin %d\n", sel_b);
- 		goto exp_setup_selb_fail;
- 	}
- 
--	ret = gpio_request(sel_c, da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_C]);
-+	ret = gpio_request_one(sel_c, GPIOF_OUT_INIT_HIGH,
-+			       da850_evm_ui_exp[DA850_EVM_UI_EXP_SEL_C]);
- 	if (ret) {
- 		pr_warning("Cannot open UI expander pin %d\n", sel_c);
- 		goto exp_setup_selc_fail;
- 	}
- 
--	/* deselect all functionalities */
--	gpio_direction_output(sel_a, 1);
--	gpio_direction_output(sel_b, 1);
--	gpio_direction_output(sel_c, 1);
--
- 	da850_evm_ui_keys_init(gpio);
- 	ret = platform_device_register(&da850_evm_ui_keys_device);
- 	if (ret) {
-@@ -774,19 +772,18 @@ static int da850_lcd_hw_init(void)
- {
- 	int status;
- 
--	status = gpio_request(DA850_LCD_BL_PIN, "lcd bl\n");
-+	status = gpio_request_one(DA850_LCD_BL_PIN, GPIOF_OUT_INIT_LOW,
-+				  "lcd bl\n");
- 	if (status < 0)
- 		return status;
- 
--	status = gpio_request(DA850_LCD_PWR_PIN, "lcd pwr\n");
-+	status = gpio_request_one(DA850_LCD_PWR_PIN, GPIOF_OUT_INIT_LOW,
-+				  "lcd pwr\n");
- 	if (status < 0) {
- 		gpio_free(DA850_LCD_BL_PIN);
- 		return status;
- 	}
- 
--	gpio_direction_output(DA850_LCD_BL_PIN, 0);
--	gpio_direction_output(DA850_LCD_PWR_PIN, 0);
--
- 	/* Switch off panel power and backlight */
- 	da850_panel_power_ctrl(0);
- 
 diff -u -p a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
 --- a/arch/arm/mach-davinci/board-dm355-evm.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-davinci/board-dm355-evm.c 2011-03-21 08:55:21.000000000 +0100
 @@ -142,8 +142,7 @@ static void __init evm_init_i2c(void)
  {
  	davinci_init_i2c(&i2c_pdata);
@@ -212,7 +227,7 @@ diff -u -p a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/boa
  	aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
 diff -u -p a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
 --- a/arch/arm/mach-davinci/board-dm355-leopard.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c 2011-03-21 08:55:21.000000000 +0100
 @@ -134,8 +134,7 @@ static void __init leopard_init_i2c(void
  {
  	davinci_init_i2c(&i2c_pdata);
@@ -235,7 +250,7 @@ diff -u -p a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci
  	aemif = clk_get(&dm355leopard_dm9000.dev, "aemif");
 diff -u -p a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
 --- a/arch/arm/mach-davinci/board-dm644x-evm.c 2011-03-20 18:17:22.000000000 +0100
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c 2011-03-20 21:01:56.000000000 +0100
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c 2011-03-21 08:55:27.000000000 +0100
 @@ -371,14 +371,11 @@ evm_u18_setup(struct i2c_client *client,
  		sw_gpio = -EINVAL;
  
@@ -298,7 +313,7 @@ diff -u -p a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/bo
  }
 diff -u -p a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
 --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c 2011-03-20 18:17:22.000000000 +0100
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c 2011-03-21 08:55:21.000000000 +0100
 @@ -44,12 +44,11 @@ static int initialize_gpio(int gpio, cha
  {
  	int ret;
@@ -315,7 +330,7 @@ diff -u -p a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci
  
 diff -u -p a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
 --- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c 2011-03-21 08:55:22.000000000 +0100
 @@ -251,11 +251,10 @@ static const struct imxuart_platform_dat
  
  static void __maybe_unused ads7846_dev_init(void)
@@ -331,7 +346,7 @@ diff -u -p a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eu
  static int ads7846_get_pendown_state(void)
 diff -u -p a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
 --- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c 2010-12-04 18:54:35.000000000 +0100
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c 2011-03-21 08:55:21.000000000 +0100
 @@ -277,16 +277,13 @@ void __init eukrea_mbimxsd25_baseboard_i
  	imx25_add_flexcan1(NULL);
  	imx25_add_sdhci_esdhc_imx(0, NULL);
@@ -352,30 +367,9 @@ diff -u -p a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/
  	gpio_free(GPIO_SWITCH1);
  
  	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
-diff -u -p a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
---- a/arch/arm/mach-imx/mach-mx25_3ds.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-imx/mach-mx25_3ds.c 2011-03-20 21:01:51.000000000 +0100
-@@ -118,11 +118,12 @@ static const struct fec_platform_data mx
- 
- static void __init mx25pdk_fec_reset(void)
- {
--	gpio_request(FEC_ENABLE_GPIO, "FEC PHY enable");
--	gpio_request(FEC_RESET_B_GPIO, "FEC PHY reset");
--
--	gpio_direction_output(FEC_ENABLE_GPIO, 0);  /* drop PHY power */
--	gpio_direction_output(FEC_RESET_B_GPIO, 0); /* assert reset */
-+	gpio_request_one(FEC_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
-+			 "FEC PHY enable");
-+	gpio_request_one(FEC_RESET_B_GPIO, GPIOF_OUT_INIT_LOW,
-+			 "FEC PHY reset");
-+  /* drop PHY power */
-+	/* assert reset */
- 	udelay(2);
- 
- 	/* turn on PHY power and lift reset */
 diff -u -p a/arch/arm/mach-imx/pcm970-baseboard.c b/arch/arm/mach-imx/pcm970-baseboard.c
 --- a/arch/arm/mach-imx/pcm970-baseboard.c 2010-12-04 18:54:35.000000000 +0100
-+++ b/arch/arm/mach-imx/pcm970-baseboard.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-imx/pcm970-baseboard.c 2011-03-21 08:55:22.000000000 +0100
 @@ -100,14 +100,12 @@ static int pcm970_sdhc2_init(struct devi
  	if (ret)
  		return ret;
@@ -392,48 +386,9 @@ diff -u -p a/arch/arm/mach-imx/pcm970-baseboard.c b/arch/arm/mach-imx/pcm970-bas
  	return 0;
  }
  
-diff -u -p a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
---- a/arch/arm/mach-kirkwood/openrd-setup.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c 2011-03-20 21:01:55.000000000 +0100
-@@ -115,7 +115,7 @@ static int __init uart1_mpp_config(void)
- {
- 	kirkwood_mpp_conf(openrd_uart1_mpp_config);
- 
--	if (gpio_request(34, "SD_UART1_SEL")) {
-+	if (gpio_request_one(34, GPIOF_OUT_INIT_LOW, "SD_UART1_SEL")) {
- 		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
- 				", gpio: 34\n");
- 		return -EIO;
-@@ -128,10 +128,6 @@ static int __init uart1_mpp_config(void)
- 		return -EIO;
- 	}
- 
--	/* Select UART1
--	 * Pin # 34: 0 => UART1, 1 => SD */
--	gpio_direction_output(34, 0);
--
- 	/* Select RS232 OR RS485
- 	 * Pin # 28: 0 => RS232, 1 => RS485 */
- 	if (uart1 == 232)
-diff -u -p a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
---- a/arch/arm/mach-ks8695/board-acs5k.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-ks8695/board-acs5k.c 2011-03-20 21:01:55.000000000 +0100
-@@ -198,10 +198,8 @@ static void __init acs5k_init_gpio(void)
- 	for (i = 8; i < 16; ++i)
- 		gpio_request(i, "ACS5K Unused");
- 
--	gpio_request(3, "ACS5K CAN Control");
--	gpio_request(6, "ACS5K Heartbeat");
--	gpio_direction_output(3, 1); /* Default CAN_RESET high */
--	gpio_direction_output(6, 0); /* Default KS8695_ACTIVE low */
-+	gpio_request_one(3, GPIOF_OUT_INIT_HIGH, "ACS5K CAN Control");
-+	gpio_request_one(6, GPIOF_OUT_INIT_LOW, "ACS5K Heartbeat");/* Default CAN_RESET high *//* Default KS8695_ACTIVE low */
- 	gpio_export(3, 0); /* export CAN_RESET as output only */
- 	gpio_export(6, 0); /* export KS8695_ACTIVE as output only */
- }
 diff -u -p a/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c
 --- a/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c 2011-02-26 13:17:46.000000000 +0100
-+++ b/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c 2011-03-20 21:01:55.000000000 +0100
++++ b/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c 2011-03-21 08:55:26.000000000 +0100
 @@ -291,16 +291,13 @@ void __init eukrea_mbimxsd35_baseboard_i
  	imx35_add_flexcan1(NULL);
  	imx35_add_sdhci_esdhc_imx(0, NULL);
@@ -456,7 +411,7 @@ diff -u -p a/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx3/eu
  	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
 diff -u -p a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
 --- a/arch/arm/mach-mx3/mach-armadillo5x0.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-armadillo5x0.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-armadillo5x0.c 2011-03-21 08:55:21.000000000 +0100
 @@ -412,18 +412,14 @@ static int armadillo5x0_sdhc1_init(struc
  	gpio_det = IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK);
  	gpio_wp = IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B);
@@ -480,7 +435,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-arma
  			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
 diff -u -p a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
 --- a/arch/arm/mach-mx3/mach-kzm_arm11_01.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c 2011-03-21 08:55:22.000000000 +0100
 @@ -113,8 +113,8 @@ static int __init kzm_init_ext_uart(void
  	 * GPIO 1-1: external UART interrupt line
  	 */
@@ -505,7 +460,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_
  }
 diff -u -p a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
 --- a/arch/arm/mach-mx3/mach-mx31lilly.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-mx31lilly.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-mx31lilly.c 2011-03-21 08:55:21.000000000 +0100
 @@ -175,8 +175,8 @@ static int usbh2_init(struct platform_de
  	/* chip select */
  	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
@@ -519,7 +474,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lil
  
 diff -u -p a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite.c
 --- a/arch/arm/mach-mx3/mach-mx31lite.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-mx31lite.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-mx31lite.c 2011-03-21 08:55:21.000000000 +0100
 @@ -164,8 +164,8 @@ static int usbh2_init(struct platform_de
  	/* chip select */
  	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
@@ -533,7 +488,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite
  
 diff -u -p a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
 --- a/arch/arm/mach-mx3/mach-mx31moboard.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-mx31moboard.c 2011-03-21 08:55:22.000000000 +0100
 @@ -311,16 +311,13 @@ static int moboard_sdhc1_init(struct dev
  {
  	int ret;
@@ -584,7 +539,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31m
  
 diff -u -p a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
 --- a/arch/arm/mach-mx3/mach-pcm037.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-pcm037.c 2011-03-20 21:01:49.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-pcm037.c 2011-03-21 08:55:21.000000000 +0100
 @@ -358,17 +358,14 @@ static int pcm970_sdhc1_init(struct devi
  {
  	int ret;
@@ -607,7 +562,7 @@ diff -u -p a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
  	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_SCK6), detect_irq,
 diff -u -p a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
 --- a/arch/arm/mach-mx3/mach-pcm043.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mach-pcm043.c 2011-03-20 21:01:49.000000000 +0100
++++ b/arch/arm/mach-mx3/mach-pcm043.c 2011-03-21 08:55:21.000000000 +0100
 @@ -229,7 +229,7 @@ static void pcm043_ac97_warm_reset(struc
  	iomux_v3_cfg_t txfs = MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS;
  	int ret;
@@ -625,62 +580,10 @@ diff -u -p a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
  	udelay(2);
  	gpio_set_value(AC97_GPIO_TXFS, 0);
  
-@@ -255,15 +254,15 @@ static void pcm043_ac97_cold_reset(struc
- 	iomux_v3_cfg_t reset_gpio = MX35_PAD_SD2_CMD__GPIO2_0;
- 	int ret;
- 
--	ret = gpio_request(AC97_GPIO_TXFS, "SSI");
-+	ret = gpio_request_one(AC97_GPIO_TXFS, GPIOF_OUT_INIT_LOW, "SSI");
- 	if (ret)
- 		goto err1;
- 
--	ret = gpio_request(AC97_GPIO_TXD, "SSI");
-+	ret = gpio_request_one(AC97_GPIO_TXD, GPIOF_OUT_INIT_LOW, "SSI");
- 	if (ret)
- 		goto err2;
- 
--	ret = gpio_request(AC97_GPIO_RESET, "SSI");
-+	ret = gpio_request_one(AC97_GPIO_RESET, GPIOF_OUT_INIT_LOW, "SSI");
- 	if (ret)
- 		goto err3;
- 
-@@ -271,11 +270,8 @@ static void pcm043_ac97_cold_reset(struc
- 	mxc_iomux_v3_setup_pad(txd_gpio);
- 	mxc_iomux_v3_setup_pad(reset_gpio);
- 
--	gpio_direction_output(AC97_GPIO_TXFS, 0);
--	gpio_direction_output(AC97_GPIO_TXD, 0);
--
- 	/* cold reset */
--	gpio_direction_output(AC97_GPIO_RESET, 0);
-+	
- 	udelay(10);
- 	gpio_direction_output(AC97_GPIO_RESET, 1);
- 
 diff -u -p a/arch/arm/mach-mx3/mx31lilly-db.c b/arch/arm/mach-mx3/mx31lilly-db.c
 --- a/arch/arm/mach-mx3/mx31lilly-db.c 2010-12-04 18:54:35.000000000 +0100
-+++ b/arch/arm/mach-mx3/mx31lilly-db.c 2011-03-20 21:01:55.000000000 +0100
-@@ -122,17 +122,14 @@ static int mxc_mmc1_init(struct device *
- 	mxc_iomux_set_pad(MX31_PIN_SD1_CLK, MMC_PAD_CFG);
- 	mxc_iomux_set_pad(MX31_PIN_SD1_CMD, MMC_PAD_CFG);
- 
--	ret = gpio_request(gpio_det, "MMC detect");
-+	ret = gpio_request_one(gpio_det, GPIOF_IN, "MMC detect");
- 	if (ret)
- 		return ret;
- 
--	ret = gpio_request(gpio_wp, "MMC w/p");
-+	ret = gpio_request_one(gpio_wp, GPIOF_IN, "MMC w/p");
- 	if (ret)
- 		goto exit_free_det;
- 
--	gpio_direction_input(gpio_det);
--	gpio_direction_input(gpio_wp);
--
- 	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO1_1), detect_irq,
- 			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
- 			  "MMC detect", data);
-@@ -197,14 +194,14 @@ static struct mx3fb_platform_data fb_pda
++++ b/arch/arm/mach-mx3/mx31lilly-db.c 2011-03-21 08:55:26.000000000 +0100
+@@ -197,14 +197,14 @@ static struct mx3fb_platform_data fb_pda
  
  static void __init mx31lilly_init_fb(void)
  {
@@ -697,32 +600,9 @@ diff -u -p a/arch/arm/mach-mx3/mx31lilly-db.c b/arch/arm/mach-mx3/mx31lilly-db.c
  }
  
  void __init mx31lilly_db_init(void)
-diff -u -p a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
---- a/arch/arm/mach-mx3/mx31lite-db.c 2010-12-04 18:54:35.000000000 +0100
-+++ b/arch/arm/mach-mx3/mx31lite-db.c 2011-03-20 21:01:51.000000000 +0100
-@@ -106,17 +106,14 @@ static int mxc_mmc1_init(struct device *
- 			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
- 	mxc_iomux_set_pad(MX31_PIN_SD1_CLK, MMC_PAD_CFG);
- 
--	ret = gpio_request(gpio_det, "MMC detect");
-+	ret = gpio_request_one(gpio_det, GPIOF_IN, "MMC detect");
- 	if (ret)
- 		return ret;
- 
--	ret = gpio_request(gpio_wp, "MMC w/p");
-+	ret = gpio_request_one(gpio_wp, GPIOF_IN, "MMC w/p");
- 	if (ret)
- 		goto exit_free_det;
- 
--	gpio_direction_input(gpio_det);
--	gpio_direction_input(gpio_wp);
--
- 	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_DCD_DCE1), detect_irq,
- 			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 			  "MMC detect", data);
 diff -u -p a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31moboard-devboard.c
 --- a/arch/arm/mach-mx3/mx31moboard-devboard.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx3/mx31moboard-devboard.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx3/mx31moboard-devboard.c 2011-03-21 08:55:21.000000000 +0100
 @@ -67,16 +67,13 @@ static int devboard_sdhc2_init(struct de
  {
  	int ret;
@@ -767,7 +647,7 @@ diff -u -p a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31mo
  }
 diff -u -p a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
 --- a/arch/arm/mach-mx3/mx31moboard-marxbot.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c 2011-03-21 08:55:22.000000000 +0100
 @@ -80,16 +80,13 @@ static int marxbot_sdhc2_init(struct dev
  {
  	int ret;
@@ -862,7 +742,7 @@ diff -u -p a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31mob
  	imx31_add_fsl_usb2_udc(&usb_pdata);
 diff -u -p a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31moboard-smartbot.c
 --- a/arch/arm/mach-mx3/mx31moboard-smartbot.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-mx3/mx31moboard-smartbot.c 2011-03-21 08:55:22.000000000 +0100
 @@ -104,14 +104,13 @@ static struct platform_device *smartbot_
  
  static int __init smartbot_cam_init(void)
@@ -883,7 +763,7 @@ diff -u -p a/arch/arm/mach-mx3/mx31moboard-smartbot.c b/arch/arm/mach-mx3/mx31mo
  }
 diff -u -p a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
 --- a/arch/arm/mach-mx5/board-cpuimx51.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-cpuimx51.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mx5/board-cpuimx51.c 2011-03-21 08:55:24.000000000 +0100
 @@ -253,17 +253,13 @@ static void __init eukrea_cpuimx51_init(
  	imx51_add_imx_uart(0, &uart_pdata);
  	imx51_add_mxc_nand(&eukrea_cpuimx51_nand_board_info);
@@ -908,7 +788,7 @@ diff -u -p a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx
  	imx51_add_fec(NULL);
 diff -u -p a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
 --- a/arch/arm/mach-mx5/board-cpuimx51sd.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-cpuimx51sd.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mx5/board-cpuimx51sd.c 2011-03-21 08:55:24.000000000 +0100
 @@ -280,22 +280,18 @@ static void __init eukrea_cpuimx51sd_ini
  	gpio_set_value(ETH_RST, 1);
  	imx51_add_fec(NULL);
@@ -948,7 +828,7 @@ diff -u -p a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpui
  	mxc_register_device(&mxc_usbh1_device, &usbh1_config);
 diff -u -p a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
 --- a/arch/arm/mach-mx5/board-mx50_rdp.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx50_rdp.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx50_rdp.c 2011-03-21 08:55:21.000000000 +0100
 @@ -176,10 +176,9 @@ static const struct fec_platform_data fe
  
  static inline void mx50_rdp_fec_reset(void)
@@ -965,7 +845,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_r
  }
 diff -u -p a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
 --- a/arch/arm/mach-mx5/board-mx51_babbage.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c 2011-03-21 08:55:21.000000000 +0100
 @@ -181,26 +181,26 @@ static int gpio_usbh1_active(void)
  
  	/* Set USBH1_STP to GPIO and toggle it */
@@ -1029,7 +909,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx
  	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
 diff -u -p a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
 --- a/arch/arm/mach-mx5/board-mx51_efikamx.c 2011-02-26 13:17:46.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx51_efikamx.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx51_efikamx.c 2011-03-21 08:55:25.000000000 +0100
 @@ -104,12 +104,11 @@ static void __init mx51_efikamx_board_id
  	/* things are taking time to settle */
  	msleep(150);
@@ -1080,7 +960,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx
  }
 diff -u -p a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
 --- a/arch/arm/mach-mx5/board-mx51_efikasb.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx51_efikasb.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx51_efikasb.c 2011-03-21 08:55:25.000000000 +0100
 @@ -108,8 +108,7 @@ static int initialize_usbh2_port(struct 
  	iomux_v3_cfg_t usbh2gpio = MX51_PAD_EIM_A26__GPIO2_20;
  
@@ -1107,7 +987,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx
  	id |= gpio_get_value(EFIKASB_PCBID1) << 1;
 diff -u -p a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
 --- a/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx53_evk.c 2011-03-21 08:55:21.000000000 +0100
 @@ -82,12 +82,12 @@ static inline void mx53_evk_fec_reset(vo
  	int ret;
  
@@ -1125,7 +1005,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_e
  	gpio_set_value(SMD_FEC_PHY_RST, 1);
 diff -u -p a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
 --- a/arch/arm/mach-mx5/board-mx53_loco.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c 2011-03-20 21:01:49.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx53_loco.c 2011-03-21 08:55:21.000000000 +0100
 @@ -185,12 +185,12 @@ static inline void mx53_loco_fec_reset(v
  	int ret;
  
@@ -1143,7 +1023,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_
  }
 diff -u -p a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
 --- a/arch/arm/mach-mx5/board-mx53_smd.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mx5/board-mx53_smd.c 2011-03-21 08:55:25.000000000 +0100
 @@ -70,12 +70,12 @@ static inline void mx53_smd_fec_reset(vo
  	int ret;
  
@@ -1161,7 +1041,7 @@ diff -u -p a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_s
  }
 diff -u -p a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
 --- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c 2011-03-20 21:01:49.000000000 +0100
++++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c 2011-03-21 08:55:21.000000000 +0100
 @@ -193,25 +193,20 @@ void __init eukrea_mbimx51_baseboard_ini
  	imx51_add_imx_uart(1, NULL);
  	imx51_add_imx_uart(2, &uart_pdata);
@@ -1195,7 +1075,7 @@ diff -u -p a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eu
  				ARRAY_SIZE(mbimx51_i2c_devices));
 diff -u -p a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
 --- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c 2011-01-09 09:32:57.000000000 +0100
-+++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c 2011-03-21 08:55:24.000000000 +0100
 @@ -150,12 +150,10 @@ void __init eukrea_mbimxsd51_baseboard_i
  
  	imx51_add_sdhci_esdhc_imx(0, NULL);
@@ -1213,7 +1093,7 @@ diff -u -p a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eu
  	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
 diff -u -p a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
 --- a/arch/arm/mach-mx5/mx51_efika.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mx5/mx51_efika.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mx5/mx51_efika.c 2011-03-21 08:55:25.000000000 +0100
 @@ -168,8 +168,7 @@ static int initialize_usbh1_port(struct 
  	void __iomem *socregs_base;
  
@@ -1258,7 +1138,7 @@ diff -u -p a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
  	imx51_add_ecspi(0, &mx51_efika_spi_pdata);
 diff -u -p a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
 --- a/arch/arm/mach-mxs/mach-mx28evk.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-mxs/mach-mx28evk.c 2011-03-21 08:55:24.000000000 +0100
 @@ -142,13 +142,13 @@ static void __init mx28evk_fec_reset(voi
  	}
  
@@ -1277,7 +1157,7 @@ diff -u -p a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
  		return;
 diff -u -p a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
 --- a/arch/arm/mach-omap1/board-ams-delta.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-ams-delta.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap1/board-ams-delta.c 2011-03-21 08:55:22.000000000 +0100
 @@ -364,12 +364,12 @@ static int __init ams_delta_modem_init(v
  	ams_delta_modem_ports[0].irq =
  			gpio_to_irq(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
@@ -1295,7 +1175,7 @@ diff -u -p a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-a
  		AMS_DELTA_LATCH2_MODEM_NRESET | AMS_DELTA_LATCH2_MODEM_CODEC,
 diff -u -p a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
 --- a/arch/arm/mach-omap1/board-fsample.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-fsample.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-fsample.c 2011-03-21 08:55:23.000000000 +0100
 @@ -299,9 +299,8 @@ static void __init omap_fsample_init(voi
  {
  	fsample_init_smc91x();
@@ -1309,7 +1189,7 @@ diff -u -p a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsa
  	omap_cfg_reg(M8_1610_FLASH_CS2B_WE);
 diff -u -p a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-mmc.c
 --- a/arch/arm/mach-omap1/board-h2-mmc.c 2010-10-04 07:26:41.000000000 +0200
-+++ b/arch/arm/mach-omap1/board-h2-mmc.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-h2-mmc.c 2011-03-21 08:55:24.000000000 +0100
 @@ -32,12 +32,11 @@ static int mmc_set_power(struct device *
  
  static int mmc_late_init(struct device *dev)
@@ -1327,7 +1207,7 @@ diff -u -p a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-m
  
 diff -u -p a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
 --- a/arch/arm/mach-omap1/board-h2.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-h2.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-h2.c 2011-03-21 08:55:24.000000000 +0100
 @@ -420,9 +420,8 @@ static void __init h2_init(void)
  
  	h2_nand_resource.end = h2_nand_resource.start = OMAP_CS2B_PHYS;
@@ -1341,7 +1221,7 @@ diff -u -p a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
  	omap_cfg_reg(M8_1610_FLASH_CS2B_WE);
 diff -u -p a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-mmc.c
 --- a/arch/arm/mach-omap1/board-h3-mmc.c 2010-10-04 07:26:41.000000000 +0200
-+++ b/arch/arm/mach-omap1/board-h3-mmc.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-h3-mmc.c 2011-03-21 08:55:24.000000000 +0100
 @@ -51,10 +51,10 @@ void __init h3_mmc_init(void)
  {
  	int ret;
@@ -1357,7 +1237,7 @@ diff -u -p a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-m
  	omap1_init_mmc(mmc_data, OMAP16XX_NR_MMC);
 diff -u -p a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
 --- a/arch/arm/mach-omap1/board-h3.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-h3.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-h3.c 2011-03-21 08:55:24.000000000 +0100
 @@ -403,9 +403,8 @@ static void __init h3_init(void)
  
  	nand_resource.end = nand_resource.start = OMAP_CS2B_PHYS;
@@ -1369,52 +1249,9 @@ diff -u -p a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
  
  	/* GPIO10 Func_MUX_CTRL reg bit 29:27, Configure V2 to mode1 as GPIO */
  	/* GPIO10 pullup/down register, Enable pullup on GPIO10 */
-diff -u -p a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
---- a/arch/arm/mach-omap1/board-htcherald.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-htcherald.c 2011-03-20 21:01:51.000000000 +0100
-@@ -536,31 +536,29 @@ static void __init htcherald_usb_enable(
- 	unsigned int value = 0;
- 
- 	/* Request the GPIOs we need to control here */
--	if (gpio_request(HTCHERALD_GPIO_USB_EN1, "herald_usb") < 0)
-+	if (gpio_request_one(HTCHERALD_GPIO_USB_EN1, GPIOF_OUT_INIT_LOW,
-+			     "herald_usb") < 0)
- 		goto err1;
- 
--	if (gpio_request(HTCHERALD_GPIO_USB_EN2, "herald_usb") < 0)
-+	if (gpio_request_one(HTCHERALD_GPIO_USB_EN2, GPIOF_OUT_INIT_LOW,
-+			     "herald_usb") < 0)
- 		goto err2;
- 
--	if (gpio_request(HTCHERALD_GPIO_USB_DM, "herald_usb") < 0)
-+	if (gpio_request_one(HTCHERALD_GPIO_USB_DM, GPIOF_IN, "herald_usb") < 0)
- 		goto err3;
- 
--	if (gpio_request(HTCHERALD_GPIO_USB_DP, "herald_usb") < 0)
-+	if (gpio_request_one(HTCHERALD_GPIO_USB_DP, GPIOF_IN, "herald_usb") < 0)
- 		goto err4;
- 
- 	/* force USB_EN GPIO to 0 */
- 	do {
--		/* output low */
--		gpio_direction_output(HTCHERALD_GPIO_USB_EN1, 0);
- 	} while ((value = gpio_get_value(HTCHERALD_GPIO_USB_EN1)) == 1 &&
- 			--tries);
- 
- 	if (value == 1)
- 		printk(KERN_WARNING "Unable to reset USB, trying to continue\n");
--
--	gpio_direction_output(HTCHERALD_GPIO_USB_EN2, 0); /* output low */
--	gpio_direction_input(HTCHERALD_GPIO_USB_DM); /* input */
--	gpio_direction_input(HTCHERALD_GPIO_USB_DP); /* input */
-+/* output low */ /* input */
-+	/* input */
- 
- 	goto done;
- 
 diff -u -p a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
 --- a/arch/arm/mach-omap1/board-nokia770.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-nokia770.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-nokia770.c 2011-03-21 08:55:24.000000000 +0100
 @@ -221,17 +221,17 @@ static void __init nokia770_mmc_init(voi
  {
  	int ret;
@@ -1439,7 +1276,7 @@ diff -u -p a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-no
  	nokia770_mmc_data[1] = &nokia770_mmc2_data;
 diff -u -p a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
 --- a/arch/arm/mach-omap1/board-osk.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-osk.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-osk.c 2011-03-21 08:55:23.000000000 +0100
 @@ -197,19 +197,19 @@ static int osk_tps_setup(struct i2c_clie
  	/* Set GPIO 1 HIGH to disable VBUS power supply;
  	 * OHCI driver powers it up/down as needed.
@@ -1483,7 +1320,7 @@ diff -u -p a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
  	spi_register_board_info(mistral_boardinfo,
 diff -u -p a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
 --- a/arch/arm/mach-omap1/board-palmte.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-palmte.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/board-palmte.c 2011-03-21 08:55:23.000000000 +0100
 @@ -233,18 +233,16 @@ static struct spi_board_info palmte_spi_
  static void __init palmte_misc_gpio_setup(void)
  {
@@ -1507,7 +1344,7 @@ diff -u -p a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palm
  static void __init omap_palmte_init(void)
 diff -u -p a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
 --- a/arch/arm/mach-omap1/board-palmz71.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-palmz71.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap1/board-palmz71.c 2011-03-21 08:55:23.000000000 +0100
 @@ -285,19 +285,18 @@ palmz71_gpio_setup(int early)
  		gpio_direction_output(1, 1);
  	} else {
@@ -1533,7 +1370,7 @@ diff -u -p a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-pal
  				"palmz71-cable", 0))
 diff -u -p a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
 --- a/arch/arm/mach-omap1/board-perseus2.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-perseus2.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap1/board-perseus2.c 2011-03-21 08:55:22.000000000 +0100
 @@ -267,9 +267,8 @@ static void __init omap_perseus2_init(vo
  {
  	perseus2_init_smc91x();
@@ -1545,29 +1382,9 @@ diff -u -p a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-pe
  
  	omap_cfg_reg(L3_1610_FLASH_CS2B_OE);
  	omap_cfg_reg(M8_1610_FLASH_CS2B_WE);
-diff -u -p a/arch/arm/mach-omap1/board-sx1.c b/arch/arm/mach-omap1/board-sx1.c
---- a/arch/arm/mach-omap1/board-sx1.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-sx1.c 2011-03-20 21:01:52.000000000 +0100
-@@ -400,12 +400,10 @@ static void __init omap_sx1_init(void)
- 
- 	/* turn on USB power */
- 	/* sx1_setusbpower(1); cant do it here because i2c is not ready */
--	gpio_request(1, "A_IRDA_OFF");
--	gpio_request(11, "A_SWITCH");
--	gpio_request(15, "A_USB_ON");
--	gpio_direction_output(1, 1);	/*A_IRDA_OFF = 1 */
--	gpio_direction_output(11, 0);	/*A_SWITCH = 0 */
--	gpio_direction_output(15, 0);	/*A_USB_ON = 0 */
-+	gpio_request_one(1, GPIOF_OUT_INIT_HIGH, "A_IRDA_OFF");
-+	gpio_request_one(11, GPIOF_OUT_INIT_LOW, "A_SWITCH");
-+	gpio_request_one(15, GPIOF_OUT_INIT_LOW, "A_USB_ON");/*A_IRDA_OFF = 1 */	/*A_SWITCH = 0 */
-+	/*A_USB_ON = 0 */
- }
- /*----------------------------------------*/
- static void __init omap_sx1_init_irq(void)
 diff -u -p a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
 --- a/arch/arm/mach-omap1/board-voiceblue.c 2011-02-11 10:53:31.000000000 +0100
-+++ b/arch/arm/mach-omap1/board-voiceblue.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap1/board-voiceblue.c 2011-03-21 08:55:24.000000000 +0100
 @@ -264,16 +264,14 @@ static void __init voiceblue_init(void)
  	/* Watchdog */
  	gpio_request(0, "Watchdog");
@@ -1589,7 +1406,7 @@ diff -u -p a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-v
  	gpio_request(13, "16C554 irq");
 diff -u -p a/arch/arm/mach-omap1/fpga.c b/arch/arm/mach-omap1/fpga.c
 --- a/arch/arm/mach-omap1/fpga.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/arm/mach-omap1/fpga.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap1/fpga.c 2011-03-21 08:55:24.000000000 +0100
 @@ -177,12 +177,11 @@ void omap1510_fpga_init_irq(void)
  	 * NOTE: For general GPIO/MPUIO access and interrupts, please see
  	 * gpio.[ch]
@@ -1606,7 +1423,7 @@ diff -u -p a/arch/arm/mach-omap1/fpga.c b/arch/arm/mach-omap1/fpga.c
  }
 diff -u -p a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
 --- a/arch/arm/mach-omap1/serial.c 2010-12-26 10:19:06.000000000 +0100
-+++ b/arch/arm/mach-omap1/serial.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap1/serial.c 2011-03-21 08:55:23.000000000 +0100
 @@ -220,13 +220,12 @@ static void __init omap_serial_set_port_
  {
  	int ret;
@@ -1624,7 +1441,7 @@ diff -u -p a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
  	if (ret) {
 diff -u -p a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
 --- a/arch/arm/mach-omap2/board-3430sdp.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-3430sdp.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap2/board-3430sdp.c 2011-03-21 08:55:23.000000000 +0100
 @@ -132,12 +132,11 @@ static int ts_gpio;	/* Needed for ads784
   */
  static void ads7846_dev_init(void)
@@ -1639,32 +1456,7 @@ diff -u -p a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-343
  	gpio_set_debounce(ts_gpio, 310);
  }
  
-@@ -190,21 +189,19 @@ static void __init sdp3430_display_init(
- 	enable_gpio    = SDP3430_LCD_PANEL_ENABLE_GPIO;
- 	backlight_gpio = SDP3430_LCD_PANEL_BACKLIGHT_GPIO;
- 
--	r = gpio_request(enable_gpio, "LCD reset");
-+	r = gpio_request_one(enable_gpio, GPIOF_OUT_INIT_LOW, "LCD reset");
- 	if (r) {
- 		printk(KERN_ERR "failed to get LCD reset GPIO\n");
- 		goto err0;
- 	}
- 
--	r = gpio_request(backlight_gpio, "LCD Backlight");
-+	r = gpio_request_one(backlight_gpio, GPIOF_OUT_INIT_LOW,
-+			     "LCD Backlight");
- 	if (r) {
- 		printk(KERN_ERR "failed to get LCD backlight GPIO\n");
- 		goto err1;
- 	}
- 
--	gpio_direction_output(enable_gpio, 0);
--	gpio_direction_output(backlight_gpio, 0);
--
- 	return;
- err1:
- 	gpio_free(enable_gpio);
-@@ -360,12 +357,10 @@ static int sdp3430_twl_gpio_setup(struct
+@@ -360,12 +359,10 @@ static int sdp3430_twl_gpio_setup(struct
  	omap2_hsmmc_init(mmc);
  
  	/* gpio + 7 is "sub_lcd_en_bkl" (output/PWM1) */
@@ -1681,7 +1473,7 @@ diff -u -p a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-343
  }
 diff -u -p a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
 --- a/arch/arm/mach-omap2/board-am3517evm.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-am3517evm.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/board-am3517evm.c 2011-03-21 08:55:25.000000000 +0100
 @@ -252,30 +252,29 @@ static void __init am3517_evm_display_in
  	/*
  	 * Enable GPIO 182 = LCD Backlight Power
@@ -1720,7 +1512,7 @@ diff -u -p a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-a
  	return;
 diff -u -p a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
 --- a/arch/arm/mach-omap2/board-apollon.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-apollon.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap2/board-apollon.c 2011-03-21 08:55:24.000000000 +0100
 @@ -246,13 +246,12 @@ static inline void __init apollon_init_s
  	udelay(100);
  
@@ -1768,7 +1560,7 @@ diff -u -p a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apo
  
 diff -u -p a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
 --- a/arch/arm/mach-omap2/board-cm-t3517.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap2/board-cm-t3517.c 2011-03-21 08:55:25.000000000 +0100
 @@ -148,14 +148,13 @@ static void __init cm_t3517_init_rtc(voi
  {
  	int err;
@@ -1788,7 +1580,7 @@ diff -u -p a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm
  #else
 diff -u -p a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
 --- a/arch/arm/mach-omap2/board-devkit8000.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-devkit8000.c 2011-03-20 21:01:55.000000000 +0100
++++ b/arch/arm/mach-omap2/board-devkit8000.c 2011-03-21 08:55:26.000000000 +0100
 @@ -468,14 +468,12 @@ static void __init devkit8000_ads7846_in
  	int gpio = OMAP3_DEVKIT_TS_GPIO;
  	int ret;
@@ -1823,7 +1615,7 @@ diff -u -p a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-
  
 diff -u -p a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
 --- a/arch/arm/mach-omap2/board-ldp.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-ldp.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/board-ldp.c 2011-03-21 08:55:25.000000000 +0100
 @@ -206,12 +206,11 @@ static int ts_gpio;
   */
  static void ads7846_dev_init(void)
@@ -1854,7 +1646,7 @@ diff -u -p a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
  static struct platform_device ldp_lcd_device = {
 diff -u -p a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
 --- a/arch/arm/mach-omap2/board-n8x0.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-n8x0.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap2/board-n8x0.c 2011-03-21 08:55:24.000000000 +0100
 @@ -106,13 +106,13 @@ static void __init n8x0_usb_init(void)
  	static char	announce[] __initdata = KERN_INFO "TUSB 6010\n";
  
@@ -1907,34 +1699,8 @@ diff -u -p a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
  	mmc_data[0] = &mmc1_data;
 diff -u -p a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
 --- a/arch/arm/mach-omap2/board-omap3beagle.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c 2011-03-20 21:01:54.000000000 +0100
-@@ -88,22 +88,18 @@ static void __init omap3_beagle_init_rev
- 	omap_mux_init_gpio(172, OMAP_PIN_INPUT_PULLUP);
- 	omap_mux_init_gpio(173, OMAP_PIN_INPUT_PULLUP);
- 
--	ret = gpio_request(171, "rev_id_0");
-+	ret = gpio_request_one(171, GPIOF_IN, "rev_id_0");
- 	if (ret < 0)
- 		goto fail0;
- 
--	ret = gpio_request(172, "rev_id_1");
-+	ret = gpio_request_one(172, GPIOF_IN, "rev_id_1");
- 	if (ret < 0)
- 		goto fail1;
- 
--	ret = gpio_request(173, "rev_id_2");
-+	ret = gpio_request_one(173, GPIOF_IN, "rev_id_2");
- 	if (ret < 0)
- 		goto fail2;
- 
--	gpio_direction_input(171);
--	gpio_direction_input(172);
--	gpio_direction_input(173);
--
- 	beagle_rev = gpio_get_value(171) | (gpio_get_value(172) << 1)
- 			| (gpio_get_value(173) << 2);
- 
-@@ -243,13 +239,12 @@ static void __init beagle_display_init(v
++++ b/arch/arm/mach-omap2/board-omap3beagle.c 2011-03-21 08:55:25.000000000 +0100
+@@ -243,13 +243,12 @@ static void __init beagle_display_init(v
  {
  	int r;
  
@@ -1952,7 +1718,7 @@ diff -u -p a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board
  #include "sdram-micron-mt46h32m32lf-6.h"
 diff -u -p a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
 --- a/arch/arm/mach-omap2/board-omap3evm.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3evm.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3evm.c 2011-03-21 08:55:23.000000000 +0100
 @@ -171,13 +171,12 @@ static inline void __init omap3evm_init_
  		usleep_range(1, 2);
  	}
@@ -2071,7 +1837,7 @@ diff -u -p a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-om
  		/* setup EHCI phy reset config */
 diff -u -p a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
 --- a/arch/arm/mach-omap2/board-omap3pandora.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3pandora.c 2011-03-21 08:55:25.000000000 +0100
 @@ -575,14 +575,12 @@ static void __init omap3pandora_ads7846_
  	int gpio = OMAP3_PANDORA_TS_GPIO;
  	int ret;
@@ -2090,7 +1856,7 @@ diff -u -p a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/boar
  static int ads7846_get_pendown_state(void)
 diff -u -p a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
 --- a/arch/arm/mach-omap2/board-omap3stalker.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3stalker.c 2011-03-21 08:55:24.000000000 +0100
 @@ -107,15 +107,14 @@ static inline void __init omap3stalker_i
  		rate = clk_get_rate(l3ck);
  
@@ -2140,7 +1906,7 @@ diff -u -p a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/boar
  
 diff -u -p a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
 --- a/arch/arm/mach-omap2/board-omap3touchbook.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c 2011-03-21 08:55:22.000000000 +0100
 @@ -155,12 +155,11 @@ static int touchbook_twl_gpio_setup(stru
  	 * power switch and overcurrent detect
  	 */
@@ -2190,7 +1956,7 @@ diff -u -p a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/bo
  static int __init early_touchbook_revision(char *p)
 diff -u -p a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
 --- a/arch/arm/mach-omap2/board-rx51-peripherals.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c 2011-03-21 08:55:22.000000000 +0100
 @@ -557,10 +557,8 @@ static __init void rx51_init_si4713(void
  static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
  {
@@ -2206,7 +1972,7 @@ diff -u -p a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/
  }
 diff -u -p a/arch/arm/mach-omap2/board-rx51-video.c b/arch/arm/mach-omap2/board-rx51-video.c
 --- a/arch/arm/mach-omap2/board-rx51-video.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-rx51-video.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-omap2/board-rx51-video.c 2011-03-21 08:55:24.000000000 +0100
 @@ -76,13 +76,12 @@ static int __init rx51_video_init(void)
  		return 0;
  	}
@@ -2225,7 +1991,7 @@ diff -u -p a/arch/arm/mach-omap2/board-rx51-video.c b/arch/arm/mach-omap2/board-
  }
 diff -u -p a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
 --- a/arch/arm/mach-omap2/board-zoom-debugboard.c 2010-10-14 18:30:03.000000000 +0200
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-omap2/board-zoom-debugboard.c 2011-03-21 08:55:23.000000000 +0100
 @@ -74,12 +74,11 @@ static inline void __init zoom_init_smsc
  
  	zoom_smsc911x_resources[1].start = OMAP_GPIO_IRQ(eth_gpio);
@@ -2271,7 +2037,7 @@ diff -u -p a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/b
  		ret = 0;
 diff -u -p a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
 --- a/arch/arm/mach-omap2/board-zoom-display.c 2011-02-19 08:28:51.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-zoom-display.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/board-zoom-display.c 2011-03-21 08:55:25.000000000 +0100
 @@ -30,21 +30,21 @@ static void zoom_lcd_panel_init(void)
  			LCD_PANEL_RESET_GPIO_PROD :
  			LCD_PANEL_RESET_GPIO_PILOT;
@@ -2300,7 +2066,7 @@ diff -u -p a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/boar
  err0:
 diff -u -p a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
 --- a/arch/arm/mach-omap2/board-zoom-peripherals.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c 2011-03-20 21:01:55.000000000 +0100
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c 2011-03-21 08:55:26.000000000 +0100
 @@ -276,13 +276,13 @@ static int zoom_twl_gpio_setup(struct de
  	zoom_vsim_supply.dev = mmc[0].dev;
  	zoom_vmmc2_supply.dev = mmc[1].dev;
@@ -2319,7 +2085,7 @@ diff -u -p a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/
  }
 diff -u -p a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x.c
 --- a/arch/arm/mach-omap2/gpmc-smc91x.c 2009-12-12 00:23:19.000000000 +0100
-+++ b/arch/arm/mach-omap2/gpmc-smc91x.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-omap2/gpmc-smc91x.c 2011-03-21 08:55:23.000000000 +0100
 @@ -147,25 +147,24 @@ void __init gpmc_smc91x_init(struct omap
  			goto free1;
  	}
@@ -2353,7 +2119,7 @@ diff -u -p a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x
  		gpio_set_value(gpmc_cfg->gpio_reset, 0);
 diff -u -p a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
 --- a/arch/arm/mach-omap2/gpmc-smsc911x.c 2010-09-30 17:54:14.000000000 +0200
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c 2011-03-21 08:55:25.000000000 +0100
 @@ -71,26 +71,25 @@ void __init gpmc_smsc911x_init(struct om
  	gpmc_smsc911x_resources[0].start = cs_mem_base + 0x0;
  	gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
@@ -2386,7 +2152,7 @@ diff -u -p a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc
  		gpio_set_value(gpmc_cfg->gpio_reset, 1);
 diff -u -p a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
 --- a/arch/arm/mach-omap2/usb-tusb6010.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-omap2/usb-tusb6010.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-omap2/usb-tusb6010.c 2011-03-21 08:55:25.000000000 +0100
 @@ -293,12 +293,11 @@ tusb6010_setup_interface(struct musb_hdr
  			);
  
@@ -2403,7 +2169,7 @@ diff -u -p a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb60
  	/* set up memory timings ... can speed them up later */
 diff -u -p a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
 --- a/arch/arm/mach-orion5x/dns323-setup.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-orion5x/dns323-setup.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-orion5x/dns323-setup.c 2011-03-21 08:55:23.000000000 +0100
 @@ -642,8 +642,8 @@ static void __init dns323_init(void)
  		 * DNS323_GPIO_LED_POWER1 to also be low.
  		 */
@@ -2417,7 +2183,7 @@ diff -u -p a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323
  		i2c_register_board_info(0, dns323ab_i2c_devices,
 diff -u -p a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
 --- a/arch/arm/mach-pxa/cm-x270.c 2010-12-31 15:18:30.000000000 +0100
-+++ b/arch/arm/mach-pxa/cm-x270.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-pxa/cm-x270.c 2011-03-21 08:55:24.000000000 +0100
 @@ -208,10 +208,9 @@ static int cmx270_marathon_probe(struct 
  	int gpio, err;
  
@@ -2432,7 +2198,7 @@ diff -u -p a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
  	pxa2xx_mfp_config(ARRAY_AND_SIZE(cmx270_marathon_on));
 diff -u -p a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
 --- a/arch/arm/mach-pxa/cm-x300.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/cm-x300.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-pxa/cm-x300.c 2011-03-21 08:55:22.000000000 +0100
 @@ -484,14 +484,14 @@ static int cm_x300_ulpi_phy_reset(void)
  	int err;
  
@@ -2452,7 +2218,7 @@ diff -u -p a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
  	msleep(10);
 diff -u -p a/arch/arm/mach-pxa/colibri-pxa3xx.c b/arch/arm/mach-pxa/colibri-pxa3xx.c
 --- a/arch/arm/mach-pxa/colibri-pxa3xx.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-pxa/colibri-pxa3xx.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-pxa/colibri-pxa3xx.c 2011-03-21 08:55:22.000000000 +0100
 @@ -103,8 +103,7 @@ static struct pxafb_mach_info sharp_lq43
  void __init colibri_pxa3xx_init_lcd(int bl_pin)
  {
@@ -2465,7 +2231,7 @@ diff -u -p a/arch/arm/mach-pxa/colibri-pxa3xx.c b/arch/arm/mach-pxa/colibri-pxa3
  #endif
 diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
 --- a/arch/arm/mach-pxa/em-x270.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/em-x270.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-pxa/em-x270.c 2011-03-21 08:55:25.000000000 +0100
 @@ -379,23 +379,19 @@ static void __init em_x270_init_nand(voi
  {
  	int err;
@@ -2492,13 +2258,7 @@ diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
  	platform_device_register(&em_x270_nand);
  }
  #else
-@@ -469,17 +465,16 @@ static int em_x270_usb_hub_init(void)
- 	if (IS_ERR(em_x270_usb_ldo))
- 		return PTR_ERR(em_x270_usb_ldo);
- 
--	err = gpio_request(GPIO9_USB_VBUS_EN, "vbus en");
-+	err = gpio_request_one(GPIO9_USB_VBUS_EN, GPIOF_OUT_INIT_LOW,
-+			       "vbus en");
+@@ -473,12 +469,11 @@ static int em_x270_usb_hub_init(void)
  	if (err)
  		goto err_free_usb_ldo;
  
@@ -2509,10 +2269,9 @@ diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
  
  	/* USB Hub power-on and reset */
 -	gpio_direction_output(usb_hub_reset, 1);
--	gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
+ 	gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
  	regulator_enable(em_x270_usb_ldo);
  	gpio_set_value(usb_hub_reset, 0);
- 	gpio_set_value(usb_hub_reset, 1);
 @@ -568,21 +563,20 @@ static int em_x270_mci_init(struct devic
  	}
  
@@ -2538,20 +2297,7 @@ diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
  	}
  
  	return 0;
-@@ -732,29 +726,29 @@ static unsigned long em_x270_libertas_pi
- 
- static int em_x270_libertas_setup(struct spi_device *spi)
- {
--	int err = gpio_request(GPIO115_WLAN_PWEN, "WLAN PWEN");
-+	int err = gpio_request_one(GPIO115_WLAN_PWEN, GPIOF_OUT_INIT_LOW,
-+				   "WLAN PWEN");
- 	if (err)
- 		return err;
- 
--	err = gpio_request(GPIO19_WLAN_STRAP, "WLAN STRAP");
-+	err = gpio_request_one(GPIO19_WLAN_STRAP, GPIOF_OUT_INIT_HIGH,
-+			       "WLAN STRAP");
- 	if (err)
+@@ -741,11 +735,11 @@ static int em_x270_libertas_setup(struct
  		goto err_free_pwen;
  
  	if (machine_is_exeda()) {
@@ -2565,15 +2311,6 @@ diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
  		msleep(100);
  	}
  
--	gpio_direction_output(GPIO19_WLAN_STRAP, 1);
- 	msleep(100);
- 
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(em_x270_libertas_pin_config));
- 
--	gpio_direction_output(GPIO115_WLAN_PWEN, 0);
- 	msleep(100);
- 	gpio_set_value(GPIO115_WLAN_PWEN, 1);
- 	msleep(100);
 @@ -951,12 +945,10 @@ static int em_x270_sensor_init(void)
  {
  	int ret;
@@ -2588,79 +2325,10 @@ diff -u -p a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
  	em_x270_camera_ldo = regulator_get(NULL, "vcc cam");
  	if (em_x270_camera_ldo == NULL) {
  		gpio_free(cam_reset);
-diff -u -p a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
---- a/arch/arm/mach-pxa/eseries.c 2010-12-28 18:26:02.000000000 +0100
-+++ b/arch/arm/mach-pxa/eseries.c 2011-03-20 21:01:51.000000000 +0100
-@@ -97,10 +97,8 @@ int eseries_tmio_resume(struct platform_
- 
- void eseries_get_tmio_gpios(void)
- {
--	gpio_request(GPIO_ESERIES_TMIO_SUSPEND, NULL);
--	gpio_request(GPIO_ESERIES_TMIO_PCLR, NULL);
--	gpio_direction_output(GPIO_ESERIES_TMIO_SUSPEND, 0);
--	gpio_direction_output(GPIO_ESERIES_TMIO_PCLR, 0);
-+	gpio_request_one(GPIO_ESERIES_TMIO_SUSPEND, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_ESERIES_TMIO_PCLR, GPIOF_OUT_INIT_LOW, NULL);
- }
- 
- /* TMIO controller uses the same resources on all e-series machines. */
-diff -u -p a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
---- a/arch/arm/mach-pxa/ezx.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/ezx.c 2011-03-20 21:01:52.000000000 +0100
-@@ -702,21 +702,19 @@ static int a780_camera_init(void)
- 	 * GPIO50_nCAM_EN is active low
- 	 * GPIO19_GEN1_CAM_RST is active on rising edge
- 	 */
--	err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
-+	err = gpio_request_one(GPIO50_nCAM_EN, GPIOF_OUT_INIT_HIGH, "nCAM_EN");
- 	if (err) {
- 		pr_err("%s: Failed to request nCAM_EN\n", __func__);
- 		goto fail;
- 	}
- 
--	err = gpio_request(GPIO19_GEN1_CAM_RST, "CAM_RST");
-+	err = gpio_request_one(GPIO19_GEN1_CAM_RST, GPIOF_OUT_INIT_LOW,
-+			       "CAM_RST");
- 	if (err) {
- 		pr_err("%s: Failed to request CAM_RST\n", __func__);
- 		goto fail_gpio_cam_rst;
- 	}
- 
--	gpio_direction_output(GPIO50_nCAM_EN, 1);
--	gpio_direction_output(GPIO19_GEN1_CAM_RST, 0);
--
- 	return 0;
- 
- fail_gpio_cam_rst:
-@@ -971,21 +969,19 @@ static int a910_camera_init(void)
- 	 * GPIO50_nCAM_EN is active low
- 	 * GPIO28_GEN2_CAM_RST is active on rising edge
- 	 */
--	err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
-+	err = gpio_request_one(GPIO50_nCAM_EN, GPIOF_OUT_INIT_HIGH, "nCAM_EN");
- 	if (err) {
- 		pr_err("%s: Failed to request nCAM_EN\n", __func__);
- 		goto fail;
- 	}
- 
--	err = gpio_request(GPIO28_GEN2_CAM_RST, "CAM_RST");
-+	err = gpio_request_one(GPIO28_GEN2_CAM_RST, GPIOF_OUT_INIT_LOW,
-+			       "CAM_RST");
- 	if (err) {
- 		pr_err("%s: Failed to request CAM_RST\n", __func__);
- 		goto fail_gpio_cam_rst;
- 	}
- 
--	gpio_direction_output(GPIO50_nCAM_EN, 1);
--	gpio_direction_output(GPIO28_GEN2_CAM_RST, 0);
--
- 	return 0;
- 
- fail_gpio_cam_rst:
 diff -u -p a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
 --- a/arch/arm/mach-pxa/magician.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/magician.c 2011-03-20 21:01:53.000000000 +0100
-@@ -748,15 +748,15 @@ static void __init magician_init(void)
++++ b/arch/arm/mach-pxa/magician.c 2011-03-21 08:55:23.000000000 +0100
+@@ -748,8 +748,8 @@ static void __init magician_init(void)
  		lcd_select = board_id & 0x8;
  		pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
  		if (lcd_select && (system_rev < 3)) {
@@ -2669,49 +2337,11 @@ diff -u -p a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
 +			gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
 +					 GPIOF_OUT_INIT_LOW, "SAMSUNG_POWER");
  		}
--		gpio_request(GPIO104_MAGICIAN_LCD_POWER_1, "LCD_POWER_1");
--		gpio_request(GPIO105_MAGICIAN_LCD_POWER_2, "LCD_POWER_2");
--		gpio_request(GPIO106_MAGICIAN_LCD_POWER_3, "LCD_POWER_3");
--		gpio_direction_output(GPIO104_MAGICIAN_LCD_POWER_1, 0);
--		gpio_direction_output(GPIO105_MAGICIAN_LCD_POWER_2, 0);
--		gpio_direction_output(GPIO106_MAGICIAN_LCD_POWER_3, 0);
-+		gpio_request_one(GPIO104_MAGICIAN_LCD_POWER_1,
-+				 GPIOF_OUT_INIT_LOW, "LCD_POWER_1");
-+		gpio_request_one(GPIO105_MAGICIAN_LCD_POWER_2,
-+				 GPIOF_OUT_INIT_LOW, "LCD_POWER_2");
-+		gpio_request_one(GPIO106_MAGICIAN_LCD_POWER_3,
-+				 GPIOF_OUT_INIT_LOW, "LCD_POWER_3");
- 		set_pxa_fb_info(lcd_select ? &samsung_info : &toppoly_info);
- 	} else
- 		pr_err("LCD detection: CPLD mapping failed\n");
-diff -u -p a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
---- a/arch/arm/mach-pxa/poodle.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/poodle.c 2011-03-20 21:01:50.000000000 +0100
-@@ -234,17 +234,16 @@ static int poodle_mci_init(struct device
- {
- 	int err;
- 
--	err = gpio_request(POODLE_GPIO_SD_PWR, "SD_PWR");
-+	err = gpio_request_one(POODLE_GPIO_SD_PWR, GPIOF_OUT_INIT_LOW,
-+			       "SD_PWR");
- 	if (err)
- 		goto err_free_2;
- 
--	err = gpio_request(POODLE_GPIO_SD_PWR1, "SD_PWR1");
-+	err = gpio_request_one(POODLE_GPIO_SD_PWR1, GPIOF_OUT_INIT_LOW,
-+			       "SD_PWR1");
- 	if (err)
- 		goto err_free_3;
- 
--	gpio_direction_output(POODLE_GPIO_SD_PWR, 0);
--	gpio_direction_output(POODLE_GPIO_SD_PWR1, 0);
--
- 	return 0;
- 
- err_free_3:
+ 		gpio_request(GPIO104_MAGICIAN_LCD_POWER_1, "LCD_POWER_1");
+ 		gpio_request(GPIO105_MAGICIAN_LCD_POWER_2, "LCD_POWER_2");
 diff -u -p a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
 --- a/arch/arm/mach-pxa/saar.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/saar.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-pxa/saar.c 2011-03-21 08:55:22.000000000 +0100
 @@ -413,13 +413,13 @@ static void ltm022a97a_lcd_power(int on,
  	int err;
  
@@ -2730,7 +2360,7 @@ diff -u -p a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
  
 diff -u -p a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
 --- a/arch/arm/mach-pxa/sharpsl_pm.c 2010-12-28 18:26:03.000000000 +0100
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-pxa/sharpsl_pm.c 2011-03-21 08:55:21.000000000 +0100
 @@ -899,12 +899,13 @@ static int __devinit sharpsl_pm_probe(st
  
  	sharpsl_pm.machinfo->init();
@@ -2753,7 +2383,7 @@ diff -u -p a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
  	if (request_irq(IRQ_GPIO(sharpsl_pm.machinfo->gpio_acin), sharpsl_ac_isr, IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, "AC Input Detect", sharpsl_ac_isr)) {
 diff -u -p a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
 --- a/arch/arm/mach-pxa/stargate2.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/stargate2.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-pxa/stargate2.c 2011-03-21 08:55:24.000000000 +0100
 @@ -693,19 +693,18 @@ static int stargate2_mci_init(struct dev
  {
  	int err;
@@ -2794,7 +2424,7 @@ diff -u -p a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
  	gpio_set_value(SG2_BT_RESET, 0);
 diff -u -p a/arch/arm/mach-pxa/zylonite_pxa300.c b/arch/arm/mach-pxa/zylonite_pxa300.c
 --- a/arch/arm/mach-pxa/zylonite_pxa300.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-pxa/zylonite_pxa300.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-pxa/zylonite_pxa300.c 2011-03-21 08:55:22.000000000 +0100
 @@ -197,8 +197,7 @@ static void __init zylonite_detect_lcd_p
  	for (i = 0; i < NUM_LCD_DETECT_PINS; i++) {
  		id = id << 1;
@@ -2807,7 +2437,7 @@ diff -u -p a/arch/arm/mach-pxa/zylonite_pxa300.c b/arch/arm/mach-pxa/zylonite_px
  			id = id | 0x1;
 diff -u -p a/arch/arm/mach-pxa/zylonite_pxa320.c b/arch/arm/mach-pxa/zylonite_pxa320.c
 --- a/arch/arm/mach-pxa/zylonite_pxa320.c 2010-01-12 18:05:01.000000000 +0100
-+++ b/arch/arm/mach-pxa/zylonite_pxa320.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-pxa/zylonite_pxa320.c 2011-03-21 08:55:21.000000000 +0100
 @@ -176,8 +176,7 @@ static void __init zylonite_detect_lcd_p
  	for (i = 0; i < NUM_LCD_DETECT_PINS; i++) {
  		id = id << 1;
@@ -2820,7 +2450,7 @@ diff -u -p a/arch/arm/mach-pxa/zylonite_pxa320.c b/arch/arm/mach-pxa/zylonite_px
  			id = id | 0x1;
 diff -u -p a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
 --- a/arch/arm/mach-s3c2410/mach-h1940.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-s3c2410/mach-h1940.c 2011-03-21 08:55:24.000000000 +0100
 @@ -305,10 +305,10 @@ int h1940_bat_init(void)
  {
  	int ret;
@@ -2845,44 +2475,9 @@ diff -u -p a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h19
  	s3c_gpio_setpull(S3C2410_GPB(0), S3C_GPIO_PULL_NONE);
  	s3c_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
  	gpio_set_value(H1940_LATCH_MAX1698_nSHUTDOWN, 1);
-@@ -700,42 +699,29 @@ static void __init h1940_init(void)
- 	      | (0x03 << S3C24XX_PLLCON_SDIVSHIFT);
- 	writel(tmp, S3C2410_UPLLCON);
- 
--	gpio_request(S3C2410_GPC(0), "LCD power");
--	gpio_request(S3C2410_GPC(1), "LCD power");
--	gpio_request(S3C2410_GPC(4), "LCD power");
--	gpio_request(S3C2410_GPC(5), "LCD power");
--	gpio_request(S3C2410_GPC(6), "LCD power");
--	gpio_request(H1940_LATCH_LCD_P0, "LCD power");
--	gpio_request(H1940_LATCH_LCD_P1, "LCD power");
--	gpio_request(H1940_LATCH_LCD_P2, "LCD power");
--	gpio_request(H1940_LATCH_LCD_P3, "LCD power");
--	gpio_request(H1940_LATCH_LCD_P4, "LCD power");
--	gpio_request(H1940_LATCH_MAX1698_nSHUTDOWN, "LCD power");
--	gpio_direction_output(S3C2410_GPC(0), 0);
--	gpio_direction_output(S3C2410_GPC(1), 0);
--	gpio_direction_output(S3C2410_GPC(4), 0);
--	gpio_direction_output(S3C2410_GPC(5), 0);
--	gpio_direction_input(S3C2410_GPC(6));
--	gpio_direction_output(H1940_LATCH_LCD_P0, 0);
--	gpio_direction_output(H1940_LATCH_LCD_P1, 0);
--	gpio_direction_output(H1940_LATCH_LCD_P2, 0);
--	gpio_direction_output(H1940_LATCH_LCD_P3, 0);
--	gpio_direction_output(H1940_LATCH_LCD_P4, 0);
--	gpio_direction_output(H1940_LATCH_MAX1698_nSHUTDOWN, 0);
-+	gpio_request_one(S3C2410_GPC(0), GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(S3C2410_GPC(1), GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(S3C2410_GPC(4), GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(S3C2410_GPC(5), GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(S3C2410_GPC(6), GPIOF_IN, "LCD power");
-+	gpio_request_one(H1940_LATCH_LCD_P0, GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(H1940_LATCH_LCD_P1, GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(H1940_LATCH_LCD_P2, GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(H1940_LATCH_LCD_P3, GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(H1940_LATCH_LCD_P4, GPIOF_OUT_INIT_LOW, "LCD power");
-+	gpio_request_one(H1940_LATCH_MAX1698_nSHUTDOWN, GPIOF_OUT_INIT_LOW,
-+			 "LCD power");
+@@ -723,8 +722,7 @@ static void __init h1940_init(void)
+ 	gpio_direction_output(H1940_LATCH_LCD_P4, 0);
+ 	gpio_direction_output(H1940_LATCH_MAX1698_nSHUTDOWN, 0);
  
 -	gpio_request(H1940_LATCH_SD_POWER, "SD power");
 -	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
@@ -2890,26 +2485,9 @@ diff -u -p a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h19
  
  	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
  
--	gpio_request(S3C2410_GPA(1), "Red LED blink");
--	gpio_request(S3C2410_GPA(3), "Blue LED blink");
--	gpio_request(S3C2410_GPA(7), "Green LED blink");
--	gpio_request(H1940_LATCH_LED_FLASH, "LED blink");
--	gpio_direction_output(S3C2410_GPA(1), 0);
--	gpio_direction_output(S3C2410_GPA(3), 0);
--	gpio_direction_output(S3C2410_GPA(7), 0);
--	gpio_direction_output(H1940_LATCH_LED_FLASH, 0);
-+	gpio_request_one(S3C2410_GPA(1), GPIOF_OUT_INIT_LOW, "Red LED blink");
-+	gpio_request_one(S3C2410_GPA(3), GPIOF_OUT_INIT_LOW, "Blue LED blink");
-+	gpio_request_one(S3C2410_GPA(7), GPIOF_OUT_INIT_LOW,
-+			 "Green LED blink");
-+	gpio_request_one(H1940_LATCH_LED_FLASH, GPIOF_OUT_INIT_LOW,
-+			 "LED blink");
- 
- 	i2c_register_board_info(0, h1940_i2c_devices,
- 		ARRAY_SIZE(h1940_i2c_devices));
 diff -u -p a/arch/arm/mach-s3c2410/mach-qt2410.c b/arch/arm/mach-s3c2410/mach-qt2410.c
 --- a/arch/arm/mach-s3c2410/mach-qt2410.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-s3c2410/mach-qt2410.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/arm/mach-s3c2410/mach-qt2410.c 2011-03-21 08:55:23.000000000 +0100
 @@ -354,8 +354,8 @@ static void __init qt2410_machine_init(v
  	s3c24xx_udc_set_platdata(&qt2410_udc_cfg);
  	s3c_i2c0_set_platdata(NULL);
@@ -2921,39 +2499,9 @@ diff -u -p a/arch/arm/mach-s3c2410/mach-qt2410.c b/arch/arm/mach-s3c2410/mach-qt
  
  	platform_add_devices(qt2410_devices, ARRAY_SIZE(qt2410_devices));
  	s3c_pm_init();
-diff -u -p a/arch/arm/mach-s3c2410/usb-simtec.c b/arch/arm/mach-s3c2410/usb-simtec.c
---- a/arch/arm/mach-s3c2410/usb-simtec.c 2010-01-20 13:04:05.000000000 +0100
-+++ b/arch/arm/mach-s3c2410/usb-simtec.c 2011-03-20 21:01:53.000000000 +0100
-@@ -110,23 +110,20 @@ int usb_simtec_init(void)
- 
- 	printk("USB Power Control, Copyright 2004 Simtec Electronics\n");
- 
--	ret = gpio_request(S3C2410_GPB(4), "USB power control");
-+	ret = gpio_request_one(S3C2410_GPB(4), GPIOF_OUT_INIT_HIGH,
-+			       "USB power control");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPB4\n", __func__);
- 		return ret;
- 	}
- 
--	ret = gpio_request(S3C2410_GPG(10), "USB overcurrent");
-+	ret = gpio_request_one(S3C2410_GPG(10), GPIOF_IN, "USB overcurrent");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPG10\n", __func__);
- 		gpio_free(S3C2410_GPB(4));
- 		return ret;
- 	}
- 
--	/* turn power on */
--	gpio_direction_output(S3C2410_GPB(4), 1);
--	gpio_direction_input(S3C2410_GPG(10));
--
- 	s3c_ohci_set_platdata(&usb_simtec_info);
- 	return 0;
- }
 diff -u -p a/arch/arm/mach-s3c2412/mach-jive.c b/arch/arm/mach-s3c2412/mach-jive.c
 --- a/arch/arm/mach-s3c2412/mach-jive.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-s3c2412/mach-jive.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-s3c2412/mach-jive.c 2011-03-21 08:55:23.000000000 +0100
 @@ -636,11 +636,9 @@ static void __init jive_machine_init(voi
  
  	/* initialise the spi */
@@ -2981,7 +2529,7 @@ diff -u -p a/arch/arm/mach-s3c2412/mach-jive.c b/arch/arm/mach-s3c2412/mach-jive
  	 * selectable USB port to USB device mode. */
 diff -u -p a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
 --- a/arch/arm/mach-s3c2416/mach-smdk2416.c 2011-01-09 09:32:57.000000000 +0100
-+++ b/arch/arm/mach-s3c2416/mach-smdk2416.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-s3c2416/mach-smdk2416.c 2011-03-21 08:55:25.000000000 +0100
 @@ -203,14 +203,11 @@ static void __init smdk2416_machine_init
  	s3c_sdhci0_set_platdata(&smdk2416_hsmmc0_pdata);
  	s3c_sdhci1_set_platdata(&smdk2416_hsmmc1_pdata);
@@ -3002,7 +2550,7 @@ diff -u -p a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-
  	smdk_machine_init();
 diff -u -p a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
 --- a/arch/arm/mach-s3c2440/mach-mini2440.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c 2011-03-21 08:55:21.000000000 +0100
 @@ -618,8 +618,8 @@ static void __init mini2440_init(void)
  	s3c_gpio_cfgpin(S3C2410_GPC(0), S3C2410_GPC0_LEND);
  
@@ -3016,7 +2564,7 @@ diff -u -p a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-
  	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
 diff -u -p a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
 --- a/arch/arm/mach-s3c2440/mach-osiris-dvs.c 2009-12-08 20:58:27.000000000 +0100
-+++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c 2011-03-21 08:55:22.000000000 +0100
 @@ -99,15 +99,13 @@ static int __devinit osiris_dvs_probe(st
  
  	dev_info(&pdev->dev, "initialising\n");
@@ -3037,7 +2585,7 @@ diff -u -p a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mac
  	if (ret) {
 diff -u -p a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
 --- a/arch/arm/mach-s3c2440/mach-rx1950.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c 2011-03-21 08:55:21.000000000 +0100
 @@ -785,8 +785,8 @@ static void __init rx1950_init_machine(v
  						S3C2410_MISCCR_USBSUSPND1, 0x0);
  
@@ -3049,28 +2597,9 @@ diff -u -p a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx
  
  	for (i = 0; i < 8; i++)
  		WARN_ON(gpio_request(S3C2410_GPC(i), "LCD power"));
-@@ -802,12 +802,12 @@ static void __init rx1950_init_machine(v
- 
- 	WARN_ON(gpio_request(S3C2410_GPB(1), "LCD power"));
- 
--	WARN_ON(gpio_request(S3C2410_GPA(3), "Red blink"));
--	WARN_ON(gpio_request(S3C2410_GPA(4), "Green blink"));
--	WARN_ON(gpio_request(S3C2410_GPJ(6), "LED blink"));
--	gpio_direction_output(S3C2410_GPA(3), 0);
--	gpio_direction_output(S3C2410_GPA(4), 0);
--	gpio_direction_output(S3C2410_GPJ(6), 0);
-+	WARN_ON(gpio_request_one(S3C2410_GPA(3), GPIOF_OUT_INIT_LOW,
-+				 "Red blink"));
-+	WARN_ON(gpio_request_one(S3C2410_GPA(4), GPIOF_OUT_INIT_LOW,
-+				 "Green blink"));
-+	WARN_ON(gpio_request_one(S3C2410_GPJ(6), GPIOF_OUT_INIT_LOW,
-+				 "LED blink"));
- 
- 	platform_add_devices(rx1950_devices, ARRAY_SIZE(rx1950_devices));
- 
 diff -u -p a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
 --- a/arch/arm/mach-s3c64xx/mach-hmt.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-s3c64xx/mach-hmt.c 2011-03-21 08:55:22.000000000 +0100
 @@ -251,14 +251,12 @@ static void __init hmt_machine_init(void
  	s3c_fb_set_platdata(&hmt_lcd_pdata);
  	s3c_nand_set_platdata(&hmt_nand_info);
@@ -3094,7 +2623,7 @@ diff -u -p a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
  }
 diff -u -p a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
 --- a/arch/arm/mach-s3c64xx/mach-smartq.c 2010-09-04 09:22:04.000000000 +0200
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c 2011-03-21 08:55:22.000000000 +0100
 @@ -189,13 +189,11 @@ static int __init smartq_lcd_setup_gpio(
  {
  	int ret;
@@ -3129,65 +2658,9 @@ diff -u -p a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-sm
  	pm_power_off = smartq_power_off;
  
  	return ret;
-@@ -294,13 +290,15 @@ static int __init smartq_usb_host_init(v
- {
- 	int ret;
- 
--	ret = gpio_request(S3C64XX_GPL(0), "USB power control");
-+	ret = gpio_request_one(S3C64XX_GPL(0), GPIOF_OUT_INIT_LOW,
-+			       "USB power control");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPL0\n", __func__);
- 		return ret;
- 	}
- 
--	ret = gpio_request(S3C64XX_GPL(1), "USB host power control");
-+	ret = gpio_request_one(S3C64XX_GPL(1), GPIOF_OUT_INIT_LOW,
-+			       "USB host power control");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPL1\n", __func__);
- 		goto err;
-@@ -316,8 +314,6 @@ static int __init smartq_usb_host_init(v
- 	}
- 
- 	/* turn power off */
--	gpio_direction_output(S3C64XX_GPL(0), 0);
--	gpio_direction_output(S3C64XX_GPL(1), 0);
- 	if (!machine_is_smartq5())
- 		gpio_direction_input(S3C64XX_GPL(10));
- 
-@@ -343,24 +339,22 @@ static int __init smartq_wifi_init(void)
- {
- 	int ret;
- 
--	ret = gpio_request(S3C64XX_GPK(1), "wifi control");
-+	ret = gpio_request_one(S3C64XX_GPK(1), GPIOF_OUT_INIT_HIGH,
-+			       "wifi control");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPK1\n", __func__);
- 		return ret;
- 	}
- 
--	ret = gpio_request(S3C64XX_GPK(2), "wifi reset");
-+	ret = gpio_request_one(S3C64XX_GPK(2), GPIOF_OUT_INIT_LOW,
-+			       "wifi reset");
- 	if (ret < 0) {
- 		pr_err("%s: failed to get GPK2\n", __func__);
- 		gpio_free(S3C64XX_GPK(1));
- 		return ret;
- 	}
- 
--	/* turn power on */
--	gpio_direction_output(S3C64XX_GPK(1), 1);
--
- 	/* reset device */
--	gpio_direction_output(S3C64XX_GPK(2), 0);
- 	mdelay(100);
- 	gpio_set_value(S3C64XX_GPK(2), 1);
- 	gpio_direction_input(S3C64XX_GPK(2));
 diff -u -p a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
 --- a/arch/arm/mach-s5pv210/mach-aquila.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-s5pv210/mach-aquila.c 2011-03-21 08:55:25.000000000 +0100
 @@ -595,8 +595,7 @@ static struct s3c_sdhci_platdata aquila_
  
  static void aquila_setup_sdhci(void)
@@ -3200,7 +2673,7 @@ diff -u -p a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aq
  	s3c_sdhci1_set_platdata(&aquila_hsmmc1_data);
 diff -u -p a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
 --- a/arch/arm/mach-s5pv210/mach-smdkv210.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c 2011-03-21 08:55:25.000000000 +0100
 @@ -153,15 +153,12 @@ static void smdkv210_lte480wv_set_power(
  {
  	if (power) {
@@ -3231,7 +2704,7 @@ diff -u -p a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-
  	}
 diff -u -p a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
 --- a/arch/arm/mach-shmobile/board-ag5evm.c 2011-02-02 17:27:36.000000000 +0100
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-shmobile/board-ag5evm.c 2011-03-21 08:55:25.000000000 +0100
 @@ -418,14 +418,11 @@ static void __init ag5evm_init(void)
  	gpio_request(GPIO_FN_MMCD0_5, NULL);
  	gpio_request(GPIO_FN_MMCD0_6, NULL);
@@ -3270,7 +2743,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/boar
  	/* MIPI-DSI clock setup */
 diff -u -p a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
 --- a/arch/arm/mach-shmobile/board-ap4evb.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-shmobile/board-ap4evb.c 2011-03-21 08:55:26.000000000 +0100
 @@ -1054,9 +1054,7 @@ static int ts_get_pendown_state(void)
  
  	gpio_free(GPIO_TSC_IRQ);
@@ -3282,26 +2755,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/boar
  
  	val = gpio_get_value(GPIO_TSC_PORT);
  
-@@ -1139,14 +1137,10 @@ static void __init ap4evb_init(void)
- 	gpio_request(GPIO_FN_IRQ6_39,	NULL);
- 
- 	/* enable Debug switch (S6) */
--	gpio_request(GPIO_PORT32, NULL);
--	gpio_request(GPIO_PORT33, NULL);
--	gpio_request(GPIO_PORT34, NULL);
--	gpio_request(GPIO_PORT35, NULL);
--	gpio_direction_input(GPIO_PORT32);
--	gpio_direction_input(GPIO_PORT33);
--	gpio_direction_input(GPIO_PORT34);
--	gpio_direction_input(GPIO_PORT35);
-+	gpio_request_one(GPIO_PORT32, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PORT33, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PORT34, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PORT35, GPIOF_IN, NULL);
- 	gpio_export(GPIO_PORT32, 0);
- 	gpio_export(GPIO_PORT33, 0);
- 	gpio_export(GPIO_PORT34, 0);
-@@ -1198,8 +1192,7 @@ static void __init ap4evb_init(void)
+@@ -1198,8 +1196,7 @@ static void __init ap4evb_init(void)
  	gpio_request(GPIO_FN_FSIAILR,	NULL);
  	gpio_request(GPIO_FN_FSIAISLD,	NULL);
  	gpio_request(GPIO_FN_FSIAOSLD,	NULL);
@@ -3311,7 +2765,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/boar
  
  	gpio_request(GPIO_PORT9, NULL);
  	gpio_request(GPIO_PORT10, NULL);
-@@ -1207,8 +1200,7 @@ static void __init ap4evb_init(void)
+@@ -1207,8 +1204,7 @@ static void __init ap4evb_init(void)
  	gpio_no_direction(GPIO_PORT10CR); /* FSIAOLR needs no direction */
  
  	/* card detect pin for MMC slot (CN7) */
@@ -3321,7 +2775,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/boar
  
  	/* setup FSI2 port B (HDMI) */
  	gpio_request(GPIO_FN_FSIBCK, NULL);
-@@ -1296,11 +1288,9 @@ static void __init ap4evb_init(void)
+@@ -1296,11 +1292,9 @@ static void __init ap4evb_init(void)
  	gpio_request(GPIO_FN_LCDDISP,  NULL);
  	gpio_request(GPIO_FN_LCDDCK,   NULL);
  
@@ -3337,7 +2791,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/boar
  	lcdc_info.ch[0].interface_type		= RGB18;
 diff -u -p a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
 --- a/arch/arm/mach-shmobile/board-g3evm.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/arm/mach-shmobile/board-g3evm.c 2011-03-20 21:01:55.000000000 +0100
++++ b/arch/arm/mach-shmobile/board-g3evm.c 2011-03-21 08:55:26.000000000 +0100
 @@ -271,18 +271,15 @@ static void __init g3evm_init(void)
  	sh7367_pinmux_init();
  
@@ -3362,7 +2816,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board
  	/* SCIFA1 */
 diff -u -p a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
 --- a/arch/arm/mach-shmobile/board-g4evm.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/arm/mach-shmobile/board-g4evm.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-shmobile/board-g4evm.c 2011-03-21 08:55:25.000000000 +0100
 @@ -315,23 +315,19 @@ static void __init g4evm_init(void)
  	sh7377_pinmux_init();
  
@@ -3393,7 +2847,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board
  	/* USBHS */
 diff -u -p a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
 --- a/arch/arm/mach-shmobile/board-mackerel.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-shmobile/board-mackerel.c 2011-03-20 21:01:55.000000000 +0100
++++ b/arch/arm/mach-shmobile/board-mackerel.c 2011-03-21 08:55:27.000000000 +0100
 @@ -1058,11 +1058,9 @@ static void __init mackerel_init(void)
  	gpio_request(GPIO_FN_LCDDISP,  NULL);
  	gpio_request(GPIO_FN_LCDDCK,   NULL);
@@ -3440,7 +2894,7 @@ diff -u -p a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/bo
  	gpio_request(GPIO_FN_MMCD0_0, NULL);
 diff -u -p a/arch/arm/mach-stmp378x/stmp378x_devb.c b/arch/arm/mach-stmp378x/stmp378x_devb.c
 --- a/arch/arm/mach-stmp378x/stmp378x_devb.c 2010-10-23 19:40:31.000000000 +0200
-+++ b/arch/arm/mach-stmp378x/stmp378x_devb.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-stmp378x/stmp378x_devb.c 2011-03-21 08:55:24.000000000 +0100
 @@ -133,18 +133,15 @@ static int stmp3xxxmmc_hw_init_ssp1(void
  		goto out;
  
@@ -3464,7 +2918,7 @@ diff -u -p a/arch/arm/mach-stmp378x/stmp378x_devb.c b/arch/arm/mach-stmp378x/stm
  	return 0;
 diff -u -p a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
 --- a/arch/arm/mach-tegra/board-harmony-pcie.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/arch/arm/mach-tegra/board-harmony-pcie.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/arm/mach-tegra/board-harmony-pcie.c 2011-03-21 08:55:24.000000000 +0100
 @@ -38,12 +38,11 @@ static int __init harmony_pcie_init(void
  	if (!machine_is_harmony())
  		return 0;
@@ -3482,7 +2936,7 @@ diff -u -p a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/boar
  		goto err_reg;
 diff -u -p a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
 --- a/arch/arm/mach-tegra/board-seaboard.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/arch/arm/mach-tegra/board-seaboard.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-tegra/board-seaboard.c 2011-03-21 08:55:24.000000000 +0100
 @@ -154,8 +154,7 @@ static struct i2c_board_info __initdata 
  
  static void __init seaboard_i2c_init(void)
@@ -3495,7 +2949,7 @@ diff -u -p a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-se
  
 diff -u -p a/arch/arm/mach-tegra/usb_phy.c b/arch/arm/mach-tegra/usb_phy.c
 --- a/arch/arm/mach-tegra/usb_phy.c 2011-03-14 17:19:13.000000000 +0100
-+++ b/arch/arm/mach-tegra/usb_phy.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/mach-tegra/usb_phy.c 2011-03-21 08:55:24.000000000 +0100
 @@ -710,8 +710,8 @@ struct tegra_usb_phy *tegra_usb_phy_open
  			goto err1;
  		}
@@ -3509,7 +2963,7 @@ diff -u -p a/arch/arm/mach-tegra/usb_phy.c b/arch/arm/mach-tegra/usb_phy.c
  	} else {
 diff -u -p a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
 --- a/arch/arm/plat-mxc/3ds_debugboard.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c 2011-03-20 21:01:54.000000000 +0100
++++ b/arch/arm/plat-mxc/3ds_debugboard.c 2011-03-21 08:55:25.000000000 +0100
 @@ -176,8 +176,7 @@ int __init mxc_expio_init(u32 base, u32 
  	/*
  	 * Configure INT line as GPIO input
@@ -3522,7 +2976,7 @@ diff -u -p a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboa
  	__raw_writew(0, brd_io + INTR_MASK_REG);
 diff -u -p a/arch/arm/plat-omap/debug-devices.c b/arch/arm/plat-omap/debug-devices.c
 --- a/arch/arm/plat-omap/debug-devices.c 2009-12-12 00:23:19.000000000 +0100
-+++ b/arch/arm/plat-omap/debug-devices.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/arm/plat-omap/debug-devices.c 2011-03-21 08:55:21.000000000 +0100
 @@ -82,12 +82,11 @@ int __init debug_card_init(u32 addr, uns
  	smc91x_resources[1].start = gpio_to_irq(gpio);
  	smc91x_resources[1].end   = gpio_to_irq(gpio);
@@ -3539,7 +2993,7 @@ diff -u -p a/arch/arm/plat-omap/debug-devices.c b/arch/arm/plat-omap/debug-devic
  	led_resources[0].end   = addr + SZ_4K - 1;
 diff -u -p a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt.c
 --- a/arch/avr32/boards/atngw100/mrmt.c 2009-09-21 18:11:44.000000000 +0200
-+++ b/arch/avr32/boards/atngw100/mrmt.c 2011-03-20 21:01:49.000000000 +0100
++++ b/arch/avr32/boards/atngw100/mrmt.c 2011-03-21 08:55:21.000000000 +0100
 @@ -314,13 +314,11 @@ static int __init mrmt1_init(void)
  #endif
  
@@ -3592,7 +3046,7 @@ diff -u -p a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt
  }
 diff -u -p a/arch/avr32/boards/atngw100/setup.c b/arch/avr32/boards/atngw100/setup.c
 --- a/arch/avr32/boards/atngw100/setup.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/avr32/boards/atngw100/setup.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/avr32/boards/atngw100/setup.c 2011-03-21 08:55:21.000000000 +0100
 @@ -309,13 +309,11 @@ static int __init atngw100_arch_init(voi
  	 */
  #ifdef CONFIG_BOARD_ATNGW100_MKII
@@ -3611,7 +3065,7 @@ diff -u -p a/arch/avr32/boards/atngw100/setup.c b/arch/avr32/boards/atngw100/set
  
 diff -u -p a/arch/blackfin/mach-bf533/boards/stamp.c b/arch/blackfin/mach-bf533/boards/stamp.c
 --- a/arch/blackfin/mach-bf533/boards/stamp.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/blackfin/mach-bf533/boards/stamp.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/blackfin/mach-bf533/boards/stamp.c 2011-03-21 08:55:22.000000000 +0100
 @@ -718,6 +718,5 @@ void __init native_machine_early_platfor
  void native_machine_restart(char *cmd)
  {
@@ -3622,7 +3076,7 @@ diff -u -p a/arch/blackfin/mach-bf533/boards/stamp.c b/arch/blackfin/mach-bf533/
  }
 diff -u -p a/arch/mips/alchemy/devboards/db1200/platform.c b/arch/mips/alchemy/devboards/db1200/platform.c
 --- a/arch/mips/alchemy/devboards/db1200/platform.c 2010-09-04 09:22:04.000000000 +0200
-+++ b/arch/mips/alchemy/devboards/db1200/platform.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/mips/alchemy/devboards/db1200/platform.c 2011-03-21 08:55:24.000000000 +0100
 @@ -468,8 +468,7 @@ static int __init db1200_dev_init(void)
  	pfc = __raw_readl((void __iomem *)SYS_PINFUNC) & ~SYS_PINFUNC_P0A;
  
@@ -3635,7 +3089,7 @@ diff -u -p a/arch/mips/alchemy/devboards/db1200/platform.c b/arch/mips/alchemy/d
  
 diff -u -p a/arch/mips/alchemy/mtx-1/platform.c b/arch/mips/alchemy/mtx-1/platform.c
 --- a/arch/mips/alchemy/mtx-1/platform.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/arch/mips/alchemy/mtx-1/platform.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/mips/alchemy/mtx-1/platform.c 2011-03-21 08:55:24.000000000 +0100
 @@ -153,14 +153,13 @@ static int __init mtx1_register_devices(
  
  	au1xxx_override_eth_cfg(0, &mtx1_au1000_eth0_pdata);
@@ -3655,7 +3109,7 @@ diff -u -p a/arch/mips/alchemy/mtx-1/platform.c b/arch/mips/alchemy/mtx-1/platfo
  }
 diff -u -p a/arch/mips/txx9/rbtx4927/setup.c b/arch/mips/txx9/rbtx4927/setup.c
 --- a/arch/mips/txx9/rbtx4927/setup.c 2010-02-11 23:53:22.000000000 +0100
-+++ b/arch/mips/txx9/rbtx4927/setup.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/mips/txx9/rbtx4927/setup.c 2011-03-21 08:55:24.000000000 +0100
 @@ -207,8 +207,7 @@ static void __init rbtx4927_mem_setup(vo
  #endif
  
@@ -3668,7 +3122,7 @@ diff -u -p a/arch/mips/txx9/rbtx4927/setup.c b/arch/mips/txx9/rbtx4927/setup.c
  }
 diff -u -p a/arch/mips/txx9/rbtx4938/setup.c b/arch/mips/txx9/rbtx4938/setup.c
 --- a/arch/mips/txx9/rbtx4938/setup.c 2010-02-11 23:53:22.000000000 +0100
-+++ b/arch/mips/txx9/rbtx4938/setup.c 2011-03-20 21:01:53.000000000 +0100
++++ b/arch/mips/txx9/rbtx4938/setup.c 2011-03-21 08:55:24.000000000 +0100
 @@ -285,14 +285,12 @@ static int __init rbtx4938_spi_init(void
  	spi_eeprom_register(SPI_BUSNO, SEEPROM1_CS, 128);
  	spi_eeprom_register(SPI_BUSNO, 16 + SEEPROM2_CS, 128);
@@ -3692,7 +3146,7 @@ diff -u -p a/arch/mips/txx9/rbtx4938/setup.c b/arch/mips/txx9/rbtx4938/setup.c
  }
 diff -u -p a/arch/sh/boards/board-sh7757lcr.c b/arch/sh/boards/board-sh7757lcr.c
 --- a/arch/sh/boards/board-sh7757lcr.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/arch/sh/boards/board-sh7757lcr.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/sh/boards/board-sh7757lcr.c 2011-03-21 08:55:21.000000000 +0100
 @@ -492,26 +492,22 @@ static int __init sh7757lcr_devices_setu
  	gpio_request(GPIO_FN_EVENT0, NULL);
  
@@ -3734,7 +3188,7 @@ diff -u -p a/arch/sh/boards/board-sh7757lcr.c b/arch/sh/boards/board-sh7757lcr.c
  	spi_register_board_info(spi_board_info,
 diff -u -p a/arch/sh/boards/mach-ap325rxa/setup.c b/arch/sh/boards/mach-ap325rxa/setup.c
 --- a/arch/sh/boards/mach-ap325rxa/setup.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/sh/boards/mach-ap325rxa/setup.c 2011-03-20 21:01:51.000000000 +0100
++++ b/arch/sh/boards/mach-ap325rxa/setup.c 2011-03-21 08:55:22.000000000 +0100
 @@ -548,17 +548,14 @@ static int __init ap325rxa_devices_setup
  					&ap325rxa_sdram_leave_end);
  
@@ -3790,7 +3244,7 @@ diff -u -p a/arch/sh/boards/mach-ap325rxa/setup.c b/arch/sh/boards/mach-ap325rxa
  
 diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24/setup.c
 --- a/arch/sh/boards/mach-ecovec24/setup.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/arch/sh/boards/mach-ecovec24/setup.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/sh/boards/mach-ecovec24/setup.c 2011-03-21 08:55:23.000000000 +0100
 @@ -433,8 +433,7 @@ static int ts_get_pendown_state(void)
  {
  	int val = 0;
@@ -3801,22 +3255,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  	val = gpio_get_value(GPIO_PTZ0);
  
-@@ -981,19 +980,14 @@ static int __init arch_setup(void)
- 	gpio_request(GPIO_FN_SCIF0_RXD, NULL);
- 
- 	/* enable debug LED */
--	gpio_request(GPIO_PTG0, NULL);
--	gpio_request(GPIO_PTG1, NULL);
--	gpio_request(GPIO_PTG2, NULL);
--	gpio_request(GPIO_PTG3, NULL);
--	gpio_direction_output(GPIO_PTG0, 0);
--	gpio_direction_output(GPIO_PTG1, 0);
--	gpio_direction_output(GPIO_PTG2, 0);
--	gpio_direction_output(GPIO_PTG3, 0);
-+	gpio_request_one(GPIO_PTG0, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTG1, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTG2, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTG3, GPIOF_OUT_INIT_LOW, NULL);
+@@ -992,8 +991,7 @@ static int __init arch_setup(void)
  	__raw_writew((__raw_readw(PORT_HIZA) & ~(0x1 << 1)) , PORT_HIZA);
  
  	/* enable SH-Eth */
@@ -3826,42 +3265,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  	mdelay(20);
  
  	gpio_request(GPIO_FN_RMII_RXD0,    NULL);
-@@ -1011,12 +1005,9 @@ static int __init arch_setup(void)
- 	/* enable USB */
- 	__raw_writew(0x0000, 0xA4D80000);
- 	__raw_writew(0x0000, 0xA4D90000);
--	gpio_request(GPIO_PTB3,  NULL);
--	gpio_request(GPIO_PTB4,  NULL);
--	gpio_request(GPIO_PTB5,  NULL);
--	gpio_direction_input(GPIO_PTB3);
--	gpio_direction_output(GPIO_PTB4, 0);
--	gpio_direction_output(GPIO_PTB5, 0);
-+	gpio_request_one(GPIO_PTB3, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PTB4, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTB5, GPIOF_OUT_INIT_LOW, NULL);
- 	__raw_writew(0x0600, 0xa40501d4);
- 	__raw_writew(0x0600, 0xa4050192);
- 
-@@ -1061,14 +1052,10 @@ static int __init arch_setup(void)
- 	gpio_request(GPIO_FN_LCDLCLK,  NULL);
- 	__raw_writew((__raw_readw(PORT_HIZA) & ~0x0001), PORT_HIZA);
- 
--	gpio_request(GPIO_PTE6, NULL);
--	gpio_request(GPIO_PTU1, NULL);
--	gpio_request(GPIO_PTR1, NULL);
--	gpio_request(GPIO_PTA2, NULL);
--	gpio_direction_input(GPIO_PTE6);
--	gpio_direction_output(GPIO_PTU1, 0);
--	gpio_direction_output(GPIO_PTR1, 0);
--	gpio_direction_output(GPIO_PTA2, 0);
-+	gpio_request_one(GPIO_PTE6, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PTU1, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTR1, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTA2, GPIOF_OUT_INIT_LOW, NULL);
- 
- 	/* I/O buffer drive ability is high */
- 	__raw_writew((__raw_readw(IODRIVEA) & ~0x00c0) | 0x0080 , IODRIVEA);
-@@ -1097,8 +1084,7 @@ static int __init arch_setup(void)
+@@ -1097,8 +1095,7 @@ static int __init arch_setup(void)
  		 * but current sh_mobile_lcdc driver doesn't control it.
  		 * It is temporary correspondence
  		 */
@@ -3871,26 +3275,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  		/* enable TouchScreen */
  		i2c_register_board_info(0, &ts_i2c_clients, 1);
-@@ -1153,14 +1139,10 @@ static int __init arch_setup(void)
- 	gpio_request(GPIO_FN_KEYIN0,      NULL);
- 
- 	/* enable user debug switch */
--	gpio_request(GPIO_PTR0, NULL);
--	gpio_request(GPIO_PTR4, NULL);
--	gpio_request(GPIO_PTR5, NULL);
--	gpio_request(GPIO_PTR6, NULL);
--	gpio_direction_input(GPIO_PTR0);
--	gpio_direction_input(GPIO_PTR4);
--	gpio_direction_input(GPIO_PTR5);
--	gpio_direction_input(GPIO_PTR6);
-+	gpio_request_one(GPIO_PTR0, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PTR4, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PTR5, GPIOF_IN, NULL);
-+	gpio_request_one(GPIO_PTR6, GPIOF_IN, NULL);
- 
- #ifdef CONFIG_MFD_SH_MOBILE_SDHI
- 	/* enable SDHI0 on CN11 (needs DS2.4 set to ON) */
-@@ -1172,8 +1154,7 @@ static int __init arch_setup(void)
+@@ -1172,8 +1169,7 @@ static int __init arch_setup(void)
  	gpio_request(GPIO_FN_SDHI0D2,  NULL);
  	gpio_request(GPIO_FN_SDHI0D1,  NULL);
  	gpio_request(GPIO_FN_SDHI0D0,  NULL);
@@ -3900,7 +3285,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  #if !defined(CONFIG_MMC_SH_MMCIF)
  	/* enable SDHI1 on CN12 (needs DS2.6,7 set to ON,OFF) */
-@@ -1185,8 +1166,7 @@ static int __init arch_setup(void)
+@@ -1185,8 +1181,7 @@ static int __init arch_setup(void)
  	gpio_request(GPIO_FN_SDHI1D2,  NULL);
  	gpio_request(GPIO_FN_SDHI1D1,  NULL);
  	gpio_request(GPIO_FN_SDHI1D0,  NULL);
@@ -3910,7 +3295,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  	/* I/O buffer drive ability is high for SDHI1 */
  	__raw_writew((__raw_readw(IODRIVEA) & ~0x3000) | 0x2000 , IODRIVEA);
-@@ -1196,27 +1176,21 @@ static int __init arch_setup(void)
+@@ -1196,21 +1191,17 @@ static int __init arch_setup(void)
  	gpio_request(GPIO_FN_MSIOF0_TXD, NULL);
  	gpio_request(GPIO_FN_MSIOF0_RXD, NULL);
  	gpio_request(GPIO_FN_MSIOF0_TSCK, NULL);
@@ -3937,16 +3322,8 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
 +	gpio_request_one(GPIO_PTU2, GPIOF_OUT_INIT_HIGH, NULL);
  
  	/* enable Camera */
--	gpio_request(GPIO_PTA3, NULL);
--	gpio_request(GPIO_PTA4, NULL);
--	gpio_direction_output(GPIO_PTA3, 0);
--	gpio_direction_output(GPIO_PTA4, 0);
-+	gpio_request_one(GPIO_PTA3, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTA4, GPIOF_OUT_INIT_LOW, NULL);
- 
- 	/* enable FSI */
- 	gpio_request(GPIO_FN_FSIMCKB,    NULL);
-@@ -1245,13 +1219,11 @@ static int __init arch_setup(void)
+ 	gpio_request(GPIO_PTA3, NULL);
+@@ -1245,13 +1236,11 @@ static int __init arch_setup(void)
  		clk_put(clk);
  	}
  
@@ -3962,7 +3339,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  	/* set VPU clock to 166 MHz */
  	clk = clk_get(NULL, "vpu_clk");
-@@ -1263,8 +1235,7 @@ static int __init arch_setup(void)
+@@ -1263,8 +1252,7 @@ static int __init arch_setup(void)
  	/* enable IrDA */
  	gpio_request(GPIO_FN_IRDA_OUT, NULL);
  	gpio_request(GPIO_FN_IRDA_IN,  NULL);
@@ -3972,7 +3349,7 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  #if defined(CONFIG_MMC_SH_MMCIF)
  	/* enable MMCIF (needs DS2.6,7 set to OFF,ON) */
-@@ -1278,8 +1249,7 @@ static int __init arch_setup(void)
+@@ -1278,8 +1266,7 @@ static int __init arch_setup(void)
  	gpio_request(GPIO_FN_MMC_D0, NULL);
  	gpio_request(GPIO_FN_MMC_CLK, NULL);
  	gpio_request(GPIO_FN_MMC_CMD, NULL);
@@ -3982,24 +3359,9 @@ diff -u -p a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24
  
  	/* I/O buffer drive ability is high for MMCIF */
  	__raw_writew((__raw_readw(IODRIVEA) & ~0x3000) | 0x2000 , IODRIVEA);
-@@ -1308,12 +1278,8 @@ static int __init arch_setup(void)
- 	gpio_request(GPIO_FN_DV_HSYNC, NULL);
- 
- 	/* AK8813 power / reset sequence */
--	gpio_request(GPIO_PTG4, NULL);
--	gpio_request(GPIO_PTU3, NULL);
--	/* Reset */
--	gpio_direction_output(GPIO_PTG4, 0);
--	/* Power down */
--	gpio_direction_output(GPIO_PTU3, 1);
-+	gpio_request_one(GPIO_PTG4, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(GPIO_PTU3, GPIOF_OUT_INIT_HIGH, NULL);
- 
- 	udelay(10);
- 
 diff -u -p a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/setup.c
 --- a/arch/sh/boards/mach-kfr2r09/setup.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/sh/boards/mach-kfr2r09/setup.c 2011-03-20 21:01:52.000000000 +0100
++++ b/arch/sh/boards/mach-kfr2r09/setup.c 2011-03-21 08:55:24.000000000 +0100
 @@ -500,8 +500,7 @@ static int kfr2r09_usb0_gadget_setup(voi
  {
  	int plugged_in;
@@ -4050,7 +3412,7 @@ diff -u -p a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/s
  	if (kfr2r09_usb0_gadget_setup() == 0)
 diff -u -p a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup.c
 --- a/arch/sh/boards/mach-migor/setup.c 2011-01-19 18:51:18.000000000 +0100
-+++ b/arch/sh/boards/mach-migor/setup.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/sh/boards/mach-migor/setup.c 2011-03-21 08:55:22.000000000 +0100
 @@ -538,8 +538,7 @@ static int __init migor_devices_setup(vo
  	/* NAND Flash */
  	gpio_request(GPIO_FN_CS6A_CE2B, NULL);
@@ -4090,7 +3452,7 @@ diff -u -p a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup
  #endif
 diff -u -p a/arch/sh/boards/mach-se/7724/setup.c b/arch/sh/boards/mach-se/7724/setup.c
 --- a/arch/sh/boards/mach-se/7724/setup.c 2011-02-02 17:27:37.000000000 +0100
-+++ b/arch/sh/boards/mach-se/7724/setup.c 2011-03-20 21:01:50.000000000 +0100
++++ b/arch/sh/boards/mach-se/7724/setup.c 2011-03-21 08:55:21.000000000 +0100
 @@ -899,8 +899,7 @@ static int __init devices_setup(void)
  	gpio_request(GPIO_FN_RMII_CRS_DV,  NULL);
  	gpio_request(GPIO_FN_MDIO,         NULL);
@@ -4101,23 +3463,9 @@ diff -u -p a/arch/sh/boards/mach-se/7724/setup.c b/arch/sh/boards/mach-se/7724/s
  	sh_eth_init();
  
  	if (sw & SW41_B) {
-diff -u -p a/arch/xtensa/platforms/s6105/setup.c b/arch/xtensa/platforms/s6105/setup.c
---- a/arch/xtensa/platforms/s6105/setup.c 2009-06-24 21:18:48.000000000 +0200
-+++ b/arch/xtensa/platforms/s6105/setup.c 2011-03-20 21:01:53.000000000 +0100
-@@ -59,9 +59,8 @@ void __init platform_setup(char **cmdlin
- void __init platform_init(bp_tag_t *first)
- {
- 	s6_gpio_init(0);
--	gpio_request(GPIO_LED1_NGREEN, "led1_green");
-+	gpio_request_one(GPIO_LED1_NGREEN, GPIOF_OUT_INIT_HIGH, "led1_green");
- 	gpio_request(GPIO_LED1_RED, "led1_red");
--	gpio_direction_output(GPIO_LED1_NGREEN, 1);
- }
- 
- void platform_heartbeat(void)
 diff -u -p a/drivers/block/mg_disk.c b/drivers/block/mg_disk.c
 --- a/drivers/block/mg_disk.c 2010-08-25 09:45:50.000000000 +0200
-+++ b/drivers/block/mg_disk.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/block/mg_disk.c 2011-03-21 08:55:24.000000000 +0100
 @@ -882,10 +882,9 @@ static int mg_probe(struct platform_devi
  	host->rst = rsc->start;
  
@@ -4144,7 +3492,7 @@ diff -u -p a/drivers/block/mg_disk.c b/drivers/block/mg_disk.c
  	/* disk reset */
 diff -u -p a/drivers/hwmon/sht15.c b/drivers/hwmon/sht15.c
 --- a/drivers/hwmon/sht15.c 2011-03-20 18:17:23.000000000 +0100
-+++ b/drivers/hwmon/sht15.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/hwmon/sht15.c 2011-03-21 08:55:24.000000000 +0100
 @@ -555,12 +555,12 @@ static int __devinit sht15_probe(struct 
  		ret = regulator_register_notifier(data->reg, &data->nb);
  	}
@@ -4162,7 +3510,7 @@ diff -u -p a/drivers/hwmon/sht15.c b/drivers/hwmon/sht15.c
  		dev_err(&pdev->dev, "gpio request failed");
 diff -u -p a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
 --- a/drivers/input/keyboard/matrix_keypad.c 2010-07-03 18:06:34.000000000 +0200
-+++ b/drivers/input/keyboard/matrix_keypad.c 2011-03-20 21:01:51.000000000 +0100
++++ b/drivers/input/keyboard/matrix_keypad.c 2011-03-21 08:55:22.000000000 +0100
 @@ -318,15 +318,14 @@ static int __devinit init_matrix_gpio(st
  	}
  
@@ -4183,7 +3531,7 @@ diff -u -p a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/mat
  	if (pdata->clustered_irq > 0) {
 diff -u -p a/drivers/input/keyboard/omap-keypad.c b/drivers/input/keyboard/omap-keypad.c
 --- a/drivers/input/keyboard/omap-keypad.c 2010-12-28 18:26:03.000000000 +0100
-+++ b/drivers/input/keyboard/omap-keypad.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/input/keyboard/omap-keypad.c 2011-03-21 08:55:22.000000000 +0100
 @@ -336,23 +336,24 @@ static int __devinit omap_kp_probe(struc
  	if (cpu_is_omap24xx()) {
  		/* Cols: outputs */
@@ -4215,7 +3563,7 @@ diff -u -p a/drivers/input/keyboard/omap-keypad.c b/drivers/input/keyboard/omap-
  		col_idx = 0;
 diff -u -p a/drivers/input/mouse/gpio_mouse.c b/drivers/input/mouse/gpio_mouse.c
 --- a/drivers/input/mouse/gpio_mouse.c 2009-07-12 20:48:31.000000000 +0200
-+++ b/drivers/input/mouse/gpio_mouse.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/input/mouse/gpio_mouse.c 2011-03-21 08:55:22.000000000 +0100
 @@ -83,14 +83,12 @@ static int __devinit gpio_mouse_probe(st
  				dev_dbg(&pdev->dev, "no left button defined\n");
  
@@ -4234,7 +3582,7 @@ diff -u -p a/drivers/input/mouse/gpio_mouse.c b/drivers/input/mouse/gpio_mouse.c
  
 diff -u -p a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
 --- a/drivers/input/serio/ams_delta_serio.c 2010-11-24 07:55:11.000000000 +0100
-+++ b/drivers/input/serio/ams_delta_serio.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/input/serio/ams_delta_serio.c 2011-03-21 08:55:21.000000000 +0100
 @@ -122,19 +122,19 @@ static int __init ams_delta_serio_init(v
  	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
  			sizeof(ams_delta_serio->phys));
@@ -4261,7 +3609,7 @@ diff -u -p a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_del
  			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
 diff -u -p a/drivers/leds/leds-bd2802.c b/drivers/leds/leds-bd2802.c
 --- a/drivers/leds/leds-bd2802.c 2010-08-06 00:40:23.000000000 +0200
-+++ b/drivers/leds/leds-bd2802.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/leds/leds-bd2802.c 2011-03-21 08:55:21.000000000 +0100
 @@ -697,8 +697,7 @@ static int __devinit bd2802_probe(struct
  	i2c_set_clientdata(client, led);
  
@@ -4272,36 +3620,9 @@ diff -u -p a/drivers/leds/leds-bd2802.c b/drivers/leds/leds-bd2802.c
  
  	/* Tacss = min 0.1ms */
  	udelay(100);
-diff -u -p a/drivers/media/video/via-camera.c b/drivers/media/video/via-camera.c
---- a/drivers/media/video/via-camera.c 2011-03-14 17:19:15.000000000 +0100
-+++ b/drivers/media/video/via-camera.c 2011-03-20 21:01:50.000000000 +0100
-@@ -194,19 +194,19 @@ static int via_sensor_power_setup(struct
- 		dev_err(&cam->platdev->dev, "Unable to find GPIO lines\n");
- 		return -EINVAL;
- 	}
--	ret = gpio_request(cam->power_gpio, "viafb-camera");
-+	ret = gpio_request_one(cam->power_gpio, GPIOF_OUT_INIT_LOW,
-+			       "viafb-camera");
- 	if (ret) {
- 		dev_err(&cam->platdev->dev, "Unable to request power GPIO\n");
- 		return ret;
- 	}
--	ret = gpio_request(cam->reset_gpio, "viafb-camera");
-+	ret = gpio_request_one(cam->reset_gpio, GPIOF_OUT_INIT_LOW,
-+			       "viafb-camera");
- 	if (ret) {
- 		dev_err(&cam->platdev->dev, "Unable to request reset GPIO\n");
- 		gpio_free(cam->power_gpio);
- 		return ret;
- 	}
--	gpio_direction_output(cam->power_gpio, 0);
--	gpio_direction_output(cam->reset_gpio, 0);
- 	return 0;
- }
- 
 diff -u -p a/drivers/mfd/dm355evm_msp.c b/drivers/mfd/dm355evm_msp.c
 --- a/drivers/mfd/dm355evm_msp.c 2009-09-19 08:25:19.000000000 +0200
-+++ b/drivers/mfd/dm355evm_msp.c 2011-03-20 21:01:51.000000000 +0100
++++ b/drivers/mfd/dm355evm_msp.c 2011-03-21 08:55:23.000000000 +0100
 @@ -307,8 +307,7 @@ static int add_children(struct i2c_clien
  	for (i = 0; i < ARRAY_SIZE(config_inputs); i++) {
  		int gpio = dm355evm_msp_gpio.base + config_inputs[i].offset;
@@ -4314,7 +3635,7 @@ diff -u -p a/drivers/mfd/dm355evm_msp.c b/drivers/mfd/dm355evm_msp.c
  		gpio_export(gpio, false);
 diff -u -p a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
 --- a/drivers/mfd/omap-usb-host.c 2011-03-14 17:19:15.000000000 +0100
-+++ b/drivers/mfd/omap-usb-host.c 2011-03-20 21:01:51.000000000 +0100
++++ b/drivers/mfd/omap-usb-host.c 2011-03-21 08:55:23.000000000 +0100
 @@ -716,17 +716,15 @@ static int usbhs_enable(struct device *d
  
  	if (pdata->ehci_data->phy_reset) {
@@ -4341,7 +3662,7 @@ diff -u -p a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
  		/* Hold the PHY in RESET for enough time till DIR is high */
 diff -u -p a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
 --- a/drivers/mmc/host/pxamci.c 2010-09-30 17:54:15.000000000 +0200
-+++ b/drivers/mmc/host/pxamci.c 2011-03-20 21:01:51.000000000 +0100
++++ b/drivers/mmc/host/pxamci.c 2011-03-21 08:55:23.000000000 +0100
 @@ -719,20 +719,19 @@ static int pxamci_probe(struct platform_
  				      host->pdata->gpio_power_invert);
  	}
@@ -4368,7 +3689,7 @@ diff -u -p a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
  				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 diff -u -p a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
 --- a/drivers/mmc/host/s3cmci.c 2010-09-18 08:59:06.000000000 +0200
-+++ b/drivers/mmc/host/s3cmci.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mmc/host/s3cmci.c 2011-03-21 08:55:25.000000000 +0100
 @@ -1676,13 +1676,12 @@ static int __devinit s3cmci_probe(struct
  		host->irq_cd = -1;
  
@@ -4387,7 +3708,7 @@ diff -u -p a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
  	/* depending on the dma state, get a dma channel to use. */
 diff -u -p a/drivers/mtd/maps/bfin-async-flash.c b/drivers/mtd/maps/bfin-async-flash.c
 --- a/drivers/mtd/maps/bfin-async-flash.c 2010-03-29 19:27:56.000000000 +0200
-+++ b/drivers/mtd/maps/bfin-async-flash.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mtd/maps/bfin-async-flash.c 2011-03-21 08:55:25.000000000 +0100
 @@ -154,12 +154,12 @@ static int __devinit bfin_flash_probe(st
  	state->flash_ambctl0  = flash_ambctl->start;
  	state->flash_ambctl1  = flash_ambctl->end;
@@ -4405,7 +3726,7 @@ diff -u -p a/drivers/mtd/maps/bfin-async-flash.c b/drivers/mtd/maps/bfin-async-f
  	state->mtd = do_map_probe(memory->name, &state->map);
 diff -u -p a/drivers/mtd/maps/gpio-addr-flash.c b/drivers/mtd/maps/gpio-addr-flash.c
 --- a/drivers/mtd/maps/gpio-addr-flash.c 2010-11-01 20:33:30.000000000 +0100
-+++ b/drivers/mtd/maps/gpio-addr-flash.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mtd/maps/gpio-addr-flash.c 2011-03-21 08:55:25.000000000 +0100
 @@ -233,7 +233,8 @@ static int __devinit gpio_flash_probe(st
  
  	i = 0;
@@ -4426,7 +3747,7 @@ diff -u -p a/drivers/mtd/maps/gpio-addr-flash.c b/drivers/mtd/maps/gpio-addr-fla
  	pr_devinit(KERN_NOTICE PFX "probing %d-bit flash bus\n",
 diff -u -p a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
 --- a/drivers/mtd/nand/cmx270_nand.c 2010-03-29 19:27:56.000000000 +0200
-+++ b/drivers/mtd/nand/cmx270_nand.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mtd/nand/cmx270_nand.c 2011-03-21 08:55:25.000000000 +0100
 @@ -159,22 +159,18 @@ static int __init cmx270_init(void)
  	if (!(machine_is_armcore() && cpu_is_pxa27x()))
  		return -ENODEV;
@@ -4454,7 +3775,7 @@ diff -u -p a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
  				  sizeof(struct nand_chip),
 diff -u -p a/drivers/mtd/nand/fsl_upm.c b/drivers/mtd/nand/fsl_upm.c
 --- a/drivers/mtd/nand/fsl_upm.c 2011-03-14 17:19:15.000000000 +0100
-+++ b/drivers/mtd/nand/fsl_upm.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mtd/nand/fsl_upm.c 2011-03-21 08:55:25.000000000 +0100
 @@ -278,13 +278,13 @@ static int __devinit fun_probe(struct pl
  		fun->rnb_gpio[i] = -1;
  		rnb_gpio = of_get_gpio(ofdev->dev.of_node, i);
@@ -4473,7 +3794,7 @@ diff -u -p a/drivers/mtd/nand/fsl_upm.c b/drivers/mtd/nand/fsl_upm.c
  			dev_err(&ofdev->dev, "RNB gpio #%d is invalid\n", i);
 diff -u -p a/drivers/mtd/nand/gpio.c b/drivers/mtd/nand/gpio.c
 --- a/drivers/mtd/nand/gpio.c 2010-01-03 21:18:12.000000000 +0100
-+++ b/drivers/mtd/nand/gpio.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/mtd/nand/gpio.c 2011-03-21 08:55:24.000000000 +0100
 @@ -259,28 +259,27 @@ static int __devinit gpio_nand_probe(str
  
  	memcpy(&gpiomtd->plat, dev->dev.platform_data, sizeof(gpiomtd->plat));
@@ -4514,7 +3835,7 @@ diff -u -p a/drivers/mtd/nand/gpio.c b/drivers/mtd/nand/gpio.c
  	this->IO_ADDR_W  = this->IO_ADDR_R;
 diff -u -p a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
 --- a/drivers/mtd/onenand/omap2.c 2011-03-14 17:19:15.000000000 +0100
-+++ b/drivers/mtd/onenand/omap2.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/mtd/onenand/omap2.c 2011-03-21 08:55:25.000000000 +0100
 @@ -682,12 +682,12 @@ static int __devinit omap2_onenand_probe
  	}
  
@@ -4530,56 +3851,9 @@ diff -u -p a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
  
  	if ((r = request_irq(gpio_to_irq(c->gpio_irq),
  			     omap2_onenand_interrupt, IRQF_TRIGGER_RISING,
-diff -u -p a/drivers/net/phy/mdio-gpio.c b/drivers/net/phy/mdio-gpio.c
---- a/drivers/net/phy/mdio-gpio.c 2011-03-14 17:19:16.000000000 +0100
-+++ b/drivers/net/phy/mdio-gpio.c 2011-03-20 21:01:52.000000000 +0100
-@@ -117,14 +117,12 @@ static struct mii_bus * __devinit mdio_g
- 
- 	snprintf(new_bus->id, MII_BUS_ID_SIZE, "%x", bus_id);
- 
--	if (gpio_request(bitbang->mdc, "mdc"))
-+	if (gpio_request_one(bitbang->mdc, GPIOF_OUT_INIT_LOW, "mdc"))
- 		goto out_free_bus;
- 
- 	if (gpio_request(bitbang->mdio, "mdio"))
- 		goto out_free_mdc;
- 
--	gpio_direction_output(bitbang->mdc, 0);
--
- 	dev_set_drvdata(dev, new_bus);
- 
- 	return new_bus;
-diff -u -p a/drivers/net/wireless/p54/p54spi.c b/drivers/net/wireless/p54/p54spi.c
---- a/drivers/net/wireless/p54/p54spi.c 2010-09-18 08:59:06.000000000 +0200
-+++ b/drivers/net/wireless/p54/p54spi.c 2011-03-20 21:01:52.000000000 +0100
-@@ -626,21 +626,19 @@ static int __devinit p54spi_probe(struct
- 		goto err_free_common;
- 	}
- 
--	ret = gpio_request(p54spi_gpio_power, "p54spi power");
-+	ret = gpio_request_one(p54spi_gpio_power, GPIOF_OUT_INIT_LOW,
-+			       "p54spi power");
- 	if (ret < 0) {
- 		dev_err(&priv->spi->dev, "power GPIO request failed: %d", ret);
- 		goto err_free_common;
- 	}
- 
--	ret = gpio_request(p54spi_gpio_irq, "p54spi irq");
-+	ret = gpio_request_one(p54spi_gpio_irq, GPIOF_IN, "p54spi irq");
- 	if (ret < 0) {
- 		dev_err(&priv->spi->dev, "irq GPIO request failed: %d", ret);
- 		goto err_free_common;
- 	}
- 
--	gpio_direction_output(p54spi_gpio_power, 0);
--	gpio_direction_input(p54spi_gpio_irq);
--
- 	ret = request_irq(gpio_to_irq(p54spi_gpio_irq),
- 			  p54spi_interrupt, IRQF_DISABLED, "p54spi",
- 			  priv->spi);
 diff -u -p a/drivers/pcmcia/bfin_cf_pcmcia.c b/drivers/pcmcia/bfin_cf_pcmcia.c
 --- a/drivers/pcmcia/bfin_cf_pcmcia.c 2010-03-29 19:27:57.000000000 +0200
-+++ b/drivers/pcmcia/bfin_cf_pcmcia.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/pcmcia/bfin_cf_pcmcia.c 2011-03-21 08:55:26.000000000 +0100
 @@ -211,13 +211,12 @@ static int __devinit bfin_cf_probe(struc
  
  	cd_pfx = platform_get_irq(pdev, 1);	/*Card Detect GPIO PIN */
@@ -4597,7 +3871,7 @@ diff -u -p a/drivers/pcmcia/bfin_cf_pcmcia.c b/drivers/pcmcia/bfin_cf_pcmcia.c
  	if (!cf) {
 diff -u -p a/drivers/pcmcia/pxa2xx_cm_x255.c b/drivers/pcmcia/pxa2xx_cm_x255.c
 --- a/drivers/pcmcia/pxa2xx_cm_x255.c 2009-11-08 21:45:05.000000000 +0100
-+++ b/drivers/pcmcia/pxa2xx_cm_x255.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_cm_x255.c 2011-03-21 08:55:26.000000000 +0100
 @@ -39,10 +39,10 @@ static struct pcmcia_irqs irqs[] = {
  
  static int cmx255_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
@@ -4613,7 +3887,7 @@ diff -u -p a/drivers/pcmcia/pxa2xx_cm_x255.c b/drivers/pcmcia/pxa2xx_cm_x255.c
  	ret = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 diff -u -p a/drivers/pcmcia/pxa2xx_cm_x270.c b/drivers/pcmcia/pxa2xx_cm_x270.c
 --- a/drivers/pcmcia/pxa2xx_cm_x270.c 2009-11-08 21:45:05.000000000 +0100
-+++ b/drivers/pcmcia/pxa2xx_cm_x270.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/pcmcia/pxa2xx_cm_x270.c 2011-03-21 08:55:26.000000000 +0100
 @@ -33,10 +33,10 @@ static struct pcmcia_irqs irqs[] = {
  
  static int cmx270_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
@@ -4627,38 +3901,9 @@ diff -u -p a/drivers/pcmcia/pxa2xx_cm_x270.c b/drivers/pcmcia/pxa2xx_cm_x270.c
  
  	skt->socket.pci_irq = PCMCIA_S0_RDYINT;
  	ret = soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
-diff -u -p a/drivers/pcmcia/pxa2xx_stargate2.c b/drivers/pcmcia/pxa2xx_stargate2.c
---- a/drivers/pcmcia/pxa2xx_stargate2.c 2009-12-17 08:30:14.000000000 +0100
-+++ b/drivers/pcmcia/pxa2xx_stargate2.c 2011-03-20 21:01:55.000000000 +0100
-@@ -122,19 +122,18 @@ static int __init sg2_pcmcia_init(void)
- 	if (!sg2_pcmcia_device)
- 		return -ENOMEM;
- 
--	ret = gpio_request(SG2_S0_BUFF_CTL, "SG2 CF buff ctl");
-+	ret = gpio_request_one(SG2_S0_BUFF_CTL, GPIOF_OUT_INIT_LOW,
-+			       "SG2 CF buff ctl");
- 	if (ret)
- 		goto error_put_platform_device;
--	ret = gpio_request(SG2_S0_POWER_CTL, "SG2 CF power ctl");
-+	ret = gpio_request_one(SG2_S0_POWER_CTL, GPIOF_OUT_INIT_HIGH,
-+			       "SG2 CF power ctl");
- 	if (ret)
- 		goto error_free_gpio_buff_ctl;
--	ret = gpio_request(SG2_S0_GPIO_RESET, "SG2 CF reset");
-+	ret = gpio_request_one(SG2_S0_GPIO_RESET, GPIOF_OUT_INIT_HIGH,
-+			       "SG2 CF reset");
- 	if (ret)
- 		goto error_free_gpio_power_ctl;
--	/* Set gpio directions */
--	gpio_direction_output(SG2_S0_BUFF_CTL, 0);
--	gpio_direction_output(SG2_S0_POWER_CTL, 1);
--	gpio_direction_output(SG2_S0_GPIO_RESET, 1);
- 
- 	ret = platform_device_add_data(sg2_pcmcia_device,
- 				       &sg2_pcmcia_ops,
 diff -u -p a/drivers/rtc/rtc-v3020.c b/drivers/rtc/rtc-v3020.c
 --- a/drivers/rtc/rtc-v3020.c 2010-03-29 19:27:57.000000000 +0200
-+++ b/drivers/rtc/rtc-v3020.c 2011-03-20 21:01:52.000000000 +0100
++++ b/drivers/rtc/rtc-v3020.c 2011-03-21 08:55:23.000000000 +0100
 @@ -125,11 +125,11 @@ static int v3020_gpio_map(struct v3020 *
  	v3020_gpio[V3020_IO].gpio = pdata->gpio_io;
  
@@ -4676,7 +3921,7 @@ diff -u -p a/drivers/rtc/rtc-v3020.c b/drivers/rtc/rtc-v3020.c
  	chip->gpio = v3020_gpio;
 diff -u -p a/drivers/spi/mpc52xx_spi.c b/drivers/spi/mpc52xx_spi.c
 --- a/drivers/spi/mpc52xx_spi.c 2011-03-14 17:19:16.000000000 +0100
-+++ b/drivers/spi/mpc52xx_spi.c 2011-03-20 21:01:52.000000000 +0100
++++ b/drivers/spi/mpc52xx_spi.c 2011-03-21 08:55:23.000000000 +0100
 @@ -468,7 +468,8 @@ static int __devinit mpc52xx_spi_probe(s
  				goto err_gpio;
  			}
@@ -4697,7 +3942,7 @@ diff -u -p a/drivers/spi/mpc52xx_spi.c b/drivers/spi/mpc52xx_spi.c
  	} else {
 diff -u -p a/drivers/spi/spi_bfin5xx.c b/drivers/spi/spi_bfin5xx.c
 --- a/drivers/spi/spi_bfin5xx.c 2011-02-19 08:28:52.000000000 +0100
-+++ b/drivers/spi/spi_bfin5xx.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/spi/spi_bfin5xx.c 2011-03-21 08:55:21.000000000 +0100
 @@ -1150,12 +1150,13 @@ static int bfin_spi_setup(struct spi_dev
  	if (chip->chip_select_num >= MAX_CTRL_CS) {
  		/* Only request on first setup */
@@ -4716,7 +3961,7 @@ diff -u -p a/drivers/spi/spi_bfin5xx.c b/drivers/spi/spi_bfin5xx.c
  
 diff -u -p a/drivers/spi/spi_oc_tiny.c b/drivers/spi/spi_oc_tiny.c
 --- a/drivers/spi/spi_oc_tiny.c 2011-02-26 13:17:47.000000000 +0100
-+++ b/drivers/spi/spi_oc_tiny.c 2011-03-20 21:01:51.000000000 +0100
++++ b/drivers/spi/spi_oc_tiny.c 2011-03-21 08:55:22.000000000 +0100
 @@ -346,10 +346,10 @@ static int __devinit tiny_spi_probe(stru
  			goto exit;
  	}
@@ -4732,7 +3977,7 @@ diff -u -p a/drivers/spi/spi_oc_tiny.c b/drivers/spi/spi_oc_tiny.c
  
 diff -u -p a/drivers/spi/spi_s3c24xx.c b/drivers/spi/spi_s3c24xx.c
 --- a/drivers/spi/spi_s3c24xx.c 2010-03-29 19:27:58.000000000 +0200
-+++ b/drivers/spi/spi_s3c24xx.c 2011-03-20 21:01:52.000000000 +0100
++++ b/drivers/spi/spi_s3c24xx.c 2011-03-21 08:55:23.000000000 +0100
 @@ -614,14 +614,14 @@ static int __init s3c24xx_spi_probe(stru
  			goto err_register;
  		}
@@ -4752,7 +3997,7 @@ diff -u -p a/drivers/spi/spi_s3c24xx.c b/drivers/spi/spi_s3c24xx.c
  
 diff -u -p a/drivers/staging/iio/adc/ad7816.c b/drivers/staging/iio/adc/ad7816.c
 --- a/drivers/staging/iio/adc/ad7816.c 2010-11-13 10:26:39.000000000 +0100
-+++ b/drivers/staging/iio/adc/ad7816.c 2011-03-20 21:01:52.000000000 +0100
++++ b/drivers/staging/iio/adc/ad7816.c 2011-03-21 08:55:24.000000000 +0100
 @@ -396,27 +396,24 @@ static int __devinit ad7816_probe(struct
  	chip->convert_pin = pins[1];
  	chip->busy_pin = pins[2];
@@ -4786,7 +4031,7 @@ diff -u -p a/drivers/staging/iio/adc/ad7816.c b/drivers/staging/iio/adc/ad7816.c
  	if (chip->indio_dev == NULL) {
 diff -u -p a/drivers/staging/iio/resolver/ad2s120x.c b/drivers/staging/iio/resolver/ad2s120x.c
 --- a/drivers/staging/iio/resolver/ad2s120x.c 2010-11-13 10:26:39.000000000 +0100
-+++ b/drivers/staging/iio/resolver/ad2s120x.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/staging/iio/resolver/ad2s120x.c 2011-03-21 08:55:24.000000000 +0100
 @@ -220,12 +220,11 @@ static int __devinit ad2s120x_probe(stru
  	unsigned short *pins = spi->dev.platform_data;
  
@@ -4801,46 +4046,9 @@ diff -u -p a/drivers/staging/iio/resolver/ad2s120x.c b/drivers/staging/iio/resol
  	}
  
  	st = kzalloc(sizeof(*st), GFP_KERNEL);
-diff -u -p a/drivers/staging/olpc_dcon/olpc_dcon_xo_1.c b/drivers/staging/olpc_dcon/olpc_dcon_xo_1.c
---- a/drivers/staging/olpc_dcon/olpc_dcon_xo_1.c 2011-02-26 13:17:47.000000000 +0100
-+++ b/drivers/staging/olpc_dcon/olpc_dcon_xo_1.c 2011-03-20 21:01:53.000000000 +0100
-@@ -20,11 +20,11 @@ static int dcon_init_xo_1(struct dcon_pr
- {
- 	unsigned char lob;
- 
--	if (gpio_request(OLPC_GPIO_DCON_STAT0, "OLPC-DCON")) {
-+	if (gpio_request_one(OLPC_GPIO_DCON_STAT0, GPIOF_IN, "OLPC-DCON")) {
- 		printk(KERN_ERR "olpc-dcon: failed to request STAT0 GPIO\n");
- 		return -EIO;
- 	}
--	if (gpio_request(OLPC_GPIO_DCON_STAT1, "OLPC-DCON")) {
-+	if (gpio_request_one(OLPC_GPIO_DCON_STAT1, GPIOF_IN, "OLPC-DCON")) {
- 		printk(KERN_ERR "olpc-dcon: failed to request STAT1 GPIO\n");
- 		goto err_gp_stat1;
- 	}
-@@ -36,7 +36,7 @@ static int dcon_init_xo_1(struct dcon_pr
- 		printk(KERN_ERR "olpc-dcon: failed to request LOAD GPIO\n");
- 		goto err_gp_load;
- 	}
--	if (gpio_request(OLPC_GPIO_DCON_BLANK, "OLPC-DCON")) {
-+	if (gpio_request_one(OLPC_GPIO_DCON_BLANK, GPIOF_IN, "OLPC-DCON")) {
- 		printk(KERN_ERR "olpc-dcon: failed to request BLANK GPIO\n");
- 		goto err_gp_blank;
- 	}
-@@ -60,10 +60,7 @@ static int dcon_init_xo_1(struct dcon_pr
- 	dcon->pending_src = dcon->curr_src;
- 
- 	/* Set the directions for the GPIO pins */
--	gpio_direction_input(OLPC_GPIO_DCON_STAT0);
--	gpio_direction_input(OLPC_GPIO_DCON_STAT1);
- 	gpio_direction_input(OLPC_GPIO_DCON_IRQ);
--	gpio_direction_input(OLPC_GPIO_DCON_BLANK);
- 	gpio_direction_output(OLPC_GPIO_DCON_LOAD,
- 			dcon->curr_src == DCON_SOURCE_CPU);
- 
 diff -u -p a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
 --- a/drivers/usb/gadget/at91_udc.c 2011-02-19 08:28:52.000000000 +0100
-+++ b/drivers/usb/gadget/at91_udc.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/usb/gadget/at91_udc.c 2011-03-21 08:55:26.000000000 +0100
 @@ -1820,12 +1820,12 @@ static int __init at91udc_probe(struct p
  		goto fail1;
  	}
@@ -4858,7 +4066,7 @@ diff -u -p a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
  		 * Get the initial state of VBUS - we cannot expect
 diff -u -p a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
 --- a/drivers/usb/gadget/pxa25x_udc.c 2010-09-04 09:22:05.000000000 +0200
-+++ b/drivers/usb/gadget/pxa25x_udc.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/usb/gadget/pxa25x_udc.c 2011-03-21 08:55:26.000000000 +0100
 @@ -2200,27 +2200,27 @@ static int __init pxa25x_udc_probe(struc
  	dev->transceiver = otg_get_transceiver();
  
@@ -4895,7 +4103,7 @@ diff -u -p a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
  	init_timer(&dev->timer);
 diff -u -p a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
 --- a/drivers/usb/host/ohci-at91.c 2010-05-08 13:16:00.000000000 +0200
-+++ b/drivers/usb/host/ohci-at91.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/usb/host/ohci-at91.c 2011-03-21 08:55:25.000000000 +0100
 @@ -283,8 +283,8 @@ static int ohci_hcd_at91_drv_probe(struc
  		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
  			if (pdata->vbus_pin[i] <= 0)
@@ -4909,7 +4117,7 @@ diff -u -p a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
  
 diff -u -p a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
 --- a/drivers/usb/host/ohci-omap.c 2009-10-28 12:03:41.000000000 +0100
-+++ b/drivers/usb/host/ohci-omap.c 2011-03-20 21:01:53.000000000 +0100
++++ b/drivers/usb/host/ohci-omap.c 2011-03-21 08:55:25.000000000 +0100
 @@ -254,8 +254,7 @@ static int ohci_omap_init(struct usb_hcd
  
  			/* gpio9 for overcurrent detction */
@@ -4922,7 +4130,7 @@ diff -u -p a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
  			omap_cfg_reg(W4_USB_HIGHZ);
 diff -u -p a/drivers/usb/musb/blackfin.c b/drivers/usb/musb/blackfin.c
 --- a/drivers/usb/musb/blackfin.c 2011-02-11 10:53:32.000000000 +0100
-+++ b/drivers/usb/musb/blackfin.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/usb/musb/blackfin.c 2011-03-21 08:55:25.000000000 +0100
 @@ -380,12 +380,12 @@ static int bfin_musb_init(struct musb *m
  	 * here because we are in host mode
  	 */
@@ -4940,7 +4148,7 @@ diff -u -p a/drivers/usb/musb/blackfin.c b/drivers/usb/musb/blackfin.c
  	musb->xceiv = otg_get_transceiver();
 diff -u -p a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
 --- a/drivers/usb/otg/gpio_vbus.c 2010-03-29 19:27:58.000000000 +0200
-+++ b/drivers/usb/otg/gpio_vbus.c 2011-03-20 21:01:54.000000000 +0100
++++ b/drivers/usb/otg/gpio_vbus.c 2011-03-21 08:55:25.000000000 +0100
 @@ -240,13 +240,12 @@ static int __init gpio_vbus_probe(struct
  	gpio_vbus->otg.set_power = gpio_vbus_set_power;
  	gpio_vbus->otg.set_suspend = gpio_vbus_set_suspend;
@@ -4958,27 +4166,9 @@ diff -u -p a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
  	if (res) {
 diff -u -p a/drivers/video/bf537-lq035.c b/drivers/video/bf537-lq035.c
 --- a/drivers/video/bf537-lq035.c 2011-02-02 17:27:39.000000000 +0100
-+++ b/drivers/video/bf537-lq035.c 2011-03-20 21:01:56.000000000 +0100
-@@ -383,23 +383,20 @@ static int __devinit request_ports(void)
- 	}
++++ b/drivers/video/bf537-lq035.c 2011-03-21 08:55:27.000000000 +0100
+@@ -399,7 +399,7 @@ static int __devinit request_ports(void)
  
- #if (defined(UD) && defined(LBR))
--	if (gpio_request(UD, KBUILD_MODNAME)) {
-+	if (gpio_request_one(UD, GPIOF_OUT_INIT_LOW, KBUILD_MODNAME)) {
- 		pr_err("requesting GPIO %d failed\n", UD);
- 		return -EBUSY;
- 	}
- 
--	if (gpio_request(LBR, KBUILD_MODNAME)) {
-+	if (gpio_request_one(LBR, GPIOF_OUT_INIT_HIGH, KBUILD_MODNAME)) {
- 		pr_err("requesting GPIO %d failed\n", LBR);
- 		gpio_free(UD);
- 		return -EBUSY;
- 	}
- 
--	gpio_direction_output(UD, 0);
--	gpio_direction_output(LBR, 1);
--
  #endif
  
 -	if (gpio_request(MOD, KBUILD_MODNAME)) {
@@ -4986,7 +4176,7 @@ diff -u -p a/drivers/video/bf537-lq035.c b/drivers/video/bf537-lq035.c
  		pr_err("requesting GPIO %d failed\n", MOD);
  #if (defined(UD) && defined(LBR))
  		gpio_free(LBR);
-@@ -408,8 +405,6 @@ static int __devinit request_ports(void)
+@@ -408,8 +408,6 @@ static int __devinit request_ports(void)
  		return -EBUSY;
  	}
  
@@ -4997,7 +4187,7 @@ diff -u -p a/drivers/video/bf537-lq035.c b/drivers/video/bf537-lq035.c
  }
 diff -u -p a/drivers/video/bf54x-lq043fb.c b/drivers/video/bf54x-lq043fb.c
 --- a/drivers/video/bf54x-lq043fb.c 2010-08-10 09:17:44.000000000 +0200
-+++ b/drivers/video/bf54x-lq043fb.c 2011-03-20 21:01:50.000000000 +0100
++++ b/drivers/video/bf54x-lq043fb.c 2011-03-21 08:55:21.000000000 +0100
 @@ -240,7 +240,7 @@ static int request_ports(struct bfin_bf5
  	u16 eppi_req_18[] = EPPI0_18;
  	u16 disp = fbi->mach_info->disp;
@@ -5018,7 +4208,7 @@ diff -u -p a/drivers/video/bf54x-lq043fb.c b/drivers/video/bf54x-lq043fb.c
  
 diff -u -p a/drivers/video/bfin-lq035q1-fb.c b/drivers/video/bfin-lq035q1-fb.c
 --- a/drivers/video/bfin-lq035q1-fb.c 2010-05-27 15:47:04.000000000 +0200
-+++ b/drivers/video/bfin-lq035q1-fb.c 2011-03-20 21:01:56.000000000 +0100
++++ b/drivers/video/bfin-lq035q1-fb.c 2011-03-21 08:55:26.000000000 +0100
 @@ -363,10 +363,10 @@ static int __devinit bfin_lq035q1_reques
  	 * Drive PPI_FS3 Low
  	 */
@@ -5051,7 +4241,7 @@ diff -u -p a/drivers/video/bfin-lq035q1-fb.c b/drivers/video/bfin-lq035q1-fb.c
  	ret = register_framebuffer(fbinfo);
 diff -u -p a/drivers/video/bfin_adv7393fb.c b/drivers/video/bfin_adv7393fb.c
 --- a/drivers/video/bfin_adv7393fb.c 2010-12-04 18:54:36.000000000 +0100
-+++ b/drivers/video/bfin_adv7393fb.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/video/bfin_adv7393fb.c 2011-03-21 08:55:26.000000000 +0100
 @@ -411,12 +411,12 @@ static int __devinit bfin_adv7393_fb_pro
  
  	/* Workaround "PPI Does Not Start Properly In Specific Mode" */
@@ -5067,133 +4257,9 @@ diff -u -p a/drivers/video/bfin_adv7393fb.c b/drivers/video/bfin_adv7393fb.c
  	}
  
  	if (peripheral_request_list(ppi_pins, DRIVER_NAME)) {
-diff -u -p a/drivers/video/omap/lcd_2430sdp.c b/drivers/video/omap/lcd_2430sdp.c
---- a/drivers/video/omap/lcd_2430sdp.c 2009-12-17 08:30:14.000000000 +0100
-+++ b/drivers/video/omap/lcd_2430sdp.c 2011-03-20 21:01:55.000000000 +0100
-@@ -66,10 +66,8 @@ static int sdp2430_panel_init(struct lcd
- 		backlight_gpio = SDP2430_LCD_PANEL_BACKLIGHT_GPIO;
- 	}
- 
--	gpio_request(enable_gpio, "LCD enable");	/* LCD panel */
--	gpio_request(backlight_gpio, "LCD bl");		/* LCD backlight */
--	gpio_direction_output(enable_gpio, 0);
--	gpio_direction_output(backlight_gpio, 0);
-+	gpio_request_one(enable_gpio, GPIOF_OUT_INIT_LOW, "LCD enable");	/* LCD panel */
-+	gpio_request_one(backlight_gpio, GPIOF_OUT_INIT_LOW, "LCD bl");
- 
- 	return 0;
- }
-diff -u -p a/drivers/video/omap/lcd_inn1610.c b/drivers/video/omap/lcd_inn1610.c
---- a/drivers/video/omap/lcd_inn1610.c 2009-11-16 12:10:37.000000000 +0100
-+++ b/drivers/video/omap/lcd_inn1610.c 2011-03-20 21:01:55.000000000 +0100
-@@ -32,20 +32,18 @@ static int innovator1610_panel_init(stru
- {
- 	int r = 0;
- 
--	if (gpio_request(14, "lcd_en0")) {
-+	if (gpio_request_one(14, GPIOF_OUT_INIT_LOW, "lcd_en0")) {
- 		pr_err(MODULE_NAME ": can't request GPIO 14\n");
- 		r = -1;
- 		goto exit;
- 	}
--	if (gpio_request(15, "lcd_en1")) {
-+	if (gpio_request_one(15, GPIOF_OUT_INIT_LOW, "lcd_en1")) {
- 		pr_err(MODULE_NAME ": can't request GPIO 15\n");
- 		gpio_free(14);
- 		r = -1;
- 		goto exit;
- 	}
- 	/* configure GPIO(14, 15) as outputs */
--	gpio_direction_output(14, 0);
--	gpio_direction_output(15, 0);
- exit:
- 	return r;
- }
-diff -u -p a/drivers/video/omap/lcd_ldp.c b/drivers/video/omap/lcd_ldp.c
---- a/drivers/video/omap/lcd_ldp.c 2009-12-17 08:30:14.000000000 +0100
-+++ b/drivers/video/omap/lcd_ldp.c 2011-03-20 21:01:55.000000000 +0100
-@@ -65,15 +65,13 @@
- static int ldp_panel_init(struct lcd_panel *panel,
- 				struct omapfb_device *fbdev)
- {
--	gpio_request(LCD_PANEL_RESET_GPIO, "lcd reset");
--	gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
--	gpio_request(LCD_PANEL_ENABLE_GPIO, "lcd panel");
--	gpio_request(LCD_PANEL_BACKLIGHT_GPIO, "lcd backlight");
--
--	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 0);
--	gpio_direction_output(LCD_PANEL_RESET_GPIO, 0);
--	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 0);
--	gpio_direction_output(LCD_PANEL_BACKLIGHT_GPIO, 0);
-+	gpio_request_one(LCD_PANEL_RESET_GPIO, GPIOF_OUT_INIT_LOW,
-+			 "lcd reset");
-+	gpio_request_one(LCD_PANEL_QVGA_GPIO, GPIOF_OUT_INIT_LOW, "lcd qvga");
-+	gpio_request_one(LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
-+			 "lcd panel");
-+	gpio_request_one(LCD_PANEL_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW,
-+			 "lcd backlight");
- 
- #ifdef CONFIG_FB_OMAP_LCD_VGA
- 	gpio_set_value(LCD_PANEL_QVGA_GPIO, 0);
-diff -u -p a/drivers/video/omap/lcd_omap2evm.c b/drivers/video/omap/lcd_omap2evm.c
---- a/drivers/video/omap/lcd_omap2evm.c 2009-12-17 08:30:14.000000000 +0100
-+++ b/drivers/video/omap/lcd_omap2evm.c 2011-03-20 21:01:55.000000000 +0100
-@@ -47,19 +47,13 @@ static unsigned int bklight_level;
- static int omap2evm_panel_init(struct lcd_panel *panel,
- 				struct omapfb_device *fbdev)
- {
--	gpio_request(LCD_PANEL_ENABLE_GPIO, "LCD enable");
--	gpio_request(LCD_PANEL_LR, "LCD lr");
--	gpio_request(LCD_PANEL_UD, "LCD ud");
--	gpio_request(LCD_PANEL_INI, "LCD ini");
--	gpio_request(LCD_PANEL_QVGA, "LCD qvga");
--	gpio_request(LCD_PANEL_RESB, "LCD resb");
--
--	gpio_direction_output(LCD_PANEL_ENABLE_GPIO, 1);
--	gpio_direction_output(LCD_PANEL_RESB, 1);
--	gpio_direction_output(LCD_PANEL_INI, 1);
--	gpio_direction_output(LCD_PANEL_QVGA, 0);
--	gpio_direction_output(LCD_PANEL_LR, 1);
--	gpio_direction_output(LCD_PANEL_UD, 1);
-+	gpio_request_one(LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_HIGH,
-+			 "LCD enable");
-+	gpio_request_one(LCD_PANEL_LR, GPIOF_OUT_INIT_HIGH, "LCD lr");
-+	gpio_request_one(LCD_PANEL_UD, GPIOF_OUT_INIT_HIGH, "LCD ud");
-+	gpio_request_one(LCD_PANEL_INI, GPIOF_OUT_INIT_HIGH, "LCD ini");
-+	gpio_request_one(LCD_PANEL_QVGA, GPIOF_OUT_INIT_LOW, "LCD qvga");
-+	gpio_request_one(LCD_PANEL_RESB, GPIOF_OUT_INIT_HIGH, "LCD resb");
- 
- 	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x11, TWL_LED_LEDEN);
- 	twl_i2c_write_u8(TWL4030_MODULE_PWMA, 0x01, TWL_PWMA_PWMAON);
-diff -u -p a/drivers/video/omap/lcd_omap3evm.c b/drivers/video/omap/lcd_omap3evm.c
---- a/drivers/video/omap/lcd_omap3evm.c 2009-12-17 08:30:14.000000000 +0100
-+++ b/drivers/video/omap/lcd_omap3evm.c 2011-03-20 21:01:55.000000000 +0100
-@@ -51,17 +51,11 @@ static unsigned int bklight_level;
- static int omap3evm_panel_init(struct lcd_panel *panel,
- 				struct omapfb_device *fbdev)
- {
--	gpio_request(LCD_PANEL_LR, "LCD lr");
--	gpio_request(LCD_PANEL_UD, "LCD ud");
--	gpio_request(LCD_PANEL_INI, "LCD ini");
--	gpio_request(LCD_PANEL_RESB, "LCD resb");
--	gpio_request(LCD_PANEL_QVGA, "LCD qvga");
--
--	gpio_direction_output(LCD_PANEL_RESB, 1);
--	gpio_direction_output(LCD_PANEL_INI, 1);
--	gpio_direction_output(LCD_PANEL_QVGA, 0);
--	gpio_direction_output(LCD_PANEL_LR, 1);
--	gpio_direction_output(LCD_PANEL_UD, 1);
-+	gpio_request_one(LCD_PANEL_LR, GPIOF_OUT_INIT_HIGH, "LCD lr");
-+	gpio_request_one(LCD_PANEL_UD, GPIOF_OUT_INIT_HIGH, "LCD ud");
-+	gpio_request_one(LCD_PANEL_INI, GPIOF_OUT_INIT_HIGH, "LCD ini");
-+	gpio_request_one(LCD_PANEL_RESB, GPIOF_OUT_INIT_HIGH, "LCD resb");
-+	gpio_request_one(LCD_PANEL_QVGA, GPIOF_OUT_INIT_LOW, "LCD qvga");
- 
- 	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x11, TWL_LED_LEDEN);
- 	twl_i2c_write_u8(TWL4030_MODULE_PWMA, 0x01, TWL_PWMA_PWMAON);
 diff -u -p a/drivers/video/omap2/displays/panel-taal.c b/drivers/video/omap2/displays/panel-taal.c
 --- a/drivers/video/omap2/displays/panel-taal.c 2011-03-14 17:19:17.000000000 +0100
-+++ b/drivers/video/omap2/displays/panel-taal.c 2011-03-20 21:01:55.000000000 +0100
++++ b/drivers/video/omap2/displays/panel-taal.c 2011-03-21 08:55:26.000000000 +0100
 @@ -753,14 +753,12 @@ static int taal_probe(struct omap_dss_de
  	if (panel_data->use_ext_te) {
  		int gpio = panel_data->ext_te_gpio;
@@ -5212,7 +4278,7 @@ diff -u -p a/drivers/video/omap2/displays/panel-taal.c b/drivers/video/omap2/dis
  				"taal vsync", dssdev);
 diff -u -p a/sound/pci/cs5535audio/cs5535audio_olpc.c b/sound/pci/cs5535audio/cs5535audio_olpc.c
 --- a/sound/pci/cs5535audio/cs5535audio_olpc.c 2009-12-17 08:30:15.000000000 +0100
-+++ b/sound/pci/cs5535audio/cs5535audio_olpc.c 2011-03-20 21:01:54.000000000 +0100
++++ b/sound/pci/cs5535audio/cs5535audio_olpc.c 2011-03-21 08:55:25.000000000 +0100
 @@ -152,11 +152,10 @@ int __devinit olpc_quirks(struct snd_car
  	if (!machine_is_olpc())
  		return 0;
@@ -5228,7 +4294,7 @@ diff -u -p a/sound/pci/cs5535audio/cs5535audio_olpc.c b/sound/pci/cs5535audio/cs
  	memset(&elem, 0, sizeof(elem));
 diff -u -p a/sound/soc/blackfin/bf5xx-ac97.c b/sound/soc/blackfin/bf5xx-ac97.c
 --- a/sound/soc/blackfin/bf5xx-ac97.c 2011-01-19 18:51:20.000000000 +0100
-+++ b/sound/soc/blackfin/bf5xx-ac97.c 2011-03-20 21:01:53.000000000 +0100
++++ b/sound/soc/blackfin/bf5xx-ac97.c 2011-03-21 08:55:24.000000000 +0100
 @@ -215,8 +215,7 @@ static void bf5xx_ac97_warm_reset(struct
  	pr_debug("%s enter\n", __func__);
  
@@ -5257,7 +4323,7 @@ diff -u -p a/sound/soc/blackfin/bf5xx-ac97.c b/sound/soc/blackfin/bf5xx-ac97.c
  			sizeof(struct ac97_frame), NULL);
 diff -u -p a/sound/soc/blackfin/bf5xx-ad73311.c b/sound/soc/blackfin/bf5xx-ad73311.c
 --- a/sound/soc/blackfin/bf5xx-ad73311.c 2010-11-24 07:55:12.000000000 +0100
-+++ b/sound/soc/blackfin/bf5xx-ad73311.c 2011-03-20 21:01:54.000000000 +0100
++++ b/sound/soc/blackfin/bf5xx-ad73311.c 2011-03-21 08:55:25.000000000 +0100
 @@ -131,13 +131,11 @@ static int snd_ad73311_configure(void)
  static int bf5xx_probe(struct platform_device *pdev)
  {
@@ -5275,7 +4341,7 @@ diff -u -p a/sound/soc/blackfin/bf5xx-ad73311.c b/sound/soc/blackfin/bf5xx-ad733
  		return -EFAULT;
 diff -u -p a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
 --- a/sound/soc/codecs/tlv320aic3x.c 2010-12-26 10:19:08.000000000 +0100
-+++ b/sound/soc/codecs/tlv320aic3x.c 2011-03-20 21:01:52.000000000 +0100
++++ b/sound/soc/codecs/tlv320aic3x.c 2011-03-21 08:55:24.000000000 +0100
 @@ -1379,10 +1379,10 @@ static int aic3x_probe(struct snd_soc_co
  
  	if (gpio_is_valid(aic3x->gpio_reset) &&
@@ -5291,7 +4357,7 @@ diff -u -p a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
  	for (i = 0; i < ARRAY_SIZE(aic3x->supplies); i++)
 diff -u -p a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
 --- a/sound/soc/codecs/tlv320dac33.c 2011-03-14 17:19:19.000000000 +0100
-+++ b/sound/soc/codecs/tlv320dac33.c 2011-03-20 21:01:51.000000000 +0100
++++ b/sound/soc/codecs/tlv320dac33.c 2011-03-21 08:55:22.000000000 +0100
 @@ -1553,14 +1553,14 @@ static int __devinit dac33_i2c_probe(str
  
  	/* Check if the reset GPIO number is valid and request it */
@@ -5311,7 +4377,7 @@ diff -u -p a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
  	for (i = 0; i < ARRAY_SIZE(dac33->supplies); i++)
 diff -u -p a/sound/soc/codecs/tpa6130a2.c b/sound/soc/codecs/tpa6130a2.c
 --- a/sound/soc/codecs/tpa6130a2.c 2011-01-19 18:51:20.000000000 +0100
-+++ b/sound/soc/codecs/tpa6130a2.c 2011-03-20 21:01:51.000000000 +0100
++++ b/sound/soc/codecs/tpa6130a2.c 2011-03-21 08:55:22.000000000 +0100
 @@ -393,13 +393,13 @@ static int __devinit tpa6130a2_probe(str
  						TPA6130A2_MUTE_L;
  
@@ -5328,57 +4394,25 @@ diff -u -p a/sound/soc/codecs/tpa6130a2.c b/sound/soc/codecs/tpa6130a2.c
  	}
  
  	switch (data->id) {
-diff -u -p a/sound/soc/jz4740/qi_lb60.c b/sound/soc/jz4740/qi_lb60.c
---- a/sound/soc/jz4740/qi_lb60.c 2010-11-24 07:55:12.000000000 +0100
-+++ b/sound/soc/jz4740/qi_lb60.c 2011-03-20 21:01:53.000000000 +0100
-@@ -106,23 +106,20 @@ static int __init qi_lb60_init(void)
- 	if (!qi_lb60_snd_device)
- 		return -ENOMEM;
- 
--	ret = gpio_request(QI_LB60_SND_GPIO, "SND");
-+	ret = gpio_request_one(QI_LB60_SND_GPIO, GPIOF_OUT_INIT_LOW, "SND");
- 	if (ret) {
- 		pr_err("qi_lb60 snd: Failed to request SND GPIO(%d): %d\n",
- 				QI_LB60_SND_GPIO, ret);
- 		goto err_device_put;
- 	}
- 
--	ret = gpio_request(QI_LB60_AMP_GPIO, "AMP");
-+	ret = gpio_request_one(QI_LB60_AMP_GPIO, GPIOF_OUT_INIT_LOW, "AMP");
- 	if (ret) {
- 		pr_err("qi_lb60 snd: Failed to request AMP GPIO(%d): %d\n",
- 				QI_LB60_AMP_GPIO, ret);
- 		goto err_gpio_free_snd;
- 	}
- 
--	gpio_direction_output(QI_LB60_SND_GPIO, 0);
--	gpio_direction_output(QI_LB60_AMP_GPIO, 0);
--
- 	platform_set_drvdata(qi_lb60_snd_device, &qi_lb60);
- 
- 	ret = platform_device_add(qi_lb60_snd_device);
 diff -u -p a/sound/soc/omap/n810.c b/sound/soc/omap/n810.c
 --- a/sound/soc/omap/n810.c 2011-01-09 09:32:58.000000000 +0100
-+++ b/sound/soc/omap/n810.c 2011-03-20 21:01:51.000000000 +0100
-@@ -369,11 +369,10 @@ static int __init n810_soc_init(void)
++++ b/sound/soc/omap/n810.c 2011-03-21 08:55:22.000000000 +0100
+@@ -369,10 +369,10 @@ static int __init n810_soc_init(void)
  	clk_set_parent(sys_clkout2_src, func96m_clk);
  	clk_set_rate(sys_clkout2, 12000000);
  
 -	BUG_ON((gpio_request(N810_HEADSET_AMP_GPIO, "hs_amp") < 0) ||
--	       (gpio_request(N810_SPEAKER_AMP_GPIO, "spk_amp") < 0));
--
--	gpio_direction_output(N810_HEADSET_AMP_GPIO, 0);
--	gpio_direction_output(N810_SPEAKER_AMP_GPIO, 0);
 +	BUG_ON((gpio_request_one(N810_HEADSET_AMP_GPIO, GPIOF_OUT_INIT_LOW,
 +				 "hs_amp") < 0) ||
-+	       (gpio_request_one(N810_SPEAKER_AMP_GPIO, GPIOF_OUT_INIT_LOW,
-+				 "spk_amp") < 0));
+ 	       (gpio_request(N810_SPEAKER_AMP_GPIO, "spk_amp") < 0));
+ 
+-	gpio_direction_output(N810_HEADSET_AMP_GPIO, 0);
+ 	gpio_direction_output(N810_SPEAKER_AMP_GPIO, 0);
  
  	return 0;
- err4:
 diff -u -p a/sound/soc/omap/zoom2.c b/sound/soc/omap/zoom2.c
 --- a/sound/soc/omap/zoom2.c 2010-11-24 07:55:12.000000000 +0100
-+++ b/sound/soc/omap/zoom2.c 2011-03-20 21:01:51.000000000 +0100
++++ b/sound/soc/omap/zoom2.c 2011-03-21 08:55:22.000000000 +0100
 @@ -260,11 +260,11 @@ static int __init zoom2_soc_init(void)
  	if (ret)
  		goto err1;
@@ -5395,38 +4429,9 @@ diff -u -p a/sound/soc/omap/zoom2.c b/sound/soc/omap/zoom2.c
  
  	return 0;
  
-diff -u -p a/sound/soc/samsung/s3c24xx_simtec.c b/sound/soc/samsung/s3c24xx_simtec.c
---- a/sound/soc/samsung/s3c24xx_simtec.c 2011-01-24 08:53:37.000000000 +0100
-+++ b/sound/soc/samsung/s3c24xx_simtec.c 2011-03-20 21:01:53.000000000 +0100
-@@ -247,21 +247,20 @@ static int attach_gpio_amp(struct device
- 
- 	/* attach gpio amp gain (if any) */
- 	if (pdata->amp_gain[0] > 0) {
--		ret = gpio_request(pd->amp_gain[0], "gpio-amp-gain0");
-+		ret = gpio_request_one(pd->amp_gain[0], GPIOF_OUT_INIT_LOW,
-+				       "gpio-amp-gain0");
- 		if (ret) {
- 			dev_err(dev, "cannot get amp gpio gain0\n");
- 			return ret;
- 		}
- 
--		ret = gpio_request(pd->amp_gain[1], "gpio-amp-gain1");
-+		ret = gpio_request_one(pd->amp_gain[1], GPIOF_OUT_INIT_LOW,
-+				       "gpio-amp-gain1");
- 		if (ret) {
- 			dev_err(dev, "cannot get amp gpio gain1\n");
- 			gpio_free(pdata->amp_gain[0]);
- 			return ret;
- 		}
--
--		gpio_direction_output(pd->amp_gain[0], 0);
--		gpio_direction_output(pd->amp_gain[1], 0);
- 	}
- 
- 	/* note, currently we assume GPA0 isn't valid amp */
 diff -u -p a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda134x.c
 --- a/sound/soc/samsung/s3c24xx_uda134x.c 2011-02-02 17:27:40.000000000 +0100
-+++ b/sound/soc/samsung/s3c24xx_uda134x.c 2011-03-20 21:01:53.000000000 +0100
++++ b/sound/soc/samsung/s3c24xx_uda134x.c 2011-03-21 08:55:24.000000000 +0100
 @@ -266,12 +266,11 @@ static struct uda134x_platform_data s3c2
  
  static int s3c24xx_uda134x_setup_pin(int pin, char *fun)
@@ -5443,7 +4448,7 @@ diff -u -p a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda
  
 diff -u -p a/sound/soc/tegra/harmony.c b/sound/soc/tegra/harmony.c
 --- a/sound/soc/tegra/harmony.c 2011-02-19 08:28:53.000000000 +0100
-+++ b/sound/soc/tegra/harmony.c 2011-03-20 21:01:50.000000000 +0100
++++ b/sound/soc/tegra/harmony.c 2011-03-21 08:55:22.000000000 +0100
 @@ -201,35 +201,30 @@ static int harmony_asoc_init(struct snd_
  	struct harmony_audio_platform_data *pdata = harmony->pdata;
  	int ret;
