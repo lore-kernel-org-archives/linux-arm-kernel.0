@@ -1,32 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Mar 2011 23:10:13 +0000
-Subject: Updated mach-types update
-In-Reply-To: <20110321234150.23936e8f.dv@vollmann.ch>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<20110321234150.23936e8f.dv@vollmann.ch>
-Message-ID: <20110321231013.GH4340@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 21 Mar 2011 23:17:39 +0000
+Subject: [PATCH RFC] arm: mini2440: Fix uda134x codec problem.
+In-Reply-To: <20110311122637.GH1760@opensource.wolfsonmicro.com>
+References: <1299703580-3957-1-git-send-email-marek.belisko@open-nandra.com>
+	<20110311121704.GF1760@opensource.wolfsonmicro.com>
+	<AANLkTintYQ=qO3PALBL-bkiYKQFw0+JiW3=-oZmkRhZ1@mail.gmail.com>
+	<20110311122637.GH1760@opensource.wolfsonmicro.com>
+Message-ID: <20110321231739.GE9995@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2011 at 11:41:50PM +0100, Detlef Vollmann wrote:
-> On Sun, 20 Mar 2011 11:03:22 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Fri, Mar 11, 2011 at 12:26:37PM +0000, Mark Brown wrote:
+> On Fri, Mar 11, 2011 at 01:23:37PM +0100, Belisko Marek wrote:
 > 
-> > What this means is that any platform in the machine database which has not
-> > been submitted to mainline for 12 months since it was registered will be
-> > automatically dropped from the file, and the platform maintainer will need
-> > to either talk to me to get it reinstated before submission, or update the
-> > entry in some way to 'freshen' it.
->
-> So what happens to the number that was allocated for a platform that
-> got dropped?  Will it be recycled for another platform or is it safe
-> to use it in code that is not intended to go mainline (to avoid cluttering
-> mainline with code that doesn't need to be mainline)?
+> > You're right. I think sending whole patch to help understand what
+> > I'm trying to do (because wasn't sure). You apply just asoc part right?
+> > Thanks for comments!
+> 
+> I applied everything, Ben has said he is very busy so it seemed easiest
+> to just merge the whole thing.
 
-You've completely misunderstood what I said.  Nothing has been deleted
-from the database.  The file downloadable off the website continues to
-give the full set of entries.
+That's fine, and as long as it doesn't mess up other merges I'm generally
+ok with this.
 
-All that's happened is some filtering on the version I include in the
-mainline kernel to make it saner.  There's no point including 2000
-lines (which expand to about 700K of generated file) which aren't used
-in the mainline kernel.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
