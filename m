@@ -1,33 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 Mar 2011 11:17:19 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Mar 2011 10:32:28 +0000
 Subject: Booting Integrator/AP with ARM920T
-Message-ID: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
+In-Reply-To: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
+References: <AANLkTi=ko-8B=C32e42HsL7vOZa63t_JtmfGKqYht99P@mail.gmail.com>
+Message-ID: <20110321103228.GA22222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have this Integrator/AP development board here in my office:
+On Mon, Mar 21, 2011 at 11:17:19AM +0100, Linus Walleij wrote:
+> Does anyone beside me *ever* try to actually boot a recent kernel
+> on this thing?
+> 
+> How do you do it? Do I need patched U-boots etc, or can I just load
+> a Z-record image of vmlinux into RAM over the serial console?
+> 
+> Needless to say, ARM Ltd. has deleted the web pages for official
+> support of this thing as far as I can see. I was going to try out a
+> few patches affecting mach-integrator...
 
-Initialising Boot Monitor System Information Block
-boot Monitor > i
-ARM bootPROM [Version 1.3] Rebuilt on Jun 26 2001 at 22:04:10
-Running on a Integrator Evaluation Board
-Board Revision V1.0, ARM920T Processor
-Memory Size is 128MBytes, Flash Size is 32MBytes
-Copyright (c) ARM Limited 1999 - 2001. All rights reserved.
-Board designed by ARM Limited
-Hardware support provided at http://www.arm.com/
-For help on the available commands type ? or h
-boot Monitor >
+That's going back quite a few years... and yes, it wasn't trivial.  How
+it used to be done was with a boot loader called 'milo' which read the
+kernel out of flash - you had to program it and the kernel using 'afu'
+via the debugger.
 
-Does anyone beside me *ever* try to actually boot a recent kernel
-on this thing?
+Looking at the various scripts I have around, the other way I did it was
+using Angel (and presumably armsd).  I have this .angelrc file:
 
-How do you do it? Do I need patched U-boots etc, or can I just load
-a Z-record image of vmlinux into RAM over the serial console?
+device /dev/ttyS3
+options "9600 8N1"
+baud 115200
+base 0x00008000
+entry 0x00008000
+#otherfile ramdisk_img.gz
+#otherbase 0xc0800000
+r0 0x00
+r1 21
+exec .start-minicom
 
-Needless to say, ARM Ltd. has deleted the web pages for official
-support of this thing as far as I can see. I was going to try out a
-few patches affecting mach-integrator...
+and .start-minicom is:
+#!/bin/sh
+exec ~/bin/start-minicom int
 
-Yours,
-Linus Walleij
+Not sure if any of this helps, but might provide some hints.
