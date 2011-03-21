@@ -1,30 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Mar 2011 13:20:38 +0100
-Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
-In-Reply-To: <4D873890.5000302@snapgear.com>
-References: <AANLkTi=T=QM_GmYYnd8yXJz37LOKqt+AFWk7EEw-7uaN@mail.gmail.com>
-	<201103192114.05164.arnd@arndb.de> <4D873890.5000302@snapgear.com>
-Message-ID: <201103211320.38227.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Mar 2011 12:36:55 +0000
+Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
+	format definitions
+In-Reply-To: <20110124214225.GO24104@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
+	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
+	<20110124214225.GO24104@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikH9tBTGCiJ-+dvhh1tajMVq_6ua41MMZmq48sC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 March 2011, Greg Ungerer wrote:
-> > I could not find a git tree for uClinux that contains any recent
-> > kernel. Does that exist?
-> 
-> I used to keep one on git.kernel.org for promoting non-architectural
-> but non-MMU specific changes to mainline.
-> 
-> http://git.kernel.org/?p=linux/kernel/git/gerg/uclinux.git;a=summary
-> 
-> But I have had so few changes that fit in that category that I
-> haven't used it in quite a while.
+Hi Russell,
 
-Yes, I found that tree when I looked last week. I was wondering
-if there is any git or other repo for the files that are in
-http://sourceforge.net/projects/uclinux/files/uClinux%20Stable/
+On 24 January 2011 21:42, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 25, 2011 at 08:26:42AM +1100, Nick Piggin wrote:
+>> Too bad about the PAE thing; my condolences.
+>>
+>>
+>> On Tue, Jan 25, 2011 at 4:55 AM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > This patch introduces the pgtable-3level*.h files with definitions
+>> > specific to the LPAE page table format (3 levels of page tables).
+>>
+>> Seeing as you're shaking up these definitions, what do you think about
+>> switching from 4level-fixup.h to pgtable-nopud.h / pgtable-nopmd.h headers?
+>> One day eventually it would be nice to get rid of the fixup mode.
+>
+> I have patches to do this which I de-queued for the last merge window.
+> It's not entirely trivial and without problem. ?You can find the patches
+> in linux-next now.
+>
+> I was waiting for the new set of patches from Catalin before going back
+> and working out the solutions to some of those problems.
 
-The kernel sources there are newer than the ones from uclinux.git,
-but I could not find a pointer to who maintains them or how.
+Any plans for the nopmd patches? I haven't seen them in -next or on the list.
 
-	Arnd
+Thanks.
+
+-- 
+Catalin
