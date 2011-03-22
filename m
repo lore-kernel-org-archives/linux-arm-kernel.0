@@ -1,29 +1,48 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 22 Mar 2011 16:52:48 +0000
-Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C47D5EE@dbde02.ent.ti.com>
-References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
-	<1299592667-21367-2-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C3B85A5@dbde02.ent.ti.com>
-	<20110318123917.GC27129@sirena.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C47D5EE@dbde02.ent.ti.com>
-Message-ID: <20110322165248.GF22583@opensource.wolfsonmicro.com>
+Date: Tue, 22 Mar 2011 16:59:07 +0000
+Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
+In-Reply-To: <AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
+References: <20110322142619.1109.89105.sendpatchset@t400s>
+	<20110322142855.GB2202@sirena.org.uk>
+	<20110322143307.GB24004@linux-sh.org>
+	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
+	<20110322153226.GC30303@linux-sh.org>
+	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
+	<20110322155730.GD30303@linux-sh.org>
+	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
+	<20110322163144.GC2202@sirena.org.uk>
+	<AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
+Message-ID: <20110322165907.GG22583@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 03:05:07PM +0530, Nori, Sekhar wrote:
-> On Fri, Mar 18, 2011 at 18:09:17, Mark Brown wrote:
+On Wed, Mar 23, 2011 at 01:51:02AM +0900, Magnus Damm wrote:
 
-> > ...unfortunately conflicts with this - currently all clock API
-> > implementations are unique to the platform and there's no way of adding
-> > clocks that works over multiple platforms.
+> I'm not sure if this is i2c specific though - in general you probably
+> need to register the parent bus driver first.
 
-> Hmm, I guess I have a limited view of this. We do have drivers which
-> use clock API and work across OMAP and DaVinci series of ARM SoCs.
-> The clock implementation in this case is under mach-omap and mach-davinci
-> respectively.
+This was my original question - I'm not aware of any reason why you
+should need to register the driver for the specific bus first, it seems
+odd.
 
-It's mostly fine from the point of view of using clocks, it's if you're
-trying to provide a clock that there's no API you can rely on - the
-clock API itself only includes the user side and every platform gets to
-provide its own implementation.
+> I've seen some SH-Mobile designs with PMICs, and they all use a
+> dedicated i2c bus.
+
+It's the most common bus for PMICs but some use SPI for performance
+reasons, especially if they integrate other mixed signal functionality
+such as touchscreen controllers that might be high volume.
+
+> > In general embedded platforms register I2C early as things like PMICs
+> > typically hang off them. ?Grant was trying to push people to use
+> > deferred registration for this stuff but it didn't happen yet and I'd
+> > personally be more comfortable with more infastructure supporting that.
+
+> The dependency tracking is a bit primitive with only initcalls. I
+> wouldn't mind something like this:
+
+That's not a general solution as it doesn't cover things like cross
+dependencies between devices on the same bus type.  You really want to
+be able to say "I depend on this set of other devices" somehow, the
+proposal from Grant that I'm talking about was to only register devices
+once their dependencies had appeared which solves the issue but is a bit
+manual for the board files.
