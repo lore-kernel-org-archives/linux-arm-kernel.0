@@ -1,39 +1,23 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 22 Mar 2011 16:39:17 +0000
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-In-Reply-To: <20110322161811.GF6466@game.jcrosoft.org>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<20110316.131734.242138246.davem@davemloft.net>
-	<4D86F25A.7060405@atmel.com>
-	<20110321111838.GC2610@pulham.picochip.com>
-	<20110322161811.GF6466@game.jcrosoft.org>
-Message-ID: <20110322163917.GD10058@pulham.picochip.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 22 Mar 2011 12:47:56 -0400 (EDT)
+Subject: [PATCH v2] ARM:boot:device tree: Allow the device tree binary to
+	be appended to zImage
+In-Reply-To: <4D87E260.6050902@secretlab.ca>
+References: <20110321221930.19756.36549.stgit@riker>
+	<alpine.LFD.2.00.1103211844500.11889@xanadu.home>
+	<4D87E260.6050902@secretlab.ca>
+Message-ID: <alpine.LFD.2.00.1103221242340.11889@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Mon, 21 Mar 2011, John Bonesio wrote:
 
-On Tue, Mar 22, 2011 at 05:18:11PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:18 Mon 21 Mar     , Jamie Iles wrote:
-> > I have an existing tree for this at
-> > 
-> > 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
-> > 
-> > based off of 2.6.38 (with your ACK's now added) and I'd be happy with 
-> > either route.
-> but we must detect the gem via the version register and ditto for macb for
-> avr32 and at91
+> Hi Nicolas,
 > 
-> so please rebase it over my patch
-> 
-> and you get my sob too
+> Is this addhi instruction the only one, or do I need to go through and
+> find other instructions to update as well?
 
-Would you mind respinning your patch without the changes to the clk 
-stuff?  Otherwise we're changing it from compile time to version based, 
-only to completely remove it in subsequent patches.
+That was the only one I noticed.
 
-Also, can you confirm that the module ID's that you are using to 
-differentiate between AT91 and AVR32 won't clash with MACB uses in 
-other, non-at91/avr32 chips, or that it doesn't matter?
 
-Jamie
+Nicolas
