@@ -1,59 +1,26 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 22 Mar 2011 14:18:49 +0300
-Subject: [PATCH] msm: board-msm8960: Add USB peripheral and OTG support
-In-Reply-To: <1300783908-4638-1-git-send-email-anjir@codeaurora.org>
-References: <1300783908-4638-1-git-send-email-anjir@codeaurora.org>
-Message-ID: <4D888599.4080705@ru.mvista.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Mar 2011 12:46:47 +0100
+Subject: [PATCH] mmci: separate out ST Micro register defines
+In-Reply-To: <1299228173-3162-1-git-send-email-linus.walleij@stericsson.com>
+References: <1299228173-3162-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTi=HYjSHQgZLK8xbCgMNjmeKw7_Ok1pC0TAqWJ0R@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Russell:
 
-On 22-03-2011 11:51, Anji jonnala wrote:
+On Fri, Mar 4, 2011 at 9:42 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
 
-> Signed-off-by: Anji jonnala <anjir@codeaurora.org>
-[...]
+> The mmci.h header contained a few registers not clearly marked
+> as ST Micro only, rectify this and remove the HWFC magic in the
+> process. The idea is to make the mmci.h header file more ordered
+> so other vendors with PL180 derivates can see where to put in
+> their custom register defines.
 
-> diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
-> index 894ff98..8baf4fa 100644
-> --- a/arch/arm/mach-msm/devices-msm8960.c
-> +++ b/arch/arm/mach-msm/devices-msm8960.c
-[...]
-> @@ -89,6 +90,52 @@ struct platform_device msm8960_device_uart_gsbi5 = {
->   	.resource	= resources_uart_gsbi5,
->   };
->
-> +static struct resource resources_otg[] = {
-> +	{
-> +		.start	= MSM8960_HSUSB_PHYS,
-> +		.end	= MSM8960_HSUSB_PHYS + MSM8960_HSUSB_SIZE,
+This is marked as "applied" in the patch tracker, since it's not
+in mainline merges or next, just checking that it didn't get lost due
+to harddisk problems or such?
 
-    You forgot "- 1".
-
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start	= USB1_HS_IRQ,
-> +		.end	= USB1_HS_IRQ,
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device msm_device_otg = {
-> +	.name		= "msm_otg",
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(resources_otg),
-> +	.resource	= resources_otg,
-> +	.dev		= {
-> +		.coherent_dma_mask	= 0xffffffff,
-> +	},
-> +};
-> +
-> +static struct resource resources_hsusb[] = {
-> +	{
-> +		.start	= MSM8960_HSUSB_PHYS,
-> +		.end	= MSM8960_HSUSB_PHYS + MSM8960_HSUSB_SIZE,
-
-    You forgot "- 1" here too.
-
-WBR, Sergei
+Yours,
+Linus Walleij
