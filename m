@@ -1,52 +1,94 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 22 Mar 2011 02:13:26 +0100
-Subject: [PATCH v3 3/9] lpc2k: clk API
-In-Reply-To: <083DF309106F364B939360100EC290F80B15C9C579@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
-	<1300653009-11675-4-git-send-email-ithamar.adema@team-embedded.nl>
-	<083DF309106F364B939360100EC290F80B15C9C579@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <1300756406.2648.25.camel@team-embedded-2>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 21 Mar 2011 19:00:57 -0700
+Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
+In-Reply-To: <20110321150349.GC4340@n2100.arm.linux.org.uk>
+References: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+	<20110321150349.GC4340@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinVBCpinGfMkFbb_RpJbdAJiuQ57aWjqj5F=FoB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-22 at 01:16 +0100, Kevin Wells wrote:
-> > +struct clk {
-> > +	int		refcount;
-> > +	struct clk	*parent;
-> > +	unsigned long	rate;
-> 
-> It looks like this rate field is only used in 3 clock
-> descriptors. It might save some space to get rid of this field
-> and associated code and have those 3 clocks just use functions
-> for get_rate() that return the direct value.
+2011/3/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sun, Mar 20, 2011 at 11:12:29PM -0700, Barry Song wrote:
+>> Hi Eric/Fujita/Russell,
+>> As i checked the "remove now unnecessary dma_needs_bounce()" patches
+>> of Eric, I found you were all involved. Due to compiling error of
+>> IXP4xx platforms, the patch was reverted by Russell in
+>> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=commit;h=0485e18bc4112a3b548baa314c24bfbece4d156b
+>>
+>> But I think Eric's patch made much sense. dma_needs_bounce() is very
+>> ambiguous in the whole arm arch, if devices use dma_mask right,
+>> map_single() will decide whether it needs DMA bounce by the following
+>> logic:
+>> ? ? ? ? if (dev->dma_mask) {
+>> ? ? ? ? ? ? ? ? unsigned long mask = *dev->dma_mask;
+>> ? ? ? ? ? ? ? ? unsigned long limit;
+>>
+>> ? ? ? ? ? ? ? ? limit = (mask + 1) & ~mask;
+>> ? ? ? ? ? ? ? ? if (limit && size > limit) {
+>> ? ? ? ? ? ? ? ? ? ? ? ? dev_err(dev, "DMA mapping too big (requested %#x "
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "mask %#Lx)\n", size, *dev->dma_mask);
+>> ? ? ? ? ? ? ? ? ? ? ? ? return ~0;
+>> ? ? ? ? ? ? ? ? }
+>>
+>> ? ? ? ? ? ? ? ? /*
+>> ? ? ? ? ? ? ? ? ?* Figure out if we need to bounce from the DMA mask.
+>> ? ? ? ? ? ? ? ? ?*/
+>> ? ? ? ? ? ? ? ? needs_bounce = (dma_addr | (dma_addr + size - 1)) & ~mask;
+>> ? ? ? ? }
+>>
+>> Basically, we don't need dma_needs_bounce() for all chips at all. For
+>> saa1111, it is needed only because a bug in the SoC.
+>> For ?assabet and pfs168 machines, it gave a workaound by self-defined
+>> a dma_needs_bounce function.
+>> return ((machine_is_assabet() || machine_is_pfs168()) &&
+>> ? ? ? ? ? ? ? ? (addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
+>
+> No, you don't understand what's a bug and what's a design issue.
+>
+> The SA1111 (not SAA which would be a Phillips device) is designed to only
+> access one SDRAM chip. ?From memory, the SA1110 can have up to four SDRAM
+> chips connected to it - at 0xc0000000, 0xc8000000, 0xd0000000, 0xd8000000
+> phys.
+>
+> Depending on how the platform is wired up, the SA1111 can only access
+> memory from exactly _one_ of those banks. ?It can _never_ access all of
+> those banks of memory.
+>
+> However, as an entirely separate issue, the SA1111 has a bug in that it
+> incorrectly drives one of the SDRAM address inputs during part of the
+> access cycle, which if logic one causes the SDRAM to become confused.
+> This means that we end up with situations where odd MB of SDRAM are
+> unavailable for DMA, whereas even MB of SDRAM are perfectly fine.
+>
+> So, not only do we need to ensure that we bounce any memory which is not
+> in the right bank, but also any memory which conflicts with the buggy
+> behaviour.
+>
+> The buggy behaviour is dealt with setting an appropriate DMA mask,
+> which clears the problematical bit. ?This would be legal if the DMA mask
+> was a mask, but it isn't - it's misnamed as its actually a DMA _limit_.
+>
+> This is where the problem comes - a DMA limit can't incorporate the
+> information necessary to indicate which bank of SDRAM is accessible to
+> the SA1111 as it can't indicate that only the second bank should be
+> used for DMA.
+>
+> This is exactly where dma_needs_bounce() comes in to provide this kind
+> of platform knowledge into the DMA bounce code - and I think trying to
+> remove the function is a big mistake.
+>
+Now i understand sa1111 issue better. Even though sa1111 really need
+dma_needs_bounce() to handle what dma_mask can't provide, for example,
+tell which bank can be used for DMA, for most chips, memory area which
+can be used for DMA is lower address, dma_limit is just dma_mask. So
+is it possible to make dma_needs_bounce() optional for SoC to
+implement? Chips  without issues like sa1111 don't need to implement
+this function. dma_mask will help to decide whether dma bounce will be
+done.
 
-Fair enough, I can update that....
-
-> > +static unsigned long pclkdiv[] = { 4, 1, 2, 8 };
-> > +
-> > +#define PERCLK(name, pnum)	\
-> > +	static unsigned long name ## _get_rate(struct clk *clk) \
-> > +	{	\
-> > +		unsigned long rate = clk_get_rate(clk->parent);	\
-> > +		u32 val = clk_readl((pnum < 16) ? PCLKSEL0 : PCLKSEL1); \
-> > +		val >>= (pnum < 16) ? pnum * 2 : (pnum - 16) * 2;	\
-> > +		return rate / pclkdiv[val & 3];	\
-> > +	}	\
-> > +	struct clk clk_ ## name = {	\
-> > +		.parent = &clk_cpu,	\
-> > +		.enable_mask = (1 << pnum),	\
-> > +		.get_rate = name ## _get_rate,	\
-> > +	}
-> > +
-> 
-> This macro will generate multiple functions with different names but the same
-> code. Can the function be made common to the supported clocks and the macro
-> just handle clock descriptor setup?
-
-I could add a field to the clk struct to store it, since the peripheral
-clock is the most common type of clk in the system, so it wouldn't waste
-too much.
-
-Regards,
-
-Ithamar.
+For sa1111, why don't PCB design just connect one sdram to bank0 and
+make software use bank0 as DMA bank if bank0 is not slower than
+bank1/2/3? If bank0 is same with bank1/2/3 in hardware timing, there
+is no reason to make a strange design which uses bank1/2/3 as DMA
+area.
