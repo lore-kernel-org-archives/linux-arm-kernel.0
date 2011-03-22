@@ -1,20 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Mar 2011 08:17:46 +0000
-Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
-In-Reply-To: <AANLkTinVBCpinGfMkFbb_RpJbdAJiuQ57aWjqj5F=FoB@mail.gmail.com>
-References: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
-	<20110321150349.GC4340@n2100.arm.linux.org.uk>
-	<AANLkTinVBCpinGfMkFbb_RpJbdAJiuQ57aWjqj5F=FoB@mail.gmail.com>
-Message-ID: <20110322081746.GA17264@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Mar 2011 09:34:50 +0100
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+In-Reply-To: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
+References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201103220934.50435.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2011 at 07:00:57PM -0700, Barry Song wrote:
-> For sa1111, why don't PCB design just connect one sdram to bank0 and
-> make software use bank0 as DMA bank if bank0 is not slower than
-> bank1/2/3? If bank0 is same with bank1/2/3 in hardware timing, there
-> is no reason to make a strange design which uses bank1/2/3 as DMA
-> area.
+On Tuesday 22 March 2011, Stephen Boyd wrote:
+> Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
+> introduced a generic sizes.h. Use that instead of the ARM specific
+> version.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Who knows why board and SoC designers do silly things.  If we could stop
-that, the kernel would be *much* simpler.
+Acked-by: Arnd Bergmann <arnd@arndb.de
