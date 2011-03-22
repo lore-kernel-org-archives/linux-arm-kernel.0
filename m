@@ -1,26 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Mar 2011 12:46:47 +0100
-Subject: [PATCH] mmci: separate out ST Micro register defines
-In-Reply-To: <1299228173-3162-1-git-send-email-linus.walleij@stericsson.com>
-References: <1299228173-3162-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTi=HYjSHQgZLK8xbCgMNjmeKw7_Ok1pC0TAqWJ0R@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 22 Mar 2011 13:14:14 +0100
+Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
+Message-ID: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell:
+In case CONFIG_FB_PXA_OVERLAY is not defined, the pxafb_freq_transition()
+function tests nonexistent member of pxafb_info (since the member is not
+part of the structure).
 
-On Fri, Mar 4, 2011 at 9:42 AM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+Fix this by wraping the test in ifdef, even if I don't really like how the code
+looks now. The check doesn't have to happen if overlays are disabled at all as
+the check is always true then.
 
-> The mmci.h header contained a few registers not clearly marked
-> as ST Micro only, rectify this and remove the HWFC magic in the
-> process. The idea is to make the mmci.h header file more ordered
-> so other vendors with PL180 derivates can see where to put in
-> their custom register defines.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/video/pxafb.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-This is marked as "applied" in the patch tracker, since it's not
-in mainline merges or next, just checking that it didn't get lost due
-to harddisk problems or such?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index a2e5b51..0f4e8c9 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -1648,7 +1648,9 @@ pxafb_freq_transition(struct notifier_block *nb, unsigned long val, void *data)
+ 
+ 	switch (val) {
+ 	case CPUFREQ_PRECHANGE:
+-		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
++#ifdef CONFIG_FB_PXA_OVERLAY
++		if (!(fbi->overlay[0].usage || fbi->overlay[1].usage))
++#endif
+ 			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
+ 		break;
+ 
+-- 
+1.7.2.3
