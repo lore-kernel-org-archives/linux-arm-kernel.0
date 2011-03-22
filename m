@@ -1,51 +1,36 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Mar 2011 12:52:17 +0000
-Subject: [PATCH] ARM: kernel/sleep.S: fix Thumb2 compilation issues
-In-Reply-To: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
-References: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
-Message-ID: <20110322125216.GA4190@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Mar 2011 14:12:10 +0100
+Subject: Support for ARM940T core Samsung S3C2510A MCU under Linux
+In-Reply-To: <AANLkTik1jSNpuREDuX3-LhNafD43m5T=14ZDwNUC5a8X@mail.gmail.com>
+References: <AANLkTinSMPPHzmp5e1JrPByXC0XCY-591S=jGATXHR=U@mail.gmail.com>
+	<4D87363A.7090209@snapgear.com>
+	<AANLkTik1jSNpuREDuX3-LhNafD43m5T=14ZDwNUC5a8X@mail.gmail.com>
+Message-ID: <201103221412.10916.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 11:00:02PM -0400, Nicolas Pitre wrote:
+On Tuesday 22 March 2011, Madhavi Manchala wrote:
+
+> These sources (patches) are similar to samsung sources which are
+> available in uClinux-dist. So, I will look into the Ithamar Adema
+> patches and uClinux-dist samsung machine directory sources. Please
+> suggest me.
 > 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index bfad698..6398ead 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -119,11 +119,19 @@ ENTRY(cpu_resume)
->  #else
->  	ldr	r0, sleep_save_sp	@ stack phys addr
->  #endif
-> -	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
-> +	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
->  #ifdef MULTI_CPU
-> -	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
-> +	@ load v:p, stack, return fn, resume fn
-> +  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
-> +THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
-> +THUMB(	mov	sp, r2			)
-> +THUMB(	mov	lr, r3			)
-> +THUMB(	bx	r4			)
->  #else
-> -	ldmia	r0!, {r1, sp, lr}	@ load v:p, stack, return fn
-> +	@ load v:p, stack, return fn
-> +  ARM(	ldmia	r0!, {r1, sp, lr}	)
-> +THUMB(	ldmia	r0!, {r1, r2, lr}	)
-> +THUMB(	mov	sp, r2			)
->  	b	cpu_do_resume
->  #endif
->  ENDPROC(cpu_resume)
+> My final question, All these samsung machines (s3c24a0, s3c3410,
+> s3c44b0x and s5c7375) are ARM7TDMI core based MCUs. My MCU (Samsung
+> s3c2510A) is a ARM9TDMI core based. So, is this porting will help?
 
-As far as I can determine from the context, r1-r4 are not live at
-this point, so the suggested change looks sound.
+The CPU support is really separate from the platform, and
+ARM9TDMI/ARM940T is supported by the platform-independent code.
 
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
+In the s3c2510-specific portion, you should need very little
+code that has dependencies on the specific ARM code besides
+for the Kconfig 'select CPU_ARM940T' statement.
 
-I haven't watched the generic suspend/resume discussion too
-closely; how would I go about testing this?
+> I am extreamly sorry, If I asked silly questions here.
 
-Cheers
----Dave
+No problem at all, these things are not well documented, so it's
+good if at least people can refer to this conversation in the
+email archives.
+
+	Arnd
