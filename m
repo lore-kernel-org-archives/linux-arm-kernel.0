@@ -1,33 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Mar 2011 11:10:20 +0100
-Subject: [PATCH] ARM: Use asm-generic/sizes.h
-In-Reply-To: <20110322092113.GB17264@n2100.arm.linux.org.uk>
-References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
-	<201103220934.50435.arnd@arndb.de>
-	<20110322092113.GB17264@n2100.arm.linux.org.uk>
-Message-ID: <201103221110.20861.arnd@arndb.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 22 Mar 2011 18:23:13 +0800
+Subject: [PATCH 0/7] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <1300259538.2817.0.camel@localhost>
+References: <1300240521-4344-1-git-send-email-b32955@freescale.com>
+	<1300259538.2817.0.camel@localhost>
+Message-ID: <4D887891.7040708@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 March 2011, Russell King - ARM Linux wrote:
-> On Tue, Mar 22, 2011 at 09:34:50AM +0100, Arnd Bergmann wrote:
-> > On Tuesday 22 March 2011, Stephen Boyd wrote:
-> > > Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
-> > > introduced a generic sizes.h. Use that instead of the ARM specific
-> > > version.
-> > > 
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de
-> 
-> I assume the generic version was derived from the ARM version.  Is there
-> a reason why ARM Ltd's copyright was seemingly dropped?
+Hi Artem:
 
-I'll let Guan Xuetao answer that, he introduced the file along with the
-unicore32 architecture.
+Do you have any comments about this driver?
 
-I doubt that the contents of this file are copyrightable, but of course
-that is normally no reason to remove the notice.
+thanks.
 
-	Arnd
+Huang Shijie
+
+
+> On Wed, 2011-03-16 at 09:55 +0800, Huang Shijie wrote:
+>> The general-purpose media interface(GPMI) controller is a flexible interface
+>> to up to several NAND flashs.
+> Is there any public documentation for this controller?
+>
