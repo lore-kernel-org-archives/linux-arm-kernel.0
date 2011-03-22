@@ -1,77 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Mar 2011 19:34:09 +0000
-Subject: [PATCH] ARM: memmap: only free allocated memmap entries when using
-	SPARSEMEM
-Message-ID: <1300822449-7324-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 22 Mar 2011 19:52:57 -0000
+Subject: Single-stepping ARMv7 with KDB...
+In-Reply-To: <AANLkTikL0KUdY5Ggv1BRfRQiwxyd9B6ooMXT2rPoVAxA@mail.gmail.com>
+References: <AANLkTimBAm-Eaordw-KSPnEycQYz2z4QM+Dc5nauLFxh@mail.gmail.com>	<766766263404232078@unknownmsgid>
+	<AANLkTikL0KUdY5Ggv1BRfRQiwxyd9B6ooMXT2rPoVAxA@mail.gmail.com>
+Message-ID: <002b01cbe8ca$be358f10$3aa0ad30$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPARSEMEM code allocates memmap entries only for sections which are
-present (i.e. those which contain some valid memory). The membank checks
-in free_unused_memmap do not take this into account and can incorrectly
-attempt to free memory which is not allocated, resulting in a BUG() in
-the bootmem code.
+Hi Andrei,
 
-However, if memory is configured as follows:
+> > x86 uses the hw_breakpoint framework for handling hardware breakpoints
+> > in KGDB (see kgdb_correct_hw_break for how it converts breakinfo
+> > structures into perf_events) so it might be possible to do something
+> > similar for single-step on ARM if we allow the kernel to specify that
+> > the breakpoint is to be a mismatch by poking the step_ctrl field in
+> > the arch_hw_breakpoint struct.
+> 
+> ...in this case monitor mode will have to be turned on outside SVC,
+> else it will immediately trigger a debug abort inside the code
+> programming BRV/BRC for mismatch... I guess that's the point I wanted
+> to bring up. I suppose it's only really useful for KDB, as with KGDB
+> you can have a debugger take care of branches, and all you would need
+> to ensure is to save/restore breakpoints across context switches (and
+> reentrancy). I'll play with enabling 'ss' with KDB as soon as I get
+> linux-next running on our platform...
 
-    |<----section---->|<----hole---->|<----section---->|
-    +--------+--------+--------------+--------+--------+
-    | bank 0 | unused |              | bank 1 | unused |
-    +--------+--------+--------------+--------+--------+
+At the moment monitor mode is enabled all of the time, so you might
+want to add a thread flag when a thread is using hardware debugging
+resources. You can check that on return to userspace and enable monitor
+mode only then (I'm not sure about your ABT trick, need to check the
+docs). There will still be places in the hardware breakpoint code where
+we need monitor mode enabled so you'll need to bank any mismatch
+breakpoints over these regions of code and disable monitor mode before
+reinstalling them again.
 
-where a bank only occupies part of a section, the memmap allocated for
-the remainder of the section *can* be freed.
+Note that enabling monitor mode is pretty error prone and might not
+even be possible on your CPU so the failure path needs to be graceful.
 
-This patch modifies the checks in free_unused_memmap so that only valid
-memmap entries are considered for removal.
-
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/init.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ce406e5..dfd4286 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -399,7 +399,7 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert start_pfn/end_pfn to a struct page pointer.
- 	 */
- 	start_pg = pfn_to_page(start_pfn - 1) + 1;
--	end_pg = pfn_to_page(end_pfn);
-+	end_pg = pfn_to_page(end_pfn - 1) + 1;
- 
- 	/*
- 	 * Convert to physical addresses, and
-@@ -433,6 +433,14 @@ static void __init free_unused_memmap(struct meminfo *mi)
- 
- 		bank_start = bank_pfn_start(bank);
- 
-+#ifdef CONFIG_SPARSEMEM
-+		/*
-+		 * Take care not to free memmap entries that don't exist
-+		 * due to SPARSEMEM sections which aren't present.
-+		 */
-+		bank_start = min(bank_start,
-+				 ALIGN(prev_bank_end, PAGES_PER_SECTION));
-+#endif
- 		/*
- 		 * If we had a previous bank, and there is a space
- 		 * between the current bank and the previous, free it.
-@@ -447,6 +455,12 @@ static void __init free_unused_memmap(struct meminfo *mi)
- 		 */
- 		prev_bank_end = ALIGN(bank_pfn_end(bank), MAX_ORDER_NR_PAGES);
- 	}
-+
-+#ifdef CONFIG_SPARSEMEM
-+	if (!IS_ALIGNED(prev_bank_end, PAGES_PER_SECTION))
-+		free_memmap(prev_bank_end,
-+			    ALIGN(prev_bank_end, PAGES_PER_SECTION));
-+#endif
- }
- 
- static void __init free_highpages(void)
--- 
-1.7.0.4
+Will
