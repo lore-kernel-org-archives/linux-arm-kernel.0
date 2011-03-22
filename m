@@ -1,77 +1,56 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 23 Mar 2011 01:51:02 +0900
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <20110322163144.GC2202@sirena.org.uk>
-References: <20110322142619.1109.89105.sendpatchset@t400s>
-	<20110322142855.GB2202@sirena.org.uk>
-	<20110322143307.GB24004@linux-sh.org>
-	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
-	<20110322153226.GC30303@linux-sh.org>
-	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
-	<20110322155730.GD30303@linux-sh.org>
-	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
-	<20110322163144.GC2202@sirena.org.uk>
-Message-ID: <AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
+From: dongas86@gmail.com (Dongas)
+Date: Wed, 23 Mar 2011 00:51:25 +0800
+Subject: dma cache coherency issue
+In-Reply-To: <20110321190335.GG4340@n2100.arm.linux.org.uk>
+References: <AANLkTi=ZdiZATPde6W8bStZCwu05Am6Z216+LxaEzaTj@mail.gmail.com>
+	<20110321190335.GG4340@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=H0Gz21iUZVCcxyMzXMd25vHeDYjFfLbcUmfcP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2011 at 1:31 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 23, 2011 at 01:20:23AM +0900, Magnus Damm wrote:
->> On Wed, Mar 23, 2011 at 12:57 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+2011/3/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Mar 22, 2011 at 02:52:19AM +0800, Dongas wrote:
+>> Hi All,
+>>
+>> Similar as stated in the following articles,
+>> http://lwn.net/Articles/2265/
+>> The issue is that i got a SDIO WiFi dirver which has the folliowing
+>> structure definitions:
+>> ??? struct iostruct {
+>> ? ? ? ? ...
+>> ? ? ? ? int ifield;
+>> ? ? ? ? char dma_buffer[SMALL_SIZE];
+>> ? ? ? ? ...
+>> ??? };
+>> And the ifield may share the same cache line with dma_buffer which is
+>> used for dma transfer.
+>> Consider the case that if CPU accesses ifield during the DMA transfer,
+>> then the CPU cache line may get the stale data from dma buffer.
+>> After DMA completes, in current kernel code(2.6.38), the dma_unmap_sg
+>> will finally call v7_dma_unmap_area and v7_dma_inv_range to clean and
+>> invalidate cache again for DMA_FROM_DEVICE operation.
+>> However, since the cache line already contains the stale data of dma
+>> buffer, the clean to write back the cache line to memory may cause
+>> data corruption.
 >
->> > In this case I would suspect general indifference or simply copying other
->> > drivers. I2C is a bit of a tricky case with regards to ordering in
->> > general, but at least input devices are relatively straightforward.
+> Correct.
 >
->> I remember having to move the init order around at least once before
->> in the case of i2c, so I'm not so surprised when new initcall issues
->> come up now and then.
+>> My question is:
+>> Is it a bug of current linux kernel or still as above old article
+>> said, there's no better solutions for it?
 >
-> It's mostly an issue for PMICs (and possibly some other similar things)
-> so that the regulators are present before their consumers try to start.
-> I'm not aware of any issues with I2C itself.
-
-I recall changing my i2c bus driver i2c-sh_mobile.c from module_init()
-to subsys_initcall() a few years ago (see
-ccb3bc16b4891a82649d4bccbeefe60b1d9a62e2) - this because regular
-drivers tend to use module_init() and following the link order is not
-enough. I think the patch for tca6416 is more or less the same issue
-but on subsys_initcall() level instead.
-
-I'm not sure if this is i2c specific though - in general you probably
-need to register the parent bus driver first.
-
-I've seen some SH-Mobile designs with PMICs, and they all use a
-dedicated i2c bus.
-
->> The "may" above comes from that I don't know the i2c bus driver
->> initcall time on non-SH-Mobile platforms. So this may trigger on other
->> platforms, or it may not depending on their cpu/board code and I2c bus
->> driver.
+> It is a bug.
 >
-> In general embedded platforms register I2C early as things like PMICs
-> typically hang off them. ?Grant was trying to push people to use
-> deferred registration for this stuff but it didn't happen yet and I'd
-> personally be more comfortable with more infastructure supporting that.
+> Another solution would be to allocate the dma buffer separately using
+> kmalloc, and store a pointer to it in the iostruct. ?Don't forget to
+> free it after you've finished with it though. ?That probably requires
+> the smallest overall change.
 
-The dependency tracking is a bit primitive with only initcalls. I
-wouldn't mind something like this:
+Thanks Russell.
+We tried another solution that adding cacheline aligned
+padding(eg.128bytes) before and after dma_buffer to prevent CPU to
+access the variables in the same shared cacheline with dma_buffer
+and it seemed to also work.
 
--static int __init tca6416_keypad_init(void)
--{
--	return i2c_add_driver(&tca6416_keypad_driver);
--}
--
--subsys_initcall(tca6416_keypad_init);
--
--static void __exit tca6416_keypad_exit(void)
--{
--	i2c_del_driver(&tca6416_keypad_driver);
--}
--module_exit(tca6416_keypad_exit);
-+i2c_driver_module(&tca6416_keypad_driver);
-
-Cheers,
-
-/ magnus
+Regards
+Aisheng
