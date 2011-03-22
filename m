@@ -1,63 +1,57 @@
-From: zaks_974@yahoo.com (ZAKIR AHMED)
-Date: Wed, 30 Mar 2011 14:40:36 -0000
-Subject: Kernel does NOT boot when loaded @ 32MB
-Message-ID: <192188.82478.qm@web33203.mail.mud.yahoo.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Tue, 22 Mar 2011 13:19:14 -0000
+Subject: Updated mach-types update
+In-Reply-To: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
+
+On Sun, Mar 20, 2011 at 12:03 PM, Russell King - ARM Linux <
+linux@arm.linux.org.uk> wrote:
+
+>
+> What this means is that any platform in the machine database which has not
+> been submitted to mainline for 12 months since it was registered will be
+> automatically dropped from the file, and the platform maintainer will need
+> to either talk to me to get it reinstated before submission, or update the
+> entry in some way to 'freshen' it.
+>
+
+I think this statement matches the needs of those, like me, are trying to
+add a new board.
+My patch [0] applies but does not build any more. How does it work in this
+case?
+
+I may include a new bit which adds the right entry in mach-types (so that my
+patch is actually
+buildable and testable before inclusion), in taking my patch set then you
+should drop the
+mach-types bit because it will be updated by you script later.
 
 
-Hi
+> This does have the potential to go wrong if people start randomly changing
+> the format of how they write the MACHINE_START() macro.  If it's not found
+> by:
+>
+> grep -rh --exclude=include --include='*.c' MACHINE_START arch/arm |
+>  grep -v '^#' | sed "s@[^(]*(\([^,]*\).*@ ('\1')@;2,\$s@^@,@"
+>
 
+maybe it could be useful to add this regex in the top of mach-types or put
+it in scripts/ so that everybody can validate his/her changes.
 
+anyway I would add some comment in mach-types that explains how the files is
+managed.
 
-I am working on kexec for ARM 11 mpcore. 
+thanks,
+Domenico
 
-I am using an ARM MPcore board with Linux 2.6.33. I need to load the kernel 
-
-I have resolved most of the problems with the posts available. Now, I am stuck
-at a place where the second kernel starts but hangs. I started debugging this
-problem, by just booting the second kernel @32MB. That also does NOT boot.
-Looks like, the second kernel does NOT boot @ 32MB
-
-
-
-The following is what I have changed 
-
-?? zreladdr-y?? := 0x02008000
-
-params_phys-y?? := 0x02000100
-
-initrd_phys-y?? := 0x02800000
-
-
-
-I have also changed the PHYS_OFFSET to 0x02000000.
-
-
-
-I have loaded the kernel at 32MB.
-
-
-
-I used printascii as suggested to see where it hangs. I am seeing that after
-turn_mmu on, it does NOT proceed to switch_data which it should ideally. If I
-get the symbols using readelf and forcefully give the phys address itself of
-switch_data, it proceeds till the start_kernel and then hangs in printks.
-
-
-
-It somehow looks like, I have missed some change some where. 
-
-
-
-Could you please let me know if I have missed some steps OR any
-pointers/materials to what all needs to change when I want to load the kernel
-and boot from a NON standard location?
-
-
-
-With Regards,  Zakir Ahmed  ?  "And fear Almighty, and know that you are to meet him in the hereafter"  ?
+-----[ Domenico Andreoli, aka cavok
+ --[ http://www.dandreoli.com/gpgkey.asc
+   ---[ 3A0F 2F80 F79C 678A 8936  4FEE 0677 9033 A20E BC50
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110330/0f083127/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110322/3a89c019/attachment-0001.html>
