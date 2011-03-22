@@ -1,34 +1,91 @@
-From: schen@mvista.com (Steve Chen)
-Date: Tue, 22 Mar 2011 07:21:10 -0500
-Subject: [Q] Booting kernel from NFS?
-In-Reply-To: <20110322112118.GD5456@radix50.net>
-References: <201008080921466561614@gmail.com> <201103201612142509289@gmail.com>
-	<20110322112118.GD5456@radix50.net>
-Message-ID: <AANLkTim5FOQaFp+SfAFu8vuwYenA6W7J0yoGoXvu5TwT@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 22 Mar 2011 17:54:24 +0530
+Subject: [PATCH v17 08/13] davinci: eliminate use of IO_ADDRESS() on sysmod
+In-Reply-To: <1300197523-4574-1-git-send-email-manjunath.hadli@ti.com>
+References: <1300197523-4574-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C47D7B5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 6:21 AM, Baurzhan Ismagulov <ibr@radix50.net> wrote:
-> On Sun, Mar 20, 2011 at 04:13:04PM +0800, Chen Wenjie wrote:
->> ? ? ? I am debuging some issues on an arm-arch board.
->> now, I have to compile the whole kernel, download zImage to the target board
->> and reboot the board again and again. Since the relations between the
->> source files are complex, it is difficult to just write a module for insmod/rmmod.
->>
->> ? ? ? My question is: is there any way to boot the kernel from NFS? so we can
->> use zImage on the host machine through an ethernet/USB cable. Then we needn't
->> download the zImage file to the target board when we debug it.
->>
->> ? ? ? Is there any bootloader with this feature? Any comments?
->> (now I use bootloader LK("Little Kernel"))
->
-> U-Boot can download the kernel over TFTP.
+On Tue, Mar 15, 2011 at 19:28:43, Hadli, Manjunath wrote:
+> Current devices.c file has a number of instances where
+> IO_ADDRESS() is used for system module register
+> access. Eliminate this in favor of a ioremap()
+> based access.
+> 
+> Consequent to this, a new global pointer davinci_sysmodbase
+> has been introduced which gets initialized during
+> the initialization of each relevant SoC.
+> 
+> In this patch davinci_sysmodbase is used by davinci_setup_mmc
+> but the later patches in the series use the same in different
+> places using DAVINCI_SYSMODULE_VIRT.This patch lays the
+> foundation for that.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> ---
+>  arch/arm/mach-davinci/devices.c               |   23 ++++++++++++++---------
+>  arch/arm/mach-davinci/dm355.c                 |    1 +
+>  arch/arm/mach-davinci/dm365.c                 |    1 +
+>  arch/arm/mach-davinci/dm644x.c                |    1 +
+>  arch/arm/mach-davinci/dm646x.c                |    1 +
+>  arch/arm/mach-davinci/include/mach/hardware.h |    6 ++++++
+>  6 files changed, 24 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+> index d3b2040..b7ef950 100644
+> --- a/arch/arm/mach-davinci/devices.c
+> +++ b/arch/arm/mach-davinci/devices.c
+> @@ -33,6 +33,14 @@
+>  #define DM365_MMCSD0_BASE	     0x01D11000
+>  #define DM365_MMCSD1_BASE	     0x01D00000
+>  
+> +void __iomem  *davinci_sysmodbase;
+> +
+> +void davinci_map_sysmod(void)
+> +{
+> +	davinci_sysmodbase = ioremap_nocache(DAVINCI_SYSTEM_MODULE_BASE, 0x800);
+> +	WARN_ON(!davinci_sysmodbase);
+> +}
+> +
+>  static struct resource i2c_resources[] = {
+>  	{
+>  		.start		= DAVINCI_I2C_BASE,
+> @@ -210,12 +218,12 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+>  			davinci_cfg_reg(DM355_SD1_DATA2);
+>  			davinci_cfg_reg(DM355_SD1_DATA3);
+>  		} else if (cpu_is_davinci_dm365()) {
+> -			void __iomem *pupdctl1 =
+> -				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE + 0x7c);
+> -
+>  			/* Configure pull down control */
+> -			__raw_writel((__raw_readl(pupdctl1) & ~0xfc0),
+> -					pupdctl1);
+> +			void __iomem *pupdctl1 = DAVINCI_SYSMODULE_VIRT(0x7c);
+> +			unsigned v;
+> +
+> +			v = __raw_readl(pupdctl1);
+> +			__raw_writel(v & ~0xfc0, pupdctl1);
 
-Yes, you can use the tftp or bootp command under u-boot.  Use "help
-<command>" for syntax.  Alternatively, you can edit /etc/dhcpd.conf on
-the host machine and restart dhcp server to load the kernel
-automatically.
+You fixed this as Sergei requested...
 
-Regards,
+>  
+>  			mmcsd1_resources[0].start = DM365_MMCSD1_BASE;
+>  			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
+> @@ -244,11 +252,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+>  			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT0;
+>  		} else if (cpu_is_davinci_dm644x()) {
+>  			/* REVISIT: should this be in board-init code? */
+> -			void __iomem *base =
+> -				IO_ADDRESS(DAVINCI_SYSTEM_MODULE_BASE);
+> -
+>  			/* Power-on 3.3V IO cells */
+> -			__raw_writel(0, base + DM64XX_VDD3P3V_PWDN);
+> +			writel(0, DAVINCI_SYSMODULE_VIRT(DM64XX_VDD3P3V_PWDN));
 
-Steve
+.. but forgot to fix this. There is nothing wrong with
+using writel, but it doesn't fit into what the subject
+of this patch is.
+
+Thanks,
+Sekhar
