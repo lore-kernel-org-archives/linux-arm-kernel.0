@@ -1,52 +1,68 @@
-From: gxt@mprc.pku.edu.cn (Guan Xuetao)
-Date: Tue, 22 Mar 2011 21:43:46 +0800
-Subject: [PATCH] ARM: Use asm-generic/sizes.h
-In-Reply-To: <201103221110.20861.arnd@arndb.de>
-References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
-	<201103220934.50435.arnd@arndb.de>
-	<20110322092113.GB17264@n2100.arm.linux.org.uk>
-	<201103221110.20861.arnd@arndb.de>
-Message-ID: <00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Mar 2011 22:14:47 +0800
+Subject: [PATCH 2/2] ARM: mxs: TX28: Setup MAC addresses for both FEC
+	MACs from OTP fuses.
+In-Reply-To: <49cf2dff25189eb7b7a0ff9eaceefab359f08b2e.1300724245.git.LW@KARO-electronics.de>
+References: <de3ad96f6cc48ee276487b67a413b36fb089379d.1300724245.git.LW@KARO-electronics.de>
+	<49cf2dff25189eb7b7a0ff9eaceefab359f08b2e.1300724245.git.LW@KARO-electronics.de>
+Message-ID: <20110322141446.GI28098@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Firstly, the sizes.h is do derived from arm version.
-And I just complete the SZ_* definitions for 32-bit architecture,
-and remove SZ_48M for not being power-of-2 size.
-I am sorry for removing copyright information when cleaning-up the code.
-However, the content of this file is so common sense for handy sizes.
-So, I believe that GPLv2 license is enough.
+On Mon, Mar 21, 2011 at 05:48:06PM +0100, Lothar Wa?mann wrote:
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/mach-mxs/module-tx28.c |   39 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 39 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+> index 7d44936..7a9e7b6 100644
+> --- a/arch/arm/mach-mxs/module-tx28.c
+> +++ b/arch/arm/mach-mxs/module-tx28.c
+> @@ -74,6 +74,43 @@ static struct fec_platform_data tx28_fec1_data = {
+>  	.phy = PHY_INTERFACE_MODE_RMII,
+>  };
+>  
+> +#define HW_OCOTP_CUST0			0x20
+> +#define HW_OCOTP_CUST(n)		(HW_OCOTP_CUST0 + (n) * 0x10)
+> +#define HW_OCOTP_CTRL			0x00
+> +#define HW_OCOTP_CTRL_SET		(HW_OCOTP_CTRL + 4)
+> +#define HW_OCOTP_CTRL_CLR		(HW_OCOTP_CTRL + 8)
+> +
+> +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> +
+> +static int __init tx28_set_mac(int id, unsigned char mac[])
+> +{
+> +	int i;
+> +	void __iomem *ocotp_base = ioremap(MX28_OCOTP_BASE_ADDR, SZ_4K);
+> +	u32 reg = 0;
+> +	long timeout = 1000;
+> +
+> +	if (ocotp_base == NULL)
+> +		return -ENOMEM;
+> +
+> +	/* set this bit to open the OTP banks for reading */
+> +	writel(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base + HW_OCOTP_CTRL_SET);
+> +
+> +	while (readl(ocotp_base + HW_OCOTP_CTRL) & BM_OCOTP_CTRL_BUSY) {
+> +		if (timeout-- < 0)
+> +			return -ETIMEDOUT;
+> +		udelay(100);
+> +	}
+> +
+> +	for (i = 0; i < ETH_ALEN; i++) {
+> +		if (i % 4 == 0)
+> +			reg = readl(ocotp_base + HW_OCOTP_CUST(id * 2 + i / 4));
+> +		mac[i] = reg >> (24 - ((i % 4) * 8));
+> +	}
+> +	iounmap(ocotp_base);
+> +	return 0;
+> +}
+> +
 
-Regards.
+Why don't you use mxs_get_ocotp() to read otp?
 
-Guan Xuetao
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, March 22, 2011 6:10 PM
-> To: linux-arm-kernel at lists.infradead.org; Guan Xuetao
-> Cc: Russell King - ARM Linux; Stephen Boyd; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM: Use asm-generic/sizes.h
-> 
-> On Tuesday 22 March 2011, Russell King - ARM Linux wrote:
-> > On Tue, Mar 22, 2011 at 09:34:50AM +0100, Arnd Bergmann wrote:
-> > > On Tuesday 22 March 2011, Stephen Boyd wrote:
-> > > > Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
-> > > > introduced a generic sizes.h. Use that instead of the ARM specific
-> > > > version.
-> > > >
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > >
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de
-> >
-> > I assume the generic version was derived from the ARM version.  Is there
-> > a reason why ARM Ltd's copyright was seemingly dropped?
-> 
-> I'll let Guan Xuetao answer that, he introduced the file along with the
-> unicore32 architecture.
-> 
-> I doubt that the contents of this file are copyrightable, but of course
-> that is normally no reason to remove the notice.
-> 
-> 	Arnd
+-- 
+Regards,
+Shawn
