@@ -1,24 +1,48 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 22 Mar 2011 18:23:13 +0800
-Subject: [PATCH 0/7] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <1300259538.2817.0.camel@localhost>
-References: <1300240521-4344-1-git-send-email-b32955@freescale.com>
-	<1300259538.2817.0.camel@localhost>
-Message-ID: <4D887891.7040708@freescale.com>
+From: samuel.ortiz@intel.com (Samuel Ortiz)
+Date: Tue, 22 Mar 2011 12:03:10 +0100
+Subject: [PATCH 3/3] mach-ux500: configure board for the TPS61052
+	regulator v2
+In-Reply-To: <AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
+References: <1299672196-4778-1-git-send-email-linus.walleij@stericsson.com>
+	<20110317234241.GB32168@sortiz-mobl>
+	<AANLkTinT_fcTJ=gJUDAFW=qjdYbxdOCdoUq=PCFgzvo3@mail.gmail.com>
+Message-ID: <20110322110309.GC2347@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem:
+Hi Linus,
 
-Do you have any comments about this driver?
-
-thanks.
-
-Huang Shijie
-
-
-> On Wed, 2011-03-16 at 09:55 +0800, Huang Shijie wrote:
->> The general-purpose media interface(GPMI) controller is a flexible interface
->> to up to several NAND flashs.
-> Is there any public documentation for this controller?
+On Fri, Mar 18, 2011 at 08:26:23AM +0000, Linus Walleij wrote:
+> On Fri, Mar 18, 2011 at 12:42 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
+> > On Wed, Mar 09, 2011 at 12:03:16PM +0000, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> This registers the TPS61052 regulator to the ux500 MOP/HREF boards.
+> >
+> > Patch applied as well.
+> 
+> Oh no please skip that patch for now.
 >
+> It will just collide with Russell's tree in -next and wreak havoc.
+> 
+> I will take that platform data in the next merge window or through
+> Torvalds' tree after Russells and yours is merged, safest path.
+Sounds good to me. I dropped the patch.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
+---------------------------------------------------------------------
+Intel Corporation SAS (French simplified joint stock company)
+Registered headquarters: "Les Montalets"- 2, rue de Paris, 
+92196 Meudon Cedex, France
+Registration Number:  302 456 199 R.C.S. NANTERRE
+Capital: 4,572,000 Euros
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
