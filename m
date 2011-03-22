@@ -1,23 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Mar 2011 09:21:13 +0000
-Subject: [PATCH] ARM: Use asm-generic/sizes.h
-In-Reply-To: <201103220934.50435.arnd@arndb.de>
-References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
-	<201103220934.50435.arnd@arndb.de>
-Message-ID: <20110322092113.GB17264@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 22 Mar 2011 15:05:07 +0530
+Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
+In-Reply-To: <20110318123917.GC27129@sirena.org.uk>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
+	<1299592667-21367-2-git-send-email-subhasish@mistralsolutions.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C3B85A5@dbde02.ent.ti.com>
+	<20110318123917.GC27129@sirena.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C47D5EE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 09:34:50AM +0100, Arnd Bergmann wrote:
-> On Tuesday 22 March 2011, Stephen Boyd wrote:
-> > Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
-> > introduced a generic sizes.h. Use that instead of the ARM specific
-> > version.
-> > 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de
+Hi Mark,
 
-I assume the generic version was derived from the ARM version.  Is there
-a reason why ARM Ltd's copyright was seemingly dropped?
+On Fri, Mar 18, 2011 at 18:09:17, Mark Brown wrote:
+> On Fri, Mar 18, 2011 at 05:29:39PM +0530, Nori, Sekhar wrote:
+> 
+> > PRUSS as an IP is not really tied to the DA8xx SoC architecture.
+> > So, can you please name the files ti-pruss* or even just pruss if
+> > MFD folks are okay with it?
+> 
+> This...
+> 
+> > > +EXPORT_SYMBOL(pruss_get_clk_freq);
+> 
+> > This looks strange. Why do we need this? There
+> > is clk_get_rate() API in the kernel would would
+> > seem more suitable.
+> 
+> ...unfortunately conflicts with this - currently all clock API
+> implementations are unique to the platform and there's no way of adding
+> clocks that works over multiple platforms.
+
+Hmm, I guess I have a limited view of this. We do have drivers which
+use clock API and work across OMAP and DaVinci series of ARM SoCs.
+The clock implementation in this case is under mach-omap and mach-davinci
+respectively.
+
+Thanks,
+Sekhar
