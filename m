@@ -1,22 +1,20 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 22 Mar 2011 10:11:05 +0200
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <4D884489.1040205@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-	<1299570622.2754.4.camel@localhost> <4D766A2F.9080001@codeaurora.org>
-	<4D86F295.8040409@codeaurora.org> <1300691551.2761.8.camel@localhost>
-	<4D87053A.70701@codeaurora.org>  <4D884489.1040205@codeaurora.org>
-Message-ID: <1300781465.2735.0.camel@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Mar 2011 08:17:46 +0000
+Subject: Revert "[ARM] pxa: remove now unnecessary dma_needs_bounce()"
+In-Reply-To: <AANLkTinVBCpinGfMkFbb_RpJbdAJiuQ57aWjqj5F=FoB@mail.gmail.com>
+References: <AANLkTin0hVKnicRtxLwxwPJZU6tYiuTZnbGUfxt9bLYe@mail.gmail.com>
+	<20110321150349.GC4340@n2100.arm.linux.org.uk>
+	<AANLkTinVBCpinGfMkFbb_RpJbdAJiuQ57aWjqj5F=FoB@mail.gmail.com>
+Message-ID: <20110322081746.GA17264@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-03-22 at 12:11 +0530, Murali Nalajala wrote:
-> Still you have any issues/comments?
+On Mon, Mar 21, 2011 at 07:00:57PM -0700, Barry Song wrote:
+> For sa1111, why don't PCB design just connect one sdram to bank0 and
+> make software use bank0 as DMA bank if bank0 is not slower than
+> bank1/2/3? If bank0 is same with bank1/2/3 in hardware timing, there
+> is no reason to make a strange design which uses bank1/2/3 as DMA
+> area.
 
-No, not so far, just have not time now to look closer.
-
-
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Who knows why board and SoC designers do silly things.  If we could stop
+that, the kernel would be *much* simpler.
