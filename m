@@ -1,43 +1,33 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 22 Mar 2011 15:13:46 +0530
-Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C47D5EE@dbde02.ent.ti.com>
-References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
-	<1299592667-21367-2-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C3B85A5@dbde02.ent.ti.com>
-	<20110318123917.GC27129@sirena.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C47D5EE@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C47D604@dbde02.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Mar 2011 11:10:20 +0100
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+In-Reply-To: <20110322092113.GB17264@n2100.arm.linux.org.uk>
+References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
+	<201103220934.50435.arnd@arndb.de>
+	<20110322092113.GB17264@n2100.arm.linux.org.uk>
+Message-ID: <201103221110.20861.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 15:05:07, Nori, Sekhar wrote:
-> Hi Mark,
+On Tuesday 22 March 2011, Russell King - ARM Linux wrote:
+> On Tue, Mar 22, 2011 at 09:34:50AM +0100, Arnd Bergmann wrote:
+> > On Tuesday 22 March 2011, Stephen Boyd wrote:
+> > > Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
+> > > introduced a generic sizes.h. Use that instead of the ARM specific
+> > > version.
+> > > 
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de
 > 
-> On Fri, Mar 18, 2011 at 18:09:17, Mark Brown wrote:
-> > On Fri, Mar 18, 2011 at 05:29:39PM +0530, Nori, Sekhar wrote:
-> > 
-> > > PRUSS as an IP is not really tied to the DA8xx SoC architecture.
-> > > So, can you please name the files ti-pruss* or even just pruss if
-> > > MFD folks are okay with it?
-> > 
-> > This...
-> > 
-> > > > +EXPORT_SYMBOL(pruss_get_clk_freq);
-> > 
-> > > This looks strange. Why do we need this? There
-> > > is clk_get_rate() API in the kernel would would
-> > > seem more suitable.
-> > 
-> > ...unfortunately conflicts with this - currently all clock API
-> > implementations are unique to the platform and there's no way of adding
-> > clocks that works over multiple platforms.
-> 
-> Hmm, I guess I have a limited view of this. We do have drivers which
-> use clock API and work across OMAP and DaVinci series of ARM SoCs.
-> The clock implementation in this case is under mach-omap and mach-davinci
+> I assume the generic version was derived from the ARM version.  Is there
+> a reason why ARM Ltd's copyright was seemingly dropped?
 
-This should have read "under plat-omap/mach-omap2 and mach-davinci"
+I'll let Guan Xuetao answer that, he introduced the file along with the
+unicore32 architecture.
 
-Thanks,
-Sekhar
+I doubt that the contents of this file are copyrightable, but of course
+that is normally no reason to remove the notice.
+
+	Arnd
