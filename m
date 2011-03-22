@@ -1,84 +1,74 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 23 Mar 2011 01:20:23 +0900
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <20110322155730.GD30303@linux-sh.org>
-References: <20110322142619.1109.89105.sendpatchset@t400s>
-	<20110322142855.GB2202@sirena.org.uk>
-	<20110322143307.GB24004@linux-sh.org>
-	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
-	<20110322153226.GC30303@linux-sh.org>
-	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
-	<20110322155730.GD30303@linux-sh.org>
-Message-ID: <AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 22 Mar 2011 17:18:11 +0100
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110321111838.GC2610@pulham.picochip.com>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<20110316.131734.242138246.davem@davemloft.net>
+	<4D86F25A.7060405@atmel.com>
+	<20110321111838.GC2610@pulham.picochip.com>
+Message-ID: <20110322161811.GF6466@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2011 at 12:57 AM, Paul Mundt <lethal@linux-sh.org> wrote:
-> On Wed, Mar 23, 2011 at 12:43:54AM +0900, Magnus Damm wrote:
->> On Wed, Mar 23, 2011 at 12:32 AM, Paul Mundt <lethal@linux-sh.org> wrote:
->> > On Wed, Mar 23, 2011 at 12:22:05AM +0900, Magnus Damm wrote:
->> >> I believe all other i2c keyboard drivers use module_init().
->> >>
->> > We do not change initcall ordering around unless there is a reason to do
->> > so, as it's assumed that a given initcall has been chosen for a reason.
->>
->> Yes, obviously this driver is special and all other keypad drivers are wrong.
->>
-> I'm not sure why you're purposely trying to be dense. I was explaining
-> why it's not uncommon to find drivers using subsys_initcall for various
-> non-obvious reasons and why blindly changing them without valid rationale
-> generally causes more trouble than it prevents. In the case of a keypad
-> driver it's unlikely to matter, but someone may still have had a reason
-> for doing so. Given that your patch is fixing a problem, this is what
-> should be reflected in your commit text, not some vague hand-waving about
-> what everyone else is doing or what could hypothetically lead to
-> problems.
+On 11:18 Mon 21 Mar     , Jamie Iles wrote:
+> On Mon, Mar 21, 2011 at 02:38:18PM +0800, Nicolas Ferre wrote:
+> > On 3/17/2011 4:17 AM, David Miller :
+> > > From: Jamie Iles <jamie@jamieiles.com>
+> > > Date: Tue, 15 Mar 2011 10:14:47 +0000
+> > > 
+> > >> This patch series extends the Atmel MACB driver to support the Cadence
+> > >> GEM (Gigabit Ethernet MAC) to support 10/100 operation.  The GEM is
+> > >> based on the MACB block but has a few moved registers and bitfields.
+> > >> This patch series attempts to use the MACB accessors where block
+> > >> functionallity is identical and only overrides to GEM specific
+> > >> acccessors when needed.
+> > >>
+> > >> This has been runtested on a board with a Cadence GEM and compile tested
+> > >> for all at91 configurations and a number of avr32 configurations.
+> > >>
+> > >> Changes since v1:
+> > >> 	- AT91 now provides a fake "hclk" and "macb_clk" has been
+> > >> 	renamed to "pclk" to be consistent with AVR32.
+> > >> 	- Configurable GEM receive buffer size support has been added.
+> > >> 	- pr_foo() and dev_foo() have been converted to netdev_foo()
+> > >> 	where appropriate.
+> > >> 	- New conditional accessors (macb_or_gem_{read,write}l) have
+> > >> 	been introduced that do the conditional accesses dependent on
+> > >> 	macb/gem type.
+> > >> 	- GEM is now dynamically detected from the module ID rather than
+> > >> 	platform device name.
+> > >>
+> > >> Jean-Christophe, I haven't based this on your conditional clock patch as
+> > >> I wasn't sure what decision had been made on that and whether the
+> > >> at91/avr32 detection is reliable.
+> > > 
+> > > I'm happy to ACK this so you guys can merge this via one of the
+> > > ARM trees:
+> > > 
+> > > Acked-by: David S. Miller <davem@davemloft.net>
+> > 
+> > I add my:
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > Now, tell me if we need to setup a git tree with this and make it 
+> > handled by linux-next (we do not have for at91 yet)?
+> > or Russell can take the series in a "devel" branch?
+> 
+> Thanks for testing Nicolas!
+> 
+> I have an existing tree for this at
+> 
+> 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> 
+> based off of 2.6.38 (with your ACK's now added) and I'd be happy with 
+> either route.
+but we must detect the gem via the version register and ditto for macb for
+avr32 and at91
 
-Sure, including the problem description is of course a good thing.
+so please rebase it over my patch
 
->> It would be interesting to hear why subsys_initcall() was put there in
->> the first place.
->>
-> In this case I would suspect general indifference or simply copying other
-> drivers. I2C is a bit of a tricky case with regards to ordering in
-> general, but at least input devices are relatively straightforward.
+and you get my sob too
 
-I remember having to move the init order around at least once before
-in the case of i2c, so I'm not so surprised when new initcall issues
-come up now and then.
-
-Perhaps the original driver author remembers why subsys_initcall() was
-put there.
-
->> The keypad driver tries to use the I2C bus before the I2C bus driver
->> is initialized. Isn't that a pretty good reason to change the initcall
->> order?
->>
-> Yes, and that part is also not mentioned anywhere in your commit text.
-> Starting to see a pattern?
-
-"This may lead to problems with the tca6416 driver being initialized
-before the I2C bus driver."
-
-The "may" above comes from that I don't know the i2c bus driver
-initcall time on non-SH-Mobile platforms. So this may trigger on other
-platforms, or it may not depending on their cpu/board code and I2c bus
-driver.
-
->> > You had a reason, great. Next time put it in your commit text.
->>
->> Whatever. Let me know which lines you'd like to add and I'll send a V2.
->>
-> I don't think it's too much to ask that you write a commit text that
-> actually mentions what problem you are experiencing and fixing. I also
-> don't know why this needs to be pointed out. One shouldn't have to work
-> for an explanation of what purpose your patch serves when you're the one
-> trying to get it merged.
-
-I agree that it's not too much to ask for. This patch did however have
-20 lines of commit message for a one line change. Obviously the words
-were not chosen well enough to please everyone, but compared to most
-commit messages I read I believe my description was at least rather
-detailed.
-
-/ magnus
+Best Regards,
+J.
