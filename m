@@ -1,48 +1,133 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 22 Mar 2011 16:59:07 +0000
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
-References: <20110322142619.1109.89105.sendpatchset@t400s>
-	<20110322142855.GB2202@sirena.org.uk>
-	<20110322143307.GB24004@linux-sh.org>
-	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
-	<20110322153226.GC30303@linux-sh.org>
-	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
-	<20110322155730.GD30303@linux-sh.org>
-	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
-	<20110322163144.GC2202@sirena.org.uk>
-	<AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
-Message-ID: <20110322165907.GG22583@opensource.wolfsonmicro.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 22 Mar 2011 17:55:23 +0000
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110322163917.GD10058@pulham.picochip.com>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<20110316.131734.242138246.davem@davemloft.net>
+	<4D86F25A.7060405@atmel.com>
+	<20110321111838.GC2610@pulham.picochip.com>
+	<20110322161811.GF6466@game.jcrosoft.org>
+	<20110322163917.GD10058@pulham.picochip.com>
+Message-ID: <20110322175523.GE10058@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2011 at 01:51:02AM +0900, Magnus Damm wrote:
+Hi Jean-Christophe,
 
-> I'm not sure if this is i2c specific though - in general you probably
-> need to register the parent bus driver first.
+On Tue, Mar 22, 2011 at 04:39:17PM +0000, Jamie Iles wrote:
+> Hi Jean-Christophe,
+> 
+> On Tue, Mar 22, 2011 at 05:18:11PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:18 Mon 21 Mar     , Jamie Iles wrote:
+> > > I have an existing tree for this at
+> > > 
+> > > 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> > > 
+> > > based off of 2.6.38 (with your ACK's now added) and I'd be happy with 
+> > > either route.
+> > but we must detect the gem via the version register and ditto for macb for
+> > avr32 and at91
+> > 
+> > so please rebase it over my patch
+> > 
+> > and you get my sob too
+> 
+> Would you mind respinning your patch without the changes to the clk 
+> stuff?  Otherwise we're changing it from compile time to version based, 
+> only to completely remove it in subsequent patches.
 
-This was my original question - I'm not aware of any reason why you
-should need to register the driver for the specific bus first, it seems
-odd.
+Actually, this patch doesn't work anyway as the version register is 
+being read before the clks are enabled so the device isn't accessible 
+(and the registers haven't yet been ioremap()'d).
 
-> I've seen some SH-Mobile designs with PMICs, and they all use a
-> dedicated i2c bus.
+> Also, can you confirm that the module ID's that you are using to 
+> differentiate between AT91 and AVR32 won't clash with MACB uses in 
+> other, non-at91/avr32 chips, or that it doesn't matter?
 
-It's the most common bus for PMICs but some use SPI for performance
-reasons, especially if they integrate other mixed signal functionality
-such as touchscreen controllers that might be high volume.
+If this does work, then it would be nice if we made the else path of the 
+RMII AT91 tests also test for avr32 too so we aren't driving the USRIO 
+pins on platforms that aren't at91 but also aren't avr32.  So something 
+the patch below instead.
 
-> > In general embedded platforms register I2C early as things like PMICs
-> > typically hang off them. ?Grant was trying to push people to use
-> > deferred registration for this stuff but it didn't happen yet and I'd
-> > personally be more comfortable with more infastructure supporting that.
+Jamie
 
-> The dependency tracking is a bit primitive with only initcalls. I
-> wouldn't mind something like this:
+8<---
 
-That's not a general solution as it doesn't cover things like cross
-dependencies between devices on the same bus type.  You really want to
-be able to say "I depend on this set of other devices" somehow, the
-proposal from Grant that I'm talking about was to only register devices
-once their dependencies had appeared which solves the issue but is a bit
-manual for the board files.
+diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+index 79ccb54..55b81f5 100644
+--- a/drivers/net/macb.c
++++ b/drivers/net/macb.c
+@@ -22,7 +22,6 @@
+ #include <linux/phy.h>
+ 
+ #include <mach/board.h>
+-#include <mach/cpu.h>
+ 
+ #include "macb.h"
+ 
+@@ -1169,6 +1168,7 @@ static int __init macb_probe(struct platform_device *pdev)
+ 		err = -ENOMEM;
+ 		goto err_out_disable_clocks;
+ 	}
++	bp->version = macb_readl(bp, VERSION);
+ 
+ 	dev->irq = platform_get_irq(pdev, 0);
+ 	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
+@@ -1201,18 +1201,18 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	macb_get_hwaddr(bp);
+ 	pdata = pdev->dev.platform_data;
+ 
+-	if (pdata && pdata->is_rmii)
+-#if defined(CONFIG_ARCH_AT91)
+-		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)) );
+-#else
+-		macb_writel(bp, USRIO, 0);
+-#endif
+-	else
+-#if defined(CONFIG_ARCH_AT91)
+-		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
+-#else
+-		macb_writel(bp, USRIO, MACB_BIT(MII));
+-#endif
++	if (pdata && pdata->is_rmii) {
++		if (macb_is_at91(bp))
++			macb_writel(bp, USRIO,
++				    (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
++		else if (macb_is_avr32(bp))
++			macb_writel(bp, USRIO, 0);
++	} else {
++		if (macb_is_at91(bp))
++			macb_writel(bp, USRIO, MACB_BIT(CLKEN));
++		else if (macb_is_avr32(bp))
++			macb_writel(bp, USRIO, MACB_BIT(MII));
++	}
+ 
+ 	bp->tx_pending = DEF_TX_RING_PENDING;
+ 
+diff --git a/drivers/net/macb.h b/drivers/net/macb.h
+index d3212f6..56a4fcb 100644
+--- a/drivers/net/macb.h
++++ b/drivers/net/macb.h
+@@ -59,6 +59,7 @@
+ #define MACB_TPQ				0x00bc
+ #define MACB_USRIO				0x00c0
+ #define MACB_WOL				0x00c4
++#define MACB_VERSION				0x00fc
+ 
+ /* Bitfields in NCR */
+ #define MACB_LB_OFFSET				0
+@@ -389,6 +390,14 @@ struct macb {
+ 	unsigned int 		link;
+ 	unsigned int 		speed;
+ 	unsigned int 		duplex;
++
++	uint32_t		version;
+ };
+ 
++#define MACB_VERSION_MASK	0xffff0000
++#define macb_is_at91(bp)	\
++	(((bp)->version & MACB_VERSION_MASK) == 0x06010000)
++#define macb_is_avr32(bp)	\
++	(((bp)->version & MACB_VERSION_MASK) == 0x00010000)
++
+ #endif /* _MACB_H */
