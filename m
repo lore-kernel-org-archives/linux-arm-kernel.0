@@ -1,48 +1,51 @@
-From: carlv@codeaurora.org (Carl Vanderlip)
-Date: Mon, 21 Mar 2011 17:08:13 -0700 (PDT)
-Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB033D22EABA@dbde02.ent.ti.com>
-References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-	<1300485095-26923-1-git-send-email-carlv@codeaurora.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB033D22EABA@dbde02.ent.ti.com>
-Message-ID: <91dc9c88fe2071229e9ffa84e5dc5659.squirrel@www.codeaurora.org>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 22 Mar 2011 01:16:16 +0100
+Subject: [PATCH v3 3/9] lpc2k: clk API
+In-Reply-To: <1300653009-11675-4-git-send-email-ithamar.adema@team-embedded.nl>
+References: <1300653009-11675-1-git-send-email-ithamar.adema@team-embedded.nl>
+	<1300653009-11675-4-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <083DF309106F364B939360100EC290F80B15C9C579@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->
->> -----Original Message-----
->> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
->> owner at vger.kernel.org] On Behalf Of Carl Vanderlip
->> Sent: Saturday, March 19, 2011 3:22 AM
->> To: Russell King; David Brown; Daniel Walker; Bryan Huntsman
->> Cc: Brian Swetland; Dima Zavin; Rebecca Schultz Zavin; Colin Cross;
->> linux-
->> fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-arm-
->> msm at vger.kernel.org; linux-kernel at vger.kernel.org; Carl Vanderlip
->> Subject: [PATCH 01/20] video: msm: Fix typo 'mpd'->'mdp'
->>
->> From: Brian Swetland <swetland@google.com>
->>
->> Trivial fix
->
-> The Subject line states that you are only changing a typo from mpd to mdp.
-> The description doesn't state anything more.
-> But the patch is changing Copyright info also.
->>
->> Authors:
->> Dima Zavin <dima@android.com>
->> Rebecca Schultz Zavin <rebecca@android.com>
->> Colin Cross <ccross@android.com>
->>
->> Signed-off-by: Carl Vanderlip <carlv@codeaurora.org>
+Hi Ithamar,
 
-It was my intention to update the files I was changing in this patchset
-with the correct copyright assignments. v2 commit text will mention this
-change.
+> +#define clk_readl(a)	\
+> +	ioread32(APB_SCB_BASE + (a))
+> +#define clk_writel(v, a)	\
+> +	iowrite32(v, APB_SCB_BASE + (a))
+> +
+> +struct clk {
+> +	int		refcount;
+> +	struct clk	*parent;
+> +	unsigned long	rate;
 
-    -Carl V.
+It looks like this rate field is only used in 3 clock
+descriptors. It might save some space to get rid of this field
+and associated code and have those 3 clocks just use functions
+for get_rate() that return the direct value.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> +
+> +static unsigned long pclkdiv[] = { 4, 1, 2, 8 };
+> +
+> +#define PERCLK(name, pnum)	\
+> +	static unsigned long name ## _get_rate(struct clk *clk) \
+> +	{	\
+> +		unsigned long rate = clk_get_rate(clk->parent);	\
+> +		u32 val = clk_readl((pnum < 16) ? PCLKSEL0 : PCLKSEL1); \
+> +		val >>= (pnum < 16) ? pnum * 2 : (pnum - 16) * 2;	\
+> +		return rate / pclkdiv[val & 3];	\
+> +	}	\
+> +	struct clk clk_ ## name = {	\
+> +		.parent = &clk_cpu,	\
+> +		.enable_mask = (1 << pnum),	\
+> +		.get_rate = name ## _get_rate,	\
+> +	}
+> +
+
+This macro will generate multiple functions with different names but the same
+code. Can the function be made common to the supported clocks and the macro
+just handle clock descriptor setup?
+
+> +PERCLK(timer0, 1);
+> +PERCLK(timer1, 2);
