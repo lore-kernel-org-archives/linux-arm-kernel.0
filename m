@@ -1,69 +1,78 @@
-From: mnalajal@codeaurora.org (Murali Nalajala)
-Date: Tue, 22 Mar 2011 12:11:13 +0530
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <4D87053A.70701@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>	
-	<1299570622.2754.4.camel@localhost>
-	<4D766A2F.9080001@codeaurora.org>	
-	<4D86F295.8040409@codeaurora.org>
-	<1300691551.2761.8.camel@localhost> <4D87053A.70701@codeaurora.org>
-Message-ID: <4D884489.1040205@codeaurora.org>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Tue, 22 Mar 2011 12:23:14 +0530
+Subject: [PATCH v17 00/13] davinci vpbe: dm6446 v4l2 driver
+In-Reply-To: <1300197388-3704-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF72A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/21/2011 1:28 PM, Murali Nalajala wrote:
-> On 3/21/2011 12:42 PM, Artem Bityutskiy wrote:
->> On Mon, 2011-03-21 at 12:09 +0530, Murali Nalajala wrote:
->>> On 3/8/2011 11:11 PM, Murali Nalajala wrote:
->>>> On 3/8/2011 12:50 AM, Artem Bityutskiy wrote:
->>>>> On Tue, 2011-03-08 at 05:38 +0530, Murali Nalajala wrote:
->>>>>> Lets non-standard NAND drivers take advantage of known NAND
->>>>>> chip information.
->>>>>>
->>>>>> The initial development of msm nand driver, driver uses the supported
->>>>>> NAND devices information as a hardcoded table. Remove the existing
->>>>>> hardcoded supported flash device table and read the flash device
->>>>>> information from the flash id table which are part of the mtd
->>>>>> subsystem.
->>>>>
->>>>> Why this initial version should be upstream? Why wouldn't you make it
->>>>> "standard" first?
->>>>>
->>>>
->>>> Currently we are not fully using the MTD nand subsystem. That's the
->>>> intention author has introduced "non-standard" here!!!
->>>>
->>>> Thanks,
->>>> Murali N
->>>>
->>>
->>> Any reviews comments on this change?
->>
->> No, I think you should "sell" your driver better than that. Indeed,
->>
->> Q: "Why this initial version should be upstream? Why wouldn't you make
->> it "standard" first?"
->> A: Currently we are not fully using the MTD nand subsystem. That's the
->> intention author has introduced "non-standard" here!!!
->>
->
-> The driver (msm_nand.c) is in align to MTD specification.
-> But this commit text is bit misleading, initially the driver
-> didn't make use of nand flash devices information from the
-> flash id table which are part of the MTD subsystem. Hence
-> we have enabled this config option to make use of it.
->
-> Thanks,
-> Murali N
->
+Sekhar, Kevin, 
+ These patches have gone through considerable reviews. 
+Could you please ACK from your end?
 
-Hi,
-Still you have any issues/comments?
 
-Thanks,
-Murali N
+Thanks and Regards,
+-Manju
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+On Tue, Mar 15, 2011 at 19:26:28, Hadli, Manjunath wrote:
+> version17:
+> The more important among the patch history from previous comments 1. Replacing _raw_readl() with readl().
+> 2. Removal of platform resource overlap.
+> 3. Removal of unused macros.
+> 4. Fixing the module params typo.
+> 5. Minor changes in the GPL licensing header.
+> 6. Removed the initializer for field inversion parameter.
+> 7. Changing the Field inversion #ifdef to platform 
+>    based implementation.
+> 8. Interchanged platform and board specific patches due to dependencies.
+> 
+> Manjunath Hadli (13):
+>   davinci vpbe: V4L2 display driver for DM644X SoC
+>   davinci vpbe: VPBE display driver
+>   davinci vpbe: OSD(On Screen Display) block
+>   davinci vpbe: VENC( Video Encoder) implementation
+>   davinci vpbe: Build infrastructure for VPBE driver
+>   davinci vpbe: Readme text for Dm6446 vpbe
+>   davinci: move DM64XX_VDD3P3V_PWDN to devices.c
+>   davinci: eliminate use of IO_ADDRESS() on sysmod
+>   davinci: dm644x: Replace register base value with a defined macro
+>   davinci: dm644x: change vpfe capture structure variables for
+>     consistency
+>   davinci: dm644x: move vpfe init from soc to board specific files
+>   davinci: dm644x: add support for v4l2 video display
+>   davinci: dm644x EVM: add support for VPBE display
+> 
+>  Documentation/video4linux/README.davinci-vpbe |   93 ++
+>  arch/arm/mach-davinci/board-dm644x-evm.c      |  131 ++-
+>  arch/arm/mach-davinci/devices.c               |   24 +-
+>  arch/arm/mach-davinci/dm355.c                 |    1 +
+>  arch/arm/mach-davinci/dm365.c                 |    1 +
+>  arch/arm/mach-davinci/dm644x.c                |  172 ++-
+>  arch/arm/mach-davinci/dm646x.c                |    1 +
+>  arch/arm/mach-davinci/include/mach/dm644x.h   |    7 +-
+>  arch/arm/mach-davinci/include/mach/hardware.h |    7 +-
+>  drivers/media/video/davinci/Kconfig           |   22 +
+>  drivers/media/video/davinci/Makefile          |    2 +
+>  drivers/media/video/davinci/vpbe.c            |  826 ++++++++++
+>  drivers/media/video/davinci/vpbe_display.c    | 2084 +++++++++++++++++++++++++
+>  drivers/media/video/davinci/vpbe_osd.c        | 1216 ++++++++++++++
+>  drivers/media/video/davinci/vpbe_osd_regs.h   |  364 +++++
+>  drivers/media/video/davinci/vpbe_venc.c       |  556 +++++++
+>  drivers/media/video/davinci/vpbe_venc_regs.h  |  177 +++
+>  include/media/davinci/vpbe.h                  |  185 +++
+>  include/media/davinci/vpbe_display.h          |  146 ++
+>  include/media/davinci/vpbe_osd.h              |  397 +++++
+>  include/media/davinci/vpbe_types.h            |   91 ++
+>  include/media/davinci/vpbe_venc.h             |   41 +
+>  22 files changed, 6500 insertions(+), 44 deletions(-)  create mode 100644 Documentation/video4linux/README.davinci-vpbe
+>  create mode 100644 drivers/media/video/davinci/vpbe.c
+>  create mode 100644 drivers/media/video/davinci/vpbe_display.c
+>  create mode 100644 drivers/media/video/davinci/vpbe_osd.c
+>  create mode 100644 drivers/media/video/davinci/vpbe_osd_regs.h
+>  create mode 100644 drivers/media/video/davinci/vpbe_venc.c
+>  create mode 100644 drivers/media/video/davinci/vpbe_venc_regs.h
+>  create mode 100644 include/media/davinci/vpbe.h  create mode 100644 include/media/davinci/vpbe_display.h
+>  create mode 100644 include/media/davinci/vpbe_osd.h  create mode 100644 include/media/davinci/vpbe_types.h
+>  create mode 100644 include/media/davinci/vpbe_venc.h
+> 
+> 
