@@ -1,37 +1,34 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 22 Mar 2011 13:14:14 +0100
-Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
-Message-ID: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
+From: schen@mvista.com (Steve Chen)
+Date: Tue, 22 Mar 2011 07:21:10 -0500
+Subject: [Q] Booting kernel from NFS?
+In-Reply-To: <20110322112118.GD5456@radix50.net>
+References: <201008080921466561614@gmail.com> <201103201612142509289@gmail.com>
+	<20110322112118.GD5456@radix50.net>
+Message-ID: <AANLkTim5FOQaFp+SfAFu8vuwYenA6W7J0yoGoXvu5TwT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case CONFIG_FB_PXA_OVERLAY is not defined, the pxafb_freq_transition()
-function tests nonexistent member of pxafb_info (since the member is not
-part of the structure).
+On Tue, Mar 22, 2011 at 6:21 AM, Baurzhan Ismagulov <ibr@radix50.net> wrote:
+> On Sun, Mar 20, 2011 at 04:13:04PM +0800, Chen Wenjie wrote:
+>> ? ? ? I am debuging some issues on an arm-arch board.
+>> now, I have to compile the whole kernel, download zImage to the target board
+>> and reboot the board again and again. Since the relations between the
+>> source files are complex, it is difficult to just write a module for insmod/rmmod.
+>>
+>> ? ? ? My question is: is there any way to boot the kernel from NFS? so we can
+>> use zImage on the host machine through an ethernet/USB cable. Then we needn't
+>> download the zImage file to the target board when we debug it.
+>>
+>> ? ? ? Is there any bootloader with this feature? Any comments?
+>> (now I use bootloader LK("Little Kernel"))
+>
+> U-Boot can download the kernel over TFTP.
 
-Fix this by wraping the test in ifdef, even if I don't really like how the code
-looks now. The check doesn't have to happen if overlays are disabled at all as
-the check is always true then.
+Yes, you can use the tftp or bootp command under u-boot.  Use "help
+<command>" for syntax.  Alternatively, you can edit /etc/dhcpd.conf on
+the host machine and restart dhcp server to load the kernel
+automatically.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- drivers/video/pxafb.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+Regards,
 
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index a2e5b51..0f4e8c9 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -1648,7 +1648,9 @@ pxafb_freq_transition(struct notifier_block *nb, unsigned long val, void *data)
- 
- 	switch (val) {
- 	case CPUFREQ_PRECHANGE:
--		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
-+#ifdef CONFIG_FB_PXA_OVERLAY
-+		if (!(fbi->overlay[0].usage || fbi->overlay[1].usage))
-+#endif
- 			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
- 		break;
- 
--- 
-1.7.2.3
+Steve
