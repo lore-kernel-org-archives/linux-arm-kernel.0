@@ -1,25 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Mar 2011 13:24:27 -0000
-Subject: [PATCH 2/2] ARM: perf: add required isbs() to ARMv7 backend
-In-Reply-To: <AANLkTimcpgXnpXTbcK3WFaF3gt_FruBTGoqh7sbXJfWD@mail.gmail.com>
-References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>	<1300289898-2720-2-git-send-email-will.deacon@arm.com>	<AANLkTinQJ_1Ym8jVHjRP80XzC0PKzR+o9-Fdk56WzEF8@mail.gmail.com>	<9133336726495377032@unknownmsgid>
-	<AANLkTimcpgXnpXTbcK3WFaF3gt_FruBTGoqh7sbXJfWD@mail.gmail.com>
-Message-ID: <002601cbe894$780c0a90$68241fb0$@deacon@arm.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Tue, 22 Mar 2011 14:30:34 +0100
+Subject: reboot/kexec in 2.6.38
+In-Reply-To: <AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
+References: <20110317064523.GA1995@ucw.cz>
+	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
+Message-ID: <20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi!
+> I think it's config issue. Never heard of this.
 
-> > I'd like to submit this to the patch system if you're happy with it.
-> > Are you OK with the barrier coming before the write to the PMCR?
-> 
-> Yes I am OK
-> 
-> Acked-by: Jean Pihet <j-pihet@ti.com>
+I've just compiled and booted 2.6.38. The kernel boots without problems when
+flashed in. But I've had no success with kexec, the last lines I see are:
 
-Thanks for the ack. I've submitted these two patches as 6823/1 and
-6824/1 respectively.
+Starting new kernel
+Bye!
+_
 
-Cheers,
+Any ides where to dig?
 
-Will
+-- 
+metan
