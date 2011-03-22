@@ -1,28 +1,59 @@
-From: ibr@radix50.net (Baurzhan Ismagulov)
-Date: Tue, 22 Mar 2011 12:21:18 +0100
-Subject: [Q] Booting kernel from NFS?
-In-Reply-To: <201103201612142509289@gmail.com>
-References: <201008080921466561614@gmail.com> <201103201612142509289@gmail.com>
-Message-ID: <20110322112118.GD5456@radix50.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 22 Mar 2011 14:18:49 +0300
+Subject: [PATCH] msm: board-msm8960: Add USB peripheral and OTG support
+In-Reply-To: <1300783908-4638-1-git-send-email-anjir@codeaurora.org>
+References: <1300783908-4638-1-git-send-email-anjir@codeaurora.org>
+Message-ID: <4D888599.4080705@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2011 at 04:13:04PM +0800, Chen Wenjie wrote:
-> 	I am debuging some issues on an arm-arch board. 
-> now, I have to compile the whole kernel, download zImage to the target board 
-> and reboot the board again and again. Since the relations between the 
-> source files are complex, it is difficult to just write a module for insmod/rmmod.
-> 
-> 	My question is: is there any way to boot the kernel from NFS? so we can 
-> use zImage on the host machine through an ethernet/USB cable. Then we needn't 
-> download the zImage file to the target board when we debug it.
->                                                            	
-> 	Is there any bootloader with this feature? Any comments?
-> (now I use bootloader LK("Little Kernel"))
+Hello.
 
-U-Boot can download the kernel over TFTP.
+On 22-03-2011 11:51, Anji jonnala wrote:
 
-With kind regards,
--- 
-Baurzhan Ismagulov
-http://www.kz-easy.com/
+> Signed-off-by: Anji jonnala <anjir@codeaurora.org>
+[...]
+
+> diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
+> index 894ff98..8baf4fa 100644
+> --- a/arch/arm/mach-msm/devices-msm8960.c
+> +++ b/arch/arm/mach-msm/devices-msm8960.c
+[...]
+> @@ -89,6 +90,52 @@ struct platform_device msm8960_device_uart_gsbi5 = {
+>   	.resource	= resources_uart_gsbi5,
+>   };
+>
+> +static struct resource resources_otg[] = {
+> +	{
+> +		.start	= MSM8960_HSUSB_PHYS,
+> +		.end	= MSM8960_HSUSB_PHYS + MSM8960_HSUSB_SIZE,
+
+    You forgot "- 1".
+
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= USB1_HS_IRQ,
+> +		.end	= USB1_HS_IRQ,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device msm_device_otg = {
+> +	.name		= "msm_otg",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(resources_otg),
+> +	.resource	= resources_otg,
+> +	.dev		= {
+> +		.coherent_dma_mask	= 0xffffffff,
+> +	},
+> +};
+> +
+> +static struct resource resources_hsusb[] = {
+> +	{
+> +		.start	= MSM8960_HSUSB_PHYS,
+> +		.end	= MSM8960_HSUSB_PHYS + MSM8960_HSUSB_SIZE,
+
+    You forgot "- 1" here too.
+
+WBR, Sergei
