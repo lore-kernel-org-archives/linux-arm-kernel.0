@@ -1,70 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Mar 2011 19:30:26 +0000
-Subject: Updated mach-types update
-In-Reply-To: <AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
-Message-ID: <20110322193026.GC17264@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Mar 2011 19:34:09 +0000
+Subject: [PATCH] ARM: memmap: only free allocated memmap entries when using
+	SPARSEMEM
+Message-ID: <1300822449-7324-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 02:19:11PM +0100, Domenico Andreoli wrote:
-> Hi Russell,
-> 
-> On Sun, Mar 20, 2011 at 12:03 PM, Russell King - ARM Linux <
-> linux at arm.linux.org.uk> wrote:
-> 
-> >
-> > What this means is that any platform in the machine database which has not
-> > been submitted to mainline for 12 months since it was registered will be
-> > automatically dropped from the file, and the platform maintainer will need
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > to either talk to me to get it reinstated before submission, or update the
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > entry in some way to 'freshen' it.
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> >
-> 
-> I think this statement matches the needs of those, like me, are trying to
-> add a new board.
-> My patch [0] applies but does not build any more. How does it work in this
-> case?
+The SPARSEMEM code allocates memmap entries only for sections which are
+present (i.e. those which contain some valid memory). The membank checks
+in free_unused_memmap do not take this into account and can incorrectly
+attempt to free memory which is not allocated, resulting in a BUG() in
+the bootmem code.
 
-Precisely in the way I said above - see the bit I've underlined.
+However, if memory is configured as follows:
 
-Frankly, if you are a platform developer, and you are unable to submit
-your code within 12 months, and stuff you need for that platform gets
-dropped, that's not _our_ problem to deal with.
+    |<----section---->|<----hole---->|<----section---->|
+    +--------+--------+--------------+--------+--------+
+    | bank 0 | unused |              | bank 1 | unused |
+    +--------+--------+--------------+--------+--------+
 
-> I may include a new bit which adds the right entry in mach-types (so that my
-> patch is actually
-> buildable and testable before inclusion), in taking my patch set then you
-> should drop the mach-types bit because it will be updated by you script
-> later.
+where a bank only occupies part of a section, the memmap allocated for
+the remainder of the section *can* be freed.
 
-Or you could follow the instructions I said above.
+This patch modifies the checks in free_unused_memmap so that only valid
+memmap entries are considered for removal.
 
-> > This does have the potential to go wrong if people start randomly changing
-> > the format of how they write the MACHINE_START() macro.  If it's not found
-> > by:
-> >
-> > grep -rh --exclude=include --include='*.c' MACHINE_START arch/arm |
-> >  grep -v '^#' | sed "s@[^(]*(\([^,]*\).*@ ('\1')@;2,\$s@^@,@"
-> >
-> 
-> maybe it could be useful to add this regex in the top of mach-types or put
-> it in scripts/ so that everybody can validate his/her changes.
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/init.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-Why?  It's not actually useful to anyone else as all it does is produce
-a big amount of SQL-formatted stuff to indicate what's in mainline.  You
-know what's in mainline already - and it's really the case that you have
-to be extremely obscure to avoid it matching.
-
-Even if it was included, it wouldn't prompt people to check that their
-new stuff matches.
-
-> anyway I would add some comment in mach-types that explains how the files is
-> managed.
-
-You mean like the comment that's in there - have you even looked at the
-cut down version yet?
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ce406e5..dfd4286 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -399,7 +399,7 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ 	 * Convert start_pfn/end_pfn to a struct page pointer.
+ 	 */
+ 	start_pg = pfn_to_page(start_pfn - 1) + 1;
+-	end_pg = pfn_to_page(end_pfn);
++	end_pg = pfn_to_page(end_pfn - 1) + 1;
+ 
+ 	/*
+ 	 * Convert to physical addresses, and
+@@ -433,6 +433,14 @@ static void __init free_unused_memmap(struct meminfo *mi)
+ 
+ 		bank_start = bank_pfn_start(bank);
+ 
++#ifdef CONFIG_SPARSEMEM
++		/*
++		 * Take care not to free memmap entries that don't exist
++		 * due to SPARSEMEM sections which aren't present.
++		 */
++		bank_start = min(bank_start,
++				 ALIGN(prev_bank_end, PAGES_PER_SECTION));
++#endif
+ 		/*
+ 		 * If we had a previous bank, and there is a space
+ 		 * between the current bank and the previous, free it.
+@@ -447,6 +455,12 @@ static void __init free_unused_memmap(struct meminfo *mi)
+ 		 */
+ 		prev_bank_end = ALIGN(bank_pfn_end(bank), MAX_ORDER_NR_PAGES);
+ 	}
++
++#ifdef CONFIG_SPARSEMEM
++	if (!IS_ALIGNED(prev_bank_end, PAGES_PER_SECTION))
++		free_memmap(prev_bank_end,
++			    ALIGN(prev_bank_end, PAGES_PER_SECTION));
++#endif
+ }
+ 
+ static void __init free_highpages(void)
+-- 
+1.7.0.4
