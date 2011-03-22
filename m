@@ -1,133 +1,20 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 22 Mar 2011 17:55:23 +0000
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-In-Reply-To: <20110322163917.GD10058@pulham.picochip.com>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<20110316.131734.242138246.davem@davemloft.net>
-	<4D86F25A.7060405@atmel.com>
-	<20110321111838.GC2610@pulham.picochip.com>
-	<20110322161811.GF6466@game.jcrosoft.org>
-	<20110322163917.GD10058@pulham.picochip.com>
-Message-ID: <20110322175523.GE10058@pulham.picochip.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 22 Mar 2011 11:39:31 -0700
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+In-Reply-To: <00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>
+References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
+	<201103220934.50435.arnd@arndb.de>
+	<20110322092113.GB17264@n2100.arm.linux.org.uk>
+	<201103221110.20861.arnd@arndb.de>
+	<00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>
+Message-ID: <4D88ECE3.1070209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On 03/22/2011 06:43 AM, Guan Xuetao wrote:
+> And I just complete the SZ_* definitions for 32-bit architecture,
+> and remove SZ_48M for not being power-of-2 size.
 
-On Tue, Mar 22, 2011 at 04:39:17PM +0000, Jamie Iles wrote:
-> Hi Jean-Christophe,
-> 
-> On Tue, Mar 22, 2011 at 05:18:11PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 11:18 Mon 21 Mar     , Jamie Iles wrote:
-> > > I have an existing tree for this at
-> > > 
-> > > 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
-> > > 
-> > > based off of 2.6.38 (with your ACK's now added) and I'd be happy with 
-> > > either route.
-> > but we must detect the gem via the version register and ditto for macb for
-> > avr32 and at91
-> > 
-> > so please rebase it over my patch
-> > 
-> > and you get my sob too
-> 
-> Would you mind respinning your patch without the changes to the clk 
-> stuff?  Otherwise we're changing it from compile time to version based, 
-> only to completely remove it in subsequent patches.
-
-Actually, this patch doesn't work anyway as the version register is 
-being read before the clks are enabled so the device isn't accessible 
-(and the registers haven't yet been ioremap()'d).
-
-> Also, can you confirm that the module ID's that you are using to 
-> differentiate between AT91 and AVR32 won't clash with MACB uses in 
-> other, non-at91/avr32 chips, or that it doesn't matter?
-
-If this does work, then it would be nice if we made the else path of the 
-RMII AT91 tests also test for avr32 too so we aren't driving the USRIO 
-pins on platforms that aren't at91 but also aren't avr32.  So something 
-the patch below instead.
-
-Jamie
-
-8<---
-
-diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-index 79ccb54..55b81f5 100644
---- a/drivers/net/macb.c
-+++ b/drivers/net/macb.c
-@@ -22,7 +22,6 @@
- #include <linux/phy.h>
- 
- #include <mach/board.h>
--#include <mach/cpu.h>
- 
- #include "macb.h"
- 
-@@ -1169,6 +1168,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 		err = -ENOMEM;
- 		goto err_out_disable_clocks;
- 	}
-+	bp->version = macb_readl(bp, VERSION);
- 
- 	dev->irq = platform_get_irq(pdev, 0);
- 	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
-@@ -1201,18 +1201,18 @@ static int __init macb_probe(struct platform_device *pdev)
- 	macb_get_hwaddr(bp);
- 	pdata = pdev->dev.platform_data;
- 
--	if (pdata && pdata->is_rmii)
--#if defined(CONFIG_ARCH_AT91)
--		macb_writel(bp, USRIO, (MACB_BIT(RMII) | MACB_BIT(CLKEN)) );
--#else
--		macb_writel(bp, USRIO, 0);
--#endif
--	else
--#if defined(CONFIG_ARCH_AT91)
--		macb_writel(bp, USRIO, MACB_BIT(CLKEN));
--#else
--		macb_writel(bp, USRIO, MACB_BIT(MII));
--#endif
-+	if (pdata && pdata->is_rmii) {
-+		if (macb_is_at91(bp))
-+			macb_writel(bp, USRIO,
-+				    (MACB_BIT(RMII) | MACB_BIT(CLKEN)));
-+		else if (macb_is_avr32(bp))
-+			macb_writel(bp, USRIO, 0);
-+	} else {
-+		if (macb_is_at91(bp))
-+			macb_writel(bp, USRIO, MACB_BIT(CLKEN));
-+		else if (macb_is_avr32(bp))
-+			macb_writel(bp, USRIO, MACB_BIT(MII));
-+	}
- 
- 	bp->tx_pending = DEF_TX_RING_PENDING;
- 
-diff --git a/drivers/net/macb.h b/drivers/net/macb.h
-index d3212f6..56a4fcb 100644
---- a/drivers/net/macb.h
-+++ b/drivers/net/macb.h
-@@ -59,6 +59,7 @@
- #define MACB_TPQ				0x00bc
- #define MACB_USRIO				0x00c0
- #define MACB_WOL				0x00c4
-+#define MACB_VERSION				0x00fc
- 
- /* Bitfields in NCR */
- #define MACB_LB_OFFSET				0
-@@ -389,6 +390,14 @@ struct macb {
- 	unsigned int 		link;
- 	unsigned int 		speed;
- 	unsigned int 		duplex;
-+
-+	uint32_t		version;
- };
- 
-+#define MACB_VERSION_MASK	0xffff0000
-+#define macb_is_at91(bp)	\
-+	(((bp)->version & MACB_VERSION_MASK) == 0x06010000)
-+#define macb_is_avr32(bp)	\
-+	(((bp)->version & MACB_VERSION_MASK) == 0x00010000)
-+
- #endif /* _MACB_H */
+Ah, I didn't notice this part. SZ_48M is actually used by ARM code so
+that would need to be added to the generic header should we go with this
+patch.
