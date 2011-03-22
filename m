@@ -1,20 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 22 Mar 2011 14:28:55 +0000
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <20110322142619.1109.89105.sendpatchset@t400s>
-References: <20110322142619.1109.89105.sendpatchset@t400s>
-Message-ID: <20110322142855.GB2202@sirena.org.uk>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 22 Mar 2011 19:58:57 +0530
+Subject: [PATCH v17 12/13] davinci: dm644x: add support for v4l2 video
+	display
+In-Reply-To: <1300197580-5029-1-git-send-email-manjunath.hadli@ti.com>
+References: <1300197580-5029-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C47D8A2@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2011 at 11:26:19PM +0900, Magnus Damm wrote:
+On Tue, Mar 15, 2011 at 19:29:40, Hadli, Manjunath wrote:
+> Create platform devices for various video modules like venc,osd,
+> vpbe and v4l2 driver for dm644x.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> ---
 
-> The tca6416 driver makes use of the I2C bus for chatting
-> with the actual hardware device. Without this patch both
-> the I2C bus driver and the tca6416 driver are initialized
-> at the subsys_initcall() level. This may lead to problems
-> with the tca6416 driver being initialized before the I2C
-> bus driver.
+> +struct venc_platform_data dm644x_venc_pdata = {
+> +	.venc_type	= VPBE_VERSION_1,
+> +	.setup_clock	= dm644x_venc_setup_clock,
+> +};
 
-While this change seems reasonable I'm curious what the problems caused
-by out of order registration are?
+Sparse pointed out that this symbol can
+be static.
+
+Can you please build the complete series with
+C=1 on the command line? This will enable
+sparse check on all files being re-compiled.
+
+I also noticed some sparse warnings on vpbe_venc.c
+
+Also, please build with CONFIG_DEBUG_SECTION_MISMATCH=y
+on the command line. I noticed some section
+mismatches as well with the new code.
+
+Thanks,
+Sekhar
