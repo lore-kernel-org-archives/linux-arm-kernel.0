@@ -1,34 +1,33 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 23 Mar 2011 07:23:11 -0700
-Subject: [Git pull] MSM for v2.6.39
-In-Reply-To: <8yazkotpwk6.fsf@huya.qualcomm.com>
-References: <8yazkotpwk6.fsf@huya.qualcomm.com>
-Message-ID: <1300890191.6117.43.camel@m0nster>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Wed, 23 Mar 2011 15:31:34 +0100
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+In-Reply-To: <016301cbe934$957a69f0$c06f3dd0$@mprc.pku.edu.cn>
+References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>
+	<201103220934.50435.arnd@arndb.de>
+	<20110322092113.GB17264@n2100.arm.linux.org.uk>
+	<201103221110.20861.arnd@arndb.de>
+	<00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>
+	<4D88ECE3.1070209@codeaurora.org>
+	<00fc01cbe8f9$cd807640$688162c0$@mprc.pku.edu.cn>
+	<4D896616.7070307@codeaurora.org>
+	<016301cbe934$957a69f0$c06f3dd0$@mprc.pku.edu.cn>
+Message-ID: <20110323143134.GA10136@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-17 at 08:59 -0700, David Brown wrote:
-> David Brown (16):
->       msm: Add CPU queries
->       msm: Generalize timer register mappings
->       msm: Generalize QGIC registers
->       msm: Add MSM 8960 cpu_is check
->       Merge branch 'msm-uart' into for-next
->       Merge branch 'msm-8960' into for-next
->       Merge branch 'msm-sdcc' into for-next
->       Merge branch 'msm-fb' into for-next
->       Merge branch 'msm-8960' into msm-core
->       msm: Remove broken register definition from trout
->       msm: Warning fix in trout gpio board file
->       Merge branch 'msm-core' into for-next
->       Merge branch 'msm-core' into for-next
->       Merge branch 'msm-core' into for-next
->       msm: Use explicit GPLv2 licenses
->       Merge remote branch 'rmk/for-linus' into for-linus 
+> > I'm hoping that kbuild gets asm-generic support sometime soon so files
+> > with only a "#include <asm-generic/*>" are generated instead of living
+> > in the tree. In that case I'd rather have the non power of 2 constants
+> > added to the generic sizes.h and be done with it. There isn't any strong
+> > technical reason to deny power of 2 constants from the generic header,
+> > right?
+> No.
+> I just think that power-of-2 sizes are more generic, not compulsively of course.
+> 
+> Sam Ravnborg had introduced a patch set to provide generic support for
+> architectures that using one-line asm-generic headers.
 
-Could you change the "for-next" name to something more interesting like
-msm-for-linus .. I think it would be acceptable to just create
-msm-for-linus during the merge window and merge all the sub-tree's into
-that.
+It almost ready - but my spare time has been spent on sparc lately.
+Will try to take alook at it again soon.
 
-Daniel
+	Sam
