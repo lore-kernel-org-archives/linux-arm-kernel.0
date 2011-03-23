@@ -1,22 +1,33 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 23 Mar 2011 12:55:35 -0700
-Subject: [PATCH 0/2] Fix resource size miscalculations
-Message-ID: <cover.1300909445.git.joe@perches.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Mar 2011 20:03:53 +0000
+Subject: multiple definition of show_mem for pxa
+In-Reply-To: <4D89F000.1070509@cam.ac.uk>
+References: <4D89F000.1070509@cam.ac.uk>
+Message-ID: <20110323200353.GA9844@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use resource_size a few places
+On Wed, Mar 23, 2011 at 01:05:04PM +0000, Jonathan Cameron wrote:
+> Hi all
+> 
+> Can't immediately track down what changed to cause this issue, but
+> building with current mainline is giving me:
+> 
+> lib/lib.a(show_mem.o): In function `show_mem':
+> show_mem.c:(.text+0x13c): multiple definition of `show_mem'
+> arch/arm/mm/built-in.o:copypage-xscale.c:(.text+0xfcc): first defined here
+> make: *** [vmlinux.o] Error 1
+> 
+> 
+> Anyone know what caused this?
+> 
+> There are indeed two versions of mem_info, the generic one and one
+> in arch/arm/mm/init.c but I think they have both been around for
+> some time without issue.
 
-Joe Perches (2):
-  trivial: treewide: Fix iomap resource size miscalculations
-  trivial: arm: mach-u300/gpio: Fix mem_region resource size miscalculations
+The generic one doesn't work on ARM, and it's supposed to override the
+generic one.  It seems that ddd588b5dd55f14320379961e47683db4e4c1d90
+causes the generic one to be pulled in due to a reference to __show_mem()
+which then causes show_mem() to be defined twice.
 
- arch/arm/mach-u300/gpio.c         |    7 +++----
- arch/arm/mach-ux500/mbox-db5500.c |    6 ++----
- arch/mips/rb532/gpio.c            |    2 +-
- drivers/video/msm/mddi.c          |    2 +-
- drivers/watchdog/bcm63xx_wdt.c    |    2 +-
- 5 files changed, 8 insertions(+), 11 deletions(-)
-
--- 
-1.7.4.2.g597a6.dirty
+The change in lib/show_mem.c needs to also be ported to ARMs own version.
