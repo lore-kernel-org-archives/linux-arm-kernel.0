@@ -1,43 +1,55 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 23 Mar 2011 11:15:52 +0200
-Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
-In-Reply-To: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
-References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <201103231115.53082.anarsoul@gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Wed, 23 Mar 2011 10:31:57 +0100
+Subject: Updated mach-types update
+In-Reply-To: <20110322193026.GC17264@n2100.arm.linux.org.uk>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+	<AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
+	<20110322193026.GC17264@n2100.arm.linux.org.uk>
+Message-ID: <20110323093157.GA6397@vixen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 March 2011 14:14:14 Marek Vasut wrote:
-> In case CONFIG_FB_PXA_OVERLAY is not defined, the pxafb_freq_transition()
-> function tests nonexistent member of pxafb_info (since the member is not
-> part of the structure).
-> Fix this by wraping the test in ifdef, even if I don't really like how the
-> code looks now. The check doesn't have to happen if overlays are disabled
-> at all as the check is always true then.
+Hi,
 
-Ok, but how you're going to implement it if overlay support is enabled, but 
-SoC does not support it?
- 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-
-Acked-by: Vasily Khoruzhick <anarsoul@gmail.com>
-
-> ---
->  drivers/video/pxafb.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
+On Tue, Mar 22, 2011 at 07:30:26PM +0000, ext Russell King - ARM Linux wrote:
+> On Tue, Mar 22, 2011 at 02:19:11PM +0100, Domenico Andreoli wrote:
+> > On Sun, Mar 20, 2011 at 12:03 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > >
+> > > What this means is that any platform in the machine database which has not
+> > > been submitted to mainline for 12 months since it was registered will be
+> > > automatically dropped from the file, and the platform maintainer will need
+>                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > to either talk to me to get it reinstated before submission, or update the
+>     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > entry in some way to 'freshen' it.
+>     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > >
+> > 
+> > I think this statement matches the needs of those, like me, are trying to
+> > add a new board.
+> > My patch [0] applies but does not build any more. How does it work in this
+> > case?
 > 
-> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index a2e5b51..0f4e8c9 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -1648,7 +1648,9 @@ pxafb_freq_transition(struct notifier_block *nb,
-> unsigned long val, void *data)
+> Precisely in the way I said above - see the bit I've underlined.
+
+So it looks like I cannot be of any help improving my QQ2440 patch :)
+
+Could you please reintroduce the qq2440 mach type? I have one patch
+[0] sitting, I got some feedback but nobody has Revieved-by the v3 yet.
+The networking part has been already pulled by Linus trough netdev.
+
+Thank you.
+
+> > anyway I would add some comment in mach-types that explains how the files is
+> > managed.
 > 
->  	switch (val) {
->  	case CPUFREQ_PRECHANGE:
-> -		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
-> +#ifdef CONFIG_FB_PXA_OVERLAY
-> +		if (!(fbi->overlay[0].usage || fbi->overlay[1].usage))
-> +#endif
->  			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
->  		break;
+> You mean like the comment that's in there - have you even looked at the
+> cut down version yet?
+
+Yes, after I sent the email. It took a while for me to find your git
+tree, it was not obvious that rmk is you :) Sorry for the noise.
+
+Regards,
+Domenico
+
+[0] http://article.gmane.org/gmane.linux.ports.arm.kernel/110583/match=qq2440
