@@ -1,50 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Mar 2011 18:44:19 -0000
-Subject: [PATCH] ARM: perf: ensure overflows aren't missed due to IRQ
-	latency
-In-Reply-To: <4D8A3D6A.1000409@codeaurora.org>
-References: <1300895525-10800-1-git-send-email-will.deacon@arm.com>	<20110323181302.GF2795@pulham.picochip.com>
-	<AANLkTimOKgtuAwYOrnx7anW1__wzQg-rPhqqRmC=qJcY@mail.gmail.com>
-	<4D8A3D6A.1000409@codeaurora.org>
-Message-ID: <003501cbe98a$51c00b10$f5402130$@deacon@arm.com>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 23 Mar 2011 12:18:52 -0700
+Subject: [PATCH 09/20] video: msm: Split out MDP2.2 HW specific code.
+In-Reply-To: <1300885912.6117.16.camel@m0nster>
+References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
+	<1300485423-27281-1-git-send-email-carlv@codeaurora.org>
+	<1300885912.6117.16.camel@m0nster>
+Message-ID: <AANLkTimYqxt1q2Ca8meEYdM0yGEHWoBqdTTDU0GXC5ge@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 03/23/2011 02:28 PM, Jamie Iles wrote:
-> > Hmm, I'm not really sure I follow that and see how it works for an
-> > overflow when new < prev.  Why doesn't the naive:
-> >
-> >        new_raw_count &= armpmu->max_period;
-> >        prev_raw_count &= armpmu->max_period;
-> >        if (overflow)
-> >                delta = (armpmu->max_period - prev_raw_count) +
-> >                        new_raw_count
-> >        else
-> >                delta = new_raw_count - prev_raw_count;
-> >
-> > work?  I'm sure I'm missing something here!
-> >
-> > Jamie
-> 
-> When new < prev, delta will be greater than 2^32. So we'll have accounted for the overflow condition
-> anyway.
-> 
-> The naive solution you mention above is what we discussed earlier and works too.
+>> +config MSM_MDP22
+>> + ? ? ? bool
+>> + ? ? ? depends on ARCH_MSM7X00A
+>> + ? ? ? default y
+>> +
+>
+> You should remove the "default y" and this should be moved to a Kconfig
+> under video (shouldn't be added into mach-msm).
 
-Yup, they both work but I think Jamie's version is easier to read so
-I'll roll another patch...
+Additionally, please have the right MDP version directly 'select'ed by
+the ARCH_XXXX definitions instead of doing the 'depends on' business.
 
-> I guess the additional:
-> 
-> >        new_raw_count &= armpmu->max_period;
-> >        prev_raw_count &= armpmu->max_period;
-> 
-> just makes it cleaner than the shifting to upper 32bits, subtracting and then shifting back again.
+--Dima
 
-... but I'm having second thoughts about using max_period as the
-mask. If the period was anything other than 0xffffffff then it
-wouldn't work. I'll add another field to the PMU structure in
-case somebody in the future has counters with strange period
-constraints.
-
-Will
+>
+> Daniel
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
