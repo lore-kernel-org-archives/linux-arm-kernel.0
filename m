@@ -1,76 +1,61 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 23 Mar 2011 15:56:24 +0100
-Subject: [PATCH 5/7] add GPMI support for imx28
-In-Reply-To: <4D8964F4.3070104@freescale.com>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-	<1300239773-4222-6-git-send-email-b32955@freescale.com>
-	<19848.39439.380861.195051@ipc1.ka-ro>
-	<4D8964F4.3070104@freescale.com>
-Message-ID: <19850.2584.566366.251874@ipc1.ka-ro>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 23 Mar 2011 16:01:58 +0100
+Subject: [PATCH 1/2] ARM: perf: reset counters on all CPUs during
+	initialisation
+In-Reply-To: <-7053270875332574934@unknownmsgid>
+References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>
+	<AANLkTim_XwErHv_Brkn5hXn7sAxvkd++C5wbKv9n4VXC@mail.gmail.com>
+	<-7053270875332574934@unknownmsgid>
+Message-ID: <AANLkTikbWKHgNyQmgu+LHQ+mPBm411R8BLaDDz6YZnJo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-Huang Shijie writes:
-> Hi Lothar:
-> 
->     Thanks a lot for your carefully review.
-> 
-> 
-> > Hi,
-> >
-> > some general comments:
-> > - Why are you not using the existing nand_ids but inventing your own
-> >    database?
-> >
-> The nand_ids{} contains poor information for me.
-> Such as :
-> [1]The nand_ids does not have the enough information for the page 
-> size,oob size for some new NANDs.
->     And you can not get the information from parsing the NAND ids, such 
-> as some Micron NANDs.
-> 
-You could use it for the standard chips where you do not need
-additional information. That way most NAND chips could be supported
-out of the box without having to modify the driver.
+On Wed, Mar 23, 2011 at 2:39 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Jean,
+>
+>> On Wed, Mar 16, 2011 at 4:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > ARMv7 dictates that the interrupt-enable and count-enable registers for
+>> > each PMU counter are UNKNOWN following core reset.
+>> Great! Is this development driven by actual issues or by precaution?
+>>
+>> >
+>> > This patch adds an arch_initcall to the ARMv7 perf events backend which
+>> > disables the counters on each CPU prior to setting the Enable bit in the
+>> > PMCR.
+>> Also the function rename is a good thing.
+>>
+>> >
+>> > Cc: Jean Pihet <jean.pihet@newoldbits.com>
+>> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>
+>> Acked-by: Jean Pihet <j-pihet@ti.com>
+>
+> I don't think this patch is safe for combined v6/v7 kernels because the
+> arch_initcall will try to poke the v7 PMU regardless of whether or not
+> it exists. I'll try and rework something and send another version to the
+> list.
+Ok. The new code should probably be called from *read_num_pmnc_events.
 
-> [2]I need the timing information of the NAND. The nand_ids DOES not have 
-> it. I have to
->     read the datasheet of the NAND, and add it to my database.
-> 
-Do we really need exact timing data for each individual chip?
-Or couldn't we live with some sane timing that works for most chips
-and provide some means to specify a different timing via
-platform_data?
+>
+> I've removed it from the patch system but left the isb patch there
+> because that is fine as it is.
+Agree
 
-> > - What is the purpose of the 'rom_helpers'? To me it looks like they
-> >    are doing something that should be done in the mtd partition
-> >    handlers, not in the flash chip driver.
-> >
-> We have saled a lot products based the imx23 or imx28.
-> All the products support the nand boot mode by flashing the kernel to 
-> the kernel partitions of the nands.
-> In order to compliant to the old product, the layout of the nand is 
-> constraint to the current situation:
-> [1] first a boot partition for the kernel.
-> [2] the rest is for other uses, such as rootfs.
-> 
-> So I have to use the rom_helpers to split the kernel partition before 
-> the real MTD partition initializations.
-> 
-Why can't you just create appropriate partitions using the standard
-partition handlers?
+>
+> Stay tuned...
+>
+> Will
+>
+Thanks,
+Jean
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
