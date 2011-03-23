@@ -1,53 +1,192 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 23 Mar 2011 22:00:02 +0100
-Subject: [PATCH] leds: leds-regulator.c,
-	fix handling already enabled regulators
-Message-ID: <1300914002-17760-1-git-send-email-ospite@studenti.unina.it>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 23 Mar 2011 14:19:20 -0700
+Subject: [PATCH V12 1/4] ptp: Added a brand new class driver for ptp
+	clocks.
+In-Reply-To: <bf964489f4c6ee51bd8a2ab818cd6a5e2f544627.1298878618.git.richard.cochran@omicron.at>
+References: <cover.1298878618.git.richard.cochran@omicron.at>
+	<bf964489f4c6ee51bd8a2ab818cd6a5e2f544627.1298878618.git.richard.cochran@omicron.at>
+Message-ID: <1300915160.848.33.camel@work-vm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the driver aware of the initial status of the regulator.
+On Mon, 2011-02-28 at 08:57 +0100, Richard Cochran wrote:
+> This patch adds an infrastructure for hardware clocks that implement
+> IEEE 1588, the Precision Time Protocol (PTP). A class driver offers a
+> registration method to particular hardware clock drivers. Each clock is
+> presented as a standard POSIX clock.
+> 
+> The ancillary clock features are exposed in two different ways, via
+> the sysfs and by a character device.
+> 
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
 
-The leds-regulator driver was ignoring the initial status of the
-regulator; this resulted in rdev->use_count incremented up to 2 after
-calling regulator_led_set_value() in the .probe method when a regulator
-was already enabled at insmod time, and this made impossible to ever
-disable the regulator.
+I think this looks mostly ok. I've got one concern on the locking and
+there are a few minor nits that might need extra commenting below. 
 
-Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
----
+thanks
+-john
 
-This problem was anticipated by Mark Brown on the very first submission 
-of the driver but my knowledge about regulators at the time made me 
-overlook what he was asking for, now that I have actually experienced 
-the problem I've finally figured out what Mark was really referring to.
+> --- /dev/null
+> +++ b/Documentation/ptp/testptp.c
+[snip]
+> +	if (0x7fffffff != adjfreq) {
+> +		memset(&tx, 0, sizeof(tx));
+> +		tx.modes = ADJ_FREQUENCY;
+> +		tx.freq = (long) (adjfreq * 65.536);
 
-NOTE: initially I thought about CC-ing stable at kernel.org as well on 
-this, as it is an actual fix, but then I checked that there are 
-currently no users of the driver in mainline linux and I dropped it, is 
-that how it should be?
+So, 65.536... I understand you're converting ppb to ppm << 16 (which is
+what adjtime takes), but I'm not sure if anyone else will. I'd either
+wrap that in a commented conversion function/macro or just do the
+conversion explicitly (freq = (adjfreq << 16)/1000;  although this has
+potential overflow risks with large ppb values) with a comment about
+what is going on.
 
-Thanks,
-   Antonio Ospite
-   http://ao2.it
+> --- /dev/null
+> +++ b/drivers/ptp/ptp_clock.c
+> @@ -0,0 +1,320 @@
+[snip]
+> +static void enqueue_external_timestamp(struct timestamp_event_queue *queue,
+> +				       struct ptp_clock_event *src)
+> +{
+> +	struct ptp_extts_event *dst;
+> +	unsigned long flags;
+> +	u32 remainder;
+> +
+> +	dst = &queue->buf[queue->tail];
 
- drivers/leds/leds-regulator.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Doesn't the lock need to happen before you access the
+queue->buf[queue->tail] ? 
 
-diff --git a/drivers/leds/leds-regulator.c b/drivers/leds/leds-regulator.c
-index 3790816..8497f56 100644
---- a/drivers/leds/leds-regulator.c
-+++ b/drivers/leds/leds-regulator.c
-@@ -178,6 +178,10 @@ static int __devinit regulator_led_probe(struct platform_device *pdev)
- 	led->cdev.flags |= LED_CORE_SUSPENDRESUME;
- 	led->vcc = vcc;
- 
-+	/* to handle correctly an already enabled regulator */
-+	if (regulator_is_enabled(led->vcc))
-+		led->enabled = 1;
-+
- 	mutex_init(&led->mutex);
- 	INIT_WORK(&led->work, led_work);
- 
--- 
-1.7.4.1
+For example: What happens if two cpus enter the function at the same
+time, both get the same tail index, one overwrite the other's data, then
+both take turns bumping up the tail pointer?
+
+
+> +	dst->index = src->index;
+> +	dst->t.sec = div_u64_rem(src->timestamp, 1000000000, &remainder);
+> +	dst->t.nsec = remainder;
+> +
+> +	spin_lock_irqsave(&queue->lock, flags);
+> +
+> +	if (!queue_free(queue))
+> +		queue->head = (queue->head + 1) % PTP_MAX_TIMESTAMPS;
+> +
+> +	queue->tail = (queue->tail + 1) % PTP_MAX_TIMESTAMPS;
+> +
+> +	spin_unlock_irqrestore(&queue->lock, flags);
+> +}
+[snip]
+> +static int ptp_clock_adjtime(struct posix_clock *pc, struct timex *tx)
+> +{
+> +	struct ptp_clock *ptp = container_of(pc, struct ptp_clock, clock);
+> +	struct ptp_clock_info *ops;
+> +	int err = -EOPNOTSUPP;
+> +
+> +	ops = ptp->info;
+> +
+> +	if (tx->modes & ADJ_SETOFFSET) {
+> +		struct timespec ts;
+> +		ktime_t kt;
+> +		s64 delta;
+> +
+> +		ts.tv_sec  = tx->time.tv_sec;
+> +		ts.tv_nsec = tx->time.tv_usec;
+> +
+> +		if (!(tx->modes & ADJ_NANO))
+> +			ts.tv_nsec *= 1000;
+> +
+> +		if ((unsigned long) ts.tv_nsec >= NSEC_PER_SEC)
+> +			return -EINVAL;
+> +
+> +		kt = timespec_to_ktime(ts);
+> +		delta = ktime_to_ns(kt);
+> +		err = ops->adjtime(ops, delta);
+> +
+> +	} else if (tx->modes & ADJ_FREQUENCY) {
+> +		s64 ppb = 1 + tx->freq;
+> +		ppb *= 125;
+> +		ppb >>= 13;
+
+((1 + freq) *125)>>13 == magic :)
+Needs a clear comment.
+
+> +		err = ops->adjfreq(ops, (s32)ppb);
+> +	}
+> +
+> +	return err;
+> +}
+
+[snip]
+
+> diff --git a/drivers/ptp/ptp_private.h b/drivers/ptp/ptp_private.h
+> new file mode 100644
+> index 0000000..2f76266
+> --- /dev/null
+> +++ b/drivers/ptp/ptp_private.h
+> @@ -0,0 +1,86 @@
+> +/*
+> + * PTP 1588 clock support - private declarations for the core module.
+> + *
+> + * Copyright (C) 2010 OMICRON electronics GmbH
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + *
+> + *  You should have received a copy of the GNU General Public License
+> + *  along with this program; if not, write to the Free Software
+> + *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> + */
+> +#ifndef _PTP_PRIVATE_H_
+> +#define _PTP_PRIVATE_H_
+> +
+> +#include <linux/cdev.h>
+> +#include <linux/device.h>
+> +#include <linux/mutex.h>
+> +#include <linux/posix-clock.h>
+> +#include <linux/ptp_clock.h>
+> +#include <linux/ptp_clock_kernel.h>
+> +#include <linux/time.h>
+> +
+> +#define PTP_MAX_TIMESTAMPS 128
+> +#define PTP_BUF_TIMESTAMPS 30
+> +
+> +struct timestamp_event_queue {
+> +	struct ptp_extts_event buf[PTP_MAX_TIMESTAMPS];
+> +	int head;
+> +	int tail;
+> +	spinlock_t lock;
+> +};
+> +
+> +struct ptp_clock {
+> +	struct posix_clock clock;
+> +	struct device *dev;
+> +	struct ptp_clock_info *info;
+> +	dev_t devid;
+> +	int index; /* index into clocks.map */
+> +	struct pps_device *pps_source;
+> +	struct timestamp_event_queue tsevq; /* simple fifo for time stamps */
+> +	struct mutex tsevq_mux; /* one process at a time reading the fifo */
+> +	wait_queue_head_t tsev_wq;
+> +};
+> +
+> +static inline int queue_cnt(struct timestamp_event_queue *q)
+> +{
+> +	int cnt = q->tail - q->head;
+> +	return cnt < 0 ? PTP_MAX_TIMESTAMPS + cnt : cnt;
+> +}
+
+q->tail and head access probably need to happen only when locked. 
+
+So probably need a comment that queue_cnt must be called only when
+holding the proper lock.
+
+
+thanks
+-john
