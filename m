@@ -1,86 +1,85 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 23 Mar 2011 11:05:16 +0100
-Subject: [PATCH 5/6] spi/pl022: Add loopback support for the SPI on 5500
-Message-ID: <1300874717-14914-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 23 Mar 2011 11:05:36 +0100
+Subject: [PATCH 6/6] mmci: support for ST-Ericsson db8500v2
+Message-ID: <1300874736-14952-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philippe Langlais <philippe.langlais@linaro.org>
 
-Extend the vendor data with a loopback field, and add new
-amba-pl022 vendor data for the DB5500 pl023, as the pl023
-on db8500 and db5500 vary.
+ST-Ericsson modified ARM PrimeCell PL180 block has not got
+an updated corresponding amba-id, althought the IP block has
+changed in db8500v2. The change was done to the datactrl register.
+Using the overrided subversion ID, account for this.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Prajadevi H <prajadevi.h@stericsson.com>
 Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/spi/amba-pl022.c |   20 +++++++++++++++++++-
- 1 files changed, 19 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |   25 +++++++++++++++++++++++--
+ 1 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 95e58c7..fe79773 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -324,6 +324,7 @@ struct vendor_data {
- 	bool unidir;
- 	bool extended_cr;
- 	bool pl023;
-+	bool loopback;
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 5bbb87d..0c72a77 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -51,6 +51,7 @@ static unsigned int fmax = 515633;
+  *		  is asserted (likewise for RX)
+  * @sdio: variant supports SDIO
+  * @st_clkdiv: true if using a ST-specific clock divider algorithm
++ * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -60,6 +61,7 @@ struct variant_data {
+ 	unsigned int		fifohalfsize;
+ 	bool			sdio;
+ 	bool			st_clkdiv;
++	bool			blksz_datactrl16;
  };
  
- /**
-@@ -1984,7 +1985,7 @@ static int pl022_setup(struct spi_device *spi)
- 
- 	SSP_WRITE_BITS(chip->cr0, clk_freq.scr, SSP_CR0_MASK_SCR, 8);
- 	/* Loopback is available on all versions except PL023 */
--	if (!pl022->vendor->pl023) {
-+	if (pl022->vendor->loopback) {
- 		if (spi->mode & SPI_LOOP)
- 			tmp = LOOPBACK_ENABLED;
- 		else
-@@ -2228,6 +2229,7 @@ static struct vendor_data vendor_arm = {
- 	.unidir = false,
- 	.extended_cr = false,
- 	.pl023 = false,
-+	.loopback = true,
+ static struct variant_data variant_arm = {
+@@ -86,6 +88,17 @@ static struct variant_data variant_ux500 = {
+ 	.st_clkdiv		= true,
  };
  
- 
-@@ -2237,6 +2239,7 @@ static struct vendor_data vendor_st = {
- 	.unidir = false,
- 	.extended_cr = true,
- 	.pl023 = false,
-+	.loopback = true,
- };
- 
- static struct vendor_data vendor_st_pl023 = {
-@@ -2245,6 +2248,16 @@ static struct vendor_data vendor_st_pl023 = {
- 	.unidir = false,
- 	.extended_cr = true,
- 	.pl023 = true,
-+	.loopback = false,
++static struct variant_data variant_ux500v2 = {
++	.fifosize		= 30 * 4,
++	.fifohalfsize		= 8 * 4,
++	.clkreg			= MCI_CLK_ENABLE,
++	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
++	.datalength_bits	= 24,
++	.sdio			= true,
++	.st_clkdiv		= true,
++	.blksz_datactrl16	= true,
 +};
 +
-+static struct vendor_data vendor_db5500_pl023 = {
-+	.fifodepth = 32,
-+	.max_bpw = 32,
-+	.unidir = false,
-+	.extended_cr = true,
-+	.pl023 = true,
-+	.loopback = true,
- };
+ /*
+  * This must be called with host->lock held
+  */
+@@ -457,7 +470,10 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	blksz_bits = ffs(data->blksz) - 1;
+ 	BUG_ON(1 << blksz_bits != data->blksz);
  
- static struct amba_id pl022_ids[] = {
-@@ -2278,6 +2291,11 @@ static struct amba_id pl022_ids[] = {
- 		.mask   = 0xffffffff,
- 		.data   = &vendor_st_pl023,
+-	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
++	if (variant->blksz_datactrl16)
++		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
++	else
++		datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+ 
+ 	if (data->flags & MMC_DATA_READ)
+ 		datactrl |= MCI_DPSM_DIRECTION;
+@@ -1298,9 +1314,14 @@ static struct amba_id mmci_ids[] = {
+ 	},
+ 	{
+ 		.id     = 0x00480180,
+-		.mask   = 0x00ffffff,
++		.mask   = 0xf0ffffff,
+ 		.data	= &variant_ux500,
  	},
 +	{
-+		.id	= 0x10080023,
-+		.mask	= 0xffffffff,
-+		.data	= &vendor_db5500_pl023,
++		.id     = 0x10480180,
++		.mask   = 0xf0ffffff,
++		.data	= &variant_ux500v2,
 +	},
  	{ 0, 0 },
  };
