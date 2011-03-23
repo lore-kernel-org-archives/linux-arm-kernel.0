@@ -1,61 +1,24 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 23 Mar 2011 16:01:58 +0100
-Subject: [PATCH 1/2] ARM: perf: reset counters on all CPUs during
-	initialisation
-In-Reply-To: <-7053270875332574934@unknownmsgid>
-References: <1300289898-2720-1-git-send-email-will.deacon@arm.com>
-	<AANLkTim_XwErHv_Brkn5hXn7sAxvkd++C5wbKv9n4VXC@mail.gmail.com>
-	<-7053270875332574934@unknownmsgid>
-Message-ID: <AANLkTikbWKHgNyQmgu+LHQ+mPBm411R8BLaDDz6YZnJo@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 23 Mar 2011 17:05:15 +0200
+Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
+In-Reply-To: <201103231554.36178.marek.vasut@gmail.com>
+References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
+	<201103231115.53082.anarsoul@gmail.com>
+	<201103231554.36178.marek.vasut@gmail.com>
+Message-ID: <201103231705.16164.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wednesday 23 March 2011 16:54:36 Marek Vasut wrote:
 
-On Wed, Mar 23, 2011 at 2:39 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
->> On Wed, Mar 16, 2011 at 4:38 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > ARMv7 dictates that the interrupt-enable and count-enable registers for
->> > each PMU counter are UNKNOWN following core reset.
->> Great! Is this development driven by actual issues or by precaution?
->>
->> >
->> > This patch adds an arch_initcall to the ARMv7 perf events backend which
->> > disables the counters on each CPU prior to setting the Enable bit in the
->> > PMCR.
->> Also the function rename is a good thing.
->>
->> >
->> > Cc: Jean Pihet <jean.pihet@newoldbits.com>
->> > Signed-off-by: Will Deacon <will.deacon@arm.com>
->>
->> Acked-by: Jean Pihet <j-pihet@ti.com>
->
-> I don't think this patch is safe for combined v6/v7 kernels because the
-> arch_initcall will try to poke the v7 PMU regardless of whether or not
-> it exists. I'll try and rework something and send another version to the
-> list.
-Ok. The new code should probably be called from *read_num_pmnc_events.
+> Implement what ? The member doesn't exist in the structure so it doesn't
+> even compile with overlays disabled.
 
->
-> I've removed it from the patch system but left the isb patch there
-> because that is fine as it is.
-Agree
+Hm, sorry, I thought you also don't like that check is performed on SoCs 
+without overlays (PXA250/PXA260) when overlay support is compiled in.
 
->
-> Stay tuned...
->
-> Will
->
-Thanks,
-Jean
+I understand that it does not compile at all when CONFIG_FB_PXA_OVERLAY is not 
+set.
 
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Regards
+Vasily
