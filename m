@@ -1,53 +1,76 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 23 Mar 2011 15:54:36 +0100
-Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
-In-Reply-To: <201103231115.53082.anarsoul@gmail.com>
-References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
-	<201103231115.53082.anarsoul@gmail.com>
-Message-ID: <201103231554.36178.marek.vasut@gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 23 Mar 2011 15:56:24 +0100
+Subject: [PATCH 5/7] add GPMI support for imx28
+In-Reply-To: <4D8964F4.3070104@freescale.com>
+References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
+	<1300239773-4222-6-git-send-email-b32955@freescale.com>
+	<19848.39439.380861.195051@ipc1.ka-ro>
+	<4D8964F4.3070104@freescale.com>
+Message-ID: <19850.2584.566366.251874@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 March 2011 10:15:52 Vasily Khoruzhick wrote:
-> On Tuesday 22 March 2011 14:14:14 Marek Vasut wrote:
-> > In case CONFIG_FB_PXA_OVERLAY is not defined, the pxafb_freq_transition()
-> > function tests nonexistent member of pxafb_info (since the member is not
-> > part of the structure).
-> > Fix this by wraping the test in ifdef, even if I don't really like how
-> > the code looks now. The check doesn't have to happen if overlays are
-> > disabled at all as the check is always true then.
-> 
-> Ok, but how you're going to implement it if overlay support is enabled, but
-> SoC does not support it?
+Hi,
 
-Implement what ? The member doesn't exist in the structure so it doesn't even 
-compile with overlays disabled.
+Huang Shijie writes:
+> Hi Lothar:
+> 
+>     Thanks a lot for your carefully review.
+> 
+> 
+> > Hi,
+> >
+> > some general comments:
+> > - Why are you not using the existing nand_ids but inventing your own
+> >    database?
+> >
+> The nand_ids{} contains poor information for me.
+> Such as :
+> [1]The nand_ids does not have the enough information for the page 
+> size,oob size for some new NANDs.
+>     And you can not get the information from parsing the NAND ids, such 
+> as some Micron NANDs.
+> 
+You could use it for the standard chips where you do not need
+additional information. That way most NAND chips could be supported
+out of the box without having to modify the driver.
 
+> [2]I need the timing information of the NAND. The nand_ids DOES not have 
+> it. I have to
+>     read the datasheet of the NAND, and add it to my database.
 > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Do we really need exact timing data for each individual chip?
+Or couldn't we live with some sane timing that works for most chips
+and provide some means to specify a different timing via
+platform_data?
+
+> > - What is the purpose of the 'rom_helpers'? To me it looks like they
+> >    are doing something that should be done in the mtd partition
+> >    handlers, not in the flash chip driver.
+> >
+> We have saled a lot products based the imx23 or imx28.
+> All the products support the nand boot mode by flashing the kernel to 
+> the kernel partitions of the nands.
+> In order to compliant to the old product, the layout of the nand is 
+> constraint to the current situation:
+> [1] first a boot partition for the kernel.
+> [2] the rest is for other uses, such as rootfs.
 > 
-> Acked-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> So I have to use the rom_helpers to split the kernel partition before 
+> the real MTD partition initializations.
 > 
-> > ---
-> > 
-> >  drivers/video/pxafb.c |    4 +++-
-> >  1 files changed, 3 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> > index a2e5b51..0f4e8c9 100644
-> > --- a/drivers/video/pxafb.c
-> > +++ b/drivers/video/pxafb.c
-> > @@ -1648,7 +1648,9 @@ pxafb_freq_transition(struct notifier_block *nb,
-> > unsigned long val, void *data)
-> > 
-> >  	switch (val) {
-> > 
-> >  	case CPUFREQ_PRECHANGE:
-> > -		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
-> > +#ifdef CONFIG_FB_PXA_OVERLAY
-> > +		if (!(fbi->overlay[0].usage || fbi->overlay[1].usage))
-> > +#endif
-> > 
-> >  			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
-> >  		
-> >  		break;
+Why can't you just create appropriate partitions using the standard
+partition handlers?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
