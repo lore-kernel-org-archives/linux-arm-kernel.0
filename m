@@ -1,28 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Mar 2011 21:21:10 +0000
-Subject: [PATCH] leds: leds-regulator.c, fix handling already enabled
-	regulators
-In-Reply-To: <1300914002-17760-1-git-send-email-ospite@studenti.unina.it>
-References: <1300914002-17760-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <20110323212110.GA26862@opensource.wolfsonmicro.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Wed, 23 Mar 2011 16:27:54 -0500
+Subject: [PATCHv6 2/4] ARM: mx51: Add entry for gpc_dvfs_clk
+In-Reply-To: <1300915676-10359-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300915676-10359-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1300915676-10359-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2011 at 10:00:02PM +0100, Antonio Ospite wrote:
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-> The leds-regulator driver was ignoring the initial status of the
-> regulator; this resulted in rdev->use_count incremented up to 2 after
-> calling regulator_led_set_value() in the .probe method when a regulator
-> was already enabled at insmod time, and this made impossible to ever
-> disable the regulator.
+For MX51 SRPG, we need to turn on the GPC clock in order to set the
+SRPG registers.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-> NOTE: initially I thought about CC-ing stable at kernel.org as well on 
-> this, as it is an actual fix, but then I checked that there are 
-> currently no users of the driver in mainline linux and I dropped it, is 
-> that how it should be?
-
-Even if there's no users in mainline people could well be shipping out
-of tree boards using it and could benefit from the code.  OTOH it's not
-the most urgent thing ever.
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 652ace4..3eb1c6e 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -865,6 +865,13 @@ static struct clk aips_tz2_clk = {
+ 	.disable = _clk_ccgr_disable_inwait,
+ };
+ 
++static struct clk gpc_dvfs_clk = {
++	.enable_reg = MXC_CCM_CCGR5,
++	.enable_shift = MXC_CCM_CCGRx_CG12_OFFSET,
++	.enable = _clk_ccgr_enable,
++	.disable = _clk_ccgr_disable,
++};
++
+ static struct clk gpt_32k_clk = {
+ 	.id = 0,
+ 	.parent = &ckil_clk,
+@@ -1448,6 +1455,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
+ 	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+ 	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
++	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+ };
+ 
+ static struct clk_lookup mx53_lookups[] = {
+-- 
+1.6.0.4
