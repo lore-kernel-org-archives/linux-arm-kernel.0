@@ -1,76 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Mar 2011 09:28:18 +0100
-Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
-	support.
-In-Reply-To: <6a4328fcb24af3fa28b2188864875cbecc6f533a.1298977728.git.viresh.kumar@st.com>
-References: <cover.1298977728.git.viresh.kumar@st.com>
-	<6a4328fcb24af3fa28b2188864875cbecc6f533a.1298977728.git.viresh.kumar@st.com>
-Message-ID: <201103230928.18445.arnd@arndb.de>
+From: gxt@mprc.pku.edu.cn (Guan Xuetao)
+Date: Wed, 23 Mar 2011 16:30:31 +0800
+Subject: [PATCH] ARM: Use asm-generic/sizes.h
+In-Reply-To: <4D896616.7070307@codeaurora.org>
+References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>	<201103220934.50435.arnd@arndb.de>	<20110322092113.GB17264@n2100.arm.linux.org.uk>	<201103221110.20861.arnd@arndb.de>	<00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>	<4D88ECE3.1070209@codeaurora.org>
+	<00fc01cbe8f9$cd807640$688162c0$@mprc.pku.edu.cn>
+	<4D896616.7070307@codeaurora.org>
+Message-ID: <016301cbe934$957a69f0$c06f3dd0$@mprc.pku.edu.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 March 2011, Viresh Kumar wrote:
-> From: Pratyush Anand <pratyush.anand@st.com>
+
+
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> Sent: Wednesday, March 23, 2011 11:17 AM
+> To: Guan Xuetao
+> Cc: 'Russell King - ARM Linux'; linux-arm-kernel at lists.infradead.org; 'Arnd Bergmann'; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] ARM: Use asm-generic/sizes.h
 > 
-> SPEAr13xx family contains Synopsys designware PCIe version 3.30a. This
-> patch adds support for this PCIe module for spear platform.
+> On 03/22/2011 06:29 PM, Guan Xuetao wrote:
+> >> -----Original Message-----
+> >> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> >> Sent: Wednesday, March 23, 2011 2:40 AM
+> >> To: Guan Xuetao
+> >> Cc: 'Arnd Bergmann'; linux-arm-kernel at lists.infradead.org; 'Russell King - ARM Linux'; linux-kernel at vger.kernel.org
+> >> Subject: Re: [PATCH] ARM: Use asm-generic/sizes.h
+> >> Ah, I didn't notice this part. SZ_48M is actually used by ARM code so
+> >> that would need to be added to the generic header should we go with this
+> >> patch.
+> > IMO, the content of asm-generic/sizes.h should only include power-of-2 sizes definitions.
+> > And SZ_48M could be replaced by (SZ_32M | SZ_16M) or (SZ_32M + SZ_16M), or added to arch-specific headers.
+> >
+> >
+> 
+> I'm hoping that kbuild gets asm-generic support sometime soon so files
+> with only a "#include <asm-generic/*>" are generated instead of living
+> in the tree. In that case I'd rather have the non power of 2 constants
+> added to the generic sizes.h and be done with it. There isn't any strong
+> technical reason to deny power of 2 constants from the generic header,
+> right?
+No.
+I just think that power-of-2 sizes are more generic, not compulsively of course.
 
-Looks almost good now, but I still have my doubts about the I/O space handling.
-Most importantly, I cannot even see where the I/O space is getting mapped to.
-This becomes rather interesting when you have multiple root ports that each
-have their own physical I/O space windows, and there are multiple ways it can
-be done.
+Sam Ravnborg had introduced a patch set to provide generic support for
+architectures that using one-line asm-generic headers.
 
-The way I would recommend is to reserve a part of the system's virtual
-address space for all I/O windows, and using iotable_init() to map
-them contiguously. The first port will then be the only one that
-can hold ISA ranges (needed for legacy VGA mode, for instance).
+CC: Sam Ravnborg <sam@ravnborg.org>
 
-> Changes since V6:
-> - Read request size in RC'c PCIE capability is forced to 128 bytes.
-> - Max payload is forced to the minimum value of max payload of any of the
->   device in tree.
-> - Request_resource for IO Space is from ioport_resource now. Earlier it was from
->   iomem_resource.
-
-This seems like a mistake. The I/O space window resides inside of
-iomem_resource, so you have to register it from there.
-
-The ioport_resource refers to ports in the range between 0x1000 and 0x2ffff
-that get mapped into that window, so you cannot register the window inside
-of itself.
-
-You should probably register both -- add the physical address to iomem_resource,
-and register the I/O port range for each PCIe port to ioport_resource.
-
-> diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
-> index fd8c2dc..6169d4f 100644
-> --- a/arch/arm/mach-spear13xx/include/mach/hardware.h
-> +++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
-> @@ -28,4 +28,8 @@
->  /* typesafe io address */
->  #define __io_address(n)		__io(IO_ADDRESS(n))
-
-Please reread my previous comments. You have to redefine __io() in order to make
-the I/O port accesses work. When you do that, you cannot define
-__io_address (which is used by non-PCI code) as using __io.
-
-> +#define PCIBIOS_MIN_IO		0
-
-PCIBIOS_MIN_IO should be 0x1000, to make sure that any ISA or PCMCIA
-devices behind a bridge cannot interfere with regular PCI or PCIe
-devices.
-
-> +/*
-> + * In current implementation address translation is done using IN0 only. So IN1
-> + * start address and IN0 end address has been kept same
-> +*/
-> +#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
-> +#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
-> +#define IN_CFG0_SIZE	(1 * 1024 * 1024 - 1)
-> +#define IN_CFG1_SIZE	(1 * 1024 * 1024 - 1)
-> +#define IN_MSG_SIZE	(1 * 1024 * 1024 - 1)
-
-Is IN_IO_SIZE per host, or this shared across all hosts?
-
-	Arnd
+> 
+> Note: SH could also move to this if SZ_26M is put in the generic header.
+> 
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
