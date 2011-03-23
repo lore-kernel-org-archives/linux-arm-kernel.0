@@ -1,56 +1,98 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 23 Mar 2011 11:10:42 -0700
-Subject: [Git pull] MSM for v2.6.39
-In-Reply-To: <1300890191.6117.43.camel@m0nster> (Daniel Walker's message of
-	"Wed, 23 Mar 2011 07:23:11 -0700")
-References: <8yazkotpwk6.fsf@huya.qualcomm.com>
-	<1300890191.6117.43.camel@m0nster>
-Message-ID: <8yapqphhfml.fsf@huya.qualcomm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 23 Mar 2011 18:13:02 +0000
+Subject: [PATCH] ARM: perf: ensure overflows aren't missed due to IRQ
+	latency
+In-Reply-To: <1300895525-10800-1-git-send-email-will.deacon@arm.com>
+References: <1300895525-10800-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20110323181302.GF2795@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23 2011, Daniel Walker wrote:
+Hi Will,
 
-> On Thu, 2011-03-17 at 08:59 -0700, David Brown wrote:
->> David Brown (16):
->>       msm: Add CPU queries
->>       msm: Generalize timer register mappings
->>       msm: Generalize QGIC registers
->>       msm: Add MSM 8960 cpu_is check
->>       Merge branch 'msm-uart' into for-next
->>       Merge branch 'msm-8960' into for-next
->>       Merge branch 'msm-sdcc' into for-next
->>       Merge branch 'msm-fb' into for-next
->>       Merge branch 'msm-8960' into msm-core
->>       msm: Remove broken register definition from trout
->>       msm: Warning fix in trout gpio board file
->>       Merge branch 'msm-core' into for-next
->>       Merge branch 'msm-core' into for-next
->>       Merge branch 'msm-core' into for-next
->>       msm: Use explicit GPLv2 licenses
->>       Merge remote branch 'rmk/for-linus' into for-linus 
->
-> Could you change the "for-next" name to something more interesting like
-> msm-for-linus .. I think it would be acceptable to just create
-> msm-for-linus during the merge window and merge all the sub-tree's into
-> that.
+On Wed, Mar 23, 2011 at 03:52:05PM +0000, Will Deacon wrote:
+> If a counter overflows during a perf stat profiling run it may overtake
+> the last known value of the counter:
+> 
+>     0        prev     new                0xffffffff
+>     |----------|-------|----------------------|
+> 
+> In this case, the number of events that have occurred is
+> (0xffffffff - prev) + new. Unfortunately, the event update code will
+> not realise an overflow has occurred and will instead report the event
+> delta as (new - prev) which may be considerably smaller than the real
+> count.
+> 
+> This patch adds an extra argument to armpmu_event_update which indicates
+> whether or not an overflow has occurred. If an overflow has occurred and
+> the new count value is greater than the previous one, then we add on
+> the remaining event period (which must have expired for the overflow to
+> occur) and the previous count value.
+> 
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Reported-by: Ashwin Chaugule <ashbertslists@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Jamie, I've changed quite a bit of the delta calculation code in
+> armpmu_event_update so that we can detect the problem above.
+> 
+> Please let me know if I've missed/broken anything!
+> 
+> Will
+> 
+>  arch/arm/kernel/perf_event.c        |   19 +++++++++++--------
+>  arch/arm/kernel/perf_event_v6.c     |    2 +-
+>  arch/arm/kernel/perf_event_v7.c     |    2 +-
+>  arch/arm/kernel/perf_event_xscale.c |    4 ++--
+>  4 files changed, 15 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index d150ad1..53f6068 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -204,11 +204,9 @@ armpmu_event_set_period(struct perf_event *event,
+>  static u64
+>  armpmu_event_update(struct perf_event *event,
+>  		    struct hw_perf_event *hwc,
+> -		    int idx)
+> +		    int idx, int overflow)
+>  {
+> -	int shift = 64 - 32;
+> -	s64 prev_raw_count, new_raw_count;
+> -	u64 delta;
+> +	u64 delta, prev_raw_count, new_raw_count;
+>  
+>  again:
+>  	prev_raw_count = local64_read(&hwc->prev_count);
+> @@ -218,8 +216,13 @@ again:
+>  			     new_raw_count) != prev_raw_count)
+>  		goto again;
+>  
+> -	delta = (new_raw_count << shift) - (prev_raw_count << shift);
+> -	delta >>= shift;
+> +	new_raw_count &= armpmu->max_period;
+> +	prev_raw_count &= armpmu->max_period;
+> +
+> +	delta = (new_raw_count - prev_raw_count);
+> +
+> +	if (overflow && new_raw_count > prev_raw_count)
+> +		delta += local64_read(&hwc->period_left) + prev_raw_count;
+>  
+>  	local64_add(delta, &event->count);
+>  	local64_sub(delta, &hwc->period_left);
 
-I think the problem was that these trees came in, intended for
-linux-next, and were pulled into that branch.  Then, I published that as
-the tree for the pull-request 'for-linus', but nothing was actually
-merged into that tree.
+Hmm, I'm not really sure I follow that and see how it works for an 
+overflow when new < prev.  Why doesn't the naive:
 
-I can do a separate merge into the 'for-linus' tree before the merge
-window, but then I won't be giving a pull request for the same commit as
-what has been being tested in linux-next.  I'm not sure what is
-preferred here.  Doing a separate merge at the end has the benefit of
-reducing the number of intermediate merges.  The tree sha will be the
-same in either case, so it's really a matter what the history should
-look like.
+	new_raw_count &= armpmu->max_period;
+	prev_raw_count &= armpmu->max_period;
+	if (overflow)
+		delta = (armpmu->max_period - prev_raw_count) + 
+			new_raw_count
+	else
+		delta = new_raw_count - prev_raw_count;
 
-Thanks,
-David
+work?  I'm sure I'm missing something here!
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Jamie
