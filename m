@@ -1,55 +1,43 @@
-From: gxt@mprc.pku.edu.cn (Guan Xuetao)
-Date: Wed, 23 Mar 2011 16:30:31 +0800
-Subject: [PATCH] ARM: Use asm-generic/sizes.h
-In-Reply-To: <4D896616.7070307@codeaurora.org>
-References: <1300751462-1494-1-git-send-email-sboyd@codeaurora.org>	<201103220934.50435.arnd@arndb.de>	<20110322092113.GB17264@n2100.arm.linux.org.uk>	<201103221110.20861.arnd@arndb.de>	<00ec01cbe897$2eed7210$8cc85630$@mprc.pku.edu.cn>	<4D88ECE3.1070209@codeaurora.org>
-	<00fc01cbe8f9$cd807640$688162c0$@mprc.pku.edu.cn>
-	<4D896616.7070307@codeaurora.org>
-Message-ID: <016301cbe934$957a69f0$c06f3dd0$@mprc.pku.edu.cn>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 23 Mar 2011 11:15:52 +0200
+Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
+In-Reply-To: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
+References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <201103231115.53082.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 22 March 2011 14:14:14 Marek Vasut wrote:
+> In case CONFIG_FB_PXA_OVERLAY is not defined, the pxafb_freq_transition()
+> function tests nonexistent member of pxafb_info (since the member is not
+> part of the structure).
+> Fix this by wraping the test in ifdef, even if I don't really like how the
+> code looks now. The check doesn't have to happen if overlays are disabled
+> at all as the check is always true then.
 
+Ok, but how you're going to implement it if overlay support is enabled, but 
+SoC does not support it?
+ 
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> Sent: Wednesday, March 23, 2011 11:17 AM
-> To: Guan Xuetao
-> Cc: 'Russell King - ARM Linux'; linux-arm-kernel at lists.infradead.org; 'Arnd Bergmann'; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM: Use asm-generic/sizes.h
+Acked-by: Vasily Khoruzhick <anarsoul@gmail.com>
+
+> ---
+>  drivers/video/pxafb.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
 > 
-> On 03/22/2011 06:29 PM, Guan Xuetao wrote:
-> >> -----Original Message-----
-> >> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> >> Sent: Wednesday, March 23, 2011 2:40 AM
-> >> To: Guan Xuetao
-> >> Cc: 'Arnd Bergmann'; linux-arm-kernel at lists.infradead.org; 'Russell King - ARM Linux'; linux-kernel at vger.kernel.org
-> >> Subject: Re: [PATCH] ARM: Use asm-generic/sizes.h
-> >> Ah, I didn't notice this part. SZ_48M is actually used by ARM code so
-> >> that would need to be added to the generic header should we go with this
-> >> patch.
-> > IMO, the content of asm-generic/sizes.h should only include power-of-2 sizes definitions.
-> > And SZ_48M could be replaced by (SZ_32M | SZ_16M) or (SZ_32M + SZ_16M), or added to arch-specific headers.
-> >
-> >
+> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> index a2e5b51..0f4e8c9 100644
+> --- a/drivers/video/pxafb.c
+> +++ b/drivers/video/pxafb.c
+> @@ -1648,7 +1648,9 @@ pxafb_freq_transition(struct notifier_block *nb,
+> unsigned long val, void *data)
 > 
-> I'm hoping that kbuild gets asm-generic support sometime soon so files
-> with only a "#include <asm-generic/*>" are generated instead of living
-> in the tree. In that case I'd rather have the non power of 2 constants
-> added to the generic sizes.h and be done with it. There isn't any strong
-> technical reason to deny power of 2 constants from the generic header,
-> right?
-No.
-I just think that power-of-2 sizes are more generic, not compulsively of course.
-
-Sam Ravnborg had introduced a patch set to provide generic support for
-architectures that using one-line asm-generic headers.
-
-CC: Sam Ravnborg <sam@ravnborg.org>
-
-> 
-> Note: SH could also move to this if SZ_26M is put in the generic header.
-> 
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>  	switch (val) {
+>  	case CPUFREQ_PRECHANGE:
+> -		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
+> +#ifdef CONFIG_FB_PXA_OVERLAY
+> +		if (!(fbi->overlay[0].usage || fbi->overlay[1].usage))
+> +#endif
+>  			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
+>  		break;
