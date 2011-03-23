@@ -1,26 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Mar 2011 16:20:22 +0000
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <AANLkTin1jG36-EsvAk9o-KxdxaBBhx=5Rf+JMidjYqsT@mail.gmail.com>
-References: <20110322143307.GB24004@linux-sh.org>
-	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
-	<20110322153226.GC30303@linux-sh.org>
-	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
-	<20110322155730.GD30303@linux-sh.org>
-	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
-	<20110322163144.GC2202@sirena.org.uk>
-	<AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
-	<20110322165907.GG22583@opensource.wolfsonmicro.com>
-	<AANLkTin1jG36-EsvAk9o-KxdxaBBhx=5Rf+JMidjYqsT@mail.gmail.com>
-Message-ID: <20110323162021.GA26594@opensource.wolfsonmicro.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 23 Mar 2011 11:37:44 -0500
+Subject: Updated mach-types update
+In-Reply-To: <20110322193026.GC17264@n2100.arm.linux.org.uk>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+	<AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
+	<20110322193026.GC17264@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B027084269764D17276B2@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 01:04:31AM +0900, Magnus Damm wrote:
+Hello Russell,
 
-> Sounds nice. Hopefully that will allow us to use module_init() in
-> drivers instead of other initcall levels depending on bus type.
+I will be submitting the platform init for MACH_VISION_EP9307 for review soon.  I
+have a bit more testing to do before it will be ready.  Possibly by the end of the
+week or early next week.
 
-None of this is anything to do with the bus type - it's to do with the
-function of the devices within the system.  Things that are required for
-early init of the kernel get bumped up the list.
+Should this submission include the necessary patch to add back:
+
++vision_ep9307          MACH_VISION_EP9307      VISION_EP9307           1578
+
+Or do I just need to inform you so that it can be added back to mach-types?
+
+Thanks,
+Hartley
