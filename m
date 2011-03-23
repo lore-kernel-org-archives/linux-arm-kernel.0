@@ -1,51 +1,25 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 23 Mar 2011 15:47:15 -0700
-Subject: [PATCH 09/20] video: msm: Split out MDP2.2 HW specific code.
-In-Reply-To: <4D8A5B44.9050306@codeaurora.org> (Carl Vanderlip's message of
-	"Wed, 23 Mar 2011 13:42:44 -0700")
-References: <1300484846-26393-1-git-send-email-carlv@codeaurora.org>
-	<1300485423-27281-1-git-send-email-carlv@codeaurora.org>
-	<1300885912.6117.16.camel@m0nster> <4D8A5B44.9050306@codeaurora.org>
-Message-ID: <8yay6455ua4.fsf@huya.qualcomm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 23 Mar 2011 17:29:24 -0600 (MDT)
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D7A22F6.5050806@ti.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>
+	<4D7A22F6.5050806@ti.com>
+Message-ID: <alpine.DEB.2.00.1103231728370.4952@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23 2011, Carl Vanderlip wrote:
+Hi Rajendra,
 
-> On 03/23/2011 06:11 AM, Daniel Walker wrote:
->> On Fri, 2011-03-18 at 14:57 -0700, Carl Vanderlip wrote:
->>> index df9d74e..d6e75c3 100644
->>> --- a/arch/arm/mach-msm/Kconfig
->>> +++ b/arch/arm/mach-msm/Kconfig
->>> @@ -76,6 +76,11 @@ config HAS_MSM_DEBUG_UART_PHYS
->>>  config  MSM_VIC
->>>         bool
->>>  
->>> +config MSM_MDP22
->>> +       bool
->>> +       depends on ARCH_MSM7X00A
->>> +       default y
->>> + 
->> You should remove the "default y" and this should be moved to a Kconfig
->> under video (shouldn't be added into mach-msm).
->>
->> Daniel
->>
-> What about removing the 'depends on' and 'default y' and making it be
-> selected by MSM7X00A?
+I regret the delay,
 
-But why should the feature be in the Kconfig for arch/arm/mach-msm when
-the driver is under drivers/video/msm?  If it does indeed need
-configuration, why not put a Kconfig under drivers/video/msm?
+On Fri, 11 Mar 2011, Rajendra Nayak wrote:
 
-The last patch does select this, so it shouldn't need to get a default.
+> Would a board rev make a difference?
 
-Does the code work if both MDP22 and MDP31 are defined?  Eventually, it
-will be possible to enable multiple SOCs, so this driver will need to be
-able to handle that determination at run-time.
+I doubt it...
 
-David 
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+- Paul
