@@ -1,33 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Mar 2011 10:59:45 -0700
-Subject: Updated mach-types update
-In-Reply-To: <20110320114137.GD16646@n2100.arm.linux.org.uk>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<20110320114137.GD16646@n2100.arm.linux.org.uk>
-Message-ID: <20110324175945.GV2811@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 24 Mar 2011 21:01:57 +0300
+Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
+References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
+	<4D89E308.8060404@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+	<4D8B415A.2050706@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
+Message-ID: <4D8B8715.2000407@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110320 04:39]:
-> On Sun, Mar 20, 2011 at 11:03:22AM +0000, Russell King - ARM Linux wrote:
-> 
-> Note that OMAP references machine_is_omap2evm() yet this has never been
-> merged.
-> 
-> arch/arm/plat-omap/include/plat/uncompress.h:
-> 
->                 DEBUG_LL_OMAP2(1, omap2evm);
-> 
-> so this entry needs to be removed.
+Hello.
 
-Hmm looks like we have LCD support and ASoC support for it, but no
-board :)
+Nori, Sekhar wrote:
 
-Anybody working with this board?
+>>>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>>>>> index 68fe4c2..276199d 100644
+>>>>> --- a/arch/arm/mach-davinci/da850.c
+>>>>> +++ b/arch/arm/mach-davinci/da850.c
+>>>>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
+>>>>>    	.flags		= DA850_CLK_ASYNC3,
+>>>>>    };
+>>>>>
+>>>>> +static struct clk sata_clk = {
+>>>>> +	.name		= "sata",
+>>>>> +	.parent		=&pll0_sysclk2,
+>>>>> +	.lpsc		= DA850_LPSC1_SATA,
+>>>>> +	.gpsc		= 1,
+>>>>> +	.flags		= PSC_FORCE,
+>>>>> +};
+>>>>> +
+>>>>>    static struct clk_lookup da850_clks[] = {
+>>>>>    	CLK(NULL,		"ref",		&ref_clk),
+>>>>>    	CLK(NULL,		"pll0",		&pll0_clk),
+>>>>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
+>>>>>    	CLK(NULL,		"usb20",	&usb20_clk),
+>>>>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+>>>>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+>>>>> +	CLK("ahci",		NULL,		&sata_clk),
+>>>>>    	CLK(NULL,		NULL,		NULL),
+>>>>>    };
 
-If so, please send patches for the related board-*.c support ASAP.
-Otherwise let's plan on deleting the related support.
+>>>>      I'd put the above into a separate patch...
 
-Regards,
+>>> Why should addition of clock data not be in the same patch
+>>> as the one which adds platform resources etc? It is not a big
+>>> deal to change, but I would like to know why you request this.
 
-Tony
+>>     I didn't request anything, I just said what I'd have done. :-)
+
+> Okay. I guess I will keep it as is.
+
+>> I think modifying the DA8xx-common and DA850-specific files should better be 
+>> done separately. Although in this case we're adding DA850 only device, so 
+>> perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
+
+> Good point. Will add the #ifdef.
+
+    Or perhaps the device should just be placed in da850.c instead?
+
+WBR, Sergei
