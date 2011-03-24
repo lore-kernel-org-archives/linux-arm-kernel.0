@@ -1,32 +1,54 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Thu, 24 Mar 2011 14:56:07 +0100
-Subject: [PATCH 1/1] ARM: dmabounce: fix dmabounce may cause crash issue
-In-Reply-To: <1300965400-28304-1-git-send-email-b29396@freescale.com>
-References: <1300965400-28304-1-git-send-email-b29396@freescale.com>
-Message-ID: <19851.19831.866814.522361@pilspetsen.it.uu.se>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 24 Mar 2011 14:18:26 +0000
+Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
+Message-ID: <20110324141826.GA3810@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aisheng.Dong writes:
- >  static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- >  		enum dma_data_direction dir)
- >  {
- > -	struct dmabounce_device_info *device_info = dev->archdata.dmabounce;
- > +	struct dmabounce_device_info *device_info;
- >  	dma_addr_t dma_addr;
- >  	int needs_bounce = 0;
- >  
- > +	if (dev)
- > +		device_info = dev->archdata.dmabounce;
- > +
- >  	if (device_info)
- >  		DO_STATS ( device_info->map_op_count++ );
+Hi all,
 
-If dev == NULL then device_info is uninitialized in this if-test.
-(gcc should have warned about that.  Did it?)
+Considering how to add the VFP/NEON register state to Coredumps,
+there's no single obvious solution, so I'd like to put this out
+for people's comments.
 
-Just pre-init device_info to NULL, then you can also remove the
-following change:
+Currently, the coredump consists of several notes, the interesting
+ones currently being:
 
- > -	if (device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
- > +	if (dev && device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
+ * NT_PRSTATUS - general process status, including the integer registers
+ * NT_FPREGSET - the FPA registers (only present if FPA is in use)
+
+These notes are duplicated per thread when a multithreaded process
+dumps core.
+
+There are few options I see:
+
+ a) Dump the VFP/NEON state in NT_FPREGSET.
+    This could be appended to, or in place of the legacy FPA regs,
+    with flags in a header or (struct elf_prstatus).pr_fpvalid
+    to describe what was dumped.  Old gdb etc. may read the
+    resulting information as random FPA register contents;
+    this could perhaps be avoided by always dumping a dummy
+    FPA regs structure at the start of this note, though this
+    seems wasteful.
+
+    Possibly, gdb may explode if the NT_FPREGSET note is larger
+    then expected.  I've not investigated this.
+
+ b) Dump the VFP/NEON regs in a note of type NT_PRXFPREG.
+    This avoids defining a new note type; however, this note type
+    is really for x86 -- so overloading it in this way may just
+    be nonsensical / confusing.
+
+ c) Create a new note type specially for this, and dump the
+    VFP/NEON regs in there.  This is closest to the model followed
+    by ptrace, where PTRACE_GETREGS, PTRACE_GETFPREGS and
+    PTRAGE_GETVFPREGS are all distinct.
+
+
+Going for (c) seems sanest to me, and also means that old gdb
+will just ignore the new data; this is probably what we want.
+
+Comments are welcome.
+
+Cheers
+---Dave
