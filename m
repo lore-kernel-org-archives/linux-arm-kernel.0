@@ -1,115 +1,182 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 Mar 2011 16:51:40 +0800
-Subject: [PATCH 5/7] add GPMI support for imx28
-In-Reply-To: <19850.62451.678409.328798@ipc1.ka-ro>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>	<1300239773-4222-6-git-send-email-b32955@freescale.com>	<19848.39439.380861.195051@ipc1.ka-ro>	<4D8964F4.3070104@freescale.com>	<19850.2584.566366.251874@ipc1.ka-ro>	<4D8AB490.30408@freescale.com>
-	<19850.62451.678409.328798@ipc1.ka-ro>
-Message-ID: <4D8B061C.5080200@freescale.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 24 Mar 2011 09:54:59 +0100 (CET)
+Subject: [PATCH 1/4] mmc: tmio_mmc: Move some defines into a shared header
+	(fwd)
+Message-ID: <Pine.LNX.4.64.1103240952280.15629@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar:
+From: Simon Horman <horms@verge.net.au>
 
-> Hi,
->
-> Huang Shijie writes:
->> Hi Lothar:
->>>>> some general comments:
->>>>> - Why are you not using the existing nand_ids but inventing your own
->>>>>      database?
->>>>>
->>>> The nand_ids{} contains poor information for me.
->>>> Such as :
->>>> [1]The nand_ids does not have the enough information for the page
->>>> size,oob size for some new NANDs.
->>>>       And you can not get the information from parsing the NAND ids, such
->>>> as some Micron NANDs.
->>>>
->>> You could use it for the standard chips where you do not need
->>> additional information. That way most NAND chips could be supported
->>> out of the box without having to modify the driver.
->>>
->> What the meaning of "standard chips"?
->>
-> Those chips that are supported by other drivers for long time.
->
-see belowing.
->> There are many nands in the world. Every vendor has its own rules, some
->> even does has :)
->>
->> Unluckily, the imx23/imx28 supports many nands that the nand_ids{} does
->> not support.
->>
-> That's no reason to scrap support for all chips that every other
-> driver supports.
->
-Frankly speaking, Which nand we should to support depends on the 
-customer's requires.
+Also add TMIO_BBS.
 
-So we really do not want to support other nands that the customer does 
-not have.
+This allows these defines to also be used by zboot.
 
->> I have many nands by my hand. I will add it gradually.
->>
-> So why not add them to the generic database?
->
-I ever thought to change the generic database. But I found it would cost 
-a long time.
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
 
-The parsing code in nand_get_flash_type() can not parse out the page 
-size/oob size
-in some cases. And IMHO I do not think to get the page size/oob size by 
-parsing the ids is a good way,
-this really makes the code mess (sorry, David, I really think the 
-current code is ugly.).
+As requested by Simon, this is now rebased on top of all my current tmio 
+patches.
 
-IMHO, the best solution is add a database like mine. Using the id bytes 
-as the keyword to match the nand.
-then to get the page size /oob size , etc, from the database.
+ drivers/mmc/host/tmio_mmc.h     |   30 +++--------------------
+ drivers/mmc/host/tmio_mmc_dma.c |    1 +
+ drivers/mmc/host/tmio_mmc_pio.c |   21 +----------------
+ include/linux/mmc/tmio.h        |   49 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 55 insertions(+), 46 deletions(-)
+ create mode 100644 include/linux/mmc/tmio.h
 
-I will send a patch about this in future, but now, I do not want to  be 
-stumbled by this problem.
-
-
-
-
->> I want to get the page size/oob size from my own database which can not
->> get from the nand_ids.
->>
-> If there are parameters needed that cannot be obtained from the
-> generic database, it might be worth upgrading that database instead of
-> creating your own local database.
->
->>>> [2]I need the timing information of the NAND. The nand_ids DOES not have
->>>> it. I have to
->>>>       read the datasheet of the NAND, and add it to my database.
->>>>
->>> Do we really need exact timing data for each individual chip?
->>> Or couldn't we live with some sane timing that works for most chips
->>> and provide some means to specify a different timing via
->>> platform_data?
->>>
->> Most of the time, the timing is really based on a safe timing setting.
->> But in the original GPMI driver in the FREESCALE BSP, there exits some
->> nands need to be set with their own timing setting.
->>
->> So I do not use the safe timing for _ALL_ the nand, and i'd better get
->> it from the
->> database.
->>
-> It should be sufficient to provide timing info from platform_data in
-> special cases instead of bloating the nand id database with that
-> stuff. Platforms might need to adjust the timing because of
-> peculiarities in the HW. Thus the timing info should be provided from
-> there, not from the chip database.
-
-The timing information is needed by the GPMI module, not other module. 
-So the
-best way to get this is from the chip database.
-
-Setting the GPMI with the proper timing will make the NAND runs in high 
-performance.
-
-Thanks for your advice, I will use the safe timing for all the nand.
-
-Huang Shijie
+diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
+index 7d79b14..099ed49 100644
+--- a/drivers/mmc/host/tmio_mmc.h
++++ b/drivers/mmc/host/tmio_mmc.h
+@@ -17,36 +17,14 @@
+ #define TMIO_MMC_H
+ 
+ #include <linux/highmem.h>
++#include <linux/mmc/tmio.h>
+ #include <linux/pagemap.h>
+ 
+-/* Definitions for values the CTRL_STATUS register can take. */
+-#define TMIO_STAT_CMDRESPEND    0x00000001
+-#define TMIO_STAT_DATAEND       0x00000004
+-#define TMIO_STAT_CARD_REMOVE   0x00000008
+-#define TMIO_STAT_CARD_INSERT   0x00000010
+-#define TMIO_STAT_SIGSTATE      0x00000020
+-#define TMIO_STAT_WRPROTECT     0x00000080
+-#define TMIO_STAT_CARD_REMOVE_A 0x00000100
+-#define TMIO_STAT_CARD_INSERT_A 0x00000200
+-#define TMIO_STAT_SIGSTATE_A    0x00000400
+-#define TMIO_STAT_CMD_IDX_ERR   0x00010000
+-#define TMIO_STAT_CRCFAIL       0x00020000
+-#define TMIO_STAT_STOPBIT_ERR   0x00040000
+-#define TMIO_STAT_DATATIMEOUT   0x00080000
+-#define TMIO_STAT_RXOVERFLOW    0x00100000
+-#define TMIO_STAT_TXUNDERRUN    0x00200000
+-#define TMIO_STAT_CMDTIMEOUT    0x00400000
+-#define TMIO_STAT_RXRDY         0x01000000
+-#define TMIO_STAT_TXRQ          0x02000000
+-#define TMIO_STAT_ILL_FUNC      0x20000000
+-#define TMIO_STAT_CMD_BUSY      0x40000000
+-#define TMIO_STAT_ILL_ACCESS    0x80000000
+-
+ /* Definitions for values the CTRL_SDIO_STATUS register can take. */
+-#define TMIO_SDIO_STAT_IOIRQ		0x0001
++#define TMIO_SDIO_STAT_IOIRQ	0x0001
+ #define TMIO_SDIO_STAT_EXPUB52	0x4000
+-#define TMIO_SDIO_STAT_EXWT		0x8000
+-#define TMIO_SDIO_MASK_ALL		0xc007
++#define TMIO_SDIO_STAT_EXWT	0x8000
++#define TMIO_SDIO_MASK_ALL	0xc007
+ 
+ /* Define some IRQ masks */
+ /* This is the mask used at reset by the chip */
+diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
+index c505278..d3de74a 100644
+--- a/drivers/mmc/host/tmio_mmc_dma.c
++++ b/drivers/mmc/host/tmio_mmc_dma.c
+@@ -14,6 +14,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/mfd/tmio.h>
+ #include <linux/mmc/host.h>
++#include <linux/mmc/tmio.h>
+ #include <linux/pagemap.h>
+ #include <linux/scatterlist.h>
+ 
+diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
+index e35e179..6ae8d2f 100644
+--- a/drivers/mmc/host/tmio_mmc_pio.c
++++ b/drivers/mmc/host/tmio_mmc_pio.c
+@@ -35,6 +35,7 @@
+ #include <linux/irq.h>
+ #include <linux/mfd/tmio.h>
+ #include <linux/mmc/host.h>
++#include <linux/mmc/tmio.h>
+ #include <linux/module.h>
+ #include <linux/pagemap.h>
+ #include <linux/platform_device.h>
+@@ -44,26 +45,6 @@
+ 
+ #include "tmio_mmc.h"
+ 
+-#define CTL_SD_CMD 0x00
+-#define CTL_ARG_REG 0x04
+-#define CTL_STOP_INTERNAL_ACTION 0x08
+-#define CTL_XFER_BLK_COUNT 0xa
+-#define CTL_RESPONSE 0x0c
+-#define CTL_STATUS 0x1c
+-#define CTL_IRQ_MASK 0x20
+-#define CTL_SD_CARD_CLK_CTL 0x24
+-#define CTL_SD_XFER_LEN 0x26
+-#define CTL_SD_MEM_CARD_OPT 0x28
+-#define CTL_SD_ERROR_DETAIL_STATUS 0x2c
+-#define CTL_SD_DATA_PORT 0x30
+-#define CTL_TRANSACTION_CTL 0x34
+-#define CTL_SDIO_STATUS 0x36
+-#define CTL_SDIO_IRQ_MASK 0x38
+-#define CTL_RESET_SD 0xe0
+-#define CTL_SDIO_REGS 0x100
+-#define CTL_CLK_AND_WAIT_CTL 0x138
+-#define CTL_RESET_SDIO 0x1e0
+-
+ static u16 sd_ctrl_read16(struct tmio_mmc_host *host, int addr)
+ {
+ 	return readw(host->ctl + (addr << host->bus_shift));
+diff --git a/include/linux/mmc/tmio.h b/include/linux/mmc/tmio.h
+new file mode 100644
+index 0000000..7131f8d
+--- /dev/null
++++ b/include/linux/mmc/tmio.h
+@@ -0,0 +1,49 @@
++#ifndef TMIO_H
++#define TMIO_H
++
++#define CTL_SD_CMD 0x00
++#define CTL_ARG_REG 0x04
++#define CTL_STOP_INTERNAL_ACTION 0x08
++#define CTL_XFER_BLK_COUNT 0xa
++#define CTL_RESPONSE 0x0c
++#define CTL_STATUS 0x1c
++#define CTL_IRQ_MASK 0x20
++#define CTL_SD_CARD_CLK_CTL 0x24
++#define CTL_SD_XFER_LEN 0x26
++#define CTL_SD_MEM_CARD_OPT 0x28
++#define CTL_SD_ERROR_DETAIL_STATUS 0x2c
++#define CTL_SD_DATA_PORT 0x30
++#define CTL_TRANSACTION_CTL 0x34
++#define CTL_SDIO_STATUS 0x36
++#define CTL_SDIO_IRQ_MASK 0x38
++#define CTL_RESET_SD 0xe0
++#define CTL_SDIO_REGS 0x100
++#define CTL_CLK_AND_WAIT_CTL 0x138
++#define CTL_RESET_SDIO 0x1e0
++
++/* Definitions for values the CTRL_STATUS register can take. */
++#define TMIO_STAT_CMDRESPEND    0x00000001
++#define TMIO_STAT_DATAEND       0x00000004
++#define TMIO_STAT_CARD_REMOVE   0x00000008
++#define TMIO_STAT_CARD_INSERT   0x00000010
++#define TMIO_STAT_SIGSTATE      0x00000020
++#define TMIO_STAT_WRPROTECT     0x00000080
++#define TMIO_STAT_CARD_REMOVE_A 0x00000100
++#define TMIO_STAT_CARD_INSERT_A 0x00000200
++#define TMIO_STAT_SIGSTATE_A    0x00000400
++#define TMIO_STAT_CMD_IDX_ERR   0x00010000
++#define TMIO_STAT_CRCFAIL       0x00020000
++#define TMIO_STAT_STOPBIT_ERR   0x00040000
++#define TMIO_STAT_DATATIMEOUT   0x00080000
++#define TMIO_STAT_RXOVERFLOW    0x00100000
++#define TMIO_STAT_TXUNDERRUN    0x00200000
++#define TMIO_STAT_CMDTIMEOUT    0x00400000
++#define TMIO_STAT_RXRDY         0x01000000
++#define TMIO_STAT_TXRQ          0x02000000
++#define TMIO_STAT_ILL_FUNC      0x20000000
++#define TMIO_STAT_CMD_BUSY      0x40000000
++#define TMIO_STAT_ILL_ACCESS    0x80000000
++
++#define TMIO_BBS		512		/* Boot block size */
++
++#endif
+-- 
+1.7.2.5
