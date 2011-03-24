@@ -1,93 +1,50 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 24 Mar 2011 08:34:11 +0100
-Subject: [PATCH 5/7] add GPMI support for imx28
-In-Reply-To: <4D8AB490.30408@freescale.com>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-	<1300239773-4222-6-git-send-email-b32955@freescale.com>
-	<19848.39439.380861.195051@ipc1.ka-ro>
-	<4D8964F4.3070104@freescale.com>
-	<19850.2584.566366.251874@ipc1.ka-ro>
-	<4D8AB490.30408@freescale.com>
-Message-ID: <19850.62451.678409.328798@ipc1.ka-ro>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 24 Mar 2011 00:57:27 -0700
+Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
+In-Reply-To: <AANLkTincDenFBzk0sF48c=oJknAVnNnXjNr-uFOj5KQ7@mail.gmail.com>
+References: <20110322153226.GC30303@linux-sh.org>
+	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
+	<20110322155730.GD30303@linux-sh.org>
+	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
+	<20110322163144.GC2202@sirena.org.uk>
+	<AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
+	<20110322165907.GG22583@opensource.wolfsonmicro.com>
+	<AANLkTin1jG36-EsvAk9o-KxdxaBBhx=5Rf+JMidjYqsT@mail.gmail.com>
+	<20110323162021.GA26594@opensource.wolfsonmicro.com>
+	<AANLkTincDenFBzk0sF48c=oJknAVnNnXjNr-uFOj5KQ7@mail.gmail.com>
+Message-ID: <20110324075727.GB8990@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie writes:
-> Hi Lothar:
+On Thu, Mar 24, 2011 at 12:38:21PM +0900, Magnus Damm wrote:
+> On Thu, Mar 24, 2011 at 1:20 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Thu, Mar 24, 2011 at 01:04:31AM +0900, Magnus Damm wrote:
 > >
-> >>> some general comments:
-> >>> - Why are you not using the existing nand_ids but inventing your own
-> >>>     database?
-> >>>
-> >> The nand_ids{} contains poor information for me.
-> >> Such as :
-> >> [1]The nand_ids does not have the enough information for the page
-> >> size,oob size for some new NANDs.
-> >>      And you can not get the information from parsing the NAND ids, such
-> >> as some Micron NANDs.
-> >>
-> > You could use it for the standard chips where you do not need
-> > additional information. That way most NAND chips could be supported
-> > out of the box without having to modify the driver.
+> >> Sounds nice. Hopefully that will allow us to use module_init() in
+> >> drivers instead of other initcall levels depending on bus type.
 > >
-> What the meaning of "standard chips"?
+> > None of this is anything to do with the bus type - it's to do with the
+> > function of the devices within the system. ?Things that are required for
+> > early init of the kernel get bumped up the list.
 > 
-Those chips that are supported by other drivers for long time.
-
-> There are many nands in the world. Every vendor has its own rules, some 
-> even does has :)
+> Hm, sorry for being unclear - I should have used the words "other
+> initcall levels depending on the init order of the parent hardware
+> bus". I'm referring to the state of things now without any patches
+> from Grant.
 > 
-> Unluckily, the imx23/imx28 supports many nands that the nand_ids{} does 
-> not support.
->
-That's no reason to scrap support for all chips that every other
-driver supports.
-
-> I have many nands by my hand. I will add it gradually.
+> I understand that early init code often are using different initcall
+> levels to make sure they are getting initialized before other code.
+> Initcalls can also be used to work around link order issues.
 > 
-So why not add them to the generic database?
-
-> I want to get the page size/oob size from my own database which can not 
-> get from the nand_ids.
+> I can't however see the reason why a keypad driver needs to be
+> initialized early on. I may be wrong, but I thought user space was the
+> only consumer of input devices?
 > 
-If there are parameters needed that cannot be obtained from the
-generic database, it might be worth upgrading that database instead of
-creating your own local database.
 
-> >> [2]I need the timing information of the NAND. The nand_ids DOES not have
-> >> it. I have to
-> >>      read the datasheet of the NAND, and add it to my database.
-> >>
-> > Do we really need exact timing data for each individual chip?
-> > Or couldn't we live with some sane timing that works for most chips
-> > and provide some means to specify a different timing via
-> > platform_data?
-> >
-> Most of the time, the timing is really based on a safe timing setting.
-> But in the original GPMI driver in the FREESCALE BSP, there exits some
-> nands need to be set with their own timing setting.
-> 
-> So I do not use the safe timing for _ALL_ the nand, and i'd better get 
-> it from the
-> database.
->
-It should be sufficient to provide timing info from platform_data in
-special cases instead of bloating the nand id database with that
-stuff. Platforms might need to adjust the timing because of
-peculiarities in the HW. Thus the timing info should be provided from
-there, not from the chip database.
+SysRq is kind of a consumer, so there sometimes a desire to get keyboard
+working as soon as possible. But even SysRq is initialized ad module_init
+level, so I tend to agree that tca should simply use module_init.
 
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Dmitry
