@@ -1,59 +1,42 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Thu, 24 Mar 2011 15:48:05 +0100
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-In-Reply-To: <20110324141826.GA3810@arm.com>
-References: <20110324141826.GA3810@arm.com>
-Message-ID: <19851.22949.752686.1270@pilspetsen.it.uu.se>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 24 Mar 2011 22:41:42 +0800
+Subject: [patch v4 1/3] arm: introduce cross trigger interface helpers
+In-Reply-To: <20110308163113.GB9995@trinity.fluff.org>
+References: <1299598729-27974-1-git-send-email-tom.leiming@gmail.com>
+	<1299598729-27974-2-git-send-email-tom.leiming@gmail.com>
+	<20110308163113.GB9995@trinity.fluff.org>
+Message-ID: <AANLkTi=-Y+GQ==F01tq+exxRCPowiy9EWFNaUYWwCX-c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin writes:
- > Hi all,
- > 
- > Considering how to add the VFP/NEON register state to Coredumps,
- > there's no single obvious solution, so I'd like to put this out
- > for people's comments.
- > 
- > Currently, the coredump consists of several notes, the interesting
- > ones currently being:
- > 
- >  * NT_PRSTATUS - general process status, including the integer registers
- >  * NT_FPREGSET - the FPA registers (only present if FPA is in use)
- > 
- > These notes are duplicated per thread when a multithreaded process
- > dumps core.
- > 
- > There are few options I see:
- > 
- >  a) Dump the VFP/NEON state in NT_FPREGSET.
- >     This could be appended to, or in place of the legacy FPA regs,
- >     with flags in a header or (struct elf_prstatus).pr_fpvalid
- >     to describe what was dumped.  Old gdb etc. may read the
- >     resulting information as random FPA register contents;
- >     this could perhaps be avoided by always dumping a dummy
- >     FPA regs structure at the start of this note, though this
- >     seems wasteful.
- > 
- >     Possibly, gdb may explode if the NT_FPREGSET note is larger
- >     then expected.  I've not investigated this.
- > 
- >  b) Dump the VFP/NEON regs in a note of type NT_PRXFPREG.
- >     This avoids defining a new note type; however, this note type
- >     is really for x86 -- so overloading it in this way may just
- >     be nonsensical / confusing.
- > 
- >  c) Create a new note type specially for this, and dump the
- >     VFP/NEON regs in there.  This is closest to the model followed
- >     by ptrace, where PTRACE_GETREGS, PTRACE_GETFPREGS and
- >     PTRAGE_GETVFPREGS are all distinct.
- > 
- > 
- > Going for (c) seems sanest to me, and also means that old gdb
- > will just ignore the new data; this is probably what we want.
- > 
- > Comments are welcome.
+Hi Ben,
 
-Strongly prefer (c) or (b).  (a) should be avoided if at all
-possible: appending to or changing established types is just
-asking for trouble, unless those types were designed from the
-start to be self-describing and extensible.
+2011/3/9 Ben Dooks <ben-linux@fluff.org>:
+
+> could you just use the primecell register information for these
+
+Seems there is no the primecell register information for these.
+
+Follows some comment from Will in private mail:
+
+Other primecell drivers in the kernel (sp810, pl330, nomadik MTU, ...)
+define these themselves so I don't see the problem. Furthermore,
+the actual ID registers are often incorrect in the hardware, but
+we don't appear to be using them anyway.
+
+
+>> +static inline void cti_irq_ack(struct cti *cti)
+>> +{
+>> + ? ? void __iomem *base = cti->base;
+>> + ? ? unsigned long val;
+>> +
+>> + ? ? val = __raw_readl(base + CTIINTACK);
+>> + ? ? val |= BIT(cti->trig_out_for_irq);
+>
+> would it be easier to get a pre-shifted bit here?
+
+I don't think the above is more difficult, do I?
+
+thanks,
+-- 
+Lei Ming
