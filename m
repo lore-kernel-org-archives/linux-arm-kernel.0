@@ -1,103 +1,103 @@
-From: arno.steffen@googlemail.com (Arno Steffen)
-Date: Thu, 24 Mar 2011 12:56:48 +0100
-Subject: IRQ handler under load - slow response
-In-Reply-To: <20110314144715.GH333@e-circ.dyndns.org>
-References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
-	<20110309152252.GB333@e-circ.dyndns.org>
-	<AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
-	<20110314144715.GH333@e-circ.dyndns.org>
-Message-ID: <AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 24 Mar 2011 16:04:26 +0300
+Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
+	<4D89E308.8060404@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+Message-ID: <4D8B415A.2050706@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/14 Kurt Van Dijck <kurt.van.dijck@eia.be>:
-> On Mon, Mar 14, 2011 at 02:26:35PM +0100, Arno Steffen wrote:
->>
->> Sorry for delay with resonse.
-> No problem.
->> Thanks for your help. Most of this options for ps doesn't work on my
->> busybox embedded system.
-> Yep, we use a regular ps for that.
->> Also chrt is not implemented currently. But that inspired me to
-> try a program with sched_setscheduler(2)
->> another idea. I just announced the irqs in a sperate process:
->> Is this what you proposed in b) ?
->>
->> ? ? ? i = fork();
->> ? ? ? if (i == 0) {
->> ? ? ? ? ? ? ? printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
->> ? ? ? ? ? ? ? setpriority(PRIO_PROCESS, getpid(), -10);
->> ? ? ? ? ? ? ? printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
->> ? ? ? ? ? ? ? gpio_irq_setup(GPI_IN1, GPIOCFG_FALLINGDETECT_INTR, &irq_handler);
->> ? ? ? ? ? ? ? gpio_irq_setup(GPI_IN2, GPIOCFG_RISINGDETECT_INTR, &irq_handler );
->> ? ? ? ? ? ? ? printf("all IRQ handlers are setup !\n");
->> ? ? ? ? ? ? ? do {sleep(1);} while(1);
->> ? ? ? ? ? ? ? exit(0);
->> ? ? ? }
-> Euhm, my proposed b) deals in kernel. I think your example is in userspace?
-> Maybe I don't understand your precise setup well.
->
-> Anyway, what I meant was something in kernel like:
-> ?s32Status = request_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GpioIrqHandler,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GpioIrqThread,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "GPIOINTR",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? NULL);
->
-> static irqreturn_t GpioIrqHandler (int irq, void *dev_id)
-> {
-> ? ?int s32GpioNumber = 0 ;
-> ? ?s32GpioNumber = irq - IH_GPIO_BASE;
-> ? ?set_bit (s32GpioNumber , (volatile unsigned long *) &gsts32GpioIrqStatus);
-> - ? tasklet_schedule (&GpioTasklet);
-> - ? return IRQ_HANDLED;
-> + ? return IRQ_WAKE_THREAD;
-> }
->
-> -DECLARE_TASKLET(GpioTasklet, GpioIntrTasklet, 0);
-> static irqreturn_t GpioIrqThread(int irq, void *dev_id)
-> {
-> ? ? ? ?/* do whatever the tasklet was supposed to do */
-> }
->
+Hello.
 
-Dear Kurt,
-I did as you proposed, but doesn't have the big picture
+On 24-03-2011 12:08, Nori, Sekhar wrote:
 
-I think there is a typo in your request_irq change:
-s32Status = request_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
- -                                     GpioIrqHandler,
-+                                     GpioIrqThread,
-                                    0,
-                                     "GPIOINTR",
-                                     NULL);
-Is this what you mean? What you have suggested is replacing a flag by
-a pointer - this cannot work. I can't see how  GpioIrqHandler and
-GpioIrqThread are connected now.
+>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>>> index 68fe4c2..276199d 100644
+>>> --- a/arch/arm/mach-davinci/da850.c
+>>> +++ b/arch/arm/mach-davinci/da850.c
+>>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
+>>>    	.flags		= DA850_CLK_ASYNC3,
+>>>    };
+>>>
+>>> +static struct clk sata_clk = {
+>>> +	.name		= "sata",
+>>> +	.parent		=&pll0_sysclk2,
+>>> +	.lpsc		= DA850_LPSC1_SATA,
+>>> +	.gpsc		= 1,
+>>> +	.flags		= PSC_FORCE,
+>>> +};
+>>> +
+>>>    static struct clk_lookup da850_clks[] = {
+>>>    	CLK(NULL,		"ref",		&ref_clk),
+>>>    	CLK(NULL,		"pll0",		&pll0_clk),
+>>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
+>>>    	CLK(NULL,		"usb20",	&usb20_clk),
+>>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+>>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+>>> +	CLK("ahci",		NULL,		&sata_clk),
+>>>    	CLK(NULL,		NULL,		NULL),
+>>>    };
 
-> no, you get a seperate kernel thread that you can play with (chrt etc.).
+>>      I'd put the above into a separate patch...
 
-I am not sure this help. The kernel thread might become a higher
-proirity, but what has to be improved is that the IRQ-routine in user
-space is responding faster.
+> Why should addition of clock data not be in the same patch
+> as the one which adds platform resources etc? It is not a big
+> deal to change, but I would like to know why you request this.
 
->
->>
->> This helps me reducing the delay to 2ms. Not very fast, but much
->> better than before.
-> I was not aware of that there was a userspace process involved.
-> setting that process to SCHED_RR too (together with the kernel thread when applicable)
-> is a good idea.
->
->> Setting the priority doesn't have any effect by the way.
-> Yep, SCHED_RR or SCHED_FIFO will do.
->>
->> Best regards
->> Arno
->
+    I didn't request anything, I just said what I'd have done. :-)
+I think modifying the DA8xx-common and DA850-specific files should better be 
+done separately. Although in this case we're adding DA850 only device, so 
+perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
 
-Does it make sense to send you the hole code? I am afraid that there
-is to much potential for misunderstanding. But I won't bother your.
-Best regards
-Arno
+>>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>>> index 625d4b6..e061396 100644
+>>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>> [...]
+>>> @@ -834,3 +836,139 @@ int __init da8xx_register_spi(int instance, struct spi_board_info *info,
+>> [...]
+>>> +/* Supported DA850 SATA crystal frequencies */
+>>> +#define KHZ_TO_HZ(freq) ((freq) * 1000)
+>>> +static unsigned long da850_sata_xtal[] = {
+>>> +	KHZ_TO_HZ(300000),
+>>> +	KHZ_TO_HZ(250000),
+>>> +	0,			/* Reserved */
+
+>>      Why reserve a place for it at all?
+
+> Because then this table maps one-to-one to the hardware
+> defined table.
+
+    Ah, sorry, have missed that...
+
+>>> +		val = SATA_PHY_MPY(i + 1);
+>>> +	}
+>>> +
+>> [...]
+
+>>> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+>>> index e4fc1af..aa6f08e 100644
+>>> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
+>>> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+>> [...]
+>>> @@ -65,6 +66,7 @@ extern unsigned int da850_max_speed;
+>>>    #define DA8XX_GPIO_BASE		0x01e26000
+>>>    #define DA8XX_PSC1_BASE		0x01e27000
+>>>    #define DA8XX_LCD_CNTRL_BASE	0x01e13000
+>>> +#define DA850_SATA_BASE		0x01e18000
+
+>>      It's used only in devices-da8xx.c -- shouldn't it be declared there?
+
+> Yes, will move. Base addresses for modules like LCD and MMCSD can be
+> moved as well - should be subject of some future clean-up patch.
+
+    Yes, maybe I'll submit one...
+
+> Thanks,
+> Sekhar
+
+WBR, Sergei
