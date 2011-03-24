@@ -1,54 +1,86 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 24 Mar 2011 14:18:26 +0000
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-Message-ID: <20110324141826.GA3810@arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 24 Mar 2011 20:03:47 +0530
+Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
+In-Reply-To: <4D8B415A.2050706@mvista.com>
+References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
+	<4D89E308.8060404@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+	<4D8B415A.2050706@mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Sergei,
 
-Considering how to add the VFP/NEON register state to Coredumps,
-there's no single obvious solution, so I'd like to put this out
-for people's comments.
+On Thu, Mar 24, 2011 at 18:34:26, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 24-03-2011 12:08, Nori, Sekhar wrote:
+> 
+> >>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> >>> index 68fe4c2..276199d 100644
+> >>> --- a/arch/arm/mach-davinci/da850.c
+> >>> +++ b/arch/arm/mach-davinci/da850.c
+> >>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
+> >>>    	.flags		= DA850_CLK_ASYNC3,
+> >>>    };
+> >>>
+> >>> +static struct clk sata_clk = {
+> >>> +	.name		= "sata",
+> >>> +	.parent		=&pll0_sysclk2,
+> >>> +	.lpsc		= DA850_LPSC1_SATA,
+> >>> +	.gpsc		= 1,
+> >>> +	.flags		= PSC_FORCE,
+> >>> +};
+> >>> +
+> >>>    static struct clk_lookup da850_clks[] = {
+> >>>    	CLK(NULL,		"ref",		&ref_clk),
+> >>>    	CLK(NULL,		"pll0",		&pll0_clk),
+> >>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
+> >>>    	CLK(NULL,		"usb20",	&usb20_clk),
+> >>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+> >>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+> >>> +	CLK("ahci",		NULL,		&sata_clk),
+> >>>    	CLK(NULL,		NULL,		NULL),
+> >>>    };
+> 
+> >>      I'd put the above into a separate patch...
+> 
+> > Why should addition of clock data not be in the same patch
+> > as the one which adds platform resources etc? It is not a big
+> > deal to change, but I would like to know why you request this.
+> 
+>     I didn't request anything, I just said what I'd have done. :-)
 
-Currently, the coredump consists of several notes, the interesting
-ones currently being:
+Okay. I guess I will keep it as is.
 
- * NT_PRSTATUS - general process status, including the integer registers
- * NT_FPREGSET - the FPA registers (only present if FPA is in use)
+> I think modifying the DA8xx-common and DA850-specific files should better be 
+> done separately. Although in this case we're adding DA850 only device, so 
+> perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
 
-These notes are duplicated per thread when a multithreaded process
-dumps core.
+Good point. Will add the #ifdef.
 
-There are few options I see:
+> >>> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+> >>> index e4fc1af..aa6f08e 100644
+> >>> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
+> >>> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+> >> [...]
+> >>> @@ -65,6 +66,7 @@ extern unsigned int da850_max_speed;
+> >>>    #define DA8XX_GPIO_BASE		0x01e26000
+> >>>    #define DA8XX_PSC1_BASE		0x01e27000
+> >>>    #define DA8XX_LCD_CNTRL_BASE	0x01e13000
+> >>> +#define DA850_SATA_BASE		0x01e18000
+> 
+> >>      It's used only in devices-da8xx.c -- shouldn't it be declared there?
+> 
+> > Yes, will move. Base addresses for modules like LCD and MMCSD can be
+> > moved as well - should be subject of some future clean-up patch.
+> 
+>     Yes, maybe I'll submit one...
 
- a) Dump the VFP/NEON state in NT_FPREGSET.
-    This could be appended to, or in place of the legacy FPA regs,
-    with flags in a header or (struct elf_prstatus).pr_fpvalid
-    to describe what was dumped.  Old gdb etc. may read the
-    resulting information as random FPA register contents;
-    this could perhaps be avoided by always dumping a dummy
-    FPA regs structure at the start of this note, though this
-    seems wasteful.
+Thanks for the help!
 
-    Possibly, gdb may explode if the NT_FPREGSET note is larger
-    then expected.  I've not investigated this.
-
- b) Dump the VFP/NEON regs in a note of type NT_PRXFPREG.
-    This avoids defining a new note type; however, this note type
-    is really for x86 -- so overloading it in this way may just
-    be nonsensical / confusing.
-
- c) Create a new note type specially for this, and dump the
-    VFP/NEON regs in there.  This is closest to the model followed
-    by ptrace, where PTRACE_GETREGS, PTRACE_GETFPREGS and
-    PTRAGE_GETVFPREGS are all distinct.
-
-
-Going for (c) seems sanest to me, and also means that old gdb
-will just ignore the new data; this is probably what we want.
-
-Comments are welcome.
-
-Cheers
----Dave
+Regards,
+Sekhar
