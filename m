@@ -1,144 +1,43 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 24 Mar 2011 14:38:54 +0530
-Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
-In-Reply-To: <4D89E308.8060404@mvista.com>
-References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
-	<4D89E308.8060404@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+From: jiri.prchal@aksignal.cz (=?ISO-8859-2?Q?Prchal_Ji=F8=ED?=)
+Date: Thu, 24 Mar 2011 10:10:35 +0100
+Subject: [PATCH] mmc, AT91: fix init fequency problem
+In-Reply-To: <1300949648-15078-2-git-send-email-horms@verge.net.au>
+References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
+	<1300949648-15078-2-git-send-email-horms@verge.net.au>
+Message-ID: <4D8B0A8B.6030002@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi,
+this patch fixes problem with some SD cards during initialization. Not all SD(HC) card can run at even 375kHz. Sets
+minimal frequency to 200kHz.
+And in function "at91_mci_set_ios" is limit to maximum division, it's only 8 bit value.
 
-On Wed, Mar 23, 2011 at 17:39:44, Sergei Shtylyov wrote:
+Kernel version: 2.6.38
+Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+---
 
-> > diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> > index 68fe4c2..276199d 100644
-> > --- a/arch/arm/mach-davinci/da850.c
-> > +++ b/arch/arm/mach-davinci/da850.c
-> > @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
-> >   	.flags		= DA850_CLK_ASYNC3,
-> >   };
-> >
-> > +static struct clk sata_clk = {
-> > +	.name		= "sata",
-> > +	.parent		=&pll0_sysclk2,
-> > +	.lpsc		= DA850_LPSC1_SATA,
-> > +	.gpsc		= 1,
-> > +	.flags		= PSC_FORCE,
-> > +};
-> > +
-> >   static struct clk_lookup da850_clks[] = {
-> >   	CLK(NULL,		"ref",		&ref_clk),
-> >   	CLK(NULL,		"pll0",		&pll0_clk),
-> > @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
-> >   	CLK(NULL,		"usb20",	&usb20_clk),
-> >   	CLK("spi_davinci.0",	NULL,		&spi0_clk),
-> >   	CLK("spi_davinci.1",	NULL,		&spi1_clk),
-> > +	CLK("ahci",		NULL,		&sata_clk),
-> >   	CLK(NULL,		NULL,		NULL),
-> >   };
-> 
->     I'd put the above into a separate patch...
+diff -uprN -X linux-2.6.38-vanilla/Documentation/dontdiff linux-2.6.38-vanilla/drivers/mmc/host/at91_mci.c
+/home/prchal/arm/fw-cdu/linux/linux-2.6.38/drivers/mmc/host/at91_mci.c
+--- linux-2.6.38-vanilla/drivers/mmc/host/at91_mci.c	2011-03-15 02:20:32.000000000 +0100
++++ /home/prchal/arm/fw-cdu/linux/linux-2.6.38/drivers/mmc/host/at91_mci.c	2011-03-24 09:20:22.869370179 +0100
+@@ -724,6 +724,10 @@ static void at91_mci_set_ios(struct mmc_
+ 		else
+ 			clkdiv = (at91_master_clock / ios->clock) / 2;
 
-Why should addition of clock data not be in the same patch
-as the one which adds platform resources etc? It is not a big
-deal to change, but I would like to know why you request this.
++		/* set maximum divider */
++		if (clkdiv > 255)
++			clkdiv = 255;
++
+ 		pr_debug("clkdiv = %d. mcck = %ld\n", clkdiv,
+ 			at91_master_clock / (2 * (clkdiv + 1)));
+ 	}
+@@ -944,7 +948,7 @@ static int __init at91_mci_probe(struct
+ 	}
 
-> 
-> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> > index 625d4b6..e061396 100644
-> > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> [...]
-> > @@ -834,3 +836,139 @@ int __init da8xx_register_spi(int instance, struct spi_board_info *info,
-> [...]
-> > +/* Supported DA850 SATA crystal frequencies */
-> > +#define KHZ_TO_HZ(freq) ((freq) * 1000)
-> > +static unsigned long da850_sata_xtal[] = {
-> > +	KHZ_TO_HZ(300000),
-> > +	KHZ_TO_HZ(250000),
-> > +	0,			/* Reserved */
-> 
->     Why reserve a place for it at all?
-
-Because then this table maps one-to-one to the hardware
-defined table. This in turn keeps the init code pretty
-simple. Plus, if and when hardware adds support for a
-crystal there, the changes to rest of the code are minimal.
-
-> 
-> > +	KHZ_TO_HZ(187500),
-> > +	KHZ_TO_HZ(150000),
-> > +	KHZ_TO_HZ(125000),
-> > +	KHZ_TO_HZ(120000),
-> > +	KHZ_TO_HZ(100000),
-> > +	KHZ_TO_HZ(75000),
-> > +	KHZ_TO_HZ(60000),
-> > +};
-> > +
-> > +static int da850_sata_init(struct device *dev, void __iomem *addr)
-> > +{
-> > +	int i, ret;
-> > +	unsigned int val;
-> > +
-> > +	da850_sata_clk = clk_get(dev, NULL);
-> > +	if (IS_ERR(da850_sata_clk))
-> > +		return PTR_ERR(da850_sata_clk);
-> > +
-> > +	ret = clk_enable(da850_sata_clk);
-> > +	if (ret)
-> > +		goto err0;
-> > +
-> > +	/* Enable SATA clock receiver */
-> > +	val = __raw_readl(DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-> > +	val&= ~BIT(0);
-> > +	__raw_writel(val, DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-> > +
-> > +	/* Get the multiplier needed for 1.5GHz PLL output */
-> > +	for (i = 0; i<  ARRAY_SIZE(da850_sata_xtal); i++) {
-> > +		if (da850_sata_xtal[i] == da850_sata_refclkpn)
-> > +			break;
-> > +	}
-> 
->     {} not needed.
-
-Okay, will remove.
-
-> 
-> > +
-> > +	if (i == ARRAY_SIZE(da850_sata_xtal)) {
-> > +		ret = -EINVAL;
-> > +		goto err1;
-> > +	} else {
-> 
->     *else* not needed here, after *goto*.
-
-Yup, will fix.
-
-> 
-> > +		val = SATA_PHY_MPY(i + 1);
-> > +	}
-> > +
-> [...]
-> 
-> > diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-> > index e4fc1af..aa6f08e 100644
-> > --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> > +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-> [...]
-> > @@ -65,6 +66,7 @@ extern unsigned int da850_max_speed;
-> >   #define DA8XX_GPIO_BASE		0x01e26000
-> >   #define DA8XX_PSC1_BASE		0x01e27000
-> >   #define DA8XX_LCD_CNTRL_BASE	0x01e13000
-> > +#define DA850_SATA_BASE		0x01e18000
-> 
->     It's used only in devices-da8xx.c -- shouldn't it be declared there?
-
-Yes, will move. Base addresses for modules like LCD and MMCSD can be
-moved as well - should be subject of some future clean-up patch.
-
-Thanks,
-Sekhar
+ 	mmc->ops = &at91_mci_ops;
+-	mmc->f_min = 375000;
++	mmc->f_min = 200000; /* not all cards can run at 375kHz */
+ 	mmc->f_max = 25000000;
+ 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+ 	mmc->caps = 0;
