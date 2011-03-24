@@ -1,62 +1,55 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 24 Mar 2011 18:47:49 -0400
-Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
-In-Reply-To: <1299863887-15490-1-git-send-email-pawel.moll@arm.com> (Pawel
-	Moll's message of "Fri, 11 Mar 2011 17:18:07 +0000")
-References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <m3zkokm8yy.fsf@pullcord.laptop.org>
+From: ccross@google.com (Colin Cross)
+Date: Thu, 24 Mar 2011 16:14:05 -0700
+Subject: how can I cleanly exclude memory from the kernel memory allocator?
+In-Reply-To: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
+References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
+Message-ID: <AANLkTinKketbDZ87Qp400uzSBv5t3bF9azJgXqbwudL9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
-
-On Fri, Mar 11 2011, Pawel Moll wrote:
-> New IO FPGA implementation for Versatile Express boards contain
-> MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
+On Thu, Mar 24, 2011 at 3:18 PM, Larry Bassel <lbassel@codeaurora.org> wrote:
+> I want to (early in system initialization) exclude some
+> contiguous physical memory from one or more memory banks
+> so that it won't be mapped in the normal kernel 1-to-1 mapping
+> (so that it can be mapped uncached, strongly ordered, etc.
+> as needed -- I know that it is forbidden to have a cached
+> and an uncached mapping to the same memory) and so that it
+> won't be freed into the kernel memory allocator (so that
+> it won't fragment and can be allocated using genalloc).
 >
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/mmc/host/mmci.c |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
+> I have tried to find a clean way to do this, but none of
+> the approaches I've considered seem very good:
 >
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 2d6de3e..e7197b0 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -66,6 +66,12 @@ static struct variant_data variant_arm = {
->  	.datalength_bits	= 16,
->  };
->  
-> +static struct variant_data variant_arm_extended_fifo = {
-> +	.fifosize		= 128 * 4,
-> +	.fifohalfsize		= 64 * 4,
-> +	.datalength_bits	= 16,
-> +};
-> +
->  static struct variant_data variant_u300 = {
->  	.fifosize		= 16 * 4,
->  	.fifohalfsize		= 8 * 4,
-> @@ -1019,10 +1025,15 @@ static int mmci_resume(struct amba_device *dev)
->  static struct amba_id mmci_ids[] = {
->  	{
->  		.id	= 0x00041180,
-> -		.mask	= 0x000fffff,
-> +		.mask	= 0xff0fffff,
->  		.data	= &variant_arm,
->  	},
->  	{
-> +		.id	= 0x01041180,
-> +		.mask	= 0xff0fffff,
-> +		.data	= &variant_arm_extended_fifo,
-> +	},
-> +	{
->  		.id	= 0x00041181,
->  		.mask	= 0x000fffff,
->  		.data	= &variant_arm,
+> 1. Add a hook to the memory tag parsing routine to (possibly)
+> change each tag before arm_add_memory() is called,
+> or alter arm_add_memory() itself.
+> 2. Add a hook at the beginning of paging_init() to inspect
+> and alter the meminfo memory bank starts and sizes as needed.
+> 3. Wait until after the memory is added to the normal
+> kernel memory pool and somehow get it back out
+> (I can't use alloc_bootmem() or related functionality of course
+> since then the memory will be part of the cached kernel 1-to-1 1M
+> page mapping, precluding use of ioremap() on it).
+>
+> A further drawback for #1 is that I'd really like to
+> see all of the available memory banks before deciding which
+> memory to steal (we often have multiple memory banks on
+> our platforms).
+>
+> Perhaps there is a solution for this problem that already exists
+> that I'm unaware of (or at least community consensus about how
+> one should add this functionality).
+>
+> I believe Russell King has stated that he intends
+> to carve out memory that can be used for dma_alloc_coherent(),
+> that won't be mapped otherwise by the kernel.
+>
+> I'd like to know how he is planning to do this, as I could hopefully
+> do something similar.
+>
+> Thanks.
+>
+> Larry Bassel
 
-Pushed to mmc-next for .39-rc2, thanks.
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+You want memblock_remove, called from the new .reserve machine entry
+function.  See arch/arm/plat-omap/devices.c for an example.
