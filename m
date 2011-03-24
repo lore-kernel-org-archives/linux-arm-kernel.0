@@ -1,63 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 24 Mar 2011 08:09:53 -0700
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <87pqpxbqho.fsf@ti.com> (Kevin Hilman's message of "Fri, 11 Mar
-	2011 07:56:19 -0800")
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-	<49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
-	<87pqpxbqho.fsf@ti.com>
-Message-ID: <87mxkk1rni.fsf@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 24 Mar 2011 16:20:32 +0100
+Subject: multiple definition of `show_mem'
+Message-ID: <4D8B6140.4020300@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+Hello,
 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> [...]
->
->>> >
->>> > This series doesn't boot on ES1 (boot log below.)  Do we need to
->>> > totally prevent WFI on ES1?
->>> >
->> Nope. WFI is ok.
->> The ES1.0 boot issue on pm-core branch doesn't seems to
->> be related to this series. Without this series as well
->> OMAP4 ES1.0 is not booting for me. When I disable
->> CONFIG_PM + WATCHDOG fix, it booted ok. I will
->> git-bisect this later on pm-core branch.
->>
->>> > Also, if we want a CPUidle enabled kernel to boot on all silicon,
->>> > it will need a omap_rev() check during init to ensure it doesn't
->>> > override the default idle path.
->>> >
->> OMAP4 PM series already takes care of not overriding
->> the default idle path for ES1.0. The omap4_mpuss_init()
->> fails on ES1.0 and hence the CPUidle init is skipped in
->> that case.
->>
->> Just to further check, I pulled the latest omap-for-linus
->> branch and merged Paul's pull-request into it. Then
->> applied OMAP4 PM series and I got a boot crash, a different
->> one. This was again related to clock-domain initialization
->> and static deps. I fixed this issue by avoiding omap4_pm_init()
->> code running on ES1.0. With this boot on ES1.0 works fine now
->> with OMAP4 PM series.
->
-> Thanks for finding this.  I just tested your v3 branch together with my
-> pm-core and it's now booting fine on ES1.
->
+current mainline (v2.6.38-7210-gb81a618) on ARM/mxs has the following build failure:
 
-Hi Santosh,
+> lib/lib.a(show_mem.o): In function `show_mem':
+> .../linux-2.6/lib/show_mem.c:67: multiple definition of `show_mem'
+> arch/arm/mm/built-in.o:.../linux-2.6/arch/arm/mm/init.c:82: first defined here
+> make: *** [vmlinux.o] Error 1
 
-Can you rebase and repost your v3 series, I'd like to get this queued
-up early in the 2.6.40 dev cycle.
+After reverting these patches the kernel compiles...
 
-You can base on my current pm-core branch, which also has Russell's 
-devel-stable branch merged in.
+cbf978bfb12d7deca97d7333f65eda0381a072de oom: suppress nodes that are not allowed from meminfo on page alloc failure
+29423e77c06cee7d4e335ef4a7cbd949da978c91 oom: suppress show_mem() for many nodes in irq context on page alloc failure
+ddd588b5dd55f14320379961e47683db4e4c1d90 oom: suppress nodes that are not allowed from meminfo on oom kill
 
-Thanks,
+No time to boot the kernel, though.
 
-Kevin
+cheers, MArc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110324/9ffa1e92/attachment.sig>
