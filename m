@@ -1,52 +1,98 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 Mar 2011 11:07:37 +0800
-Subject: [PATCH 5/7] add GPMI support for imx28
-In-Reply-To: <201103231616.56375.ffainelli@freebox.fr>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-	<4D8964F4.3070104@freescale.com>
-	<19850.2584.566366.251874@ipc1.ka-ro>
-	<201103231616.56375.ffainelli@freebox.fr>
-Message-ID: <4D8AB579.60805@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 23 Mar 2011 21:28:26 -0600
+Subject: [PATCH 5/6] spi/pl022: Add loopback support for the SPI on 5500
+In-Reply-To: <1300874717-14914-1-git-send-email-linus.walleij@stericsson.com>
+References: <1300874717-14914-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110324032826.GB21846@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
->>>> Hi,
->>>>
->>>> some general comments:
->>>> - Why are you not using the existing nand_ids but inventing your own
->>>>
->>>>     database?
->>> The nand_ids{} contains poor information for me.
->>> Such as :
->>> [1]The nand_ids does not have the enough information for the page
->>> size,oob size for some new NANDs.
->>>
->>>      And you can not get the information from parsing the NAND ids, such
->>>
->>> as some Micron NANDs.
->> You could use it for the standard chips where you do not need
->> additional information. That way most NAND chips could be supported
->> out of the box without having to modify the driver.
->>
->>> [2]I need the timing information of the NAND. The nand_ids DOES not have
->>> it. I have to
->>>
->>>      read the datasheet of the NAND, and add it to my database.
->> Do we really need exact timing data for each individual chip?
->> Or couldn't we live with some sane timing that works for most chips
->> and provide some means to specify a different timing via
->> platform_data?
-> I suppose this is the way it should be done, but then you might some need some
-> sort of NAND detection available before registering the driver. Eventually,
-> the bootloader might have configured the appropriate timings already.
-The bootloader does not set it.
-> Have you considered using ONFI chips? They have standard timings at least.
->
-The imx23/imx28 do not support ONFI chips in the DDR mode due to the 
-hardware limits.
-The the imx508 does support the ONFI and TOGGLE nand in the DDR mode.
+On Wed, Mar 23, 2011 at 11:05:16AM +0100, Linus Walleij wrote:
+> From: Philippe Langlais <philippe.langlais@linaro.org>
+> 
+> Extend the vendor data with a loopback field, and add new
+> amba-pl022 vendor data for the DB5500 pl023, as the pl023
+> on db8500 and db5500 vary.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Prajadevi H <prajadevi.h@stericsson.com>
+> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
+Applied, thanks.
 
-Best Regards
-Huang Shijie
+g.
+
+> ---
+>  drivers/spi/amba-pl022.c |   20 +++++++++++++++++++-
+>  1 files changed, 19 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+> index 95e58c7..fe79773 100644
+> --- a/drivers/spi/amba-pl022.c
+> +++ b/drivers/spi/amba-pl022.c
+> @@ -324,6 +324,7 @@ struct vendor_data {
+>  	bool unidir;
+>  	bool extended_cr;
+>  	bool pl023;
+> +	bool loopback;
+>  };
+>  
+>  /**
+> @@ -1984,7 +1985,7 @@ static int pl022_setup(struct spi_device *spi)
+>  
+>  	SSP_WRITE_BITS(chip->cr0, clk_freq.scr, SSP_CR0_MASK_SCR, 8);
+>  	/* Loopback is available on all versions except PL023 */
+> -	if (!pl022->vendor->pl023) {
+> +	if (pl022->vendor->loopback) {
+>  		if (spi->mode & SPI_LOOP)
+>  			tmp = LOOPBACK_ENABLED;
+>  		else
+> @@ -2228,6 +2229,7 @@ static struct vendor_data vendor_arm = {
+>  	.unidir = false,
+>  	.extended_cr = false,
+>  	.pl023 = false,
+> +	.loopback = true,
+>  };
+>  
+>  
+> @@ -2237,6 +2239,7 @@ static struct vendor_data vendor_st = {
+>  	.unidir = false,
+>  	.extended_cr = true,
+>  	.pl023 = false,
+> +	.loopback = true,
+>  };
+>  
+>  static struct vendor_data vendor_st_pl023 = {
+> @@ -2245,6 +2248,16 @@ static struct vendor_data vendor_st_pl023 = {
+>  	.unidir = false,
+>  	.extended_cr = true,
+>  	.pl023 = true,
+> +	.loopback = false,
+> +};
+> +
+> +static struct vendor_data vendor_db5500_pl023 = {
+> +	.fifodepth = 32,
+> +	.max_bpw = 32,
+> +	.unidir = false,
+> +	.extended_cr = true,
+> +	.pl023 = true,
+> +	.loopback = true,
+>  };
+>  
+>  static struct amba_id pl022_ids[] = {
+> @@ -2278,6 +2291,11 @@ static struct amba_id pl022_ids[] = {
+>  		.mask   = 0xffffffff,
+>  		.data   = &vendor_st_pl023,
+>  	},
+> +	{
+> +		.id	= 0x10080023,
+> +		.mask	= 0xffffffff,
+> +		.data	= &vendor_db5500_pl023,
+> +	},
+>  	{ 0, 0 },
+>  };
+>  
+> -- 
+> 1.7.3.2
+> 
