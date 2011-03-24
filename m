@@ -1,28 +1,62 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 24 Mar 2011 15:49:05 -0700
-Subject: [PATCH 0/2] Fix resource size miscalculations
-In-Reply-To: <cover.1300909445.git.joe@perches.com>
-References: <cover.1300909445.git.joe@perches.com>
-Message-ID: <1301006945.29444.15.camel@Joe-Laptop>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 24 Mar 2011 18:47:49 -0400
+Subject: [PATCH] arm: mmci: Add ARM variant with extended FIFO
+In-Reply-To: <1299863887-15490-1-git-send-email-pawel.moll@arm.com> (Pawel
+	Moll's message of "Fri, 11 Mar 2011 17:18:07 +0000")
+References: <1299863887-15490-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <m3zkokm8yy.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-23 at 12:55 -0700, Joe Perches wrote:
-> Use resource_size a few places
+Hi Pawel,
 
-Perhaps this relatively common error is too common.
-It seems to be poor style.  A possible better style for
-struct resource uses could be inline function(s) like:
+On Fri, Mar 11 2011, Pawel Moll wrote:
+> New IO FPGA implementation for Versatile Express boards contain
+> MMCI (PL180) cell with FIFO extended to 128 words (512 bytes).
+>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/mmc/host/mmci.c |   13 ++++++++++++-
+>  1 files changed, 12 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 2d6de3e..e7197b0 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -66,6 +66,12 @@ static struct variant_data variant_arm = {
+>  	.datalength_bits	= 16,
+>  };
+>  
+> +static struct variant_data variant_arm_extended_fifo = {
+> +	.fifosize		= 128 * 4,
+> +	.fifohalfsize		= 64 * 4,
+> +	.datalength_bits	= 16,
+> +};
+> +
+>  static struct variant_data variant_u300 = {
+>  	.fifosize		= 16 * 4,
+>  	.fifohalfsize		= 8 * 4,
+> @@ -1019,10 +1025,15 @@ static int mmci_resume(struct amba_device *dev)
+>  static struct amba_id mmci_ids[] = {
+>  	{
+>  		.id	= 0x00041180,
+> -		.mask	= 0x000fffff,
+> +		.mask	= 0xff0fffff,
+>  		.data	= &variant_arm,
+>  	},
+>  	{
+> +		.id	= 0x01041180,
+> +		.mask	= 0xff0fffff,
+> +		.data	= &variant_arm_extended_fifo,
+> +	},
+> +	{
+>  		.id	= 0x00041181,
+>  		.mask	= 0x000fffff,
+>  		.data	= &variant_arm,
 
-static inline void __iomem *resource_ioremap(struct resource *r)
-{
-	return ioremap(r->start, resource_size(r));
-}
+Pushed to mmc-next for .39-rc2, thanks.
 
-and maybe
-
-static inline struct resource *
-resource_request_region(struct resource *r, const char *name)
-{
-	return __request_region(&ioport_resource, r->start, resource_size(r), name, 0);
-}
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
