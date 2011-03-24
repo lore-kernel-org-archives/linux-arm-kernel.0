@@ -1,33 +1,144 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 24 Mar 2011 19:27:09 -0400 (EDT)
-Subject: how can I cleanly exclude memory from the kernel memory allocator?
-In-Reply-To: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 24 Mar 2011 16:34:45 -0700
+Subject: [PATCH 1/2] msm: clock: Support dummy clocks
+In-Reply-To: <1301009686-4042-1-git-send-email-sboyd@codeaurora.org>
+References: <1301009686-4042-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1301009686-4042-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Mar 2011, Larry Bassel wrote:
+Implement a dummy clock driver and macro in the spirit of
+CLK_PCOM(). This is useful on targets where a pclk doesn't exist
+and we want to keep drivers sane by providing such clocks.
 
-> I want to (early in system initialization) exclude some
-> contiguous physical memory from one or more memory banks
-> so that it won't be mapped in the normal kernel 1-to-1 mapping
-> (so that it can be mapped uncached, strongly ordered, etc.
-> as needed -- I know that it is forbidden to have a cached
-> and an uncached mapping to the same memory) and so that it
-> won't be freed into the kernel memory allocator (so that
-> it won't fragment and can be allocated using genalloc).
-> 
-> I have tried to find a clean way to do this, but none of
-> the approaches I've considered seem very good:
-> 
-> 1. Add a hook to the memory tag parsing routine to (possibly)
-> change each tag before arm_add_memory() is called,
-> or alter arm_add_memory() itself.
+Change-Id: Iad37f6e5f19052127814934cf7484971fdb4fcda
+Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/Makefile      |    1 +
+ arch/arm/mach-msm/clock-dummy.c |   81 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/clock.h       |   11 +++++
+ 3 files changed, 93 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/clock-dummy.c
 
-There is already a hook for that.  In your machine descriptor you can 
-add a .fixup method to do just that.  See tag_fixup_mem32() in 
-arch/arm/mach-orion5x/common.c for a usage example.
-
-
-Nicolas
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index f641480..e8cc2ee 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,5 +1,6 @@
+ obj-y += io.o idle.o timer.o
+ obj-y += clock.o
++obj-y += clock-dummy.o
+ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
+ 
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
+diff --git a/arch/arm/mach-msm/clock-dummy.c b/arch/arm/mach-msm/clock-dummy.c
+new file mode 100644
+index 0000000..8ae3768
+--- /dev/null
++++ b/arch/arm/mach-msm/clock-dummy.c
+@@ -0,0 +1,81 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "clock.h"
++
++static int dummy_clk_enable(unsigned id)
++{
++	return 0;
++}
++
++static void dummy_clk_disable(unsigned id)
++{
++}
++
++static int dummy_clk_reset(unsigned id, enum clk_reset_action action)
++{
++	return 0;
++}
++
++static int dummy_clk_set_rate(unsigned id, unsigned rate)
++{
++	return 0;
++}
++
++static int dummy_clk_set_min_rate(unsigned id, unsigned rate)
++{
++	return 0;
++}
++
++static int dummy_clk_set_max_rate(unsigned id, unsigned rate)
++{
++	return 0;
++}
++
++static int dummy_clk_set_flags(unsigned id, unsigned flags)
++{
++	return 0;
++}
++
++static unsigned dummy_clk_get_rate(unsigned id)
++{
++	return 0;
++}
++
++static unsigned dummy_clk_is_enabled(unsigned id)
++{
++	return 0;
++}
++
++static long dummy_clk_round_rate(unsigned id, unsigned rate)
++{
++	return rate;
++}
++
++static bool dummy_clk_is_local(unsigned id)
++{
++	return true;
++}
++
++struct clk_ops clk_ops_dummy = {
++	.enable = dummy_clk_enable,
++	.disable = dummy_clk_disable,
++	.reset = dummy_clk_reset,
++	.set_rate = dummy_clk_set_rate,
++	.set_min_rate = dummy_clk_set_min_rate,
++	.set_max_rate = dummy_clk_set_max_rate,
++	.set_flags = dummy_clk_set_flags,
++	.get_rate = dummy_clk_get_rate,
++	.is_enabled = dummy_clk_is_enabled,
++	.round_rate = dummy_clk_round_rate,
++	.is_local = dummy_clk_is_local,
++};
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index 2c007f6..1e62074 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -69,4 +69,15 @@ static inline int __init clock_debug_init(void) { return 0; }
+ static inline int __init clock_debug_add(struct clk *clock) { return 0; }
+ #endif
+ 
++extern struct clk_ops clk_ops_dummy;
++
++#define CLK_DUMMY(clk_name, clk_id, clk_dev) {	\
++	.con_id = clk_name, \
++	.dev_id = clk_dev, \
++	.clk = &(struct clk){ \
++		.dbg_name = #clk_id, \
++		.ops = &clk_ops_dummy, \
++	}, \
++	}
++
+ #endif
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
