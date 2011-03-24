@@ -1,90 +1,129 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 24 Mar 2011 16:11:32 +0000
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-In-Reply-To: <OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
-References: <20110324141826.GA3810@arm.com>
-	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
-Message-ID: <AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Mar 2011 16:22:24 -0000
+Subject: [PATCH v2] ARM: perf: reset counters on all CPUs during
+	initialisation
+In-Reply-To: <1300895204-10544-1-git-send-email-will.deacon@arm.com>
+References: <1300895204-10544-1-git-send-email-will.deacon@arm.com>
+Message-ID: <003b01cbea3f$a93fc8c0$fbbf5a40$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 2:57 PM, Ulrich Weigand
-<Ulrich.Weigand@de.ibm.com> wrote:
-> Dave Martin <dave.martin@linaro.org> wrote:
->
->> ?c) Create a new note type specially for this, and dump the
->> ? ? VFP/NEON regs in there. ?This is closest to the model followed
->> ? ? by ptrace, where PTRACE_GETREGS, PTRACE_GETFPREGS and
->> ? ? PTRAGE_GETVFPREGS are all distinct.
->
-> From a GDB perspective, I'd consider this the preferred solution;
-> there are precedents for this on other platforms (e.g. PowerPC),
-> and there is existing GDB/BFD infrastructure to check for presence/
-> absence of such notes.
->
-> However, we also need to be able to distinguish the various cases:
-> VFPv2 vs. VFPv3-D16 vs. VFPv3-D32 vs. VFPv32-D32+NEON
-> These cause GDB to display/interact with the register set in
-> different ways ...
->
-> To distinguish 16 vs. 32 registers, we can of course simply look
-> at the size of the note. ?But how to detect support for NEON as
-> opposed to plain VFPv32-D32? ?I could think of two ways:
->
-> 1) Have *two* new note types, one for VFP, and one for NEON
+> ARMv7 dictates that the interrupt-enable and count-enable registers for
+> each PMU counter are UNKNOWN following core reset.
+> 
+> This patch adds a new (optional) function pointer to struct arm_pmu for
+> resetting the PMU state during init. The reset function is called on
+> each CPU via an arch_initcall in the generic ARM perf_event code and
+> allows the PMU backend to write sane values to any UNKNOWN registers.
+> 
+> Cc: Jean Pihet <jean.pihet@ti.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Hi Jean, here's the updated patch following the discussion on the list.
+> 
+> Please let me know what you think.
+> 
+> Will
 
-That may not make sense, since really it's a single register file
-shared by VFP and NEON.  With NEON, you always have 32 x 64-bit regs,
-but it's possible (although rare) to have this many regs on ARMv7 even
-if NEON is absent.
-
-> 2) Have GDB look into the AT_HWCAP setting in the NT_AUXV note
->
-> Option 2) seems preferable to me, since NT_AUXV is already there,
-> and it can also be used to detect the integer-only NEON case.
-
-We could also dump the relevant hardware capability registers, which
-can be more informative, though I'm in two minds about whether this is
-appropriate / beneficial.  A layout something like this might work:
-
-NT_VFPREGSET*
-
-    unsigned long flags;
-    unsigned long feature_registers[3];
-    unsigned long fpscr;
-    unsigned long long regs[16 or 32];
-
-There are currently 3 relevant feature registers, the main
-floating-point ID register FPSID, and the floating-point / SIMD
-feature registers MVFR0, MVFR1.
-
-In either case, we define the contents of the flags field in such a
-way as to allow gdb to understand the format, and to allow for future
-expansion if this is ever needed.
-
-(*The note types seem to use different names in linux/elf.h compared
-with /usr/include/elf.h and GDB.  I've followed the outside world's
-convention here.)
-
-Does this look workable?
-
----Dave
-
->
-> Thoughts?
->
->
-> Mit freundlichen Gruessen / Best Regards
->
-> Ulrich Weigand
->
+Resending with correct email address for Jean...
+ 
+>  arch/arm/kernel/perf_event.c    |   14 ++++++++++++++
+>  arch/arm/kernel/perf_event_v7.c |   22 ++++++++++++++++------
+>  2 files changed, 30 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 53f6068..b23a364 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -79,6 +79,7 @@ struct arm_pmu {
+>  	void		(*write_counter)(int idx, u32 val);
+>  	void		(*start)(void);
+>  	void		(*stop)(void);
+> +	void		(*reset)(void *);
+>  	const unsigned	(*cache_map)[PERF_COUNT_HW_CACHE_MAX]
+>  				    [PERF_COUNT_HW_CACHE_OP_MAX]
+>  				    [PERF_COUNT_HW_CACHE_RESULT_MAX];
+> @@ -612,6 +613,19 @@ static struct pmu pmu = {
+>  #include "perf_event_v6.c"
+>  #include "perf_event_v7.c"
+> 
+> +/*
+> + * Ensure the PMU has sane values out of reset.
+> + * This requires SMP to be available, so exists as a separate initcall.
+> + */
+> +static int __init
+> +armpmu_reset(void)
+> +{
+> +	if (armpmu && armpmu->reset)
+> +		return on_each_cpu(armpmu->reset, NULL, 1);
+> +	return 0;
+> +}
+> +arch_initcall(armpmu_reset);
+> +
+>  static int __init
+>  init_hw_perf_events(void)
+>  {
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index 2aa83c2..4960686 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -849,6 +849,18 @@ static int armv7pmu_get_event_idx(struct cpu_hw_events *cpuc,
+>  	}
+>  }
+> 
+> +static void armv7pmu_reset(void *info)
+> +{
+> +	u32 idx, nb_cnt = armpmu->num_events;
+> +
+> +	/* The counter and interrupt enable registers are unknown at reset. */
+> +	for (idx = 1; idx < nb_cnt; ++idx)
+> +		armv7pmu_disable_event(NULL, idx);
+> +
+> +	/* Initialize & Reset PMNC: C and P bits */
+> +	armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
+> +}
+> +
+>  static struct arm_pmu armv7pmu = {
+>  	.handle_irq		= armv7pmu_handle_irq,
+>  	.enable			= armv7pmu_enable_event,
+> @@ -858,17 +870,15 @@ static struct arm_pmu armv7pmu = {
+>  	.get_event_idx		= armv7pmu_get_event_idx,
+>  	.start			= armv7pmu_start,
+>  	.stop			= armv7pmu_stop,
+> +	.reset			= armv7pmu_reset,
+>  	.raw_event_mask		= 0xFF,
+>  	.max_period		= (1LLU << 32) - 1,
+>  };
+> 
+> -static u32 __init armv7_reset_read_pmnc(void)
+> +static u32 __init armv7_read_num_pmnc_events(void)
+>  {
+>  	u32 nb_cnt;
+> 
+> -	/* Initialize & Reset PMNC: C and P bits */
+> -	armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
+> -
+>  	/* Read the nb of CNTx counters supported from PMNC */
+>  	nb_cnt = (armv7_pmnc_read() >> ARMV7_PMNC_N_SHIFT) & ARMV7_PMNC_N_MASK;
+> 
+> @@ -882,7 +892,7 @@ static const struct arm_pmu *__init armv7_a8_pmu_init(void)
+>  	armv7pmu.name		= "ARMv7 Cortex-A8";
+>  	armv7pmu.cache_map	= &armv7_a8_perf_cache_map;
+>  	armv7pmu.event_map	= &armv7_a8_perf_map;
+> -	armv7pmu.num_events	= armv7_reset_read_pmnc();
+> +	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+>  	return &armv7pmu;
+>  }
+> 
+> @@ -892,7 +902,7 @@ static const struct arm_pmu *__init armv7_a9_pmu_init(void)
+>  	armv7pmu.name		= "ARMv7 Cortex-A9";
+>  	armv7pmu.cache_map	= &armv7_a9_perf_cache_map;
+>  	armv7pmu.event_map	= &armv7_a9_perf_map;
+> -	armv7pmu.num_events	= armv7_reset_read_pmnc();
+> +	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+>  	return &armv7pmu;
+>  }
+>  #else
 > --
-> ?Dr. Ulrich Weigand | Phone: +49-7031/16-3727
-> ?STSM, GNU compiler and toolchain for Linux on System z and Cell/B.E.
-> ?IBM Deutschland Research & Development GmbH
-> ?Vorsitzender des Aufsichtsrats: Martin Jetter | Gesch?ftsf?hrung: Dirk
-> Wittkopp
-> ?Sitz der Gesellschaft: B?blingen | Registergericht: Amtsgericht
-> Stuttgart, HRB 243294
->
->
+> 1.7.0.4
