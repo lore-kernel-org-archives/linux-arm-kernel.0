@@ -1,67 +1,52 @@
-From: dilinger@queued.net (Andres Salomon)
-Date: Thu, 24 Mar 2011 13:27:30 -0700
-Subject: [PATCH] ARM: mx51_efika: update platform data for new mfd changes
-In-Reply-To: <20110307085358.GM29521@pengutronix.de>
-References: <20110304080653.3f2c3f19@debxo>
-	<20110307085358.GM29521@pengutronix.de>
-Message-ID: <20110324132730.443e045b@queued.net>
+From: andy@warmcat.com (Andy Green)
+Date: Thu, 24 Mar 2011 21:27:20 +0000
+Subject: [RFC PATCH 0/2] OMAP2+: PANDA: Provide unique-ish MAC addresses for
+	Ethernet and WLAN interfaces
+Message-ID: <20110324211451.14936.39750.stgit@otae.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Mar 2011 09:53:58 +0100
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+The following series solves a problem Panda suffers from where
+because there is no local MAC address storage on the board, a
+new random MAC address is applied to the onboard Ethernet
+interface each time, and the wl12xx module's wlan0 interface is
+always found with an unworkable 00:00:00:00:00:00 MAC.
 
-> On Fri, Mar 04, 2011 at 08:06:53AM -0800, Andres Salomon wrote:
-> > Note that this relies on stuff currently in mfd's next tree, but
-> > this is also a newer driver.  I'm not sure which tree it should go
-> > through, as it's a problem that shows up in next.
-> 
-> Please ping me again when the mfd tree is in Linus master. I see no
-> other chance fixing this on my side other than removing regulator
-> support for efika completely for now. So I guess you have to live with
-> the compile breakage for some time.
+The series adds an omap id-related API to generate a
+6-byte Ethernet MAC address from "hashing" a little the CPU ID
+registers.  It is understood from TI that these contain data
+that at least in a subset of the 128 bits of the ID are unique per-CPU.
 
-FYI, the mfd changes are now in Linus master, so this patch should
-probably be applied.
+It then introduces code in the Panda board definition file to
+watch network interface creation and if the device's path is on
+a list, set its MAC address to the CPU ID-generated one, plus
+two bits which differ according to which interface in the list
+is being changed.  (This scheme was suggested by Alan Cox).
+
+The device paths for the onboard Ethernet smsc95xx, and the
+onboard WLAN wl12xx are listed, so both of these will get
+assigned a consistent, unique-ish locally administered MAC
+address with these patches.
+
+It's beleived the current scheme for MAC generation from ID
+data captures most of the entropy, but if there is a better scheme
+more closely mapped to what the unique factory areas are advice
+is welcome.
+
+The patches are against linux-omap which already has a prerequisite
+patch that fixes a problem with device ID capture on OMAP4.
+
+---
+
+Andy Green (2):
+      OMAP2+: PANDA: Fix up random or missing MAC addresses for eth0 and wlan0
+      OMAP2+: add cpu id register to MAC address helper
 
 
-> 
-> Sascha
-> 
-> > 
-> > 
-> > 
-> > From: Andres Salomon <dilinger@queued.net>
-> > 
-> > MFD changes in c738892f cause the mc13xxx_platform_data struct
-> > to change.  This changes one more (new) user of it, fixing a build
-> > error.
-> > 
-> > Signed-off-by: Andres Salomon <dilinger@queued.net>
-> > ---
-> >  arch/arm/mach-mx5/mx51_efika.c |    6 ++++--
-> >  1 files changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx5/mx51_efika.c
-> > b/arch/arm/mach-mx5/mx51_efika.c index 74991c9..6451fb4 100644
-> > --- a/arch/arm/mach-mx5/mx51_efika.c
-> > +++ b/arch/arm/mach-mx5/mx51_efika.c
-> > @@ -572,8 +572,10 @@ static struct mc13xxx_regulator_init_data
-> > mx51_efika_regulators[] = { 
-> >  static struct mc13xxx_platform_data mx51_efika_mc13892_data = {
-> >  	.flags = MC13XXX_USE_RTC | MC13XXX_USE_REGULATOR,
-> > -	.num_regulators = ARRAY_SIZE(mx51_efika_regulators),
-> > -	.regulators = mx51_efika_regulators,
-> > +	.regulators = {
-> > +		.num_regulators =
-> > ARRAY_SIZE(mx51_efika_regulators),
-> > +		.regulators = mx51_efika_regulators,
-> > +	},
-> >  };
-> >  
-> >  static struct spi_board_info mx51_efika_spi_board_info[]
-> > __initdata = { -- 
-> > 1.7.2.3
-> > 
-> > 
-> 
+ arch/arm/mach-omap2/board-omap4panda.c |   91 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/id.c               |   39 ++++++++++++++
+ arch/arm/mach-omap2/include/mach/id.h  |    1 
+ 3 files changed, 131 insertions(+), 0 deletions(-)
+
+-- 
+Signature
