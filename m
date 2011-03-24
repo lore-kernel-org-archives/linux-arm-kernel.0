@@ -1,103 +1,37 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 24 Mar 2011 16:04:26 +0300
-Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
-References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
-	<4D89E308.8060404@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
-Message-ID: <4D8B415A.2050706@mvista.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Thu, 24 Mar 2011 18:46:22 +0530
+Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
+In-Reply-To: <4D776B05.4010506@pengutronix.de>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
+	<1299592667-21367-2-git-send-email-subhasish@mistralsolutions.com>
+	<4D776B05.4010506@pengutronix.de>
+Message-ID: <384BC720F8C741B886DC000F067EBA20@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello,
 
-On 24-03-2011 12:08, Nori, Sekhar wrote:
+> A device may be de-initialized and another loaded or two different devices
+> can be run simultaneously on the two cores.
+> It's also possible, as in our case, to implement a single device on both
+> the PRU's resulting in improved load sharing.
 
->>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->>> index 68fe4c2..276199d 100644
->>> --- a/arch/arm/mach-davinci/da850.c
->>> +++ b/arch/arm/mach-davinci/da850.c
->>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
->>>    	.flags		= DA850_CLK_ASYNC3,
->>>    };
->>>
->>> +static struct clk sata_clk = {
->>> +	.name		= "sata",
->>> +	.parent		=&pll0_sysclk2,
->>> +	.lpsc		= DA850_LPSC1_SATA,
->>> +	.gpsc		= 1,
->>> +	.flags		= PSC_FORCE,
->>> +};
->>> +
->>>    static struct clk_lookup da850_clks[] = {
->>>    	CLK(NULL,		"ref",		&ref_clk),
->>>    	CLK(NULL,		"pll0",		&pll0_clk),
->>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
->>>    	CLK(NULL,		"usb20",	&usb20_clk),
->>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
->>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
->>> +	CLK("ahci",		NULL,		&sata_clk),
->>>    	CLK(NULL,		NULL,		NULL),
->>>    };
+>Make you driver compile with sparse "make C=1", you cast way too much
+>when accessing io mem. Use void __iomem * instead of u32 *.
 
->>      I'd put the above into a separate patch...
 
-> Why should addition of clock data not be in the same patch
-> as the one which adds platform resources etc? It is not a big
-> deal to change, but I would like to know why you request this.
+With make C=1 I am receiving some warnings such as:
 
-    I didn't request anything, I just said what I'd have done. :-)
-I think modifying the DA8xx-common and DA850-specific files should better be 
-done separately. Although in this case we're adding DA850 only device, so 
-perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
+warning: cast removes address space of expression
+drivers/mfd/da8xx_pru.c:61:17: warning: incorrect type in argument 1 
+(different base types)
+drivers/mfd/da8xx_pru.c:61:17:    expected void const volatile [noderef] 
+<asn:2>*<noident>
+drivers/mfd/da8xx_pru.c:61:17:    got int
+drivers/mfd/da8xx_pru.c:66:28: warning: incorrect type in argument 1 
+(different address spaces)
 
->>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
->>> index 625d4b6..e061396 100644
->>> --- a/arch/arm/mach-davinci/devices-da8xx.c
->>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
->> [...]
->>> @@ -834,3 +836,139 @@ int __init da8xx_register_spi(int instance, struct spi_board_info *info,
->> [...]
->>> +/* Supported DA850 SATA crystal frequencies */
->>> +#define KHZ_TO_HZ(freq) ((freq) * 1000)
->>> +static unsigned long da850_sata_xtal[] = {
->>> +	KHZ_TO_HZ(300000),
->>> +	KHZ_TO_HZ(250000),
->>> +	0,			/* Reserved */
+I can remove all of these by casting to (__force void  __iomem *) but is 
+this correct.
 
->>      Why reserve a place for it at all?
-
-> Because then this table maps one-to-one to the hardware
-> defined table.
-
-    Ah, sorry, have missed that...
-
->>> +		val = SATA_PHY_MPY(i + 1);
->>> +	}
->>> +
->> [...]
-
->>> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
->>> index e4fc1af..aa6f08e 100644
->>> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
->>> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
->> [...]
->>> @@ -65,6 +66,7 @@ extern unsigned int da850_max_speed;
->>>    #define DA8XX_GPIO_BASE		0x01e26000
->>>    #define DA8XX_PSC1_BASE		0x01e27000
->>>    #define DA8XX_LCD_CNTRL_BASE	0x01e13000
->>> +#define DA850_SATA_BASE		0x01e18000
-
->>      It's used only in devices-da8xx.c -- shouldn't it be declared there?
-
-> Yes, will move. Base addresses for modules like LCD and MMCSD can be
-> moved as well - should be subject of some future clean-up patch.
-
-    Yes, maybe I'll submit one...
-
-> Thanks,
-> Sekhar
-
-WBR, Sergei
+-SG 
