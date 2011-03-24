@@ -1,65 +1,69 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 24 Mar 2011 21:01:57 +0300
-Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
-References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
-	<4D89E308.8060404@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
-	<4D8B415A.2050706@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
-Message-ID: <4D8B8715.2000407@mvista.com>
+From: Ulrich.Weigand@de.ibm.com (Ulrich Weigand)
+Date: Thu, 24 Mar 2011 19:11:16 +0100
+Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
+In-Reply-To: <AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>
+References: <20110324141826.GA3810@arm.com>	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
+	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
+	<AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>
+Message-ID: <OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dave Martin <dave.martin@linaro.org> wrote:
+> On Thu, Mar 24, 2011 at 4:40 PM, Ulrich Weigand
+<Ulrich.Weigand@de.ibm.com> wrote:
+> > I would prefer to keep the contents of NT_VFPREGSET identical to the
+> > contents of the PTRACE_GETVPFREGS/PTRACE_SETVPFREGS buffer:
+> >
+> > - This would allow implementation via the new generic user_regset_view
+> > ?mechanism (which the ARM kernel doesn't use yet, but probably should)
+> >
+> > - In any case, GDB likes to have the same set of information available
+> > ?when debugging core files and native targets
+> >
+> > So if there is indeed additional information that would be interesting,
+> > I'd argue this should be presented as a *new* core file note, *and* as
+> > a new set of PTRACE_... APIs. ? (But for GDB's purpose NT_AUXV right
+> > now is sufficent. ?Everything else could be displayed to the user if
+> > of interest.)
+>
+> OK, that sounds reasonable.
+>
+> If I'm reading the kernel code correctly, the size of the data
+> returned by PTRACE_GETVFPREGS is already dependent on the number of
+> registers (D16/D32) implemented by the hardware, and this is
+> determinable from the auxv contents; so I guess we don't have a new
+> problem to solve here.
+>
+> The other info can always be added in a later pass, if it looks like
+> it would be useful...
 
-Nori, Sekhar wrote:
+OK, agreed.
 
->>>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->>>>> index 68fe4c2..276199d 100644
->>>>> --- a/arch/arm/mach-davinci/da850.c
->>>>> +++ b/arch/arm/mach-davinci/da850.c
->>>>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
->>>>>    	.flags		= DA850_CLK_ASYNC3,
->>>>>    };
->>>>>
->>>>> +static struct clk sata_clk = {
->>>>> +	.name		= "sata",
->>>>> +	.parent		=&pll0_sysclk2,
->>>>> +	.lpsc		= DA850_LPSC1_SATA,
->>>>> +	.gpsc		= 1,
->>>>> +	.flags		= PSC_FORCE,
->>>>> +};
->>>>> +
->>>>>    static struct clk_lookup da850_clks[] = {
->>>>>    	CLK(NULL,		"ref",		&ref_clk),
->>>>>    	CLK(NULL,		"pll0",		&pll0_clk),
->>>>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
->>>>>    	CLK(NULL,		"usb20",	&usb20_clk),
->>>>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
->>>>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
->>>>> +	CLK("ahci",		NULL,		&sata_clk),
->>>>>    	CLK(NULL,		NULL,		NULL),
->>>>>    };
+So to summarize: the kernel will write additional note sections as if
+generated via user_regset_view, containing the PTRACE_GETVFPREGS data.
 
->>>>      I'd put the above into a separate patch...
+Note name: "LINUX"
+Note type: t.b.d. [*]
 
->>> Why should addition of clock data not be in the same patch
->>> as the one which adds platform resources etc? It is not a big
->>> deal to change, but I would like to know why you request this.
+[*] Looking at elf.h a logical name/value might be:
 
->>     I didn't request anything, I just said what I'd have done. :-)
+#define NT_ARM_VFP            0x400		/* ARM VFP/NEON registers */
 
-> Okay. I guess I will keep it as is.
 
->> I think modifying the DA8xx-common and DA850-specific files should better be 
->> done separately. Although in this case we're adding DA850 only device, so 
->> perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
+GDB support along those lines ought to be straightforward.
 
-> Good point. Will add the #ifdef.
 
-    Or perhaps the device should just be placed in da850.c instead?
 
-WBR, Sergei
+Mit freundlichen Gruessen / Best Regards
+
+Ulrich Weigand
+
+--
+  Dr. Ulrich Weigand | Phone: +49-7031/16-3727
+  STSM, GNU compiler and toolchain for Linux on System z and Cell/B.E.
+  IBM Deutschland Research & Development GmbH
+  Vorsitzender des Aufsichtsrats: Martin Jetter | Gesch?ftsf?hrung: Dirk
+Wittkopp
+  Sitz der Gesellschaft: B?blingen | Registergericht: Amtsgericht
+Stuttgart, HRB 243294
