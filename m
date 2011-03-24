@@ -1,70 +1,103 @@
-From: b29396@freescale.com (Aisheng.Dong)
-Date: Thu, 24 Mar 2011 19:16:40 +0800
-Subject: [PATCH 1/1] ARM: dmabounce: fix dmabounce may cause crash issue
-Message-ID: <1300965400-28304-1-git-send-email-b29396@freescale.com>
+From: arno.steffen@googlemail.com (Arno Steffen)
+Date: Thu, 24 Mar 2011 12:56:48 +0100
+Subject: IRQ handler under load - slow response
+In-Reply-To: <20110314144715.GH333@e-circ.dyndns.org>
+References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+	<20110309152252.GB333@e-circ.dyndns.org>
+	<AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
+	<20110314144715.GH333@e-circ.dyndns.org>
+Message-ID: <AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The map_single does not check if dev is NULL which may cause kernel panic
-like follows:
-Unable to handle kernel NULL pointer dereference at virtual address 000000bc
-pgd = 80004000
-[000000bc] *pgd=00000000
-Internal error: Oops: 5 [#1] PREEMPT
-last sysfs file:
-Modules linked in:
-CPU: 0    Not tainted  (2.6.35.3-00845-g204c152-dirty #112)
-PC is at dma_map_single+0x2c/0x2a0
-LR is at fec_enet_interrupt+0x1d4/0x450
-pc : [<8003cf04>]    lr : [<802936b8>]    psr: 60000193
-sp : 80809ec8  ip : 00000080  fp : 99308040
-r10: 99308040  r9 : 00000002  r8 : 99074f00
-r7 : fa0a5000  r6 : 00000000  r5 : 00000060  r4 : 992e4000
-r3 : 00000002  r2 : 8080cac0  r1 : 99308040  r0 : 00000000
+2011/3/14 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+> On Mon, Mar 14, 2011 at 02:26:35PM +0100, Arno Steffen wrote:
+>>
+>> Sorry for delay with resonse.
+> No problem.
+>> Thanks for your help. Most of this options for ps doesn't work on my
+>> busybox embedded system.
+> Yep, we use a regular ps for that.
+>> Also chrt is not implemented currently. But that inspired me to
+> try a program with sched_setscheduler(2)
+>> another idea. I just announced the irqs in a sperate process:
+>> Is this what you proposed in b) ?
+>>
+>> ? ? ? i = fork();
+>> ? ? ? if (i == 0) {
+>> ? ? ? ? ? ? ? printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
+>> ? ? ? ? ? ? ? setpriority(PRIO_PROCESS, getpid(), -10);
+>> ? ? ? ? ? ? ? printf("Prio IRQ %d\n",getpriority(PRIO_PROCESS, getpid()));
+>> ? ? ? ? ? ? ? gpio_irq_setup(GPI_IN1, GPIOCFG_FALLINGDETECT_INTR, &irq_handler);
+>> ? ? ? ? ? ? ? gpio_irq_setup(GPI_IN2, GPIOCFG_RISINGDETECT_INTR, &irq_handler );
+>> ? ? ? ? ? ? ? printf("all IRQ handlers are setup !\n");
+>> ? ? ? ? ? ? ? do {sleep(1);} while(1);
+>> ? ? ? ? ? ? ? exit(0);
+>> ? ? ? }
+> Euhm, my proposed b) deals in kernel. I think your example is in userspace?
+> Maybe I don't understand your precise setup well.
+>
+> Anyway, what I meant was something in kernel like:
+> ?s32Status = request_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GpioIrqHandler,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GpioIrqThread,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "GPIOINTR",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? NULL);
+>
+> static irqreturn_t GpioIrqHandler (int irq, void *dev_id)
+> {
+> ? ?int s32GpioNumber = 0 ;
+> ? ?s32GpioNumber = irq - IH_GPIO_BASE;
+> ? ?set_bit (s32GpioNumber , (volatile unsigned long *) &gsts32GpioIrqStatus);
+> - ? tasklet_schedule (&GpioTasklet);
+> - ? return IRQ_HANDLED;
+> + ? return IRQ_WAKE_THREAD;
+> }
+>
+> -DECLARE_TASKLET(GpioTasklet, GpioIntrTasklet, 0);
+> static irqreturn_t GpioIrqThread(int irq, void *dev_id)
+> {
+> ? ? ? ?/* do whatever the tasklet was supposed to do */
+> }
+>
 
-The patch checks the dev to avoid this issue and align with the
-original dma_map_single to allow dev is NULL.
+Dear Kurt,
+I did as you proposed, but doesn't have the big picture
 
-Signed-off-by: Aisheng.Dong <b29396@freescale.com>
-Signed-off-by: Jason.Liu <r64343@freescale.com>
----
- arch/arm/common/dmabounce.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+I think there is a typo in your request_irq change:
+s32Status = request_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
+ -                                     GpioIrqHandler,
++                                     GpioIrqThread,
+                                    0,
+                                     "GPIOINTR",
+                                     NULL);
+Is this what you mean? What you have suggested is replacing a flag by
+a pointer - this cannot work. I can't see how  GpioIrqHandler and
+GpioIrqThread are connected now.
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index e568163..8b575ef 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -222,16 +222,19 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
- static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- 		enum dma_data_direction dir)
- {
--	struct dmabounce_device_info *device_info = dev->archdata.dmabounce;
-+	struct dmabounce_device_info *device_info;
- 	dma_addr_t dma_addr;
- 	int needs_bounce = 0;
- 
-+	if (dev)
-+		device_info = dev->archdata.dmabounce;
-+
- 	if (device_info)
- 		DO_STATS ( device_info->map_op_count++ );
- 
- 	dma_addr = virt_to_dma(dev, ptr);
- 
--	if (dev->dma_mask) {
-+	if (dev && dev->dma_mask) {
- 		unsigned long mask = *dev->dma_mask;
- 		unsigned long limit;
- 
-@@ -248,7 +251,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
- 		needs_bounce = (dma_addr | (dma_addr + size - 1)) & ~mask;
- 	}
- 
--	if (device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
-+	if (dev && device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
- 		struct safe_buffer *buf;
- 
- 		buf = alloc_safe_buffer(device_info, ptr, size, dir);
--- 
-1.7.0.4
+> no, you get a seperate kernel thread that you can play with (chrt etc.).
+
+I am not sure this help. The kernel thread might become a higher
+proirity, but what has to be improved is that the IRQ-routine in user
+space is responding faster.
+
+>
+>>
+>> This helps me reducing the delay to 2ms. Not very fast, but much
+>> better than before.
+> I was not aware of that there was a userspace process involved.
+> setting that process to SCHED_RR too (together with the kernel thread when applicable)
+> is a good idea.
+>
+>> Setting the priority doesn't have any effect by the way.
+> Yep, SCHED_RR or SCHED_FIFO will do.
+>>
+>> Best regards
+>> Arno
+>
+
+Does it make sense to send you the hole code? I am afraid that there
+is to much potential for misunderstanding. But I won't bother your.
+Best regards
+Arno
