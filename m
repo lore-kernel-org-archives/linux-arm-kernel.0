@@ -1,147 +1,53 @@
-From: andy@warmcat.com (Andy Green)
-Date: Thu, 24 Mar 2011 21:27:38 +0000
-Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC addresses
-	for eth0 and wlan0
-In-Reply-To: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-Message-ID: <20110324212737.14936.21228.stgit@otae.warmcat.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Thu, 24 Mar 2011 15:18:54 -0700
+Subject: how can I cleanly exclude memory from the kernel memory allocator?
+Message-ID: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers a network device notifier callback to set the mac
-addresses for the onboard network assets of Panda correctly, despite the
-drivers involved have used a random or all-zeros MAC address.
+I want to (early in system initialization) exclude some
+contiguous physical memory from one or more memory banks
+so that it won't be mapped in the normal kernel 1-to-1 mapping
+(so that it can be mapped uncached, strongly ordered, etc.
+as needed -- I know that it is forbidden to have a cached
+and an uncached mapping to the same memory) and so that it
+won't be freed into the kernel memory allocator (so that
+it won't fragment and can be allocated using genalloc).
 
-The technique was suggested by Alan Cox on lkml.
+I have tried to find a clean way to do this, but none of
+the approaches I've considered seem very good:
 
-It works by device path so it corrects the MAC addresses even if the
-drivers are in modules loaded in an order that changes their interface
-name from usual (eg, the onboard module might be "wlan1" if there is a
-USB wireless stick plugged in and its module is inserted first.)
+1. Add a hook to the memory tag parsing routine to (possibly)
+change each tag before arm_add_memory() is called,
+or alter arm_add_memory() itself.
+2. Add a hook at the beginning of paging_init() to inspect
+and alter the meminfo memory bank starts and sizes as needed.
+3. Wait until after the memory is added to the normal
+kernel memory pool and somehow get it back out
+(I can't use alloc_bootmem() or related functionality of course
+since then the memory will be part of the cached kernel 1-to-1 1M
+page mapping, precluding use of ioremap() on it).
 
-Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
-Signed-off-by: Andy Green <andy.green@linaro.org>
----
+A further drawback for #1 is that I'd really like to
+see all of the available memory banks before deciding which
+memory to steal (we often have multiple memory banks on
+our platforms).
 
- arch/arm/mach-omap2/board-omap4panda.c |   91 ++++++++++++++++++++++++++++++++
- 1 files changed, 91 insertions(+), 0 deletions(-)
+Perhaps there is a solution for this problem that already exists
+that I'm unaware of (or at least community consensus about how
+one should add this functionality).
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 80b8860..0b92873 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -28,9 +28,12 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- #include <linux/wl12xx.h>
-+#include <linux/netdevice.h>
-+#include <linux/if_ether.h>
- 
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
-+#include <mach/id.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -506,6 +509,92 @@ static inline void board_serial_init(void)
- }
- #endif
- 
-+/*
-+ * These device paths represent the onboard USB <-> Ethernet bridge, and
-+ * the WLAN module on Panda, both of which need their random or all-zeros
-+ * mac address replacing with a per-cpu stable generated one
-+ */
-+
-+static const char * const panda_fixup_mac_device_paths[] = {
-+	"usb1/1-1/1-1.1/1-1.1:1.0",
-+	"mmc1:0001:2",
-+};
-+
-+static int panda_device_path_need_mac(struct device *dev)
-+{
-+	const char **try = panda_fixup_mac_device_paths;
-+	const char *path;
-+	int count = ARRAY_SIZE(panda_fixup_mac_device_paths);
-+	const char *p;
-+	int len;
-+	struct device *devn;
-+
-+	while (count--) {
-+
-+		p = *try + strlen(*try);
-+		devn = dev;
-+
-+		while (devn) {
-+
-+			path = dev_name(devn);
-+			len = strlen(path);
-+
-+			if ((p - *try) < len) {
-+				devn = NULL;
-+				continue;
-+			}
-+
-+			p -= len;
-+
-+			if (strncmp(path, p, len)) {
-+				devn = NULL;
-+				continue;
-+			}
-+
-+			devn = devn->parent;
-+			if (p == *try)
-+				return count;
-+
-+			if (devn != NULL && (p - *try) < 2)
-+				devn = NULL;
-+
-+			p--;
-+			if (devn != NULL && *p != '/')
-+				devn = NULL;
-+		}
-+
-+		try++;
-+	}
-+
-+	return -ENOENT;
-+}
-+
-+static int omap_panda_netdev_event(struct notifier_block *this,
-+						 unsigned long event, void *ptr)
-+{
-+	struct net_device *dev = ptr;
-+	struct sockaddr sa;
-+	int n;
-+
-+	if (event != NETDEV_REGISTER)
-+		return NOTIFY_DONE;
-+
-+	n = panda_device_path_need_mac(dev->dev.parent);
-+	if (n >= 0) {
-+		sa.sa_family = dev->type;
-+		omap2_die_id_to_ethernet_mac(sa.sa_data, n);
-+		dev->netdev_ops->ndo_set_mac_address(dev, &sa);
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block omap_panda_netdev_notifier = {
-+	.notifier_call = omap_panda_netdev_event,
-+	.priority = 1,
-+};
-+
-+
- static void __init omap4_panda_init(void)
- {
- 	int package = OMAP_PACKAGE_CBS;
-@@ -517,6 +606,8 @@ static void __init omap4_panda_init(void)
- 	if (wl12xx_set_platform_data(&omap_panda_wlan_data))
- 		pr_err("error setting wl12xx data\n");
- 
-+	register_netdevice_notifier(&omap_panda_netdev_notifier);
-+
- 	omap4_panda_i2c_init();
- 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
- 	platform_device_register(&omap_vwlan_device);
+I believe Russell King has stated that he intends
+to carve out memory that can be used for dma_alloc_coherent(),
+that won't be mapped otherwise by the kernel.
+
+I'd like to know how he is planning to do this, as I could hopefully
+do something similar.
+
+Thanks.
+
+Larry Bassel
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
