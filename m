@@ -1,37 +1,32 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 24 Mar 2011 18:35:32 +0200
-Subject: [PATCH 3/6] arm: mach-omap2: smartreflex: request the memory region
+Date: Thu, 24 Mar 2011 18:35:31 +0200
+Subject: [PATCH 2/6] arm: mach-omap2: smartreflex: fix sr_late_init() error
+	path in probe
 In-Reply-To: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>
 References: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1300984535-10530-3-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <1300984535-10530-2-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are releasing the memory region, but never actually request it.
+sr_late_init() will take care of freeing the resources.
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 6dfc8db..81bd5ed 100644
+index 8f674c9..6dfc8db 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -847,6 +847,14 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		goto err_free_devinfo;
+@@ -883,7 +883,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 		ret = sr_late_init(sr_info);
+ 		if (ret) {
+ 			pr_warning("%s: Error in SR late init\n", __func__);
+-			goto err_release_region;
++			return ret;
+ 		}
  	}
  
-+	mem = request_mem_region(mem->start, resource_size(mem),
-+					dev_name(&pdev->dev));
-+	if (!mem) {
-+		dev_err(&pdev->dev, "%s: no mem region\n", __func__);
-+		ret = -EBUSY;
-+		goto err_free_devinfo;
-+	}
-+
- 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 
- 	pm_runtime_enable(&pdev->dev);
 -- 
 1.5.6.5
