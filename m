@@ -1,57 +1,27 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Tue, 22 Mar 2011 13:19:14 -0000
-Subject: Updated mach-types update
-In-Reply-To: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=C3TGRvN+eWLc+C2JHf_XRmc_s8Dp+pnGkO+j2@mail.gmail.com>
+From: R6AAKA@freescale.com (Trivedi Anish-R6AAKA)
+Date: Thu, 24 Mar 2011 16:00:48 -0000
+Subject: Prefetching on Cortex-A8
+Message-ID: <02B259EBC9134A47B143131FCAF2FEA30D6596@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Russell,
 
-On Sun, Mar 20, 2011 at 12:03 PM, Russell King - ARM Linux <
-linux@arm.linux.org.uk> wrote:
+Recently, we encountered a cache coherency issue on a Cortex-A8 based SOC (using DMA on a read from a device to a buffer in memory) on kernel version 2.6.31. After some debugging, we found that to fix the coherency problem we needed to port a patch found in kernel 2.6.35 related to prefetching fix for ARMv6 and v7 platforms that you co-authored:
 
->
-> What this means is that any platform in the machine database which has not
-> been submitted to mainline for 12 months since it was registered will be
-> automatically dropped from the file, and the platform maintainer will need
-> to either talk to me to get it reinstated before submission, or update the
-> entry in some way to 'freshen' it.
->
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=2ffe2da3e71652d4f4cae19539b5c78c2a239136
 
-I think this statement matches the needs of those, like me, are trying to
-add a new board.
-My patch [0] applies but does not build any more. How does it work in this
-case?
+However, according to ARM, Cortex-A8 only performs instruction prefetching, it does not  prefetch data into the cache. I am confused, then, as to why your patch comments that prefetching applies to DMA data. Am I missing something?
 
-I may include a new bit which adds the right entry in mach-types (so that my
-patch is actually
-buildable and testable before inclusion), in taking my patch set then you
-should drop the
-mach-types bit because it will be updated by you script later.
+Secondly, a portion of the v7 cache code is mysterious. In the following file: http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=arch/arm/mm/cache-v7.S;h=bcd64f265870804532dc6012274bca6e398a0622;hb=2ffe2da3e71652d4f4cae19539b5c78c2a239136
+The v7_dma_inv_range function that is part of the patch above does an invalidation of the cache lines with line 230:
 
+mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
 
-> This does have the potential to go wrong if people start randomly changing
-> the format of how they write the MACHINE_START() macro.  If it's not found
-> by:
->
-> grep -rh --exclude=include --include='*.c' MACHINE_START arch/arm |
->  grep -v '^#' | sed "s@[^(]*(\([^,]*\).*@ ('\1')@;2,\$s@^@,@"
->
+However, according to ARM, this only performs a cache line invalidation for L1, it does not invalidate L2 cache lines (there is no invalidate operation for L1 and L2 cache lines, there is only a clean and invalidate if both L1 and L2 cache lines are to be invalidated). So I am wondering how the Linux cache code in ensuring that L2 cache lines are invalidated?
 
-maybe it could be useful to add this regex in the top of mach-types or put
-it in scripts/ so that everybody can validate his/her changes.
-
-anyway I would add some comment in mach-types that explains how the files is
-managed.
-
-thanks,
-Domenico
-
------[ Domenico Andreoli, aka cavok
- --[ http://www.dandreoli.com/gpgkey.asc
-   ---[ 3A0F 2F80 F79C 678A 8936  4FEE 0677 9033 A20E BC50
+Thanks,
+Anish
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110322/3a89c019/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110324/08aef72a/attachment-0001.html>
