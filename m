@@ -1,55 +1,140 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 24 Mar 2011 16:14:05 -0700
-Subject: how can I cleanly exclude memory from the kernel memory allocator?
-In-Reply-To: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-Message-ID: <AANLkTinKketbDZ87Qp400uzSBv5t3bF9azJgXqbwudL9@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 24 Mar 2011 19:14:03 -0400
+Subject: [PATCH V7 3/4] mmc: sdhci-esdhc: make the writel/readl as the
+	general APIs
+In-Reply-To: <1300684936-8218-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+	(Richard Zhu's message of "Mon, 21 Mar 2011 13:22:15 +0800")
+References: <1300684936-8218-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1300684936-8218-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <m3r59wm7r8.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 3:18 PM, Larry Bassel <lbassel@codeaurora.org> wrote:
-> I want to (early in system initialization) exclude some
-> contiguous physical memory from one or more memory banks
-> so that it won't be mapped in the normal kernel 1-to-1 mapping
-> (so that it can be mapped uncached, strongly ordered, etc.
-> as needed -- I know that it is forbidden to have a cached
-> and an uncached mapping to the same memory) and so that it
-> won't be freed into the kernel memory allocator (so that
-> it won't fragment and can be allocated using genalloc).
->
-> I have tried to find a clean way to do this, but none of
-> the approaches I've considered seem very good:
->
-> 1. Add a hook to the memory tag parsing routine to (possibly)
-> change each tag before arm_add_memory() is called,
-> or alter arm_add_memory() itself.
-> 2. Add a hook at the beginning of paging_init() to inspect
-> and alter the meminfo memory bank starts and sizes as needed.
-> 3. Wait until after the memory is added to the normal
-> kernel memory pool and somehow get it back out
-> (I can't use alloc_bootmem() or related functionality of course
-> since then the memory will be part of the cached kernel 1-to-1 1M
-> page mapping, precluding use of ioremap() on it).
->
-> A further drawback for #1 is that I'd really like to
-> see all of the available memory banks before deciding which
-> memory to steal (we often have multiple memory banks on
-> our platforms).
->
-> Perhaps there is a solution for this problem that already exists
-> that I'm unaware of (or at least community consensus about how
-> one should add this functionality).
->
-> I believe Russell King has stated that he intends
-> to carve out memory that can be used for dma_alloc_coherent(),
-> that won't be mapped otherwise by the kernel.
->
-> I'd like to know how he is planning to do this, as I could hopefully
-> do something similar.
->
-> Thanks.
->
-> Larry Bassel
+Hi Richard,
 
-You want memblock_remove, called from the new .reserve machine entry
-function.  See arch/arm/plat-omap/devices.c for an example.
+On Mon, Mar 21 2011, Richard Zhu wrote:
+> Add one flag to indicate the GPIO CD/WP is enabled or not
+> on imx platforms, and reuse the writel/readl as the general
+> APIs for imx SOCs.
+>
+> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   39 +++++++++++++++++++++++++++++------
+>  drivers/mmc/host/sdhci-pltfm.h     |    2 +-
+>  2 files changed, 33 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 3b52485..372455b 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+>  #include <linux/gpio.h>
+> +#include <linux/slab.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/mmc/sdhci-pltfm.h>
+>  #include <mach/hardware.h>
+> @@ -24,6 +25,13 @@
+>  #include "sdhci-pltfm.h"
+>  #include "sdhci-esdhc.h"
+>  
+> +#define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
+> +
+> +struct pltfm_imx_data {
+> +	int flags;
+> +	u32 scratchpad;
+> +};
+> +
+>  static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
+>  {
+>  	void __iomem *base = host->ioaddr + (reg & ~0x3);
+> @@ -34,10 +42,14 @@ static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, i
+>  
+>  static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+>  {
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +
+>  	/* fake CARD_PRESENT flag on mx25/35 */
+>  	u32 val = readl(host->ioaddr + reg);
+>  
+> -	if (unlikely(reg == SDHCI_PRESENT_STATE)) {
+> +	if (unlikely((reg == SDHCI_PRESENT_STATE)
+> +			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP))) {
+>  		struct esdhc_platform_data *boarddata =
+>  				host->mmc->parent->platform_data;
+>  
+> @@ -55,7 +67,11 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+>  
+>  static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+>  {
+> -	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE))
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +
+> +	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
+> +			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
+>  		/*
+>  		 * these interrupts won't work with a custom card_detect gpio
+>  		 * (only applied to mx25/35)
+> @@ -76,6 +92,7 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+>  static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>  
+>  	switch (reg) {
+>  	case SDHCI_TRANSFER_MODE:
+> @@ -83,10 +100,10 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  		 * Postpone this write, we must do it together with a
+>  		 * command write that is down below.
+>  		 */
+> -		pltfm_host->scratchpad = val;
+> +		imx_data->scratchpad = val;
+>  		return;
+>  	case SDHCI_COMMAND:
+> -		writel(val << 16 | pltfm_host->scratchpad,
+> +		writel(val << 16 | imx_data->scratchpad,
+>  			host->ioaddr + SDHCI_TRANSFER_MODE);
+>  		return;
+>  	case SDHCI_BLOCK_SIZE:
+> @@ -146,7 +163,9 @@ static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
+>  }
+>  
+>  static struct sdhci_ops sdhci_esdhc_ops = {
+> +	.read_l = esdhc_readl_le,
+>  	.read_w = esdhc_readw_le,
+> +	.write_l = esdhc_writel_le,
+>  	.write_w = esdhc_writew_le,
+>  	.write_b = esdhc_writeb_le,
+>  	.set_clock = esdhc_set_clock,
+> @@ -168,6 +187,7 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+>  	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
+>  	struct clk *clk;
+>  	int err;
+> +	struct pltfm_imx_data *imx_data;
+>  
+>  	clk = clk_get(mmc_dev(host->mmc), NULL);
+>  	if (IS_ERR(clk)) {
+> @@ -177,7 +197,10 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+>  	clk_enable(clk);
+>  	pltfm_host->clk = clk;
+>  
+> -	if (cpu_is_mx35() || cpu_is_mx51())
+> +	imx_data = kzalloc(sizeof(struct pltfm_imx_data), GFP_KERNEL);
+> +	pltfm_host->priv = imx_data;
+> +
+> +	if (!cpu_is_mx25())
+>  		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+>  
+>  	if (cpu_is_mx25() || cpu_is_mx35()) {
+
+kzalloc() can fail.
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
