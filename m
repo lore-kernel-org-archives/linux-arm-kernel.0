@@ -1,82 +1,144 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 24 Mar 2011 16:52:06 +0000
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-In-Reply-To: <OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
-References: <20110324141826.GA3810@arm.com>
-	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
-	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>
-	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
-Message-ID: <AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Mar 2011 17:07:22 +0000
+Subject: [PATCH v2] ARM: perf: ensure overflows aren't missed due to IRQ
+	latency
+Message-ID: <1300986442-20461-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 4:40 PM, Ulrich Weigand
-<Ulrich.Weigand@de.ibm.com> wrote:
-> Dave Martin <dave.martin@linaro.org> wrote:
->> On Thu, Mar 24, 2011 at 2:57 PM, Ulrich Weigand
-> <Ulrich.Weigand@de.ibm.com> wrote:
->> > 1) Have *two* new note types, one for VFP, and one for NEON
->>
->> That may not make sense, since really it's a single register file
->> shared by VFP and NEON. ?With NEON, you always have 32 x 64-bit regs,
->> but it's possible (although rare) to have this many regs on ARMv7 even
->> if NEON is absent.
->
-> OK, agreed.
->
->> > 2) Have GDB look into the AT_HWCAP setting in the NT_AUXV note
->> >
->> > Option 2) seems preferable to me, since NT_AUXV is already there,
->> > and it can also be used to detect the integer-only NEON case.
->>
->> We could also dump the relevant hardware capability registers, which
->> can be more informative, though I'm in two minds about whether this is
->> appropriate / beneficial. ?A layout something like this might work:
->>
->> NT_VFPREGSET*
->>
->> ? ? unsigned long flags;
->> ? ? unsigned long feature_registers[3];
->> ? ? unsigned long fpscr;
->> ? ? unsigned long long regs[16 or 32];
->>
->> There are currently 3 relevant feature registers, the main
->> floating-point ID register FPSID, and the floating-point / SIMD
->> feature registers MVFR0, MVFR1.
->>
->> In either case, we define the contents of the flags field in such a
->> way as to allow gdb to understand the format, and to allow for future
->> expansion if this is ever needed.
->>
->> (*The note types seem to use different names in linux/elf.h compared
->> with /usr/include/elf.h and GDB. ?I've followed the outside world's
->> convention here.)
->
-> I would prefer to keep the contents of NT_VFPREGSET identical to the
-> contents of the PTRACE_GETVPFREGS/PTRACE_SETVPFREGS buffer:
->
-> - This would allow implementation via the new generic user_regset_view
-> ?mechanism (which the ARM kernel doesn't use yet, but probably should)
->
-> - In any case, GDB likes to have the same set of information available
-> ?when debugging core files and native targets
->
-> So if there is indeed additional information that would be interesting,
-> I'd argue this should be presented as a *new* core file note, *and* as
-> a new set of PTRACE_... APIs. ? (But for GDB's purpose NT_AUXV right
-> now is sufficent. ?Everything else could be displayed to the user if
-> of interest.)
+If a counter overflows during a perf stat profiling run it may overtake
+the last known value of the counter:
 
-OK, that sounds reasonable.
+    0        prev     new                0xffffffff
+    |----------|-------|----------------------|
 
-If I'm reading the kernel code correctly, the size of the data
-returned by PTRACE_GETVFPREGS is already dependent on the number of
-registers (D16/D32) implemented by the hardware, and this is
-determinable from the auxv contents; so I guess we don't have a new
-problem to solve here.
+In this case, the number of events that have occurred is
+(0xffffffff - prev) + new. Unfortunately, the event update code will
+not realise an overflow has occurred and will instead report the event
+delta as (new - prev) which may be considerably smaller than the real
+count.
 
-The other info can always be added in a later pass, if it looks like
-it would be useful...
+This patch adds an extra argument to armpmu_event_update which indicates
+whether or not an overflow has occurred. If an overflow has occurred
+then we use the maximum period of the counter to calculate the elapsed
+events.
 
-Cheers
----Dave
+Cc: Jamie Iles <jamie@jamieiles.com>
+Reported-by: Ashwin Chaugule <ashwinc@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Updated following feedback from Jamie so that the code is easier to read
+and follows the commit log more closely in its implementation.
+
+Will
+
+
+ arch/arm/kernel/perf_event.c        |   19 +++++++++++--------
+ arch/arm/kernel/perf_event_v6.c     |    2 +-
+ arch/arm/kernel/perf_event_v7.c     |    2 +-
+ arch/arm/kernel/perf_event_xscale.c |    4 ++--
+ 4 files changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 7921d08..c726fbc 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -205,11 +205,9 @@ armpmu_event_set_period(struct perf_event *event,
+ static u64
+ armpmu_event_update(struct perf_event *event,
+ 		    struct hw_perf_event *hwc,
+-		    int idx)
++		    int idx, int overflow)
+ {
+-	int shift = 64 - 32;
+-	s64 prev_raw_count, new_raw_count;
+-	u64 delta;
++	u64 delta, prev_raw_count, new_raw_count;
+ 
+ again:
+ 	prev_raw_count = local64_read(&hwc->prev_count);
+@@ -219,8 +217,13 @@ again:
+ 			     new_raw_count) != prev_raw_count)
+ 		goto again;
+ 
+-	delta = (new_raw_count << shift) - (prev_raw_count << shift);
+-	delta >>= shift;
++	new_raw_count &= armpmu->max_period;
++	prev_raw_count &= armpmu->max_period;
++
++	if (overflow)
++		delta = armpmu->max_period - prev_raw_count + new_raw_count;
++	else
++		delta = new_raw_count - prev_raw_count;
+ 
+ 	local64_add(delta, &event->count);
+ 	local64_sub(delta, &hwc->period_left);
+@@ -237,7 +240,7 @@ armpmu_read(struct perf_event *event)
+ 	if (hwc->idx < 0)
+ 		return;
+ 
+-	armpmu_event_update(event, hwc, hwc->idx);
++	armpmu_event_update(event, hwc, hwc->idx, 0);
+ }
+ 
+ static void
+@@ -255,7 +258,7 @@ armpmu_stop(struct perf_event *event, int flags)
+ 	if (!(hwc->state & PERF_HES_STOPPED)) {
+ 		armpmu->disable(hwc, hwc->idx);
+ 		barrier(); /* why? */
+-		armpmu_event_update(event, hwc, hwc->idx);
++		armpmu_event_update(event, hwc, hwc->idx, 0);
+ 		hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
+ 	}
+ }
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index c058bfc..66ce900 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -474,7 +474,7 @@ armv6pmu_handle_irq(int irq_num,
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event, hwc, idx, 1);
+ 		data.period = event->hw.last_period;
+ 		if (!armpmu_event_set_period(event, hwc, idx))
+ 			continue;
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index c08d07a..4960686 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -782,7 +782,7 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event, hwc, idx, 1);
+ 		data.period = event->hw.last_period;
+ 		if (!armpmu_event_set_period(event, hwc, idx))
+ 			continue;
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 28cd3b0..39affbe 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -246,7 +246,7 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event, hwc, idx, 1);
+ 		data.period = event->hw.last_period;
+ 		if (!armpmu_event_set_period(event, hwc, idx))
+ 			continue;
+@@ -578,7 +578,7 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event, hwc, idx, 1);
+ 		data.period = event->hw.last_period;
+ 		if (!armpmu_event_set_period(event, hwc, idx))
+ 			continue;
+-- 
+1.7.0.4
