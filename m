@@ -1,48 +1,30 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Thu, 24 Mar 2011 18:35:33 +0200
-Subject: [PATCH 4/6] arm: mach-omap2: smartreflex: fix ioremap leak on probe
-	error
+Date: Thu, 24 Mar 2011 18:35:35 +0200
+Subject: [PATCH 6/6] arm: mach-omap2: smartreflex: delete debugfs entries on
+	probe error
 In-Reply-To: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>
 References: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1300984535-10530-4-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <1300984535-10530-6-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing iounmap() to error paths.
+Delete created debugfs entries if probe fails.
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 81bd5ed..e72b419 100644
+index c8cd1ef..85d8167 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -904,7 +904,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	vdd_dbg_dir = omap_voltage_get_dbgdir(sr_info->voltdm);
- 	if (!vdd_dbg_dir) {
- 		ret = -EINVAL;
--		goto err_release_region;
-+		goto err_iounmap;
- 	}
- 
- 	sr_info->dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
-@@ -912,7 +912,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
- 			__func__);
- 		ret = PTR_ERR(sr_info->dbg_dir);
--		goto err_release_region;
-+		goto err_iounmap;
- 	}
- 
- 	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
 @@ -929,7 +929,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
  		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
  			"for n-values\n", __func__);
  		ret = PTR_ERR(nvalue_dir);
--		goto err_release_region;
-+		goto err_iounmap;
+-		goto err_iounmap;
++		goto err_debugfs;
  	}
  
  	omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
@@ -50,8 +32,8 @@ index 81bd5ed..e72b419 100644
  			"entries for n-values\n",
  			__func__, sr_info->voltdm->name);
  		ret = -ENODATA;
--		goto err_release_region;
-+		goto err_iounmap;
+-		goto err_iounmap;
++		goto err_debugfs;
  	}
  
  	for (i = 0; i < sr_info->nvalue_count; i++) {
@@ -59,10 +41,10 @@ index 81bd5ed..e72b419 100644
  
  	return ret;
  
-+err_iounmap:
-+	iounmap(sr_info->base);
- err_release_region:
- 	release_mem_region(mem->start, resource_size(mem));
- err_free_devinfo:
++err_debugfs:
++	debugfs_remove_recursive(sr_info->dbg_dir);
+ err_iounmap:
+ 	list_del(&sr_info->node);
+ 	iounmap(sr_info->base);
 -- 
 1.5.6.5
