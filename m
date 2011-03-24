@@ -1,89 +1,59 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Thu, 24 Mar 2011 15:45:18 +0100
-Subject: IRQ handler under load - slow response
-In-Reply-To: <AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
-References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
-	<20110309152252.GB333@e-circ.dyndns.org>
-	<AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
-	<20110314144715.GH333@e-circ.dyndns.org>
-	<AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
-Message-ID: <20110324144518.GA27661@e-circ.dyndns.org>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Thu, 24 Mar 2011 15:48:05 +0100
+Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
+In-Reply-To: <20110324141826.GA3810@arm.com>
+References: <20110324141826.GA3810@arm.com>
+Message-ID: <19851.22949.752686.1270@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 12:56:48PM +0100, Arno Steffen wrote:
-> 2011/3/14 Kurt Van Dijck <kurt.van.dijck@eia.be>:
-> > On Mon, Mar 14, 2011 at 02:26:35PM +0100, Arno Steffen wrote:
-> > Euhm, my proposed b) deals in kernel. I think your example is in userspace?
-> > Maybe I don't understand your precise setup well.
-> >
-> > static irqreturn_t GpioIrqHandler (int irq, void *dev_id)
-> > {
-> > ? ?int s32GpioNumber = 0 ;
-> > ? ?s32GpioNumber = irq - IH_GPIO_BASE;
-> > ? ?set_bit (s32GpioNumber , (volatile unsigned long *) &gsts32GpioIrqStatus);
-> > - ? tasklet_schedule (&GpioTasklet);
-> > - ? return IRQ_HANDLED;
-> > + ? return IRQ_WAKE_THREAD;
-> > }
-> >
-> > -DECLARE_TASKLET(GpioTasklet, GpioIntrTasklet, 0);
-> > static irqreturn_t GpioIrqThread(int irq, void *dev_id)
-> > {
-> > ? ? ? ?/* do whatever the tasklet was supposed to do */
-> > }
-> >
-> 
-> Dear Kurt,
-> I did as you proposed, but doesn't have the big picture
-> 
-> I think there is a typo in your request_irq change:
+Dave Martin writes:
+ > Hi all,
+ > 
+ > Considering how to add the VFP/NEON register state to Coredumps,
+ > there's no single obvious solution, so I'd like to put this out
+ > for people's comments.
+ > 
+ > Currently, the coredump consists of several notes, the interesting
+ > ones currently being:
+ > 
+ >  * NT_PRSTATUS - general process status, including the integer registers
+ >  * NT_FPREGSET - the FPA registers (only present if FPA is in use)
+ > 
+ > These notes are duplicated per thread when a multithreaded process
+ > dumps core.
+ > 
+ > There are few options I see:
+ > 
+ >  a) Dump the VFP/NEON state in NT_FPREGSET.
+ >     This could be appended to, or in place of the legacy FPA regs,
+ >     with flags in a header or (struct elf_prstatus).pr_fpvalid
+ >     to describe what was dumped.  Old gdb etc. may read the
+ >     resulting information as random FPA register contents;
+ >     this could perhaps be avoided by always dumping a dummy
+ >     FPA regs structure at the start of this note, though this
+ >     seems wasteful.
+ > 
+ >     Possibly, gdb may explode if the NT_FPREGSET note is larger
+ >     then expected.  I've not investigated this.
+ > 
+ >  b) Dump the VFP/NEON regs in a note of type NT_PRXFPREG.
+ >     This avoids defining a new note type; however, this note type
+ >     is really for x86 -- so overloading it in this way may just
+ >     be nonsensical / confusing.
+ > 
+ >  c) Create a new note type specially for this, and dump the
+ >     VFP/NEON regs in there.  This is closest to the model followed
+ >     by ptrace, where PTRACE_GETREGS, PTRACE_GETFPREGS and
+ >     PTRAGE_GETVFPREGS are all distinct.
+ > 
+ > 
+ > Going for (c) seems sanest to me, and also means that old gdb
+ > will just ignore the new data; this is probably what we want.
+ > 
+ > Comments are welcome.
 
-> Is this what you mean? What you have suggested is replacing a flag by
-> a pointer - this cannot work. I can't see how  GpioIrqHandler and
-> GpioIrqThread are connected now.
-my mistake, I had in mind to replace request_irq with 'requist_threaded_irq'.
-sorry for that noise.  (I hope you did not loose too much time with that :-) ).
-
-	s32Status = request_threaded_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
-			GpioIrqHandler, GpioIrqThread, 0, "GPIOINTR", NULL);
-
-And then, you can pull your tasklet out of the softirq thread into a seperate
-kernel thread (which you can set SCHED_FIFO with sched_setscheduler(2)).
-> 
-> I am not sure this help. The kernel thread might become a higher
-> proirity, but what has to be improved is that the IRQ-routine in user
-> space is responding faster.
-This makes your bottom-halve respond regardless of the other load, due to the
-scheduling policy.
-This will not yet impact any userspace stuff. Therefore, set the scheduling
-policy of you userspace task too.
-
-In fact, the latter (setting scheduling policy of the userspace) is probably
-the first step to take. put:
-
-#include <sched.h>
-
-
-int main(...) {
-	const struct sched_param sched_param = {
-		.sched_priority = 50,
-	};
-	int ret;
-
-	ret = sched_setscheduler(0, SCHED_FIFO, &sched_param);
-	if (ret < 0)
-		perror(...);
-	
-	....
-}
-
-into your userspace program.
-> 
-> Does it make sense to send you the hole code? I am afraid that there
-> is to much potential for misunderstanding.
-This time, it was my wrong info.
-I don't feel like digging in code yet, since it comprises very different parts
-(kernel & userspace).
-> Best regards
-> Arno
+Strongly prefer (c) or (b).  (a) should be avoided if at all
+possible: appending to or changing established types is just
+asking for trouble, unless those types were designed from the
+start to be self-describing and extensible.
