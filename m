@@ -1,66 +1,27 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 24 Mar 2011 16:26:37 +0800
-Subject: [PATCH 5/7] add GPMI support for imx28
-In-Reply-To: <19850.62451.678409.328798@ipc1.ka-ro>
-References: <1300239773-4222-1-git-send-email-b32955@freescale.com>
-	<1300239773-4222-6-git-send-email-b32955@freescale.com>
-	<19848.39439.380861.195051@ipc1.ka-ro>
-	<4D8964F4.3070104@freescale.com>
-	<19850.2584.566366.251874@ipc1.ka-ro>
-	<4D8AB490.30408@freescale.com>
-	<19850.62451.678409.328798@ipc1.ka-ro>
-Message-ID: <AANLkTinjqAcCmQRdAxL+SS0LPVrRUpVBkEJmw0ZDccnq@mail.gmail.com>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Thu, 24 Mar 2011 09:29:40 +0100
+Subject: [trivial PATCH 1/2] treewide: Fix iomap resource size
+	miscalculations
+In-Reply-To: <c4422b4a8ee132d3adac95fd86237c61b2f8b364.1300909446.git.joe@perches.com>
+References: <cover.1300909445.git.joe@perches.com>
+	<c4422b4a8ee132d3adac95fd86237c61b2f8b364.1300909446.git.joe@perches.com>
+Message-ID: <20110324082940.GB4968@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/24 Lothar Wa?mann <LW@karo-electronics.de>:
-> Hi,
-[...]
->> Most of the time, the timing is really based on a safe timing setting.
->> But in the original GPMI driver in the FREESCALE BSP, there exits some
->> nands need to be set with their own timing setting.
->>
->> So I do not use the safe timing for _ALL_ the nand, and i'd better get
->> it from the
->> database.
->>
-> It should be sufficient to provide timing info from platform_data in
-> special cases instead of bloating the nand id database with that
-> stuff. Platforms might need to adjust the timing because of
-> peculiarities in the HW. Thus the timing info should be provided from
-> there, not from the chip database.
+Hi Joe,
 
-No, we can't. since some boards only provide one NAND socket, customer
-can place any NAND flash chip they want. And with the NAND tech evolution, some
-NAND flash will end-of-line and customer need change another new NAND.
-As we all know that RAW NAND flash vendor does not follow the same
-rule to encode
-ID related information such as page size/oob size/block size etc. Even
-with same vendor,
-take Sumsung as example, there is not one generic rule to encode the
-id information.
-If you do NAND support with many customers, you will find that
-currenly linux NAND driver
-(nand_base.c/nand_ids.c) provide very poor support for that.
+> Convert off-by-1 r->end - r->start to resource_size(r)
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  arch/arm/mach-ux500/mbox-db5500.c |    6 ++----
+>  arch/mips/rb532/gpio.c            |    2 +-
+>  drivers/video/msm/mddi.c          |    2 +-
+>  drivers/watchdog/bcm63xx_wdt.c    |    2 +-
+>  4 files changed, 5 insertions(+), 7 deletions(-)
 
-Jason
+Acked-by: Wim Van Sebroeck <wim@iguana.be>
 
->
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Kind regards,
+Wim.
