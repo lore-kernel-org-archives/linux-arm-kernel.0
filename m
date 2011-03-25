@@ -1,88 +1,105 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 25 Mar 2011 12:53:35 -0300
-Subject: [PATCH] ARM: mx5/mx53_evk: Add LED support
-Message-ID: <1301068415-18989-1-git-send-email-fabio.estevam@freescale.com>
+Date: Fri, 25 Mar 2011 12:52:47 -0300
+Subject: [PATCH] ARM: mx53: Print silicon revision on boot
+Message-ID: <1301068367-18937-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the mx53evk board there is an LED connected to GPIO7_7.
+Having the silicon revision to appear on the boot log is a useful information.
 
-Add support for it.
+MX31, MX35 and MX51 already show the silicon revision on boot. 
+
+Add support for displaying such information for MX53 as well.
+
+Tested on a mx53loco board, where it shows:
+
+CPU identified as i.MX53, silicon rev 2.0
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mx5/board-mx53_evk.c |   31 +++++++++++++++++++++++++++++++
- 1 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c     |    1 +
+ arch/arm/mach-mx5/cpu.c                 |   23 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ arch/arm/plat-mxc/include/mach/mx53.h   |   13 -------------
+ 4 files changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 7b5735c..f2c5151 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -24,6 +24,7 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/leds.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
- #include <mach/common.h>
-@@ -37,6 +38,7 @@
- #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
- #define EVK_ECSPI1_CS0		IMX_GPIO_NR(2, 30)
- #define EVK_ECSPI1_CS1		IMX_GPIO_NR(3, 19)
-+#define MX53EVK_LED		IMX_GPIO_NR(7, 7)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index cc6ad1c..e014289 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1555,6 +1555,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	clk_enable(&iim_clk);
+ 	mx53_revision();
+ 	clk_disable(&iim_clk);
++	mx53_display_revision();
  
- #include "crm_regs.h"
- #include "devices-imx53.h"
-@@ -60,6 +62,8 @@ static iomux_v3_cfg_t mx53_evk_pads[] = {
- 	/* ecspi chip select lines */
- 	MX53_PAD_EIM_EB2__GPIO2_30,
- 	MX53_PAD_EIM_D19__GPIO3_19,
-+	/* LED */
-+	MX53_PAD_PATA_DA_1__GPIO7_7,
- };
- 
- static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
-@@ -118,6 +122,32 @@ static const struct spi_imx_master mx53_evk_spi_data __initconst = {
- 	.num_chipselect = ARRAY_SIZE(mx53_evk_spi_cs),
- };
- 
-+static struct gpio_led mx53_evk_leds[] = {
-+	{
-+		.name			= "led-green",
-+		.default_trigger	= "heartbeat",
-+		.active_low		= 0,
-+		.gpio			= MX53EVK_LED,
-+	},
-+};
-+
-+static struct gpio_led_platform_data mx53_evk_leds_data = {
-+	.leds = mx53_evk_leds,
-+	.num_leds = ARRAY_SIZE(mx53_evk_leds),
-+};
-+
-+static struct platform_device mx53_evk_leds_device = {
-+	.name = "leds-gpio",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &mx53_evk_leds_data,
-+	},
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mx53_evk_leds_device,
-+};
-+
- static void __init mx53_evk_board_init(void)
- {
- 	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
-@@ -136,6 +166,7 @@ static void __init mx53_evk_board_init(void)
- 		ARRAY_SIZE(mx53_evk_spi_board_info));
- 	imx53_add_ecspi(0, &mx53_evk_spi_data);
- 	imx53_add_imx2_wdt(0, NULL);
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(&esdhc1_clk, &pll2_sw_clk);
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 3b4c307..6ef7856 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -127,6 +127,29 @@ int mx53_revision(void)
  }
+ EXPORT_SYMBOL(mx53_revision);
  
- static void __init mx53_evk_timer_init(void)
++void mx53_display_revision(void)
++{
++	int rev;
++	char *srev;
++	rev = mx53_revision();
++
++	switch (rev) {
++	case IMX_CHIP_REVISION_1_0:
++		srev = IMX_CHIP_REVISION_1_0_STRING;
++		break;
++	case IMX_CHIP_REVISION_2_0:
++		srev = IMX_CHIP_REVISION_2_0_STRING;
++		break;
++	case IMX_CHIP_REVISION_2_1:
++		srev = IMX_CHIP_REVISION_2_1_STRING;
++		break;
++	default:
++		srev = IMX_CHIP_REVISION_UNKNOWN_STRING;
++	}
++	printk(KERN_INFO "CPU identified as i.MX53, silicon rev %s\n", srev);
++}
++EXPORT_SYMBOL(mx53_display_revision);
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index a22ebe1..bfa1ffc 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -68,4 +68,5 @@ extern void mxc91231_arch_reset(int, const char *);
+ extern void mxc91231_prepare_idle(void);
+ extern void mx51_efikamx_reset(void);
+ extern int mx53_revision(void);
++extern int mx53_display_revision(void);
+ #endif
+diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
+index ace1786..9d2a1ef 100644
+--- a/arch/arm/plat-mxc/include/mach/mx53.h
++++ b/arch/arm/plat-mxc/include/mach/mx53.h
+@@ -337,17 +337,4 @@
+ #define MX53_INT_GPIO7_LOW	107
+ #define MX53_INT_GPIO7_HIGH	108
+ 
+-/* silicon revisions specific to i.MX53 */
+-#define MX53_CHIP_REV_1_0		0x10
+-#define MX53_CHIP_REV_1_1		0x11
+-#define MX53_CHIP_REV_1_2		0x12
+-#define MX53_CHIP_REV_1_3		0x13
+-#define MX53_CHIP_REV_2_0		0x20
+-#define MX53_CHIP_REV_2_1		0x21
+-#define MX53_CHIP_REV_2_2		0x22
+-#define MX53_CHIP_REV_2_3		0x23
+-#define MX53_CHIP_REV_3_0		0x30
+-#define MX53_CHIP_REV_3_1		0x31
+-#define MX53_CHIP_REV_3_2		0x32
+-
+ #endif /* ifndef __MACH_MX53_H__ */
 -- 
 1.6.0.4
