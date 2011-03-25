@@ -1,19 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Mar 2011 09:20:41 +0530
-Subject: [PATCH 2/6] arm: mach-omap2: smartreflex: fix sr_late_init()
-	error path in probe
-In-Reply-To: <87fwqczbba.fsf@ti.com>
-References: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>	<1300984535-10530-2-git-send-email-aaro.koskinen@nokia.com>
-	<87fwqczbba.fsf@ti.com>
-Message-ID: <4D8C1111.7030807@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 25 Mar 2011 17:47:50 +1100
+Subject: arm: Move the definition of ARCH_HAS_DMA_MMAP_COHERENT where it
+	belongs
+Message-ID: <1301035670.2402.468.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman wrote, on 03/24/2011 10:48 PM:
-> Also, I renamed the subject/shortlog to use 'OMAP2+: smartreflex: ..."
-> instead of 'arm: mach-omap2'.
-might be better to be OMAP3+ we dont have SR on OMAP2 :)
+Something I noticed while implementing dma_mmap_coherent() for powerpc...
 
--- 
-Regards,
-Nishanth Menon
+Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
+ arch/arm/include/asm/dma-mapping.h |    2 +-
+ sound/core/pcm_native.c            |    7 -------
+ 2 files changed, 1 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 4fff837..ed33eab 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -214,7 +214,7 @@ extern void dma_free_coherent(struct device *, size_t, void *, dma_addr_t);
+  */
+ int dma_mmap_coherent(struct device *, struct vm_area_struct *,
+ 		void *, dma_addr_t, size_t);
+-
++#define ARCH_HAS_DMA_MMAP_COHERENT
+ 
+ /**
+  * dma_alloc_writecombine - allocate writecombining memory for DMA
+diff --git a/sound/core/pcm_native.c b/sound/core/pcm_native.c
+index ae42b65..2d99c37 100644
+--- a/sound/core/pcm_native.c
++++ b/sound/core/pcm_native.c
+@@ -3145,13 +3145,6 @@ static const struct vm_operations_struct snd_pcm_vm_ops_data_fault = {
+ 	.fault =	snd_pcm_mmap_data_fault,
+ };
+ 
+-#ifndef ARCH_HAS_DMA_MMAP_COHERENT
+-/* This should be defined / handled globally! */
+-#ifdef CONFIG_ARM
+-#define ARCH_HAS_DMA_MMAP_COHERENT
+-#endif
+-#endif
+-
+ /*
+  * mmap the DMA buffer on RAM
+  */
