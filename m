@@ -1,41 +1,55 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 25 Mar 2011 10:00:18 +0100
-Subject: [PATCH V8 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <1301024346-2232-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: R65037@freescale.com (Zhu Richard-R65037)
+Date: Fri, 25 Mar 2011 09:05:51 +0000
+Subject: [PATCH V8 3/4] mmc: sdhci-esdhc: make the writel/readl as the
+	general APIs
+In-Reply-To: <20110325085329.GA3302@pengutronix.de>
 References: <1301024346-2232-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1301024346-2232-4-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110325090018.GB3302@pengutronix.de>
+	<1301024346-2232-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110325085329.GA3302@pengutronix.de>
+Message-ID: <010C9052C42A00499CE76D637FA5EE900D45DB@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2011 at 11:39:06AM +0800, Richard Zhu wrote:
-> Fix the NO INT in the Multi-BLK IO in SD/MMC, and Multi-BLK
-> read in SDIO on imx53.
-> 
-> The CMDTYPE of the CMD register (offset 0xE) should be set to
-> "11" when the STOP CMD12 is issued on imx53 to abort one
-> open ended multi-blk IO. Otherwise one the TC INT wouldn't
-> be generated.
-> 
-> In exact block transfer, the controller doesn't complete the
-> operations automatically as required at the end of the
-> transfer and remains on hold if the abort command is not sent on
-> imx53.
-> As a result, the TC flag is not asserted and SW  received timeout
-> exeception. set bit1 of Vendor Spec registor to fix it.
-> 
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Hi Wolfram:
+Got that.
+Thanks for your reminder.
+Would follow your advice in future.
 
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+Best Regards
+Richard Zhu
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110325/da650a72/attachment.sig>
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Friday, March 25, 2011 4:53 PM
+> To: Zhu Richard-R65037
+> Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de; linux-
+> mmc at vger.kernel.org; cjb at laptop.org; avorontsov at ru.mvista.com;
+> eric at eukrea.com; linuxzsc at gmail.com; eric.miao at linaro.org
+> Subject: Re: [PATCH V8 3/4] mmc: sdhci-esdhc: make the writel/readl as
+> the general APIs
+>
+> On Fri, Mar 25, 2011 at 11:39:05AM +0800, Richard Zhu wrote:
+> > Add one flag to indicate the GPIO CD/WP is enabled or not on imx
+> > platforms, and reuse the writel/readl as the general APIs for imx
+> > SOCs.
+> >
+> > Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+> > ---
+>
+> Please provide something like "changes since last time" _below_ this
+> dashed line "---" next time. Or use --cover-letter to introduce the
+> changes.
+>
+> Other than that
+>
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+>
+> Regards,
+>
+>    Wolfram
+>
+> --
+> Pengutronix e.K.                           | Wolfram Sang
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
