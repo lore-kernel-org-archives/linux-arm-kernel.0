@@ -1,57 +1,28 @@
-From: andy@warmcat.com (Andy Green)
-Date: Fri, 25 Mar 2011 20:30:52 +0000
-Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
-	addresses for eth0 and wlan0
-In-Reply-To: <AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>	<20110324212737.14936.21228.stgit@otae.warmcat.com>	<78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
-	<AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-Message-ID: <4D8CFB7C.3080306@linaro.org>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Fri, 25 Mar 2011 13:49:35 -0700
+Subject: reboot/kexec in 2.6.38
+In-Reply-To: <20110322133034.GA15475@atrey.karlin.mff.cuni.cz> (Cyril Hrubis's
+	message of "Tue, 22 Mar 2011 14:30:34 +0100")
+References: <20110317064523.GA1995@ucw.cz>
+	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
+	<20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
+Message-ID: <m1bp0zylgg.fsf@fess.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2011 08:13 PM, Somebody in the thread at some point said:
+Cyril Hrubis <metan@ucw.cz> writes:
 
-Hi -
+> Hi!
+>> I think it's config issue. Never heard of this.
+>
+> I've just compiled and booted 2.6.38. The kernel boots without problems when
+> flashed in. But I've had no success with kexec, the last lines I see are:
+>
+> Starting new kernel
 
-> I very much like this approach.  I believed the ability to use the die
-> ID to get a unique code was reasonable approach and that is why I
-> didn't get an EEPROM put onto the BeagleBoard, though Gerald is
-> looking at adding one on a future revision because the lack of one
-> wasn't well received.  Minor questions below.
+Enable early_printk to a serial port if you can.
 
-Great.  FWIW I think it'd be a lost opportunity to wire the EEPROM 
-direct to the network device.  It's more flexible and powerful to regard 
-the EEPROM as general "board identity storage", a way to bind 
-information to the physical board.  Then you can stick any kind of 
-information that you need to bind to the board in the same 25c device 
-and in-kernel code can take care of discovering that data when needed on 
-any subsystem that takes an interest.
+There is definitely an issue in 2.6.38 where kdump doesn't work, that
+right now looks like a memblock issue.
 
-> The use of the OMAP die id below makes this OMAP specific and the list
-> referenced below of the devices to be referenced makes it Panda
-> specific.  Is there a way to make the list board specific, but to make
-> these functions that will be used across many OMAP platforms reusable?
->   I believe that this current code will result in a lot of
-> cut-and-paste.  My preference is that this is accepted and that we
-> make this more general when we add this to other OMAP platforms, but
-> it'd be great to capture your suggestions on how to do so before those
-> cut-and-paste patch sets start coming in.
-
-Sure, I would be happy to put this stuff at OMAP platform layer for 
-example if it makes sense to OMAP guys more generally.
-
-> I just want to make sure I understand how this works.  When a new
-> network device is added, if the device name matches one of the above
-> listed device paths, then the die id based MAC id is applied.  This
-> must be done via a device registration notifier as the registration is
-> triggered when the device is detected.
-
-That's right.  Arguably it would be better if there was a core API to 
-register your board-specific uniqueness / entropy, and the drivers were 
-able to use that instead of "random" ethernet address all in network 
-layer.   But after wasting two weeks getting pointlessly beaten up on 
-lkml largely on the question of how generic this issue is, I would 
-rather restart somewhere specific where everyone can see the obvious 
-benefit and if it's seen as more useful migrate it.
-
--Andy
+Eric
