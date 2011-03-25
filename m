@@ -1,71 +1,191 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri, 25 Mar 2011 10:46:12 -0600
-Subject: [PATCH] OMAP: iovmm: fix SW flags passed by user
-Message-ID: <1301071572-25251-1-git-send-email-omar.ramirez@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 25 Mar 2011 22:29:57 +0530
+Subject: [PATCH 1/4] davinci: psc.h: clean up indentation done using spaces
+Message-ID: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d038aee24dcd changes iovmm to receive flags specified by user,
-however the upper 16 bits of the flags are wiped by iovmm itself.
+psc.h has indentation using spaces at a number of places.
+Fix this by indenting using tabs instead.
 
-This fixes IOVMF_DA_FIXED flags from being lost, and lets the user
-map its desired "device addresses".
-
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/plat-omap/include/plat/iovmm.h |    3 ---
- arch/arm/plat-omap/iovmm.c              |    4 ----
- 2 files changed, 0 insertions(+), 7 deletions(-)
+ arch/arm/mach-davinci/include/mach/psc.h |  148 +++++++++++++++---------------
+ 1 files changed, 74 insertions(+), 74 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/iovmm.h b/arch/arm/plat-omap/include/plat/iovmm.h
-index 32a2f6c..e992b96 100644
---- a/arch/arm/plat-omap/include/plat/iovmm.h
-+++ b/arch/arm/plat-omap/include/plat/iovmm.h
-@@ -29,9 +29,6 @@ struct iovm_struct {
-  * lower 16 bit is used for h/w and upper 16 bit is for s/w.
-  */
- #define IOVMF_SW_SHIFT		16
--#define IOVMF_HW_SIZE		(1 << IOVMF_SW_SHIFT)
--#define IOVMF_HW_MASK		(IOVMF_HW_SIZE - 1)
--#define IOVMF_SW_MASK		(~IOVMF_HW_MASK)UL
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index a47e6f2..1110fdd 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -30,47 +30,47 @@
+ #define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
  
+ /* Power and Sleep Controller (PSC) Domains */
+-#define DAVINCI_GPSC_ARMDOMAIN      0
+-#define DAVINCI_GPSC_DSPDOMAIN      1
++#define DAVINCI_GPSC_ARMDOMAIN		0
++#define DAVINCI_GPSC_DSPDOMAIN		1
+ 
+-#define DAVINCI_LPSC_VPSSMSTR       0
+-#define DAVINCI_LPSC_VPSSSLV        1
+-#define DAVINCI_LPSC_TPCC           2
+-#define DAVINCI_LPSC_TPTC0          3
+-#define DAVINCI_LPSC_TPTC1          4
+-#define DAVINCI_LPSC_EMAC           5
+-#define DAVINCI_LPSC_EMAC_WRAPPER   6
+-#define DAVINCI_LPSC_USB            9
+-#define DAVINCI_LPSC_ATA            10
+-#define DAVINCI_LPSC_VLYNQ          11
+-#define DAVINCI_LPSC_UHPI           12
+-#define DAVINCI_LPSC_DDR_EMIF       13
+-#define DAVINCI_LPSC_AEMIF          14
+-#define DAVINCI_LPSC_MMC_SD         15
+-#define DAVINCI_LPSC_McBSP          17
+-#define DAVINCI_LPSC_I2C            18
+-#define DAVINCI_LPSC_UART0          19
+-#define DAVINCI_LPSC_UART1          20
+-#define DAVINCI_LPSC_UART2          21
+-#define DAVINCI_LPSC_SPI            22
+-#define DAVINCI_LPSC_PWM0           23
+-#define DAVINCI_LPSC_PWM1           24
+-#define DAVINCI_LPSC_PWM2           25
+-#define DAVINCI_LPSC_GPIO           26
+-#define DAVINCI_LPSC_TIMER0         27
+-#define DAVINCI_LPSC_TIMER1         28
+-#define DAVINCI_LPSC_TIMER2         29
+-#define DAVINCI_LPSC_SYSTEM_SUBSYS  30
+-#define DAVINCI_LPSC_ARM            31
+-#define DAVINCI_LPSC_SCR2           32
+-#define DAVINCI_LPSC_SCR3           33
+-#define DAVINCI_LPSC_SCR4           34
+-#define DAVINCI_LPSC_CROSSBAR       35
+-#define DAVINCI_LPSC_CFG27          36
+-#define DAVINCI_LPSC_CFG3           37
+-#define DAVINCI_LPSC_CFG5           38
+-#define DAVINCI_LPSC_GEM            39
+-#define DAVINCI_LPSC_IMCOP          40
++#define DAVINCI_LPSC_VPSSMSTR		0
++#define DAVINCI_LPSC_VPSSSLV		1
++#define DAVINCI_LPSC_TPCC		2
++#define DAVINCI_LPSC_TPTC0		3
++#define DAVINCI_LPSC_TPTC1		4
++#define DAVINCI_LPSC_EMAC		5
++#define DAVINCI_LPSC_EMAC_WRAPPER	6
++#define DAVINCI_LPSC_USB		9
++#define DAVINCI_LPSC_ATA		10
++#define DAVINCI_LPSC_VLYNQ		11
++#define DAVINCI_LPSC_UHPI		12
++#define DAVINCI_LPSC_DDR_EMIF		13
++#define DAVINCI_LPSC_AEMIF		14
++#define DAVINCI_LPSC_MMC_SD		15
++#define DAVINCI_LPSC_McBSP		17
++#define DAVINCI_LPSC_I2C		18
++#define DAVINCI_LPSC_UART0		19
++#define DAVINCI_LPSC_UART1		20
++#define DAVINCI_LPSC_UART2		21
++#define DAVINCI_LPSC_SPI		22
++#define DAVINCI_LPSC_PWM0		23
++#define DAVINCI_LPSC_PWM1		24
++#define DAVINCI_LPSC_PWM2		25
++#define DAVINCI_LPSC_GPIO		26
++#define DAVINCI_LPSC_TIMER0		27
++#define DAVINCI_LPSC_TIMER1		28
++#define DAVINCI_LPSC_TIMER2		29
++#define DAVINCI_LPSC_SYSTEM_SUBSYS	30
++#define DAVINCI_LPSC_ARM		31
++#define DAVINCI_LPSC_SCR2		32
++#define DAVINCI_LPSC_SCR3		33
++#define DAVINCI_LPSC_SCR4		34
++#define DAVINCI_LPSC_CROSSBAR		35
++#define DAVINCI_LPSC_CFG27		36
++#define DAVINCI_LPSC_CFG3		37
++#define DAVINCI_LPSC_CFG5		38
++#define DAVINCI_LPSC_GEM		39
++#define DAVINCI_LPSC_IMCOP		40
+ 
+ #define DM355_LPSC_TIMER3		5
+ #define DM355_LPSC_SPI1			6
+@@ -102,39 +102,39 @@
  /*
-  * iovma: h/w flags derived from cam and ram attribute
-diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index 51ef43e..83a37c5 100644
---- a/arch/arm/plat-omap/iovmm.c
-+++ b/arch/arm/plat-omap/iovmm.c
-@@ -648,7 +648,6 @@ u32 iommu_vmap(struct iommu *obj, u32 da, const struct sg_table *sgt,
- 			return PTR_ERR(va);
- 	}
+  * LPSC Assignments
+  */
+-#define DM646X_LPSC_ARM            0
+-#define DM646X_LPSC_C64X_CPU       1
+-#define DM646X_LPSC_HDVICP0        2
+-#define DM646X_LPSC_HDVICP1        3
+-#define DM646X_LPSC_TPCC           4
+-#define DM646X_LPSC_TPTC0          5
+-#define DM646X_LPSC_TPTC1          6
+-#define DM646X_LPSC_TPTC2          7
+-#define DM646X_LPSC_TPTC3          8
+-#define DM646X_LPSC_PCI            13
+-#define DM646X_LPSC_EMAC           14
+-#define DM646X_LPSC_VDCE           15
+-#define DM646X_LPSC_VPSSMSTR       16
+-#define DM646X_LPSC_VPSSSLV        17
+-#define DM646X_LPSC_TSIF0          18
+-#define DM646X_LPSC_TSIF1          19
+-#define DM646X_LPSC_DDR_EMIF       20
+-#define DM646X_LPSC_AEMIF          21
+-#define DM646X_LPSC_McASP0         22
+-#define DM646X_LPSC_McASP1         23
+-#define DM646X_LPSC_CRGEN0         24
+-#define DM646X_LPSC_CRGEN1         25
+-#define DM646X_LPSC_UART0          26
+-#define DM646X_LPSC_UART1          27
+-#define DM646X_LPSC_UART2          28
+-#define DM646X_LPSC_PWM0           29
+-#define DM646X_LPSC_PWM1           30
+-#define DM646X_LPSC_I2C            31
+-#define DM646X_LPSC_SPI            32
+-#define DM646X_LPSC_GPIO           33
+-#define DM646X_LPSC_TIMER0         34
+-#define DM646X_LPSC_TIMER1         35
+-#define DM646X_LPSC_ARM_INTC       45
++#define DM646X_LPSC_ARM		0
++#define DM646X_LPSC_C64X_CPU	1
++#define DM646X_LPSC_HDVICP0	2
++#define DM646X_LPSC_HDVICP1	3
++#define DM646X_LPSC_TPCC	4
++#define DM646X_LPSC_TPTC0	5
++#define DM646X_LPSC_TPTC1	6
++#define DM646X_LPSC_TPTC2	7
++#define DM646X_LPSC_TPTC3	8
++#define DM646X_LPSC_PCI		13
++#define DM646X_LPSC_EMAC	14
++#define DM646X_LPSC_VDCE	15
++#define DM646X_LPSC_VPSSMSTR	16
++#define DM646X_LPSC_VPSSSLV	17
++#define DM646X_LPSC_TSIF0	18
++#define DM646X_LPSC_TSIF1	19
++#define DM646X_LPSC_DDR_EMIF	20
++#define DM646X_LPSC_AEMIF	21
++#define DM646X_LPSC_McASP0	22
++#define DM646X_LPSC_McASP1	23
++#define DM646X_LPSC_CRGEN0	24
++#define DM646X_LPSC_CRGEN1	25
++#define DM646X_LPSC_UART0	26
++#define DM646X_LPSC_UART1	27
++#define DM646X_LPSC_UART2	28
++#define DM646X_LPSC_PWM0	29
++#define DM646X_LPSC_PWM1	30
++#define DM646X_LPSC_I2C		31
++#define DM646X_LPSC_SPI		32
++#define DM646X_LPSC_GPIO	33
++#define DM646X_LPSC_TIMER0	34
++#define DM646X_LPSC_TIMER1	35
++#define DM646X_LPSC_ARM_INTC	45
  
--	flags &= IOVMF_HW_MASK;
- 	flags |= IOVMF_DISCONT;
- 	flags |= IOVMF_MMIO;
+ /* PSC0 defines */
+ #define DA8XX_LPSC0_TPCC		0
+@@ -243,7 +243,7 @@
+ #define PSC_STATE_DISABLE	2
+ #define PSC_STATE_ENABLE	3
  
-@@ -706,7 +705,6 @@ u32 iommu_vmalloc(struct iommu *obj, u32 da, size_t bytes, u32 flags)
- 	if (!va)
- 		return -ENOMEM;
+-#define MDSTAT_STATE_MASK 0x1f
++#define MDSTAT_STATE_MASK	0x1f
  
--	flags &= IOVMF_HW_MASK;
- 	flags |= IOVMF_DISCONT;
- 	flags |= IOVMF_ALLOC;
- 
-@@ -795,7 +793,6 @@ u32 iommu_kmap(struct iommu *obj, u32 da, u32 pa, size_t bytes,
- 	if (!va)
- 		return -ENOMEM;
- 
--	flags &= IOVMF_HW_MASK;
- 	flags |= IOVMF_LINEAR;
- 	flags |= IOVMF_MMIO;
- 
-@@ -853,7 +850,6 @@ u32 iommu_kmalloc(struct iommu *obj, u32 da, size_t bytes, u32 flags)
- 		return -ENOMEM;
- 	pa = virt_to_phys(va);
- 
--	flags &= IOVMF_HW_MASK;
- 	flags |= IOVMF_LINEAR;
- 	flags |= IOVMF_ALLOC;
+ #ifndef __ASSEMBLER__
  
 -- 
-1.7.1
+1.7.3.2
