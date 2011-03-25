@@ -1,54 +1,51 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 25 Mar 2011 22:03:24 +0100 (CET)
-Subject: [patch 17/23] arm: at91: Cleanup irq chip
-In-Reply-To: <20110325132048.996818347@linutronix.de>
-References: <20110325131617.258789658@linutronix.de>
-	<20110325132048.996818347@linutronix.de>
-Message-ID: <alpine.LFD.2.00.1103252202440.31464@localhost6.localdomain6>
+From: tixy@yxit.co.uk (Tixy)
+Date: Fri, 25 Mar 2011 21:19:04 +0000
+Subject: [PATCH] kprobes/arm: fix emulation of LDR/STR instruction when
+	Rn == PC
+In-Reply-To: <1301072519-27937-1-git-send-email-viktor.rosendahl@nokia.com>
+References: <1301072519-27937-1-git-send-email-viktor.rosendahl@nokia.com>
+Message-ID: <1301087944.2744.85.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Mar 2011, Thomas Gleixner wrote:
-
-> Avoid the whole lazy disable dance in the demux handler by providing a
-> irq_disable() callback.
+On Fri, 2011-03-25 at 19:01 +0200, Viktor Rosendahl wrote:
+> The Rn value from the emulation is unconditionally written back; this is fine
+> as long as Rn != PC because in that case, even if the instruction isn't a write
+> back instruction, it will only result in the same value being written back.
 > 
-> Use the proper accessor functions and tidy up gpio_irq_handler()
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/arm/mach-at91/gpio.c |   31 +++++++++----------------------
->  1 file changed, 9 insertions(+), 22 deletions(-)
-> 
-> Index: linux-2.6-tip/arch/arm/mach-at91/gpio.c
-> ===================================================================
-> --- linux-2.6-tip.orig/arch/arm/mach-at91/gpio.c
-> +++ linux-2.6-tip/arch/arm/mach-at91/gpio.c
-> @@ -375,6 +375,7 @@ static int gpio_irq_type(struct irq_data
->  
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
-> +	.irq_disable	= gpio_irq_mask,
->  	.irq_mask	= gpio_irq_mask,
->  	.irq_unmask	= gpio_irq_unmask,
->  	.irq_set_type	= gpio_irq_type,
-> @@ -384,16 +385,14 @@ static struct irq_chip gpio_irqchip = {
->  static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  {
->  	unsigned	pin;
-> -	struct irq_desc	*gpio;
-> -	struct at91_gpio_chip *at91_gpio;
-> -	void __iomem	*pio;
-> +	struct irq_data *idata = irq_desc_get_irq_data(desc);
-> +	struct irq_chip *chip = irq_data_get_chip(data);
-> +	struct at91_gpio_chip *at91_gpio = irq_data_get_chip_data(data);
+> In case Rn == PC, then the emulated instruction doesn't have the actual PC
+> value in Rn but an adjusted value; when this is written back, it will result in
+> the PC being incorrectly updated.
 
-Sorry, needs to be
+It looks like we have the same problem with emulate_ldrd and
+emulate_strd as well.
 
-+	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(data);
+> An altenative solution would be to check bits 24 and 22 to see whether the
+> instruction actually is a write back instruction or not. I think it's
+> enough to check whether Rn != PC,  because:
+> - it's looks cheaper than the alternative
+> - to my understaning it's not permitted to update the PC with a write back
+> instruction, so we don't lose any ability to emulate legal instructions.
+> - in case of writing back for non write back instructions where Rn != PC, it
+> doesn't matter because the values are the same.
 
-Will fix and resend.
+I agree that the check for Rn != PC seems simplest and sufficient.
 
-Thanks,
+> Regarding the second point above, it would possibly be prudent to add some
+> checking to prep_emulate_ldr_str(), so that instructions with write back and
+> Rn == PC would be rejected.
 
-	tglx
+I don't think it is worth adding code to check for illegal instructions.
+The toolchain shouldn't generate them in the first place, and there are
+many places in the kprobe code which doesn't bother checking; there are
+even comments like "may be invalid, don't care".
+
+[...]
+
+I'm currently working on implementing Thumb support in kprobes and am
+writing test code as part of that. I planned on adding test cases for
+ARM so hopefully will catch a few more instruction emulation bugs (if
+there are any to be found).
+
+-- 
+Tixy
