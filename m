@@ -1,31 +1,38 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 Mar 2011 07:51:58 -0700
-Subject: [PATCH 2/6] arm: mach-omap2: smartreflex: fix sr_late_init()
-	error path in probe
-In-Reply-To: <4D8C1111.7030807@ti.com> (Nishanth Menon's message of "Fri, 25
-	Mar 2011 09:20:41 +0530")
-References: <1300984535-10530-1-git-send-email-aaro.koskinen@nokia.com>
-	<1300984535-10530-2-git-send-email-aaro.koskinen@nokia.com>
-	<87fwqczbba.fsf@ti.com> <4D8C1111.7030807@ti.com>
-Message-ID: <87bp0zw8vl.fsf@ti.com>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 25 Mar 2011 15:00:51 +0000
+Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <201103251550.26117.arnd@arndb.de>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<201103251424.47141.arnd@arndb.de> <4D8C99CC.5020103@linaro.org>
+	<201103251550.26117.arnd@arndb.de>
+Message-ID: <4D8CAE23.5080906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
-
-> Kevin Hilman wrote, on 03/24/2011 10:48 PM:
->> Also, I renamed the subject/shortlog to use 'OMAP2+: smartreflex: ..."
->> instead of 'arm: mach-omap2'.
+On 03/25/2011 02:50 PM, Somebody in the thread at some point said:
+> On Friday 25 March 2011, Andy Green wrote:
+>> I see.  It would work OK then.  They probably wouldn't want to blow
+>> their $1750 just on Panda though, so maybe they set 4 bits or whatever
+>> and let 20 be computed.
 >
-> might be better to be OMAP3+ we dont have SR on OMAP2 :)
->
+> Well, if the algorithm is defined well, it could be used for any device
+> based on OMAP. The marketing department could turn this into a win by
+> declaring "does not require external EEPROM for ethernet mac address" ;-)
 
-Good point.  Will use OMAP3+.
+Okay, can't argue with it ^^
 
-Thanks,
+> * Some places try to keep a database of all used machines and their MAC
+> addresses to monitor who connects to the network. This requires the address
+> to be stable. It also prevents the use of virtualization, so it's becoming
+> less common.
 
-Kevin
+They will probably just be happy the crazy noise they have been seeing 
+from current Panda MACs changing every session will go away, it doesn't 
+seem to add anything it's an OUI namespace MAC.  In the patch case the 
+"locally administered" mac will be "stable".
 
-P.S. Nishanth, as you are one of the primary developers on SR, any
-     acks, reviewed-bys from you are most welcome on SR patches.
-     Thanks.
+Anyway since I understood it, I can see your idea is a cool approach, 
+it's up to TI what they will do about it but I guess it's OK with or 
+without it.
+
+-Andy
