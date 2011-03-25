@@ -1,55 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 Mar 2011 08:24:10 -0700
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com> (Santosh
-	Shilimkar's message of "Fri, 25 Mar 2011 12:35:00 +0530")
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-	<49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
-	<87pqpxbqho.fsf@ti.com> <87mxkk1rni.fsf@ti.com>
-	<86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com>
-Message-ID: <87mxkjusth.fsf@ti.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Fri, 25 Mar 2011 08:28:57 -0700
+Subject: how can I cleanly exclude memory from the kernel memory allocator?
+In-Reply-To: <alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
+	<alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+Message-ID: <20110325152857.GB29359@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Santosh,
+On 24 Mar 11 19:27, Nicolas Pitre wrote:
+> On Thu, 24 Mar 2011, Larry Bassel wrote:
+> 
+> > I want to (early in system initialization) exclude some
+> > contiguous physical memory from one or more memory banks
+> > so that it won't be mapped in the normal kernel 1-to-1 mapping
+> > (so that it can be mapped uncached, strongly ordered, etc.
+> > as needed -- I know that it is forbidden to have a cached
+> > and an uncached mapping to the same memory) and so that it
+> > won't be freed into the kernel memory allocator (so that
+> > it won't fragment and can be allocated using genalloc).
+> > 
+> > I have tried to find a clean way to do this, but none of
+> > the approaches I've considered seem very good:
+> > 
+> > 1. Add a hook to the memory tag parsing routine to (possibly)
+> > change each tag before arm_add_memory() is called,
+> > or alter arm_add_memory() itself.
+> 
+> There is already a hook for that.  In your machine descriptor you can 
+> add a .fixup method to do just that.  See tag_fixup_mem32() in 
+> arch/arm/mach-orion5x/common.c for a usage example.
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+I thought fixup was called before the tags were parsed so
+that one could (for instance) set up a memory configuration
+which would override the tags (such as what is done in 
+arch/arm/mach-msm/board-halibut,c) -- while I could presumably
+parse the tags myself there to get the memory map
+that the bootloader passed in (and alter it), this seems like
+a duplication of effort.
 
-[...]
+> 
+> 
+> Nicolas
 
->> Can you rebase and repost your v3 series, I'd like to get this
->> queued up early in the 2.6.40 dev cycle.
->>
->> You can base on my current pm-core branch, which also has Russell's
->> devel-stable branch merged in.
->>
-> I pulled your latest pm-core branch
-> ------
-> commit 61cbb3172176b84c106bf0f4c32317c472932ab5
-> Merge: d0cf394... da19719...
-> Author: Kevin Hilman <khilman@ti.com>
-> Date:   Wed Mar 23 16:33:01 2011 -0700
->
->     Merge branch 'for_2.6.40/pm-misc' into pm-reset
-> -----------------
-> Looks like Russell's devel branch isn't merged in pm-core.
-> I didn't find the relevant patches.
+Larry
 
-hmm, you're right.  I'm actually pulling Russell's devel-stable branch
-not his devel branch.  I assumed they were in devel-stable as well.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> By the way the relevant ARM patches are already in mainline.  So if
-> the pm-core is rebased against latest mainline, we can get those
-> changes as well.
-
-Before I rebase, I'll wait at least until -rc1 and/or Tony rebases to
-mainline.
-
-In the mean time, can you create two branches?  One with the
-dependencies and another with the OMAP4 PM series.  After some final
-review and testing, I'll merge the latter series and by then we'll
-probably have an -rc1 baseline.
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
