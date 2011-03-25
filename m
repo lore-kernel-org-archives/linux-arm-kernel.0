@@ -1,78 +1,61 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 25 Mar 2011 11:57:07 +0000
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-In-Reply-To: <OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
-References: <20110324141826.GA3810@arm.com>
-	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
-	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>
-	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
-	<AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>
-	<OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
-Message-ID: <AANLkTi=VtCy9MrY5+wGYfh9+otWy87WmFZkmGN-PqMPo@mail.gmail.com>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 25 Mar 2011 12:08:59 +0000
+Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <201103251249.32578.arnd@arndb.de>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<20110324212729.14936.98130.stgit@otae.warmcat.com>
+	<201103251249.32578.arnd@arndb.de>
+Message-ID: <4D8C85DB.6060001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 6:11 PM, Ulrich Weigand
-<Ulrich.Weigand@de.ibm.com> wrote:
-> Dave Martin <dave.martin@linaro.org> wrote:
->> On Thu, Mar 24, 2011 at 4:40 PM, Ulrich Weigand
-> <Ulrich.Weigand@de.ibm.com> wrote:
->> > I would prefer to keep the contents of NT_VFPREGSET identical to the
->> > contents of the PTRACE_GETVPFREGS/PTRACE_SETVPFREGS buffer:
->> >
->> > - This would allow implementation via the new generic user_regset_view
->> > ?mechanism (which the ARM kernel doesn't use yet, but probably should)
->> >
->> > - In any case, GDB likes to have the same set of information available
->> > ?when debugging core files and native targets
->> >
->> > So if there is indeed additional information that would be interesting,
->> > I'd argue this should be presented as a *new* core file note, *and* as
->> > a new set of PTRACE_... APIs. ? (But for GDB's purpose NT_AUXV right
->> > now is sufficent. ?Everything else could be displayed to the user if
->> > of interest.)
+On 03/25/2011 11:49 AM, Somebody in the thread at some point said:
+> On Thursday 24 March 2011, Andy Green wrote:
+>> Introduce a generic helper function that can set a MAC address using
+>> data from the OMAP unique CPU ID register.
 >>
->> OK, that sounds reasonable.
+>> For comparison purposes this produces a MAC address of
 >>
->> If I'm reading the kernel code correctly, the size of the data
->> returned by PTRACE_GETVFPREGS is already dependent on the number of
->> registers (D16/D32) implemented by the hardware, and this is
->> determinable from the auxv contents; so I guess we don't have a new
->> problem to solve here.
+>>    2e:40:70:f0:12:06
 >>
->> The other info can always be added in a later pass, if it looks like
->> it would be useful...
+>> for the ethernet device on my Panda.
+>>
+>>
+>> Note that this patch requires the fix patch for CPU ID register
+>> indexes previously posted to linux-omap, otherwise the CPU ID is
+>> misread on Panda by the existing function to do it.  This patch
+>> is already on linux-omap.
+>>
+>> "OMAP2+:Common CPU DIE ID reading code reads wrong registers for OMAP4430"
+>> http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=b235e007831dbf57710e59cd4a120e2f374eecb9
+>>
+>> Signed-off-by: Andy Green<andy.green@linaro.org>
 >
-> OK, agreed.
->
-> So to summarize: the kernel will write additional note sections as if
-> generated via user_regset_view, containing the PTRACE_GETVFPREGS data.
->
-> Note name: "LINUX"
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
 
-Why "LINUX" and not "CORE"?  I don't understand the distinction... are
-the "CORE" notes common to all platforms / all ELF implementations?
+Thanks.
 
-> Note type: t.b.d. [*]
+> TI folks: While this is a working solution, I still think it would
+> be good to get an officially sanctioned method that allows the creation
+> of a IEEE 802 MAC address in a range assigned to TI instead of using
+> an address from the locally administered range.
 >
-> [*] Looking at elf.h a logical name/value might be:
->
-> #define NT_ARM_VFP ? ? ? ? ? ?0x400 ? ? ? ? ? ? /* ARM VFP/NEON registers */
->
->
-> GDB support along those lines ought to be straightforward.
+> Is that something that can be done?
 
-It's been suggested that the new note should include a version/flags
-field alongside the ptrace-like register dump, so that if the format
-turns out to be inadequate / broken, it can be extended in a
-compatible way.
+Having a proper MAC from IEEE assigned for each interface is of course 
+ideal.
 
-However, nothing else in the coredump or the ptrace interface seems to
-have such versioning implementation.  Ptrace gets extended by adding
-more and more ptrace call types instead.  Adding version fields, while
-sensible, seems inconsistent with the current implementation.
+But even if that happened today though, on Panda there is no "board 
+identity storage" to put the reserved MAC addresses in to bind it to the 
+physical board.  If you try to manage them on SD Card, you have the 
+problem of dealing with correct MAC addresses needing putting there 
+again every time it is nuked.  So it doesn't in itself help in the Panda 
+case.
 
-What's your view on adding a flags field to the VFP state dump?
+David Anders mentioned yesterday that for next OMAP board, he probably 
+puts a general board identity EEPROM where one could stash MACs.  This 
+kind of API can be extended to query the EEPROM at device-register-time 
+and fetch the MAC instead of compute it.  So I think we go in a 
+reasonable direction even when it is possible to get assigned MACs.
 
-Cheers
----Dave
+-Andy
