@@ -1,193 +1,106 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Mar 2011 17:35:30 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add Atmel mXT touchscreen device to the NURI
-	board
-In-Reply-To: <1300258751-662-1-git-send-email-jy0922.shim@samsung.com>
-References: <1300258751-662-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <000601cbeac7$9e8d8f60$dba8ae20$%kim@samsung.com>
+From: arno.steffen@googlemail.com (Arno Steffen)
+Date: Fri, 25 Mar 2011 09:46:43 +0100
+Subject: IRQ handler under load - slow response
+In-Reply-To: <20110324144518.GA27661@e-circ.dyndns.org>
+References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+	<20110309152252.GB333@e-circ.dyndns.org>
+	<AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
+	<20110314144715.GH333@e-circ.dyndns.org>
+	<AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
+	<20110324144518.GA27661@e-circ.dyndns.org>
+Message-ID: <AANLkTikQhKz73sv1so2EepdeP5Nh6ZiLJ4+MKcNkt+u=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
-> 
-> This patch is to support Atmel mXT touchscreen device to the NURI board.
-> 
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Hi,
-> 
-> This patch is created at the source tree merged next branch of
-> git.kernel.org/pub/scm/linux/kernel/git/dtor/input.git to next-exynos4
-branch
-> of
-> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> 
-> Thanks.
-> 
->  arch/arm/mach-exynos4/Kconfig     |    2 +
->  arch/arm/mach-exynos4/mach-nuri.c |   89
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 91 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index 82195a9..74a5ff6 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -151,8 +151,10 @@ config MACH_NURI
->  	select S3C_DEV_HSMMC2
->  	select S3C_DEV_HSMMC3
->  	select S3C_DEV_I2C1
-> +	select S3C_DEV_I2C3
->  	select S3C_DEV_I2C5
->  	select EXYNOS4_SETUP_I2C1
-> +	select EXYNOS4_SETUP_I2C3
->  	select EXYNOS4_SETUP_I2C5
->  	select EXYNOS4_SETUP_SDHCI
->  	select SAMSUNG_DEV_PWM
-> diff --git a/arch/arm/mach-exynos4/mach-nuri.c
-b/arch/arm/mach-exynos4/mach-
-> nuri.c
-> index b79ad01..cf354e2 100644
-> --- a/arch/arm/mach-exynos4/mach-nuri.c
-> +++ b/arch/arm/mach-exynos4/mach-nuri.c
-> @@ -12,6 +12,7 @@
->  #include <linux/serial_core.h>
->  #include <linux/input.h>
->  #include <linux/i2c.h>
-> +#include <linux/i2c/atmel_mxt_ts.h>
->  #include <linux/gpio_keys.h>
->  #include <linux/gpio.h>
->  #include <linux/regulator/machine.h>
-> @@ -30,6 +31,8 @@
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/sdhci.h>
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/iic.h>
-> 
->  #include <mach/map.h>
-> 
-> @@ -257,6 +260,88 @@ static struct i2c_board_info i2c1_devs[] __initdata =
-{
->  	/* Gyro, To be updated */
->  };
-> 
-> +/* TSP */
-> +static u8 mxt_init_vals[] = {
-> +	/* MXT_GEN_COMMAND(6) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_GEN_POWER(7) */
-> +	0x20, 0xff, 0x32,
-> +	/* MXT_GEN_ACQUIRE(8) */
-> +	0x0a, 0x00, 0x05, 0x00, 0x00, 0x00, 0x09, 0x23,
-> +	/* MXT_TOUCH_MULTI(9) */
-> +	0x00, 0x00, 0x00, 0x13, 0x0b, 0x00, 0x00, 0x00, 0x02, 0x00,
-> +	0x00, 0x01, 0x01, 0x0e, 0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00,
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	0x00,
-> +	/* MXT_TOUCH_KEYARRAY(15) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
-> +	0x00,
-> +	/* MXT_SPT_GPIOPWM(19) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_PROCI_GRIPFACE(20) */
-> +	0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x28, 0x04,
-> +	0x0f, 0x0a,
-> +	/* MXT_PROCG_NOISE(22) */
-> +	0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x23, 0x00,
-> +	0x00, 0x05, 0x0f, 0x19, 0x23, 0x2d, 0x03,
-> +	/* MXT_TOUCH_PROXIMITY(23) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	0x00, 0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_PROCI_ONETOUCH(24) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_SPT_SELFTEST(25) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_PROCI_TWOTOUCH(27) */
-> +	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +	/* MXT_SPT_CTECONFIG(28) */
-> +	0x00, 0x00, 0x02, 0x08, 0x10, 0x00,
-> +};
-> +
-> +static struct mxt_platform_data mxt_platform_data = {
-> +	.config			= mxt_init_vals,
-> +	.config_length		= ARRAY_SIZE(mxt_init_vals),
-> +
-> +	.x_line			= 18,
-> +	.y_line			= 11,
-> +	.x_size			= 1024,
-> +	.y_size			= 600,
-> +	.blen			= 0x1,
-> +	.threshold		= 0x28,
-> +	.voltage		= 2800000,              /* 2.8V */
-> +	.orient			= MXT_DIAGONAL_COUNTER,
-> +	.irqflags		= IRQF_TRIGGER_FALLING,
-> +};
-> +
-> +static struct s3c2410_platform_i2c i2c3_data __initdata = {
-> +	.flags		= 0,
-> +	.bus_num	= 3,
-> +	.slave_addr	= 0x10,
-> +	.frequency	= 400 * 1000,
-> +	.sda_delay	= 100,
-> +};
-> +
-> +static struct i2c_board_info i2c3_devs[] __initdata = {
-> +	{
-> +		I2C_BOARD_INFO("atmel_mxt_ts", 0x4a),
-> +		.platform_data	= &mxt_platform_data,
-> +		.irq		= IRQ_EINT(4),
-> +	},
-> +};
-> +
-> +static void __init nuri_tsp_init(void)
-> +{
-> +	int gpio;
-> +
-> +	/* TOUCH_INT: XEINT_4 */
-> +	gpio = EXYNOS4_GPX0(4);
-> +	gpio_request(gpio, "TOUCH_INT");
-> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +}
-> +
->  /* GPIO I2C 5 (PMIC) */
->  static struct i2c_board_info i2c5_devs[] __initdata = {
->  	/* max8997, To be updated */
-> @@ -270,6 +355,7 @@ static struct platform_device *nuri_devices[]
-__initdata
-> = {
->  	&s3c_device_hsmmc3,
->  	&s3c_device_wdt,
->  	&s3c_device_timer[0],
-> +	&s3c_device_i2c3,
-> 
->  	/* NURI Devices */
->  	&nuri_gpio_keys,
-> @@ -287,8 +373,11 @@ static void __init nuri_map_io(void)
->  static void __init nuri_machine_init(void)
->  {
->  	nuri_sdhci_init();
-> +	nuri_tsp_init();
-> 
->  	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
-> +	s3c_i2c3_set_platdata(&i2c3_data);
-> +	i2c_register_board_info(3, i2c3_devs, ARRAY_SIZE(i2c3_devs));
->  	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
-> 
->  	/* Last */
-> --
-> 1.7.0.4
+2011/3/24 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+> On Thu, Mar 24, 2011 at 12:56:48PM +0100, Arno Steffen wrote:
+>> 2011/3/14 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+>> > On Mon, Mar 14, 2011 at 02:26:35PM +0100, Arno Steffen wrote:
+>> > Euhm, my proposed b) deals in kernel. I think your example is in userspace?
+>> > Maybe I don't understand your precise setup well.
+>> >
+>> > static irqreturn_t GpioIrqHandler (int irq, void *dev_id)
+>> > {
+>> > ? ?int s32GpioNumber = 0 ;
+>> > ? ?s32GpioNumber = irq - IH_GPIO_BASE;
+>> > ? ?set_bit (s32GpioNumber , (volatile unsigned long *) &gsts32GpioIrqStatus);
+>> > - ? tasklet_schedule (&GpioTasklet);
+>> > - ? return IRQ_HANDLED;
+>> > + ? return IRQ_WAKE_THREAD;
+>> > }
+>> >
+>> > -DECLARE_TASKLET(GpioTasklet, GpioIntrTasklet, 0);
+>> > static irqreturn_t GpioIrqThread(int irq, void *dev_id)
+>> > {
+>> > ? ? ? ?/* do whatever the tasklet was supposed to do */
+>> > }
+>> >
+>>
+>> Dear Kurt,
+>> I did as you proposed, but doesn't have the big picture
+>>
+>> I think there is a typo in your request_irq change:
+>
+>> Is this what you mean? What you have suggested is replacing a flag by
+>> a pointer - this cannot work. I can't see how ?GpioIrqHandler and
+>> GpioIrqThread are connected now.
+> my mistake, I had in mind to replace request_irq with 'requist_threaded_irq'.
+> sorry for that noise. ?(I hope you did not loose too much time with that :-) ).
+>
+> ? ? ? ?s32Status = request_threaded_irq((IH_GPIO_BASE + s32AppRecvGpioNum),
+> ? ? ? ? ? ? ? ? ? ? ? ?GpioIrqHandler, GpioIrqThread, 0, "GPIOINTR", NULL);
+>
+> And then, you can pull your tasklet out of the softirq thread into a seperate
+> kernel thread (which you can set SCHED_FIFO with sched_setscheduler(2)).
+>>
+>> I am not sure this help. The kernel thread might become a higher
+>> proirity, but what has to be improved is that the IRQ-routine in user
+>> space is responding faster.
+> This makes your bottom-halve respond regardless of the other load, due to the
+> scheduling policy.
+> This will not yet impact any userspace stuff. Therefore, set the scheduling
+> policy of you userspace task too.
+>
+> In fact, the latter (setting scheduling policy of the userspace) is probably
+> the first step to take. put:
+>
+> #include <sched.h>
+>
+>
+> int main(...) {
+> ? ? ? ?const struct sched_param sched_param = {
+> ? ? ? ? ? ? ? ?.sched_priority = 50,
+> ? ? ? ?};
+> ? ? ? ?int ret;
+>
+> ? ? ? ?ret = sched_setscheduler(0, SCHED_FIFO, &sched_param);
+> ? ? ? ?if (ret < 0)
+> ? ? ? ? ? ? ? ?perror(...);
+>
+> ? ? ? ?....
+> }
+>
+> into your userspace program.
+>>
+>> Does it make sense to send you the hole code? I am afraid that there
+>> is to much potential for misunderstanding.
+> This time, it was my wrong info.
+> I don't feel like digging in code yet, since it comprises very different parts
+> (kernel & userspace).
+>> Best regards
+>> Arno
 
-Ok, applied.
-Thanks.
+I get it working with your help. I see now threads for every IRQ I
+anounce to the system. Nevertheless it doesn't change the behaviour,
+even after increasing their prio. My assumption is: The kernel IRQs
+threads are processed fast, I do have the trouble on the user side of
+the IRQ handler.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+The best performance I get, if all processes on my device are running
+in policy OTHER. As soon as my code is running in FIFO or RR I have
+problems. If the IRQs-thread has higher priority it works better, but
+is far away from reliability of OTHER policy. This is in opposite to
+all what I know about scheduling policies.
+
+Best regards
+Arno
