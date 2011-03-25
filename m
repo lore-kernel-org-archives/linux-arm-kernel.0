@@ -1,61 +1,73 @@
-From: andy@warmcat.com (Andy Green)
-Date: Fri, 25 Mar 2011 12:08:59 +0000
-Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <201103251249.32578.arnd@arndb.de>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<20110324212729.14936.98130.stgit@otae.warmcat.com>
-	<201103251249.32578.arnd@arndb.de>
-Message-ID: <4D8C85DB.6060001@linaro.org>
+From: Ulrich.Weigand@de.ibm.com (Ulrich Weigand)
+Date: Fri, 25 Mar 2011 14:11:16 +0100
+Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
+In-Reply-To: <AANLkTi=VtCy9MrY5+wGYfh9+otWy87WmFZkmGN-PqMPo@mail.gmail.com>
+References: <20110324141826.GA3810@arm.com>	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
+	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
+	<AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>	<OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
+	<AANLkTi=VtCy9MrY5+wGYfh9+otWy87WmFZkmGN-PqMPo@mail.gmail.com>
+Message-ID: <OF13B038E5.B9DFA4EA-ONC125785E.0047A984-C125785E.004871A1@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2011 11:49 AM, Somebody in the thread at some point said:
-> On Thursday 24 March 2011, Andy Green wrote:
->> Introduce a generic helper function that can set a MAC address using
->> data from the OMAP unique CPU ID register.
->>
->> For comparison purposes this produces a MAC address of
->>
->>    2e:40:70:f0:12:06
->>
->> for the ethernet device on my Panda.
->>
->>
->> Note that this patch requires the fix patch for CPU ID register
->> indexes previously posted to linux-omap, otherwise the CPU ID is
->> misread on Panda by the existing function to do it.  This patch
->> is already on linux-omap.
->>
->> "OMAP2+:Common CPU DIE ID reading code reads wrong registers for OMAP4430"
->> http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=b235e007831dbf57710e59cd4a120e2f374eecb9
->>
->> Signed-off-by: Andy Green<andy.green@linaro.org>
+Dave Martin <dave.martin@linaro.org> wrote:
+> > So to summarize: the kernel will write additional note sections as if
+> > generated via user_regset_view, containing the PTRACE_GETVFPREGS data.
+> >
+> > Note name: "LINUX"
 >
-> Acked-by: Arnd Bergmann<arnd@arndb.de>
+> Why "LINUX" and not "CORE"?  I don't understand the distinction... are
+> the "CORE" notes common to all platforms / all ELF implementations?
 
-Thanks.
+Because that's what user_regset_view would do; all notes except the
+standard ones (NT_PRPSINFO, NT_PRSTATUS, NT_PRFPREG, NT_AUXV) have a
+note name of "LINUX".   I'm not completely sure about the rationale,
+but presumably it is indeed because the standard notes are more or less
+common across multiple platforms.
 
-> TI folks: While this is a working solution, I still think it would
-> be good to get an officially sanctioned method that allows the creation
-> of a IEEE 802 MAC address in a range assigned to TI instead of using
-> an address from the locally administered range.
+> > Note type: t.b.d. [*]
+> >
+> > [*] Looking at elf.h a logical name/value might be:
+> >
+> > #define NT_ARM_VFP ? ? ? ? ? ?0x400 ? ? ? ? ? ? /* ARM VFP/NEON
+registers */
+> >
+> >
+> > GDB support along those lines ought to be straightforward.
 >
-> Is that something that can be done?
+> It's been suggested that the new note should include a version/flags
+> field alongside the ptrace-like register dump, so that if the format
+> turns out to be inadequate / broken, it can be extended in a
+> compatible way.
+>
+> However, nothing else in the coredump or the ptrace interface seems to
+> have such versioning implementation.  Ptrace gets extended by adding
+> more and more ptrace call types instead.  Adding version fields, while
+> sensible, seems inconsistent with the current implementation.
+>
+> What's your view on adding a flags field to the VFP state dump?
 
-Having a proper MAC from IEEE assigned for each interface is of course 
-ideal.
+Again, if we want to use (or mimic) the user_regset_view mechanism,
+there is no choice in any of this; the content of the note will be
+exactly identical to the content of the ptrace buffer.  Since this
+is the way everybody else is using, I think we'd have to have really
+good arguments for deviating from it; I'm not sure I see those.
 
-But even if that happened today though, on Panda there is no "board 
-identity storage" to put the reserved MAC addresses in to bind it to the 
-physical board.  If you try to manage them on SD Card, you have the 
-problem of dealing with correct MAC addresses needing putting there 
-again every time it is nuked.  So it doesn't in itself help in the Panda 
-case.
+The usual way to deal with changes to the register set is to define
+*new* regset structures, which then translates to new ptrace commands
+and new core files notes, which are used instead of or in addition to
+the old ones ...
 
-David Anders mentioned yesterday that for next OMAP board, he probably 
-puts a general board identity EEPROM where one could stash MACs.  This 
-kind of API can be extended to query the EEPROM at device-register-time 
-and fetch the MAC instead of compute it.  So I think we go in a 
-reasonable direction even when it is possible to get assigned MACs.
 
--Andy
+Mit freundlichen Gruessen / Best Regards
+
+Ulrich Weigand
+
+--
+  Dr. Ulrich Weigand | Phone: +49-7031/16-3727
+  STSM, GNU compiler and toolchain for Linux on System z and Cell/B.E.
+  IBM Deutschland Research & Development GmbH
+  Vorsitzender des Aufsichtsrats: Martin Jetter | Gesch?ftsf?hrung: Dirk
+Wittkopp
+  Sitz der Gesellschaft: B?blingen | Registergericht: Amtsgericht
+Stuttgart, HRB 243294
