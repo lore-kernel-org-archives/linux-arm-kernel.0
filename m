@@ -1,76 +1,51 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 25 Mar 2011 14:49:00 +0530
-Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
-In-Reply-To: <4D8B8715.2000407@mvista.com>
-References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
-	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
-	<4D89E308.8060404@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
-	<4D8B415A.2050706@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
-	<4D8B8715.2000407@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C5326A1@dbde02.ent.ti.com>
+From: kurt.van.dijck@eia.be (Kurt Van Dijck)
+Date: Fri, 25 Mar 2011 10:53:08 +0100
+Subject: IRQ handler under load - slow response
+In-Reply-To: <AANLkTikQhKz73sv1so2EepdeP5Nh6ZiLJ4+MKcNkt+u=@mail.gmail.com>
+References: <AANLkTinTCfrPPwP6ZnWZTWW8vmR4=Uaw+OmHK7b99-9g@mail.gmail.com>
+	<20110309152252.GB333@e-circ.dyndns.org>
+	<AANLkTikCSE3xOYsAnSJQQnW9iTrwbvoscU8hikkewGh6@mail.gmail.com>
+	<20110314144715.GH333@e-circ.dyndns.org>
+	<AANLkTinmQ0seioxSPaj8eqHAwuDpuDSCSmg=BTYHbrkT@mail.gmail.com>
+	<20110324144518.GA27661@e-circ.dyndns.org>
+	<AANLkTikQhKz73sv1so2EepdeP5Nh6ZiLJ4+MKcNkt+u=@mail.gmail.com>
+Message-ID: <20110325095308.GB349@e-circ.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Fri, Mar 25, 2011 at 09:46:43AM +0100, Arno Steffen wrote:
+> 2011/3/24 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+> > On Thu, Mar 24, 2011 at 12:56:48PM +0100, Arno Steffen wrote:
+> >> 2011/3/14 Kurt Van Dijck <kurt.van.dijck@eia.be>:
+> >> > On Mon, Mar 14, 2011 at 02:26:35PM +0100, Arno Steffen wrote:
+> 
+> I get it working with your help. I see now threads for every IRQ I
+> anounce to the system.
+Good news. I'm in fact a bit curious to the results...
+> Nevertheless it doesn't change the behaviour,
+> even after increasing their prio. My assumption is: The kernel IRQs
+> threads are processed fast, I do have the trouble on the user side of
+> the IRQ handler.
+> 
+> The best performance I get, if all processes on my device are running
+> in policy OTHER.
+Just to update my memory: I think threaded-irq will give:
+* less peak perfomance
+* less average performance
+* better 'worst' performance
+ie. There should be much less jitter in the performance measurement.
+> As soon as my code is running in FIFO or RR I have
+> problems. If the IRQs-thread has higher priority it works better, but
+> is far away from reliability of OTHER policy.
+That's less good news.
+I suppose you have enabled all relevant RT & preemptive options.
+Then I'm out of ideas too.
+> This is in opposite to
+> all what I know about scheduling policies.
+Ack.
+> 
+> Best regards
+> Arno
 
-On Thu, Mar 24, 2011 at 23:31:57, Sergei Shtylyov wrote:
-> Hello.
-> 
-> Nori, Sekhar wrote:
-> 
-> >>>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> >>>>> index 68fe4c2..276199d 100644
-> >>>>> --- a/arch/arm/mach-davinci/da850.c
-> >>>>> +++ b/arch/arm/mach-davinci/da850.c
-> >>>>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
-> >>>>>    	.flags		= DA850_CLK_ASYNC3,
-> >>>>>    };
-> >>>>>
-> >>>>> +static struct clk sata_clk = {
-> >>>>> +	.name		= "sata",
-> >>>>> +	.parent		=&pll0_sysclk2,
-> >>>>> +	.lpsc		= DA850_LPSC1_SATA,
-> >>>>> +	.gpsc		= 1,
-> >>>>> +	.flags		= PSC_FORCE,
-> >>>>> +};
-> >>>>> +
-> >>>>>    static struct clk_lookup da850_clks[] = {
-> >>>>>    	CLK(NULL,		"ref",		&ref_clk),
-> >>>>>    	CLK(NULL,		"pll0",		&pll0_clk),
-> >>>>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
-> >>>>>    	CLK(NULL,		"usb20",	&usb20_clk),
-> >>>>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
-> >>>>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
-> >>>>> +	CLK("ahci",		NULL,		&sata_clk),
-> >>>>>    	CLK(NULL,		NULL,		NULL),
-> >>>>>    };
-> 
-> >>>>      I'd put the above into a separate patch...
-> 
-> >>> Why should addition of clock data not be in the same patch
-> >>> as the one which adds platform resources etc? It is not a big
-> >>> deal to change, but I would like to know why you request this.
-> 
-> >>     I didn't request anything, I just said what I'd have done. :-)
-> 
-> > Okay. I guess I will keep it as is.
-> 
-> >> I think modifying the DA8xx-common and DA850-specific files should better be 
-> >> done separately. Although in this case we're adding DA850 only device, so 
-> >> perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
-> 
-> > Good point. Will add the #ifdef.
-> 
->     Or perhaps the device should just be placed in da850.c instead?
-
-Um, no. da850.c is currently free from any peripheral specific
-functionality and would like to keep it that way. MMC/SD1 is
-DA850 specific as well, and has been kept in devices-da8xx.c.
-I think consolidating all peripheral specific code in devices-da8xx.c
-is a better idea.
-
-Thanks,
-Sekhar
+Regards,
+Kurt
