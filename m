@@ -1,15 +1,16 @@
 From: lbassel@codeaurora.org (Larry Bassel)
-Date: Fri, 25 Mar 2011 10:37:12 -0700
+Date: Fri, 25 Mar 2011 10:39:28 -0700
 Subject: how can I cleanly exclude memory from the kernel memory allocator?
-In-Reply-To: <AANLkTinKketbDZ87Qp400uzSBv5t3bF9azJgXqbwudL9@mail.gmail.com>
+In-Reply-To: <alpine.LFD.2.00.1103241912390.11889@xanadu.home>
 References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-	<AANLkTinKketbDZ87Qp400uzSBv5t3bF9azJgXqbwudL9@mail.gmail.com>
-Message-ID: <20110325173712.GC29359@labbmf-linux.qualcomm.com>
+	<alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+Message-ID: <20110325173928.GD29359@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 Mar 11 16:14, Colin Cross wrote:
-> On Thu, Mar 24, 2011 at 3:18 PM, Larry Bassel <lbassel@codeaurora.org> wrote:
+On 24 Mar 11 19:27, Nicolas Pitre wrote:
+> On Thu, 24 Mar 2011, Larry Bassel wrote:
+> 
 > > I want to (early in system initialization) exclude some
 > > contiguous physical memory from one or more memory banks
 > > so that it won't be mapped in the normal kernel 1-to-1 mapping
@@ -18,51 +19,30 @@ On 24 Mar 11 16:14, Colin Cross wrote:
 > > and an uncached mapping to the same memory) and so that it
 > > won't be freed into the kernel memory allocator (so that
 > > it won't fragment and can be allocated using genalloc).
-> >
+> > 
 > > I have tried to find a clean way to do this, but none of
 > > the approaches I've considered seem very good:
-> >
+> > 
 > > 1. Add a hook to the memory tag parsing routine to (possibly)
 > > change each tag before arm_add_memory() is called,
 > > or alter arm_add_memory() itself.
-> > 2. Add a hook at the beginning of paging_init() to inspect
-> > and alter the meminfo memory bank starts and sizes as needed.
-> > 3. Wait until after the memory is added to the normal
-> > kernel memory pool and somehow get it back out
-> > (I can't use alloc_bootmem() or related functionality of course
-> > since then the memory will be part of the cached kernel 1-to-1 1M
-> > page mapping, precluding use of ioremap() on it).
-> >
-> > A further drawback for #1 is that I'd really like to
-> > see all of the available memory banks before deciding which
-> > memory to steal (we often have multiple memory banks on
-> > our platforms).
-> >
-> > Perhaps there is a solution for this problem that already exists
-> > that I'm unaware of (or at least community consensus about how
-> > one should add this functionality).
-> >
-> > I believe Russell King has stated that he intends
-> > to carve out memory that can be used for dma_alloc_coherent(),
-> > that won't be mapped otherwise by the kernel.
-> >
-> > I'd like to know how he is planning to do this, as I could hopefully
-> > do something similar.
-> >
-> > Thanks.
-> >
-> > Larry Bassel
 > 
-> You want memblock_remove, called from the new .reserve machine entry
-> function.  See arch/arm/plat-omap/devices.c for an example.
+> There is already a hook for that.  In your machine descriptor you can 
+> add a .fixup method to do just that.  See tag_fixup_mem32() in 
+> arch/arm/mach-orion5x/common.c for a usage example.
 
-Yes, this is effectively my option #2 (reserve memory after the tags
-are parsed and before paging_init). This looks like a good approach.
+OK, please ignore my previous mail, I see that .fixup can be
+used to adjust tags. It appears to me, however, that using a
+.reserve function calling memblock_reserve will be an
+easier way of doing what I need.
 
 Thanks.
 
-Larry
+> 
+> 
+> Nicolas
 
+Larry
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
 > the body of a message to majordomo at vger.kernel.org
