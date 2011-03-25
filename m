@@ -1,44 +1,40 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 25 Mar 2011 13:51:10 +0000
-Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
-In-Reply-To: <OFD0474D33.663BAB94-ONC125785E.004ABB86-C125785E.004B1C72@de.ibm.com>
-References: <20110324141826.GA3810@arm.com>
-	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
-	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>
-	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
-	<AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>
-	<OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
-	<AANLkTi=VtCy9MrY5+wGYfh9+otWy87WmFZkmGN-PqMPo@mail.gmail.com>
-	<OF13B038E5.B9DFA4EA-ONC125785E.0047A984-C125785E.004871A1@de.ibm.com>
-	<AANLkTi=zrf-_S3fFFb69SXPvGhZawwEY94kt74CVC8-n@mail.gmail.com>
-	<OFD0474D33.663BAB94-ONC125785E.004ABB86-C125785E.004B1C72@de.ibm.com>
-Message-ID: <AANLkTimN8nGe=FTyE7V+Yz_6=mopU0GRC39rWCy9g3-o@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Mar 2011 15:50:25 +0100
+Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <4D8C99CC.5020103@linaro.org>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<201103251424.47141.arnd@arndb.de> <4D8C99CC.5020103@linaro.org>
+Message-ID: <201103251550.26117.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2011 at 1:40 PM, Ulrich Weigand
-<Ulrich.Weigand@de.ibm.com> wrote:
-> Dave Martin <dave.martin@linaro.org> wrote:
->
->> I was indeed thinking that it might be a good idea to take this
->> opportunity to migrate to using regsets; though for simplicity, I'll
->> probably avoid this for the first iteration.
->>
->> Will this have any impact on the ptrace interface?
->
-> Well, once you support regsets, the PTRACE_GETREGSET/PTRACE_SETREGSET
-> commands will start working. ?However, on platforms that already had
-> commands to access registers, platform-specific code will of course
-> need to continue to support those.
+On Friday 25 March 2011, Andy Green wrote:
+> I see.  It would work OK then.  They probably wouldn't want to blow 
+> their $1750 just on Panda though, so maybe they set 4 bits or whatever 
+> and let 20 be computed.
 
-Ah, right -- I wondered if there was something like this, but
-initially I'd just been looking at the ptrace man page; I guess it's
-rather too out-of-date for this.
+Well, if the algorithm is defined well, it could be used for any device
+based on OMAP. The marketing department could turn this into a win by
+declaring "does not require external EEPROM for ethernet mac address" ;-)
+ 
+> However, the only practical advantage is that it would show up as a TI 
+> MAC in an OUI database.  The "locally administered" address as used at 
+> the moment is otherwise legal in every respect AFAIK.
 
->
-> See e.g. arch/powerpc/kernel/ptrace.c, which by now implements all
-> of its legacy ptrace register commands in terms of regset functions.
+It should work almost always, except in very special corner cases:
 
-OK, I'll take a look -- thanks.
+* If you have a netboot setup, you want the boot loader to use the
+same mac address for requesting the kernel image that you use later,
+otherwise the switch might consider it a MAC spoofing attach and disable
+the port. The obvious workaround is to put your code into the boot loader
+as well.
 
----Dave
+* Some environments might be configured to disallow locally administered
+MAC addresses for "security" reasons. A bit bogus, but not unheard of.
+
+* Some places try to keep a database of all used machines and their MAC
+addresses to monitor who connects to the network. This requires the address
+to be stable. It also prevents the use of virtualization, so it's becoming
+less common.
+
+	Arnd
