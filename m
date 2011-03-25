@@ -1,55 +1,38 @@
-From: lbassel@codeaurora.org (Larry Bassel)
-Date: Fri, 25 Mar 2011 08:28:57 -0700
-Subject: how can I cleanly exclude memory from the kernel memory allocator?
-In-Reply-To: <alpine.LFD.2.00.1103241912390.11889@xanadu.home>
-References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
-	<alpine.LFD.2.00.1103241912390.11889@xanadu.home>
-Message-ID: <20110325152857.GB29359@labbmf-linux.qualcomm.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Fri, 25 Mar 2011 09:28:53 -0600
+Subject: [PATCH 0/8] ux500: support for snowball board V2 
+Message-ID: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 Mar 11 19:27, Nicolas Pitre wrote:
-> On Thu, 24 Mar 2011, Larry Bassel wrote:
-> 
-> > I want to (early in system initialization) exclude some
-> > contiguous physical memory from one or more memory banks
-> > so that it won't be mapped in the normal kernel 1-to-1 mapping
-> > (so that it can be mapped uncached, strongly ordered, etc.
-> > as needed -- I know that it is forbidden to have a cached
-> > and an uncached mapping to the same memory) and so that it
-> > won't be freed into the kernel memory allocator (so that
-> > it won't fragment and can be allocated using genalloc).
-> > 
-> > I have tried to find a clean way to do this, but none of
-> > the approaches I've considered seem very good:
-> > 
-> > 1. Add a hook to the memory tag parsing routine to (possibly)
-> > change each tag before arm_add_memory() is called,
-> > or alter arm_add_memory() itself.
-> 
-> There is already a hook for that.  In your machine descriptor you can 
-> add a .fixup method to do just that.  See tag_fixup_mem32() in 
-> arch/arm/mach-orion5x/common.c for a usage example.
+From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
 
-I thought fixup was called before the tags were parsed so
-that one could (for instance) set up a memory configuration
-which would override the tags (such as what is done in 
-arch/arm/mach-msm/board-halibut,c) -- while I could presumably
-parse the tags myself there to get the memory map
-that the bootloader passed in (and alter it), this seems like
-a duplication of effort.
+This suite of patches is the second, re-worked version for
+the support of the snowball board.
 
-> 
-> 
-> Nicolas
+Mathieu J. Poirier (8):
+  ux500: adding machine ID for snowball.
+  ux500: adding new board file for snowball.
+  ux500: setting proper uart for snowball
+  ux500: adding custom pin configuration file for snowball
+  ux500: adding SDI support for snowball board
+  ux500: fixing irq header file dependency.
+  ux500: adding config file options for snowball board.
+  ux500: Kconfig for snowball board
 
-Larry
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ arch/arm/configs/u8500_defconfig                   |   18 +-
+ arch/arm/mach-ux500/Kconfig                        |    6 +
+ arch/arm/mach-ux500/Makefile                       |    3 +
+ arch/arm/mach-ux500/board-mop500-sdi.c             |   31 ++-
+ arch/arm/mach-ux500/board-mop500.h                 |    5 +
+ arch/arm/mach-ux500/board-snowball-pins.c          |  133 ++++++++
+ arch/arm/mach-ux500/board-snowball.c               |  359 ++++++++++++++++++++
+ arch/arm/mach-ux500/board-snowball.h               |   12 +
+ .../mach-ux500/include/mach/irqs-board-mop500.h    |   44 +++
+ arch/arm/mach-ux500/include/mach/irqs.h            |   43 ---
+ arch/arm/mach-ux500/include/mach/uncompress.h      |    3 +-
+ arch/arm/tools/mach-types                          |    1 +
+ 12 files changed, 606 insertions(+), 52 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-snowball-pins.c
+ create mode 100644 arch/arm/mach-ux500/board-snowball.c
+ create mode 100644 arch/arm/mach-ux500/board-snowball.h
