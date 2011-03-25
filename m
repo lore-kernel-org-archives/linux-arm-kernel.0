@@ -1,22 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Mar 2011 21:21:23 +0100
-Subject: [PATCH 0/8] ux500: support for snowball board V2
-In-Reply-To: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <AANLkTimCMhoeV3G0cLRV-zL=j6X91wFLDRZt-mrDm4hu@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 25 Mar 2011 16:23:21 -0400 (EDT)
+Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
+	addresses for eth0 and wlan0
+In-Reply-To: <AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<20110324212737.14936.21228.stgit@otae.warmcat.com>
+	<78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
+	<AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1103251615380.11889@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2011 at 4:28 PM,  <mathieu.poirier@linaro.org> wrote:
+On Fri, 25 Mar 2011, Jason Kridner wrote:
 
-> From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
->
-> This suite of patches is the second, re-worked version for
-> the support of the snowball board.
+> I very much like this approach.  I believed the ability to use the die
+> ID to get a unique code was reasonable approach and that is why I
+> didn't get an EEPROM put onto the BeagleBoard, though Gerald is
+> looking at adding one on a future revision because the lack of one
+> wasn't well received.  Minor questions below.
 
-Excellent work Mathieu, except for [1/8] which is already in the mainline
-kernel by Russell I will pick and integrate to the ux500-core branch for
--next as soon as we have 2.6.39-rc1 available.
+If this code had been available and/or the procedure well documented 
+before then I believe the reception would have been better.
 
-Yours,
-Linus Walleij
+> The use of the OMAP die id below makes this OMAP specific and the list
+> referenced below of the devices to be referenced makes it Panda
+> specific.  Is there a way to make the list board specific, but to make
+> these functions that will be used across many OMAP platforms reusable?
+>  I believe that this current code will result in a lot of
+> cut-and-paste.  My preference is that this is accepted and that we
+> make this more general when we add this to other OMAP platforms, but
+> it'd be great to capture your suggestions on how to do so before those
+> cut-and-paste patch sets start coming in.
+
+It is true that this might get copied.  But as I suggested to Andy, it 
+is best to wait and see how often this happens before generalizing the 
+approach.  Consolidation is easier when you can see what is actually 
+common and what is board specific.  Otherwise it is easy to 
+fall into the over-engineering trap.
+
+
+Nicolas
