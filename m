@@ -1,36 +1,78 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Fri, 25 Mar 2011 15:14:57 -0500
-Subject: [PATCH] OMAP: iovmm: fix SW flags passed by user
-In-Reply-To: <20110325200557.GA14228@n2100.arm.linux.org.uk>
-References: <1301071572-25251-1-git-send-email-omar.ramirez@ti.com>
-	<4D8CD126.6000405@ru.mvista.com>
-	<AANLkTikV37gmmf5sRQ98EzOL6K7JNvDy9gfCWbR=747k@mail.gmail.com>
-	<20110325200557.GA14228@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikZz2MerkGQyVUdWnUwpw4aoPC38yMR4E5M7MtD@mail.gmail.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Fri, 25 Mar 2011 14:04:31 -0600
+Subject: [PATCH v2] OMAP: iovmm: fix SW flags passed by user
+Message-ID: <1301083471-11284-1-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2011 at 3:05 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk>
->> >> Commit d038aee24dcd changes iovmm to receive flags specified by user,
->> >
->> > ? Please also specify that commit's summary for the human readers. Bare ID
->> > is only usable to gitweb...
->>
->> Here it is the patch, introducing the change:
->>
->> https://patchwork.kernel.org/patch/620871/
->>
->> If accepted by Hiroshi, I can update the description making reference
->> to this patch instead of commit.
->
-> It is a requirement that all descriptions which refer to a commit shall
-> contain both the commit ID *and* the summary line for that commit.
-> Failure to ensure that's the case results in rejection of the patch
-> until it conforms.
+Commit d038aee24dcd5a2a0d8547f5396f67ae9698ac8e
+"omap: iovmm: don't check 'da' to set IOVMF_DA_FIXED flag",
+changes iovmm to receive flags specified by user, however
+the upper 16 bits of the flags are wiped by iovmm itself.
 
-Not a problem then... resending v2.
+This fixes IOVMF_DA_FIXED flags from being lost, and lets the user
+map its desired "device addresses".
 
-Regards,
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
 
-Omar
+v2:
+Include missing reference (commit and name) to patch in
+description.
+
+ arch/arm/plat-omap/include/plat/iovmm.h |    3 ---
+ arch/arm/plat-omap/iovmm.c              |    4 ----
+ 2 files changed, 0 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/iovmm.h b/arch/arm/plat-omap/include/plat/iovmm.h
+index 32a2f6c..e992b96 100644
+--- a/arch/arm/plat-omap/include/plat/iovmm.h
++++ b/arch/arm/plat-omap/include/plat/iovmm.h
+@@ -29,9 +29,6 @@ struct iovm_struct {
+  * lower 16 bit is used for h/w and upper 16 bit is for s/w.
+  */
+ #define IOVMF_SW_SHIFT		16
+-#define IOVMF_HW_SIZE		(1 << IOVMF_SW_SHIFT)
+-#define IOVMF_HW_MASK		(IOVMF_HW_SIZE - 1)
+-#define IOVMF_SW_MASK		(~IOVMF_HW_MASK)UL
+ 
+ /*
+  * iovma: h/w flags derived from cam and ram attribute
+diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
+index 51ef43e..83a37c5 100644
+--- a/arch/arm/plat-omap/iovmm.c
++++ b/arch/arm/plat-omap/iovmm.c
+@@ -648,7 +648,6 @@ u32 iommu_vmap(struct iommu *obj, u32 da, const struct sg_table *sgt,
+ 			return PTR_ERR(va);
+ 	}
+ 
+-	flags &= IOVMF_HW_MASK;
+ 	flags |= IOVMF_DISCONT;
+ 	flags |= IOVMF_MMIO;
+ 
+@@ -706,7 +705,6 @@ u32 iommu_vmalloc(struct iommu *obj, u32 da, size_t bytes, u32 flags)
+ 	if (!va)
+ 		return -ENOMEM;
+ 
+-	flags &= IOVMF_HW_MASK;
+ 	flags |= IOVMF_DISCONT;
+ 	flags |= IOVMF_ALLOC;
+ 
+@@ -795,7 +793,6 @@ u32 iommu_kmap(struct iommu *obj, u32 da, u32 pa, size_t bytes,
+ 	if (!va)
+ 		return -ENOMEM;
+ 
+-	flags &= IOVMF_HW_MASK;
+ 	flags |= IOVMF_LINEAR;
+ 	flags |= IOVMF_MMIO;
+ 
+@@ -853,7 +850,6 @@ u32 iommu_kmalloc(struct iommu *obj, u32 da, size_t bytes, u32 flags)
+ 		return -ENOMEM;
+ 	pa = virt_to_phys(va);
+ 
+-	flags &= IOVMF_HW_MASK;
+ 	flags |= IOVMF_LINEAR;
+ 	flags |= IOVMF_ALLOC;
+ 
+-- 
+1.7.1
