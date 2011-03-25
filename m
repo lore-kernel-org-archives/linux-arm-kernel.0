@@ -1,28 +1,54 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Fri, 25 Mar 2011 13:49:35 -0700
-Subject: reboot/kexec in 2.6.38
-In-Reply-To: <20110322133034.GA15475@atrey.karlin.mff.cuni.cz> (Cyril Hrubis's
-	message of "Tue, 22 Mar 2011 14:30:34 +0100")
-References: <20110317064523.GA1995@ucw.cz>
-	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
-	<20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
-Message-ID: <m1bp0zylgg.fsf@fess.ebiederm.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 25 Mar 2011 22:03:24 +0100 (CET)
+Subject: [patch 17/23] arm: at91: Cleanup irq chip
+In-Reply-To: <20110325132048.996818347@linutronix.de>
+References: <20110325131617.258789658@linutronix.de>
+	<20110325132048.996818347@linutronix.de>
+Message-ID: <alpine.LFD.2.00.1103252202440.31464@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyril Hrubis <metan@ucw.cz> writes:
+On Fri, 25 Mar 2011, Thomas Gleixner wrote:
 
-> Hi!
->> I think it's config issue. Never heard of this.
->
-> I've just compiled and booted 2.6.38. The kernel boots without problems when
-> flashed in. But I've had no success with kexec, the last lines I see are:
->
-> Starting new kernel
+> Avoid the whole lazy disable dance in the demux handler by providing a
+> irq_disable() callback.
+> 
+> Use the proper accessor functions and tidy up gpio_irq_handler()
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  arch/arm/mach-at91/gpio.c |   31 +++++++++----------------------
+>  1 file changed, 9 insertions(+), 22 deletions(-)
+> 
+> Index: linux-2.6-tip/arch/arm/mach-at91/gpio.c
+> ===================================================================
+> --- linux-2.6-tip.orig/arch/arm/mach-at91/gpio.c
+> +++ linux-2.6-tip/arch/arm/mach-at91/gpio.c
+> @@ -375,6 +375,7 @@ static int gpio_irq_type(struct irq_data
+>  
+>  static struct irq_chip gpio_irqchip = {
+>  	.name		= "GPIO",
+> +	.irq_disable	= gpio_irq_mask,
+>  	.irq_mask	= gpio_irq_mask,
+>  	.irq_unmask	= gpio_irq_unmask,
+>  	.irq_set_type	= gpio_irq_type,
+> @@ -384,16 +385,14 @@ static struct irq_chip gpio_irqchip = {
+>  static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>  {
+>  	unsigned	pin;
+> -	struct irq_desc	*gpio;
+> -	struct at91_gpio_chip *at91_gpio;
+> -	void __iomem	*pio;
+> +	struct irq_data *idata = irq_desc_get_irq_data(desc);
+> +	struct irq_chip *chip = irq_data_get_chip(data);
+> +	struct at91_gpio_chip *at91_gpio = irq_data_get_chip_data(data);
 
-Enable early_printk to a serial port if you can.
+Sorry, needs to be
 
-There is definitely an issue in 2.6.38 where kdump doesn't work, that
-right now looks like a memblock issue.
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(data);
 
-Eric
+Will fix and resend.
+
+Thanks,
+
+	tglx
