@@ -1,65 +1,58 @@
-From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
-Date: Fri, 25 Mar 2011 19:01:59 +0200
-Subject: [PATCH] kprobes/arm: fix emulation of LDR/STR instruction when Rn ==
-	PC
-Message-ID: <1301072519-27937-1-git-send-email-viktor.rosendahl@nokia.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Fri, 25 Mar 2011 11:09:52 -0600
+Subject: multiple definition of `show_mem'
+In-Reply-To: <4D8C7750.5070102@pengutronix.de>
+References: <4D8B6140.4020300@pengutronix.de><alpine.DEB.2.00.1103241522230.26730@chino.kir.corp.google.com>
+	<4D8C7750.5070102@pengutronix.de>
+Message-ID: <4dc8fdc5-b255-4c26-93ec-8be5056f8646@VA3EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rn value from the emulation is unconditionally written back; this is fine
-as long as Rn != PC because in that case, even if the instruction isn't a write
-back instruction, it will only result in the same value being written back.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Marc Kleine-Budde
+> Sent: Friday, March 25, 2011 5:07 AM
+> To: David Rientjes
+> Cc: linux-arm-kernel; LKML; kernel at pengutronix.de
+> Subject: Re: multiple definition of `show_mem'
+> 
+> On 03/24/2011 11:22 PM, David Rientjes wrote:
+> >> current mainline (v2.6.38-7210-gb81a618) on ARM/mxs has the
+following build failure:
+> >>
+> >>> lib/lib.a(show_mem.o): In function `show_mem':
+> >>> .../linux-2.6/lib/show_mem.c:67: multiple definition of `show_mem'
+> >>> arch/arm/mm/built-in.o:.../linux-2.6/arch/arm/mm/init.c:82: first
+> >>> defined here
+> >>> make: *** [vmlinux.o] Error 1
+> 
+> [..]
+> 
+> > Sorry about that, Marc.  I have a patch at
+> >
+> > 	http://marc.info/?l=linux-kernel&m=130100511521954
+> >
+> > which should fix the issue for you (and I tested it with my arm
+cross
+> > compiler).
+> 
+> \o/ - the patch is already in mainline, boots like charm on my
+mx28evk.
 
-In case Rn == PC, then the emulated instruction doesn't have the actual PC
-value in Rn but an adjusted value; when this is written back, it will result in
-the PC being incorrectly updated.
+I pulled it, rebuilt without any issues, and it runs also on the Xilinx
+platform.
 
-An altenative solution would be to check bits 24 and 22 to see whether the
-instruction actually is a write back instruction or not. I think it's
-enough to check whether Rn != PC,  because:
-- it's looks cheaper than the alternative
-- to my understaning it's not permitted to update the PC with a write back
-instruction, so we don't lose any ability to emulate legal instructions.
-- in case of writing back for non write back instructions where Rn != PC, it
-doesn't matter because the values are the same.
+Thanks,
+John
 
-Regarding the second point above, it would possibly be prudent to add some
-checking to prep_emulate_ldr_str(), so that instructions with write back and
-Rn == PC would be rejected.
+> 
+> regards, Marc
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Signed-off-by: Viktor Rosendahl <viktor.rosendahl@nokia.com>
----
- arch/arm/kernel/kprobes-decode.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 8f6ed43..2389131 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -594,7 +594,8 @@ static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
- 	long cpsr = regs->ARM_cpsr;
- 
- 	fnr.dr = insnslot_llret_3arg_rflags(rnv, 0, rmv, cpsr, i_fn);
--	regs->uregs[rn] = fnr.r0;  /* Save Rn in case of writeback. */
-+	if (rn != 15)
-+		regs->uregs[rn] = fnr.r0;  /* Save Rn in case of writeback. */
- 	rdv = fnr.r1;
- 
- 	if (rd == 15) {
-@@ -622,10 +623,11 @@ static void __kprobes emulate_str(struct kprobe *p, struct pt_regs *regs)
- 	long rdv = (rd == 15) ? iaddr + str_pc_offset : regs->uregs[rd];
- 	long rnv = (rn == 15) ? iaddr +  8 : regs->uregs[rn];
- 	long rmv = regs->uregs[rm];  /* rm/rmv may be invalid, don't care. */
-+	long rnv_wb;
- 
--	/* Save Rn in case of writeback. */
--	regs->uregs[rn] =
--		insnslot_3arg_rflags(rnv, rdv, rmv, regs->ARM_cpsr, i_fn);
-+	rnv_wb = insnslot_3arg_rflags(rnv, rdv, rmv, regs->ARM_cpsr, i_fn);
-+	if (rn != 15)
-+		regs->uregs[rn] = rnv_wb;  /* Save Rn in case of writeback. */
- }
- 
- static void __kprobes emulate_mrrc(struct kprobe *p, struct pt_regs *regs)
--- 
-1.7.2.5
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
