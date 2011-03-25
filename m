@@ -1,1265 +1,28 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 25 Mar 2011 18:23:00 +0800
-Subject: [ PATCH V2  6/7] MTD : add GPMI support for imx28
+Date: Fri, 25 Mar 2011 18:22:58 +0800
+Subject: [ PATCH V2 4/7] MTD : add the common code for GPMI controller driver
 In-Reply-To: <1301048581-21321-1-git-send-email-b32955@freescale.com>
 References: <1301048581-21321-1-git-send-email-b32955@freescale.com>
-Message-ID: <1301048581-21321-7-git-send-email-b32955@freescale.com>
+Message-ID: <1301048581-21321-5-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files contain the code to implement the GPMI in the imx28.
+These files contain the common code for the GPMI driver.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h  |  342 ++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h |  370 ++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/hal-imx28.c       |  503 +++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nfc/rom-imx28.c       |   66 ++++
- 4 files changed, 1281 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
- create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
- create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx28.c
- create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx28.c
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c | 2452 +++++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h      |  550 +++++++
+ 2 files changed, 3002 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
 
-diff --git a/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
+diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
 new file mode 100644
-index 0000000..7e3dfac
+index 0000000..252248f
 --- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
-@@ -0,0 +1,342 @@
-+/*
-+ * Freescale GPMI NFC NAND Flash Driver
-+ *
-+ * Copyright 2008-2011 Freescale Semiconductor, Inc.
-+ * Copyright 2008 Embedded Alley Solutions, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+#ifndef __GPMI_NFC_BCH_REGS_H
-+#define __GPMI_NFC_BCH_REGS_H
-+
-+/*============================================================================*/
-+#define HW_BCH_CTRL				0x00000000
-+#define HW_BCH_CTRL_SET				0x00000004
-+#define HW_BCH_CTRL_CLR				0x00000008
-+#define HW_BCH_CTRL_TOG				0x0000000c
-+
-+#define BM_BCH_CTRL_SFTRST			0x80000000
-+#define BV_BCH_CTRL_SFTRST__RUN			0x0
-+#define BV_BCH_CTRL_SFTRST__RESET		0x1
-+#define BM_BCH_CTRL_CLKGATE			0x40000000
-+#define BV_BCH_CTRL_CLKGATE__RUN		0x0
-+#define BV_BCH_CTRL_CLKGATE__NO_CLKS		0x1
-+#define BP_BCH_CTRL_RSVD5			23
-+#define BM_BCH_CTRL_RSVD5			0x3F800000
-+#define BF_BCH_CTRL_RSVD5(v)		(((v) << 23) & BM_BCH_CTRL_RSVD5)
-+#define BM_BCH_CTRL_DEBUGSYNDROME		0x00400000
-+#define BP_BCH_CTRL_RSVD4			20
-+#define BM_BCH_CTRL_RSVD4			0x00300000
-+#define BF_BCH_CTRL_RSVD4(v)		(((v) << 20) & BM_BCH_CTRL_RSVD4)
-+#define BP_BCH_CTRL_M2M_LAYOUT			18
-+#define BM_BCH_CTRL_M2M_LAYOUT			0x000C0000
-+#define BF_BCH_CTRL_M2M_LAYOUT(v)	(((v) << 18) & BM_BCH_CTRL_M2M_LAYOUT)
-+#define BM_BCH_CTRL_M2M_ENCODE			0x00020000
-+#define BM_BCH_CTRL_M2M_ENABLE			0x00010000
-+#define BP_BCH_CTRL_RSVD3			11
-+#define BM_BCH_CTRL_RSVD3			0x0000F800
-+#define BF_BCH_CTRL_RSVD3(v)		(((v) << 11) & BM_BCH_CTRL_RSVD3)
-+#define BM_BCH_CTRL_DEBUG_STALL_IRQ_EN		0x00000400
-+#define BM_BCH_CTRL_RSVD2			0x00000200
-+#define BM_BCH_CTRL_COMPLETE_IRQ_EN		0x00000100
-+#define BP_BCH_CTRL_RSVD1			4
-+#define BM_BCH_CTRL_RSVD1			0x000000F0
-+#define BF_BCH_CTRL_RSVD1(v)		(((v) << 4) & BM_BCH_CTRL_RSVD1)
-+#define BM_BCH_CTRL_BM_ERROR_IRQ		0x00000008
-+#define BM_BCH_CTRL_DEBUG_STALL_IRQ		0x00000004
-+#define BM_BCH_CTRL_RSVD0			0x00000002
-+#define BM_BCH_CTRL_COMPLETE_IRQ		0x00000001
-+
-+/*============================================================================*/
-+#define HW_BCH_STATUS0				0x00000010
-+
-+#define BP_BCH_STATUS0_HANDLE			20
-+#define BM_BCH_STATUS0_HANDLE			0xFFF00000
-+#define BF_BCH_STATUS0_HANDLE(v)	(((v) << 20) & BM_BCH_STATUS0_HANDLE)
-+#define BP_BCH_STATUS0_COMPLETED_CE		16
-+#define BM_BCH_STATUS0_COMPLETED_CE		0x000F0000
-+#define BF_BCH_STATUS0_COMPLETED_CE(v)	\
-+				(((v) << 16) & BM_BCH_STATUS0_COMPLETED_CE)
-+#define BP_BCH_STATUS0_STATUS_BLK0		8
-+#define BM_BCH_STATUS0_STATUS_BLK0		0x0000FF00
-+#define BF_BCH_STATUS0_STATUS_BLK0(v)	\
-+				(((v) << 8) & BM_BCH_STATUS0_STATUS_BLK0)
-+#define BV_BCH_STATUS0_STATUS_BLK0__ZERO	0x00
-+#define BV_BCH_STATUS0_STATUS_BLK0__ERROR1	0x01
-+#define BV_BCH_STATUS0_STATUS_BLK0__ERROR2	0x02
-+#define BV_BCH_STATUS0_STATUS_BLK0__ERROR3	0x03
-+#define BV_BCH_STATUS0_STATUS_BLK0__ERROR4	0x04
-+#define BV_BCH_STATUS0_STATUS_BLK0__UNCORRECTABLE	0xFE
-+#define BV_BCH_STATUS0_STATUS_BLK0__ERASED	0xFF
-+#define BP_BCH_STATUS0_RSVD1			5
-+#define BM_BCH_STATUS0_RSVD1			0x000000E0
-+#define BF_BCH_STATUS0_RSVD1(v)		(((v) << 5) & BM_BCH_STATUS0_RSVD1)
-+#define BM_BCH_STATUS0_ALLONES			0x00000010
-+#define BM_BCH_STATUS0_CORRECTED		0x00000008
-+#define BM_BCH_STATUS0_UNCORRECTABLE		0x00000004
-+#define BP_BCH_STATUS0_RSVD0			0
-+#define BM_BCH_STATUS0_RSVD0			0x00000003
-+#define BF_BCH_STATUS0_RSVD0(v)		(((v) << 0) & BM_BCH_STATUS0_RSVD0)
-+
-+/*============================================================================*/
-+#define HW_BCH_MODE				0x00000020
-+
-+#define BP_BCH_MODE_RSVD			8
-+#define BM_BCH_MODE_RSVD			0xFFFFFF00
-+#define BF_BCH_MODE_RSVD(v)		(((v) << 8) & BM_BCH_MODE_RSVD)
-+#define BP_BCH_MODE_ERASE_THRESHOLD		0
-+#define BM_BCH_MODE_ERASE_THRESHOLD		0x000000FF
-+#define BF_BCH_MODE_ERASE_THRESHOLD(v)	\
-+				(((v) << 0) & BM_BCH_MODE_ERASE_THRESHOLD)
-+
-+/*============================================================================*/
-+#define HW_BCH_ENCODEPTR			0x00000030
-+
-+#define BP_BCH_ENCODEPTR_ADDR			0
-+#define BM_BCH_ENCODEPTR_ADDR			0xFFFFFFFF
-+#define BF_BCH_ENCODEPTR_ADDR(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_DATAPTR				0x00000040
-+
-+#define BP_BCH_DATAPTR_ADDR			0
-+#define BM_BCH_DATAPTR_ADDR			0xFFFFFFFF
-+#define BF_BCH_DATAPTR_ADDR(v)			(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_METAPTR				0x00000050
-+
-+#define BP_BCH_METAPTR_ADDR			0
-+#define BM_BCH_METAPTR_ADDR			0xFFFFFFFF
-+#define BF_BCH_METAPTR_ADDR(v)			(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_LAYOUTSELECT			0x00000070
-+
-+#define BP_BCH_LAYOUTSELECT_CS15_SELECT		30
-+#define BM_BCH_LAYOUTSELECT_CS15_SELECT		0xC0000000
-+#define BF_BCH_LAYOUTSELECT_CS15_SELECT(v)	\
-+				(((v) << 30) & BM_BCH_LAYOUTSELECT_CS15_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS14_SELECT		28
-+#define BM_BCH_LAYOUTSELECT_CS14_SELECT		0x30000000
-+#define BF_BCH_LAYOUTSELECT_CS14_SELECT(v)	\
-+				(((v) << 28) & BM_BCH_LAYOUTSELECT_CS14_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS13_SELECT		26
-+#define BM_BCH_LAYOUTSELECT_CS13_SELECT		0x0C000000
-+#define BF_BCH_LAYOUTSELECT_CS13_SELECT(v)	\
-+				(((v) << 26) & BM_BCH_LAYOUTSELECT_CS13_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS12_SELECT		24
-+#define BM_BCH_LAYOUTSELECT_CS12_SELECT		0x03000000
-+#define BF_BCH_LAYOUTSELECT_CS12_SELECT(v)	\
-+				(((v) << 24) & BM_BCH_LAYOUTSELECT_CS12_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS11_SELECT		22
-+#define BM_BCH_LAYOUTSELECT_CS11_SELECT		0x00C00000
-+#define BF_BCH_LAYOUTSELECT_CS11_SELECT(v)	\
-+				(((v) << 22) & BM_BCH_LAYOUTSELECT_CS11_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS10_SELECT		20
-+#define BM_BCH_LAYOUTSELECT_CS10_SELECT		0x00300000
-+#define BF_BCH_LAYOUTSELECT_CS10_SELECT(v)	\
-+				(((v) << 20) & BM_BCH_LAYOUTSELECT_CS10_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS9_SELECT		18
-+#define BM_BCH_LAYOUTSELECT_CS9_SELECT		0x000C0000
-+#define BF_BCH_LAYOUTSELECT_CS9_SELECT(v)	\
-+				(((v) << 18) & BM_BCH_LAYOUTSELECT_CS9_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS8_SELECT		16
-+#define BM_BCH_LAYOUTSELECT_CS8_SELECT		0x00030000
-+#define BF_BCH_LAYOUTSELECT_CS8_SELECT(v)	\
-+				(((v) << 16) & BM_BCH_LAYOUTSELECT_CS8_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS7_SELECT		14
-+#define BM_BCH_LAYOUTSELECT_CS7_SELECT		0x0000C000
-+#define BF_BCH_LAYOUTSELECT_CS7_SELECT(v)	\
-+				(((v) << 14) & BM_BCH_LAYOUTSELECT_CS7_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS6_SELECT		12
-+#define BM_BCH_LAYOUTSELECT_CS6_SELECT		0x00003000
-+#define BF_BCH_LAYOUTSELECT_CS6_SELECT(v)	\
-+				(((v) << 12) & BM_BCH_LAYOUTSELECT_CS6_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS5_SELECT		10
-+#define BM_BCH_LAYOUTSELECT_CS5_SELECT		0x00000C00
-+#define BF_BCH_LAYOUTSELECT_CS5_SELECT(v)	\
-+				(((v) << 10) & BM_BCH_LAYOUTSELECT_CS5_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS4_SELECT		8
-+#define BM_BCH_LAYOUTSELECT_CS4_SELECT		0x00000300
-+#define BF_BCH_LAYOUTSELECT_CS4_SELECT(v)	\
-+				(((v) << 8) & BM_BCH_LAYOUTSELECT_CS4_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS3_SELECT		6
-+#define BM_BCH_LAYOUTSELECT_CS3_SELECT		0x000000C0
-+#define BF_BCH_LAYOUTSELECT_CS3_SELECT(v)	\
-+				(((v) << 6) & BM_BCH_LAYOUTSELECT_CS3_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS2_SELECT		4
-+#define BM_BCH_LAYOUTSELECT_CS2_SELECT		0x00000030
-+#define BF_BCH_LAYOUTSELECT_CS2_SELECT(v)	\
-+				(((v) << 4) & BM_BCH_LAYOUTSELECT_CS2_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS1_SELECT		2
-+#define BM_BCH_LAYOUTSELECT_CS1_SELECT		0x0000000C
-+#define BF_BCH_LAYOUTSELECT_CS1_SELECT(v)	\
-+				(((v) << 2) & BM_BCH_LAYOUTSELECT_CS1_SELECT)
-+#define BP_BCH_LAYOUTSELECT_CS0_SELECT		0
-+#define BM_BCH_LAYOUTSELECT_CS0_SELECT		0x00000003
-+#define BF_BCH_LAYOUTSELECT_CS0_SELECT(v)	\
-+				(((v) << 0) & BM_BCH_LAYOUTSELECT_CS0_SELECT)
-+
-+/*============================================================================*/
-+#define HW_BCH_FLASH0LAYOUT0			0x00000080
-+
-+#define BP_BCH_FLASH0LAYOUT0_NBLOCKS		24
-+#define BM_BCH_FLASH0LAYOUT0_NBLOCKS		0xFF000000
-+#define BF_BCH_FLASH0LAYOUT0_NBLOCKS(v)		\
-+				(((v) << 24) & BM_BCH_FLASH0LAYOUT0_NBLOCKS)
-+#define BP_BCH_FLASH0LAYOUT0_META_SIZE		16
-+#define BM_BCH_FLASH0LAYOUT0_META_SIZE		0x00FF0000
-+#define BF_BCH_FLASH0LAYOUT0_META_SIZE(v)	\
-+				(((v) << 16) & BM_BCH_FLASH0LAYOUT0_META_SIZE)
-+#define BP_BCH_FLASH0LAYOUT0_ECC0		12
-+#define BM_BCH_FLASH0LAYOUT0_ECC0		0x0000F000
-+#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
-+				(((v) << 12) & BM_BCH_FLASH0LAYOUT0_ECC0)
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__NONE		0x0
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC2		0x1
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC4		0x2
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC6		0x3
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC8		0x4
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC10	0x5
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC12	0x6
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC14	0x7
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC16	0x8
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC18	0x9
-+#define BV_BCH_FLASH0LAYOUT0_ECC0__ECC20	0xA
-+#define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
-+#define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		0x00000FFF
-+#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
-+				(((v) << 0) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+
-+/*============================================================================*/
-+#define HW_BCH_FLASH0LAYOUT1			0x00000090
-+
-+#define BP_BCH_FLASH0LAYOUT1_PAGE_SIZE		16
-+#define BM_BCH_FLASH0LAYOUT1_PAGE_SIZE		0xFFFF0000
-+#define BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(v)	\
-+				(((v) << 16) & BM_BCH_FLASH0LAYOUT1_PAGE_SIZE)
-+#define BP_BCH_FLASH0LAYOUT1_ECCN		12
-+#define BM_BCH_FLASH0LAYOUT1_ECCN		0x0000F000
-+#define BF_BCH_FLASH0LAYOUT1_ECCN(v)	\
-+				(((v) << 12) & BM_BCH_FLASH0LAYOUT1_ECCN)
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__NONE		0x0
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC2		0x1
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC4		0x2
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC6		0x3
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC8		0x4
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC10	0x5
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC12	0x6
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC14	0x7
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC16	0x8
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC18	0x9
-+#define BV_BCH_FLASH0LAYOUT1_ECCN__ECC20	0xA
-+#define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
-+#define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		0x00000FFF
-+#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
-+				(((v) << 0) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+
-+/*============================================================================*/
-+#define HW_BCH_DEBUG0				0x00000100
-+#define HW_BCH_DEBUG0_SET			0x00000104
-+#define HW_BCH_DEBUG0_CLR			0x00000108
-+#define HW_BCH_DEBUG0_TOG			0x0000010c
-+
-+#define BP_BCH_DEBUG0_RSVD1			27
-+#define BM_BCH_DEBUG0_RSVD1			0xF8000000
-+#define BF_BCH_DEBUG0_RSVD1(v)		(((v) << 27) & BM_BCH_DEBUG0_RSVD1)
-+#define BM_BCH_DEBUG0_ROM_BIST_ENABLE		0x04000000
-+#define BM_BCH_DEBUG0_ROM_BIST_COMPLETE		0x02000000
-+#define BP_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL	16
-+#define BM_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL	0x01FF0000
-+#define BF_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL(v)	\
-+			(((v) << 16) & BM_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL)
-+#define BV_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL__NORMAL		0x0
-+#define BV_BCH_DEBUG0_KES_DEBUG_SYNDROME_SYMBOL__TEST_MODE	0x1
-+#define BM_BCH_DEBUG0_KES_DEBUG_SHIFT_SYND			0x00008000
-+#define BM_BCH_DEBUG0_KES_DEBUG_PAYLOAD_FLAG			0x00004000
-+#define BV_BCH_DEBUG0_KES_DEBUG_PAYLOAD_FLAG__DATA		0x1
-+#define BV_BCH_DEBUG0_KES_DEBUG_PAYLOAD_FLAG__AUX		0x1
-+#define BM_BCH_DEBUG0_KES_DEBUG_MODE4K				0x00002000
-+#define BV_BCH_DEBUG0_KES_DEBUG_MODE4K__4k			0x1
-+#define BV_BCH_DEBUG0_KES_DEBUG_MODE4K__2k			0x1
-+#define BM_BCH_DEBUG0_KES_DEBUG_KICK				0x00001000
-+#define BM_BCH_DEBUG0_KES_STANDALONE				0x00000800
-+#define BV_BCH_DEBUG0_KES_STANDALONE__NORMAL			0x0
-+#define BV_BCH_DEBUG0_KES_STANDALONE__TEST_MODE			0x1
-+#define BM_BCH_DEBUG0_KES_DEBUG_STEP				0x00000400
-+#define BM_BCH_DEBUG0_KES_DEBUG_STALL				0x00000200
-+#define BV_BCH_DEBUG0_KES_DEBUG_STALL__NORMAL			0x0
-+#define BV_BCH_DEBUG0_KES_DEBUG_STALL__WAIT			0x1
-+#define BM_BCH_DEBUG0_BM_KES_TEST_BYPASS			0x00000100
-+#define BV_BCH_DEBUG0_BM_KES_TEST_BYPASS__NORMAL		0x0
-+#define BV_BCH_DEBUG0_BM_KES_TEST_BYPASS__TEST_MODE		0x1
-+#define BP_BCH_DEBUG0_RSVD0			6
-+#define BM_BCH_DEBUG0_RSVD0			0x000000C0
-+#define BF_BCH_DEBUG0_RSVD0(v)		(((v) << 6) & BM_BCH_DEBUG0_RSVD0)
-+#define BP_BCH_DEBUG0_DEBUG_REG_SELECT		0
-+#define BM_BCH_DEBUG0_DEBUG_REG_SELECT		0x0000003F
-+#define BF_BCH_DEBUG0_DEBUG_REG_SELECT(v)	\
-+				(((v) << 0) & BM_BCH_DEBUG0_DEBUG_REG_SELECT)
-+
-+/*============================================================================*/
-+#define HW_BCH_DBGKESREAD			(0x00000110)
-+
-+#define BP_BCH_DBGKESREAD_VALUES		0
-+#define BM_BCH_DBGKESREAD_VALUES		0xFFFFFFFF
-+#define BF_BCH_DBGKESREAD_VALUES(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_DBGCSFEREAD			0x00000120
-+
-+#define BP_BCH_DBGCSFEREAD_VALUES		0
-+#define BM_BCH_DBGCSFEREAD_VALUES		0xFFFFFFFF
-+#define BF_BCH_DBGCSFEREAD_VALUES(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_DBGSYNDGENREAD			0x00000130
-+
-+#define BP_BCH_DBGSYNDGENREAD_VALUES		0
-+#define BM_BCH_DBGSYNDGENREAD_VALUES		0xFFFFFFFF
-+#define BF_BCH_DBGSYNDGENREAD_VALUES(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_DBGAHBMREAD			0x00000140
-+
-+#define BP_BCH_DBGAHBMREAD_VALUES		0
-+#define BM_BCH_DBGAHBMREAD_VALUES		0xFFFFFFFF
-+#define BF_BCH_DBGAHBMREAD_VALUES(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_BLOCKNAME			0x00000150
-+
-+#define BP_BCH_BLOCKNAME_NAME			0
-+#define BM_BCH_BLOCKNAME_NAME			0xFFFFFFFF
-+#define BF_BCH_BLOCKNAME_NAME(v)		(v)
-+
-+/*============================================================================*/
-+#define HW_BCH_VERSION				0x00000160
-+
-+#define BP_BCH_VERSION_MAJOR			24
-+#define BM_BCH_VERSION_MAJOR			0xFF000000
-+#define BF_BCH_VERSION_MAJOR(v)		(((v) << 24) & BM_BCH_VERSION_MAJOR)
-+#define BP_BCH_VERSION_MINOR			16
-+#define BM_BCH_VERSION_MINOR			0x00FF0000
-+#define BF_BCH_VERSION_MINOR(v)		(((v) << 16) & BM_BCH_VERSION_MINOR)
-+#define BP_BCH_VERSION_STEP			0
-+#define BM_BCH_VERSION_STEP			0x0000FFFF
-+#define BF_BCH_VERSION_STEP(v)		(((v) << 0) & BM_BCH_VERSION_STEP)
-+/*============================================================================*/
-+#endif
-diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
-new file mode 100644
-index 0000000..c4cc7e9
---- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
-@@ -0,0 +1,370 @@
-+/*
-+ * Freescale GPMI NFC NAND Flash Driver
-+ *
-+ * Copyright 2008-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-+ *
-+ * Xml Revision: 2.2
-+ * Template revision: 26195
-+ */
-+#ifndef __GPMI_NFC_GPMI_REGS_H
-+#define __GPMI_NFC_GPMI_REGS_H
-+
-+/*============================================================================*/
-+#define HW_GPMI_CTRL0					0x00000000
-+#define HW_GPMI_CTRL0_SET				0x00000004
-+#define HW_GPMI_CTRL0_CLR				0x00000008
-+#define HW_GPMI_CTRL0_TOG				0x0000000c
-+
-+#define BM_GPMI_CTRL0_SFTRST				0x80000000
-+#define BV_GPMI_CTRL0_SFTRST__RUN			0x0
-+#define BV_GPMI_CTRL0_SFTRST__RESET			0x1
-+#define BM_GPMI_CTRL0_CLKGATE				0x40000000
-+#define BV_GPMI_CTRL0_CLKGATE__RUN			0x0
-+#define BV_GPMI_CTRL0_CLKGATE__NO_CLKS			0x1
-+#define BM_GPMI_CTRL0_RUN				0x20000000
-+#define BV_GPMI_CTRL0_RUN__IDLE				0x0
-+#define BV_GPMI_CTRL0_RUN__BUSY				0x1
-+#define BM_GPMI_CTRL0_DEV_IRQ_EN			0x10000000
-+#define BM_GPMI_CTRL0_LOCK_CS				0x08000000
-+#define BV_GPMI_CTRL0_LOCK_CS__DISABLED			0x0
-+#define BV_GPMI_CTRL0_LOCK_CS__ENABLED			0x1
-+#define BM_GPMI_CTRL0_UDMA				0x04000000
-+#define BV_GPMI_CTRL0_UDMA__DISABLED			0x0
-+#define BV_GPMI_CTRL0_UDMA__ENABLED			0x1
-+#define BP_GPMI_CTRL0_COMMAND_MODE			24
-+#define BM_GPMI_CTRL0_COMMAND_MODE			0x03000000
-+#define BF_GPMI_CTRL0_COMMAND_MODE(v)  \
-+				(((v) << 24) & BM_GPMI_CTRL0_COMMAND_MODE)
-+#define BV_GPMI_CTRL0_COMMAND_MODE__WRITE		0x0
-+#define BV_GPMI_CTRL0_COMMAND_MODE__READ		0x1
-+#define BV_GPMI_CTRL0_COMMAND_MODE__READ_AND_COMPARE	0x2
-+#define BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY	0x3
-+#define BM_GPMI_CTRL0_WORD_LENGTH			0x00800000
-+#define BV_GPMI_CTRL0_WORD_LENGTH__16_BIT		0x0
-+#define BV_GPMI_CTRL0_WORD_LENGTH__8_BIT		0x1
-+#define BP_GPMI_CTRL0_CS				20
-+#define BM_GPMI_CTRL0_CS				0x00700000
-+#define BF_GPMI_CTRL0_CS(v)		(((v) << 20) & BM_GPMI_CTRL0_CS)
-+#define BP_GPMI_CTRL0_ADDRESS				17
-+#define BM_GPMI_CTRL0_ADDRESS				0x000E0000
-+#define BF_GPMI_CTRL0_ADDRESS(v)	(((v) << 17) & BM_GPMI_CTRL0_ADDRESS)
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_DATA		0x0
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_CLE			0x1
-+#define BV_GPMI_CTRL0_ADDRESS__NAND_ALE			0x2
-+#define BM_GPMI_CTRL0_ADDRESS_INCREMENT			0x00010000
-+#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__DISABLED	0x0
-+#define BV_GPMI_CTRL0_ADDRESS_INCREMENT__ENABLED	0x1
-+#define BP_GPMI_CTRL0_XFER_COUNT			0
-+#define BM_GPMI_CTRL0_XFER_COUNT			0x0000FFFF
-+#define BF_GPMI_CTRL0_XFER_COUNT(v)	(((v) << 0) & BM_GPMI_CTRL0_XFER_COUNT)
-+
-+/*============================================================================*/
-+#define HW_GPMI_COMPARE					0x00000010
-+
-+#define BP_GPMI_COMPARE_MASK				16
-+#define BM_GPMI_COMPARE_MASK				0xFFFF0000
-+#define BF_GPMI_COMPARE_MASK(v)		(((v) << 16) & BM_GPMI_COMPARE_MASK)
-+#define BP_GPMI_COMPARE_REFERENCE			0
-+#define BM_GPMI_COMPARE_REFERENCE			0x0000FFFF
-+#define BF_GPMI_COMPARE_REFERENCE(v)	(((v) << 0) & BM_GPMI_COMPARE_REFERENCE)
-+
-+/*============================================================================*/
-+#define HW_GPMI_ECCCTRL					0x00000020
-+#define HW_GPMI_ECCCTRL_SET				0x00000024
-+#define HW_GPMI_ECCCTRL_CLR				0x00000028
-+#define HW_GPMI_ECCCTRL_TOG				0x0000002c
-+
-+#define BP_GPMI_ECCCTRL_HANDLE				16
-+#define BM_GPMI_ECCCTRL_HANDLE				0xFFFF0000
-+#define BF_GPMI_ECCCTRL_HANDLE(v)	(((v) << 16) & BM_GPMI_ECCCTRL_HANDLE)
-+#define BM_GPMI_ECCCTRL_RSVD2				0x00008000
-+#define BP_GPMI_ECCCTRL_ECC_CMD				13
-+#define BM_GPMI_ECCCTRL_ECC_CMD				0x00006000
-+#define BF_GPMI_ECCCTRL_ECC_CMD(v)	(((v) << 13) & BM_GPMI_ECCCTRL_ECC_CMD)
-+#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE			0x0
-+#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE			0x1
-+#define BV_GPMI_ECCCTRL_ECC_CMD__RESERVE2		0x2
-+#define BV_GPMI_ECCCTRL_ECC_CMD__RESERVE3		0x3
-+#define BM_GPMI_ECCCTRL_ENABLE_ECC			0x00001000
-+#define BV_GPMI_ECCCTRL_ENABLE_ECC__ENABLE		0x1
-+#define BV_GPMI_ECCCTRL_ENABLE_ECC__DISABLE		0x0
-+#define BP_GPMI_ECCCTRL_RSVD1				9
-+#define BM_GPMI_ECCCTRL_RSVD1				0x00000E00
-+#define BF_GPMI_ECCCTRL_RSVD1(v)	(((v) << 9) & BM_GPMI_ECCCTRL_RSVD1)
-+#define BP_GPMI_ECCCTRL_BUFFER_MASK			0
-+#define BM_GPMI_ECCCTRL_BUFFER_MASK			0x000001FF
-+#define BF_GPMI_ECCCTRL_BUFFER_MASK(v)  \
-+				(((v) << 0) & BM_GPMI_ECCCTRL_BUFFER_MASK)
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY	0x100
-+#define BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE		0x1FF
-+
-+/*============================================================================*/
-+#define HW_GPMI_ECCCOUNT				0x00000030
-+
-+#define BP_GPMI_ECCCOUNT_RSVD2				16
-+#define BM_GPMI_ECCCOUNT_RSVD2				0xFFFF0000
-+#define BF_GPMI_ECCCOUNT_RSVD2(v)	(((v) << 16) & BM_GPMI_ECCCOUNT_RSVD2)
-+#define BP_GPMI_ECCCOUNT_COUNT				0
-+#define BM_GPMI_ECCCOUNT_COUNT				0x0000FFFF
-+#define BF_GPMI_ECCCOUNT_COUNT(v)	(((v) << 0) & BM_GPMI_ECCCOUNT_COUNT)
-+
-+/*============================================================================*/
-+#define HW_GPMI_PAYLOAD					0x00000040
-+
-+#define BP_GPMI_PAYLOAD_ADDRESS				2
-+#define BM_GPMI_PAYLOAD_ADDRESS				0xFFFFFFFC
-+#define BF_GPMI_PAYLOAD_ADDRESS(v)	(((v) << 2) & BM_GPMI_PAYLOAD_ADDRESS)
-+#define BP_GPMI_PAYLOAD_RSVD0				0
-+#define BM_GPMI_PAYLOAD_RSVD0				0x00000003
-+#define BF_GPMI_PAYLOAD_RSVD0(v)	(((v) << 0) & BM_GPMI_PAYLOAD_RSVD0)
-+
-+/*============================================================================*/
-+#define HW_GPMI_AUXILIARY				0x00000050
-+
-+#define BP_GPMI_AUXILIARY_ADDRESS			2
-+#define BM_GPMI_AUXILIARY_ADDRESS			0xFFFFFFFC
-+#define BF_GPMI_AUXILIARY_ADDRESS(v)	(((v) << 2) & BM_GPMI_AUXILIARY_ADDRESS)
-+#define BP_GPMI_AUXILIARY_RSVD0				0
-+#define BM_GPMI_AUXILIARY_RSVD0				0x00000003
-+#define BF_GPMI_AUXILIARY_RSVD0(v)	(((v) << 0) & BM_GPMI_AUXILIARY_RSVD0)
-+
-+/*============================================================================*/
-+#define HW_GPMI_CTRL1					0x00000060
-+#define HW_GPMI_CTRL1_SET				0x00000064
-+#define HW_GPMI_CTRL1_CLR				0x00000068
-+#define HW_GPMI_CTRL1_TOG				0x0000006c
-+
-+#define BP_GPMI_CTRL1_RSVD2				25
-+#define BM_GPMI_CTRL1_RSVD2				0xFE000000
-+#define BF_GPMI_CTRL1_RSVD2(v)		(((v) << 25) & BM_GPMI_CTRL1_RSVD2)
-+#define BM_GPMI_CTRL1_DECOUPLE_CS			0x01000000
-+#define BP_GPMI_CTRL1_WRN_DLY_SEL			22
-+#define BM_GPMI_CTRL1_WRN_DLY_SEL			0x00C00000
-+#define BF_GPMI_CTRL1_WRN_DLY_SEL(v)	\
-+				(((v) << 22) & BM_GPMI_CTRL1_WRN_DLY_SEL)
-+#define BM_GPMI_CTRL1_RSVD1				0x00200000
-+#define BM_GPMI_CTRL1_TIMEOUT_IRQ_EN			0x00100000
-+#define BM_GPMI_CTRL1_GANGED_RDYBUSY			0x00080000
-+#define BM_GPMI_CTRL1_BCH_MODE				0x00040000
-+#define BP_GPMI_CTRL1_DLL_ENABLE			17
-+#define BM_GPMI_CTRL1_DLL_ENABLE			0x00020000
-+#define BP_GPMI_CTRL1_HALF_PERIOD			16
-+#define BM_GPMI_CTRL1_HALF_PERIOD			0x00010000
-+#define BP_GPMI_CTRL1_RDN_DELAY				12
-+#define BM_GPMI_CTRL1_RDN_DELAY				0x0000F000
-+#define BF_GPMI_CTRL1_RDN_DELAY(v)	(((v) << 12) & BM_GPMI_CTRL1_RDN_DELAY)
-+#define BM_GPMI_CTRL1_DMA2ECC_MODE			0x00000800
-+#define BM_GPMI_CTRL1_DEV_IRQ				0x00000400
-+#define BM_GPMI_CTRL1_TIMEOUT_IRQ			0x00000200
-+#define BM_GPMI_CTRL1_BURST_EN				0x00000100
-+#define BM_GPMI_CTRL1_ABORT_WAIT_REQUEST		0x00000080
-+#define BP_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL	4
-+#define BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL	0x00000070
-+#define BF_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL(v)  \
-+		(((v) << 4) & BM_GPMI_CTRL1_ABORT_WAIT_FOR_READY_CHANNEL)
-+#define BM_GPMI_CTRL1_DEV_RESET				0x00000008
-+#define BV_GPMI_CTRL1_DEV_RESET__ENABLED		0x0
-+#define BV_GPMI_CTRL1_DEV_RESET__DISABLED		0x1
-+#define BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY		0x00000004
-+#define BV_GPMI_CTRL1_ATA_IRQRDY_POLARITY__ACTIVELOW	0x0
-+#define BV_GPMI_CTRL1_ATA_IRQRDY_POLARITY__ACTIVEHIGH	0x1
-+#define BM_GPMI_CTRL1_CAMERA_MODE			0x00000002
-+#define BM_GPMI_CTRL1_GPMI_MODE				0x00000001
-+#define BV_GPMI_CTRL1_GPMI_MODE__NAND			0x0
-+#define BV_GPMI_CTRL1_GPMI_MODE__ATA			0x1
-+
-+/*============================================================================*/
-+#define HW_GPMI_TIMING0					0x00000070
-+
-+#define BP_GPMI_TIMING0_RSVD1				24
-+#define BM_GPMI_TIMING0_RSVD1				0xFF000000
-+#define BF_GPMI_TIMING0_RSVD1(v)	(((v) << 24) & BM_GPMI_TIMING0_RSVD1)
-+#define BP_GPMI_TIMING0_ADDRESS_SETUP			16
-+#define BM_GPMI_TIMING0_ADDRESS_SETUP			0x00FF0000
-+#define BF_GPMI_TIMING0_ADDRESS_SETUP(v)	\
-+				(((v) << 16) & BM_GPMI_TIMING0_ADDRESS_SETUP)
-+#define BP_GPMI_TIMING0_DATA_HOLD			8
-+#define BM_GPMI_TIMING0_DATA_HOLD			0x0000FF00
-+#define BF_GPMI_TIMING0_DATA_HOLD(v)	\
-+				(((v) << 8) & BM_GPMI_TIMING0_DATA_HOLD)
-+#define BP_GPMI_TIMING0_DATA_SETUP			0
-+#define BM_GPMI_TIMING0_DATA_SETUP			0x000000FF
-+#define BF_GPMI_TIMING0_DATA_SETUP(v)	\
-+				(((v) << 0) & BM_GPMI_TIMING0_DATA_SETUP)
-+
-+/*============================================================================*/
-+#define HW_GPMI_TIMING1					0x00000080
-+
-+#define BP_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT		16
-+#define BM_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT		0xFFFF0000
-+#define BF_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT(v)	\
-+			(((v) << 16) & BM_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT)
-+#define BP_GPMI_TIMING1_RSVD1				0
-+#define BM_GPMI_TIMING1_RSVD1				0x0000FFFF
-+#define BF_GPMI_TIMING1_RSVD1(v)	(((v) << 0) & BM_GPMI_TIMING1_RSVD1)
-+
-+/*============================================================================*/
-+#define HW_GPMI_TIMING2					0x00000090
-+
-+#define BP_GPMI_TIMING2_UDMA_TRP			24
-+#define BM_GPMI_TIMING2_UDMA_TRP			0xFF000000
-+#define BF_GPMI_TIMING2_UDMA_TRP(v)	(((v) << 24) & BM_GPMI_TIMING2_UDMA_TRP)
-+#define BP_GPMI_TIMING2_UDMA_ENV			16
-+#define BM_GPMI_TIMING2_UDMA_ENV			0x00FF0000
-+#define BF_GPMI_TIMING2_UDMA_ENV(v)	(((v) << 16) & BM_GPMI_TIMING2_UDMA_ENV)
-+#define BP_GPMI_TIMING2_UDMA_HOLD			8
-+#define BM_GPMI_TIMING2_UDMA_HOLD			0x0000FF00
-+#define BF_GPMI_TIMING2_UDMA_HOLD(v)	(((v) << 8) & BM_GPMI_TIMING2_UDMA_HOLD)
-+#define BP_GPMI_TIMING2_UDMA_SETUP			0
-+#define BM_GPMI_TIMING2_UDMA_SETUP			0x000000FF
-+#define BF_GPMI_TIMING2_UDMA_SETUP(v)	\
-+				(((v) << 0) & BM_GPMI_TIMING2_UDMA_SETUP)
-+
-+/*============================================================================*/
-+#define HW_GPMI_DATA					0x000000a0
-+
-+#define BP_GPMI_DATA_DATA				0
-+#define BM_GPMI_DATA_DATA				0xFFFFFFFF
-+#define BF_GPMI_DATA_DATA(v)				(v)
-+
-+#define HW_GPMI_STAT					0x000000b0
-+
-+#define BP_GPMI_STAT_READY_BUSY				24
-+#define BM_GPMI_STAT_READY_BUSY				0xFF000000
-+#define BF_GPMI_STAT_READY_BUSY(v)	(((v) << 24) & BM_GPMI_STAT_READY_BUSY)
-+#define BP_GPMI_STAT_RDY_TIMEOUT			16
-+#define BM_GPMI_STAT_RDY_TIMEOUT			0x00FF0000
-+#define BF_GPMI_STAT_RDY_TIMEOUT(v)	(((v) << 16) & BM_GPMI_STAT_RDY_TIMEOUT)
-+#define BM_GPMI_STAT_DEV7_ERROR				0x00008000
-+#define BM_GPMI_STAT_DEV6_ERROR				0x00004000
-+#define BM_GPMI_STAT_DEV5_ERROR				0x00002000
-+#define BM_GPMI_STAT_DEV4_ERROR				0x00001000
-+#define BM_GPMI_STAT_DEV3_ERROR				0x00000800
-+#define BM_GPMI_STAT_DEV2_ERROR				0x00000400
-+#define BM_GPMI_STAT_DEERROR				0x00000200
-+#define BM_GPMI_STAT_DEV0_ERROR				0x00000100
-+#define BP_GPMI_STAT_RSVD1				5
-+#define BM_GPMI_STAT_RSVD1				0x000000E0
-+#define BF_GPMI_STAT_RSVD1(v)		(((v) << 5) & BM_GPMI_STAT_RSVD1)
-+#define BM_GPMI_STAT_ATA_IRQ				0x00000010
-+#define BM_GPMI_STAT_INVALID_BUFFER_MASK		0x00000008
-+#define BM_GPMI_STAT_FIFO_EMPTY				0x00000004
-+#define BV_GPMI_STAT_FIFO_EMPTY__NOT_EMPTY		0x0
-+#define BV_GPMI_STAT_FIFO_EMPTY__EMPTY			0x1
-+#define BM_GPMI_STAT_FIFO_FULL				0x00000002
-+#define BV_GPMI_STAT_FIFO_FULL__NOT_FULL		0x0
-+#define BV_GPMI_STAT_FIFO_FULL__FULL			0x1
-+#define BM_GPMI_STAT_PRESENT				0x00000001
-+#define BV_GPMI_STAT_PRESENT__UNAVAILABLE		0x0
-+#define BV_GPMI_STAT_PRESENT__AVAILABLE			0x1
-+
-+/*============================================================================*/
-+#define HW_GPMI_DEBUG					0x000000c0
-+
-+#define BP_GPMI_DEBUG_WAIT_FOR_READY_END		24
-+#define BM_GPMI_DEBUG_WAIT_FOR_READY_END		0xFF000000
-+#define BF_GPMI_DEBUG_WAIT_FOR_READY_END(v)	\
-+				(((v) << 24) & BM_GPMI_DEBUG_WAIT_FOR_READY_END)
-+#define BP_GPMI_DEBUG_DMA_SENSE				16
-+#define BM_GPMI_DEBUG_DMA_SENSE				0x00FF0000
-+#define BF_GPMI_DEBUG_DMA_SENSE(v)	(((v) << 16) & BM_GPMI_DEBUG_DMA_SENSE)
-+#define BP_GPMI_DEBUG_DMAREQ				8
-+#define BM_GPMI_DEBUG_DMAREQ				0x0000FF00
-+#define BF_GPMI_DEBUG_DMAREQ(v)		(((v) << 8) & BM_GPMI_DEBUG_DMAREQ)
-+#define BP_GPMI_DEBUG_CMD_END				0
-+#define BM_GPMI_DEBUG_CMD_END				0x000000FF
-+#define BF_GPMI_DEBUG_CMD_END(v)	(((v) << 0) & BM_GPMI_DEBUG_CMD_END)
-+
-+/*============================================================================*/
-+#define HW_GPMI_VERSION					0x000000d0
-+
-+#define BP_GPMI_VERSION_MAJOR				24
-+#define BM_GPMI_VERSION_MAJOR				0xFF000000
-+#define BF_GPMI_VERSION_MAJOR(v)	(((v) << 24) & BM_GPMI_VERSION_MAJOR)
-+#define BP_GPMI_VERSION_MINOR				16
-+#define BM_GPMI_VERSION_MINOR				0x00FF0000
-+#define BF_GPMI_VERSION_MINOR(v)	(((v) << 16) & BM_GPMI_VERSION_MINOR)
-+#define BP_GPMI_VERSION_STEP				0
-+#define BM_GPMI_VERSION_STEP				0x0000FFFF
-+#define BF_GPMI_VERSION_STEP(v)		(((v) << 0) & BM_GPMI_VERSION_STEP)
-+
-+/*============================================================================*/
-+#define HW_GPMI_DEBUG2					0x000000e0
-+
-+#define BP_GPMI_DEBUG2_RSVD1				28
-+#define BM_GPMI_DEBUG2_RSVD1				0xF0000000
-+#define BF_GPMI_DEBUG2_RSVD1(v)		(((v) << 28) & BM_GPMI_DEBUG2_RSVD1)
-+#define BP_GPMI_DEBUG2_UDMA_STATE			24
-+#define BM_GPMI_DEBUG2_UDMA_STATE			0x0F000000
-+#define BF_GPMI_DEBUG2_UDMA_STATE(v)	\
-+				(((v) << 24) & BM_GPMI_DEBUG2_UDMA_STATE)
-+#define BM_GPMI_DEBUG2_BUSY				0x00800000
-+#define BV_GPMI_DEBUG2_BUSY__DISABLED			0x0
-+#define BV_GPMI_DEBUG2_BUSY__ENABLED			0x1
-+#define BP_GPMI_DEBUG2_PIN_STATE			20
-+#define BM_GPMI_DEBUG2_PIN_STATE			0x00700000
-+#define BF_GPMI_DEBUG2_PIN_STATE(v)	(((v) << 20) & BM_GPMI_DEBUG2_PIN_STATE)
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_IDLE		0x0
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_BYTCNT		0x1
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_ADDR		0x2
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_STALL		0x3
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_STROBE		0x4
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_ATARDY		0x5
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_DHOLD		0x6
-+#define BV_GPMI_DEBUG2_PIN_STATE__PSM_DONE		0x7
-+#define BP_GPMI_DEBUG2_MAIN_STATE			16
-+#define BM_GPMI_DEBUG2_MAIN_STATE			0x000F0000
-+#define BF_GPMI_DEBUG2_MAIN_STATE(v)	\
-+				(((v) << 16) & BM_GPMI_DEBUG2_MAIN_STATE)
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_IDLE		0x0
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_BYTCNT		0x1
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFE		0x2
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFR		0x3
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DMAREQ		0x4
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DMAACK		0x5
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_WAITFF		0x6
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_LDFIFO		0x7
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_LDDMAR		0x8
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_RDCMP		0x9
-+#define BV_GPMI_DEBUG2_MAIN_STATE__MSM_DONE		0xA
-+#define BP_GPMI_DEBUG2_SYND2GPMI_BE			12
-+#define BM_GPMI_DEBUG2_SYND2GPMI_BE			0x0000F000
-+#define BF_GPMI_DEBUG2_SYND2GPMI_BE(v)	\
-+				(((v) << 12) & BM_GPMI_DEBUG2_SYND2GPMI_BE)
-+#define BM_GPMI_DEBUG2_GPMI2SYND_VALID			0x00000800
-+#define BM_GPMI_DEBUG2_GPMI2SYND_READY			0x00000400
-+#define BM_GPMI_DEBUG2_SYND2GPMI_VALID			0x00000200
-+#define BM_GPMI_DEBUG2_SYND2GPMI_READY			0x00000100
-+#define BM_GPMI_DEBUG2_VIEW_DELAYED_RDN			0x00000080
-+#define BM_GPMI_DEBUG2_UPDATE_WINDOW			0x00000040
-+#define BP_GPMI_DEBUG2_RDN_TAP				0
-+#define BM_GPMI_DEBUG2_RDN_TAP				0x0000003F
-+#define BF_GPMI_DEBUG2_RDN_TAP(v)	(((v) << 0) & BM_GPMI_DEBUG2_RDN_TAP)
-+
-+/*============================================================================*/
-+#define HW_GPMI_DEBUG3					0x000000f0
-+
-+#define BP_GPMI_DEBUG3_APB_WORD_CNTR			16
-+#define BM_GPMI_DEBUG3_APB_WORD_CNTR			0xFFFF0000
-+#define BF_GPMI_DEBUG3_APB_WORD_CNTR(v)	\
-+				(((v) << 16) & BM_GPMI_DEBUG3_APB_WORD_CNTR)
-+#define BP_GPMI_DEBUG3_DEV_WORD_CNTR			0
-+#define BM_GPMI_DEBUG3_DEV_WORD_CNTR			0x0000FFFF
-+#define BF_GPMI_DEBUG3_DEV_WORD_CNTR(v)	\
-+				(((v) << 0) & BM_GPMI_DEBUG3_DEV_WORD_CNTR)
-+/*============================================================================*/
-+#endif
-diff --git a/drivers/mtd/nand/gpmi-nfc/hal-imx28.c b/drivers/mtd/nand/gpmi-nfc/hal-imx28.c
-new file mode 100644
-index 0000000..e20bbde
---- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/hal-imx28.c
-@@ -0,0 +1,503 @@
-+/*
-+ * Freescale GPMI NFC NAND Flash Driver
-+ *
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2008 Embedded Alley Solutions, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+#include "gpmi-nfc.h"
-+#include "gpmi-regs-imx28.h"
-+#include "bch-regs-imx28.h"
-+
-+static int init_hal_imx28(struct gpmi_nfc_data *this)
-+{
-+	struct resources  *resources = &this->resources;
-+
-+	/* Enable the clock. */
-+	clk_enable(resources->clock);
-+
-+	/* Reset the GPMI block. */
-+	mxs_reset_block(resources->gpmi_regs);
-+
-+	/* Choose NAND mode. */
-+	__raw_writel(BM_GPMI_CTRL1_GPMI_MODE,
-+				resources->gpmi_regs + HW_GPMI_CTRL1_CLR);
-+
-+	/* Set the IRQ polarity. */
-+	__raw_writel(BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY,
-+				resources->gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/* Disable write protection. */
-+	__raw_writel(BM_GPMI_CTRL1_DEV_RESET,
-+				resources->gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/* Select BCH ECC. */
-+	__raw_writel(BM_GPMI_CTRL1_BCH_MODE,
-+				resources->gpmi_regs + HW_GPMI_CTRL1_SET);
-+
-+	/* Disable the clock. */
-+	clk_disable(resources->clock);
-+
-+	return 0;
-+}
-+
-+/* Configures the NFC geometry for BCH.  */
-+static int set_geometry(struct gpmi_nfc_data *this)
-+{
-+	struct resources     *resources = &this->resources;
-+	struct nfc_geometry  *nfc       = &this->nfc_geometry;
-+	unsigned int         block_count;
-+	unsigned int         block_size;
-+	unsigned int         metadata_size;
-+	unsigned int         ecc_strength;
-+	unsigned int         page_size;
-+
-+	/* We make the abstract choices in a common function. */
-+	if (common_nfc_set_geometry(this))
-+		return !0;
-+
-+	/* Translate the abstract choices into register fields. */
-+	block_count   = nfc->ecc_chunk_count - 1;
-+	block_size    = nfc->ecc_chunk_size_in_bytes;
-+	metadata_size = nfc->metadata_size_in_bytes;
-+	ecc_strength  = nfc->ecc_strength >> 1;
-+	page_size     = nfc->page_size_in_bytes;
-+
-+	/* Enable the clock. */
-+	clk_enable(resources->clock);
-+
-+	/*
-+	 * Reset the BCH block. Notice that we pass in true for the just_enable
-+	 * flag. This is because the soft reset for the version 0 BCH block
-+	 * doesn't work and the version 1 BCH block is similar enough that we
-+	 * suspect the same (though this has not been officially tested). If you
-+	 * try to soft reset a version 0 BCH block, it becomes unusable until
-+	 * the next hard reset.
-+	 */
-+	mxs_reset_block(resources->bch_regs);
-+
-+	/* Configure layout 0. */
-+	__raw_writel(
-+		BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)     |
-+		BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size) |
-+		BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)       |
-+		BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size)   ,
-+		resources->bch_regs + HW_BCH_FLASH0LAYOUT0);
-+
-+	__raw_writel(
-+		BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)   |
-+		BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)     |
-+		BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size) ,
-+		resources->bch_regs + HW_BCH_FLASH0LAYOUT1);
-+
-+	/* Set *all* chip selects to use layout 0. */
-+	__raw_writel(0, resources->bch_regs + HW_BCH_LAYOUTSELECT);
-+
-+	/* Enable interrupts. */
-+	__raw_writel(BM_BCH_CTRL_COMPLETE_IRQ_EN,
-+				resources->bch_regs + HW_BCH_CTRL_SET);
-+
-+	/* Disable the clock. */
-+	clk_disable(resources->clock);
-+
-+	return 0;
-+}
-+
-+static int set_timing(struct gpmi_nfc_data *this,
-+			const struct nand_timing *timing)
-+{
-+	struct nfc_hal  *nfc = this->nfc;
-+
-+	nfc->timing = *timing;
-+	return 0;
-+}
-+
-+/**
-+ * get_timing() - Retrieves the NFC hardware timing.
-+ *
-+ * @this:                    Per-device data.
-+ * @clock_frequency_in_hz:   The clock frequency, in Hz, during the current
-+ *                           I/O transaction. If no I/O transaction is in
-+ *                           progress, this is the clock frequency during the
-+ *                           most recent I/O transaction.
-+ * @hardware_timing:         The hardware timing configuration in effect during
-+ *                           the current I/O transaction. If no I/O transaction
-+ *                           is in progress, this is the hardware timing
-+ *                           configuration during the most recent I/O
-+ *                           transaction.
-+ */
-+static void get_timing(struct gpmi_nfc_data *this,
-+			unsigned long *clock_frequency_in_hz,
-+			struct gpmi_nfc_hardware_timing *hardware_timing)
-+{
-+	struct resources                 *resources = &this->resources;
-+	struct nfc_hal                   *nfc       =  this->nfc;
-+	unsigned char                    *gpmi_regs = resources->gpmi_regs;
-+	uint32_t                         register_image;
-+
-+	/* Return the clock frequency. */
-+	*clock_frequency_in_hz = nfc->clock_frequency_in_hz;
-+
-+	/* We'll be reading the hardware, so let's enable the clock. */
-+	clk_enable(resources->clock);
-+
-+	/* Retrieve the hardware timing. */
-+	register_image = __raw_readl(gpmi_regs + HW_GPMI_TIMING0);
-+
-+	hardware_timing->data_setup_in_cycles =
-+		(register_image & BM_GPMI_TIMING0_DATA_SETUP) >>
-+						BP_GPMI_TIMING0_DATA_SETUP;
-+
-+	hardware_timing->data_hold_in_cycles =
-+		(register_image & BM_GPMI_TIMING0_DATA_HOLD) >>
-+						BP_GPMI_TIMING0_DATA_HOLD;
-+
-+	hardware_timing->address_setup_in_cycles =
-+		(register_image & BM_GPMI_TIMING0_ADDRESS_SETUP) >>
-+						BP_GPMI_TIMING0_ADDRESS_SETUP;
-+
-+	register_image = __raw_readl(gpmi_regs + HW_GPMI_CTRL1);
-+
-+	hardware_timing->use_half_periods =
-+		(register_image & BM_GPMI_CTRL1_HALF_PERIOD) >>
-+						BP_GPMI_CTRL1_HALF_PERIOD;
-+
-+	hardware_timing->sample_delay_factor =
-+		(register_image & BM_GPMI_CTRL1_RDN_DELAY) >>
-+						BP_GPMI_CTRL1_RDN_DELAY;
-+
-+	/* We're done reading the hardware, so disable the clock. */
-+	clk_disable(resources->clock);
-+}
-+
-+static void exit(struct gpmi_nfc_data *this)
-+{
-+}
-+
-+static void begin(struct gpmi_nfc_data *this)
-+{
-+	struct resources                 *resources = &this->resources;
-+
-+	/* Enable the clock. */
-+	clk_enable(resources->clock);
-+}
-+
-+static void end(struct gpmi_nfc_data *this)
-+{
-+	struct resources  *resources = &this->resources;
-+	clk_disable(resources->clock);
-+}
-+
-+/* Clears a BCH interrupt. */
-+static void clear_bch(struct gpmi_nfc_data *this)
-+{
-+	struct resources  *r = &this->resources;
-+
-+	__raw_writel(BM_BCH_CTRL_COMPLETE_IRQ, r->bch_regs + HW_BCH_CTRL_CLR);
-+}
-+
-+/* Returns the Ready/Busy status of the given chip. */
-+static int is_ready(struct gpmi_nfc_data *this, unsigned chip)
-+{
-+	struct resources  *resources = &this->resources;
-+	uint32_t          mask;
-+	uint32_t          register_image;
-+
-+	/* Extract and return the status. */
-+	mask = BF_GPMI_STAT_READY_BUSY(1 << chip);
-+	register_image = __raw_readl(resources->gpmi_regs + HW_GPMI_STAT);
-+	return !!(register_image & mask);
-+}
-+
-+/* Sends a command and associated addresses. */
-+static int send_command(struct gpmi_nfc_data *this)
-+{
-+	struct dma_chan *channel = get_dma_chan(this);
-+	struct mil *mil	= &this->mil;
-+	struct dma_async_tx_descriptor *desc;
-+	struct scatterlist *sgl;
-+	u32 pio[3];
-+
-+	/* [1] send out the PIO words */
-+	pio[0] = BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WRITE)
-+		| BM_GPMI_CTRL0_WORD_LENGTH
-+		| BF_GPMI_CTRL0_CS(mil->current_chip)
-+		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_CLE)
-+		| BM_GPMI_CTRL0_ADDRESS_INCREMENT
-+		| BF_GPMI_CTRL0_XFER_COUNT(mil->command_length);
-+	pio[1] = pio[2] = 0;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					(struct scatterlist *)pio,
-+					ARRAY_SIZE(pio), DMA_NONE, 0);
-+	if (!desc) {
-+		log("step 1 error");
-+		return -1;
-+	}
-+
-+	/* [2] send out the COMMAND + ADDRESS string stored in @buffer */
-+	sgl = &mil->cmd_sgl;
-+
-+	sg_init_one(sgl, mil->cmd_buffer, mil->command_length);
-+	dma_map_sg(this->dev, sgl, 1, DMA_TO_DEVICE);
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					sgl, 1, DMA_TO_DEVICE, 1);
-+	if (!desc) {
-+		log("error");
-+		return -1;
-+	}
-+
-+	/* [3] submit the DMA */
-+	this->dma_type = DMA_FOR_COMMAND;
-+	start_dma_without_bch_irq(this, desc);
-+	return 0;
-+}
-+
-+static int send_data(struct gpmi_nfc_data *this)
-+{
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *channel = get_dma_chan(this);
-+	struct mil *mil	= &this->mil;
-+	uint32_t command_mode;
-+	uint32_t address;
-+	u32 pio[2];
-+
-+	/* [1] PIO */
-+	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WRITE;
-+	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+
-+	pio[0] =
-+		BF_GPMI_CTRL0_COMMAND_MODE(command_mode)	|
-+		BM_GPMI_CTRL0_WORD_LENGTH			|
-+		BF_GPMI_CTRL0_CS(mil->current_chip)		|
-+		BF_GPMI_CTRL0_ADDRESS(address)			|
-+		BF_GPMI_CTRL0_XFER_COUNT(mil->upper_len);
-+	pio[1] = 0;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					(struct scatterlist *)pio,
-+					ARRAY_SIZE(pio), DMA_NONE, 0);
-+	if (!desc) {
-+		log("step 1 error");
-+		return -1;
-+	}
-+
-+	/* [2] : send DMA request */
-+	prepare_data_dma(this, DMA_TO_DEVICE);
-+	desc = channel->device->device_prep_slave_sg(channel, &mil->data_sgl,
-+						1, DMA_TO_DEVICE, 1);
-+	if (!desc) {
-+		log("step 2 error");
-+		return -1;
-+	}
-+	/* [3] submit the DMA */
-+	this->dma_type = DMA_FOR_WRITE_DATA;
-+	start_dma_without_bch_irq(this, desc);
-+	return 0;
-+}
-+
-+static int read_data(struct gpmi_nfc_data *this)
-+{
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *channel = get_dma_chan(this);
-+	struct mil *mil = &this->mil;
-+	u32 pio[2];
-+
-+	/* [1] : send PIO */
-+	pio[0] = BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__READ)
-+		| BM_GPMI_CTRL0_WORD_LENGTH
-+		| BF_GPMI_CTRL0_CS(mil->current_chip)
-+		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
-+		| BF_GPMI_CTRL0_XFER_COUNT(mil->upper_len);
-+	pio[1] = 0;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					(struct scatterlist *)pio,
-+					ARRAY_SIZE(pio), DMA_NONE, 0);
-+	if (!desc) {
-+		log("step 1 error");
-+		return -1;
-+	}
-+
-+	/* [2] : setup DMA buffer */
-+	prepare_data_dma(this, DMA_FROM_DEVICE);
-+	desc = channel->device->device_prep_slave_sg(channel, &mil->data_sgl,
-+						1, DMA_FROM_DEVICE, 1);
-+	if (!desc) {
-+		log("step 2 error");
-+		return -1;
-+	}
-+
-+	/* [3] : submit the DMA */
-+	this->dma_type = DMA_FOR_READ_DATA;
-+	start_dma_without_bch_irq(this, desc);
-+	return 0;
-+}
-+
-+static int send_page(struct gpmi_nfc_data *this,
-+				dma_addr_t payload, dma_addr_t auxiliary)
-+{
-+	struct nfc_geometry  *geo   = &this->nfc_geometry;
-+	uint32_t             command_mode;
-+	uint32_t             address;
-+	uint32_t             ecc_command;
-+	uint32_t             buffer_mask;
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *channel = get_dma_chan(this);
-+	struct mil *mil = &this->mil;
-+	int chip = mil->current_chip;
-+	u32 pio[6];
-+
-+	/* A DMA descriptor that does an ECC page read. */
-+	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WRITE;
-+	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__ENCODE;
-+	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE |
-+				BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
-+
-+	pio[0] =
-+		BF_GPMI_CTRL0_COMMAND_MODE(command_mode) |
-+		BM_GPMI_CTRL0_WORD_LENGTH                |
-+		BF_GPMI_CTRL0_CS(chip)                   |
-+		BF_GPMI_CTRL0_ADDRESS(address)           |
-+		BF_GPMI_CTRL0_XFER_COUNT(0)              ;
-+	pio[1] = 0;
-+	pio[2] =
-+		BM_GPMI_ECCCTRL_ENABLE_ECC               |
-+		BF_GPMI_ECCCTRL_ECC_CMD(ecc_command)     |
-+		BF_GPMI_ECCCTRL_BUFFER_MASK(buffer_mask) ;
-+	pio[3] = geo->page_size_in_bytes;
-+	pio[4] = payload;
-+	pio[5] = auxiliary;
-+
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					(struct scatterlist *)pio,
-+					ARRAY_SIZE(pio), DMA_NONE, 0);
-+	if (!desc) {
-+		log("step 2 error");
-+		return -1;
-+	}
-+	this->dma_type = DMA_FOR_WRITE_ECC_PAGE;
-+	return start_dma_with_bch_irq(this, desc);
-+}
-+
-+static int read_page(struct gpmi_nfc_data *this,
-+				dma_addr_t payload, dma_addr_t auxiliary)
-+{
-+	struct nfc_geometry *geo = &this->nfc_geometry;
-+	uint32_t             command_mode;
-+	uint32_t             address;
-+	uint32_t             ecc_command;
-+	uint32_t             buffer_mask;
-+
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *channel = get_dma_chan(this);
-+	struct mil *mil = &this->mil;
-+	int chip = mil->current_chip;
-+	u32 pio[6];
-+
-+	/* [1] Wait for the chip to report ready. */
-+	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY;
-+	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+
-+	pio[0] =  BF_GPMI_CTRL0_COMMAND_MODE(command_mode)
-+		| BM_GPMI_CTRL0_WORD_LENGTH
-+		| BF_GPMI_CTRL0_CS(chip)
-+		| BF_GPMI_CTRL0_ADDRESS(address)
-+		| BF_GPMI_CTRL0_XFER_COUNT(0);
-+	pio[1] = 0;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+				(struct scatterlist *)pio, 2, DMA_NONE, 0);
-+	if (!desc) {
-+		log("step 1 error");
-+		return -1;
-+	}
-+
-+	/* [2] Enable the BCH block and read. */
-+	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__READ;
-+	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__DECODE;
-+	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE
-+			| BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
-+
-+	pio[0] =  BF_GPMI_CTRL0_COMMAND_MODE(command_mode)
-+		| BM_GPMI_CTRL0_WORD_LENGTH
-+		| BF_GPMI_CTRL0_CS(chip)
-+		| BF_GPMI_CTRL0_ADDRESS(address)
-+		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size_in_bytes);
-+
-+	pio[1] = 0;
-+	pio[2] =  BM_GPMI_ECCCTRL_ENABLE_ECC
-+		| BF_GPMI_ECCCTRL_ECC_CMD(ecc_command)
-+		| BF_GPMI_ECCCTRL_BUFFER_MASK(buffer_mask);
-+	pio[3] = geo->page_size_in_bytes;
-+	pio[4] = payload;
-+	pio[5] = auxiliary;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+					(struct scatterlist *)pio,
-+					ARRAY_SIZE(pio), DMA_NONE, 1);
-+	if (!desc) {
-+		log("step 2 error");
-+		return -1;
-+	}
-+
-+	/* [3] Disable the BCH block */
-+	command_mode = BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY;
-+	address      = BV_GPMI_CTRL0_ADDRESS__NAND_DATA;
-+
-+	pio[0] =
-+		BF_GPMI_CTRL0_COMMAND_MODE(command_mode)              |
-+		BM_GPMI_CTRL0_WORD_LENGTH                             |
-+		BF_GPMI_CTRL0_CS(chip)                                |
-+		BF_GPMI_CTRL0_ADDRESS(address)                        |
-+		BF_GPMI_CTRL0_XFER_COUNT(geo->page_size_in_bytes) ;
-+	pio[1] = 0;
-+	desc = channel->device->device_prep_slave_sg(channel,
-+				(struct scatterlist *)pio, 2, DMA_NONE, 1);
-+	if (!desc) {
-+		log("step 3 error");
-+		return -1;
-+	}
-+
-+	/* [4] submit the DMA */
-+	this->dma_type = DMA_FOR_READ_ECC_PAGE;
-+	return start_dma_with_bch_irq(this, desc);
-+}
-+
-+/* This structure represents the NFC HAL for this version of the hardware. */
-+struct nfc_hal  gpmi_nfc_hal_imx28 = {
-+	.version                     = 1,
-+	.description                 = "8-chip GPMI and BCH",
-+	.max_chip_count              = 8,
-+	.max_data_setup_cycles       = (BM_GPMI_TIMING0_DATA_SETUP >>
-+						BP_GPMI_TIMING0_DATA_SETUP),
-+	.internal_data_setup_in_ns   = 0,
-+	.max_sample_delay_factor     = (BM_GPMI_CTRL1_RDN_DELAY >>
-+						BP_GPMI_CTRL1_RDN_DELAY),
-+	.max_dll_clock_period_in_ns  = 32,
-+	.max_dll_delay_in_ns         = 16,
-+	.init                        = init_hal_imx28,
-+	.set_geometry                = set_geometry,
-+	.set_timing                  = set_timing,
-+	.get_timing                  = get_timing,
-+	.exit                        = exit,
-+	.begin                       = begin,
-+	.end                         = end,
-+	.clear_bch                   = clear_bch,
-+	.is_ready                    = is_ready,
-+	.send_command                = send_command,
-+	.read_data                   = read_data,
-+	.send_data                   = send_data,
-+	.send_page                   = send_page,
-+	.read_page                   = read_page,
-+};
-diff --git a/drivers/mtd/nand/gpmi-nfc/rom-imx28.c b/drivers/mtd/nand/gpmi-nfc/rom-imx28.c
-new file mode 100644
-index 0000000..03be07f
---- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/rom-imx28.c
-@@ -0,0 +1,66 @@
++++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+@@ -0,0 +1,2452 @@
 +/*
 + * Freescale GPMI NFC NAND Flash Driver
 + *
@@ -1280,51 +43,2993 @@ index 0000000..03be07f
 + * with this program; if not, write to the Free Software Foundation, Inc.,
 + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
++#include <linux/slab.h>
 +#include "gpmi-nfc.h"
++#include "linux/slab.h"
 +
-+/* Sets geometry for the Boot ROM Helper. */
-+static int set_geometry(struct gpmi_nfc_data *this)
++/* add our owner bbt descriptor */
++static uint8_t scan_ff_pattern[] = { 0xff };
++static struct nand_bbt_descr gpmi_bbt_descr = {
++	.options	= 0,
++	.offs		= 0,
++	.len		= 1,
++	.pattern	= scan_ff_pattern
++};
++
++/* debug control */
++int gpmi_debug;
++
++static ssize_t show_gpmi_debug(struct device *dev,
++				struct device_attribute *attr, char *buf)
 +{
-+	struct gpmi_nfc_platform_data  *pdata    =  this->pdata;
-+	struct boot_rom_geometry       *geometry = &this->rom_geometry;
-+	int                            error;
++	return sprintf(buf, "%d\n", gpmi_debug);
++}
 +
-+	/* Version-independent geometry. */
-+	error = gpmi_nfc_rom_helper_set_geometry(this);
-+	if (error)
-+		return error;
++static ssize_t
++store_gpmi_debug(struct device *dev, struct device_attribute *attr,
++			const char *buf, size_t size)
++{
++	const char *p = buf;
++	unsigned long v;
++
++	if (strict_strtoul(p, 0, &v) < 0)
++		return size;
++
++	gpmi_debug = v;
++	return size;
++}
++
++static ssize_t show_ignorebad(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct gpmi_nfc_data  *this = dev_get_drvdata(dev);
++	struct mil            *mil  = &this->mil;
++
++	return sprintf(buf, "%d\n", mil->ignore_bad_block_marks);
++}
++
++/* Sets the value of the 'ignorebad' flag. */
++static ssize_t
++store_ignorebad(struct device *dev, struct device_attribute *attr,
++			const char *buf, size_t size)
++{
++	struct gpmi_nfc_data  *this = dev_get_drvdata(dev);
++	struct mil            *mil  = &this->mil;
++	const char            *p = buf;
++	unsigned long         v;
++
++	/* Try to make sense of what arrived from user space. */
++	if (strict_strtoul(p, 0, &v) < 0)
++		return size;
++
++	if (v > 0)
++		v = 1;
++
++	if (v != mil->ignore_bad_block_marks) {
++		if (v) {
++			/*
++			 * If control arrives here, we want to begin ignoring
++			 * bad block marks. Reach into the NAND Flash MTD data
++			 * structures and set the in-memory BBT pointer to NULL.
++			 * This will cause the NAND Flash MTD code to believe
++			 * that it never created a BBT and force it to call our
++			 * block_bad function.
++			 *
++			 * See mil_block_bad for more details.
++			 */
++			mil->saved_bbt = mil->nand.bbt;
++			mil->nand.bbt  = 0;
++		} else {
++			/*
++			 * If control arrives here, we want to stop ignoring
++			 * bad block marks. Restore the NAND Flash MTD's pointer
++			 * to its in-memory BBT.
++			 */
++			mil->nand.bbt = mil->saved_bbt;
++		}
++		mil->ignore_bad_block_marks = v;
++	}
++	return size;
++}
++
++/* Device attributes that appear in sysfs. */
++static DEVICE_ATTR(ignorebad, 0644, show_ignorebad, store_ignorebad);
++static DEVICE_ATTR(gpmi_debug, 0644, show_gpmi_debug, store_gpmi_debug);
++static struct device_attribute *device_attributes[] = {
++	&dev_attr_ignorebad,
++	&dev_attr_gpmi_debug,
++};
++
++irqreturn_t bch_irq(int irq, void *cookie)
++{
++	struct gpmi_nfc_data  *this = cookie;
++	struct nfc_hal        *nfc  = this->nfc;
++
++	/* Clear the BCH interrupt */
++	nfc->clear_bch(this);
++
++	complete(&nfc->bch_done);
++	return IRQ_HANDLED;
++}
++
++/* get the ECC strength */
++static inline int get_ecc_strength(struct gpmi_nfc_data *this)
++{
++	return this->device_info.attr.ecc_strength_in_bits;
++}
++
++static inline int get_ecc_chunk_size(struct gpmi_nfc_data *this)
++{
++	return this->device_info.attr.ecc_size_in_bytes;
++}
++
++static inline bool is_ddr_nand(struct nand_chip *chip)
++{
++	return chip->onfi_version != 0;
++}
++
++int common_nfc_set_geometry(struct gpmi_nfc_data *this)
++{
++	struct nfc_geometry       *geo = &this->nfc_geometry;
++	struct boot_rom_helper    *rom =  this->rom;
++	struct mtd_info		  *mtd = &this->mil.mtd;
++	struct nand_chip	*chip = &this->mil.nand;
++	unsigned int              metadata_size;
++	unsigned int              status_size;
++	unsigned int              chunk_data_size_in_bits;
++	unsigned int              chunk_ecc_size_in_bits;
++	unsigned int              chunk_total_size_in_bits;
++	unsigned int              block_mark_chunk_number;
++	unsigned int              block_mark_chunk_bit_offset;
++	unsigned int              block_mark_bit_offset;
++
++	/* We only support BCH now. */
++	geo->ecc_algorithm = "BCH";
 +
 +	/*
-+	 * Check if the platform data indicates we are to protect the boot area.
++	 * We always choose a metadata size of 10. Don't try to make sense of
++	 * it -- this is really only for historical compatibility.
 +	 */
-+	if (!pdata->boot_area_size_in_bytes) {
-+		geometry->boot_area_count         = 0;
-+		geometry->boot_area_size_in_bytes = 0;
++	geo->metadata_size_in_bytes = 10;
++
++	/* ECC chunks */
++	geo->ecc_chunk_size_in_bytes = get_ecc_chunk_size(this);
++
++	/*
++	 * Compute the total number of ECC chunks in a page. This includes the
++	 * slightly larger chunk at the beginning of the page, which contains
++	 * both data and metadata.
++	 */
++	geo->ecc_chunk_count = mtd->writesize / geo->ecc_chunk_size_in_bytes;
++
++	/*
++	 * We use the same ECC strength for all chunks, including the first one.
++	 */
++	geo->ecc_strength = get_ecc_strength(this);
++	if (!geo->ecc_strength) {
++		log("Unsupported page geometry.");
++		return -EINVAL;
++	}
++
++	/* Compute the page size, include page and oob. */
++	geo->page_size_in_bytes = mtd->writesize + mtd->oobsize;
++
++	/*
++	 * ONFI/TOGGLE nand needs GF14, so re-culculate DMA page size.
++	 * The ONFI nand must do the reculation,
++	 * else it will fail in DMA in some platform(such as imx50).
++	 */
++	if (is_ddr_nand(chip))
++		geo->page_size_in_bytes = mtd->writesize +
++				geo->metadata_size_in_bytes +
++			(geo->ecc_strength * 14 * 8 / geo->ecc_chunk_count);
++
++	/*
++	 * The payload buffer contains the data area of a page. The ECC engine
++	 * only needs what's required to hold the data.
++	 */
++	geo->payload_size_in_bytes = mtd->writesize;
++
++	/*
++	 * In principle, computing the auxiliary buffer geometry is NFC
++	 * version-specific. However, at this writing, all versions share the
++	 * same model, so this code can also be shared.
++	 *
++	 * The auxiliary buffer contains the metadata and the ECC status. The
++	 * metadata is padded to the nearest 32-bit boundary. The ECC status
++	 * contains one byte for every ECC chunk, and is also padded to the
++	 * nearest 32-bit boundary.
++	 */
++	metadata_size = (geo->metadata_size_in_bytes + 0x3) & ~0x3;
++	status_size   = (geo->ecc_chunk_count        + 0x3) & ~0x3;
++
++	geo->auxiliary_size_in_bytes = metadata_size + status_size;
++	geo->auxiliary_status_offset = metadata_size;
++
++	/* Check if we're going to do block mark swapping. */
++	if (!rom->swap_block_mark)
 +		return 0;
++
++	/*
++	 * If control arrives here, we're doing block mark swapping, so we need
++	 * to compute the byte and bit offsets of the physical block mark within
++	 * the ECC-based view of the page data. In principle, this isn't a
++	 * difficult computation -- but it's very important and it's easy to get
++	 * it wrong, so we do it carefully.
++	 *
++	 * Note that this calculation is simpler because we use the same ECC
++	 * strength for all chunks, including the zero'th one, which contains
++	 * the metadata. The calculation would be slightly more complicated
++	 * otherwise.
++	 *
++	 * We start by computing the physical bit offset of the block mark. We
++	 * then subtract the number of metadata and ECC bits appearing before
++	 * the mark to arrive at its bit offset within the data alone.
++	 */
++
++	/* Compute some important facts about chunk geometry. */
++	chunk_data_size_in_bits = geo->ecc_chunk_size_in_bytes * 8;
++
++	/* ONFI/TOGGLE nand needs GF14 */
++	if (is_ddr_nand(chip))
++		chunk_ecc_size_in_bits  = geo->ecc_strength * 14;
++	else
++		chunk_ecc_size_in_bits  = geo->ecc_strength * 13;
++
++	chunk_total_size_in_bits =
++			chunk_data_size_in_bits + chunk_ecc_size_in_bits;
++
++	/* Compute the bit offset of the block mark within the physical page. */
++	block_mark_bit_offset = mtd->writesize * 8;
++
++	/* Subtract the metadata bits. */
++	block_mark_bit_offset -= geo->metadata_size_in_bytes * 8;
++
++	/*
++	 * Compute the chunk number (starting at zero) in which the block mark
++	 * appears.
++	 */
++	block_mark_chunk_number =
++			block_mark_bit_offset / chunk_total_size_in_bits;
++
++	/*
++	 * Compute the bit offset of the block mark within its chunk, and
++	 * validate it.
++	 */
++	block_mark_chunk_bit_offset =
++		block_mark_bit_offset -
++			(block_mark_chunk_number * chunk_total_size_in_bits);
++
++	if (block_mark_chunk_bit_offset > chunk_data_size_in_bits) {
++		/*
++		 * If control arrives here, the block mark actually appears in
++		 * the ECC bits of this chunk. This wont' work.
++		 */
++		log("Unsupported page geometry (block mark in ECC): %u:%u",
++					mtd->writesize, mtd->oobsize);
++		return !0;
 +	}
 +
 +	/*
-+	 * If control arrives here, we are supposed to set up partitions to
-+	 * protect the boot areas. In this version of the ROM, we support only
-+	 * one boot area.
++	 * Now that we know the chunk number in which the block mark appears,
++	 * we can subtract all the ECC bits that appear before it.
 +	 */
-+	geometry->boot_area_count = 1;
++	block_mark_bit_offset -=
++			block_mark_chunk_number * chunk_ecc_size_in_bits;
 +
 +	/*
-+	 * Use the platform's boot area size.
++	 * We now know the absolute bit offset of the block mark within the
++	 * ECC-based data. We can now compute the byte offset and the bit
++	 * offset within the byte.
 +	 */
-+	geometry->boot_area_size_in_bytes = pdata->boot_area_size_in_bytes;
++	geo->block_mark_byte_offset = block_mark_bit_offset / 8;
++	geo->block_mark_bit_offset  = block_mark_bit_offset % 8;
 +
 +	return 0;
 +}
 +
-+/* This structure represents the Boot ROM Helper for this version. */
-+struct boot_rom_helper  gpmi_nfc_boot_rom_imx28 = {
-+	.version                   = 1,
-+	.description               = "Single-chip boot area, "
-+						"block mark swapping supported",
-+	.swap_block_mark           = true,
-+	.set_geometry              = set_geometry,
++struct dma_chan *get_dma_chan(struct gpmi_nfc_data *this)
++{
++	int chip = this->mil.current_chip;
++
++	BUG_ON(chip < 0);
++	return this->dma_chans[chip];
++}
++
++/* Can we use the upper's buffer directly for DMA? */
++void prepare_data_dma(struct gpmi_nfc_data *this, enum dma_data_direction dr)
++{
++	struct mil *mil = &this->mil;
++	struct scatterlist *sgl = &mil->data_sgl;
++	int ret;
++
++	mil->direct_dma_map_ok = true;
++
++	/* first try to map the upper buffer directly */
++	sg_init_one(sgl, mil->upper_buf, mil->upper_len);
++	ret = dma_map_sg(this->dev, sgl, 1, dr);
++	if (ret == 0) {
++		/* We have to use our own DMA buffer. */
++		sg_init_one(sgl, mil->data_buffer_dma, PAGE_SIZE);
++		ret = dma_map_sg(this->dev, sgl, 1, dr);
++		BUG_ON(ret == 0);
++
++		if (dr == DMA_TO_DEVICE)
++			memcpy(mil->data_buffer_dma, mil->upper_buf,
++				mil->upper_len);
++		mil->direct_dma_map_ok = false;
++	}
++}
++
++/* This will be called after the DMA operation is finished. */
++static void dma_irq_callback(void *param)
++{
++	struct gpmi_nfc_data *this = param;
++	struct nfc_hal *nfc = this->nfc;
++	struct mil *mil = &this->mil;
++
++	complete(&nfc->dma_done);
++
++	switch (this->dma_type) {
++	case DMA_FOR_COMMAND:
++		dma_unmap_sg(this->dev, &mil->cmd_sgl, 1, DMA_TO_DEVICE);
++		break;
++
++	case DMA_FOR_READ_DATA:
++		if (mil->direct_dma_map_ok == false)
++			memcpy(mil->upper_buf, (char *)mil->data_buffer_dma,
++				mil->upper_len);
++		dma_unmap_sg(this->dev, &mil->data_sgl, 1, DMA_FROM_DEVICE);
++		break;
++
++	case DMA_FOR_WRITE_DATA:
++		dma_unmap_sg(this->dev, &mil->data_sgl, 1, DMA_TO_DEVICE);
++		break;
++
++	case DMA_FOR_READ_ECC_PAGE:
++	case DMA_FOR_WRITE_ECC_PAGE:
++		/* We have to wait the BCH interrupt to finish. */
++		break;
++
++	default:
++		BUG();
++	}
++}
++
++int start_dma_without_bch_irq(struct gpmi_nfc_data *this,
++				struct dma_async_tx_descriptor *desc)
++{
++	struct nfc_hal *nfc = this->nfc;
++	int err;
++
++	init_completion(&nfc->dma_done);
++
++	desc->callback		= dma_irq_callback;
++	desc->callback_param	= this;
++	dmaengine_submit(desc);
++
++	/* Wait for the interrupt from the DMA block. */
++	err = wait_for_completion_timeout(&nfc->dma_done,
++					msecs_to_jiffies(1000));
++	err = (!err) ? -ETIMEDOUT : 0;
++	if (err)
++		log("DMA timeout!!!");
++	return err;
++}
++
++/*
++ * This function is used in BCH reading or BCH writing pages.
++ * It will wait for the BCH interrupt as long as ONE second.
++ * Actually, we must wait for two interrupts :
++ *	[1] firstly the DMA interrupt and
++ *	[2] secondly the BCH interrupt.
++ *
++ * @this:	Per-device data structure.
++ * @desc:	DMA channel
++ */
++int start_dma_with_bch_irq(struct gpmi_nfc_data *this,
++			struct dma_async_tx_descriptor *desc)
++{
++	struct nfc_hal *nfc = this->nfc;
++	int err;
++
++	/* Prepare to receive an interrupt from the BCH block. */
++	init_completion(&nfc->bch_done);
++
++	/* start the DMA */
++	start_dma_without_bch_irq(this, desc);
++
++	/* Wait for the interrupt from the BCH block. */
++	err = wait_for_completion_timeout(&nfc->bch_done,
++					msecs_to_jiffies(1000));
++	err = (!err) ? -ETIMEDOUT : 0;
++	if (err)
++		log("bch timeout!!!");
++	return err;
++}
++
++/**
++ * ns_to_cycles - Converts time in nanoseconds to cycles.
++ *
++ * @ntime:   The time, in nanoseconds.
++ * @period:  The cycle period, in nanoseconds.
++ * @min:     The minimum allowable number of cycles.
++ */
++static unsigned int ns_to_cycles(unsigned int time,
++					unsigned int period, unsigned int min)
++{
++	unsigned int k;
++
++	/*
++	 * Compute the minimum number of cycles that entirely contain the
++	 * given time.
++	 */
++	k = (time + period - 1) / period;
++	return max(k, min);
++}
++
++/**
++ * gpmi_compute_hardware_timing - Apply timing to current hardware conditions.
++ *
++ * @this:             Per-device data.
++ * @hardware_timing:  A pointer to a hardware timing structure that will receive
++ *                    the results of our calculations.
++ */
++int gpmi_nfc_compute_hardware_timing(struct gpmi_nfc_data *this,
++					struct gpmi_nfc_hardware_timing *hw)
++{
++	struct gpmi_nfc_platform_data  *pdata	=  this->pdata;
++	struct nfc_hal                 *nfc	=  this->nfc;
++	struct nand_chip		*nand	= &this->mil.nand;
++	struct nand_timing		target	= nfc->timing;
++	bool           improved_timing_is_available;
++	unsigned long  clock_frequency_in_hz;
++	unsigned int   clock_period_in_ns;
++	bool           dll_use_half_periods;
++	unsigned int   dll_delay_shift;
++	unsigned int   max_sample_delay_in_ns;
++	unsigned int   address_setup_in_cycles;
++	unsigned int   data_setup_in_ns;
++	unsigned int   data_setup_in_cycles;
++	unsigned int   data_hold_in_cycles;
++	int            ideal_sample_delay_in_ns;
++	unsigned int   sample_delay_factor;
++	int            tEYE;
++	unsigned int   min_prop_delay_in_ns = pdata->min_prop_delay_in_ns;
++	unsigned int   max_prop_delay_in_ns = pdata->max_prop_delay_in_ns;
++
++	/*
++	 * If there are multiple chips, we need to relax the timings to allow
++	 * for signal distortion due to higher capacitance.
++	 */
++	if (nand->numchips > 2) {
++		target.data_setup_in_ns    += 10;
++		target.data_hold_in_ns     += 10;
++		target.address_setup_in_ns += 10;
++	} else if (nand->numchips > 1) {
++		target.data_setup_in_ns    += 5;
++		target.data_hold_in_ns     += 5;
++		target.address_setup_in_ns += 5;
++	}
++
++	/* Check if improved timing information is available. */
++	improved_timing_is_available =
++		(target.tREA_in_ns  >= 0) &&
++		(target.tRLOH_in_ns >= 0) &&
++		(target.tRHOH_in_ns >= 0) ;
++
++	/* Inspect the clock. */
++	clock_frequency_in_hz = nfc->clock_frequency_in_hz;
++	clock_period_in_ns    = 1000000000 / clock_frequency_in_hz;
++
++	/*
++	 * The NFC quantizes setup and hold parameters in terms of clock cycles.
++	 * Here, we quantize the setup and hold timing parameters to the
++	 * next-highest clock period to make sure we apply at least the
++	 * specified times.
++	 *
++	 * For data setup and data hold, the hardware interprets a value of zero
++	 * as the largest possible delay. This is not what's intended by a zero
++	 * in the input parameter, so we impose a minimum of one cycle.
++	 */
++	data_setup_in_cycles    = ns_to_cycles(target.data_setup_in_ns,
++							clock_period_in_ns, 1);
++	data_hold_in_cycles     = ns_to_cycles(target.data_hold_in_ns,
++							clock_period_in_ns, 1);
++	address_setup_in_cycles = ns_to_cycles(target.address_setup_in_ns,
++							clock_period_in_ns, 0);
++
++	/*
++	 * The clock's period affects the sample delay in a number of ways:
++	 *
++	 * (1) The NFC HAL tells us the maximum clock period the sample delay
++	 *     DLL can tolerate. If the clock period is greater than half that
++	 *     maximum, we must configure the DLL to be driven by half periods.
++	 *
++	 * (2) We need to convert from an ideal sample delay, in ns, to a
++	 *     "sample delay factor," which the NFC uses. This factor depends on
++	 *     whether we're driving the DLL with full or half periods.
++	 *     Paraphrasing the reference manual:
++	 *
++	 *         AD = SDF x 0.125 x RP
++	 *
++	 * where:
++	 *
++	 *     AD   is the applied delay, in ns.
++	 *     SDF  is the sample delay factor, which is dimensionless.
++	 *     RP   is the reference period, in ns, which is a full clock period
++	 *          if the DLL is being driven by full periods, or half that if
++	 *          the DLL is being driven by half periods.
++	 *
++	 * Let's re-arrange this in a way that's more useful to us:
++	 *
++	 *                        8
++	 *         SDF  =  AD x ----
++	 *                       RP
++	 *
++	 * The reference period is either the clock period or half that, so this
++	 * is:
++	 *
++	 *                        8       AD x DDF
++	 *         SDF  =  AD x -----  =  --------
++	 *                      f x P        P
++	 *
++	 * where:
++	 *
++	 *       f  is 1 or 1/2, depending on how we're driving the DLL.
++	 *       P  is the clock period.
++	 *     DDF  is the DLL Delay Factor, a dimensionless value that
++	 *          incorporates all the constants in the conversion.
++	 *
++	 * DDF will be either 8 or 16, both of which are powers of two. We can
++	 * reduce the cost of this conversion by using bit shifts instead of
++	 * multiplication or division. Thus:
++	 *
++	 *                 AD << DDS
++	 *         SDF  =  ---------
++	 *                     P
++	 *
++	 *     or
++	 *
++	 *         AD  =  (SDF >> DDS) x P
++	 *
++	 * where:
++	 *
++	 *     DDS  is the DLL Delay Shift, the logarithm to base 2 of the DDF.
++	 */
++	if (clock_period_in_ns > (nfc->max_dll_clock_period_in_ns >> 1)) {
++		dll_use_half_periods = true;
++		dll_delay_shift      = 3 + 1;
++	} else {
++		dll_use_half_periods = false;
++		dll_delay_shift      = 3;
++	}
++
++	/*
++	 * Compute the maximum sample delay the NFC allows, under current
++	 * conditions. If the clock is running too slowly, no sample delay is
++	 * possible.
++	 */
++	if (clock_period_in_ns > nfc->max_dll_clock_period_in_ns)
++		max_sample_delay_in_ns = 0;
++	else {
++		/*
++		 * Compute the delay implied by the largest sample delay factor
++		 * the NFC allows.
++		 */
++		max_sample_delay_in_ns =
++			(nfc->max_sample_delay_factor * clock_period_in_ns) >>
++								dll_delay_shift;
++
++		/*
++		 * Check if the implied sample delay larger than the NFC
++		 * actually allows.
++		 */
++		if (max_sample_delay_in_ns > nfc->max_dll_delay_in_ns)
++			max_sample_delay_in_ns = nfc->max_dll_delay_in_ns;
++	}
++
++	/*
++	 * Check if improved timing information is available. If not, we have to
++	 * use a less-sophisticated algorithm.
++	 */
++	if (!improved_timing_is_available) {
++		/*
++		 * Fold the read setup time required by the NFC into the ideal
++		 * sample delay.
++		 */
++		ideal_sample_delay_in_ns = target.gpmi_sample_delay_in_ns +
++						nfc->internal_data_setup_in_ns;
++
++		/*
++		 * The ideal sample delay may be greater than the maximum
++		 * allowed by the NFC. If so, we can trade off sample delay time
++		 * for more data setup time.
++		 *
++		 * In each iteration of the following loop, we add a cycle to
++		 * the data setup time and subtract a corresponding amount from
++		 * the sample delay until we've satisified the constraints or
++		 * can't do any better.
++		 */
++		while ((ideal_sample_delay_in_ns > max_sample_delay_in_ns) &&
++			(data_setup_in_cycles < nfc->max_data_setup_cycles)) {
++
++			data_setup_in_cycles++;
++			ideal_sample_delay_in_ns -= clock_period_in_ns;
++
++			if (ideal_sample_delay_in_ns < 0)
++				ideal_sample_delay_in_ns = 0;
++
++		}
++
++		/*
++		 * Compute the sample delay factor that corresponds most closely
++		 * to the ideal sample delay. If the result is too large for the
++		 * NFC, use the maximum value.
++		 *
++		 * Notice that we use the ns_to_cycles function to compute the
++		 * sample delay factor. We do this because the form of the
++		 * computation is the same as that for calculating cycles.
++		 */
++		sample_delay_factor =
++			ns_to_cycles(
++				ideal_sample_delay_in_ns << dll_delay_shift,
++							clock_period_in_ns, 0);
++
++		if (sample_delay_factor > nfc->max_sample_delay_factor)
++			sample_delay_factor = nfc->max_sample_delay_factor;
++
++		/* Skip to the part where we return our results. */
++		goto return_results;
++	}
++
++	/*
++	 * If control arrives here, we have more detailed timing information,
++	 * so we can use a better algorithm.
++	 */
++
++	/*
++	 * Fold the read setup time required by the NFC into the maximum
++	 * propagation delay.
++	 */
++	max_prop_delay_in_ns += nfc->internal_data_setup_in_ns;
++
++	/*
++	 * Earlier, we computed the number of clock cycles required to satisfy
++	 * the data setup time. Now, we need to know the actual nanoseconds.
++	 */
++	data_setup_in_ns = clock_period_in_ns * data_setup_in_cycles;
++
++	/*
++	 * Compute tEYE, the width of the data eye when reading from the NAND
++	 * Flash. The eye width is fundamentally determined by the data setup
++	 * time, perturbed by propagation delays and some characteristics of the
++	 * NAND Flash device.
++	 *
++	 * start of the eye = max_prop_delay + tREA
++	 * end of the eye   = min_prop_delay + tRHOH + data_setup
++	 */
++	tEYE = (int)min_prop_delay_in_ns + (int)target.tRHOH_in_ns +
++							(int)data_setup_in_ns;
++
++	tEYE -= (int)max_prop_delay_in_ns + (int)target.tREA_in_ns;
++
++	/*
++	 * The eye must be open. If it's not, we can try to open it by
++	 * increasing its main forcer, the data setup time.
++	 *
++	 * In each iteration of the following loop, we increase the data setup
++	 * time by a single clock cycle. We do this until either the eye is
++	 * open or we run into NFC limits.
++	 */
++	while ((tEYE <= 0) &&
++			(data_setup_in_cycles < nfc->max_data_setup_cycles)) {
++		/* Give a cycle to data setup. */
++		data_setup_in_cycles++;
++		/* Synchronize the data setup time with the cycles. */
++		data_setup_in_ns += clock_period_in_ns;
++		/* Adjust tEYE accordingly. */
++		tEYE += clock_period_in_ns;
++	}
++
++	/*
++	 * When control arrives here, the eye is open. The ideal time to sample
++	 * the data is in the center of the eye:
++	 *
++	 *     end of the eye + start of the eye
++	 *     ---------------------------------  -  data_setup
++	 *                    2
++	 *
++	 * After some algebra, this simplifies to the code immediately below.
++	 */
++	ideal_sample_delay_in_ns =
++		((int)max_prop_delay_in_ns +
++			(int)target.tREA_in_ns +
++				(int)min_prop_delay_in_ns +
++					(int)target.tRHOH_in_ns -
++						(int)data_setup_in_ns) >> 1;
++
++	/*
++	 * The following figure illustrates some aspects of a NAND Flash read:
++	 *
++	 *
++	 *           __                   _____________________________________
++	 * RDN         \_________________/
++	 *
++	 *                                         <---- tEYE ----->
++	 *                                        /-----------------\
++	 * Read Data ----------------------------<                   >---------
++	 *                                        \-----------------/
++	 *             ^                 ^                 ^              ^
++	 *             |                 |                 |              |
++	 *             |<--Data Setup -->|<--Delay Time -->|              |
++	 *             |                 |                 |              |
++	 *             |                 |                                |
++	 *             |                 |<--   Quantized Delay Time   -->|
++	 *             |                 |                                |
++	 *
++	 *
++	 * We have some issues we must now address:
++	 *
++	 * (1) The *ideal* sample delay time must not be negative. If it is, we
++	 *     jam it to zero.
++	 *
++	 * (2) The *ideal* sample delay time must not be greater than that
++	 *     allowed by the NFC. If it is, we can increase the data setup
++	 *     time, which will reduce the delay between the end of the data
++	 *     setup and the center of the eye. It will also make the eye
++	 *     larger, which might help with the next issue...
++	 *
++	 * (3) The *quantized* sample delay time must not fall either before the
++	 *     eye opens or after it closes (the latter is the problem
++	 *     illustrated in the above figure).
++	 */
++
++	/* Jam a negative ideal sample delay to zero. */
++	if (ideal_sample_delay_in_ns < 0)
++		ideal_sample_delay_in_ns = 0;
++
++	/*
++	 * Extend the data setup as needed to reduce the ideal sample delay
++	 * below the maximum permitted by the NFC.
++	 */
++	while ((ideal_sample_delay_in_ns > max_sample_delay_in_ns) &&
++			(data_setup_in_cycles < nfc->max_data_setup_cycles)) {
++
++		/* Give a cycle to data setup. */
++		data_setup_in_cycles++;
++		/* Synchronize the data setup time with the cycles. */
++		data_setup_in_ns += clock_period_in_ns;
++		/* Adjust tEYE accordingly. */
++		tEYE += clock_period_in_ns;
++
++		/*
++		 * Decrease the ideal sample delay by one half cycle, to keep it
++		 * in the middle of the eye.
++		 */
++		ideal_sample_delay_in_ns -= (clock_period_in_ns >> 1);
++
++		/* Jam a negative ideal sample delay to zero. */
++		if (ideal_sample_delay_in_ns < 0)
++			ideal_sample_delay_in_ns = 0;
++	}
++
++	/*
++	 * Compute the sample delay factor that corresponds to the ideal sample
++	 * delay. If the result is too large, then use the maximum allowed
++	 * value.
++	 *
++	 * Notice that we use the ns_to_cycles function to compute the sample
++	 * delay factor. We do this because the form of the computation is the
++	 * same as that for calculating cycles.
++	 */
++	sample_delay_factor =
++		ns_to_cycles(ideal_sample_delay_in_ns << dll_delay_shift,
++							clock_period_in_ns, 0);
++
++	if (sample_delay_factor > nfc->max_sample_delay_factor)
++		sample_delay_factor = nfc->max_sample_delay_factor;
++
++	/*
++	 * These macros conveniently encapsulate a computation we'll use to
++	 * continuously evaluate whether or not the data sample delay is inside
++	 * the eye.
++	 */
++	#define IDEAL_DELAY  ((int) ideal_sample_delay_in_ns)
++
++	#define QUANTIZED_DELAY  \
++		((int) ((sample_delay_factor * clock_period_in_ns) >> \
++							dll_delay_shift))
++
++	#define DELAY_ERROR  (abs(QUANTIZED_DELAY - IDEAL_DELAY))
++
++	#define SAMPLE_IS_NOT_WITHIN_THE_EYE  (DELAY_ERROR > (tEYE >> 1))
++
++	/*
++	 * While the quantized sample time falls outside the eye, reduce the
++	 * sample delay or extend the data setup to move the sampling point back
++	 * toward the eye. Do not allow the number of data setup cycles to
++	 * exceed the maximum allowed by the NFC.
++	 */
++	while (SAMPLE_IS_NOT_WITHIN_THE_EYE &&
++			(data_setup_in_cycles < nfc->max_data_setup_cycles)) {
++		/*
++		 * If control arrives here, the quantized sample delay falls
++		 * outside the eye. Check if it's before the eye opens, or after
++		 * the eye closes.
++		 */
++		if (QUANTIZED_DELAY > IDEAL_DELAY) {
++			/*
++			 * If control arrives here, the quantized sample delay
++			 * falls after the eye closes. Decrease the quantized
++			 * delay time and then go back to re-evaluate.
++			 */
++			if (sample_delay_factor != 0)
++				sample_delay_factor--;
++			continue;
++		}
++
++		/*
++		 * If control arrives here, the quantized sample delay falls
++		 * before the eye opens. Shift the sample point by increasing
++		 * data setup time. This will also make the eye larger.
++		 */
++
++		/* Give a cycle to data setup. */
++		data_setup_in_cycles++;
++		/* Synchronize the data setup time with the cycles. */
++		data_setup_in_ns += clock_period_in_ns;
++		/* Adjust tEYE accordingly. */
++		tEYE += clock_period_in_ns;
++
++		/*
++		 * Decrease the ideal sample delay by one half cycle, to keep it
++		 * in the middle of the eye.
++		 */
++		ideal_sample_delay_in_ns -= (clock_period_in_ns >> 1);
++
++		/* ...and one less period for the delay time. */
++		ideal_sample_delay_in_ns -= clock_period_in_ns;
++
++		/* Jam a negative ideal sample delay to zero. */
++		if (ideal_sample_delay_in_ns < 0)
++			ideal_sample_delay_in_ns = 0;
++
++		/*
++		 * We have a new ideal sample delay, so re-compute the quantized
++		 * delay.
++		 */
++		sample_delay_factor =
++			ns_to_cycles(
++				ideal_sample_delay_in_ns << dll_delay_shift,
++							clock_period_in_ns, 0);
++
++		if (sample_delay_factor > nfc->max_sample_delay_factor)
++			sample_delay_factor = nfc->max_sample_delay_factor;
++	}
++
++	/* Control arrives here when we're ready to return our results. */
++return_results:
++	hw->data_setup_in_cycles    = data_setup_in_cycles;
++	hw->data_hold_in_cycles     = data_hold_in_cycles;
++	hw->address_setup_in_cycles = address_setup_in_cycles;
++	hw->use_half_periods        = dll_use_half_periods;
++	hw->sample_delay_factor     = sample_delay_factor;
++
++	/* Return success. */
++	return 0;
++}
++
++int gpmi_nfc_rom_helper_set_geometry(struct gpmi_nfc_data *this)
++{
++	struct boot_rom_geometry  *geometry = &this->rom_geometry;
++
++	/*
++	 * Set the boot block stride size.
++	 *
++	 * In principle, we should be reading this from the OTP bits, since
++	 * that's where the ROM is going to get it. In fact, we don't have any
++	 * way to read the OTP bits, so we go with the default and hope for the
++	 * best.
++	 */
++	geometry->stride_size_in_pages = 64;
++
++	/*
++	 * Set the search area stride exponent.
++	 *
++	 * In principle, we should be reading this from the OTP bits, since
++	 * that's where the ROM is going to get it. In fact, we don't have any
++	 * way to read the OTP bits, so we go with the default and hope for the
++	 * best.
++	 */
++	geometry->search_area_stride_exponent = 2;
++
++	return 0;
++}
++
++static int acquire_register_block(struct gpmi_nfc_data *this,
++			const char *resource_name, void **reg_block_base)
++{
++	struct platform_device  *pdev = this->pdev;
++	struct resource         *r;
++	void                    *p;
++
++	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, resource_name);
++	if (!r) {
++		log("Can't get resource information for '%s'", resource_name);
++		return -ENXIO;
++	}
++
++	/* remap the register block */
++	p = ioremap(r->start, resource_size(r));
++	if (!p) {
++		log("Can't remap %s", resource_name);
++		return -ENOMEM;
++	}
++
++	*reg_block_base = p;
++	return 0;
++}
++
++static void release_register_block(struct gpmi_nfc_data *this,
++				void *reg_block_base)
++{
++	iounmap(reg_block_base);
++}
++
++static int acquire_interrupt(struct gpmi_nfc_data *this,
++			const char *resource_name,
++			irq_handler_t interrupt_handler, int *lno, int *hno)
++{
++	struct platform_device  *pdev = this->pdev;
++	struct resource         *r;
++	int                     err;
++
++	r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, resource_name);
++	if (!r) {
++		log("Can't get resource information for '%s'", resource_name);
++		return -ENXIO;
++	}
++
++	BUG_ON(r->start != r->end);
++	err = request_irq(r->start, interrupt_handler, 0, resource_name, this);
++	if (err) {
++		log("Can't own %s", resource_name);
++		return err;
++	}
++
++	*lno = r->start;
++	*hno = r->end;
++	return 0;
++}
++
++static void release_interrupt(struct gpmi_nfc_data *this,
++			int low_interrupt_number, int high_interrupt_number)
++{
++	int i;
++	for (i = low_interrupt_number; i <= high_interrupt_number; i++)
++		free_irq(i, this);
++}
++
++static bool gpmi_dma_filter(struct dma_chan *chan, void *param)
++{
++	struct gpmi_nfc_data *this = param;
++	struct resource *r = this->private;
++
++	if (!mxs_dma_is_apbh(chan))
++		return false;
++	/*
++	 * only catch the GPMI dma channels :
++	 *	for mx23 :	MX23_DMA_GPMI0 ~ MX23_DMA_GPMI3
++	 *		(These four channels share the same IRQ!)
++	 *
++	 *	for mx28 :	MX28_DMA_GPMI0 ~ MX28_DMA_GPMI7
++	 *		(These eight channels share the same IRQ!)
++	 */
++	if (r->start <= chan->chan_id && chan->chan_id <= r->end) {
++		chan->private = &this->dma_data;
++		return true;
++	}
++	return false;
++}
++
++static void release_dma_channels(struct gpmi_nfc_data *this)
++{
++	unsigned int i;
++	for (i = 0; i < DMA_CHANS; i++)
++		if (this->dma_chans[i]) {
++			dma_release_channel(this->dma_chans[i]);
++			this->dma_chans[i] = NULL;
++		}
++}
++
++static int acquire_dma_channels(struct gpmi_nfc_data *this,
++				const char *resource_name,
++				unsigned *low_channel, unsigned *high_channel)
++{
++	struct platform_device  *pdev = this->pdev;
++	struct resource         *r, *r_dma;
++	unsigned int            i;
++
++	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, resource_name);
++	r_dma = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
++					GPMI_NFC_DMA_INTERRUPT_RES_NAME);
++	if (!r || !r_dma) {
++		log("Can't get resource for DMA");
++		return -ENXIO;
++	}
++
++	/* get the DMA interrupt */
++	BUG_ON(r_dma->start != r_dma->end);
++	this->dma_data.chan_irq = r_dma->start;
++
++	/* used in gpmi_dma_filter() */
++	this->private = r;
++
++	for (i = r->start; i <= r->end; i++) {
++		dma_cap_mask_t		mask;
++		struct dma_chan		*dma_chan;
++
++		dma_cap_zero(mask);
++		dma_cap_set(DMA_SLAVE, mask);
++
++		dma_chan = dma_request_channel(mask, gpmi_dma_filter, this);
++		if (!dma_chan)
++			goto acquire_err;
++		/* fill the first empty item */
++		this->dma_chans[i - r->start] = dma_chan;
++	}
++
++	*low_channel  = r->start;
++	*high_channel = r->end;
++	return 0;
++
++acquire_err:
++	log("Can't acquire DMA channel %u", i);
++	release_dma_channels(this);
++	return -EINVAL;
++}
++
++static inline int acquire_clock(struct gpmi_nfc_data *this, struct clk **clock)
++{
++	struct clk *c;
++
++	c = clk_get(&this->pdev->dev, NULL);
++	if (IS_ERR(c)) {
++		log("Can't own clock");
++		return PTR_ERR(c);
++	}
++	*clock = c;
++	return 0;
++}
++
++static void release_clock(struct gpmi_nfc_data *this, struct clk *clock)
++{
++	clk_put(clock);
++}
++
++static int acquire_resources(struct gpmi_nfc_data *this)
++{
++	struct resources *resources = &this->resources;
++	int error;
++
++	/* Attempt to acquire the GPMI register block. */
++	error = acquire_register_block(this,
++				GPMI_NFC_GPMI_REGS_ADDR_RES_NAME,
++				&resources->gpmi_regs);
++	if (error)
++		goto exit_gpmi_regs;
++
++	/* Attempt to acquire the BCH register block. */
++	error = acquire_register_block(this,
++				GPMI_NFC_BCH_REGS_ADDR_RES_NAME,
++				&resources->bch_regs);
++	if (error)
++		goto exit_bch_regs;
++
++	/* Attempt to acquire the BCH interrupt. */
++	error = acquire_interrupt(this,
++				GPMI_NFC_BCH_INTERRUPT_RES_NAME,
++				bch_irq,
++				&resources->bch_low_interrupt,
++				&resources->bch_high_interrupt);
++	if (error)
++		goto exit_bch_interrupt;
++
++	/* Attempt to acquire the DMA channels. */
++	error = acquire_dma_channels(this,
++				GPMI_NFC_DMA_CHANNELS_RES_NAME,
++				&resources->dma_low_channel,
++				&resources->dma_high_channel);
++	if (error)
++		goto exit_dma_channels;
++
++	/* Attempt to acquire our clock. */
++	error = acquire_clock(this, &resources->clock);
++	if (error)
++		goto exit_clock;
++	return 0;
++
++exit_clock:
++	release_dma_channels(this);
++exit_dma_channels:
++	release_interrupt(this, resources->bch_low_interrupt,
++				resources->bch_high_interrupt);
++exit_bch_interrupt:
++	release_register_block(this, resources->bch_regs);
++exit_bch_regs:
++	release_register_block(this, resources->gpmi_regs);
++exit_gpmi_regs:
++	return error;
++}
++
++static void release_resources(struct gpmi_nfc_data *this)
++{
++	struct resources  *resources = &this->resources;
++
++	release_clock(this, resources->clock);
++	release_register_block(this, resources->gpmi_regs);
++	release_register_block(this, resources->bch_regs);
++	release_interrupt(this, resources->bch_low_interrupt,
++				resources->bch_low_interrupt);
++	release_dma_channels(this);
++}
++
++static void exit_nfc_hal(struct gpmi_nfc_data *this)
++{
++	if (this->nfc)
++		this->nfc->exit(this);
++}
++
++static int set_up_nfc_hal(struct gpmi_nfc_data *this)
++{
++	struct nfc_hal *nfc = NULL;
++	int error;
++
++	/*
++	 * This structure contains the "safe" GPMI timing that should succeed
++	 * with any NAND Flash device
++	 * (although, with less-than-optimal performance).
++	 */
++	static struct nand_timing  safe_timing = {
++		.data_setup_in_ns        = 80,
++		.data_hold_in_ns         = 60,
++		.address_setup_in_ns     = 25,
++		.gpmi_sample_delay_in_ns =  6,
++		.tREA_in_ns              = -1,
++		.tRLOH_in_ns             = -1,
++		.tRHOH_in_ns             = -1,
++	};
++
++	if (cpu_is_mx23())
++		nfc = &gpmi_nfc_hal_imx23;
++	if (cpu_is_mx28())
++		nfc = &gpmi_nfc_hal_imx28;
++
++	BUG_ON(nfc == NULL);
++	this->nfc = nfc;
++
++	/* Initialize the NFC HAL. */
++	error = nfc->init(this);
++	if (error)
++		return error;
++
++	/* Set up safe timing. */
++	nfc->set_timing(this, &safe_timing);
++	return 0;
++}
++
++static int set_up_boot_rom_helper(struct gpmi_nfc_data *this)
++{
++	struct boot_rom_helper *rom = NULL;
++
++	if (cpu_is_mx23())
++		rom = &gpmi_nfc_boot_rom_imx23;
++	if (cpu_is_mx28())
++		rom = &gpmi_nfc_boot_rom_imx28;
++
++	BUG_ON(rom == NULL);
++
++	pr_info("Boot ROM: Version %u, %s\n", rom->version, rom->description);
++	this->rom = rom;
++	return 0;
++}
++
++/* Creates/Removes sysfs files for this device.*/
++static void manage_sysfs_files(struct gpmi_nfc_data *this, int create)
++{
++	struct device            *dev = this->dev;
++	int                      error;
++	unsigned int             i;
++	struct device_attribute  **attr;
++
++	for (i = 0, attr = device_attributes;
++			i < ARRAY_SIZE(device_attributes); i++, attr++) {
++
++		if (create) {
++			error = device_create_file(dev, *attr);
++			if (error) {
++				while (--attr >= device_attributes)
++					device_remove_file(dev, *attr);
++				return;
++			}
++		} else {
++			device_remove_file(dev, *attr);
++		}
++	}
++}
++
++static int read_page_prepare(struct gpmi_nfc_data *this,
++			void *destination, unsigned length,
++			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
++			void **use_virt, dma_addr_t *use_phys)
++{
++	struct device  *dev = this->dev;
++	dma_addr_t destination_phys = ~0;
++
++	if (virt_addr_valid(destination))
++		destination_phys = dma_map_single(dev, (void *)destination,
++						length, DMA_FROM_DEVICE);
++
++	if (dma_mapping_error(dev, destination_phys)) {
++		if (alt_size < length) {
++			log("Alternate buffer is too small for incoming I/O.");
++			return -ENOMEM;
++		}
++
++		*use_virt = alt_virt;
++		*use_phys = alt_phys;
++	} else {
++		*use_virt = destination;
++		*use_phys = destination_phys;
++	}
++	return 0;
++}
++
++static void read_page_end(struct gpmi_nfc_data *this,
++			void *destination, unsigned length,
++			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
++			void *used_virt, dma_addr_t used_phys)
++{
++	struct device  *dev = this->dev;
++
++	if (used_virt == destination)
++		dma_unmap_single(dev, used_phys, length, DMA_FROM_DEVICE);
++	else
++		memcpy(destination, alt_virt, length);
++}
++
++static int send_page_prepare(struct gpmi_nfc_data *this,
++			const void *source, unsigned length,
++			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
++			const void **use_virt, dma_addr_t *use_phys)
++{
++	dma_addr_t source_phys = ~0;
++	struct device  *dev = this->dev;
++
++	if (virt_addr_valid(source))
++		source_phys = dma_map_single(dev,
++				(void *)source, length, DMA_TO_DEVICE);
++
++	if (dma_mapping_error(dev, source_phys)) {
++		if (alt_size < length) {
++			log("Alternate buffer is too small for outgoing I/O");
++			return -ENOMEM;
++		}
++
++		/*
++		 * Copy the contents of the source buffer into the alternate
++		 * buffer and set up the return values accordingly.
++		 */
++		memcpy(alt_virt, source, length);
++
++		*use_virt = alt_virt;
++		*use_phys = alt_phys;
++	} else {
++		*use_virt = source;
++		*use_phys = source_phys;
++	}
++	return 0;
++}
++
++static void send_page_end(struct gpmi_nfc_data *this,
++			const void *source, unsigned length,
++			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
++			const void *used_virt, dma_addr_t used_phys)
++{
++	struct device  *dev = this->dev;
++	if (used_virt == source)
++		dma_unmap_single(dev, used_phys, length, DMA_TO_DEVICE);
++}
++
++static void mil_free_dma_buffer(struct gpmi_nfc_data *this)
++{
++	struct device *dev = this->dev;
++	struct mil *mil	= &this->mil;
++
++	if (mil->page_buffer_virt && virt_addr_valid(mil->page_buffer_virt))
++		dma_free_coherent(dev, mil->page_buffer_size,
++					mil->page_buffer_virt,
++					mil->page_buffer_phys);
++	kfree(mil->cmd_buffer);
++	kfree(mil->data_buffer_dma);
++
++	mil->cmd_buffer		= NULL;
++	mil->data_buffer_dma	= NULL;
++	mil->page_buffer_virt	= NULL;
++	mil->page_buffer_size	=  0;
++	mil->page_buffer_phys	= ~0;
++}
++
++/* Allocate the DMA buffers */
++static int mil_alloc_dma_buffer(struct gpmi_nfc_data *this)
++{
++	struct device        *dev	= this->dev;
++	struct nfc_geometry  *geo	= &this->nfc_geometry;
++	struct mil           *mil	= &this->mil;
++
++	/* [1] Allocate a command buffer. PAGE_SIZE is enough. */
++	mil->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA);
++	if (mil->cmd_buffer == NULL)
++		goto error_alloc;
++
++	/* [2] Allocate a read/write data buffer. PAGE_SIZE is enough. */
++	mil->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA);
++	if (mil->data_buffer_dma == NULL)
++		goto error_alloc;
++
++	/*
++	 * [3] Allocate the page buffer.
++	 *
++	 * Both the payload buffer and the auxiliary buffer must appear on
++	 * 32-bit boundaries. We presume the size of the payload buffer is a
++	 * power of two and is much larger than four, which guarantees the
++	 * auxiliary buffer will appear on a 32-bit boundary.
++	 */
++	mil->page_buffer_size = geo->payload_size_in_bytes +
++				geo->auxiliary_size_in_bytes;
++
++	mil->page_buffer_virt = dma_alloc_coherent(dev, mil->page_buffer_size,
++					&mil->page_buffer_phys, GFP_DMA);
++	if (!mil->page_buffer_virt)
++		goto error_alloc;
++
++
++	/* Slice up the page buffer. */
++	mil->payload_virt = mil->page_buffer_virt;
++	mil->payload_phys = mil->page_buffer_phys;
++	mil->auxiliary_virt = ((char *) mil->payload_virt) +
++					geo->payload_size_in_bytes;
++	mil->auxiliary_phys = mil->payload_phys +
++					geo->payload_size_in_bytes;
++	return 0;
++
++error_alloc:
++	mil_free_dma_buffer(this);
++	log("allocate DMA buffer error!!");
++	return -ENOMEM;
++}
++
++static void mil_cmd_ctrl(struct mtd_info *mtd, int data, unsigned int ctrl)
++{
++	struct nand_chip      *nand = mtd->priv;
++	struct gpmi_nfc_data  *this = nand->priv;
++	struct mil            *mil  = &this->mil;
++	struct nfc_hal        *nfc  =  this->nfc;
++	int                   error;
++
++	/*
++	 * Every operation begins with a command byte and a series of zero or
++	 * more address bytes. These are distinguished by either the Address
++	 * Latch Enable (ALE) or Command Latch Enable (CLE) signals being
++	 * asserted. When MTD is ready to execute the command, it will deassert
++	 * both latch enables.
++	 *
++	 * Rather than run a separate DMA operation for every single byte, we
++	 * queue them up and run a single DMA operation for the entire series
++	 * of command and data bytes. NAND_CMD_NONE means the END of the queue.
++	 */
++	if ((ctrl & (NAND_ALE | NAND_CLE))) {
++		if (data != NAND_CMD_NONE)
++			mil->cmd_buffer[mil->command_length++] = data;
++		return;
++	}
++
++	if (!mil->command_length)
++		return;
++
++	error = nfc->send_command(this);
++	if (error)
++		log("Chip: %u, Error %d", mil->current_chip, error);
++
++	mil->command_length = 0;
++}
++
++static int mil_dev_ready(struct mtd_info *mtd)
++{
++	struct nand_chip      *nand = mtd->priv;
++	struct gpmi_nfc_data  *this = nand->priv;
++	struct nfc_hal        *nfc  = this->nfc;
++	struct mil            *mil  = &this->mil;
++
++	return nfc->is_ready(this, mil->current_chip);
++}
++
++static void mil_select_chip(struct mtd_info *mtd, int chip)
++{
++	struct nand_chip      *nand  = mtd->priv;
++	struct gpmi_nfc_data  *this  = nand->priv;
++	struct mil            *mil   = &this->mil;
++	struct nfc_hal        *nfc   =  this->nfc;
++
++	if ((mil->current_chip < 0) && (chip >= 0))
++		nfc->begin(this);
++	else if ((mil->current_chip >= 0) && (chip < 0))
++		nfc->end(this);
++	else
++		;
++
++	mil->current_chip = chip;
++}
++
++static void mil_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
++{
++	struct nand_chip      *nand     = mtd->priv;
++	struct gpmi_nfc_data  *this     = nand->priv;
++	struct nfc_hal        *nfc      = this->nfc;
++	struct mil            *mil      = &this->mil;
++
++	logio(GPMI_DEBUG_READ);
++	/* save the info in mil{} for future */
++	mil->upper_buf	= buf;
++	mil->upper_len	= len;
++
++	nfc->read_data(this);
++}
++
++static void mil_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
++{
++	struct nand_chip      *nand     = mtd->priv;
++	struct gpmi_nfc_data  *this     = nand->priv;
++	struct nfc_hal        *nfc      =  this->nfc;
++	struct mil            *mil      = &this->mil;
++
++	logio(GPMI_DEBUG_WRITE);
++	/* save the info in mil{} for future */
++	mil->upper_buf	= (uint8_t *)buf;
++	mil->upper_len	= len;
++
++	nfc->send_data(this);
++}
++
++static uint8_t mil_read_byte(struct mtd_info *mtd)
++{
++	struct nand_chip      *nand     = mtd->priv;
++	struct gpmi_nfc_data  *this     = nand->priv;
++	struct mil *mil = &this->mil;
++	uint8_t *buf = mil->data_buffer_dma;
++
++	mil_read_buf(mtd, buf, 1);
++	return buf[0];
++}
++
++/**
++ * mil_handle_block_mark_swapping() - Handles block mark swapping.
++ *
++ * Note that, when this function is called, it doesn't know whether it's
++ * swapping the block mark, or swapping it *back* -- but it doesn't matter
++ * because the the operation is the same.
++ *
++ * @this:       Per-device data.
++ * @payload:    A pointer to the payload buffer.
++ * @auxiliary:  A pointer to the auxiliary buffer.
++ */
++static void mil_handle_block_mark_swapping(struct gpmi_nfc_data *this,
++						void *payload, void *auxiliary)
++{
++	struct nfc_geometry     *nfc_geo = &this->nfc_geometry;
++	struct boot_rom_helper  *rom     =  this->rom;
++	unsigned char           *p;
++	unsigned char           *a;
++	unsigned int            bit;
++	unsigned char           mask;
++	unsigned char           from_data;
++	unsigned char           from_oob;
++
++	/* Check if we're doing block mark swapping. */
++	if (!rom->swap_block_mark)
++		return;
++
++	/*
++	 * If control arrives here, we're swapping. Make some convenience
++	 * variables.
++	 */
++	bit = nfc_geo->block_mark_bit_offset;
++	p   = payload + nfc_geo->block_mark_byte_offset;
++	a   = auxiliary;
++
++	/*
++	 * Get the byte from the data area that overlays the block mark. Since
++	 * the ECC engine applies its own view to the bits in the page, the
++	 * physical block mark won't (in general) appear on a byte boundary in
++	 * the data.
++	 */
++	from_data = (p[0] >> bit) | (p[1] << (8 - bit));
++
++	/* Get the byte from the OOB. */
++	from_oob = a[0];
++
++	/* Swap them. */
++	a[0] = from_data;
++
++	mask = (0x1 << bit) - 1;
++	p[0] = (p[0] & mask) | (from_oob << bit);
++
++	mask = ~0 << bit;
++	p[1] = (p[1] & mask) | (from_oob >> (8 - bit));
++}
++
++static int mil_ecc_read_page(struct mtd_info *mtd, struct nand_chip *nand,
++				uint8_t *buf, int page)
++{
++	struct gpmi_nfc_data    *this    = nand->priv;
++	struct nfc_hal          *nfc     =  this->nfc;
++	struct nfc_geometry     *nfc_geo = &this->nfc_geometry;
++	struct mil              *mil     = &this->mil;
++	void                    *payload_virt;
++	dma_addr_t              payload_phys;
++	void                    *auxiliary_virt;
++	dma_addr_t              auxiliary_phys;
++	unsigned int            i;
++	unsigned char           *status;
++	unsigned int            failed;
++	unsigned int            corrected;
++	int                     error;
++
++	logio(GPMI_DEBUG_ECC_READ);
++	error = read_page_prepare(this, buf, mtd->writesize,
++					mil->payload_virt, mil->payload_phys,
++					nfc_geo->payload_size_in_bytes,
++					&payload_virt, &payload_phys);
++	if (error) {
++		log("Inadequate DMA buffer");
++		error = -ENOMEM;
++		return error;
++	}
++	auxiliary_virt = mil->auxiliary_virt;
++	auxiliary_phys = mil->auxiliary_phys;
++
++	/* ask the NFC */
++	error = nfc->read_page(this, payload_phys, auxiliary_phys);
++	if (error) {
++		log("Error in ECC-based read: %d", error);
++		goto exit_nfc;
++	}
++
++	/* handle the block mark swapping */
++	mil_handle_block_mark_swapping(this, payload_virt, auxiliary_virt);
++
++	/* Loop over status bytes, accumulating ECC status. */
++	failed		= 0;
++	corrected	= 0;
++	status		= auxiliary_virt + nfc_geo->auxiliary_status_offset;
++
++	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
++		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
++			continue;
++
++		if (*status == STATUS_UNCORRECTABLE) {
++			failed++;
++			continue;
++		}
++		corrected += *status;
++	}
++
++	/*
++	 * Propagate ECC status to the owning MTD only when failed or
++	 * corrected times nearly reaches our ECC correction threshold.
++	 */
++	if (failed || corrected >= (nfc_geo->ecc_strength - 1)) {
++		mtd->ecc_stats.failed    += failed;
++		mtd->ecc_stats.corrected += corrected;
++	}
++
++	/*
++	 * It's time to deliver the OOB bytes. See mil_ecc_read_oob() for
++	 * details about our policy for delivering the OOB.
++	 *
++	 * We fill the caller's buffer with set bits, and then copy the block
++	 * mark to th caller's buffer. Note that, if block mark swapping was
++	 * necessary, it has already been done, so we can rely on the first
++	 * byte of the auxiliary buffer to contain the block mark.
++	 */
++	memset(nand->oob_poi, ~0, mtd->oobsize);
++	nand->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
++
++exit_nfc:
++	read_page_end(this, buf, mtd->writesize,
++					mil->payload_virt, mil->payload_phys,
++					nfc_geo->payload_size_in_bytes,
++					payload_virt, payload_phys);
++	return error;
++}
++
++static void mil_ecc_write_page(struct mtd_info *mtd,
++				struct nand_chip *nand, const uint8_t *buf)
++{
++	struct gpmi_nfc_data    *this    = nand->priv;
++	struct nfc_hal          *nfc     =  this->nfc;
++	struct nfc_geometry     *nfc_geo = &this->nfc_geometry;
++	struct boot_rom_helper  *rom     =  this->rom;
++	struct mil              *mil     = &this->mil;
++	const void              *payload_virt;
++	dma_addr_t              payload_phys;
++	const void              *auxiliary_virt;
++	dma_addr_t              auxiliary_phys;
++	int                     error;
++
++	logio(GPMI_DEBUG_ECC_WRITE);
++	if (rom->swap_block_mark) {
++		/*
++		 * If control arrives here, we're doing block mark swapping.
++		 * Since we can't modify the caller's buffers, we must copy them
++		 * into our own.
++		 */
++		memcpy(mil->payload_virt, buf, mtd->writesize);
++		payload_virt = mil->payload_virt;
++		payload_phys = mil->payload_phys;
++
++		memcpy(mil->auxiliary_virt, nand->oob_poi,
++				nfc_geo->auxiliary_size_in_bytes);
++		auxiliary_virt = mil->auxiliary_virt;
++		auxiliary_phys = mil->auxiliary_phys;
++
++		/* Handle block mark swapping. */
++		mil_handle_block_mark_swapping(this,
++				(void *) payload_virt, (void *) auxiliary_virt);
++	} else {
++		/*
++		 * If control arrives here, we're not doing block mark swapping,
++		 * so we can to try and use the caller's buffers.
++		 */
++		error = send_page_prepare(this,
++				buf, mtd->writesize,
++				mil->payload_virt, mil->payload_phys,
++				nfc_geo->payload_size_in_bytes,
++				&payload_virt, &payload_phys);
++		if (error) {
++			log("Inadequate payload DMA buffer");
++			return;
++		}
++
++		error = send_page_prepare(this,
++				nand->oob_poi, mtd->oobsize,
++				mil->auxiliary_virt, mil->auxiliary_phys,
++				nfc_geo->auxiliary_size_in_bytes,
++				&auxiliary_virt, &auxiliary_phys);
++		if (error) {
++			log("Inadequate auxiliary DMA buffer");
++			goto exit_auxiliary;
++		}
++	}
++
++	/* Ask the NFC. */
++	error = nfc->send_page(this, payload_phys, auxiliary_phys);
++	if (error)
++		log("Error in ECC-based write: %d", error);
++
++	if (!rom->swap_block_mark) {
++		send_page_end(this, nand->oob_poi, mtd->oobsize,
++				mil->auxiliary_virt, mil->auxiliary_phys,
++				nfc_geo->auxiliary_size_in_bytes,
++				auxiliary_virt, auxiliary_phys);
++exit_auxiliary:
++		send_page_end(this, buf, mtd->writesize,
++				mil->payload_virt, mil->payload_phys,
++				nfc_geo->payload_size_in_bytes,
++				payload_virt, payload_phys);
++	}
++}
++
++/**
++ * mil_hook_block_markbad() - Hooked MTD Interface block_markbad().
++ *
++ * This function is a veneer that replaces the function originally installed by
++ * the NAND Flash MTD code. See the description of the marking_a_bad_block field
++ * in struct mil for more information about this.
++ *
++ * @mtd:  A pointer to the MTD.
++ * @ofs:  Byte address of the block to mark.
++ */
++static int mil_hook_block_markbad(struct mtd_info *mtd, loff_t ofs)
++{
++	register struct nand_chip  *chip = mtd->priv;
++	struct gpmi_nfc_data       *this = chip->priv;
++	struct mil                 *mil  = &this->mil;
++	int                        ret;
++
++	mil->marking_a_bad_block = true;
++	ret = mil->hooked_block_markbad(mtd, ofs);
++	mil->marking_a_bad_block = false;
++	return ret;
++}
++
++/**
++ * mil_ecc_read_oob() - MTD Interface ecc.read_oob().
++ *
++ * There are several places in this driver where we have to handle the OOB and
++ * block marks. This is the function where things are the most complicated, so
++ * this is where we try to explain it all. All the other places refer back to
++ * here.
++ *
++ * These are the rules, in order of decreasing importance:
++ *
++ * 1) Nothing the caller does can be allowed to imperil the block mark, so all
++ *    write operations take measures to protect it.
++ *
++ * 2) In read operations, the first byte of the OOB we return must reflect the
++ *    true state of the block mark, no matter where that block mark appears in
++ *    the physical page.
++ *
++ * 3) ECC-based read operations return an OOB full of set bits (since we never
++ *    allow ECC-based writes to the OOB, it doesn't matter what ECC-based reads
++ *    return).
++ *
++ * 4) "Raw" read operations return a direct view of the physical bytes in the
++ *    page, using the conventional definition of which bytes are data and which
++ *    are OOB. This gives the caller a way to see the actual, physical bytes
++ *    in the page, without the distortions applied by our ECC engine.
++ *
++ *
++ * What we do for this specific read operation depends on two questions:
++ *
++ * 1) Are we doing a "raw" read, or an ECC-based read?
++ *
++ * 2) Are we using block mark swapping or transcription?
++ *
++ * There are four cases, illustrated by the following Karnaugh map:
++ *
++ *                    |           Raw           |         ECC-based       |
++ *       -------------+-------------------------+-------------------------+
++ *                    | Read the conventional   |                         |
++ *                    | OOB at the end of the   |                         |
++ *       Swapping     | page and return it. It  |                         |
++ *                    | contains exactly what   |                         |
++ *                    | we want.                | Read the block mark and |
++ *       -------------+-------------------------+ return it in a buffer   |
++ *                    | Read the conventional   | full of set bits.       |
++ *                    | OOB at the end of the   |                         |
++ *                    | page and also the block |                         |
++ *       Transcribing | mark in the metadata.   |                         |
++ *                    | Copy the block mark     |                         |
++ *                    | into the first byte of  |                         |
++ *                    | the OOB.                |                         |
++ *       -------------+-------------------------+-------------------------+
++ *
++ * Note that we break rule #4 in the Transcribing/Raw case because we're not
++ * giving an accurate view of the actual, physical bytes in the page (we're
++ * overwriting the block mark). That's OK because it's more important to follow
++ * rule #2.
++ *
++ * It turns out that knowing whether we want an "ECC-based" or "raw" read is not
++ * easy. When reading a page, for example, the NAND Flash MTD code calls our
++ * ecc.read_page or ecc.read_page_raw function. Thus, the fact that MTD wants an
++ * ECC-based or raw view of the page is implicit in which function it calls
++ * (there is a similar pair of ECC-based/raw functions for writing).
++ *
++ * Since MTD assumes the OOB is not covered by ECC, there is no pair of
++ * ECC-based/raw functions for reading or or writing the OOB. The fact that the
++ * caller wants an ECC-based or raw view of the page is not propagated down to
++ * this driver.
++ *
++ * @mtd:     A pointer to the owning MTD.
++ * @nand:    A pointer to the owning NAND Flash MTD.
++ * @page:    The page number to read.
++ * @sndcmd:  Indicates this function should send a command to the chip before
++ *           reading the out-of-band bytes. This is only false for small page
++ *           chips that support auto-increment.
++ */
++static int mil_ecc_read_oob(struct mtd_info *mtd, struct nand_chip *nand,
++							int page, int sndcmd)
++{
++	struct gpmi_nfc_data      *this     = nand->priv;
++	struct boot_rom_helper    *rom      =  this->rom;
++
++	/* clear the OOB buffer */
++	memset(nand->oob_poi, ~0, mtd->oobsize);
++
++	/* Read out the conventional OOB. */
++	nand->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
++	nand->read_buf(mtd, nand->oob_poi, mtd->oobsize);
++
++	/*
++	 * Now, we want to make sure the block mark is correct. In the
++	 * Swapping/Raw case, we already have it. Otherwise, we need to
++	 * explicitly read it.
++	 */
++	if (!rom->swap_block_mark) {
++		/* Read the block mark into the first byte of the OOB buffer. */
++		nand->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
++		nand->oob_poi[0] = nand->read_byte(mtd);
++	}
++
++	/*
++	 * Return true, indicating that the next call to this function must send
++	 * a command.
++	 */
++	return true;
++}
++
++static int mil_ecc_write_oob(struct mtd_info *mtd,
++				struct nand_chip *nand, int page)
++{
++	struct gpmi_nfc_data	*this	= nand->priv;
++	struct device		*dev	= this->dev;
++	struct mil		*mil	= &this->mil;
++	struct boot_rom_helper	*rom	= this->rom;
++	uint8_t			*block_mark;
++	int	block_mark_column;
++	int	status;
++	int	error = 0;
++
++	/*
++	 * There are fundamental incompatibilities between the i.MX GPMI NFC and
++	 * the NAND Flash MTD model that make it essentially impossible to write
++	 * the out-of-band bytes.
++	 *
++	 * We permit *ONE* exception. If the *intent* of writing the OOB is to
++	 * mark a block bad, we can do that.
++	 */
++	if (!mil->marking_a_bad_block) {
++		dev_emerg(dev, "This driver doesn't support writing the OOB\n");
++		WARN_ON(1);
++		error = -EIO;
++		goto exit;
++	}
++
++	/*
++	 * If control arrives here, we're marking a block bad. First, figure out
++	 * where the block mark is.
++	 *
++	 * If we're using swapping, the block mark is in the conventional
++	 * location. Otherwise, we're using transcription, and the block mark
++	 * appears in the first byte of the page.
++	 */
++	if (rom->swap_block_mark)
++		block_mark_column = mtd->writesize;
++	else
++		block_mark_column = 0;
++
++	/* Write the block mark. */
++	block_mark = mil->data_buffer_dma;
++	block_mark[0] = 0; /* bad block marker */
++
++	nand->cmdfunc(mtd, NAND_CMD_SEQIN, block_mark_column, page);
++	nand->write_buf(mtd, block_mark, 1);
++	nand->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
++
++	status = nand->waitfunc(mtd, nand);
++
++	/* Check if it worked. */
++	if (status & NAND_STATUS_FAIL)
++		error = -EIO;
++exit:
++	return error;
++}
++
++/**
++ * mil_block_bad - Claims all blocks are good.
++ *
++ * In principle, this function is *only* called when the NAND Flash MTD system
++ * isn't allowed to keep an in-memory bad block table, so it is forced to ask
++ * the driver for bad block information.
++ *
++ * In fact, we permit the NAND Flash MTD system to have an in-memory BBT, so
++ * this function is *only* called when we take it away.
++ *
++ * We take away the in-memory BBT when the user sets the "ignorebad" parameter,
++ * which indicates that all blocks should be reported good.
++ *
++ * Thus, this function is only called when we want *all* blocks to look good,
++ * so it *always* return success.
++ *
++ * @mtd:      Ignored.
++ * @ofs:      Ignored.
++ * @getchip:  Ignored.
++ */
++static int mil_block_bad(struct mtd_info *mtd, loff_t ofs, int getchip)
++{
++	return 0;
++}
++
++static void show_rom_geometry(struct boot_rom_geometry *geo)
++{
++	pr_info("--------------------------------------------\n");
++	pr_info("	Boot ROM Geometry\n");
++	pr_info("--------------------------------------------\n");
++	pr_info("Boot Area Count            : %u\n", geo->boot_area_count);
++	pr_info("Boot Area Size in Bytes    : %u (0x%x)\n",
++					geo->boot_area_size_in_bytes,
++					geo->boot_area_size_in_bytes);
++	pr_info("Stride Size in Pages       : %u\n", geo->stride_size_in_pages);
++	pr_info("Search Area Stride Exponent: %u\n",
++					geo->search_area_stride_exponent);
++}
++
++/* Set up the Boot ROM Helper geometry. */
++static int mil_set_boot_rom_helper_geometry(struct gpmi_nfc_data  *this)
++{
++	struct boot_rom_helper    *rom =  this->rom;
++	struct boot_rom_geometry  *geo = &this->rom_geometry;
++	int error;
++
++	error = rom->set_geometry(this);
++	if (error)
++		return error;
++
++	if (gpmi_debug & GPMI_DEBUG_INIT)
++		show_rom_geometry(geo);
++
++	return 0;
++}
++
++static void show_nfc_geometry(struct nfc_geometry *geo)
++{
++	pr_info("---------------------------------------\n");
++	pr_info("	NFC Geometry (used by BCH)\n");
++	pr_info("---------------------------------------\n");
++	pr_info("ECC Algorithm          : %s\n", geo->ecc_algorithm);
++	pr_info("ECC Strength           : %u\n", geo->ecc_strength);
++	pr_info("Page Size in Bytes     : %u\n", geo->page_size_in_bytes);
++	pr_info("Metadata Size in Bytes : %u\n", geo->metadata_size_in_bytes);
++	pr_info("ECC Chunk Size in Bytes: %u\n", geo->ecc_chunk_size_in_bytes);
++	pr_info("ECC Chunk Count        : %u\n", geo->ecc_chunk_count);
++	pr_info("Payload Size in Bytes  : %u\n", geo->payload_size_in_bytes);
++	pr_info("Auxiliary Size in Bytes: %u\n", geo->auxiliary_size_in_bytes);
++	pr_info("Auxiliary Status Offset: %u\n", geo->auxiliary_status_offset);
++	pr_info("Block Mark Byte Offset : %u\n", geo->block_mark_byte_offset);
++	pr_info("Block Mark Bit Offset  : %u\n", geo->block_mark_bit_offset);
++}
++
++static int mil_set_geometry(struct gpmi_nfc_data *this)
++{
++	struct nfc_hal *nfc = this->nfc;
++	struct nfc_geometry *geo = &this->nfc_geometry;
++	int error;
++
++	/* Free the temporary DMA memory for read ID case */
++	mil_free_dma_buffer(this);
++
++	/* Set up the NFC geometry which is used by BCH. */
++	error = nfc->set_geometry(this);
++	if (error != 0) {
++		log("NFC set geometry error : %d", error);
++		return error;
++	}
++	if (gpmi_debug & GPMI_DEBUG_INIT)
++		show_nfc_geometry(geo);
++
++	/* Alloc the new DMA buffers according to the pagesize and oobsize */
++	return mil_alloc_dma_buffer(this);
++}
++
++static int mil_pre_bbt_scan(struct gpmi_nfc_data  *this)
++{
++	struct boot_rom_helper	*rom = this->rom;
++	int error;
++
++	error = mil_set_boot_rom_helper_geometry(this);
++	if (error)
++		return error;
++
++	/* This is ROM arch-specific initilization before the BBT scanning. */
++	if (rom->rom_extra_init)
++		error = rom->rom_extra_init(this);
++	return error;
++}
++
++static int mil_scan_bbt(struct mtd_info *mtd)
++{
++	struct nand_chip         *nand = mtd->priv;
++	struct gpmi_nfc_data     *this = nand->priv;
++	int                      error;
++
++	/* Prepare for the BBT scan. */
++	error = mil_pre_bbt_scan(this);
++	if (error)
++		return error;
++
++	/* use the default BBT implementation */
++	return nand_default_bbt(mtd);
++}
++
++static int mil_boot_areas_init(struct gpmi_nfc_data *this)
++{
++	struct boot_rom_geometry       *rom      = &this->rom_geometry;
++	struct mil                     *mil      = &this->mil;
++	struct mtd_info                *mtd      = &mil->mtd;
++
++	if (rom->boot_area_count == 0) {
++		mil->general_use_mtd = &mil->mtd;
++		pr_info("There is no Boot area.\n");
++	} else if (rom->boot_area_count == 1) {
++		static char  *chip_0_boot_name = "gpmi-nfc-0-boot";
++		static char  *general_use_name = "gpmi-nfc-general-use";
++		struct mtd_partition partitions[2];
++
++		pr_info("Boot area protection is enabled.\n");
++		/*
++		 * We partition the medium like so:
++		 *
++		 * +------+----------------------------------------------------+
++		 * | Boot |                    General Use                     |
++		 * +------+----------------------------------------------------+
++		 */
++
++		/* Chip 0 Boot */
++		partitions[0].name       = chip_0_boot_name;
++		partitions[0].offset     = 0;
++		partitions[0].size       = rom->boot_area_size_in_bytes;
++		partitions[0].mask_flags = 0;
++
++		/* General Use */
++		partitions[1].name       = general_use_name;
++		partitions[1].offset     = rom->boot_area_size_in_bytes;
++		partitions[1].size       = MTDPART_SIZ_FULL;
++		partitions[1].mask_flags = 0;
++
++		/* Construct and register the partitions. */
++		add_mtd_partitions(mtd, partitions, 2);
++
++		/* Find the general use MTD. */
++		mil->general_use_mtd = get_mtd_device_nm(general_use_name);
++		if (IS_ERR(mil->general_use_mtd)) {
++			log("Can't find general use MTD");
++			BUG();
++		}
++	} else {
++		log("Boot area count greater than one is unimplemented.");
++		return -ENXIO;
++	}
++	return 0;
++}
++
++static void mil_boot_areas_exit(struct gpmi_nfc_data *this)
++{
++	struct boot_rom_geometry  *rom = &this->rom_geometry;
++	struct mil                *mil = &this->mil;
++	struct mtd_info           *mtd = &mil->mtd;
++
++	if (!rom->boot_area_count) {
++		mil->general_use_mtd = NULL;
++		return;
++	}
++	del_mtd_partitions(mtd);
++	mil->general_use_mtd = NULL;
++}
++
++static int construct_general_use_partitions(struct gpmi_nfc_data *this)
++{
++	struct mil                     *mil   = &this->mil;
++	unsigned int                   partition_count;
++	struct mtd_partition           *partitions;
++	unsigned int                   name_size;
++	char                           *names;
++	unsigned int                   size;
++	unsigned int                   i;
++	static const char              *name_prefix = "gpmi-nfc-ubi-";
++
++	/* Only handle the MTD which is larger than 2GiB. */
++	if (mil->general_use_mtd->size <= SZ_2G)
++		return 0;
++
++	/* Split it by 2G for historical reason*/
++	partition_count = mil->general_use_mtd->size >> 31;
++	if (mil->general_use_mtd->size & ((1 << 30) - 1))
++		partition_count++;
++
++	/* construct the partitions */
++	name_size = strlen(name_prefix) + 4;
++	size = (sizeof(*partitions) + name_size) * partition_count;
++	partitions = kzalloc(size, GFP_KERNEL);
++	if (!partitions) {
++		log("Could not allocate memory for UBI partitions.");
++		return -ENOMEM;
++	}
++
++	names = (char *)(partitions + partition_count);
++	for (i = 0; i < partition_count; i++) {
++		partitions[i].name   = names;
++		partitions[i].size   = SZ_2G;
++		partitions[i].offset = MTDPART_OFS_NXTBLK;
++
++		sprintf(names, "%s%u", name_prefix, i);
++		names += name_size;
++	}
++	/* Adjust the last partition to take up the remainder. */
++	partitions[i - 1].size = MTDPART_SIZ_FULL;
++
++	mil->partitions           = partitions;
++	mil->partition_count      = partition_count;
++	return 0;
++}
++
++static int mil_partitions_init(struct gpmi_nfc_data *this)
++{
++	struct mil *mil = &this->mil;
++	int  error;
++
++	error = mil_boot_areas_init(this);
++	if (error)
++		return error;
++
++	/* Construct partitions */
++	error = construct_general_use_partitions(this);
++	if (error) {
++		log("error : %d", error);
++		return error;
++	}
++	if (mil->partition_count)
++		add_mtd_partitions(mil->general_use_mtd, mil->partitions,
++					mil->partition_count);
++	return 0;
++}
++
++static void mil_partitions_exit(struct gpmi_nfc_data *this)
++{
++	struct mil *mil = &this->mil;
++
++	if (mil->partition_count) {
++		del_mtd_partitions(mil->general_use_mtd);
++		kfree(mil->partitions);
++		mil->partition_count = 0;
++	}
++	mil_boot_areas_exit(this);
++}
++
++/*
++ * This function is used to set the mtd->pagesize, mtd->oobsize,
++ * mtd->erasesize. Yes, we also do some initialization.
++ *
++ * Return with the bus width. 0 for 8-bit, -1 for error.
++ */
++static int gpmi_init_size(struct mtd_info *mtd, struct nand_chip *nand,
++				u8 *id_bytes)
++{
++	struct gpmi_nfc_data *this	= nand->priv;
++	struct nfc_hal       *nfc	= this->nfc;
++	struct mil           *mil	= &this->mil;
++	struct nand_ecclayout *layout	= &mil->oob_layout;
++	struct nand_device_info  *info;
++	struct nand_attr	 *attr;
++	int error;
++
++	/* Look up this device in our own database. */
++	info = nand_device_get_info(id_bytes);
++	if (!info) {
++		pr_err("Unrecognized NAND Flash device.\n");
++		return -EINVAL;
++	} else if (gpmi_debug & GPMI_DEBUG_INIT)
++		nand_device_print_info(info);
++	else
++		pr_info("We found nand : [ %s ]\n", info->desc);
++
++	attr = &info->attr;
++	/*
++	 *  Init the right NAND/MTD parameters which will be used
++	 *  in the following mil_set_geometry().
++	 */
++	mtd->writesize	= 1 << (fls(attr->page_total_size_in_bytes) - 1);
++	mtd->erasesize	= mtd->writesize * attr->block_size_in_pages;
++	mtd->oobsize	= attr->page_total_size_in_bytes - mtd->writesize;
++	nand->chipsize	= attr->chip_size_in_bytes;
++
++	/* Configure the struct nand_ecclayout. */
++	layout->eccbytes          = 0;
++	layout->oobavail          = mtd->oobsize;
++	layout->oobfree[0].offset = 0;
++	layout->oobfree[0].length = mtd->oobsize;
++
++	nand->ecc.layout = layout;
++
++	/* copy it. */
++	this->device_info = *info;
++	this->device_info.desc = kstrdup(info->desc, GFP_KERNEL);
++
++	/* Set up the medium geometry */
++	error = mil_set_geometry(this);
++	if (error)
++		return error;
++
++	/* extra init */
++	if (nfc->extra_init) {
++		error = nfc->extra_init(this);
++		if (error != 0)
++			return error;
++	}
++
++	/* We only use 8-bit bus now, not 16-bit. */
++	return 0;
++}
++
++/* Initializes the MTD Interface Layer */
++int gpmi_nfc_mil_init(struct gpmi_nfc_data *this)
++{
++	struct gpmi_nfc_platform_data  *pdata =  this->pdata;
++	struct mil                     *mil   = &this->mil;
++	struct mtd_info                *mtd   = &mil->mtd;
++	struct nand_chip               *nand  = &mil->nand;
++	int                            error;
++
++	/* Initialize MIL data */
++	mil->current_chip	= -1;
++	mil->command_length	=  0;
++	mil->page_buffer_virt	=  0;
++	mil->page_buffer_phys	= ~0;
++	mil->page_buffer_size	=  0;
++
++	/* Initialize the MTD data structures */
++	mtd->priv		= nand;
++	mtd->name		= "gpmi-nfc-main";
++	mtd->owner		= THIS_MODULE;
++	nand->priv		= this;
++
++	/* Controls */
++	nand->select_chip	= mil_select_chip;
++	nand->cmd_ctrl		= mil_cmd_ctrl;
++	nand->dev_ready		= mil_dev_ready;
++
++	/*
++	 * Low-level I/O :
++	 *	We don't support a 16-bit NAND Flash bus,
++	 *	so we don't implement read_word.
++	 */
++	nand->read_byte		= mil_read_byte;
++	nand->read_buf		= mil_read_buf;
++	nand->write_buf		= mil_write_buf;
++
++	/* ECC-aware I/O */
++	nand->ecc.read_page	= mil_ecc_read_page;
++	nand->ecc.write_page	= mil_ecc_write_page;
++
++	/* High-level I/O */
++	nand->ecc.read_oob	= mil_ecc_read_oob;
++	nand->ecc.write_oob	= mil_ecc_write_oob;
++
++	/* Bad Block Management */
++	nand->block_bad		= mil_block_bad;
++	nand->scan_bbt		= mil_scan_bbt;
++	nand->init_size		= gpmi_init_size;
++	nand->badblock_pattern	= &gpmi_bbt_descr;
++
++	/* Disallow partial page writes */
++	nand->options		|= NAND_NO_SUBPAGE_WRITE;
++
++	/*
++	 * Tell the NAND Flash MTD system that we'll be handling ECC with our
++	 * own hardware. It turns out that we still have to fill in the ECC size
++	 * because the MTD code will divide by it -- even though it doesn't
++	 * actually care.
++	 */
++	nand->ecc.mode		= NAND_ECC_HW;
++	nand->ecc.size		= 1;
++
++	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
++	this->nfc_geometry.payload_size_in_bytes	= 1024;
++	this->nfc_geometry.auxiliary_size_in_bytes	= 128;
++	error = mil_alloc_dma_buffer(this);
++	if (error)
++		goto exit_dma_allocation;
++
++	pr_info("Scanning for NAND Flash chips...\n");
++	error = nand_scan(mtd, pdata->max_chip_count);
++	if (error) {
++		log("Chip scan failed");
++		goto exit_nand_scan;
++	}
++
++	/* Take over the management of the OOB */
++	mil->hooked_block_markbad = mtd->block_markbad;
++	mtd->block_markbad        = mil_hook_block_markbad;
++
++	/* Construct partitions as necessary. */
++	error = mil_partitions_init(this);
++	if (error)
++		goto exit_partitions;
++	return 0;
++
++exit_partitions:
++	nand_release(&mil->mtd);
++exit_nand_scan:
++	mil_free_dma_buffer(this);
++exit_dma_allocation:
++	return error;
++}
++
++void gpmi_nfc_mil_exit(struct gpmi_nfc_data *this)
++{
++	struct mil *mil = &this->mil;
++
++	mil_partitions_exit(this);
++	nand_release(&mil->mtd);
++	mil_free_dma_buffer(this);
++}
++static int gpmi_nfc_probe(struct platform_device *pdev)
++{
++	struct gpmi_nfc_platform_data  *pdata = pdev->dev.platform_data;
++	struct gpmi_nfc_data           *this;
++	int error;
++
++	this = kzalloc(sizeof(*this), GFP_KERNEL);
++	if (!this) {
++		log("Failed to allocate per-device memory\n");
++		return -ENOMEM;
++	}
++
++	/* Set up our data structures. */
++	platform_set_drvdata(pdev, this);
++	this->pdev  = pdev;
++	this->dev   = &pdev->dev;
++	this->pdata = pdata;
++
++	/* Acquire the resources we need. */
++	error = acquire_resources(this);
++	if (error)
++		goto exit_acquire_resources;
++
++	/* Set up the NFC. */
++	error = set_up_nfc_hal(this);
++	if (error)
++		goto exit_nfc_init;
++
++	/* Set up the Boot ROM Helper. */
++	error = set_up_boot_rom_helper(this);
++	if (error)
++		goto exit_boot_rom_helper_init;
++
++	/* Initialize the MTD Interface Layer. */
++	error = gpmi_nfc_mil_init(this);
++	if (error)
++		goto exit_mil_init;
++
++	manage_sysfs_files(this, true);
++	return 0;
++
++exit_mil_init:
++exit_boot_rom_helper_init:
++	exit_nfc_hal(this);
++exit_nfc_init:
++	release_resources(this);
++exit_acquire_resources:
++	platform_set_drvdata(pdev, NULL);
++	kfree(this);
++	return error;
++}
++
++static int __exit gpmi_nfc_remove(struct platform_device *pdev)
++{
++	struct gpmi_nfc_data *this = platform_get_drvdata(pdev);
++
++	manage_sysfs_files(this, false);
++	gpmi_nfc_mil_exit(this);
++	exit_nfc_hal(this);
++	release_resources(this);
++	platform_set_drvdata(pdev, NULL);
++	kfree(this);
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int gpmi_nfc_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	return 0;
++}
++
++static int gpmi_nfc_resume(struct platform_device *pdev)
++{
++	return 0;
++}
++#else
++#define suspend  NULL
++#define resume   NULL
++#endif
++
++/* This structure represents this driver to the platform management system. */
++static struct platform_driver gpmi_nfc_driver = {
++	.driver = {
++		.name = GPMI_NFC_DRIVER_NAME,
++	},
++	.probe   = gpmi_nfc_probe,
++	.remove  = __exit_p(gpmi_nfc_remove),
++	.suspend = gpmi_nfc_suspend,
++	.resume  = gpmi_nfc_resume,
 +};
++
++static int __init gpmi_nfc_init(void)
++{
++	int err;
++
++	err = platform_driver_register(&gpmi_nfc_driver);
++	if (err == 0)
++		printk(KERN_INFO "GPMI NFC driver registered. (IMX)\n");
++	else
++		pr_err("i.MX GPMI NFC driver registration failed\n");
++	return err;
++}
++
++static void __exit gpmi_nfc_exit(void)
++{
++	platform_driver_unregister(&gpmi_nfc_driver);
++}
++
++static int __init gpmi_debug_setup(char *__unused)
++{
++	gpmi_debug = GPMI_DEBUG_INIT;
++	return 1;
++}
++__setup("gpmi_debug_init", gpmi_debug_setup);
++
++module_init(gpmi_nfc_init);
++module_exit(gpmi_nfc_exit);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc.");
++MODULE_DESCRIPTION("i.MX GPMI NAND Flash Controller Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+new file mode 100644
+index 0000000..2fb83b8
+--- /dev/null
++++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+@@ -0,0 +1,550 @@
++/*
++ * Freescale GPMI NFC NAND Flash Driver
++ *
++ * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
++ * Copyright (C) 2008 Embedded Alley Solutions, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++#ifndef __DRIVERS_MTD_NAND_GPMI_NFC_H
++#define __DRIVERS_MTD_NAND_GPMI_NFC_H
++
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/concat.h>
++#include <linux/dmaengine.h>
++#include <asm/sizes.h>
++
++#include <mach/mxs.h>
++#include <mach/common.h>
++#include <mach/dma.h>
++#include <mach/gpmi-nfc.h>
++#include <mach/system.h>
++#include <mach/clock.h>
++
++#include "../nand_device_info.h"
++
++/**
++ * struct resources - The collection of resources the driver needs.
++ *
++ * @gpmi_regs:         A pointer to the GPMI registers.
++ * @bch_regs:          A pointer to the BCH registers.
++ * @bch_interrupt:     The BCH interrupt number.
++ * @dma_low_channel:   The low  DMA channel.
++ * @dma_high_channel:  The high DMA channel.
++ * @clock:             A pointer to the struct clk for the NFC's clock.
++ */
++struct resources {
++	void          *gpmi_regs;
++	void          *bch_regs;
++	unsigned int  bch_low_interrupt;
++	unsigned int  bch_high_interrupt;
++	unsigned int  dma_low_channel;
++	unsigned int  dma_high_channel;
++	struct clk    *clock;
++};
++
++/**
++ * struct mil - State for the MTD Interface Layer.
++ *
++ * @nand:                    The NAND Flash MTD data structure that represents
++ *                           the NAND Flash medium.
++ * @mtd:                     The MTD data structure that represents the NAND
++ *                           Flash medium.
++ * @oob_layout:              A structure that describes how bytes are laid out
++ *                           in the OOB.
++ * @general_use_mtd:         A pointer to an MTD we export for general use.
++ *                           This *may* simply be a pointer to the mtd field, if
++ *                           we've been instructed NOT to protect the boot
++ *                           areas.
++ * @partitions:              A pointer to a set of partitions applied to the
++ *                           general use MTD.
++ * @partition_count:         The number of partitions.
++ * @current_chip:            The chip currently selected by the NAND Fash MTD
++ *                           code. A negative value indicates that no chip is
++ *                           selected.
++ * @command_length:          The length of the command that appears in the
++ *                           command buffer (see cmd_virt, below).
++ * @ignore_bad_block_marks:  Indicates we are ignoring bad block marks.
++ * @saved_bbt:               A saved pointer to the in-memory NAND Flash MTD bad
++ *                           block table. See show_device_ignorebad() for more
++ *                           details.
++ * @marking_a_bad_block:     Indicates the caller is marking a bad block. See
++ *                           mil_ecc_write_oob() for details.
++ * @hooked_block_markbad:    A pointer to the block_markbad() function we
++ *                           we "hooked." See mil_ecc_write_oob() for details.
++ * @upper_buf:               The buffer passed from upper layer.
++ * @upper_len:               The buffer len passed from upper layer.
++ * @direct_dma_map_ok:       Is the direct DMA map is good for the upper_buf?
++ * @cmd_sgl/cmd_buffer:      For NAND command.
++ * @data_sgl/data_buffer_dma:For NAND DATA ops.
++ * @page_buffer_virt:        A pointer to a DMA-coherent buffer we use for
++ *                           reading and writing pages. This buffer includes
++ *                           space for both the payload data and the auxiliary
++ *                           data (including status bytes, but not syndrome
++ *                           bytes).
++ * @page_buffer_phys:        The physical address for the page_buffer_virt
++ *                           buffer.
++ * @page_buffer_size:        The size of the page buffer.
++ * @payload_virt:            A pointer to a location in the page buffer used
++ *                           for payload bytes. The size of this buffer is
++ *                           determined by struct nfc_geometry.
++ * @payload_phys:            The physical address for payload_virt.
++ * @auxiliary_virt:          A pointer to a location in the page buffer used
++ *                           for auxiliary bytes. The size of this buffer is
++ *                           determined by struct nfc_geometry.
++ * @auxiliary_phys:          The physical address for auxiliary_virt.
++ */
++struct mil {
++	/* MTD Data Structures */
++	struct nand_chip       nand;
++	struct mtd_info        mtd;
++	struct nand_ecclayout  oob_layout;
++
++	/* Partitioning and Boot Area Protection */
++	struct mtd_info        *general_use_mtd;
++	struct mtd_partition   *partitions;
++	unsigned int           partition_count;
++
++	/* General-use Variables */
++	int                    current_chip;
++	unsigned int           command_length;
++	int                    ignore_bad_block_marks;
++	void                   *saved_bbt;
++
++	/* MTD Function Pointer Hooks */
++	int                    marking_a_bad_block;
++	int                    (*hooked_block_markbad)(struct mtd_info *mtd,
++					loff_t ofs);
++
++	/* from upper layer */
++	uint8_t			*upper_buf;
++	int			upper_len;
++
++	/* DMA */
++	bool			direct_dma_map_ok;
++
++	struct scatterlist	cmd_sgl;
++	char			*cmd_buffer;
++
++	struct scatterlist	data_sgl;
++	char			*data_buffer_dma;
++
++	void                   *page_buffer_virt;
++	dma_addr_t             page_buffer_phys;
++	unsigned int           page_buffer_size;
++
++	void                   *payload_virt;
++	dma_addr_t             payload_phys;
++
++	void                   *auxiliary_virt;
++	dma_addr_t             auxiliary_phys;
++};
++
++/**
++ * struct nfc_geometry - NFC geometry description.
++ *
++ * This structure describes the NFC's view of the medium geometry.
++ *
++ * @ecc_algorithm:            The human-readable name of the ECC algorithm
++ *                            (e.g., "Reed-Solomon" or "BCH").
++ * @ecc_strength:             A number that describes the strength of the ECC
++ *                            algorithm.
++ * @page_size_in_bytes:       The size, in bytes, of a physical page, including
++ *                            both data and OOB.
++ * @metadata_size_in_bytes:   The size, in bytes, of the metadata.
++ * @ecc_chunk_size_in_bytes:  The size, in bytes, of a single ECC chunk. Note
++ *                            the first chunk in the page includes both data and
++ *                            metadata, so it's a bit larger than this value.
++ * @ecc_chunk_count:          The number of ECC chunks in the page,
++ * @payload_size_in_bytes:    The size, in bytes, of the payload buffer.
++ * @auxiliary_size_in_bytes:  The size, in bytes, of the auxiliary buffer.
++ * @auxiliary_status_offset:  The offset into the auxiliary buffer at which
++ *                            the ECC status appears.
++ * @block_mark_byte_offset:   The byte offset in the ECC-based page view at
++ *                            which the underlying physical block mark appears.
++ * @block_mark_bit_offset:    The bit offset into the ECC-based page view at
++ *                            which the underlying physical block mark appears.
++ */
++struct nfc_geometry {
++	char          *ecc_algorithm;
++	unsigned int  ecc_strength;
++	unsigned int  page_size_in_bytes;
++	unsigned int  metadata_size_in_bytes;
++	unsigned int  ecc_chunk_size_in_bytes;
++	unsigned int  ecc_chunk_count;
++	unsigned int  payload_size_in_bytes;
++	unsigned int  auxiliary_size_in_bytes;
++	unsigned int  auxiliary_status_offset;
++	unsigned int  block_mark_byte_offset;
++	unsigned int  block_mark_bit_offset;
++};
++
++/**
++ * struct boot_rom_geometry - Boot ROM geometry description.
++ *
++ * This structure encapsulates decisions made by the Boot ROM Helper.
++ *
++ * @boot_area_count:             The number of boot areas. The first boot area
++ *                               appears at the beginning of chip 0, the next
++ *                               at the beginning of chip 1, etc.
++ * @boot_area_size_in_bytes:     The size, in bytes, of each boot area.
++ * @stride_size_in_pages:        The size of a boot block stride, in pages.
++ * @search_area_stride_exponent: The logarithm to base 2 of the size of a
++ *                               search area in boot block strides.
++ */
++struct boot_rom_geometry {
++	unsigned int  boot_area_count;
++	unsigned int  boot_area_size_in_bytes;
++	unsigned int  stride_size_in_pages;
++	unsigned int  search_area_stride_exponent;
++};
++
++/* DMA operations types */
++enum dma_ops_type {
++	DMA_FOR_COMMAND = 1,
++	DMA_FOR_READ_DATA,
++	DMA_FOR_WRITE_DATA,
++	DMA_FOR_READ_ECC_PAGE,
++	DMA_FOR_WRITE_ECC_PAGE
++};
++
++/**
++ * This structure contains the fundamental timing attributes for NAND.
++ *
++ * @data_setup_in_ns:         The data setup time, in nanoseconds. Usually the
++ *                            maximum of tDS and tWP. A negative value
++ *                            indicates this characteristic isn't known.
++ * @data_hold_in_ns:          The data hold time, in nanoseconds. Usually the
++ *                            maximum of tDH, tWH and tREH. A negative value
++ *                            indicates this characteristic isn't known.
++ * @address_setup_in_ns:      The address setup time, in nanoseconds. Usually
++ *                            the maximum of tCLS, tCS and tALS. A negative
++ *                            value indicates this characteristic isn't known.
++ * @gpmi_sample_delay_in_ns:  A GPMI-specific timing parameter. A negative value
++ *                            indicates this characteristic isn't known.
++ * @tREA_in_ns:               tREA, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ * @tRLOH_in_ns:              tRLOH, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ * @tRHOH_in_ns:              tRHOH, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ */
++struct nand_timing {
++	int8_t  data_setup_in_ns;
++	int8_t  data_hold_in_ns;
++	int8_t  address_setup_in_ns;
++	int8_t  gpmi_sample_delay_in_ns;
++	int8_t  tREA_in_ns;
++	int8_t  tRLOH_in_ns;
++	int8_t  tRHOH_in_ns;
++};
++
++/**
++ * struct gpmi_nfc_data - i.MX NFC per-device data.
++ *
++ * Note that the "device" managed by this driver represents the NAND Flash
++ * controller *and* the NAND Flash medium behind it. Thus, the per-device data
++ * structure has information about the controller, the chips to which it is
++ * connected, and properties of the medium as a whole.
++ *
++ * @dev:                 A pointer to the owning struct device.
++ * @pdev:                A pointer to the owning struct platform_device.
++ * @pdata:               A pointer to the device's platform data.
++ * @resources:           Information about system resources used by this driver.
++ * @device_info:         A structure that contains detailed information about
++ *                       the NAND Flash device.
++ * @nfc:                 A pointer to a structure that represents the underlying
++ *                       NFC hardware.
++ * @nfc_geometry:        A description of the medium geometry as viewed by the
++ *                       NFC.
++ * @rom:                 A pointer to a structure that represents the underlying
++ *                       Boot ROM.
++ * @rom_geometry:        A description of the medium geometry as viewed by the
++ *                       Boot ROM.
++ * @mil:                 A collection of information used by the MTD Interface
++ *                       Layer.
++ */
++struct gpmi_nfc_data {
++	/* System Interface */
++	struct device                  *dev;
++	struct platform_device         *pdev;
++	struct gpmi_nfc_platform_data  *pdata;
++
++	/* Resources */
++	struct resources               resources;
++
++	/* Flash Hardware */
++	struct nand_device_info		device_info;
++	struct nand_timing		timing;
++
++	/* NFC HAL */
++	struct nfc_hal                 *nfc;
++	struct nfc_geometry            nfc_geometry;
++
++	/* Boot ROM Helper */
++	struct boot_rom_helper         *rom;
++	struct boot_rom_geometry       rom_geometry;
++
++	/* MTD Interface Layer */
++	struct mil                     mil;
++
++	/* DMA channels */
++#define DMA_CHANS			8
++	struct dma_chan			*dma_chans[DMA_CHANS];
++	struct mxs_dma_data		dma_data;
++	enum dma_ops_type		dma_type;
++
++	/* private */
++	void				*private;
++};
++
++/**
++ * struct gpmi_nfc_hardware_timing - GPMI NFC hardware timing parameters.
++ *
++ * This structure contains timing information expressed in a form directly
++ * usable by the GPMI NFC hardware.
++ *
++ * @data_setup_in_cycles:      The data setup time, in cycles.
++ * @data_hold_in_cycles:       The data hold time, in cycles.
++ * @address_setup_in_cycles:   The address setup time, in cycles.
++ * @use_half_periods:          Indicates the clock is running slowly, so the
++ *                             NFC DLL should use half-periods.
++ * @sample_delay_factor:       The sample delay factor.
++ */
++struct gpmi_nfc_hardware_timing {
++	uint8_t  data_setup_in_cycles;
++	uint8_t  data_hold_in_cycles;
++	uint8_t  address_setup_in_cycles;
++	bool     use_half_periods;
++	uint8_t  sample_delay_factor;
++};
++
++/**
++ * struct nfc_hal - GPMI NFC HAL
++ *
++ * This structure embodies an abstract interface to the underlying NFC hardware.
++ *
++ * @version:                     The NFC hardware version.
++ * @description:                 A pointer to a human-readable description of
++ *                               the NFC hardware.
++ * @max_chip_count:              The maximum number of chips the NFC can
++ *                               possibly support (this value is a constant for
++ *                               each NFC version). This may *not* be the actual
++ *                               number of chips connected.
++ * @max_data_setup_cycles:       The maximum number of data setup cycles that
++ *                               can be expressed in the hardware.
++ * @internal_data_setup_in_ns:   The time, in ns, that the NFC hardware requires
++ *                               for data read internal setup. In the Reference
++ *                               Manual, see the chapter "High-Speed NAND
++ *                               Timing" for more details.
++ * @max_sample_delay_factor:     The maximum sample delay factor that can be
++ *                               expressed in the hardware.
++ * @max_dll_clock_period_in_ns:  The maximum period of the GPMI clock that the
++ *                               sample delay DLL hardware can possibly work
++ *                               with (the DLL is unusable with longer periods).
++ *                               If the full-cycle period is greater than HALF
++ *                               this value, the DLL must be configured to use
++ *                               half-periods.
++ * @max_dll_delay_in_ns:         The maximum amount of delay, in ns, that the
++ *                               DLL can implement.
++ * @dma_descriptors:             A pool of DMA descriptors.
++ * @isr_dma_channel:             The DMA channel with which the NFC HAL is
++ *                               working. We record this here so the ISR knows
++ *                               which DMA channel to acknowledge.
++ * @dma_done:                    The completion structure used for DMA
++ *                               interrupts.
++ * @bch_done:                    The completion structure used for BCH
++ *                               interrupts.
++ * @timing:                      The current timing configuration.
++ * @clock_frequency_in_hz:       The clock frequency, in Hz, during the current
++ *                               I/O transaction. If no I/O transaction is in
++ *                               progress, this is the clock frequency during
++ *                               the most recent I/O transaction.
++ * @hardware_timing:             The hardware timing configuration in effect
++ *                               during the current I/O transaction. If no I/O
++ *                               transaction is in progress, this is the
++ *                               hardware timing configuration during the most
++ *                               recent I/O transaction.
++ * @init:                        Initializes the NFC hardware and data
++ *                               structures. This function will be called after
++ *                               everything has been set up for communication
++ *                               with the NFC itself, but before the platform
++ *                               has set up off-chip communication. Thus, this
++ *                               function must not attempt to communicate with
++ *                               the NAND Flash hardware.
++ * @set_geometry:                Configures the NFC hardware and data structures
++ *                               to match the physical NAND Flash geometry.
++ * @set_geometry:                Configures the NFC hardware and data structures
++ *                               to match the physical NAND Flash geometry.
++ * @set_timing:                  Configures the NFC hardware and data structures
++ *                               to match the given NAND Flash bus timing.
++ * @get_timing:                  Returns the the clock frequency, in Hz, and
++ *                               the hardware timing configuration during the
++ *                               current I/O transaction. If no I/O transaction
++ *                               is in progress, this is the timing state during
++ *                               the most recent I/O transaction.
++ * @exit:                        Shuts down the NFC hardware and data
++ *                               structures. This function will be called after
++ *                               the platform has shut down off-chip
++ *                               communication but while communication with the
++ *                               NFC itself still works.
++ * @clear_bch:                   Clears a BCH interrupt (intended to be called
++ *                               by a more general interrupt handler to do
++ *                               device-specific clearing).
++ * @is_ready:                    Returns true if the given chip is ready.
++ * @begin:                       Begins an interaction with the NFC. This
++ *                               function must be called before *any* of the
++ *                               following functions so the NFC can prepare
++ *                               itself.
++ * @end:                         Ends interaction with the NFC. This function
++ *                               should be called to give the NFC a chance to,
++ *                               among other things, enter a lower-power state.
++ * @send_command:                Sends the given buffer of command bytes.
++ * @send_data:                   Sends the given buffer of data bytes.
++ * @read_data:                   Reads data bytes into the given buffer.
++ * @send_page:                   Sends the given given data and OOB bytes,
++ *                               using the ECC engine.
++ * @read_page:                   Reads a page through the ECC engine and
++ *                               delivers the data and OOB bytes to the given
++ *                               buffers.
++ */
++struct nfc_hal {
++	/* Hardware attributes. */
++	const unsigned int      version;
++	const char              *description;
++	const unsigned int      max_chip_count;
++	const unsigned int      max_data_setup_cycles;
++	const unsigned int      internal_data_setup_in_ns;
++	const unsigned int      max_sample_delay_factor;
++	const unsigned int      max_dll_clock_period_in_ns;
++	const unsigned int      max_dll_delay_in_ns;
++
++	int                     isr_dma_channel;
++	struct completion       dma_done;
++	struct completion       bch_done;
++	struct nand_timing      timing;
++	unsigned long           clock_frequency_in_hz;
++
++	/* Configuration functions. */
++	int   (*init)        (struct gpmi_nfc_data *);
++	int   (*extra_init)  (struct gpmi_nfc_data *);
++	int   (*set_geometry)(struct gpmi_nfc_data *);
++	int   (*set_timing)  (struct gpmi_nfc_data *,
++					const struct nand_timing *);
++	void  (*get_timing)  (struct gpmi_nfc_data *,
++					unsigned long *clock_frequency_in_hz,
++					struct gpmi_nfc_hardware_timing *);
++	void  (*exit)        (struct gpmi_nfc_data *);
++
++	/* Call these functions to begin and end I/O. */
++	void  (*begin)       (struct gpmi_nfc_data *);
++	void  (*end)         (struct gpmi_nfc_data *);
++
++	/* Call these I/O functions only between begin() and end(). */
++	void  (*clear_bch)   (struct gpmi_nfc_data *);
++	int   (*is_ready)    (struct gpmi_nfc_data *, unsigned chip);
++	int   (*send_command)(struct gpmi_nfc_data *);
++	int   (*send_data)   (struct gpmi_nfc_data *);
++	int   (*read_data)   (struct gpmi_nfc_data *);
++	int   (*send_page)   (struct gpmi_nfc_data *,
++				dma_addr_t payload, dma_addr_t auxiliary);
++	int   (*read_page)   (struct gpmi_nfc_data *,
++				dma_addr_t payload, dma_addr_t auxiliary);
++};
++
++/**
++ * struct boot_rom_helper - Boot ROM Helper
++ *
++ * This structure embodies the interface to an object that assists the driver
++ * in making decisions that relate to the Boot ROM.
++ *
++ * @version:                    The Boot ROM version.
++ * @description:                A pointer to a human-readable description of the
++ *                              Boot ROM.
++ * @swap_block_mark:            Indicates that the Boot ROM will swap the block
++ *                              mark with the first byte of the OOB.
++ * @set_geometry:               Configures the Boot ROM geometry.
++ * @rom_extra_init:             Arch-specific init.
++ */
++struct boot_rom_helper {
++	const unsigned int  version;
++	const char          *description;
++	const int           swap_block_mark;
++	int  (*set_geometry)             (struct gpmi_nfc_data *);
++	int  (*rom_extra_init)           (struct gpmi_nfc_data *);
++};
++
++/* NFC HAL Common Services */
++extern int common_nfc_set_geometry(struct gpmi_nfc_data *this);
++extern int gpmi_nfc_compute_hardware_timing(struct gpmi_nfc_data *this,
++					struct gpmi_nfc_hardware_timing *hw);
++extern struct dma_chan *get_dma_chan(struct gpmi_nfc_data *this);
++extern void prepare_data_dma(struct gpmi_nfc_data *this,
++				enum dma_data_direction dr);
++extern int start_dma_without_bch_irq(struct gpmi_nfc_data *this,
++					struct dma_async_tx_descriptor *desc);
++extern int start_dma_with_bch_irq(struct gpmi_nfc_data *this,
++					struct dma_async_tx_descriptor *desc);
++/* NFC HAL Structures */
++extern struct nfc_hal  gpmi_nfc_hal_imx23;
++extern struct nfc_hal  gpmi_nfc_hal_imx28;
++
++/* Boot ROM Helper Common Services */
++extern int gpmi_nfc_rom_helper_set_geometry(struct gpmi_nfc_data *this);
++
++/* Boot ROM Helper Structures */
++extern struct boot_rom_helper  gpmi_nfc_boot_rom_imx23;
++extern struct boot_rom_helper  gpmi_nfc_boot_rom_imx28;
++
++/* MTD Interface Layer */
++extern int  gpmi_nfc_mil_init(struct gpmi_nfc_data *this);
++extern void gpmi_nfc_mil_exit(struct gpmi_nfc_data *this);
++
++/* for log */
++extern int gpmi_debug;
++#define GPMI_DEBUG_INIT		0x0001
++#define GPMI_DEBUG_READ		0x0002
++#define GPMI_DEBUG_WRITE	0x0004
++#define GPMI_DEBUG_ECC_READ	0x0008
++#define GPMI_DEBUG_ECC_WRITE	0x0010
++
++#define log(a, ...) printk(KERN_INFO "[ %s : %.3d ] "a"\n", \
++			__func__, __LINE__,  ## __VA_ARGS__)
++#define logio(level)				\
++		do {				\
++			if (gpmi_debug & level)	\
++				log();		\
++		} while (0)
++
++/* BCH : Status Block Completion Codes */
++#define STATUS_GOOD		0x00
++#define STATUS_ERASED		0xff
++#define STATUS_UNCORRECTABLE	0xfe
++
++#endif
 -- 
 1.7.0.4
