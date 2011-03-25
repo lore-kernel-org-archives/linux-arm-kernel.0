@@ -1,58 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Mar 2011 10:16:51 +0000
-Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
-	device accesses
-Message-ID: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 25 Mar 2011 18:22:54 +0800
+Subject: [ PATCH V2  0/7] add the GPMI controller driver for IMX23/IMX28
+Message-ID: <1301048581-21321-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since mandatory barriers may be used (explicitly or implicitly via readl
-etc.) to ensure the ordering between Device and Normal memory accesses,
-a DMB is not enough. This patch converts it to a DSB.
+The general-purpose media interface(GPMI) controller is a flexible interface
+to up to several NAND flashs.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Colin Cross <ccross@android.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/system.h                  |    2 +-
- arch/arm/mach-realview/include/mach/barriers.h |    2 +-
- arch/arm/mach-tegra/include/mach/barriers.h    |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 9a87823..926d867 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -159,7 +159,7 @@ extern unsigned int user_debug;
- #include <mach/barriers.h>
- #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
- #define mb()		do { dsb(); outer_sync(); } while (0)
--#define rmb()		dmb()
-+#define rmb()		dsb()
- #define wmb()		mb()
- #else
- #include <asm/memory.h>
-diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
-index 0c5d749..9a73219 100644
---- a/arch/arm/mach-realview/include/mach/barriers.h
-+++ b/arch/arm/mach-realview/include/mach/barriers.h
-@@ -4,5 +4,5 @@
-  * operation to deadlock the system.
-  */
- #define mb()		dsb()
--#define rmb()		dmb()
-+#define rmb()		dsb()
- #define wmb()		mb()
-diff --git a/arch/arm/mach-tegra/include/mach/barriers.h b/arch/arm/mach-tegra/include/mach/barriers.h
-index cc11517..425b42e 100644
---- a/arch/arm/mach-tegra/include/mach/barriers.h
-+++ b/arch/arm/mach-tegra/include/mach/barriers.h
-@@ -23,7 +23,7 @@
- 
- #include <asm/outercache.h>
- 
--#define rmb()		dmb()
-+#define rmb()		dsb()
- #define wmb()		do { dsb(); outer_sync(); } while (0)
- #define mb()		wmb()
- 
+With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+not.
+
+This driver is based the Shawn Guo's DMA patches for IMX23/IMX28,
+please refer to :
+	http://git.infradead.org/users/vkoul/slave-dma.git/commit/a580b8c5429a624d120cd603e1498bf676e2b4da
+
+v1 --> v2:
+	[0] merge the common files into the gpmi-nfc-main.c
+	[1] change the code to get the clock.
+	[2] remove the timing in the nand_device_info{}
+	[3] fix DMA errors
+	[4] add the nand_device_info.[ch] to generic code
+	[5] use the chip->onfi_version for the ONFI nand
+	[6] useless init
+	[7] others
+
+Huang Shijie (7):
+  ARM: add GPMI support for imx23/imx28
+  dmaengine: change the flags of request_irq()
+  MTD : add the database for the NANDs
+  MTD : add the common code for GPMI controller driver
+  MTD : add GPMI support for imx23
+  MTD : add GPMI support for imx28
+  MTD : add GPMI driver in the config and Makefile
+
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    3 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    3 +
+ arch/arm/mach-mxs/devices-mx23.h                |    3 +
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-gpmi.c       |  140 ++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
+ arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   62 +
+ arch/arm/mach-mxs/mach-mx23evk.c                |   37 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |   37 +
+ drivers/dma/mxs-dma.c                           |    2 +-
+ drivers/mtd/nand/Kconfig                        |   10 +
+ drivers/mtd/nand/Makefile                       |    1 +
+ drivers/mtd/nand/gpmi-nfc/Makefile              |    7 +
+ drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h      |  342 ++++
+ drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h      |  342 ++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c       | 2452 +++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h            |  550 +++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h     |  381 ++++
+ drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h     |  370 ++++
+ drivers/mtd/nand/gpmi-nfc/hal-imx23.c           |  555 +++++
+ drivers/mtd/nand/gpmi-nfc/hal-imx28.c           |  503 +++++
+ drivers/mtd/nand/gpmi-nfc/rom-imx23.c           |  300 +++
+ drivers/mtd/nand/gpmi-nfc/rom-imx28.c           |   66 +
+ drivers/mtd/nand/nand_device_info.c             |  154 ++
+ drivers/mtd/nand/nand_device_info.h             |   83 +
+ 28 files changed, 6415 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/Makefile
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx23.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx23.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-regs-imx28.h
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx23.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-imx28.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx23.c
+ create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-imx28.c
+ create mode 100644 drivers/mtd/nand/nand_device_info.c
+ create mode 100644 drivers/mtd/nand/nand_device_info.h
