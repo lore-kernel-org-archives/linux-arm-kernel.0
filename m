@@ -1,42 +1,18 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 25 Mar 2011 16:23:21 -0400 (EDT)
-Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
-	addresses for eth0 and wlan0
-In-Reply-To: <AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<20110324212737.14936.21228.stgit@otae.warmcat.com>
-	<78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
-	<AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103251615380.11889@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Mar 2011 20:27:55 +0000
+Subject: how can I cleanly exclude memory from the kernel memory allocator?
+In-Reply-To: <20110325173928.GD29359@labbmf-linux.qualcomm.com>
+References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
+	<alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+	<20110325173928.GD29359@labbmf-linux.qualcomm.com>
+Message-ID: <20110325202755.GA13574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Mar 2011, Jason Kridner wrote:
+On Fri, Mar 25, 2011 at 10:39:28AM -0700, Larry Bassel wrote:
+> OK, please ignore my previous mail, I see that .fixup can be
+> used to adjust tags. It appears to me, however, that using a
+> .reserve function calling memblock_reserve will be an
+> easier way of doing what I need.
 
-> I very much like this approach.  I believed the ability to use the die
-> ID to get a unique code was reasonable approach and that is why I
-> didn't get an EEPROM put onto the BeagleBoard, though Gerald is
-> looking at adding one on a future revision because the lack of one
-> wasn't well received.  Minor questions below.
-
-If this code had been available and/or the procedure well documented 
-before then I believe the reception would have been better.
-
-> The use of the OMAP die id below makes this OMAP specific and the list
-> referenced below of the devices to be referenced makes it Panda
-> specific.  Is there a way to make the list board specific, but to make
-> these functions that will be used across many OMAP platforms reusable?
->  I believe that this current code will result in a lot of
-> cut-and-paste.  My preference is that this is accepted and that we
-> make this more general when we add this to other OMAP platforms, but
-> it'd be great to capture your suggestions on how to do so before those
-> cut-and-paste patch sets start coming in.
-
-It is true that this might get copied.  But as I suggested to Andy, it 
-is best to wait and see how often this happens before generalizing the 
-approach.  Consolidation is easier when you can see what is actually 
-common and what is board specific.  Otherwise it is easy to 
-fall into the over-engineering trap.
-
-
-Nicolas
+Absolutely.
