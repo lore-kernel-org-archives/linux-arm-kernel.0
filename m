@@ -1,41 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Mar 2011 12:49:32 +0100
-Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <20110324212729.14936.98130.stgit@otae.warmcat.com>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<20110324212729.14936.98130.stgit@otae.warmcat.com>
-Message-ID: <201103251249.32578.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Mar 2011 20:22:17 +0900
+Subject: [PATCH] ARM: Suspend: Fix dependency of ARCH_SUSPEND_POSSIBLE
+Message-ID: <1301052137-13788-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 March 2011, Andy Green wrote:
-> Introduce a generic helper function that can set a MAC address using
-> data from the OMAP unique CPU ID register.
-> 
-> For comparison purposes this produces a MAC address of
-> 
->   2e:40:70:f0:12:06
-> 
-> for the ethernet device on my Panda.
-> 
-> 
-> Note that this patch requires the fix patch for CPU ID register
-> indexes previously posted to linux-omap, otherwise the CPU ID is
-> misread on Panda by the existing function to do it.  This patch
-> is already on linux-omap.
-> 
-> "OMAP2+:Common CPU DIE ID reading code reads wrong registers for OMAP4430"
-> http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=b235e007831dbf57710e59cd4a120e2f374eecb9
-> 
-> Signed-off-by: Andy Green <andy.green@linaro.org>
+The current mainline codes of ARCH_S5P64X0 and ARCH_S5P6442
+can not support suspend to ram. So needs this for preventing
+build error on them.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Len Brown <len.brown@intel.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+As a note, suspend to ram will be supported on them soon :)
 
-TI folks: While this is a working solution, I still think it would
-be good to get an officially sanctioned method that allows the creation
-of a IEEE 802 MAC address in a range assigned to TI instead of using
-an address from the locally administered range.
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Is that something that can be done?
-
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 93d595a..efe06e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2009,6 +2009,7 @@ menu "Power management options"
+ source "kernel/power/Kconfig"
+ 
+ config ARCH_SUSPEND_POSSIBLE
++	depends on !ARCH_S5P64X0 && !ARCH_S5P6442
+ 	def_bool y
+ 
+ endmenu
+-- 
+1.7.1
