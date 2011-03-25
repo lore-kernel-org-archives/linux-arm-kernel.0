@@ -1,51 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 25 Mar 2011 12:35:00 +0530
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <87mxkk1rni.fsf@ti.com>
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><49a5273c412bf9193a9f930e990d22d4@mail.gmail.com><87pqpxbqho.fsf@ti.com>
-	<87mxkk1rni.fsf@ti.com>
-Message-ID: <86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 25 Mar 2011 08:26:20 +0100
+Subject: [PATCH 1/6] mach-netx: delete hardcoded periphid
+In-Reply-To: <1300874630-14708-1-git-send-email-linus.walleij@stericsson.com>
+References: <1300874630-14708-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110325072620.GD7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 24, 2011 8:40 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; Rajendra Nayak; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
-> CPUilde support.
->
+On Wed, Mar 23, 2011 at 11:03:50AM +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The periphid of the AMBA CLCD controller is hardcoded to a value
+> that the CLCD driver does not even support.
+> 
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-[...]
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
->
-> Hi Santosh,
->
-> Can you rebase and repost your v3 series, I'd like to get this
-> queued up early in the 2.6.40 dev cycle.
->
-> You can base on my current pm-core branch, which also has Russell's
-> devel-stable branch merged in.
->
-I pulled your latest pm-core branch
-------
-commit 61cbb3172176b84c106bf0f4c32317c472932ab5
-Merge: d0cf394... da19719...
-Author: Kevin Hilman <khilman@ti.com>
-Date:   Wed Mar 23 16:33:01 2011 -0700
+My i.MX branch is not very suitable for this patch, can you feed this
+into the patch system?
 
-    Merge branch 'for_2.6.40/pm-misc' into pm-reset
------------------
-Looks like Russell's devel branch isn't merged in pm-core.
-I didn't find the relevant patches.
+Sascha
 
-By the way the relevant ARM patches are already in
-mainline. So if the pm-core is rebased against latest
-mainline, we can get those changes as well.
+> ---
+>  arch/arm/mach-netx/fb.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-netx/fb.c b/arch/arm/mach-netx/fb.c
+> index 5b84bcd..b991323 100644
+> --- a/arch/arm/mach-netx/fb.c
+> +++ b/arch/arm/mach-netx/fb.c
+> @@ -103,7 +103,6 @@ static struct amba_device fb_device = {
+>  		.flags	= IORESOURCE_MEM,
+>  	},
+>  	.irq		= { NETX_IRQ_LCD, NO_IRQ },
+> -	.periphid	= 0x10112400,
+>  };
+>  
+>  int netx_fb_init(struct clcd_board *board, struct clcd_panel *panel)
+> -- 
+> 1.7.3.2
+> 
+> 
 
-Regards,
-Santosh
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
