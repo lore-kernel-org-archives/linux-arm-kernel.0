@@ -1,62 +1,51 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 25 Mar 2011 14:59:02 +0800
-Subject: [PATCH 3/7] add the database for the NANDs
-In-Reply-To: <19852.15018.820053.918668@ipc1.ka-ro>
-References: <1300240521-4344-1-git-send-email-b32955@freescale.com>	<201103231629.46958.ffainelli@freebox.fr>	<4D8AAC1C.2070709@freescale.com>	<201103241450.50967.ffainelli@freebox.fr>	<4D8C0250.1060604@freescale.com>
-	<19852.15018.820053.918668@ipc1.ka-ro>
-Message-ID: <4D8C3D36.7000703@freescale.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 25 Mar 2011 12:35:00 +0530
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <87mxkk1rni.fsf@ti.com>
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com><87d3lycu0h.fsf@ti.com><49a5273c412bf9193a9f930e990d22d4@mail.gmail.com><87pqpxbqho.fsf@ti.com>
+	<87mxkk1rni.fsf@ti.com>
+Message-ID: <86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-
-> Hi,
+Kevin,
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Thursday, March 24, 2011 8:40 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; Rajendra Nayak; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 00/19] OMAP4: PM: Suspend, CPU-hotplug and
+> CPUilde support.
 >
-> Huang Shijie writes:
->> Hi Florian:
->>
->>
->>>>>> +#include "nand_device_info.h"
->>>>>> +
->>>>>> +static struct nand_device_info samsung_nand[] __initdata = {
->>>>>> +	{
->>>>>> +		.id	= { 0xec, 0xd3, 0x14, 0x25, 0x64, 0xec, 0xd3, 0x14 },
->>>>>> +		.desc	= "K9G8G08U0M, K9HAG08U1M",
->>>>>> +		.attr	= ATTR(MLC, 1LL * SZ_1G, 128, 2 * SZ_1K + 64, 4, 512),
->>>>>> +		.timing	= TIMING(20, 15, 20, 6, -1, -1, -1),
->>>>>> +	}, {
->>>>>> +		.id	= { 0xec, 0xd7, 0xd5, 0x29, 0x38, 0x41, 0xec, 0xd7 },
->>>>>> +		.desc	= "K9LBG08U0D",
->>>>>> +		.attr	= ATTR(MLC, 4LL * SZ_1G, 128, 4 * SZ_1K + 218, 8, 512),
->>>>>> +		.timing	= TIMING(20, 10, 25, 6, 20, 5, 15),
->>>>>> +	}, {
->>>>>> +		.id	= { 0xec, 0xd5, 0x14, 0xb6, 0x74, 0xec, 0xd5, 0x14 },
->>>>>> +		.desc	= "K9GAG08U0M",
->>>>>> +		.attr	= ATTR(MLC, 2LL * SZ_1G, 128, 4 * SZ_1K + 218, 4, 512),
->>>>>> +		.timing	= TIMING(15, 10, 20, 6, -1, -1, -1),
->>>>>> +	}, {
->>>>>> +		/* end of the table. */
->>>>>> +		.id	= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
->>>>>> +	},
->>>>>> +};
->>>>> Such information should be set in platform code, because it is specific
->>>>> to your controller and most likely to a particular board design.
->>>> I prefer to place it here.
->>>>
->>>>     If I move the code to arch/arm/mach-mxs, it will make the arch/ much
->>>> bigger.
->>>> I have nearly 50 different nands information by hand, I will add it
->>>> gradually in later patches.
->>> This certainly makes the code bigger, but this is also the place where the
->>> code belongs. Also, if you mark your structures with __initdata, such memory
->>> can be freed later by the kernel, so I would rather go into that direction.
->>>
->> Please check the emails i talked with Lothar.
->>
-> Maybe you should separate the database from the driver and build it as
-> a separate entity, so that other chip drivers can take advantage of it
-> and in the long run it might replace the current nand_ids database.
->
-ok. a good idea. I will try it.
 
-Huang Shijie
+[...]
+
+>
+> Hi Santosh,
+>
+> Can you rebase and repost your v3 series, I'd like to get this
+> queued up early in the 2.6.40 dev cycle.
+>
+> You can base on my current pm-core branch, which also has Russell's
+> devel-stable branch merged in.
+>
+I pulled your latest pm-core branch
+------
+commit 61cbb3172176b84c106bf0f4c32317c472932ab5
+Merge: d0cf394... da19719...
+Author: Kevin Hilman <khilman@ti.com>
+Date:   Wed Mar 23 16:33:01 2011 -0700
+
+    Merge branch 'for_2.6.40/pm-misc' into pm-reset
+-----------------
+Looks like Russell's devel branch isn't merged in pm-core.
+I didn't find the relevant patches.
+
+By the way the relevant ARM patches are already in
+mainline. So if the pm-core is rebased against latest
+mainline, we can get those changes as well.
+
+Regards,
+Santosh
