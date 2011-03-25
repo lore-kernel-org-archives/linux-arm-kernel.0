@@ -1,43 +1,41 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 25 Mar 2011 12:46:37 +0100
-Subject: mx28 sdio problems (was: Re: [PATCH v4] ARM: mxs/mx28evk: add mmc
-	device)
-In-Reply-To: <1298364624-19907-1-git-send-email-shawn.guo@freescale.com>
-References: <1298284979-14853-7-git-send-email-shawn.guo@freescale.com>
-	<1298364624-19907-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <4D8C809D.9010202@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Mar 2011 12:49:32 +0100
+Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
+In-Reply-To: <20110324212729.14936.98130.stgit@otae.warmcat.com>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<20110324212729.14936.98130.stgit@otae.warmcat.com>
+Message-ID: <201103251249.32578.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2011 09:50 AM, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+On Thursday 24 March 2011, Andy Green wrote:
+> Introduce a generic helper function that can set a MAC address using
+> data from the OMAP unique CPU ID register.
+> 
+> For comparison purposes this produces a MAC address of
+> 
+>   2e:40:70:f0:12:06
+> 
+> for the ethernet device on my Panda.
+> 
+> 
+> Note that this patch requires the fix patch for CPU ID register
+> indexes previously posted to linux-omap, otherwise the CPU ID is
+> misread on Panda by the existing function to do it.  This patch
+> is already on linux-omap.
+> 
+> "OMAP2+:Common CPU DIE ID reading code reads wrong registers for OMAP4430"
+> http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap-2.6.git;a=commit;h=b235e007831dbf57710e59cd4a120e2f374eecb9
+> 
+> Signed-off-by: Andy Green <andy.green@linaro.org>
 
-I ported these patches to current mainline (the to be released
-2.6.39-rc1). mmc works with sd and sdhc cards without problems on my
-mx28evk.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-However sdio doesn't work. When I plug a sdio wlan card the kernel gives
-me the following error messages in a loop:
+TI folks: While this is a working solution, I still think it would
+be good to get an officially sanctioned method that allows the creation
+of a IEEE 802 MAC address in a range assigned to TI instead of using
+an address from the locally administered range.
 
-[ 1002.760000] mmc1: new SDIO card at address 0001
-[ 1003.760000] mmc1: card 0001 removed
-[ 1003.810000] mmc1: new SDIO card at address 0001
-[ 1004.810000] mmc1: card 0001 removed
+Is that something that can be done?
 
-Any hints how to debug?
-
-cheers, Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110325/5ebbd956/attachment.sig>
+	Arnd
