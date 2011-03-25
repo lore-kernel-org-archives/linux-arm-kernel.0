@@ -1,55 +1,76 @@
-From: R65037@freescale.com (Zhu Richard-R65037)
-Date: Fri, 25 Mar 2011 09:05:51 +0000
-Subject: [PATCH V8 3/4] mmc: sdhci-esdhc: make the writel/readl as the
-	general APIs
-In-Reply-To: <20110325085329.GA3302@pengutronix.de>
-References: <1301024346-2232-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1301024346-2232-3-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<20110325085329.GA3302@pengutronix.de>
-Message-ID: <010C9052C42A00499CE76D637FA5EE900D45DB@039-SN1MPN1-001.039d.mgd.msft.net>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 25 Mar 2011 14:49:00 +0530
+Subject: [PATCH 3/4] davinci: da850: add support for SATA interface
+In-Reply-To: <4D8B8715.2000407@mvista.com>
+References: <1300879949-16379-1-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-2-git-send-email-nsekhar@ti.com>
+	<1300879949-16379-3-git-send-email-nsekhar@ti.com>
+	<4D89E308.8060404@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C47E42D@dbde02.ent.ti.com>
+	<4D8B415A.2050706@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C53228A@dbde02.ent.ti.com>
+	<4D8B8715.2000407@mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C5326A1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
-Got that.
-Thanks for your reminder.
-Would follow your advice in future.
+Hi Sergei,
 
-Best Regards
-Richard Zhu
+On Thu, Mar 24, 2011 at 23:31:57, Sergei Shtylyov wrote:
+> Hello.
+> 
+> Nori, Sekhar wrote:
+> 
+> >>>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> >>>>> index 68fe4c2..276199d 100644
+> >>>>> --- a/arch/arm/mach-davinci/da850.c
+> >>>>> +++ b/arch/arm/mach-davinci/da850.c
+> >>>>> @@ -373,6 +373,14 @@ static struct clk spi1_clk = {
+> >>>>>    	.flags		= DA850_CLK_ASYNC3,
+> >>>>>    };
+> >>>>>
+> >>>>> +static struct clk sata_clk = {
+> >>>>> +	.name		= "sata",
+> >>>>> +	.parent		=&pll0_sysclk2,
+> >>>>> +	.lpsc		= DA850_LPSC1_SATA,
+> >>>>> +	.gpsc		= 1,
+> >>>>> +	.flags		= PSC_FORCE,
+> >>>>> +};
+> >>>>> +
+> >>>>>    static struct clk_lookup da850_clks[] = {
+> >>>>>    	CLK(NULL,		"ref",		&ref_clk),
+> >>>>>    	CLK(NULL,		"pll0",		&pll0_clk),
+> >>>>> @@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
+> >>>>>    	CLK(NULL,		"usb20",	&usb20_clk),
+> >>>>>    	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+> >>>>>    	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+> >>>>> +	CLK("ahci",		NULL,		&sata_clk),
+> >>>>>    	CLK(NULL,		NULL,		NULL),
+> >>>>>    };
+> 
+> >>>>      I'd put the above into a separate patch...
+> 
+> >>> Why should addition of clock data not be in the same patch
+> >>> as the one which adds platform resources etc? It is not a big
+> >>> deal to change, but I would like to know why you request this.
+> 
+> >>     I didn't request anything, I just said what I'd have done. :-)
+> 
+> > Okay. I guess I will keep it as is.
+> 
+> >> I think modifying the DA8xx-common and DA850-specific files should better be 
+> >> done separately. Although in this case we're adding DA850 only device, so 
+> >> perhaps the added code in devices-da8xx.c should be enclosed into #ifdef?
+> 
+> > Good point. Will add the #ifdef.
+> 
+>     Or perhaps the device should just be placed in da850.c instead?
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Friday, March 25, 2011 4:53 PM
-> To: Zhu Richard-R65037
-> Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de; linux-
-> mmc at vger.kernel.org; cjb at laptop.org; avorontsov at ru.mvista.com;
-> eric at eukrea.com; linuxzsc at gmail.com; eric.miao at linaro.org
-> Subject: Re: [PATCH V8 3/4] mmc: sdhci-esdhc: make the writel/readl as
-> the general APIs
->
-> On Fri, Mar 25, 2011 at 11:39:05AM +0800, Richard Zhu wrote:
-> > Add one flag to indicate the GPIO CD/WP is enabled or not on imx
-> > platforms, and reuse the writel/readl as the general APIs for imx
-> > SOCs.
-> >
-> > Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> > ---
->
-> Please provide something like "changes since last time" _below_ this
-> dashed line "---" next time. Or use --cover-letter to introduce the
-> changes.
->
-> Other than that
->
-> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
->
-> Regards,
->
->    Wolfram
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
+Um, no. da850.c is currently free from any peripheral specific
+functionality and would like to keep it that way. MMC/SD1 is
+DA850 specific as well, and has been kept in devices-da8xx.c.
+I think consolidating all peripheral specific code in devices-da8xx.c
+is a better idea.
+
+Thanks,
+Sekhar
