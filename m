@@ -1,43 +1,29 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 25 Mar 2011 12:06:56 +0100
-Subject: multiple definition of `show_mem'
-In-Reply-To: <alpine.DEB.2.00.1103241522230.26730@chino.kir.corp.google.com>
-References: <4D8B6140.4020300@pengutronix.de>
-	<alpine.DEB.2.00.1103241522230.26730@chino.kir.corp.google.com>
-Message-ID: <4D8C7750.5070102@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Mar 2011 12:39:53 +0100
+Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
+	addresses for eth0 and wlan0
+In-Reply-To: <20110324212737.14936.21228.stgit@otae.warmcat.com>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<20110324212737.14936.21228.stgit@otae.warmcat.com>
+Message-ID: <201103251239.54243.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2011 11:22 PM, David Rientjes wrote:
->> current mainline (v2.6.38-7210-gb81a618) on ARM/mxs has the following build failure:
->>
->>> lib/lib.a(show_mem.o): In function `show_mem':
->>> .../linux-2.6/lib/show_mem.c:67: multiple definition of `show_mem'
->>> arch/arm/mm/built-in.o:.../linux-2.6/arch/arm/mm/init.c:82: first defined here
->>> make: *** [vmlinux.o] Error 1
-
-[..]
-
-> Sorry about that, Marc.  I have a patch at
+On Thursday 24 March 2011, Andy Green wrote:
+> This patch registers a network device notifier callback to set the mac
+> addresses for the onboard network assets of Panda correctly, despite the
+> drivers involved have used a random or all-zeros MAC address.
 > 
-> 	http://marc.info/?l=linux-kernel&m=130100511521954
+> The technique was suggested by Alan Cox on lkml.
 > 
-> which should fix the issue for you (and I tested it with my arm cross 
-> compiler).
+> It works by device path so it corrects the MAC addresses even if the
+> drivers are in modules loaded in an order that changes their interface
+> name from usual (eg, the onboard module might be "wlan1" if there is a
+> USB wireless stick plugged in and its module is inserted first.)
+> 
+> Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
+> Signed-off-by: Andy Green <andy.green@linaro.org>
 
-\o/ - the patch is already in mainline, boots like charm on my mx28evk.
+It looks like this is the best solution so far.
 
-regards, Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110325/d45f8f9a/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
