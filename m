@@ -1,47 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Mar 2011 21:20:55 +0100
-Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
-	addresses for eth0 and wlan0
-In-Reply-To: <AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
-	<AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
-Message-ID: <201103252120.55417.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Mar 2011 21:21:23 +0100
+Subject: [PATCH 0/8] ux500: support for snowball board V2
+In-Reply-To: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <AANLkTimCMhoeV3G0cLRV-zL=j6X91wFLDRZt-mrDm4hu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 March 2011 21:13:05 Jason Kridner wrote:
-> The use of the OMAP die id below makes this OMAP specific and the list
-> referenced below of the devices to be referenced makes it Panda
-> specific.  Is there a way to make the list board specific, but to make
-> these functions that will be used across many OMAP platforms reusable?
->  I believe that this current code will result in a lot of
-> cut-and-paste.  My preference is that this is accepted and that we
-> make this more general when we add this to other OMAP platforms, but
-> it'd be great to capture your suggestions on how to do so before those
-> cut-and-paste patch sets start coming in.
- 
-Do you know of other existing boards without the EEPROM?
-If we need the code to be more general, it will simply have
-to move out of the panda specific board file into one file
-that can be selected for compilation by other boards.
+On Fri, Mar 25, 2011 at 4:28 PM,  <mathieu.poirier@linaro.org> wrote:
 
-> >> static void __init omap4_panda_init(void)
-> >> {
-> >>       int package = OMAP_PACKAGE_CBS;
-> >>@@ -517,6 +606,8 @@ static void __init omap4_panda_init(void)
-> >>       if (wl12xx_set_platform_data(&omap_panda_wlan_data))
-> >>               pr_err("error setting wl12xx data\n");
-> >>
-> >>+      register_netdevice_notifier(&omap_panda_netdev_notifier);
-> >>+
-> 
-> I just want to make sure I understand how this works.  When a new
-> network device is added, if the device name matches one of the above
-> listed device paths, then the die id based MAC id is applied.  This
-> must be done via a device registration notifier as the registration is
-> triggered when the device is detected.
+> From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
+>
+> This suite of patches is the second, re-worked version for
+> the support of the snowball board.
 
-Correct.
+Excellent work Mathieu, except for [1/8] which is already in the mainline
+kernel by Russell I will pick and integrate to the ux500-core branch for
+-next as soon as we have 2.6.39-rc1 available.
 
-	Arnd
+Yours,
+Linus Walleij
