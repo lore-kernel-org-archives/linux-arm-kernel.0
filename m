@@ -1,46 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 25 Mar 2011 08:26:20 +0100
-Subject: [PATCH 1/6] mach-netx: delete hardcoded periphid
-In-Reply-To: <1300874630-14708-1-git-send-email-linus.walleij@stericsson.com>
-References: <1300874630-14708-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110325072620.GD7285@pengutronix.de>
+Date: Fri, 25 Mar 2011 08:30:54 +0100
+Subject: [PATCHv6 4/4] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <1300915676-10359-4-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1300915676-10359-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300915676-10359-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300915676-10359-3-git-send-email-Dinh.Nguyen@freescale.com>
+	<1300915676-10359-4-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20110325073054.GE7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2011 at 11:03:50AM +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Mar 23, 2011 at 04:27:56PM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> The periphid of the AMBA CLCD controller is hardcoded to a value
-> that the CLCD driver does not even support.
+> Adds initial low power suspend functionality to MX51.
+> Supports "mem" and "standby" modes.
 > 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> +
+> +static int __init mx5_pm_init(void)
+> +{
+> +	if (gpc_dvfs_clk == NULL)
+> +		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+> +
+> +	if (!IS_ERR(gpc_dvfs_clk)) {
+> +		if (cpu_is_mx51())
+> +			suspend_set_ops(&mx5_suspend_ops);
+> +	} else {
+> +		printk(KERN_ERR "Cannot enter SRPG suspend -no gpc_dvfs clock!\n");
+> +		return -EPERM;
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-My i.MX branch is not very suitable for this patch, can you feed this
-into the patch system?
+This will print a warning on every non i.MX51 machine, not a good idea.
+Please just bail out early on irrelevant machines.
 
 Sascha
 
-> ---
->  arch/arm/mach-netx/fb.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-netx/fb.c b/arch/arm/mach-netx/fb.c
-> index 5b84bcd..b991323 100644
-> --- a/arch/arm/mach-netx/fb.c
-> +++ b/arch/arm/mach-netx/fb.c
-> @@ -103,7 +103,6 @@ static struct amba_device fb_device = {
->  		.flags	= IORESOURCE_MEM,
->  	},
->  	.irq		= { NETX_IRQ_LCD, NO_IRQ },
-> -	.periphid	= 0x10112400,
->  };
->  
->  int netx_fb_init(struct clcd_board *board, struct clcd_panel *panel)
+> +	}
+> +
+> +	return 0;
+> +}
+> +device_initcall(mx5_pm_init);
 > -- 
-> 1.7.3.2
+> 1.6.0.4
+> 
 > 
 > 
 
