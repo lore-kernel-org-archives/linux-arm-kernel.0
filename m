@@ -1,33 +1,214 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Mar 2011 20:05:57 +0000
-Subject: [PATCH] OMAP: iovmm: fix SW flags passed by user
-In-Reply-To: <AANLkTikV37gmmf5sRQ98EzOL6K7JNvDy9gfCWbR=747k@mail.gmail.com>
-References: <1301071572-25251-1-git-send-email-omar.ramirez@ti.com>
-	<4D8CD126.6000405@ru.mvista.com>
-	<AANLkTikV37gmmf5sRQ98EzOL6K7JNvDy9gfCWbR=747k@mail.gmail.com>
-Message-ID: <20110325200557.GA14228@n2100.arm.linux.org.uk>
+From: jkridner@beagleboard.org (Jason Kridner)
+Date: Fri, 25 Mar 2011 16:13:05 -0400
+Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or missing MAC
+	addresses for eth0 and wlan0
+In-Reply-To: <78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
+References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
+	<20110324212737.14936.21228.stgit@otae.warmcat.com>
+	<78b7faad4cdc37c6b507c008fde18ef3@mail.gmail.com>
+Message-ID: <AANLkTineUsH=Qz83YKJy8YZ1KSE1si-RddQ9eBsPjMdk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2011 at 12:36:57PM -0500, Ramirez Luna, Omar wrote:
-> On Fri, Mar 25, 2011 at 12:30 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> > Hello.
-> >
-> > Omar Ramirez Luna wrote:
-> >
-> >> Commit d038aee24dcd changes iovmm to receive flags specified by user,
-> >
-> > ? Please also specify that commit's summary for the human readers. Bare ID
-> > is only usable to gitweb...
-> 
-> Here it is the patch, introducing the change:
-> 
-> https://patchwork.kernel.org/patch/620871/
-> 
-> If accepted by Hiroshi, I can update the description making reference
-> to this patch instead of commit.
+On Fri, Mar 25, 2011 at 3:39 AM, Hema Kalliguddi <hemahk@ti.com> wrote:
+> Hi,
+>
+> one Minor comment.
+>
+>>-----Original Message-----
+>>From: linux-omap-owner at vger.kernel.org
+>>[mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Andy Green
+>>Sent: Friday, March 25, 2011 2:58 AM
+>>To: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+>>Cc: patches at linaro.org; nicolas.pitre at linaro.org;
+>>arnd at arndb.de; x0132446 at ti.com; s-jan at ti.com;
+>>tony at atomide.com; Alan Cox; Andy Green
+>>Subject: [RFC PATCH 2/2] OMAP2+: PANDA: Fix up random or
+>>missing MAC addresses for eth0 and wlan0
+>>
+>>This patch registers a network device notifier callback to set the mac
+>>addresses for the onboard network assets of Panda correctly,
+>>despite the
+>>drivers involved have used a random or all-zeros MAC address.
+>>
+>>The technique was suggested by Alan Cox on lkml.
+>>
+>>It works by device path so it corrects the MAC addresses even if the
+>>drivers are in modules loaded in an order that changes their interface
+>>name from usual (eg, the onboard module might be "wlan1" if there is a
+>>USB wireless stick plugged in and its module is inserted first.)
+>>
+>>Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
+>>Signed-off-by: Andy Green <andy.green@linaro.org>
 
-It is a requirement that all descriptions which refer to a commit shall
-contain both the commit ID *and* the summary line for that commit.
-Failure to ensure that's the case results in rejection of the patch
-until it conforms.
+I very much like this approach.  I believed the ability to use the die
+ID to get a unique code was reasonable approach and that is why I
+didn't get an EEPROM put onto the BeagleBoard, though Gerald is
+looking at adding one on a future revision because the lack of one
+wasn't well received.  Minor questions below.
+
+>>---
+>>
+>> arch/arm/mach-omap2/board-omap4panda.c | ? 91
+>>++++++++++++++++++++++++++++++++
+>> 1 files changed, 91 insertions(+), 0 deletions(-)
+>>
+>>diff --git a/arch/arm/mach-omap2/board-omap4panda.c
+>>b/arch/arm/mach-omap2/board-omap4panda.c
+>>index 80b8860..0b92873 100644
+>>--- a/arch/arm/mach-omap2/board-omap4panda.c
+>>+++ b/arch/arm/mach-omap2/board-omap4panda.c
+>>@@ -28,9 +28,12 @@
+>> #include <linux/regulator/machine.h>
+>> #include <linux/regulator/fixed.h>
+>> #include <linux/wl12xx.h>
+>>+#include <linux/netdevice.h>
+>>+#include <linux/if_ether.h>
+>>
+>> #include <mach/hardware.h>
+>> #include <mach/omap4-common.h>
+>>+#include <mach/id.h>
+>> #include <asm/mach-types.h>
+>> #include <asm/mach/arch.h>
+>> #include <asm/mach/map.h>
+>>@@ -506,6 +509,92 @@ static inline void board_serial_init(void)
+>> }
+>> #endif
+>>
+>>+/*
+>>+ * These device paths represent the onboard USB <-> Ethernet
+>>bridge, and
+>>+ * the WLAN module on Panda, both of which need their random
+>>or all-zeros
+>>+ * mac address replacing with a per-cpu stable generated one
+>>+ */
+>>+
+>>+static const char * const panda_fixup_mac_device_paths[] = {
+>>+ ? ? ?"usb1/1-1/1-1.1/1-1.1:1.0",
+>>+ ? ? ?"mmc1:0001:2",
+>>+};
+>>+
+>>+static int panda_device_path_need_mac(struct device *dev)
+>>+{
+>>+ ? ? ?const char **try = panda_fixup_mac_device_paths;
+>>+ ? ? ?const char *path;
+>>+ ? ? ?int count = ARRAY_SIZE(panda_fixup_mac_device_paths);
+>>+ ? ? ?const char *p;
+>>+ ? ? ?int len;
+>>+ ? ? ?struct device *devn;
+>>+
+>>+ ? ? ?while (count--) {
+>>+
+>>+ ? ? ? ? ? ? ?p = *try + strlen(*try);
+>>+ ? ? ? ? ? ? ?devn = dev;
+>>+
+>>+ ? ? ? ? ? ? ?while (devn) {
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?path = dev_name(devn);
+>>+ ? ? ? ? ? ? ? ? ? ? ?len = strlen(path);
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?if ((p - *try) < len) {
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?devn = NULL;
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?continue;
+>>+ ? ? ? ? ? ? ? ? ? ? ?}
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?p -= len;
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?if (strncmp(path, p, len)) {
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?devn = NULL;
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?continue;
+>>+ ? ? ? ? ? ? ? ? ? ? ?}
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?devn = devn->parent;
+>>+ ? ? ? ? ? ? ? ? ? ? ?if (p == *try)
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return count;
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?if (devn != NULL && (p - *try) < 2)
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?devn = NULL;
+>>+
+>>+ ? ? ? ? ? ? ? ? ? ? ?p--;
+>>+ ? ? ? ? ? ? ? ? ? ? ?if (devn != NULL && *p != '/')
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?devn = NULL;
+>>+ ? ? ? ? ? ? ?}
+>>+
+>>+ ? ? ? ? ? ? ?try++;
+>>+ ? ? ?}
+>>+
+>>+ ? ? ?return -ENOENT;
+>>+}
+>>+
+>>+static int omap_panda_netdev_event(struct notifier_block *this,
+>>+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long
+
+The use of the OMAP die id below makes this OMAP specific and the list
+referenced below of the devices to be referenced makes it Panda
+specific.  Is there a way to make the list board specific, but to make
+these functions that will be used across many OMAP platforms reusable?
+ I believe that this current code will result in a lot of
+cut-and-paste.  My preference is that this is accepted and that we
+make this more general when we add this to other OMAP platforms, but
+it'd be great to capture your suggestions on how to do so before those
+cut-and-paste patch sets start coming in.
+
+>>event, void *ptr)
+>>+{
+>>+ ? ? ?struct net_device *dev = ptr;
+>>+ ? ? ?struct sockaddr sa;
+>>+ ? ? ?int n;
+>>+
+>>+ ? ? ?if (event != NETDEV_REGISTER)
+>>+ ? ? ? ? ? ? ?return NOTIFY_DONE;
+>>+
+>>+ ? ? ?n = panda_device_path_need_mac(dev->dev.parent);
+>>+ ? ? ?if (n >= 0) {
+>>+ ? ? ? ? ? ? ?sa.sa_family = dev->type;
+>>+ ? ? ? ? ? ? ?omap2_die_id_to_ethernet_mac(sa.sa_data, n);
+>>+ ? ? ? ? ? ? ?dev->netdev_ops->ndo_set_mac_address(dev, &sa);
+>>+ ? ? ?}
+>>+
+>>+ ? ? ?return NOTIFY_DONE;
+>>+}
+>>+
+>>+static struct notifier_block omap_panda_netdev_notifier = {
+>>+ ? ? ?.notifier_call = omap_panda_netdev_event,
+>>+ ? ? ?.priority = 1,
+>>+};
+>>+
+>>+
+>
+> One extra blank line not needed.
+>
+> Regards,
+> Hema
+>
+>> static void __init omap4_panda_init(void)
+>> {
+>> ? ? ? int package = OMAP_PACKAGE_CBS;
+>>@@ -517,6 +606,8 @@ static void __init omap4_panda_init(void)
+>> ? ? ? if (wl12xx_set_platform_data(&omap_panda_wlan_data))
+>> ? ? ? ? ? ? ? pr_err("error setting wl12xx data\n");
+>>
+>>+ ? ? ?register_netdevice_notifier(&omap_panda_netdev_notifier);
+>>+
+
+I just want to make sure I understand how this works.  When a new
+network device is added, if the device name matches one of the above
+listed device paths, then the die id based MAC id is applied.  This
+must be done via a device registration notifier as the registration is
+triggered when the device is detected.
+
+>> ? ? ? omap4_panda_i2c_init();
+>> ? ? ? platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
+>> ? ? ? platform_device_register(&omap_vwlan_device);
+>>
+>>--
+>>To unsubscribe from this list: send the line "unsubscribe
+>>linux-omap" in
+>>the body of a message to majordomo at vger.kernel.org
+>>More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
