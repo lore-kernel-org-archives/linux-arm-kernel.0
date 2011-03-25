@@ -1,9 +1,9 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 25 Mar 2011 09:28:59 -0600
-Subject: [PATCH 6/8] ux500: fixing irq header file dependency.
+Date: Fri, 25 Mar 2011 09:28:58 -0600
+Subject: [PATCH 5/8] ux500: adding SDI support for snowball board
 In-Reply-To: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1301066941-15877-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1301066941-15877-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,123 +11,107 @@ From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../mach-ux500/include/mach/irqs-board-mop500.h    |   44 ++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/irqs.h            |   43 -------------------
- 2 files changed, 44 insertions(+), 43 deletions(-)
+ arch/arm/mach-ux500/Makefile           |    2 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c |   31 ++++++++++++++++++++++++-------
+ arch/arm/mach-ux500/board-mop500.h     |    5 +++++
+ arch/arm/mach-ux500/board-snowball.c   |    1 +
+ 4 files changed, 31 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-index 7cdeb2a..2c82c9c 100644
---- a/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs-board-mop500.h
-@@ -10,6 +10,33 @@
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index d74f303..016cb9f 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -13,7 +13,7 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
+ 				board-mop500-pins.o
+ obj-$(CONFIG_MACH_U8500_SNOWBALL) += board-snowball.o \
+ 				board-snowball-pins.o \
+-				board-mop500-regulators.o
++				board-mop500-regulators.o board-mop500-sdi.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index bf0b024..4ca069c 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -35,10 +35,17 @@
+ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
+ 				   unsigned char power_mode)
+ {
++	int gpio;
++
++	if (!machine_is_snowball())
++		gpio = GPIO_SDMMC_EN;
++	else
++               gpio = SNOWBALL_SDMMC_EN_GPIO;
++
+ 	if (power_mode == MMC_POWER_UP)
+-		gpio_set_value_cansleep(GPIO_SDMMC_EN, 1);
++		gpio_set_value_cansleep(gpio, 1);
+ 	else if (power_mode == MMC_POWER_OFF)
+-		gpio_set_value_cansleep(GPIO_SDMMC_EN, 0);
++		gpio_set_value_cansleep(gpio, 0);
  
- /* Number of AB8500 irqs is taken from header file */
- #include <linux/mfd/ab8500.h>
-+#include <mach/irqs-db5500.h>
-+#include <mach/irqs-db8500.h>
+ 	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
+ 	       MCI_DATA2DIREN | MCI_DATA31DIREN;
+@@ -191,15 +198,25 @@ void __init mop500_sdi_init(void)
+ 	/* PoP:ed eMMC on top of DB8500 v1.0 has problems with high speed */
+ 	if (!cpu_is_u8500v10())
+ 		mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
+-	db8500_add_sdi2(&mop500_sdi2_data);
 +
-+#define IRQ_LOCALTIMER                  29
-+#define IRQ_LOCALWDOG                   30
-+
-+/* Shared Peripheral Interrupt (SHPI) */
-+#define IRQ_SHPI_START                  32
-+
-+/* Interrupt numbers generic for shared peripheral */
-+#define IRQ_MTU0                (IRQ_SHPI_START + 4)
-+
-+/* There are 128 shared peripheral interrupts assigned to
-+ * INTID[160:32]. The first 32 interrupts are reserved.
-+ */
-+#define DBX500_NR_INTERNAL_IRQS         161
-+
-+/* After chip-specific IRQ numbers we have the GPIO ones */
-+#define NOMADIK_NR_GPIO                 288
-+#define NOMADIK_GPIO_TO_IRQ(gpio)       ((gpio) + DBX500_NR_INTERNAL_IRQS)
-+#define NOMADIK_IRQ_TO_GPIO(irq)        ((irq) - DBX500_NR_INTERNAL_IRQS)
-+#define IRQ_BOARD_START                 NOMADIK_GPIO_TO_IRQ(NOMADIK_NR_GPIO)
-+
-+/* This will be overridden by board-specific irq headers */
-+#define IRQ_BOARD_END                   IRQ_BOARD_START
-+
-+/*********************************************************************/
++	/* sdi2 on snowball is in ATL_B mode for FSMC (LAN) */
++	if (!machine_is_snowball())
++		db8500_add_sdi2(&mop500_sdi2_data);
  
- #define MOP500_AB8500_IRQ_BASE		IRQ_BOARD_START
- #define MOP500_AB8500_IRQ_END		(MOP500_AB8500_IRQ_BASE \
-@@ -44,4 +71,21 @@
- #define IRQ_BOARD_END	MOP500_IRQ_END
- #endif
+ 	/* On-board eMMC */
+ 	db8500_add_sdi4(&mop500_sdi4_data);
  
-+/*********************************************************************/
-+
-+/*
-+ * After the board specific IRQ:s we reserve a range of IRQ:s in which virtual
-+ * IRQ:s representing modem IRQ:s can be allocated
-+ */
-+#define IRQ_MODEM_EVENTS_BASE (IRQ_BOARD_END + 1)
-+#define IRQ_MODEM_EVENTS_NBR 72
-+#define IRQ_MODEM_EVENTS_END (IRQ_MODEM_EVENTS_BASE + IRQ_MODEM_EVENTS_NBR)
-+
-+/* List of virtual IRQ:s that are allocated from the range above */
-+#define MBOX_PAIR0_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 43)
-+#define MBOX_PAIR1_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 45)
-+#define MBOX_PAIR2_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 41)
-+
-+#define NR_IRQS                         IRQ_MODEM_EVENTS_END
-+
- #endif
-diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
-index ba1294c..ccc2ba0 100644
---- a/arch/arm/mach-ux500/include/mach/irqs.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs.h
-@@ -10,49 +10,6 @@
- #ifndef ASM_ARCH_IRQS_H
- #define ASM_ARCH_IRQS_H
+-	if (machine_is_hrefv60()) {
+-		mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
+-		sdi0_en = HREFV60_SDMMC_EN_GPIO;
+-		sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
++	if (machine_is_hrefv60() || machine_is_snowball()) {
++		if (machine_is_hrefv60()) {
++			mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
++			sdi0_en = HREFV60_SDMMC_EN_GPIO;
++			sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
++		} else if (machine_is_snowball()) {
++			mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
++			mop500_sdi0_data.cd_invert = true;
++			sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
++			sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
++		}
+ 		sdi0_configure();
+ 	}
+ 	/*
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 56722f4..8c8e665 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -7,6 +7,11 @@
+ #ifndef __BOARD_MOP500_H
+ #define __BOARD_MOP500_H
  
--#include <mach/irqs-db5500.h>
--#include <mach/irqs-db8500.h>
--
--#define IRQ_LOCALTIMER                  29
--#define IRQ_LOCALWDOG                   30
--
--/* Shared Peripheral Interrupt (SHPI) */
--#define IRQ_SHPI_START			32
--
--/* Interrupt numbers generic for shared peripheral */
--#define IRQ_MTU0		(IRQ_SHPI_START + 4)
--
--/* There are 128 shared peripheral interrupts assigned to
-- * INTID[160:32]. The first 32 interrupts are reserved.
-- */
--#define DBX500_NR_INTERNAL_IRQS		161
--
--/* After chip-specific IRQ numbers we have the GPIO ones */
--#define NOMADIK_NR_GPIO			288
--#define NOMADIK_GPIO_TO_IRQ(gpio)	((gpio) + DBX500_NR_INTERNAL_IRQS)
--#define NOMADIK_IRQ_TO_GPIO(irq)	((irq) - DBX500_NR_INTERNAL_IRQS)
--#define IRQ_BOARD_START			NOMADIK_GPIO_TO_IRQ(NOMADIK_NR_GPIO)
--
--/* This will be overridden by board-specific irq headers */
--#define IRQ_BOARD_END			IRQ_BOARD_START
--
--#ifdef CONFIG_MACH_U8500
- #include <mach/irqs-board-mop500.h>
--#endif
--
--/*
-- * After the board specific IRQ:s we reserve a range of IRQ:s in which virtual
-- * IRQ:s representing modem IRQ:s can be allocated
-- */
--#define IRQ_MODEM_EVENTS_BASE (IRQ_BOARD_END + 1)
--#define IRQ_MODEM_EVENTS_NBR 72
--#define IRQ_MODEM_EVENTS_END (IRQ_MODEM_EVENTS_BASE + IRQ_MODEM_EVENTS_NBR)
--
--/* List of virtual IRQ:s that are allocated from the range above */
--#define MBOX_PAIR0_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 43)
--#define MBOX_PAIR1_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 45)
--#define MBOX_PAIR2_VIRT_IRQ (IRQ_MODEM_EVENTS_BASE + 41)
--
--#define NR_IRQS				IRQ_MODEM_EVENTS_END
++/* snowball GPIO for MMC card */
++#define SNOWBALL_SDMMC_EN_GPIO 217
++#define SNOWBALL_SDMMC_1V8_3V_GPIO 228
++#define SNOWBALL_SDMMC_CD_GPIO 218
++
+ /* HREFv60-specific GPIO assignments, this board has no GPIO expander */
+ #define HREFV60_TOUCH_RST_GPIO		143
+ #define HREFV60_PROX_SENSE_GPIO		217
+diff --git a/arch/arm/mach-ux500/board-snowball.c b/arch/arm/mach-ux500/board-snowball.c
+index ab152ee..ec6ec9f 100644
+--- a/arch/arm/mach-ux500/board-snowball.c
++++ b/arch/arm/mach-ux500/board-snowball.c
+@@ -342,6 +342,7 @@ static void __init mop500_init_machine(void)
+ 	snowball_pins_init();
  
- #endif /* ASM_ARCH_IRQS_H */
+ 	mop500_i2c_init();
++	mop500_sdi_init();
+ 	mop500_spi_init();
+ 	mop500_uart_init();
+ 
 -- 
 1.7.1
