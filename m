@@ -1,45 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Mar 2011 17:35:30 +0900
-Subject: [PATCH 6/6] ARM: Remove clkdev.o build in arch/arm/common/Makefile
-In-Reply-To: <1300521019-13612-7-git-send-email-thomas.ab@samsung.com>
-References: <1300521019-13612-1-git-send-email-thomas.ab@samsung.com>
-	<1300521019-13612-7-git-send-email-thomas.ab@samsung.com>
-Message-ID: <000101cbeac7$9df03df0$d9d0b9d0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Mar 2011 08:36:30 +0000
+Subject: [PATCH 1/1] ARM: dmabounce: fix dmabounce may cause crash issue
+In-Reply-To: <1300965400-28304-1-git-send-email-b29396@freescale.com>
+References: <1300965400-28304-1-git-send-email-b29396@freescale.com>
+Message-ID: <20110325083630.GA26481@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On Thu, Mar 24, 2011 at 07:16:40PM +0800, Aisheng.Dong wrote:
+> The map_single does not check if dev is NULL which may cause kernel panic
+> like follows:
+> Unable to handle kernel NULL pointer dereference at virtual address 000000bc
+> pgd = 80004000
+> [000000bc] *pgd=00000000
+> Internal error: Oops: 5 [#1] PREEMPT
+> last sysfs file:
+> Modules linked in:
+> CPU: 0    Not tainted  (2.6.35.3-00845-g204c152-dirty #112)
+> PC is at dma_map_single+0x2c/0x2a0
+> LR is at fec_enet_interrupt+0x1d4/0x450
+> pc : [<8003cf04>]    lr : [<802936b8>]    psr: 60000193
+> sp : 80809ec8  ip : 00000080  fp : 99308040
+> r10: 99308040  r9 : 00000002  r8 : 99074f00
+> r7 : fa0a5000  r6 : 00000000  r5 : 00000060  r4 : 992e4000
+> r3 : 00000002  r2 : 8080cac0  r1 : 99308040  r0 : 00000000
 > 
-> clkdev.c is moved to drivers/clk. So build for clkdev.o can
-> be removed from arch/arm/common/Makefile.
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/common/Makefile |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-> index e7521bc..6ea9b6f 100644
-> --- a/arch/arm/common/Makefile
-> +++ b/arch/arm/common/Makefile
-> @@ -16,5 +16,4 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
->  obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
->  obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
->  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
-> -obj-$(CONFIG_COMMON_CLKDEV)	+= clkdev.o
->  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
-> --
-> 1.6.6.rc2
+> The patch checks the dev to avoid this issue and align with the
+> original dma_map_single to allow dev is NULL.
 
-Yeah, right.
-
-But, should be handled in Linux ARM kernel mailing list.
-Cc'ed Russell and LAKML :)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Is there a reason that the FEC code can't pass the appropriate struct
+device?
