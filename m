@@ -1,44 +1,42 @@
-From: andy@warmcat.com (Andy Green)
-Date: Fri, 25 Mar 2011 13:34:04 +0000
-Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <201103251424.47141.arnd@arndb.de>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<201103251249.32578.arnd@arndb.de> <4D8C85DB.6060001@linaro.org>
-	<201103251424.47141.arnd@arndb.de>
-Message-ID: <4D8C99CC.5020103@linaro.org>
+From: Ulrich.Weigand@de.ibm.com (Ulrich Weigand)
+Date: Fri, 25 Mar 2011 14:40:24 +0100
+Subject: RFC: ARM: Support for VFP/NEON registers in coredumps
+In-Reply-To: <AANLkTi=zrf-_S3fFFb69SXPvGhZawwEY94kt74CVC8-n@mail.gmail.com>
+References: <20110324141826.GA3810@arm.com>	<OF1A9833E7.A620B0FF-ONC125785D.004F4BC3-C125785D.0052255A@de.ibm.com>
+	<AANLkTin+X7BNBE9ZuDQhHVeNQqeNPjqj16pZDLTag_n+@mail.gmail.com>	<OFAB8D9B91.5F6DE70D-ONC125785D.0059E446-C125785D.005B916C@de.ibm.com>
+	<AANLkTinzxmULwhgXHbAUw0zveYXYj8zxRgZkoPYdOPhc@mail.gmail.com>	<OF17449AB0.36DF06DD-ONC125785D.00635CD3-C125785D.0063E8BB@de.ibm.com>
+	<AANLkTi=VtCy9MrY5+wGYfh9+otWy87WmFZkmGN-PqMPo@mail.gmail.com>	<OF13B038E5.B9DFA4EA-ONC125785E.0047A984-C125785E.004871A1@de.ibm.com>
+	<AANLkTi=zrf-_S3fFFb69SXPvGhZawwEY94kt74CVC8-n@mail.gmail.com>
+Message-ID: <OFD0474D33.663BAB94-ONC125785E.004ABB86-C125785E.004B1C72@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2011 01:24 PM, Somebody in the thread at some point said:
-> On Friday 25 March 2011, Andy Green wrote:
->> Having a proper MAC from IEEE assigned for each interface is of course
->> ideal.
->>
->> But even if that happened today though, on Panda there is no "board
->> identity storage" to put the reserved MAC addresses in to bind it to the
->> physical board.  If you try to manage them on SD Card, you have the
->> problem of dealing with correct MAC addresses needing putting there
->> again every time it is nuked.  So it doesn't in itself help in the Panda
->> case.
+Dave Martin <dave.martin@linaro.org> wrote:
+
+> I was indeed thinking that it might be a good idea to take this
+> opportunity to migrate to using regsets; though for simplicity, I'll
+> probably avoid this for the first iteration.
 >
-> What I meant is computing an official MAC address from the same input
-> data as you already do. Unfortunately that would mean having at most 24
-> bits available instead of the 44 or so bits you currently use, because
-> the upper half of the address then becomes fixed.
->
-> Also it would require
-> 1. defining an new algorithm that computes the lower 24 bits from the
->     die ID in a way that minimises the chances of collision
-> 2. Getting an official identifier for the upper half of the address
->     assigned to the OMAP3/OMAP4 CPUs
-> 3. Documenting this method in the OMAP data sheets.
+> Will this have any impact on the ptrace interface?
 
-I see.  It would work OK then.  They probably wouldn't want to blow 
-their $1750 just on Panda though, so maybe they set 4 bits or whatever 
-and let 20 be computed.
+Well, once you support regsets, the PTRACE_GETREGSET/PTRACE_SETREGSET
+commands will start working.  However, on platforms that already had
+commands to access registers, platform-specific code will of course
+need to continue to support those.
 
-However, the only practical advantage is that it would show up as a TI 
-MAC in an OUI database.  The "locally administered" address as used at 
-the moment is otherwise legal in every respect AFAIK.
+See e.g. arch/powerpc/kernel/ptrace.c, which by now implements all
+of its legacy ptrace register commands in terms of regset functions.
 
--Andy
+
+Mit freundlichen Gruessen / Best Regards
+
+Ulrich Weigand
+
+--
+  Dr. Ulrich Weigand | Phone: +49-7031/16-3727
+  STSM, GNU compiler and toolchain for Linux on System z and Cell/B.E.
+  IBM Deutschland Research & Development GmbH
+  Vorsitzender des Aufsichtsrats: Martin Jetter | Gesch?ftsf?hrung: Dirk
+Wittkopp
+  Sitz der Gesellschaft: B?blingen | Registergericht: Amtsgericht
+Stuttgart, HRB 243294
