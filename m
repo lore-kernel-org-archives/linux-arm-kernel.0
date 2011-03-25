@@ -1,151 +1,58 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 25 Mar 2011 11:10:55 +0100
-Subject: [PATCH v2] ARM: perf: reset counters on all CPUs during
-	initialisation
-In-Reply-To: <-978680943347076223@unknownmsgid>
-References: <1300895204-10544-1-git-send-email-will.deacon@arm.com>
-	<-978680943347076223@unknownmsgid>
-Message-ID: <AANLkTi=QhU_OHkLrn0seXnXH0MW7gYfLxLDtby1RvzPk@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Mar 2011 10:16:51 +0000
+Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
+	device accesses
+Message-ID: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 5:22 PM, Will Deacon <will.deacon@arm.com> wrote:
->> ARMv7 dictates that the interrupt-enable and count-enable registers for
->> each PMU counter are UNKNOWN following core reset.
->>
->> This patch adds a new (optional) function pointer to struct arm_pmu for
->> resetting the PMU state during init. The reset function is called on
->> each CPU via an arch_initcall in the generic ARM perf_event code and
->> allows the PMU backend to write sane values to any UNKNOWN registers.
->>
->> Cc: Jean Pihet <jean.pihet@ti.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>
->> Hi Jean, here's the updated patch following the discussion on the list.
->>
->> Please let me know what you think.
+Since mandatory barriers may be used (explicitly or implicitly via readl
+etc.) to ensure the ordering between Device and Normal memory accesses,
+a DMB is not enough. This patch converts it to a DSB.
 
-Great work, thanks!
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Colin Cross <ccross@android.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/system.h                  |    2 +-
+ arch/arm/mach-realview/include/mach/barriers.h |    2 +-
+ arch/arm/mach-tegra/include/mach/barriers.h    |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Acked-by: j-pihet at ti.com
-
-(Please note the correct e-mail address ;-)
-
-Regards,
-Jean
-
->>
->> Will
->
-> Resending with correct email address for Jean...
->
->> ?arch/arm/kernel/perf_event.c ? ?| ? 14 ++++++++++++++
->> ?arch/arm/kernel/perf_event_v7.c | ? 22 ++++++++++++++++------
->> ?2 files changed, 30 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 53f6068..b23a364 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -79,6 +79,7 @@ struct arm_pmu {
->> ? ? ? void ? ? ? ? ? ?(*write_counter)(int idx, u32 val);
->> ? ? ? void ? ? ? ? ? ?(*start)(void);
->> ? ? ? void ? ? ? ? ? ?(*stop)(void);
->> + ? ? void ? ? ? ? ? ?(*reset)(void *);
->> ? ? ? const unsigned ?(*cache_map)[PERF_COUNT_HW_CACHE_MAX]
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? [PERF_COUNT_HW_CACHE_OP_MAX]
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? [PERF_COUNT_HW_CACHE_RESULT_MAX];
->> @@ -612,6 +613,19 @@ static struct pmu pmu = {
->> ?#include "perf_event_v6.c"
->> ?#include "perf_event_v7.c"
->>
->> +/*
->> + * Ensure the PMU has sane values out of reset.
->> + * This requires SMP to be available, so exists as a separate initcall.
->> + */
->> +static int __init
->> +armpmu_reset(void)
->> +{
->> + ? ? if (armpmu && armpmu->reset)
->> + ? ? ? ? ? ? return on_each_cpu(armpmu->reset, NULL, 1);
->> + ? ? return 0;
->> +}
->> +arch_initcall(armpmu_reset);
->> +
->> ?static int __init
->> ?init_hw_perf_events(void)
->> ?{
->> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
->> index 2aa83c2..4960686 100644
->> --- a/arch/arm/kernel/perf_event_v7.c
->> +++ b/arch/arm/kernel/perf_event_v7.c
->> @@ -849,6 +849,18 @@ static int armv7pmu_get_event_idx(struct cpu_hw_events *cpuc,
->> ? ? ? }
->> ?}
->>
->> +static void armv7pmu_reset(void *info)
->> +{
->> + ? ? u32 idx, nb_cnt = armpmu->num_events;
->> +
->> + ? ? /* The counter and interrupt enable registers are unknown at reset. */
->> + ? ? for (idx = 1; idx < nb_cnt; ++idx)
->> + ? ? ? ? ? ? armv7pmu_disable_event(NULL, idx);
->> +
->> + ? ? /* Initialize & Reset PMNC: C and P bits */
->> + ? ? armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
->> +}
->> +
->> ?static struct arm_pmu armv7pmu = {
->> ? ? ? .handle_irq ? ? ? ? ? ? = armv7pmu_handle_irq,
->> ? ? ? .enable ? ? ? ? ? ? ? ? = armv7pmu_enable_event,
->> @@ -858,17 +870,15 @@ static struct arm_pmu armv7pmu = {
->> ? ? ? .get_event_idx ? ? ? ? ?= armv7pmu_get_event_idx,
->> ? ? ? .start ? ? ? ? ? ? ? ? ?= armv7pmu_start,
->> ? ? ? .stop ? ? ? ? ? ? ? ? ? = armv7pmu_stop,
->> + ? ? .reset ? ? ? ? ? ? ? ? ?= armv7pmu_reset,
->> ? ? ? .raw_event_mask ? ? ? ? = 0xFF,
->> ? ? ? .max_period ? ? ? ? ? ? = (1LLU << 32) - 1,
->> ?};
->>
->> -static u32 __init armv7_reset_read_pmnc(void)
->> +static u32 __init armv7_read_num_pmnc_events(void)
->> ?{
->> ? ? ? u32 nb_cnt;
->>
->> - ? ? /* Initialize & Reset PMNC: C and P bits */
->> - ? ? armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
->> -
->> ? ? ? /* Read the nb of CNTx counters supported from PMNC */
->> ? ? ? nb_cnt = (armv7_pmnc_read() >> ARMV7_PMNC_N_SHIFT) & ARMV7_PMNC_N_MASK;
->>
->> @@ -882,7 +892,7 @@ static const struct arm_pmu *__init armv7_a8_pmu_init(void)
->> ? ? ? armv7pmu.name ? ? ? ? ? = "ARMv7 Cortex-A8";
->> ? ? ? armv7pmu.cache_map ? ? ?= &armv7_a8_perf_cache_map;
->> ? ? ? armv7pmu.event_map ? ? ?= &armv7_a8_perf_map;
->> - ? ? armv7pmu.num_events ? ? = armv7_reset_read_pmnc();
->> + ? ? armv7pmu.num_events ? ? = armv7_read_num_pmnc_events();
->> ? ? ? return &armv7pmu;
->> ?}
->>
->> @@ -892,7 +902,7 @@ static const struct arm_pmu *__init armv7_a9_pmu_init(void)
->> ? ? ? armv7pmu.name ? ? ? ? ? = "ARMv7 Cortex-A9";
->> ? ? ? armv7pmu.cache_map ? ? ?= &armv7_a9_perf_cache_map;
->> ? ? ? armv7pmu.event_map ? ? ?= &armv7_a9_perf_map;
->> - ? ? armv7pmu.num_events ? ? = armv7_reset_read_pmnc();
->> + ? ? armv7pmu.num_events ? ? = armv7_read_num_pmnc_events();
->> ? ? ? return &armv7pmu;
->> ?}
->> ?#else
->> --
->> 1.7.0.4
->
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 9a87823..926d867 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -159,7 +159,7 @@ extern unsigned int user_debug;
+ #include <mach/barriers.h>
+ #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+ #define mb()		do { dsb(); outer_sync(); } while (0)
+-#define rmb()		dmb()
++#define rmb()		dsb()
+ #define wmb()		mb()
+ #else
+ #include <asm/memory.h>
+diff --git a/arch/arm/mach-realview/include/mach/barriers.h b/arch/arm/mach-realview/include/mach/barriers.h
+index 0c5d749..9a73219 100644
+--- a/arch/arm/mach-realview/include/mach/barriers.h
++++ b/arch/arm/mach-realview/include/mach/barriers.h
+@@ -4,5 +4,5 @@
+  * operation to deadlock the system.
+  */
+ #define mb()		dsb()
+-#define rmb()		dmb()
++#define rmb()		dsb()
+ #define wmb()		mb()
+diff --git a/arch/arm/mach-tegra/include/mach/barriers.h b/arch/arm/mach-tegra/include/mach/barriers.h
+index cc11517..425b42e 100644
+--- a/arch/arm/mach-tegra/include/mach/barriers.h
++++ b/arch/arm/mach-tegra/include/mach/barriers.h
+@@ -23,7 +23,7 @@
+ 
+ #include <asm/outercache.h>
+ 
+-#define rmb()		dmb()
++#define rmb()		dsb()
+ #define wmb()		do { dsb(); outer_sync(); } while (0)
+ #define mb()		wmb()
+ 
