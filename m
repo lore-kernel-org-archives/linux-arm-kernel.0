@@ -1,63 +1,47 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 25 Mar 2011 09:02:26 +0100
-Subject: arm: Move the definition of ARCH_HAS_DMA_MMAP_COHERENT where it
-	belongs
-In-Reply-To: <1301035670.2402.468.camel@pasglop>
-References: <1301035670.2402.468.camel@pasglop>
-Message-ID: <s5h7hbnvd9p.wl%tiwai@suse.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Mar 2011 17:35:30 +0900
+Subject: [PATCH] ARM: S5PV210: Fix security engine interrupt names
+In-Reply-To: <1300826909-14634-1-git-send-email-vzapolskiy@gmail.com>
+References: <1300826909-14634-1-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <000701cbeac7$9e9e3130$dbda9390$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 25 Mar 2011 17:47:50 +1100,
-Benjamin Herrenschmidt wrote:
+Vladimir Zapolskiy wrote:
 > 
-> Something I noticed while implementing dma_mmap_coherent() for powerpc...
+> This change is intended to correct security subsystem interrupt names
+> for Samsung S5PV210 and S5PC110 SoCs.
 > 
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-
-Thanks for catching up!
-
-Acked-by: Takashi Iwai <tiwai@suse.de>
-
-
-Takashi
-
+> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
 > ---
->  arch/arm/include/asm/dma-mapping.h |    2 +-
->  sound/core/pcm_native.c            |    7 -------
->  2 files changed, 1 insertions(+), 8 deletions(-)
+>  arch/arm/mach-s5pv210/include/mach/irqs.h |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 4fff837..ed33eab 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -214,7 +214,7 @@ extern void dma_free_coherent(struct device *, size_t, void *, dma_addr_t);
->   */
->  int dma_mmap_coherent(struct device *, struct vm_area_struct *,
->  		void *, dma_addr_t, size_t);
-> -
-> +#define ARCH_HAS_DMA_MMAP_COHERENT
->  
->  /**
->   * dma_alloc_writecombine - allocate writecombining memory for DMA
-> diff --git a/sound/core/pcm_native.c b/sound/core/pcm_native.c
-> index ae42b65..2d99c37 100644
-> --- a/sound/core/pcm_native.c
-> +++ b/sound/core/pcm_native.c
-> @@ -3145,13 +3145,6 @@ static const struct vm_operations_struct snd_pcm_vm_ops_data_fault = {
->  	.fault =	snd_pcm_mmap_data_fault,
->  };
->  
-> -#ifndef ARCH_HAS_DMA_MMAP_COHERENT
-> -/* This should be defined / handled globally! */
-> -#ifdef CONFIG_ARM
-> -#define ARCH_HAS_DMA_MMAP_COHERENT
-> -#endif
-> -#endif
-> -
->  /*
->   * mmap the DMA buffer on RAM
->   */
+> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
+> s5pv210/include/mach/irqs.h
+> index 26710b3..b9f9ec3 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+> @@ -99,9 +99,9 @@
+>  #define IRQ_TC			IRQ_PENDN
+>  #define IRQ_KEYPAD		S5P_IRQ_VIC2(25)
+>  #define IRQ_CG			S5P_IRQ_VIC2(26)
+> -#define IRQ_SEC			S5P_IRQ_VIC2(27)
+> -#define IRQ_SECRX		S5P_IRQ_VIC2(28)
+> -#define IRQ_SECTX		S5P_IRQ_VIC2(29)
+> +#define IRQ_SSS_INT		S5P_IRQ_VIC2(27)
+> +#define IRQ_SSS_HASH		S5P_IRQ_VIC2(28)
+> +#define IRQ_PCM2		S5P_IRQ_VIC2(29)
+>  #define IRQ_SDMIRQ		S5P_IRQ_VIC2(30)
+>  #define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
 > 
-> 
-> 
+> --
+
+Ok, applied.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
