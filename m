@@ -1,38 +1,55 @@
-From: andy@warmcat.com (Andy Green)
-Date: Fri, 25 Mar 2011 15:00:51 +0000
-Subject: [RFC PATCH 1/2] OMAP2+: add cpu id register to MAC address helper
-In-Reply-To: <201103251550.26117.arnd@arndb.de>
-References: <20110324211451.14936.39750.stgit@otae.warmcat.com>
-	<201103251424.47141.arnd@arndb.de> <4D8C99CC.5020103@linaro.org>
-	<201103251550.26117.arnd@arndb.de>
-Message-ID: <4D8CAE23.5080906@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 25 Mar 2011 08:24:10 -0700
+Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
+	CPU-hotplug and CPUilde support.
+In-Reply-To: <86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com> (Santosh
+	Shilimkar's message of "Fri, 25 Mar 2011 12:35:00 +0530")
+References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
+	<87d3lycu0h.fsf@ti.com>
+	<49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
+	<87pqpxbqho.fsf@ti.com> <87mxkk1rni.fsf@ti.com>
+	<86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com>
+Message-ID: <87mxkjusth.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2011 02:50 PM, Somebody in the thread at some point said:
-> On Friday 25 March 2011, Andy Green wrote:
->> I see.  It would work OK then.  They probably wouldn't want to blow
->> their $1750 just on Panda though, so maybe they set 4 bits or whatever
->> and let 20 be computed.
+Hi  Santosh,
+
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+[...]
+
+>> Can you rebase and repost your v3 series, I'd like to get this
+>> queued up early in the 2.6.40 dev cycle.
+>>
+>> You can base on my current pm-core branch, which also has Russell's
+>> devel-stable branch merged in.
+>>
+> I pulled your latest pm-core branch
+> ------
+> commit 61cbb3172176b84c106bf0f4c32317c472932ab5
+> Merge: d0cf394... da19719...
+> Author: Kevin Hilman <khilman@ti.com>
+> Date:   Wed Mar 23 16:33:01 2011 -0700
 >
-> Well, if the algorithm is defined well, it could be used for any device
-> based on OMAP. The marketing department could turn this into a win by
-> declaring "does not require external EEPROM for ethernet mac address" ;-)
+>     Merge branch 'for_2.6.40/pm-misc' into pm-reset
+> -----------------
+> Looks like Russell's devel branch isn't merged in pm-core.
+> I didn't find the relevant patches.
 
-Okay, can't argue with it ^^
+hmm, you're right.  I'm actually pulling Russell's devel-stable branch
+not his devel branch.  I assumed they were in devel-stable as well.
 
-> * Some places try to keep a database of all used machines and their MAC
-> addresses to monitor who connects to the network. This requires the address
-> to be stable. It also prevents the use of virtualization, so it's becoming
-> less common.
+> By the way the relevant ARM patches are already in mainline.  So if
+> the pm-core is rebased against latest mainline, we can get those
+> changes as well.
 
-They will probably just be happy the crazy noise they have been seeing 
-from current Panda MACs changing every session will go away, it doesn't 
-seem to add anything it's an OUI namespace MAC.  In the patch case the 
-"locally administered" mac will be "stable".
+Before I rebase, I'll wait at least until -rc1 and/or Tony rebases to
+mainline.
 
-Anyway since I understood it, I can see your idea is a cool approach, 
-it's up to TI what they will do about it but I guess it's OK with or 
-without it.
+In the mean time, can you create two branches?  One with the
+dependencies and another with the OMAP4 PM series.  After some final
+review and testing, I'll merge the latter series and by then we'll
+probably have an -rc1 baseline.
 
--Andy
+Kevin
