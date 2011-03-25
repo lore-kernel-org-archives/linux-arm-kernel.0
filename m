@@ -1,279 +1,43 @@
-From: ffainelli@freebox.fr (Florian Fainelli)
-Date: Fri, 25 Mar 2011 11:34:44 +0100
-Subject: [ PATCH V2  3/7] MTD : add the database for the NANDs
-In-Reply-To: <1301048581-21321-4-git-send-email-b32955@freescale.com>
-References: <1301048581-21321-1-git-send-email-b32955@freescale.com>
-	<1301048581-21321-4-git-send-email-b32955@freescale.com>
-Message-ID: <201103251134.44731.ffainelli@freebox.fr>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 25 Mar 2011 12:06:56 +0100
+Subject: multiple definition of `show_mem'
+In-Reply-To: <alpine.DEB.2.00.1103241522230.26730@chino.kir.corp.google.com>
+References: <4D8B6140.4020300@pengutronix.de>
+	<alpine.DEB.2.00.1103241522230.26730@chino.kir.corp.google.com>
+Message-ID: <4D8C7750.5070102@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Huang,
+On 03/24/2011 11:22 PM, David Rientjes wrote:
+>> current mainline (v2.6.38-7210-gb81a618) on ARM/mxs has the following build failure:
+>>
+>>> lib/lib.a(show_mem.o): In function `show_mem':
+>>> .../linux-2.6/lib/show_mem.c:67: multiple definition of `show_mem'
+>>> arch/arm/mm/built-in.o:.../linux-2.6/arch/arm/mm/init.c:82: first defined here
+>>> make: *** [vmlinux.o] Error 1
 
-On Friday 25 March 2011 11:22:57 Huang Shijie wrote:
-> This is a new database for the NANDs which is searched by the id_bytes.
+[..]
+
+> Sorry about that, Marc.  I have a patch at
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/mtd/nand/nand_device_info.c |  154
-> +++++++++++++++++++++++++++++++++++ drivers/mtd/nand/nand_device_info.h | 
->  83 +++++++++++++++++++
->  2 files changed, 237 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/mtd/nand/nand_device_info.c
->  create mode 100644 drivers/mtd/nand/nand_device_info.h
+> 	http://marc.info/?l=linux-kernel&m=130100511521954
 > 
-> diff --git a/drivers/mtd/nand/nand_device_info.c
-> b/drivers/mtd/nand/nand_device_info.c new file mode 100644
-> index 0000000..3ceec9c
-> --- /dev/null
-> +++ b/drivers/mtd/nand/nand_device_info.c
-> @@ -0,0 +1,154 @@
-> +/*
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + */
-> +
-> +/*
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <asm/sizes.h>
-> +#include <linux/mtd/nand.h>
-> +
-> +#include "nand_device_info.h"
-> +
-> +static const struct nand_device_info samsung_nand[] = {
-> +	{
-> +		.id	= { 0xec, 0xd3, 0x14, 0x25, 0x64, 0xec, 0xd3, 0x14 },
-> +		.id_len	= 8,
-> +		.desc	= "K9G8G08U0M, K9HAG08U1M",
-> +		.attr	= ATTR(MLC, 1LL * SZ_1G, 128, 2 * SZ_1K + 64, 8, 512),
-> +	}, {
-> +		.id	= { 0xec, 0xd7, 0xd5, 0x29, 0x38, 0x41, 0xec, 0xd7 },
-> +		.id_len	= 8,
-> +		.desc	= "K9LBG08U0D",
-> +		.attr	= ATTR(MLC, 4LL * SZ_1G, 128, 4 * SZ_1K + 218, 16, 512),
-> +	}, {
-> +		.id	= { 0xec, 0xd5, 0x14, 0xb6, 0x74, 0xec, 0xd5, 0x14 },
-> +		.id_len	= 8,
-> +		.desc	= "K9GAG08U0M",
-> +		.attr	= ATTR(MLC, 2LL * SZ_1G, 128, 4 * SZ_1K + 218, 16, 512),
-> +	}, {
-> +		/* end of the table. */
-> +		.id	= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-> +	},
-> +};
+> which should fix the issue for you (and I tested it with my arm cross 
+> compiler).
 
-Sorry, but I do not see why this is still needed. drivers/mtd/nand_ids.c 
-should already recognize all of these chips correctly. If this is not the case 
-for you, you should fix nand_get_flash_type() instead.
+\o/ - the patch is already in mainline, boots like charm on my mx28evk.
 
-> +
-> +/* macro to get the id bytes */
-> +#define ID_GET_MFR_CODE(id)  ((id)[0])
-> +
-> +void nand_device_print_info(struct nand_device_info *info)
-> +{
-> +	unsigned    i;
-> +	const char  *mfr_name;
-> +	const char  *cell_technology_name;
-> +	uint64_t    chip_size;
-> +	const char  *chip_size_units;
-> +	unsigned    page_size;
-> +	unsigned    oob_size;
-> +	struct nand_attr *attr		= &info->attr;
-> +
-> +	/* Prepare the manufacturer name. */
-> +	mfr_name = "Unknown";
-> +	for (i = 0; nand_manuf_ids[i].id; i++) {
-> +		if (nand_manuf_ids[i].id == ID_GET_MFR_CODE(info->id)) {
-> +			mfr_name = nand_manuf_ids[i].name;
-> +			break;
-> +		}
-> +	}
-> +
-> +	/* Prepare the name of the cell technology. */
-> +	switch (attr->cell_technology) {
-> +	case SLC:
-> +		cell_technology_name = "SLC";
-> +		break;
-> +	case MLC:
-> +		cell_technology_name = "MLC";
-> +		break;
-> +	default:
-> +		cell_technology_name = "Unknown";
-> +		break;
-> +	}
-> +
-> +	/* Prepare the chip size. */
-> +	if ((attr->chip_size_in_bytes >= SZ_1G) &&
-> +					!(attr->chip_size_in_bytes % SZ_1G)) {
-> +		chip_size       = attr->chip_size_in_bytes / ((uint64_t) SZ_1G);
-> +		chip_size_units = "GiB";
-> +	} else if ((attr->chip_size_in_bytes >= SZ_1M) &&
-> +					!(attr->chip_size_in_bytes % SZ_1M)) {
-> +		chip_size       = attr->chip_size_in_bytes / ((uint64_t) SZ_1M);
-> +		chip_size_units = "MiB";
-> +	} else {
-> +		chip_size       = attr->chip_size_in_bytes;
-> +		chip_size_units = "B";
-> +	}
-> +
-> +	/* Prepare the page geometry. */
-> +	page_size = (1 << (fls(attr->page_total_size_in_bytes) - 1));
-> +	oob_size  = attr->page_total_size_in_bytes - page_size;
-> +
-> +	/* Print the infomation. */
-> +	pr_info("--------------------------------------\n");
-> +	pr_info("	NAND device infomation (RAW)\n");
-> +	pr_info("--------------------------------------\n");
-> +	pr_info("Manufacturer      : %s (0x%02x)\n", mfr_name, info->id[0]);
-> +	pr_info("Device Code       : 0x%02x\n", info->id[1]);
-> +	pr_info("Cell Technology   : %s\n", cell_technology_name);
-> +	pr_info("Chip Size         : %llu %s\n", chip_size, chip_size_units);
-> +	pr_info("Pages per Block   : %u\n", attr->block_size_in_pages);
-> +	pr_info("Page Geometry     : %u+%u\n", page_size, oob_size);
-> +	pr_info("ECC Strength      : %u bits\n", attr->ecc_strength_in_bits);
-> +	pr_info("ECC Size          : %u B\n", attr->ecc_size_in_bytes);
-> +	pr_info("Description       : %s\n", info->desc);
-> +}
-> +
-> +static struct nand_device_info * __init
-> +search_table(const struct nand_device_info *table, const uint8_t id[])
-> +{
-> +	struct nand_device_info *info = (struct nand_device_info *)table;
-> +
-> +	while (ID_GET_MFR_CODE(info->id)) {
-> +		int i;
-> +
-> +		/* match all the valid id bytes. Is it too strict? */
-> +		for (i = 0; i < info->id_len; i++)
-> +			if (info->id[i] != id[i])
-> +				break;
-> +
-> +		/* found it */
-> +		if (i == info->id_len)
-> +			return info;
-> +		info++;
-> +	}
-> +	return NULL;
-> +}
-> +
-> +struct nand_device_mfr_info {
-> +	uint8_t                  id;
-> +	const struct nand_device_info  *table;
-> +};
-> +
-> +static const struct nand_device_mfr_info  nand_device_mfr_directory[] = {
-> +	{ NAND_MFR_SAMSUNG, samsung_nand },
-> +	{ 0, NULL },
-> +};
-> +
-> +struct nand_device_info *nand_device_get_info(const uint8_t id[])
-> +{
-> +	uint8_t mfr_id = ID_GET_MFR_CODE(id);
-> +	unsigned i;
-> +
-> +	for (i = 0; nand_device_mfr_directory[i].id; i++) {
-> +		if (nand_device_mfr_directory[i].id == mfr_id) {
-> +			const struct nand_device_info  *table;
-> +
-> +			table = nand_device_mfr_directory[i].table;
-> +			return search_table(table, id);
-> +		}
-> +	}
-> +	return NULL;
-> +}
-> diff --git a/drivers/mtd/nand/nand_device_info.h
-> b/drivers/mtd/nand/nand_device_info.h new file mode 100644
-> index 0000000..fe22233
-> --- /dev/null
-> +++ b/drivers/mtd/nand/nand_device_info.h
-> @@ -0,0 +1,83 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + */
-> +
-> +/*
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#ifndef __DRIVERS_NAND_DEVICE_INFO_H
-> +#define __DRIVERS_NAND_DEVICE_INFO_H
-> +
-> +enum nand_device_cell_technology {
-> +	SLC = 0,
-> +	MLC = 1,
-> +};
-> +
-> +/**
-> + * @cell_technology:           The storage cell technology.
-> + * @chip_size_in_bytes:        The total size of the storage behind a
-> single + *                             chip select, in bytes. Notice that
-> this is *not* + *                             necessarily the total size
-> of the storage in a + *                             *package*, which may
-> contain several chips. + * @block_size_in_pages:       The number of pages
-> in a block.
-> + * @page_total_size_in_bytes:  The total size of a page, in bytes,
-> including + *                             both the data and the OOB.
-> + * @ecc_strength_in_bits:      The strength of the ECC called for by the
-> + *                             manufacturer, in number of correctable
-> bits. + * @ecc_size_in_bytes:         The size of the data block over
-> which the + *                             manufacturer calls for the given
-> ECC algorithm + *                             and strength.
-> + */
-> +struct nand_attr {
-> +	/* Technology */
-> +	enum nand_device_cell_technology  cell_technology;
-> +
-> +	/* Geometry */
-> +	uint64_t	chip_size_in_bytes;
-> +	uint32_t	block_size_in_pages;
-> +	uint32_t	page_total_size_in_bytes;
-> +
-> +	/* ECC */
-> +	uint16_t	ecc_strength_in_bits;
-> +	uint16_t	ecc_size_in_bytes;
-> +};
-> +
-> +#define ID_BYTES	(8)
-> +/*
-> + * struct nand_device_info - Information about a single NAND Flash device.
-> + *
-> + * This structure contains all the *essential* information about a NAND
-> Flash + * device, derived from the device's data sheet.
-> + */
-> +struct nand_device_info {
-> +	/* id */
-> +	uint8_t			id[ID_BYTES];
-> +	unsigned int		id_len;
-> +
-> +	/* Description */
-> +	const char		*desc;
-> +
-> +	/* attribute*/
-> +	struct nand_attr	attr;
-> +};
-> +
-> +/* macro for the NAND attribute */
-> +#define ATTR(_a, _b, _c, _d, _e, _f)			\
-> +	{						\
-> +		.cell_technology          = (_a),	\
-> +		.chip_size_in_bytes       = (_b),	\
-> +		.block_size_in_pages      = (_c),	\
-> +		.page_total_size_in_bytes = (_d),	\
-> +		.ecc_strength_in_bits     = (_e),	\
-> +		.ecc_size_in_bytes        = (_f),	\
-> +	}
-> +
-> +struct nand_device_info *nand_device_get_info(const uint8_t id_bytes[]);
-> +void nand_device_print_info(struct nand_device_info *info);
-> +
-> +#endif
+regards, Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110325/d45f8f9a/attachment.sig>
