@@ -1,9 +1,9 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 25 Mar 2011 09:28:58 -0600
-Subject: [PATCH 5/8] ux500: adding SDI support for snowball board
+Date: Fri, 25 Mar 2011 09:29:00 -0600
+Subject: [PATCH 7/8] ux500: adding config file options for snowball board.
 In-Reply-To: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1301066941-15877-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1301066941-15877-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1301066941-15877-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,107 +11,65 @@ From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/arm/mach-ux500/Makefile           |    2 +-
- arch/arm/mach-ux500/board-mop500-sdi.c |   31 ++++++++++++++++++++++++-------
- arch/arm/mach-ux500/board-mop500.h     |    5 +++++
- arch/arm/mach-ux500/board-snowball.c   |    1 +
- 4 files changed, 31 insertions(+), 8 deletions(-)
+ arch/arm/configs/u8500_defconfig |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index d74f303..016cb9f 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -13,7 +13,7 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
- 				board-mop500-pins.o
- obj-$(CONFIG_MACH_U8500_SNOWBALL) += board-snowball.o \
- 				board-snowball-pins.o \
--				board-mop500-regulators.o
-+				board-mop500-regulators.o board-mop500-sdi.o
- obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index bf0b024..4ca069c 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -35,10 +35,17 @@
- static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
- 				   unsigned char power_mode)
- {
-+	int gpio;
-+
-+	if (!machine_is_snowball())
-+		gpio = GPIO_SDMMC_EN;
-+	else
-+               gpio = SNOWBALL_SDMMC_EN_GPIO;
-+
- 	if (power_mode == MMC_POWER_UP)
--		gpio_set_value_cansleep(GPIO_SDMMC_EN, 1);
-+		gpio_set_value_cansleep(gpio, 1);
- 	else if (power_mode == MMC_POWER_OFF)
--		gpio_set_value_cansleep(GPIO_SDMMC_EN, 0);
-+		gpio_set_value_cansleep(gpio, 0);
- 
- 	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
- 	       MCI_DATA2DIREN | MCI_DATA31DIREN;
-@@ -191,15 +198,25 @@ void __init mop500_sdi_init(void)
- 	/* PoP:ed eMMC on top of DB8500 v1.0 has problems with high speed */
- 	if (!cpu_is_u8500v10())
- 		mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
--	db8500_add_sdi2(&mop500_sdi2_data);
-+
-+	/* sdi2 on snowball is in ATL_B mode for FSMC (LAN) */
-+	if (!machine_is_snowball())
-+		db8500_add_sdi2(&mop500_sdi2_data);
- 
- 	/* On-board eMMC */
- 	db8500_add_sdi4(&mop500_sdi4_data);
- 
--	if (machine_is_hrefv60()) {
--		mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
--		sdi0_en = HREFV60_SDMMC_EN_GPIO;
--		sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
-+	if (machine_is_hrefv60() || machine_is_snowball()) {
-+		if (machine_is_hrefv60()) {
-+			mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
-+			sdi0_en = HREFV60_SDMMC_EN_GPIO;
-+			sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
-+		} else if (machine_is_snowball()) {
-+			mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
-+			mop500_sdi0_data.cd_invert = true;
-+			sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
-+			sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
-+		}
- 		sdi0_configure();
- 	}
- 	/*
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 56722f4..8c8e665 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -7,6 +7,11 @@
- #ifndef __BOARD_MOP500_H
- #define __BOARD_MOP500_H
- 
-+/* snowball GPIO for MMC card */
-+#define SNOWBALL_SDMMC_EN_GPIO 217
-+#define SNOWBALL_SDMMC_1V8_3V_GPIO 228
-+#define SNOWBALL_SDMMC_CD_GPIO 218
-+
- /* HREFv60-specific GPIO assignments, this board has no GPIO expander */
- #define HREFV60_TOUCH_RST_GPIO		143
- #define HREFV60_PROX_SENSE_GPIO		217
-diff --git a/arch/arm/mach-ux500/board-snowball.c b/arch/arm/mach-ux500/board-snowball.c
-index ab152ee..ec6ec9f 100644
---- a/arch/arm/mach-ux500/board-snowball.c
-+++ b/arch/arm/mach-ux500/board-snowball.c
-@@ -342,6 +342,7 @@ static void __init mop500_init_machine(void)
- 	snowball_pins_init();
- 
- 	mop500_i2c_init();
-+	mop500_sdi_init();
- 	mop500_spi_init();
- 	mop500_uart_init();
- 
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index e1d6020..80e26b2 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -11,6 +11,7 @@ CONFIG_ARCH_U8500=y
+ CONFIG_UX500_SOC_DB5500=y
+ CONFIG_UX500_SOC_DB8500=y
+ CONFIG_MACH_U8500=y
++CONFIG_MACH_U8500_SNOWBALL=y
+ CONFIG_MACH_U5500=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+@@ -25,6 +26,13 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_IPV6 is not set
++CONFIG_NETFILTER=y
+ CONFIG_PHONET=y
+ CONFIG_PHONET_PIPECTRLR=y
+ # CONFIG_WIRELESS is not set
+@@ -35,6 +43,13 @@ CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_MISC_DEVICES=y
+ CONFIG_AB8500_PWM=y
+ CONFIG_SENSORS_BH1780=y
++CONFIG_NETDEVICES=y
++CONFIG_SMSC_PHY=y
++CONFIG_NET_ETHERNET=y
++CONFIG_SMSC911X=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+@@ -64,7 +79,6 @@ CONFIG_GPIO_TC3589X=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_MFD_TC3589X=y
+ CONFIG_AB8500_CORE=y
+-CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AB8500=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_MUSB_HDRC=y
+@@ -95,6 +109,8 @@ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_CONFIGFS_FS=m
+ # CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
 -- 
 1.7.1
