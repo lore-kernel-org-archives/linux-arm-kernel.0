@@ -1,44 +1,47 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Fri, 25 Mar 2011 11:31:19 +0800
-Subject: [PATCH] call cookies_initialize() before gator_start()
-Message-ID: <1301023879-1770-1-git-send-email-ratbert.chuang@gmail.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Fri, 25 Mar 2011 11:39:03 +0800
+Subject: [PATCH V8 1/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET
+	from ESDHC_DEFAULT_QUIRKS
+Message-ID: <1301024346-2232-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Po-Yu Chuang <ratbert@faraday-tech.com>
+sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET. Make it OF-specific.
 
-gator_crc32_table might be accessed by gator_chksum_crc32() before
-it is allocated.
-
-Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
-Hi Pawel Moll,
+ drivers/mmc/host/sdhci-esdhc.h    |    3 +--
+ drivers/mmc/host/sdhci-of-esdhc.c |    3 ++-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Not sure where to post this patch. Please let me know if there were something
-wrong.
-
- gator_main.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/gator_main.c b/gator_main.c
-index 60b09cb..12aa1be 100644
---- a/gator_main.c
-+++ b/gator_main.c
-@@ -739,13 +739,13 @@ static int gator_op_start(void)
+diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+index c55aae8..c3b08f1 100644
+--- a/drivers/mmc/host/sdhci-esdhc.h
++++ b/drivers/mmc/host/sdhci-esdhc.h
+@@ -23,8 +23,7 @@
+ 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
+ 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+ 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
+-				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
+-				SDHCI_QUIRK_NO_CARD_NO_RESET)
++				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
  
- 	mutex_lock(&start_mutex);
+ #define ESDHC_SYSTEM_CONTROL	0x2c
+ #define ESDHC_CLOCK_MASK	0x0000fff0
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index 08161f6..ba40d6d 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -74,7 +74,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
  
-+	cookies_initialize();
-+
- 	if (gator_started || gator_start())
- 		err = -EINVAL;
- 	else
- 		gator_started = 1;
- 
--	cookies_initialize();
--
- 	mutex_unlock(&start_mutex);
- 
- 	return err;
+ struct sdhci_of_data sdhci_esdhc = {
+ 	/* card detection could be handled via GPIO */
+-	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
++	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION
++		| SDHCI_QUIRK_NO_CARD_NO_RESET,
+ 	.ops = {
+ 		.read_l = sdhci_be32bs_readl,
+ 		.read_w = esdhc_readw,
 -- 
-1.6.3.3
+1.7.1
