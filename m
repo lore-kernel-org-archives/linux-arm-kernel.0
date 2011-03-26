@@ -1,38 +1,53 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sat, 26 Mar 2011 17:17:12 +0100
-Subject: [PATCH] arm: disable non-existent prpmc1100 code.
-Message-ID: <20110326161711.GA573@riccoc20.at.omicron.at>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 26 Mar 2011 12:00:52 -0700
+Subject: [GIT PULL] omap-fixes for -rc1
+Message-ID: <20110326190052.GB571@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6f82f4db80189281a8ac42f2e72396accb719b57 removed the prpmc110 from
-the list of machine types. This commit disables a PCI fixup function for
-that board, since its presence is preventing the kernel from compiling.
+Hi Linus,
 
-Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
----
- arch/arm/kernel/bios32.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Please pull omap fixes from:
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index d86fcd4..ba1c426 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -167,6 +167,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, pci_fixup_d
-  * with an IXP4xx target device and we don't want to kill the
-  * resources in that case.
-  */
-+#ifdef CONFIG_ARCH_PRPMC1100
- static void __devinit pci_fixup_prpmc1100(struct pci_dev *dev)
- {
- 	int i;
-@@ -182,6 +183,7 @@ static void __devinit pci_fixup_prpmc1100(struct pci_dev *dev)
- 	}
- }
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IXP4XX, pci_fixup_prpmc1100);
-+#endif
- 
- /*
-  * PCI IDE controllers use non-standard I/O port decoding, respect it.
--- 
-1.7.0.4
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+This series includes a fix for GPMC (General Purpose Memory Controller)
+interrupts to work for omap2 and 4 in addition to omap3, and get
+rid of the related warnings. It also fixes a mystery shutdown issue
+on Panda board by removing unused regulators. Other fixes are quite
+trivial, also included is the change to make hwspinlock depend on
+ARCH_OMAP4.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 16c29dafcc86024048f1dbb8349d31cb22c7c55a:
+
+  Merge branch 'syscore' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/suspend-2.6 (2011-03-25 21:07:59 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Aaro Koskinen (2):
+      arm: mach-omap2: devices: fix omap3_l3_init() return value
+      arm: mach-omap2: omap_l3_smx: fix irq handler setup
+
+Balaji T K (1):
+      ARM: OMAP2+: Fix warnings for GPMC interrupt
+
+David Anders (1):
+      OMAP4: PandaBoard: remove unused power regulators
+
+Ohad Ben-Cohen (1):
+      hwspinlock: depend on OMAP4
+
+ arch/arm/mach-omap2/board-omap4panda.c |   28 ----------------------------
+ arch/arm/mach-omap2/devices.c          |    2 +-
+ arch/arm/mach-omap2/gpmc.c             |   13 ++++++++-----
+ arch/arm/mach-omap2/omap_l3_smx.c      |   11 ++++-------
+ arch/arm/plat-omap/include/plat/irqs.h |    2 +-
+ drivers/hwspinlock/Kconfig             |    1 +
+ 6 files changed, 15 insertions(+), 42 deletions(-)
