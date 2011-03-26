@@ -1,23 +1,77 @@
-From: B32955@freescale.com (Huang Shijie-B32955)
-Date: Sat, 26 Mar 2011 14:33:21 +0000
-Subject: reply: [ PATCH V2  0/7] add the GPMI controller driver for IMX23/IMX28
-Message-ID: <14C4E31473AF7E4B98176CB73615181C1124AF@039-SN1MPN1-002.039d.mgd.msft.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 26 Mar 2011 23:01:17 +0800
+Subject: [PATCH] sound/soc/pxa/zylonite.c: set .codec_dai_name in
+	initializer
+In-Reply-To: <1300448853-15651-1-git-send-email-ospite@studenti.unina.it>
+References: <1300448853-15651-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <AANLkTinG7R6L8JDQPYd7sJ0Z9YBnRrT1MG_fEV061pHh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 18, 2011 at 7:47 PM, Antonio Ospite
+<ospite@studenti.unina.it> wrote:
+> Fix the initialization of .codec_dai_name in zylonite_dai initializer,
+> do not mix it with the initialization of .codec_name which is set
+> already a few lines above.
+>
+> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
 
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
->> Further the 'RSVD' entries should be removed from the register
->> definitions (even if they are generated from the XML).
-
->Even more, all unused defines should go.
-Ok, I will remove it in the next version
-
-thanks .
-
-Huang Shijie
-
-
---
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+>
+> Hi,
+>
+> I didn't test that because I don't have the hardware, I just noticed it by
+> reading the code from 2.6.38 and thought this may be the right fix.
+>
+> Is there any mechanism to spot out when the same field in a struct initializer
+> is set more than once?
+>
+> Regards,
+> ? Antonio Ospite
+> ? http://ao2.it
+>
+> ?sound/soc/pxa/zylonite.c | ? ?6 +++---
+> ?1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/sound/soc/pxa/zylonite.c b/sound/soc/pxa/zylonite.c
+> index 25bba10..5e96f7e 100644
+> --- a/sound/soc/pxa/zylonite.c
+> +++ b/sound/soc/pxa/zylonite.c
+> @@ -167,7 +167,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
+> ? ? ? ?.codec_name = "wm9713-codec",
+> ? ? ? ?.platform_name = "pxa-pcm-audio",
+> ? ? ? ?.cpu_dai_name = "pxa2xx-ac97",
+> - ? ? ? .codec_name = "wm9713-hifi",
+> + ? ? ? .codec_dai_name = "wm9713-hifi",
+> ? ? ? ?.init = zylonite_wm9713_init,
+> ?},
+> ?{
+> @@ -176,7 +176,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
+> ? ? ? ?.codec_name = "wm9713-codec",
+> ? ? ? ?.platform_name = "pxa-pcm-audio",
+> ? ? ? ?.cpu_dai_name = "pxa2xx-ac97-aux",
+> - ? ? ? .codec_name = "wm9713-aux",
+> + ? ? ? .codec_dai_name = "wm9713-aux",
+> ?},
+> ?{
+> ? ? ? ?.name = "WM9713 Voice",
+> @@ -184,7 +184,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
+> ? ? ? ?.codec_name = "wm9713-codec",
+> ? ? ? ?.platform_name = "pxa-pcm-audio",
+> ? ? ? ?.cpu_dai_name = "pxa-ssp-dai.2",
+> - ? ? ? .codec_name = "wm9713-voice",
+> + ? ? ? .codec_dai_name = "wm9713-voice",
+> ? ? ? ?.ops = &zylonite_voice_ops,
+> ?},
+> ?};
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
