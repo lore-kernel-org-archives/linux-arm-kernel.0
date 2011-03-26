@@ -1,56 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 26 Mar 2011 11:41:38 -0400 (EDT)
-Subject: [PATCH] ARM: kernel/sleep.S: fix Thumb2 compilation issues
-In-Reply-To: <20110326102041.GA24620@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
-	<20110326102041.GA24620@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1103261123530.11889@xanadu.home>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 26 Mar 2011 23:49:54 +0800
+Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
+In-Reply-To: <201103231705.16164.anarsoul@gmail.com>
+References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
+	<201103231115.53082.anarsoul@gmail.com>
+	<201103231554.36178.marek.vasut@gmail.com>
+	<201103231705.16164.anarsoul@gmail.com>
+Message-ID: <AANLkTimA3EmcLu2543PWwnriA2DTLKH4jDtajuRWTCS4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Mar 2011, Russell King - ARM Linux wrote:
+Merged with Vasily's Ack. On SoCs where there is no overlay HW yet
+the support has been built into the kernel, the overlay[0/1].usage will
+just be zero(s).
 
-> On Fri, Mar 18, 2011 at 11:00:02PM -0400, Nicolas Pitre wrote:
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> > index bfad698..6398ead 100644
-> > --- a/arch/arm/kernel/sleep.S
-> > +++ b/arch/arm/kernel/sleep.S
-> > @@ -119,11 +119,19 @@ ENTRY(cpu_resume)
-> >  #else
-> >  	ldr	r0, sleep_save_sp	@ stack phys addr
-> >  #endif
-> > -	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
-> > +	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
-> >  #ifdef MULTI_CPU
-> > -	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
-> > +	@ load v:p, stack, return fn, resume fn
-> > +  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
-> > +THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
-> > +THUMB(	mov	sp, r2			)
-> > +THUMB(	mov	lr, r3			)
-> > +THUMB(	bx	r4			)
-> >  #else
-> > -	ldmia	r0!, {r1, sp, lr}	@ load v:p, stack, return fn
-> > +	@ load v:p, stack, return fn
-> > +  ARM(	ldmia	r0!, {r1, sp, lr}	)
-> > +THUMB(	ldmia	r0!, {r1, r2, lr}	)
-> > +THUMB(	mov	sp, r2			)
-> >  	b	cpu_do_resume
-> >  #endif
-> >  ENDPROC(cpu_resume)
-> 
-> Do we know whether boot loaders support calling the resume path in Thumb
-> mode, and is the necessary setup in place for telling boot loaders that
-> they are to call the resume path in Thumb mode?
-
-Hard to tell for sure without testing.  But in theory, if the bootloader 
-is passed the value of the cpu_resume symbol, even after going through 
-virt_to_phys(), then bit 0 should be set indicating Thumb mode and 
-therefore it ought to work correctly by simply loading that value into 
-the pc (not true for ARMv6T2 but we don't support any of those).
-
-
-Nicolas
+On Wed, Mar 23, 2011 at 11:05 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Wednesday 23 March 2011 16:54:36 Marek Vasut wrote:
+>
+>> Implement what ? The member doesn't exist in the structure so it doesn't
+>> even compile with overlays disabled.
+>
+> Hm, sorry, I thought you also don't like that check is performed on SoCs
+> without overlays (PXA250/PXA260) when overlay support is compiled in.
+>
+> I understand that it does not compile at all when CONFIG_FB_PXA_OVERLAY is not
+> set.
+>
+> Regards
+> Vasily
+>
