@@ -1,24 +1,43 @@
-From: smuckle@codeaurora.org (Steve Muckle)
-Date: Fri, 25 Mar 2011 16:55:16 -0700
-Subject: IO access and *_relaxed macros
-In-Reply-To: <1301047705.25814.4.camel@e102109-lin.cambridge.arm.com>
-References: <4D8B8BD3.5070403@codeaurora.org>
-	<1301047705.25814.4.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <4D8D2B64.9030709@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Mar 2011 00:01:48 +0000
+Subject: [ PATCH V2 4/7] MTD : add the common code for GPMI controller
+	driver
+In-Reply-To: <1301048581-21321-5-git-send-email-b32955@freescale.com>
+References: <1301048581-21321-1-git-send-email-b32955@freescale.com>
+	<1301048581-21321-5-git-send-email-b32955@freescale.com>
+Message-ID: <20110326000148.GB13574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/11 03:08, Catalin Marinas wrote:
-> Are there other scenarios (in relation with coherent DMA buffers) where
-> we need a DSB after writel() or before readl()?
+On Fri, Mar 25, 2011 at 06:22:58PM +0800, Huang Shijie wrote:
+> +/* Can we use the upper's buffer directly for DMA? */
+> +void prepare_data_dma(struct gpmi_nfc_data *this, enum dma_data_direction dr)
+> +{
+> +	struct mil *mil = &this->mil;
+> +	struct scatterlist *sgl = &mil->data_sgl;
+> +	int ret;
+> +
+> +	mil->direct_dma_map_ok = true;
+> +
+> +	/* first try to map the upper buffer directly */
+> +	sg_init_one(sgl, mil->upper_buf, mil->upper_len);
+> +	ret = dma_map_sg(this->dev, sgl, 1, dr);
+> +	if (ret == 0) {
+> +		/* We have to use our own DMA buffer. */
+> +		sg_init_one(sgl, mil->data_buffer_dma, PAGE_SIZE);
+> +		ret = dma_map_sg(this->dev, sgl, 1, dr);
+> +		BUG_ON(ret == 0);
+> +
+> +		if (dr == DMA_TO_DEVICE)
+> +			memcpy(mil->data_buffer_dma, mil->upper_buf,
+> +				mil->upper_len);
 
-I'm not sure about use with DMA buffers - I've just been looking at
-these macros with respect to (non-DMA related) device accesses, since
-they're heavily used for this purpose as well.
+Buggy.  Ensure data is present in the buffers _before_ mapping.
 
-thanks,
-Steve
+> +	case DMA_FOR_READ_DATA:
+> +		if (mil->direct_dma_map_ok == false)
+> +			memcpy(mil->upper_buf, (char *)mil->data_buffer_dma,
+> +				mil->upper_len);
+> +		dma_unmap_sg(this->dev, &mil->data_sgl, 1, DMA_FROM_DEVICE);
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Buggy.  Only read data from buffers _after_ unmapping.
