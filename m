@@ -1,45 +1,47 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 27 Mar 2011 00:38:27 +0300
-Subject: [PATCH] OMAP3: l3: fix for "irq 10: nobody cared" message
-In-Reply-To: <1301099396-30380-1-git-send-email-omar.ramirez@ti.com>
-References: <1301099396-30380-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <4D8E5CD3.8010007@ru.mvista.com>
+From: ccross@android.com (Colin Cross)
+Date: Sat, 26 Mar 2011 15:37:34 -0700
+Subject: [patch 02/23] arm: tegra: Remove unused function which fiddles
+	with irq_desc
+In-Reply-To: <alpine.LFD.2.00.1103262118010.31464@localhost6.localdomain6>
+References: <20110325131617.258789658@linutronix.de>
+	<20110325132047.552074703@linutronix.de>
+	<4D8E4897.5030705@nvidia.com>
+	<alpine.LFD.2.00.1103262118010.31464@localhost6.localdomain6>
+Message-ID: <AANLkTi=y9JkpJVCq5G151G9k3d0rAcSH13gi6uGB_gDX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 26-03-2011 3:29, Omar Ramirez Luna wrote:
-
-> If an error occurs in the L3 on any other initiator than MPU,
-> the interrupt goes unhandled given that the 'base' register
-> was calculated with the initialized err_base value (which
-> coincidentally points to MPU) and not with the actual source
-> of the error.
-
-> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_l3_smx.c |    5 +++--
->   1 files changed, 3 insertions(+), 2 deletions(-)
-
-> diff --git a/arch/arm/mach-omap2/omap_l3_smx.c b/arch/arm/mach-omap2/omap_l3_smx.c
-> index 5f2da75..da917c2 100644
-> --- a/arch/arm/mach-omap2/omap_l3_smx.c
-> +++ b/arch/arm/mach-omap2/omap_l3_smx.c
-> @@ -196,11 +196,12 @@ static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
->   		/* No timeout error for debug sources */
->   	}
+On Sat, Mar 26, 2011 at 1:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Sun, 27 Mar 2011, Varun Wadekar wrote:
+>>
+>> Thomas, then how do you think we should handle restoring of gpio states
+>> across suspend-resume cycles?
 >
-> -	base = ((l3->rt) + (*(omap3_l3_bases[int_type] + err_source)));
-> -
->   	/* identify the error source */
->   	for (err_source = 0; !(status&  (1<<  err_source)); err_source++)
->   									;
-> +
-> +	base = ((l3->rt) + (*(omap3_l3_bases[int_type] + err_source)));
-> +
+> That code is unused. Period. No caller, nothing nada. So what does it
+> handle?
 
-    What's the point of having () around rvalue? You could drop them, while at 
-it...
+Tegra suspend support didn't make it into 2.6.39, but should get
+merged in 2.6.40, and will call tegra_gpio_suspend/resume.
 
-WBR, Sergei
+>> > -
+>> > - ? for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
+>> > - ? ? ? ? ? struct irq_desc *desc = irq_to_desc(i);
+>> > - ? ? ? ? ? if (!desc || (desc->status & IRQ_WAKEUP))
+>> > - ? ? ? ? ? ? ? ? ? continue;
+>> > - ? ? ? ? ? enable_irq(i);
+>> > - ? }
+>
+> And this part is totally unacceptable and should have never been
+> merged. Further it is in the way of cleanups to the core code and as
+> there is no user I'm not willing to even think about what it does and
+> why it is there.
+>
+> FYI, the core code deals with interrupt suspending/resuming
+> already. So if there is a problem with that which does not cover your
+> specific problem, then you better talk to me before hacking up such
+> private workarounds and expecting that I tolerate them in unused code.
+
+Yes, the existing code wrong, and unnecessary.  It was copied from
+mach-tegra/irq.c, which I later fixed, but I missed this one.  I'll
+take this patch for 2.6.39-rc1, which will prevent merge conflicts
+between your tree and the tegra tree in 2.6.40.
