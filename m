@@ -1,31 +1,38 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 26 Mar 2011 23:49:54 +0800
-Subject: [PATCH] ARM: pxafb: Fix access to nonexistent member of pxafb_info
-In-Reply-To: <201103231705.16164.anarsoul@gmail.com>
-References: <1300796054-18697-1-git-send-email-marek.vasut@gmail.com>
-	<201103231115.53082.anarsoul@gmail.com>
-	<201103231554.36178.marek.vasut@gmail.com>
-	<201103231705.16164.anarsoul@gmail.com>
-Message-ID: <AANLkTimA3EmcLu2543PWwnriA2DTLKH4jDtajuRWTCS4@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 26 Mar 2011 17:17:12 +0100
+Subject: [PATCH] arm: disable non-existent prpmc1100 code.
+Message-ID: <20110326161711.GA573@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merged with Vasily's Ack. On SoCs where there is no overlay HW yet
-the support has been built into the kernel, the overlay[0/1].usage will
-just be zero(s).
+Commit 6f82f4db80189281a8ac42f2e72396accb719b57 removed the prpmc110 from
+the list of machine types. This commit disables a PCI fixup function for
+that board, since its presence is preventing the kernel from compiling.
 
-On Wed, Mar 23, 2011 at 11:05 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> On Wednesday 23 March 2011 16:54:36 Marek Vasut wrote:
->
->> Implement what ? The member doesn't exist in the structure so it doesn't
->> even compile with overlays disabled.
->
-> Hm, sorry, I thought you also don't like that check is performed on SoCs
-> without overlays (PXA250/PXA260) when overlay support is compiled in.
->
-> I understand that it does not compile at all when CONFIG_FB_PXA_OVERLAY is not
-> set.
->
-> Regards
-> Vasily
->
+Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+---
+ arch/arm/kernel/bios32.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index d86fcd4..ba1c426 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -167,6 +167,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, pci_fixup_d
+  * with an IXP4xx target device and we don't want to kill the
+  * resources in that case.
+  */
++#ifdef CONFIG_ARCH_PRPMC1100
+ static void __devinit pci_fixup_prpmc1100(struct pci_dev *dev)
+ {
+ 	int i;
+@@ -182,6 +183,7 @@ static void __devinit pci_fixup_prpmc1100(struct pci_dev *dev)
+ 	}
+ }
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IXP4XX, pci_fixup_prpmc1100);
++#endif
+ 
+ /*
+  * PCI IDE controllers use non-standard I/O port decoding, respect it.
+-- 
+1.7.0.4
