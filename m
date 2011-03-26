@@ -1,77 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 26 Mar 2011 23:01:17 +0800
-Subject: [PATCH] sound/soc/pxa/zylonite.c: set .codec_dai_name in
-	initializer
-In-Reply-To: <1300448853-15651-1-git-send-email-ospite@studenti.unina.it>
-References: <1300448853-15651-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <AANLkTinG7R6L8JDQPYd7sJ0Z9YBnRrT1MG_fEV061pHh@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 26 Mar 2011 11:41:38 -0400 (EDT)
+Subject: [PATCH] ARM: kernel/sleep.S: fix Thumb2 compilation issues
+In-Reply-To: <20110326102041.GA24620@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
+	<20110326102041.GA24620@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1103261123530.11889@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2011 at 7:47 PM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> Fix the initialization of .codec_dai_name in zylonite_dai initializer,
-> do not mix it with the initialization of .codec_name which is set
-> already a few lines above.
->
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+On Sat, 26 Mar 2011, Russell King - ARM Linux wrote:
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> On Fri, Mar 18, 2011 at 11:00:02PM -0400, Nicolas Pitre wrote:
+> > 
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> > index bfad698..6398ead 100644
+> > --- a/arch/arm/kernel/sleep.S
+> > +++ b/arch/arm/kernel/sleep.S
+> > @@ -119,11 +119,19 @@ ENTRY(cpu_resume)
+> >  #else
+> >  	ldr	r0, sleep_save_sp	@ stack phys addr
+> >  #endif
+> > -	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
+> > +	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+> >  #ifdef MULTI_CPU
+> > -	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
+> > +	@ load v:p, stack, return fn, resume fn
+> > +  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
+> > +THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
+> > +THUMB(	mov	sp, r2			)
+> > +THUMB(	mov	lr, r3			)
+> > +THUMB(	bx	r4			)
+> >  #else
+> > -	ldmia	r0!, {r1, sp, lr}	@ load v:p, stack, return fn
+> > +	@ load v:p, stack, return fn
+> > +  ARM(	ldmia	r0!, {r1, sp, lr}	)
+> > +THUMB(	ldmia	r0!, {r1, r2, lr}	)
+> > +THUMB(	mov	sp, r2			)
+> >  	b	cpu_do_resume
+> >  #endif
+> >  ENDPROC(cpu_resume)
+> 
+> Do we know whether boot loaders support calling the resume path in Thumb
+> mode, and is the necessary setup in place for telling boot loaders that
+> they are to call the resume path in Thumb mode?
 
-> ---
->
-> Hi,
->
-> I didn't test that because I don't have the hardware, I just noticed it by
-> reading the code from 2.6.38 and thought this may be the right fix.
->
-> Is there any mechanism to spot out when the same field in a struct initializer
-> is set more than once?
->
-> Regards,
-> ? Antonio Ospite
-> ? http://ao2.it
->
-> ?sound/soc/pxa/zylonite.c | ? ?6 +++---
-> ?1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/sound/soc/pxa/zylonite.c b/sound/soc/pxa/zylonite.c
-> index 25bba10..5e96f7e 100644
-> --- a/sound/soc/pxa/zylonite.c
-> +++ b/sound/soc/pxa/zylonite.c
-> @@ -167,7 +167,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
-> ? ? ? ?.codec_name = "wm9713-codec",
-> ? ? ? ?.platform_name = "pxa-pcm-audio",
-> ? ? ? ?.cpu_dai_name = "pxa2xx-ac97",
-> - ? ? ? .codec_name = "wm9713-hifi",
-> + ? ? ? .codec_dai_name = "wm9713-hifi",
-> ? ? ? ?.init = zylonite_wm9713_init,
-> ?},
-> ?{
-> @@ -176,7 +176,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
-> ? ? ? ?.codec_name = "wm9713-codec",
-> ? ? ? ?.platform_name = "pxa-pcm-audio",
-> ? ? ? ?.cpu_dai_name = "pxa2xx-ac97-aux",
-> - ? ? ? .codec_name = "wm9713-aux",
-> + ? ? ? .codec_dai_name = "wm9713-aux",
-> ?},
-> ?{
-> ? ? ? ?.name = "WM9713 Voice",
-> @@ -184,7 +184,7 @@ static struct snd_soc_dai_link zylonite_dai[] = {
-> ? ? ? ?.codec_name = "wm9713-codec",
-> ? ? ? ?.platform_name = "pxa-pcm-audio",
-> ? ? ? ?.cpu_dai_name = "pxa-ssp-dai.2",
-> - ? ? ? .codec_name = "wm9713-voice",
-> + ? ? ? .codec_dai_name = "wm9713-voice",
-> ? ? ? ?.ops = &zylonite_voice_ops,
-> ?},
-> ?};
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Hard to tell for sure without testing.  But in theory, if the bootloader 
+is passed the value of the cpu_resume symbol, even after going through 
+virt_to_phys(), then bit 0 should be set indicating Thumb mode and 
+therefore it ought to work correctly by simply loading that value into 
+the pc (not true for ARMv6T2 but we don't support any of those).
+
+
+Nicolas
