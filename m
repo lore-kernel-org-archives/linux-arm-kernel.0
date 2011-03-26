@@ -1,53 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 26 Mar 2011 12:00:52 -0700
-Subject: [GIT PULL] omap-fixes for -rc1
-Message-ID: <20110326190052.GB571@atomide.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 26 Mar 2011 21:51:43 +0200
+Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
+Message-ID: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+PXA27x does not like fastbus for some reason, it can hang in
+random places when it's enabled. So don't use it to make cpufreq
+stable.
 
-Please pull omap fixes from:
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/mach-pxa/cpufreq-pxa2xx.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-This series includes a fix for GPMC (General Purpose Memory Controller)
-interrupts to work for omap2 and 4 in addition to omap3, and get
-rid of the related warnings. It also fixes a mystery shutdown issue
-on Panda board by removing unused regulators. Other fixes are quite
-trivial, also included is the change to make hwspinlock depend on
-ARCH_OMAP4.
-
-Regards,
-
-Tony
-
-
-The following changes since commit 16c29dafcc86024048f1dbb8349d31cb22c7c55a:
-
-  Merge branch 'syscore' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/suspend-2.6 (2011-03-25 21:07:59 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Aaro Koskinen (2):
-      arm: mach-omap2: devices: fix omap3_l3_init() return value
-      arm: mach-omap2: omap_l3_smx: fix irq handler setup
-
-Balaji T K (1):
-      ARM: OMAP2+: Fix warnings for GPMC interrupt
-
-David Anders (1):
-      OMAP4: PandaBoard: remove unused power regulators
-
-Ohad Ben-Cohen (1):
-      hwspinlock: depend on OMAP4
-
- arch/arm/mach-omap2/board-omap4panda.c |   28 ----------------------------
- arch/arm/mach-omap2/devices.c          |    2 +-
- arch/arm/mach-omap2/gpmc.c             |   13 ++++++++-----
- arch/arm/mach-omap2/omap_l3_smx.c      |   11 ++++-------
- arch/arm/plat-omap/include/plat/irqs.h |    2 +-
- drivers/hwspinlock/Kconfig             |    1 +
- 6 files changed, 15 insertions(+), 42 deletions(-)
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+index 6a7aeab..b5727aa 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+@@ -156,13 +156,13 @@ MODULE_PARM_DESC(pxa255_turbo_table, "Selects the frequency table (0 = run table
+    ((T)  ? CCLKCFG_TURBO : 0))
+ 
+ static pxa_freqs_t pxa27x_freqs[] = {
+-	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0, CCLKCFG2(1, 0, 1),  900000, 1705000 },
+-	{156000, 104000, PXA27x_CCCR(1,	 8, 3), 0, CCLKCFG2(1, 0, 1), 1000000, 1705000 },
++	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0, CCLKCFG2(0, 0, 1),  900000, 1705000 },
++	{156000, 104000, PXA27x_CCCR(1,	 8, 3), 0, CCLKCFG2(0, 0, 1), 1000000, 1705000 },
+ 	{208000, 208000, PXA27x_CCCR(0, 16, 2), 1, CCLKCFG2(0, 0, 1), 1180000, 1705000 },
+-	{312000, 208000, PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(1, 0, 1), 1250000, 1705000 },
+-	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(1, 0, 1), 1350000, 1705000 },
+-	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1, CCLKCFG2(1, 0, 1), 1450000, 1705000 },
+-	{624000, 208000, PXA27x_CCCR(1, 16, 6), 1, CCLKCFG2(1, 0, 1), 1550000, 1705000 }
++	{312000, 208000, PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(0, 0, 1), 1250000, 1705000 },
++	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(0, 0, 1), 1350000, 1705000 },
++	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1, CCLKCFG2(0, 0, 1), 1450000, 1705000 },
++	{624000, 208000, PXA27x_CCCR(1, 16, 6), 1, CCLKCFG2(0, 0, 1), 1550000, 1705000 }
+ };
+ 
+ #define NUM_PXA27x_FREQS ARRAY_SIZE(pxa27x_freqs)
+-- 
+1.7.4.1
