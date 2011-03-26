@@ -1,35 +1,44 @@
-From: manuel_roeder@gmx.de (Manuel Roeder)
-Date: Sat, 26 Mar 2011 09:19:48 +0100
-Subject: D-Link DNS323 Rev. B1  Problem with Kernel 2.6.38.1 (2.6.38, too)
-	- I2C-Bus mv64xxx / RTC ST M41T80 / LM75 Sensor
-Message-ID: <4D8DA1A4.1020008@gmx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Mar 2011 10:20:41 +0000
+Subject: [PATCH] ARM: kernel/sleep.S: fix Thumb2 compilation issues
+In-Reply-To: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
+References: <alpine.LFD.2.00.1103182256330.26889@xanadu.home>
+Message-ID: <20110326102041.GA24620@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Mar 18, 2011 at 11:00:02PM -0400, Nicolas Pitre wrote:
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index bfad698..6398ead 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -119,11 +119,19 @@ ENTRY(cpu_resume)
+>  #else
+>  	ldr	r0, sleep_save_sp	@ stack phys addr
+>  #endif
+> -	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
+> +	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+>  #ifdef MULTI_CPU
+> -	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
+> +	@ load v:p, stack, return fn, resume fn
+> +  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
+> +THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
+> +THUMB(	mov	sp, r2			)
+> +THUMB(	mov	lr, r3			)
+> +THUMB(	bx	r4			)
+>  #else
+> -	ldmia	r0!, {r1, sp, lr}	@ load v:p, stack, return fn
+> +	@ load v:p, stack, return fn
+> +  ARM(	ldmia	r0!, {r1, sp, lr}	)
+> +THUMB(	ldmia	r0!, {r1, r2, lr}	)
+> +THUMB(	mov	sp, r2			)
+>  	b	cpu_do_resume
+>  #endif
+>  ENDPROC(cpu_resume)
 
-I found problems using 2.6.38.1 (2.6.38, too)  on DNS323 Rev. B1
-(orion5x) - seems to be an I2C-Bus- or RTC-driver problem.
-
-[   18.270364] i2c /dev entries driver
-[   18.274728] rtc-m41t80 0-0068: chip found, driver version 0.05
-[   18.280955] m41t80: dev (254:0)
-[   18.281012] rtc-m41t80 0-0068: rtc core: registered m41t80 as rtc0
-[   20.280626] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   20.287144] rtc-m41t80 0-0068: Can't clear HT bit
-[   20.292139] rtc-m41t80: probe of 0-0068 failed with error -5
-[   22.290615] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   22.297153] lm75: probe of 0-0048 failed with error -110
-[   24.300623] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   26.300925] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   28.300905] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   30.300636] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   32.300906] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   34.300844] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   36.300648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-
-This problem does not occur using original firmware (moddified 2.6.16
-Kernel).
-Fan, RTC and temp. sensors are working fine with original firmware.
-
-regards Manuel Roeder, manuel.roeder(at)web.de
+Do we know whether boot loaders support calling the resume path in Thumb
+mode, and is the necessary setup in place for telling boot loaders that
+they are to call the resume path in Thumb mode?
