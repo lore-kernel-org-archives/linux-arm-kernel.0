@@ -1,80 +1,57 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 28 Mar 2011 01:28:20 +0200
-Subject: [PATCH 4/7] ARM / SA1100: Use struct syscore_ops for "core" power
-	management
-In-Reply-To: <201103280125.11750.rjw@sisk.pl>
-References: <201103280125.11750.rjw@sisk.pl>
-Message-ID: <201103280128.21107.rjw@sisk.pl>
+Date: Mon, 28 Mar 2011 01:25:11 +0200
+Subject: [PATCH 0/7] ARM: Use syscore_ops for "core" power management
+Message-ID: <201103280125.11750.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafael J. Wysocki <rjw@sisk.pl>
+Hi,
 
-Replace the sysdev class and struct sys_device used for power
-management by the SA1100 interrupt-handling code with a
-struct syscore_ops object which is simpler.
+There are multiple problems with sysdevs, or struct sys_device objects to
+be precise, that are so annoying that some people have started to think
+of removind them entirely from the kernel.  To me, personally, the most
+obvious issue is the way sysdevs are used for defining suspend/resume
+callbacks to be executed with one CPU on-line and interrupts disabled.
+Apart from this, sysdevs do not follow general rules related to the
+representation of things in /sys/devices/, so user space that uses
+/sys/devices/ to retrieve information on device hierarchy layout and
+device configuration, such as udev, cannot really handle them correctly.
 
-Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
----
- arch/arm/mach-sa1100/irq.c |   19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+Some subsystems need to carry out certain operations during suspend after
+we've disabled non-boot CPUs and interrupts have been switched off on the
+only on-line one.  Currently, the only way to achieve that is to define
+sysdev suspend/resume callbacks, but this is cumbersome and inefficient.
+Namely, to do that, one has to define a sysdev class providing the callbacks
+and a sysdev actually using them, which is excessively complicated.  Moreover,
+the sysdev suspend/resume callbacks take arguments that are not really used
+by the majority of subsystems defining sysdev suspend/resume callbacks
+(or even if they are used, they don't really need to be used, so they
+are simply unnecessary).  Of course, if a sysdev is only defined to provide
+suspend/resume (and maybe shutdown) callbacks, there's no real reason why
+it should show up in sysfs.
 
-Index: linux-2.6/arch/arm/mach-sa1100/irq.c
-===================================================================
---- linux-2.6.orig/arch/arm/mach-sa1100/irq.c
-+++ linux-2.6/arch/arm/mach-sa1100/irq.c
-@@ -14,7 +14,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/ioport.h>
--#include <linux/sysdev.h>
-+#include <linux/syscore_ops.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach/irq.h>
-@@ -234,7 +234,7 @@ static struct sa1100irq_state {
- 	unsigned int	iccr;
- } sa1100irq_state;
- 
--static int sa1100irq_suspend(struct sys_device *dev, pm_message_t state)
-+static int sa1100irq_suspend(void)
- {
- 	struct sa1100irq_state *st = &sa1100irq_state;
- 
-@@ -264,7 +264,7 @@ static int sa1100irq_suspend(struct sys_
- 	return 0;
- }
- 
--static int sa1100irq_resume(struct sys_device *dev)
-+static void sa1100irq_resume(void)
- {
- 	struct sa1100irq_state *st = &sa1100irq_state;
- 
-@@ -277,24 +277,17 @@ static int sa1100irq_resume(struct sys_d
- 
- 		ICMR = st->icmr;
- 	}
--	return 0;
- }
- 
--static struct sysdev_class sa1100irq_sysclass = {
--	.name		= "sa11x0-irq",
-+static struct syscore_ops sa1100irq_syscore_ops = {
- 	.suspend	= sa1100irq_suspend,
- 	.resume		= sa1100irq_resume,
- };
- 
--static struct sys_device sa1100irq_device = {
--	.id		= 0,
--	.cls		= &sa1100irq_sysclass,
--};
--
- static int __init sa1100irq_init_devicefs(void)
- {
--	sysdev_class_register(&sa1100irq_sysclass);
--	return sysdev_register(&sa1100irq_device);
-+	register_syscore_ops(&sa1100irq_syscore_ops);
-+	return 0;
- }
- 
- device_initcall(sa1100irq_init_devicefs);
+For this reason, I thought it would be a good idea to provide a simpler
+interface for subsystems to define "very late" suspend callbacks and
+"very early" resume callbacks (and "very late" shutdown callbacks as well)
+without the entire bloat related to sysdevs.  Such an interface has been
+merged recently in the form of struct syscore_ops framework that can be used
+to replace sysdevs in the "core" power management area.
+
+The x86 architecture and subsystems it depends on have already been converted
+to using the new framework instead of sysdevs for "core" power management and
+the following series of patches does the analogous thing for the ARM
+architecture.  I have done my best to build the kernel for every affected
+platform, but unfortunately some of them don't build even without my changes,
+so some minor issues might have slept through my fingers.  Hopefully, though,
+there won't be too many of them.
+
+[1/7] - Use syscore_ops for "core" PM in some common ARM code.
+[2/7] - Use syscore_ops for "core" PM on OMAP.
+[3/7] - Use syscore_ops for "core" PM on Integrator.
+[4/7] - Use syscore_ops for "core" PM on SA1100.
+[5/7] - Use syscore_ops for "core" PM on PXA-based platforms.
+[6/7] - Use syscore_ops for "core" PM on Samsung platforms.
+[7/7] - Mark ARM select CONFIG_ARCH_NO_SYSDEV_OPS.
+
+Thanks,
+Rafael
