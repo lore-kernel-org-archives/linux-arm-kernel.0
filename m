@@ -1,27 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 27 Mar 2011 09:41:13 -0400 (EDT)
-Subject: Git pull request: Orion/Kirkwood/Dove fixes
-Message-ID: <alpine.LFD.2.00.1103270932590.11889@xanadu.home>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 27 Mar 2011 17:45:14 +0300
+Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
+In-Reply-To: <4D8F0CD0.8010203@compulab.co.il>
+References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
+	<201103271248.02774.anarsoul@gmail.com>
+	<4D8F0CD0.8010203@compulab.co.il>
+Message-ID: <201103271745.15216.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull:
+On Sunday 27 March 2011 13:09:20 Igor Grinberg wrote:
+> On 03/27/11 11:48, Vasily Khoruzhick wrote:
+> > On Sunday 27 March 2011 12:09:21 Igor Grinberg wrote:
+> >> Possibly, but Z2 is not the only one using PXA27x.
+> >> And of course you lose performance, unless you don't care,
+> >> because if it does not work at all, you don't care about performance,
+> >> but again it is wrong to force all PXA27x based boards to this.
+> > 
+> > Ok, that's why I've sent this patch with RFC in subject - Z2 is the only
+> > PXA270-based device I own :)
+> > 
+> >> cm-x270 and em-x270 work well with fast bus bit set with userspace
+> >> governor and with the above frequencies.
+> > 
+> > What about ondemand and conservative governors?
+> 
+> I haven't tested those and I don't think I will have an opportunity in the
+> near future, but is it really important also to test those? Are they
+> different in any special way?
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git
+They switch freq rapidly, so they can be used as stability test for cpufreq 
+implementation.
 
-to get the following fixes:
-
-Alexander Clouter (1):
-      ARM: orion5x: replace printk with pr_{err,info,...} in ts78xx-setup.c
-
-Konstantin Porotchkin (1):
-      Fix the broken build for Marvell Dove platform.
-
-Robin Becker (1):
-      arm: mach-kirkwood: add led in sheevaplug-setup.c
-
- arch/arm/mach-dove/include/mach/dove.h    |    2 +-
- arch/arm/mach-dove/mpp.c                  |    3 ---
- arch/arm/mach-kirkwood/sheevaplug-setup.c |    7 +++++++
- arch/arm/mach-orion5x/ts78xx-setup.c      |   18 +++++++++---------
- 4 files changed, 17 insertions(+), 13 deletions(-)
+Regards
+Vasily
