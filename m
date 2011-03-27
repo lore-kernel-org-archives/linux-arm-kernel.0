@@ -1,34 +1,45 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 27 Mar 2011 12:48:02 +0300
-Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
-In-Reply-To: <4D8EFEC1.7010803@compulab.co.il>
-References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
-	<201103271028.56672.anarsoul@gmail.com>
-	<4D8EFEC1.7010803@compulab.co.il>
-Message-ID: <201103271248.02774.anarsoul@gmail.com>
+From: kostap@marvell.com (Konstantin Porotchkin)
+Date: Sun, 27 Mar 2011 11:54:49 +0200
+Subject: [PATCH] Fix the broken build for Marvell Dove platform.
+Message-ID: <1301219689-9186-1-git-send-email-kostap@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 27 March 2011 12:09:21 Igor Grinberg wrote:
+Remove call to the old GPIO init function.
+Fix old MPP control offset value.
 
-> Possibly, but Z2 is not the only one using PXA27x.
-> And of course you lose performance, unless you don't care,
-> because if it does not work at all, you don't care about performance,
-> but again it is wrong to force all PXA27x based boards to this.
+Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+---
+ arch/arm/mach-dove/include/mach/dove.h |    2 +-
+ arch/arm/mach-dove/mpp.c               |    3 ---
+ 2 files changed, 1 insertions(+), 4 deletions(-)
 
-Ok, that's why I've sent this patch with RFC in subject - Z2 is the only 
-PXA270-based device I own :)
-
-> cm-x270 and em-x270 work well with fast bus bit set with userspace governor
-> and with the above frequencies.
-
-What about ondemand and conservative governors?
-
-> I'd check the hardware (especially DRAM).
-> And I agree with Marek, if you want to disable the fast bus,
-> then it should be board (or otherwise) controllable.
-
-Ok
-
-Regards
-Vasily
+diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+index e5fcdd3..b20ec9a 100644
+--- a/arch/arm/mach-dove/include/mach/dove.h
++++ b/arch/arm/mach-dove/include/mach/dove.h
+@@ -136,7 +136,7 @@
+ #define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xe803c)
+ #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
+ #define  DOVE_NAND_GPIO_EN		(1 << 0)
+-#define DOVE_MPP_CTRL4_VIRT_BASE	(DOVE_GPIO_VIRT_BASE + 0x40)
++#define DOVE_MPP_CTRL4_VIRT_BASE	(DOVE_GPIO_LO_VIRT_BASE + 0x40)
+ #define  DOVE_SPI_GPIO_SEL		(1 << 5)
+ #define  DOVE_UART1_GPIO_SEL		(1 << 4)
+ #define  DOVE_AU1_GPIO_SEL		(1 << 3)
+diff --git a/arch/arm/mach-dove/mpp.c b/arch/arm/mach-dove/mpp.c
+index 71db2bd..c66c763 100644
+--- a/arch/arm/mach-dove/mpp.c
++++ b/arch/arm/mach-dove/mpp.c
+@@ -147,9 +147,6 @@ void __init dove_mpp_conf(unsigned int *mpp_list)
+ 	u32 pmu_sig_ctrl[PMU_SIG_REGS];
+ 	int i;
+ 
+-	/* Initialize gpiolib. */
+-	orion_gpio_init();
+-
+ 	for (i = 0; i < MPP_NR_REGS; i++)
+ 		mpp_ctrl[i] = readl(MPP_CTRL(i));
+ 
+-- 
+1.7.4.1
