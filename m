@@ -1,201 +1,200 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 28 Mar 2011 11:17:43 +1300
-Subject: Regression: NFS rootfs: BUG: spinlock recursion on boot
-Message-ID: <4D8FB787.4060904@bluewatersys.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 28 Mar 2011 00:11:35 +0100
+Subject: [PATCH] I2C: Samsung: Add support for PM_runtime in the I2C
+	driver.
+In-Reply-To: <1301257963-17196-1-git-send-email-amit.kachhap@linaro.org>
+References: <1301257963-17196-1-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <20110327231135.GG9995@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Mar 27, 2011 at 04:32:43PM -0400, Amit Daniel Kachhap wrote:
+> This patch adds PM runtime management support in the I2C driver.
+> The functionality of the driver is not modified much but some extra I2C
+> states are added for PM runtime. The runtime suspend keeps the interrupt
+> for the I2C interface disabled.
 
-My ARM EP93xx board panics on boot on 2.6.38-rc8 (see boot log below). I
-am using an NFS based root filesystem. My .config is attached.
-
-I have managed to bisect the problem to the following commit:
-
-250df6ed274d767da844a5d9f05720b804240197 is the first bad commit
-commit 250df6ed274d767da844a5d9f05720b804240197
-Author: Dave Chinner <dchinner@redhat.com>
-Date:   Tue Mar 22 22:23:36 2011 +1100
-
-    fs: protect inode->i_state with inode->i_lock
-    
-    Protect inode state transitions and validity checks with the
-    inode->i_lock. This enables us to make inode state transitions
-    independently of the inode_lock and is the first step to peeling
-    away the inode_lock from the code.
-    
-    This requires that __iget() is done atomically with i_state checks
-    during list traversals so that we don't race with another thread
-    marking the inode I_FREEING between the state check and grabbing the
-    reference.
-    
-    Also remove the unlock_new_inode() memory barrier optimisation
-    required to avoid taking the inode_lock when clearing I_NEW.
-    Simplify the code by simply taking the inode->i_lock around the
-    state change and wakeup. Because the wakeup is no longer tricky,
-    remove the wake_up_inode() function and open code the wakeup where
-    necessary.
-    
-    Signed-off-by: Dave Chinner <dchinner@redhat.com>
-    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
-
-Thanks,
-~Ryan
-
-Bootlog:
----
-
-Starting kernel ...
-
-Uncompressing Linux... done, booting the kernel.
-Linux version 2.6.38-08569-g16c29da (ryan at okiwi) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #763 Mon Mar 28 09:18:51 NZDT 2011
-CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
-CPU: VIVT data cache, VIVT instruction cache
-Machine: Bluewater Systems Snapper CL15
-Memory policy: ECC disabled, Data cache writeback
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 15952
-Kernel command line: console=ttyAM0,115200 root=/dev/nfs ip=bootp
-PID hash table entries: 256 (order: -2, 1024 bytes)
-Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
-Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
-Memory: 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB = 64MB total
-Memory: 60936k/60936k available, 4600k reserved, 0K highmem
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-    vmalloc : 0xce000000 - 0xfe800000   ( 776 MB)
-    lowmem  : 0xc0000000 - 0xcd800000   ( 216 MB)
-    modules : 0xbf000000 - 0xc0000000   (  16 MB)
-      .init : 0xc0008000 - 0xc0022000   ( 104 kB)
-      .text : 0xc0022000 - 0xc03aebbc   (3635 kB)
-      .data : 0xc03b0000 - 0xc03d2e40   ( 140 kB)
-NR_IRQS:120
-VIC @fefb0000: id 0x00041190, vendor 0x41
-VIC @fefc0000: id 0x00041190, vendor 0x41
-Calibrating delay loop... 104.34 BogoMIPS (lpj=521728)
-pid_max: default: 32768 minimum: 301
-Mount-cache hash table entries: 512
-CPU: Testing write buffer coherency: ok
-NET: Registered protocol family 16
-ep93xx clock: PLL1 running at 199 MHz, PLL2 at 192 MHz
-ep93xx clock: FCLK 199 MHz, HCLK 99 MHz, PCLK 49 MHz
-ep93xx dma_m2p: M2P DMA subsystem initialized
-bio: create slab <bio-0> at 0
-SCSI subsystem initialized
-usbcore: registered new interface driver usbfs
-usbcore: registered new interface driver hub
-usbcore: registered new device driver usb
-i2c-gpio i2c-gpio.0: using pins 49 (SDA) and 48 (SCL)
-Advanced Linux Sound Architecture Driver Version 1.0.24.
-Bluetooth: Core ver 2.16
-NET: Registered protocol family 31
-Bluetooth: HCI device and connection manager initialized
-Bluetooth: HCI socket layer initialized
-Bluetooth: L2CAP socket layer initialized
-NET: Registered protocol family 2
-IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
-IPv4 FIB: Using LC-trie version 0.409
-TCP established hash table entries: 2048 (order: 2, 16384 bytes)
-TCP bind hash table entries: 2048 (order: 3, 40960 bytes)
-TCP: Hash tables configured (established 2048 bind 2048)
-TCP reno registered
-UDP hash table entries: 128 (order: 0, 6144 bytes)
-UDP-Lite hash table entries: 128 (order: 0, 6144 bytes)
-NET: Registered protocol family 1
-RPC: Registered udp transport module.
-RPC: Registered tcp transport module.
-RPC: Registered tcp NFSv4.1 backchannel transport module.
-NetWinder Floating Point Emulator V0.97 (extended precision)
-JFFS2 version 2.2. (NAND) ? 2001-2006 Red Hat, Inc.
-msgmni has been set to 119
-io scheduler noop registered
-io scheduler deadline registered (default)
-Serial: AMBA driver
-apb:uart1: ttyAM0 at MMIO 0x808c0000 (irq = 52) is a AMBA
-console [ttyAM0] enabled
-apb:uart2: ttyAM1 at MMIO 0x808d0000 (irq = 54) is a AMBA
-apb:uart3: ttyAM2 at MMIO 0x808e0000 (irq = 55) is a AMBA
-nbd: registered device at major 43
-ep93xx-eth version 0.1 loading
-eth0: ep93xx on-chip ethernet, IRQ 39, 00:00:00:00:00:01
-rtl8150: v0.6.2 (2004/08/27):rtl8150 based usb-ethernet driver
-usbcore: registered new interface driver rtl8150
-ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-ep93xx-ohci ep93xx-ohci: EP93xx OHCI
-ep93xx-ohci ep93xx-ohci: new USB bus registered, assigned bus number 1
-ep93xx-ohci ep93xx-ohci: irq 56, io mem 0x80020000
-usb usb1: New USB device found, idVendor=1d6b, idProduct=0001
-usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
-usb usb1: Product: EP93xx OHCI
-usb usb1: Manufacturer: Linux 2.6.38-08569-g16c29da ohci_hcd
-usb usb1: SerialNumber: ep93xx
-hub 1-0:1.0: USB hub found
-hub 1-0:1.0: 3 ports detected
-Initializing USB Mass Storage driver...
-usbcore: registered new interface driver usb-storage
-USB Mass Storage support registered.
-usbcore: registered new interface driver usbserial
-usbserial: USB Serial Driver core
-USB Serial support registered for pl2303
-usbcore: registered new interface driver pl2303
-pl2303: Prolific PL2303 USB to serial adaptor driver
-ep93xx-rtc ep93xx-rtc: rtc core: registered ep93xx-rtc as rtc0
-i2c /dev entries driver
-ep93xx_wdt: EP93XX watchdog, driver version 0.3
-AIC23 Audio Codec 0.1
-asoc: tlv320aic23-hifi <-> ep93xx-i2s mapping ok
-ALSA device list:
-  #0: Snapper CL15
-TCP cubic registered
-NET: Registered protocol family 10
-NET: Registered protocol family 17
-NET: Registered protocol family 15
-Bluetooth: RFCOMM TTY layer initialized
-Bluetooth: RFCOMM socket layer initialized
-Bluetooth: RFCOMM ver 1.11
-ep93xx-rtc ep93xx-rtc: setting system clock to 1970-01-01 00:00:03 UTC (3)
-Sending BOOTP requests . OK
-IP-Config: Got BOOTP answer from 192.168.2.2, my address is 192.168.2.187
-IP-Config: Complete:
-     device=eth0, addr=192.168.2.187, mask=255.255.255.0, gw=192.168.2.254,
-     host=192.168.2.187, domain=bluewaternz.com, nis-domain=bluewater,
-     bootserver=192.168.2.2, rootserver=192.168.2.2, rootpath=
-VFS: Mounted root (nfs filesystem) on device 0:12.
-Freeing init memory: 104K
-init started: BusyBox v1.10.1 (2009-02-03 09:12:12 NZDT)
-starting pid 250, tty '': '/etc/init.d/rcS'
-Mounting system filesystems...
-mount: mounting none on /sys/kernel/debug failed: No such file or directory
-Starting local networking...
-Setting up console ttyAM0...
-starting pid 262, tty '': '/sbin/getty -L -n tty_console 115200 xterm'
-BUG: spinlock recursion on CPU#0, getty/262
- lock: cc421cb4, .magic: dead4ead, .owner: getty/262, .owner_cpu: 0
-[<c0031b0c>] (unwind_backtrace+0x0/0xe4) from [<c015f16c>] (do_raw_spin_lock+0x40/0x13c)
-[<c015f16c>] (do_raw_spin_lock+0x40/0x13c) from [<c00a938c>] (igrab+0x14/0x48)
-[<c00a938c>] (igrab+0x14/0x48) from [<c01186bc>] (nfs_updatepage+0x2e0/0x524)
-[<c01186bc>] (nfs_updatepage+0x2e0/0x524) from [<c010b19c>] (nfs_write_end+0x23c/0x270)
-[<c010b19c>] (nfs_write_end+0x23c/0x270) from [<c006b484>] (generic_file_buffered_write+0x180/0x248)
-[<c006b484>] (generic_file_buffered_write+0x180/0x248) from [<c006d060>] (__generic_file_aio_write+0x3b8/0x3f4)
-[<c006d060>] (__generic_file_aio_write+0x3b8/0x3f4) from [<c006d108>] (generic_file_aio_write+0x6c/0xdc)
-[<c006d108>] (generic_file_aio_write+0x6c/0xdc) from [<c010bce0>] (nfs_file_write+0xec/0x178)
-[<c010bce0>] (nfs_file_write+0xec/0x178) from [<c00956ac>] (do_sync_write+0xa4/0xe4)
-[<c00956ac>] (do_sync_write+0xa4/0xe4) from [<c00960c8>] (vfs_write+0xb4/0x12c)
-[<c00960c8>] (vfs_write+0xb4/0x12c) from [<c00961f0>] (sys_write+0x3c/0x68)
-[<c00961f0>] (sys_write+0x3c/0x68) from [<c002c8e0>] (ret_fast_syscall+0x0/0x2c)
-
+ok, whilst this looks ok, it's too late for the current merge window,
+so will go into the -next for the next kernel
+ 
+> Signed-off-by:  Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-s3c2410.c |   61 +++++++++++++++++++++++++++++++++-----
+>  1 files changed, 53 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> index 6c00c10..8ebe621 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/slab.h>
+>  #include <linux/io.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  #include <asm/irq.h>
+>  
+> @@ -48,7 +49,9 @@ enum s3c24xx_i2c_state {
+>  	STATE_START,
+>  	STATE_READ,
+>  	STATE_WRITE,
+> -	STATE_STOP
+> +	STATE_STOP,
+> +	STATE_STANDBY,
+> +	STATE_SUSPEND
+>  };
+>  
+>  enum s3c24xx_i2c_type {
+> @@ -59,7 +62,6 @@ enum s3c24xx_i2c_type {
+>  struct s3c24xx_i2c {
+>  	spinlock_t		lock;
+>  	wait_queue_head_t	wait;
+> -	unsigned int		suspended:1;
+>  
+>  	struct i2c_msg		*msg;
+>  	unsigned int		msg_num;
+> @@ -400,8 +402,13 @@ static int i2s_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
+>  				i2c->msg++;
+>  			}
+>  		}
+> +		break;
+>  
+> +	default:
+> +		dev_err(i2c->dev, "%s: called with invalid state\n", __func__);
+> +		goto out;
+>  		break;
+> +
+>  	}
+>  
+>  	/* acknowlegde the IRQ and get back on with the work */
+> @@ -485,7 +492,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+>  	int spins = 20;
+>  	int ret;
+>  
+> -	if (i2c->suspended)
+> +	if (i2c->state == STATE_SUSPEND)
+>  		return -EIO;
+>  
+>  	ret = s3c24xx_i2c_set_master(i2c);
+> @@ -555,12 +562,14 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
+>  	int ret;
+>  
+>  	clk_enable(i2c->clk);
+> +	pm_runtime_get_sync(i2c->dev);
+>  
+>  	for (retry = 0; retry < adap->retries; retry++) {
+>  
+>  		ret = s3c24xx_i2c_doxfer(i2c, msgs, num);
+>  
+>  		if (ret != -EAGAIN) {
+> +			pm_runtime_put_sync(i2c->dev);
+>  			clk_disable(i2c->clk);
+>  			return ret;
+>  		}
+> @@ -570,6 +579,7 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
+>  		udelay(100);
+>  	}
+>  
+> +	pm_runtime_put_sync(i2c->dev);
+>  	clk_disable(i2c->clk);
+>  	return -EREMOTEIO;
+>  }
+> @@ -912,10 +922,14 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>  		goto err_cpufreq;
+>  	}
+>  
+> +	/*Set Initial I2C state*/
+> +	i2c->state = STATE_STANDBY;
+> +
+>  	platform_set_drvdata(pdev, i2c);
+>  
+>  	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
+>  	clk_disable(i2c->clk);
+> +	pm_runtime_enable(&pdev->dev);
+>  	return 0;
+>  
+>   err_cpufreq:
+> @@ -956,6 +970,7 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
+>  
+>  	clk_disable(i2c->clk);
+>  	clk_put(i2c->clk);
+> +	pm_runtime_disable(&pdev->dev);
+>  
+>  	iounmap(i2c->regs);
+>  
+> @@ -972,9 +987,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+>  
+> -	i2c->suspended = 1;
+> -
+> +	i2c->state = STATE_SUSPEND;
+>  	return 0;
+> +
+>  }
+>  
+>  static int s3c24xx_i2c_resume(struct device *dev)
+> @@ -982,17 +997,47 @@ static int s3c24xx_i2c_resume(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+>  
+> -	i2c->suspended = 0;
+>  	clk_enable(i2c->clk);
+>  	s3c24xx_i2c_init(i2c);
+> +	i2c->state = STATE_STANDBY;
+>  	clk_disable(i2c->clk);
+>  
+>  	return 0;
+>  }
+>  
+> +static int s3c_i2c_runtime_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+> +
+> +	i2c->state = STATE_STANDBY;
+> +	s3c24xx_i2c_disable_irq(i2c);
+> +	s3c24xx_i2c_disable_ack(i2c);
+> +
+> +	return 0;
+> +}
+> +
+> +static int s3c_i2c_runtime_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+> +
+> +	if (i2c->state != STATE_STANDBY)
+> +		return 0;
+> +
+> +	/*No major activity in runtime resume because all the registers are
+> +	re-initialised for each i2c transfer, so just changing the state*/
+> +	i2c->state = STATE_IDLE;
+> +
+> +	return 0;
+> +}
+> +
+> +
+>  static const struct dev_pm_ops s3c24xx_i2c_dev_pm_ops = {
+> -	.suspend_noirq = s3c24xx_i2c_suspend_noirq,
+> -	.resume = s3c24xx_i2c_resume,
+> +	.suspend_noirq		= s3c24xx_i2c_suspend_noirq,
+> +	.resume			= s3c24xx_i2c_resume,
+> +	.runtime_suspend	= s3c_i2c_runtime_suspend,
+> +	.runtime_resume		= s3c_i2c_runtime_resume,
+>  };
+>  
+>  #define S3C24XX_DEV_PM_OPS (&s3c24xx_i2c_dev_pm_ops)
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
-Fax:   +64 3 3779135			  USA 1800 261 2934
-
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: .config
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110328/cf1b35af/attachment-0001.ksh>
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
