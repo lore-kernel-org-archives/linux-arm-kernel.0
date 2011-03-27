@@ -1,57 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 27 Mar 2011 10:07:15 +0200 (CEST)
-Subject: [patch 02/23] arm: tegra: Remove unused function which fiddles
-	with irq_desc
-In-Reply-To: <AANLkTi=y9JkpJVCq5G151G9k3d0rAcSH13gi6uGB_gDX@mail.gmail.com>
-References: <20110325131617.258789658@linutronix.de>
-	<20110325132047.552074703@linutronix.de>
-	<4D8E4897.5030705@nvidia.com>
-	<alpine.LFD.2.00.1103262118010.31464@localhost6.localdomain6>
-	<AANLkTi=y9JkpJVCq5G151G9k3d0rAcSH13gi6uGB_gDX@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103271004560.31464@localhost6.localdomain6>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 27 Mar 2011 11:09:21 +0200
+Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
+In-Reply-To: <201103271028.56672.anarsoul@gmail.com>
+References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>	<201103270152.45581.marek.vasut@gmail.com>
+	<201103271028.56672.anarsoul@gmail.com>
+Message-ID: <4D8EFEC1.7010803@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Mar 2011, Colin Cross wrote:
+Hi,
 
-> On Sat, Mar 26, 2011 at 1:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> > On Sun, 27 Mar 2011, Varun Wadekar wrote:
-> >>
-> >> Thomas, then how do you think we should handle restoring of gpio states
-> >> across suspend-resume cycles?
-> >
-> > That code is unused. Period. No caller, nothing nada. So what does it
-> > handle?
-> 
-> Tegra suspend support didn't make it into 2.6.39, but should get
-> merged in 2.6.40, and will call tegra_gpio_suspend/resume.
-> 
-> >> > -
-> >> > - ? for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
-> >> > - ? ? ? ? ? struct irq_desc *desc = irq_to_desc(i);
-> >> > - ? ? ? ? ? if (!desc || (desc->status & IRQ_WAKEUP))
-> >> > - ? ? ? ? ? ? ? ? ? continue;
-> >> > - ? ? ? ? ? enable_irq(i);
-> >> > - ? }
-> >
-> > And this part is totally unacceptable and should have never been
-> > merged. Further it is in the way of cleanups to the core code and as
-> > there is no user I'm not willing to even think about what it does and
-> > why it is there.
-> >
-> > FYI, the core code deals with interrupt suspending/resuming
-> > already. So if there is a problem with that which does not cover your
-> > specific problem, then you better talk to me before hacking up such
-> > private workarounds and expecting that I tolerate them in unused code.
-> 
-> Yes, the existing code wrong, and unnecessary.  It was copied from
-> mach-tegra/irq.c, which I later fixed, but I missed this one.  I'll
-> take this patch for 2.6.39-rc1, which will prevent merge conflicts
-> between your tree and the tegra tree in 2.6.40.
+On 03/27/11 09:28, Vasily Khoruzhick wrote:
 
-You can keep the functions if you need them anyway, but the irq
-fiddling needs to go now as it blocks core code cleanups.
+> On Sunday 27 March 2011 03:52:45 Marek Vasut wrote:
+>> On Saturday 26 March 2011 20:51:43 Vasily Khoruzhick wrote:
+>>> PXA27x does not like fastbus for some reason, it can hang in
+>>> random places when it's enabled. So don't use it to make cpufreq
+>>> stable.
+>> This is B/S, you're loosing performance!
+> I'm losing nothing, without this patch cpufreq does not work stable at all on 
+> Zipit Z2.
 
-Thanks,
+Possibly, but Z2 is not the only one using PXA27x.
+And of course you lose performance, unless you don't care,
+because if it does not work at all, you don't care about performance,
+but again it is wrong to force all PXA27x based boards to this.
 
-	tglx
+>> I'd suggest module parameter or
+>> device- specific callback to toggle use of fastbus on/off.
+> Can you test cpufreq without this patch on pxa270-based board with ondemand or 
+> conservative governor (or userspace with 104/208/312mhz)? Is it stable? If not 
+> then there's no reason to leave fastbus.
+
+cm-x270 and em-x270 work well with fast bus bit set with userspace governor and
+with the above frequencies.
+I'd check the hardware (especially DRAM).
+And I agree with Marek, if you want to disable the fast bus,
+then it should be board (or otherwise) controllable.
+
+
+-- 
+Regards,
+Igor.
