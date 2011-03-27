@@ -1,117 +1,80 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 28 Mar 2011 01:27:08 +0200
-Subject: [PATCH 2/7] ARM / OMAP: Use struct syscore_ops for "core" power
+Date: Mon, 28 Mar 2011 01:28:20 +0200
+Subject: [PATCH 4/7] ARM / SA1100: Use struct syscore_ops for "core" power
 	management
 In-Reply-To: <201103280125.11750.rjw@sisk.pl>
 References: <201103280125.11750.rjw@sisk.pl>
-Message-ID: <201103280127.09110.rjw@sisk.pl>
+Message-ID: <201103280128.21107.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafael J. Wysocki <rjw@sisk.pl>
 
 Replace the sysdev class and struct sys_device used for power
-management in the OMAP's GPIO code with a struct syscore_ops object
-which is simpler.
+management by the SA1100 interrupt-handling code with a
+struct syscore_ops object which is simpler.
 
 Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/arm/plat-omap/gpio.c |   35 +++++++++--------------------------
- 1 file changed, 9 insertions(+), 26 deletions(-)
+ arch/arm/mach-sa1100/irq.c |   19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
 
-Index: linux-2.6/arch/arm/plat-omap/gpio.c
+Index: linux-2.6/arch/arm/mach-sa1100/irq.c
 ===================================================================
---- linux-2.6.orig/arch/arm/plat-omap/gpio.c
-+++ linux-2.6/arch/arm/plat-omap/gpio.c
-@@ -17,7 +17,7 @@
- #include <linux/init.h>
- #include <linux/module.h>
+--- linux-2.6.orig/arch/arm/mach-sa1100/irq.c
++++ linux-2.6/arch/arm/mach-sa1100/irq.c
+@@ -14,7 +14,7 @@
  #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/ioport.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-@@ -1379,9 +1379,7 @@ static const struct dev_pm_ops omap_mpui
- 	.resume_noirq = omap_mpuio_resume_noirq,
- };
  
--/* use platform_driver for this, now that there's no longer any
-- * point to sys_device (other than not disturbing old code).
-- */
-+/* use platform_driver for this. */
- static struct platform_driver omap_mpuio_driver = {
- 	.driver		= {
- 		.name	= "mpuio",
-@@ -1754,7 +1752,7 @@ static int __devinit omap_gpio_probe(str
- }
+ #include <mach/hardware.h>
+ #include <asm/mach/irq.h>
+@@ -234,7 +234,7 @@ static struct sa1100irq_state {
+ 	unsigned int	iccr;
+ } sa1100irq_state;
  
- #if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
--static int omap_gpio_suspend(struct sys_device *dev, pm_message_t mesg)
-+static int omap_gpio_suspend(void)
+-static int sa1100irq_suspend(struct sys_device *dev, pm_message_t state)
++static int sa1100irq_suspend(void)
  {
- 	int i;
+ 	struct sa1100irq_state *st = &sa1100irq_state;
  
-@@ -1804,12 +1802,12 @@ static int omap_gpio_suspend(struct sys_
+@@ -264,7 +264,7 @@ static int sa1100irq_suspend(struct sys_
  	return 0;
  }
  
--static int omap_gpio_resume(struct sys_device *dev)
-+static void omap_gpio_resume(void)
+-static int sa1100irq_resume(struct sys_device *dev)
++static void sa1100irq_resume(void)
  {
- 	int i;
+ 	struct sa1100irq_state *st = &sa1100irq_state;
  
- 	if (!cpu_class_is_omap2() && !cpu_is_omap16xx())
--		return 0;
-+		return;
+@@ -277,24 +277,17 @@ static int sa1100irq_resume(struct sys_d
  
- 	for (i = 0; i < gpio_bank_count; i++) {
- 		struct gpio_bank *bank = &gpio_bank[i];
-@@ -1845,21 +1843,13 @@ static int omap_gpio_resume(struct sys_d
- 		__raw_writel(bank->saved_wakeup, wake_set);
- 		spin_unlock_irqrestore(&bank->lock, flags);
+ 		ICMR = st->icmr;
  	}
--
 -	return 0;
  }
  
--static struct sysdev_class omap_gpio_sysclass = {
--	.name		= "gpio",
-+static struct syscore_ops omap_gpio_syscore_ops = {
- 	.suspend	= omap_gpio_suspend,
- 	.resume		= omap_gpio_resume,
+-static struct sysdev_class sa1100irq_sysclass = {
+-	.name		= "sa11x0-irq",
++static struct syscore_ops sa1100irq_syscore_ops = {
+ 	.suspend	= sa1100irq_suspend,
+ 	.resume		= sa1100irq_resume,
  };
  
--static struct sys_device omap_gpio_device = {
+-static struct sys_device sa1100irq_device = {
 -	.id		= 0,
--	.cls		= &omap_gpio_sysclass,
+-	.cls		= &sa1100irq_sysclass,
 -};
 -
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP2PLUS
-@@ -2117,21 +2107,14 @@ postcore_initcall(omap_gpio_drv_reg);
- 
- static int __init omap_gpio_sysinit(void)
+ static int __init sa1100irq_init_devicefs(void)
  {
--	int ret = 0;
--
- 	mpuio_init();
- 
- #if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
--	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
--		if (ret == 0) {
--			ret = sysdev_class_register(&omap_gpio_sysclass);
--			if (ret == 0)
--				ret = sysdev_register(&omap_gpio_device);
--		}
--	}
-+	if (cpu_is_omap16xx() || cpu_class_is_omap2())
-+		register_syscore_ops(&omap_gpio_syscore_ops);
- #endif
- 
--	return ret;
+-	sysdev_class_register(&sa1100irq_sysclass);
+-	return sysdev_register(&sa1100irq_device);
++	register_syscore_ops(&sa1100irq_syscore_ops);
 +	return 0;
  }
  
- arch_initcall(omap_gpio_sysinit);
+ device_initcall(sa1100irq_init_devicefs);
