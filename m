@@ -1,50 +1,96 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 27 Mar 2011 01:52:45 +0100
-Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
-In-Reply-To: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
-References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201103270152.45581.marek.vasut@gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sun, 27 Mar 2011 08:37:12 +0200
+Subject: [PATCH V13 0/4] ptp: IEEE 1588 hardware clock support
+Message-ID: <cover.1301206090.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 March 2011 20:51:43 Vasily Khoruzhick wrote:
-> PXA27x does not like fastbus for some reason, it can hang in
-> random places when it's enabled. So don't use it to make cpufreq
-> stable.
+* Introduction
 
-This is B/S, you're loosing performance! I'd suggest module parameter or device-
-specific callback to toggle use of fastbus on/off.
+  The aim of this patch set is to add support for PTP Hardware Clocks
+  (PHCs) into the Linux kernel. The patch series builds upon the
+  dynamic posix clock work appearing in kernel version 2.6.39.
 
-Cheers
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm/mach-pxa/cpufreq-pxa2xx.c |   12 ++++++------
->  1 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> b/arch/arm/mach-pxa/cpufreq-pxa2xx.c index 6a7aeab..b5727aa 100644
-> --- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> +++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> @@ -156,13 +156,13 @@ MODULE_PARM_DESC(pxa255_turbo_table, "Selects the
-> frequency table (0 = run table ((T)  ? CCLKCFG_TURBO : 0))
-> 
->  static pxa_freqs_t pxa27x_freqs[] = {
-> -	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0, CCLKCFG2(1, 0, 1),  900000,
-> 1705000 }, -	{156000, 104000, PXA27x_CCCR(1,	 8, 3), 0, CCLKCFG2(1, 0, 1),
-> 1000000, 1705000 }, +	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0,
-> CCLKCFG2(0, 0, 1),  900000, 1705000 }, +	{156000, 104000, PXA27x_CCCR(1,	
-> 8, 3), 0, CCLKCFG2(0, 0, 1), 1000000, 1705000 }, {208000, 208000,
-> PXA27x_CCCR(0, 16, 2), 1, CCLKCFG2(0, 0, 1), 1180000, 1705000 },
-> -	{312000, 208000, PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(1, 0, 1), 1250000,
-> 1705000 }, -	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(1, 0, 1),
-> 1350000, 1705000 }, -	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1,
-> CCLKCFG2(1, 0, 1), 1450000, 1705000 }, -	{624000, 208000, PXA27x_CCCR(1,
-> 16, 6), 1, CCLKCFG2(1, 0, 1), 1550000, 1705000 } +	{312000, 208000,
-> PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(0, 0, 1), 1250000, 1705000 },
-> +	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(0, 0, 1), 1350000,
-> 1705000 }, +	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1, CCLKCFG2(0, 0, 1),
-> 1450000, 1705000 }, +	{624000, 208000, PXA27x_CCCR(1, 16, 6), 1,
-> CCLKCFG2(0, 0, 1), 1550000, 1705000 } };
-> 
->  #define NUM_PXA27x_FREQS ARRAY_SIZE(pxa27x_freqs)
+  Support for obtaining timestamps from a PHC already exists via the
+  SO_TIMESTAMPING socket option, integrated in kernel version 2.6.30.
+  This patch set completes the picture by allow user space programs to
+  adjust the PHC and to control its ancillary features.
+
+* Why all the CCs?
+  - One driver is for PowerPC, and adds device tree stuff.
+  - One driver is for the ARM Xscale IXP465.
+
+* PHC Patch ChangeLog
+** v13
+*** Incorporate v12 review from Andrew Morton
+    - external timestamp read: mutex was held unnecessarily long
+    - external timestamp read: require size to be multiple of sizeof(extts)
+    - replaced 'uint' with 'unsigned int' in poll function
+    - replaced empty release function with NULL function pointer
+*** Incorporate v12 review from John Stultz
+    - added comment to explain the ppm to ppb conversion
+    - commented the locking rules for the queue_cnt() function
+    - commented the ppb to ppm conversion in the example program
+    - fixed incomplete locking of external timestamp queue
+    - gianfar, dp83640: comment on the locking rules
+    - gianfar: fixed unlikely unprotected register access in probe()
+    - ixp4xx: gave some private functions more unique names
+
+* Previous Discussions
+  - [V12] http://lkml.org/lkml/2011/2/28/53
+  - [V11] http://lkml.org/lkml/2011/2/23/107
+  - [V10] http://lkml.org/lkml/2011/1/27/71
+
+
+Richard Cochran (4):
+  ptp: Added a brand new class driver for ptp clocks.
+  ptp: Added a clock that uses the eTSEC found on the MPC85xx.
+  ptp: Added a clock driver for the IXP46x.
+  ptp: Added a clock driver for the National Semiconductor PHYTER.
+
+ Documentation/ABI/testing/sysfs-ptp                |   98 ++
+ .../devicetree/bindings/net/fsl-tsec-phy.txt       |   54 +
+ Documentation/ptp/ptp.txt                          |   89 ++
+ Documentation/ptp/testptp.c                        |  368 +++++++
+ Documentation/ptp/testptp.mk                       |   33 +
+ arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h      |   78 ++
+ arch/powerpc/boot/dts/mpc8313erdb.dts              |   13 +
+ arch/powerpc/boot/dts/mpc8572ds.dts                |   13 +
+ arch/powerpc/boot/dts/p2020ds.dts                  |   13 +
+ arch/powerpc/boot/dts/p2020rdb.dts                 |   13 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/net/Makefile                               |    1 +
+ drivers/net/arm/ixp4xx_eth.c                       |  192 ++++-
+ drivers/net/gianfar_ptp.c                          |  588 +++++++++++
+ drivers/net/phy/Makefile                           |    1 +
+ drivers/net/phy/dp83640.c                          | 1015 ++++++++++++++++++++
+ drivers/net/phy/dp83640_reg.h                      |  267 +++++
+ drivers/ptp/Kconfig                                |   75 ++
+ drivers/ptp/Makefile                               |    7 +
+ drivers/ptp/ptp_chardev.c                          |  155 +++
+ drivers/ptp/ptp_clock.c                            |  339 +++++++
+ drivers/ptp/ptp_ixp46x.c                           |  332 +++++++
+ drivers/ptp/ptp_private.h                          |   91 ++
+ drivers/ptp/ptp_sysfs.c                            |  230 +++++
+ include/linux/Kbuild                               |    1 +
+ include/linux/ptp_clock.h                          |   84 ++
+ include/linux/ptp_clock_kernel.h                   |  139 +++
+ 28 files changed, 4289 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-ptp
+ create mode 100644 Documentation/ptp/ptp.txt
+ create mode 100644 Documentation/ptp/testptp.c
+ create mode 100644 Documentation/ptp/testptp.mk
+ create mode 100644 arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h
+ create mode 100644 drivers/net/gianfar_ptp.c
+ create mode 100644 drivers/net/phy/dp83640.c
+ create mode 100644 drivers/net/phy/dp83640_reg.h
+ create mode 100644 drivers/ptp/Kconfig
+ create mode 100644 drivers/ptp/Makefile
+ create mode 100644 drivers/ptp/ptp_chardev.c
+ create mode 100644 drivers/ptp/ptp_clock.c
+ create mode 100644 drivers/ptp/ptp_ixp46x.c
+ create mode 100644 drivers/ptp/ptp_private.h
+ create mode 100644 drivers/ptp/ptp_sysfs.c
+ create mode 100644 include/linux/ptp_clock.h
+ create mode 100644 include/linux/ptp_clock_kernel.h
