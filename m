@@ -1,49 +1,182 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 27 Mar 2011 12:32:54 +0200
-Subject: [PATCH] Fix the broken build for Marvell Dove platform.
-In-Reply-To: <1301219689-9186-1-git-send-email-kostap@marvell.com>
-References: <1301219689-9186-1-git-send-email-kostap@marvell.com>
-Message-ID: <AANLkTikH9qZDXr2QFBxAZdzKn-q1a=Lp26EN5gES6u+i@mail.gmail.com>
+From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
+Date: Sun, 27 Mar 2011 16:32:43 -0400
+Subject: [PATCH] I2C: Samsung: Add support for PM_runtime in the I2C driver.
+Message-ID: <1301257963-17196-1-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 27, 2011 at 11:54 AM, Konstantin Porotchkin
-<kostap@marvell.com> wrote:
-> Remove call to the old GPIO init function.
-> Fix old MPP control offset value.
->
-> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
-> ---
-> ?arch/arm/mach-dove/include/mach/dove.h | ? ?2 +-
-> ?arch/arm/mach-dove/mpp.c ? ? ? ? ? ? ? | ? ?3 ---
-> ?2 files changed, 1 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-> index e5fcdd3..b20ec9a 100644
-> --- a/arch/arm/mach-dove/include/mach/dove.h
-> +++ b/arch/arm/mach-dove/include/mach/dove.h
-> @@ -136,7 +136,7 @@
-> ?#define DOVE_MPP_GENERAL_VIRT_BASE ? ? (DOVE_SB_REGS_VIRT_BASE | 0xe803c)
-> ?#define ?DOVE_AU1_SPDIFO_GPIO_EN ? ? ? (1 << 1)
-> ?#define ?DOVE_NAND_GPIO_EN ? ? ? ? ? ? (1 << 0)
-> -#define DOVE_MPP_CTRL4_VIRT_BASE ? ? ? (DOVE_GPIO_VIRT_BASE + 0x40)
-> +#define DOVE_MPP_CTRL4_VIRT_BASE ? ? ? (DOVE_GPIO_LO_VIRT_BASE + 0x40)
-> ?#define ?DOVE_SPI_GPIO_SEL ? ? ? ? ? ? (1 << 5)
-> ?#define ?DOVE_UART1_GPIO_SEL ? ? ? ? ? (1 << 4)
-> ?#define ?DOVE_AU1_GPIO_SEL ? ? ? ? ? ? (1 << 3)
-> diff --git a/arch/arm/mach-dove/mpp.c b/arch/arm/mach-dove/mpp.c
-> index 71db2bd..c66c763 100644
-> --- a/arch/arm/mach-dove/mpp.c
-> +++ b/arch/arm/mach-dove/mpp.c
-> @@ -147,9 +147,6 @@ void __init dove_mpp_conf(unsigned int *mpp_list)
-> ? ? ? ?u32 pmu_sig_ctrl[PMU_SIG_REGS];
-> ? ? ? ?int i;
->
-> - ? ? ? /* Initialize gpiolib. */
-> - ? ? ? orion_gpio_init();
-> -
-> ? ? ? ?for (i = 0; i < MPP_NR_REGS; i++)
-> ? ? ? ? ? ? ? ?mpp_ctrl[i] = readl(MPP_CTRL(i));
->
-looks fine to me. Nico, can you please merge?
-saeed
+This patch adds PM runtime management support in the I2C driver.
+The functionality of the driver is not modified much but some extra I2C
+states are added for PM runtime. The runtime suspend keeps the interrupt
+for the I2C interface disabled.
+
+Signed-off-by:  Amit Daniel Kachhap <amit.kachhap@linaro.org>
+---
+ drivers/i2c/busses/i2c-s3c2410.c |   61 +++++++++++++++++++++++++++++++++-----
+ 1 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 6c00c10..8ebe621 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -35,6 +35,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -48,7 +49,9 @@ enum s3c24xx_i2c_state {
+ 	STATE_START,
+ 	STATE_READ,
+ 	STATE_WRITE,
+-	STATE_STOP
++	STATE_STOP,
++	STATE_STANDBY,
++	STATE_SUSPEND
+ };
+ 
+ enum s3c24xx_i2c_type {
+@@ -59,7 +62,6 @@ enum s3c24xx_i2c_type {
+ struct s3c24xx_i2c {
+ 	spinlock_t		lock;
+ 	wait_queue_head_t	wait;
+-	unsigned int		suspended:1;
+ 
+ 	struct i2c_msg		*msg;
+ 	unsigned int		msg_num;
+@@ -400,8 +402,13 @@ static int i2s_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
+ 				i2c->msg++;
+ 			}
+ 		}
++		break;
+ 
++	default:
++		dev_err(i2c->dev, "%s: called with invalid state\n", __func__);
++		goto out;
+ 		break;
++
+ 	}
+ 
+ 	/* acknowlegde the IRQ and get back on with the work */
+@@ -485,7 +492,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 	int spins = 20;
+ 	int ret;
+ 
+-	if (i2c->suspended)
++	if (i2c->state == STATE_SUSPEND)
+ 		return -EIO;
+ 
+ 	ret = s3c24xx_i2c_set_master(i2c);
+@@ -555,12 +562,14 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
+ 	int ret;
+ 
+ 	clk_enable(i2c->clk);
++	pm_runtime_get_sync(i2c->dev);
+ 
+ 	for (retry = 0; retry < adap->retries; retry++) {
+ 
+ 		ret = s3c24xx_i2c_doxfer(i2c, msgs, num);
+ 
+ 		if (ret != -EAGAIN) {
++			pm_runtime_put_sync(i2c->dev);
+ 			clk_disable(i2c->clk);
+ 			return ret;
+ 		}
+@@ -570,6 +579,7 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
+ 		udelay(100);
+ 	}
+ 
++	pm_runtime_put_sync(i2c->dev);
+ 	clk_disable(i2c->clk);
+ 	return -EREMOTEIO;
+ }
+@@ -912,10 +922,14 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+ 		goto err_cpufreq;
+ 	}
+ 
++	/*Set Initial I2C state*/
++	i2c->state = STATE_STANDBY;
++
+ 	platform_set_drvdata(pdev, i2c);
+ 
+ 	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
+ 	clk_disable(i2c->clk);
++	pm_runtime_enable(&pdev->dev);
+ 	return 0;
+ 
+  err_cpufreq:
+@@ -956,6 +970,7 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
+ 
+ 	clk_disable(i2c->clk);
+ 	clk_put(i2c->clk);
++	pm_runtime_disable(&pdev->dev);
+ 
+ 	iounmap(i2c->regs);
+ 
+@@ -972,9 +987,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+ 
+-	i2c->suspended = 1;
+-
++	i2c->state = STATE_SUSPEND;
+ 	return 0;
++
+ }
+ 
+ static int s3c24xx_i2c_resume(struct device *dev)
+@@ -982,17 +997,47 @@ static int s3c24xx_i2c_resume(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+ 
+-	i2c->suspended = 0;
+ 	clk_enable(i2c->clk);
+ 	s3c24xx_i2c_init(i2c);
++	i2c->state = STATE_STANDBY;
+ 	clk_disable(i2c->clk);
+ 
+ 	return 0;
+ }
+ 
++static int s3c_i2c_runtime_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
++
++	i2c->state = STATE_STANDBY;
++	s3c24xx_i2c_disable_irq(i2c);
++	s3c24xx_i2c_disable_ack(i2c);
++
++	return 0;
++}
++
++static int s3c_i2c_runtime_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
++
++	if (i2c->state != STATE_STANDBY)
++		return 0;
++
++	/*No major activity in runtime resume because all the registers are
++	re-initialised for each i2c transfer, so just changing the state*/
++	i2c->state = STATE_IDLE;
++
++	return 0;
++}
++
++
+ static const struct dev_pm_ops s3c24xx_i2c_dev_pm_ops = {
+-	.suspend_noirq = s3c24xx_i2c_suspend_noirq,
+-	.resume = s3c24xx_i2c_resume,
++	.suspend_noirq		= s3c24xx_i2c_suspend_noirq,
++	.resume			= s3c24xx_i2c_resume,
++	.runtime_suspend	= s3c_i2c_runtime_suspend,
++	.runtime_resume		= s3c_i2c_runtime_resume,
+ };
+ 
+ #define S3C24XX_DEV_PM_OPS (&s3c24xx_i2c_dev_pm_ops)
+-- 
+1.7.1
