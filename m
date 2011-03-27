@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 Mar 2011 23:14:19 +0000
-Subject: Updated mach-types update
-In-Reply-To: <AANLkTi=0o3y7sPFjcmW0OLyPuZ8+DQNggpH7VRDd9Q-R@mail.gmail.com>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<AANLkTi=0o3y7sPFjcmW0OLyPuZ8+DQNggpH7VRDd9Q-R@mail.gmail.com>
-Message-ID: <20110326231419.GA29422@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 27 Mar 2011 01:52:45 +0100
+Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
+In-Reply-To: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
+References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201103270152.45581.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 26, 2011 at 03:52:04PM -0700, Colin Cross wrote:
-> This breaks master with CONFIG_PCI=y:
->   CC      arch/arm/kernel/bios32.o
-> arch/arm/kernel/bios32.c: In function 'pci_fixup_prpmc1100':
-> arch/arm/kernel/bios32.c:174: error: implicit declaration of function
-> 'machine_is_prpmc1100'
+On Saturday 26 March 2011 20:51:43 Vasily Khoruzhick wrote:
+> PXA27x does not like fastbus for some reason, it can hang in
+> random places when it's enabled. So don't use it to make cpufreq
+> stable.
+
+This is B/S, you're loosing performance! I'd suggest module parameter or device-
+specific callback to toggle use of fastbus on/off.
+
+Cheers
 > 
-> I can't tell what the right fix is.  Deleting pci_fixup_prpmc1100
-> fixes it.  There is no machine for prpmc1100, but there is
-> CONFIG_ARCH_PRPMC1100 that enables machine IXCDP1100 in
-> arch/arm/mach-ixp4xx/ixdp425-setup.c.  Should bios32.c be using
-> machine_is_ixcdp1100?  The history is all pre-git.
-
-http://linux.bkbits.net:8080/linux-2.6/?PAGE=cset&REV=40a29db2qiY8UR8FWw0U1i4DgOLsRA
-
-Looks like Deepak submitted it as part of the IXP4xx stuff.  However,
-prpmc1100-pci.c no longer exists... but can be found:
-
-http://linux.bkbits.net:8080/linux-2.6/BitKeeper/deleted/.del-prpmc1100-pci.c~da88e9014dd6125b?PAGE=related
-
-which lead to:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=2448%2F1
-
-So, your patch below looks like the right thing.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-pxa/cpufreq-pxa2xx.c |   12 ++++++------
+>  1 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> b/arch/arm/mach-pxa/cpufreq-pxa2xx.c index 6a7aeab..b5727aa 100644
+> --- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> +++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> @@ -156,13 +156,13 @@ MODULE_PARM_DESC(pxa255_turbo_table, "Selects the
+> frequency table (0 = run table ((T)  ? CCLKCFG_TURBO : 0))
+> 
+>  static pxa_freqs_t pxa27x_freqs[] = {
+> -	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0, CCLKCFG2(1, 0, 1),  900000,
+> 1705000 }, -	{156000, 104000, PXA27x_CCCR(1,	 8, 3), 0, CCLKCFG2(1, 0, 1),
+> 1000000, 1705000 }, +	{104000, 104000, PXA27x_CCCR(1,	 8, 2), 0,
+> CCLKCFG2(0, 0, 1),  900000, 1705000 }, +	{156000, 104000, PXA27x_CCCR(1,	
+> 8, 3), 0, CCLKCFG2(0, 0, 1), 1000000, 1705000 }, {208000, 208000,
+> PXA27x_CCCR(0, 16, 2), 1, CCLKCFG2(0, 0, 1), 1180000, 1705000 },
+> -	{312000, 208000, PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(1, 0, 1), 1250000,
+> 1705000 }, -	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(1, 0, 1),
+> 1350000, 1705000 }, -	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1,
+> CCLKCFG2(1, 0, 1), 1450000, 1705000 }, -	{624000, 208000, PXA27x_CCCR(1,
+> 16, 6), 1, CCLKCFG2(1, 0, 1), 1550000, 1705000 } +	{312000, 208000,
+> PXA27x_CCCR(1, 16, 3), 1, CCLKCFG2(0, 0, 1), 1250000, 1705000 },
+> +	{416000, 208000, PXA27x_CCCR(1, 16, 4), 1, CCLKCFG2(0, 0, 1), 1350000,
+> 1705000 }, +	{520000, 208000, PXA27x_CCCR(1, 16, 5), 1, CCLKCFG2(0, 0, 1),
+> 1450000, 1705000 }, +	{624000, 208000, PXA27x_CCCR(1, 16, 6), 1,
+> CCLKCFG2(0, 0, 1), 1550000, 1705000 } };
+> 
+>  #define NUM_PXA27x_FREQS ARRAY_SIZE(pxa27x_freqs)
