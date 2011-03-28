@@ -1,37 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 28 Mar 2011 12:14:31 -0700
-Subject: [PATCHv2 1/3] msm: Remove arch-specific gpiomux tables
-In-Reply-To: <1299522922-31294-1-git-send-email-rvaswani@codeaurora.org>
-	(Rohit Vaswani's message of "Mon, 7 Mar 2011 10:35:22 -0800")
-References: <1299522922-31294-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <8yatyenukfc.fsf@huya.qualcomm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 28 Mar 2011 21:13:41 +0200 (CEST)
+Subject: [patch 08/29] arm: tegra: Remove unused bogus irq enable/disable
+	magic
+In-Reply-To: <BANLkTinjYq3F0CwfqRQVzG53ecPm=QyV5A@mail.gmail.com>
+References: <20110328170219.059141076@linutronix.de>
+	<20110328170651.575138721@linutronix.de>
+	<BANLkTinjYq3F0CwfqRQVzG53ecPm=QyV5A@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1103282113160.2774@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07 2011, Rohit Vaswani wrote:
+On Mon, 28 Mar 2011, Colin Cross wrote:
+> On Mon, Mar 28, 2011 at 10:12 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> 
+> Other than that:
+> Acked-by: Colin Cross <ccross@android.com>
+> 
+> Do you want me to take this through the Tegra tree for 2.6.39-rc1?
 
-> Remove arch-specific gpiomux files and include the gpiomux configs
-> as a part of the board file.
->
-> Change-Id: I83de33c6d5f9e8e91832d8173d31a96cf11ce592
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
-> v2: Re-send
->
->  arch/arm/mach-msm/Makefile        |    4 +-
->  arch/arm/mach-msm/board-msm8x60.c |    3 ++
->  arch/arm/mach-msm/board-qsd8x50.c |   12 ++++++++
->  arch/arm/mach-msm/gpiomux-8x50.c  |   51 -------------------------------------
->  arch/arm/mach-msm/gpiomux-8x60.c  |   19 -------------
->  5 files changed, 17 insertions(+), 72 deletions(-)
->  delete mode 100644 arch/arm/mach-msm/gpiomux-8x50.c
->  delete mode 100644 arch/arm/mach-msm/gpiomux-8x60.c
+Either way is fine.
 
-Rohit, this change seems to have broken MMC/SD on the 8x50 target.  I'm
-going to need to pull these out of my 'for-40' branch.
+Thanks,
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	tglx
+ 
