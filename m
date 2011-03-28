@@ -1,60 +1,29 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 29 Mar 2011 12:03:06 +1300
-Subject: [PATCH] EP93xx: Remove ep93xx_gpio_dbg_show function
-Message-ID: <4D9113AA.20404@bluewatersys.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 28 Mar 2011 18:40:04 -0500
+Subject: [PATCH] mach-types: add back vision_ep9307
+In-Reply-To: <20110328222922.GE31457@n2100.arm.linux.org.uk>
+References: <201103281359.29255.hartleys@visionengravers.com>
+	<20110328222922.GE31457@n2100.arm.linux.org.uk>
+Message-ID: <0D753D10438DA54287A00B027084269764D19A80F6@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hartley pointed out that the patch I posted to remove the irq internals
-fiddling from ep93xx_gpio_dbg_show does not function as expected. It
-will print [interrupt] beside all pins which are capable of being
-interrupts, not just those which are currently configured as interrupts.
+On Monday, March 28, 2011 3:29 PM, Russell King wrote:
+> On Mon, Mar 28, 2011 at 01:59:27PM -0700, H Hartley Sweeten wrote:
+>> Add machine vision_ep9307 back to cut down mach-types.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> 
+>> ---
+>> 
+>> I'm not sure if this will happen automatically when the init code
+>> for MACH_VISION_EP9307 gets merged (patch 6851/1).
+>
+> You can 'refresh' it merely by visiting the web page for the database
+> entry and click 'update'.  That will update the timestamp in the
+> database which will then renew its inclusion for another 12 months.
 
-The best solution is just to remove the custom ep93xx gpio debugfs
-function all together. The generic gpiolib one is good enough.
+Will do, thanks for the information.
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
----
-
-diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
-index 34e071d..c74adf9 100644
---- a/arch/arm/mach-ep93xx/gpio.c
-+++ b/arch/arm/mach-ep93xx/gpio.c
-@@ -348,29 +348,6 @@ static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
- 	return 0;
- }
- 
--static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
--{
--	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
--	u8 data_reg, data_dir_reg;
--	int gpio, i;
--
--	data_reg = __raw_readb(ep93xx_chip->data_reg);
--	data_dir_reg = __raw_readb(ep93xx_chip->data_dir_reg);
--
--	gpio = ep93xx_chip->chip.base;
--	for (i = 0; i < chip->ngpio; i++, gpio++) {
--		int is_out = data_dir_reg & (1 << i);
--		int irq = gpio_to_irq(gpio);
--
--		seq_printf(s, " %s%d gpio-%-3d (%-12s) %s %s %s\n",
--				chip->label, i, gpio,
--				gpiochip_is_requested(chip, i) ? : "",
--				is_out ? "out" : "in ",
--				(data_reg & (1<<  i)) ? "hi" : "lo",
--				(!is_out && irq>= 0) ? "(interrupt)" : "");
--	}
--}
--
- #define EP93XX_GPIO_BANK(name, dr, ddr, base_gpio)			\
- 	{								\
- 		.chip = {						\
-@@ -379,7 +356,6 @@ static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 			.direction_output = ep93xx_gpio_direction_output, \
- 			.get		  = ep93xx_gpio_get,		\
- 			.set		  = ep93xx_gpio_set,		\
--			.dbg_show	  = ep93xx_gpio_dbg_show,	\
- 			.base		  = base_gpio,			\
- 			.ngpio		  = 8,				\
- 		},							\
+Regards,
+Hartley
