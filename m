@@ -1,29 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 28 Mar 2011 18:40:04 -0500
-Subject: [PATCH] mach-types: add back vision_ep9307
-In-Reply-To: <20110328222922.GE31457@n2100.arm.linux.org.uk>
-References: <201103281359.29255.hartleys@visionengravers.com>
-	<20110328222922.GE31457@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B027084269764D19A80F6@AUSP01VMBX24.collaborationhost.net>
+From: collinsd@codeaurora.org (David Collins)
+Date: Mon, 28 Mar 2011 16:52:35 -0700
+Subject: [PATCH v2 0/2] regulator: Fix regulator_enable deadlock and add
+	uA_load propagation
+In-Reply-To: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
+References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
+Message-ID: <1301356355-7546-1-git-send-email-collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 28, 2011 3:29 PM, Russell King wrote:
-> On Mon, Mar 28, 2011 at 01:59:27PM -0700, H Hartley Sweeten wrote:
->> Add machine vision_ep9307 back to cut down mach-types.
->> 
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> 
->> ---
->> 
->> I'm not sure if this will happen automatically when the init code
->> for MACH_VISION_EP9307 gets merged (patch 6851/1).
->
-> You can 'refresh' it merely by visiting the web page for the database
-> entry and click 'update'.  That will update the timestamp in the
-> database which will then renew its inclusion for another 12 months.
+Because the uA_load propagation change takes out a lock on a regulator and
+then the regulators that it supplies, it will cause deadlock with the current
+regulator_enable implementation.  regulator_disable can also deadlock with
+regulator_enable, but it requires two threads and precise timing to observe.
+Therefore, regulator_enable must be fixed before current propagation can be
+used.
 
-Will do, thanks for the information.
+Changes from v1:
+	- Renamed _regulator_enable to regulator_dev_enable.
+	- Made change logs more verbose.
 
-Regards,
-Hartley
+David Collins (2):
+  regulator: Remove possible deadlock from regulator_enable
+  regulator: Propagate uA_load requirements up supply chain
+
+ drivers/regulator/core.c         |  151 ++++++++++++++++++++++++++++++-------
+ include/linux/regulator/driver.h |    5 +
+ 2 files changed, 127 insertions(+), 29 deletions(-)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
