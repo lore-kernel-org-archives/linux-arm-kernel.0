@@ -1,41 +1,56 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 28 Mar 2011 10:22:01 +0200
-Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
-In-Reply-To: <201103272013.19981.anarsoul@gmail.com>
-References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
-	<1301240089.10831.2.camel@konomi> <87r59sbixx.fsf@free.fr>
-	<201103272013.19981.anarsoul@gmail.com>
-Message-ID: <4D904529.9090404@compulab.co.il>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 28 Mar 2011 12:27:03 +0400
+Subject: [PATCH] OMAP3: l3: fix for "irq 10: nobody cared" message
+In-Reply-To: <AANLkTikcV_NSYz+zSRRMA=dQMxB7AS1tKsau95mxbCka@mail.gmail.com>
+References: <1301099396-30380-1-git-send-email-omar.ramirez@ti.com>	<4D8E5CD3.8010007@ru.mvista.com>
+	<AANLkTikcV_NSYz+zSRRMA=dQMxB7AS1tKsau95mxbCka@mail.gmail.com>
+Message-ID: <4D904657.40401@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/11 19:13, Vasily Khoruzhick wrote:
+Hello.
 
-> On Sunday 27 March 2011 19:56:58 Robert Jarzmik wrote:
->
->> These 2 work well on the mioa701 platform, under the constraint that the
->> minimal frequency is set to 208 instead of 104.
->>
->> I would think as Marek that it's a under-voltage issue, unless it's the
->> 104Mhz transition issue which lasts for as long as I own my platform (and
->> which might be mioa701 specific AFAIK).
-> I tried to disable regulator at all (so, regulator is left in default state), 
+On 28-03-2011 5:49, Ramirez Luna, Omar wrote:
 
-What is the default state on Z2? Can you measure it?
-The most important are VCC_CORE and VCC_MEM and usually there should be
-some "good" capacitors on those, so it should be relatively easy to measure.
+>>> If an error occurs in the L3 on any other initiator than MPU,
+>>> the interrupt goes unhandled given that the 'base' register
+>>> was calculated with the initialized err_base value (which
+>>> coincidentally points to MPU) and not with the actual source
+>>> of the error.
 
-> stock bootloader configures CPU to 208mhz(normal)/312mhz(fast) and enables 
-> fast mode, but leaves fastbus disabled. So I tried fixed 208mhz and 312mhz 
-> with fastbus bit set - it hangs in random places, even without cpu freq 
-> transitions... So maybe it's some hw misdesign,
+>>> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+>>> ---
+>>>   arch/arm/mach-omap2/omap_l3_smx.c |    5 +++--
+>>>   1 files changed, 3 insertions(+), 2 deletions(-)
 
-Yep, it looks like it is... PXA27x local bus was always hard to please...
+>>> diff --git a/arch/arm/mach-omap2/omap_l3_smx.c
+>>> b/arch/arm/mach-omap2/omap_l3_smx.c
+>>> index 5f2da75..da917c2 100644
+>>> --- a/arch/arm/mach-omap2/omap_l3_smx.c
+>>> +++ b/arch/arm/mach-omap2/omap_l3_smx.c
+>>> @@ -196,11 +196,12 @@ static irqreturn_t omap3_l3_app_irq(int irq, void
+>>> *_l3)
+>>>                 /* No timeout error for debug sources */
+>>>         }
+>>>
+>>> -       base = ((l3->rt) + (*(omap3_l3_bases[int_type] + err_source)));
+>>> -
+>>>         /* identify the error source */
+>>>         for (err_source = 0; !(status&    (1<<    err_source)); err_source++)
+>>>                                                                         ;
+>>> +
+>>> +       base = ((l3->rt) + (*(omap3_l3_bases[int_type] + err_source)));
+>>> +
 
->  but once again - it works 
-> pretty stable @104-416mhz with fastbus disabled.
+>>    What's the point of having () around rvalue? You could drop them, while at
+>> it...
 
+> You're right, will do.
 
--- 
-Regards,
-Igor.
+    The same goes about 'l3->rt' and '*(omap3_l3_bases[int_type] + err_source)'...
+
+> Regards,
+
+> Omar
+
+WBR, Sergei
