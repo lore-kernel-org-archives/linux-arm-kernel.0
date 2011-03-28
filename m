@@ -1,23 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Mar 2011 19:02:55 +0100
-Subject: [PATCH 2/2] regulator: Propagate uA_load requirements up supply
-	chain
-In-Reply-To: <1301326482-6547-3-git-send-email-collinsd@codeaurora.org>
-References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-	<1301326482-6547-3-git-send-email-collinsd@codeaurora.org>
-Message-ID: <20110328180255.GA28494@opensource.wolfsonmicro.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 28 Mar 2011 11:06:35 -0700
+Subject: [PATCH V13 1/4] ptp: Added a brand new class driver for ptp
+	clocks.
+In-Reply-To: <86641738e4c84fbdb105d6f2eb6141d5d13c3190.1301206090.git.richard.cochran@omicron.at>
+References: <cover.1301206090.git.richard.cochran@omicron.at>
+	<86641738e4c84fbdb105d6f2eb6141d5d13c3190.1301206090.git.richard.cochran@omicron.at>
+Message-ID: <1301335595.21829.0.camel@work-vm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2011 at 08:34:42AM -0700, David Collins wrote:
-> regulator_set_optimum_mode currently only determines the load
-> on the specified regulator.  Physically however, this current
-> must be provided by regulators further up the supply chain.
-> Add code to handle uA_load propagation up through the regulator
-> supply chain.
+On Sun, 2011-03-27 at 08:38 +0200, Richard Cochran wrote:
+> This patch adds an infrastructure for hardware clocks that implement
+> IEEE 1588, the Precision Time Protocol (PTP). A class driver offers a
+> registration method to particular hardware clock drivers. Each clock is
+> presented as a standard POSIX clock.
+> 
+> The ancillary clock features are exposed in two different ways, via
+> the sysfs and by a character device.
+> 
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
 
-We can't do this - current doesn't map 1:1 through a regulator, the
-power consumption will map through but obviously there's a voltage
-change involved and the regulators will not be 100% efficient so there
-will also be some overhead from the chipld regulator.  The child
-regulator needs to do the mapping in a regulator specific fashion.
+Acked-by: John Stultz <john.stultz@linaro.org>
+
+thanks
+-john
