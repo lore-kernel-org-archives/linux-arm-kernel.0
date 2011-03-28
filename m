@@ -1,31 +1,23 @@
-From: rajeev-dlh.kumar@st.com (Rajeev Kumar)
-Date: Mon, 28 Mar 2011 17:29:06 +0530
-Subject: [PATCH resend] input/spear-keyboard fix: return IRQ_NONE if (status
-	reg & DATA_AVAIL)
-Message-ID: <1301313546-24420-1-git-send-email-rajeev-dlh.kumar@st.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 28 Mar 2011 13:25:57 +0100
+Subject: CPUv6K (ARM1176) and wfi()
+Message-ID: <20110328122557.GB2738@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should return IRQ_NONE from interrupt handler in case data is not
-avail for keyboard
+Hi Catalin, Will,
 
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
----
- drivers/input/keyboard/spear-keyboard.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I'm respinning some PM patches for my platform (ARM1176JZ-S) and looking 
+at arch/arm/include/asm/system.h, for CPU_32v6K wfi() uses the "wfi" 
+instruction, but when I use this on my system the instruction returns 
+immediately.  Replacing this with:
 
-diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
-index f18dc67..c6ab1df 100644
---- a/drivers/input/keyboard/spear-keyboard.c
-+++ b/drivers/input/keyboard/spear-keyboard.c
-@@ -70,7 +70,7 @@ static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
- 	u8 sts, val;
- 
- 	sts = readb(kbd->io_base + STATUS_REG);
--	if (sts & DATA_AVAIL)
-+	if (!(sts & DATA_AVAIL))
- 		return IRQ_NONE;
- 
- 	if (kbd->last_key != KEY_RESERVED) {
--- 
-1.6.0.2
+	asm volatile("mcr   p15, 0, %0, c7, c0, 4\n" :: "r"(0));
+
+makes everything work properly.  The ARM1176 TRM doesn't mention the wfi 
+instruction afaict but does say to use the cp15 instruction in section 
+10.2.2 (Standby mode).  It doesn't look to me that the SEV or WFE 
+instructions are implemented on ARM1176 so I'm guessing that these are 
+only in mpcore?
+
+Jamie
