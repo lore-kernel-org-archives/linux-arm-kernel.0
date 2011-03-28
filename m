@@ -1,37 +1,26 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 28 Mar 2011 10:15:52 -0500
-Subject: [PATCH] OMAP3: l3: fix for "irq 10: nobody cared" message
-In-Reply-To: <f12f050c3f7fe0b405fde475fcd62104@mail.gmail.com>
-References: <1301099396-30380-1-git-send-email-omar.ramirez@ti.com>
-	<f12f050c3f7fe0b405fde475fcd62104@mail.gmail.com>
-Message-ID: <AANLkTimDCpHQ5yvYN+0mW7HyyovyXCdGOf8LPv5FapNh@mail.gmail.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Mon, 28 Mar 2011 08:34:40 -0700
+Subject: [PATCH 0/2] regulator: Fix regulator_enable deadlock and add uA_load
+	propagation
+Message-ID: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Because the uA_load propagation change takes out a lock on a regulator and
+then the regulators that it supplies, it will cause deadlock with the current
+regulator_enable implementation.  regulator_disable can also deadlock with
+regulator_enable, but it requires two threads and precise timing to observe.
+Therefore, regulator_enable must be fixed before current propagation can be
+used.
 
-On Mon, Mar 28, 2011 at 12:38 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->> If an error occurs in the L3 on any other initiator than MPU,
->> the interrupt goes unhandled given that the 'base' register
->> was calculated with the initialized err_base value (which
->> coincidentally points to MPU) and not with the actual source
->> of the error.
->>
->> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
->
-> Patch looks good. Did you observe this with DSP initiator??
+David Collins (2):
+  regulator: Remove possible deadlock from regulator_enable
+  regulator: Propagate uA_load requirements up supply chain
 
-Yes, when loading a base image for the DSP, I got an: In-band Error
-Error seen by IVA_SS  at address 0; after this fix.
+ drivers/regulator/core.c         |  147 +++++++++++++++++++++++++++++++-------
+ include/linux/regulator/driver.h |    5 ++
+ 2 files changed, 125 insertions(+), 27 deletions(-)
 
-I was planning to remove the duplicated "Error" print too.
-
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Thanks, I'll add it in my next version when I make the changes
-affecting only these lines.
-
-Regards,
-
-Omar
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
