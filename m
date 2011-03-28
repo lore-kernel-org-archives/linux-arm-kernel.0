@@ -1,90 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 28 Mar 2011 14:52:25 +0530
-Subject: [pm-core][PATCH v3 09/21] OMAP4: PM: Add GIC distributor and
-	interface enable/disable accessory API
-In-Reply-To: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1301304157-2466-10-git-send-email-santosh.shilimkar@ti.com>
+From: rajeev-dlh.kumar@st.com (Rajeev Kumar)
+Date: Mon, 28 Mar 2011 15:23:57 +0530
+Subject: [PATCH] input/spear-keyboard fix: return IRQ_NONE if (status reg &
+	DATA_AVAIL)
+Message-ID: <1301306037-27666-1-git-send-email-rajeev-dlh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power management code needs to have access to enable/disable the
-gic cpu interface and distributor based on targetted low power
-states.
+We should return IRQ_NONE from interrupt handler in case data is not
+avail for keyboard
 
-These APIs are suppose to me moved to common ARM GIC library and patch
-for the same was posted earlier. The GIC code refactoring is ongoing
-and hence for time being this is kept under OMAP code so that OMAP4
-PM can continue to work.
-
-Discussion thread:
-	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42940.html
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-omap2/include/mach/omap4-common.h |    5 +++-
- arch/arm/mach-omap2/omap4-common.c              |   24 +++++++++++++++++++++++
- 2 files changed, 28 insertions(+), 1 deletions(-)
+ drivers/input/keyboard/spear-keyboard.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
-index a6ce905..a4b3beb 100644
---- a/arch/arm/mach-omap2/include/mach/omap4-common.h
-+++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
-@@ -44,6 +44,10 @@ extern void __iomem *omap4_get_gic_dist_base(void);
- extern void __iomem *omap4_get_gic_cpu_base(void);
- extern void __iomem *omap4_get_sar_ram_base(void);
- extern void __init gic_init_irq(void);
-+extern void gic_cpu_enable(void);
-+extern void gic_cpu_disable(void);
-+extern void gic_dist_enable(void);
-+extern void gic_dist_disable(void);
- extern void omap_smc1(u32 fn, u32 arg);
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+index f18dc67..c6ab1df 100644
+--- a/drivers/input/keyboard/spear-keyboard.c
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -70,7 +70,7 @@ static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
+ 	u8 sts, val;
  
- /*
-@@ -64,7 +68,6 @@ extern int omap4_mpuss_init(void);
- extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
- extern void omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
- extern void omap4_cpu_resume(void);
--
- #else
+ 	sts = readb(kbd->io_base + STATUS_REG);
+-	if (sts & DATA_AVAIL)
++	if (!(sts & DATA_AVAIL))
+ 		return IRQ_NONE;
  
- static inline int omap4_enter_lowpower(unsigned int cpu,
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 97d7d8a..9dd50b7 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -61,6 +61,30 @@ void __init gic_init_irq(void)
- 	gic_init(0, 29, gic_dist_base_addr, gic_cpu_base);
- }
- 
-+/*
-+ * FIXME: Remove this GIC APIs once common GIG library starts
-+ * supporting it.
-+ */
-+void gic_cpu_enable(void)
-+{
-+	__raw_writel(0xf0, gic_cpu_base + GIC_CPU_PRIMASK);
-+	__raw_writel(1, gic_cpu_base + GIC_CPU_CTRL);
-+}
-+
-+void gic_cpu_disable(void)
-+{
-+	__raw_writel(0, gic_cpu_base + GIC_CPU_CTRL);
-+}
-+
-+void gic_dist_enable(void)
-+{
-+	__raw_writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
-+}
-+void gic_dist_disable(void)
-+{
-+	__raw_writel(0, gic_dist_base_addr + GIC_CPU_CTRL);
-+}
-+
- #ifdef CONFIG_CACHE_L2X0
- 
- void __iomem *omap4_get_l2cache_base(void)
+ 	if (kbd->last_key != KEY_RESERVED) {
 -- 
-1.6.0.4
+1.6.0.2
