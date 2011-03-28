@@ -1,32 +1,22 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Mon, 28 Mar 2011 16:52:35 -0700
-Subject: [PATCH v2 0/2] regulator: Fix regulator_enable deadlock and add
-	uA_load propagation
-In-Reply-To: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-Message-ID: <1301356355-7546-1-git-send-email-collinsd@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 28 Mar 2011 18:53:12 -0500
+Subject: [PATCH] EP93xx: Remove ep93xx_gpio_dbg_show function
+In-Reply-To: <4D9113AA.20404@bluewatersys.com>
+References: <4D9113AA.20404@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D19A811F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the uA_load propagation change takes out a lock on a regulator and
-then the regulators that it supplies, it will cause deadlock with the current
-regulator_enable implementation.  regulator_disable can also deadlock with
-regulator_enable, but it requires two threads and precise timing to observe.
-Therefore, regulator_enable must be fixed before current propagation can be
-used.
+On Monday, March 28, 2011 4:03 PM, Ryan Mallon wrote:
+>
+> Hartley pointed out that the patch I posted to remove the irq internals
+> fiddling from ep93xx_gpio_dbg_show does not function as expected. It
+> will print [interrupt] beside all pins which are capable of being
+> interrupts, not just those which are currently configured as interrupts.
+>
+> The best solution is just to remove the custom ep93xx gpio debugfs
+> function all together. The generic gpiolib one is good enough.
+>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Changes from v1:
-	- Renamed _regulator_enable to regulator_dev_enable.
-	- Made change logs more verbose.
-
-David Collins (2):
-  regulator: Remove possible deadlock from regulator_enable
-  regulator: Propagate uA_load requirements up supply chain
-
- drivers/regulator/core.c         |  151 ++++++++++++++++++++++++++++++-------
- include/linux/regulator/driver.h |    5 +
- 2 files changed, 127 insertions(+), 29 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
