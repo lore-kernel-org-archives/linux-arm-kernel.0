@@ -1,25 +1,11 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 28 Mar 2011 17:12:21 -0000
-Subject: [patch 00/29] arm: bug fixes and irq cleanup (v2) for .39
-Message-ID: <20110328170219.059141076@linutronix.de>
+Date: Mon, 28 Mar 2011 17:12:29 -0000
+Subject: [patch 14/29] arm: stmp3xxx: Use generic_handle_irq()
+References: <20110328170219.059141076@linutronix.de>
+Message-ID: <20110328170652.135147806@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series contains a few bugfixes, which I made in order to
-compile the irq cleanup series.
-
-The irq cleanup series is almost the same except for a few typo fixups and
-does not longer remove the tegra resume/suspend stuff, but removes the irq
-fiddling inside.
-
-For your conveniance the series is also available from:
-
-    git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip.git irq/for-arm
-
-once the mirror decided to sync.
-
-Please let me know how to proceed with this lot.
-
-Thanks,
-
-	tglx
+An embedded and charset-unspecified text was scrubbed...
+Name: arm-stmp3.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110328/54b7799a/attachment.ksh>
