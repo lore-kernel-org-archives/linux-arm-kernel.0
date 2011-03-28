@@ -1,129 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 28 Mar 2011 09:18:28 -0700
-Subject: [PATCH 2/7] ARM / OMAP: Use struct syscore_ops for "core" power
-	management
-In-Reply-To: <201103280127.09110.rjw@sisk.pl> (Rafael J. Wysocki's message of
-	"Mon, 28 Mar 2011 01:27:08 +0200")
-References: <201103280125.11750.rjw@sisk.pl> <201103280127.09110.rjw@sisk.pl>
-Message-ID: <87ipv3kyln.fsf@ti.com>
+From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
+Date: Mon, 28 Mar 2011 19:27:59 +0300
+Subject: [PATCH] kprobes/arm: fix emulation of LDR/STR instruction when
+	Rn == PC
+In-Reply-To: <1301087944.2744.85.camel@computer2.home>
+References: <1301072519-27937-1-git-send-email-viktor.rosendahl@nokia.com>
+	<1301087944.2744.85.camel@computer2.home>
+Message-ID: <4D90B70F.7050108@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
-
-> From: Rafael J. Wysocki <rjw@sisk.pl>
+On 03/25/2011 11:19 PM, ext Tixy wrote:
 >
-> Replace the sysdev class and struct sys_device used for power
-> management in the OMAP's GPIO code with a struct syscore_ops object
-> which is simpler.
+>> Regarding the second point above, it would possibly be prudent to add some
+>> checking to prep_emulate_ldr_str(), so that instructions with write back and
+>> Rn == PC would be rejected.
 >
-> Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+> I don't think it is worth adding code to check for illegal instructions.
+> The toolchain shouldn't generate them in the first place, and there are
+> many places in the kprobe code which doesn't bother checking; there are
+> even comments like "may be invalid, don't care".
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+I think those "may be invalid, don't care" comments mostly are about the 
+Rm value, which isn't valid for some fully legal variants of the 
+instruction, those instructions that have the immediate bit set. In that 
+case the Rm value, will actually be part of an immediate and thus bogus. 
+However, it will not impact the result of the emulation because the 
+instruction will not read from the r2 register. It's enough to check the 
+immediate bit in the prep_emulate_*() functions; if you check for 
+example the prep_emulate_ldr_str() function you will se that it actually 
+does it before adjusting Rm to r2.
 
-Looks fine to me.  We're in the process of converting this driver to
-runtime PM.  When that happens the syscore ops will be removed as well,
-but I'm fine with this patch until we finish the runtime PM conversion.
+To summarize, I think the "may be invalid, don't care" comments simply 
+mean "This value may be bogus but in that case it will not impact the 
+result of the emulation so we don't care".
 
-Kevin
-
-> ---
->  arch/arm/plat-omap/gpio.c |   35 +++++++++--------------------------
->  1 file changed, 9 insertions(+), 26 deletions(-)
 >
-> Index: linux-2.6/arch/arm/plat-omap/gpio.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/plat-omap/gpio.c
-> +++ linux-2.6/arch/arm/plat-omap/gpio.c
-> @@ -17,7 +17,7 @@
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/interrupt.h>
-> -#include <linux/sysdev.h>
-> +#include <linux/syscore_ops.h>
->  #include <linux/err.h>
->  #include <linux/clk.h>
->  #include <linux/io.h>
-> @@ -1379,9 +1379,7 @@ static const struct dev_pm_ops omap_mpui
->  	.resume_noirq = omap_mpuio_resume_noirq,
->  };
->  
-> -/* use platform_driver for this, now that there's no longer any
-> - * point to sys_device (other than not disturbing old code).
-> - */
-> +/* use platform_driver for this. */
->  static struct platform_driver omap_mpuio_driver = {
->  	.driver		= {
->  		.name	= "mpuio",
-> @@ -1754,7 +1752,7 @@ static int __devinit omap_gpio_probe(str
->  }
->  
->  #if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
-> -static int omap_gpio_suspend(struct sys_device *dev, pm_message_t mesg)
-> +static int omap_gpio_suspend(void)
->  {
->  	int i;
->  
-> @@ -1804,12 +1802,12 @@ static int omap_gpio_suspend(struct sys_
->  	return 0;
->  }
->  
-> -static int omap_gpio_resume(struct sys_device *dev)
-> +static void omap_gpio_resume(void)
->  {
->  	int i;
->  
->  	if (!cpu_class_is_omap2() && !cpu_is_omap16xx())
-> -		return 0;
-> +		return;
->  
->  	for (i = 0; i < gpio_bank_count; i++) {
->  		struct gpio_bank *bank = &gpio_bank[i];
-> @@ -1845,21 +1843,13 @@ static int omap_gpio_resume(struct sys_d
->  		__raw_writel(bank->saved_wakeup, wake_set);
->  		spin_unlock_irqrestore(&bank->lock, flags);
->  	}
-> -
-> -	return 0;
->  }
->  
-> -static struct sysdev_class omap_gpio_sysclass = {
-> -	.name		= "gpio",
-> +static struct syscore_ops omap_gpio_syscore_ops = {
->  	.suspend	= omap_gpio_suspend,
->  	.resume		= omap_gpio_resume,
->  };
->  
-> -static struct sys_device omap_gpio_device = {
-> -	.id		= 0,
-> -	.cls		= &omap_gpio_sysclass,
-> -};
-> -
->  #endif
->  
->  #ifdef CONFIG_ARCH_OMAP2PLUS
-> @@ -2117,21 +2107,14 @@ postcore_initcall(omap_gpio_drv_reg);
->  
->  static int __init omap_gpio_sysinit(void)
->  {
-> -	int ret = 0;
-> -
->  	mpuio_init();
->  
->  #if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
-> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> -		if (ret == 0) {
-> -			ret = sysdev_class_register(&omap_gpio_sysclass);
-> -			if (ret == 0)
-> -				ret = sysdev_register(&omap_gpio_device);
-> -		}
-> -	}
-> +	if (cpu_is_omap16xx() || cpu_class_is_omap2())
-> +		register_syscore_ops(&omap_gpio_syscore_ops);
->  #endif
->  
-> -	return ret;
-> +	return 0;
->  }
->  
->  arch_initcall(omap_gpio_sysinit);
+> I'm currently working on implementing Thumb support in kprobes and am
+> writing test code as part of that. I planned on adding test cases for
+> ARM so hopefully will catch a few more instruction emulation bugs (if
+> there are any to be found).
+>
+
+Nice.
