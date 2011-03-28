@@ -1,49 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 28 Mar 2011 08:56:55 -0700
-Subject: [PATCH v2 00/19] OMAP4: PM: Suspend,
-	CPU-hotplug and CPUilde support.
-In-Reply-To: <d6e3117993699fda33d37081605a9403@mail.gmail.com> (Santosh
-	Shilimkar's message of "Mon, 28 Mar 2011 16:32:39 +0530")
-References: <1299766095-23879-1-git-send-email-santosh.shilimkar@ti.com>
-	<87d3lycu0h.fsf@ti.com>
-	<49a5273c412bf9193a9f930e990d22d4@mail.gmail.com>
-	<87pqpxbqho.fsf@ti.com> <87mxkk1rni.fsf@ti.com>
-	<86f296cd6f86c03bc066efaf7cf2b537@mail.gmail.com>
-	<87mxkjusth.fsf@ti.com>
-	<d6e3117993699fda33d37081605a9403@mail.gmail.com>
-Message-ID: <87vcz3kzlk.fsf@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 28 Mar 2011 18:01:30 +0200
+Subject: [PATCH 4/4] arm: lpc32xx: clock: use bool logic instead of binary
+In-Reply-To: <1301328090-25994-1-git-send-email-w.sang@pengutronix.de>
+References: <1301328090-25994-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1301328090-25994-4-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ arch/arm/mach-lpc32xx/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-
-[...]
-
-> Have created two branches as you suggested against latest
-> pm-core.
-
-Thanks!
-
-> 1) OMAP4-PM series:
-> git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-> omap4_pm_pmcore_v3
-
-Also, can you post this version of the series to the list,
-w/linux-arm-kernel Cc'd.
-
-> 2) Dependent patches
-> git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-> omap4_pm_pmcore_dep
->
-> Also created an integration branch which merges 1) and 2)
->
-> git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-> omap4_pm_pmcore_int
-
-Excellent.
-
-Thanks
-
-Kevin
+diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+index 1e02751..7218237 100644
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -396,7 +396,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
+ 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+ 
+ 		/* Wait for PLL lock */
+-		while ((timeout > jiffies) & (ret == -ENODEV)) {
++		while ((timeout > jiffies) && (ret == -ENODEV)) {
+ 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+ 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
+ 				ret = 0;
+-- 
+1.7.2.5
