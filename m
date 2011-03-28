@@ -1,40 +1,80 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Mar 2011 15:32:07 +0100
-Subject: CPUv6K (ARM1176) and wfi()
-In-Reply-To: <20110328122557.GB2738@pulham.picochip.com>
-References: <20110328122557.GB2738@pulham.picochip.com>
-Message-ID: <AANLkTimahGgupW-b370664jXKhyv+NEh1+TwX=PVCb3G@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 28 Mar 2011 22:38:07 +0800
+Subject: [PATCH] mmc: change CONFIG of MMC_SDHCI based drivers from
+	'bool' to 'tristate'
+In-Reply-To: <1300114465-3769-1-git-send-email-shawn.guo@freescale.com>
+References: <1300114465-3769-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110328143806.GC18721@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2011 at 1:25 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> Hi Catalin, Will,
->
-> I'm respinning some PM patches for my platform (ARM1176JZ-S) and looking
-> at arch/arm/include/asm/system.h, for CPU_32v6K wfi() uses the "wfi"
-> instruction, but when I use this on my system the instruction returns
-> immediately. ?Replacing this with:
->
-> ? ? ? ?asm volatile("mcr ? p15, 0, %0, c7, c0, 4\n" :: "r"(0));
->
-> makes everything work properly. ?The ARM1176 TRM doesn't mention the wfi
-> instruction afaict but does say to use the cp15 instruction in section
-> 10.2.2 (Standby mode). ?It doesn't look to me that the SEV or WFE
-> instructions are implemented on ARM1176 so I'm guessing that these are
-> only in mpcore?
+Hi Chris,
 
-I think WFI/SEV/WFE are encoded as NOP-synonyms, so they may do
-nothing on non-multicore platforms; so I think the MCR is the correct
-mechanism to use for 1176... unless Will or Catalin have better ideas.
+Any comment on this one?
 
-Cheers
----Dave
+-- 
+Regards,
+Shawn
 
->
-> Jamie
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Mon, Mar 14, 2011 at 10:54:25PM +0800, Shawn Guo wrote:
+> The MMC_SDHCI based driver is either based on MMC_SDHCI_PLTFM or
+> MMC_SDHCI_OF.  As both parent CONFIG are 'tristate', it may make
+> sense to get all children drivers CONFIG as 'tristate'.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  drivers/mmc/host/Kconfig |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index afe8c6f..f98adbf 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -91,7 +91,7 @@ config MMC_SDHCI_OF
+>  	  If unsure, say N.
+>  
+>  config MMC_SDHCI_OF_ESDHC
+> -	bool "SDHCI OF support for the Freescale eSDHC controller"
+> +	tristate "SDHCI OF support for the Freescale eSDHC controller"
+>  	depends on MMC_SDHCI_OF
+>  	depends on PPC_OF
+>  	select MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
+> @@ -101,7 +101,7 @@ config MMC_SDHCI_OF_ESDHC
+>  	  If unsure, say N.
+>  
+>  config MMC_SDHCI_OF_HLWD
+> -	bool "SDHCI OF support for the Nintendo Wii SDHCI controllers"
+> +	tristate "SDHCI OF support for the Nintendo Wii SDHCI controllers"
+>  	depends on MMC_SDHCI_OF
+>  	depends on PPC_OF
+>  	select MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
+> @@ -124,7 +124,7 @@ config MMC_SDHCI_PLTFM
+>  	  If unsure, say N.
+>  
+>  config MMC_SDHCI_CNS3XXX
+> -	bool "SDHCI support on the Cavium Networks CNS3xxx SoC"
+> +	tristate "SDHCI support on the Cavium Networks CNS3xxx SoC"
+>  	depends on ARCH_CNS3XXX
+>  	depends on MMC_SDHCI_PLTFM
+>  	help
+> @@ -133,7 +133,7 @@ config MMC_SDHCI_CNS3XXX
+>  	  If unsure, say N.
+>  
+>  config MMC_SDHCI_ESDHC_IMX
+> -	bool "SDHCI platform support for the Freescale eSDHC i.MX controller"
+> +	tristate "SDHCI platform support for the Freescale eSDHC i.MX controller"
+>  	depends on MMC_SDHCI_PLTFM && (ARCH_MX25 || ARCH_MX35 || ARCH_MX5)
+>  	select MMC_SDHCI_IO_ACCESSORS
+>  	help
+> @@ -143,7 +143,7 @@ config MMC_SDHCI_ESDHC_IMX
+>  	  If unsure, say N.
+>  
+>  config MMC_SDHCI_DOVE
+> -	bool "SDHCI support on Marvell's Dove SoC"
+> +	tristate "SDHCI support on Marvell's Dove SoC"
+>  	depends on ARCH_DOVE
+>  	depends on MMC_SDHCI_PLTFM
+>  	select MMC_SDHCI_IO_ACCESSORS
+> -- 
+> 1.7.1
+> 
