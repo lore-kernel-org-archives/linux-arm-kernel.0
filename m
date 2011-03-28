@@ -1,175 +1,94 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Mon, 28 Mar 2011 08:34:42 -0700
-Subject: [PATCH 2/2] regulator: Propagate uA_load requirements up supply chain
-In-Reply-To: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-Message-ID: <1301326482-6547-3-git-send-email-collinsd@codeaurora.org>
+From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
+Date: Mon, 28 Mar 2011 18:56:05 +0300
+Subject: [PATCH] Fix ldrd/strd emulation for kprobes/ARM
+In-Reply-To: <1301087944.2744.85.camel@computer2.home>
+References: <1301087944.2744.85.camel@computer2.home>
+Message-ID: <1301327765-6996-1-git-send-email-viktor.rosendahl@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regulator_set_optimum_mode currently only determines the load
-on the specified regulator.  Physically however, this current
-must be provided by regulators further up the supply chain.
-Add code to handle uA_load propagation up through the regulator
-supply chain.
+On 03/25/2011 11:19 PM, ext Tixy wrote:
+> On Fri, 2011-03-25 at 19:01 +0200, Viktor Rosendahl wrote:
+>> The Rn value from the emulation is unconditionally written back; this is fine
+>> as long as Rn != PC because in that case, even if the instruction isn't a write
+>> back instruction, it will only result in the same value being written back.
+>>
+>> In case Rn == PC, then the emulated instruction doesn't have the actual PC
+>> value in Rn but an adjusted value; when this is written back, it will result in
+>> the PC being incorrectly updated.
+> It looks like we have the same problem with emulate_ldrd and
+> emulate_strd as well.
 
-Signed-off-by: David Collins <collinsd@codeaurora.org>
+Yes, it seems so. Currently emulate_ldrd and emulate_strd don't even have the
+adjustment of the PC value, so in case of Rn == PC, it will not update the PC
+incorrectly but instead load/store from the wrong address. Below is a patch
+that adds both the adjustment of the PC value and the check for PC == PC.
+
+I haven't tested this code at all and I am not sure of how to test it.
+
+Signed-off-by: Viktor Rosendahl <viktor.rosendahl@nokia.com>
 ---
- drivers/regulator/core.c         |   69 ++++++++++++++++++++++++++++++++++++-
- include/linux/regulator/driver.h |    5 +++
- 2 files changed, 72 insertions(+), 2 deletions(-)
+ arch/arm/kernel/kprobes-decode.c |   20 +++++++++++++++-----
+ 1 files changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 425beba..2591fae 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -422,10 +422,20 @@ static ssize_t regulator_total_uA_show(struct device *dev,
- 				      struct device_attribute *attr, char *buf)
+diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+index 2389131..3b0cf90 100644
+--- a/arch/arm/kernel/kprobes-decode.c
++++ b/arch/arm/kernel/kprobes-decode.c
+@@ -540,9 +540,12 @@ static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
  {
- 	struct regulator_dev *rdev = dev_get_drvdata(dev);
-+	struct regulator_dev *consumer_rdev;
- 	struct regulator *regulator;
- 	int uA = 0;
+ 	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+ 	kprobe_opcode_t insn = p->opcode;
++	long ppc = (long)p->addr + 8;
+ 	int rd = (insn >> 12) & 0xf;
+ 	int rn = (insn >> 16) & 0xf;
+ 	int rm = insn & 0xf;  /* rm may be invalid, don't care. */
++	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
++	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
  
-+	/* Calculate total load of consumer regulator devices. */
-+	list_for_each_entry(consumer_rdev, &rdev->supply_list, slist)
-+		if (consumer_rdev->desc->ops->get_current_required) {
-+			mutex_lock(&consumer_rdev->mutex);
-+			uA += consumer_rdev->uA_load;
-+			mutex_unlock(&consumer_rdev->mutex);
-+		}
-+
- 	mutex_lock(&rdev->mutex);
-+	/* Calculate total load of consumer devices. */
- 	list_for_each_entry(regulator, &rdev->consumer_list, list)
- 		uA += regulator->uA_load;
- 	mutex_unlock(&rdev->mutex);
-@@ -574,10 +584,14 @@ static struct class regulator_class = {
- 	.dev_attrs = regulator_dev_attrs,
- };
- 
--/* Calculate the new optimum regulator operating mode based on the new total
-- * consumer load. All locks held by caller */
-+/*
-+ * Calculate the new optimum regulator operating mode based on the new total
-+ * consumer load. Lock for rdev is held by caller. Locks will be taken for
-+ * consumer regulators of rdev.
-+ */
- static void drms_uA_update(struct regulator_dev *rdev)
- {
-+	struct regulator_dev *consumer_rdev;
- 	struct regulator *sibling;
- 	int current_uA = 0, output_uV, input_uV, err;
- 	unsigned int mode;
-@@ -607,6 +621,14 @@ static void drms_uA_update(struct regulator_dev *rdev)
- 	list_for_each_entry(sibling, &rdev->consumer_list, list)
- 		current_uA += sibling->uA_load;
- 
-+	/* calculate total load of consumer regulator devices before locking */
-+	list_for_each_entry(consumer_rdev, &rdev->supply_list, slist)
-+		if (consumer_rdev->desc->ops->get_current_required) {
-+			mutex_lock(&consumer_rdev->mutex);
-+			current_uA += consumer_rdev->uA_load;
-+			mutex_unlock(&consumer_rdev->mutex);
-+		}
-+
- 	/* now get the optimum mode for our new total regulator load */
- 	mode = rdev->desc->ops->get_optimum_mode(rdev, input_uV,
- 						  output_uV, current_uA);
-@@ -615,6 +637,14 @@ static void drms_uA_update(struct regulator_dev *rdev)
- 	err = regulator_check_mode(rdev, mode);
- 	if (err == 0)
- 		rdev->desc->ops->set_mode(rdev, mode);
-+
-+	if (rdev->desc->ops->get_current_required) {
-+		err = rdev->desc->ops->get_current_required(rdev, input_uV,
-+							output_uV, current_uA);
-+		if (err < 0)
-+			return;
-+		rdev->uA_load = err;
-+	}
+ 	/* Not following the C calling convention here, so need asm(). */
+ 	__asm__ __volatile__ (
+@@ -554,29 +557,36 @@ static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
+ 		"str	r0, %[rn]	\n\t"	/* in case of writeback */
+ 		"str	r2, %[rd0]	\n\t"
+ 		"str	r3, %[rd1]	\n\t"
+-		: [rn]  "+m" (regs->uregs[rn]),
++		: [rn]  "+m" (rnv),
+ 		  [rd0] "=m" (regs->uregs[rd]),
+ 		  [rd1] "=m" (regs->uregs[rd+1])
+-		: [rm]   "m" (regs->uregs[rm]),
++		: [rm]   "m" (rmv),
+ 		  [cpsr] "r" (regs->ARM_cpsr),
+ 		  [i_fn] "r" (i_fn)
+ 		: "r0", "r1", "r2", "r3", "lr", "cc"
+ 	);
++	if (rn != 15)
++		regs->uregs[rn] = rnv;  /* Save Rn in case of writeback. */
  }
  
- static int suspend_set_state(struct regulator_dev *rdev,
-@@ -2033,10 +2063,20 @@ EXPORT_SYMBOL_GPL(regulator_get_mode);
- int regulator_set_optimum_mode(struct regulator *regulator, int uA_load)
+ static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
  {
- 	struct regulator_dev *rdev = regulator->rdev;
-+	struct regulator_dev *consumer_rdev;
- 	struct regulator *consumer;
- 	int ret, output_uV, input_uV, total_uA_load = 0;
- 	unsigned int mode;
+ 	insn_4arg_fn_t *i_fn = (insn_4arg_fn_t *)&p->ainsn.insn[0];
+ 	kprobe_opcode_t insn = p->opcode;
++	long ppc = (long)p->addr + 8;
+ 	int rd = (insn >> 12) & 0xf;
+ 	int rn = (insn >> 16) & 0xf;
+ 	int rm  = insn & 0xf;
+-	long rnv = regs->uregs[rn];
+-	long rmv = regs->uregs[rm];  /* rm/rmv may be invalid, don't care. */
++	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
++	/* rm/rmv may be invalid, don't care. */
++	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
++	long rnv_wb;
  
-+	/* calculate total load of consumer regulator devices before locking */
-+	list_for_each_entry(consumer_rdev, &rdev->supply_list, slist) {
-+		if (consumer_rdev->desc->ops->get_current_required) {
-+			mutex_lock(&consumer_rdev->mutex);
-+			total_uA_load += consumer_rdev->uA_load;
-+			mutex_unlock(&consumer_rdev->mutex);
-+		}
-+	}
-+
- 	mutex_lock(&rdev->mutex);
- 
- 	regulator->uA_load = uA_load;
-@@ -2086,9 +2126,34 @@ int regulator_set_optimum_mode(struct regulator *regulator, int uA_load)
- 		rdev_err(rdev, "failed to set optimum mode %x\n", mode);
- 		goto out;
- 	}
-+
-+	if (rdev->desc->ops->get_current_required) {
-+		ret = rdev->desc->ops->get_current_required(rdev, input_uV,
-+						output_uV, total_uA_load);
-+		if (ret < 0) {
-+			rdev_err(rdev, "failed to get required load @ %d uA "
-+					"%d -> %d uV, rc=%d\n", total_uA_load,
-+					input_uV, output_uV, ret);
-+			goto out;
-+		}
-+
-+		rdev->uA_load = ret;
-+	}
-+
- 	ret = mode;
-+
- out:
- 	mutex_unlock(&rdev->mutex);
-+
-+	/* Update load for our supplies */
-+	while (rdev->desc->ops->get_current_required && rdev->supply) {
-+		rdev = rdev->supply;
-+
-+		mutex_lock(&rdev->mutex);
-+		drms_uA_update(rdev);
-+		mutex_unlock(&rdev->mutex);
-+	}
-+
- 	return ret;
+-	regs->uregs[rn] = insnslot_4arg_rflags(rnv, rmv, regs->uregs[rd],
++	rnv_wb = insnslot_4arg_rflags(rnv, rmv, regs->uregs[rd],
+ 					       regs->uregs[rd+1],
+ 					       regs->ARM_cpsr, i_fn);
++	if (rn != 15)
++		regs->uregs[rn] = rnv_wb;  /* Save Rn in case of writeback. */
  }
- EXPORT_SYMBOL_GPL(regulator_set_optimum_mode);
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index b8ed16a..521b1b6 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -117,6 +117,10 @@ struct regulator_ops {
- 	unsigned int (*get_optimum_mode) (struct regulator_dev *, int input_uV,
- 					  int output_uV, int load_uA);
  
-+	/* get supply current required for load */
-+	int (*get_current_required) (struct regulator_dev *, int input_uV,
-+				     int output_uV, int load_uA);
-+
- 	/* the operations below are for configuration of regulator state when
- 	 * its parent PMIC enters a global STANDBY/HIBERNATE state */
- 
-@@ -178,6 +182,7 @@ struct regulator_dev {
- 	int exclusive;
- 	u32 use_count;
- 	u32 open_count;
-+	int uA_load;
- 
- 	/* lists we belong to */
- 	struct list_head list; /* list of all regulators */
+ static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2.5
