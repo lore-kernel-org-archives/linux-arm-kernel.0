@@ -1,59 +1,75 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 29 Mar 2011 12:30:51 +0200
-Subject: [PATCH v4 05/10] lpc2k: gpiolib
+Date: Tue, 29 Mar 2011 12:30:54 +0200
+Subject: [PATCH v4 08/10] lpc2k: Add UART, SSP, and MCI devices
 In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301394656-24853-6-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1301394656-24853-9-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpiolib support, including gpio interrupts.
+Adds devices for which the drivers are already in the tree. For
+the relevant devices, let the ea2478devkit board set them up.
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
 no changes since v3.
 
 changes since v2:
-	* Added LPC2K_GPIO(port,pin) macro and used similar macros
-	  to minimize declarations of GPIO IRQs.
+	* removed clk_put() from UART init routine.
 
 no changes since v1.
 ---
  arch/arm/Kconfig                            |    1 +
  arch/arm/mach-lpc2k/Makefile                |    2 +-
- arch/arm/mach-lpc2k/gpio.c                  |  265 +++++++++++++++++++++++++++
- arch/arm/mach-lpc2k/include/mach/gpio.h     |   25 +++
- arch/arm/mach-lpc2k/include/mach/hardware.h |    2 +
- arch/arm/mach-lpc2k/include/mach/irqs.h     |    5 +-
- 6 files changed, 298 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/gpio.c
- create mode 100644 arch/arm/mach-lpc2k/include/mach/gpio.h
+ arch/arm/mach-lpc2k/common.h                |    4 +
+ arch/arm/mach-lpc2k/devices.c               |  173 +++++++++++++++++++++++++++
+ arch/arm/mach-lpc2k/include/mach/hardware.h |    6 +
+ arch/arm/mach-lpc2k/mach-ea2478devkit.c     |   20 +++
+ 6 files changed, 205 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/devices.c
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4a399e0..eaa5f8c 100644
+index eaa5f8c..0ad1915 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -501,6 +501,7 @@ config ARCH_LPC2K
+@@ -499,6 +499,7 @@ config ARCH_LPC2K
+ 	depends on !MMU
+ 	select CPU_ARM7TDMI
  	select ARM_VIC
++	select ARM_AMBA
  	select CLKDEV_LOOKUP
  	select GENERIC_CLOCKEVENTS
-+	select ARCH_REQUIRE_GPIOLIB
- 	help
- 	  Support for NXP LPC2K family of SoCs. These SoCs are based on
- 	  an ARM7TDMI-S core, and have optional on-chip flash and SRAM,
+ 	select ARCH_REQUIRE_GPIOLIB
 diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 267432c..89596a7 100644
+index 93e27fb..aa2b353 100644
 --- a/arch/arm/mach-lpc2k/Makefile
 +++ b/arch/arm/mach-lpc2k/Makefile
-@@ -1 +1 @@
--obj-y	:= clock.o irq.o time.o
-+obj-y	:= clock.o irq.o gpio.o time.o
-diff --git a/arch/arm/mach-lpc2k/gpio.c b/arch/arm/mach-lpc2k/gpio.c
+@@ -1,3 +1,3 @@
+ obj-y	:= clock.o irq.o gpio.o mfp.o time.o
+ 
+-obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o
++obj-$(CONFIG_MACH_EA2478DEVKIT) += mach-ea2478devkit.o devices.o
+diff --git a/arch/arm/mach-lpc2k/common.h b/arch/arm/mach-lpc2k/common.h
+index 6b775d9..1d4c21e 100644
+--- a/arch/arm/mach-lpc2k/common.h
++++ b/arch/arm/mach-lpc2k/common.h
+@@ -16,6 +16,10 @@ extern void lpc2k_init_clocks(unsigned long xtal, unsigned long rtc);
+ extern void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num);
+ extern void lpc2k_init_irq(void);
+ 
++extern void lpc2k_add_uart(int nr);
++extern void lpc2k_add_ssp(int nr, void *platform_data);
++extern void lpc2k_add_mci(void *platform_data, int pwr_high);
++
+ extern struct sys_timer lpc2k_timer;
+ 
+ #endif /* LPC2K_COMMON_H */
+diff --git a/arch/arm/mach-lpc2k/devices.c b/arch/arm/mach-lpc2k/devices.c
 new file mode 100644
-index 0000000..b55864c
+index 0000000..8e7de6d
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/gpio.c
-@@ -0,0 +1,265 @@
++++ b/arch/arm/mach-lpc2k/devices.c
+@@ -0,0 +1,173 @@
 +/*
 + * Copyright (C) 2011 Team Embeded VOF
 + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
@@ -64,323 +80,228 @@ index 0000000..b55864c
 + */
 +
 +#include <linux/module.h>
-+#include <linux/gpio.h>
-+#include <linux/irq.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/clk.h>
 +#include <linux/io.h>
 +
++#include <linux/amba/bus.h>
++#include <linux/amba/mmci.h>
++#include <linux/amba/pl022.h>
++
 +#include <mach/hardware.h>
-+#include <mach/irqs.h>
 +
-+#define LPC2K_GPIO_CHIP(name, base_gpio, nr_gpio, irqbase)		\
-+	{								\
-+		.chip = {						\
-+			.label		  = name,			\
-+			.direction_input  = lpc2k_dir_input,		\
-+			.direction_output = lpc2k_dir_output,		\
-+			.to_irq           = lpc2k_to_irq,		\
-+			.get		  = lpc2k_gpio_get,		\
-+			.set		  = lpc2k_gpio_set,		\
-+			.base		  = base_gpio,			\
-+			.ngpio		  = nr_gpio,			\
-+		},							\
-+		.irq_base = irqbase,					\
++/* System Control Block - System Controls and Status register */
++#define SCS		0x1a0
++
++#define __IORESOURCE_MEM_16K(x)	{	\
++	.start = x,			\
++	.end   = x + SZ_16K - 1,	\
++	.flags = IORESOURCE_MEM,	\
 +	}
 +
-+#define to_lpc2k_gpio_chip(c) container_of(c, struct lpc2k_gpio_chip, chip)
-+
-+#define FIODIR	0x00
-+#define FIOMASK	0x10
-+#define FIOPIN	0x14
-+#define FIOSET	0x18
-+#define FIOCLR	0x1c
-+
-+struct lpc2k_gpio_chip {
-+	struct gpio_chip chip;
-+	void __iomem *regbase;
-+	int irq_base;
-+	spinlock_t gpio_lock;
-+};
-+
-+static int lpc2k_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct lpc2k_gpio_chip *lpc2k_gpio = to_lpc2k_gpio_chip(chip);
-+	if (lpc2k_gpio->irq_base < 0)
-+		return -EINVAL;
-+
-+	return lpc2k_gpio->irq_base + offset;
-+}
-+
-+static int lpc2k_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct lpc2k_gpio_chip *lpc2k_gpio = to_lpc2k_gpio_chip(chip);
-+
-+	return !!(readl(lpc2k_gpio->regbase + FIOPIN) & (1 << offset));
-+}
-+
-+static void lpc2k_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
-+{
-+	struct lpc2k_gpio_chip *lpc2k_gpio = to_lpc2k_gpio_chip(chip);
-+
-+	writel(1 << offset, lpc2k_gpio->regbase + (val ? FIOSET : FIOCLR));
-+}
-+
-+static int lpc2k_dir_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct lpc2k_gpio_chip *lpc2k_gpio = to_lpc2k_gpio_chip(chip);
-+	void __iomem *pio = lpc2k_gpio->regbase + FIODIR;
-+	unsigned int regval;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&lpc2k_gpio->gpio_lock, flags);
-+
-+	regval = readl(pio);
-+	regval &= ~(1 << offset);
-+	writel(regval, pio);
-+
-+	spin_unlock_irqrestore(&lpc2k_gpio->gpio_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int lpc2k_dir_output(struct gpio_chip *chip, unsigned offset, int val)
-+{
-+	struct lpc2k_gpio_chip *lpc2k_gpio = to_lpc2k_gpio_chip(chip);
-+	unsigned int regval;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&lpc2k_gpio->gpio_lock, flags);
-+
-+	regval = readl(lpc2k_gpio->regbase + FIODIR);
-+	regval |= (1 << offset);
-+	writel(regval, lpc2k_gpio->regbase + FIODIR);
-+
-+	writel(1 << offset, lpc2k_gpio->regbase + (val ? FIOSET : FIOCLR));
-+
-+	spin_unlock_irqrestore(&lpc2k_gpio->gpio_lock, flags);
-+
-+	return 0;
-+}
-+
-+static struct lpc2k_gpio_chip lpc2k_gpio[] = {
-+	LPC2K_GPIO_CHIP("P0", 0, 32, IRQ_LPC2K_PORT0(0)),
-+	LPC2K_GPIO_CHIP("P1", 32, 32, -1),
-+	LPC2K_GPIO_CHIP("P2", 64, 32, IRQ_LPC2K_PORT2(0)),
-+	LPC2K_GPIO_CHIP("P3", 96, 32, -1),
-+	LPC2K_GPIO_CHIP("P4", 128, 32, -1),
-+};
-+
-+#define IOINTSTAT	0x0080
-+#define IO0INT		0x0084
-+#define IO2INT		0x00a4
-+
-+#define IOINTSTATR	0x0000
-+#define IOINTSTATF	0x0004
-+#define IOINTCLR	0x0008
-+#define IOINTENR	0x000c
-+#define IOINTENF	0x0010
-+
-+static void lpc2k_gpio_enable_irq(struct irq_data *d)
-+{
-+	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	unsigned irq = d->irq & 31;
-+	unsigned status = irq_to_desc(d->irq)->status;
-+
-+	status &= IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING;
-+	if (!status)
-+		status = IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING;
-+
-+	if (status & IRQ_TYPE_EDGE_RISING)
-+		writel(readl(base + IOINTENR) | (1 << irq), base + IOINTENR);
-+	else
-+		writel(readl(base + IOINTENR) & ~(1 << irq), base + IOINTENR);
-+
-+	if (status & IRQ_TYPE_EDGE_FALLING)
-+		writel(readl(base + IOINTENF) | (1 << irq), base + IOINTENF);
-+	else
-+		writel(readl(base + IOINTENF) & ~(1 << irq), base + IOINTENF);
-+}
-+
-+static void lpc2k_gpio_disable_irq(struct irq_data *d)
-+{
-+	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	unsigned irq = d->irq & 31;
-+
-+	writel(readl(base + IOINTENR) & ~(1 << irq), base + IOINTENR);
-+	writel(readl(base + IOINTENF) & ~(1 << irq), base + IOINTENF);
-+}
-+
-+static int lpc2k_gpio_set_type(struct irq_data *d, unsigned trigger)
-+{
-+	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	struct irq_desc *desc = irq_to_desc(d->irq);
-+	unsigned irq = d->irq & 31;
-+
-+	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
-+		return -EINVAL;
-+
-+	desc->status &= ~IRQ_TYPE_SENSE_MASK;
-+	desc->status |= trigger;
-+
-+	/* don't enable the IRQ if it's currently disabled */
-+	if (desc->depth == 0) {
-+		if (trigger & IRQ_TYPE_EDGE_RISING)
-+			writel(readl(base + IOINTENR) | (1 << irq),
-+			       base + IOINTENR);
-+		else
-+			writel(readl(base + IOINTENR) & ~(1 << irq),
-+			       base + IOINTENR);
-+
-+		if (trigger & IRQ_TYPE_EDGE_FALLING)
-+			writel(readl(base + IOINTENF) | (1 << irq),
-+			       base + IOINTENF);
-+		else
-+			writel(readl(base + IOINTENF) & ~(1 << irq),
-+			       base + IOINTENF);
++#define __IORESOURCE_IRQ(x)	{	\
++	.start = x,			\
++	. end  = x,			\
 +	}
 +
-+	return 0;
-+}
-+
-+struct irq_chip gpio_irq_chip_p0 = {
-+	.name = "GPIO-P0",
-+	.irq_enable = lpc2k_gpio_enable_irq,
-+	.irq_disable = lpc2k_gpio_disable_irq,
-+	.irq_set_type = lpc2k_gpio_set_type,
-+};
-+
-+struct irq_chip gpio_irq_chip_p2 = {
-+	.name = "GPIO-P2",
-+	.irq_enable = lpc2k_gpio_enable_irq,
-+	.irq_disable = lpc2k_gpio_disable_irq,
-+	.irq_set_type = lpc2k_gpio_set_type,
-+};
-+
-+static void lpc2k_demux_gpio_irq(unsigned int irq, struct irq_desc *desc)
-+{
-+	u32 status = readl(APB_GPIO_BASE + IOINTSTAT);
-+	if (status & 1) {
-+		int i, stat = readl(APB_GPIO_BASE + IO0INT + IOINTSTATR) |
-+		    readl(APB_GPIO_BASE + IO0INT + IOINTSTATF);
-+
-+		writel(stat, APB_GPIO_BASE + IO0INT + IOINTCLR);
-+
-+		for (i = 0; i < 32; i++)
-+			if (stat & (1 << i))
-+				generic_handle_irq(IRQ_LPC2K_PORT0(i));
-+	}
-+
-+	if (status & 4) {
-+		int i, stat = readl(APB_GPIO_BASE + IO2INT + IOINTSTATR) |
-+		    readl(APB_GPIO_BASE + IO2INT + IOINTSTATF);
-+
-+		writel(stat, APB_GPIO_BASE + IO2INT + IOINTCLR);
-+
-+		for (i = 0; i < 32; i++)
-+			if (stat & (1 << i))
-+				generic_handle_irq(IRQ_LPC2K_PORT2(i));
-+	}
-+}
-+
-+static int __init lpc2k_init_gpio(void)
-+{
-+	struct lpc2k_gpio_chip *gpio_chip;
-+	void __iomem *base;
-+	unsigned i;
-+
-+	for (i = 0; i < ARRAY_SIZE(lpc2k_gpio); i++) {
-+		gpio_chip = &lpc2k_gpio[i];
-+		spin_lock_init(&gpio_chip->gpio_lock);
-+		gpio_chip->regbase =
-+		    (void __iomem *)(FAST_GPIO_BASE + i * 0x20);
-+		gpiochip_add(&gpio_chip->chip);
-+
-+		writel(0, gpio_chip->regbase + FIOMASK);
-+	}
-+
-+	base = (void __iomem *)(APB_GPIO_BASE + IO0INT);
-+	for (i = IRQ_LPC2K_PORT0(0); i <= IRQ_LPC2K_PORT0(31); i++) {
-+		set_irq_chip(i, &gpio_irq_chip_p0);
-+		set_irq_chip_data(i, base);
-+		set_irq_handler(i, handle_simple_irq);
-+		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-+	}
-+
-+	base = (void __iomem *)(APB_GPIO_BASE + IO2INT);
-+	for (i = IRQ_LPC2K_PORT2(0); i <= IRQ_LPC2K_PORT2(31); i++) {
-+		set_irq_chip(i, &gpio_irq_chip_p2);
-+		set_irq_chip_data(i, base);
-+		set_irq_handler(i, handle_simple_irq);
-+		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-+	}
-+
-+	set_irq_chained_handler(IRQ_LPC2K_EINT3, lpc2k_demux_gpio_irq);
-+
-+	return 0;
-+}
-+
-+postcore_initcall(lpc2k_init_gpio);
-diff --git a/arch/arm/mach-lpc2k/include/mach/gpio.h b/arch/arm/mach-lpc2k/include/mach/gpio.h
-new file mode 100644
-index 0000000..533e3da
---- /dev/null
-+++ b/arch/arm/mach-lpc2k/include/mach/gpio.h
-@@ -0,0 +1,25 @@
-+/*
-+ *  Copyright (C) 2011 Team Embedded VOF
-+ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++/* UARTs
++ *   0/1 are available on all LPC2Ks
++ *   2/3 are available on LPC23XX and up.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
++ * NOTE: the dev.init_name assignment is there so we can use the clk API to
++ *       retrieve and enable the clock, since dev_name() is called from
++ *       the clk_get implementation before the platform device is registered.
 + */
 +
-+#ifndef MACH_LPC2K_GPIO_H
-+#define MACH_LPC2K_GPIO_H
++#define LPC2K_UART(uartnum) \
++	static struct plat_serial8250_port lpc2k_pdata_uart##uartnum[] = { \
++		{ \
++			.mapbase	= APB_UART##uartnum##_BASE, \
++			.membase	= (void __iomem *) \
++						APB_UART##uartnum##_BASE, \
++			.irq		= IRQ_LPC2K_UART##uartnum, \
++			.flags		= UPF_SKIP_TEST | UPF_BOOT_AUTOCONF, \
++			.iotype		= UPIO_MEM, \
++			.regshift	= 2, \
++			.uartclk	= 0, \
++		}, \
++		{ }, \
++	}; \
++	static struct resource lpc2k_resources_uart##uartnum[] = { \
++		[0] = __IORESOURCE_MEM_16K(APB_UART##uartnum##_BASE), \
++		[1] = __IORESOURCE_IRQ(IRQ_LPC2K_UART##uartnum), \
++	}; \
++	static struct platform_device lpc2k_device_uart##uartnum = { \
++		.dev = { \
++			.init_name = "serial8250." __stringify(uartnum), \
++			.platform_data = lpc2k_pdata_uart##uartnum, \
++		}, \
++		.name		= "serial8250", \
++		.id		= uartnum, \
++		.resource	= lpc2k_resources_uart##uartnum, \
++		.num_resources	= ARRAY_SIZE(lpc2k_resources_uart##uartnum), \
++	}
 +
-+#include <asm-generic/gpio.h>
 +
-+#define gpio_get_value		__gpio_get_value
-+#define gpio_set_value		__gpio_set_value
-+#define gpio_cansleep		__gpio_cansleep
-+#define gpio_to_irq		__gpio_to_irq
++LPC2K_UART(0);
++LPC2K_UART(1);
++LPC2K_UART(2);
++LPC2K_UART(3);
 +
-+/* Convert from PX.Y notation to GPIO number */
-+#define LPC2K_GPIO(port,pin)	(((port) * 32) + (pin))
++static struct platform_device *uarts[] __initdata = {
++	&lpc2k_device_uart0,
++	&lpc2k_device_uart1,
++	&lpc2k_device_uart2,
++	&lpc2k_device_uart3,
++};
 +
-+#endif /* MACH_LPC2K_GPIO_H */
++void __init lpc2k_add_uart(int nr)
++{
++	struct platform_device *pdev;
++	struct clk *clk;
++	int res;
++
++	BUG_ON(nr < 0 || nr > ARRAY_SIZE(uarts));
++	pdev = uarts[nr];
++
++	clk = clk_get(&pdev->dev, NULL);
++	BUG_ON(IS_ERR(clk));
++	clk_enable(clk);
++	((struct plat_serial8250_port *)pdev->dev.platform_data)->uartclk =
++		clk_get_rate(clk);
++
++	res = platform_device_register(pdev);
++	if (res)
++		dev_err(&pdev->dev, "Unable to register: %d\n", res);
++}
++
++/* SSP, aka pl022
++ *
++ * 1-only available on enhanced LPC21XX and LPC22XX.
++ * 0/1 available on LPC23XX and up.
++ */
++
++static struct amba_device lpc2k_device_ssp0 = {
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.init_name = "ssp0",
++	},
++	.res = __IORESOURCE_MEM_16K(APB_SSP0_BASE),
++	.irq = { IRQ_LPC2K_SPI0, NO_IRQ },
++};
++
++static struct amba_device lpc2k_device_ssp1 = {
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.init_name = "ssp1",
++	},
++	.res = __IORESOURCE_MEM_16K(APB_SSP1_BASE),
++	.irq = { IRQ_LPC2K_SPI1, NO_IRQ },
++};
++
++void __init lpc2k_add_ssp(int nr, void *platform_data)
++{
++	struct amba_device *adev;
++	int res;
++
++	BUG_ON(nr < 0 || nr > 1);
++	adev = nr ? &lpc2k_device_ssp1 : &lpc2k_device_ssp0;
++	adev->dev.platform_data = platform_data;
++
++	res = amba_device_register(adev, &iomem_resource);
++	if (res)
++		dev_err(&adev->dev, "Unable to register: %d\n", res);
++}
++
++/* SD/MMC, aka pl180/1
++ *
++ * Available on LPC23XX and up.
++ */
++
++static struct amba_device lpc2k_device_mci = {
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.init_name = "mci",
++	},
++	.res = __IORESOURCE_MEM_16K(APB_MCI_BASE),
++	.irq = { IRQ_LPC2K_MCI, NO_IRQ },
++};
++
++void __init lpc2k_add_mci(void *platform_data, int pwr_high)
++{
++	int res;
++	u32 scs;
++
++	/* Set MCIPWR pin to be active high or low */
++	scs = ioread32(APB_SCB_BASE + SCS);
++	scs = pwr_high ? scs | (1 << 3) : scs & ~(1 << 3);
++	iowrite32(scs, APB_SCB_BASE + SCS);
++
++	lpc2k_device_mci.dev.platform_data = platform_data;
++	res = amba_device_register(&lpc2k_device_mci, &iomem_resource);
++	if (res)
++		dev_err(&lpc2k_device_mci.dev, "Unable to register: %d\n", res);
++}
 diff --git a/arch/arm/mach-lpc2k/include/mach/hardware.h b/arch/arm/mach-lpc2k/include/mach/hardware.h
-index 3463b47..b8c471b 100644
+index 1a20126..b2e3a18 100644
 --- a/arch/arm/mach-lpc2k/include/mach/hardware.h
 +++ b/arch/arm/mach-lpc2k/include/mach/hardware.h
-@@ -15,10 +15,12 @@
- /* Default memory size if no ATAGS found */
- #define MEM_SIZE	(SZ_32M)
- 
-+#define FAST_GPIO_BASE		0x3fffc000
- #define APB_WDT_BASE		0xe0000000
+@@ -20,8 +20,14 @@
  #define APB_TIMER0_BASE		0xe0004000
  #define APB_TIMER1_BASE		0xe0008000
  #define APB_UART0_BASE		0xe000c000
-+#define APB_GPIO_BASE		0xe0028000
++#define APB_UART1_BASE		0xe0010000
+ #define APB_GPIO_BASE		0xe0028000
+ #define APB_PINSEL_BASE		0xe002c000
++#define APB_SSP1_BASE		0xe0030000
++#define APB_SSP0_BASE		0xe0068000
++#define APB_UART2_BASE		0xe0078000
++#define APB_UART3_BASE		0xe007c000
++#define APB_MCI_BASE		0xe008c000
  #define APB_SCB_BASE		0xe01fc000
  #define APH_VIC_BASE		0xfffff000
  
-diff --git a/arch/arm/mach-lpc2k/include/mach/irqs.h b/arch/arm/mach-lpc2k/include/mach/irqs.h
-index 87b80dd..9207702 100644
---- a/arch/arm/mach-lpc2k/include/mach/irqs.h
-+++ b/arch/arm/mach-lpc2k/include/mach/irqs.h
-@@ -44,6 +44,9 @@
- #define IRQ_LPC2K_I2C2		30
- #define IRQ_LPC2K_I2S		31
+diff --git a/arch/arm/mach-lpc2k/mach-ea2478devkit.c b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
+index d59f5ba..4d7e95b 100644
+--- a/arch/arm/mach-lpc2k/mach-ea2478devkit.c
++++ b/arch/arm/mach-lpc2k/mach-ea2478devkit.c
+@@ -8,6 +8,8 @@
+  */
  
--#define NR_IRQS			32
-+#define IRQ_LPC2K_PORT0(pin)	(32 + (pin))
-+#define IRQ_LPC2K_PORT2(pin)	(64 + (pin))
+ #include <linux/module.h>
++#include <linux/amba/pl022.h>
++#include <linux/amba/mmci.h>
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+ 
+@@ -96,9 +98,27 @@ static unsigned long mfp_cfgs[] __initdata = {
+ 	P1_12_MCIDAT3,
+ };
+ 
++static struct pl022_ssp_controller ssp0_plat_data = {
++	.bus_id = 0,
++	.enable_dma = 0,
++	.num_chipselect = 1,
++};
 +
-+#define NR_IRQS			96
++static struct mmci_platform_data mci_plat_data = {
++	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
++	.capabilities = MMC_CAP_4_BIT_DATA,
++	.f_max = 200000,
++	.gpio_cd = -1,
++	.gpio_wp = -1,
++};
++
+ void __init ea2478devkit_init_machine(void)
+ {
+ 	lpc2k_mfp_config(mfp_cfgs, ARRAY_SIZE(mfp_cfgs));
++
++	lpc2k_add_uart(0);
++	lpc2k_add_ssp(0, &ssp0_plat_data);
++	lpc2k_add_mci(&mci_plat_data, 0 /* active low */);
+ }
  
- #endif /* MACH_LPC2K_IRQS_H */
+ static void __init ea2478devkit_init_irq(void)
 -- 
 1.7.1
