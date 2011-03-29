@@ -1,64 +1,45 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 29 Mar 2011 10:51:22 -0700
-Subject: [PATCH 04/10] omap: Make a subset of dmtimer functions into
-	inline functions
-In-Reply-To: <20110328222137.4046.32363.stgit@baageli.muru.com> (Tony
-	Lindgren's message of "Mon, 28 Mar 2011 15:21:37 -0700")
-References: <20110328221501.4046.41079.stgit@baageli.muru.com>
-	<20110328222137.4046.32363.stgit@baageli.muru.com>
-Message-ID: <87y63xx1b9.fsf@ti.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 29 Mar 2011 19:56:47 +0200
+Subject: [PATCH 1/4] arm: lpc32xx: add tsc-device
+In-Reply-To: <20110329170219.GA6762@pengutronix.de>
+References: <1301328090-25994-1-git-send-email-w.sang@pengutronix.de>
+	<083DF309106F364B939360100EC290F811ECEDC208@eu1rdcrdc1wx030.exi.nxp.com>
+	<20110329170219.GA6762@pengutronix.de>
+Message-ID: <083DF309106F364B939360100EC290F811ECEDC221@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
 
-> This will allow us to share the code between system timer and
-> dmtimer device driver code without having to initialize all
-> dmtimers early. It will also make the timer_set_next_event
-> more efficient as the inline functions will optimize the code
-> better in this case.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Subject: Re: [PATCH 1/4] arm: lpc32xx: add tsc-device
+> 
+> On Tue, Mar 29, 2011 at 06:43:45PM +0200, Kevin Wells wrote:
+> > Hi Wolfram,
+> >
+> > Thanks for submitting these. These all look good!
+> >
+> > > +/* TSC (Touch Screen Controller) */
+> > > +
+> > > +static struct resource lpc32xx_tsc_resources[] = {
+> > > +	{
+> > > +		.start = LPC32XX_ADC_BASE,
+> > > +		.end = LPC32XX_ADC_BASE + SZ_16K - 1,
+> >
+> > The LPC32xx user's guide spaces peripheral register sets 16K apart,
+> > but internally the register blocks are 4K or smaller. I'm not sure
+> > why these need to be setup as 16K instead of 4K. Hmm, maybe I'm
+> > missing something here?
+> 
+> Probably not. I just took the user's guide as a reference. If you know
+> this is
+> wrong, I can respin the series. ADC is also 4K?
 
-[...]
+Yes, WDT/ADC/RTC are all 4K register blocks.
 
-> -static void omap_dm_timer_reset(struct omap_dm_timer *timer)
-> +/* Assumes the source clock has been set by caller */
-> +void __omap_dm_timer_reset(struct omap_dm_timer *timer, int autoidle,
-> +				int wakeup)
->  {
->  	u32 l;
->  
-> +	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
-> +	l |= 0x02 << 3;  /* Set to smart-idle mode */
-> +	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on idle */
-> +
-> +	if (autoidle)
-> +		l |= 0x1 << 0;
-> +
-> +	if (wakeup)
-> +		l |= 1 << 2;
-> +
-> +	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG, l);
-> +
-> +	/* Match hardware reset default of posted mode */
-> +	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
-> +			OMAP_TIMER_CTRL_POSTED);
-> +	timer->posted = 1;
-> +}
-
-The reset code is an example of something that will not be able to be
-shared between a system timer driver and a real device driver.  In the
-real driver, the reset (as well as smart-idle, autoidle, wakeup
-capability, etc.) will all be handled by the hwmod.
-
-With a hwmod conversion, the system timer will have to have
-duplicate/alternate compared to the real timer.
-
-Ideally, what we need is a way for the system timer to be early_init
-only.  When the real driver is available, it switches to that.  This
-could probably be done pretty easily by using the 'rating' field of the
-clockevent so when the "real" timer driver becomes available with a
-higher rating, the clockevent code would switch to it.
-
-Kevin
+> 
+> Thanks,
+> 
+>    Wolfram
+> 
+> --
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
