@@ -1,102 +1,29 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 29 Mar 2011 11:20:17 -0600
-Subject: [PATCH 3/5] OMAP3: l3: minor cleanup for error message,
-	parenthesis and extra lines
-In-Reply-To: <1301419219-30547-1-git-send-email-omar.ramirez@ti.com>
-References: <1301419219-30547-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1301419219-30547-4-git-send-email-omar.ramirez@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 29 Mar 2011 10:41:48 -0700
+Subject: [PATCH 03/10] omap: Move dmtimer defines to dmtimer.h
+In-Reply-To: <20110328222134.4046.53842.stgit@baageli.muru.com> (Tony
+	Lindgren's message of "Mon, 28 Mar 2011 15:21:35 -0700")
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<20110328222134.4046.53842.stgit@baageli.muru.com>
+Message-ID: <87mxkdygbn.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing extra lines and unneeded parenthesis.
+Tony Lindgren <tony@atomide.com> writes:
 
-While at it collapsing an if statement to detect the type of error
-based on the irq received; also fixing the message printed on error.
+[...]
 
-So now: 				looks like:
-"No Error Error seen..."		"No Error seen..."
-"In-Band Error Error seen..."	"In-Band Error seen..."
+> diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+> index 330bd17..66c4b34 100644
+> --- a/arch/arm/plat-omap/include/plat/dmtimer.h
+> +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+> @@ -92,5 +92,130 @@ void omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value
+>  
+>  int omap_dm_timers_active(void);
+>  
+> +/*
+> + * Do not the defines below, they are not needed. They should be only
 
-Other messages are self explanatory, no "Error" added to them.
-(E.g.: "Address Hole seen...")
+Do not what?    ;)
 
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
----
- arch/arm/mach-omap2/omap_l3_smx.c |   19 +++++--------------
- 1 files changed, 5 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_l3_smx.c b/arch/arm/mach-omap2/omap_l3_smx.c
-index 32961b1..873c0e3 100644
---- a/arch/arm/mach-omap2/omap_l3_smx.c
-+++ b/arch/arm/mach-omap2/omap_l3_smx.c
-@@ -155,7 +155,7 @@ static irqreturn_t omap3_l3_block_irq(struct omap3_l3 *l3,
- 	u8                      multi = error & L3_ERROR_LOG_MULTI;
- 	u32			address = omap3_l3_decode_addr(error_addr);
- 
--	WARN(true, "%s Error seen by %s %s at address %x\n",
-+	WARN(true, "%s seen by %s %s at address %x\n",
- 				 omap3_l3_code_string(code),
- 			  omap3_l3_initiator_string(initid),
- 			     multi ? "Multiple Errors" : "",
-@@ -167,21 +167,15 @@ static irqreturn_t omap3_l3_block_irq(struct omap3_l3 *l3,
- static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
- {
- 	struct omap3_l3         *l3 = _l3;
--
- 	u64                     status, clear;
- 	u64                     error;
- 	u64			error_addr;
- 	u64			err_source = 0;
- 	void			__iomem *base;
- 	int			int_type;
--
- 	irqreturn_t             ret = IRQ_NONE;
- 
--	if (irq == l3->app_irq)
--		int_type = L3_APPLICATION_ERROR;
--	else
--		int_type = L3_DEBUG_ERROR;
--
-+	int_type = irq == l3->app_irq ? L3_APPLICATION_ERROR : L3_DEBUG_ERROR;
- 	if (!int_type) {
- 		status = omap3_l3_readll(l3->rt, L3_SI_FLAG_STATUS_0);
- 		/*
-@@ -202,7 +196,6 @@ static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
- 
- 	base = l3->rt + *(omap3_l3_bases[int_type] + err_source);
- 	error = omap3_l3_readll(base, L3_ERROR_LOG);
--
- 	if (error) {
- 		error_addr = omap3_l3_readll(base, L3_ERROR_LOG_ADDR);
- 
-@@ -210,9 +203,8 @@ static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
- 	}
- 
- 	/* Clear the status register */
--	clear = ((L3_AGENT_STATUS_CLEAR_IA << int_type) |
--		 (L3_AGENT_STATUS_CLEAR_TA));
--
-+	clear = (L3_AGENT_STATUS_CLEAR_IA << int_type) |
-+		L3_AGENT_STATUS_CLEAR_TA;
- 	omap3_l3_writell(base, L3_AGENT_STATUS, clear);
- 
- 	/* clear the error log register */
-@@ -240,7 +232,7 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
- 		goto err0;
- 	}
- 	l3->rt = ioremap(res->start, resource_size(res));
--	if (!(l3->rt)) {
-+	if (!l3->rt) {
- 		dev_err(&pdev->dev, "ioremap failed\n");
- 		ret = -ENOMEM;
- 		goto err0;
-@@ -259,7 +251,6 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
- 	ret = request_irq(l3->app_irq, omap3_l3_app_irq,
- 		IRQF_DISABLED | IRQF_TRIGGER_RISING,
- 		"l3-app-irq", l3);
--
- 	if (ret) {
- 		dev_err(&pdev->dev, "couldn't request app irq\n");
- 		goto err2;
--- 
-1.7.1
+Kevin
