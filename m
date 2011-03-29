@@ -1,85 +1,63 @@
 From: martin.furmanski@gmail.com (Martin Furmanski)
-Date: Tue, 29 Mar 2011 15:02:56 -0000
+Date: Tue, 29 Mar 2011 21:06:45 -0000
 Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
 	device accesses
-In-Reply-To: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
+In-Reply-To: <1301416642.583.101.camel@e102109-lin.cambridge.arm.com>
 References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTim1=686NAO7ox8s-HAd_KT4OjiUb1Y7jrUtgia3@mail.gmail.com>
+	<1301416642.583.101.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTi=eXRhZEVUuX8aT8n=heZnTR6TjxXdasV_ObgNh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do you have a reference on this?
+These statements appear not even remotely valid. Certainly the CPU is only a
+bus master, so when you say slave/master memory access, what are you
+referring to?
 
-I have been under the impression that DMB is a barrier for all memory
-accesses. I find no support in ARMv7, for the hypothesis that DSB is needed
-to order between Device and Normal.
+(Sorry for accidentally bringing the thread off the list for the last 2
+posts. Bringing it back.)
 
-Regards,
+Best Regards,
 Martin Furmanski
 
-On Fri, Mar 25, 2011 at 11:16 AM, Catalin Marinas
-<catalin.marinas@arm.com>wrote:
+On Tue, Mar 29, 2011 at 6:37 PM, Catalin Marinas <catalin.marinas@arm.com>wrote:
 
-> Since mandatory barriers may be used (explicitly or implicitly via readl
-> etc.) to ensure the ordering between Device and Normal memory accesses,
-> a DMB is not enough. This patch converts it to a DSB.
+> On Tue, 2011-03-29 at 17:16 +0100, Martin Furmanski wrote:
+> > From memory_barriers.txt, regarding rmb():
+> >
+> > " (3) Read (or load) memory barriers.
+> >
+> >      A read barrier is a data dependency barrier plus a guarantee that
+> all the
+> >      LOAD operations specified before the barrier will appear to happen
+> before
+> >      all the LOAD operations specified after the barrier with respect to
+> the
+> >      other components of the system."
+> >
+> > If above is the semantics that you are aiming for, then it is still
+> irrelevant whether
+> > the memory is Normal or Device. But other than that, I see no issues.
 >
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Colin Cross <ccross@android.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/include/asm/system.h                  |    2 +-
->  arch/arm/mach-realview/include/mach/barriers.h |    2 +-
->  arch/arm/mach-tegra/include/mach/barriers.h    |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> The relevant part is that a Device access is usually a *slave* access
+> while Normal memory access is a *master* one. The DMB only ensures the
+> latter (as specified by the ARM ARM, though probably not very clear).
 >
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 9a87823..926d867 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -159,7 +159,7 @@ extern unsigned int user_debug;
->  #include <mach/barriers.h>
->  #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
->  #define mb()           do { dsb(); outer_sync(); } while (0)
-> -#define rmb()          dmb()
-> +#define rmb()          dsb()
->  #define wmb()          mb()
->  #else
->  #include <asm/memory.h>
-> diff --git a/arch/arm/mach-realview/include/mach/barriers.h
-> b/arch/arm/mach-realview/include/mach/barriers.h
-> index 0c5d749..9a73219 100644
-> --- a/arch/arm/mach-realview/include/mach/barriers.h
-> +++ b/arch/arm/mach-realview/include/mach/barriers.h
-> @@ -4,5 +4,5 @@
->  * operation to deadlock the system.
->  */
->  #define mb()           dsb()
-> -#define rmb()          dmb()
-> +#define rmb()          dsb()
->  #define wmb()          mb()
-> diff --git a/arch/arm/mach-tegra/include/mach/barriers.h
-> b/arch/arm/mach-tegra/include/mach/barriers.h
-> index cc11517..425b42e 100644
-> --- a/arch/arm/mach-tegra/include/mach/barriers.h
-> +++ b/arch/arm/mach-tegra/include/mach/barriers.h
-> @@ -23,7 +23,7 @@
+> I'm not sure whether the memory-barriers.txt doc covers all the usage in
+> the kernel but the mandatory barriers (mb/rmb/wmb) may be used to
+> control the effect of I/O accesses (as per the above document). On ARM,
+> this needs to be DSB rather than DMB.
 >
->  #include <asm/outercache.h>
+> I can even give examples where a DMB would fail with regards to Device
+> memory.
 >
-> -#define rmb()          dmb()
-> +#define rmb()          dsb()
->  #define wmb()          do { dsb(); outer_sync(); } while (0)
->  #define mb()           wmb()
+> --
+> Catalin
 >
 >
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/af7c1441/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/06e8ffc3/attachment-0001.html>
