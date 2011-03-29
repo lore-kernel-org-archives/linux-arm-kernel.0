@@ -1,28 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (broonie@gmail.com)
-Date: Mon, 28 Mar 2011 18:33:49 -0000
-Subject: [PATCH 2/2] regulator: Propagate uA_load requirements up supply
-	chain
-In-Reply-To: <4D90D0DE.7050709@codeaurora.org>
-	(sfid-20110328_191811_289383_377F8CF1)
-References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-	<1301326482-6547-3-git-send-email-collinsd@codeaurora.org>
-	<20110328180255.GA28494@opensource.wolfsonmicro.com>
-	<4D90D0DE.7050709@codeaurora.org>
-	(sfid-20110328_191811_289383_377F8CF1)
-Message-ID: <a4caa2cc-c810-40fe-b5ac-1f7fcb0d2edc@email.android.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 29 Mar 2011 06:27:39 -0000
+Subject: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup timer and
+	debug counters
+In-Reply-To: <4287119fdbc364dd7bd414ee40c1a9a4@mail.gmail.com>
+References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
+	<1301304157-2466-15-git-send-email-santosh.shilimkar@ti.com>
+	<20110328210046.GE30616@atomide.com>
+	<4287119fdbc364dd7bd414ee40c1a9a4@mail.gmail.com>
+Message-ID: <AANLkTikbBWn0KrUmAwTbEtY8K_g-xT2r9BqZU49iiOsb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You need to at least make this clear in the changelog, including handling for regulators that don't implement the new function.
--- 
-Sent from my Android phone with K-9 Mail. Please excuse my brevity.
+Sorry for spamming your inbox with same email. :(
+Looks like my mailer has srewed up. It send same messege almost 20 times and
+it shows me that it has
+stuck in outbox
 
-David Collins <collinsd@codeaurora.org> wrote:
+Regards
+Santosh
 
-On 03/28/2011 11:02 AM, Mark Brown wrote: > On Mon, Mar 28, 2011 at 08:34:42AM -0700, David Collins wrote: >> regulator_set_optimum_mode currently only determines the load >> on the specified regulator. Physically however, this current >> must be provided by regulators further up the supply chain. >> Add code to handle uA_load propagation up through the regulator >> supply chain. > > We can't do this - current doesn't map 1:1 through a regulator, the > power consumption will map through but obviously there's a voltage > change involved and the regulators will not be 100% efficient so there > will also be some overhead from the chipld regulator. The child > regulator needs to do the mapping in a regulator specific fashion. I am aware that input current of a regulator will not simply be the sum of the output current loads required by consumers. I have accounted for this by adding a new callback function in struct regulator_ops (from the patch): +	/* get supply current required 
- for
-load */ +	int (*get_current_required) (struct regulator_dev *, int input_uV, +				 int output_uV, int load_uA); The intention is that all hardware specific characteristics of a given regulator can captured with this callback function. The two simple cases would be a linear regulator: current_required = load_uA / efficiency + ground_current; and a switching regulator: current_required = load_uA * output_uV / (input_uV * efficiency) I have set up the usage of this callback in the core such that if it is not defined for regulators in a system, then the overall system operation is identical to how it would be without the current propagation patch. Can you look through the patch to see if the new API is reasonable? Thanks, David -- Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum. 
+On Tue, Mar 29, 2011 at 11:20 AM, Santosh Shilimkar <
+santosh.shilimkar@ti.com> wrote:
 
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Tuesday, March 29, 2011 2:31 AM
+> > To: Santosh Shilimkar
+> > Cc: linux-omap at vger.kernel.org; khilman at ti.com; rnayak at ti.com;
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup
+> > timer and debug counters
+> >
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110328 02:21]:
+> > > --- a/arch/arm/mach-omap2/pm-debug.c
+> > > +++ b/arch/arm/mach-omap2/pm-debug.c
+> > > @@ -40,6 +41,11 @@ static int omap4_pm_suspend(void)
+> > >     int state, ret = 0;
+> > >     u32 cpu_id = smp_processor_id();
+> > >
+> > > +   /* Wakeup timer from suspend */
+> > > +   if (wakeup_timer_seconds || wakeup_timer_milliseconds)
+> > > +           omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
+> > > +                                    wakeup_timer_milliseconds);
+> > > +
+> > >     /* Save current powerdomain state */
+> > >     list_for_each_entry(pwrst, &pwrst_list, node) {
+> > >             pwrst->saved_state = pwrdm_read_next_pwrst(pwrst-
+> > >pwrdm);
+> >
+> > This hack to mess diretly with sys_timer will be ripped out,
+> > so please drop this patch.
+> >
+> Ok.
+>
+> > In the long run we'll have dmtimer1 dedicated to the PM code,
+> > so then it's possible to do similar things.
+> >
+>
+> Regards,
+> Santosh
+>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110328/8191134a/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/57b3038e/attachment-0001.html>
