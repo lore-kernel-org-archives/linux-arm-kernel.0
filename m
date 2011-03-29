@@ -1,64 +1,49 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Tue, 29 Mar 2011 15:08:44 +0530
-Subject: MACH_TYPE undeclared error
-In-Reply-To: <20110329092733.GA11236@n2100.arm.linux.org.uk>
-References: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
-	<20110329065457.GG30938@pengutronix.de>
-	<AANLkTimsNOmK4H8MYMB2jjd+zkT4qcYD1dy+J1fxdd7w@mail.gmail.com>
-	<20110329092733.GA11236@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik8ZhyPR_eZ8Khbba_Pt8YF-DVqQaeFXKGBHsHu@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Mar 2011 10:40:14 +0100
+Subject: [PATCH v2] ARM: perf: ensure overflows aren't missed due to IRQ
+	latency
+In-Reply-To: <4D8D85C4.1080501@free.fr>
+References: <1300986442-20461-1-git-send-email-will.deacon@arm.com>
+	<4D8D85C4.1080501@free.fr>
+Message-ID: <006f01cbedf5$4e9725d0$ebc57170$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+> Hi,
 
-On Tue, Mar 29, 2011 at 2:57 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 29, 2011 at 02:01:10PM +0530, Madhavi Manchala wrote:
->> Dear Uwe,
->>
->> 2011/3/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> > On Tue, Mar 29, 2011 at 12:01:40PM +0530, Madhavi Manchala wrote:
->> >> Dear All,
->> >>
->> >> I have defined a MACHINE_START macro in my board C file as follows.
->> >>
->> >> MACHINE_START(S3C2510, "S3C2510")
->> >> ? ? ? .init_irq ? ? ? = s3c2510_init_irq,
->> >> ? ? ? .timer ? ? ? ? ?= &s3c2510_time_init,
->> >> MACHINE_END
->> >>
->> >> When I try to compile this C file, I am seeing the following error message.
->> >>
->> >> arch/arm/mach-s3c2510/s3c2510.c:35:1: error: 'MACH_TYPE_S3C2510'
->> >> undeclared here (not in a function)
->> > you need a line defining S3C2510 in arch/arm/tools/mach-types.
->>
->> Yeah. It is there in the arch/arm/tools/mach-types file. I did not add
->> to it, but it is automatically generated. The few lines from the
->> arch/arm/tools/mach-types file are as follows.
->>
->> izarus ? ? ? ? ? ? ? ?MACH_IZARUS ? ? ? ? ? ? IZARUS ? ? ? ? ?573
->> pxa_rts ? ? ? ? ? ? ? MACH_RTS ? ? ? ? ? ? ? ?RTS ? ? ? ? ? ? ? ? ? ? 574
->> se5100 ? ? ? ? ? ? ? ?MACH_SE5100 ? ? ? ? ? ? SE5100 ? ? ? ? ?575
->> s3c2510 ? ? ? ? ? ? ? MACH_S3C2510 ? ?S3C2510 ? ? ? ? 576
->> csb437tl ? ? ? ? ? ? ?MACH_CSB437TL ? CSB437TL ? ? ? ? ? ? ? ?577
->> slauson ? ? ? ? ? ? ? MACH_SLAUSON ? ?SLAUSON ? ? ? ? 578
->> pearlriver ? ? ? ? ? ?MACH_PEARLRIVER PEARLRIVER ? ? ?579
->> tdc_p210 ? ? ? ? ? ? ?MACH_TDC_P210 ? TDC_P210 ? ? ? ?580
->>
->> The machine S3C2510 is there in that file.
->
-> S3C2510 sounds to me like a SoC name not a board name. ?I delete anything
-> which sounds like a SoC name as that's not the purpose of the database.
-> It's for platforms and boards, not SoCs.
+Hello Chris,
 
-Yeah. The S3C2510 is a SoC. We have a board which is based on this
-SoC. Just, I have given that name as I am new to this architecture
-development environment. I will change the name and assigns an
-appropriate one which suits for my board.
+> Sorry, my first attempt was regarded as suspicious.
+> This time I shall try to avoid HTML.
 
-Thanks for your information.
+Good idea :)
 
-Thanks and Regards,
-Madhavi M.
+> A couple of nitpicks in the introduction.
+> 
+> Le 24/03/2011 18:07, Will Deacon a ?crit :
+> > If a counter overflows during a perf stat profiling run it may overtake
+> > the last known value of the counter:
+> >
+> >      0        prev     new                0xffffffff
+> >      |----------|-------|----------------------|
+> >
+> > In this case, the number of events that have occurred is
+> > (0xffffffff - prev) + new. Unfortunately, the event update code will
+> > not realise an overflow has occurred and will instead report the event
+> > delta as (new - prev) which may be considerably smaller than the real
+> > count.
+> 
+> a) "(0xffffffff - prev) + new"
+> Surely that should be "(0x100000000 - prev) + new"
+
+This has been merged now, so it's too late to change the commit log.
+However, I think this is also a problem in the code in that we're not
+counting the event through zero (Jamie - it means my original code *was*
+subtly different to yours, but I can't pretend I saw this issue!).
+
+So now we're off by 1 rather than some number bounded by maxuint. At least
+we're converging on accuracy...
+
+I'll post a fix.
+
+Will
