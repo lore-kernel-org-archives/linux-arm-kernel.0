@@ -1,25 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Mar 2011 09:28:48 +0100
-Subject: [PATCH 2/2] regulator: Propagate uA_load requirements up
-	supply chain
-In-Reply-To: <20110329075310.GA29330@opensource.wolfsonmicro.com>
-References: <1301326482-6547-1-git-send-email-collinsd@codeaurora.org>
-	<1301326482-6547-3-git-send-email-collinsd@codeaurora.org>
-	<20110328180255.GA28494@opensource.wolfsonmicro.com>
-	<20110328181415.GD31457@n2100.arm.linux.org.uk>
-	<20110329075310.GA29330@opensource.wolfsonmicro.com>
-Message-ID: <20110329082848.GA10447@n2100.arm.linux.org.uk>
+From: madhavi.linux@gmail.com (Madhavi Manchala)
+Date: Tue, 29 Mar 2011 14:01:10 +0530
+Subject: MACH_TYPE undeclared error
+In-Reply-To: <20110329065457.GG30938@pengutronix.de>
+References: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
+	<20110329065457.GG30938@pengutronix.de>
+Message-ID: <AANLkTimsNOmK4H8MYMB2jjd+zkT4qcYD1dy+J1fxdd7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2011 at 08:53:11AM +0100, Mark Brown wrote:
-> On Mon, Mar 28, 2011 at 07:14:15PM +0100, Russell King - ARM Linux wrote:
-> 
-> > That's not true.  Firstly, *all* regulators are not 100% efficient.  They
-> > lose *power* in the form of heat.  So power into the regulator will always
-> > be more than power out.
-> 
-> That's pretty much what I said, yes.
+Dear Uwe,
 
-No, you said the power will map through but the current will not.  I'm
-saying that the power will *not* map through either.
+2011/3/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Tue, Mar 29, 2011 at 12:01:40PM +0530, Madhavi Manchala wrote:
+>> Dear All,
+>>
+>> I have defined a MACHINE_START macro in my board C file as follows.
+>>
+>> MACHINE_START(S3C2510, "S3C2510")
+>> ? ? ? .init_irq ? ? ? = s3c2510_init_irq,
+>> ? ? ? .timer ? ? ? ? ?= &s3c2510_time_init,
+>> MACHINE_END
+>>
+>> When I try to compile this C file, I am seeing the following error message.
+>>
+>> arch/arm/mach-s3c2510/s3c2510.c:35:1: error: 'MACH_TYPE_S3C2510'
+>> undeclared here (not in a function)
+> you need a line defining S3C2510 in arch/arm/tools/mach-types.
+
+Yeah. It is there in the arch/arm/tools/mach-types file. I did not add
+to it, but it is automatically generated. The few lines from the
+arch/arm/tools/mach-types file are as follows.
+
+izarus		MACH_IZARUS		IZARUS		573
+pxa_rts		MACH_RTS		RTS			574
+se5100		MACH_SE5100		SE5100		575
+s3c2510		MACH_S3C2510	S3C2510		576
+csb437tl		MACH_CSB437TL	CSB437TL		577
+slauson		MACH_SLAUSON	SLAUSON		578
+pearlriver		MACH_PEARLRIVER	PEARLRIVER	579
+tdc_p210		MACH_TDC_P210	TDC_P210	580
+
+The machine S3C2510 is there in that file.
+
+Thanks and Regards,
+Madhavi M.
+
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
