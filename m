@@ -1,96 +1,40 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 29 Mar 2011 12:30:56 +0200
-Subject: [PATCH v4 10/10] NOMMU: implement access_remote_vm
-In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301394656-24853-11-git-send-email-ithamar.adema@team-embedded.nl>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 29 Mar 2011 11:58:46 +0100
+Subject: CPUv6K (ARM1176) and wfi()
+In-Reply-To: <006d01cbedf0$c60d1070$52273150$@deacon@arm.com>
+References: <20110328122557.GB2738@pulham.picochip.com>
+	<AANLkTimahGgupW-b370664jXKhyv+NEh1+TwX=PVCb3G@mail.gmail.com>
+	<006d01cbedf0$c60d1070$52273150$@deacon@arm.com>
+Message-ID: <20110329105846.GD2738@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Frysinger <vapier@gentoo.org>
+On Tue, Mar 29, 2011 at 10:07:47AM +0100, Will Deacon wrote:
+> > On Mon, Mar 28, 2011 at 1:25 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> > > Hi Catalin, Will,
+> > >
+> > > I'm respinning some PM patches for my platform (ARM1176JZ-S) and looking
+> > > at arch/arm/include/asm/system.h, for CPU_32v6K wfi() uses the "wfi"
+> > > instruction, but when I use this on my system the instruction returns
+> > > immediately. ?Replacing this with:
+> > >
+> > > ? ? ? ?asm volatile("mcr ? p15, 0, %0, c7, c0, 4\n" :: "r"(0));
+> > >
+> > > makes everything work properly. ?The ARM1176 TRM doesn't mention the wfi
+> > > instruction afaict but does say to use the cp15 instruction in section
+> > > 10.2.2 (Standby mode). ?It doesn't look to me that the SEV or WFE
+> > > instructions are implemented on ARM1176 so I'm guessing that these are
+> > > only in mpcore?
+> > 
+> > I think WFI/SEV/WFE are encoded as NOP-synonyms, so they may do
+> > nothing on non-multicore platforms; so I think the MCR is the correct
+> > mechanism to use for 1176... unless Will or Catalin have better ideas.
+> 
+> Would using the mcr get in the way of a combined v6/v7 kernel image?
+> I notice that the behaviour on A9 is the exact opposite (wfi works, mcr
+> is a NOP).
 
-Recent vm changes brought in a new function which the core procfs code
-utilizes.  So implement it for nommu systems too to avoid link failures.
+Wouldnet it also be a problem for smp-on-up for a v6K only kernel?  It 
+doesn't look like arm11 mpcore supports the cp15 access...
 
-Signed-off-by: Mike Frysinger <vapier@gentoo.org>
----
-This patch was already sent to LKML, but I included it only to keep
-the current patchset buildable....
----
- mm/nommu.c |   52 +++++++++++++++++++++++++++++++++++++++-------------
- 1 files changed, 39 insertions(+), 13 deletions(-)
-
-diff --git a/mm/nommu.c b/mm/nommu.c
-index cb86e7d..c4c542c 100644
---- a/mm/nommu.c
-+++ b/mm/nommu.c
-@@ -1971,21 +1971,10 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
- }
- EXPORT_SYMBOL(filemap_fault);
- 
--/*
-- * Access another process' address space.
-- * - source/target buffer must be kernel space
-- */
--int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write)
-+static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
-+		unsigned long addr, void *buf, int len, int write)
- {
- 	struct vm_area_struct *vma;
--	struct mm_struct *mm;
--
--	if (addr + len < addr)
--		return 0;
--
--	mm = get_task_mm(tsk);
--	if (!mm)
--		return 0;
- 
- 	down_read(&mm->mmap_sem);
- 
-@@ -2010,6 +1999,43 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
- 	}
- 
- 	up_read(&mm->mmap_sem);
-+
-+	return len;
-+}
-+
-+/**
-+ * @access_remote_vm - access another process' address space
-+ * @mm:		the mm_struct of the target address space
-+ * @addr:	start address to access
-+ * @buf:	source or destination buffer
-+ * @len:	number of bytes to transfer
-+ * @write:	whether the access is a write
-+ *
-+ * The caller must hold a reference on @mm.
-+ */
-+int access_remote_vm(struct mm_struct *mm, unsigned long addr,
-+		void *buf, int len, int write)
-+{
-+	return __access_remote_vm(NULL, mm, addr, buf, len, write);
-+}
-+
-+/*
-+ * Access another process' address space.
-+ * - source/target buffer must be kernel space
-+ */
-+int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write)
-+{
-+	struct mm_struct *mm;
-+
-+	if (addr + len < addr)
-+		return 0;
-+
-+	mm = get_task_mm(tsk);
-+	if (!mm)
-+		return 0;
-+
-+	len = __access_remote_vm(tsk, mm, addr, buf, len, write);
-+
- 	mmput(mm);
- 	return len;
- }
--- 
-1.7.1
+Jamie
