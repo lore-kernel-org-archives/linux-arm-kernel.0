@@ -1,32 +1,32 @@
-From: manuel_roeder@gmx.de (Manuel Roeder)
-Date: Tue, 29 Mar 2011 06:52:19 -0000
-Subject: D-Link DNS323 Rev. B1 Problem with Kernel 2.6.38.1 (2.6.38, too)
-	- I2C-Bus mv64xxx / RTC ST M41T80 / LM75 Sensor
-Message-ID: <4D91803E.60601@gmx.de>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 29 Mar 2011 08:35:35 -0000
+Subject: [uClinux for armnommu] Undefined reference for access_remote_vm
+In-Reply-To: <AANLkTikRMUcoGNGTRB2p8dYvOqV-utPmLDXK-gdTgKea@mail.gmail.com>
+References: <AANLkTikRMUcoGNGTRB2p8dYvOqV-utPmLDXK-gdTgKea@mail.gmail.com>
+Message-ID: <AANLkTi=-_rQrT0Y+kioV2obr23c2WUF0=MnkfVBab+fK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The formerly found bug seems to be introduced with the RTC-rework starting with kernel 2.6.38.
-It seems to be NOT a bug of I2C- or LM75-driver! 
-The bug starts with kernel 2.6.38 and is still there in 2.6.38.2.
+Hi Greg,
 
-Kernel 2.6.37.6 runs fine!!!! No RTC-bug here!!!
+I am building linux kernel for armnommu, but I see the error as following:
 
-[   18.270364] i2c /dev entries driver
-[   18.274728] rtc-m41t80 0-0068: chip found, driver version 0.05
-[   18.280955] m41t80: dev (254:0)
-[   18.281012] rtc-m41t80 0-0068: rtc core: registered m41t80 as rtc0
-[   20.280626] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   20.287144] rtc-m41t80 0-0068: Can't clear HT bit
-[   20.292139] rtc-m41t80: probe of 0-0068 failed with error -5
-[   22.290615] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   22.297153] lm75: probe of 0-0048 failed with error -110
-[   24.300623] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   26.300925] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   28.300905] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   30.300636] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   32.300906] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   34.300844] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   36.300648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+?CHK ? ? include/generated/compile.h
+?UPD ? ? include/generated/compile.h
+?CC ? ? ?init/version.o
+?LD ? ? ?init/built-in.o
+?LD ? ? ?.tmp_vmlinux1
+fs/built-in.o?????mem_read???
+super.c:(.text+0x40548)??access_remote_vm? Undefined reference
+fs/built-in.o?????mem_write???
+super.c:(.text+0x406b0)??access_remote_vm? Undefined reference
+make: *** [.tmp_vmlinux1] ?? 1
 
-regards Manuel Roeder - manuel.roeder(at)web.de
+I checked this code, 'access_remote_vm' function was defined in
+mm/memory.c, and its Makefile is 'mmu-$(CONFIG_MMU) ? ? := fremap.o
+highmem.o madvise.o memory.o',
+so if I did not configure this CONFIG_MMU, then the memory.c will not
+be built, which leaded to above error.
+
+Thanks!
+Wan.
