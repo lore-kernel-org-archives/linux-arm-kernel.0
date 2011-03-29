@@ -1,24 +1,73 @@
 From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Tue, 29 Mar 2011 08:32:39 +0200
-Subject: [PATCH 0/4] s3c2440: mini2440: Add missing code parts to be fully
-	working with latest kernel.
-Message-ID: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
+Date: Tue, 29 Mar 2011 08:32:40 +0200
+Subject: [PATCH 1/4] s3c2440: mini2440: Add support for new LCD panels.
+In-Reply-To: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
+References: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <1301380363-3282-2-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch add new LCD panels with which was board produced. Also add touchscreen
-support. Enabling LCD backlight during early booting stage also added.
+This patch add support for new mini2440 board LCD's:
+3.5" TFT + TS (TD035STED4)
+5.6" TFT (Innolux AT056TN52).
+3.5" TFT + TS (SONY X35)
 
-Some code parts are collected or inspired from other code (authors are in CC).
+Values overtaken from mini2440 kernel:
+git://repo.or.cz/linux-2.6/mini2440.git
+and https://github.com/a1ien/mini2440-linux-kernel
 
-Marek Belisko (4):
-  s3c2440: mini2440: Add support for new LCD panels.
-  s3c2440: mini2440: Add touchscreen support for mini2440.
-  s3c2440: mini2440: Select touchscreen by default.
-  s3c2440: mini2440: Enable the backlight LED earlier at boot time.
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/mach-s3c2440/mach-mini2440.c |   37 +++++++++++++++++++++++++++++++++
+ 1 files changed, 37 insertions(+), 0 deletions(-)
 
- arch/arm/mach-s3c2410/include/mach/leds-gpio.h |    1 +
- arch/arm/mach-s3c2440/Kconfig                  |    1 +
- arch/arm/mach-s3c2440/mach-mini2440.c          |   55 +++++++++++++++++++++++-
- drivers/leds/leds-s3c24xx.c                    |    6 ++-
- 4 files changed, 60 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index dfedc9c..ce152b4 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -167,6 +167,43 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+ 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+ 				   S3C2410_LCDCON5_HWSWP),
+ 	},
++	[3] = {	/* mini2440 + 3.5" TFT + TS -- New model as Nov 2009 "T35" */
++		_LCD_DECLARE(
++			7,			/* The 3.5 is quite fast */
++			240, 21, 25, 6,		/* x timing */
++			320, 2, 4, 2,		/* y timing */
++			40),			/* refresh rate */
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_INVVDEN |
++				   S3C2410_LCDCON5_PWREN),
++	},
++	[4] = { /* mini2440 + 5.6" TFT + touchscreen -- Innolux AT056TN52 */
++		/* be sure the "power" jumper is set accordingly ! */
++		_LCD_DECLARE(
++			10,			/* the 5.3" runs slower */
++			640, 41, 68, 22,	/* x timing */
++			480, 26, 6, 2,		/* y timing */
++			40),			/* refresh rate */
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_PWREN),
++	},
++	[5] = { /* mini2440 + 3,5" TFT + touchscreen -- SONY X35 */
++		_LCD_DECLARE(
++			7,
++			240, 1, 26, 5,		/* x timing */
++			320, 1, 5, 9,		/* y timing */
++			60),			/* refresh rate */
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++					S3C2410_LCDCON5_INVVDEN |
++					S3C2410_LCDCON5_INVVFRAME |
++					S3C2410_LCDCON5_INVVLINE |
++					S3C2410_LCDCON5_INVVCLK |
++					S3C2410_LCDCON5_HWSWP),
++	},
+ };
+ 
+ /* todo - put into gpio header */
+-- 
+1.7.1
