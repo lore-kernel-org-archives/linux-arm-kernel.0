@@ -1,41 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Mar 2011 10:01:13 -0700
-Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
-	support
-In-Reply-To: <5cbdd88c3ca3fe5c5a0f119be446ce99@mail.gmail.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110328205027.GC30616@atomide.com>
-	<5cbdd88c3ca3fe5c5a0f119be446ce99@mail.gmail.com>
-Message-ID: <20110329170113.GG4016@atomide.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 29 Mar 2011 19:02:19 +0200
+Subject: [PATCH 1/4] arm: lpc32xx: add tsc-device
+In-Reply-To: <083DF309106F364B939360100EC290F811ECEDC208@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1301328090-25994-1-git-send-email-w.sang@pengutronix.de>
+	<083DF309106F364B939360100EC290F811ECEDC208@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20110329170219.GA6762@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110328 22:47]:
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> >
-> > Do you really need to initialize all of this that early?
-> >
-> Yes. It's a interrupt controller extension and needs to work
-> together with GIC.
+On Tue, Mar 29, 2011 at 06:43:45PM +0200, Kevin Wells wrote:
+> Hi Wolfram,
+> 
+> Thanks for submitting these. These all look good!
+> 
+> > +/* TSC (Touch Screen Controller) */
+> > +
+> > +static struct resource lpc32xx_tsc_resources[] = {
+> > +	{
+> > +		.start = LPC32XX_ADC_BASE,
+> > +		.end = LPC32XX_ADC_BASE + SZ_16K - 1,
+> 
+> The LPC32xx user's guide spaces peripheral register sets 16K apart,
+> but internally the register blocks are 4K or smaller. I'm not sure
+> why these need to be setup as 16K instead of 4K. Hmm, maybe I'm
+> missing something here?
 
-Hmm to me it seems that the gic_arch_extn functions should be
-all NULL during runtime operation, and the wake-up generator
-should be programmed only before entering an idle state.
+Probably not. I just took the user's guide as a reference. If you know this is
+wrong, I can respin the series. ADC is also 4K?
 
-Then the wake-up generator can be cleared after delivering
-the wake-up event(s).
+Thanks,
 
-Or am I missing something on why this should be enabled all
-the time?
+   Wolfram
 
-BTW, looks like you got few typos in the comments in this
-patch, noticed these while reading:
-
-Hardware requirements is
-GIC rgeisters
-gic architecture specific fucntioms
-
-I know I'm making tons of typos too ;)
-
-Tony
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/2ff4b7a1/attachment.sig>
