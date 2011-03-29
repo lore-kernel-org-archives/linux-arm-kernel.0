@@ -1,71 +1,36 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 29 Mar 2011 16:11:12 +0900
-Subject: [PATCH] Input: tca6416-keypad: Change to module_init()
-In-Reply-To: <AANLkTin1jG36-EsvAk9o-KxdxaBBhx=5Rf+JMidjYqsT@mail.gmail.com>
-References: <20110322142619.1109.89105.sendpatchset@t400s>
-	<20110322142855.GB2202@sirena.org.uk>
-	<20110322143307.GB24004@linux-sh.org>
-	<AANLkTimRV9vzOE7+VPX48y3KebLJSvBOkqxoM--9gqGb@mail.gmail.com>
-	<20110322153226.GC30303@linux-sh.org>
-	<AANLkTimyxdcJ-eEke9x7X1zdiJNbFtncfv0=NzKjtAme@mail.gmail.com>
-	<20110322155730.GD30303@linux-sh.org>
-	<AANLkTi=Fjc2f837ifH152Rh8W0PfiZvViYaLe=8XZo4Z@mail.gmail.com>
-	<20110322163144.GC2202@sirena.org.uk>
-	<AANLkTiniBVWhSiNZMRYbO857D_Vj03KxH4qYqkVo-11J@mail.gmail.com>
-	<20110322165907.GG22583@opensource.wolfsonmicro.com>
-	<AANLkTin1jG36-EsvAk9o-KxdxaBBhx=5Rf+JMidjYqsT@mail.gmail.com>
-Message-ID: <AANLkTimX+SQHaFjc=zARjuvdzX8OisQMHCBUgcR4V7sa@mail.gmail.com>
+From: buserror@gmail.com (M P)
+Date: Tue, 29 Mar 2011 08:20:19 +0100
+Subject: [PATCH 0/4] s3c2440: mini2440: Add missing code parts to be fully
+	working with latest kernel.
+In-Reply-To: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
+References: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <AANLkTin9PZuJpy4CizGvw4w6nexrdr1h+yPTU2vwjTBV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2011 at 1:04 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On Wed, Mar 23, 2011 at 1:59 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Wed, Mar 23, 2011 at 01:51:02AM +0900, Magnus Damm wrote:
->>
->>> I'm not sure if this is i2c specific though - in general you probably
->>> need to register the parent bus driver first.
->>
->> This was my original question - I'm not aware of any reason why you
->> should need to register the driver for the specific bus first, it seems
->> odd.
+On Tue, Mar 29, 2011 at 7:32 AM, Marek Belisko
+<marek.belisko@open-nandra.com> wrote:
+> Patch add new LCD panels with which was board produced. Also add touchscreen
+> support. Enabling LCD backlight during early booting stage also added.
 >
-> Can't see why it wouldn't work - in theory at least. I'll have a look tomorrow.
+> Some code parts are collected or inspired from other code (authors are in CC).
 
-Ok, it seems like the I2C bus registration is working as expected.
-After digging into this a bit more I've discovered that the root cause
-seems to be related to clocks. On sh7372 the I2C controller and the
-serial console share the parent clock, and the setup order is
-affecting the serial console.
+Actually, I'm not in CC, and most of this was from my own mini2440
+tree on repo.or.cz, I'm also listed as maintainer at the bottom of the
+mach-mini2440.c file.
 
-Without this patch, if subsys_init() is used for tca6416-keypad then
-the I2C controller will be used at probe() time from the function
-tca6416_setup_registers() - this before the serial console driver has
-been initialized properly. The I2C controller used by tca6416 will
-stop the parent clock when the I2C bus access is finished. The serial
-console driver is driven early using earlyprintk at this time, and the
-clock is assumed to be enabled until the real driver is installed at
-module_init() time. So with subsys_init() in tca6416 the I2C
-controller stops the clock while the earlyprintk code assumes it to be
-on. This is causing delays.
+Michael
 
-If the tca6416 driver is changed to module_init() then the serial
-console driver will be initialized before the tca6416 driver due to
-the linking order and all is working fine.
-
-As we already knew, the clock framework code in drivers/sh/clk should
-be updated to turn off unused clocks. To fix the issue in this mail
-thread we should also update the code to force the console clock to be
-enabled early on to make sure the serial console clock isn't turned
-off by accident.
-
-I propose that we convert the tca6416 driver to module_init() as a
-short term fix _and_ at the same time work on improving the clock
-framework code.
-
-Can anyone think of a reason why the tca6416 driver shouldn't be
-changed to module_init()?
-
-Thanks,
-
-/ magnus
+> Marek Belisko (4):
+> ?s3c2440: mini2440: Add support for new LCD panels.
+> ?s3c2440: mini2440: Add touchscreen support for mini2440.
+> ?s3c2440: mini2440: Select touchscreen by default.
+> ?s3c2440: mini2440: Enable the backlight LED earlier at boot time.
+>
+> ?arch/arm/mach-s3c2410/include/mach/leds-gpio.h | ? ?1 +
+> ?arch/arm/mach-s3c2440/Kconfig ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-s3c2440/mach-mini2440.c ? ? ? ? ?| ? 55 +++++++++++++++++++++++-
+> ?drivers/leds/leds-s3c24xx.c ? ? ? ? ? ? ? ? ? ?| ? ?6 ++-
+> ?4 files changed, 60 insertions(+), 3 deletions(-)
+>
+>
