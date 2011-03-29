@@ -1,91 +1,218 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 29 Mar 2011 12:30:55 +0200
-Subject: [PATCH v4 09/10] lpc2k: defconfig for NXP LPC2K platform
+Date: Tue, 29 Mar 2011 12:30:50 +0200
+Subject: [PATCH v4 04/10] lpc2k: generic time and clockevents
 In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301394656-24853-10-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1301394656-24853-5-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a defconfig that is setup to support booting a uClinux based
-system. This enables ROMFS/CRAMFS, initrd, and FLAT binaries besides
-the drivers for the devices added in the previous patch.
+This code was mostly "borrowed" form the lpc32xx implementation.
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
 no changes since v3.
 
-no changes since v2.
+changes since v2:
+        * Removed clk_put() from init code.
+        * Added clk_get()/clk_enable() for timer0.
 
 changes since v1:
-        * enabled CONFIG_MAGIC_SYSRQ for testing arch_reset.
+        * make use of clockevents_calc_mult_shift.
 ---
- arch/arm/configs/lpc2k_defconfig |   57 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 57 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/lpc2k_defconfig
+ arch/arm/mach-lpc2k/Makefile |    2 +-
+ arch/arm/mach-lpc2k/time.c   |  176 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 177 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/time.c
 
-diff --git a/arch/arm/configs/lpc2k_defconfig b/arch/arm/configs/lpc2k_defconfig
+diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
+index 9eb0a6a..267432c 100644
+--- a/arch/arm/mach-lpc2k/Makefile
++++ b/arch/arm/mach-lpc2k/Makefile
+@@ -1 +1 @@
+-obj-y	:= clock.o irq.o
++obj-y	:= clock.o irq.o time.o
+diff --git a/arch/arm/mach-lpc2k/time.c b/arch/arm/mach-lpc2k/time.c
 new file mode 100644
-index 0000000..47a7bcf
+index 0000000..1d1c9d6
 --- /dev/null
-+++ b/arch/arm/configs/lpc2k_defconfig
-@@ -0,0 +1,57 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_TINY_RCU=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
-+# CONFIG_COMPAT_BRK is not set
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_LPC2K=y
-+CONFIG_MACH_EA2478DEVKIT=y
-+CONFIG_PROCESSOR_ID=0x41007700
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_CMDLINE="root=/dev/ram initrd=0xa1a00000,4000k console=ttyS0,115200N8 debug rw earlyprintk"
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+# CONFIG_HWMON is not set
-+# CONFIG_MFD_SUPPORT is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_CRAMFS=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
++++ b/arch/arm/mach-lpc2k/time.c
+@@ -0,0 +1,176 @@
++/*
++ * Copyright (C) 2011 Team Embeded VOF
++ *                    Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++ * Copyright (C) 2009 - 2010 NXP Semiconductors
++ * Copyright (C) 2009 Fontys University of Applied Sciences, Eindhoven
++ *                    Ed Schouten <e.schouten@fontys.nl>
++ *                    Laurens Timmermans <l.timmermans@fontys.nl>
++ *
++ * Based on timer code from plat-lpc32xx.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/time.h>
++#include <linux/err.h>
++#include <linux/clockchips.h>
++#include <linux/clk.h>
++
++#include <asm/mach/time.h>
++
++#include <mach/hardware.h>
++
++#define IR		0x00
++#define TCR		0x04
++#define TC		0x08
++#define PR		0x0c
++#define PC		0x10
++#define MCR		0x14
++#define MR0		0x18
++#define MR1		0x1c
++#define MR2		0x20
++#define CCR		0x28
++#define CR0		0x2c
++#define CR1		0x30
++#define CR2		0x34
++#define CR3		0x38
++#define EMR		0x3c
++#define CTCR		0x70
++
++#define IR_MR_SHIFT	0
++#define IR_CR_SHIFT	4
++
++#define TCR_EN		(1 << 0)
++#define TCR_RESET	(1 << 1)
++
++
++static void __iomem *timer0 = (void __iomem *)APB_TIMER0_BASE;
++static void __iomem *timer1 = (void __iomem *)APB_TIMER1_BASE;
++
++static cycle_t lpc2k_clksrc_read(struct clocksource *cs)
++{
++	return __raw_readl(timer1 + TC);
++}
++
++static struct clocksource lpc2k_clksrc = {
++	.name	= "lpc2k_clksrc",
++	.rating	= 300,
++	.read	= lpc2k_clksrc_read,
++	.mask	= CLOCKSOURCE_MASK(32),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static int lpc2k_clkevt_next_event(unsigned long delta,
++	struct clock_event_device *dev)
++{
++	__raw_writel(TCR_RESET, timer0 + TCR);
++	__raw_writel(delta, timer0 + PR);
++	__raw_writel(TCR_EN, timer0 + TCR);
++
++	return 0;
++}
++
++static void lpc2k_clkevt_mode(enum clock_event_mode mode,
++	struct clock_event_device *dev)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		BUG();
++		break;
++
++	case CLOCK_EVT_MODE_ONESHOT:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		/*
++		 * Disable the timer. When using oneshot, we must also
++		 * disable the timer to wait for the first call to
++		 * set_next_event().
++		 */
++		__raw_writel(0, timer0 + TCR);
++		break;
++
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		break;
++	}
++}
++
++static struct clock_event_device lpc2k_clkevt = {
++	.name		= "lpc2k_clkevt",
++	.features	= CLOCK_EVT_FEAT_ONESHOT,
++	.rating		= 300,
++	.set_next_event	= lpc2k_clkevt_next_event,
++	.set_mode	= lpc2k_clkevt_mode,
++};
++
++static irqreturn_t lpc2k_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &lpc2k_clkevt;
++
++	/* Clear match */
++	__raw_writel((1 << IR_MR_SHIFT), timer0 + IR);
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction lpc2k_timer_irq = {
++	.name		= "LPC2K Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= lpc2k_timer_interrupt,
++};
++
++/*
++ * The clock management driver isn't initialized at this point, so the
++ * clocks need to be enabled here manually and then tagged as used in
++ * the clock driver initialization
++ */
++static void __init lpc2k_timer_init(void)
++{
++	unsigned long rate;
++	struct clk *clk;
++
++	clk = clk_get(NULL, "timer1");
++	BUG_ON(IS_ERR(clk));
++	clk_enable(clk);
++
++	rate = clk_get_rate(clk);
++
++	clk = clk_get(NULL, "timer0");
++	BUG_ON(IS_ERR(clk));
++	clk_enable(clk);
++
++	/* Initial timer setup */
++	__raw_writel(0, timer0 + TCR);
++	__raw_writel(1 << IR_MR_SHIFT, timer0 + IR);
++	__raw_writel(1, timer0 + MR0);
++	__raw_writel(3 << 0, timer0 + MCR);
++
++	/* Setup tick interrupt */
++	setup_irq(IRQ_LPC2K_TIMER0, &lpc2k_timer_irq);
++
++	/* Setup the clockevent structure. */
++	clockevents_calc_mult_shift(&lpc2k_clkevt, rate, 5);
++	lpc2k_clkevt.max_delta_ns = clockevent_delta2ns(-1,
++		&lpc2k_clkevt);
++	lpc2k_clkevt.min_delta_ns = clockevent_delta2ns(1,
++		&lpc2k_clkevt) + 1;
++	lpc2k_clkevt.cpumask = cpumask_of(0);
++	clockevents_register_device(&lpc2k_clkevt);
++
++	/* Use timer1 as clock source. */
++	__raw_writel(TCR_RESET, timer1 + TCR);
++	__raw_writel(0, timer1 + PR);
++	__raw_writel(0, timer1 + MCR);
++	__raw_writel(TCR_EN, timer1 + TCR);
++	clocksource_register_hz(&lpc2k_clksrc, rate);
++}
++
++struct sys_timer lpc2k_timer = {
++	.init		= &lpc2k_timer_init,
++};
 -- 
 1.7.1
