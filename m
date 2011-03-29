@@ -1,43 +1,25 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 29 Mar 2011 15:49:02 +0900
-Subject: [PATCH] Exynos4: Fix cpuinit section mismatches
-Message-ID: <20110329064902.GA32621@july>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 29 Mar 2011 08:50:55 +0200
+Subject: MACH_TYPE undeclared error
+In-Reply-To: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
+References: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
+Message-ID: <20110329065055.GA26987@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+Hi Medhavi,
 
-Fix cpuinit section mismatch(es).
+On Tue, Mar 29, 2011 at 12:01:40PM +0530, Madhavi Manchala wrote:
+> arch/arm/mach-s3c2510/s3c2510.c:35:1: error: 'MACH_TYPE_S3C2510'
+> undeclared here (not in a function)
 
-WARNING: modpost: Found 2 section mismatch(es).
-To see full details build your kernel with:
-'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+See 6f82f4db80189281a8ac42f2e72396accb719b57 (ARM: Update (and cut down) 
+mach-types), and the recent discussion in this list 
+(http://thread.gmane.org/gmane.linux.ports.arm.kernel/110967).
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-exynos4/headsmp.S b/arch/arm/mach-exynos4/headsmp.S
-index 6c6cfc5..3cdeb36 100644
---- a/arch/arm/mach-exynos4/headsmp.S
-+++ b/arch/arm/mach-exynos4/headsmp.S
-@@ -13,7 +13,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--	__INIT
-+	__CPUINIT
- 
- /*
-  * exynos4 specific entry point for secondary CPUs.  This provides
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index 6d35878..f77e66a 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -35,7 +35,7 @@ extern void exynos4_secondary_startup(void);
-  * boot "holding pen"
-  */
- 
--volatile int __cpuinitdata pen_release = -1;
-+volatile int pen_release = -1;
- 
- /*
-  * Write pen_release in a way that is guaranteed to be visible to all
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
