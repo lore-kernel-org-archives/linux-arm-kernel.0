@@ -1,65 +1,32 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 29 Mar 2011 06:27:39 -0000
-Subject: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup timer and
-	debug counters
-In-Reply-To: <4287119fdbc364dd7bd414ee40c1a9a4@mail.gmail.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110328210046.GE30616@atomide.com>
-	<4287119fdbc364dd7bd414ee40c1a9a4@mail.gmail.com>
-Message-ID: <AANLkTikbBWn0KrUmAwTbEtY8K_g-xT2r9BqZU49iiOsb@mail.gmail.com>
+From: manuel_roeder@gmx.de (Manuel Roeder)
+Date: Tue, 29 Mar 2011 06:52:19 -0000
+Subject: D-Link DNS323 Rev. B1 Problem with Kernel 2.6.38.1 (2.6.38, too)
+	- I2C-Bus mv64xxx / RTC ST M41T80 / LM75 Sensor
+Message-ID: <4D91803E.60601@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for spamming your inbox with same email. :(
-Looks like my mailer has srewed up. It send same messege almost 20 times and
-it shows me that it has
-stuck in outbox
+The formerly found bug seems to be introduced with the RTC-rework starting with kernel 2.6.38.
+It seems to be NOT a bug of I2C- or LM75-driver! 
+The bug starts with kernel 2.6.38 and is still there in 2.6.38.2.
 
-Regards
-Santosh
+Kernel 2.6.37.6 runs fine!!!! No RTC-bug here!!!
 
-On Tue, Mar 29, 2011 at 11:20 AM, Santosh Shilimkar <
-santosh.shilimkar@ti.com> wrote:
+[   18.270364] i2c /dev entries driver
+[   18.274728] rtc-m41t80 0-0068: chip found, driver version 0.05
+[   18.280955] m41t80: dev (254:0)
+[   18.281012] rtc-m41t80 0-0068: rtc core: registered m41t80 as rtc0
+[   20.280626] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   20.287144] rtc-m41t80 0-0068: Can't clear HT bit
+[   20.292139] rtc-m41t80: probe of 0-0068 failed with error -5
+[   22.290615] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   22.297153] lm75: probe of 0-0048 failed with error -110
+[   24.300623] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   26.300925] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   28.300905] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   30.300636] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   32.300906] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   34.300844] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
+[   36.300648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
 
-> > -----Original Message-----
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> > Sent: Tuesday, March 29, 2011 2:31 AM
-> > To: Santosh Shilimkar
-> > Cc: linux-omap at vger.kernel.org; khilman at ti.com; rnayak at ti.com;
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup
-> > timer and debug counters
-> >
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110328 02:21]:
-> > > --- a/arch/arm/mach-omap2/pm-debug.c
-> > > +++ b/arch/arm/mach-omap2/pm-debug.c
-> > > @@ -40,6 +41,11 @@ static int omap4_pm_suspend(void)
-> > >     int state, ret = 0;
-> > >     u32 cpu_id = smp_processor_id();
-> > >
-> > > +   /* Wakeup timer from suspend */
-> > > +   if (wakeup_timer_seconds || wakeup_timer_milliseconds)
-> > > +           omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
-> > > +                                    wakeup_timer_milliseconds);
-> > > +
-> > >     /* Save current powerdomain state */
-> > >     list_for_each_entry(pwrst, &pwrst_list, node) {
-> > >             pwrst->saved_state = pwrdm_read_next_pwrst(pwrst-
-> > >pwrdm);
-> >
-> > This hack to mess diretly with sys_timer will be ripped out,
-> > so please drop this patch.
-> >
-> Ok.
->
-> > In the long run we'll have dmtimer1 dedicated to the PM code,
-> > so then it's possible to do similar things.
-> >
->
-> Regards,
-> Santosh
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/57b3038e/attachment-0001.html>
+regards Manuel Roeder - manuel.roeder(at)web.de
