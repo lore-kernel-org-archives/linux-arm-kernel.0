@@ -1,49 +1,74 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 29 Mar 2011 11:20:33 +0530
-Subject: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup timer and
-	debug counters
-In-Reply-To: <20110328210046.GE30616@atomide.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110328210046.GE30616@atomide.com>
-Message-ID: <4287119fdbc364dd7bd414ee40c1a9a4@mail.gmail.com>
+Date: Tue, 29 Mar 2011 11:41:50 +0530
+Subject: [PATCH 01/10] omap: Use separate init_irq functions to
+	avoidcpu_is_omap tests early
+In-Reply-To: <20110328222128.4046.70846.stgit@baageli.muru.com>
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<20110328222128.4046.70846.stgit@baageli.muru.com>
+Message-ID: <4fb3028a4ae904028e93cf6e22df7e79@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Tuesday, March 29, 2011 2:31 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; khilman at ti.com; rnayak at ti.com;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [pm-core][PATCH v3 14/21] OMAP4: pm-debug: Add wakeup
-> timer and debug counters
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> Sent: Tuesday, March 29, 2011 3:51 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Subject: [PATCH 01/10] omap: Use separate init_irq functions to
+> avoidcpu_is_omap tests early
 >
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110328 02:21]:
-> > --- a/arch/arm/mach-omap2/pm-debug.c
-> > +++ b/arch/arm/mach-omap2/pm-debug.c
-> > @@ -40,6 +41,11 @@ static int omap4_pm_suspend(void)
-> >  	int state, ret = 0;
-> >  	u32 cpu_id = smp_processor_id();
-> >
-> > +	/* Wakeup timer from suspend */
-> > +	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
-> > +		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
-> > +					 wakeup_timer_milliseconds);
-> > +
-> >  	/* Save current powerdomain state */
-> >  	list_for_each_entry(pwrst, &pwrst_list, node) {
-> >  		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst-
-> >pwrdm);
+> This allows us to remove cpu_is_omap calls from init_irq functions
+> and the irq handler. There should not be any need for cpu_is_omap
+> as at this point we only care about SoC generation, and not about
+> subcategories.
 >
-> This hack to mess diretly with sys_timer will be ripped out,
-> so please drop this patch.
+> The main reason for the patch is that we want to initialize only
+> minimal omap specific code from the init_early call, and this and
+> the following patches get us closer to that goal.
 >
-Ok.
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+[....]
 
-> In the long run we'll have dmtimer1 dedicated to the PM code,
-> so then it's possible to do similar things.
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-
+> omap2/omap4-common.c
+> index 9ef8c29..1c3bcf1 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -19,6 +19,8 @@
+>  #include <asm/hardware/gic.h>
+>  #include <asm/hardware/cache-l2x0.h>
 >
+> +#include <plat/irqs.h>
+> +
+>  #include <mach/hardware.h>
+>  #include <mach/omap4-common.h>
+>
+> @@ -34,6 +36,10 @@ void __init gic_init_irq(void)
+>  	void __iomem *gic_cpu_base;
+>
+>  	/* Static mapping, never released */
+> +	omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_4K);
+> +	BUG_ON(!omap_irq_base);
+> +
+Above mapping is incorrect. The address space is of just
+512 bytes. Infact you don't need to ioremap it again.
+Below should be enough.
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c
+b/arch/arm/mach-omap2/omap4-common.c
+index 9ef8c29..9bddc9e 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -41,6 +41,8 @@ void __init gic_init_irq(void)
+ 	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+ 	BUG_ON(!gic_cpu_base);
+
++	omap_irq_base = gic_cpu_base;
++
+ 	gic_init(0, 29, gic_dist_base_addr, gic_cpu_base);
+ }
 
 Regards,
 Santosh
