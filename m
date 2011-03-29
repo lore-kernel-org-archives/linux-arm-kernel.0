@@ -1,118 +1,91 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 29 Mar 2011 12:30:48 +0200
-Subject: [PATCH v4 02/10] lpc2k: Exception vector handling
+Date: Tue, 29 Mar 2011 12:30:55 +0200
+Subject: [PATCH v4 09/10] lpc2k: defconfig for NXP LPC2K platform
 In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301394656-24853-3-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1301394656-24853-10-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPC2K optionally remaps the first 64 bytes of SRAM to address 0, to facilitate
-writable low vectors. However, since it only remaps the first 64 bytes the stubs
-can't be copied there and end up too far away from the vectors, requiring the
-vectors to use an indirect jump instead of branch to get to the stubs.
-
-Since now VECTOR_BASE is below PHYS_OFFSET, do not try to reserve the vector
-page, as it will fail (and prevent the kernel from booting).
-
-Also, commit 247055aa (6384/1: Remove the domain switching on ARMv6k/v7 CPUs) broke
-the placement of vectors in the !MMU case, so fix this too.
+Add a defconfig that is setup to support booting a uClinux based
+system. This enables ROMFS/CRAMFS, initrd, and FLAT binaries besides
+the drivers for the devices added in the previous patch.
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
 no changes since v3.
 
-changes since v2:
-        * reworded reason for vector branch changes.
+no changes since v2.
 
 changes since v1:
-        * added comment to entry-armv.S vector #ifdef.
+        * enabled CONFIG_MAGIC_SYSRQ for testing arch_reset.
 ---
- arch/arm/Kconfig             |    1 +
- arch/arm/kernel/entry-armv.S |   23 +++++++++++++++++++++++
- arch/arm/kernel/traps.c      |    2 +-
- arch/arm/mm/nommu.c          |    2 ++
- 4 files changed, 27 insertions(+), 1 deletions(-)
+ arch/arm/configs/lpc2k_defconfig |   57 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 57 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/lpc2k_defconfig
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1ff6e18..c96908e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -186,6 +186,7 @@ config VECTORS_BASE
- 	hex
- 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
- 	default DRAM_BASE if REMAP_VECTORS_TO_RAM
-+	default 0x40000000 if ARCH_LPC2K
- 	default 0x00000000
- 	help
- 	  The base address of exception vectors.
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index e8d8856..65be7b1 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -1208,6 +1208,7 @@ __stubs_end:
- 
- 	.globl	__vectors_start
- __vectors_start:
-+#ifndef CONFIG_ARCH_LPC2K
-  ARM(	swi	SYS_ERROR0	)
-  THUMB(	svc	#0		)
-  THUMB(	nop			)
-@@ -1218,6 +1219,28 @@ __vectors_start:
- 	W(b)	vector_addrexcptn + stubs_offset
- 	W(b)	vector_irq + stubs_offset
- 	W(b)	vector_fiq + stubs_offset
-+#else /* CONFIG_ARCH_LPC2K */
-+	/*
-+	 * The LPC2K remaps 64 bytes of SRAM to address 0 for vectors. This
-+	 * means that the stubs can't be in the same page, and end up too far
-+	 * away from the vectors to use a branch instruction.
-+	 */
-+	swi	SYS_ERROR0
-+	ldr	pc, .vector_und
-+	ldr	pc, .vector_swi
-+	ldr	pc, .vector_pabt
-+	ldr	pc, .vector_dabt
-+	ldr	pc, .vector_addrexcptn
-+	ldr	pc, .vector_irq
-+	ldr	pc, .vector_fiq
-+.vector_und:		.word   vector_und
-+.vector_swi:		.word   vector_swi
-+.vector_pabt:		.word   vector_pabt
-+.vector_dabt:		.word   vector_dabt
-+.vector_addrexcptn:	.word   vector_addrexcptn
-+.vector_irq:		.word   vector_irq
-+.vector_fiq:		.word   vector_fiq
-+#endif
- 
- 	.globl	__vectors_end
- __vectors_end:
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index f0000e1..db101fc 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -758,7 +758,7 @@ static void __init kuser_get_tls_init(unsigned long vectors)
- 
- void __init early_trap_init(void)
- {
--#if defined(CONFIG_CPU_USE_DOMAINS)
-+#if defined(CONFIG_CPU_USE_DOMAINS) || !defined(CONFIG_MMU)
- 	unsigned long vectors = CONFIG_VECTORS_BASE;
- #else
- 	unsigned long vectors = (unsigned long)vectors_page;
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 687d023..e3bec02 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -24,7 +24,9 @@ void __init arm_mm_memblock_reserve(void)
- 	 * some architectures which the DRAM is the exception vector to trap,
- 	 * alloc_page breaks with error, although it is not NULL, but "0."
- 	 */
-+#if PHYS_OFFSET <= CONFIG_VECTORS_BASE
- 	memblock_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
-+#endif
- }
- 
- /*
+diff --git a/arch/arm/configs/lpc2k_defconfig b/arch/arm/configs/lpc2k_defconfig
+new file mode 100644
+index 0000000..47a7bcf
+--- /dev/null
++++ b/arch/arm/configs/lpc2k_defconfig
+@@ -0,0 +1,57 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_TINY_RCU=y
++# CONFIG_UTS_NS is not set
++# CONFIG_PID_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_LPC2K=y
++CONFIG_MACH_EA2478DEVKIT=y
++CONFIG_PROCESSOR_ID=0x41007700
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_CMDLINE="root=/dev/ram initrd=0xa1a00000,4000k console=ttyS0,115200N8 debug rw earlyprintk"
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_SUSPEND is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++# CONFIG_HWMON is not set
++# CONFIG_MFD_SUPPORT is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_ARMMMCI=y
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
 -- 
 1.7.1
