@@ -1,76 +1,28 @@
 From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Tue, 29 Mar 2011 08:32:41 +0200
-Subject: [PATCH 2/4] s3c2440: mini2440: Add touchscreen support for mini2440.
+Date: Tue, 29 Mar 2011 08:32:42 +0200
+Subject: [PATCH 3/4] s3c2440: mini2440: Select touchscreen by default.
 In-Reply-To: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
 References: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <1301380363-3282-3-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <1301380363-3282-4-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch add support for mini2440 touchscreen.
-Some code borrowed from:
-git://repo.or.cz/linux-2.6/mini2440.git
-
 Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
 ---
- arch/arm/mach-s3c2440/mach-mini2440.c |   17 +++++++++++++++--
- 1 files changed, 15 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c2440/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index ce152b4..163d318 100644
---- a/arch/arm/mach-s3c2440/mach-mini2440.c
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -47,6 +47,7 @@
- #include <plat/iic.h>
- #include <plat/mci.h>
- #include <plat/udc.h>
-+#include <plat/ts.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-@@ -530,6 +531,11 @@ static struct platform_device uda1340_codec = {
- 		.id = -1,
- };
- 
-+static struct s3c2410_ts_mach_info mini2440_ts_cfg __initdata = {
-+	.delay = 10000,
-+	.presc = 0xff, /* slow as we can go */
-+};
-+
- static struct platform_device *mini2440_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_wdt,
-@@ -548,6 +554,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
- 	&uda1340_codec,
- 	&mini2440_audio,
- 	&samsung_asoc_dma,
-+	&s3c_device_adc,
- };
- 
- static void __init mini2440_map_io(void)
-@@ -631,8 +638,13 @@ static void mini2440_parse_features(
- 			features->done |= FEATURE_BACKLIGHT;
- 			break;
- 		case 't':
--			printk(KERN_INFO "MINI2440: '%c' ignored, "
--				"touchscreen not compiled in\n", f);
-+			if (features->done & FEATURE_TOUCH)
-+				printk(KERN_INFO "MINI2440: '%c' ignored, "
-+					"touchscreen already set\n", f);
-+			else
-+				features->optional[features->count++] =
-+						&s3c_device_ts;
-+			features->done |= FEATURE_TOUCH;
- 			break;
- 		case 'c':
- 			if (features->done & FEATURE_CAMERA)
-@@ -699,6 +711,7 @@ static void __init mini2440_init(void)
- 	s3c24xx_mci_set_platdata(&mini2440_mmc_cfg);
- 	s3c_nand_set_platdata(&mini2440_nand_info);
- 	s3c_i2c0_set_platdata(NULL);
-+	s3c24xx_ts_set_platdata(&mini2440_ts_cfg);
- 
- 	i2c_register_board_info(0, mini2440_i2c_devs,
- 				ARRAY_SIZE(mini2440_i2c_devs));
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index 50825a3..e713eea 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -186,6 +186,7 @@ config MACH_MINI2440
+ 	select LEDS_TRIGGER_BACKLIGHT
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
++	select TOUCHSCREEN_S3C2410
+ 	help
+ 	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
+ 	  available via various sources. It can come with a 3.5" or 7" touch LCD.
 -- 
 1.7.1
