@@ -1,67 +1,44 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Tue, 29 Mar 2011 19:48:05 +0530
-Subject: [OpenWrt-Devel] linker errors like ignoring invalid character `#'
-	in expression
-In-Reply-To: <AANLkTima8pjzo4y89MH6ntdJEqqq72gToCXjskSXCO9p@mail.gmail.com>
-References: <AANLkTim6qKQ78J+L28iCDhretGY+g_6zo3TznAWL=-LC@mail.gmail.com>
-	<AANLkTikDfakPT3LxqEuaAcz3o3hH=Mub-oaCma_-szia@mail.gmail.com>
-	<AANLkTima8pjzo4y89MH6ntdJEqqq72gToCXjskSXCO9p@mail.gmail.com>
-Message-ID: <AANLkTim_4V7o0p7ijmfmHUxS22WgUkXd+h-AXPzRDacN@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Mar 2011 16:21:44 +0100
+Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in
+	for device accesses
+In-Reply-To: <AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
+	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+Message-ID: <1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2011 at 7:38 PM, Jonathan Bennett <jbscience87@gmail.com> wrote:
-> On Tue, Mar 29, 2011 at 9:06 AM, Madhavi Manchala
-> <madhavi.linux@gmail.com> wrote:
->> On Tue, Mar 29, 2011 at 7:16 PM, Madhavi Manchala
->> <madhavi.linux@gmail.com> wrote:
->>> Dear All,
->>>
->>> I am seeing the following linker error messages when I try to build
->>> the OpenWRT image for my board.
->>>
->>> arm-openwrt-linux-uclibcgnueabi-ld:arch/arm/kernel/vmlinux.lds:284:
->>> ignoring invalid character `#' in expression
->>> arm-openwrt-linux-uclibcgnueabi-ld:arch/arm/kernel/vmlinux.lds:284: syntax error
->>>
->>> I googled, but there is no much luck for me. I did not understand why
->>> am I getting this error.
->>>
->>> Any suggestions / hints would be appreciated.
->>>
->>> Thanks for your help, too.
->>>
->>> Thanks and Regards,
->>> Madhavi M.
->>
->> Dear All,
->>
->> It was resolved. Thanks.
->
-> That's great! However, a few words of explanation might be helpful in
-> case anyone else runs across this issue. (And I'm curious.)
+On Tue, 2011-03-29 at 16:02 +0100, Martin Furmanski wrote:
+> Do you have a reference on this?
 
-Dear Jonathan Bennett,
+Usually the ARM ARM but a document with examples is this:
 
-It was due to a comment line which is placed in the
-arch/arm/kernel/vmlinux.lds file. The comment was added as //comment.
-However, when I looked whole vmlinux.lds file, all the comments are
-included in /* */. So, I changed it to /* */ instead //. Then it
-compiled. I do not know the exact reason for that. May be .lds files
-do not accept the comments in //.
+http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
 
-Thanks.
+(infocenter.arm.com -> Developer Guides and Articles -> ARM architecture
+-> Barrier Litmus and Tests Cookbook)
 
-Regards,
-Madhavi M.
+> I have been under the impression that DMB is a barrier for all memory
+> accesses. I find no support in ARMv7, for the hypothesis that DSB is
+> needed to order between Device and Normal.
 
->>
->> Regards,
->> Madhavi M.
->
-> ~Jonathan Bennett
-> _______________________________________________
-> openwrt-devel mailing list
-> openwrt-devel at lists.openwrt.org
-> https://lists.openwrt.org/mailman/listinfo/openwrt-devel
->
+The key point is that DMB only ensures the *observability* of memory
+accesses by the processors and not arrival to the device or block of
+memory. In the drawing below, DMB only ensures the ordering at point
+(1). For arrival to RAM or Device you need a DSB.
+
+       +------+     +------+
+       |  P1  |     |  P2  |
+       +------+     +------+
+          |     (1)     |
+          +------+------+
+                 |
+   +-------------+-------------+
+   |             |             |
++------+     +------+     +--------+
+| RAM1 |     | RAM2 |     | Device |
++------+     +------+     +--------+
+
+-- 
+Catalin
