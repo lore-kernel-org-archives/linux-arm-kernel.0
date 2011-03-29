@@ -1,25 +1,92 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Mar 2011 21:52:36 +0200
-Subject: [PATCH 2/2] ARM: mxs/mach-mx23evk: Set the initial value on
-	gpio_request_one
-In-Reply-To: <1301427910-31726-2-git-send-email-fabio.estevam@freescale.com>
-References: <1301427910-31726-1-git-send-email-fabio.estevam@freescale.com>
-	<1301427910-31726-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110329195236.GP30938@pengutronix.de>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Tue, 29 Mar 2011 17:04:38 -0400
+Subject: accessing vfpinstr macros from outside vfp directory
+Message-ID: <4D924966.2050707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2011 at 04:45:10PM -0300, Fabio Estevam wrote:
-> Current code does not set the GPIO value to zero as mentioned in the comment.
-> 
-> Fix it by setting the initial GPIO value to zero.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-If you ask me squash this into patch 1. You can add my Ack independently
-of that though.
+(Resending: forgot to add Russell to To: list; subject change to avoid it getting lost in 
+code review thread, was Re: [PATCH v4 2/3] [ARM] perfevents: Add support for Scorpion 
+performance monitors)
 
-Uwe
+Russell,
+
+On 3/16/2011 5:13 AM, Jean Pihet wrote:
+ > On Tue, Mar 15, 2011 at 4:58 PM, Sheetal Sahasrabudhe
+ > <sheetals@codeaurora.org>  wrote:
+ >> Hi Will/Jean,
+ >>
+ >> On Mon, March 14, 2011 6:35 pm, Bryan Huntsman wrote:
+ >>> On 03/09/2011 09:16 AM, Sheetal Sahasrabudhe wrote:
+ >>>> This commit adds support for performance monitors provided by
+ >>>> Qualcomm Scorpion and ScorpionMP processor to perfevents.
+ >>>>
+ >>>> Signed-off-by: Sheetal Sahasrabudhe<sheetals@codeaurora.org>
+ >>>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
+ >>>> Reviewed-by: Will Deacon<will.deacon@arm.com>
+ >>>> ---
+ >>>>   arch/arm/include/asm/perf_event.h |    2 +
+ >>>>   arch/arm/kernel/perf_event.c      |   11 +
+ >>>>   arch/arm/kernel/perf_event_msm.c  |  679 +++++++++++++++++++++++++++++++++++++
+ >>>>   3 files changed, 692 insertions(+), 0 deletions(-)
+ >>>>   create mode 100644 arch/arm/kernel/perf_event_msm.c
+ >>>>
+ >>>
+ >>> ...
+ >>>
+ >>>> diff --git a/arch/arm/kernel/perf_event_msm.c b/arch/arm/kernel/perf_event_msm.c
+ >>>> new file mode 100644
+ >>>> index 0000000..4e42f27
+ >>>> --- /dev/null
+ >>>> +++ b/arch/arm/kernel/perf_event_msm.c
+ >> [...]
+ >>
+ >>>> +#include<asm/vfp.h>
+ >>>> +#include<asm/system.h>
+ >>>> +#include "../vfp/vfpinstr.h"
+ >>>
+ >>> Sorry I didn't see this earlier.  Is there another way to get the info
+ >>> you need that wouldn't use a relative include path?  If the info from
+ >>> vfpinstr.h is now needed outside of the vfp directory, can it be moved
+ >>> to a common header instead?  Thanks.
+ > Good catch! Sorry I did not catch this one while reviewing the code.
+ >
+ >>>
+ >>> - Bryan
+ >>
+ >> I see other files under vfp that include this header.
+ >> So if we were to implement Bryan's suggestion, I think a separate patch that moves the 
+header and updates all the depdendencies would be more appropriate.
+ >> Are you okay with the relative include path for vfpinstr.h in this patch for now or 
+would you want to see an update to move vfpinstr.h to include/asm?.
+ >
+ > Adding Russell and Nicolas for the VFP question.
+ > Only fmrx and fmxr are used from "../vfp/vfpinstr.h". Can those be
+ > moved to arch/arm/include/asm/vfp.h?
+ >
+ > What is the best solution to this?
+ >
+ > Regards,
+ > Jean
+ >
+
+Any opinions on what would be the best thing to do here? Choices appear to be:
+
+1) allow the relative include path of ../vfp/vfpinstr.h
+2) move the definitions of fmrx, fmxr from vfp/vfpinstr.h to include/asm/vfp.h
+3) move vfp/vfpinstr.h to include/asm
+4) other...?
+
+If it helps, I can create a patch for whichever is considered the preferred solution.
+
+Thanks,
+Neil (Standing in temporarily for Sheetal while she is on leave of absence)
+
+ >>
+ >> Thanks,
+ >> Sheetal
+ >>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
