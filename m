@@ -1,197 +1,56 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Tue, 29 Mar 2011 11:59:15 +0200
-Subject: [PATCH] s3c2440: mini2440: Use leds-gpio driver for board leds
-	handling.
-In-Reply-To: <1301392380-9022-1-git-send-email-marek.belisko@open-nandra.com>
-References: <AANLkTi=RW0o=+hXcO0Y04nq10QEd=hWY0Nzc0enJ=Tr7@mail.gmail.com>
-	<1301392380-9022-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <AANLkTikE6pnKmpp8JVMwjKuQbhery6DGR23YjaC6KsZ8@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 29 Mar 2011 12:05:45 +0200
+Subject: mx28 sdio problems
+In-Reply-To: <20110326141312.GA17797@S2100-06.ap.freescale.net>
+References: <1298284979-14853-7-git-send-email-shawn.guo@freescale.com>	<1298364624-19907-1-git-send-email-shawn.guo@freescale.com>	<4D8C809D.9010202@pengutronix.de>
+	<20110326141312.GA17797@S2100-06.ap.freescale.net>
+Message-ID: <4D91AEF9.4080401@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should be in-reply-to https://lkml.org/lkml/2011/3/29/79 comments
+On 03/26/2011 03:13 PM, Shawn Guo wrote:
+> On Fri, Mar 25, 2011 at 12:46:37PM +0100, Marc Kleine-Budde wrote:
+>> On 02/22/2011 09:50 AM, Shawn Guo wrote:
+>>> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+>>
+>> I ported these patches to current mainline (the to be released
+>> 2.6.39-rc1). mmc works with sd and sdhc cards without problems on my
+>> mx28evk.
+>>
+>> However sdio doesn't work. When I plug a sdio wlan card the kernel gives
+>> me the following error messages in a loop:
+>>
+>> [ 1002.760000] mmc1: new SDIO card at address 0001
+>> [ 1003.760000] mmc1: card 0001 removed
+>> [ 1003.810000] mmc1: new SDIO card at address 0001
+>> [ 1004.810000] mmc1: card 0001 removed
+>>
+>> Any hints how to debug?
+>>
+> The only problem I had when testing an Atheros sdio wifi cards was
+> the shortage of power supply on slot1 (internal regulator powered).
+> The slot2 on mx28evk just works out of box with this sdio card.  You
+> also rework the board to get the slot1 be powered by external
+> regulator just like slot2.
 
-On Tue, Mar 29, 2011 at 11:53 AM, Marek Belisko
-<marek.belisko@open-nandra.com> wrote:
-> Intention of this patch is convert existing usage of leds-s3c24xx driver
-> to use generic gpio-leds driver. Leds are separated to 2 devices.
-> First device handle 4 available leds. Second device is used to drive
-> LCD backlight. Backlight can be controlled via parameter b so we need
-> separate device which is registered or not depending on parameter.
->
-> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-> ---
-> ?arch/arm/mach-s3c2440/mach-mini2440.c | ?121 +++++++++++++++------------------
-> ?1 files changed, 54 insertions(+), 67 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-> index 163d318..28ef6eb 100644
-> --- a/arch/arm/mach-s3c2440/mach-mini2440.c
-> +++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-> @@ -419,81 +419,71 @@ static struct platform_device mini2440_button_device = {
-> ?};
->
-> ?/* LEDS */
-> -
-> -static struct s3c24xx_led_platdata mini2440_led1_pdata = {
-> - ? ? ? .name ? ? ? ? ? = "led1",
-> - ? ? ? .gpio ? ? ? ? ? = S3C2410_GPB(5),
-> - ? ? ? .flags ? ? ? ? ?= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> - ? ? ? .def_trigger ? ?= "heartbeat",
-> -};
-> -
-> -static struct s3c24xx_led_platdata mini2440_led2_pdata = {
-> - ? ? ? .name ? ? ? ? ? = "led2",
-> - ? ? ? .gpio ? ? ? ? ? = S3C2410_GPB(6),
-> - ? ? ? .flags ? ? ? ? ?= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> - ? ? ? .def_trigger ? ?= "nand-disk",
-> -};
-> -
-> -static struct s3c24xx_led_platdata mini2440_led3_pdata = {
-> - ? ? ? .name ? ? ? ? ? = "led3",
-> - ? ? ? .gpio ? ? ? ? ? = S3C2410_GPB(7),
-> - ? ? ? .flags ? ? ? ? ?= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> - ? ? ? .def_trigger ? ?= "mmc0",
-> -};
-> -
-> -static struct s3c24xx_led_platdata mini2440_led4_pdata = {
-> - ? ? ? .name ? ? ? ? ? = "led4",
-> - ? ? ? .gpio ? ? ? ? ? = S3C2410_GPB(8),
-> - ? ? ? .flags ? ? ? ? ?= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> - ? ? ? .def_trigger ? ?= "",
-> -};
-> -
-> -static struct s3c24xx_led_platdata mini2440_led_backlight_pdata = {
-> - ? ? ? .name ? ? ? ? ? = "backlight",
-> - ? ? ? .gpio ? ? ? ? ? = S3C2410_GPG(4),
-> - ? ? ? .def_trigger ? ?= "backlight",
-> +static struct gpio_led gpio_leds[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "led1",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S3C2410_GPB(5),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "heartbeat",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "led2",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S3C2410_GPB(6),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "nand-disk",
-> + ? ? ? ? ? ? ? .default_state ? ? ? ? ?= LEDS_GPIO_DEFSTATE_OFF,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "led3",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S3C2410_GPB(7),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "mmc0",
-> + ? ? ? ? ? ? ? .default_state ? ? ? ? ?= LEDS_GPIO_DEFSTATE_OFF,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "led4",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S3C2410_GPB(8),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "none",
-> + ? ? ? ? ? ? ? .default_state ? ? ? ? ?= LEDS_GPIO_DEFSTATE_OFF,
-> + ? ? ? }
-> ?};
->
-> -static struct platform_device mini2440_led1 = {
-> - ? ? ? .name ? ? ? ? ? = "s3c24xx_led",
-> - ? ? ? .id ? ? ? ? ? ? = 1,
-> - ? ? ? .dev ? ? ? ? ? ?= {
-> - ? ? ? ? ? ? ? .platform_data ?= &mini2440_led1_pdata,
-> - ? ? ? },
-> +static struct gpio_led backlight_led[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "backlight",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = S3C2410_GPG(4),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "backlight",
-> + ? ? ? ? ? ? ? .default_state ? ? ? ? ?= LEDS_GPIO_DEFSTATE_ON,
-> + ? ? ? }
-> ?};
->
-> -static struct platform_device mini2440_led2 = {
-> - ? ? ? .name ? ? ? ? ? = "s3c24xx_led",
-> - ? ? ? .id ? ? ? ? ? ? = 2,
-> - ? ? ? .dev ? ? ? ? ? ?= {
-> - ? ? ? ? ? ? ? .platform_data ?= &mini2440_led2_pdata,
-> - ? ? ? },
-> +static struct gpio_led_platform_data gpio_led_info = {
-> + ? ? ? .leds ? ? ? ? ? = gpio_leds,
-> + ? ? ? .num_leds ? ? ? = ARRAY_SIZE(gpio_leds),
-> ?};
->
-> -static struct platform_device mini2440_led3 = {
-> - ? ? ? .name ? ? ? ? ? = "s3c24xx_led",
-> - ? ? ? .id ? ? ? ? ? ? = 3,
-> - ? ? ? .dev ? ? ? ? ? ?= {
-> - ? ? ? ? ? ? ? .platform_data ?= &mini2440_led3_pdata,
-> - ? ? ? },
-> +static struct gpio_led_platform_data backlight_info = {
-> + ? ? ? .leds ? ? ? ? ? = backlight_led,
-> + ? ? ? .num_leds ? ? ? = ARRAY_SIZE(backlight_led),
-> ?};
->
-> -static struct platform_device mini2440_led4 = {
-> - ? ? ? .name ? ? ? ? ? = "s3c24xx_led",
-> - ? ? ? .id ? ? ? ? ? ? = 4,
-> - ? ? ? .dev ? ? ? ? ? ?= {
-> - ? ? ? ? ? ? ? .platform_data ?= &mini2440_led4_pdata,
-> - ? ? ? },
-> +static struct platform_device mini2440_leds = {
-> + ? ? ? .name ? = "leds-gpio",
-> + ? ? ? .id ? ? = 0,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data ?= &gpio_led_info,
-> + ? ? ? }
-> ?};
->
-> ?static struct platform_device mini2440_led_backlight = {
-> - ? ? ? .name ? ? ? ? ? = "s3c24xx_led",
-> - ? ? ? .id ? ? ? ? ? ? = 5,
-> - ? ? ? .dev ? ? ? ? ? ?= {
-> - ? ? ? ? ? ? ? .platform_data ?= &mini2440_led_backlight_pdata,
-> - ? ? ? },
-> + ? ? ? .name ? = "leds-gpio",
-> + ? ? ? .id ? ? = 1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data ?= &backlight_info,
-> + ? ? ? }
-> ?};
-> -
-> ?/* AUDIO */
->
-> ?static struct s3c24xx_uda134x_platform_data mini2440_audio_pins = {
-> @@ -543,10 +533,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
-> ? ? ? ?&s3c_device_rtc,
-> ? ? ? ?&s3c_device_usbgadget,
-> ? ? ? ?&mini2440_device_eth,
-> - ? ? ? &mini2440_led1,
-> - ? ? ? &mini2440_led2,
-> - ? ? ? &mini2440_led3,
-> - ? ? ? &mini2440_led4,
-> + ? ? ? &mini2440_leds,
-> ? ? ? ?&mini2440_button_device,
-> ? ? ? ?&s3c_device_nand,
-> ? ? ? ?&s3c_device_sdi,
-> --
-> 1.7.1
->
->
+I just received an atheros sd25, the card gets recognized. No driver to
+test more.
 
-regards,
+However with the old card the problem remains. On my sheeva plug I see
+the same problems with the old card.
 
-marek
+cheers, Marc
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-icq: 290551086
-web: http://open-nandra.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110329/a2ea84e9/attachment.sig>
