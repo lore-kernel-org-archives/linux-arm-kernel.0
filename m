@@ -1,60 +1,62 @@
 From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Tue, 29 Mar 2011 12:30:52 +0200
-Subject: [PATCH v4 06/10] lpc2k: multifunction pin configuration
+Date: Tue, 29 Mar 2011 12:30:49 +0200
+Subject: [PATCH v4 03/10] lpc2k: clk API
 In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
 References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301394656-24853-7-git-send-email-ithamar.adema@team-embedded.nl>
+Message-ID: <1301394656-24853-4-git-send-email-ithamar.adema@team-embedded.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inspired by the mfp support in PXA. Includes definition of pins
-for NXP LPC2468/78.
+Implements clock API using the CLKDEV_LOOKUP common code.
 
 Signed-off-by: Ithamar R. Adema <ithamar.adema@team-embedded.nl>
 ---
-no changes since v3.
+changes since v3:
+	* removed 'rate' field from struct clk, and implemented
+	  get_rate hook for the 3 fixed rate clocks.
+	* removed generation of get_rate function per peripheral
+	  clock, and introduced clk_id field in struct clk used
+	  by the new single per_get_rate function.
 
-changes since v2:
-	* Removed MFP_PIN_* enum.
-	* Renamed GPIOx_signal defines to Px_y_signal.
+no changes since v2.
 
-no changes since v1.
+changes since v1:
+        * changed mutex into spinlock
+        * simplified clk_readl/clk_writel macros
 ---
- arch/arm/mach-lpc2k/Makefile                   |    2 +-
- arch/arm/mach-lpc2k/include/mach/hardware.h    |    1 +
- arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h |   98 +++++++++++++++++++++++
- arch/arm/mach-lpc2k/include/mach/mfp.h         |   43 ++++++++++
- arch/arm/mach-lpc2k/mfp.c                      |  100 ++++++++++++++++++++++++
- 5 files changed, 243 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
- create mode 100644 arch/arm/mach-lpc2k/include/mach/mfp.h
- create mode 100644 arch/arm/mach-lpc2k/mfp.c
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-lpc2k/Makefile              |    2 +-
+ arch/arm/mach-lpc2k/clock.c               |  388 +++++++++++++++++++++++++++++
+ arch/arm/mach-lpc2k/include/mach/clkdev.h |   17 ++
+ 4 files changed, 407 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-lpc2k/clock.c
+ create mode 100644 arch/arm/mach-lpc2k/include/mach/clkdev.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c96908e..4a399e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -499,6 +499,7 @@ config ARCH_LPC2K
+ 	depends on !MMU
+ 	select CPU_ARM7TDMI
+ 	select ARM_VIC
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	help
+ 	  Support for NXP LPC2K family of SoCs. These SoCs are based on
 diff --git a/arch/arm/mach-lpc2k/Makefile b/arch/arm/mach-lpc2k/Makefile
-index 89596a7..2c50bb9 100644
+index 546666b..9eb0a6a 100644
 --- a/arch/arm/mach-lpc2k/Makefile
 +++ b/arch/arm/mach-lpc2k/Makefile
 @@ -1 +1 @@
--obj-y	:= clock.o irq.o gpio.o time.o
-+obj-y	:= clock.o irq.o gpio.o mfp.o time.o
-diff --git a/arch/arm/mach-lpc2k/include/mach/hardware.h b/arch/arm/mach-lpc2k/include/mach/hardware.h
-index b8c471b..1a20126 100644
---- a/arch/arm/mach-lpc2k/include/mach/hardware.h
-+++ b/arch/arm/mach-lpc2k/include/mach/hardware.h
-@@ -21,6 +21,7 @@
- #define APB_TIMER1_BASE		0xe0008000
- #define APB_UART0_BASE		0xe000c000
- #define APB_GPIO_BASE		0xe0028000
-+#define APB_PINSEL_BASE		0xe002c000
- #define APB_SCB_BASE		0xe01fc000
- #define APH_VIC_BASE		0xfffff000
- 
-diff --git a/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h b/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
+-obj-y	:= irq.o
++obj-y	:= clock.o irq.o
+diff --git a/arch/arm/mach-lpc2k/clock.c b/arch/arm/mach-lpc2k/clock.c
 new file mode 100644
-index 0000000..dafb8f1
+index 0000000..8c3207a
 --- /dev/null
-+++ b/arch/arm/mach-lpc2k/include/mach/mfp-lpc24xx.h
-@@ -0,0 +1,98 @@
++++ b/arch/arm/mach-lpc2k/clock.c
+@@ -0,0 +1,388 @@
 +/*
 + * Copyright 2011 Team Embedded VOF
 + *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
@@ -64,249 +66,407 @@ index 0000000..dafb8f1
 + * published by the Free Software Foundation.
 + */
 +
-+#ifndef MACH_LPC2K_MFP_LPC24XX_H
-+#define MACH_LPC2K_MFP_LPC24XX_H
-+
-+#include <mach/mfp.h>
-+
-+#define P0_0_RD1		MFP_CFG(LPC2K_GPIO(0,0), AF1)
-+#define P0_0_TXD3		MFP_CFG(LPC2K_GPIO(0,0), AF2)
-+#define P0_0_SDA1		MFP_CFG(LPC2K_GPIO(0,0), AF3)
-+#define P0_1_TD1		MFP_CFG(LPC2K_GPIO(0,1), AF1)
-+#define P0_1_RXD3		MFP_CFG(LPC2K_GPIO(0,1), AF2)
-+#define P0_1_SCL1		MFP_CFG(LPC2K_GPIO(0,1), AF3)
-+#define P0_2_TXD0		MFP_CFG(LPC2K_GPIO(0,2), AF1)
-+#define P0_3_RXD0		MFP_CFG(LPC2K_GPIO(0,3), AF1)
-+#define P0_4_LCDVD0		MFP_CFG(LPC2K_GPIO(0,4), AF1)
-+#define P0_5_LCDVD1		MFP_CFG(LPC2K_GPIO(0,5), AF1)
-+#define P0_6_LCDVD8		MFP_CFG(LPC2K_GPIO(0,6), AF1)
-+#define P0_7_LCDVD9		MFP_CFG(LPC2K_GPIO(0,7), AF1)
-+#define P0_8_LCDVD16		MFP_CFG(LPC2K_GPIO(0,8), AF1)
-+#define P0_9_LCDVD17		MFP_CFG(LPC2K_GPIO(0,9), AF1)
-+#define P0_10_TXD2		MFP_CFG(LPC2K_GPIO(0,10), AF1)
-+#define P0_11_RXD2		MFP_CFG(LPC2K_GPIO(0,11), AF1)
-+#define P0_12_USB_PPWR2		MFP_CFG(LPC2K_GPIO(0,12), AF1)
-+#define P0_13_USB_UP_LED2	MFP_CFG(LPC2K_GPIO(0,13), AF1)
-+#define P0_15_SCK		MFP_CFG(LPC2K_GPIO(0,15), AF3)
-+#define P0_17_MISO		MFP_CFG(LPC2K_GPIO(0,17), AF3)
-+#define P0_18_MOSI		MFP_CFG(LPC2K_GPIO(0,18), AF3)
-+#define P0_27_SDA0		MFP_CFG(LPC2K_GPIO(0,27), AF1)
-+#define P0_28_SCL0		MFP_CFG(LPC2K_GPIO(0,28), AF1)
-+#define P0_29_USB_Dp1		MFP_CFG(LPC2K_GPIO(0,29), AF1)
-+#define P0_30_USB_Dn1		MFP_CFG(LPC2K_GPIO(0,30), AF1)
-+#define P0_31_USB_Dp2		MFP_CFG(LPC2K_GPIO(0,31), AF1)
-+#define P1_0_ENET_TXD0		MFP_CFG(LPC2K_GPIO(1,0), AF1)
-+#define P1_1_ENET_TXD1		MFP_CFG(LPC2K_GPIO(1,1), AF1)
-+#define P1_2_MCICLK		MFP_CFG(LPC2K_GPIO(1,2), AF2)
-+#define P1_3_MCICMD		MFP_CFG(LPC2K_GPIO(1,3), AF2)
-+#define P1_4_ENET_TX_EN		MFP_CFG(LPC2K_GPIO(1,4), AF1)
-+#define P1_5_MCIPWR		MFP_CFG(LPC2K_GPIO(1,5), AF2)
-+#define P1_6_ENET_TX_CLK	MFP_CFG(LPC2K_GPIO(1,6), AF1)
-+#define P1_6_MCIDAT0		MFP_CFG(LPC2K_GPIO(1,6), AF2)
-+#define P1_7_MCIDAT1		MFP_CFG(LPC2K_GPIO(1,7), AF2)
-+#define P1_8_ENET_CRS		MFP_CFG(LPC2K_GPIO(1,8), AF1)
-+#define P1_9_ENET_RXD0		MFP_CFG(LPC2K_GPIO(1,9), AF1)
-+#define P1_10_ENET_RXD1		MFP_CFG(LPC2K_GPIO(1,10), AF1)
-+#define P1_11_MCIDAT2		MFP_CFG(LPC2K_GPIO(1,11), AF2)
-+#define P1_12_MCIDAT3		MFP_CFG(LPC2K_GPIO(1,12), AF2)
-+#define P1_14_ENET_RX_ERR	MFP_CFG(LPC2K_GPIO(1,14), AF1)
-+#define P1_15_ENET_REF_CLK	MFP_CFG(LPC2K_GPIO(1,15), AF1)
-+#define P1_16_ENET_MDC		MFP_CFG(LPC2K_GPIO(1,16), AF1)
-+#define P1_17_ENET_MDIO		MFP_CFG(LPC2K_GPIO(1,17), AF1)
-+#define P1_18_PWM1		MFP_CFG(LPC2K_GPIO(1,18), AF2)
-+#define P1_20_LCDVD10		MFP_CFG(LPC2K_GPIO(1,20), AF1)
-+#define P1_21_LCDVD11		MFP_CFG(LPC2K_GPIO(1,21), AF1)
-+#define P1_22_LCDVD12		MFP_CFG(LPC2K_GPIO(1,22), AF1)
-+#define P1_23_LCDVD13		MFP_CFG(LPC2K_GPIO(1,23), AF1)
-+#define P1_24_LCDVD14		MFP_CFG(LPC2K_GPIO(1,24), AF1)
-+#define P1_25_LCDVD15		MFP_CFG(LPC2K_GPIO(1,25), AF1)
-+#define P1_26_LCDVD20		MFP_CFG(LPC2K_GPIO(1,26), AF1)
-+#define P1_27_LCDVD21		MFP_CFG(LPC2K_GPIO(1,27), AF1)
-+#define P1_28_LCDVD22		MFP_CFG(LPC2K_GPIO(1,28), AF1)
-+#define P1_29_LCDVD23		MFP_CFG(LPC2K_GPIO(1,29), AF1)
-+#define P1_30_VBUS		MFP_CFG(LPC2K_GPIO(1,30), AF2)
-+#define P1_31_USB_OVRCR2	MFP_CFG(LPC2K_GPIO(1,31), AF1)
-+#define P2_0_LCDPWR		MFP_CFG(LPC2K_GPIO(2,0), AF3)
-+#define P2_1_LCDLE		MFP_CFG(LPC2K_GPIO(2,1), AF3)
-+#define P2_2_LCDDCLK		MFP_CFG(LPC2K_GPIO(2,2), AF3)
-+#define P2_3_LCDFP		MFP_CFG(LPC2K_GPIO(2,3), AF3)
-+#define P2_4_LCDM		MFP_CFG(LPC2K_GPIO(2,4), AF3)
-+#define P2_5_LCDLP		MFP_CFG(LPC2K_GPIO(2,5), AF3)
-+#define P2_6_LCDVP4		MFP_CFG(LPC2K_GPIO(2,6), AF3)
-+#define P2_7_LCDVP5		MFP_CFG(LPC2K_GPIO(2,7), AF3)
-+#define P2_8_LCDVP6		MFP_CFG(LPC2K_GPIO(2,8), AF3)
-+#define P2_9_LCDVP7		MFP_CFG(LPC2K_GPIO(2,9), AF3)
-+#define P2_11_LCDCLKIN		MFP_CFG(LPC2K_GPIO(2,11), AF1)
-+#define P2_12_LCDVP18		MFP_CFG(LPC2K_GPIO(2,12), AF1)
-+#define P2_13_LCDVP19		MFP_CFG(LPC2K_GPIO(2,13), AF1)
-+#define P3_16_TXD1		MFP_CFG(LPC2K_GPIO(3,16), AF3)
-+#define P3_17_RXD1		MFP_CFG(LPC2K_GPIO(3,17), AF3)
-+#define P3_18_CTS1		MFP_CFG(LPC2K_GPIO(3,18), AF3)
-+#define P3_19_DCD1		MFP_CFG(LPC2K_GPIO(3,19), AF3)
-+#define P3_20_DSR1		MFP_CFG(LPC2K_GPIO(3,20), AF3)
-+#define P3_21_DR1		MFP_CFG(LPC2K_GPIO(3,21), AF3)
-+#define P3_22_RI1		MFP_CFG(LPC2K_GPIO(3,22), AF3)
-+#define P3_30_RTS1		MFP_CFG(LPC2K_GPIO(3,30), AF3)
-+#define P4_28_TXD3		MFP_CFG(LPC2K_GPIO(4,28), AF3)
-+#define P4_28_LCDVP2		MFP_CFG(LPC2K_GPIO(4,28), AF2)
-+#define P4_29_RXD3		MFP_CFG(LPC2K_GPIO(4,29), AF3)
-+#define P4_29_LCDVP3		MFP_CFG(LPC2K_GPIO(4,29), AF2)
-+
-+#endif /* MACH_LPC2K_MFP_LPC24XX_H */
-diff --git a/arch/arm/mach-lpc2k/include/mach/mfp.h b/arch/arm/mach-lpc2k/include/mach/mfp.h
-new file mode 100644
-index 0000000..c3d0378
---- /dev/null
-+++ b/arch/arm/mach-lpc2k/include/mach/mfp.h
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright 2011 Team Embedded VOF
-+ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef ARCH_LPC2K_MFP_H
-+#define ARCH_LPC2K_MFP_H
-+
-+#define mfp_to_gpio(m)	((m) % 160)
-+
-+/* pin number; currently only 0-159 are used */
-+#define MFP_PIN(x)	((x) & 0x3ff)
-+
-+/* Alternate functions, currently only 0-3 are used */
-+#define MFP_AF0		(0x0 << 10)
-+#define MFP_AF1		(0x1 << 10)
-+#define MFP_AF2		(0x2 << 10)
-+#define MFP_AF3		(0x3 << 10)
-+#define MFP_AF_MASK	(0x3 << 10)
-+#define MFP_AF(x)	(((x) >> 10) & 0x3)
-+
-+/* Pullup/down configuration, currently only none/high/low are used */
-+#define MFP_PULL_NONE	(0x2 << 21)
-+#define MFP_PULL_LOW	(0x3 << 21)
-+#define MFP_PULL_HIGH	(0x0 << 21)
-+#define MFP_PULL_MASK	(0x3 << 21)
-+#define MFP_PULL(x)	(((x) >> 21) & 0x3)
-+
-+#define MFP_CFG_DEFAULT	(MFP_PULL_HIGH | MFP_AF0)
-+
-+#define MFP_CFG(pin, af)		\
-+	((MFP_CFG_DEFAULT & ~MFP_AF_MASK) |\
-+	 (MFP_PIN(pin) | MFP_##af))
-+
-+#define MFP_CFG_PULL(pin, af, pull)	\
-+	((MFP_CFG_DEFAULT & ~(MFP_AF_MASK | MFP_PULL_MASK)) |\
-+	 (MFP_PIN(pin) | MFP_##af | MFP_##pull))
-+
-+#endif /* ARCH_LPC2K_MFP_H */
-diff --git a/arch/arm/mach-lpc2k/mfp.c b/arch/arm/mach-lpc2k/mfp.c
-new file mode 100644
-index 0000000..c0d356b
---- /dev/null
-+++ b/arch/arm/mach-lpc2k/mfp.c
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright (C) 2011 Team Embeded VOF
-+ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
-+ *
-+ * Based on MFP code from mach-pxa.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
 +
 +#include <linux/module.h>
-+#include <linux/gpio.h>
++#include <linux/clk.h>
 +#include <linux/io.h>
 +
++#include <linux/clkdev.h>
++
 +#include <mach/hardware.h>
-+#include <mach/mfp.h>
++#include <mach/regs-scb.h>
 +
-+#define PINSEL(bank)	(0x00 + (bank)*4)
-+#define PINMODE(bank)	(0x40 + (bank)*4)
++#define clk_readl(a)	\
++	ioread32(APB_SCB_BASE + (a))
++#define clk_writel(v, a)	\
++	iowrite32(v, APB_SCB_BASE + (a))
 +
-+struct gpio_desc {
-+	unsigned valid:1;
-+	unsigned long config;
++struct clk {
++	int		refcount;
++	struct clk	*parent;
++
++	u32		enable_mask;
++	u32		clk_id;
++
++	long		(*round_rate)(struct clk *clk, unsigned long rate);
++	int		(*set_rate)(struct clk *clk, unsigned long rate);
++	unsigned long	(*get_rate)(struct clk *clk);
++	int		(*set_parent)(struct clk *clk, struct clk *parent);
 +};
 +
-+static struct gpio_desc gpio_desc[LPC2K_GPIO(4,31) + 1];
++static DEFINE_SPINLOCK(clk_lock);
 +
-+static int __mfp_config_gpio(unsigned gpio, unsigned long c)
++/*-------------------------------------------------------------------------
++ * Standard clock functions defined in include/linux/clk.h
++ *-------------------------------------------------------------------------*/
++
++static void __clk_disable(struct clk *clk)
 +{
-+	unsigned bank = gpio >> 4;
-+	unsigned shift = (gpio & 0xf) * 2;
-+	unsigned val;
++	BUG_ON(clk->refcount == 0);
 +
-+	/* Configure alternate function */
-+	val = __raw_readl(APB_PINSEL_BASE + PINSEL(bank));
-+	if ((val & (3 << shift)) &&
-+	    (val & (3 << shift)) != (MFP_AF(c) << shift))
-+		pr_warning
-+		    ("GPIO%d is already configured (%x), not reconfigured!\n",
-+		     gpio, (val & (3 << shift)) >> shift);
-+	else {
-+		val &= ~(0x3 << shift);
-+		val |= MFP_AF(c) << shift;
-+		__raw_writel(val, APB_PINSEL_BASE + PINSEL(bank));
++	if (!(--clk->refcount)) {
++		if (clk->parent)
++			__clk_disable(clk->parent);
++
++		if (clk->enable_mask) {
++			/* Unconditionally disable the clock in hardware */
++			u32 value = clk_readl(PCONP);
++			clk_writel(value & ~clk->enable_mask, PCONP);
++		}
 +	}
++}
 +
-+	/* Configuration pullup/dn */
-+	val = __raw_readl(APB_PINSEL_BASE + PINMODE(bank));
-+	val &= ~(0x3 << shift);
-+	val |= MFP_PULL(c) << shift;
-+	__raw_writel(val, APB_PINSEL_BASE + PINMODE(bank));
++static int __clk_enable(struct clk *clk)
++{
++	int ret = 0;
++
++	if (clk->refcount++ == 0) {
++		if (clk->parent)
++			ret = __clk_enable(clk->parent);
++		if (ret)
++			return ret;
++		else if (clk->enable_mask) {
++			u32 value = clk_readl(PCONP);
++			clk_writel(value | clk->enable_mask, PCONP);
++		}
++	}
 +
 +	return 0;
 +}
 +
-+static inline int __mfp_validate(int mfp)
-+{
-+	int gpio = mfp_to_gpio(mfp);
-+
-+	if (!gpio_desc[gpio].valid) {
-+		pr_warning("%s: GPIO%d is invalid pin\n", __func__, gpio);
-+		return -1;
-+	}
-+
-+	return gpio;
-+}
-+
-+void lpc2k_mfp_config(unsigned long *mfp_cfgs, int num)
++/* This function increments the reference count on the clock and enables the
++ * clock if not already enabled. The parent clock tree is recursively enabled
++ */
++int clk_enable(struct clk *clk)
 +{
 +	unsigned long flags;
-+	unsigned long *c;
-+	int i, gpio;
++	int ret = 0;
 +
-+	for (i = 0, c = mfp_cfgs; i < num; i++, c++) {
++	if (!clk)
++		return -EINVAL;
 +
-+		gpio = __mfp_validate(MFP_PIN(*c));
-+		if (gpio < 0)
-+			continue;
++	spin_lock_irqsave(&clk_lock, flags);
++	ret = __clk_enable(clk);
++	spin_unlock_irqrestore(&clk_lock, flags);
 +
-+		local_irq_save(flags);
-+
-+		gpio_desc[gpio].config = *c;
-+		__mfp_config_gpio(gpio, *c);
-+
-+		local_irq_restore(flags);
-+	}
++	return ret;
 +}
++EXPORT_SYMBOL_GPL(clk_enable);
 +
-+static int __init lpc2k_mfp_init(void)
++/* This function decrements the reference count on the clock and disables
++ * the clock when reference count is 0. The parent clock tree is
++ * recursively disabled
++ */
++void clk_disable(struct clk *clk)
 +{
-+	int i;
++	unsigned long flags;
 +
-+	for (i = 0; i < ARRAY_SIZE(gpio_desc); i++)
-+		gpio_desc[i].valid = 1;
++	if (!clk)
++		return;
++
++	spin_lock_irqsave(&clk_lock, flags);
++	__clk_disable(clk);
++	spin_unlock_irqrestore(&clk_lock, flags);
++}
++EXPORT_SYMBOL_GPL(clk_disable);
++
++/* Retrieve the *current* clock rate. If the clock itself
++ * does not provide a special calculation routine, ask
++ * its parent and so on, until one is able to return
++ * a valid clock rate
++ */
++unsigned long clk_get_rate(struct clk *clk)
++{
++	if (!clk)
++		return 0UL;
++
++	if (clk->get_rate)
++		return clk->get_rate(clk);
++
++	if (clk->parent)
++		return clk_get_rate(clk->parent);
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(clk_get_rate);
 +
-+postcore_initcall(lpc2k_mfp_init);
++/* Round the requested clock rate to the nearest supported
++ * rate that is less than or equal to the requested rate.
++ * This is dependent on the clock's current parent.
++ */
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	if (!clk)
++		return 0;
++	if (!clk->round_rate)
++		return 0;
++
++	return clk->round_rate(clk, rate);
++}
++EXPORT_SYMBOL_GPL(clk_round_rate);
++
++/* Set the clock to the requested clock rate. The rate must
++ * match a supported rate exactly based on what clk_round_rate returns
++ */
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long flags;
++	int ret = -EINVAL;
++
++	if (!clk)
++		return ret;
++	if (!clk->set_rate || !rate)
++		return ret;
++
++	spin_lock_irqsave(&clk_lock, flags);
++	ret = clk->set_rate(clk, rate);
++	spin_unlock_irqrestore(&clk_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(clk_set_rate);
++
++/* Set the clock's parent to another clock source */
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	unsigned long flags;
++	struct clk *old;
++	int ret = -EINVAL;
++
++	if (!clk)
++		return ret;
++	if (!clk->set_parent || !parent)
++		return ret;
++
++	spin_lock_irqsave(&clk_lock, flags);
++	old = clk->parent;
++	if (clk->refcount)
++		__clk_enable(parent);
++	ret = clk->set_parent(clk, parent);
++	if (ret)
++		old = parent;
++	if (clk->refcount)
++		__clk_disable(old);
++	spin_unlock_irqrestore(&clk_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(clk_set_parent);
++
++/* Retrieve the clock's parent clock source */
++struct clk *clk_get_parent(struct clk *clk)
++{
++	if (!clk)
++		return NULL;
++
++	return clk->parent;
++}
++EXPORT_SYMBOL_GPL(clk_get_parent);
++
++unsigned long irc_get_rate(struct clk *clk)
++{
++	return 4000000;
++}
++
++static struct clk clk_irc = {
++	.get_rate = irc_get_rate,
++};
++
++static unsigned long xtal_rate; /* set on init */
++
++static unsigned long xtal_get_rate(struct clk *clk)
++{
++	return xtal_rate;
++}
++
++static struct clk clk_xtal = {
++	.get_rate = xtal_get_rate,
++};
++
++
++static unsigned xrtc_rate; /* set on init */
++
++static unsigned long xrtc_get_rate(struct clk *clk)
++{
++	return xrtc_rate;
++}
++
++static struct clk clk_xrtc = {
++	.get_rate = xrtc_get_rate,
++};
++
++static unsigned long pll_get_rate(struct clk *clk)
++{
++	unsigned long rate = clk_get_rate(clk->parent);
++	u32 pll_stat = clk_readl(PLLSTAT);
++
++	if (pll_stat & PLLE && pll_stat & PLLC)
++		rate = (2 * M(pll_stat) * rate) / N(pll_stat);
++
++	return rate;
++}
++
++static struct clk clk_pll = {
++	.parent = NULL,
++	.get_rate = pll_get_rate,
++};
++
++static unsigned long cpu_get_rate(struct clk *clk)
++{
++	unsigned long rate = clk_get_rate(clk->parent);
++	return rate / (CCLKSEL(clk_readl(CCLKCFG)) + 1);
++}
++
++static struct clk clk_cpu = {
++	.parent = &clk_pll,
++	.get_rate = cpu_get_rate,
++};
++
++static unsigned long usb_get_rate(struct clk *clk)
++{
++	unsigned long rate = clk_get_rate(clk->parent);
++	return rate / (USBSEL(clk_readl(USBCLKCFG)) + 1);
++}
++
++static struct clk clk_usb = {
++	.enable_mask = (1 << 31),
++	.parent = &clk_pll,
++	.get_rate = usb_get_rate,
++};
++
++static struct clk clk_apbpclk;
++
++static unsigned long pclkdiv[] = { 4, 1, 2, 8 };
++
++static unsigned long per_get_rate(struct clk *clk)
++{
++	unsigned long rate = clk_get_rate(clk->parent);
++	u32 val = clk_readl((clk->clk_id < 16) ? PCLKSEL0 : PCLKSEL1);
++	val >>= (clk->clk_id < 16) ? clk->clk_id * 2 : (clk->clk_id - 16) * 2;
++	return rate / pclkdiv[val & 3];
++}
++
++#define PERCLK(name, pnum)	\
++	struct clk clk_ ## name = {	\
++		.parent = &clk_cpu,	\
++		.enable_mask = (1 << pnum),	\
++		.clk_id = pnum,			\
++		.get_rate = per_get_rate,	\
++	}
++
++PERCLK(timer0, 1);
++PERCLK(timer1, 2);
++PERCLK(uart0, 3);
++PERCLK(uart1, 4);
++PERCLK(pwm0, 5);
++PERCLK(pwm1, 6);
++PERCLK(i2c0, 7);
++PERCLK(spi, 8);
++PERCLK(prtc, 9);
++PERCLK(ssp1, 10);
++PERCLK(emc, 11);
++PERCLK(adc, 12);
++PERCLK(can1, 13);
++PERCLK(can2, 14);
++PERCLK(i2c1, 19);
++PERCLK(lcd, 20);
++PERCLK(ssp0, 21);
++PERCLK(timer2, 22);
++PERCLK(timer3, 23);
++PERCLK(uart2, 24);
++PERCLK(uart3, 25);
++PERCLK(i2c2, 26);
++PERCLK(i2s, 27);
++PERCLK(mci, 28);
++PERCLK(dma, 29);
++PERCLK(eth, 30);
++
++#define INIT_CK(dev, con, ck)	\
++	{ .dev_id = dev, .con_id = con, .clk = ck }
++
++
++/* clk_rtc is a virtual clock used as glue to adjust at runtime
++ * if we're using the normal peripheral clock or an extern osc.
++ */
++static struct clk clk_rtc;
++
++static struct clk_lookup clocks[] = {
++	INIT_CK(NULL, "apb_pclk", &clk_apbpclk),
++	INIT_CK(NULL, "irc", &clk_irc),
++	INIT_CK(NULL, "xtal", &clk_xtal),
++	INIT_CK(NULL, "pll", &clk_pll),
++	INIT_CK(NULL, "cpu", &clk_cpu),
++	INIT_CK(NULL, "usb", &clk_usb),
++	INIT_CK(NULL, "timer0", &clk_timer0),
++	INIT_CK(NULL, "timer1", &clk_timer1),
++	INIT_CK(NULL, "timer2", &clk_timer2),
++	INIT_CK(NULL, "timer3", &clk_timer3),
++	INIT_CK("lpc2k-pwm.0", NULL, &clk_pwm0),
++	INIT_CK("lpc2k-pwm.1", NULL, &clk_pwm1),
++	INIT_CK("lpc2k-adc", NULL, &clk_adc),
++	INIT_CK("lpc2k-i2c.0", NULL, &clk_i2c0),
++	INIT_CK("lpc2k-i2c.1", NULL, &clk_i2c1),
++	INIT_CK("lpc2k-i2c.2", NULL, &clk_i2c2),
++	INIT_CK("serial8250.0", NULL, &clk_uart0),
++	INIT_CK("serial8250.1", NULL, &clk_uart1),
++	INIT_CK("serial8250.2", NULL, &clk_uart2),
++	INIT_CK("serial8250.3", NULL, &clk_uart3),
++	INIT_CK("lpc2k-ohci", NULL, &clk_usb),
++	INIT_CK("lpc2k-spi.0", NULL, &clk_ssp0),
++	INIT_CK("lpc2k-spi.1", NULL, &clk_ssp1),
++	INIT_CK("lpc2k-eth", NULL, &clk_eth),
++	INIT_CK("lpc2k-rtc", NULL, &clk_rtc),
++	INIT_CK("ssp0", NULL, &clk_ssp0),
++	INIT_CK("ssp1", NULL, &clk_ssp1),
++	INIT_CK("mci", NULL, &clk_mci),
++	INIT_CK("lcd", NULL, &clk_lcd),
++	INIT_CK("dma", NULL, &clk_dma),
++};
++
++void __init lpc2k_init_clocks(unsigned long xtal, unsigned long rtc)
++{
++	struct clk *pll_src_clk[] = { &clk_irc, &clk_xtal, &clk_xrtc };
++	int i;
++
++	xtal_rate = xtal;
++	xrtc_rate = rtc;
++
++	clk_pll.parent = pll_src_clk[CLKSRC(clk_readl(CLKSRCSEL))];
++
++	/* If no external RTC osc. is specified, make RTC clock child
++	   of peripheral RTC (CPU) clock */
++	clk_rtc.parent = rtc ? &clk_xrtc : &clk_prtc;
++
++	for (i = 0; i < ARRAY_SIZE(clocks); i++) {
++		pr_debug("clock '%s', rate %luHz\n",
++			clocks[i].con_id ? clocks[i].con_id : clocks[i].dev_id,
++			clk_get_rate(clocks[i].clk));
++
++		clkdev_add(&clocks[i]);
++	}
++}
+diff --git a/arch/arm/mach-lpc2k/include/mach/clkdev.h b/arch/arm/mach-lpc2k/include/mach/clkdev.h
+new file mode 100644
+index 0000000..92267cc
+--- /dev/null
++++ b/arch/arm/mach-lpc2k/include/mach/clkdev.h
+@@ -0,0 +1,17 @@
++/*
++ *  Copyright (C) 2011 Team Embedded VOF
++ *     Ithamar R. Adema <ihamar.adema@team-embedded.nl>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef MACH_LPC2K_CLKDEV_H
++#define MACH_LPC2K_CLKDEV_H
++
++#define __clk_get(clk) ({ 1; })
++#define __clk_put(clk) do { } while (0)
++
++#endif /* MACH_LPC2K_CLKDEV_H */
 -- 
 1.7.1
