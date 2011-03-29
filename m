@@ -1,19 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Mar 2011 11:24:21 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Mar 2011 10:27:33 +0100
 Subject: MACH_TYPE undeclared error
 In-Reply-To: <AANLkTimsNOmK4H8MYMB2jjd+zkT4qcYD1dy+J1fxdd7w@mail.gmail.com>
 References: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
 	<20110329065457.GG30938@pengutronix.de>
 	<AANLkTimsNOmK4H8MYMB2jjd+zkT4qcYD1dy+J1fxdd7w@mail.gmail.com>
-Message-ID: <20110329092421.GJ30938@pengutronix.de>
+Message-ID: <20110329092733.GA11236@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
 On Tue, Mar 29, 2011 at 02:01:10PM +0530, Madhavi Manchala wrote:
+> Dear Uwe,
+> 
 > 2011/3/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
 > > On Tue, Mar 29, 2011 at 12:01:40PM +0530, Madhavi Manchala wrote:
+> >> Dear All,
+> >>
 > >> I have defined a MACHINE_START macro in my board C file as follows.
 > >>
 > >> MACHINE_START(S3C2510, "S3C2510")
@@ -41,15 +43,7 @@ On Tue, Mar 29, 2011 at 02:01:10PM +0530, Madhavi Manchala wrote:
 > tdc_p210		MACH_TDC_P210	TDC_P210	580
 > 
 > The machine S3C2510 is there in that file.
-Do you have
 
-	#include <asm/mach-types.h>
-
-in your machine file?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+S3C2510 sounds to me like a SoC name not a board name.  I delete anything
+which sounds like a SoC name as that's not the purpose of the database.
+It's for platforms and boards, not SoCs.
