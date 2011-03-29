@@ -1,110 +1,101 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 29 Mar 2011 13:07:34 -0400 (EDT)
-Subject: [PATCH] Fix ldrd/strd emulation for kprobes/ARM
-In-Reply-To: <1301403301.2519.125.camel@computer2.home>
-References: <1301087944.2744.85.camel@computer2.home>
-	<1301327765-6996-1-git-send-email-viktor.rosendahl@nokia.com>
-	<1301403301.2519.125.camel@computer2.home>
-Message-ID: <alpine.LFD.2.00.1103291258590.11889@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 29 Mar 2011 10:11:12 -0700
+Subject: [PATCH 01/10] omap: Use separate init_irq functions to avoid
+	cpu_is_omap tests early
+In-Reply-To: <20110328222128.4046.70846.stgit@baageli.muru.com> (Tony
+	Lindgren's message of "Mon, 28 Mar 2011 15:21:28 -0700")
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<20110328222128.4046.70846.stgit@baageli.muru.com>
+Message-ID: <874o6lg8cv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2011, Tixy wrote:
+Hi Tony,
 
-> On Mon, 2011-03-28 at 18:56 +0300, Viktor Rosendahl wrote:
-> > On 03/25/2011 11:19 PM, ext Tixy wrote:
-> > > On Fri, 2011-03-25 at 19:01 +0200, Viktor Rosendahl wrote:
-> > >> The Rn value from the emulation is unconditionally written back; this is fine
-> > >> as long as Rn != PC because in that case, even if the instruction isn't a write
-> > >> back instruction, it will only result in the same value being written back.
-> > >>
-> > >> In case Rn == PC, then the emulated instruction doesn't have the actual PC
-> > >> value in Rn but an adjusted value; when this is written back, it will result in
-> > >> the PC being incorrectly updated.
-> > > It looks like we have the same problem with emulate_ldrd and
-> > > emulate_strd as well.
-> > 
-> > Yes, it seems so. Currently emulate_ldrd and emulate_strd don't even have the
-> > adjustment of the PC value, so in case of Rn == PC, it will not update the PC
-> > incorrectly but instead load/store from the wrong address. Below is a patch
-> > that adds both the adjustment of the PC value and the check for PC == PC.
-> > 
-> > I haven't tested this code at all and I am not sure of how to test it.
-> 
-> In a day or two I should have support in my test code for these sorts of
-> instructions. From looking at them, the changes look functionally
-> correct though. I do have a suggestion for slight change, see inline
-> comments below...
-> 
-> > 
-> > Signed-off-by: Viktor Rosendahl <viktor.rosendahl@nokia.com>
-> > ---
-> >  arch/arm/kernel/kprobes-decode.c |   20 +++++++++++++++-----
-> >  1 files changed, 15 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-> > index 2389131..3b0cf90 100644
-> > --- a/arch/arm/kernel/kprobes-decode.c
-> > +++ b/arch/arm/kernel/kprobes-decode.c
-> > @@ -540,9 +540,12 @@ static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
-> >  {
-> >  	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
-> >  	kprobe_opcode_t insn = p->opcode;
-> > +	long ppc = (long)p->addr + 8;
-> >  	int rd = (insn >> 12) & 0xf;
-> >  	int rn = (insn >> 16) & 0xf;
-> >  	int rm = insn & 0xf;  /* rm may be invalid, don't care. */
-> > +	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
-> > +	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
-> >  
-> >  	/* Not following the C calling convention here, so need asm(). */
-> >  	__asm__ __volatile__ (
-> > @@ -554,29 +557,36 @@ static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
-> >  		"str	r0, %[rn]	\n\t"	/* in case of writeback */
-> >  		"str	r2, %[rd0]	\n\t"
-> >  		"str	r3, %[rd1]	\n\t"
-> > -		: [rn]  "+m" (regs->uregs[rn]),
-> > +		: [rn]  "+m" (rnv),
-> >  		  [rd0] "=m" (regs->uregs[rd]),
-> >  		  [rd1] "=m" (regs->uregs[rd+1])
-> > -		: [rm]   "m" (regs->uregs[rm]),
-> > +		: [rm]   "m" (rmv),
-> >  		  [cpsr] "r" (regs->ARM_cpsr),
-> >  		  [i_fn] "r" (i_fn)
-> >  		: "r0", "r1", "r2", "r3", "lr", "cc"
-> >  	);
-> > +	if (rn != 15)
-> > +		regs->uregs[rn] = rnv;  /* Save Rn in case of writeback. */
-> >  }
-> 
-> 
-> If the variables rnv and rmv were declared as registers then we could
-> avoid 3 stores and 3 loads of stack values. This would require changing
-> the the assembler as well, e.g. something like this...
-> 
-> 	register long rnv asm("r0");
-> 	register long rmv asm("r1");
-> 	rnv = (rn == 15) ? ppc : regs->uregs[rn];
-> 	rmv = (rm == 15) ? ppc : regs->uregs[rm];
+Tony Lindgren <tony@atomide.com> writes:
+
+> This allows us to remove cpu_is_omap calls from init_irq functions
+> and the irq handler. There should not be any need for cpu_is_omap
+> as at this point we only care about SoC generation, and not about
+> subcategories.
+>
+> The main reason for the patch is that we want to initialize only
+> minimal omap specific code from the init_early call, and this and
+> the following patches get us closer to that goal.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+[...]
+
+A couple of minor comments on naming below...
+
+> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> index bc524b9..33a5c0d 100644
+> --- a/arch/arm/mach-omap2/irq.c
+> +++ b/arch/arm/mach-omap2/irq.c
+> @@ -103,28 +103,36 @@ static void omap_ack_irq(struct irq_data *d)
+>  	intc_bank_write_reg(0x1, &irq_banks[0], INTC_CONTROL);
+>  }
 >  
-> 	__asm__ __volatile__ (
-> 		"msr	cpsr_fs, %[cpsr]\n\t"
-> 		"mov	lr, pc		\n\t"
-> 		"mov	pc, %[i_fn]	\n\t"
-> 		"str	r2, %[rd0]	\n\t"
-> 		"str	r3, %[rd1]	\n\t"
-> 		:       "=r" (rnv),
-> 		  [rd0] "=m" (regs->uregs[rd]),
-> 		  [rd1] "=m" (regs->uregs[rd+1])
-> 		:        "0" (rnv),
-> 		         "r" (rmv),
-> 		  [cpsr] "r" (regs->ARM_cpsr),
-> 		  [i_fn] "r" (i_fn)
-> 		: "r2", "r3", "lr", "cc"
->  	);
+> +static inline void _omap_mask_irq(int irq)
+> +{
+> +	int offset = irq & (~(IRQ_BITS_PER_REG - 1));
+> +	irq &= (IRQ_BITS_PER_REG - 1);
+> +	intc_bank_write_reg(1 << irq, &irq_banks[0], INTC_MIR_SET0 + offset);
+> +}
+> +
+>  static void omap_mask_irq(struct irq_data *d)
+>  {
+>  	unsigned int irq = d->irq;
+> -	int offset = irq & (~(IRQ_BITS_PER_REG - 1));
+>  
+> -	if (cpu_is_omap34xx() && !cpu_is_ti816x()) {
+> -		int spurious = 0;
+> +	_omap_mask_irq(irq);
+> +}
+>  
+> -		/*
+> -		 * INT_34XX_GPT12_IRQ is also the spurious irq. Maybe because
+> -		 * it is the highest irq number?
+> -		 */
+> -		if (irq == INT_34XX_GPT12_IRQ)
+> -			spurious = omap_check_spurious(irq);
+> +static void omap_mask_irq_omap3(struct irq_data *d)
 
-I agree this is a nice improvement.  However it is best to keep fixes 
-and improvements into separate patches.
+how about omap3_mask_irq().
 
+In most other code we're using the SoC name as a prefix instead of
+suffix.
 
-Nicolas
+> +{
+> +	unsigned int irq = d->irq;
+> +	int spurious = 0;
+>  
+> -		if (!spurious)
+> -			previous_irq = irq;
+> -	}
+> +	/*
+> +	 * INT_34XX_GPT12_IRQ is also the spurious irq. Maybe because
+> +	 * it is the highest irq number?
+> +	 */
+> +	if (irq == INT_34XX_GPT12_IRQ)
+> +		spurious = omap_check_spurious(irq);
+>  
+> -	irq &= (IRQ_BITS_PER_REG - 1);
+> +	if (!spurious)
+> +		previous_irq = irq;
+>  
+> -	intc_bank_write_reg(1 << irq, &irq_banks[0], INTC_MIR_SET0 + offset);
+> +	_omap_mask_irq(irq);
+>  }
+>  
+>  static void omap_unmask_irq(struct irq_data *d)
+> @@ -143,6 +151,12 @@ static void omap_mask_ack_irq(struct irq_data *d)
+>  	omap_ack_irq(d);
+>  }
+>  
+> +static void omap_mask_ack_irq_omap3(struct irq_data *d)
+
+Also here: omap3_mask_ack_irq()
+
+Kevin
