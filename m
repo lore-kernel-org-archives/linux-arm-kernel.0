@@ -1,49 +1,174 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2011 10:40:14 +0100
-Subject: [PATCH v2] ARM: perf: ensure overflows aren't missed due to IRQ
-	latency
-In-Reply-To: <4D8D85C4.1080501@free.fr>
-References: <1300986442-20461-1-git-send-email-will.deacon@arm.com>
-	<4D8D85C4.1080501@free.fr>
-Message-ID: <006f01cbedf5$4e9725d0$ebc57170$@deacon@arm.com>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Tue, 29 Mar 2011 11:53:00 +0200
+Subject: [PATCH] s3c2440: mini2440: Use leds-gpio driver for board leds
+	handling.
+In-Reply-To: <AANLkTi=RW0o=+hXcO0Y04nq10QEd=hWY0Nzc0enJ=Tr7@mail.gmail.com>
+References: <AANLkTi=RW0o=+hXcO0Y04nq10QEd=hWY0Nzc0enJ=Tr7@mail.gmail.com>
+Message-ID: <1301392380-9022-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
+Intention of this patch is convert existing usage of leds-s3c24xx driver
+to use generic gpio-leds driver. Leds are separated to 2 devices.
+First device handle 4 available leds. Second device is used to drive
+LCD backlight. Backlight can be controlled via parameter b so we need
+separate device which is registered or not depending on parameter.
 
-Hello Chris,
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+---
+ arch/arm/mach-s3c2440/mach-mini2440.c |  121 +++++++++++++++------------------
+ 1 files changed, 54 insertions(+), 67 deletions(-)
 
-> Sorry, my first attempt was regarded as suspicious.
-> This time I shall try to avoid HTML.
-
-Good idea :)
-
-> A couple of nitpicks in the introduction.
-> 
-> Le 24/03/2011 18:07, Will Deacon a ?crit :
-> > If a counter overflows during a perf stat profiling run it may overtake
-> > the last known value of the counter:
-> >
-> >      0        prev     new                0xffffffff
-> >      |----------|-------|----------------------|
-> >
-> > In this case, the number of events that have occurred is
-> > (0xffffffff - prev) + new. Unfortunately, the event update code will
-> > not realise an overflow has occurred and will instead report the event
-> > delta as (new - prev) which may be considerably smaller than the real
-> > count.
-> 
-> a) "(0xffffffff - prev) + new"
-> Surely that should be "(0x100000000 - prev) + new"
-
-This has been merged now, so it's too late to change the commit log.
-However, I think this is also a problem in the code in that we're not
-counting the event through zero (Jamie - it means my original code *was*
-subtly different to yours, but I can't pretend I saw this issue!).
-
-So now we're off by 1 rather than some number bounded by maxuint. At least
-we're converging on accuracy...
-
-I'll post a fix.
-
-Will
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index 163d318..28ef6eb 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -419,81 +419,71 @@ static struct platform_device mini2440_button_device = {
+ };
+ 
+ /* LEDS */
+-
+-static struct s3c24xx_led_platdata mini2440_led1_pdata = {
+-	.name		= "led1",
+-	.gpio		= S3C2410_GPB(5),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "heartbeat",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led2_pdata = {
+-	.name		= "led2",
+-	.gpio		= S3C2410_GPB(6),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "nand-disk",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led3_pdata = {
+-	.name		= "led3",
+-	.gpio		= S3C2410_GPB(7),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "mmc0",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led4_pdata = {
+-	.name		= "led4",
+-	.gpio		= S3C2410_GPB(8),
+-	.flags		= S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+-	.def_trigger	= "",
+-};
+-
+-static struct s3c24xx_led_platdata mini2440_led_backlight_pdata = {
+-	.name		= "backlight",
+-	.gpio		= S3C2410_GPG(4),
+-	.def_trigger	= "backlight",
++static struct gpio_led gpio_leds[] = {
++	{
++		.name			= "led1",
++		.gpio			= S3C2410_GPB(5),
++		.active_low		= 1,
++		.default_trigger	= "heartbeat",
++	},
++	{
++		.name			= "led2",
++		.gpio			= S3C2410_GPB(6),
++		.active_low		= 1,
++		.default_trigger	= "nand-disk",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	},
++	{
++		.name			= "led3",
++		.gpio			= S3C2410_GPB(7),
++		.active_low		= 1,
++		.default_trigger	= "mmc0",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	},
++	{
++		.name			= "led4",
++		.gpio			= S3C2410_GPB(8),
++		.active_low		= 1,
++		.default_trigger	= "none",
++		.default_state		= LEDS_GPIO_DEFSTATE_OFF,
++	}
+ };
+ 
+-static struct platform_device mini2440_led1 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &mini2440_led1_pdata,
+-	},
++static struct gpio_led backlight_led[] = {
++	{
++		.name			= "backlight",
++		.gpio			= S3C2410_GPG(4),
++		.active_low		= 0,
++		.default_trigger	= "backlight",
++		.default_state		= LEDS_GPIO_DEFSTATE_ON,
++	}
+ };
+ 
+-static struct platform_device mini2440_led2 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 2,
+-	.dev		= {
+-		.platform_data	= &mini2440_led2_pdata,
+-	},
++static struct gpio_led_platform_data gpio_led_info = {
++	.leds		= gpio_leds,
++	.num_leds	= ARRAY_SIZE(gpio_leds),
+ };
+ 
+-static struct platform_device mini2440_led3 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 3,
+-	.dev		= {
+-		.platform_data	= &mini2440_led3_pdata,
+-	},
++static struct gpio_led_platform_data backlight_info = {
++	.leds		= backlight_led,
++	.num_leds	= ARRAY_SIZE(backlight_led),
+ };
+ 
+-static struct platform_device mini2440_led4 = {
+-	.name		= "s3c24xx_led",
+-	.id		= 4,
+-	.dev		= {
+-		.platform_data	= &mini2440_led4_pdata,
+-	},
++static struct platform_device mini2440_leds = {
++	.name	= "leds-gpio",
++	.id	= 0,
++	.dev	= {
++		.platform_data	= &gpio_led_info,
++	}
+ };
+ 
+ static struct platform_device mini2440_led_backlight = {
+-	.name		= "s3c24xx_led",
+-	.id		= 5,
+-	.dev		= {
+-		.platform_data	= &mini2440_led_backlight_pdata,
+-	},
++	.name	= "leds-gpio",
++	.id	= 1,
++	.dev	= {
++		.platform_data	= &backlight_info,
++	}
+ };
+-
+ /* AUDIO */
+ 
+ static struct s3c24xx_uda134x_platform_data mini2440_audio_pins = {
+@@ -543,10 +533,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_rtc,
+ 	&s3c_device_usbgadget,
+ 	&mini2440_device_eth,
+-	&mini2440_led1,
+-	&mini2440_led2,
+-	&mini2440_led3,
+-	&mini2440_led4,
++	&mini2440_leds,
+ 	&mini2440_button_device,
+ 	&s3c_device_nand,
+ 	&s3c_device_sdi,
+-- 
+1.7.1
