@@ -1,28 +1,24 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Tue, 29 Mar 2011 12:01:40 +0530
-Subject: MACH_TYPE undeclared error
-Message-ID: <AANLkTimSWBx-FTj1WXpOgFXyH6rLSWFNzayLd_yOj7d_@mail.gmail.com>
+From: marek.belisko@open-nandra.com (Marek Belisko)
+Date: Tue, 29 Mar 2011 08:32:39 +0200
+Subject: [PATCH 0/4] s3c2440: mini2440: Add missing code parts to be fully
+	working with latest kernel.
+Message-ID: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+Patch add new LCD panels with which was board produced. Also add touchscreen
+support. Enabling LCD backlight during early booting stage also added.
 
-I have defined a MACHINE_START macro in my board C file as follows.
+Some code parts are collected or inspired from other code (authors are in CC).
 
-MACHINE_START(S3C2510, "S3C2510")
-	.init_irq	= s3c2510_init_irq,
-	.timer		= &s3c2510_time_init,
-MACHINE_END
+Marek Belisko (4):
+  s3c2440: mini2440: Add support for new LCD panels.
+  s3c2440: mini2440: Add touchscreen support for mini2440.
+  s3c2440: mini2440: Select touchscreen by default.
+  s3c2440: mini2440: Enable the backlight LED earlier at boot time.
 
-When I try to compile this C file, I am seeing the following error message.
-
-arch/arm/mach-s3c2510/s3c2510.c:35:1: error: 'MACH_TYPE_S3C2510'
-undeclared here (not in a function)
-
-I googled, but there is no luck for me. Please suggest me whether I am
-missing any configuration item.
-
-Any hints / suggestions would be appreciated.
-
-Thanks and Regards,
-Madhavi M.
+ arch/arm/mach-s3c2410/include/mach/leds-gpio.h |    1 +
+ arch/arm/mach-s3c2440/Kconfig                  |    1 +
+ arch/arm/mach-s3c2440/mach-mini2440.c          |   55 +++++++++++++++++++++++-
+ drivers/leds/leds-s3c24xx.c                    |    6 ++-
+ 4 files changed, 60 insertions(+), 3 deletions(-)
