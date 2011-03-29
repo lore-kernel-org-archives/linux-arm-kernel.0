@@ -1,73 +1,76 @@
 From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Tue, 29 Mar 2011 08:32:40 +0200
-Subject: [PATCH 1/4] s3c2440: mini2440: Add support for new LCD panels.
+Date: Tue, 29 Mar 2011 08:32:41 +0200
+Subject: [PATCH 2/4] s3c2440: mini2440: Add touchscreen support for mini2440.
 In-Reply-To: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
 References: <1301380363-3282-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <1301380363-3282-2-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <1301380363-3282-3-git-send-email-marek.belisko@open-nandra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for new mini2440 board LCD's:
-3.5" TFT + TS (TD035STED4)
-5.6" TFT (Innolux AT056TN52).
-3.5" TFT + TS (SONY X35)
-
-Values overtaken from mini2440 kernel:
+Patch add support for mini2440 touchscreen.
+Some code borrowed from:
 git://repo.or.cz/linux-2.6/mini2440.git
-and https://github.com/a1ien/mini2440-linux-kernel
 
 Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
 ---
- arch/arm/mach-s3c2440/mach-mini2440.c |   37 +++++++++++++++++++++++++++++++++
- 1 files changed, 37 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2440/mach-mini2440.c |   17 +++++++++++++++--
+ 1 files changed, 15 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index dfedc9c..ce152b4 100644
+index ce152b4..163d318 100644
 --- a/arch/arm/mach-s3c2440/mach-mini2440.c
 +++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -167,6 +167,43 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
- 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
- 				   S3C2410_LCDCON5_HWSWP),
- 	},
-+	[3] = {	/* mini2440 + 3.5" TFT + TS -- New model as Nov 2009 "T35" */
-+		_LCD_DECLARE(
-+			7,			/* The 3.5 is quite fast */
-+			240, 21, 25, 6,		/* x timing */
-+			320, 2, 4, 2,		/* y timing */
-+			40),			/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_INVVDEN |
-+				   S3C2410_LCDCON5_PWREN),
-+	},
-+	[4] = { /* mini2440 + 5.6" TFT + touchscreen -- Innolux AT056TN52 */
-+		/* be sure the "power" jumper is set accordingly ! */
-+		_LCD_DECLARE(
-+			10,			/* the 5.3" runs slower */
-+			640, 41, 68, 22,	/* x timing */
-+			480, 26, 6, 2,		/* y timing */
-+			40),			/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_PWREN),
-+	},
-+	[5] = { /* mini2440 + 3,5" TFT + touchscreen -- SONY X35 */
-+		_LCD_DECLARE(
-+			7,
-+			240, 1, 26, 5,		/* x timing */
-+			320, 1, 5, 9,		/* y timing */
-+			60),			/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+					S3C2410_LCDCON5_INVVDEN |
-+					S3C2410_LCDCON5_INVVFRAME |
-+					S3C2410_LCDCON5_INVVLINE |
-+					S3C2410_LCDCON5_INVVCLK |
-+					S3C2410_LCDCON5_HWSWP),
-+	},
+@@ -47,6 +47,7 @@
+ #include <plat/iic.h>
+ #include <plat/mci.h>
+ #include <plat/udc.h>
++#include <plat/ts.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+@@ -530,6 +531,11 @@ static struct platform_device uda1340_codec = {
+ 		.id = -1,
  };
  
- /* todo - put into gpio header */
++static struct s3c2410_ts_mach_info mini2440_ts_cfg __initdata = {
++	.delay = 10000,
++	.presc = 0xff, /* slow as we can go */
++};
++
+ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&s3c_device_ohci,
+ 	&s3c_device_wdt,
+@@ -548,6 +554,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ 	&uda1340_codec,
+ 	&mini2440_audio,
+ 	&samsung_asoc_dma,
++	&s3c_device_adc,
+ };
+ 
+ static void __init mini2440_map_io(void)
+@@ -631,8 +638,13 @@ static void mini2440_parse_features(
+ 			features->done |= FEATURE_BACKLIGHT;
+ 			break;
+ 		case 't':
+-			printk(KERN_INFO "MINI2440: '%c' ignored, "
+-				"touchscreen not compiled in\n", f);
++			if (features->done & FEATURE_TOUCH)
++				printk(KERN_INFO "MINI2440: '%c' ignored, "
++					"touchscreen already set\n", f);
++			else
++				features->optional[features->count++] =
++						&s3c_device_ts;
++			features->done |= FEATURE_TOUCH;
+ 			break;
+ 		case 'c':
+ 			if (features->done & FEATURE_CAMERA)
+@@ -699,6 +711,7 @@ static void __init mini2440_init(void)
+ 	s3c24xx_mci_set_platdata(&mini2440_mmc_cfg);
+ 	s3c_nand_set_platdata(&mini2440_nand_info);
+ 	s3c_i2c0_set_platdata(NULL);
++	s3c24xx_ts_set_platdata(&mini2440_ts_cfg);
+ 
+ 	i2c_register_board_info(0, mini2440_i2c_devs,
+ 				ARRAY_SIZE(mini2440_i2c_devs));
 -- 
 1.7.1
