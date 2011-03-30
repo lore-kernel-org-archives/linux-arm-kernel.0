@@ -1,43 +1,71 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 30 Mar 2011 14:43:32 +1000
-Subject: [PATCH] arm: at91: fix compiler warning for eb01 board build
-Message-ID: <1301460212-6940-1-git-send-email-gerg@uclinux.org>
+Date: Wed, 30 Mar 2011 14:44:19 +1000
+Subject: [PATCH] arm: at91: minimal defconfig fot at91eb01 board
+Message-ID: <1301460259-6984-1-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix compiler warning when building for AT91EB01 board:
-
-arch/arm/mach-at91/board-eb01.c:41: warning: initialisation from incompatible pointer type
+A minimal defconfig for build testing the AT91x40 based EB01 board.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-at91/board-eb01.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/configs/at91eb01_defconfig |   48 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/at91eb01_defconfig
 
-diff --git a/arch/arm/mach-at91/board-eb01.c b/arch/arm/mach-at91/board-eb01.c
-index 1f9d3cb..d8df59a 100644
---- a/arch/arm/mach-at91/board-eb01.c
-+++ b/arch/arm/mach-at91/board-eb01.c
-@@ -30,6 +30,11 @@
- #include <mach/board.h>
- #include "generic.h"
- 
-+static void __init at91eb01_init_irq(void)
-+{
-+	at91x40_init_interrupts(NULL);
-+}
-+
- static void __init at91eb01_map_io(void)
- {
- 	at91x40_initialize(40000000);
-@@ -38,7 +43,7 @@ static void __init at91eb01_map_io(void)
- MACHINE_START(AT91EB01, "Atmel AT91 EB01")
- 	/* Maintainer: Greg Ungerer <gerg@snapgear.com> */
- 	.timer		= &at91x40_timer,
--	.init_irq	= at91x40_init_interrupts,
-+	.init_irq	= at91eb01_init_irq,
- 	.map_io		= at91eb01_map_io,
- MACHINE_END
- 
+diff --git a/arch/arm/configs/at91eb01_defconfig b/arch/arm/configs/at91eb01_defconfig
+new file mode 100644
+index 0000000..c55e921
+--- /dev/null
++++ b/arch/arm/configs/at91eb01_defconfig
+@@ -0,0 +1,48 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_EMBEDDED=y
++# CONFIG_HOTPLUG is not set
++# CONFIG_ELF_CORE is not set
++# CONFIG_FUTEX is not set
++# CONFIG_TIMERFD is not set
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_AT91=y
++CONFIG_ARCH_AT91X40=y
++CONFIG_MACH_AT91EB01=y
++CONFIG_AT91_EARLY_USART0=y
++CONFIG_CPU_ARM7TDMI=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x01000000
++CONFIG_DRAM_SIZE=0x00400000
++CONFIG_FLASH_MEM_BASE=0x01400000
++CONFIG_PROCESSOR_ID=0x14000040
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_BINFMT_FLAT=y
++# CONFIG_SUSPEND is not set
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_RAM=y
++CONFIG_MTD_ROM=y
++CONFIG_BLK_DEV_RAM=y
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_DEVKMEM is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++# CONFIG_DNOTIFY is not set
++CONFIG_ROMFS_FS=y
++# CONFIG_ENABLE_MUST_CHECK is not set
 -- 
 1.7.0.4
