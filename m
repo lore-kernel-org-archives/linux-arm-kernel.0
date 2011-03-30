@@ -1,93 +1,45 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 30 Mar 2011 20:39:09 +0100
-Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
-In-Reply-To: <alpine.LFD.2.00.1103301328280.28032@xanadu.home>
-References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
-	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
-	<1301500340.2488.127.camel@computer2.home>
-	<alpine.LFD.2.00.1103301328280.28032@xanadu.home>
-Message-ID: <1301513949.2488.229.camel@computer2.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Mar 2011 21:43:51 +0200
+Subject: [PATCH V5 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <20110330191506.GD2939@n2100.arm.linux.org.uk>
+References: <1301444651-18008-1-git-send-email-john.linn@xilinx.com>
+	<201103301529.03648.arnd@arndb.de>
+	<20110330191506.GD2939@n2100.arm.linux.org.uk>
+Message-ID: <201103302143.51409.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-30 at 13:59 -0400, Nicolas Pitre wrote:
-> On Wed, 30 Mar 2011, Tixy wrote:
-> 
-> > On Wed, 2011-03-30 at 16:42 +0300, Viktor Rosendahl wrote:
-> > > On 03/29/2011 09:44 PM, ext Nicolas Pitre wrote:
-> > >  > On Tue, 29 Mar 2011, Russell King - ARM Linux wrote:
-> > >  >
-> > >  >> On Tue, Mar 29, 2011 at 12:55:27PM -0400, Nicolas Pitre wrote:
-> > >  >>> Sorry, I meant r15-indexed with a write back.
-> > >  >>
-> > >  >> I believe that's unpredictable.  So actually you can make kprobes do
-> > >  >> anything you like with it - no one should ever generate an instruction
-> > >  >> which read-modify-writes the PC.
-> > >  >
-> > >  > Indeed.  Hence my suggestion to simply refuse and abort the placement of
-> > >  > a probe on such instructions and keep the actual emulation code free of
-> > >  > tests for those odd cases.  In practice this shouldn't affect anyone.
-> > >  >
-> > > 
-> > > Here is a patch for implementing the rejection of probes on those instructions,
-> > > with Rn == 15 and writeback enabled. Those previous patches are still
-> > > required, since they fix the emulation of the fully legal instructions where
-> > > Rn == 15 and writeback isn't enabled.
-> > 
-> > I think this could be a slippery slope, what about the other dubious
-> > combinations, like writeback when Rn==Rt, or when Rm==pc? By the same
-> > rationale we should check for those to.
-> > 
-> > If we start littering the code with all these extra checks we risk
-> > introducing bugs and making the code more difficult to maintain.
-> > 
-> > In my opinion we should not add any extra code to handle instructions
-> > combinations that the ARM ARM says are UNPREDICTABLE, or have fields
-> > which are SBZ/SBO. The toolchain shouldn't ever generate these bad
-> > instructions in which case the extra kprobes code is redundant.
-> 
-> There are two categories to consider for such issues:
-> 
-> 1) What to do with any writeback to pc.  This is really important 
->    because this directly affects the running thread and determines where
->    execution will resume once the probe is done.  Any dubious case 
->    should be carefully intercepted, otherwise this may become a 
->    potential security risk.  So, given that this has to be handled
->    somehow, I think it is best to simply refuse the placement of a probe
->    on a dubious instruction rather than working around the dubiousness in
->    the actual emulation code.
-> 
-> 2) What to do with any other undefined combinations.  Well, anything 
->    else that is defined as unpredictable by the ARM ARM which doesn't 
->    involve writing the pc should simply pass through the emulation code 
->    without incuring any additional overhead or special care.  By definition,
->    if the result is unpredictable, we can emulate it the way we wish and
->    any discrepancy with native hardware result is unimportant.
-> 
-> In the first category can be found things like:
-> 
-> 	ldmdb	pc!, {r0, r1, r2}
-> 
-> In the second category would be:
-> 
-> 	ldmdb	pc, {r0, r1, r2}
-> 
-> We can safely ignore the second case, but the first case clearly has the 
-> potential for trouble if mis-emulated.  And trying to correctly emulate 
-> any of those cases is worthless.
+On Wednesday 30 March 2011 21:15:06 Russell King - ARM Linux wrote:
+> And how do you deal with PCMCIA implementations where each socket has
+> its own separate IO space, each maybe several MB large and may be spread
+> across several MB of memory with the PCMCIA attribute and PCMCIA memory
+> spaces interspersed.  Remember that PCMCIA drivers assume PCI/ISA IO
+> support.
 
-I don't think it's quite as black and white. In both cases the kernel
-was executing an illegal instruction before we inserted the probe, so we
-are probably already in the territorial of "affects the running thread"
-and security issues.
+I would assume that the majority of implementations uses regular (64KB)
+I/O spaces per bus, so within 1 MB, that could fit 16 of them.
 
-However, if the simple rule we need to follow is "avoid ambiguous writes
-to PC" then I won't put up any more fight :-) (Expecially as I just
-checked normal execution of one writeback to PC instruction an found
-that PC was unaffected ;-)
+> What about platforms which have a real ISA IO space in addition to the
+> PCMCIA IO spaces?
 
-I'll get on with writing test code so that we can find bugs when probing
-legal instructions...
+I'd do the same as on powerpc: One of them gets registered as the "primary"
+bus, which gets the first 64KB. This one is typically the only
+one that can support legacy ISA devices with hardcoded I/O port numbers.
 
--- 
-Tixy
+Any other bus (PCI, PCMCIA, secondary ISA if needed) can go into one
+of the other 15 64KB slots.
+
+> Things aren't as simple as you'd like them to be, and sometimes changing
+> this stuff changes userland too (think PCMCIA needing the IO regions
+> declared to it from userspace during boot.)
+
+Can you give an example what hardware or driver needs this?
+
+Anyway, the idea is more to have a standard implementation that can be
+used by most platforms without causing pain, getting us one step
+closer to a multiplatform kernel. If one of the more obscure platforms
+doesn't fit, it can still use its own variant and not be part of the
+multiplatform configuration. There are a lot of other things needed
+before we get there anyway.
+
+	Arnd
