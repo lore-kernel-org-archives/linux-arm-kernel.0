@@ -1,71 +1,45 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 30 Mar 2011 22:31:15 +1000
-Subject: [PATCH] arm: at91: minimal defconfig for at91x40 SoC
-Message-ID: <1301488275-12700-1-git-send-email-gerg@uclinux.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Mar 2011 13:46:23 +0100
+Subject: [PATCH] ARM: vfp: Remote obsolete fpmx_state field from
+	vfp_hard_struct
+Message-ID: <1301489184-4112-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A minimal defconfig for build testing the AT91x40 SoC.
+The fpmx_state field was presumably used in the past, when
+FSTMX/FLDMX were used to save and resture the VFP state.
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+This was been deprecated since ARMv6, the context switch code
+has been ported to use the double-precision load/store variants
+many years ago, and now it appears that nothing in the kernel
+references this field any more.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/configs/at91x40_defconfig |   48 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 48 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/at91x40_defconfig
+ arch/arm/include/asm/fpstate.h |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/configs/at91x40_defconfig b/arch/arm/configs/at91x40_defconfig
-new file mode 100644
-index 0000000..c55e921
---- /dev/null
-+++ b/arch/arm/configs/at91x40_defconfig
-@@ -0,0 +1,48 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_EMBEDDED=y
-+# CONFIG_HOTPLUG is not set
-+# CONFIG_ELF_CORE is not set
-+# CONFIG_FUTEX is not set
-+# CONFIG_TIMERFD is not set
-+# CONFIG_VM_EVENT_COUNTERS is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_ARCH_AT91X40=y
-+CONFIG_MACH_AT91EB01=y
-+CONFIG_AT91_EARLY_USART0=y
-+CONFIG_CPU_ARM7TDMI=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x01000000
-+CONFIG_DRAM_SIZE=0x00400000
-+CONFIG_FLASH_MEM_BASE=0x01400000
-+CONFIG_PROCESSOR_ID=0x14000040
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_BINFMT_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_FW_LOADER is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_RAM=y
-+CONFIG_MTD_ROM=y
-+CONFIG_BLK_DEV_RAM=y
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_DEVKMEM is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+# CONFIG_DNOTIFY is not set
-+CONFIG_ROMFS_FS=y
-+# CONFIG_ENABLE_MUST_CHECK is not set
+diff --git a/arch/arm/include/asm/fpstate.h b/arch/arm/include/asm/fpstate.h
+index ee5e03e..08bb836 100644
+--- a/arch/arm/include/asm/fpstate.h
++++ b/arch/arm/include/asm/fpstate.h
+@@ -18,7 +18,6 @@
+  * VFP storage area has:
+  *  - FPEXC, FPSCR, FPINST and FPINST2.
+  *  - 16 or 32 double precision data registers
+- *  - an implementation-dependant word of state for FLDMX/FSTMX (pre-ARMv6)
+  * 
+  *  FPEXC will always be non-zero once the VFP has been used in this process.
+  */
+@@ -29,9 +28,6 @@ struct vfp_hard_struct {
+ #else
+ 	__u64 fpregs[16];
+ #endif
+-#if __LINUX_ARM_ARCH__ < 6
+-	__u32 fpmx_state;
+-#endif
+ 	__u32 fpexc;
+ 	__u32 fpscr;
+ 	/*
 -- 
-1.7.0.4
+1.7.1
