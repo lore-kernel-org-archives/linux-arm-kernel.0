@@ -1,54 +1,115 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 31 Mar 2011 00:56:33 +0200 (CEST)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110330224526.GM18334@atomide.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103302155270.22418@localhost6.localdomain6>
-	<20110330215434.GI18334@atomide.com>
-	<alpine.LFD.2.00.1103310018540.22418@localhost6.localdomain6>
-	<20110330224526.GM18334@atomide.com>
-Message-ID: <alpine.LFD.2.00.1103310049530.22418@localhost6.localdomain6>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Wed, 30 Mar 2011 18:03:30 -0500
+Subject: [PATCHv8] ARM: mx51: Add support for low power suspend on MX51
+Message-ID: <1301526210-21260-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar 2011, Tony Lindgren wrote:
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-> * Thomas Gleixner <tglx@linutronix.de> [110330 15:22]:
-> > On Wed, 30 Mar 2011, Tony Lindgren wrote:
-> > 
-> > > * Thomas Gleixner <tglx@linutronix.de> [110330 14:07]:
-> > > > 
-> > > > So one person will be not enough, that needs to be a whole team of
-> > > > experienced people in the very near future to deal with the massive
-> > > > tsunami of crap which is targeted at mainline. If we fail to set that
-> > > > up, then we run into a very ugly maintainability issue in no time.
-> > > 
-> > > One thing that will help here and distribute the load is to move
-> > > more things under drivers/ as then we have more maintainers looking
-> > > at the code.
-> > 
-> > Guess what's that going to solve? Nothing, nada.
-> > 
-> > Really, you move the problem to people who are not prepared to deal
-> > with the wave either. So what's the gain?
-> 
-> I guess my point is that with creating more common frameworks people
-> will be using common code. Some examples that come to mind are clock
-> framework, gpiolib, dma engine, runtime PM and so on.
+Adds initial low power suspend functionality to MX51.
+Supports "mem" and "standby" modes.
 
-For all that to happen you need a really experienced team with a
-strong team lead to fight that through and go through the existing
-horror while dealing  with the incoming flood at the same time.
+Tested on mx51-babbage.
 
-See commit 9ad198cb for illustration.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/Makefile  |    1 +
+ arch/arm/mach-mx5/pm-imx5.c |   74 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 75 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/pm-imx5.c
 
-Sigh, I fought that battle for a couple of month to deal with shite
-coming in faster than you can fix it and everyone ignoring it.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 0b9338c..d646feb 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -6,6 +6,7 @@
+ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
+ obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
+ 
++obj-$(CONFIG_PM) += pm-imx5.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+ obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+diff --git a/arch/arm/mach-mx5/pm-imx5.c b/arch/arm/mach-mx5/pm-imx5.c
+new file mode 100644
+index 0000000..2232d04
+--- /dev/null
++++ b/arch/arm/mach-mx5/pm-imx5.c
+@@ -0,0 +1,74 @@
++/*
++ *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/suspend.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <asm/cacheflush.h>
++#include <asm/tlbflush.h>
++#include <mach/system.h>
++#include "crm_regs.h"
++
++static struct clk *gpc_dvfs_clk;
++
++static int mx5_suspend_enter(suspend_state_t state)
++{
++	clk_enable(gpc_dvfs_clk);
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		mx5_cpu_lp_set(STOP_POWER_OFF);
++		break;
++	case PM_SUSPEND_STANDBY:
++		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	if (state == PM_SUSPEND_MEM) {
++		local_flush_tlb_all();
++		flush_cache_all();
++
++		/*clear the EMPGC0/1 bits */
++		__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
++		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
++	}
++	cpu_do_idle();
++	clk_disable(gpc_dvfs_clk);
++
++	return 0;
++}
++
++static int mx5_pm_valid(suspend_state_t state)
++{
++	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
++}
++
++static const struct platform_suspend_ops mx5_suspend_ops = {
++	.valid = mx5_pm_valid,
++	.enter = mx5_suspend_enter,
++};
++
++static int __init mx5_pm_init(void)
++{
++	if (!cpu_is_mx51())
++		return 0;
++
++	gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
++
++	if (IS_ERR(gpc_dvfs_clk))
++		printk(KERN_ERR "Cannot enter SRPG suspend -no gpc_dvfs clock!\n");
++	else
++		suspend_set_ops(&mx5_suspend_ops);
++
++	return 0;
++}
++device_initcall(mx5_pm_init);
+-- 
+1.6.0.4
