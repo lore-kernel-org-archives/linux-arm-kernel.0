@@ -1,156 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Mar 2011 11:22:12 -0700
-Subject: [PATCH 00/10] omap init_early changes for irq and timer init
-In-Reply-To: <4D92E21F.6030608@ti.com>
-References: <20110328221501.4046.41079.stgit@baageli.muru.com>
-	<4D92E21F.6030608@ti.com>
-Message-ID: <20110330182211.GE18334@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Mar 2011 20:24:49 +0200
+Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
+In-Reply-To: <20110330174010.GA2939@n2100.arm.linux.org.uk>
+References: <1301391619-4499-1-git-send-email-arend@broadcom.com>
+	<201103301509.04899.arnd@arndb.de>
+	<20110330174010.GA2939@n2100.arm.linux.org.uk>
+Message-ID: <201103302024.49921.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110330 00:53]:
+On Wednesday 30 March 2011 19:40:10 Russell King - ARM Linux wrote:
+
+> The reason we don't do automatic scanning (which we could on the various
+> ARM platforms) is because of the platform data necessary to make some of
+> the primecell drivers work.
 > 
-> After going through entire series again, it looks very
-> good clean-up and right step towards moving rest of
-> the timer to drivers/ directory.
+> Unfortunately, these buses are not as simple as PCI, where a device
+> typically sits on its own card and is totally self-contained.  With
+> primecell stuff, there's normally some interdependencies between the
+> various primecells.
 > 
-> I also realized that the discussion we had before this series was
-> because of miss-understating about the 'wakeu_up' timer
-> terminology. After this series I see that you were mentioning
-> about the pm debug timer where as I was taling about
-> clock-event wakeups from CPUidle point of view.
+> That doesn't stop there being an automatic enumeration layer, but such
+> a layer would need some way of attaching platform specific data to
+> specific amba devices.
 
-Well this patcheset keeps the current behaviour, except for
-the PM debug hack to program gpt1.
+Right, I understand that this would not completely remove the need for
+platform devices, but I think it would be a great step in the right
+direction if we could scan all simple devices automatically, or
+possibly even all devices in some simple machines.
 
-What it does not have is the code to dedicate gpt1 for PM
-code, which can be done later once all the other dmtimer
-changes are done.
+If we can scan the main resources (memory ranges, interrupts, ...),
+that will make it possible to avoid a whole lot of the stuff we currently
+do for each new board. It also means we can gradually move away from
+statically defined devices, something that Greg has been pushing for
+quite some time.
 
-So the earlier discussion is still a separate issue from the
-PM debug hack removed in this series. I'll post some patches
-later on for that.
- 
-> I still have few concerns about this series.
-> 
-> 1)We have removed the flexibility if choosing the timer from
->   from board files and hard-coded them in platform timer
->   header.
+The device tree work has shown that it's possible to describe very
+complex hardware in simple data structures, but it would be much
+better if we needed neither a device tree nor a board file for this.
+As you say, this isn't possible today with the data on available
+to the AMBA bus, but I think it would be better to just fill in 
+the blanks (and corrections where they are wrong) than to duplicate
+all of it as we now do in the kernel.
 
-Well it's not removed, you can still select the timer setup
-by setting .timer entry in the board-*.c file.
+Ideally, we would point SoC companies to this (or a future extended
+version) as the place to add all the required information when
+they want the drivers to work out of the box. My impression is that
+there is no fundamental difference to buses like PCI or USB, other
+than that there is more data required to encode and that there is
+a lack of social pressure to get it right. I remember PCI cards
+from the 1990s that could not be probed properly and required
+setting a lot of module parameters copied from a web site depending
+on what hardware you had bought. The reason we don't have that 
+as much today is that the manufacturers realized that it's impossible
+to write proper drivers if you cannot detect the hardware.
 
-So for example, we have omap3_timer and omap3_beagle_timer
-for the beagle rev a & b based boards.
-
->  Below board related hard-coding in platform files looks more
->  hacky and the interface done  by Pual still has a merits of
->  its own.
-> 
-> --- a/arch/arm/plat-omap/include/plat/common.h
-> +++ b/arch/arm/plat-omap/include/plat/common.h
-> @@ -34,7 +34,12 @@
->  struct sys_timer;
-> 
->  extern void omap_map_common_io(void);
-> -extern struct sys_timer omap_timer;
-> +extern struct sys_timer omap1_timer;
-> +extern struct sys_timer omap242x_timer;
-> +extern struct sys_timer omap243x_timer;
-> +extern struct sys_timer omap3_timer;
-> +extern struct sys_timer omap3_beagle_timer;
-> +extern struct sys_timer omap4_timer;
->  extern bool omap_32k_timer_init(void);
->  extern int __init omap_init_clocksource_32k(void);
->  extern unsigned long long notrace omap_32k_sched_clock(void);
-
-Hmm the only reason for omap3_beagle_timer naming is the
-hardware bug in rev a & b beagle boards.
-
-> +/*
-> + * Beagle based designs typically have an issue with gptimer1. Also note
-> + * that GPTIMER12 can only use the secure 32KiHz clock source.
-> + */
->  static void __init omap3_beagle_timer_init(void)
->  {
->  	omap_dm_timer_init();
-> -	omap2_gp_clockevent_init();
-> +	omap2_gp_clockevent_init(OMAP3_BEAGLE_TIMER, OMAP3_CLKEV_SOURCE);
->  	omap2_gp_clocksource_init();
->  }
-
-Got any better name in mind for that timer?
-
-For removing the old interface, I don't see any reason to
-select timer combinations on omap3 other than omap3_timer
-and omap3_beagle_timer.
-
-If there's need, any new valid sane combinations can be esily
-added, although I seriously doubt that we'll need more for
-omap3.
- 
-> 2) In patch [6/10], you have removed wakeup timer debug
-> capability with comment "Later on we can reserve gptimer1
-> for PM code only and have similar functionality".
-> 
-> I don't know how this will work on OMAP. GPTIMER1 is the
-> only timer which is in always on power domain and wakeup
-> OMAP from deeper power states like CORE OSWR, CORE OFF,
-> DEVICE OFF.
-
-Right, that's why the PM code should manage it for the wake-up
-events. For the clockevent and clocksource we just want to
-use something fast for the runtime.
-
-Then when we hit idle, we can just let PM code program gpt1
-for the wake-up event.
- 
-> We do implement these C-state in CPUidle as well and hence
-> the clock-event is expected to be of wakeup-capable.
-> Hence GPTIMER1 is already reserved for clock-event.
-
-The PM code can easily deal with gpt1 by either calling
-next_timer_interrupt, or just by cloning the clockevent
-timer value. But again, that's a separate patch series
-to come..
- 
-> The wakeup timer used was only in suspend scenario's
-> and that point of time the timer system is already
-> suspended. So during that even if TIMER1 is re-used
-> for wakeup (which is the case), I don't see any issue.
-
-The reason is that for performance and latency reasons
-we want to use localtimers for runtime on omap4+, and
-need only gpt1 for PM wake-up.
-
-The gpt1 using 32KiHz source clock is a very slow clock
-to reprogram as it's on the external bus.
- 
-> At least I don't see other solution than using GPT1
-> for wakeup.
-
-Right, there's no other way to wake except gpt1 or wake-up
-enabled gpio lines. But we don't need to use gpt1 during
-runtime at all.
-
-> 3) You have created few functions so that they can
-> be used between system timer and dmtimer driver code.
-> When we move the dmtimer driver to say some drivers/
-> directory. Is it allowed to share such functions from
-> device drivers
-
-The only function we for clockevent and clocksource is
-the init_one function, which will be implemented in in
-arch/arm/mach-omap2/timer.c anyways. The function to
-reprogram the timer is an inline function so dmtimer
-can then be a loadable driver module :)
- 
-> Apart from above comments, I really liked this series.
-> If you like you can add my,
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Thanks for looking, will add.
-
-Regards,
-
-Tony
+	Arnd
