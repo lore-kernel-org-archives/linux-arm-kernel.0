@@ -1,23 +1,42 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 30 Mar 2011 14:53:33 +0100
-Subject: How to handle kprobe bugs?
-Message-ID: <1301493213.2488.41.camel@computer2.home>
+From: nikai@nikai.net (Nicolas Kaiser)
+Date: Wed, 30 Mar 2011 15:59:11 +0200
+Subject: [PATCH] arm: tegra: fix error check in tegra2_clocks.c
+Message-ID: <20110330155911.6dc0ef63@absol.kitzblitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that I'm writing some test code for kprobes I'm quickly finding
-further bugs with the instruction emulation. E.g. ALU ops with an
-immediate operand are broke. Shall I wait until I have completed writing
-all test cases before submitting a single fix patch? (It could be a
-couple of weeks.)
+Checking 'rate < 0' doesn't work because 'rate' is unsigned.
 
-I also find that instruction emulation for some (all?) ARMv6K and newer
-instructions are missing. E.g. hint instructions like NOP and WFI. Shall
-I produce a second patch to add these?
+Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+---
+Untested.
 
-At some point I will also get around to doing my original task of adding
-Thumb support to kprobes. I'm assuming that fixing ARM code is higher
-priority than adding Thumb support?
+ arch/arm/mach-tegra/tegra2_clocks.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 6d7c4ee..4459470 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1362,14 +1362,15 @@ static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	unsigned long flags;
+ 	int ret;
++	long new_rate = rate;
+ 
+-	rate = clk_round_rate(c->parent, rate);
+-	if (rate < 0)
+-		return rate;
++	new_rate = clk_round_rate(c->parent, new_rate);
++	if (new_rate < 0)
++		return new_rate;
+ 
+ 	spin_lock_irqsave(&c->parent->spinlock, flags);
+ 
+-	c->u.shared_bus_user.rate = rate;
++	c->u.shared_bus_user.rate = new_rate;
+ 	ret = tegra_clk_shared_bus_update(c->parent);
+ 
+ 	spin_unlock_irqrestore(&c->parent->spinlock, flags);
 -- 
-Tixy
+1.7.3.4
