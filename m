@@ -1,27 +1,64 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 30 Mar 2011 19:34:48 +0100
-Subject: How to handle kprobe bugs?
-In-Reply-To: <20110330141011.GA2844@arm.com>
-References: <1301493213.2488.41.camel@computer2.home>
-	<20110330141011.GA2844@arm.com>
-Message-ID: <1301510088.2488.184.camel@computer2.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Mar 2011 11:40:58 -0700
+Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
+	support
+In-Reply-To: <4D92CA92.50805@ti.com>
+References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
+	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110328205027.GC30616@atomide.com>
+	<5cbdd88c3ca3fe5c5a0f119be446ce99@mail.gmail.com>
+	<20110329170113.GG4016@atomide.com> <4D92CA92.50805@ti.com>
+Message-ID: <20110330184058.GF18334@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-30 at 15:10 +0100, Dave Martin wrote:
-> On Wed, Mar 30, 2011 at 02:53:33PM +0100, Tixy wrote:
-> > I also find that instruction emulation for some (all?) ARMv6K and newer
-> > instructions are missing. E.g. hint instructions like NOP and WFI. Shall
-> > I produce a second patch to add these?
-> 
-> Sure.
-> 
-> Note that you should emulate all the hinted NOPs as actual NOPs,
-> since the event the hint waits for may happen in the meantime;
-> under some circumstances that would lead to stalls.
+* Santosh <santosh.shilimkar@ti.com> [110329 23:13]:
+> On 3/29/2011 10:31 PM, Tony Lindgren wrote:
+> >* Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 22:47]:
+> >>>From: Tony Lindgren [mailto:tony at atomide.com]
+> >>>
+> >>>Do you really need to initialize all of this that early?
+> >>>
+> >>Yes. It's a interrupt controller extension and needs to work
+> >>together with GIC.
+> >
+> >Hmm to me it seems that the gic_arch_extn functions should be
+> >all NULL during runtime operation, and the wake-up generator
+> >should be programmed only before entering an idle state.
+> >
+> >Then the wake-up generator can be cleared after delivering
+> >the wake-up event(s).
+> >
+> >Or am I missing something on why this should be enabled all
+> >the time?
+> >
+> Yep. The WakeupGen sits between GIC and CPU and can
+> gate the interrupts in normal operation too. It's
+> mandatory that the interrupt mask at GIC and WakeupGen
+> matches to deliver the interrupt to CPU.
 
-Good point :-) Conversely, things like Send Event shouldn't be actual
-NOPs.
+But it seems that the states of GIC and WakeupGen can be
+synced up just before hitting an idle mode.
 
--- 
-Tixy
+And then the wake-ups only need to be acked after waking
+from idle and delivering the interrupts.
+
+> This is the reason why all the necessary GIC hooks are
+> populated with it so that they work together.
+
+Hmm I still see no reason to call these functions for every
+interrupt during runtime.
+
+AFAIK, these functions only need to be called only once
+right after waking from idle.
+ 
+> So far without this patch all interrupts at WakeupGen
+> level were always enabled and hence there was no issue.
+
+OK so things work during runtime without calling these
+functions for every interrupt. Why then would we want to
+call them for each interrupt?
+
+Regards,
+
+Tony
