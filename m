@@ -1,40 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Mar 2011 15:09:04 +0200
-Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
-In-Reply-To: <20110329181947.GA18134@flint.arm.linux.org.uk>
-References: <1301391619-4499-1-git-send-email-arend@broadcom.com>
-	<20110329181947.GA18134@flint.arm.linux.org.uk>
-Message-ID: <201103301509.04899.arnd@arndb.de>
+From: John.Linn@xilinx.com (John Linn)
+Date: Wed, 30 Mar 2011 07:17:46 -0600
+Subject: [PATCH V5 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <201103301344.45307.arnd@arndb.de>
+References: <1301444651-18008-1-git-send-email-john.linn@xilinx.com>
+	<1301444651-18008-3-git-send-email-john.linn@xilinx.com>
+	<9ceff117-ad43-4513-bee0-153a93c379ce@VA3EHSMHS008.ehs.local>
+	<201103301344.45307.arnd@arndb.de>
+Message-ID: <f4872ed7-b6e4-4050-9445-5176f5aa961a@VA3EHSMHS017.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2011, Russell King wrote:
-> On Tue, Mar 29, 2011 at 11:40:18AM +0200, Arend van Spriel wrote:
-> > GUIDANCE NEEDED:
-> > This patch puts the module at proposed location. Please provide your
-> > guidance if there is a better location within the linux tree for this
-> > module.
-> > 
-> > This module has been isolated from the brcm80211 driver currently
-> > located in staging and provided to other drivers for chipsets using
-> > the AMBA AXI on-chip interconnect with ARM Device Management Plugin
-> > (DMP) silicon IP, which provides system discovery (chip being the
-> > system) and basic core function (disable, reset, etc.).
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Wednesday, March 30, 2011 5:45 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org;
+linux-kernel at vger.kernel.org;
+> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
+> jamie at jamieiles.com
+> Subject: Re: [PATCH V5 3/4] ARM: Xilinx: base header files and
+assembly
+> macros
 > 
-> What does this do which the 'amba' bus support doesn't?
+> Hi John,
+> 
+> I looked over the latest version of your patches, everything looks
+> good to me, but I found one problem that you have probably copied
+> from other platforms:
 
-I believe the one thing we really want from this driver is the bus
-scan code, which is not present in the amba bus implementation,
-as far as I can tell. Today, the amba bus does very little beyond
-what the platform bus does, in particular you still need to
-register every single device from board specific code.
+Hi Arnd,
 
-When the proposed axi_scan() function gets turned into an
-amba_bus_register() function, a board file can call that to
-add all devices on the bus without listing them individually
-and calling amba_device_register() for each one.
+Thanks for taking the time to review again. Yep I did copy from others.
 
-Basically everything else is already there in the amba bus,
-no need to do it again.
+> 
+> On Wednesday 30 March 2011, John Linn wrote:
+> > +
+> > +/* Allow IO space to be anywhere in the memory */
+> > +
+> > +#define IO_SPACE_LIMIT 0xffff
+> > +
+> > +/* IO address mapping macros, nothing special at this time but
+> required */
+> > +
+> > +#ifdef __ASSEMBLER__
+> > +#define IOMEM(x)               (x)
+> > +#else
+> > +#define IOMEM(x)               ((void __force __iomem *)(x))
+> > +#endif
+> > +
+> > +#define __io(a)                        __typesafe_io(a)
+> > +#define __mem_pci(a)           (a)
+> 
+> The definition of __io() looks wrong, so any call to inb()/outb()
+> will be a wild pointer access when you add PCI support.
 
-	Arnd
+Yes that makes sense.  We don't have immediate plans for PCI and 
+I was assuming when we add PCI we would need to change that.  
+
+If you think I shouldn't put it off then I'll fix it now.  My 
+preference was to get the platform supported, then add more features.
+
+Thanks,
+John
+
+> 
+> If you don't plan to support PCI in the future, there should
+> be no problem.
+> 
+> 	Arnd
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
