@@ -1,70 +1,71 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 30 Mar 2011 14:33:13 +0200
-Subject: [PATCH] mach-ux500: fix i2c0 device setup regression
-Message-ID: <1301488393-13924-1-git-send-email-linus.walleij@stericsson.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed, 30 Mar 2011 22:31:15 +1000
+Subject: [PATCH] arm: at91: minimal defconfig for at91x40 SoC
+Message-ID: <1301488275-12700-1-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+A minimal defconfig for build testing the AT91x40 SoC.
 
-Adding two sets of I2C devices to the same bus doesn't quite work,
-atleast not anymore. Stash one array and determine how much of it
-shall be added instead.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/configs/at91x40_defconfig |   48 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/at91x40_defconfig
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index dc8746d..cc64bf4 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -178,16 +178,15 @@ static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
- 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
- 		.platform_data  = &mop500_tc35892_data,
- 	},
--};
--
--/* I2C0 devices only available prior to HREFv60 */
--static struct i2c_board_info __initdata mop500_i2c0_old_devices[] = {
-+	/* I2C0 devices only available prior to HREFv60 */
- 	{
- 		I2C_BOARD_INFO("tps61052", 0x33),
- 		.platform_data  = &mop500_tps61052_data,
- 	},
- };
- 
-+#define NUM_PRE_V60_I2C0_DEVICES 1
-+
- static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
- 	{
- 		/* lp5521 LED driver, 1st device */
-@@ -425,6 +424,8 @@ static void __init mop500_uart_init(void)
- 
- static void __init mop500_init_machine(void)
- {
-+	int i2c0_devs;
-+
- 	/*
- 	 * The HREFv60 board removed a GPIO expander and routed
- 	 * all these GPIO pins to the internal GPIO controller
-@@ -448,11 +449,11 @@ static void __init mop500_init_machine(void)
- 
- 	platform_device_register(&ab8500_device);
- 
--	i2c_register_board_info(0, mop500_i2c0_devices,
--				ARRAY_SIZE(mop500_i2c0_devices));
--	if (!machine_is_hrefv60())
--		i2c_register_board_info(0, mop500_i2c0_old_devices,
--					ARRAY_SIZE(mop500_i2c0_old_devices));
-+	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+	if (machine_is_hrefv60())
-+		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
-+
-+	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 	i2c_register_board_info(2, mop500_i2c2_devices,
- 				ARRAY_SIZE(mop500_i2c2_devices));
- }
+diff --git a/arch/arm/configs/at91x40_defconfig b/arch/arm/configs/at91x40_defconfig
+new file mode 100644
+index 0000000..c55e921
+--- /dev/null
++++ b/arch/arm/configs/at91x40_defconfig
+@@ -0,0 +1,48 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_EMBEDDED=y
++# CONFIG_HOTPLUG is not set
++# CONFIG_ELF_CORE is not set
++# CONFIG_FUTEX is not set
++# CONFIG_TIMERFD is not set
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_AT91=y
++CONFIG_ARCH_AT91X40=y
++CONFIG_MACH_AT91EB01=y
++CONFIG_AT91_EARLY_USART0=y
++CONFIG_CPU_ARM7TDMI=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x01000000
++CONFIG_DRAM_SIZE=0x00400000
++CONFIG_FLASH_MEM_BASE=0x01400000
++CONFIG_PROCESSOR_ID=0x14000040
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_BINFMT_FLAT=y
++# CONFIG_SUSPEND is not set
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_RAM=y
++CONFIG_MTD_ROM=y
++CONFIG_BLK_DEV_RAM=y
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_DEVKMEM is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++# CONFIG_DNOTIFY is not set
++CONFIG_ROMFS_FS=y
++# CONFIG_ENABLE_MUST_CHECK is not set
 -- 
-1.7.3.2
+1.7.0.4
