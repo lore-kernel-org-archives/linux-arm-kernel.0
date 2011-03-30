@@ -1,42 +1,55 @@
-From: nikai@nikai.net (Nicolas Kaiser)
-Date: Wed, 30 Mar 2011 15:59:11 +0200
-Subject: [PATCH] arm: tegra: fix error check in tegra2_clocks.c
-Message-ID: <20110330155911.6dc0ef63@absol.kitzblitz>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 30 Mar 2011 16:02:34 +0200
+Subject: [PATCH] mach-ux500: correct MMC/SDI parameters
+Message-ID: <1301493754-25442-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checking 'rate < 0' doesn't work because 'rate' is unsigned.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+We cannot clock the MMCI blocks more than 50 MHz. A bug prevented
+us from seeing the effect of actually driving them to 100 MHz,
+which indeed resulted failure, on the external SD card.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Untested.
+ arch/arm/mach-ux500/board-mop500-sdi.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
- arch/arm/mach-tegra/tegra2_clocks.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 6d7c4ee..4459470 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -1362,14 +1362,15 @@ static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
- {
- 	unsigned long flags;
- 	int ret;
-+	long new_rate = rate;
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index bf0b024..f4bccea 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -67,8 +67,10 @@ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
+ static struct mmci_platform_data mop500_sdi0_data = {
+ 	.vdd_handler	= mop500_sdi0_vdd_handler,
+ 	.ocr_mask	= MMC_VDD_29_30,
+-	.f_max		= 100000000,
+-	.capabilities	= MMC_CAP_4_BIT_DATA,
++	.f_max		= 50000000,
++	.capabilities	= MMC_CAP_4_BIT_DATA |
++				MMC_CAP_SD_HIGHSPEED |
++				MMC_CAP_MMC_HIGHSPEED,
+ 	.gpio_wp	= -1,
+ #ifdef CONFIG_STE_DMA40
+ 	.dma_filter	= stedma40_filter,
+@@ -137,7 +139,7 @@ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
  
--	rate = clk_round_rate(c->parent, rate);
--	if (rate < 0)
--		return rate;
-+	new_rate = clk_round_rate(c->parent, new_rate);
-+	if (new_rate < 0)
-+		return new_rate;
+ static struct mmci_platform_data mop500_sdi2_data = {
+ 	.ocr_mask	= MMC_VDD_165_195,
+-	.f_max		= 100000000,
++	.f_max		= 50000000,
+ 	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+ 	.gpio_cd	= -1,
+ 	.gpio_wp	= -1,
+@@ -174,7 +176,7 @@ static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
  
- 	spin_lock_irqsave(&c->parent->spinlock, flags);
- 
--	c->u.shared_bus_user.rate = rate;
-+	c->u.shared_bus_user.rate = new_rate;
- 	ret = tegra_clk_shared_bus_update(c->parent);
- 
- 	spin_unlock_irqrestore(&c->parent->spinlock, flags);
+ static struct mmci_platform_data mop500_sdi4_data = {
+ 	.ocr_mask	= MMC_VDD_29_30,
+-	.f_max		= 100000000,
++	.f_max		= 50000000,
+ 	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+ 			  MMC_CAP_MMC_HIGHSPEED,
+ 	.gpio_cd	= -1,
 -- 
-1.7.3.4
+1.7.3.2
