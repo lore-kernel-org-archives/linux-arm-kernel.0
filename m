@@ -1,43 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Mar 2011 11:12:10 +0200
-Subject: [PATCH v2 1/1] ARM: imx: add gpu device
-In-Reply-To: <AANLkTimGUvNra0igyUGRJrzj5y3SwYFt4WEGKrLxd88-@mail.gmail.com>
-References: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
-	<20110330071658.GQ30938@pengutronix.de>
-	<20110330081625.GB3195@b20223-02.ap.freescale.net>
-	<AANLkTimGUvNra0igyUGRJrzj5y3SwYFt4WEGKrLxd88-@mail.gmail.com>
-Message-ID: <20110330091210.GA19394@pengutronix.de>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 30 Mar 2011 14:45:16 +0530
+Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
+In-Reply-To: <201103111628.57549.arnd@arndb.de>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
+	<1299592667-21367-2-git-send-email-subhasish@mistralsolutions.com>
+	<201103111628.57549.arnd@arndb.de>
+Message-ID: <9E9CA0E03AAF4C9AA18DDD7CDE5168A8@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-On Wed, Mar 30, 2011 at 05:03:45PM +0800, Eric Miao wrote:
-> >> > @@ -203,6 +205,7 @@ static void __init mx35_3ds_init(void)
-> >> > ? ? ? ? ? ? pr_warn("Init of the debugboard failed, all "
-> >> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? "devices on the debugboard are unusable.\n");
-> >> > ? ? imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
-> >> > + ? imx35_add_mxc_gpu(&z160_revision);
-> >> Do you really need to pass this by pointer? Wouldn't
-> >> imx35_add_mxc_gpu(0) be good enough?
-> > It's because sometimes z160_revision has different values with different
-> > TO versions and z160_revision will be dup as plat data.
-Yeah, I got that. I just meant how imx_add_mxc_gpu works. Just let it
-take a int (instead of an int *) and pass the address of the local
-parameter to imx_add_platform_device_dmamask.
- 
-> This is where platform_device_id comes into play, at least by registering
-> device with different names, e.g. 'imx35-gpu' or 'imx51-gpu', and the
-> driver can handle.
-> 
-> Difference between steppings is a bit tricky though, I think a QUIRK_
-> way, and pass combined QUIRK_* flags will be better in imx35_add_mxc_gpu()
-> function itself.
-... or that
+I am using a .setup to initialize pin mux etc. To use the mfd_cells directly 
+should I
+use .enable and .disable of the mfd_cells instead of the .setup.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> +static int pruss_mfd_add_devices(struct platform_device *pdev)
+>> +{
+>> + struct da8xx_pruss_devices *dev_data = pdev->dev.platform_data;
+>> + struct device *dev = &pdev->dev;
+>> + struct mfd_cell cell;
+>> + u32 err, count;
+>> +
+>> + for (count = 0; dev_data[count].dev_name != NULL; count++) {
+>> + memset(&cell, 0, sizeof(struct mfd_cell));
+>> + cell.id = count;
+>> + cell.name = dev_data[count].dev_name;
+>> + cell.platform_data = dev_data[count].pdata;
+>> + cell.data_size = dev_data[count].pdata_size;
+>> + cell.resources = dev_data[count].resources;
+>> + cell.num_resources = dev_data[count].num_resources;
+>> +
+>> + err = mfd_add_devices(dev, 0, &cell, 1, NULL, 0);
+>> + if (err) {
+>> + dev_err(dev, "cannot add mfd cells\n");
+>> + return err;
+>> + }
+>> + dev_info(dev, "mfd: added %s device\n",
+>> + dev_data[count].dev_name);
+>> + }
+>> +
+>> + return err;
+>> +}
+>
+> This would get much simpler if you just replaced the da8xx_pruss_devices
+> array with an mfd_cell array. 
