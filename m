@@ -1,224 +1,85 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 31 Mar 2011 08:46:14 +0900
-Subject: [PATCH 1/2] regulator: pm8921-regulator: Add regulator driver
-	for PM8921
-In-Reply-To: <1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
-References: <1301523361-5982-1-git-send-email-collinsd@codeaurora.org>
-	<1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
-Message-ID: <20110330234613.GA21487@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Mar 2011 00:59:30 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+References: <20110317183048.GW7258@atomide.com>
+	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+	<20110318101512.GA15375@n2100.arm.linux.org.uk>
+	<201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+Message-ID: <20110330235930.GA6680@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 03:17:12PM -0700, David Collins wrote:
+On Wed, Mar 30, 2011 at 07:31:59PM -0400, Nicolas Pitre wrote:
+> Sure, but important noise nevertheless.  As long as the noise is 
+> confined to a limited set of .c files I'm happy.  OTOH I have very 
+> little hope for a separate project that would only deal with that noise.  
+> That will simply never fly, even less so as an Open Source project.
 
-> Regulator framework operation callback functions work as expected with
-> one exception: pm8921_vreg_get_mode and pm8921_vreg_set_mode.  These
-> callbacks are shared by all regulator types in the driver.  The mode
-> setting scheme was modified from the normal framework usage to
-> accommodate pin control.  Pin control allows a regulator that has been
-> disabled by software writing to its control registers to become
-> enabled by a hardware pin.  Many of the PM8921 regulators support pin
+It's also an excuse for people to make it a closed source project, and
+so you end up with platforms with a closed source binary blob passed
+into the kernel, which has hacky patches to fixup the binary blob parser
+to make it all work.
 
-Don't do this.  There's two problems with it.  One is that you're
-abusing a standard API for an unrelated purpose which will confuse
-anything that tries to use the API as normal, the other is that this
-sounds like a fairly widely supported feature (although normally one
-that is used with a GPIO on the CPU, there's a few examples of this in
-mainline).
+We already see this with the damn simple memory layout stuff we already
+(try) to require of boot loaders.
 
-> REGULATOR_MODE_FAST    - set to high power mode (HPM)
-> REGULATOR_MODE_NORMAL  - remove a vote for pin control
-> REGULATOR_MODE_IDLE    - vote for pin control (ref-counted)
-> REGULATOR_MODE_STANDBY - set to low power mode (LPM)
+> Still... there are on-going efforts to consolidate things amongst all 
+> the ARM vendors.  The ARM architecture is standardizing more and more 
+> stuff in the whole stack in every revision.  But they won't standardize 
+> everything otherwise they'll kill that competing ecosystem.
 
-> There is an additional caveat that pin control mode will override LPM
-> such that, a set mode call for LPM will be ignored if the pin control
-> reference count is greater than 0.  Similarly, HPM will override pin
-> control mode.  Transitivity is not maintained though, because the mode
-> can be changed from HPM to LPM.  This ensures that it is still
-> possible to transition freely between LPM and HPM with calls to
-> regulator_set_optimum_mode.
+Let's not kid ourselves over that effort: because there is already soo
+much code in mainline, the efforts to consolidate things can in itself
+create _big_ patches which will inflate the %age change under arch/arm.
 
-What is the voting that's been referred to here?
+> > Now, some of it is quite understandable - ie real drivers for real
+> > hardware. But a _lot_ of it seems to be just descriptor tables, and
+> > I'm getting the very strong feeling that ARM people aren't even
+> > _trying_ to make it sane, and trying to standardize things, or trying
+> > to aim for the whole notion of "one kernel image, with much more hw
+> > description done elsewhere".
+> 
+> That work is happening.  It is not ready.  I'm not against it but I 
+> remain sceptical.  I still think that a self contained kernel is more 
+> maintainable.
 
-> --- a/drivers/mfd/pm8921-core.c
-> +++ b/drivers/mfd/pm8921-core.c
-> @@ -119,8 +119,9 @@ static int __devinit pm8921_add_subdevices(const struct pm8921_platform_data
->  					   struct pm8921 *pmic,
->  					   u32 rev)
->  {
-> -	int ret = 0, irq_base = 0;
-> +	int ret = 0, irq_base = 0, i;
->  	struct pm_irq_chip *irq_chip;
+Let's not forget that in the future, the hardware should improve.
+There's efforts to standardise some of the peripherals, such as
+interrupt controllers and timers.
 
-Don't mix initialised and non-initialised definitions.
+The first attempt at architecting an interrupt controller for ARM has
+actually caused *more* complexity, as the architected interrupt (GIC)
+controller contained no power management.  That has caused SoC vendors
+to bolt a second power management interrupt controller alongside the
+GIC which needs to be kept in sync.  So... the result was yet more code
+which doesn't sit at all well with data descriptions of systems.
 
-> +	/* Add one device for each regulator used by the board. */
-> +	if (pdata->num_regulators > 0 && pdata->regulator_pdatas) {
-> +		mfd_regulators = kzalloc(sizeof(struct mfd_cell)
-> +					 * (pdata->num_regulators), GFP_KERNEL);
-> +		if (!mfd_regulators) {
-> +			pr_err("Cannot allocate %d bytes for pm8921 regulator "
-> +				"mfd cells\n", sizeof(struct mfd_cell)
-> +						* (pdata->num_regulators));
-> +			ret = -ENOMEM;
-> +			goto bail;
-> +		}
+> Still, because ARM is just a CPU architecture, those SOC vendors will 
+> always have something new to differenciate themselves from the other SOC 
+> vendors.  And that cannot be described in a table alone. The power 
+> management hardware from TI will still require separate _executable_ 
+> code from the Freescale one, or the Samsung one, or the Nvidia one, or 
+> the Qualcomm one, or the Marvell one, yada yada.  And I really don't 
+> want to see that code turned into some vendor provided buggy ACPI 
+> bytecode or similar.
 
-I know some devices do follow this pattern but it's simpler to just
-register the regulators that are physically present on the device
-unconditionally.
+To get rid of all the platform related stuff, I think you'd need some
+kind of bytecode to deal with some of the procedural stuff with various
+platforms.  Without bytecode, the only other way is to keep the stuff
+as C functions in the kernel and find some way of binding them to
+drivers through DT, which means we're still going to have platform
+specific C files littering the kernel.
 
-> +static int pm8921_vreg_write(struct pm8921_vreg *vreg, u16 addr, u8 val,
-> +			     u8 mask, u8 *reg_save)
+While I can see DT solving the "declare this data structure" problem,
+I believe that's only part of the issue.
 
-The function is confusingly named - it's actually a bitmask update but
-write() would normally suggest a straight write of an absolute value.
+This is exactly why when DT was proposed as a miracle cure-all for ARM,
+I wanted to see DT on a real ARM platform rather than just ARM Ltd's
+simple and similar development boards.
 
-> +{
-> +	int rc = 0;
-> +	u8 reg;
-> +
-> +	reg = (*reg_save & ~mask) | (val & mask);
-> +	if (reg != *reg_save)
-> +		rc = pm8xxx_writeb(vreg->dev->parent, addr, reg);
-> +
-> +	if (rc)
-> +		pr_err("pm8xxx_writeb failed; addr=0x%03X, rc=%d\n", addr, rc);
-> +	else
-> +		*reg_save = reg;
-> +
-> +	return rc;
-> +}
-
-This needs locking if any registers are shared between multiple
-regulators.
-
-> +	if (min_uV < PLDO_LOW_UV_MIN || min_uV > PLDO_HIGH_UV_MAX) {
-> +		vreg_err(vreg, "requested voltage %d is outside of allowed "
-> +				"range.\n", min_uV);
-
-Don't split text over multiple lines, it's not helpful when grepping.
-
-> +static int pm8921_nldo1200_set_voltage(struct regulator_dev *rdev, int min_uV,
-> +				   int max_uV, unsigned *selector)
-> +{
-> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
-> +
-> +	return _pm8921_nldo1200_set_voltage(vreg, min_uV);
-> +}
-
-I have to say I'm not finding the indirection to the _ functions is
-actually adding anything to the code here.
-
-> +	/* Round down for set points in the gaps between bands. */
-> +	if (uV > FTSMPS_BAND1_UV_MAX && uV < FTSMPS_BAND2_UV_MIN)
-> +		uV = FTSMPS_BAND1_UV_MAX;
-> +	else if (uV > FTSMPS_BAND2_UV_MAX
-> +			&& uV < FTSMPS_BAND3_UV_SETPOINT_MIN)
-> +		uV = FTSMPS_BAND2_UV_MAX;
-
-That seems broken - it means you'll go under voltage on what was
-requested.  You should ensure that you're always within the requested
-range so if the higher band minimum is in the range you should select
-that, otherwise you should error out.
-
-In general you're not checking that your voltage selection actually
-satisfies the request that went in...
-
-> +static int pm8921_ftsmps_set_voltage(struct regulator_dev *rdev, int min_uV,
-> +				     int max_uV, unsigned *selector)
-> +{
-> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
-> +
-> +	return _pm8921_ftsmps_set_voltage(vreg, min_uV, 0);
-> +}
-
-...note how you discard the upper limit on the requested voltage here
-before going into the implementation.
-
-> +static unsigned int pm8921_vreg_get_optimum_mode(struct regulator_dev *rdev,
-> +		int input_uV, int output_uV, int load_uA)
-> +{
-> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
-> +
-> +	vreg->save_uA = load_uA;
-
-What's this about?  There's no other references to save_uA in the driver
-and it looks suspicous.
-
-> +	if (load_uA >= vreg->hpm_min_load)
-> +		return REGULATOR_MODE_FAST;
-> +
-> +	return REGULATOR_MODE_STANDBY;
-
-Using an else would be clearer and less error prone.
-
-> +static int pm8921_vreg_enable(struct regulator_dev *rdev)
-> +{
-> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
-> +	int mode, rc = 0;
-> +
-> +	mode = pm8921_vreg_get_mode(rdev);
-> +
-> +	if (mode == REGULATOR_MODE_IDLE) {
-> +		/* Turn on pin control. */
-> +		rc = pm8921_vreg_set_pin_ctrl(vreg, 1);
-> +		if (rc)
-> +			goto bail;
-> +		return rc;
-> +	}
-
-This looks wrong, it's not actually enabling the regulator but putting
-it into pin control mode instead.  If something actually wanted the
-regulator enabling it's going to be disappointed.
-
-> +	/* Disable in local control register. */
-> +	if (vreg->type == REGULATOR_TYPE_SMPS && SMPS_IN_ADVANCED_MODE(vreg)) {
-> +		/* Change SMPS to legacy mode before disabling. */
-> +		rc = pm8921_smps_set_voltage_legacy(vreg, vreg->save_uV);
-> +		if (rc)
-> +			goto bail;
-> +		rc = pm8921_vreg_write(vreg, vreg->ctrl_addr, REGULATOR_DISABLE,
-> +			REGULATOR_ENABLE_MASK, &vreg->ctrl_reg);
-> +	} else if (vreg->type == REGULATOR_TYPE_FTSMPS) {
-
-This would all be a lot more legible with a switch statement for the
-regulator types.
-
-> +static int __devinit pm8921_vreg_probe(struct platform_device *pdev)
-> +{
-> +	struct regulator_desc *rdesc;
-> +	struct pm8921_vreg *vreg;
-> +	const char *reg_name = "";
-> +	int rc = 0;
-> +
-> +	if (pdev == NULL)
-> +		return -EINVAL;
-> +
-> +	if (pdev->id >= 0 && pdev->id < PM8921_VREG_ID_MAX) {
-> +		rdesc = &pm8921_vreg_description[pdev->id];
-> +		vreg = &pm8921_vreg[pdev->id];
-> +		memcpy(&(vreg->pdata), pdev->dev.platform_data,
-> +			sizeof(struct pm8921_regulator_platform_data));
-> +		reg_name = pm8921_vreg_description[pdev->id].name;
-> +		vreg->name = reg_name;
-> +		vreg->dev = &pdev->dev;
-> +
-> +		rc = pm8921_init_regulator(vreg);
-> +		if (rc)
-> +			goto bail;
-> +
-
-This function is just a switch statement per regulator, may aswell expan
-ithere.  Or restructure things so that you've got a driver per regulator
-type - that would also mean you'd be able to get the device IDs to
-correspond to the regulator numbers which would probably be clearer.
-
-> +static int __init pm8921_vreg_init(void)
-> +{
-> +	return platform_driver_register(&pm8921_vreg_driver);
-> +}
-> +module_init(pm8921_vreg_init);
-
-subsys_initcall().
+Certainly, though, DT for ARM is progressing.
