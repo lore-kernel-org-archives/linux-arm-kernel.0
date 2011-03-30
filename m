@@ -1,31 +1,33 @@
-From: bob.dunlop@xyzzy.org.uk (Bob Dunlop)
-Date: Wed, 30 Mar 2011 09:22:04 +0100
-Subject: [PATCH] davinci: correct RMII 50MHz mux setting
-Message-ID: <20110330082204.GA16271@xyzzy.org.uk>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Wed, 30 Mar 2011 16:26:40 +0800
+Subject: [PATCH 2/3] MTD: atmel_nand: trivial: change DMA usage information
+	trace
+In-Reply-To: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
+References: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <1301473601-29570-2-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Whilst bringing up a new board I discovered that the OMAP-L138 pin multiplexor
-setting for the RMII 50 Mhz clock was incorrect.  The TI reference manual
-(SPRUGM7D - April 2010) lists the bit patten to enable this function as 0x8.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-With the value changed I can bring up the PHY on our board.
-
-Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-
-
---- linux-2.6.38-orig/arch/arm/mach-davinci/da850.c	2011-03-21 13:06:06.000000000 +0000
-+++ linux-2.6.38/arch/arm/mach-davinci/da850.c	2011-03-25 17:15:56.000000000 +0000
-@@ -440,7 +440,7 @@
- 	MUX_CFG(DA850, RMII_RXD_0,	14,	24,	15,	8,	false)
- 	MUX_CFG(DA850, RMII_RXD_1,	14,	20,	15,	8,	false)
- 	MUX_CFG(DA850, RMII_RXER,	14,	28,	15,	8,	false)
--	MUX_CFG(DA850, RMII_MHZ_50_CLK,	15,	0,	15,	0,	false)
-+	MUX_CFG(DA850, RMII_MHZ_50_CLK,	15,	0,	15,	8,	false)
- 	/* McASP function */
- 	MUX_CFG(DA850,	ACLKR,		0,	0,	15,	1,	false)
- 	MUX_CFG(DA850,	ACLKX,		0,	4,	15,	1,	false)
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 9acecdc..c36ea50 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -611,7 +611,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 	if (use_dma)
+-		dev_info(host->dev, "Using DMA for NAND access.\n");
++		dev_info(host->dev, "Using %s for DMA transfers.\n",
++					dma_chan_name(host->dma_chan));
+ 	else
+ 		dev_info(host->dev, "No DMA support for NAND access.\n");
+ 
 -- 
-        Bob Dunlop
+1.7.3.3
