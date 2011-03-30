@@ -1,58 +1,73 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Wed, 30 Mar 2011 07:37:10 -0600
-Subject: [PATCH V5 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <201103301529.03648.arnd@arndb.de>
-References: <1301444651-18008-1-git-send-email-john.linn@xilinx.com>
-	<201103301344.45307.arnd@arndb.de>
-	<f4872ed7-b6e4-4050-9445-5176f5aa961a@VA3EHSMHS017.ehs.local>
-	<201103301529.03648.arnd@arndb.de>
-Message-ID: <807f31a6-c9ff-4f35-bece-e0222a8e1fda@VA3EHSMHS006.ehs.local>
+From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
+Date: Wed, 30 Mar 2011 16:42:30 +0300
+Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
+In-Reply-To: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
+References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
+Message-ID: <1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, March 30, 2011 7:29 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org;
-> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
-> jamie at jamieiles.com
-> Subject: Re: [PATCH V5 3/4] ARM: Xilinx: base header files and
-assembly
-> macros
-> 
-> On Wednesday 30 March 2011, John Linn wrote:
-> > Yes that makes sense.  We don't have immediate plans for PCI and
-> > I was assuming when we add PCI we would need to change that.
-> >
-> > If you think I shouldn't put it off then I'll fix it now.  My
-> > preference was to get the platform supported, then add more
-features.
-> 
-> Getting it fixed properly depends a bit on the PCI implementation.
-> I've been planning to clean up this part of the ARM architecture
-> for some time and I can probably do it for one more platform when
-> I get to it.
+On 03/29/2011 09:44 PM, ext Nicolas Pitre wrote:
+ > On Tue, 29 Mar 2011, Russell King - ARM Linux wrote:
+ >
+ >> On Tue, Mar 29, 2011 at 12:55:27PM -0400, Nicolas Pitre wrote:
+ >>> Sorry, I meant r15-indexed with a write back.
+ >>
+ >> I believe that's unpredictable.  So actually you can make kprobes do
+ >> anything you like with it - no one should ever generate an instruction
+ >> which read-modify-writes the PC.
+ >
+ > Indeed.  Hence my suggestion to simply refuse and abort the placement of
+ > a probe on such instructions and keep the actual emulation code free of
+ > tests for those odd cases.  In practice this shouldn't affect anyone.
+ >
 
-Sounds like it's fine to postpone it til we do PCI as I don't know all
-the
-details of the system yet. Soft logic in FPGAs is great :)
+Here is a patch for implementing the rejection of probes on those instructions,
+with Rn == 15 and writeback enabled. Those previous patches are still
+required, since they fix the emulation of the fully legal instructions where
+Rn == 15 and writeback isn't enabled.
 
-> 
-> My idea for the multiplatform kernel is to have a global I/O space
-> window (maybe 1 MB) that is in the same location in the virtual
-> address space all the time, so any platform that wants to support
-> PCI with direct-mapped I/O space can simply map it in there
-> at boot time.
-> 
+Signed-off-by: Viktor Rosendahl <viktor.rosendahl@nokia.com>
+---
+ arch/arm/kernel/kprobes-decode.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-Sounds like that will make it easier for everyone and more consistent.
-
-Thanks,
-John
-
-> 	Arnd
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+index 3b0cf90..b5c89c8 100644
+--- a/arch/arm/kernel/kprobes-decode.c
++++ b/arch/arm/kernel/kprobes-decode.c
+@@ -868,6 +868,15 @@ static enum kprobe_insn __kprobes
+ prep_emulate_ldr_str(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
+ 	int ibit = (insn & (1 << 26)) ? 25 : 22;
++	int is_preindexed = (insn >> 24) & 0x1;
++	int is_writeback = (insn >> 21) & 0x1;
++	int rn = (insn >> 16) & 0xf;
++
++	/* Writeback is always enabled in post-indexed mode. */
++	is_writeback = is_writeback || !is_preindexed;
++	/* writeback to PC is unpredictable, so reject it */
++	if (is_writeback && rn == 15)
++		return INSN_REJECTED;
+ 
+ 	insn &= 0xfff00fff;
+ 	insn |= 0x00001000;	/* Rn = r0, Rd = r1 */
+@@ -1115,6 +1124,16 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 			return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+ 		} else if ((insn & 0x0e1000d0) == 0x00000d0) {
+ 			/* STRD/LDRD */
++			int is_preindexed = (insn >> 24) & 0x1;
++			int is_writeback = (insn >> 21) & 0x1;
++			int rn = (insn >> 16) & 0xf;
++
++			/* Writeback is always enabled in post-indexed mode. */
++			is_writeback = is_writeback || !is_preindexed;
++			/* writeback to PC is unpredictable, so reject it */
++			if (is_writeback && rn == 15)
++				return INSN_REJECTED;
++
+ 			insn &= 0xfff00fff;
+ 			insn |= 0x00002000;	/* Rn = r0, Rd = r2 */
+ 			if (insn & (1 << 22)) {
+-- 
+1.7.2.5
