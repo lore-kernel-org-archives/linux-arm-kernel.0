@@ -1,5 +1,5 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 30 Mar 2011 16:13:36 -0700
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Mar 2011 01:14:12 +0200 (CEST)
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
 In-Reply-To: <20110330224752.GN18334@atomide.com>
 References: <20110317183048.GW7258@atomide.com>
@@ -11,11 +11,12 @@ References: <20110317183048.GW7258@atomide.com>
 	<20110330215434.GI18334@atomide.com>
 	<20110330223807.GP2255@linux.vnet.ibm.com>
 	<20110330224752.GN18334@atomide.com>
-Message-ID: <20110330231336.GT2255@linux.vnet.ibm.com>
+Message-ID: <alpine.LFD.2.00.1103310059531.22418@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 03:47:52PM -0700, Tony Lindgren wrote:
+On Wed, 30 Mar 2011, Tony Lindgren wrote:
+
 > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [110330 15:35]:
 > > On Wed, Mar 30, 2011 at 02:54:35PM -0700, Tony Lindgren wrote:
 > > > * Thomas Gleixner <tglx@linutronix.de> [110330 14:07]:
@@ -42,7 +43,25 @@ On Wed, Mar 30, 2011 at 03:47:52PM -0700, Tony Lindgren wrote:
 > ties to board or SoC become just generic drivers that are easy
 > to review.
 
-Yep!  The trick is getting to that point.  Some drivers will be easier
-than others.
+You wish. There is an already existing problem that the identical IP
+cores of peripheral crap are reused accross architectures. And of
+course because it is a different architecture we have two different
+drivers with different issues.
 
-							Thanx, Paul
+See: http://marc.info/?l=linux-kernel&m=130041568128164
+
+We already fail to detect this on the driver level, so please answer
+the question I asked before: How do you spread the load and scale with
+the amount of shite which is coming in?
+
+The above example is probably not the only one in tree and we will see
+lots of unnoticed instances of drivers dealing with minimal different
+versions of the same IP crappola in the near future simply because the
+vendors claim that their stuff is unique and only works with their
+particular instance of hackery unless we have enough capable people to
+look over this. Whether it's in arch/ or drivers/ it does not
+matter. We are simply not prepared to the amount of crap coming in.
+
+Thanks,
+
+	tglx
