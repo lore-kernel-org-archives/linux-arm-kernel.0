@@ -1,11 +1,11 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 30 Mar 2011 16:00:40 +0800
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 30 Mar 2011 10:05:53 +0200
 Subject: [PATCH v2 1/1] ARM: imx: add gpu device
 In-Reply-To: <87aagdrqne.fsf@lebrac.rtp-net.org>
 References: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
 	<20110330073651.GR7285@pengutronix.de>
 	<87aagdrqne.fsf@lebrac.rtp-net.org>
-Message-ID: <20110330080039.GA3195@b20223-02.ap.freescale.net>
+Message-ID: <20110330080553.GS7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,12 +28,15 @@ On Wed, Mar 30, 2011 at 09:52:53AM +0200, Arnaud Patard wrote:
 > itself is GPL but relies on closed-source userspace stuff, that's imho why
 > you didn't see a driver for it. I think you can find it in fsl tree
 > inside drivers/mxc/ directory.
-Correct. It's for z430/z160 GPU. The kernel part of the driver is in
-drivers/mxc/amd-gpu/ of freescale kernel source. It can be built as external
-kernel module. We don't have plan to upstream it yet.
 
-Thanks
-Richard
-> 
-> Arnaud
-> 
+I should have been more specific. My open-source eyes have never seen a
+driver for this. That's why we shouldn't add support code for this into
+mainline.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
