@@ -1,38 +1,41 @@
 From: hong.xu@atmel.com (Hong Xu)
-Date: Wed, 30 Mar 2011 16:26:41 +0800
-Subject: [PATCH 3/3] MTD/atmel_nand: Fix support for CPUs that do not support
-	DMA access
-In-Reply-To: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
-References: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
-Message-ID: <1301473601-29570-3-git-send-email-hong.xu@atmel.com>
+Date: Wed, 30 Mar 2011 16:26:39 +0800
+Subject: [PATCH 1/3] MTD: atmel_nand: modify test case for using DMA operations
+Message-ID: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use_dma was always "1" even if the CPU does not support DMA
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Tested on AT91SAM9261EK by Jean-Christophe PLAGNIOL-VILLARD
+We have better performances not using DMA for oob operations.
+Modify size test so that it is using DMA for size greater than oobsize.
 
-Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Hong Xu <hong.xu@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/mtd/nand/atmel_nand.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/atmel_nand.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index c36ea50..1b43654 100644
+index 6fae04b..9acecdc 100644
 --- a/drivers/mtd/nand/atmel_nand.c
 +++ b/drivers/mtd/nand/atmel_nand.c
-@@ -599,7 +599,10 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 		nand_chip->options |= NAND_USE_FLASH_BBT;
- 	}
+@@ -280,7 +280,7 @@ static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+ 	struct nand_chip *chip = mtd->priv;
+ 	struct atmel_nand_host *host = chip->priv;
  
--	if (cpu_has_dma() && use_dma) {
-+	if (!cpu_has_dma())
-+		use_dma = 0;
-+
-+	if (use_dma) {
- 		dma_cap_mask_t mask;
+-	if (use_dma && len >= mtd->oobsize)
++	if (use_dma && len > mtd->oobsize)
+ 		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
+ 			return;
  
- 		dma_cap_zero(mask);
+@@ -295,7 +295,7 @@ static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
+ 	struct nand_chip *chip = mtd->priv;
+ 	struct atmel_nand_host *host = chip->priv;
+ 
+-	if (use_dma && len >= mtd->oobsize)
++	if (use_dma && len > mtd->oobsize)
+ 		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
+ 			return;
+ 
 -- 
 1.7.3.3
