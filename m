@@ -1,45 +1,32 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 30 Mar 2011 09:31:36 +0100
-Subject: [PATCH 1/1] ARM: imx: Add sched_clock support to i.mx platform
-In-Reply-To: <1301472471-5826-1-git-send-email-Frank.Li@freescale.com>
-References: <1301472471-5826-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20110330083136.GA27368@pulham.picochip.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 30 Mar 2011 09:37:51 +0100
+Subject: SMP soft lockup on smp_call_function_many when doing
+	flush_tlb_page
+In-Reply-To: <20110330051849.GB13080@mvista.com>
+References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
+	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
+	<1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
+	<20110330051849.GB13080@mvista.com>
+Message-ID: <AANLkTikwmSw0h-CKwF+MkkTymbURVWuoS3L7YTnL_EZB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 30 March 2011 06:18, George G. Davis <gdavis@mvista.com> wrote:
+> On Wed, Mar 09, 2011 at 03:50:48PM +0000, Catalin Marinas wrote:
+>> On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
+>> > > Did you get a chance to try this patch?
+>> > yes, it works fine
+>>
+>> Thanks for trying. I'll add a commit log and post.
+>
+> Based on your comments here [1], it looks like your fix for this [2] is
+> superseeded by [3] which is already applied [4]. ?Can you confirm?
 
-On Wed, Mar 30, 2011 at 04:07:51PM +0800, Frank Li wrote:
-> From: Xinyu Chen <xinyu.chen@freescale.com>
-> 
-> Add sched_clock() implement for i.mx platform to support nanosecond
-> resolution time for sched clock used by scheduler.
-> 
-> Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  arch/arm/plat-mxc/time.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-> index 9f0c261..de8a04f 100644
-> --- a/arch/arm/plat-mxc/time.c
-> +++ b/arch/arm/plat-mxc/time.c
-> @@ -123,6 +123,15 @@ static struct clocksource clocksource_mxc = {
->  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
-> +unsigned long long sched_clock(void)
-> +{
-> +	if (!timer_base)
-> +		return 0;
-> +
-> +	return clocksource_cyc2ns(clocksource_mxc.read(&clocksource_mxc),
-> +			clocksource_mxc.mult, clocksource_mxc.shift);
-> +}
+Yes, it's been fixed by the commit you mentioned.
 
-sched_clock() should be marked "notrace".  Also, this should use the 
-sched_clock support in arch/arm/include/asm/sched_clock.h that takes 
-care of wrapping and making it monotonic.
-
-Jamie
+-- 
+Catalin
