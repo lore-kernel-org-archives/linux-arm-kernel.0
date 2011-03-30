@@ -1,63 +1,31 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Wed, 30 Mar 2011 10:17:38 +0200
-Subject: SMP soft lockup on smp_call_function_many when doing
-	flush_tlb_page
-In-Reply-To: <20110330051849.GB13080@mvista.com>
-References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
-	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
-	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
-	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
-	<1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
-	<20110330051849.GB13080@mvista.com>
-Message-ID: <AANLkTin2JMW0FkEW5v-FMDN4826xo6s+B6heK5QSn_b=@mail.gmail.com>
+From: bob.dunlop@xyzzy.org.uk (Bob Dunlop)
+Date: Wed, 30 Mar 2011 09:22:04 +0100
+Subject: [PATCH] davinci: correct RMII 50MHz mux setting
+Message-ID: <20110330082204.GA16271@xyzzy.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 7:18 AM, George G. Davis <gdavis@mvista.com> wrote:
-> Hi,
->
-> On Wed, Mar 09, 2011 at 03:50:48PM +0000, Catalin Marinas wrote:
->> On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
->> > > Did you get a chance to try this patch?
->> > yes, it works fine
->>
->> Thanks for trying. I'll add a commit log and post.
->
-> Based on your comments here [1], it looks like your fix for this [2] is
-> superseeded by [3] which is already applied [4]. ?Can you confirm?
-[4] fixed the bug that I reported here. and since my kernel based on
-2.6.35.9, I backported several patches besides to that one, here is
-the list::
-0001-generic-ipi-Fix-deadlock-in-__smp_call_function_sing.patch
-0002-kernel-smp.c-fix-smp_call_function_many-SMP-race.patch
-0003-kernel-smp.c-consolidate-writes-in-smp_call_function.patch
-0004-call_function_many-fix-list-delete-vs-add-race.patch
-0005-call_function_many-add-missing-ordering.patch
-0006-smp_call_function_many-handle-concurrent-clearing-of.patch
+Hi,
 
-with those patches I don't see IPI lockup issue any more.
-saeed
->
-> TIA!
->
-> --
-> Regards,
-> George
->
-> [1] https://lkml.org/lkml/2011/3/15/429
-> [2] https://lkml.org/lkml/2011/3/15/296
-> [3] https://lkml.org/lkml/2011/3/15/315
-> [4] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=723aae2
->>
->> --
->> Catalin
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Whilst bringing up a new board I discovered that the OMAP-L138 pin multiplexor
+setting for the RMII 50 Mhz clock was incorrect.  The TI reference manual
+(SPRUGM7D - April 2010) lists the bit patten to enable this function as 0x8.
+
+With the value changed I can bring up the PHY on our board.
+
+Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+
+
+--- linux-2.6.38-orig/arch/arm/mach-davinci/da850.c	2011-03-21 13:06:06.000000000 +0000
++++ linux-2.6.38/arch/arm/mach-davinci/da850.c	2011-03-25 17:15:56.000000000 +0000
+@@ -440,7 +440,7 @@
+ 	MUX_CFG(DA850, RMII_RXD_0,	14,	24,	15,	8,	false)
+ 	MUX_CFG(DA850, RMII_RXD_1,	14,	20,	15,	8,	false)
+ 	MUX_CFG(DA850, RMII_RXER,	14,	28,	15,	8,	false)
+-	MUX_CFG(DA850, RMII_MHZ_50_CLK,	15,	0,	15,	0,	false)
++	MUX_CFG(DA850, RMII_MHZ_50_CLK,	15,	0,	15,	8,	false)
+ 	/* McASP function */
+ 	MUX_CFG(DA850,	ACLKR,		0,	0,	15,	1,	false)
+ 	MUX_CFG(DA850,	ACLKX,		0,	4,	15,	1,	false)
+-- 
+        Bob Dunlop
