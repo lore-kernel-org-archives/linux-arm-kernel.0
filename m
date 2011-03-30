@@ -1,64 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Mar 2011 11:40:58 -0700
-Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
-	support
-In-Reply-To: <4D92CA92.50805@ti.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110328205027.GC30616@atomide.com>
-	<5cbdd88c3ca3fe5c5a0f119be446ce99@mail.gmail.com>
-	<20110329170113.GG4016@atomide.com> <4D92CA92.50805@ti.com>
-Message-ID: <20110330184058.GF18334@atomide.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 30 Mar 2011 11:54:42 -0700
+Subject: [PATCH] ARM: allow hotplug on msm
+In-Reply-To: <1301078861-1991-1-git-send-email-johlstei@codeaurora.org> (Jeff
+	Ohlstein's message of "Fri, 25 Mar 2011 11:47:41 -0700")
+References: <1301078861-1991-1-git-send-email-johlstei@codeaurora.org>
+Message-ID: <8yabp0ssakt.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh <santosh.shilimkar@ti.com> [110329 23:13]:
-> On 3/29/2011 10:31 PM, Tony Lindgren wrote:
-> >* Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 22:47]:
-> >>>From: Tony Lindgren [mailto:tony at atomide.com]
-> >>>
-> >>>Do you really need to initialize all of this that early?
-> >>>
-> >>Yes. It's a interrupt controller extension and needs to work
-> >>together with GIC.
-> >
-> >Hmm to me it seems that the gic_arch_extn functions should be
-> >all NULL during runtime operation, and the wake-up generator
-> >should be programmed only before entering an idle state.
-> >
-> >Then the wake-up generator can be cleared after delivering
-> >the wake-up event(s).
-> >
-> >Or am I missing something on why this should be enabled all
-> >the time?
-> >
-> Yep. The WakeupGen sits between GIC and CPU and can
-> gate the interrupts in normal operation too. It's
-> mandatory that the interrupt mask at GIC and WakeupGen
-> matches to deliver the interrupt to CPU.
+On Fri, Mar 25 2011, Jeff Ohlstein wrote:
 
-But it seems that the states of GIC and WakeupGen can be
-synced up just before hitting an idle mode.
+> Hotplug support was added in 9f1890a (msm: hotplug: support cpu hotplug
+> on msm, 2010-12-02)
+>
+> Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+> ---
+>  arch/arm/Kconfig |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 172e918..9485b6c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1358,7 +1358,6 @@ config NR_CPUS
+>  config HOTPLUG_CPU
+>  	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+>  	depends on SMP && HOTPLUG && EXPERIMENTAL
+> -	depends on !ARCH_MSM
+>  	help
+>  	  Say Y here to experiment with turning CPUs off and on.  CPUs
+>  	  can be controlled through /sys/devices/system/cpu.
 
-And then the wake-ups only need to be acked after waking
-from idle and delivering the interrupts.
+This looks fine by me.  Russell, would you like Jeff to submit this to
+your patch tracking system?
 
-> This is the reason why all the necessary GIC hooks are
-> populated with it so that they work together.
+Thanks,
+David
 
-Hmm I still see no reason to call these functions for every
-interrupt during runtime.
-
-AFAIK, these functions only need to be called only once
-right after waking from idle.
- 
-> So far without this patch all interrupts at WakeupGen
-> level were always enabled and hence there was no issue.
-
-OK so things work during runtime without calling these
-functions for every interrupt. Why then would we want to
-call them for each interrupt?
-
-Regards,
-
-Tony
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
