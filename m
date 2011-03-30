@@ -1,71 +1,42 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 30 Mar 2011 14:44:19 +1000
-Subject: [PATCH] arm: at91: minimal defconfig fot at91eb01 board
-Message-ID: <1301460259-6984-1-git-send-email-gerg@uclinux.org>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 30 Mar 2011 15:00:26 +1000
+Subject: arm non-mmu 2.6.39-rc1 and loadable modules
+Message-ID: <201103300500.p2U50Qve010921@goober.internal.moreton.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A minimal defconfig for build testing the AT91x40 based EB01 board.
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/configs/at91eb01_defconfig |   48 +++++++++++++++++++++++++++++++++++
- 1 files changed, 48 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/at91eb01_defconfig
+Hi All,
 
-diff --git a/arch/arm/configs/at91eb01_defconfig b/arch/arm/configs/at91eb01_defconfig
-new file mode 100644
-index 0000000..c55e921
---- /dev/null
-+++ b/arch/arm/configs/at91eb01_defconfig
-@@ -0,0 +1,48 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_EMBEDDED=y
-+# CONFIG_HOTPLUG is not set
-+# CONFIG_ELF_CORE is not set
-+# CONFIG_FUTEX is not set
-+# CONFIG_TIMERFD is not set
-+# CONFIG_VM_EVENT_COUNTERS is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_ARCH_AT91X40=y
-+CONFIG_MACH_AT91EB01=y
-+CONFIG_AT91_EARLY_USART0=y
-+CONFIG_CPU_ARM7TDMI=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x01000000
-+CONFIG_DRAM_SIZE=0x00400000
-+CONFIG_FLASH_MEM_BASE=0x01400000
-+CONFIG_PROCESSOR_ID=0x14000040
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_BINFMT_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_FW_LOADER is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_RAM=y
-+CONFIG_MTD_ROM=y
-+CONFIG_BLK_DEV_RAM=y
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_DEVKMEM is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+# CONFIG_DNOTIFY is not set
-+CONFIG_ROMFS_FS=y
-+# CONFIG_ENABLE_MUST_CHECK is not set
--- 
-1.7.0.4
+With 2.6.39-rc1 you can cleanly compile for non-mmu targets if you
+do not have kernel modules enabled. But if you do you will get:
+
+  arch/arm/kernel/built-in.o: In function `module_finalize':
+  io.c:(.text+0x3840): undefined reference to `fixup_smp'
+
+fixup_smp() is only defined in arch/arm/kernel/head.S, and that is
+only used for MMU enabled kernels.A Now the most simple fix is
+something like:
+
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index fee7c36..7080e68 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -339,9 +339,11 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *
+        if (s)
+                fixup_pv_table((void *)s->sh_addr, s->sh_size);
+ #endif
++#ifdef CONFIG_MMU
+        s = find_mod_section(hdr, sechdrs, ".alt.smp.init");
+        if (s && !is_smp())
+                fixup_smp((void *)s->sh_addr, s->sh_size);
++#endif
+        return 0;
+ }
+
+But I am wondering is the ".alt.smp.init" section something we should
+be dealing with no matter whether we are running with MMU enabled or not?
+Do we need a fixup_smp() for the non-MMU case as well?
+
+Regards
+Greg
