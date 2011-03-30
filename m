@@ -1,42 +1,48 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Wed, 30 Mar 2011 15:00:26 +1000
-Subject: arm non-mmu 2.6.39-rc1 and loadable modules
-Message-ID: <201103300500.p2U50Qve010921@goober.internal.moreton.com.au>
+From: gdavis@mvista.com (George G. Davis)
+Date: Wed, 30 Mar 2011 01:18:49 -0400
+Subject: SMP soft lockup on smp_call_function_many when doing
+	flush_tlb_page
+In-Reply-To: <1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
+	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
+	<1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110330051849.GB13080@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi All,
+On Wed, Mar 09, 2011 at 03:50:48PM +0000, Catalin Marinas wrote:
+> On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
+> > > Did you get a chance to try this patch?
+> > yes, it works fine
+> 
+> Thanks for trying. I'll add a commit log and post.
 
-With 2.6.39-rc1 you can cleanly compile for non-mmu targets if you
-do not have kernel modules enabled. But if you do you will get:
+Based on your comments here [1], it looks like your fix for this [2] is
+superseeded by [3] which is already applied [4].  Can you confirm?
 
-  arch/arm/kernel/built-in.o: In function `module_finalize':
-  io.c:(.text+0x3840): undefined reference to `fixup_smp'
+TIA!
 
-fixup_smp() is only defined in arch/arm/kernel/head.S, and that is
-only used for MMU enabled kernels.A Now the most simple fix is
-something like:
+--
+Regards,
+George
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index fee7c36..7080e68 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -339,9 +339,11 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *
-        if (s)
-                fixup_pv_table((void *)s->sh_addr, s->sh_size);
- #endif
-+#ifdef CONFIG_MMU
-        s = find_mod_section(hdr, sechdrs, ".alt.smp.init");
-        if (s && !is_smp())
-                fixup_smp((void *)s->sh_addr, s->sh_size);
-+#endif
-        return 0;
- }
-
-But I am wondering is the ".alt.smp.init" section something we should
-be dealing with no matter whether we are running with MMU enabled or not?
-Do we need a fixup_smp() for the non-MMU case as well?
-
-Regards
-Greg
+[1] https://lkml.org/lkml/2011/3/15/429
+[2] https://lkml.org/lkml/2011/3/15/296
+[3] https://lkml.org/lkml/2011/3/15/315
+[4] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=723aae2
+> 
+> -- 
+> Catalin
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
