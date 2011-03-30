@@ -1,44 +1,38 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 30 Mar 2011 18:20:29 +0100
-Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
-In-Reply-To: <4D935E67.8060203@nokia.com>
-References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
-	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
-	<1301500340.2488.127.camel@computer2.home> <4D935E67.8060203@nokia.com>
-Message-ID: <1301505629.2488.148.camel@computer2.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Mar 2011 18:40:10 +0100
+Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
+In-Reply-To: <201103301509.04899.arnd@arndb.de>
+References: <1301391619-4499-1-git-send-email-arend@broadcom.com>
+	<20110329181947.GA18134@flint.arm.linux.org.uk>
+	<201103301509.04899.arnd@arndb.de>
+Message-ID: <20110330174010.GA2939@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-03-30 at 19:46 +0300, Viktor Rosendahl wrote:
-> On 03/30/2011 06:52 PM, ext Tixy wrote:
+On Wed, Mar 30, 2011 at 03:09:04PM +0200, Arnd Bergmann wrote:
+> I believe the one thing we really want from this driver is the bus
+> scan code, which is not present in the amba bus implementation,
+> as far as I can tell. Today, the amba bus does very little beyond
+> what the platform bus does, in particular you still need to
+> register every single device from board specific code.
 > 
-> > If we start littering the code with all these extra checks we risk
-> > introducing bugs and making the code more difficult to maintain.
-> >
-> > In my opinion we should not add any extra code to handle instructions
-> > combinations that the ARM ARM says are UNPREDICTABLE, or have fields
-> > which are SBZ/SBO. The toolchain shouldn't ever generate these bad
-> > instructions in which case the extra kprobes code is redundant.
-> >
+> When the proposed axi_scan() function gets turned into an
+> amba_bus_register() function, a board file can call that to
+> add all devices on the bus without listing them individually
+> and calling amba_device_register() for each one.
 > 
-> I see your point. I guess we can decide to not care about those 
-> unpredictable cases, unless someone can come up with some decoding & 
-> checking code that covers all the cases and is easy to understand and 
-> maintain.
+> Basically everything else is already there in the amba bus,
+> no need to do it again.
 
-I came to my conclusion because I was trying to verify the PC writeback
-fix by looking at the ARM ARM and checking that all of the 20 or so
-encodings [1] of LDR/STR instructions handled by the routine actually
-had the prefix and writeback bits we were testing. I think they did, but
-it was very tedious, and I thought I could easily miss something and
-then we might end up introducing a new bug.
+The reason we don't do automatic scanning (which we could on the various
+ARM platforms) is because of the platform data necessary to make some of
+the primecell drivers work.
 
-If ARM were still a RISC processor then things would be a lot easier ;-)
+Unfortunately, these buses are not as simple as PCI, where a device
+typically sits on its own card and is totally self-contained.  With
+primecell stuff, there's normally some interdependencies between the
+various primecells.
 
--- 
-Tixy
-
-[1] In ARM ARM, See
-    Table A5-15 Single data transfer instructions
-    Table A5-10 Extra load/store instructions
-    Table A5-11 Extra load/store instructions (unprivileged)
+That doesn't stop there being an automatic enumeration layer, but such
+a layer would need some way of attaching platform specific data to
+specific amba devices.
