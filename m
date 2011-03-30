@@ -1,90 +1,93 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 30 Mar 2011 12:21:32 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201103301906.42429.arnd@arndb.de>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-Message-ID: <AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 30 Mar 2011 20:39:09 +0100
+Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
+In-Reply-To: <alpine.LFD.2.00.1103301328280.28032@xanadu.home>
+References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
+	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
+	<1301500340.2488.127.camel@computer2.home>
+	<alpine.LFD.2.00.1103301328280.28032@xanadu.home>
+Message-ID: <1301513949.2488.229.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 10:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> I'm still new to the ARM world, but I think one real problem is the way
-> that all platforms have their own trees with a very flat hierarchy --
-> a lot of people directly ask Linus to pull their trees, and the main
-> way to sort out conflicts is linux-next. The number of platforms in the
-> ARM arch is still increasing, so I assume that this only gets worse.
+On Wed, 2011-03-30 at 13:59 -0400, Nicolas Pitre wrote:
+> On Wed, 30 Mar 2011, Tixy wrote:
+> 
+> > On Wed, 2011-03-30 at 16:42 +0300, Viktor Rosendahl wrote:
+> > > On 03/29/2011 09:44 PM, ext Nicolas Pitre wrote:
+> > >  > On Tue, 29 Mar 2011, Russell King - ARM Linux wrote:
+> > >  >
+> > >  >> On Tue, Mar 29, 2011 at 12:55:27PM -0400, Nicolas Pitre wrote:
+> > >  >>> Sorry, I meant r15-indexed with a write back.
+> > >  >>
+> > >  >> I believe that's unpredictable.  So actually you can make kprobes do
+> > >  >> anything you like with it - no one should ever generate an instruction
+> > >  >> which read-modify-writes the PC.
+> > >  >
+> > >  > Indeed.  Hence my suggestion to simply refuse and abort the placement of
+> > >  > a probe on such instructions and keep the actual emulation code free of
+> > >  > tests for those odd cases.  In practice this shouldn't affect anyone.
+> > >  >
+> > > 
+> > > Here is a patch for implementing the rejection of probes on those instructions,
+> > > with Rn == 15 and writeback enabled. Those previous patches are still
+> > > required, since they fix the emulation of the fully legal instructions where
+> > > Rn == 15 and writeback isn't enabled.
+> > 
+> > I think this could be a slippery slope, what about the other dubious
+> > combinations, like writeback when Rn==Rt, or when Rm==pc? By the same
+> > rationale we should check for those to.
+> > 
+> > If we start littering the code with all these extra checks we risk
+> > introducing bugs and making the code more difficult to maintain.
+> > 
+> > In my opinion we should not add any extra code to handle instructions
+> > combinations that the ARM ARM says are UNPREDICTABLE, or have fields
+> > which are SBZ/SBO. The toolchain shouldn't ever generate these bad
+> > instructions in which case the extra kprobes code is redundant.
+> 
+> There are two categories to consider for such issues:
+> 
+> 1) What to do with any writeback to pc.  This is really important 
+>    because this directly affects the running thread and determines where
+>    execution will resume once the probe is done.  Any dubious case 
+>    should be carefully intercepted, otherwise this may become a 
+>    potential security risk.  So, given that this has to be handled
+>    somehow, I think it is best to simply refuse the placement of a probe
+>    on a dubious instruction rather than working around the dubiousness in
+>    the actual emulation code.
+> 
+> 2) What to do with any other undefined combinations.  Well, anything 
+>    else that is defined as unpredictable by the ARM ARM which doesn't 
+>    involve writing the pc should simply pass through the emulation code 
+>    without incuring any additional overhead or special care.  By definition,
+>    if the result is unpredictable, we can emulate it the way we wish and
+>    any discrepancy with native hardware result is unimportant.
+> 
+> In the first category can be found things like:
+> 
+> 	ldmdb	pc!, {r0, r1, r2}
+> 
+> In the second category would be:
+> 
+> 	ldmdb	pc, {r0, r1, r2}
+> 
+> We can safely ignore the second case, but the first case clearly has the 
+> potential for trouble if mis-emulated.  And trying to correctly emulate 
+> any of those cases is worthless.
 
-As far as I'm concerned, the biggest issuee is that some of the ARM
-crap is just CRAP. It's idiotic tables that get updated by multiple
-people, and in totally nonsensical ways. When I see conflicts in those
-damn clock-data files, I just go mental. Those files are an
-abomination.
+I don't think it's quite as black and white. In both cases the kernel
+was executing an illegal instruction before we inserted the probe, so we
+are probably already in the territorial of "affects the running thread"
+and security issues.
 
-Why the hell is the clock-data for fifty (number taken out of my ass)
-different clocking rules in one array? And why do we have eight
-different files of that kind of crap for omap2?
+However, if the simple rule we need to follow is "avoid ambiguous writes
+to PC" then I won't put up any more fight :-) (Expecially as I just
+checked normal execution of one writeback to PC instruction an found
+that PC was unaffected ;-)
 
-THAT is an example of something that is totally and utterly screwed
-up. Those kinds of random board-level detail files abound in the ARM
-tree. They should either be in a per-board file, or (much better) the
-ARM people should have standardized this ten f*cking years ago, and
-put it in a bootloader or something that just initializes the crap so
-that the kernel doesn't have to have random tables like that at all.
+I'll get on with writing test code so that we can find bugs when probing
+legal instructions...
 
-ARM right now i a nightmare, and most of it is because ARM hardware
-manufacturers are morons. But the way the ARM tree is then laid out
-has made that even more painful, and the decision to put all the crazy
-board details in the kernel tables instead of trying to have a
-per-board boot loader that fills in the details is just crazy.
-
-Look at the dirstat for arch/ in just the current merge window
-(cut-off at 5% just to not get too much):
-
-[torvalds at i5 linux]$ git diff -C --dirstat=5 --cumulative v2.6.38.. arch
-  14.0% arch/arm/mach-omap2/
-   5.8% arch/arm/plat-mxc/include/mach/
-   6.3% arch/arm/plat-mxc/
-  57.1% arch/arm/
-   5.4% arch/m68k/
-   9.6% arch/unicore32/
-   6.9% arch/x86/
- 100.0% arch/
-
-almost *SIXTY* percent of all arch updates were to ARM code. And
-that's despite the fact that one of those architectures (unicore32) is
-a totally new architecture, and despite m68k having gone through a
-first-level unification of nommu and mmu code!
-
-And was this just a fluke? No. Doing the same for 2.3.37..38 gives
-58.3% for arch/arm (and in that release we had a blackfin unification
-effort, otherwise arm would have been an even bigger percentage).
-
-That's ridiculous. It's entirely due to the whole f*cked-up arm ecosystem.
-
-Something needs to be done. A small part is to make sure the source
-code is more hierarchical, so that we don't have those crazy shared
-data-files that are ugly as hell and get conflicts because different
-boards all think they need to care.
-
-But the larger problem is that somebody really REALLY needs to think
-about how to get those crazy board details out of the kernel entirely.
-Having per-board drivers for real hardware is sane - having to have
-per-board detail files for clock chips is just crazy. Split off that
-thing a "Linux ARM second-stage bootloader" project that has the
-per-board tables or something. Don't pollute the main kernel with
-crazy details like this.
-
-Because as far as I can tell, most of that board support really is
-about crazy details that the kernel shouldn't even care about. Come up
-with a table that describes them, have one common parsing routine, and
-push the table into a bootloader. And get rid of having to add a board
-file for every crazy random piece of hardware that nobody really cares
-about.
-
-Or something.
-
-                          Linus
+-- 
+Tixy
