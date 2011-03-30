@@ -1,78 +1,156 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Mar 2011 13:59:45 -0400 (EDT)
-Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
-In-Reply-To: <1301500340.2488.127.camel@computer2.home>
-References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
-	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
-	<1301500340.2488.127.camel@computer2.home>
-Message-ID: <alpine.LFD.2.00.1103301328280.28032@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Mar 2011 11:22:12 -0700
+Subject: [PATCH 00/10] omap init_early changes for irq and timer init
+In-Reply-To: <4D92E21F.6030608@ti.com>
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<4D92E21F.6030608@ti.com>
+Message-ID: <20110330182211.GE18334@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar 2011, Tixy wrote:
-
-> On Wed, 2011-03-30 at 16:42 +0300, Viktor Rosendahl wrote:
-> > On 03/29/2011 09:44 PM, ext Nicolas Pitre wrote:
-> >  > On Tue, 29 Mar 2011, Russell King - ARM Linux wrote:
-> >  >
-> >  >> On Tue, Mar 29, 2011 at 12:55:27PM -0400, Nicolas Pitre wrote:
-> >  >>> Sorry, I meant r15-indexed with a write back.
-> >  >>
-> >  >> I believe that's unpredictable.  So actually you can make kprobes do
-> >  >> anything you like with it - no one should ever generate an instruction
-> >  >> which read-modify-writes the PC.
-> >  >
-> >  > Indeed.  Hence my suggestion to simply refuse and abort the placement of
-> >  > a probe on such instructions and keep the actual emulation code free of
-> >  > tests for those odd cases.  In practice this shouldn't affect anyone.
-> >  >
-> > 
-> > Here is a patch for implementing the rejection of probes on those instructions,
-> > with Rn == 15 and writeback enabled. Those previous patches are still
-> > required, since they fix the emulation of the fully legal instructions where
-> > Rn == 15 and writeback isn't enabled.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [110330 00:53]:
 > 
-> I think this could be a slippery slope, what about the other dubious
-> combinations, like writeback when Rn==Rt, or when Rm==pc? By the same
-> rationale we should check for those to.
+> After going through entire series again, it looks very
+> good clean-up and right step towards moving rest of
+> the timer to drivers/ directory.
 > 
-> If we start littering the code with all these extra checks we risk
-> introducing bugs and making the code more difficult to maintain.
+> I also realized that the discussion we had before this series was
+> because of miss-understating about the 'wakeu_up' timer
+> terminology. After this series I see that you were mentioning
+> about the pm debug timer where as I was taling about
+> clock-event wakeups from CPUidle point of view.
+
+Well this patcheset keeps the current behaviour, except for
+the PM debug hack to program gpt1.
+
+What it does not have is the code to dedicate gpt1 for PM
+code, which can be done later once all the other dmtimer
+changes are done.
+
+So the earlier discussion is still a separate issue from the
+PM debug hack removed in this series. I'll post some patches
+later on for that.
+ 
+> I still have few concerns about this series.
 > 
-> In my opinion we should not add any extra code to handle instructions
-> combinations that the ARM ARM says are UNPREDICTABLE, or have fields
-> which are SBZ/SBO. The toolchain shouldn't ever generate these bad
-> instructions in which case the extra kprobes code is redundant.
+> 1)We have removed the flexibility if choosing the timer from
+>   from board files and hard-coded them in platform timer
+>   header.
 
-There are two categories to consider for such issues:
+Well it's not removed, you can still select the timer setup
+by setting .timer entry in the board-*.c file.
 
-1) What to do with any writeback to pc.  This is really important 
-   because this directly affects the running thread and determines where
-   execution will resume once the probe is done.  Any dubious case 
-   should be carefully intercepted, otherwise this may become a 
-   potential security risk.  So, given that this has to be handled
-   somehow, I think it is best to simply refuse the placement of a probe
-   on a dubious instruction rather than working around the dubiousness in
-   the actual emulation code.
+So for example, we have omap3_timer and omap3_beagle_timer
+for the beagle rev a & b based boards.
 
-2) What to do with any other undefined combinations.  Well, anything 
-   else that is defined as unpredictable by the ARM ARM which doesn't 
-   involve writing the pc should simply pass through the emulation code 
-   without incuring any additional overhead or special care.  By definition,
-   if the result is unpredictable, we can emulate it the way we wish and
-   any discrepancy with native hardware result is unimportant.
+>  Below board related hard-coding in platform files looks more
+>  hacky and the interface done  by Pual still has a merits of
+>  its own.
+> 
+> --- a/arch/arm/plat-omap/include/plat/common.h
+> +++ b/arch/arm/plat-omap/include/plat/common.h
+> @@ -34,7 +34,12 @@
+>  struct sys_timer;
+> 
+>  extern void omap_map_common_io(void);
+> -extern struct sys_timer omap_timer;
+> +extern struct sys_timer omap1_timer;
+> +extern struct sys_timer omap242x_timer;
+> +extern struct sys_timer omap243x_timer;
+> +extern struct sys_timer omap3_timer;
+> +extern struct sys_timer omap3_beagle_timer;
+> +extern struct sys_timer omap4_timer;
+>  extern bool omap_32k_timer_init(void);
+>  extern int __init omap_init_clocksource_32k(void);
+>  extern unsigned long long notrace omap_32k_sched_clock(void);
 
-In the first category can be found things like:
+Hmm the only reason for omap3_beagle_timer naming is the
+hardware bug in rev a & b beagle boards.
 
-	ldmdb	pc!, {r0, r1, r2}
+> +/*
+> + * Beagle based designs typically have an issue with gptimer1. Also note
+> + * that GPTIMER12 can only use the secure 32KiHz clock source.
+> + */
+>  static void __init omap3_beagle_timer_init(void)
+>  {
+>  	omap_dm_timer_init();
+> -	omap2_gp_clockevent_init();
+> +	omap2_gp_clockevent_init(OMAP3_BEAGLE_TIMER, OMAP3_CLKEV_SOURCE);
+>  	omap2_gp_clocksource_init();
+>  }
 
-In the second category would be:
+Got any better name in mind for that timer?
 
-	ldmdb	pc, {r0, r1, r2}
+For removing the old interface, I don't see any reason to
+select timer combinations on omap3 other than omap3_timer
+and omap3_beagle_timer.
 
-We can safely ignore the second case, but the first case clearly has the 
-potential for trouble if mis-emulated.  And trying to correctly emulate 
-any of those cases is worthless.
+If there's need, any new valid sane combinations can be esily
+added, although I seriously doubt that we'll need more for
+omap3.
+ 
+> 2) In patch [6/10], you have removed wakeup timer debug
+> capability with comment "Later on we can reserve gptimer1
+> for PM code only and have similar functionality".
+> 
+> I don't know how this will work on OMAP. GPTIMER1 is the
+> only timer which is in always on power domain and wakeup
+> OMAP from deeper power states like CORE OSWR, CORE OFF,
+> DEVICE OFF.
 
+Right, that's why the PM code should manage it for the wake-up
+events. For the clockevent and clocksource we just want to
+use something fast for the runtime.
 
-Nicolas
+Then when we hit idle, we can just let PM code program gpt1
+for the wake-up event.
+ 
+> We do implement these C-state in CPUidle as well and hence
+> the clock-event is expected to be of wakeup-capable.
+> Hence GPTIMER1 is already reserved for clock-event.
+
+The PM code can easily deal with gpt1 by either calling
+next_timer_interrupt, or just by cloning the clockevent
+timer value. But again, that's a separate patch series
+to come..
+ 
+> The wakeup timer used was only in suspend scenario's
+> and that point of time the timer system is already
+> suspended. So during that even if TIMER1 is re-used
+> for wakeup (which is the case), I don't see any issue.
+
+The reason is that for performance and latency reasons
+we want to use localtimers for runtime on omap4+, and
+need only gpt1 for PM wake-up.
+
+The gpt1 using 32KiHz source clock is a very slow clock
+to reprogram as it's on the external bus.
+ 
+> At least I don't see other solution than using GPT1
+> for wakeup.
+
+Right, there's no other way to wake except gpt1 or wake-up
+enabled gpio lines. But we don't need to use gpt1 during
+runtime at all.
+
+> 3) You have created few functions so that they can
+> be used between system timer and dmtimer driver code.
+> When we move the dmtimer driver to say some drivers/
+> directory. Is it allowed to share such functions from
+> device drivers
+
+The only function we for clockevent and clocksource is
+the init_one function, which will be implemented in in
+arch/arm/mach-omap2/timer.c anyways. The function to
+reprogram the timer is an inline function so dmtimer
+can then be a loadable driver module :)
+ 
+> Apart from above comments, I really liked this series.
+> If you like you can add my,
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Thanks for looking, will add.
+
+Regards,
+
+Tony
