@@ -1,32 +1,30 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 30 Mar 2011 18:46:17 +0200
-Subject: [PATCH] mmc: change CONFIG of MMC_SDHCI based drivers from 'bool'
-	to 'tristate'
-In-Reply-To: <m37hbihenx.fsf@pullcord.laptop.org>
-References: <1300114465-3769-1-git-send-email-shawn.guo@freescale.com>	<20110328143806.GC18721@S2100-06.ap.freescale.net>
-	<m37hbihenx.fsf@pullcord.laptop.org>
-Message-ID: <4D935E59.2020908@metafoo.de>
+From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
+Date: Wed, 30 Mar 2011 19:46:31 +0300
+Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
+In-Reply-To: <1301500340.2488.127.camel@computer2.home>
+References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>	
+	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
+	<1301500340.2488.127.camel@computer2.home>
+Message-ID: <4D935E67.8060203@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2011 03:57 AM, Chris Ball wrote:
-> Hi Shawn,
-> 
-> On Mon, Mar 28 2011, Shawn Guo wrote:
->> Hi Chris,
->>
->> Any comment on this one?
-> 
-> Yep, I'll push it to mmc-next once -rc1 is released.
-> 
-> Thanks,
-> 
-> - Chris.
+On 03/30/2011 06:52 PM, ext Tixy wrote:
 
-That patch doesn't make much sense. The config options are used to decide
-whether support for that platform should be build into the sdhci-platform or
-sdhci-of module. So setting them 'm' doesn't make any sense, since you can't
-build part of an module as a module. The effect for 'm' will probably be the
-same as for 'n'.
+> If we start littering the code with all these extra checks we risk
+> introducing bugs and making the code more difficult to maintain.
+>
+> In my opinion we should not add any extra code to handle instructions
+> combinations that the ARM ARM says are UNPREDICTABLE, or have fields
+> which are SBZ/SBO. The toolchain shouldn't ever generate these bad
+> instructions in which case the extra kprobes code is redundant.
+>
 
-- Lars
+I see your point. I guess we can decide to not care about those 
+unpredictable cases, unless someone can come up with some decoding & 
+checking code that covers all the cases and is easy to understand and 
+maintain.
+
+best regards,
+
+Viktor
