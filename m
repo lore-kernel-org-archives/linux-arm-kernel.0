@@ -1,8 +1,10 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Mar 2011 13:46:23 +0100
+Date: Wed, 30 Mar 2011 13:46:24 +0100
 Subject: [PATCH] ARM: vfp: Remote obsolete fpmx_state field from
 	vfp_hard_struct
-Message-ID: <1301489184-4112-1-git-send-email-dave.martin@linaro.org>
+In-Reply-To: <1301489184-4112-1-git-send-email-dave.martin@linaro.org>
+References: <1301489184-4112-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1301489184-4112-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
