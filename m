@@ -1,28 +1,63 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 30 Mar 2011 12:57:06 -0400
-Subject: [PATCH] mmc: change CONFIG of MMC_SDHCI based drivers from 'bool'
-	to 'tristate'
-In-Reply-To: <4D935E59.2020908@metafoo.de> (Lars-Peter Clausen's message of
-	"Wed, 30 Mar 2011 18:46:17 +0200")
-References: <1300114465-3769-1-git-send-email-shawn.guo@freescale.com>
-	<20110328143806.GC18721@S2100-06.ap.freescale.net>
-	<m37hbihenx.fsf@pullcord.laptop.org> <4D935E59.2020908@metafoo.de>
-Message-ID: <m3tyek7di5.fsf@pullcord.laptop.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Mar 2011 19:06:41 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110318101512.GA15375@n2100.arm.linux.org.uk>
+References: <20110317183048.GW7258@atomide.com>
+	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+	<20110318101512.GA15375@n2100.arm.linux.org.uk>
+Message-ID: <201103301906.42429.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
+On Friday 18 March 2011, Russell King - ARM Linux wrote:
+> I do get the impression that you're extremely unhappy with the way ARM
+> stuff works, and I've no real idea how to solve that.  I think much of
+> it is down to perception rather than anything tangible.
+> 
+> Maybe the only solution is for ARM to fork the kernel, which is something
+> I really don't want to do - but from what I'm seeing its the only solution
+> which could come close to making you happy.
 
-On Wed, Mar 30 2011, Lars-Peter Clausen wrote:
-> That patch doesn't make much sense. The config options are used to decide
-> whether support for that platform should be build into the sdhci-platform or
-> sdhci-of module. So setting them 'm' doesn't make any sense, since you can't
-> build part of an module as a module. The effect for 'm' will probably be the
-> same as for 'n'.
+I'm still new to the ARM world, but I think one real problem is the way
+that all platforms have their own trees with a very flat hierarchy --
+a lot of people directly ask Linus to pull their trees, and the main
+way to sort out conflicts is linux-next. The number of platforms in the
+ARM arch is still increasing, so I assume that this only gets worse.
 
-Thanks, makes sense -- I'll drop the patch.
+This would be no easier if everyone was asking you to pull their trees,
+as I believe was the case before that. The amount of code getting changed
+there is too large to get reviewed by a single person, and I believe
+neither of you really wants the burden to judge if all of the branches
+are ok (and complain to the authors when they are not).
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Russell, do you think it would help to have an additional ARM platform
+tree that collects all the changes that impact only the platform code but
+not the core architecture? I believe that would be a way out, but requires
+a careful selection of people responsible for it. In particular, I don't
+think a single person can handle it without good sub-maintainers.
+
+The way that x86 is maintained is to have a small group of people that
+all have write access to one tree, so patches and branches from downstream
+maintainers can get pulled by a number of people, when at least one of
+them in totally comfortable with the contents and nobody else objects.
+In case one of them is unhappy about something that went in, it can always
+get reverted and will not be applied again until everybody is happy with it.
+
+I think a similar setup would be possible for ARM, but only if you are
+in the team, plus one person from at least ARM Ltd (Catalin?),
+Linaro (Nicolas?) and maybe one or two more, but none of the actual
+SoC vendors that produce the bulk of the code that would go in there.
+
+It would also require buy-in from Linus eventually, to make it clear that
+he would pull from that tree directly and no longer from other 
+subarchitecture trees, once the process has been proven to work
+for everyone.
+
+I don't think I would want to be on the committers team myself, to make
+it not too Linaro-heavy, but I can definitely offer a significant amount
+of time for reviewing patches to be committed by someone else.
+
+Also, I would assume that your own time would keep focused on the core
+ARM tree that already keeps you busy enough.
+
+	Arnd
