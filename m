@@ -1,63 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Mar 2011 19:06:41 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110318101512.GA15375@n2100.arm.linux.org.uk>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-Message-ID: <201103301906.42429.arnd@arndb.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 30 Mar 2011 18:20:29 +0100
+Subject: [PATCH] Reject kprobes when Rn==15 and writeback is set
+In-Reply-To: <4D935E67.8060203@nokia.com>
+References: <alpine.LFD.2.00.1103291441160.11889@xanadu.home>
+	<1301492550-16747-1-git-send-email-viktor.rosendahl@nokia.com>
+	<1301500340.2488.127.camel@computer2.home> <4D935E67.8060203@nokia.com>
+Message-ID: <1301505629.2488.148.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 March 2011, Russell King - ARM Linux wrote:
-> I do get the impression that you're extremely unhappy with the way ARM
-> stuff works, and I've no real idea how to solve that.  I think much of
-> it is down to perception rather than anything tangible.
+On Wed, 2011-03-30 at 19:46 +0300, Viktor Rosendahl wrote:
+> On 03/30/2011 06:52 PM, ext Tixy wrote:
 > 
-> Maybe the only solution is for ARM to fork the kernel, which is something
-> I really don't want to do - but from what I'm seeing its the only solution
-> which could come close to making you happy.
+> > If we start littering the code with all these extra checks we risk
+> > introducing bugs and making the code more difficult to maintain.
+> >
+> > In my opinion we should not add any extra code to handle instructions
+> > combinations that the ARM ARM says are UNPREDICTABLE, or have fields
+> > which are SBZ/SBO. The toolchain shouldn't ever generate these bad
+> > instructions in which case the extra kprobes code is redundant.
+> >
+> 
+> I see your point. I guess we can decide to not care about those 
+> unpredictable cases, unless someone can come up with some decoding & 
+> checking code that covers all the cases and is easy to understand and 
+> maintain.
 
-I'm still new to the ARM world, but I think one real problem is the way
-that all platforms have their own trees with a very flat hierarchy --
-a lot of people directly ask Linus to pull their trees, and the main
-way to sort out conflicts is linux-next. The number of platforms in the
-ARM arch is still increasing, so I assume that this only gets worse.
+I came to my conclusion because I was trying to verify the PC writeback
+fix by looking at the ARM ARM and checking that all of the 20 or so
+encodings [1] of LDR/STR instructions handled by the routine actually
+had the prefix and writeback bits we were testing. I think they did, but
+it was very tedious, and I thought I could easily miss something and
+then we might end up introducing a new bug.
 
-This would be no easier if everyone was asking you to pull their trees,
-as I believe was the case before that. The amount of code getting changed
-there is too large to get reviewed by a single person, and I believe
-neither of you really wants the burden to judge if all of the branches
-are ok (and complain to the authors when they are not).
+If ARM were still a RISC processor then things would be a lot easier ;-)
 
-Russell, do you think it would help to have an additional ARM platform
-tree that collects all the changes that impact only the platform code but
-not the core architecture? I believe that would be a way out, but requires
-a careful selection of people responsible for it. In particular, I don't
-think a single person can handle it without good sub-maintainers.
+-- 
+Tixy
 
-The way that x86 is maintained is to have a small group of people that
-all have write access to one tree, so patches and branches from downstream
-maintainers can get pulled by a number of people, when at least one of
-them in totally comfortable with the contents and nobody else objects.
-In case one of them is unhappy about something that went in, it can always
-get reverted and will not be applied again until everybody is happy with it.
-
-I think a similar setup would be possible for ARM, but only if you are
-in the team, plus one person from at least ARM Ltd (Catalin?),
-Linaro (Nicolas?) and maybe one or two more, but none of the actual
-SoC vendors that produce the bulk of the code that would go in there.
-
-It would also require buy-in from Linus eventually, to make it clear that
-he would pull from that tree directly and no longer from other 
-subarchitecture trees, once the process has been proven to work
-for everyone.
-
-I don't think I would want to be on the committers team myself, to make
-it not too Linaro-heavy, but I can definitely offer a significant amount
-of time for reviewing patches to be committed by someone else.
-
-Also, I would assume that your own time would keep focused on the core
-ARM tree that already keeps you busy enough.
-
-	Arnd
+[1] In ARM ARM, See
+    Table A5-15 Single data transfer instructions
+    Table A5-10 Extra load/store instructions
+    Table A5-11 Extra load/store instructions (unprivileged)
