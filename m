@@ -1,175 +1,224 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Mar 2011 19:31:59 -0400 (EDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 Mar 2011 08:46:14 +0900
+Subject: [PATCH 1/2] regulator: pm8921-regulator: Add regulator driver
+	for PM8921
+In-Reply-To: <1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
+References: <1301523361-5982-1-git-send-email-collinsd@codeaurora.org>
+	<1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
+Message-ID: <20110330234613.GA21487@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar 2011, Linus Torvalds wrote:
+On Wed, Mar 30, 2011 at 03:17:12PM -0700, David Collins wrote:
 
-> On Wed, Mar 30, 2011 at 1:41 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> >
-> > If in your mind "competitors" == "morons" then you might be right.
-> 
-> There's a difference between "competition" and "do things differently
-> just to be difficult".
+> Regulator framework operation callback functions work as expected with
+> one exception: pm8921_vreg_get_mode and pm8921_vreg_set_mode.  These
+> callbacks are shared by all regulator types in the driver.  The mode
+> setting scheme was modified from the normal framework usage to
+> accommodate pin control.  Pin control allows a regulator that has been
+> disabled by software writing to its control registers to become
+> enabled by a hardware pin.  Many of the PM8921 regulators support pin
 
-Absolutely.  We've seen that from some proprietary software companies.
+Don't do this.  There's two problems with it.  One is that you're
+abusing a standard API for an unrelated purpose which will confuse
+anything that tries to use the API as normal, the other is that this
+sounds like a fairly widely supported feature (although normally one
+that is used with a GPIO on the CPU, there's a few examples of this in
+mainline).
 
-> > Trying to rely on bootloaders doing things right is like saying that x86
-> > should always rely on the BIOS doing things right.
-> 
-> No. Not at all.
-> 
-> The problem with firmware/BIOS is that it's set in stone and closed-source.
-> 
-> I'm suggesting splitting out the crazy part into a separate project
-> that does this. Open-source. Like a mini-kernel. Because the thing is,
-> the main kernel doesn't care, and _shouldn't_ care. Those board files
-> are just noise.
+> REGULATOR_MODE_FAST    - set to high power mode (HPM)
+> REGULATOR_MODE_NORMAL  - remove a vote for pin control
+> REGULATOR_MODE_IDLE    - vote for pin control (ref-counted)
+> REGULATOR_MODE_STANDBY - set to low power mode (LPM)
 
-Sure, but important noise nevertheless.  As long as the noise is 
-confined to a limited set of .c files I'm happy.  OTOH I have very 
-little hope for a separate project that would only deal with that noise.  
-That will simply never fly, even less so as an Open Source project.  
-The insentive for people to work on such thing simply aren't there as 
-that is totally uninteresting and without any rewards.
+> There is an additional caveat that pin control mode will override LPM
+> such that, a set mode call for LPM will be ignored if the pin control
+> reference count is greater than 0.  Similarly, HPM will override pin
+> control mode.  Transitivity is not maintained though, because the mode
+> can be changed from HPM to LPM.  This ensures that it is still
+> possible to transition freely between LPM and HPM with calls to
+> regulator_set_optimum_mode.
 
-Furthermore, this does create pain.  you have to make things in sync 
-between the kernel and the mini-kernel (let's call it bootloader).  In 
-practice the bootloader is always maintained separately from the kernel, 
-on its own pace and with its own release schedule.  Trying to 
-synchronize independent projects is really painful as you know already, 
-otherwise the user space for perf would still be maintained separately 
-from the kernel, right?
+What is the voting that's been referred to here?
 
-Now, when there is a bug in one of the clock settings, or one clock 
-is missing for that new kernel driver to work properly, the 
-bootloader would have to be fixed, revalidated, and the fix deployed 
-separately but still in addition to the kernel.  This process still adds 
-to the pain such that what people do in those cases is simply to hack 
-the driver code in the kernel.  Instead, the OMAP folks created a table 
-to abstract them into something more manageable.
+> --- a/drivers/mfd/pm8921-core.c
+> +++ b/drivers/mfd/pm8921-core.c
+> @@ -119,8 +119,9 @@ static int __devinit pm8921_add_subdevices(const struct pm8921_platform_data
+>  					   struct pm8921 *pmic,
+>  					   u32 rev)
+>  {
+> -	int ret = 0, irq_base = 0;
+> +	int ret = 0, irq_base = 0, i;
+>  	struct pm_irq_chip *irq_chip;
 
-And here's the final catch.  Most of those clocks are often derived from 
-each other in a tree structure inside the SOC.  And for power saving 
-reasons, some crazy people want to dynamically change the config for 
-those clocks at run time according to the required frequency for given 
-loads, turn them off when possible, and of course turn the parent clock 
-off as well if all the children clocks are themselves turned off.  So 
-the kernel has NO CHOICE but to be fully aware of them.
+Don't mix initialised and non-initialised definitions.
 
-Then comes power domains with the cascade of regulators and so forth, 
-again all software controlled.  Add to the mix the different sleep 
-states that can be derived from that, which is far more sophisticated 
-than ACPI states on Intel.  And in some cases, the hardware capabilities 
-are there but people still didn't find the optimal way to drive them, so 
-research is still on-going software wise.  And obviously those SOC 
-vendors do compete on that front since power consumption is the killing 
-weapon these days.  No wonder why they are so different from each other 
-with all that "board crap".
+> +	/* Add one device for each regulator used by the board. */
+> +	if (pdata->num_regulators > 0 && pdata->regulator_pdatas) {
+> +		mfd_regulators = kzalloc(sizeof(struct mfd_cell)
+> +					 * (pdata->num_regulators), GFP_KERNEL);
+> +		if (!mfd_regulators) {
+> +			pr_err("Cannot allocate %d bytes for pm8921 regulator "
+> +				"mfd cells\n", sizeof(struct mfd_cell)
+> +						* (pdata->num_regulators));
+> +			ret = -ENOMEM;
+> +			goto bail;
+> +		}
 
-> The long-term situation should be that you should be able to have ONE
-> binary kernel "just work". That's where we are on x86. Really.
+I know some devices do follow this pattern but it's simpler to just
+register the regulators that are physically present on the device
+unconditionally.
 
-But X86 is peanuts.  Really.  There was one machine called the IBM PC at 
-some point that everybody cloned, and the rest was totally irrelevant.  
-Then came that thing called Windows that reinforced this hardware 
-monoculture as it was used for the ultimate conformance testing.  This 
-is damn easy in that case to produce a kernel that works virtually 
-everywhere.
+> +static int pm8921_vreg_write(struct pm8921_vreg *vreg, u16 addr, u8 val,
+> +			     u8 mask, u8 *reg_save)
 
-On ARM there is simply not such thing as a single machine design to 
-clone, and a closed source test bench to design for.
+The function is confusingly named - it's actually a bitmask update but
+write() would normally suggest a straight write of an absolute value.
 
-And this is orthogonal to this discussion anyway, as having in-kernel 
-clock tables is not incompatible with a single kernel binary.  Dropping 
-at runtime those clock tables that are irrelevant to the currently 
-running hardware is not rocket science.
+> +{
+> +	int rc = 0;
+> +	u8 reg;
+> +
+> +	reg = (*reg_save & ~mask) | (val & mask);
+> +	if (reg != *reg_save)
+> +		rc = pm8xxx_writeb(vreg->dev->parent, addr, reg);
+> +
+> +	if (rc)
+> +		pr_err("pm8xxx_writeb failed; addr=0x%03X, rc=%d\n", addr, rc);
+> +	else
+> +		*reg_save = reg;
+> +
+> +	return rc;
+> +}
 
-> Without that kind of long-term view, where do you think ARM is going
-> to be in five years?
+This needs locking if any registers are shared between multiple
+regulators.
 
-ARM is going to still be relevant simply because they now have Linux 
-that they can modify to suit their latest changes.  That's one thing 
-with Open Source which can be good or bad: full hardware compatibility 
-is no longer an issue since the software can be adapted at will.
+> +	if (min_uV < PLDO_LOW_UV_MIN || min_uV > PLDO_HIGH_UV_MAX) {
+> +		vreg_err(vreg, "requested voltage %d is outside of allowed "
+> +				"range.\n", min_uV);
 
-Still... there are on-going efforts to consolidate things amongst all 
-the ARM vendors.  The ARM architecture is standardizing more and more 
-stuff in the whole stack in every revision.  But they won't standardize 
-everything otherwise they'll kill that competing ecosystem.
+Don't split text over multiple lines, it's not helpful when grepping.
 
-> >> almost *SIXTY* percent of all arch updates were to ARM code.
-> >
-> > Absolutely not! ?You have 14% going to OMAP code which happens to be
-> > under arch/arm/ but there is nothing ARM specific in there. ?If OMAP was
-> > using a PPC or a MIPS core then you'd have the same result except under
-> > arch/powerpc or arch/mips. ?There is very little in terms of ARM
-> > specific peculiarities under arch/arm/mach-omap2/ in fact.
-> 
-> But that's my point - the problem is all the crazy board crap.
-> 
-> I've never claimed that this is about the ARM cpu (which has it's own
-> issues, but that's a separate rant entirely). It's about the broken
-> infrastructure.
+> +static int pm8921_nldo1200_set_voltage(struct regulator_dev *rdev, int min_uV,
+> +				   int max_uV, unsigned *selector)
+> +{
+> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
+> +
+> +	return _pm8921_nldo1200_set_voltage(vreg, min_uV);
+> +}
 
-Let's see how we can fix it then.  Trying to shovel the problem away 
-won't help the situation.  Those ARM vendors are crazy for sure.  But 
-it's not a relatively few merge conflicts compared to the volume of 
-changes that will make us flinch, right?
+I have to say I'm not finding the indirection to the _ functions is
+actually adding anything to the code here.
 
-> Now, some of it is quite understandable - ie real drivers for real
-> hardware. But a _lot_ of it seems to be just descriptor tables, and
-> I'm getting the very strong feeling that ARM people aren't even
-> _trying_ to make it sane, and trying to standardize things, or trying
-> to aim for the whole notion of "one kernel image, with much more hw
-> description done elsewhere".
+> +	/* Round down for set points in the gaps between bands. */
+> +	if (uV > FTSMPS_BAND1_UV_MAX && uV < FTSMPS_BAND2_UV_MIN)
+> +		uV = FTSMPS_BAND1_UV_MAX;
+> +	else if (uV > FTSMPS_BAND2_UV_MAX
+> +			&& uV < FTSMPS_BAND3_UV_SETPOINT_MIN)
+> +		uV = FTSMPS_BAND2_UV_MAX;
 
-That work is happening.  It is not ready.  I'm not against it but I 
-remain sceptical.  I still think that a self contained kernel is more 
-maintainable.
+That seems broken - it means you'll go under voltage on what was
+requested.  You should ensure that you're always within the requested
+range so if the higher band minimum is in the range you should select
+that, otherwise you should error out.
 
-Still, because ARM is just a CPU architecture, those SOC vendors will 
-always have something new to differenciate themselves from the other SOC 
-vendors.  And that cannot be described in a table alone. The power 
-management hardware from TI will still require separate _executable_ 
-code from the Freescale one, or the Samsung one, or the Nvidia one, or 
-the Qualcomm one, or the Marvell one, yada yada.  And I really don't 
-want to see that code turned into some vendor provided buggy ACPI 
-bytecode or similar.
+In general you're not checking that your voltage selection actually
+satisfies the request that went in...
 
-> arch/arm is already about 3x the size of arch/x86. And it's pretty
-> much all the crazy infrastructure afaik. timer chips, irq chips, gpio
-> differences - crap like that.
+> +static int pm8921_ftsmps_set_voltage(struct regulator_dev *rdev, int min_uV,
+> +				     int max_uV, unsigned *selector)
+> +{
+> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
+> +
+> +	return _pm8921_ftsmps_set_voltage(vreg, min_uV, 0);
+> +}
 
-Indeed.  And I expect it to grow even bigger.  Be warned.
+...note how you discard the upper limit on the requested voltage here
+before going into the implementation.
 
-> And the fact that you don't even seem to UNDERSTAND the problem, and
-> think that it's ok, and that continued future explosion of this is all
-> fine makes me even more nervous.
+> +static unsigned int pm8921_vreg_get_optimum_mode(struct regulator_dev *rdev,
+> +		int input_uV, int output_uV, int load_uA)
+> +{
+> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
+> +
+> +	vreg->save_uA = load_uA;
 
-I do understand the problem.  And so far, the way we scaled is to have 
-TI people care about the OMAP code, Freescale people care about the iMX 
-code, and so on.  If one of them produces crap code then so it is, and 
-the other vendor is totally unaffected, which is why I'm not too 
-nervous.  Blaming a merge conflict on the entire ARM ecosystem just 
-because one team was large enough to have separate people doing 
-different things that intersected into the clock table is blowing things 
-totally out of proportion.
+What's this about?  There's no other references to save_uA in the driver
+and it looks suspicous.
 
-And if those hardware vendors are still in business in the future, and 
-apparently new ones are joining in, then the arch/arm/ directory will 
-continue to gain weight.  And on ARM, Linux is very very successful 
-that's all.
+> +	if (load_uA >= vreg->hpm_min_load)
+> +		return REGULATOR_MODE_FAST;
+> +
+> +	return REGULATOR_MODE_STANDBY;
 
+Using an else would be clearer and less error prone.
 
-Nicolas
+> +static int pm8921_vreg_enable(struct regulator_dev *rdev)
+> +{
+> +	struct pm8921_vreg *vreg = rdev_get_drvdata(rdev);
+> +	int mode, rc = 0;
+> +
+> +	mode = pm8921_vreg_get_mode(rdev);
+> +
+> +	if (mode == REGULATOR_MODE_IDLE) {
+> +		/* Turn on pin control. */
+> +		rc = pm8921_vreg_set_pin_ctrl(vreg, 1);
+> +		if (rc)
+> +			goto bail;
+> +		return rc;
+> +	}
+
+This looks wrong, it's not actually enabling the regulator but putting
+it into pin control mode instead.  If something actually wanted the
+regulator enabling it's going to be disappointed.
+
+> +	/* Disable in local control register. */
+> +	if (vreg->type == REGULATOR_TYPE_SMPS && SMPS_IN_ADVANCED_MODE(vreg)) {
+> +		/* Change SMPS to legacy mode before disabling. */
+> +		rc = pm8921_smps_set_voltage_legacy(vreg, vreg->save_uV);
+> +		if (rc)
+> +			goto bail;
+> +		rc = pm8921_vreg_write(vreg, vreg->ctrl_addr, REGULATOR_DISABLE,
+> +			REGULATOR_ENABLE_MASK, &vreg->ctrl_reg);
+> +	} else if (vreg->type == REGULATOR_TYPE_FTSMPS) {
+
+This would all be a lot more legible with a switch statement for the
+regulator types.
+
+> +static int __devinit pm8921_vreg_probe(struct platform_device *pdev)
+> +{
+> +	struct regulator_desc *rdesc;
+> +	struct pm8921_vreg *vreg;
+> +	const char *reg_name = "";
+> +	int rc = 0;
+> +
+> +	if (pdev == NULL)
+> +		return -EINVAL;
+> +
+> +	if (pdev->id >= 0 && pdev->id < PM8921_VREG_ID_MAX) {
+> +		rdesc = &pm8921_vreg_description[pdev->id];
+> +		vreg = &pm8921_vreg[pdev->id];
+> +		memcpy(&(vreg->pdata), pdev->dev.platform_data,
+> +			sizeof(struct pm8921_regulator_platform_data));
+> +		reg_name = pm8921_vreg_description[pdev->id].name;
+> +		vreg->name = reg_name;
+> +		vreg->dev = &pdev->dev;
+> +
+> +		rc = pm8921_init_regulator(vreg);
+> +		if (rc)
+> +			goto bail;
+> +
+
+This function is just a switch statement per regulator, may aswell expan
+ithere.  Or restructure things so that you've got a driver per regulator
+type - that would also mean you'd be able to get the device IDs to
+correspond to the regulator numbers which would probably be clearer.
+
+> +static int __init pm8921_vreg_init(void)
+> +{
+> +	return platform_driver_register(&pm8921_vreg_driver);
+> +}
+> +module_init(pm8921_vreg_init);
+
+subsys_initcall().
