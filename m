@@ -1,23 +1,34 @@
-From: alex.bluesman.smirnov@gmail.com (Alexander Smirnov)
-Date: Wed, 30 Mar 2011 06:23:56 -0000
-Subject: AT91SAM9G45-EK-ES support
-Message-ID: <AANLkTi=bK5T66eyYtq0z6Ey2jXqbUKMi3kK-U8u2aiEC@mail.gmail.com>
+From: zaks_974@yahoo.com (ZAKIR AHMED)
+Date: Wed, 30 Mar 2011 14:34:44 -0000
+Subject: Loading Kernel @ 32MB and booting.. Kernel Hangs
+Message-ID: <279958.91760.qm@web33204.mail.mud.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi
 
-I'm working with Atmel AT91SAM9G45-EK-ES board. I built the latest upstream
-kernel, but it doesn't work. There is problem with machine ID. Currently
-boards with AT91SAM9G45-EK ID only are supported, support for EKES boards
-was removed (as I see in git log). What's the reason of such changes and how
-can I bring up my board without hacks?
+I am working on kexec for ARM 11 mpcore. 
+I am using an ARM MPcore board with Linux 2.6.33. I need to load the kernel 
+I have resolved most of the problems with the posts available. Now, I am stuck at a place where the second kernel starts but hangs. I started debugging this problem, by just booting the second kernel @32MB. That also does NOT boot. Looks like, the second kernel does NOT boot @ 32MB
 
-Also, could anyone please describe current status of SAM9G45 boards support
-in mainline. Do all the drivers work, are they up-to-date?
+The following is what I have changed 
+?? zreladdr-y?? := 0x02008000
+params_phys-y?? := 0x02000100
+initrd_phys-y?? := 0x02800000
 
-Thank you a lot,
-Alexander
+I have also changed the PHYS_OFFSET to 0x02000000.
+
+I have loaded the kernel at 32MB.
+
+I used printascii as suggested to see where it hangs. I am seeing that after turn_mmu on, it does NOT proceed to switch_data which it should ideally. If I get the symbols using readelf and forcefully give the phys address itself of switch_data, it proceeds till the start_kernel and then hangs in printks.
+
+It somehow looks like, I have missed some change some where. 
+
+Could you please let me know if I have missed some steps OR any pointers/materials to what all needs to change when I want to load the kernel and boot from a NON standard location?
+
+
+
+With Regards,  Zakir Ahmed  ?  "And fear Almighty, and know that you are to meet him in the hereafter"  ?
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110330/ea754cd3/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110330/b053011c/attachment-0001.html>
