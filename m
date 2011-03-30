@@ -1,56 +1,45 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 30 Mar 2011 11:45:46 +0530
-Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
-	support
-In-Reply-To: <20110329170113.GG4016@atomide.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110328205027.GC30616@atomide.com>
-	<5cbdd88c3ca3fe5c5a0f119be446ce99@mail.gmail.com>
-	<20110329170113.GG4016@atomide.com>
-Message-ID: <4D92CA92.50805@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 30 Mar 2011 11:57:46 +0530
+Subject: [PATCH 1/5] OMAP3: l3: fix for "irq 10: nobody cared" message
+In-Reply-To: <1301419219-30547-2-git-send-email-omar.ramirez@ti.com>
+References: <1301419219-30547-1-git-send-email-omar.ramirez@ti.com>
+	<1301419219-30547-2-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4D92CD62.9060707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/29/2011 10:31 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 22:47]:
->>> From: Tony Lindgren [mailto:tony at atomide.com]
->>>
->>> Do you really need to initialize all of this that early?
->>>
->> Yes. It's a interrupt controller extension and needs to work
->> together with GIC.
+On 3/29/2011 10:50 PM, Omar Ramirez Luna wrote:
+> If an error occurs in the L3 on any other initiator than MPU,
+> the interrupt goes unhandled given that the 'base' register
+> was calculated with the initialized err_source value (which
+> coincidentally points to MPU) and not with the actual source
+> of the error.
 >
-> Hmm to me it seems that the gic_arch_extn functions should be
-> all NULL during runtime operation, and the wake-up generator
-> should be programmed only before entering an idle state.
+> Removed parenthesis that are not needed for the touched lines.
 >
-> Then the wake-up generator can be cleared after delivering
-> the wake-up event(s).
->
-> Or am I missing something on why this should be enabled all
-> the time?
->
-Yep. The WakeupGen sits between GIC and CPU and can
-gate the interrupts in normal operation too. It's
-mandatory that the interrupt mask at GIC and WakeupGen
-matches to deliver the interrupt to CPU.
+> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+> ---
 
-This is the reason why all the necessary GIC hooks are
-populated with it so that they work together.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-So far without this patch all interrupts at WakeupGen
-level were always enabled and hence there was no issue.
-
-> BTW, looks like you got few typos in the comments in this
-> patch, noticed these while reading:
+>   arch/arm/mach-omap2/omap_l3_smx.c |    4 ++--
+>   1 files changed, 2 insertions(+), 2 deletions(-)
 >
-> Hardware requirements is
-> GIC rgeisters
-> gic architecture specific fucntioms
+> diff --git a/arch/arm/mach-omap2/omap_l3_smx.c b/arch/arm/mach-omap2/omap_l3_smx.c
+> index 5f2da75..4321e79 100644
+> --- a/arch/arm/mach-omap2/omap_l3_smx.c
+> +++ b/arch/arm/mach-omap2/omap_l3_smx.c
+> @@ -196,11 +196,11 @@ static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
+>   		/* No timeout error for debug sources */
+>   	}
 >
-I do lot of them :(
-Will fix these typos.
-
-Regards
-Santosh
+> -	base = ((l3->rt) + (*(omap3_l3_bases[int_type] + err_source)));
+> -
+>   	/* identify the error source */
+>   	for (err_source = 0; !(status&  (1<<  err_source)); err_source++)
+>   									;
+> +
+> +	base = l3->rt + *(omap3_l3_bases[int_type] + err_source);
+>   	error = omap3_l3_readll(base, L3_ERROR_LOG);
+>
+>   	if (error) {
