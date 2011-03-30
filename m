@@ -1,48 +1,24 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 30 Mar 2011 00:30:37 -0700
-Subject: [PATCH] ARM: tegra: gpio: Fix unused variable warnings
-Message-ID: <1301470237-5231-1-git-send-email-ccross@android.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 30 Mar 2011 09:36:51 +0200
+Subject: [PATCH v2 1/1] ARM: imx: add gpu device
+In-Reply-To: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
+References: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20110330073651.GR7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change b0f18edaf6ee4e6fac89cae63a90bd38ad2a3418
-(arm: tegra: Remove unused bogus irq enable/disable magic)
-introduces warnings:
-arch/arm/mach-tegra/gpio.c: In function 'tegra_gpio_resume':
-arch/arm/mach-tegra/gpio.c:260: warning: unused variable 'i'
-arch/arm/mach-tegra/gpio.c: In function 'tegra_gpio_suspend':
-arch/arm/mach-tegra/gpio.c:283: warning: unused variable 'i'
+On Wed, Mar 30, 2011 at 02:05:28PM +0800, Richard Zhao wrote:
+> From: Richard Zhao <richard.zhao@linaro.org>
+> 
+> Add mxc_gpu devices for imx35/50/51/53, so external gpu driver module built
+> for the kernel can work.
 
-Fix them, and fix a coding style issue on the same lines.
+Why do we need this? I have never seen a driver for this.
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/mach-tegra/gpio.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Sascha
 
-diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-index 76a3f65..65a1aba 100644
---- a/arch/arm/mach-tegra/gpio.c
-+++ b/arch/arm/mach-tegra/gpio.c
-@@ -257,7 +257,8 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- void tegra_gpio_resume(void)
- {
- 	unsigned long flags;
--	int b, p, i;
-+	int b;
-+	int p;
- 
- 	local_irq_save(flags);
- 
-@@ -280,7 +281,8 @@ void tegra_gpio_resume(void)
- void tegra_gpio_suspend(void)
- {
- 	unsigned long flags;
--	int b, p, i;
-+	int b;
-+	int p;
- 
- 	local_irq_save(flags);
- 	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
