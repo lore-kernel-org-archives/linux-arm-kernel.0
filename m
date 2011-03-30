@@ -1,84 +1,23 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed, 30 Mar 2011 17:19:24 +0200
-Subject: [PATCH 8/8] OMAP PM: early init of the pwrdms states
-In-Reply-To: <1301498364-726-1-git-send-email-j-pihet@ti.com>
-References: <1301498364-726-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1301498364-726-9-git-send-email-j-pihet@ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 30 Mar 2011 21:19:12 +0530
+Subject: [PATCH 1/2] davinci: mityomapl138: Use correct id for NAND
+	controller
+In-Reply-To: <1300882542-26039-1-git-send-email-michael.williamson@criticallink.com>
+References: <1300882542-26039-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C5E60E3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+Hi Mike,
 
-The powerdomains next states are initialized in pwrdms_setup as a
-late_initcall. Because the wake-up constraint can be requested
-early in the boot sequence, the power domains next states can be
-overwritten by pwrdms_setup.
+On Wed, Mar 23, 2011 at 17:45:41, Michael Williamson wrote:
+> For the MityDSP-L138/MityARM-1808 SOMS, the NAND controller id (which needs
+> to correspond to the chipselect, and is used for controlling the HW ECC
+> computation) is not correct.  Fix it.
+> 
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 
-This patch fixes it by initializing the power domains next states
-early at boot, so that the constraints can be applied.
-Later in the pwrdms_setup function the currently programmed
-next states are re-used as next state values.
+Will queue these two patches for 2.6.39-rc
 
-Applies to OMAP3 and OMAP4.
-
-Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-on MPU, CORE and PER.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c      |    2 +-
- arch/arm/mach-omap2/pm44xx.c      |    2 +-
- arch/arm/mach-omap2/powerdomain.c |    5 +++++
- 3 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 0c5e3a4..8d202a7 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -840,7 +840,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!pwrst)
- 		return -ENOMEM;
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_POWER_RET;
-+	pwrst->next_state = pwrdm_read_next_pwrst(pwrdm);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	if (pwrdm_has_hdwr_sar(pwrdm))
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 76cfff2..ed35482 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -84,7 +84,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!pwrst)
- 		return -ENOMEM;
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_POWER_ON;
-+	pwrdm->state = pwrdm_read_pwrst(pwrdm);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index b8d3860..ac8a2d7 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -78,6 +78,7 @@ static struct powerdomain *_pwrdm_lookup(const char *name)
- static int _pwrdm_register(struct powerdomain *pwrdm)
- {
- 	int i;
-+	int next_state = PWRDM_POWER_RET;
- 
- 	if (!pwrdm || !pwrdm->name)
- 		return -EINVAL;
-@@ -114,6 +115,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	pwrdm_wait_transition(pwrdm);
- 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
- 	pwrdm->state_counter[pwrdm->state] = 1;
-+	/* Early init of the next power state */
-+	if (cpu_is_omap44xx())
-+		next_state = PWRDM_POWER_ON;
-+	pwrdm_set_next_pwrst(pwrdm, next_state);
- 
- 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
- 
--- 
-1.7.2.5
+Thanks,
+Sekhar
