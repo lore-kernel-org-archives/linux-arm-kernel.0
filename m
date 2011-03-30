@@ -1,54 +1,51 @@
-From: viktor.rosendahl@nokia.com (Viktor Rosendahl)
-Date: Wed, 30 Mar 2011 17:09:43 +0300
-Subject: [PATCH] Fix ldrd/strd emulation for kprobes/ARM
-In-Reply-To: <alpine.LFD.2.00.1103291235380.11889@xanadu.home>
-References: <1301087944.2744.85.camel@computer2.home>
-	<1301327765-6996-1-git-send-email-viktor.rosendahl@nokia.com>
-	<alpine.LFD.2.00.1103281822170.11889@xanadu.home>
-	<4D91C1EF.1040102@nokia.com>
-	<alpine.LFD.2.00.1103291235380.11889@xanadu.home>
-Message-ID: <4D9339A7.30606@nokia.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Mar 2011 15:10:11 +0100
+Subject: How to handle kprobe bugs?
+In-Reply-To: <1301493213.2488.41.camel@computer2.home>
+References: <1301493213.2488.41.camel@computer2.home>
+Message-ID: <20110330141011.GA2844@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2011 07:55 PM, ext Nicolas Pitre wrote:
->
-> Sorry, I meant r15-indexed with a write back.
->
+On Wed, Mar 30, 2011 at 02:53:33PM +0100, Tixy wrote:
+> Now that I'm writing some test code for kprobes I'm quickly finding
+> further bugs with the instruction emulation. E.g. ALU ops with an
+> immediate operand are broke. Shall I wait until I have completed writing
 
-OK, I guess it was kind of implicit in your message but I missed it.
+Good spot ... if so, this definitely needs fixing(!)
 
->> Now, I admit that it's possible that somewhere beyond the horizon of my
->> understanding there is some good reason to do two LDRs into adjacent registers
->> from adjacent memory addresses, instead of merging them into one LDRD.
->
-> In this case I suspect that the loaded values were pushed to the literal
-> pool, and it is hard for the compiler to ensure the placement is always
-> 64-bit aligned.
->
+> all test cases before submitting a single fix patch? (It could be a
+> couple of weeks.)
 
-I guess you are right, I missed that LDRD/STRD needs to be double word 
-aligned for the older alignment models. In the ARMv7 model, word 
-alignment is enough.
+My view (others may differ):
 
->> BTW, in my kernel, LDR indexed by r15 is a really common instruction at the
->> very beginning of functions. I am not sure why; it could have something to do
->> with the fact that the kernel is compiled without frame pointers.
->
-> No, it's all about literal pool usage.
+If there are several independent fixes, that's probably best presented
+as multiple patches; but it may be better to post them as a series when
+you're done.
 
-Yes, of course it's the literals. I was silly to think otherwise :)
+I expect this will be more digestible for people than a trickle of
+patches over a longer period, unless the total changeset becomes
+large.
 
->
-> But nowhere will you find pc-indexed addressing with a writeback.
-> That's one of the cases I think should be rejected upfront instead of
-> evaluating this possibility which is likely to never happen in practice
-> each time the instruction is emulated.
->
+> 
+> I also find that instruction emulation for some (all?) ARMv6K and newer
+> instructions are missing. E.g. hint instructions like NOP and WFI. Shall
+> I produce a second patch to add these?
 
-Currently, we are not checking for that case at all, so the only missing 
-part would be to modify the decoding logic. I just sent a patch for that.
+Sure.
 
-best regards,
+Note that you should emulate all the hinted NOPs as actual NOPs,
+since the event the hint waits for may happen in the meantime;
+under some circumstances that would lead to stalls.
 
-Viktor
+> 
+> At some point I will also get around to doing my original task of adding
+> Thumb support to kprobes. I'm assuming that fixing ARM code is higher
+> priority than adding Thumb support?
+
+I think that's reasonable, provided there is not too much work to do
+to fix the ARM case -- it sounds like there isn't much to fix, but
+please shout otherwise.
+
+Cheers
+---Dave
