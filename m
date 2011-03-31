@@ -1,57 +1,106 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 31 Mar 2011 10:17:27 +0100
-Subject: [PATCH] ARM: vfp: Remote obsolete fpmx_state field from
-	vfp_hard_struct
-In-Reply-To: <20110330175236.GB2939@n2100.arm.linux.org.uk>
-References: <1301489184-4112-1-git-send-email-dave.martin@linaro.org>
-	<1301489184-4112-2-git-send-email-dave.martin@linaro.org>
-	<20110330175236.GB2939@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikhKRZF=hirQRRZPFP8N+v0-rkDG8t710axMBz=@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 31 Mar 2011 11:34:27 +0200
+Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
+In-Reply-To: <4D9444A6.2060109@freescale.com>
+References: <19858.62649.218523.984252@ipc1.ka-ro>
+	<1301554968-29066-1-git-send-email-b32955@freescale.com>
+	<19860.13566.651111.241538@ipc1.ka-ro>
+	<4D94403F.6000000@freescale.com>
+	<19860.16442.199644.984424@ipc1.ka-ro>
+	<4D9444A6.2060109@freescale.com>
+Message-ID: <19860.19107.105852.138993@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 6:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 30, 2011 at 01:46:24PM +0100, Dave Martin wrote:
->> The fpmx_state field was presumably used in the past, when
->> FSTMX/FLDMX were used to save and resture the VFP state.
->>
->> This was been deprecated since ARMv6, the context switch code
->> has been ported to use the double-precision load/store variants
->> many years ago, and now it appears that nothing in the kernel
->> references this field any more.
->
-> Wrong.
->
-> ? ? ? ?.macro ?VFPFSTMIA, base, tmp
-> #if __LINUX_ARM_ARCH__ < 6
-> ? ? ? ?STC ? ? p11, cr0, [\base],#33*4 ? ? ? ? ? ? @ FSTMIAX \base!, {d0-d15}
-> #else
-> ? ? ? ?STC ? ? p11, cr0, [\base],#32*4 ? ? ? ? ? ? @ FSTMIAD \base!, {d0-d15}
-> #endif
->
-> So, building for pre-ARMv6, it's still used.
->
+Hi,
 
-Fair point -- looks like my grepping missed those.  Oops.
+Huang Shijie writes:
+> Hi,
+> > Hi,
+> >
+> > Huang Shijie writes:
+> >> Hi:
+> >>> Hi,
+> >>>
+> >>> Huang Shijie writes:
+> >>>> The GPMI may have many DMA channels, such as the imx23 has
+> >>>> four DMA channels. All these DMA channels share the same interrupt.
+> >>>> Add the interrupt check for the GPMI, only the first DMA channel will
+> >>>> register the irq.
+> >>>>
+> >>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+> >>>> ---
+> >>>>    drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
+> >>>>    1 files changed, 32 insertions(+), 4 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> >>>> index 88aad4f..db36bf1 100644
+> >>>> --- a/drivers/dma/mxs-dma.c
+> >>>> +++ b/drivers/dma/mxs-dma.c
+> >>>> @@ -26,6 +26,8 @@
+> >>>>    #include<asm/irq.h>
+> >>>>    #include<mach/mxs.h>
+> >>>>    #include<mach/dma.h>
+> >>>> +#include<mach/mx23.h>
+> >>>> +#include<mach/mx28.h>
+> >>>>    #include<mach/common.h>
+> >>>>
+> >>>>    /*
+> >>>> @@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+> >>>>    	return IRQ_HANDLED;
+> >>>>    }
+> >>>>
+> >>>> +/* The GPMI has several DMA channels, only the first can register the irq. */
+> >>>> +static bool irq_check(struct mxs_dma_chan *mxs_chan)
+> >>>> +{
+> >>>> +	int irq_num = mxs_chan->chan_irq;
+> >>>> +
+> >>>> +#ifdef CONFIG_SOC_IMX23
+> >>>> +	if (cpu_is_mx23()&&   irq_num == MX23_INT_GPMI_DMA) {
+> >>>> +		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
+> >>>> +			return true;
+> >>>> +		else
+> >>>> +			return false;
+> >>>> +	}
+> >>>> +#endif
+> >>>> +#ifdef CONFIG_SOC_IMX28
+> >>>> +	if (cpu_is_mx28()&&   irq_num == MX28_INT_GPMI_DMA) {
+> >>>> +		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
+> >>>> +			return true;
+> >>>> +		else
+> >>>> +			return false;
+> >>>> +	}
+> >>>> +#endif
+> >>>> +	return true;
+> >>>> +}
+> >>>>
+> >>> You should make the distinction based on the platform_id, which would
+> >>> save you the ugly ifdef's and cpu_is_... macros.
+> >>>
+> >>>
+> >> This in the DMA driver.
+> >> Do you want me to change the DMA driver to add the platform_id?
+> >> The DMA driver has already used the cpu_is_xx() macros.
+> >>
+> > The mxs-dma driver is already using platform ids!
+> >
+> >
+> Do you mean the mxd_dma_type[] ?
+> 
+> How can i distinction the imx23 and imx28 with it ?
+> It seems can not be used to do the work.
+> 
+It should be extended to make this distinction possible.
 
-While I'm looking at this file though...  vfpmacros.h starts with:
 
-@ Macros to allow building with old toolkits (with no VFP support)
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-I don't think we support building the kernel with such old binutils
-any more.  Maybe this file could be simplified?  arch/arm/vfp/ seems
-to be built with -mfpu=softvfp+vfp, which appears to enable most of
-the affected mnemonics.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-vfpmacros.h also contains some oddities such as:
-
-#ifdef CONFIG_VFPv3
-#if __LINUX_ARM_ARCH__ <= 6
-    /*...*/
-
-Since we don't support building a single kernel across ARMv5 and
-ARMv7, are these blocks effectively dead code?
-
-Cheers
----Dave
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
