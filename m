@@ -1,96 +1,141 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 30 Mar 2011 17:16:10 -0700
-Subject: [PATCH 07/17] OMAP3+: voltage: add scalable flag to voltagedomain
+Date: Wed, 30 Mar 2011 17:16:12 -0700
+Subject: [PATCH 09/17] OMAP2: add voltage domains and connect to powerdomains
 In-Reply-To: <1301530580-12046-1-git-send-email-khilman@ti.com>
 References: <1301530580-12046-1-git-send-email-khilman@ti.com>
-Message-ID: <1301530580-12046-8-git-send-email-khilman@ti.com>
+Message-ID: <1301530580-12046-10-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a 'bool scalable' flag to the struct powerdomain and set it for
-the scalable domains on OMAP3 and OMAP4.
+Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
+with the newly created voltage domains.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/voltage.c                 |    3 +++
- arch/arm/mach-omap2/voltage.h                 |    2 ++
- arch/arm/mach-omap2/voltagedomains3xxx_data.c |    2 ++
- arch/arm/mach-omap2/voltagedomains44xx_data.c |    3 +++
- 4 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Makefile                  |    3 +-
+ arch/arm/mach-omap2/io.c                      |    2 +
+ arch/arm/mach-omap2/powerdomains2xxx_data.c   |    4 +++
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains2xxx_data.c |   32 +++++++++++++++++++++++++
+ 5 files changed, 41 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index f995003..bc944ff 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -1054,6 +1054,9 @@ int __init omap_voltage_late_init(void)
- 		pr_err("%s: Unable to create voltage debugfs main dir\n",
- 			__func__);
- 	list_for_each_entry(voltdm, &voltdm_list, node) {
-+		if (!voltdm->scalable)
-+			continue;
-+
- 		if (voltdm->vdd) {
- 			if (omap_vdd_data_configure(voltdm))
- 				continue;
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index a45cd64..7907947 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -91,7 +91,8 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
+ # OMAP voltage domains
+ ifeq ($(CONFIG_PM),y)
+ voltagedomain-common			:= voltage.o
+-obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common)
++obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
++					   voltagedomains2xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
+ 					   voltagedomains3xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 44c2c3e..b5c8e80 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -356,10 +356,12 @@ void __init omap2_init_common_infrastructure(void)
+ 	u8 postsetup_state;
+ 
+ 	if (cpu_is_omap242x()) {
++		omap2xxx_voltagedomains_init();
+ 		omap2xxx_powerdomains_init();
+ 		omap2xxx_clockdomains_init();
+ 		omap2420_hwmod_init();
+ 	} else if (cpu_is_omap243x()) {
++		omap2xxx_voltagedomains_init();
+ 		omap2xxx_powerdomains_init();
+ 		omap2xxx_clockdomains_init();
+ 		omap2430_hwmod_init();
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+index cc389fb..274f64c 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+@@ -38,6 +38,7 @@ static struct powerdomain dsp_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain mpu_24xx_pwrdm = {
+@@ -53,6 +54,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain core_24xx_pwrdm = {
+@@ -71,6 +73,7 @@ static struct powerdomain core_24xx_pwrdm = {
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ 
+@@ -95,6 +98,7 @@ static struct powerdomain mdm_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ #endif     /* CONFIG_SOC_OMAP2430 */
 diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 5440298..25cfb5c 100644
+index 25cfb5c..cacd76e 100644
 --- a/arch/arm/mach-omap2/voltage.h
 +++ b/arch/arm/mach-omap2/voltage.h
-@@ -53,11 +53,13 @@ struct omap_vfsm_instance_data {
- /**
-  * struct voltagedomain - omap voltage domain global structure.
-  * @name: Name of the voltage domain which can be used as a unique identifier.
-+ * @scalable: Whether or not this voltage domain is scalable
-  * @node: list_head linking all voltage domains
-  * @vdd: to be removed
-  */
- struct voltagedomain {
- 	char *name;
-+	bool scalable;
- 	struct list_head node;
- 	struct omap_vdd_info *vdd;
- };
-diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-index 42d0b11..d7e1052 100644
---- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-@@ -61,11 +61,13 @@ static struct omap_vdd_info omap3_vdd2_info = {
+@@ -180,6 +180,7 @@ static inline int omap_voltage_late_init(void)
+ }
+ #endif
  
- static struct voltagedomain omap3_voltdm_mpu = {
- 	.name = "mpu_iva",
-+	.scalable = true,
- 	.vdd = &omap3_vdd1_info,
- };
++extern void omap2xxx_voltagedomains_init(void);
+ extern void omap3xxx_voltagedomains_init(void);
+ extern void omap44xx_voltagedomains_init(void);
  
- static struct voltagedomain omap3_voltdm_core = {
- 	.name = "core",
-+	.scalable = true,
- 	.vdd = &omap3_vdd2_info,
- };
- 
-diff --git a/arch/arm/mach-omap2/voltagedomains44xx_data.c b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-index 245fdf9..95e1ce5 100644
---- a/arch/arm/mach-omap2/voltagedomains44xx_data.c
-+++ b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-@@ -70,16 +70,19 @@ static struct omap_vdd_info omap4_vdd_core_info = {
- 
- static struct voltagedomain omap4_voltdm_mpu = {
- 	.name = "mpu",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_mpu_info,
- };
- 
- static struct voltagedomain omap4_voltdm_iva = {
- 	.name = "iva",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_iva_info,
- };
- 
- static struct voltagedomain omap4_voltdm_core = {
- 	.name = "core",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_core_info,
- };
- 
+diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+new file mode 100644
+index 0000000..69ff261
+--- /dev/null
++++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+@@ -0,0 +1,32 @@
++/*
++ * OMAP3 voltage domain data
++ *
++ * Copyright (C) 2007, 2010 Texas Instruments, Inc.
++
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "voltage.h"
++
++static struct voltagedomain omap2_voltdm_core = {
++	.name = "core",
++};
++
++static struct voltagedomain omap2_voltdm_wkup = {
++	.name = "wakeup",
++};
++
++static struct voltagedomain *voltagedomains_omap2[] __initdata = {
++	&omap2_voltdm_core,
++	&omap2_voltdm_wkup,
++	NULL,
++};
++
++void __init omap2xxx_voltagedomains_init(void)
++{
++	voltdm_init(voltagedomains_omap2);
++}
 -- 
 1.7.4
