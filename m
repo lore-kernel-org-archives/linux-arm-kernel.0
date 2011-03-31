@@ -1,75 +1,86 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 31 Mar 2011 19:30:44 +0200
-Subject: [PATCH V2 1/3] arm: lpc32xx: add tsc-device
-Message-ID: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 Mar 2011 10:32:12 -0700
+Subject: [PATCH 00/10] omap init_early changes for irq and timer init
+In-Reply-To: <4D943871.4030206@ti.com>
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<4D92E21F.6030608@ti.com> <20110330182211.GE18334@atomide.com>
+	<4D943871.4030206@ti.com>
+Message-ID: <20110331173212.GB21887@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the clock name, too.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [110331 01:14]:
+> On 3/30/2011 11:52 PM, Tony Lindgren wrote:
+> 
+> >What it does not have is the code to dedicate gpt1 for PM
+> >code, which can be done later once all the other dmtimer
+> >changes are done.
+> >
+> Which not possible to do unless you plan to hack generic
+> timer framework or waste additional timer hardware for
+> this.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/mach-lpc32xx/clock.c  |    2 +-
- arch/arm/mach-lpc32xx/common.c |   21 +++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h |    1 +
- 3 files changed, 23 insertions(+), 1 deletions(-)
+Well an extra timer hardware would only be needed on omap2 & 3.
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index da0e649..1e02751 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -1077,7 +1077,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
- 	_REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
- 	_REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
--	_REGISTER_CLOCK("lpc32xx-ts", NULL, clk_tsc)
-+	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
- 	_REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
- 	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
- 	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
-diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-index ee24dc2..6880b47 100644
---- a/arch/arm/mach-lpc32xx/common.c
-+++ b/arch/arm/mach-lpc32xx/common.c
-@@ -95,6 +95,27 @@ struct platform_device lpc32xx_i2c2_device = {
- 	},
- };
+But hey, if it makes sense to do or not to do is a different
+set of patches. At least we now have an option to play with it.
  
-+/* TSC (Touch Screen Controller) */
-+
-+static struct resource lpc32xx_tsc_resources[] = {
-+	{
-+		.start = LPC32XX_ADC_BASE,
-+		.end = LPC32XX_ADC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_LPC32XX_TS_IRQ,
-+		.end = IRQ_LPC32XX_TS_IRQ,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device lpc32xx_tsc_device = {
-+	.name =  "ts-lpc32xx",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(lpc32xx_tsc_resources),
-+	.resource = lpc32xx_tsc_resources,
-+};
-+
- /*
-  * Returns the unique ID for the device
-  */
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index f82211f..e81243c 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -28,6 +28,7 @@ extern struct platform_device lpc32xx_watchdog_device;
- extern struct platform_device lpc32xx_i2c0_device;
- extern struct platform_device lpc32xx_i2c1_device;
- extern struct platform_device lpc32xx_i2c2_device;
-+extern struct platform_device lpc32xx_tsc_device;
+> >For removing the old interface, I don't see any reason to
+> >select timer combinations on omap3 other than omap3_timer
+> >and omap3_beagle_timer.
+> >
+> >If there's need, any new valid sane combinations can be esily
+> >added, although I seriously doubt that we'll need more for
+> >omap3.
+> >
+> May be I am wrong but the point is about the merit of the
+> solution even if there are only couple of board files where
+> we use that interface.
+> 
+> It much cleaner and simpler to say timerid=X, from board
+> file rather than creating a "struct sys_timer" instance
+> and putting that in timer code.
+
+Well the timerid=X adds yet another interface and more calls from
+board-*.c to the common code. And it requires more changes if beagle
+boards want to use the system clock as the source clock instead
+of the 32KiHZ source.
+
+Maybe let's call the omap3_beagle_timer omap3_secure_timer instead?
+
+That should solve your issue of having the board name show up
+in the generic code, no?
  
- /*
-  * Other arch specific structures and functions
--- 
-1.7.2.5
+> >>At least I don't see other solution than using GPT1
+> >>for wakeup.
+> >
+> >Right, there's no other way to wake except gpt1 or wake-up
+> >enabled gpio lines. But we don't need to use gpt1 during
+> >runtime at all.
+> >
+> This is not entirely correct and I think this is the point
+> where we are not on same page. During runtime, gpt1 clock
+> event is not used for tick generation but it's kept
+> programmed because low power state switch via
+> get triggered any time and on any CPU.
+
+Well ideally we would not program it during runtime at all
+because it's slow to program. I don't think that can be
+currently done with the sys_timer.
+ 
+> This is the same problem as X86 APIC timer + HPET
+> switching and I worked with Thomas G and Russell
+> to get this working on ARM platforms using generic
+> timer framework. No hacking is needed in PM code
+> for this.
+
+Except we should improve things eventually where we don't
+need to program the slow external timer during runtime
+if we have local timers.
+
+Hmm maybe I'm wrong and you got that working already?
+
+Regards,
+
+Tony
+ 
