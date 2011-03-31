@@ -1,43 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 31 Mar 2011 14:49:27 -0700
-Subject: [PATCH] OMAP2+: PM debug: update suspend wakeup timer for DM timer changes
-Message-ID: <mailman.184.1301609393.1530.linux-arm-kernel@lists.infradead.org>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Thu, 31 Mar 2011 15:26:51 -0700
+Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
+	<1301587083.31087.1032.camel@nimitz>
+	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
+	<1301606078.31087.1275.camel@nimitz>
+	<op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
+Message-ID: <1301610411.30870.29.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/pm-debug.c |    4 ++--
- arch/arm/mach-omap2/timer-gp.c |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+On Fri, 2011-04-01 at 00:18 +0200, Michal Nazarewicz wrote:
+> On Thu, 31 Mar 2011 23:14:38 +0200, Dave Hansen wrote:
+> > We BUG_ON() in bootmem.  Basically if we try to allocate an early-boot
+> > structure and fail, we're screwed.  We can't keep running without an
+> > inode hash, or a mem_map[].
+> >
+> > This looks like it's going to at least get partially used in drivers, at
+> > least from the examples.  Are these kinds of things that, if the driver
+> > fails to load, that the system is useless and hosed?  Or, is it
+> > something where we might limp along to figure out what went wrong before
+> > we reboot?
+> 
+> Bug in the above place does not mean that we could not allocate memory.  It
+> means caller is broken.
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index a5a83b3..eccf117 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -171,8 +171,8 @@ void omap2_pm_wakeup_on_timer(u32 seconds, u32 milliseconds)
- 
- 	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gptimer_wakeup));
- 	cycles = tick_rate * seconds + tick_rate * milliseconds / 1000;
--	omap_dm_timer_stop(gptimer_wakeup);
--	omap_dm_timer_set_load_start(gptimer_wakeup, 0, 0xffffffff - cycles);
-+	__omap_dm_timer_load_start(gptimer_wakeup->io_base, OMAP_TIMER_CTRL_ST,
-+				   0xffffffff - cycles, 1);
- 
- 	pr_info("PM: Resume timer in %u.%03u secs"
- 		" (%d ticks at %d ticks/sec.)\n",
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index c21e99f..52100b2 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -76,7 +76,7 @@ static struct omap_dm_timer *gptimer;
- static struct clock_event_device clockevent_gpt;
- static u8 __initdata gptimer_id = 1;
- static u8 __initdata inited;
--struct omap_dm_timer *gptimer_wakeup;
-+struct omap_dm_timer *gptimer_wakeup = &clkev;
- 
- static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
- {
--- 
-1.7.4
+Could you explain that a bit?
+
+Is this a case where a device is mapped to a very *specific* range of
+physical memory and no where else?  What are the reasons for not marking
+it off limits at boot?  I also saw some bits of isolation and migration
+in those patches.  Can't the migration fail?  
+
+-- Dave
