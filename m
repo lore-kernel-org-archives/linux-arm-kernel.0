@@ -1,54 +1,74 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 30 Mar 2011 17:55:45 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331001502.GB6680@n2100.arm.linux.org.uk>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<20110331001502.GB6680@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinE7EDbV8hrYZWBxgvwOxdPMLoS0Y57PSm04rvM@mail.gmail.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Wed, 30 Mar 2011 21:05:21 -0400
+Subject: SMP soft lockup on smp_call_function_many when doing
+	flush_tlb_page
+In-Reply-To: <AANLkTin2JMW0FkEW5v-FMDN4826xo6s+B6heK5QSn_b=@mail.gmail.com>
+References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
+	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
+	<AANLkTi=HzSUP0aXSBSg=5zKLngJz+8Jwqr+oLrW+tEyL@mail.gmail.com>
+	<1299603582.19820.125.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
+	<1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
+	<20110330051849.GB13080@mvista.com>
+	<AANLkTin2JMW0FkEW5v-FMDN4826xo6s+B6heK5QSn_b=@mail.gmail.com>
+Message-ID: <20110331010521.GL13080@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 5:15 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> In this merge window, I deleted at least 6000 lines from arch/arm, and
-> by quoting diffstat percentages, you're using that against the ARM
-> community. ?Why did I bother (that's not a question).
+Hi,
 
-Umm. The actual stats are still:
+On Wed, Mar 30, 2011 at 10:17:38AM +0200, saeed bishara wrote:
+> On Wed, Mar 30, 2011 at 7:18 AM, George G. Davis <gdavis@mvista.com> wrote:
+> > Hi,
+> >
+> > On Wed, Mar 09, 2011 at 03:50:48PM +0000, Catalin Marinas wrote:
+> >> On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
+> >> > > Did you get a chance to try this patch?
+> >> > yes, it works fine
+> >>
+> >> Thanks for trying. I'll add a commit log and post.
+> >
+> > Based on your comments here [1], it looks like your fix for this [2] is
+> > superseeded by [3] which is already applied [4]. ?Can you confirm?
+> [4] fixed the bug that I reported here. and since my kernel based on
+> 2.6.35.9, I backported several patches besides to that one, here is
+> the list::
+> 0001-generic-ipi-Fix-deadlock-in-__smp_call_function_sing.patch
+> 0002-kernel-smp.c-fix-smp_call_function_many-SMP-race.patch
+> 0003-kernel-smp.c-consolidate-writes-in-smp_call_function.patch
+> 0004-call_function_many-fix-list-delete-vs-add-race.patch
+> 0005-call_function_many-add-missing-ordering.patch
+> 0006-smp_call_function_many-handle-concurrent-clearing-of.patch
+> 
+> with those patches I don't see IPI lockup issue any more.
+> saeed
 
- 1349 files changed, 62230 insertions(+), 33993 deletions(-)
+Thanks!
 
-which is sad. And the end result speaks for itself: this is lines per
-architecture:
+--
+Regards,
+George
 
-  ...
-  124022 total arch/sh
-  124418 total arch/sparc
-  181997 total arch/m68k
-  246717 total arch/mips
-  254785 total arch/x86
-  370912 total arch/powerpc
-  732732 total arch/arm
-
-notice how ARM ends up being in a class of its own. This is a PROBLEM.
-
-And ARM fanbois can say "oh, but arm is special" all they want, but
-they need to realize that the lack of common platform for ARM is a
-real major issue. It's not a "feature", and I'm sorry, but anybody who
-calls x86 "peanuts" is a moron and should be ashamed of himself.
-Instead of trying to feel superior, those people should feel like
-pariah.
-
-The fact that x86 has a platform, and people have cared about
-compatibility, and actually gets things to work with less code is a
-good thing. I know ARM people who think that x86 is an "ugly"
-architecture. But the fact is, of all the architectures out there, ARM
-right now is the ugliest BY FAR. Exactly because of people who don't
-seem to understand that this kind of crap is a problem.
-
-                    Linus
+> >
+> > TIA!
+> >
+> > --
+> > Regards,
+> > George
+> >
+> > [1] https://lkml.org/lkml/2011/3/15/429
+> > [2] https://lkml.org/lkml/2011/3/15/296
+> > [3] https://lkml.org/lkml/2011/3/15/315
+> > [4] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=723aae2
+> >>
+> >> --
+> >> Catalin
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
