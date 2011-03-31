@@ -1,129 +1,34 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 31 Mar 2011 15:16:08 +0200
-Subject: [PATCH 12/12] ARM: S5PC110: Added CMA regions to Aquila and
-	Goni	boards
-In-Reply-To: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1301577368-16095-13-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Mar 2011 14:25:33 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110331104152.GB3723@elte.hu>
+References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<20110331104152.GB3723@elte.hu>
+Message-ID: <20110331132533.GC17547@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds CMA memory regions to Aquila and Goni boards.
+On Thu, Mar 31, 2011 at 12:41:52PM +0200, Ingo Molnar wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
+> > > Having strong, effective platform abstractions inside the kernel really helps 
+> > > even if the hardware space itself is inevitably fragmented: both powerpc and 
+> > > x86 has shown that. Until you realize and appreciate that you really have not 
+> > > understood the problem i think.
+> > 
+> > No, I think it is the other way around.  Folk like me and Nicolas over the 
+> > last ten years have put considerable amounts of effort into trying to keep 
+> > the ARM support code as clean and maintainable as possible.
+> 
+> Absolutely no argument about that, whenever i have read core ARM code it was 
+> always a pleasure. You guys are doing a fine job there.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/mach-aquila.c |   31 +++++++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-goni.c   |   31 +++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 4e1d8ff..de3c41f 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -21,6 +21,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -642,6 +643,35 @@ static void __init aquila_sound_init(void)
- 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
- }
- 
-+static void __init aquila_reserve(void)
-+{
-+	static struct cma_region regions[] = {
-+		{
-+			.name		= "fw",
-+			.size		=  16 << 20,
-+			.alignment	= 128 << 10,
-+			.start		= 0x32000000,
-+		},
-+		{
-+			.name		= "b1",
-+			.size		=  32 << 20,
-+			.start		= 0x33000000,
-+		},
-+		{
-+			.name		= "b2",
-+			.size		=  32 << 20,
-+			.start		= 0x44000000,
-+		},
-+		{ }
-+	};
-+
-+	static const char map[] __initconst =
-+		"s5p-mfc/f=fw;s5p-mfc/a=b1;s5p-mfc/b=b2;*=b1,b2";
-+
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
-+}
-+
- static void __init aquila_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -683,4 +713,5 @@ MACHINE_START(AQUILA, "Aquila")
- 	.map_io		= aquila_map_io,
- 	.init_machine	= aquila_machine_init,
- 	.timer		= &s5p_timer,
-+	.reserve	= aquila_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 31d5aa7..24f3f5c 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -26,6 +26,7 @@
- #include <linux/input.h>
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
-+#include <linux/cma.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -833,6 +834,35 @@ static void __init goni_sound_init(void)
- 	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
- }
- 
-+static void __init goni_reserve(void)
-+{
-+	static struct cma_region regions[] = {
-+		{
-+			.name		= "fw",
-+			.size		=  16 << 20,
-+			.alignment	= 128 << 10,
-+			.start		= 0x31000000,
-+		},
-+		{
-+			.name		= "b1",
-+			.size		=  32 << 20,
-+			.start		= 0x33000000,
-+		},
-+		{
-+			.name		= "b2",
-+			.size		=  32 << 20,
-+			.start		= 0x44000000,
-+		},
-+		{ }
-+	};
-+
-+	static const char map[] __initconst =
-+		"s5p-mfc/f=fw;s5p-mfc/a=b1;s5p-mfc/b=b2;*=b1,b2";
-+
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
-+}
-+
- static void __init goni_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -893,4 +923,5 @@ MACHINE_START(GONI, "GONI")
- 	.map_io		= goni_map_io,
- 	.init_machine	= goni_machine_init,
- 	.timer		= &s5p_timer,
-+	.reserve	= goni_reserve,
- MACHINE_END
--- 
-1.7.1.569.g6f426
+Thanks for your vote of confidence.  It's really appreciated.
