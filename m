@@ -1,32 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2011 09:30:45 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331080634.GA18022@elte.hu>
-References: <201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-Message-ID: <20110331083044.GB14323@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Mar 2011 14:05:04 +0530
+Subject: [pm-core][PATCH v3 02/21] OMAP4: Use WARN_ON() instead of BUG_ON()
+	with graceful exit
+In-Reply-To: <20110328205323.GD30616@atomide.com>
+References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
+	<1301304157-2466-3-git-send-email-santosh.shilimkar@ti.com>
+	<20110328205323.GD30616@atomide.com>
+Message-ID: <4D943CB8.70002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
-> Having strong, effective platform abstractions inside the kernel really helps 
-> even if the hardware space itself is inevitably fragmented: both powerpc and 
-> x86 has shown that. Until you realize and appreciate that you really have not 
-> understood the problem i think.
+On 3/29/2011 2:23 AM, Tony Lindgren wrote:
+> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 02:20]:
+>> OMAP L2X0 and GIC initialisation code uses BUG_ON() for the
+>> ioremap() failure scenarios.
+>>
+>> Use WARN_ON() instead and allow graceful function exits.
+>>
+>> This was suggsted by Kevin Hilman<khilman@ti.com>  during
+>> OMAP4 PM code review.
+>>
+>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap4-common.c |    9 ++++++---
+>>   1 files changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>> index 559d227..8f9b97d 100644
+>> --- a/arch/arm/mach-omap2/omap4-common.c
+>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>> @@ -36,11 +36,13 @@ void __init gic_init_irq(void)
+>>
+>>   	/* Static mapping, never released */
+>>   	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+>> -	BUG_ON(!gic_dist_base_addr);
+>> +	if (WARN_ON(!gic_dist_base_addr))
+>> +		return;
+>>
+>>   	/* Static mapping, never released */
+>>   	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+>> -	BUG_ON(!gic_cpu_base);
+>> +	if (WARN_ON(!gic_cpu_base))
+>> +		return;
+>>
+>>   	omap_wakeupgen_init();
+>>
+>> @@ -68,7 +70,8 @@ static int __init omap_l2_cache_init(void)
+>>
+>>   	/* Static mapping, never released */
+>>   	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+>> -	BUG_ON(!l2cache_base);
+>> +	if (WARN_ON(!l2cache_base))
+>> +		return -ENODEV;
+>>
+>>   	/*
+>>   	 * 16-way associativity, parity disabled
+>
+> Hmm to me it seems that if any of these we don't want to
+> continue.
+>
+L2 cache is no problem and kernel can boot without L2 cache
+support. I agree with you on interrupt controller init though.
 
-No, I think it is the other way around.  Folk like me and Nicolas over
-the last ten years have put considerable amounts of effort into trying
-to keep the ARM support code as clean and maintainable as possible.
+Will drop the interrupt related checks from this patch.
 
-That is true of the common ARM stuff, but there's no way we can do this
-for all SoC support - there aren't the hours in the day to provide such
-a wide oversight.  That's why we have SoC maintainers, and the SoC
-maintainers have the responsibility to sort out their own sub-trees.
+Kevin, Are you ok with it ?
+
+Regards
+Santosh
