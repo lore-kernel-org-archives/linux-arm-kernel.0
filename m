@@ -1,79 +1,46 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 31 Mar 2011 10:02:06 +0200
-Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
-In-Reply-To: <1301554968-29066-1-git-send-email-b32955@freescale.com>
-References: <19858.62649.218523.984252@ipc1.ka-ro>
-	<1301554968-29066-1-git-send-email-b32955@freescale.com>
-Message-ID: <19860.13566.651111.241538@ipc1.ka-ro>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 31 Mar 2011 10:06:34 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+References: <20110318101512.GA15375@n2100.arm.linux.org.uk>
+	<201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+Message-ID: <20110331080634.GA18022@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Huang Shijie writes:
-> The GPMI may have many DMA channels, such as the imx23 has
-> four DMA channels. All these DMA channels share the same interrupt.
-> Add the interrupt check for the GPMI, only the first DMA channel will
-> register the irq.
+* Nicolas Pitre <nico@fluxnic.net> wrote:
+
+> On Wed, 30 Mar 2011, david at lang.hm wrote:
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
->  1 files changed, 32 insertions(+), 4 deletions(-)
+> > back in the early days of the PCs, different systems from different vendors
+> > had different bus types, peripherals at different addresses, etc. that didn't
+> > make all of those vendors systems different architectures, instead those
+> > things were varients of the x86 architecture.
 > 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 88aad4f..db36bf1 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -26,6 +26,8 @@
->  #include <asm/irq.h>
->  #include <mach/mxs.h>
->  #include <mach/dma.h>
-> +#include <mach/mx23.h>
-> +#include <mach/mx28.h>
->  #include <mach/common.h>
->  
->  /*
-> @@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> +/* The GPMI has several DMA channels, only the first can register the irq. */
-> +static bool irq_check(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	int irq_num = mxs_chan->chan_irq;
-> +
-> +#ifdef CONFIG_SOC_IMX23
-> +	if (cpu_is_mx23() && irq_num == MX23_INT_GPMI_DMA) {
-> +		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
-> +			return true;
-> +		else
-> +			return false;
-> +	}
-> +#endif
-> +#ifdef CONFIG_SOC_IMX28
-> +	if (cpu_is_mx28() && irq_num == MX28_INT_GPMI_DMA) {
-> +		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
-> +			return true;
-> +		else
-> +			return false;
-> +	}
-> +#endif
-> +	return true;
-> +}
->
-You should make the distinction based on the platform_id, which would
-save you the ugly ifdef's and cpu_is_... macros.
+> Most of them didn't survive.  That really helps.
 
+That's not the point, 99% of the current ARM boards will not 'survive' either, 
+10-20 years down the road.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+I think you missed David's main point: life inevitably went on and few of the 
+old x86 hardware 'survived' physically, but past hardware versions have not 
+littered the kernel source with half a million lines of source code in the 
+process ...
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Having strong, effective platform abstractions inside the kernel really helps 
+even if the hardware space itself is inevitably fragmented: both powerpc and 
+x86 has shown that. Until you realize and appreciate that you really have not 
+understood the problem i think.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks,
+
+	Ingo
