@@ -1,26 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2011 01:15:02 +0100
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Mar 2011 17:15:32 -0700
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+In-Reply-To: <20110330235930.GA6680@n2100.arm.linux.org.uk>
 References: <20110317183048.GW7258@atomide.com>
 	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
 	<20110318101512.GA15375@n2100.arm.linux.org.uk>
 	<201103301906.42429.arnd@arndb.de>
 	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-Message-ID: <20110331001502.GB6680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<20110330235930.GA6680@n2100.arm.linux.org.uk>
+Message-ID: <20110331001531.GR18334@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 12:21:32PM -0700, Linus Torvalds wrote:
-> Look at the dirstat for arch/ in just the current merge window
-> (cut-off at 5% just to not get too much):
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110330 16:57]:
+> On Wed, Mar 30, 2011 at 07:31:59PM -0400, Nicolas Pitre wrote:
 > 
-> [torvalds at i5 linux]$ git diff -C --dirstat=5 --cumulative v2.6.38.. arch
->   14.0% arch/arm/mach-omap2/
->    5.8% arch/arm/plat-mxc/include/mach/
->    6.3% arch/arm/plat-mxc/
->   57.1% arch/arm/
+> > Still, because ARM is just a CPU architecture, those SOC vendors will 
+> > always have something new to differenciate themselves from the other SOC 
+> > vendors.  And that cannot be described in a table alone. The power 
+> > management hardware from TI will still require separate _executable_ 
+> > code from the Freescale one, or the Samsung one, or the Nvidia one, or 
+> > the Qualcomm one, or the Marvell one, yada yada.  And I really don't 
+> > want to see that code turned into some vendor provided buggy ACPI 
+> > bytecode or similar.
+> 
+> To get rid of all the platform related stuff, I think you'd need some
+> kind of bytecode to deal with some of the procedural stuff with various
+> platforms.  Without bytecode, the only other way is to keep the stuff
+> as C functions in the kernel and find some way of binding them to
+> drivers through DT, which means we're still going to have platform
+> specific C files littering the kernel.
 
-In this merge window, I deleted at least 6000 lines from arch/arm, and
-by quoting diffstat percentages, you're using that against the ARM
-community.  Why did I bother (that's not a question).
+The SoC specific code still needs to be different for things like PM,
+but that's pretty small compared to the mux/clock/hwmod data on omaps.
+
+Also I think we can make the PM code into loadable modules eventually.
+ 
+> While I can see DT solving the "declare this data structure" problem,
+> I believe that's only part of the issue.
+
+Yup I agree there are other issues too.
+
+> This is exactly why when DT was proposed as a miracle cure-all for ARM,
+> I wanted to see DT on a real ARM platform rather than just ARM Ltd's
+> simple and similar development boards.
+> 
+> Certainly, though, DT for ARM is progressing.
+
+At least omap mux/clokc/hwmod data could come either from devicetree
+or be a loadable kernel module for most entries.
+
+Regards,
+
+Tony
