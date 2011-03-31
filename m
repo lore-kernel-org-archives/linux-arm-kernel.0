@@ -1,25 +1,56 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Thu, 31 Mar 2011 16:50:49 +0300
-Subject: [PATCHv2] omap: rx51: Platform support for lp5523 led chip
-In-Reply-To: <1301578692-29286-1-git-send-email-ameya.palande@nokia.com>
-References: <alpine.DEB.1.10.1103311524420.2634@esdhcp041196.research.nokia.com>
-	<1301578692-29286-1-git-send-email-ameya.palande@nokia.com>
-Message-ID: <20110331165049.f3b83956.jhnikula@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Mar 2011 15:54:33 +0200 (CEST)
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110331105000.GC14323@n2100.arm.linux.org.uk>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<AANLkTikV5OMifKjWRVdtJLEcxcZ56jrjWLYJBX89pHQ0@mail.gmail.com>
+	<alpine.LFD.2.00.1103310012500.28032@xanadu.home>
+	<20110331105440.42692165@lxorguk.ukuu.org.uk>
+	<20110331105000.GC14323@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1103311541190.22418@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011 16:38:12 +0300
-Ameya Palande <ameya.palande@nokia.com> wrote:
-
-> Signed-off-by: Ameya Palande <ameya.palande@nokia.com>
-> Signed-off-by: Mathias Nyman <mathias.nyman@nokia.com>
-> ---
->  arch/arm/mach-omap2/board-rx51-peripherals.c |   74 ++++++++++++++++++++++++++
->  1 files changed, 74 insertions(+), 0 deletions(-)
+On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
+> And I'm not going to be merging anything into my tree for the time being.
+> I know there's no way for me to continue without being moaned at by someone.
+> So I'm just going to take the easy option at the moment and do precisely
+> nothing in terms of queueing patches until something gets resolved one way
+> or the other.  I'm not even going to review any patches because I currently
+> see it as a total waste of time - I've no idea whether they'll stand any
+> chance what so ever of making it into mainline.
 > 
-Nice keyboard and rgb led blinking:
+> What's the way out of this?  I've no idea.  Can ARM continue being part
+> of the mainline kernel?  I've no idea.  Will we be ripping out all the
+> ARM platform code from the mainline kernel?  I've no idea.
 
-while true; do ls /sys/class/leds/lp5523\:channel?/brightness |xargs -I
-{} bash -c 'echo $((RANDOM % 255)) > {}'; done
+Moving arm out of mainline would be a complete disaster.
+ 
+> I am now completely demotivated.
 
-Tested-by: Jarkko Nikula <jhnikula@gmail.com>
+I can understand that, but I have to say again, that you do a pretty
+damned good job on keeping the ARM core code clean and I always enjoy
+working with you when infrastructure I'm working on needs to deal with
+ARM requirements. We disagree from time to time, but I don't remember
+a single incident where we could not resolve that on a technical base.
+
+It's not your fault, that you can't clone yourself 10 times to deal
+with the subarch flood. It's also not your fault that the subarch
+maintainers tend not to look over the brim of their SoC sandbox and
+figure out how to solve the big picture.
+
+So no, ARM needs to stay and the ARM crowd needs to find competent
+people who babysit the SoC crowd and work with you to get the big
+picture straight. Something like this should have been done _before_
+the wave of ARM spilling out of every other silicon shop became
+tsunami sized. But not doing it at all will not solve anything.
+
+Thanks,
+
+	tglx
