@@ -1,61 +1,76 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 31 Mar 2011 12:11:53 +0200 (CEST)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103302319290.28032@xanadu.home>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<20110331001502.GB6680@n2100.arm.linux.org.uk>
-	<AANLkTinE7EDbV8hrYZWBxgvwOxdPMLoS0Y57PSm04rvM@mail.gmail.com>
-	<alpine.LFD.2.00.1103302319290.28032@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1103310928240.22418@localhost6.localdomain6>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 31 Mar 2011 13:10:48 +0300
+Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
+In-Reply-To: <4D92F277.7060607@freescale.com>
+References: <1301474413-28821-1-git-send-email-b32955@freescale.com>
+	<1301474413-28821-4-git-send-email-b32955@freescale.com>
+	<201103301046.04357.ffainelli@freebox.fr>
+	<4D92F277.7060607@freescale.com>
+Message-ID: <1301566248.2828.40.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-B1;2401;0cOn Thu, 31 Mar 2011, Nicolas Pitre wrote:
-> On Wed, 30 Mar 2011, Linus Torvalds wrote:
-> > And ARM fanbois can say "oh, but arm is special" all they want, but
-> > they need to realize that the lack of common platform for ARM is a
-> > real major issue. It's not a "feature", and I'm sorry, but anybody who
-> > calls x86 "peanuts" is a moron and should be ashamed of himself.
-> > Instead of trying to feel superior, those people should feel like
-> > pariah.
+Hi,
+
+On Wed, 2011-03-30 at 17:05 +0800, Huang Shijie wrote:
+> > On Wednesday 30 March 2011 10:40:10 Huang Shijie wrote:
+> >> This is a new database for the NANDs which is searched by the id_bytes.
+> > drivers/mtd//nand/nand_base.c will be able to detect all of your chips listed
+> > below based on the ids present in drivers/mtd/nand/nand_ids.c
+> >
+> yes.
 > 
-> Oh come on.  You just provided actual numbers above showing that ARM is 
-> simply fscked up (your words) compared to X86.  I would be curious to 
-> know what people like tglx who did significant work on both 
-> architectures actually think of X86 relative to ARM when it comes to 
-> kernel maintenance.
+> But I will use the new database to replace the old one.
+> 
+> I will  submit new patches to modify the generic code if my driver is 
+> accepted.
 
-To be honest both suck in their own way. The only reason why x86 is
-slightly less horrible is the fact that it's better architectured at
-the hardware level.
+Sorry, but this is not how the opensource community works. The common
+practice everywhere in the kernel is that if the generic code/framework
+is too limiting, you first change the framework, then start using it. We
+do not do things like - I'll first create my custom solution, and then I
+promise I will change the framework.
 
-But I see the same mess coming in with all those wonderful Atom based
-SoCs on the horizon, which are nothing else than any other random ARM
-SoC, just that they glue an x86 core into the same cheepo random IP
-peripherals conglomerate. In fact some of those chip have been ARM
-powered before they got an x86 injected.
+Again, this is not just MTD, this is everywhere in the kernel. This is
+how linux goes forward - we force people to improve common code and
+accept their drivers, and everyone benefits form this. Yes, this is more
+work for you, of course, sorry :-)
 
-And worse: the Intel folks went there and wrote a new driver for an IP
-block which had already an "ARM associated" driver.
+> > If you have new chips to support in the future, you should add them in
+> > drivers/mtd/nand/nand_ids.c and not keep this file.
+> >
+> The data structure  nand_flash_dev{} does not contain enough information.
+> So I want to the nand_device_info{} to replace it in future.
 
-So I say that it is not only an ARM problem, it's a general problem
-that people do not realize that the IP cores are reused all over the
-place and across architectures.
+Just add this information, if it is of generic nature (like SLC/MLC
+flag, required ECC strength, etc).
 
-I'm pretty sure after I went through all the irq code recently that
-lots of those ARM SoCs from vendors across the board could share a lot
-of driver code if someone would actually sit down and analyse the
-situation. Right now we have nobody who has the time and the stomach
-to go through this and at the same time prevent that more copied
-crappola is hitting the tree.
+> > I still do not understand why this would be needed, is it because the generic
+> > code does not provide enough informations for your driver?
+> >
+> yes.
+> 
+> IMHO, the generic code is somehow trapped in a wrong way. :(
 
-I'm sure that device tree is part of the solution, but that only helps
-if we find a way to prevent duplicate drivers in the first place.
+Fix this please :-)
 
-Thanks,
+> Paring the id bytes is not sufficient to get all the information you 
+> need which is faced by me.
 
-	tglx
+Fix this too :-)
+
+> What's more, I think the paring code is ugly, see the nand_get_flash_type().
+
+You are welcome to fix this. There is _a lot_ of ugly code in MTD
+because no one loves it. Give it some love :-)
+
+> Why not create a new database which contains all the necessary 
+> information for a nand, and can be easy
+> find by the id bytes as the keyword?
+
+You can create this database by extending/improving/cleaning up the
+existing code base with a nice series of patches.
+
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
