@@ -1,56 +1,67 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Thu, 31 Mar 2011 09:55:31 -0500
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Mar 2011 17:01:40 +0200 (CEST)
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331130123.GB17547@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+In-Reply-To: <87d3l7jqpr.fsf@ti.com>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
 	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
 	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
 	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
 	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<AANLkTikV5OMifKjWRVdtJLEcxcZ56jrjWLYJBX89pHQ0@mail.gmail.com>
-	<alpine.LFD.2.00.1103310012500.28032@xanadu.home>
-	<20110331105440.42692165@lxorguk.ukuu.org.uk>
-	<20110331105000.GC14323@n2100.arm.linux.org.uk>
-	<1301575101.10659.132.camel@e102109-lin.cambridge.arm.com>
-	<20110331130123.GB17547@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTinmoTyceJCT+K-RCm4NC76qfDyeVw@mail.gmail.com>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
+	<87d3l7jqpr.fsf@ti.com>
+Message-ID: <alpine.LFD.2.00.1103311647300.22418@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell:
+On Thu, 31 Mar 2011, Kevin Hilman wrote:
 
+> Thomas Gleixner <tglx@linutronix.de> writes:
+> 
+> > But the current SoC maintainer model does not work either. The SoC
+> > maintainers care about their sandbox and have exactly zero incentive
+> > to look at the overall picture, e.g reuse of code for the same IP
+> > blocks, better abstraction mechanisms etc. 
+> 
+> zero incentive?  that's a bit strong, IMO.
+> 
+> That may be true for some SoCs, it's not really fair as a sweeping
+> statement.
 
-On Thu, Mar 31, 2011 at 8:01 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> And since Linus' whinge about ARM defconfigs, I really *hate* merging
-> anything with *any* defconfig changes in - as a result, I don't
-> particularly want to deal with ARM defconfig changes anymore.
+Fair enough, but it's the perception in general.
 
-I think the defconfigs are as important as the code itself! Sure there
-is a lot of churn in them--- just let git deal with it and move on.
+> Conference (ELC, US and Europe.)  Especially as IP blocks are reused
+> across SoC families, abstractions like runtime PM are the only way to
+> keep the SoC specifics of PM out of the common driver.
 
-The defconfigs and board code provide critical reference models for
-new platform developers.  If these models aren't right, then you end
-up providing bad references that get replicated over and over again.
-It multiplies the problem we're trying to solve.
+Right, I know that these things happen, but at the same time the sheer
+amount of stuff flowing in makes it hard that these infrastructure
+stuff really works out. And we are only at the beginning of the big
+shuffle "code in to mainline" game.
 
-> Just look at the removal of AAEC2000, LH7A40x and 2000 lines from the
-> mach-types file removed 6000 lines, which in itself is about the number
-> of lines of change submitted during the last merge window for any one
-> non-ARM architecture. ?At this point in time with this complaint, I've
-> absolutely no idea why I bothered to do that. ?I should've left it well
-> alone and then the diffstat percentage would've been smaller. ?After
-> all, it's "pointless churn".
+After cleaning up the whole irq stuff across the tree I can tell you,
+that the mess is non-linear growing with the number of instances.
 
-I think you did it because it was the Right Thing To Do.  Even
-positive change can be painful at times.
+You can see the patterns which are:
+    - copy and paste
+    - introduce different bugs
+    - add more abuse
 
-The majority is exceedingly grateful for the effort you make.
+That's what I'm really concerned about.
 
+> Yes, ARM SoC maintainers have to make up some ground.  But compare this
+> to just a couple years ago where the common complaint was "why aren't
+> embedded SoC people contributing code to mainline", and you'll see we
+> have come a long way.
 
-b.g.
+Well, code comes in, which is progress. But we need to figure out how
+to deal with the increasingly growing flood before we drown in it.
 
--- 
-Bill Gatliff
-bgat at billgatliff.com
+Thanks,
+
+	tglx
