@@ -1,42 +1,36 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 31 Mar 2011 11:09:21 +0800
-Subject: /proc/cpu/clocks
-In-Reply-To: <AANLkTik6NQvgT1sdFf7Vg-nXCM1PKv43WhqnzOJuR=cV@mail.gmail.com>
-References: <AANLkTikBgq0bSRSQRSzeu==ByemegSB+x7AXXeJjR_ct@mail.gmail.com>
-	<20110330191938.GE2939@n2100.arm.linux.org.uk>
-	<AANLkTik6NQvgT1sdFf7Vg-nXCM1PKv43WhqnzOJuR=cV@mail.gmail.com>
-Message-ID: <20110331030920.GA3523@b20223-02.ap.freescale.net>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 31 Mar 2011 12:16:49 +0900
+Subject: [PATCH] mmc, ARM: Add zboot from eSD support for SuperH Mobile ARM
+In-Reply-To: <AANLkTin6TdEWjQoNCGw1gV1BnzHjOQss9DA_0BRMdvNE@mail.gmail.com>
+References: <1301453955-15759-1-git-send-email-horms@verge.net.au>
+	<1301453955-15759-2-git-send-email-horms@verge.net.au>
+	<AANLkTin6TdEWjQoNCGw1gV1BnzHjOQss9DA_0BRMdvNE@mail.gmail.com>
+Message-ID: <20110331031648.GA3225@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
-
-On Wed, Mar 30, 2011 at 04:06:45PM -0500, Matt Sealey wrote:
-> Ah okay. So we get to bug Freescale :)
-The clock debug info is what I'm looking for too.
-Freescale kernel does have the clock debug info. But mainline kernel does not.
-The common clock code does not have the concept of "parent".
-
-Thanks
-Richard
-> 
-> -- 
-> Matt Sealey <matt@genesi-usa.com>
-> Product Development Analyst, Genesi USA, Inc.
-> 
-> 
-> 
-> On Wed, Mar 30, 2011 at 2:19 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Mar 30, 2011 at 11:27:46AM -0500, Matt Sealey wrote:
-> >> Where did /proc/cpu/clocks go in the kernel and where can I find the
-> >> equivalent information?
+On Thu, Mar 31, 2011 at 11:06:24AM +0900, Magnus Damm wrote:
+> On Wed, Mar 30, 2011 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
+> > This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
+> > ARM to boot directly from the SDHI hardware block.
 > >
-> > It has never existed as a generic thing in mainline. ?If some platform
-> > added it then it was private to that platform.
+> > This is achieved by the MaskROM loading the first portion of the image into
+> > MERAM and then jumping to it. ?This portion contains loader code which
+> > copies the entire image to SDRAM and jumps to it. From there the zImage
+> > boot code proceeds as normal, uncompressing the image into its final
+> > location and then jumping to it.
 > >
+> > Cc: Paul Mundt <lethal@linux-sh.org>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Simon Horman <horms@verge.net.au>
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Hi Simon,
+> 
+> Thanks for your work on this. v6 of this patch looks good to me!
+> 
+> Acked-by: Magnus Damm <damm@opensource.se>
+
+Likewise. Feel free to shovel it in to the patch tracker at your leisure.
+
+Acked-by: Paul Mundt <lethal@linux-sh.org>
