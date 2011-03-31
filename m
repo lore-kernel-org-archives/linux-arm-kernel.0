@@ -1,56 +1,41 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 31 Mar 2011 15:20:06 +0400
-Subject: [PATCH 4/8] OMAP2+: omap_hwmod: manage the omap_devices the
-	wake-up latency constraints
-In-Reply-To: <1301498364-726-5-git-send-email-j-pihet@ti.com>
-References: <1301498364-726-1-git-send-email-j-pihet@ti.com>
-	<1301498364-726-5-git-send-email-j-pihet@ti.com>
-Message-ID: <4D946366.4000805@ru.mvista.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 31 Mar 2011 14:27:06 +0300
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <AANLkTi=fSUizM38SkBhPAzSbArgoNQxbV8JrC51x_RDf@mail.gmail.com>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<20110331001502.GB6680@n2100.arm.linux.org.uk>
+	<AANLkTinE7EDbV8hrYZWBxgvwOxdPMLoS0Y57PSm04rvM@mail.gmail.com>
+	<AANLkTik-BFTzyPLuYVdhCJPocc0wPY0rKvO7BQS4Fg1S@mail.gmail.com>
+	<AANLkTikd_JRxmB_OWZqq178=K3bnxhdDqcNbgFNRtTyU@mail.gmail.com>
+	<AANLkTimS_8BnBz9MSdxYJVL6oreEpH=W61BsyuX2G+Xz@mail.gmail.com>
+	<AANLkTimtO7vR2AQvJj1hHMqHCDqtoiJX_eENE9o3dPpV@mail.gmail.com>
+	<AANLkTimPJCiaUyTfcR1NSPivJ2YjSwazhiWRC-CPLy6J@mail.gmail.com>
+	<AANLkTi=fSUizM38SkBhPAzSbArgoNQxbV8JrC51x_RDf@mail.gmail.com>
+Message-ID: <20110331112706.GJ2267@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 30-03-2011 19:19, jean.pihet at newoldbits.com wrote:
+On Wed, Mar 30, 2011 at 08:24:30PM -0700, Linus Torvalds wrote:
+> So let's take a really simple example of this kind of crap.
+> 
+> Do this:
+> 
+>     git ls-files arch/arm/ | grep gpio
+> 
+> and cry. That's 145 files in the arm directory that are some kind of
+> crazy gpio support.
 
-> From: Jean Pihet<j-pihet@ti.com>
+Most likely those are remanescent from times when we didn't have
+gpiolib. It's not long ago (about 2 years) that David Brownell (rip, my
+friend) introduced it to the kernel. So those should be converted to
+gpiolib and moved to drivers/gpio/ but it doesn't mean we don't need
+that piece of code.
 
-> Hwmod is queried from the omap device layer to manage the power domains
-> wake-up latency constraints. Hwmod retrieves the correct power domain
-> and if it exists it calls the corresponding power domain function.
+With different register layout, register offsets, register sizes, etc,
+it would be way uglier to combine all those into one big hacky driver.
 
-> Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-> on MPU, CORE and PER.
-
-> Signed-off-by: Jean Pihet<j-pihet@ti.com>
-[...]
-
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index e034294..62de888 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-[...]
-> @@ -2322,11 +2323,34 @@ ohsps_unlock:
->   	return ret;
->   }
->
-> +/*
-> + * omap_hwmod_set_wkup_constraint- set/release a wake-up latency constraint
-> + *
-> + * @oh: struct omap_hwmod* to which the target device belongs to.
-> + * @cookie: identifier of the constraints list for @oh.
-> + * @min_latency: the minimum allowed wake-up latency for @oh.
-> + *
-> + * Returns 0 upon success.
-> + */
-> +int omap_hwmod_set_wkup_lat_constraint(struct omap_hwmod *oh,
-> +				       void *cookie, long min_latency)
-> +{
-> +	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-> +
-> +	if (!PTR_ERR(pwrdm)) {
-
-    What's the point of calling PTR_ERR() at all, if just '!pwrdm' will give 
-the same result?
-
-WBR, Sergei
+-- 
+balbi
