@@ -1,90 +1,69 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 30 Mar 2011 20:24:30 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTimPJCiaUyTfcR1NSPivJ2YjSwazhiWRC-CPLy6J@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<20110331001502.GB6680@n2100.arm.linux.org.uk>
-	<AANLkTinE7EDbV8hrYZWBxgvwOxdPMLoS0Y57PSm04rvM@mail.gmail.com>
-	<AANLkTik-BFTzyPLuYVdhCJPocc0wPY0rKvO7BQS4Fg1S@mail.gmail.com>
-	<AANLkTikd_JRxmB_OWZqq178=K3bnxhdDqcNbgFNRtTyU@mail.gmail.com>
-	<AANLkTimS_8BnBz9MSdxYJVL6oreEpH=W61BsyuX2G+Xz@mail.gmail.com>
-	<AANLkTimtO7vR2AQvJj1hHMqHCDqtoiJX_eENE9o3dPpV@mail.gmail.com>
-	<AANLkTimPJCiaUyTfcR1NSPivJ2YjSwazhiWRC-CPLy6J@mail.gmail.com>
-Message-ID: <AANLkTi=fSUizM38SkBhPAzSbArgoNQxbV8JrC51x_RDf@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 30 Mar 2011 22:01:47 -0600
+Subject: [PATCH] EP93xx: Remove ep93xx_gpio_dbg_show function
+In-Reply-To: <4D9113AA.20404@bluewatersys.com>
+References: <4D9113AA.20404@bluewatersys.com>
+Message-ID: <20110331040147.GG21226@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 7:20 PM, Bill Gatliff <bgat@billgatliff.com> wrote:
->
-> If it isn't opportunity, then you must be arguing that we shouldn't
-> add any new ARM SoC support to the kernel. ?Is that what you are
-> saying?
+On Tue, Mar 29, 2011 at 12:03:06PM +1300, Ryan Mallon wrote:
+> Hartley pointed out that the patch I posted to remove the irq internals
+> fiddling from ep93xx_gpio_dbg_show does not function as expected. It
+> will print [interrupt] beside all pins which are capable of being
+> interrupts, not just those which are currently configured as interrupts.
+> 
+> The best solution is just to remove the custom ep93xx gpio debugfs
+> function all together. The generic gpiolib one is good enough.
+> 
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-What I'm saying is that we should not be adding ANY MINDLESS BOARD
-DRIVERS for ARM.
+Applied, thanks.
 
-Because they don't work. Most of them are totally unmaintainable CRAP
-in the long run. They are extra code that actually have negative
-worth. It shouldn't be in the kernel at all.
+g.
 
-So let's take a really simple example of this kind of crap.
-
-Do this:
-
-    git ls-files arch/arm/ | grep gpio
-
-and cry. That's 145 files in the arm directory that are some kind of
-crazy gpio support.
-
-Now, we have gpio drivers in other parts of the kernel too, but ARM is
-at the point where it's just crazy.
-
-And most GPIO drivers I've ever seen are actually basically "turn this
-bit on or off in this register to turn it into an Input or Output"
-along with "read/write this other bit to actually see/set the value".
-Repeat that for 'nr' bits, where 'nr' is just some small value,
-usually in single digits.
-
-Now, not all of them are that, by all means, and the details are often
-slightly different. Sometimes the read register is the same as the
-write register, sometimes it isn't. Sometimes you have a "clear
-register" and a "set register" instead of a register you write the
-value to. And I haven't checked what those 145 files do, but I bet a
-_lot_ of them could be described by having a single generic gpio
-driver, and then just using devicetree to give that common driver a
-few values to describe where the IO ports are, which bits they are,
-and which type of gpio it is.
-
-And then when you have another ARM SoC, instead of writing yet another
-mindless board driver for the gpio's on it, just add the <nr> entries
-for the GPIO's to the device tree. NOT A SINGLE LINE OF CODE.
-
-Yes, yes, there are always exceptions. Many GPIO's are actually behind
-some i2c bus or something. Others can do pulsing or are just generally
-more complex than an array of single bits. So I'm sure we couldn't
-replace all those 145 gpio files under arch/arm with a single driver
-and some devicetree entries, but maybe half of them match the simple
-pattern. I bet the SoC case it's more than half, it would be silly to
-do i2c on an SoC. But I dunno. I really didn't look.
-
-PowerPC does exactly the above, btw. So I'm not just talking about
-some magical theoretical thing. I seriously think every ARM person who
-has ever written any of those "gpio" files should look at powerpc.
-Now, I suspect that most powerpc SoC's tend to share more IP blocks
-than the crazy ARM situation, but even so, please just check it out.
-Check out the device tree files (*.dts) and do that same
-
-   git ls-files arch/arm/ | grep gpio
-
-except do it on powerpc.
-
-See the difference?
-
-The powerpc people even wrote documentation about the thing, which is
-just above and beyond reasonable.
-
-                             Linus
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+> index 34e071d..c74adf9 100644
+> --- a/arch/arm/mach-ep93xx/gpio.c
+> +++ b/arch/arm/mach-ep93xx/gpio.c
+> @@ -348,29 +348,6 @@ static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
+>  	return 0;
+>  }
+>  
+> -static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+> -{
+> -	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+> -	u8 data_reg, data_dir_reg;
+> -	int gpio, i;
+> -
+> -	data_reg = __raw_readb(ep93xx_chip->data_reg);
+> -	data_dir_reg = __raw_readb(ep93xx_chip->data_dir_reg);
+> -
+> -	gpio = ep93xx_chip->chip.base;
+> -	for (i = 0; i < chip->ngpio; i++, gpio++) {
+> -		int is_out = data_dir_reg & (1 << i);
+> -		int irq = gpio_to_irq(gpio);
+> -
+> -		seq_printf(s, " %s%d gpio-%-3d (%-12s) %s %s %s\n",
+> -				chip->label, i, gpio,
+> -				gpiochip_is_requested(chip, i) ? : "",
+> -				is_out ? "out" : "in ",
+> -				(data_reg & (1<<  i)) ? "hi" : "lo",
+> -				(!is_out && irq>= 0) ? "(interrupt)" : "");
+> -	}
+> -}
+> -
+>  #define EP93XX_GPIO_BANK(name, dr, ddr, base_gpio)			\
+>  	{								\
+>  		.chip = {						\
+> @@ -379,7 +356,6 @@ static void ep93xx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  			.direction_output = ep93xx_gpio_direction_output, \
+>  			.get		  = ep93xx_gpio_get,		\
+>  			.set		  = ep93xx_gpio_set,		\
+> -			.dbg_show	  = ep93xx_gpio_dbg_show,	\
+>  			.base		  = base_gpio,			\
+>  			.ngpio		  = 8,				\
+>  		},							\
+> 
