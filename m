@@ -1,40 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Mar 2011 14:44:17 +0900
-Subject: [PATCH] mmc, ARM: Add zboot from eSD support for SuperH Mobile ARM
-In-Reply-To: <20110331031648.GA3225@linux-sh.org>
-References: <1301453955-15759-1-git-send-email-horms@verge.net.au>
-	<1301453955-15759-2-git-send-email-horms@verge.net.au>
-	<AANLkTin6TdEWjQoNCGw1gV1BnzHjOQss9DA_0BRMdvNE@mail.gmail.com>
-	<20110331031648.GA3225@linux-sh.org>
-Message-ID: <20110331054416.GA19085@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 31 Mar 2011 07:45:53 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+References: <20110317183048.GW7258@atomide.com>
+	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
+	<20110318101512.GA15375@n2100.arm.linux.org.uk>
+	<201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+Message-ID: <AANLkTimZ8+npVu6u5-o9+3CV40wB_GYwiOWvfJPso8G0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 12:16:49PM +0900, Paul Mundt wrote:
-> On Thu, Mar 31, 2011 at 11:06:24AM +0900, Magnus Damm wrote:
-> > On Wed, Mar 30, 2011 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
-> > > ARM to boot directly from the SDHI hardware block.
-> > >
-> > > This is achieved by the MaskROM loading the first portion of the image into
-> > > MERAM and then jumping to it. ?This portion contains loader code which
-> > > copies the entire image to SDRAM and jumps to it. From there the zImage
-> > > boot code proceeds as normal, uncompressing the image into its final
-> > > location and then jumping to it.
-> > >
-> > > Cc: Paul Mundt <lethal@linux-sh.org>
-> > > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > 
-> > Hi Simon,
-> > 
-> > Thanks for your work on this. v6 of this patch looks good to me!
-> > 
-> > Acked-by: Magnus Damm <damm@opensource.se>
-> 
-> Likewise. Feel free to shovel it in to the patch tracker at your leisure.
-> 
-> Acked-by: Paul Mundt <lethal@linux-sh.org>
+On Thu, Mar 31, 2011 at 01:31, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 30 Mar 2011, Linus Torvalds wrote:
+>> The long-term situation should be that you should be able to have ONE
+>> binary kernel "just work". That's where we are on x86. Really.
+>
+> But X86 is peanuts. ?Really. ?There was one machine called the IBM PC at
+> some point that everybody cloned, and the rest was totally irrelevant.
+> Then came that thing called Windows that reinforced this hardware
+> monoculture as it was used for the ultimate conformance testing. ?This
+> is damn easy in that case to produce a kernel that works virtually
+> everywhere.
+>
+> On ARM there is simply not such thing as a single machine design to
+> clone, and a closed source test bench to design for.
 
-Thanks, will do.
+There are other architectures that didn't start from a single root platform,
+but still support multi-platform kernels.
+
+Gr{oetje,eeting}s,
+
+? ? ? ? ? ? ? ? ? ? ? ? Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
