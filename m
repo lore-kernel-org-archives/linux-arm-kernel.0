@@ -1,334 +1,196 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 31 Mar 2011 15:16:07 +0200
-Subject: [PATCH 11/12] v4l: videobuf2: add CMA allocator (for testing)
+Date: Thu, 31 Mar 2011 15:16:01 +0200
+Subject: [PATCH 05/12] mm: alloc_contig_range() added
 In-Reply-To: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
 References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1301577368-16095-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the CMA contiguous memory allocator to videobuf2.
+From: Michal Nazarewicz <m.nazarewicz@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This commit adds the alloc_contig_range() function which tries
+to allecate given range of pages.  It tries to migrate all
+already allocated pages that fall in the range thus freeing them.
+Once all pages in the range are freed they are removed from the
+buddy system thus allocated for the caller to use.
+
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-CC: Pawel Osciak <pawel@osciak.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 CC: Michal Nazarewicz <mina86@mina86.com>
 ---
- drivers/media/video/Kconfig         |    6 +
- drivers/media/video/Makefile        |    1 +
- drivers/media/video/videobuf2-cma.c |  227 +++++++++++++++++++++++++++++++++++
- include/media/videobuf2-cma.h       |   40 ++++++
- 4 files changed, 274 insertions(+), 0 deletions(-)
- create mode 100644 drivers/media/video/videobuf2-cma.c
- create mode 100644 include/media/videobuf2-cma.h
+ include/linux/page-isolation.h |    2 +
+ mm/page_alloc.c                |  144 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 146 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index 4498b94..d80c9d6 100644
---- a/drivers/media/video/Kconfig
-+++ b/drivers/media/video/Kconfig
-@@ -66,6 +66,12 @@ config VIDEOBUF2_DMA_SG
- 	select VIDEOBUF2_CORE
- 	select VIDEOBUF2_MEMOPS
- 	tristate
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index f1417ed..c5d1a7c 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -34,6 +34,8 @@ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
+ extern unsigned long alloc_contig_freed_pages(unsigned long start,
+ 					      unsigned long end, gfp_t flag);
++extern int alloc_contig_range(unsigned long start, unsigned long end,
++			      gfp_t flags);
+ extern void free_contig_pages(struct page *page, int nr_pages);
+ 
+ /*
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 11f8bcb..0a270a5 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5583,6 +5583,150 @@ unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
+ 	return pfn;
+ }
+ 
++static unsigned long pfn_to_maxpage(unsigned long pfn)
++{
++	return pfn & ~(MAX_ORDER_NR_PAGES - 1);
++}
 +
-+config VIDEOBUF2_CMA
-+	depends on CMA
-+	select VIDEOBUF2_CORE
-+	select VIDEOBUF2_MEMOPS
-+	tristate
- #
- # Multimedia Video device configuration
- #
-diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
-index ace5d8b..86e98df 100644
---- a/drivers/media/video/Makefile
-+++ b/drivers/media/video/Makefile
-@@ -118,6 +118,7 @@ obj-$(CONFIG_VIDEOBUF2_MEMOPS)		+= videobuf2-memops.o
- obj-$(CONFIG_VIDEOBUF2_VMALLOC)		+= videobuf2-vmalloc.o
- obj-$(CONFIG_VIDEOBUF2_DMA_CONTIG)	+= videobuf2-dma-contig.o
- obj-$(CONFIG_VIDEOBUF2_DMA_SG)		+= videobuf2-dma-sg.o
-+obj-$(CONFIG_VIDEOBUF2_CMA)		+= videobuf2-cma.o
- 
- obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
- 
-diff --git a/drivers/media/video/videobuf2-cma.c b/drivers/media/video/videobuf2-cma.c
-new file mode 100644
-index 0000000..5dc7e89
---- /dev/null
-+++ b/drivers/media/video/videobuf2-cma.c
-@@ -0,0 +1,227 @@
-+/*
-+ * videobuf2-cma.c - CMA memory allocator for videobuf2
++static unsigned long pfn_to_maxpage_up(unsigned long pfn)
++{
++	return ALIGN(pfn, MAX_ORDER_NR_PAGES);
++}
++
++#define MIGRATION_RETRY	5
++static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
++{
++	int migration_failed = 0, ret;
++	unsigned long pfn = start;
++
++	/*
++	 * Some code "borrowed" from KAMEZAWA Hiroyuki's
++	 * __alloc_contig_pages().
++	 */
++
++	for (;;) {
++		pfn = scan_lru_pages(pfn, end);
++		if (!pfn || pfn >= end)
++			break;
++
++		ret = do_migrate_range(pfn, end);
++		if (!ret) {
++			migration_failed = 0;
++		} else if (ret != -EBUSY
++			|| ++migration_failed >= MIGRATION_RETRY) {
++			return ret;
++		} else {
++			/* There are unstable pages.on pagevec. */
++			lru_add_drain_all();
++			/*
++			 * there may be pages on pcplist before
++			 * we mark the range as ISOLATED.
++			 */
++			drain_all_pages();
++		}
++		cond_resched();
++	}
++
++	if (!migration_failed) {
++		/* drop all pages in pagevec and pcp list */
++		lru_add_drain_all();
++		drain_all_pages();
++	}
++
++	/* Make sure all pages are isolated */
++	if (WARN_ON(test_pages_isolated(start, end)))
++		return -EBUSY;
++
++	return 0;
++}
++
++/**
++ * alloc_contig_range() -- tries to allocate given range of pages
++ * @start:	start PFN to allocate
++ * @end:	one-past-the-last PFN to allocate
++ * @flags:	flags passed to alloc_contig_freed_pages().
 + *
-+ * Copyright (C) 2010-2011 Samsung Electronics
++ * The PFN range does not have to be pageblock or MAX_ORDER_NR_PAGES
++ * aligned, hovewer it's callers responsibility to guarantee that we
++ * are the only thread that changes migrate type of pageblocks the
++ * pages fall in.
 + *
-+ * Author: Pawel Osciak <p.osciak@samsung.com>
-+ *	   Marek Szyprowski <m.szyprowski@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation.
++ * Returns zero on success or negative error code.  On success all
++ * pages which PFN is in (start, end) are allocated for the caller and
++ * need to be freed with free_contig_pages().
 + */
-+
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/cma.h>
-+#include <linux/mm.h>
-+#include <linux/sched.h>
-+#include <linux/file.h>
-+
-+#include <media/videobuf2-core.h>
-+#include <media/videobuf2-memops.h>
-+
-+#include <asm/io.h>
-+
-+struct vb2_cma_conf {
-+	struct device		*dev;
-+	const char		*type;
-+	unsigned long		alignment;
-+};
-+
-+struct vb2_cma_buf {
-+	struct vb2_cma_conf		*conf;
-+	struct cm			*cm;
-+	dma_addr_t			paddr;
-+	unsigned long			size;
-+	struct vm_area_struct		*vma;
-+	atomic_t			refcount;
-+	struct vb2_vmarea_handler	handler;
-+};
-+
-+static void vb2_cma_put(void *buf_priv);
-+
-+static void *vb2_cma_alloc(void *alloc_ctx, unsigned long size)
++int alloc_contig_range(unsigned long start, unsigned long end,
++		       gfp_t flags)
 +{
-+	struct vb2_cma_conf *conf = alloc_ctx;
-+	struct vb2_cma_buf *buf;
-+
-+	buf = kzalloc(sizeof *buf, GFP_KERNEL);
-+	if (!buf)
-+		return ERR_PTR(-ENOMEM);
-+
-+	buf->cm = cma_alloc(conf->dev, conf->type, size, conf->alignment);
-+	if (IS_ERR(buf->cm)) {
-+		printk(KERN_ERR "cma_alloc of size %ld failed\n", size);
-+		kfree(buf);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+	buf->paddr = cm_pin(buf->cm);
-+	buf->conf = conf;
-+	buf->size = size;
-+
-+	buf->handler.refcount = &buf->refcount;
-+	buf->handler.put = vb2_cma_put;
-+	buf->handler.arg = buf;
-+
-+	atomic_inc(&buf->refcount);
-+
-+	return buf;
-+}
-+
-+static void vb2_cma_put(void *buf_priv)
-+{
-+	struct vb2_cma_buf *buf = buf_priv;
-+
-+	if (atomic_dec_and_test(&buf->refcount)) {
-+		cm_unpin(buf->cm);
-+		cma_free(buf->cm);
-+		kfree(buf);
-+	}
-+}
-+
-+static void *vb2_cma_cookie(void *buf_priv)
-+{
-+	struct vb2_cma_buf *buf = buf_priv;
-+
-+	return (void *)buf->paddr;
-+}
-+
-+static unsigned int vb2_cma_num_users(void *buf_priv)
-+{
-+	struct vb2_cma_buf *buf = buf_priv;
-+
-+	return atomic_read(&buf->refcount);
-+}
-+
-+static int vb2_cma_mmap(void *buf_priv, struct vm_area_struct *vma)
-+{
-+	struct vb2_cma_buf *buf = buf_priv;
-+
-+	if (!buf) {
-+		printk(KERN_ERR "No buffer to map\n");
-+		return -EINVAL;
-+	}
-+
-+	return vb2_mmap_pfn_range(vma, buf->paddr, buf->size,
-+				  &vb2_common_vm_ops, &buf->handler);
-+}
-+
-+static void *vb2_cma_get_userptr(void *alloc_ctx, unsigned long vaddr,
-+				 unsigned long size, int write)
-+{
-+	struct vb2_cma_buf *buf;
-+	struct vm_area_struct *vma;
-+	dma_addr_t paddr = 0;
++	unsigned long _start, _end;
 +	int ret;
 +
-+	buf = kzalloc(sizeof *buf, GFP_KERNEL);
-+	if (!buf)
-+		return ERR_PTR(-ENOMEM);
++	/*
++	 * What we do here is we mark all pageblocks in range as
++	 * MIGRATE_ISOLATE.  Because of the way page allocator work, we
++	 * align the range to MAX_ORDER pages so that page allocator
++	 * won't try to merge buddies from different pageblocks and
++	 * change MIGRATE_ISOLATE to some other migration type.
++	 *
++	 * Once the pageblocks are marked as MIGRATE_ISOLATE, we
++	 * migrate the pages from an unaligned range (ie. pages that
++	 * we are interested in).  This will put all the pages in
++	 * range back to page allocator as MIGRATE_ISOLATE.
++	 *
++	 * When this is done, we take the pages in range from page
++	 * allocator removing them from the buddy system.  This way
++	 * page allocator will never consider using them.
++	 *
++	 * This lets us mark the pageblocks back as
++	 * MIGRATE_CMA/MIGRATE_MOVABLE so that free pages in the
++	 * MAX_ORDER aligned range but not in the unaligned, original
++	 * range are put back to page allocator so that buddy can use
++	 * them.
++	 */
 +
-+	ret = vb2_get_contig_userptr(vaddr, size, &vma, &paddr);
-+	if (ret) {
-+		printk(KERN_ERR "Failed acquiring VMA for vaddr 0x%08lx\n",
-+				vaddr);
-+		kfree(buf);
-+		return ERR_PTR(ret);
-+	}
++	ret = start_isolate_page_range(pfn_to_maxpage(start),
++				       pfn_to_maxpage_up(end));
++	if (ret)
++		goto done;
 +
-+	buf->size = size;
-+	buf->paddr = paddr;
-+	buf->vma = vma;
++	ret = __alloc_contig_migrate_range(start, end);
++	if (ret)
++		goto done;
 +
-+	return buf;
++	/*
++	 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
++	 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
++	 * more, all pages in [start, end) are free in page allocator.
++	 * What we are going to do is to allocate all pages from
++	 * [start, end) (that is remove them from page allocater).
++	 *
++	 * The only problem is that pages at the beginning and at the
++	 * end of interesting range may be not aligned with pages that
++	 * page allocator holds, ie. they can be part of higher order
++	 * pages.  Because of this, we reserve the bigger range and
++	 * once this is done free the pages we are not interested in.
++	 */
++
++	ret = 0;
++	while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
++		if (WARN_ON(++ret >= MAX_ORDER))
++			return -EINVAL;
++
++	_start = start & (~0UL << ret);
++	_end   = alloc_contig_freed_pages(_start, end, flag);
++
++	/* Free head and tail (if any) */
++	if (start != _start)
++		free_contig_pages(pfn_to_page(_start), start - _start);
++	if (end != _end)
++		free_contig_pages(pfn_to_page(end), _end - end);
++
++	ret = 0;
++done:
++	undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end));
++	return ret;
 +}
 +
-+static void vb2_cma_put_userptr(void *mem_priv)
-+{
-+	struct vb2_cma_buf *buf = mem_priv;
-+
-+	if (!buf)
-+		return;
-+
-+	vb2_put_vma(buf->vma);
-+	kfree(buf);
-+}
-+
-+static void *vb2_cma_vaddr(void *mem_priv)
-+{
-+	struct vb2_cma_buf *buf = mem_priv;
-+	if (!buf)
-+		return 0;
-+
-+	return phys_to_virt(buf->paddr);
-+}
-+
-+const struct vb2_mem_ops vb2_cma_memops = {
-+	.alloc		= vb2_cma_alloc,
-+	.put		= vb2_cma_put,
-+	.cookie		= vb2_cma_cookie,
-+	.mmap		= vb2_cma_mmap,
-+	.get_userptr	= vb2_cma_get_userptr,
-+	.put_userptr	= vb2_cma_put_userptr,
-+	.num_users	= vb2_cma_num_users,
-+	.vaddr		= vb2_cma_vaddr,
-+};
-+EXPORT_SYMBOL_GPL(vb2_cma_memops);
-+
-+void *vb2_cma_init(struct device *dev, const char *type,
-+					unsigned long alignment)
-+{
-+	struct vb2_cma_conf *conf;
-+
-+	conf = kzalloc(sizeof *conf, GFP_KERNEL);
-+	if (!conf)
-+		return ERR_PTR(-ENOMEM);
-+
-+	conf->dev = dev;
-+	conf->type = type;
-+	conf->alignment = alignment;
-+
-+	return conf;
-+}
-+EXPORT_SYMBOL_GPL(vb2_cma_init);
-+
-+void vb2_cma_cleanup(void *conf)
-+{
-+	kfree(conf);
-+}
-+EXPORT_SYMBOL_GPL(vb2_cma_cleanup);
-+
-+void **vb2_cma_init_multi(struct device *dev,
-+					  unsigned int num_planes,
-+					  const char *types[],
-+					  unsigned long alignments[])
-+{
-+	struct vb2_cma_conf *cma_conf;
-+	void **alloc_ctxes;
-+	unsigned int i;
-+
-+	alloc_ctxes = kzalloc((sizeof *alloc_ctxes + sizeof *cma_conf)
-+				* num_planes, GFP_KERNEL);
-+	if (!alloc_ctxes)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cma_conf = (void *)(alloc_ctxes + num_planes);
-+
-+	for (i = 0; i < num_planes; ++i, ++cma_conf) {
-+		alloc_ctxes[i] = cma_conf;
-+		cma_conf->dev = dev;
-+		cma_conf->type = types[i];
-+		cma_conf->alignment = alignments[i];
-+	}
-+
-+	return alloc_ctxes;
-+}
-+EXPORT_SYMBOL_GPL(vb2_cma_init_multi);
-+
-+void vb2_cma_cleanup_multi(void **alloc_ctxes)
-+{
-+	kfree(alloc_ctxes);
-+}
-+EXPORT_SYMBOL_GPL(vb2_cma_cleanup_multi);
-+
-+MODULE_DESCRIPTION("CMA allocator handling routines for videobuf2");
-+MODULE_AUTHOR("Pawel Osciak");
-+MODULE_LICENSE("GPL");
-diff --git a/include/media/videobuf2-cma.h b/include/media/videobuf2-cma.h
-new file mode 100644
-index 0000000..ba8dad5
---- /dev/null
-+++ b/include/media/videobuf2-cma.h
-@@ -0,0 +1,40 @@
-+/*
-+ * videobuf2-cma.h - CMA memory allocator for videobuf2
-+ *
-+ * Copyright (C) 2010-2011 Samsung Electronics
-+ *
-+ * Author: Pawel Osciak <p.osciak@samsung.com>
-+ *	   Marek Szyprowski <m.szyprowski@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation.
-+ */
-+
-+#ifndef _MEDIA_VIDEOBUF2_CMA_H
-+#define _MEDIA_VIDEOBUF2_CMA_H
-+
-+#include <media/videobuf2-core.h>
-+
-+static inline unsigned long vb2_cma_plane_paddr(struct vb2_buffer *vb,
-+						unsigned int plane_no)
-+{
-+	return (unsigned long)vb2_plane_cookie(vb, plane_no);
-+}
-+
-+struct vb2_alloc_ctx *vb2_cma_init(struct device *dev, const char *type,
-+					unsigned long alignment);
-+void vb2_cma_cleanup(struct vb2_alloc_ctx *alloc_ctx);
-+
-+struct vb2_alloc_ctx **vb2_cma_init_multi(struct device *dev,
-+				  unsigned int num_planes, const char *types[],
-+				  unsigned long alignments[]);
-+void vb2_cma_cleanup_multi(struct vb2_alloc_ctx **alloc_ctxes);
-+
-+struct vb2_alloc_ctx *vb2_cma_init(struct device *dev, const char *type,
-+					unsigned long alignment);
-+void vb2_cma_cleanup(struct vb2_alloc_ctx *alloc_ctx);
-+
-+extern const struct vb2_mem_ops vb2_cma_memops;
-+
-+#endif
+ void free_contig_pages(struct page *page, int nr_pages)
+ {
+ 	for (; nr_pages; --nr_pages, ++page)
 -- 
 1.7.1.569.g6f426
