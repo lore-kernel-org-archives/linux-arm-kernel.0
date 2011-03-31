@@ -1,19 +1,29 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 31 Mar 2011 09:04:05 -0700
-Subject: [PATCH 05/12] mm: alloc_contig_range() added
-In-Reply-To: <1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1301587445.31087.1042.camel@nimitz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Mar 2011 17:45:39 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+Message-ID: <20110331164539.GB19452@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
-> +       _start = start & (~0UL << ret);
-> +       _end   = alloc_contig_freed_pages(_start, end, flag); 
+On Thu, Mar 31, 2011 at 09:03:28AM -0700, david at lang.hm wrote:
+> In this case I owe you and Nicolas an apology.
 
-These names are a wee bit lacking.  Care to give them proper names that
-might let a reader figure out how the "_" makes the variable different
-from its nearly-identical twin?
+Thanks.
 
--- Dave
+> it's not the total amount of code, and it's not even the total amount of  
+> change to the code that's the issue.
+
+I think you're not entirely correct - have a look at Linus' message where
+there's a comparison of the size of arch/arm with other architectures, and
+you'll find that it is partly about size of source code.
