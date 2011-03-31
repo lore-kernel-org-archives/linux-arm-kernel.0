@@ -1,82 +1,44 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 31 Mar 2011 15:02:48 +0800
-Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
-In-Reply-To: <19858.62649.218523.984252@ipc1.ka-ro>
-References: <19858.62649.218523.984252@ipc1.ka-ro>
-Message-ID: <1301554968-29066-1-git-send-email-b32955@freescale.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 31 Mar 2011 09:08:14 +0200
+Subject: [PATCH] mach-ux500: add HREFv60 Kconfig option
+Message-ID: <1301555294-15474-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPMI may have many DMA channels, such as the imx23 has
-four DMA channels. All these DMA channels share the same interrupt.
-Add the interrupt check for the GPMI, only the first DMA channel will
-register the irq.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+This is necessary to have any use of the HREFv60 code.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
- 1 files changed, 32 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/Kconfig |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 88aad4f..db36bf1 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -26,6 +26,8 @@
- #include <asm/irq.h>
- #include <mach/mxs.h>
- #include <mach/dma.h>
-+#include <mach/mx23.h>
-+#include <mach/mx28.h>
- #include <mach/common.h>
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 1e34d66..969e751 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -18,7 +18,7 @@ config UX500_SOC_DB8500
  
- /*
-@@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
+ endmenu
  
-+/* The GPMI has several DMA channels, only the first can register the irq. */
-+static bool irq_check(struct mxs_dma_chan *mxs_chan)
-+{
-+	int irq_num = mxs_chan->chan_irq;
+-menu "Ux500 target platform"
++menu "Ux500 target platform (boards)"
+ 
+ config MACH_U8500
+ 	bool "U8500 Development platform"
+@@ -27,6 +27,12 @@ config MACH_U8500
+ 	help
+ 	  Include support for the mop500 development platform.
+ 
++config MACH_HREFV60
++       bool "U85000 Development platform, HREFv60 version"
++       depends on UX500_SOC_DB8500
++       help
++         Include support for the HREFv60 new development platform.
 +
-+#ifdef CONFIG_SOC_IMX23
-+	if (cpu_is_mx23() && irq_num == MX23_INT_GPMI_DMA) {
-+		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
-+			return true;
-+		else
-+			return false;
-+	}
-+#endif
-+#ifdef CONFIG_SOC_IMX28
-+	if (cpu_is_mx28() && irq_num == MX28_INT_GPMI_DMA) {
-+		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
-+			return true;
-+		else
-+			return false;
-+	}
-+#endif
-+	return true;
-+}
-+
- static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- {
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-@@ -327,10 +353,12 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 
- 	memset(mxs_chan->ccw, 0, PAGE_SIZE);
- 
--	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
--				0, "mxs-dma", mxs_dma);
--	if (ret)
--		goto err_irq;
-+	if (irq_check(mxs_chan)) {
-+		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
-+					0, "mxs-dma", mxs_dma);
-+		if (ret)
-+			goto err_irq;
-+	}
- 
- 	ret = clk_enable(mxs_dma->clk);
- 	if (ret)
+ config MACH_U8500_SNOWBALL
+ 	bool "U8500 Snowball platform"
+ 	depends on UX500_SOC_DB8500
 -- 
-1.7.0.4
+1.7.3.2
