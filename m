@@ -1,71 +1,77 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 31 Mar 2011 14:05:04 +0530
-Subject: [pm-core][PATCH v3 02/21] OMAP4: Use WARN_ON() instead of BUG_ON()
-	with graceful exit
-In-Reply-To: <20110328205323.GD30616@atomide.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-3-git-send-email-santosh.shilimkar@ti.com>
-	<20110328205323.GD30616@atomide.com>
-Message-ID: <4D943CB8.70002@ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 31 Mar 2011 16:50:07 +0800
+Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
+In-Reply-To: <19860.13566.651111.241538@ipc1.ka-ro>
+References: <19858.62649.218523.984252@ipc1.ka-ro>	<1301554968-29066-1-git-send-email-b32955@freescale.com>
+	<19860.13566.651111.241538@ipc1.ka-ro>
+Message-ID: <4D94403F.6000000@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/29/2011 2:23 AM, Tony Lindgren wrote:
-> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 02:20]:
->> OMAP L2X0 and GIC initialisation code uses BUG_ON() for the
->> ioremap() failure scenarios.
+Hi:
+> Hi,
+>
+> Huang Shijie writes:
+>> The GPMI may have many DMA channels, such as the imx23 has
+>> four DMA channels. All these DMA channels share the same interrupt.
+>> Add the interrupt check for the GPMI, only the first DMA channel will
+>> register the irq.
 >>
->> Use WARN_ON() instead and allow graceful function exits.
->>
->> This was suggsted by Kevin Hilman<khilman@ti.com>  during
->> OMAP4 PM code review.
->>
->> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
 >> ---
->>   arch/arm/mach-omap2/omap4-common.c |    9 ++++++---
->>   1 files changed, 6 insertions(+), 3 deletions(-)
+>>   drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
+>>   1 files changed, 32 insertions(+), 4 deletions(-)
 >>
->> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->> index 559d227..8f9b97d 100644
->> --- a/arch/arm/mach-omap2/omap4-common.c
->> +++ b/arch/arm/mach-omap2/omap4-common.c
->> @@ -36,11 +36,13 @@ void __init gic_init_irq(void)
+>> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+>> index 88aad4f..db36bf1 100644
+>> --- a/drivers/dma/mxs-dma.c
+>> +++ b/drivers/dma/mxs-dma.c
+>> @@ -26,6 +26,8 @@
+>>   #include<asm/irq.h>
+>>   #include<mach/mxs.h>
+>>   #include<mach/dma.h>
+>> +#include<mach/mx23.h>
+>> +#include<mach/mx28.h>
+>>   #include<mach/common.h>
 >>
->>   	/* Static mapping, never released */
->>   	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
->> -	BUG_ON(!gic_dist_base_addr);
->> +	if (WARN_ON(!gic_dist_base_addr))
->> +		return;
+>>   /*
+>> @@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+>>   	return IRQ_HANDLED;
+>>   }
 >>
->>   	/* Static mapping, never released */
->>   	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
->> -	BUG_ON(!gic_cpu_base);
->> +	if (WARN_ON(!gic_cpu_base))
->> +		return;
+>> +/* The GPMI has several DMA channels, only the first can register the irq. */
+>> +static bool irq_check(struct mxs_dma_chan *mxs_chan)
+>> +{
+>> +	int irq_num = mxs_chan->chan_irq;
+>> +
+>> +#ifdef CONFIG_SOC_IMX23
+>> +	if (cpu_is_mx23()&&  irq_num == MX23_INT_GPMI_DMA) {
+>> +		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
+>> +			return true;
+>> +		else
+>> +			return false;
+>> +	}
+>> +#endif
+>> +#ifdef CONFIG_SOC_IMX28
+>> +	if (cpu_is_mx28()&&  irq_num == MX28_INT_GPMI_DMA) {
+>> +		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
+>> +			return true;
+>> +		else
+>> +			return false;
+>> +	}
+>> +#endif
+>> +	return true;
+>> +}
 >>
->>   	omap_wakeupgen_init();
->>
->> @@ -68,7 +70,8 @@ static int __init omap_l2_cache_init(void)
->>
->>   	/* Static mapping, never released */
->>   	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
->> -	BUG_ON(!l2cache_base);
->> +	if (WARN_ON(!l2cache_base))
->> +		return -ENODEV;
->>
->>   	/*
->>   	 * 16-way associativity, parity disabled
+> You should make the distinction based on the platform_id, which would
+> save you the ugly ifdef's and cpu_is_... macros.
 >
-> Hmm to me it seems that if any of these we don't want to
-> continue.
 >
-L2 cache is no problem and kernel can boot without L2 cache
-support. I agree with you on interrupt controller init though.
+This in the DMA driver.
+Do you want me to change the DMA driver to add the platform_id?
+The DMA driver has already used the cpu_is_xx() macros.
 
-Will drop the interrupt related checks from this patch.
+Best Regards
+Huang Shijie
 
-Kevin, Are you ok with it ?
-
-Regards
-Santosh
+> Lothar Wa?mann
