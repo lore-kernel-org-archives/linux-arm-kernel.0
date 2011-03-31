@@ -1,58 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Mar 2011 17:15:32 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110330235930.GA6680@n2100.arm.linux.org.uk>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<20110330235930.GA6680@n2100.arm.linux.org.uk>
-Message-ID: <20110331001531.GR18334@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 30 Mar 2011 17:16:03 -0700
+Subject: [PATCH 00/17] OMAP: voltage layer cleanup and restructure: part 1
+Message-ID: <1301530580-12046-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110330 16:57]:
-> On Wed, Mar 30, 2011 at 07:31:59PM -0400, Nicolas Pitre wrote:
-> 
-> > Still, because ARM is just a CPU architecture, those SOC vendors will 
-> > always have something new to differenciate themselves from the other SOC 
-> > vendors.  And that cannot be described in a table alone. The power 
-> > management hardware from TI will still require separate _executable_ 
-> > code from the Freescale one, or the Samsung one, or the Nvidia one, or 
-> > the Qualcomm one, or the Marvell one, yada yada.  And I really don't 
-> > want to see that code turned into some vendor provided buggy ACPI 
-> > bytecode or similar.
-> 
-> To get rid of all the platform related stuff, I think you'd need some
-> kind of bytecode to deal with some of the procedural stuff with various
-> platforms.  Without bytecode, the only other way is to keep the stuff
-> as C functions in the kernel and find some way of binding them to
-> drivers through DT, which means we're still going to have platform
-> specific C files littering the kernel.
+This is the first of a few series of voltage layer cleanups.  In part 1, the
+primary goal is to split up the voltage processor (VP) and voltage
+controller (VC) into dedicated code, and create the beginnings of a
+voltage domain layer modeled closely on the current clock domain and
+powerdomain layer.
 
-The SoC specific code still needs to be different for things like PM,
-but that's pretty small compared to the mux/clock/hwmod data on omaps.
+NOTE: there are a handful of >80 chars checkpatch warnings.
+  These are mainly due to copy/paste of existing code and are
+  ignored for now since this series is primarily concerned
+  about shuffling some code around.  The long lines will be
+  cleaned up in part 2 of the cleanups.
 
-Also I think we can make the PM code into loadable modules eventually.
- 
-> While I can see DT solving the "declare this data structure" problem,
-> I believe that's only part of the issue.
 
-Yup I agree there are other issues too.
+Benoit Cousson (1):
+  OMAP4: powerdomain data: add voltage domains
 
-> This is exactly why when DT was proposed as a miracle cure-all for ARM,
-> I wanted to see DT on a real ARM platform rather than just ARM Ltd's
-> simple and similar development boards.
-> 
-> Certainly, though, DT for ARM is progressing.
+Kevin Hilman (16):
+  OMAP2+: hwmod: remove unused voltagedomain pointer
+  OMAP2+: voltage: move PRCM mod offets into VC/VP structures
+  OMAP2+: voltage: move prm_irqst_reg from VP into voltage domain
+  OMAP2+: voltage: start towards a new voltagedomain layer
+  OMAP3: voltage: rename "mpu" voltagedomain to "mpu_iva"
+  OMAP3: voltagedomain data: add wakeup domain
+  OMAP3+: voltage: add scalable flag to voltagedomain
+  OMAP2+: powerdomain: add voltagedomain to struct powerdomain
+  OMAP2: add voltage domains and connect to powerdomains
+  OMAP3: powerdomain data: add voltage domains
+  OMAP2+: powerdomain: add voltage domain lookup during register
+  OMAP2+: voltage: keep track of powerdomains in each voltagedomain
+  OMAP2+: voltage: split voltage controller (VC) code into dedicated
+    layer
+  OMAP2+: voltage: move VC into struct voltagedomain, misc. renames
+  OMAP2+: voltage: split out voltage processor (VP) code into new layer
+  OMAP2+: VC: support PMICs with separate voltage and command registers
 
-At least omap mux/clokc/hwmod data could come either from devicetree
-or be a loadable kernel module for most entries.
+ arch/arm/mach-omap2/Makefile                     |    5 +-
+ arch/arm/mach-omap2/io.c                         |    5 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c       |    4 +-
+ arch/arm/mach-omap2/omap_twl.c                   |   20 +-
+ arch/arm/mach-omap2/pm.c                         |    4 +-
+ arch/arm/mach-omap2/powerdomain.c                |   23 +
+ arch/arm/mach-omap2/powerdomain.h                |   10 +
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    2 +
+ arch/arm/mach-omap2/powerdomains2xxx_data.c      |    4 +
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   16 +
+ arch/arm/mach-omap2/powerdomains44xx_data.c      |   18 +-
+ arch/arm/mach-omap2/sr_device.c                  |    2 +-
+ arch/arm/mach-omap2/vc.c                         |  274 +++++++
+ arch/arm/mach-omap2/vc.h                         |   36 +-
+ arch/arm/mach-omap2/vc3xxx_data.c                |   11 +-
+ arch/arm/mach-omap2/vc44xx_data.c                |   15 +-
+ arch/arm/mach-omap2/voltage.c                    |  856 +++++-----------------
+ arch/arm/mach-omap2/voltage.h                    |   55 +-
+ arch/arm/mach-omap2/voltagedomains2xxx_data.c    |   32 +
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c    |   51 +-
+ arch/arm/mach-omap2/voltagedomains44xx_data.c    |   66 +-
+ arch/arm/mach-omap2/vp.c                         |  374 ++++++++++
+ arch/arm/mach-omap2/vp.h                         |   14 +-
+ arch/arm/mach-omap2/vp3xxx_data.c                |    3 +-
+ arch/arm/mach-omap2/vp44xx_data.c                |    4 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h     |    1 -
+ 26 files changed, 1113 insertions(+), 792 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/vc.c
+ create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
+ create mode 100644 arch/arm/mach-omap2/vp.c
 
-Regards,
-
-Tony
+-- 
+1.7.4
