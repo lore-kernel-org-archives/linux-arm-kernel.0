@@ -1,51 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 31 Mar 2011 14:04:16 +0200 (CEST)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331083044.GB14323@n2100.arm.linux.org.uk>
-References: <201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 31 Mar 2011 15:09:53 +0300
+Subject: [PATCH] mtd/mxc_nand: add support for multiple chips on V21
+	devices
+In-Reply-To: <2731521d2fd2224b7b28cc9ced044fc026d4fdb7.1300085993.git.baruch@tkos.co.il>
+References: <2731521d2fd2224b7b28cc9ced044fc026d4fdb7.1300085993.git.baruch@tkos.co.il>
+Message-ID: <1301573393.2828.51.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
-> > Having strong, effective platform abstractions inside the kernel really helps 
-> > even if the hardware space itself is inevitably fragmented: both powerpc and 
-> > x86 has shown that. Until you realize and appreciate that you really have not 
-> > understood the problem i think.
+On Mon, 2011-03-14 at 09:01 +0200, Baruch Siach wrote:
+> Do the following to add support for up to 4 chips on V21 devices (i.MX25 and
+> i.MX35):
 > 
-> No, I think it is the other way around.  Folk like me and Nicolas over
-> the last ten years have put considerable amounts of effort into trying
-> to keep the ARM support code as clean and maintainable as possible.
+> * implement .select_chip for V21
+> * adjust existing NFC_V1_V2_BUF_ADDR writes to take chip select into account
+> * unlock all chip selects at preset_v1_v2()
+> * scan up to 4 devices at .probe
 > 
-> That is true of the common ARM stuff, but there's no way we can do this
-> for all SoC support - there aren't the hours in the day to provide such
+> This has been tested on i.MX25 with two attached NAND chip (on one die).
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-That's what I said. You and Nicholas wont scale.
+Pushed to l2-mtd-2.6.git, thank you.
 
-> a wide oversight.  That's why we have SoC maintainers, and the SoC
-> maintainers have the responsibility to sort out their own sub-trees.
-
-But the current SoC maintainer model does not work either. The SoC
-maintainers care about their sandbox and have exactly zero incentive
-to look at the overall picture, e.g reuse of code for the same IP
-blocks, better abstraction mechanisms etc. 
-
-Therefor you need a team of experienced kernel developers which are
-NOT associated with a particular vendor who are able to tame that SoC
-crowd and work closely with you and Nicholas to keep stuff in sync.
-
-Thanks,
-
-	tglx
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
