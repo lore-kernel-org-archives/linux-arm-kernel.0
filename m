@@ -1,37 +1,112 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 31 Mar 2011 15:26:51 -0700
-Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
-In-Reply-To: <op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
-	<1301587083.31087.1032.camel@nimitz>
-	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
-	<1301606078.31087.1275.camel@nimitz>
-	<op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
-Message-ID: <1301610411.30870.29.camel@nimitz>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 31 Mar 2011 18:49:11 -0400 (EDT)
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
+References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+	<20110331164539.GB19452@n2100.arm.linux.org.uk>
+	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
+	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
+	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1103311649450.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-01 at 00:18 +0200, Michal Nazarewicz wrote:
-> On Thu, 31 Mar 2011 23:14:38 +0200, Dave Hansen wrote:
-> > We BUG_ON() in bootmem.  Basically if we try to allocate an early-boot
-> > structure and fail, we're screwed.  We can't keep running without an
-> > inode hash, or a mem_map[].
+On Thu, 31 Mar 2011, Linus Torvalds wrote:
+
+> On Thu, Mar 31, 2011 at 12:25 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
 > >
-> > This looks like it's going to at least get partially used in drivers, at
-> > least from the examples.  Are these kinds of things that, if the driver
-> > fails to load, that the system is useless and hosed?  Or, is it
-> > something where we might limp along to figure out what went wrong before
-> > we reboot?
+> > So we need help! ?If core kernel people could get off their X86 stool
+> > and get down in the ARM mud to help sort out this mess that would be
+> > really nice (thanks tglx). ?Until then all that the few of us can do is
+> > to contain the flood and hope for the best, and so far things being as
+> > they are have still worked surprisingly well in practice for users. ?If
+> > compensation is a concern then I think Linaro might be able to arrange
+> > something.
 > 
-> Bug in the above place does not mean that we could not allocate memory.  It
-> means caller is broken.
+> The thing is, maintainers don't scale.
 
-Could you explain that a bit?
+True.  My remark about core kernel people still stands though.
 
-Is this a case where a device is mapped to a very *specific* range of
-physical memory and no where else?  What are the reasons for not marking
-it off limits at boot?  I also saw some bits of isolation and migration
-in those patches.  Can't the migration fail?  
+> The only way to get quality code is to try to improve the quality from
+> the "leaf nodes", because otherwise you'll always end up playing
+> catch-up. You'll get new bad code faster than you can clean it up.
 
--- Dave
+Leaf nodes on ARM are people coming from corporate background with the 
+old school software development methodologies.  They do it as a _job_ 
+first and foremost.  They only work on Linux because that's what their 
+boss assigned them to. Don't get me wrong: that doesn't mean they are 
+bad people.  Simply that they are not into it for the public recognition 
+(or flaming) from their peers.  Once their code works they lose interest 
+and move on.  That mindset is extremely hard to change and take time, on 
+a scale of years.  Much more time than required to produce the code 
+needed to support that new SOC out of the pipeline.  There are notable 
+exceptions obviously.  But this is still a scalability problem in 
+itself.  So we need men-in-the-middle attacks.
+
+> I've told people this before, and I'll tell it again: when I flame
+> submaintainers, they should try to push the pain down. I'm not really
+> asking those submaintainers to clean up all the stuff they are
+> getting: I'm basically asking people to say "no", or at least push
+> back a lot, and argue with the people who send you code. Tell them
+> what you don't like about the code, and tell them that you can't take
+> it any more.
+
+I wish we could be sufficient people to be able to determine what we 
+actually don't like about the code.  There is simply not enough core 
+kernel people with the required visibility doing such work in ARM land.  
+That's the fundamental problem.  The fact that the most successful 
+"real" ARM devices running Linux out there still aren't supported in 
+mainline doesn't help building a community of enthusiasts around it 
+either.
+
+> > And we can't count on vendor people doing this work. ?They are all busy
+> > porting the kernel to their next SOC version so they can win the next
+> > big Android hardware design, and doing so with our kernel quality
+> > standards is already quite a struggle for them.
+> 
+> This really isn't the argument. The argument should be that if they
+> want their code up-stream, they need to do a good job. If they don't,
+> why should you take it at all?
+
+Embedded vendors did keep their code out of the kernel before.  We've 
+been hammering them about upstreaming their code for years.  Now they 
+are striking back with too much code for our review capacity.  So 
+problematic code gets merged without anyone noticing because it compiles 
+and does work, until someone comes along with a wide scale API cleanup 
+and stumble on it.
+
+The alternative is to only accept fully reviewed code, but to scale with 
+the numbers we've all seen, 60% of the reviewers should be looking at 
+ARM code and that's not happening.  We've been there before, like two 
+years ago or so. Pressure builds up at the maintainer gate as the 
+backlog grows and key people get burned out, then the system collapses.  
+No one wants to go back there.
+
+> > What is going on at the moment is some effort to introduce DT support to
+> > ARM. ?The core support is there, but that is useless until platform code
+> > is moved to it, and corresponding work is put into bootloaders, etc.
+> > That is progressing... slowly.
+> 
+> How about not moving platform code TO it, but at least saying that you
+> won't accept new platform code that doesn't use it? When somebody
+> sends you a new platform, just say "no" if it's another copy-paste job
+> or another "add yet another #ifdef or conditional to a messy driver".
+
+DT has to prove itself on ARM with a few existing platforms before we 
+can open the flood gate towards it.  If something is wrong with DT 
+support it is best to fix only the core stuff without also having to fix 
+all users and possibly all bootloaders, etc.  That work is progressing 
+slowly because there are more people praising DT than people doing the 
+actual work.
+
+
+Nicolas
