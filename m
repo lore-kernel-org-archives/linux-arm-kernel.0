@@ -1,66 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 31 Mar 2011 15:25:27 -0400 (EDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
-	<20110331164539.GB19452@n2100.arm.linux.org.uk>
-	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103311429590.28032@xanadu.home>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 31 Mar 2011 15:26:50 -0400
+Subject: [PATCH 05/12] mm: alloc_contig_range() added
+In-Reply-To: <1301587361.31087.1040.camel@nimitz>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
+	<1301587361.31087.1040.camel@nimitz>
+Message-ID: <20110331192650.GE14441@home.goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Linus Torvalds wrote:
+On Thu, Mar 31, 2011 at 09:02:41AM -0700, Dave Hansen wrote:
+> On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
+> > +       ret = 0;
+> > +       while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
+> > +               if (WARN_ON(++ret >= MAX_ORDER))
+> > +                       return -EINVAL; 
+> 
+> Holy cow, that's dense.  Is there really no more straightforward way to
+> do that?
+> 
+> In any case, please pull the ++ret bit out of the WARN_ON().  Some
+> people like to do:
+> 
+> #define WARN_ON(...) do{}while(0)
+> 
+> to save space on some systems.  
 
-> What I'm _not_ seeing is a lot of cross-platform maintenance or sense
-> of people trying to reign things in and look for solutions to the
-> proliferation of random stupid and mindless platform code.
+That should be fixed, as the if (WARN_ON()) has become a standard in
+most of the kernel. Removing WARN_ON() should be:
 
-I do that, Russell does that, Catalin does that, Tony does that, and 
-maybe less than a handful of other important people I'm not listing 
-(sorry).  But clearly we are far far from being enough people doing that 
-kind of work.  And the fact is that the volume of ARM platform code is 
-steadily being produced at a rate far surpassing X86, and even higher 
-than all the other architectures put together.  Linaro is trying to help 
-here, but Linaro cannot conjure the needed experience and knowledge for 
-that kind of work with a magic wand.
+#define WARN_ON(x) ({0;})
 
-So we need help!  If core kernel people could get off their X86 stool 
-and get down in the ARM mud to help sort out this mess that would be 
-really nice (thanks tglx).  Until then all that the few of us can do is 
-to contain the flood and hope for the best, and so far things being as 
-they are have still worked surprisingly well in practice for users.  If 
-compensation is a concern then I think Linaro might be able to arrange 
-something.
+But I agree, that there should be no "side effects" inside a WARN_ON(),
+which that "++ret" is definitely one.
 
-And we can't count on vendor people doing this work.  They are all busy 
-porting the kernel to their next SOC version so they can win the next 
-big Android hardware design, and doing so with our kernel quality 
-standards is already quite a struggle for them.
-
-What is going on at the moment is some effort to introduce DT support to 
-ARM.  The core support is there, but that is useless until platform code 
-is moved to it, and corresponding work is put into bootloaders, etc.  
-That is progressing... slowly.
-
-Also there is some work to be able to build a kernel supporting more 
-than one SOC family at once.  Of course there is no practical use for a 
-single kernel binary that boots on all existing boards, but moving 
-towards such a goal has beneficial side effects such as good 
-consolidation when possible.
-
-But we also need some slack wrt number of lines changed.  An increased 
-consolidation effort will create more churn not less, at least for a 
-while.  The OMAP clock merge conflict was the result of some cleanup 
-which will make further consolidation easier.
-
-
-Nicolas
+-- Steve
