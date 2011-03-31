@@ -1,77 +1,87 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 31 Mar 2011 10:53:25 +0200
-Subject: [PATCH 4/9] mach-ux500: update the DB5500 register file
-Message-ID: <1301561605-23676-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 31 Mar 2011 10:53:06 +0200
+Subject: [PATCH 2/9] mach-ux500: make PRCMU base address dynamic
+Message-ID: <1301561586-23610-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
+This makes the PRCMU base address be selected at runtime for U8500
+and U5500 instead of being compiled-in.
+
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/include/mach/db5500-regs.h |   20 ++++++++++++++++++--
- 1 files changed, 18 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/cpu-db5500.c              |    2 ++
+ arch/arm/mach-ux500/cpu-db8500.c              |    2 ++
+ arch/arm/mach-ux500/cpu.c                     |    2 ++
+ arch/arm/mach-ux500/include/mach/hardware.h   |    1 +
+ arch/arm/mach-ux500/include/mach/prcmu-regs.h |    2 --
+ 5 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/include/mach/db5500-regs.h b/arch/arm/mach-ux500/include/mach/db5500-regs.h
-index bd88c1e..6ad9832 100644
---- a/arch/arm/mach-ux500/include/mach/db5500-regs.h
-+++ b/arch/arm/mach-ux500/include/mach/db5500-regs.h
-@@ -17,6 +17,8 @@
- #define U5500_GIC_DIST_BASE	0xA0411000
- #define U5500_GIC_CPU_BASE	0xA0410100
- #define U5500_DMA_BASE		0x90030000
-+#define U5500_STM_BASE		0x90020000
-+#define U5500_STM_REG_BASE	(U5500_STM_BASE + 0xF000)
- #define U5500_MCDE_BASE		0xA0400000
- #define U5500_MODEM_BASE	0xB0000000
- #define U5500_L2CC_BASE		0xA0412000
-@@ -29,7 +31,9 @@
- #define U5500_NAND0_BASE	0x60000000
- #define U5500_NAND1_BASE	0x70000000
- #define U5500_TWD_BASE		0xa0410600
-+#define U5500_ICN_BASE		0xA0040000
- #define U5500_B2R2_BASE		0xa0200000
-+#define U5500_BOOT_ROM_BASE	0x90000000
+diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
+index c9dc2ef..c01bc19 100644
+--- a/arch/arm/mach-ux500/cpu-db5500.c
++++ b/arch/arm/mach-ux500/cpu-db5500.c
+@@ -188,6 +188,8 @@ void __init u5500_map_io(void)
+ 	ux500_map_io();
  
- #define U5500_FSMC_BASE		(U5500_PER1_BASE + 0x0000)
- #define U5500_SDI0_BASE		(U5500_PER1_BASE + 0x1000)
-@@ -60,6 +64,7 @@
- #define U5500_MSP1_BASE		(U5500_PER4_BASE + 0x9000)
- #define U5500_GPIO2_BASE	(U5500_PER4_BASE + 0xA000)
- #define U5500_CDETECT_BASE	(U5500_PER4_BASE + 0xF000)
-+#define U5500_PRCMU_TCDM_BASE	(U5500_PER4_BASE + 0x18000)
- 
- #define U5500_SPI0_BASE		(U5500_PER5_BASE + 0x0000)
- #define U5500_SPI1_BASE		(U5500_PER5_BASE + 0x1000)
-@@ -83,7 +88,7 @@
- #define U5500_HASH0_BASE	(U5500_PER6_BASE + 0x1000)
- #define U5500_HASH1_BASE	(U5500_PER6_BASE + 0x2000)
- #define U5500_PKA_BASE		(U5500_PER6_BASE + 0x4000)
--#define U5500_PKAM_BASE		(U5500_PER6_BASE + 0x5000)
-+#define U5500_PKAM_BASE		(U5500_PER6_BASE + 0x5100)
- #define U5500_MTU0_BASE		(U5500_PER6_BASE + 0x6000)
- #define U5500_MTU1_BASE		(U5500_PER6_BASE + 0x7000)
- #define U5500_CR_BASE		(U5500_PER6_BASE + 0x8000)
-@@ -114,8 +119,19 @@
- #define U5500_MBOX2_LOCAL_START	(U5500_MBOX_BASE + 0x20)
- #define U5500_MBOX2_LOCAL_END	(U5500_MBOX_BASE + 0x3F)
- 
--#define U5500_ESRAM_BASE		0x40000000
-+#define U5500_ACCCON_BASE_SEC	(0xBFFF0000)
-+#define U5500_ACCCON_BASE		(0xBFFF1000)
-+#define U5500_ACCCON_CPUVEC_RESET_ADDR_OFFSET (0x00000020)
-+#define U5500_ACCCON_ACC_CPU_CTRL_OFFSET (0x000000BC)
+ 	iotable_init(u5500_io_desc, ARRAY_SIZE(u5500_io_desc));
 +
-+#define U5500_ESRAM_BASE	        0x40000000
- #define U5500_ESRAM_DMA_LCPA_OFFSET	0x10000
- #define U5500_DMA_LCPA_BASE    (U5500_ESRAM_BASE + U5500_ESRAM_DMA_LCPA_OFFSET)
++	_PRCMU_BASE = __io_address(U5500_PRCMU_BASE);
+ }
  
-+#define U5500_MCDE_SIZE		0x1000
-+#define U5500_DSI_LINK_SIZE	0x1000
-+#define U5500_DSI_LINK_COUNT	0x2
-+#define U5500_DSI_LINK1_BASE	(U5500_MCDE_BASE + U5500_MCDE_SIZE)
-+#define U5500_DSI_LINK2_BASE	(U5500_DSI_LINK1_BASE + U5500_DSI_LINK_SIZE)
+ static int usb_db5500_rx_dma_cfg[] = {
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 516126c..3d419fe 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -87,6 +87,8 @@ void __init u8500_map_io(void)
+ 		iotable_init(u8500_v1_io_desc, ARRAY_SIZE(u8500_v1_io_desc));
+ 	else if (cpu_is_u8500v2())
+ 		iotable_init(u8500_v2_io_desc, ARRAY_SIZE(u8500_v2_io_desc));
 +
++	_PRCMU_BASE = __io_address(U8500_PRCMU_BASE);
+ }
+ 
+ static struct resource db8500_pmu_resources[] = {
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index 5a43107..0190e0e 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -23,6 +23,8 @@
+ 
+ #include "clock.h"
+ 
++void __iomem *_PRCMU_BASE;
++
+ #ifdef CONFIG_CACHE_L2X0
+ static void __iomem *l2x0_base;
  #endif
+diff --git a/arch/arm/mach-ux500/include/mach/hardware.h b/arch/arm/mach-ux500/include/mach/hardware.h
+index bf63f26..2c6f710 100644
+--- a/arch/arm/mach-ux500/include/mach/hardware.h
++++ b/arch/arm/mach-ux500/include/mach/hardware.h
+@@ -35,6 +35,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <mach/id.h>
++extern void __iomem *_PRCMU_BASE;
+ 
+ #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
+ 
+diff --git a/arch/arm/mach-ux500/include/mach/prcmu-regs.h b/arch/arm/mach-ux500/include/mach/prcmu-regs.h
+index 455467e..c1226da 100644
+--- a/arch/arm/mach-ux500/include/mach/prcmu-regs.h
++++ b/arch/arm/mach-ux500/include/mach/prcmu-regs.h
+@@ -15,8 +15,6 @@
+ 
+ #include <mach/hardware.h>
+ 
+-#define _PRCMU_BASE		IO_ADDRESS(U8500_PRCMU_BASE)
+-
+ #define PRCM_ARM_PLLDIVPS	(_PRCMU_BASE + 0x118)
+ #define PRCM_ARM_CHGCLKREQ	(_PRCMU_BASE + 0x114)
+ #define PRCM_PLLARM_ENABLE	(_PRCMU_BASE + 0x98)
 -- 
 1.7.3.2
