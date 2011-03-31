@@ -1,51 +1,30 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 30 Mar 2011 18:56:19 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTimS_8BnBz9MSdxYJVL6oreEpH=W61BsyuX2G+Xz@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<20110331001502.GB6680@n2100.arm.linux.org.uk>
-	<AANLkTinE7EDbV8hrYZWBxgvwOxdPMLoS0Y57PSm04rvM@mail.gmail.com>
-	<AANLkTik-BFTzyPLuYVdhCJPocc0wPY0rKvO7BQS4Fg1S@mail.gmail.com>
-	<AANLkTikd_JRxmB_OWZqq178=K3bnxhdDqcNbgFNRtTyU@mail.gmail.com>
-	<AANLkTimS_8BnBz9MSdxYJVL6oreEpH=W61BsyuX2G+Xz@mail.gmail.com>
-Message-ID: <AANLkTimtO7vR2AQvJj1hHMqHCDqtoiJX_eENE9o3dPpV@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 31 Mar 2011 11:06:24 +0900
+Subject: [PATCH] mmc, ARM: Add zboot from eSD support for SuperH Mobile ARM
+In-Reply-To: <1301453955-15759-2-git-send-email-horms@verge.net.au>
+References: <1301453955-15759-1-git-send-email-horms@verge.net.au>
+	<1301453955-15759-2-git-send-email-horms@verge.net.au>
+Message-ID: <AANLkTin6TdEWjQoNCGw1gV1BnzHjOQss9DA_0BRMdvNE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 6:44 PM, Bill Gatliff <bgat@billgatliff.com> wrote:
+On Wed, Mar 30, 2011 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
+> This allows a ROM-able zImage to be written to eSD and for SuperH Mobile
+> ARM to boot directly from the SDHI hardware block.
 >
-> In the meantime, we have to live with the chips that exist and the
-> ones coming down the pipe. ?Until ARM and all their licensees start
-> consulting us on such matters, we'll just have to find a way to deal
-> with what we're given after the fact.
+> This is achieved by the MaskROM loading the first portion of the image into
+> MERAM and then jumping to it. ?This portion contains loader code which
+> copies the entire image to SDRAM and jumps to it. From there the zImage
+> boot code proceeds as normal, uncompressing the image into its final
+> location and then jumping to it.
+>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 
-Yes. But:
+Hi Simon,
 
- (a) we don't have to be stupid and think it's a good design and an
-"opportunity" like you do.
+Thanks for your work on this. v6 of this patch looks good to me!
 
-and
-
- (b) the kernel source code doesn't have to be the mess of code that
-it is. Those things should be abstracted out somehow (and yes,
-devicetree is hopefully one way)
-
-I really don't understand why you seem to be arguing against trying to
-fix a real problem, and why you also seem to be arguing that the messy
-ARM situation is somehow "good". I find your attitude about the lack
-of platform being "good" be to incomprehensibly stupid. There is
-absolutely _no_ advantage to anybody from the crazy arm fragmentation.
-
-I know, I know, a lot of companies make money supporting the whole
-crazy mess. I guess that can make people confused and think that being
-messy is good, and could be seen as an advantage.
-
-But most embedded companies seem to have realized that they should
-move up the stack, rather than worry about some crazy GPIO or stupid
-driver details.
-
-                Linus
+Acked-by: Magnus Damm <damm@opensource.se>
