@@ -1,65 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2011 16:05:17 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 31 Mar 2011 17:23:01 +0200
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103311647300.22418@localhost6.localdomain6>
-References: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+In-Reply-To: <87d3l7jqpr.fsf@ti.com>
+References: <201103301906.42429.arnd@arndb.de>
 	<alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
 	<87d3l7jqpr.fsf@ti.com>
-	<alpine.LFD.2.00.1103311647300.22418@localhost6.localdomain6>
-Message-ID: <20110331150517.GA19452@n2100.arm.linux.org.uk>
+Message-ID: <201103311723.02301.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 05:01:40PM +0200, Thomas Gleixner wrote:
-> On Thu, 31 Mar 2011, Kevin Hilman wrote:
-> 
-> > Thomas Gleixner <tglx@linutronix.de> writes:
-> > 
-> > > But the current SoC maintainer model does not work either. The SoC
-> > > maintainers care about their sandbox and have exactly zero incentive
-> > > to look at the overall picture, e.g reuse of code for the same IP
-> > > blocks, better abstraction mechanisms etc. 
-> > 
-> > zero incentive?  that's a bit strong, IMO.
-> > 
-> > That may be true for some SoCs, it's not really fair as a sweeping
-> > statement.
-> 
-> Fair enough, but it's the perception in general.
-> 
-> > Conference (ELC, US and Europe.)  Especially as IP blocks are reused
-> > across SoC families, abstractions like runtime PM are the only way to
-> > keep the SoC specifics of PM out of the common driver.
-> 
-> Right, I know that these things happen, but at the same time the sheer
-> amount of stuff flowing in makes it hard that these infrastructure
-> stuff really works out. And we are only at the beginning of the big
-> shuffle "code in to mainline" game.
-> 
-> After cleaning up the whole irq stuff across the tree I can tell you,
-> that the mess is non-linear growing with the number of instances.
-> 
-> You can see the patterns which are:
->     - copy and paste
->     - introduce different bugs
->     - add more abuse
-> 
-> That's what I'm really concerned about.
-> 
-> > Yes, ARM SoC maintainers have to make up some ground.  But compare this
-> > to just a couple years ago where the common complaint was "why aren't
-> > embedded SoC people contributing code to mainline", and you'll see we
-> > have come a long way.
-> 
-> Well, code comes in, which is progress. But we need to figure out how
-> to deal with the increasingly growing flood before we drown in it.
+On Thursday 31 March 2011, Kevin Hilman wrote:
+> Some SoCs families (like OMAP) have huge amount of diversity even within
+> the SoC family, so better abstractions and generic infrastrucure
+> improvements are an obvious win, even staying within the SoC.
 
-How about we declare the remainder of this cycle and the next merge window
-as being only for bug and regression fixes, and consolidation of stuff like
-the IRQ controller and GPIO controller code for the next merge window?
+But that's the point. The incentive is there for managing the infrastructure
+within the SoC, but not across SoCs. Allow me to use OMAP as a bad example
+while pointing out that it's really one of the best supported platforms
+we currently have, while the others are usually much worse in terms of
+working with the community (or at least they are behind on the learning
+curve but getting there):
+
+* OMAP2 introduced the hwmod concept as an attempt to reduce duplication
+  between board code, but the code was done on the mach-omap2 level
+  instead of finding a way to make it work across SOC vendors, or using
+  an existing solution.
+
+* The IOMMU code in omap2 duplicates the API we have in the common kernel,
+  with slight differences, instead of using the existing code, making it
+  impossible to share a driver between SOC families.
+
+* The ti-st code duplicates parts of the bluetooth layer (apparently
+  that is getting fixed soon).
+
+* The DSS display drivers introduce new infrastructure include new bus
+  types that have the complexity to make them completely generic, but
+  in practice can only work on OMAP, and are clearly not written with
+  cross-vendor abstractions in mind.
+
+	Arnd
