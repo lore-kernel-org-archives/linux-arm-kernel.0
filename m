@@ -1,56 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Mar 2011 10:26:01 +0200
-Subject: [PATCH v2 1/1] ARM: imx: add gpu device
-In-Reply-To: <AANLkTikf63wTfM1z2cpV+GuK28y1wrT7UWvw4TanBj4R@mail.gmail.com>
-References: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
-	<20110330073651.GR7285@pengutronix.de>
-	<AANLkTikf63wTfM1z2cpV+GuK28y1wrT7UWvw4TanBj4R@mail.gmail.com>
-Message-ID: <20110331082601.GV7285@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Mar 2011 09:30:45 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110331080634.GA18022@elte.hu>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+Message-ID: <20110331083044.GB14323@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 05:23:12PM -0500, Matt Sealey wrote:
-> Sascha,
-> 
-> Freescale has a driver. We have a driver since we're under NDA and
-> have the source.
-> 
-> If you want it and want to boot Ubuntu on a Smartbook or Smarttop, we
-> can give you a package that will run on our kernel and load the GPU
-> module if present (we actually ship it as a module built inside the
-> kernel, it's not external and it's dual BSD/GPL licensed). Regardless
-> of where you've not seen it, it does exist. I want this code in there
-> - on the basis that we have a consumer product that ships and needs
-> it, and this is going to be a dependency for OpenGL, OpenVG, and
-> things on top like Flash which may depend on that.
-> 
-> I dunno if I am in the "path" for this since I have the source code
-> for the driver for the kernel (it's on opensource.freescale.com/git in
-> drivers/mxc/amd-gpu somewhere after the 09.12 BSP ) and for the
-> userspace (it's NDA code) I don't believe there's any hard and fast
-> policy that says the kernel cannot have drivers referenced that are
-> not part of the mainline stack, otherwise no external module using USB
-> or any other pluggable module built externally, which Linus does not
-> disapprove of, would never be allowed to build against the kernel.
+On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
+> Having strong, effective platform abstractions inside the kernel really helps 
+> even if the hardware space itself is inevitably fragmented: both powerpc and 
+> x86 has shown that. Until you realize and appreciate that you really have not 
+> understood the problem i think.
 
-With USB there is a clear API defined and exported from the kernel to
-userspace. This API can be used from source and yes, also from closed
-source drivers.
-The FSL gpu driver is different, its API has been defined for only one
-closed source driver. There is no way of making use of it without closed
-source. There is no way for kernel maintainers to test this API without
-closed source. There is also no way to ever change this API without
-having the source available.
-No, there is no place for this kind of stub drivers in the kernel.
-Otherwise we would also have nvidia binary driver stubs.
+No, I think it is the other way around.  Folk like me and Nicolas over
+the last ten years have put considerable amounts of effort into trying
+to keep the ARM support code as clean and maintainable as possible.
 
-In any way we can delay this until there is some code using it.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That is true of the common ARM stuff, but there's no way we can do this
+for all SoC support - there aren't the hours in the day to provide such
+a wide oversight.  That's why we have SoC maintainers, and the SoC
+maintainers have the responsibility to sort out their own sub-trees.
