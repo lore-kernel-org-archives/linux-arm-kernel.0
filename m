@@ -1,85 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2011 00:59:30 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-Message-ID: <20110330235930.GA6680@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 Mar 2011 09:10:17 +0900
+Subject: [PATCH 2/2] msm: board-8960: Add support for pm8921-regulator
+In-Reply-To: <1301523466-6054-1-git-send-email-collinsd@codeaurora.org>
+References: <1301523361-5982-1-git-send-email-collinsd@codeaurora.org>
+	<1301523466-6054-1-git-send-email-collinsd@codeaurora.org>
+Message-ID: <20110331001016.GB21487@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 07:31:59PM -0400, Nicolas Pitre wrote:
-> Sure, but important noise nevertheless.  As long as the noise is 
-> confined to a limited set of .c files I'm happy.  OTOH I have very 
-> little hope for a separate project that would only deal with that noise.  
-> That will simply never fly, even less so as an Open Source project.
+On Wed, Mar 30, 2011 at 03:17:46PM -0700, David Collins wrote:
 
-It's also an excuse for people to make it a closed source project, and
-so you end up with platforms with a closed source binary blob passed
-into the kernel, which has hacky patches to fixup the binary blob parser
-to make it all work.
+> +VREG_CONSUMERS(L1) = {
+> +	REGULATOR_SUPPLY("8921_l1",		NULL),
+> +};
 
-We already see this with the damn simple memory layout stuff we already
-(try) to require of boot loaders.
+All these supplies named after the regulator name should be removed.
+Supplies define the mapping from the regulators on the board to the
+supplies on the devices on the board, if any driver is requesting a
+specific regulator name then there's an abstraction issue which means
+that these should be redundant.
 
-> Still... there are on-going efforts to consolidate things amongst all 
-> the ARM vendors.  The ARM architecture is standardizing more and more 
-> stuff in the whole stack in every revision.  But they won't standardize 
-> everything otherwise they'll kill that competing ecosystem.
-
-Let's not kid ourselves over that effort: because there is already soo
-much code in mainline, the efforts to consolidate things can in itself
-create _big_ patches which will inflate the %age change under arch/arm.
-
-> > Now, some of it is quite understandable - ie real drivers for real
-> > hardware. But a _lot_ of it seems to be just descriptor tables, and
-> > I'm getting the very strong feeling that ARM people aren't even
-> > _trying_ to make it sane, and trying to standardize things, or trying
-> > to aim for the whole notion of "one kernel image, with much more hw
-> > description done elsewhere".
-> 
-> That work is happening.  It is not ready.  I'm not against it but I 
-> remain sceptical.  I still think that a self contained kernel is more 
-> maintainable.
-
-Let's not forget that in the future, the hardware should improve.
-There's efforts to standardise some of the peripherals, such as
-interrupt controllers and timers.
-
-The first attempt at architecting an interrupt controller for ARM has
-actually caused *more* complexity, as the architected interrupt (GIC)
-controller contained no power management.  That has caused SoC vendors
-to bolt a second power management interrupt controller alongside the
-GIC which needs to be kept in sync.  So... the result was yet more code
-which doesn't sit at all well with data descriptions of systems.
-
-> Still, because ARM is just a CPU architecture, those SOC vendors will 
-> always have something new to differenciate themselves from the other SOC 
-> vendors.  And that cannot be described in a table alone. The power 
-> management hardware from TI will still require separate _executable_ 
-> code from the Freescale one, or the Samsung one, or the Nvidia one, or 
-> the Qualcomm one, or the Marvell one, yada yada.  And I really don't 
-> want to see that code turned into some vendor provided buggy ACPI 
-> bytecode or similar.
-
-To get rid of all the platform related stuff, I think you'd need some
-kind of bytecode to deal with some of the procedural stuff with various
-platforms.  Without bytecode, the only other way is to keep the stuff
-as C functions in the kernel and find some way of binding them to
-drivers through DT, which means we're still going to have platform
-specific C files littering the kernel.
-
-While I can see DT solving the "declare this data structure" problem,
-I believe that's only part of the issue.
-
-This is exactly why when DT was proposed as a miracle cure-all for ARM,
-I wanted to see DT on a real ARM platform rather than just ARM Ltd's
-simple and similar development boards.
-
-Certainly, though, DT for ARM is progressing.
+In general if you've got a supply that doesn't have a dev_name
+associated with it something is wrong.
