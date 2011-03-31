@@ -1,49 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2011 12:29:05 +0100
-Subject: [PATCH 4/8] OMAP2+: omap_hwmod: manage the omap_devices the
-	wake-up latency constraints
-In-Reply-To: <1301498364-726-5-git-send-email-j-pihet@ti.com>
-References: <1301498364-726-1-git-send-email-j-pihet@ti.com>
-	<1301498364-726-5-git-send-email-j-pihet@ti.com>
-Message-ID: <20110331112905.GA17547@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Mar 2011 14:04:16 +0200 (CEST)
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110331083044.GB14323@n2100.arm.linux.org.uk>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 05:19:20PM +0200, jean.pihet at newoldbits.com wrote:
-> +/*
-> + * omap_hwmod_set_wkup_constraint- set/release a wake-up latency constraint
-> + *
-> + * @oh: struct omap_hwmod* to which the target device belongs to.
-> + * @cookie: identifier of the constraints list for @oh.
-> + * @min_latency: the minimum allowed wake-up latency for @oh.
-> + *
-> + * Returns 0 upon success.
-> + */
-> +int omap_hwmod_set_wkup_lat_constraint(struct omap_hwmod *oh,
-> +				       void *cookie, long min_latency)
-> +{
-> +	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-> +
-> +	if (!PTR_ERR(pwrdm)) {
-> +		pr_err("%s: Error: could not find powerdomain "
-> +		       "for %s\n", __func__, oh->name);
-> +		return -EINVAL;
-> +	}
+On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
 
-If omap_hwmod_get_pwrdm() returns errors encoded into pointers, then:
+> On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
+> > Having strong, effective platform abstractions inside the kernel really helps 
+> > even if the hardware space itself is inevitably fragmented: both powerpc and 
+> > x86 has shown that. Until you realize and appreciate that you really have not 
+> > understood the problem i think.
+> 
+> No, I think it is the other way around.  Folk like me and Nicolas over
+> the last ten years have put considerable amounts of effort into trying
+> to keep the ARM support code as clean and maintainable as possible.
+> 
+> That is true of the common ARM stuff, but there's no way we can do this
+> for all SoC support - there aren't the hours in the day to provide such
 
-	if (IS_ERR(pwrdm)) {
-		...
-		return PTR_ERR(pwrdm);
-	}
+That's what I said. You and Nicholas wont scale.
 
-If it doesn't, then:
+> a wide oversight.  That's why we have SoC maintainers, and the SoC
+> maintainers have the responsibility to sort out their own sub-trees.
 
-	if (!pwrdm) {
-		...
-		return -EINVAL;
-	}
+But the current SoC maintainer model does not work either. The SoC
+maintainers care about their sandbox and have exactly zero incentive
+to look at the overall picture, e.g reuse of code for the same IP
+blocks, better abstraction mechanisms etc. 
 
-Note that PTR_ERR returns true for both valid error codes and valid
-pointers.  Use the interface correctly and don't take shortcuts.  They
-don't work.
+Therefor you need a team of experienced kernel developers which are
+NOT associated with a particular vendor who are able to tame that SoC
+crowd and work closely with you and Nicholas to keep stuff in sync.
+
+Thanks,
+
+	tglx
