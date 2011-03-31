@@ -1,30 +1,79 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 31 Mar 2011 03:21:32 -0400 (EDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTimZ8+npVu6u5-o9+3CV40wB_GYwiOWvfJPso8G0@mail.gmail.com>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<AANLkTimZ8+npVu6u5-o9+3CV40wB_GYwiOWvfJPso8G0@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103310317050.28032@xanadu.home>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 31 Mar 2011 10:02:06 +0200
+Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
+In-Reply-To: <1301554968-29066-1-git-send-email-b32955@freescale.com>
+References: <19858.62649.218523.984252@ipc1.ka-ro>
+	<1301554968-29066-1-git-send-email-b32955@freescale.com>
+Message-ID: <19860.13566.651111.241538@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Geert Uytterhoeven wrote:
+Hi,
 
-> On Thu, Mar 31, 2011 at 01:31, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On ARM there is simply not such thing as a single machine design to
-> > clone, and a closed source test bench to design for.
+Huang Shijie writes:
+> The GPMI may have many DMA channels, such as the imx23 has
+> four DMA channels. All these DMA channels share the same interrupt.
+> Add the interrupt check for the GPMI, only the first DMA channel will
+> register the irq.
 > 
-> There are other architectures that didn't start from a single root platform,
-> but still support multi-platform kernels.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
+>  1 files changed, 32 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 88aad4f..db36bf1 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -26,6 +26,8 @@
+>  #include <asm/irq.h>
+>  #include <mach/mxs.h>
+>  #include <mach/dma.h>
+> +#include <mach/mx23.h>
+> +#include <mach/mx28.h>
+>  #include <mach/common.h>
+>  
+>  /*
+> @@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +/* The GPMI has several DMA channels, only the first can register the irq. */
+> +static bool irq_check(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	int irq_num = mxs_chan->chan_irq;
+> +
+> +#ifdef CONFIG_SOC_IMX23
+> +	if (cpu_is_mx23() && irq_num == MX23_INT_GPMI_DMA) {
+> +		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
+> +			return true;
+> +		else
+> +			return false;
+> +	}
+> +#endif
+> +#ifdef CONFIG_SOC_IMX28
+> +	if (cpu_is_mx28() && irq_num == MX28_INT_GPMI_DMA) {
+> +		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
+> +			return true;
+> +		else
+> +			return false;
+> +	}
+> +#endif
+> +	return true;
+> +}
+>
+You should make the distinction based on the platform_id, which would
+save you the ugly ifdef's and cpu_is_... macros.
 
-Sure, so does ARM with some restrictions.
 
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Nicolas
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
