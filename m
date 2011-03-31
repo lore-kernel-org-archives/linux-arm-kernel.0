@@ -1,77 +1,61 @@
-From: david@lang.hm (david at lang.hm)
-Date: Thu, 31 Mar 2011 10:22:31 -0700 (PDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331105000.GC14323@n2100.arm.linux.org.uk>
-References: <201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<AANLkTikV5OMifKjWRVdtJLEcxcZ56jrjWLYJBX89pHQ0@mail.gmail.com>
-	<alpine.LFD.2.00.1103310012500.28032@xanadu.home>
-	<20110331105440.42692165@lxorguk.ukuu.org.uk>
-	<20110331105000.GC14323@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1103310904080.29543@asgard.lang.hm>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 31 Mar 2011 19:30:45 +0200
+Subject: [PATCH V2 2/3] arm: lpc32xx: add rtc-device
+In-Reply-To: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
+References: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1301592646-26356-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ arch/arm/mach-lpc32xx/common.c |   21 +++++++++++++++++++++
+ arch/arm/mach-lpc32xx/common.h |    1 +
+ 2 files changed, 22 insertions(+), 0 deletions(-)
 
-> On Thu, Mar 31, 2011 at 10:54:40AM +0100, Alan Cox wrote:
->> If I boot it on a current PC I'm booting on a multiprocessor system with
->> different timers, totally different IRQ controllers, different keyboard
->> controllers (USB), PCI Express, an IOMMU, NCQ SATA, ACPI, graphics
->> running in shared host memory able to give/take pages from the host,
->> extra instructions, etc etc
->>
->> And the same kernel boots just fine on both just fine.
->
-> We've been there for a long time with ARM.  Right from the start I had
-> a single kernel image which booted over a range of ARM CPUs and
-> platforms.
->
-> As far as ARM CPU architectures go, today we can have a single kernel
-> image which covers ARMv3 to ARMv5, and a separate kernel image which
-> covers ARMv6 to ARMv7 including SMP and UP variants.  The thing which
-> currently stops ARMv3 to ARMv7 all together is the different page table
-> layouts, the ASID tagging, the exclusive load/store support for cmpxchg
-> and other atomic operations, etc.
-
-I don't think the push is to get a single kernel image that boots 
-absolutly everywhere. having separate ARM5 and ARM7 kernels doesn't seem 
-to be a big deal to anyone.
-
-> Outside of the CPU architecture, things become a lot more complicated.
-
-exactly, and this is where there is an issue.
-
-> The biggest one up until this merge window was that there is no fixed
-> address for system RAM, which makes stuff like virt_to_phys() rather
-> horrible to deal with - which in turn makes setting up and walking page
-> tables a nightmare.  We've just solved that issue with run-time patching
-> of the kernel code to replace the add/sub instructions with ones with
-> the appropriate offset, so we're a step closer to unifying everything
-> into one single kernel image.  This work alone produced this diffstat:
->
-> 87 files changed, 450 insertions(+), 190 deletions(-)
->
-> so it actually resulted in a net increase in the amount of code to be
-> maintained rather than reducing it.  That's hardly surprising as what
-> that replaced was just a bunch of #define's for PHYS_OFFSET with some
-> complex assembly code to do run-time patching of instructions.
-
-but I don't think this sort of work is what anyone is complaining about.
-
-> Given this thread, I've lost the motivation to continue with it because
-> it's just going to cause more 'pointless churn' and end up annoying
-> Linus even more.
-
-it sounds like you are part of the solution, not part of the problem. the 
-biggest problem is the general response from 'the ARM community' when 
-these sorts of issues are raised claiming that there is no problem. you 
-seem to be very aware of the problem and are working to fix it. that is a 
-very different situaion.
-
-David Lang
+diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
+index 6880b47..205b2db 100644
+--- a/arch/arm/mach-lpc32xx/common.c
++++ b/arch/arm/mach-lpc32xx/common.c
+@@ -116,6 +116,27 @@ struct platform_device lpc32xx_tsc_device = {
+ 	.resource = lpc32xx_tsc_resources,
+ };
+ 
++/* RTC */
++
++static struct resource lpc32xx_rtc_resources[] = {
++	{
++		.start = LPC32XX_RTC_BASE,
++		.end = LPC32XX_RTC_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},{
++		.start = IRQ_LPC32XX_RTC,
++		.end = IRQ_LPC32XX_RTC,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device lpc32xx_rtc_device = {
++	.name =  "rtc-lpc32xx",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(lpc32xx_rtc_resources),
++	.resource = lpc32xx_rtc_resources,
++};
++
+ /*
+  * Returns the unique ID for the device
+  */
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index e81243c..5583f52 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -29,6 +29,7 @@ extern struct platform_device lpc32xx_i2c0_device;
+ extern struct platform_device lpc32xx_i2c1_device;
+ extern struct platform_device lpc32xx_i2c2_device;
+ extern struct platform_device lpc32xx_tsc_device;
++extern struct platform_device lpc32xx_rtc_device;
+ 
+ /*
+  * Other arch specific structures and functions
+-- 
+1.7.2.5
