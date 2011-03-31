@@ -1,8 +1,8 @@
 From: gdavis@mvista.com (George G. Davis)
-Date: Wed, 30 Mar 2011 21:05:21 -0400
+Date: Wed, 30 Mar 2011 21:05:45 -0400
 Subject: SMP soft lockup on smp_call_function_many when doing
 	flush_tlb_page
-In-Reply-To: <AANLkTin2JMW0FkEW5v-FMDN4826xo6s+B6heK5QSn_b=@mail.gmail.com>
+In-Reply-To: <AANLkTikwmSw0h-CKwF+MkkTymbURVWuoS3L7YTnL_EZB@mail.gmail.com>
 References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
 	<1299591229.19820.91.camel@e102109-lin.cambridge.arm.com>
 	<AANLkTinX+1wwxcSPf0HfyE1pG1TJv7zf0cQ9aP+DWCCD@mail.gmail.com>
@@ -11,17 +11,13 @@ References: <AANLkTimk6zmQNdZaVaxDbd5Ff+75RERhrxgmsbM55vs1@mail.gmail.com>
 	<AANLkTimzAdhfp-ARyFU4kcGytf9PL4Ypziu1c1PtH=tC@mail.gmail.com>
 	<1299685848.19820.353.camel@e102109-lin.cambridge.arm.com>
 	<20110330051849.GB13080@mvista.com>
-	<AANLkTin2JMW0FkEW5v-FMDN4826xo6s+B6heK5QSn_b=@mail.gmail.com>
-Message-ID: <20110331010521.GL13080@mvista.com>
+	<AANLkTikwmSw0h-CKwF+MkkTymbURVWuoS3L7YTnL_EZB@mail.gmail.com>
+Message-ID: <20110331010545.GM13080@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Mar 30, 2011 at 10:17:38AM +0200, saeed bishara wrote:
-> On Wed, Mar 30, 2011 at 7:18 AM, George G. Davis <gdavis@mvista.com> wrote:
-> > Hi,
-> >
+On Wed, Mar 30, 2011 at 09:37:51AM +0100, Catalin Marinas wrote:
+> On 30 March 2011 06:18, George G. Davis <gdavis@mvista.com> wrote:
 > > On Wed, Mar 09, 2011 at 03:50:48PM +0000, Catalin Marinas wrote:
 > >> On Wed, 2011-03-09 at 15:22 +0000, saeed bishara wrote:
 > >> > > Did you get a chance to try this patch?
@@ -31,18 +27,8 @@ On Wed, Mar 30, 2011 at 10:17:38AM +0200, saeed bishara wrote:
 > >
 > > Based on your comments here [1], it looks like your fix for this [2] is
 > > superseeded by [3] which is already applied [4]. ?Can you confirm?
-> [4] fixed the bug that I reported here. and since my kernel based on
-> 2.6.35.9, I backported several patches besides to that one, here is
-> the list::
-> 0001-generic-ipi-Fix-deadlock-in-__smp_call_function_sing.patch
-> 0002-kernel-smp.c-fix-smp_call_function_many-SMP-race.patch
-> 0003-kernel-smp.c-consolidate-writes-in-smp_call_function.patch
-> 0004-call_function_many-fix-list-delete-vs-add-race.patch
-> 0005-call_function_many-add-missing-ordering.patch
-> 0006-smp_call_function_many-handle-concurrent-clearing-of.patch
 > 
-> with those patches I don't see IPI lockup issue any more.
-> saeed
+> Yes, it's been fixed by the commit you mentioned.
 
 Thanks!
 
@@ -50,25 +36,6 @@ Thanks!
 Regards,
 George
 
-> >
-> > TIA!
-> >
-> > --
-> > Regards,
-> > George
-> >
-> > [1] https://lkml.org/lkml/2011/3/15/429
-> > [2] https://lkml.org/lkml/2011/3/15/296
-> > [3] https://lkml.org/lkml/2011/3/15/315
-> > [4] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=723aae2
-> >>
-> >> --
-> >> Catalin
-> >>
-> >>
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+> 
+> -- 
+> Catalin
