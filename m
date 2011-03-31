@@ -1,64 +1,47 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 31 Mar 2011 13:28:45 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
-	<20110331164539.GB19452@n2100.arm.linux.org.uk>
-	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
-	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
-Message-ID: <AANLkTikmtXVqAoDmW-fL2emGg9Oh6PMmhZa6em6=WZKc@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 31 Mar 2011 23:09:42 +0200
+Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1301587083.31087.1032.camel@nimitz>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
+	<1301587083.31087.1032.camel@nimitz>
+Message-ID: <op.vs77qfx03l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 1:05 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
+On Thu, 31 Mar 2011 17:58:03 +0200, Dave Hansen <dave@linux.vnet.ibm.com>  
+wrote:
+
+> On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
+>>
+>> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned  
+>> long end,
+>> +                                      gfp_t flag)
+>> +{
+>> +       unsigned long pfn = start, count;
+>> +       struct page *page;
+>> +       struct zone *zone;
+>> +       int order;
+>> +
+>> +       VM_BUG_ON(!pfn_valid(start));
 >
-> Umm. The whole "number of lines of code" thing has become a total red herring.
->
-> THAT IS NOT WHY I STARTED TO COMPLAIN!
->
-> The reason I point out the number of lines of code is because it's one
-> of the more obvious _symptoms_ of the problem.
->
-> But trust me, if you start doing a better job at platform code, I
-> won't be complaining when I get lots of deleted code, or when I start
-> getting devicetree descriptions instead of new drivers.
+> This seems kinda mean.  Could we return an error?  I understand that
+> this is largely going to be an early-boot thing, but surely trying to
+> punt on crappy input beats a full-on BUG().
 
-So if you don't like lines of code, how about just "number of files touched".
+Actually, I would have to check but I think that the usage of this function
+(in this patchset) is that the caller expects the function to succeed.  It  
+is
+quite a low-level function so before running it a lot of preparation is  
+needed
+and the caller must make sure that several conditions are met.  I don't  
+really
+see advantage of returning a value rather then BUG()ing.
 
-This is Thomas this merge window. Remember: he's traditionally doing
-timers and interrupts and stuff.  Do:
+Also, CMA does not call this function at boot time.
 
- git log --author=tglx v2.6.38.. --oneline --numstat |
-    cut -f3- | grep -v ' ' | cut -d/ -f1-2 |
-    sort | uniq -c | sort -n | tail
-
-and see another example of arm standing out (ok, so "kernel/irq" also
-stands out in this case, but you'd kind of _expect_ that, when the
-whole series is about irq controllers, wouldn't you?)
-
-And no, mips doesn't look so hot either.
-
-Anyway, the point is, there are many ways to show the whole "arm is a
-maintenance problem" issue. Don't get too hung up about number of
-lines changed. It's just the simplest kind of thing where the tools
-give answers very quickly without the above kinds of games.
-
-Btw, the reason why the subject line on this rant is what it is, is
-that during this merge window, arm was also one of the more annoying
-to merge. And NO, that does NOT mean that I want you guys to merge
-things behind my back just to hide the problem. I'm just saying that
-it's another facet of this whole issue. Not that I can't do merges,
-but that ARM simply ends up having these issues that others don't.
-
-                          Linus
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
