@@ -1,92 +1,78 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 31 Mar 2011 10:50:02 +0200
-Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
-In-Reply-To: <4D94403F.6000000@freescale.com>
-References: <19858.62649.218523.984252@ipc1.ka-ro>
-	<1301554968-29066-1-git-send-email-b32955@freescale.com>
-	<19860.13566.651111.241538@ipc1.ka-ro>
-	<4D94403F.6000000@freescale.com>
-Message-ID: <19860.16442.199644.984424@ipc1.ka-ro>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 31 Mar 2011 10:52:47 +0200
+Subject: [PATCH 0/9] mach-ux500: core SoC updates and new PRCMU API
+Message-ID: <1301561567-23543-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Huang Shijie writes:
-> Hi:
-> > Hi,
-> >
-> > Huang Shijie writes:
-> >> The GPMI may have many DMA channels, such as the imx23 has
-> >> four DMA channels. All these DMA channels share the same interrupt.
-> >> Add the interrupt check for the GPMI, only the first DMA channel will
-> >> register the irq.
-> >>
-> >> Signed-off-by: Huang Shijie<b32955@freescale.com>
-> >> ---
-> >>   drivers/dma/mxs-dma.c |   36 ++++++++++++++++++++++++++++++++----
-> >>   1 files changed, 32 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> >> index 88aad4f..db36bf1 100644
-> >> --- a/drivers/dma/mxs-dma.c
-> >> +++ b/drivers/dma/mxs-dma.c
-> >> @@ -26,6 +26,8 @@
-> >>   #include<asm/irq.h>
-> >>   #include<mach/mxs.h>
-> >>   #include<mach/dma.h>
-> >> +#include<mach/mx23.h>
-> >> +#include<mach/mx28.h>
-> >>   #include<mach/common.h>
-> >>
-> >>   /*
-> >> @@ -306,6 +308,30 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
-> >>   	return IRQ_HANDLED;
-> >>   }
-> >>
-> >> +/* The GPMI has several DMA channels, only the first can register the irq. */
-> >> +static bool irq_check(struct mxs_dma_chan *mxs_chan)
-> >> +{
-> >> +	int irq_num = mxs_chan->chan_irq;
-> >> +
-> >> +#ifdef CONFIG_SOC_IMX23
-> >> +	if (cpu_is_mx23()&&  irq_num == MX23_INT_GPMI_DMA) {
-> >> +		if (mxs_chan->chan.chan_id == MX23_DMA_GPMI0)
-> >> +			return true;
-> >> +		else
-> >> +			return false;
-> >> +	}
-> >> +#endif
-> >> +#ifdef CONFIG_SOC_IMX28
-> >> +	if (cpu_is_mx28()&&  irq_num == MX28_INT_GPMI_DMA) {
-> >> +		if (mxs_chan->chan.chan_id == MX28_DMA_GPMI0)
-> >> +			return true;
-> >> +		else
-> >> +			return false;
-> >> +	}
-> >> +#endif
-> >> +	return true;
-> >> +}
-> >>
-> > You should make the distinction based on the platform_id, which would
-> > save you the ugly ifdef's and cpu_is_... macros.
-> >
-> >
-> This in the DMA driver.
-> Do you want me to change the DMA driver to add the platform_id?
-> The DMA driver has already used the cpu_is_xx() macros.
->
-The mxs-dma driver is already using platform ids!
+This patch series updates a number of core platform register files,
+differentiates on-SoC IRQs per SoC family, updates the code to
+handle all the latest ASICs and makes a massive update of the
+PRCMU (Power/Reset/Control/Managament/Unit) interface. It splits
+PM-related stuff into its own subdirectory and updates the cpufreq
+driver as part of the PRCMU update, so as not to cause regressions.
 
+Linus Walleij (6):
+  mach-ux500: rename PRCMU driver per SoC
+  mach-ux500: make PRCMU base address dynamic
+  mach-ux500: update the DB8500 register file
+  mach-ux500: update the DB5500 register file
+  mach-ux500: update ASIC version detection
+  mach-ux500: create a PM subdirectory
 
-Lothar Wa?mann
+Mattias Nilsson (2):
+  mach-ux500: new DB8500 PRCMU firmware API
+  mach-ux500: add DB5500 PRCMU interface
+
+Rabin Vincent (1):
+  mach-ux500: update SoC and board IRQ handling
+
+ arch/arm/mach-ux500/Kconfig                        |    1 +
+ arch/arm/mach-ux500/Makefile                       |    6 +-
+ arch/arm/mach-ux500/cpu-db5500.c                   |    2 +
+ arch/arm/mach-ux500/cpu-db8500.c                   |    2 +
+ arch/arm/mach-ux500/cpu.c                          |    7 +-
+ arch/arm/mach-ux500/cpufreq.c                      |  211 --
+ arch/arm/mach-ux500/include/mach/db5500-regs.h     |   20 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h     |   37 +-
+ arch/arm/mach-ux500/include/mach/hardware.h        |    1 +
+ arch/arm/mach-ux500/include/mach/id.h              |   20 +
+ .../mach-ux500/include/mach/irqs-board-mop500.h    |    5 +
+ .../arm/mach-ux500/include/mach/irqs-board-u5500.h |   21 +
+ arch/arm/mach-ux500/include/mach/irqs-db5500.h     |   27 +
+ arch/arm/mach-ux500/include/mach/irqs-db8500.h     |   54 +
+ arch/arm/mach-ux500/include/mach/irqs.h            |   46 +-
+ arch/arm/mach-ux500/include/mach/prcmu-db5500.h    |   45 +
+ arch/arm/mach-ux500/include/mach/prcmu-defs.h      |   30 -
+ arch/arm/mach-ux500/include/mach/prcmu-fw-api.h    |  523 +++++
+ .../arm/mach-ux500/include/mach/prcmu-fw-defs_v1.h |  467 +++++
+ arch/arm/mach-ux500/include/mach/prcmu-regs.h      |   27 +-
+ arch/arm/mach-ux500/include/mach/prcmu.h           |   28 -
+ arch/arm/mach-ux500/pm/Kconfig                     |    6 +
+ arch/arm/mach-ux500/pm/Makefile                    |    4 +
+ arch/arm/mach-ux500/pm/cpufreq.c                   |  171 ++
+ arch/arm/mach-ux500/prcmu-db5500.c                 |  449 +++++
+ arch/arm/mach-ux500/prcmu-db8500.c                 | 2018 ++++++++++++++++++++
+ arch/arm/mach-ux500/prcmu-regs-db8500.h            |  162 ++
+ arch/arm/mach-ux500/prcmu.c                        |  394 ----
+ drivers/mfd/ab8500-i2c.c                           |    2 +-
+ 29 files changed, 4081 insertions(+), 705 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/cpufreq.c
+ create mode 100644 arch/arm/mach-ux500/include/mach/irqs-board-u5500.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/prcmu-db5500.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/prcmu-defs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/prcmu-fw-api.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/prcmu-fw-defs_v1.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/prcmu.h
+ create mode 100644 arch/arm/mach-ux500/pm/Kconfig
+ create mode 100644 arch/arm/mach-ux500/pm/Makefile
+ create mode 100644 arch/arm/mach-ux500/pm/cpufreq.c
+ create mode 100644 arch/arm/mach-ux500/prcmu-db5500.c
+ create mode 100644 arch/arm/mach-ux500/prcmu-db8500.c
+ create mode 100644 arch/arm/mach-ux500/prcmu-regs-db8500.h
+ delete mode 100644 arch/arm/mach-ux500/prcmu.c
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.3.2
