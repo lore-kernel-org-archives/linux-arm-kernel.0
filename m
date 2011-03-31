@@ -1,63 +1,81 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 31 Mar 2011 23:17:51 +0200
-Subject: [PATCH 05/12] mm: alloc_contig_range() added
-In-Reply-To: <1301603322.31087.1196.camel@nimitz>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
-	<1301587361.31087.1040.camel@nimitz>
-	<op.vs7umufd3l0zgt@mnazarewicz-glaptop>
-	<1301603322.31087.1196.camel@nimitz>
-Message-ID: <op.vs7731po3l0zgt@mnazarewicz-glaptop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 31 Mar 2011 14:35:26 -0700
+Subject: [PATCH 05/10] omap2+: Use dmtimer macros for clockevent
+In-Reply-To: <20110328222140.4046.91213.stgit@baageli.muru.com> (Tony
+	Lindgren's message of "Mon, 28 Mar 2011 15:21:40 -0700")
+References: <20110328221501.4046.41079.stgit@baageli.muru.com>
+	<20110328222140.4046.91213.stgit@baageli.muru.com>
+Message-ID: <8762qz9dnl.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011 22:28:42 +0200, Dave Hansen <dave@linux.vnet.ibm.com>  
-wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> On Thu, 2011-03-31 at 18:26 +0200, Michal Nazarewicz wrote:
->> > On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
->> >> +       ret = 0;
->> >> +       while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
->> >> +               if (WARN_ON(++ret >= MAX_ORDER))
->> >> +                       return -EINVAL;
->>
->> On Thu, 31 Mar 2011 18:02:41 +0200, Dave Hansen wrote:
->> > Holy cow, that's dense.  Is there really no more straightforward way  
->> to
->> > do that?
->>
->> Which part exactly is dense?  What would be qualify as a more
->> straightforward way?
+> This patch makes timer-gp.c to use only a subset of dmtimer
+> functions without the need to initialize dmtimer code early.
 >
-> I'm still not 100% sure what it's trying to do.  It looks like it
-> attempts to check all of "start"'s buddy pages.
+> Note that omap_dmtimer_init_one can eventually be moved to
+> omap2+ specific dmtimer.c.
+>
+> Also note that now with the inline functions, timer_set_next_event
+> becomes more efficient in the lines of assembly code.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-No.  I'm going up through parents.  This is because even though start
-falls in a free block (ie. one that page allocator tracks), the actual
-page that is in buddy system is larger then start and this loop looks
-for beginning of that page.
+In looking closer at this patch, I have a few questions.
 
-> int order;
-> for (order = 0; order <= MAX_ORDER; order++) {
-> 	unsigned long buddy_pfn = find_buddy(start, order);
-> 	struct page *buddy = pfn_to_page(buddy_pfn);
-> 	if (PageBuddy(buddy)
-> 		break;
-> 	WARN();
-> 	return -EINVAL;
-> }
+[...]
 
-The WARN() and return would have to be outside of the loop and, as I
-described, instead of find_buddy() something like find_parent() would
-have to be used.
+> @@ -75,7 +97,8 @@ static struct irqaction omap2_gp_timer_irq = {
+>  static int omap2_gp_timer_set_next_event(unsigned long cycles,
+>  					 struct clock_event_device *evt)
+>  {
+> -	omap_dm_timer_set_load_start(gptimer, 0, 0xffffffff - cycles);
+> +	__omap_dm_timer_load_start(clkev.io_base, OMAP_TIMER_CTRL_ST,
+> +						0xffffffff - cycles, 1);
+>  
+>  	return 0;
 
-> I'm wondering also if you can share some code with __rmqueue().
+The creation of macros is causing some readability concern, at least for
+me...
 
-Doubtful since start does not (have to) point to a page that is tracked
-by page allocator but a page inside such a page.
+In creating the macro versions of some of the functions, the macro
+version actually has different behavior which makes reading the code a
+little confusing.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+I just noticed that the macro version of _load_start() doesn't actually
+do the "start", so you added the OMAP_TIMER_CTRL_ST when calling it.
+To do this, the macro version takes a 'ctrl' argument where as the
+"real" version only takes the autoreload argument.
+
+If you're going to keep the same function name (but just add the __
+prefix, I would expect that the functionality of the function doesn't
+change.
+
+If the functionality of the macro is different from the "real" function,
+it should probably just be given a different name.   In this case,
+probably dropping the _start suffix is probably enough.
+
+>  }
+> @@ -85,13 +108,13 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>  {
+>  	u32 period;
+>  
+> -	omap_dm_timer_stop(gptimer);
+> +	omap_dm_timer_stop(&clkev);
+>  
+>  	switch (mode) {
+>  	case CLOCK_EVT_MODE_PERIODIC:
+> -		period = clk_get_rate(omap_dm_timer_get_fclk(gptimer)) / HZ;
+> +		period = clkev.rate / HZ;
+>  		period -= 1;
+> -		omap_dm_timer_set_load_start(gptimer, 1, 0xffffffff - period);
+> +		omap_dm_timer_set_load_start(&clkev, 1, 0xffffffff - period);
+
+Hmm, you're using the driver function here not the macro.  Is that
+intended?
+
+Why not use the macro version here with OMAP_TIMER_CTRL_AR |
+OMAP_TIMER_CTRL_ST.
+
+Kevin
