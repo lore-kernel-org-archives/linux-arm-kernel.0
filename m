@@ -1,44 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 31 Mar 2011 07:45:53 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-References: <20110317183048.GW7258@atomide.com>
-	<AANLkTimWbb5DWiiCW821H6pRicbk1fS3PYcnGyUMznvM@mail.gmail.com>
-	<20110318101512.GA15375@n2100.arm.linux.org.uk>
-	<201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-Message-ID: <AANLkTimZ8+npVu6u5-o9+3CV40wB_GYwiOWvfJPso8G0@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 31 Mar 2011 15:21:29 +0900
+Subject: [GIT PULL] SuperH Mobile ARM
+Message-ID: <1301552490-16064-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 01:31, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 30 Mar 2011, Linus Torvalds wrote:
->> The long-term situation should be that you should be able to have ONE
->> binary kernel "just work". That's where we are on x86. Really.
->
-> But X86 is peanuts. ?Really. ?There was one machine called the IBM PC at
-> some point that everybody cloned, and the rest was totally irrelevant.
-> Then came that thing called Windows that reinforced this hardware
-> monoculture as it was used for the ultimate conformance testing. ?This
-> is damn easy in that case to produce a kernel that works virtually
-> everywhere.
->
-> On ARM there is simply not such thing as a single machine design to
-> clone, and a closed source test bench to design for.
+Hi Russell,
 
-There are other architectures that didn't start from a single root platform,
-but still support multi-platform kernels.
+please considder pulling
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/shmobile-2.6.git for-russell
 
-Gr{oetje,eeting}s,
+To get the following changes since commit 0ce790e7d736cedc563e1fb4e998babf5a4dbc3d:
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
+  Linux 2.6.39-rc1 (2011-03-29 12:09:47 -0700)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I apologised for not sending this earlier, however the last
+dependency for this patch only went in just before 2.6.39-rc1 -
+the 2nd last patch of the last merge.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+I believe that the potential fall out of this patch is
+limited to breaking (non-eSD) zboot support for SuperH Mobile ARM
+and as such I would like it considered for inclusion in 2.6.39-rc2.
+
+Simon Horman (1):
+      mmc, ARM: Add zboot from eSD support for SuperH Mobile ARM
+
+ Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt    |   43 ++
+ arch/arm/Kconfig                                  |   33 ++-
+ arch/arm/boot/compressed/Makefile                 |   10 +-
+ arch/arm/boot/compressed/head-shmobile.S          |   12 +-
+ arch/arm/boot/compressed/mmcif-sh7372.c           |    2 +-
+ arch/arm/boot/compressed/sdhi-sh7372.c            |   95 +++++
+ arch/arm/boot/compressed/sdhi-shmobile.c          |  449 +++++++++++++++++++++
+ arch/arm/boot/compressed/sdhi-shmobile.h          |   11 +
+ arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h |   21 +
+ arch/arm/mach-shmobile/include/mach/sdhi.h        |   16 +
+ 10 files changed, 675 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt
+ create mode 100644 arch/arm/boot/compressed/sdhi-sh7372.c
+ create mode 100644 arch/arm/boot/compressed/sdhi-shmobile.c
+ create mode 100644 arch/arm/boot/compressed/sdhi-shmobile.h
+ create mode 100644 arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h
+ create mode 100644 arch/arm/mach-shmobile/include/mach/sdhi.h
