@@ -1,44 +1,62 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Thu, 31 Mar 2011 11:34:07 -0700
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Mar 2011 20:34:56 +0200 (CEST)
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331181751.GC19452@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+In-Reply-To: <alpine.LFD.2.00.1103311218240.28032@xanadu.home>
+References: <201103301906.42429.arnd@arndb.de>
+	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
+	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
 	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
 	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<AANLkTikV5OMifKjWRVdtJLEcxcZ56jrjWLYJBX89pHQ0@mail.gmail.com>
-	<alpine.LFD.2.00.1103310012500.28032@xanadu.home>
-	<20110331105440.42692165@lxorguk.ukuu.org.uk>
-	<20110331105000.GC14323@n2100.arm.linux.org.uk>
-	<1301575101.10659.132.camel@e102109-lin.cambridge.arm.com>
-	<20110331130123.GB17547@n2100.arm.linux.org.uk>
-	<20110331181254.GA21981@merkur.ravnborg.org>
-	<20110331181751.GC19452@n2100.arm.linux.org.uk>
-Message-ID: <20110331113407.36b7466b@jbarnes-desktop>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103311218240.28032@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1103312019350.22418@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011 19:17:51 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Thu, Mar 31, 2011 at 08:12:54PM +0200, Sam Ravnborg wrote:
-> > > And since Linus' whinge about ARM defconfigs, I really *hate* merging
-> > > anything with *any* defconfig changes in - as a result, I don't
-> > > particularly want to deal with ARM defconfig changes anymore.
-> > 
-> > I thought we solved this with the introduction of "make savedefconfig"
-> > that created much much smaller defconfig.
+On Thu, 31 Mar 2011, Nicolas Pitre wrote:
+> On Thu, 31 Mar 2011, david at lang.hm wrote:
 > 
-> Did we solve it to Linus' satisfaction, or did we solve it sufficiently
-> to avoid the immediate threat of them all being removed and we still have
-> work to do?  I've no idea.
-> 
-> Personally, I'd still like to see less of them but without significantly
-> impacting the usefulness of automated built tooks like Simtec's
-> kautobuild.
+> > I think that part of the issue is that when Linus points out a problem, the
+> > response isn't "we agree and are working on it, here's what we are doing",
+> > instead it seems to be mostly "there is no problem, this is just because there
+> > is so much variation in ARM"
+>
+> If prominent people looking at this from the side line continue bashing 
+> at those who are both feet in the mud trying to contain the flood rather 
+> than actually helping then nothing will change.  Instead this only 
+> creates despair and the splashed people may simply decide to throw in 
+> the towel, at which point things will collapse for real.  In reality, 
+> the system has been going as it is for quite a while and with more or 
+> less the same level of intensity.  And the fact is that _users_ of the 
+> ARM kernel are not complaining.  Things are far from being perfect, but 
+> so far things have been "good enough" for the majority of the people 
+> involved, and improvements are constantly being worked on with the men 
+> power available.
 
-Might be neat if kbuild could wget config files automatically from a
-known location.  Bonus points if it properly detected the right one to
-grab in the first place...
+And that's the whole point why I was ranting in the first place. I
+know that there are clever folks working on the solution, but it's
+entirely clear to me, that they are simply not enough compared to the
+massive inbound flood. So neither you nor Russell can cope with it,
+you simply do not scale. That's why I suggested that the ARM community
+needs to push competent man power into this.
 
--- 
-Jesse Barnes, Intel Open Source Technology Center
+You say the concept of subarch maintainers is working quite well. That
+depends on the definition of working. It works in terms of users can
+use it, but it does not work from a maintainability POV.
+
+Nobody wants to bash on those who are working on it, but IMNSHO the
+current way is running into an utter nightmare even w/o you and
+Russell throwing in the towel.
+
+I went through quite a few iterations of large scale cleanups, so I
+know how you feel.
+
+Thanks,
+
+	tglx
