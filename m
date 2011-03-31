@@ -1,50 +1,63 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 31 Mar 2011 14:14:38 -0700
-Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
-In-Reply-To: <op.vs77qfx03l0zgt@mnazarewicz-glaptop>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 31 Mar 2011 23:17:51 +0200
+Subject: [PATCH 05/12] mm: alloc_contig_range() added
+In-Reply-To: <1301603322.31087.1196.camel@nimitz>
 References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
-	<1301587083.31087.1032.camel@nimitz>
-	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
-Message-ID: <1301606078.31087.1275.camel@nimitz>
+	<1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
+	<1301587361.31087.1040.camel@nimitz>
+	<op.vs7umufd3l0zgt@mnazarewicz-glaptop>
+	<1301603322.31087.1196.camel@nimitz>
+Message-ID: <op.vs7731po3l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-31 at 23:09 +0200, Michal Nazarewicz wrote:
-> On Thu, 31 Mar 2011 17:58:03 +0200, Dave Hansen <dave@linux.vnet.ibm.com>  
-> wrote:
-> > On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
-> >> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned  
-> >> long end,
-> >> +                                      gfp_t flag)
-> >> +{
-> >> +       unsigned long pfn = start, count;
-> >> +       struct page *page;
-> >> +       struct zone *zone;
-> >> +       int order;
-> >> +
-> >> +       VM_BUG_ON(!pfn_valid(start));
-> >
-> > This seems kinda mean.  Could we return an error?  I understand that
-> > this is largely going to be an early-boot thing, but surely trying to
-> > punt on crappy input beats a full-on BUG().
-> 
-> Actually, I would have to check but I think that the usage of this function
-> (in this patchset) is that the caller expects the function to succeed.  It  
-> is quite a low-level function so before running it a lot of preparation is  
-> needed and the caller must make sure that several conditions are met.  I don't  
-> really see advantage of returning a value rather then BUG()ing.
-> 
-> Also, CMA does not call this function at boot time.
+On Thu, 31 Mar 2011 22:28:42 +0200, Dave Hansen <dave@linux.vnet.ibm.com>  
+wrote:
 
-We BUG_ON() in bootmem.  Basically if we try to allocate an early-boot
-structure and fail, we're screwed.  We can't keep running without an
-inode hash, or a mem_map[].
+> On Thu, 2011-03-31 at 18:26 +0200, Michal Nazarewicz wrote:
+>> > On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
+>> >> +       ret = 0;
+>> >> +       while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
+>> >> +               if (WARN_ON(++ret >= MAX_ORDER))
+>> >> +                       return -EINVAL;
+>>
+>> On Thu, 31 Mar 2011 18:02:41 +0200, Dave Hansen wrote:
+>> > Holy cow, that's dense.  Is there really no more straightforward way  
+>> to
+>> > do that?
+>>
+>> Which part exactly is dense?  What would be qualify as a more
+>> straightforward way?
+>
+> I'm still not 100% sure what it's trying to do.  It looks like it
+> attempts to check all of "start"'s buddy pages.
 
-This looks like it's going to at least get partially used in drivers, at
-least from the examples.  Are these kinds of things that, if the driver
-fails to load, that the system is useless and hosed?  Or, is it
-something where we might limp along to figure out what went wrong before
-we reboot?
+No.  I'm going up through parents.  This is because even though start
+falls in a free block (ie. one that page allocator tracks), the actual
+page that is in buddy system is larger then start and this loop looks
+for beginning of that page.
 
--- Dave
+> int order;
+> for (order = 0; order <= MAX_ORDER; order++) {
+> 	unsigned long buddy_pfn = find_buddy(start, order);
+> 	struct page *buddy = pfn_to_page(buddy_pfn);
+> 	if (PageBuddy(buddy)
+> 		break;
+> 	WARN();
+> 	return -EINVAL;
+> }
+
+The WARN() and return would have to be outside of the loop and, as I
+described, instead of find_buddy() something like find_parent() would
+have to be used.
+
+> I'm wondering also if you can share some code with __rmqueue().
+
+Doubtful since start does not (have to) point to a page that is tracked
+by page allocator but a page inside such a page.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
