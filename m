@@ -1,92 +1,91 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 31 Mar 2011 07:04:10 -0700
-Subject: [pm-core][PATCH v3 02/21] OMAP4: Use WARN_ON() instead of
-	BUG_ON() with graceful exit
-In-Reply-To: <4D943CB8.70002@ti.com> (Santosh Shilimkar's message of "Thu, 31
-	Mar 2011 14:05:04 +0530")
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301304157-2466-3-git-send-email-santosh.shilimkar@ti.com>
-	<20110328205323.GD30616@atomide.com> <4D943CB8.70002@ti.com>
-Message-ID: <87wrjfmlnp.fsf@ti.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 31 Mar 2011 10:17:14 -0400
+Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
+In-Reply-To: <1301566248.2828.40.camel@localhost>
+References: <1301474413-28821-1-git-send-email-b32955@freescale.com>
+	<1301474413-28821-4-git-send-email-b32955@freescale.com>
+	<201103301046.04357.ffainelli@freebox.fr>
+	<4D92F277.7060607@freescale.com>
+	<1301566248.2828.40.camel@localhost>
+Message-ID: <AANLkTi=59br1KueZupGevB4DgP7UqBKRgbGgRvsjgH-8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+hi,
 
-> On 3/29/2011 2:23 AM, Tony Lindgren wrote:
->> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110328 02:20]:
->>> OMAP L2X0 and GIC initialisation code uses BUG_ON() for the
->>> ioremap() failure scenarios.
->>>
->>> Use WARN_ON() instead and allow graceful function exits.
->>>
->>> This was suggsted by Kevin Hilman<khilman@ti.com>  during
->>> OMAP4 PM code review.
->>>
->>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/omap4-common.c |    9 ++++++---
->>>   1 files changed, 6 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->>> index 559d227..8f9b97d 100644
->>> --- a/arch/arm/mach-omap2/omap4-common.c
->>> +++ b/arch/arm/mach-omap2/omap4-common.c
->>> @@ -36,11 +36,13 @@ void __init gic_init_irq(void)
->>>
->>>   	/* Static mapping, never released */
->>>   	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
->>> -	BUG_ON(!gic_dist_base_addr);
->>> +	if (WARN_ON(!gic_dist_base_addr))
->>> +		return;
->>>
->>>   	/* Static mapping, never released */
->>>   	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
->>> -	BUG_ON(!gic_cpu_base);
->>> +	if (WARN_ON(!gic_cpu_base))
->>> +		return;
->>>
->>>   	omap_wakeupgen_init();
->>>
->>> @@ -68,7 +70,8 @@ static int __init omap_l2_cache_init(void)
->>>
->>>   	/* Static mapping, never released */
->>>   	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
->>> -	BUG_ON(!l2cache_base);
->>> +	if (WARN_ON(!l2cache_base))
->>> +		return -ENODEV;
->>>
->>>   	/*
->>>   	 * 16-way associativity, parity disabled
->>
->> Hmm to me it seems that if any of these we don't want to
->> continue.
->>
-> L2 cache is no problem and kernel can boot without L2 cache
-> support. I agree with you on interrupt controller init though.
+2011/3/31 Artem Bityutskiy <dedekind1@gmail.com>:
+> Hi,
 >
-> Will drop the interrupt related checks from this patch.
+> On Wed, 2011-03-30 at 17:05 +0800, Huang Shijie wrote:
+>> > On Wednesday 30 March 2011 10:40:10 Huang Shijie wrote:
+>> >> This is a new database for the NANDs which is searched by the id_bytes.
+>> > drivers/mtd//nand/nand_base.c will be able to detect all of your chips listed
+>> > below based on the ids present in drivers/mtd/nand/nand_ids.c
+>> >
+>> yes.
+>>
+>> But I will use the new database to replace the old one.
+>>
+>> I will ?submit new patches to modify the generic code if my driver is
+>> accepted.
 >
-> Kevin, Are you ok with it ?
+> Sorry, but this is not how the opensource community works. The common
+> practice everywhere in the kernel is that if the generic code/framework
+> is too limiting, you first change the framework, then start using it. We
+> do not do things like - I'll first create my custom solution, and then I
+> promise I will change the framework.
+>
 
-In general, BUG should only be used when the kernel really can not
-possibly continue[1].  I suppose inability to map the GIC falls into
-that category.
+got it.
 
-Kevin
+> Again, this is not just MTD, this is everywhere in the kernel. This is
+> how linux goes forward - we force people to improve common code and
+> accept their drivers, and everyone benefits form this. Yes, this is more
+> work for you, of course, sorry :-)
+>
+thanks :)
 
+>> > If you have new chips to support in the future, you should add them in
+>> > drivers/mtd/nand/nand_ids.c and not keep this file.
+>> >
+>> The data structure ?nand_flash_dev{} does not contain enough information.
+>> So I want to the nand_device_info{} to replace it in future.
+>
+> Just add this information, if it is of generic nature (like SLC/MLC
+> flag, required ECC strength, etc).
+>
+>> > I still do not understand why this would be needed, is it because the generic
+>> > code does not provide enough informations for your driver?
+>> >
+>> yes.
+>>
+>> IMHO, the generic code is somehow trapped in a wrong way. :(
+>
+> Fix this please :-)
+>
+>> Paring the id bytes is not sufficient to get all the information you
+>> need which is faced by me.
+>
+> Fix this too :-)
+>
+>> What's more, I think the paring code is ugly, see the nand_get_flash_type().
+>
+> You are welcome to fix this. There is _a lot_ of ugly code in MTD
+> because no one loves it. Give it some love :-)
+>
+>> Why not create a new database which contains all the necessary
+>> information for a nand, and can be easy
+>> find by the id bytes as the keyword?
+>
+> You can create this database by extending/improving/cleaning up the
+> existing code base with a nice series of patches.
+>
+ok. I will try to fix the generic code before my driver is submitted.
 
-[1] from asm-generic/bug.h:
+Best Regards.
 
-/*
- * Don't use BUG() or BUG_ON() unless there's really no way out; one
- * example might be detecting data structure corruption in the middle
- * of an operation that can't be backed out of.  If the (sub)system
- * can somehow continue operating, perhaps with reduced functionality,
- * it's probably not BUG-worthy.
- *
- * If you're tempted to BUG(), think again:  is completely giving up
- * really the *only* solution?  There are usually better options, where
- * users don't need to reboot ASAP and can mostly shut down cleanly.
- */
+> --
+> Best Regards,
+> Artem Bityutskiy (????? ????????)
+>
+>
