@@ -1,92 +1,62 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 31 Mar 2011 13:05:01 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103311429590.28032@xanadu.home>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
-	<20110331164539.GB19452@n2100.arm.linux.org.uk>
-	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
-Message-ID: <AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 31 Mar 2011 14:15:23 -0600
+Subject: [PATCH] ARM: BUG() dies silently
+Message-ID: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 12:25 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->
-> So we need help! ?If core kernel people could get off their X86 stool
-> and get down in the ARM mud to help sort out this mess that would be
-> really nice (thanks tglx). ?Until then all that the few of us can do is
-> to contain the flood and hope for the best, and so far things being as
-> they are have still worked surprisingly well in practice for users. ?If
-> compensation is a concern then I think Linaro might be able to arrange
-> something.
+There are some cases where the code generated for BUG() results
+into an infinite while loop without causing a null dereference,
+this ends on a kernel being stuck on a loop and the user without
+a clue of what happened.
 
-The thing is, maintainers don't scale.
+E.g.: lib/scatterlist.c : __sg_alloc_table
 
-The only way to get quality code is to try to improve the quality from
-the "leaf nodes", because otherwise you'll always end up playing
-catch-up. You'll get new bad code faster than you can clean it up.
+        BUG_ON(nents > max_ents);
+ 438:   9a000000        bls     440 <__sg_alloc_table+0x20>
+ 43c:   eafffffe        b       43c <__sg_alloc_table+0x1c>
 
-I've told people this before, and I'll tell it again: when I flame
-submaintainers, they should try to push the pain down. I'm not really
-asking those submaintainers to clean up all the stuff they are
-getting: I'm basically asking people to say "no", or at least push
-back a lot, and argue with the people who send you code. Tell them
-what you don't like about the code, and tell them that you can't take
-it any more.
+Adding volatile makes the compiler to avoid optimizations on this
+code, which makes the panic to occur:
 
-> And we can't count on vendor people doing this work. ?They are all busy
-> porting the kernel to their next SOC version so they can win the next
-> big Android hardware design, and doing so with our kernel quality
-> standards is already quite a struggle for them.
+        BUG_ON(nents > max_ents);
+ 438:   9a000002        bls     448 <__sg_alloc_table+0x28>
+ 43c:   e3a03000        mov     r3, #0
+ 440:   e5833000        str     r3, [r3]
+ 444:   eafffffc        b       43c <__sg_alloc_table+0x1c>
 
-This really isn't the argument. The argument should be that if they
-want their code up-stream, they need to do a good job. If they don't,
-why should you take it at all?
+Seen with gnu/linux cs arm-2010q1-202 and arm2010.09-50.
 
-> What is going on at the moment is some effort to introduce DT support to
-> ARM. ?The core support is there, but that is useless until platform code
-> is moved to it, and corresponding work is put into bootloaders, etc.
-> That is progressing... slowly.
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
 
-How about not moving platform code TO it, but at least saying that you
-won't accept new platform code that doesn't use it? When somebody
-sends you a new platform, just say "no" if it's another copy-paste job
-or another "add yet another #ifdef or conditional to a messy driver".
+If needed I can change:
+./arch/arm/mach-clps711x/include/mach/io.h:
+	#define __raw_readsb(p,d,l)  do { *(int *)0 = 0; } while (0)
+./arch/arm/mach-clps711x/include/mach/io.h:
+	#define __raw_readsl(p,d,l)  do { *(int *)0 = 0; } while (0)
+./arch/arm/mach-clps711x/include/mach/io.h:
+	#define __raw_writesb(p,d,l) do { *(int *)0 = 0; } while (0)
+./arch/arm/mach-clps711x/include/mach/io.h:
+	#define __raw_writesl(p,d,l) do { *(int *)0 = 0; } while (0)
+./arch/arm/kernel/traps.c:      *(int *)0 = 0;
 
-> But we also need some slack wrt number of lines changed. ?An increased
-> consolidation effort will create more churn not less, at least for a
-> while. ?The OMAP clock merge conflict was the result of some cleanup
-> which will make further consolidation easier.
 
-Umm. The whole "number of lines of code" thing has become a total red herring.
+ arch/arm/include/asm/bug.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-THAT IS NOT WHY I STARTED TO COMPLAIN!
-
-The reason I point out the number of lines of code is because it's one
-of the more obvious _symptoms_ of the problem.
-
-But trust me, if you start doing a better job at platform code, I
-won't be complaining when I get lots of deleted code, or when I start
-getting devicetree descriptions instead of new drivers.
-
-So "number of lines of code" and "massive churn" is a problem, but
-look at how I'm not complaining about the drivers/ subdirectory, which
-is still the bulk of all lines in the kernel by far. I may complain
-about particular subsystems in drivers (gpu..) for other reasons, but
-it's not "lines of code" per se.
-
-In the case of ARM, the reason I point out the size of the arch/arm is
-because it's illustrative of just how _different_ ARM is from the
-other architectures.  And those differences are pretty much all about
-the board/platform issues.
-
-                          Linus
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 4d88425..a58d863 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -12,7 +12,7 @@ extern void __bug(const char *file, int line) __attribute__((noreturn));
+ #else
+ 
+ /* this just causes an oops */
+-#define BUG()		do { *(int *)0 = 0; } while (1)
++#define BUG()		do { *(volatile int *)0 = 0; } while(1)
+ 
+ #endif
+ 
+-- 
+1.7.1
