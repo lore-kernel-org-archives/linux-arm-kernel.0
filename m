@@ -1,43 +1,70 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 31 Mar 2011 13:33:39 -0700
-Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
-In-Reply-To: <20110331192429.GD14441@home.goodmis.org>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
-	<1301587083.31087.1032.camel@nimitz>
-	<20110331192429.GD14441@home.goodmis.org>
-Message-ID: <1301603619.31087.1203.camel@nimitz>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 31 Mar 2011 13:35:26 -0700
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <201103311723.02301.arnd@arndb.de> (Arnd Bergmann's message of
+	"Thu, 31 Mar 2011 17:23:01 +0200")
+References: <201103301906.42429.arnd@arndb.de>
+	<alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
+	<87d3l7jqpr.fsf@ti.com> <201103311723.02301.arnd@arndb.de>
+Message-ID: <87y63vav01.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-03-31 at 15:24 -0400, Steven Rostedt wrote:
-> On Thu, Mar 31, 2011 at 08:58:03AM -0700, Dave Hansen wrote:
-> > On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
-> > > 
-> > > +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
-> > > +                                      gfp_t flag)
-> > > +{
-> > > +       unsigned long pfn = start, count;
-> > > +       struct page *page;
-> > > +       struct zone *zone;
-> > > +       int order;
-> > > +
-> > > +       VM_BUG_ON(!pfn_valid(start));
-> > 
-> > This seems kinda mean.  Could we return an error?  I understand that
-> > this is largely going to be an early-boot thing, but surely trying to
-> > punt on crappy input beats a full-on BUG().
-> > 
-> > 	if (!pfn_valid(start))
-> > 		return -1;
-> 
-> But still keep the warning?
-> 
-> 	if (WARN_ON(!pfn_valid(start))
-> 		return -1;
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Sure.  You might also want to make sure you're respecting __GFP_NOWARN
-if you're going to do that, or maybe just warn once per boot.
+> On Thursday 31 March 2011, Kevin Hilman wrote:
+>> Some SoCs families (like OMAP) have huge amount of diversity even within
+>> the SoC family, so better abstractions and generic infrastrucure
+>> improvements are an obvious win, even staying within the SoC.
+>
+> But that's the point. The incentive is there for managing the infrastructure
+> within the SoC, but not across SoCs. 
 
+OK, but the rest of my thread went on to describe how at least a few ARM
+SoC maintainers are actually actively working infrastructure that is
+cross SoC, like runtime PM.  It might start because of an abstraction
+within an SoC family like supporting both SH and SH-mobile, or
+OMAP[12345], but it does sometimes result in not only cross-SoC code but
+cross-platform frameworks.
 
--- Dave
+Admiteddly, the percentage of ARM SoC developers actively working on
+these common, cross-platform infrastructure layers is rather small, but
+at least it is non-zero. :)    
+
+> Allow me to use OMAP as a bad example while pointing out that it's
+> really one of the best supported platforms we currently have, while
+> the others are usually much worse in terms of working with the
+> community (or at least they are behind on the learning curve but
+> getting there):
+>
+> * OMAP2 introduced the hwmod concept as an attempt to reduce duplication
+ >   between board code, but the code was done on the mach-omap2 level
+>   instead of finding a way to make it work across SOC vendors, or using
+>   an existing solution.
+
+Well, before deciding whether something like hwmod should be a cross-SoC
+abstraction, it's important to be clear about what level of abstraction
+is needed, or practical for a given feature.  For power management, we
+already have (and use) existing abstractions for the drivers.  The clock
+framework, system PM and runtime PM framework are all existing
+abstraction layers for drivers.
+
+Remember that power management is one of those areas that ARM SoC
+vendors like to "differentiate" on, so the hardware is vastly different
+between ARM vendors.  Having worked on embedded Linux power management
+for a while now, I currently do not think any cross-SoC abstractions
+below the clock framework or runtime PM are worth it.  I'm certainly
+willing to be pursuaded otherwise, but currently don't see the
+usefulness.
+
+With that as background, hwmod was never inteded as something to be
+cross-SoC.  If you look at the data that's in an omap_hwmod, it's
+entirely OMAP hardware specific, and mostly focused on power management
+hardware details, register descriptions, feature capabilities etc.  This
+allows the OMAP PM core code to be generalized and work across all SoCs
+in the OMAP family.  But again, it was intended for OMAP PM core code.
+At that level, there really isn't much to share with other SoCs since
+the PM hardware for the various SoC vendors is so "differentiated"
+(a.k.a fsck'd up in extremely different ways.)
+
+Kevin
