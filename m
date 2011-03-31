@@ -1,164 +1,191 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 30 Mar 2011 17:16:13 -0700
-Subject: [PATCH 10/17] OMAP3: powerdomain data: add voltage domains
+Date: Wed, 30 Mar 2011 17:16:14 -0700
+Subject: [PATCH 11/17] OMAP4: powerdomain data: add voltage domains
 In-Reply-To: <1301530580-12046-1-git-send-email-khilman@ti.com>
 References: <1301530580-12046-1-git-send-email-khilman@ti.com>
-Message-ID: <1301530580-12046-11-git-send-email-khilman@ti.com>
+Message-ID: <1301530580-12046-12-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Benoit Cousson <b-cousson@ti.com>
 
 Add voltage domain name to indicate which voltagedomain each
 powerdomain is in.
 
+The fixed voltage domain like ldo_wakeup for emu and wkup power
+domain is added too.
+
+Update the TI copyright date to 2011.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+[khilman at ti.com]: renamed wakeup domain: s/ldo_wakeup/wakeup/
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    2 ++
- arch/arm/mach-omap2/powerdomains3xxx_data.c      |   16 ++++++++++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomains44xx_data.c   |   18 +++++++++++++++++-
+ arch/arm/mach-omap2/voltagedomains44xx_data.c |    5 +++++
+ 2 files changed, 22 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
-index 4210c33..2242c8e 100644
---- a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
-@@ -70,6 +70,7 @@ struct powerdomain gfx_omap2_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- struct powerdomain wkup_omap2_pwrdm = {
-@@ -77,4 +78,5 @@ struct powerdomain wkup_omap2_pwrdm = {
- 	.prcm_offs	= WKUP_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX | CHIP_IS_OMAP3430),
- 	.pwrsts		= PWRSTS_ON,
-+	.voltdm         = { .name = "wakeup" },
- };
-diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-index 9c9c113..09bdfcf 100644
---- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-@@ -52,6 +52,7 @@ static struct powerdomain iva2_pwrdm = {
- 		[2] = PWRSTS_OFF_ON,
- 		[3] = PWRSTS_ON,
- 	},
-+	.voltdm           = { .name = "mpu_iva" },
- };
- 
- static struct powerdomain mpu_3xxx_pwrdm = {
-@@ -68,6 +69,7 @@ static struct powerdomain mpu_3xxx_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_OFF_ON,
- 	},
-+	.voltdm           = { .name = "mpu_iva" },
- };
- 
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index c4222c7..af91554 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -1,7 +1,7 @@
  /*
-@@ -98,6 +100,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
- 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
- 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
+  * OMAP4 Power domains framework
+  *
+- * Copyright (C) 2009-2010 Texas Instruments, Inc.
++ * Copyright (C) 2009-2011 Texas Instruments, Inc.
+  * Copyright (C) 2009-2011 Nokia Corporation
+  *
+  * Abhijit Pagare (abhijitpagare at ti.com)
+@@ -33,6 +33,7 @@
+ /* core_44xx_pwrdm: CORE power domain */
+ static struct powerdomain core_44xx_pwrdm = {
+ 	.name		  = "core_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -59,6 +60,7 @@ static struct powerdomain core_44xx_pwrdm = {
+ /* gfx_44xx_pwrdm: 3D accelerator power domain */
+ static struct powerdomain gfx_44xx_pwrdm = {
+ 	.name		  = "gfx_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_GFX_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -76,6 +78,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
+ /* abe_44xx_pwrdm: Audio back end power domain */
+ static struct powerdomain abe_44xx_pwrdm = {
+ 	.name		  = "abe_pwrdm",
++	.voltdm		  = { .name = "iva" },
+ 	.prcm_offs	  = OMAP4430_PRM_ABE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -96,6 +99,7 @@ static struct powerdomain abe_44xx_pwrdm = {
+ /* dss_44xx_pwrdm: Display subsystem power domain */
+ static struct powerdomain dss_44xx_pwrdm = {
+ 	.name		  = "dss_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_DSS_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -114,6 +118,7 @@ static struct powerdomain dss_44xx_pwrdm = {
+ /* tesla_44xx_pwrdm: Tesla processor power domain */
+ static struct powerdomain tesla_44xx_pwrdm = {
+ 	.name		  = "tesla_pwrdm",
++	.voltdm		  = { .name = "iva" },
+ 	.prcm_offs	  = OMAP4430_PRM_TESLA_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -136,6 +141,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
+ /* wkup_44xx_pwrdm: Wake-up power domain */
+ static struct powerdomain wkup_44xx_pwrdm = {
+ 	.name		  = "wkup_pwrdm",
++	.voltdm		  = { .name = "wakeup" },
+ 	.prcm_offs	  = OMAP4430_PRM_WKUP_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -152,6 +158,7 @@ static struct powerdomain wkup_44xx_pwrdm = {
+ /* cpu0_44xx_pwrdm: MPU0 processor and Neon coprocessor power domain */
+ static struct powerdomain cpu0_44xx_pwrdm = {
+ 	.name		  = "cpu0_pwrdm",
++	.voltdm		  = { .name = "mpu" },
+ 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU0_INST,
+ 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -169,6 +176,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
+ /* cpu1_44xx_pwrdm: MPU1 processor and Neon coprocessor power domain */
+ static struct powerdomain cpu1_44xx_pwrdm = {
+ 	.name		  = "cpu1_pwrdm",
++	.voltdm		  = { .name = "mpu" },
+ 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU1_INST,
+ 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -186,6 +194,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
+ /* emu_44xx_pwrdm: Emulation power domain */
+ static struct powerdomain emu_44xx_pwrdm = {
+ 	.name		  = "emu_pwrdm",
++	.voltdm		  = { .name = "wakeup" },
+ 	.prcm_offs	  = OMAP4430_PRM_EMU_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -202,6 +211,7 @@ static struct powerdomain emu_44xx_pwrdm = {
+ /* mpu_44xx_pwrdm: Modena processor and the Neon coprocessor power domain */
+ static struct powerdomain mpu_44xx_pwrdm = {
+ 	.name		  = "mpu_pwrdm",
++	.voltdm		  = { .name = "mpu" },
+ 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -223,6 +233,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
+ /* ivahd_44xx_pwrdm: IVA-HD power domain */
+ static struct powerdomain ivahd_44xx_pwrdm = {
+ 	.name		  = "ivahd_pwrdm",
++	.voltdm		  = { .name = "iva" },
+ 	.prcm_offs	  = OMAP4430_PRM_IVAHD_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -247,6 +258,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
+ /* cam_44xx_pwrdm: Camera subsystem power domain */
+ static struct powerdomain cam_44xx_pwrdm = {
+ 	.name		  = "cam_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_CAM_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -264,6 +276,7 @@ static struct powerdomain cam_44xx_pwrdm = {
+ /* l3init_44xx_pwrdm: L3 initators pheripherals power domain  */
+ static struct powerdomain l3init_44xx_pwrdm = {
+ 	.name		  = "l3init_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_L3INIT_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -282,6 +295,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
+ /* l4per_44xx_pwrdm: Target peripherals power domain */
+ static struct powerdomain l4per_44xx_pwrdm = {
+ 	.name		  = "l4per_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_L4PER_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -305,6 +319,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
+  */
+ static struct powerdomain always_on_core_44xx_pwrdm = {
+ 	.name		  = "always_on_core_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_ALWAYS_ON_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -314,6 +329,7 @@ static struct powerdomain always_on_core_44xx_pwrdm = {
+ /* cefuse_44xx_pwrdm: Customer efuse controller power domain */
+ static struct powerdomain cefuse_44xx_pwrdm = {
+ 	.name		  = "cefuse_pwrdm",
++	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_CEFUSE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+diff --git a/arch/arm/mach-omap2/voltagedomains44xx_data.c b/arch/arm/mach-omap2/voltagedomains44xx_data.c
+index 95e1ce5..9a17b5e 100644
+--- a/arch/arm/mach-omap2/voltagedomains44xx_data.c
++++ b/arch/arm/mach-omap2/voltagedomains44xx_data.c
+@@ -86,10 +86,15 @@ static struct voltagedomain omap4_voltdm_core = {
+ 	.vdd = &omap4_vdd_core_info,
  };
  
- static struct powerdomain core_3xxx_es3_1_pwrdm = {
-@@ -121,6 +124,7 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
- 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
- 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
++static struct voltagedomain omap4_voltdm_wkup = {
++	.name = "wakeup",
++};
++
+ static struct voltagedomain *voltagedomains_omap4[] __initdata = {
+ 	&omap4_voltdm_mpu,
+ 	&omap4_voltdm_iva,
+ 	&omap4_voltdm_core,
++	&omap4_voltdm_wkup,
+ 	NULL,
  };
  
- static struct powerdomain dss_pwrdm = {
-@@ -136,6 +140,7 @@ static struct powerdomain dss_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- /*
-@@ -157,6 +162,7 @@ static struct powerdomain sgx_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain cam_pwrdm = {
-@@ -172,6 +178,7 @@ static struct powerdomain cam_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain per_pwrdm = {
-@@ -187,12 +194,14 @@ static struct powerdomain per_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain emu_pwrdm = {
- 	.name		= "emu_pwrdm",
- 	.prcm_offs	= OMAP3430_EMU_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain neon_pwrdm = {
-@@ -201,6 +210,7 @@ static struct powerdomain neon_pwrdm = {
- 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
- 	.pwrsts		  = PWRSTS_OFF_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_RET,
-+	.voltdm           = { .name = "mpu_iva" },
- };
- 
- static struct powerdomain usbhost_pwrdm = {
-@@ -223,36 +233,42 @@ static struct powerdomain usbhost_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,  /* MEMONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain dpll1_pwrdm = {
- 	.name		= "dpll1_pwrdm",
- 	.prcm_offs	= MPU_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.voltdm           = { .name = "mpu_iva" },
- };
- 
- static struct powerdomain dpll2_pwrdm = {
- 	.name		= "dpll2_pwrdm",
- 	.prcm_offs	= OMAP3430_IVA2_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.voltdm           = { .name = "mpu_iva" },
- };
- 
- static struct powerdomain dpll3_pwrdm = {
- 	.name		= "dpll3_pwrdm",
- 	.prcm_offs	= PLL_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain dpll4_pwrdm = {
- 	.name		= "dpll4_pwrdm",
- 	.prcm_offs	= PLL_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain dpll5_pwrdm = {
- 	.name		= "dpll5_pwrdm",
- 	.prcm_offs	= PLL_MOD,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
-+	.voltdm           = { .name = "core" },
- };
- 
- /* As powerdomains are added or removed above, this list must also be changed */
 -- 
 1.7.4
