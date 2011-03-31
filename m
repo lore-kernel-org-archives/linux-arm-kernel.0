@@ -1,43 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 31 Mar 2011 18:44:22 +0300
-Subject: [PATCHv2] omap: rx51: Platform support for lp5523 led chip
-In-Reply-To: <4D949E18.6090704@nokia.com>
-References: <alpine.DEB.1.10.1103311524420.2634@esdhcp041196.research.nokia.com>
-	<1301578692-29286-1-git-send-email-ameya.palande@nokia.com>
-	<20110331142635.GF5465@legolas.emea.dhcp.ti.com>
-	<4D949E18.6090704@nokia.com>
-Message-ID: <20110331154421.GN5465@legolas.emea.dhcp.ti.com>
+From: david@lang.hm (david at lang.hm)
+Date: Thu, 31 Mar 2011 08:45:54 -0700 (PDT)
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <20110331150517.GA19452@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103311359320.22418@localhost6.localdomain6>
+	<87d3l7jqpr.fsf@ti.com>
+	<alpine.LFD.2.00.1103311647300.22418@localhost6.localdomain6>
+	<20110331150517.GA19452@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1103310843530.29543@asgard.lang.hm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2011 at 06:30:32PM +0300, Ameya Palande wrote:
-> Hi Felipe,
-> 
-> On 03/31/2011 05:26 PM, ext Felipe Balbi wrote:
-> >Hi,
-> >
-> >On Thu, Mar 31, 2011 at 04:38:12PM +0300, Ameya Palande wrote:
-> >>+static int rx51_lp5523_setup(void)
-> >>+{
-> >>+	int err;
-> >>+
-> >>+	err = gpio_request_one(RX51_LP5523_CHIP_EN_GPIO, GPIOF_DIR_OUT,
-> >>+			"lp5523_enable");
-> >>+	if (err<  0) {
-> >>+		pr_err("Unable to get lp5523_enable GPIO\n");
-> >>+		return err;
-> >>+	}
-> >>+
-> >>+	return err;
-> >
-> >isn't enough to return gpio_request_one(RX51_LP5523_CHIP_EN_GPIO,
-> >GPIOF_DIR_OUT, "lp5523_enable"); ??
-> 
-> But then we won't know the failure reason for lp5523_probe()
-> I would prefer printing an error!
+On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
 
-see that both gpio_request() and gpio_direction_output() have debugging
-prints for error cases ;-)
+> 
+> On Thu, Mar 31, 2011 at 05:01:40PM +0200, Thomas Gleixner wrote:
+>> On Thu, 31 Mar 2011, Kevin Hilman wrote:
+>>
+>>> Thomas Gleixner <tglx@linutronix.de> writes:
+>>
+>>> Yes, ARM SoC maintainers have to make up some ground.  But compare this
+>>> to just a couple years ago where the common complaint was "why aren't
+>>> embedded SoC people contributing code to mainline", and you'll see we
+>>> have come a long way.
+>>
+>> Well, code comes in, which is progress. But we need to figure out how
+>> to deal with the increasingly growing flood before we drown in it.
+>
+> How about we declare the remainder of this cycle and the next merge window
+> as being only for bug and regression fixes, and consolidation of stuff like
+> the IRQ controller and GPIO controller code for the next merge window?
 
--- 
-balbi
+well, now that -rc1 has been released, the remainder of this cycleis 
+already only bug and regression fixes.
+
+declaring the next merge window as the same may or may not help, depending 
+on if it pushes people to do more consolodations work or just delay 
+submitting the work they are doing.
+
+David Lang
