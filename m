@@ -1,36 +1,44 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 1 Apr 2011 00:02:25 +0300
-Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
-In-Reply-To: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
-References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201104010002.25899.anarsoul@gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Fri, 01 Apr 2011 00:18:10 +0200
+Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1301606078.31087.1275.camel@nimitz>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
+	<1301587083.31087.1032.camel@nimitz>
+	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
+	<1301606078.31087.1275.camel@nimitz>
+Message-ID: <op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 March 2011 00:27:10 Vasily Khoruzhick wrote:
-> There's a race condition in stop_queue(),
-> if drv_data->queue is empty, but drv_data->busy is still set
-> (or opposite situation) stop_queue will return -EBUSY.
-> So fix loop condition to check that both drv_data->queue is empty
-> and drv_data->busy is not set.
+> On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
+>> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned
+>> long end,
+>> +                                      gfp_t flag)
+>> +{
+>> +       unsigned long pfn = start, count;
+>> +       struct page *page;
+>> +       struct zone *zone;
+>> +       int order;
+>> +
+>> +       VM_BUG_ON(!pfn_valid(start));
 
-Ping?
+On Thu, 31 Mar 2011 23:14:38 +0200, Dave Hansen wrote:
+> We BUG_ON() in bootmem.  Basically if we try to allocate an early-boot
+> structure and fail, we're screwed.  We can't keep running without an
+> inode hash, or a mem_map[].
+>
+> This looks like it's going to at least get partially used in drivers, at
+> least from the examples.  Are these kinds of things that, if the driver
+> fails to load, that the system is useless and hosed?  Or, is it
+> something where we might limp along to figure out what went wrong before
+> we reboot?
 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/spi/pxa2xx_spi.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-> index a429b01..3aa7820 100644
-> --- a/drivers/spi/pxa2xx_spi.c
-> +++ b/drivers/spi/pxa2xx_spi.c
-> @@ -1493,7 +1493,7 @@ static int stop_queue(struct driver_data *drv_data)
->  	 * execution path (pump_messages) would be required to call wake_up or
->  	 * friends on every SPI message. Do this instead */
->  	drv_data->run = QUEUE_STOPPED;
-> -	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
-> +	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
->  		spin_unlock_irqrestore(&drv_data->lock, flags);
->  		msleep(10);
->  		spin_lock_irqsave(&drv_data->lock, flags);
+Bug in the above place does not mean that we could not allocate memory.  It
+means caller is broken.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
