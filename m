@@ -1,53 +1,40 @@
-From: david@lang.hm (david at lang.hm)
-Date: Thu, 31 Mar 2011 09:03:28 -0700 (PDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110331083044.GB14323@n2100.arm.linux.org.uk>
-References: <201103301906.42429.arnd@arndb.de>
-	<AANLkTim578-kwM14SJd06RW_QiC4WVCmFuG+ASgGC4sq@mail.gmail.com>
-	<alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 31 Mar 2011 18:26:45 +0200
+Subject: [PATCH 05/12] mm: alloc_contig_range() added
+In-Reply-To: <1301587361.31087.1040.camel@nimitz>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-6-git-send-email-m.szyprowski@samsung.com>
+	<1301587361.31087.1040.camel@nimitz>
+Message-ID: <op.vs7umufd3l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Russell King - ARM Linux wrote:
+> On Thu, 2011-03-31 at 15:16 +0200, Marek Szyprowski wrote:
+>> +       ret = 0;
+>> +       while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
+>> +               if (WARN_ON(++ret >= MAX_ORDER))
+>> +                       return -EINVAL;
 
-> On Thu, Mar 31, 2011 at 10:06:34AM +0200, Ingo Molnar wrote:
->> Having strong, effective platform abstractions inside the kernel really helps
->> even if the hardware space itself is inevitably fragmented: both powerpc and
->> x86 has shown that. Until you realize and appreciate that you really have not
->> understood the problem i think.
+On Thu, 31 Mar 2011 18:02:41 +0200, Dave Hansen wrote:
+> Holy cow, that's dense.  Is there really no more straightforward way to
+> do that?
+
+Which part exactly is dense?  What would be qualify as a more
+straightforward way?
+
+> In any case, please pull the ++ret bit out of the WARN_ON().  Some
+> people like to do:
 >
-> No, I think it is the other way around.  Folk like me and Nicolas over
-> the last ten years have put considerable amounts of effort into trying
-> to keep the ARM support code as clean and maintainable as possible.
+> #define WARN_ON(...) do{}while(0)
+>
+> to save space on some systems.
 
-In this case I owe you and Nicolas an apology.
+I don't think that's the case.  Even if WARN_ON() decides not to print
+a warning, it will still return the value of the argument.  If not,
+a lot of code will brake.
 
-I think that part of the issue is that when Linus points out a problem, 
-the response isn't "we agree and are working on it, here's what we are 
-doing", instead it seems to be mostly "there is no problem, this is just 
-because there is so much variation in ARM"
-
-Linus does look at the code he pulls, if he is pulling changesets that are 
-described as consolodations and cleanups, he won't be whining about code 
-churn.
-
-but if he is just pulling chnagesets that are described as "addsupport for 
-board X" or "modify defconfig defaults" he is going to complain.
-
-it's not the total amount of code, and it's not even the total amount of 
-change to the code that's the issue. It's that the changes are conflicting 
-with each other (due to things like central config tables that multiple 
-people are updating in different ways) and the same files getting modified 
-frequently, many times in ways that don't seem to have a clear direction 
-(defconfigs for example)
-
-David Lang
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
