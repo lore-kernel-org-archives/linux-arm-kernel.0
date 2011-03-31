@@ -1,91 +1,87 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 31 Mar 2011 10:17:14 -0400
-Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
-In-Reply-To: <1301566248.2828.40.camel@localhost>
-References: <1301474413-28821-1-git-send-email-b32955@freescale.com>
-	<1301474413-28821-4-git-send-email-b32955@freescale.com>
-	<201103301046.04357.ffainelli@freebox.fr>
-	<4D92F277.7060607@freescale.com>
-	<1301566248.2828.40.camel@localhost>
-Message-ID: <AANLkTi=59br1KueZupGevB4DgP7UqBKRgbGgRvsjgH-8@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Mar 2011 19:52:01 +0530
+Subject: [RFC PATCH] ARM: GIC: Convert GIC library to use the IO relaxed
+	operations
+In-Reply-To: <1301580231.10659.142.camel@e102109-lin.cambridge.arm.com>
+References: <1301576121-10858-1-git-send-email-santosh.shilimkar@ti.com>
+	<1301580231.10659.142.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <4D948E09.3050900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-
-2011/3/31 Artem Bityutskiy <dedekind1@gmail.com>:
-> Hi,
+On 3/31/2011 7:33 PM, Catalin Marinas wrote:
+> On Thu, 2011-03-31 at 13:55 +0100, Santosh Shilimkar wrote:
+>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>> index f70ec7d..e013f65 100644
+>> --- a/arch/arm/common/gic.c
+>> +++ b/arch/arm/common/gic.c
+>> @@ -89,7 +89,9 @@ static void gic_ack_irq(struct irq_data *d)
+>>          spin_lock(&irq_controller_lock);
+>>          if (gic_arch_extn.irq_ack)
+>>                  gic_arch_extn.irq_ack(d);
+>> -       writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>> +       barrier();
+>> +       readl_relaxed(gic_cpu_base(d) + GIC_CPU_EOI);
 >
-> On Wed, 2011-03-30 at 17:05 +0800, Huang Shijie wrote:
->> > On Wednesday 30 March 2011 10:40:10 Huang Shijie wrote:
->> >> This is a new database for the NANDs which is searched by the id_bytes.
->> > drivers/mtd//nand/nand_base.c will be able to detect all of your chips listed
->> > below based on the ids present in drivers/mtd/nand/nand_ids.c
->> >
->> yes.
+> We don't need the explicit barrier(), I don't think the compiler would
+> reorder the writel/readl_relaxed calls. The same for all places where
+> you added barrier().
+>
+Ok. I added it to just avoid any compiler re-ordering.
+
+> Do we need the acknowledge to be confirmed via a readl?
+I was not sure here. Though we should ensure that the write
+has reached to CPU interface.
+
+>
+>>          spin_unlock(&irq_controller_lock);
+>>   }
 >>
->> But I will use the new database to replace the old one.
+>> @@ -98,7 +100,9 @@ static void gic_mask_irq(struct irq_data *d)
+>>          u32 mask = 1<<  (d->irq % 32);
 >>
->> I will ?submit new patches to modify the generic code if my driver is
->> accepted.
+>>          spin_lock(&irq_controller_lock);
+>> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>> +       barrier();
+>> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>>          if (gic_arch_extn.irq_mask)
+>>                  gic_arch_extn.irq_mask(d);
+>>          spin_unlock(&irq_controller_lock);
 >
-> Sorry, but this is not how the opensource community works. The common
-> practice everywhere in the kernel is that if the generic code/framework
-> is too limiting, you first change the framework, then start using it. We
-> do not do things like - I'll first create my custom solution, and then I
-> promise I will change the framework.
+> Here we need a readl back in case the calling code enables the
+> interrupts at the CPU level (that's probably the only place where we
+> need a read back?).
 >
+Ok.
 
-got it.
+>> @@ -111,7 +115,9 @@ static void gic_unmask_irq(struct irq_data *d)
+>>          spin_lock(&irq_controller_lock);
+>>          if (gic_arch_extn.irq_unmask)
+>>                  gic_arch_extn.irq_unmask(d);
+>> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+>> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+>> +       barrier();
+>> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+>>          spin_unlock(&irq_controller_lock);
+>>   }
+>
+> We don't need a read back, just let it unmask the interrupt at some
+> point in the future.
+>
+Ok. Will drop this read back then.
 
-> Again, this is not just MTD, this is everywhere in the kernel. This is
-> how linux goes forward - we force people to improve common code and
-> accept their drivers, and everyone benefits form this. Yes, this is more
-> work for you, of course, sorry :-)
->
-thanks :)
-
->> > If you have new chips to support in the future, you should add them in
->> > drivers/mtd/nand/nand_ids.c and not keep this file.
->> >
->> The data structure ?nand_flash_dev{} does not contain enough information.
->> So I want to the nand_device_info{} to replace it in future.
->
-> Just add this information, if it is of generic nature (like SLC/MLC
-> flag, required ECC strength, etc).
->
->> > I still do not understand why this would be needed, is it because the generic
->> > code does not provide enough informations for your driver?
->> >
->> yes.
+>> @@ -392,6 +399,8 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>          unsigned long map = *cpus_addr(*mask);
 >>
->> IMHO, the generic code is somehow trapped in a wrong way. :(
+>>          /* this always happens on GIC0 */
+>> -       writel(map<<  16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
+>> +       writel_relaxed(map<<  16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
+>> +       barrier();
+>> +       readl_relaxed(gic_data[0].dist_base + GIC_DIST_SOFTINT);
+>>   }
 >
-> Fix this please :-)
+> We don't need the readl.
 >
->> Paring the id bytes is not sufficient to get all the information you
->> need which is faced by me.
->
-> Fix this too :-)
->
->> What's more, I think the paring code is ugly, see the nand_get_flash_type().
->
-> You are welcome to fix this. There is _a lot_ of ugly code in MTD
-> because no one loves it. Give it some love :-)
->
->> Why not create a new database which contains all the necessary
->> information for a nand, and can be easy
->> find by the id bytes as the keyword?
->
-> You can create this database by extending/improving/cleaning up the
-> existing code base with a nice series of patches.
->
-ok. I will try to fix the generic code before my driver is submitted.
-
-Best Regards.
-
-> --
-> Best Regards,
-> Artem Bityutskiy (????? ????????)
->
->
+And this one too.
