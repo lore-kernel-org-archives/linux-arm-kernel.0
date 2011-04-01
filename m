@@ -1,46 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Apr 2011 15:50:39 +0100
-Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
-	entry/exit functions
+Date: Fri,  1 Apr 2011 15:50:40 +0100
+Subject: [PATCH 5/6] ARM: nmk: update GPIO chained IRQ handler to entry/exit
+	functions
 In-Reply-To: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
 References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1301669441-13744-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1301669441-13744-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the MSM gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
+This patch updates the Nomadik gpio chained IRQ handler to use the
+chained IRQ enter/exit functions in order to function correctly on
+primary controllers with different methods of flow control.
 
-Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Cc: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-msm/gpio-v2.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/plat-nomadik/gpio.c |   10 ++--------
+ 1 files changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index 56a964e..483f007 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -311,6 +311,9 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
- 	struct irq_data *data = irq_desc_get_irq_data(desc);
- 	unsigned long i;
-+	struct irq_chip *chip = get_irq_desc_chip(desc);
-+
-+	chained_irq_enter(chip, desc);
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index f49748e..025a54c 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -681,13 +681,7 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+ 	struct irq_chip *host_chip = irq_get_chip(irq);
+ 	unsigned int first_irq;
  
- 	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
- 	     i < NR_GPIO_IRQS;
-@@ -319,7 +322,8 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
- 							   i));
+-	if (host_chip->irq_mask_ack)
+-		host_chip->irq_mask_ack(&desc->irq_data);
+-	else {
+-		host_chip->irq_mask(&desc->irq_data);
+-		if (host_chip->irq_ack)
+-			host_chip->irq_ack(&desc->irq_data);
+-	}
++	chained_irq_enter(host_chip, desc);
+ 
+ 	nmk_chip = irq_get_handler_data(irq);
+ 	first_irq = NOMADIK_GPIO_TO_IRQ(nmk_chip->chip.base);
+@@ -698,7 +692,7 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+ 		status &= ~BIT(bit);
  	}
--	data->chip->irq_ack(data);
-+
-+	chained_irq_exit(chip, desc);
+ 
+-	host_chip->irq_unmask(&desc->irq_data);
++	chained_irq_exit(host_chip, desc);
  }
  
- static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 -- 
 1.7.0.4
