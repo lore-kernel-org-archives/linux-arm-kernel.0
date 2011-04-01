@@ -1,33 +1,84 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Apr 2011 18:44:59 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104011750.17344.arnd@arndb.de>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011659.40443.arnd@arndb.de> <4D95EF8E.9080902@vollmann.ch>
-	<201104011750.17344.arnd@arndb.de>
-Message-ID: <20110401174459.GA8615@n2100.arm.linux.org.uk>
+Date: Fri, 1 Apr 2011 19:31:09 +0100
+Subject: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
+In-Reply-To: <1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
+References: <040101>
+	<1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110401183109.GA8482@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2011 at 05:50:17PM +0200, Arnd Bergmann wrote:
-> On Friday 01 April 2011, Detlef Vollmann wrote:
-> > On 04/01/11 16:59, Arnd Bergmann wrote:
-> > > On Friday 01 April 2011, Detlef Vollmann wrote:
-> > >> On 04/01/11 15:54, Arnd Bergmann wrote:
-> > >
-> > >>> 9. All interesting work is going into a handful of platforms, all of which
-> > >>>      are ARMv7 based.
-> > >> Define interesting.
-> > >
-> > > The ones that are causing the churn that we're talking about.
-> > > Platforms that have been working forever and only need to get
-> > > the occasional bug fix are boring, i.e. not the problem.
-> > In the ARM tree I only know mach-at91.
-> > Atmel still introduces new SOCs based on ARM926EJ-S, and that makes
-> > perfect sense for lots of applications.
+On Fri, Apr 01, 2011 at 10:39:21AM +0800, Haojian Zhuang wrote:
+> Make sparsemem to support 512MB low memory with two banks in SAARB.
 > 
-> I thought new ones were generally Cortex-M3 based. Either way, even
-> if there are exceptions, focusing on ARMv7 at first should give
-> a good representation of the new development.
+> Change-Id: I1688dde366b5f3b13b48b7167bf6b88afc4f9a92
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+>  arch/arm/mach-pxa/Kconfig               |    1 +
+>  arch/arm/mach-pxa/include/mach/memory.h |   36 ++++++++++++++++++++++++++++++-
+>  2 files changed, 36 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index 2fc9f94..e8615ee 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -53,6 +53,7 @@ config MACH_SAAR
+>  config MACH_SAARB
+>  	bool "PXA955 Handheld Platform (aka SAARB)"
+>  	select CPU_PXA955
+> +	select ARCH_SPARSEMEM_ENABLE
+>  
+>  comment "Third Party Dev Platforms (sorted by vendor name)"
+>  
+> diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-pxa/include/mach/memory.h
+> index 92361a6..9a3f265 100644
+> --- a/arch/arm/mach-pxa/include/mach/memory.h
+> +++ b/arch/arm/mach-pxa/include/mach/memory.h
+> @@ -3,6 +3,7 @@
+>   *
+>   * Author:	Nicolas Pitre
+>   * Copyright:	(C) 2001 MontaVista Software Inc.
+> + * Copyright:	(C) 2010 Marvell Semiconductor Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -27,4 +28,37 @@ void cmx2xx_pci_adjust_zones(unsigned long *size, unsigned long *holes);
+>  #define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_64M)
+>  #endif
+>  
+> -#endif
+> +
+> +#ifdef CONFIG_SPARSEMEM
+> +
+> +#if defined(CONFIG_MACH_SAARB) || defined(CONFIG_MACH_SAARB_MG1)
+> +/*
+> + * There're two DRAM banks in PXA955 Saarb board.
+> + *
+> + * The macros below define sections with 256MB size and a non-linear virtual to
+> + * physical mapping:
+> + *
+> + * node 0: 0x80000000-0x8fffffff -> 0xc0000000-0xcfffffff
+> + * node 1: 0xc0000000-0xcfffffff -> 0xd0000000-0xdfffffff
+> + *
+> + * Since DRAM can be wrapped, 0xa0000000 equals to 0x80000000.
+> + */
+> +#define MAX_PHYSMEM_BITS	32
+> +#define SECTION_SIZE_BITS	28
+> +
+> +/* bank page offsets */
+> +#define BANK_PAGE_OFFSET	(PAGE_OFFSET + 0x10000000)
+> +
+> +#define __phys_to_virt(phys)						\
+> +	((phys) >= 0xc0000000 ? (phys) - 0xc0000000 + BANK_PAGE_OFFSET :\
+> +	 (phys) >= 0xa0000000 ? (phys) - 0xa0000000 + PAGE_OFFSET :	\
+> +	 (phys) - 0x80000000 + PAGE_OFFSET)				\
+> +
+> +#define __virt_to_phys(virt)						\
+> +	((virt) >= BANK_PAGE_OFFSET ? (virt) - BANK_PAGE_OFFSET + 0xc0000000 :\
+> +	 (virt) - PAGE_OFFSET + PLAT_PHYS_OFFSET)
 
-If they're M3 then they're a microcontroller, and so would be using uclinux.
+This immediately means that you can't use the dynamic P2V stuff on PXA,
+and so PXA can't be integrated with any other platform.  Is there a reason
+why you can't use highmem rather than squashing both 256MB banks into one
+512MB region?
