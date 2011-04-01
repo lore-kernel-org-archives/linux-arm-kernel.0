@@ -1,41 +1,34 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri,  1 Apr 2011 13:28:45 +0400
-Subject: [PATCH 1/2] pcmcia: limit pxa2xx_balloon3 subdriver to balloon3
+Date: Fri,  1 Apr 2011 13:28:46 +0400
+Subject: [PATCH 2/2] pcmcia: limit pxa2xx_trizeps4 subdriver to trizeps4
 	platform
-Message-ID: <1301650126-6992-1-git-send-email-dbaryshkov@gmail.com>
+In-Reply-To: <1301650126-6992-1-git-send-email-dbaryshkov@gmail.com>
+References: <1301650126-6992-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1301650126-6992-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa2xx_balloon3 tries to register pxa2xx-pcmcia device not checking whether
-machine is really balloon3, thus messing multi-machine kernels. Fix it up.
+pxa2xx_trizeps4 tries to register pxa2xx-pcmcia device not checking whether
+machine is really trizeps4, thus messing multi-machine kernels. Fix it up.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/pcmcia/pxa2xx_balloon3.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/pcmcia/pxa2xx_trizeps4.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_balloon3.c b/drivers/pcmcia/pxa2xx_balloon3.c
-index 453c54c..4c3e94c 100644
---- a/drivers/pcmcia/pxa2xx_balloon3.c
-+++ b/drivers/pcmcia/pxa2xx_balloon3.c
-@@ -25,6 +25,8 @@
- 
- #include <mach/balloon3.h>
- 
-+#include <asm/mach-types.h>
-+
- #include "soc_common.h"
- 
- /*
-@@ -127,6 +129,9 @@ static int __init balloon3_pcmcia_init(void)
+diff --git a/drivers/pcmcia/pxa2xx_trizeps4.c b/drivers/pcmcia/pxa2xx_trizeps4.c
+index b7e5966..5bb4e1a 100644
+--- a/drivers/pcmcia/pxa2xx_trizeps4.c
++++ b/drivers/pcmcia/pxa2xx_trizeps4.c
+@@ -226,6 +226,9 @@ static int __init trizeps_pcmcia_init(void)
  {
  	int ret;
  
-+	if (!machine_is_balloon3())
++	if (!machine_is_trizeps4() && !machine_is_trizeps4wl())
 +		return -ENODEV;
 +
- 	balloon3_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
- 	if (!balloon3_pcmcia_device)
+ 	trizeps_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
+ 	if (!trizeps_pcmcia_device)
  		return -ENOMEM;
 -- 
 1.7.4.1
