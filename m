@@ -1,67 +1,57 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 01 Apr 2011 18:50:48 +0400
-Subject: [PATCH 2/7] mioa701: drop udc_is_connected
-In-Reply-To: <4D95DCD9.80007@ru.mvista.com>
-References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
-	<1301666188-11822-2-git-send-email-dbaryshkov@gmail.com>
-	<4D95DCD9.80007@ru.mvista.com>
-Message-ID: <4D95E648.5000906@gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 01 Apr 2011 20:21:45 +0530
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D91824F.8020702@ti.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>
+	<4D7A22F6.5050806@ti.com> <871v2dbo3q.fsf@ti.com>
+	<4D8711A5.6070301@ti.com>
+	<alpine.DEB.2.00.1103281036060.26455@utopia.booyaka.com>
+	<4D91824F.8020702@ti.com>
+Message-ID: <4D95E681.4070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.04.2011 18:10, Sergei Shtylyov wrote:
-> Dmitry Eremin-Solenikov wrote:
->
->> Mioa701 is a pxa270 machine and pxa27x_udc driver doesn't pay any
->> attention
->> to udc_is_connected, so drop it.
->
-> You seem to be moving is_usb_connected(), not dropping it...
+Hi Paul,
 
-It may seem to be a bad wording. I'm dropping 
-pxa2xx_udc_mach_info.udc_is_connected() callback assignment. The 
-is_usb_connected() function is still used by pda-power driver.
-
->
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->> arch/arm/mach-pxa/mioa701.c | 11 +++++------
->> 1 files changed, 5 insertions(+), 6 deletions(-)
+<snip>..
 >>
->> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
->> index dd13bb6..f69a3c7 100644
->> --- a/arch/arm/mach-pxa/mioa701.c
->> +++ b/arch/arm/mach-pxa/mioa701.c
->> @@ -402,13 +402,7 @@ static void gsm_exit(void)
->> /*
->> * USB UDC
->> */
->> -static int is_usb_connected(void)
->> -{
->> - return !gpio_get_value(GPIO13_nUSB_DETECT);
->> -}
->> -
->> static struct pxa2xx_udc_mach_info mioa701_udc_info = {
->> - .udc_is_connected = is_usb_connected,
->> .gpio_pullup = GPIO22_USB_ENABLE,
->> };
+>> In omap_hwmod.c:_enable(), what do you think about:
 >>
->> @@ -596,6 +590,11 @@ static int is_ac_connected(void)
->> return gpio_get_value(GPIO96_AC_DETECT);
->> }
+>> 1. saving the current idle mode of the clockdomain,
 >>
->> +static int is_usb_connected(void)
->> +{
->> + return !gpio_get_value(GPIO13_nUSB_DETECT);
->> +}
->> +
->> static void mioa701_set_charge(int flags)
->> {
->> gpio_set_value(GPIO9_CHARGE_EN, (flags == PDA_POWER_CHARGE_USB));
+>> 2. forcing the clockdomain to software-supervised wakeup.
+>>
+>> 3. enabling clocks and waiting for the module as we currently do, then
+>>
+>> 4. switching the clockdomain's idle mode back to its original state?
+>>
+>> Seems like that would be a reasonable approach for the short term, at
+>> least for drivers that have been converted to PM runtime.
 >
-> WBR, Sergei
+> Ok, I'll try and get some RFC patches in these lines soon.
 
+I tried some of what you were suggesting here and it seems to
+work well, like you said, for the drivers which are converted
+to PM runtime.
 
--- 
-With best wishes
-Dmitry
+Now the issue seems to be, how do we handle the ones which
+are *still* using clock framework to enable main clocks and
+are yet to be converted to PM runtime.
+
+One such, MMC, is showing me issues on OMAP4 even at boot
+and causes a crash.
+
+Its a different thing that some of these drivers which use
+direct clock calls are working by fluke on OMAP4 since the
+clock framework does not even wait for the modules to become
+accessible after the clock enable.
+
+I know the right way seems to be to get all these drivers
+converted to PM runtime, but that might take sometime.
+
+regards,
+Rajendra
