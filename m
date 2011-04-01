@@ -1,67 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 01 Apr 2011 16:19:31 -0400 (EDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104011755.57412.arnd@arndb.de>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011554.07924.arnd@arndb.de>
-	<1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
-	<201104011755.57412.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1104011557080.28032@xanadu.home>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 1 Apr 2011 13:29:54 -0700
+Subject: [PATCH 2/6] ARM: tegra: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <1301669441-13744-3-git-send-email-will.deacon@arm.com>
+References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
+	<1301669441-13744-3-git-send-email-will.deacon@arm.com>
+Message-ID: <BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Apr 2011, Arnd Bergmann wrote:
+On Fri, Apr 1, 2011 at 7:50 AM, Will Deacon <will.deacon@arm.com> wrote:
+> This patch updates the Tegra gpio chained IRQ handler to use the chained
+> IRQ enter/exit functions in order to function correctly on primary
+> controllers with different methods of flow control.
+>
+> This is required for the GIC to move to fasteoi interrupt handling.
+>
+> Cc: Colin Cross <ccross@android.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> ?arch/arm/mach-tegra/gpio.c | ? ?7 ++++---
+> ?1 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+> index 76a3f65..08c43dd 100644
+> --- a/arch/arm/mach-tegra/gpio.c
+> +++ b/arch/arm/mach-tegra/gpio.c
+> @@ -221,8 +221,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?int port;
+> ? ? ? ?int pin;
+> ? ? ? ?int unmasked = 0;
+> + ? ? ? struct irq_chip chip = get_irq_desc_chip(desc);
+Should be a pointer, and 35e857c changed get_irq_desc_chip to irq_desc_get_chip
 
-> On Friday 01 April 2011, Will Deacon wrote:
-> 
-> > > 1. The core arch code is not a problem (Russell does a great job here)
-> > > 2. The platform specific code contains a lot of crap that doesn't belong there
-> > >    (not enough reviewers to push back on crap)
-> > > 3. The amount of crap in platform specfic files is growing exponentially,
-> > >    despite the best efforts of a handful of people to clean it up.
-> > > 4. Having one source file per board does not scale any more.
-> > > 5. Discoverable hardware would solve this, but is not going to happen
-> > >    in practice.
-> > > 6. Board firmware would not solve this and is usually not present.
-> > > 7. Boot loaders can not be trusted to pass valid information
-> > > 8. Device tree blobs can solve a lot of the problems, and nobody has
-> > >    come up with a better solution.
-> > 
-> > Right, so this is directly related to point (5) because in essence FDT
-> > is a way to make undiscoverable hardware discoverable by probing the
-> > tree. The `it's just data' mantra sums it up nicely.
-> 
-> Well, except that because of point 7, device trees are still inferior to
-> having correct and complete information in hardware.
+> - ? ? ? desc->irq_data.chip->irq_ack(&desc->irq_data);
+> + ? ? ? chained_irq_enter(chip, desc);
+asm/mach/irq.h needs to be included to use this function
 
-I helped with the design of a rather simple patch for ARM allowing for:
-
-	cat zImage foobar.dtb > zImage_with_dtb
-
-Then the kernel is smart enough to detect it has a dtb on its tail and 
-use it.
-
-In a perfect world the bootloader would be bug free and always up to 
-date with the best DT data.  In practice I'm very skeptical this will 
-always be the case and painless.  At least the above makes it very 
-simple to have a self contained kernel when (not if) need be.
-
-> > > 9. All interesting work is going into a handful of platforms, all of which
-> > >    are ARMv7 based.
-> > 
-> > I think starting out ARMv7-only might make this more manageable but
-> > there are still shed loads of pre-v7 chips out there which we should try
-> > not to break.
-> 
-> Yes, see below: the idea is to touch as little of the existing code
-> as possible, at least in the first stages.
-
-I don't think this is a realistic approach.  See my previous mail. Once 
-you start identifying concrete and well defined areas that needs 
-cleaning, it is best to come up with solutions that covers as much 
-existing code as possible, validating that the solution is also worth it 
-in the process.  The more existing code you may cover with your cleanup, 
-the more likely it will fit future hardware as well.
-
-
-Nicolas
+> ? ? ? ?bank = irq_get_handler_data(irq);
+>
+> @@ -241,7 +242,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ? ? ? ? ?if (lvl & (0x100 << pin)) {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unmasked = 1;
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chained_irq_exit(chip, desc);
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?generic_handle_irq(gpio_to_irq(gpio + pin));
+> @@ -249,7 +250,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?}
+>
+> ? ? ? ?if (!unmasked)
+> - ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> + ? ? ? ? ? ? ? chained_irq_exit(chip, desc);
+>
+> ?}
+>
+> --
+> 1.7.0.4
+>
+>
