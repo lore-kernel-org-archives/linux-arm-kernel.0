@@ -1,38 +1,115 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 1 Apr 2011 13:03:59 +0300
-Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
-In-Reply-To: <AANLkTikyrfYn02yg3S9_4vBGfon+BNHbPiQkaHaq_Xaq@mail.gmail.com>
-References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
-	<AANLkTikyrfYn02yg3S9_4vBGfon+BNHbPiQkaHaq_Xaq@mail.gmail.com>
-Message-ID: <201104011303.59668.anarsoul@gmail.com>
+From: ameya.palande@nokia.com (Ameya Palande)
+Date: Fri,  1 Apr 2011 13:16:12 +0300
+Subject: [PATCHv3] omap: rx51: Platform support for lp5523 led chip
+In-Reply-To: <20110331154421.GN5465@legolas.emea.dhcp.ti.com>
+References: <20110331154421.GN5465@legolas.emea.dhcp.ti.com>
+Message-ID: <1301652972-29666-1-git-send-email-ameya.palande@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 April 2011 10:26:37 Eric Miao wrote:
-> On Mon, Mar 14, 2011 at 6:27 AM, Vasily Khoruzhick <anarsoul@gmail.com> 
-wrote:
-> > There's a race condition in stop_queue(),
-> > if drv_data->queue is empty, but drv_data->busy is still set
-> > (or opposite situation) stop_queue will return -EBUSY.
-> > So fix loop condition to check that both drv_data->queue is empty
-> > and drv_data->busy is not set.
-> 
-> I think this is a good catch if the queue could be stopped only when
-> 1) queue is empty AND 2) transfer is not in progress.
+Signed-off-by: Ameya Palande <ameya.palande@nokia.com>
+Signed-off-by: Mathias Nyman <mathias.nyman@nokia.com>
+---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   66 ++++++++++++++++++++++++++
+ 1 files changed, 66 insertions(+), 0 deletions(-)
 
-It has check later (under while):
-
-if (!list_empty(&drv_data->queue) || drv_data->busy)
-	status = -EBUSY;
-
-And I'm hitting it on Z2 when I'm trying to enter suspend - it fails, because 
-spi driver refuses to enter suspend.
-
-> There are several other places you might need to change accordingly,
-> e.g. spi_bfin5xx.c
-
-I can make a patch for other drivers, but I can't test it - I have no 
-appropriate boards, and even toolchain.
-
-Regards
-Vasily
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index bbcb677..d8ec895 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -38,6 +38,7 @@
+ #include <sound/tpa6130a2-plat.h>
+ #include <media/radio-si4713.h>
+ #include <media/si4713.h>
++#include <linux/leds-lp5523.h>
+ 
+ #include <../drivers/staging/iio/light/tsl2563.h>
+ 
+@@ -51,6 +52,7 @@
+ #define RX51_WL1251_IRQ_GPIO		42
+ #define RX51_FMTX_RESET_GPIO		163
+ #define RX51_FMTX_IRQ			53
++#define RX51_LP5523_CHIP_EN_GPIO	41
+ 
+ /* list all spi devices here */
+ enum {
+@@ -67,6 +69,64 @@ static struct tsl2563_platform_data rx51_tsl2563_platform_data = {
+ };
+ #endif
+ 
++#if defined(CONFIG_LEDS_LP5523) || defined(CONFIG_LEDS_LP5523_MODULE)
++static struct lp5523_led_config rx51_lp5523_led_config[] = {
++	{
++		.chan_nr	= 0,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 1,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 2,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 3,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 4,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 5,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 6,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 7,
++		.led_current	= 50,
++	}, {
++		.chan_nr	= 8,
++		.led_current	= 50,
++	}
++};
++
++static int rx51_lp5523_setup(void)
++{
++	return gpio_request_one(RX51_LP5523_CHIP_EN_GPIO, GPIOF_DIR_OUT,
++			"lp5523_enable");
++}
++
++static void rx51_lp5523_release(void)
++{
++	gpio_free(RX51_LP5523_CHIP_EN_GPIO);
++}
++
++static void rx51_lp5523_enable(bool state)
++{
++	gpio_set_value(RX51_LP5523_CHIP_EN_GPIO, !!state);
++}
++
++static struct lp5523_platform_data rx51_lp5523_platform_data = {
++	.led_config		= rx51_lp5523_led_config,
++	.num_channels		= ARRAY_SIZE(rx51_lp5523_led_config),
++	.clock_mode		= LP5523_CLOCK_AUTO,
++	.setup_resources	= rx51_lp5523_setup,
++	.release_resources	= rx51_lp5523_release,
++	.enable			= rx51_lp5523_enable,
++};
++#endif
++
+ static struct omap2_mcspi_device_config wl1251_mcspi_config = {
+ 	.turbo_mode	= 0,
+ 	.single_channel	= 1,
+@@ -816,6 +876,12 @@ static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_2[] = {
+ 		.platform_data = &rx51_tsl2563_platform_data,
+ 	},
+ #endif
++#if defined(CONFIG_LEDS_LP5523) || defined(CONFIG_LEDS_LP5523_MODULE)
++	{
++		I2C_BOARD_INFO("lp5523", 0x32),
++		.platform_data  = &rx51_lp5523_platform_data,
++	},
++#endif
+ 	{
+ 		I2C_BOARD_INFO("tpa6130a2", 0x60),
+ 		.platform_data = &rx51_tpa6130a2_data,
+-- 
+1.7.1
