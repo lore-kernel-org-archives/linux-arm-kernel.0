@@ -1,112 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 2 Apr 2011 00:08:16 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1104011441150.28032@xanadu.home>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011750.17344.arnd@arndb.de>
-	<alpine.LFD.2.00.1104011441150.28032@xanadu.home>
-Message-ID: <201104020008.16795.arnd@arndb.de>
+From: sjg@chromium.org (Simon Glass)
+Date: Fri, 1 Apr 2011 15:29:08 -0700
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <4D959058.7010606@codeaurora.org>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+	<4D959058.7010606@codeaurora.org>
+Message-ID: <BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 April 2011 21:54:47 Nicolas Pitre wrote:
-> On Fri, 1 Apr 2011, Arnd Bergmann wrote:
-> > 
-> > I thought new ones were generally Cortex-M3 based. Either way, even
-> > if there are exceptions, focusing on ARMv7 at first should give
-> > a good representation of the new development.
-> 
-> The actual CPU core doesn't matter at all.  Whether it is ARM926EJ-S, 
-> XScale, PJ4 or Cortex-A8/A9, _that_ is the part that is extremely well 
-> maintained and abstracted already.  The focus should instead be put on 
-> those platforms that are the most used irrespective of their cores.  And 
-> by selecting the most used platforms, we have a greater chance to create 
-> community momentum, and good examples will be spread more quickly.
+Hi Stephen,
 
-Agreed.
+Sorry for the confusion, but in fact I was talking about the patch to
+make ARM use the generic bug handling via an undef instruction instead
+of calling ______bug() or writing to memory address 0. Please see
+here:
 
-> I however don't think it is practical to go off in a separate 
-> mach-nocrap space and do things in parallel.  Taking OMAP as an example, 
-> there is already way too big of an infrastructure in place to simply 
-> rewrite it in parallel to new OMAP versions coming up.
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6808/1
+
+Regards,
+Simon
+
+On Fri, Apr 1, 2011 at 1:44 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 3/31/2011 6:47 PM, Simon Glass wrote:
+>> You might try the generic bug patch and see if it also fixes this
+>> problem - Simon
 >
-> It would be more useful and scalable to simply sit down, look at the 
-> current mess, and identify common patterns that can be easily factored 
-> out into some shared library code, and all that would be left in the 
-> board or SOC specific files eventually is the data to register with that 
-> library code.  Nothing so complicated as grand plans or planification 
-> that makes it look like a mountain.
-
-This is exactly the question it comes down to. So far, we have focused
-on cleaning up platforms bit by bit. Given sufficient resources, I'm
-sure this can work. You assume that continuing on this path is the
-fastest way to clean up the whole mess, while my suggestion is based
-on the assumption that we can do better by starting a small fork.
-
-I think we can both agree that by equally distributing the workforce
-to both approaches, we'd be off worse than doing one of them right ;-)
-
-> Two patterns were identified so far, and they are:
-> 
-> 1) GPIO drivers
-> 
->    As Linus observed, in the majority of the cases GPIOs are accessed 
->    through simple memory-mapped registers.  Some have absolute state 
->    registers, the others have separate clear/set registers.  Suffice to 
->    create two generic GPIO drivers each covering those two common cases, 
->    and those generic drivers would simply register with the higher level 
->    gpiolib code, and all the board code would have to do is to provide 
->    the data for those GPIOs (register offsets, number of GPIOs, etc.).  
->    Whether this data eventually comes from DT is an orthogonal issue.
-
-Yes, this sounds like a great idea, but it's also unrelated to whether
-we'd do a new platform, or introduce this into the existing platforms.
-
-> 2) IRQ chip drivers
-> 
->    Again, as Thomas observed, the same issue exists with the majority of 
->    the IRQ chip drivers.  Most of them follow a common simple pattern 
->    that can be abstracted in some generic library code due to their very 
->    similar mode of operation.  Writing a common driver would leave the 
->    board specific code with only a data table describing hardware 
->    registers.
-
-Also sounds really good.
-
-> I think what is needed here is a bunch of people willing to work on such 
-> things, extracting those common patterns, and creating the 
-> infrastructure to cover them.  Once that is in place then we will be in 
-> a position to push back on code submissions that don't use that 
-> infrastructure, and be on the lookout for new patterns to emerge.
-> 
-> Just with the above I think there is sufficient work to keep us busy for 
-> a while.
-
-That is true, and I think we will need to do this. But as far as I can tell,
-the problems that you talk about addressing are a different class from the
-ones I was thinking of, because they only deal with areas that are already
-isolated drivers with an existing API.
-
-The things that I see as harder to do are where we need to change the
-way that parts of the platform code interact with each other:
-
-* platform specific IOMMU interfaces that need to be migrated to common
-  interfaces
-* duplicated but slightly different header files in include/mach/
-* static platform device definitions that get migrated to device tree
-  definitions.
-
-Changing these tree-wide feels like open-heart surgery, and we'd spend
-much time trying not to break stuff that could better be used to fix
-other stuff.
-
-The example that I have in mind is the time when we had a powerpc and a
-ppc architecture in parallel, with ppc supporting a lot of hardware
-that powerpc did not, but all new development getting done on powerpc.
-
-This took years longer than we had expected at first, but I still think
-it was a helpful fork. On ARM, we are in a much better shape in the
-core code than what arch/ppc was, so there would be no point forking
-that, but the problem on the platform code is quite similar.
-
-	Arnd
+> It probably won't because presumably Omar has CONFIG_BUG=n otherwise
+> Omar would have sent a patch against __bug() in arch/arm/kernel/traps.c
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
