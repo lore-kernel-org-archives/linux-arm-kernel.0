@@ -1,112 +1,108 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 31 Mar 2011 18:49:11 -0400 (EDT)
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
-	<20110331164539.GB19452@n2100.arm.linux.org.uk>
-	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
-	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1103311649450.28032@xanadu.home>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 31 Mar 2011 19:29:48 -0500
+Subject: [PATCH v2 1/1] ARM: imx: add gpu device
+In-Reply-To: <20110331053805.GB3523@b20223-02.ap.freescale.net>
+References: <1301465128-401-1-git-send-email-richard.zhao@freescale.com>
+	<20110330073651.GR7285@pengutronix.de>
+	<AANLkTikf63wTfM1z2cpV+GuK28y1wrT7UWvw4TanBj4R@mail.gmail.com>
+	<20110331053805.GB3523@b20223-02.ap.freescale.net>
+Message-ID: <AANLkTi=pmdJDRnsde8FSd-ey8=n=uBA2QnhswEzM0ofV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2011, Linus Torvalds wrote:
+On Thu, Mar 31, 2011 at 12:38 AM, Richard Zhao
+<richard.zhao@freescale.com> wrote:
+> On Wed, Mar 30, 2011 at 05:23:12PM -0500, Matt Sealey wrote:
+>> Sascha,
+>>
+>> Freescale has a driver. We have a driver since we're under NDA and
+>> have the source.
+>>
+>> In any case, this is a nice patch, it will help actually us in adding
+>> it to a fork of the mainline tree for customers. I don't think it goes
+>> far enough though: Richard, why no gpu_resource so GSL can allocate
+>> memory,
+>
+> Do you mean the resource gpu_reserved_mem? By default, if gpu_reserved_mem
+> is zero, gpu driver will use dma_alloc_xx to alloc max 16M memory. I have
+> not work out a good way to upstream the reserve memory code yet.
 
-> On Thu, Mar 31, 2011 at 12:25 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> >
-> > So we need help! ?If core kernel people could get off their X86 stool
-> > and get down in the ARM mud to help sort out this mess that would be
-> > really nice (thanks tglx). ?Until then all that the few of us can do is
-> > to contain the flood and hope for the best, and so far things being as
-> > they are have still worked surprisingly well in practice for users. ?If
-> > compensation is a concern then I think Linaro might be able to arrange
-> > something.
-> 
-> The thing is, maintainers don't scale.
+Yeah sorry I did mean like mxc_adjust_mem or whatever it was called in
+the BSP, that tweaked the value. The code I see in that is fine, and
+we have an in-house DRM/GEM mapper for a the GPU resource.
 
-True.  My remark about core kernel people still stands though.
+As long as the size is set, we don't need start/end except to align it
+to the GPU MMU boundary which means making sure the address is aligned
+to.. 32MB windows? I think that was all that was complicated about it.
+It can be any size.
 
-> The only way to get quality code is to try to improve the quality from
-> the "leaf nodes", because otherwise you'll always end up playing
-> catch-up. You'll get new bad code faster than you can clean it up.
+The reason we fiddled with DRM/GEM is because in the BSP, it allocated
+32MB for IPU and 32-64MB for the GPU, but it wasn't effectively
+sharing the memory between devices (and they are kind of one and the
+same fundamental unit - GPU is useless without IPU, and it makes no
+sense to allocate the framebuffer in a place the GPU can be protected
+from accessing..)
 
-Leaf nodes on ARM are people coming from corporate background with the 
-old school software development methodologies.  They do it as a _job_ 
-first and foremost.  They only work on Linux because that's what their 
-boss assigned them to. Don't get me wrong: that doesn't mean they are 
-bad people.  Simply that they are not into it for the public recognition 
-(or flaming) from their peers.  Once their code works they lose interest 
-and move on.  That mindset is extremely hard to change and take time, on 
-a scale of years.  Much more time than required to produce the code 
-needed to support that new SOC out of the pipeline.  There are notable 
-exceptions obviously.  But this is still a scalability problem in 
-itself.  So we need men-in-the-middle attacks.
+I think that's the problem you'd have to try and solve, right?
 
-> I've told people this before, and I'll tell it again: when I flame
-> submaintainers, they should try to push the pain down. I'm not really
-> asking those submaintainers to clean up all the stuff they are
-> getting: I'm basically asking people to say "no", or at least push
-> back a lot, and argue with the people who send you code. Tell them
-> what you don't like about the code, and tell them that you can't take
-> it any more.
+>> and why not setup the Z430 while you're at it?
+> z430 does not need any other setup.
 
-I wish we could be sufficient people to be able to determine what we 
-actually don't like about the code.  There is simply not enough core 
-kernel people with the required visibility doing such work in ARM land.  
-That's the fundamental problem.  The fact that the most successful 
-"real" ARM devices running Linux out there still aren't supported in 
-mainline doesn't help building a community of enthusiasts around it 
-either.
+Okay, but the GPU memory was conceptually shared here so I might
+nitpick about the naming: on the BSP it was called gpu2d/gpu3d or just
+gpu_whatever. This makes more sense.. since it is shared between the
+GPUs (texture memory and Xorg offscreen for our Xorg C2D driver) and
+potentially the IPU (framebuffer, Xorg offscreen for FSL's libz160
+driver) for all we know we get to some not-yet-planned MX54 which has
+a Z180 in it (unlikely but who knows :) and then the naming convention
+is wrong too..
 
-> > And we can't count on vendor people doing this work. ?They are all busy
-> > porting the kernel to their next SOC version so they can win the next
-> > big Android hardware design, and doing so with our kernel quality
-> > standards is already quite a struggle for them.
-> 
-> This really isn't the argument. The argument should be that if they
-> want their code up-stream, they need to do a good job. If they don't,
-> why should you take it at all?
+>> I have a serious problem with the way the "new"
+>> "imx_add_this_and_that" platform devices are done. Why is there so
+>> much done in little helper functions and defines?
+> It's a way to make device create dynamic.
 
-Embedded vendors did keep their code out of the kernel before.  We've 
-been hammering them about upstreaming their code for years.  Now they 
-are striking back with too much code for our review capacity.  So 
-problematic code gets merged without anyone noticing because it compiles 
-and does work, until someone comes along with a wide scale API cleanup 
-and stumble on it.
+How was mx53_loco_init_device or mxc_init_device as a *function* less dynamic?
 
-The alternative is to only accept fully reviewed code, but to scale with 
-the numbers we've all seen, 60% of the reviewers should be looking at 
-ARM code and that's not happening.  We've been there before, like two 
-years ago or so. Pressure builds up at the maintainer gate as the 
-backlog grows and key people get burned out, then the system collapses.  
-No one wants to go back there.
+I think the only possible problem is that stuff ends up in an
+undesirable ELF section in the kernel (.bss instead of .text) and
+static data hangs around if it's not properly set as __initdata (which
+99.9% of this is).
 
-> > What is going on at the moment is some effort to introduce DT support to
-> > ARM. ?The core support is there, but that is useless until platform code
-> > is moved to it, and corresponding work is put into bootloaders, etc.
-> > That is progressing... slowly.
-> 
-> How about not moving platform code TO it, but at least saying that you
-> won't accept new platform code that doesn't use it? When somebody
-> sends you a new platform, just say "no" if it's another copy-paste job
-> or another "add yet another #ifdef or conditional to a messy driver".
+Have you checked our Linux BSP modification? We split subsystem init
+into seperate functions, IOMUX are done in individual files for
+individual peripherals. (actually in all technically this should be
+done as absolutely soon after boot - in the firmware - as possible,
+but we never got round to it and RMK hates trusting the bootloader so
+we didn't think it'd mainline to never configure IOMUX peripherals).
+This was before there was mainline support for MX51 hit in 2.6.35. It
+works, We get all our RAM for static data back after init, the devices
+are easier to configure per-board where there are differences, and the
+MX and SB devices (and any MX51 board, Babbage is barely different) is
+absolutely common ground.
 
-DT has to prove itself on ARM with a few existing platforms before we 
-can open the flood gate towards it.  If something is wrong with DT 
-support it is best to fix only the core stuff without also having to fix 
-all users and possibly all bootloaders, etc.  That work is progressing 
-slowly because there are more people praising DT than people doing the 
-actual work.
+I admire moving "mxc.h" from the BSPs into seperate per-device files,
+but then having a single-file board data (board-$name.h with $name.c)
+defeats the modularization concept at  the start - because it is "like
+every other ARM platform", I think the reasoning was..
 
+BTW while we're talking about this, has anyone solved the problem
+where make headers_install doesn't populate include/asm-arm/mach
+properly - plat-mxc and mach-mx5 go together (as does every other
+mach-mx? cpu directory) but plat-mxc/include/mach stuff is never coped
+in. This is I think a fundamental kernel flaw, and I think RMK said it
+may be a distribution foible they should be fixing.. I dunno what the
+solution is here, but it makes building external modules a complete
+pain in the backside as you need to extract full Linux source and make
+prepare before you can build a module. On a system with an 8GB SSD or
+a development board with only a MicroSD card to boot from it's a bit
+of a chore to do that.. this is why distributions even on x86 ship
+linux-headers and use that for dkms etc. rather than linux-source.
 
-Nicolas
+Until that's solved the AMD GPU source may as well be built seperately
+and at least Genesi will just maintain an external patch to enable it
+(hooray for kernel forks, boo for not upstreaming).
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
