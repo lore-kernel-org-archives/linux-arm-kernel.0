@@ -1,105 +1,20 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 01 Apr 2011 14:09:18 +0530
-Subject: [PATCH 00/10] omap init_early changes for irq and timer init
-In-Reply-To: <20110331173212.GB21887@atomide.com>
-References: <20110328221501.4046.41079.stgit@baageli.muru.com>
-	<4D92E21F.6030608@ti.com> <20110330182211.GE18334@atomide.com>
-	<4D943871.4030206@ti.com> <20110331173212.GB21887@atomide.com>
-Message-ID: <4D958F36.6060208@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 01 Apr 2011 01:44:08 -0700
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+Message-ID: <4D959058.7010606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/31/2011 11:02 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110331 01:14]:
->> On 3/30/2011 11:52 PM, Tony Lindgren wrote:
->>
->>> What it does not have is the code to dedicate gpt1 for PM
->>> code, which can be done later once all the other dmtimer
->>> changes are done.
->>>
->> Which not possible to do unless you plan to hack generic
->> timer framework or waste additional timer hardware for
->> this.
->
-> Well an extra timer hardware would only be needed on omap2&  3.
->
-> But hey, if it makes sense to do or not to do is a different
-> set of patches. At least we now have an option to play with it.
->
->>> For removing the old interface, I don't see any reason to
->>> select timer combinations on omap3 other than omap3_timer
->>> and omap3_beagle_timer.
->>>
->>> If there's need, any new valid sane combinations can be esily
->>> added, although I seriously doubt that we'll need more for
->>> omap3.
->>>
->> May be I am wrong but the point is about the merit of the
->> solution even if there are only couple of board files where
->> we use that interface.
->>
->> It much cleaner and simpler to say timerid=X, from board
->> file rather than creating a "struct sys_timer" instance
->> and putting that in timer code.
->
-> Well the timerid=X adds yet another interface and more calls from
-> board-*.c to the common code. And it requires more changes if beagle
-> boards want to use the system clock as the source clock instead
-> of the 32KiHZ source.
->
-> Maybe let's call the omap3_beagle_timer omap3_secure_timer instead?
->
-> That should solve your issue of having the board name show up
-> in the generic code, no?
->
-Sorry about picking up on names but that was not
-my point. I agree with you on reducing interfaces so
-I step back on this point.
+On 3/31/2011 6:47 PM, Simon Glass wrote:
+> You might try the generic bug patch and see if it also fixes this
+> problem - Simon
 
->>>> At least I don't see other solution than using GPT1
->>>> for wakeup.
->>>
->>> Right, there's no other way to wake except gpt1 or wake-up
->>> enabled gpio lines. But we don't need to use gpt1 during
->>> runtime at all.
->>>
->> This is not entirely correct and I think this is the point
->> where we are not on same page. During runtime, gpt1 clock
->> event is not used for tick generation but it's kept
->> programmed because low power state switch via
->> get triggered any time and on any CPU.
->
-> Well ideally we would not program it during runtime at all
-> because it's slow to program. I don't think that can be
-> currently done with the sys_timer.
->
->> This is the same problem as X86 APIC timer + HPET
->> switching and I worked with Thomas G and Russell
->> to get this working on ARM platforms using generic
->> timer framework. No hacking is needed in PM code
->> for this.
->
-> Except we should improve things eventually where we don't
-> need to program the slow external timer during runtime
-> if we have local timers.
->
-This is already the case now. On OMAP4 running system,
-CPU use their own local timers and rq's. There is no
-broadcasting. Whenever there is a need of it like
-the situations where local-timers die (low power
-states), timer system switches to broad-cast timer
-which is wakeup capable. GPT1 in our case. This
-is all managed by timer framework and works seamlessly.
+It probably won't because presumably Omar has CONFIG_BUG=n otherwise
+Omar would have sent a patch against __bug() in arch/arm/kernel/traps.c
 
-> Hmm maybe I'm wrong and you got that working already?
->
-I don't think you are wrong. All your points are
-correct. The only missing point was the necessity
-of GPT1 registered as clock-event to allow
-dynamic switching between clock-events.
-
-That's where I was saying that we are not
-left with GPT1 for PM debug feature.
-
-Regards
-Santosh
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
