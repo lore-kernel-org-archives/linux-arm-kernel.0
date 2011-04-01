@@ -1,24 +1,78 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Apr 2011 19:33:25 +0100
-Subject: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
-In-Reply-To: <AANLkTikdCoHg57f9FY3kc3RbddsVUUfgkk=VJibv65QS@mail.gmail.com>
-References: <1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri, 1 Apr 2011 19:35:16 +0100
+Subject: [PATCH 4/9] ARM: pxa: use gpio reset
+In-Reply-To: <1301625568-16583-4-git-send-email-haojian.zhuang@marvell.com>
+References: <040101>
+	<1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
 	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTimf+s7NNGc=SczGjeXNP_5VYFfALC65DZ8FSEvq@mail.gmail.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C05CEEB84A9@SC-VEXCH1.marvell.com>
-	<AANLkTikdCoHg57f9FY3kc3RbddsVUUfgkk=VJibv65QS@mail.gmail.com>
-Message-ID: <20110401183325.GB8482@n2100.arm.linux.org.uk>
+	<1301625568-16583-3-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110401183516.GC8482@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2011 at 01:10:52PM +0800, Eric Miao wrote:
-> On Fri, Apr 1, 2011 at 12:35 PM, Haojian Zhuang <hzhuang1@marvell.com> wrote:
-> > If I use HIGHMEM now, our some drivers and apps should be changed also. We don't want to change them.
+On Fri, Apr 01, 2011 at 10:39:23AM +0800, Haojian Zhuang wrote:
+> Watchdog reset will clear RTC and some configuration registers. GPIO reset
+> doesn't have this impact. So replace watchdog reset by gpio reset.
 > 
-> I don't understand this will cause side effects to other drivers and apps?
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+>  arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    8 ++++++++
+>  arch/arm/mach-pxa/reset.c                    |   16 ++++++++++++----
+>  2 files changed, 20 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+> index e4fb466..28bc2a9 100644
+> --- a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+> +++ b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+> @@ -37,6 +37,14 @@
+>  #define PVCR		__REG(0x40F50100)	/* Power Manager Voltage Change Control Register */
+>  #define PCMD(x)		__REG(0x40F50110 + ((x) << 2))
+>  
+> +#define PMCR_BIE	(1 << 0)		/* Interrupt Enable for nBATT_FAULT */
+> +#define PMCR_BIS	(1 << 1)		/* Interrupt Status for nBATT_FAULT */
+> +#define PMCR_TIE	(1 << 10)		/* Interrupt Enable for XScale Core Frequency Change */
+> +#define PMCR_TIS	(1 << 11)		/* Interrupt Status for XScale Core Frequency Change */
+> +#define PMCR_VIE	(1 << 12)		/* Interrupt Enable for VCC_APPS and VCC_SRAM Voltage Change */
+> +#define PMCR_VIS	(1 << 13)		/* Interrupt Status for VCC_APPS and VCC_SRAM Voltage Change */
+> +#define PMCR_SWGR	(1 << 31)		/* Software GPIO Reset */
+> +
+>  /*
+>   * Slave Power Managment Unit
+>   */
+> diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
+> index 01e9d64..611d537 100644
+> --- a/arch/arm/mach-pxa/reset.c
+> +++ b/arch/arm/mach-pxa/reset.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <mach/regs-ost.h>
+>  #include <mach/reset.h>
+> +#include <mach/pxa3xx-regs.h>
+>  
+>  unsigned int reset_status;
+>  EXPORT_SYMBOL(reset_status);
+> @@ -75,10 +76,17 @@ static void do_gpio_reset(void)
+>  
+>  static void do_hw_reset(void)
+>  {
+> -	/* Initialize the watchdog and let it fire */
+> -	OWER = OWER_WME;
+> -	OSSR = OSSR_M3;
+> -	OSMR3 = OSCR + 368640;	/* ... in 100 ms */
+> +	if (cpu_is_pxa3xx() || cpu_is_pxa95x()) {
+> +		/* GPIO reset that is defined in silicons */
+> +		PSPR = 0x5c014000;
+> +		PMCR = (PMCR & (PMCR_BIE | PMCR_TIE | PMCR_VIE))
+> +			| PMCR_SWGR;
+> +	} else {
+> +		/* Initialize the watchdog and let it fire */
+> +		OWER = OWER_WME;
+> +		OSSR = OSSR_M3;
+> +		OSMR3 = OSCR + 368640;	/* ... in 100 ms */
+> +	}
+>  }
 
-If they're not using kmap_atomic() but are dealing directly with
-page addresses, they'll fail if the pages are coming from highmem.
-
-Given Linus' complaints in the OMAP pull request thread, I think we
-should refuse, and have the drivers fixed to work with highmem.
+Why not separate the above into two functions - do_wd_reset() and
+do_gpio_reset(), and have the selection of which is to be used in
+the initialization path?
