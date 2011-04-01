@@ -1,31 +1,44 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 01 Apr 2011 15:15:14 +0300
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Apr 2011 14:41:38 +0200
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104011407.20716.arnd@arndb.de>
-References: <201103301906.42429.arnd@arndb.de>
-	<201104011322.44729.arnd@arndb.de> <1301658919.27593.72.camel@deskari>
-	<201104011407.20716.arnd@arndb.de>
-Message-ID: <1301660114.27593.95.camel@deskari>
+In-Reply-To: <BANLkTinmoTyceJCT+K-RCm4NC76qfDyeVw@mail.gmail.com>
+References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<20110331130123.GB17547@n2100.arm.linux.org.uk>
+	<BANLkTinmoTyceJCT+K-RCm4NC76qfDyeVw@mail.gmail.com>
+Message-ID: <201104011441.38902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-01 at 14:07 +0200, Arnd Bergmann wrote:
-> On Friday 01 April 2011, Tomi Valkeinen wrote:
-> > Thanks for pointing me to the MCDE stuff. I doesn't seem to be merged,
-> > though. I need to contact them and see if they're still interested in
-> > working on the common interface.
+On Thursday 31 March 2011, Bill Gatliff wrote:
+> On Thu, Mar 31, 2011 at 8:01 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> > Just look at the removal of AAEC2000, LH7A40x and 2000 lines from the
+> > mach-types file removed 6000 lines, which in itself is about the number
+> > of lines of change submitted during the last merge window for any one
+> > non-ARM architecture.  At this point in time with this complaint, I've
+> > absolutely no idea why I bothered to do that.  I should've left it well
+> > alone and then the diffstat percentage would've been smaller.  After
+> > all, it's "pointless churn".
 > 
-> I pushed back quite hard on some of the aspects there, which probably
-> prevented it from going in so far. If the code is as much based on
-> the OMAP DSS as I think, quite a number of changes are required to
-> both in order to get them into shape for a decent cross-platform layer,
-> but there should not be any fundamental issues.
+> I think you did it because it was the Right Thing To Do.  Even
+> positive change can be painful at times.
+> 
+> The majority is exceedingly grateful for the effort you make.
 
-I only looked it briefly, but I'm not sure if there's that much code
-that could be common. But I need to read the mail thread properly.
+Defintely. I haven't seen anyone in this thread blame Russell for the
+mess. As far as I'm concerned, the code in arch/arm consists of
+the well-maintained {mm,kernel,lib,common,tools,include} directories
+that are actively being taken care of by Russell, and a huge amount
+of crap that has accumulated in mach-* and plat-*. Some of it is
+arguably better than other parts, but the problem is not that someone
+in particular did a bad job writing the code. The problem is that
+nobody today is pushing back hard enough on crap getting added.
 
-The driver for the display HW on the SoC doesn't probably have anything
-in common with OMAP one. What could and should be common is the panel
-side, which was just a single patch in that patch set.
+There is a lot of good work going on to reduce the amount of crap in
+the mach code, but my feeling is that it's not keeping up with the
+rate of crap getting added by other people. In some ways, the Linaro
+project has actually made this worse by helping people get their code
+into shape for inclusion (which of course is generally a good thing
+to do).
 
- Tomi
+	Arnd
