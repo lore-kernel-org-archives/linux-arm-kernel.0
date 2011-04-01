@@ -1,155 +1,63 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Apr 2011 08:44:02 +0900
-Subject: [PATCH 1/2] regulator: pm8921-regulator: Add regulator driver
-	for PM8921
-In-Reply-To: <4D93DAD2.5080501@codeaurora.org>
-References: <1301523361-5982-1-git-send-email-collinsd@codeaurora.org>
-	<1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
-	<20110330234613.GA21487@opensource.wolfsonmicro.com>
-	<4D93DAD2.5080501@codeaurora.org>
-Message-ID: <20110331234359.GD21726@opensource.wolfsonmicro.com>
+Date: Fri, 1 Apr 2011 01:53:05 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.LFD.2.00.1103311649450.28032@xanadu.home>
+References: <alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+	<20110331164539.GB19452@n2100.arm.linux.org.uk>
+	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
+	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
+	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
+	<alpine.LFD.2.00.1103311649450.28032@xanadu.home>
+Message-ID: <20110401005304.GA17857@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2011 at 06:37:22PM -0700, David Collins wrote:
-> On 03/30/11 16:46, Mark Brown wrote:
+On Thu, Mar 31, 2011 at 06:49:11PM -0400, Nicolas Pitre wrote:
+> On Thu, 31 Mar 2011, Linus Torvalds wrote:
 
-> > Don't do this.  There's two problems with it.  One is that you're
-> > abusing a standard API for an unrelated purpose which will confuse
-> > anything that tries to use the API as normal, the other is that this
-> > sounds like a fairly widely supported feature (although normally one
-> > that is used with a GPIO on the CPU, there's a few examples of this in
-> > mainline).
+> > The only way to get quality code is to try to improve the quality from
+> > the "leaf nodes", because otherwise you'll always end up playing
+> > catch-up. You'll get new bad code faster than you can clean it up.
+> 
+> Leaf nodes on ARM are people coming from corporate background with the 
+> old school software development methodologies.  They do it as a _job_ 
+> first and foremost.  They only work on Linux because that's what their 
+> boss assigned them to. Don't get me wrong: that doesn't mean they are 
+> bad people.  Simply that they are not into it for the public recognition 
+> (or flaming) from their peers.  Once their code works they lose interest 
+> and move on.  That mindset is extremely hard to change and take time, on 
+> a scale of years.  Much more time than required to produce the code 
+> needed to support that new SOC out of the pipeline.  There are notable 
+> exceptions obviously.  But this is still a scalability problem in 
+> itself.  So we need men-in-the-middle attacks.
 
-> Could you point out an example of a better way to handle pin control?  I
-> agree that regulator_set_mode is not the way to do it.  Could some new
-> regulator framework API be created to handle it?  I'm not sure about the
-> best way to generalize the interface.
+It's also often the case that the leaf maintainers are themselves
+overloaded with work, especially those who don't have much code in tree
+already or who have advanced power management features in their devices
+that they're trying to support (which tend to be the area that requires
+most work as they're system wide in impact).  
 
-The wm831x DCDCs and several of the Maxim PMICs have GPIO based control,
-though as indicated it's currently set up for CPU control rather than
-for control from an external device.  In the case of the wm831x this
-could be switched to and from hardware control at runtime though that's
-not a feature that's currently used.  There's also some devices which
-have seperate controls for different users that do contention control in
-hardware.
+> > This really isn't the argument. The argument should be that if they
+> > want their code up-stream, they need to do a good job. If they don't,
+> > why should you take it at all?
 
-Without actually knowing what the pin control implementation you have
-does and how it's used it's hard to suggest something specific.  I
-still don't have a good handle on what is voting, what is actually being
-controlled or how it interacts with software control by Linux.  We've
-jumped to discussion of the implementation without understanding the
-problem.  Could you perhaps go back to square one and explain what
-exactly you mean when you say "pin control"?
+> Embedded vendors did keep their code out of the kernel before.  We've 
+> been hammering them about upstreaming their code for years.  Now they 
+> are striking back with too much code for our review capacity.  So 
+> problematic code gets merged without anyone noticing because it compiles 
+> and does work, until someone comes along with a wide scale API cleanup 
+> and stumble on it.
 
-> >> REGULATOR_MODE_NORMAL  - remove a vote for pin control
-> >> REGULATOR_MODE_IDLE    - vote for pin control (ref-counted)
-
-> > What is the voting that's been referred to here?
-
-> Voting here means calling regulator_set_mode(reg, REGULATOR_MODE_IDLE).
-> These calls into the pm8921-regulator driver set_mode call back function
-> are ref-counted to decide when to actually set pin control mode.
-
-OK, that's definitely not going to work well with set_mode() - it relies
-on nothing except drivers that know about your reference counting scheme
-ever calling set_mode() and the core code never learning how to do
-things like suppress duplicate sets.
-
-> > I know some devices do follow this pattern but it's simpler to just
-> > register the regulators that are physically present on the device
-> > unconditionally.
-
-> Regulator registration needs to continue being based on which regulators
-> are configured via the board file platform data because there will be need
-> in our system in the near future to use a different (shared) regulator
-> driver to access some of the same physical regulators.
-
-> We consider this to be the native PMIC 8921 regulator driver because it
-> accesses the PMIC directly.  There will be a subsequent PMIC 8921
-> regulator driver which issues requests to a separate processor which
-> aggregates our requests with those of other SOC processors.
-
-That's not an issue - the regulator API won't write to the regulators
-unless the machine driver explicitly tells it that this is OK so all
-that will happen is that we'll be able to read back the state of the
-regulators directly.  If your driver is modifying the state of the
-regulators without the API telling it to then we should fix that as the
-no-write behaviour is an important safety feature.
-
-> > This needs locking if any registers are shared between multiple
-> > regulators.
-
-> There are no registers shared between multiple regulators.  The mutex
-> locks held inside of the regulator framework should be sufficient.
-
-OK, a comment would help - this is a very common error in regulator
-drivers as many regulators put all the enable bits for the system in a
-single register.
-
-> >> +	if (min_uV < PLDO_LOW_UV_MIN || min_uV > PLDO_HIGH_UV_MAX) {
-> >> +		vreg_err(vreg, "requested voltage %d is outside of allowed "
-> >> +				"range.\n", min_uV);
-
-> > Don't split text over multiple lines, it's not helpful when grepping.
-
-> I can change this, I'll just have to be ready to ignore checkpatch.pl errors.
-
-checkpatch isn't always right on style issues.  In this particular case
-having the string on a line by itself will probably avoid the issue.
-
-> >> +	/* Round down for set points in the gaps between bands. */
-> >> +	if (uV > FTSMPS_BAND1_UV_MAX && uV < FTSMPS_BAND2_UV_MIN)
-> >> +		uV = FTSMPS_BAND1_UV_MAX;
-> >> +	else if (uV > FTSMPS_BAND2_UV_MAX
-> >> +			&& uV < FTSMPS_BAND3_UV_SETPOINT_MIN)
-> >> +		uV = FTSMPS_BAND2_UV_MAX;
-
-> > That seems broken - it means you'll go under voltage on what was
-> > requested.  You should ensure that you're always within the requested
-> > range so if the higher band minimum is in the range you should select
-> > that, otherwise you should error out.
-
-> This rounding is done to ensure that the calculations below always yield a
-> register program voltage that is valid.  I could change this to pick the
-> minimum of the higher band instead.
-
-Note the thing about rechecking against the bounds - you need to look at
-*both* limits.
-
-> In this example, consider the second condition which is checking for
-> min_uV in the range (1400000, 1500000).  What should the correct result be
-> if a consumer calls regulator_set_voltage(reg, 1450000, 1450000) (assuming
-> that it is the only consumer so far and that the constraints step for the
-> regulator allow the value)?  As the driver is written, it would set the
-> voltage to 1.4V.  However, I think that 1.5V is more reasonable.
-> Returning an error for this seems counter productive.
-
-The driver should return an error.  If the consumer wanted exactly 1.45V
-then that's what the system should deliver, if the consumer is happy
-with other voltages then it should say so.  The specification by range
-is there because some consumers are sensitive to particular voltages and
-need to get what they asked for, or they may have much more flexibility
-in one direction or the other (like DVFS where it's usually no problem
-to be overvoltage but being undervoltage will usually fail).  By
-allowing the consumer to specify a range we allow the consumer to
-control this, having the API or the drivers take guesses on behalf of
-the consumer means it's hard for a consumer driver to reliably
-interoperate with different regulators.
-
-The API provides a mechanism for enumerating the set of supported
-voltages (which IIRC you're not implementing - you should) which
-consumers can use to ensure good interoperation.
-
-> > This function is just a switch statement per regulator, may aswell expan
-> > ithere.  Or restructure things so that you've got a driver per regulator
-> > type - that would also mean you'd be able to get the device IDs to
-> > correspond to the regulator numbers which would probably be clearer.
-
-> I separated out the type specific init functions because they are
-> relatively lengthy and independent.  Wouldn't putting that code directly
-> into a switch statement in the probe function be hard to follow?
-
-Right, but the _init() function is basically just a switch statement
-which calls these functions AFAIR - inlining the switch statement
-doesn't mean inlining the functions too.
+Plus the fact that even if the code isn't of the quality we'd ideally
+like you do tend to get *some* quality improvement from pushing things
+into mainline simply by virtue of 1000 foot review and it's much more
+likely that random people will come along and contribute improvements to
+mainline than to vendor BSPs.  Speaking as someone who works over many
+different embedded CPUs (not just ARM) I'm generally thankful when I'm
+working with mainline code, even if it's not the mainline code I might
+dream of.  There are some great out of tree BSPs but there's also
+others.
