@@ -1,46 +1,116 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 01 Feb 2011 15:10:07 +1300
-Subject: Linux Cirrus List [was Re: FW: [linux-cirrus] Fwd: Re: More about
-	SD-Card problems]
-In-Reply-To: <AANLkTik3HN3w5XadSFQ8UtDfYoc2CeFQfSYuKHLfGSvL@mail.gmail.com>
-References: <0D753D10438DA54287A00B027084269764CEE3A4FE@AUSP01VMBX24.collaborationhost.net>	<4D471F71.4010806@bluewatersys.com>
-	<AANLkTik3HN3w5XadSFQ8UtDfYoc2CeFQfSYuKHLfGSvL@mail.gmail.com>
-Message-ID: <4D476B7F.1050200@bluewatersys.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Thu, 31 Mar 2011 21:35:43 -0700
+Subject: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
+In-Reply-To: <AANLkTimf+s7NNGc=SczGjeXNP_5VYFfALC65DZ8FSEvq@mail.gmail.com>
+References: <1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTimf+s7NNGc=SczGjeXNP_5VYFfALC65DZ8FSEvq@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05CEEB84A9@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2011 02:51 PM, Martin Guy wrote:
-> You, and only you, keep declaring it dead, but I find it useful to have
-> a place for issues specific to that chip range and its
-> idiosyncracies.Few have the tenacity to follow linux-arm!
 
-I'm lucky if I receive one email per month on the Cirrus list. The last
-email on the cirrus list prior to this current discussion is from July
-2010! The Cirrus list was more useful back when Cirrus Logic were
-actually still making the EP93xx and when their kernel was more useful
-than the mainline.
 
-The EP93xx does not have enough development going on to warrant its own
-list any more. Even more annoying is when discussions and patches get
-carried out _only_ on the Linux Cirrus list. At least Cc the
-linux-arm-kernel list, especially when discussing patches.
+>-----Original Message-----
+>From: Eric Miao [mailto:eric.y.miao at gmail.com]
+>Sent: 2011?4?1? 11:46 AM
+>To: Haojian Zhuang
+>Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
+>
+>On Fri, Apr 1, 2011 at 10:39 AM, Haojian Zhuang
+><haojian.zhuang@marvell.com> wrote:
+>> Make sparsemem to support 512MB low memory with two banks in SAARB.
+>>
+>> Change-Id: I1688dde366b5f3b13b48b7167bf6b88afc4f9a92
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>
+>The concern is that this will exclude SAARB from being built into a
+>single
+>binary with other boards. Did you ever try HIGHMEM?
+>
+If I use HIGHMEM now, our some drivers and apps should be changed also. We don't want to change them.
 
-> If it were truly dead, you would unsubscribe, as it is we are all very
-> happy and content that you continue to be interedted in the ep93xx
-> range. Thanks for all your great hacks & long live!
-
-I stay subscribed because I am listed as one of the maintainers for the
-EP93xx and because people continue to post to the cirrus list and not Cc
-either myself, Hartley or the linux-arm-kernel list (which is the
-mailing list specified in the MAINTAINERS file) :-/.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+>> ---
+>> ?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-pxa/include/mach/memory.h | ? 36
+>++++++++++++++++++++++++++++++-
+>> ?2 files changed, 36 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+>> index 2fc9f94..e8615ee 100644
+>> --- a/arch/arm/mach-pxa/Kconfig
+>> +++ b/arch/arm/mach-pxa/Kconfig
+>> @@ -53,6 +53,7 @@ config MACH_SAAR
+>> ?config MACH_SAARB
+>> ? ? ? ?bool "PXA955 Handheld Platform (aka SAARB)"
+>> ? ? ? ?select CPU_PXA955
+>> + ? ? ? select ARCH_SPARSEMEM_ENABLE
+>>
+>> ?comment "Third Party Dev Platforms (sorted by vendor name)"
+>>
+>> diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-
+>pxa/include/mach/memory.h
+>> index 92361a6..9a3f265 100644
+>> --- a/arch/arm/mach-pxa/include/mach/memory.h
+>> +++ b/arch/arm/mach-pxa/include/mach/memory.h
+>> @@ -3,6 +3,7 @@
+>> ?*
+>> ?* Author: ? ? Nicolas Pitre
+>> ?* Copyright: ?(C) 2001 MontaVista Software Inc.
+>> + * Copyright: ?(C) 2010 Marvell Semiconductor Inc.
+>> ?*
+>> ?* This program is free software; you can redistribute it and/or
+>modify
+>> ?* it under the terms of the GNU General Public License version 2 as
+>> @@ -27,4 +28,37 @@ void cmx2xx_pci_adjust_zones(unsigned long *size,
+>unsigned long *holes);
+>> ?#define MAX_DMA_ADDRESS ? ? ? ? ? ? ? ?(PAGE_OFFSET + SZ_64M)
+>> ?#endif
+>>
+>> -#endif
+>> +
+>> +#ifdef CONFIG_SPARSEMEM
+>> +
+>> +#if defined(CONFIG_MACH_SAARB) || defined(CONFIG_MACH_SAARB_MG1)
+>> +/*
+>> + * There're two DRAM banks in PXA955 Saarb board.
+>> + *
+>> + * The macros below define sections with 256MB size and a non-linear
+>virtual to
+>> + * physical mapping:
+>> + *
+>> + * node 0: 0x80000000-0x8fffffff -> 0xc0000000-0xcfffffff
+>> + * node 1: 0xc0000000-0xcfffffff -> 0xd0000000-0xdfffffff
+>> + *
+>> + * Since DRAM can be wrapped, 0xa0000000 equals to 0x80000000.
+>> + */
+>> +#define MAX_PHYSMEM_BITS ? ? ? 32
+>> +#define SECTION_SIZE_BITS ? ? ?28
+>> +
+>> +/* bank page offsets */
+>> +#define BANK_PAGE_OFFSET ? ? ? (PAGE_OFFSET + 0x10000000)
+>> +
+>> +#define
+>__phys_to_virt(phys) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ((phys) >= 0xc0000000 ? (phys) - 0xc0000000 +
+>BANK_PAGE_OFFSET :\
+>> + ? ? ? ?(phys) >= 0xa0000000 ? (phys) - 0xa0000000 +
+>PAGE_OFFSET : ? ? \
+>> + ? ? ? ?(phys) - 0x80000000 +
+>PAGE_OFFSET) ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> +
+>> +#define
+>__virt_to_phys(virt) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ((virt) >= BANK_PAGE_OFFSET ? (virt) - BANK_PAGE_OFFSET +
+>0xc0000000 :\
+>> + ? ? ? ?(virt) - PAGE_OFFSET + PLAT_PHYS_OFFSET)
+>> +#endif /* CONFIG_MACH_SAARB || CONFIG_MACH_SAARB_MG1 */
+>> +
+>> +#endif /* CONFIG_SPARSEMEM */
+>> +
+>> +#endif /* __ASM_ARCH_MEMORY_H */
+>> --
+>> 1.5.6.5
+>>
+>>
