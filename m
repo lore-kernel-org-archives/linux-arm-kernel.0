@@ -1,47 +1,41 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Tue, 1 Mar 2011 10:15:27 +0530
-Subject: [PATCH v6 1/1] PRUSS UIO driver support
-In-Reply-To: <20110228212638.GB16806@local>
-References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
-	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
-	<20110228212638.GB16806@local>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 1 Apr 2011 12:36:50 +0800
+Subject: [PATCH V3 2/6] dmaengine: add interrupt check for GPMI controller
+In-Reply-To: <20110401034730.GE25866@S2100-06.ap.freescale.net>
+References: <19858.62649.218523.984252@ipc1.ka-ro>
+	<1301554968-29066-1-git-send-email-b32955@freescale.com>
+	<19860.13566.651111.241538@ipc1.ka-ro>
+	<4D94403F.6000000@freescale.com>
+	<19860.16442.199644.984424@ipc1.ka-ro>
+	<4D9444A6.2060109@freescale.com>
+	<20110401034730.GE25866@S2100-06.ap.freescale.net>
+Message-ID: <4D955662.6010309@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hi:
+> On Thu, Mar 31, 2011 at 05:08:54PM +0800, Huang Shijie wrote:
+> [...]
+>>>>> You should make the distinction based on the platform_id, which would
+>>>>> save you the ugly ifdef's and cpu_is_... macros.
+>>>>>
+>>>>>
+>>>> This in the DMA driver.
+>>>> Do you want me to change the DMA driver to add the platform_id?
+>>>> The DMA driver has already used the cpu_is_xx() macros.
+>>>>
+>>> The mxs-dma driver is already using platform ids!
+>>>
+>>>
+>> Do you mean the mxd_dma_type[] ?
+>>
+>> How can i distinction the imx23 and imx28 with it ?
+>> It seems can not be used to do the work.
+>>
+> You can drop the dmaengine patch from your gpmi series.  I will find
+> some time to fix this together with removing cpu_is_xx() and inclusion
+> of mxs.h, to get it prepared for i.mx50 aphb-dma support.
+>
+ok, thanks.
 
-> -----Original Message-----
-> From: Hans J. Koch [mailto:hjk at hansjkoch.de]
-> Sent: Tuesday, March 01, 2011 2:57 AM
-> To: TK, Pratheesh Gangadhar
-> Cc: linux-kernel at vger.kernel.org; hjk at hansjkoch.de; gregkh at suse.de;
-> tglx at linutronix.de; sshtylyov at mvista.com; arnd at arndb.de; Chatterjee, Amit;
-> davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v6 1/1] PRUSS UIO driver support
-> 
-> On Tue, Mar 01, 2011 at 02:31:35AM +0530, Pratheesh Gangadhar wrote:
-> > +
-> > +		/* Register PRUSS IRQ lines */
-> > +		p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
-> > +		p->handler = pruss_handler;
-> > +
-> > +		ret = uio_register_device(&dev->dev, p);
-> > +
-> > +		if (ret < 0)
-> > +			goto out_free;
-> > +	}
-> > +
-> > +	spin_lock_init(&lock);
-> 
-> That's too late. uio_register_device() enables the irq, and your spin_lock
-> is not ready at that time.
-
-This is ok in this context as "modprobe uio_pruss" is pre-requisite for
-running PRUSS firmware and without firmware running PRUSS won't
-generate interrupts. Actually PRUSS INTC is not setup till we start
-user application.
-
-Thanks,
-Pratheesh
+Huang Shijie
