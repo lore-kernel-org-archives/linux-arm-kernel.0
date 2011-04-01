@@ -1,86 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Apr 2011 17:55:57 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011554.07924.arnd@arndb.de>
-	<1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <201104011755.57412.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  1 Apr 2011 19:19:14 +0200
+Subject: [PATCH 3/5] dmaengine: at_hdmac: debug information sg_len for
+	prep_slave_sg
+In-Reply-To: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
+References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
+Message-ID: <d3d6a732d9d6baf8a82f4121c84df05cc8a173b6.1301678094.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 April 2011, Will Deacon wrote:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> > 1. The core arch code is not a problem (Russell does a great job here)
-> > 2. The platform specific code contains a lot of crap that doesn't belong there
-> >    (not enough reviewers to push back on crap)
-> > 3. The amount of crap in platform specfic files is growing exponentially,
-> >    despite the best efforts of a handful of people to clean it up.
-> > 4. Having one source file per board does not scale any more.
-> > 5. Discoverable hardware would solve this, but is not going to happen
-> >    in practice.
-> > 6. Board firmware would not solve this and is usually not present.
-> > 7. Boot loaders can not be trusted to pass valid information
-> > 8. Device tree blobs can solve a lot of the problems, and nobody has
-> >    come up with a better solution.
-> 
-> Right, so this is directly related to point (5) because in essence FDT
-> is a way to make undiscoverable hardware discoverable by probing the
-> tree. The `it's just data' mantra sums it up nicely.
-
-Well, except that because of point 7, device trees are still inferior to
-having correct and complete information in hardware.
-
-> > 9. All interesting work is going into a handful of platforms, all of which
-> >    are ARMv7 based.
-> 
-> I think starting out ARMv7-only might make this more manageable but
-> there are still shed loads of pre-v7 chips out there which we should try
-> not to break.
-
-Yes, see below: the idea is to touch as little of the existing code
-as possible, at least in the first stages.
-
-> > 10. We do not want to discontinue support for old boards that work fine.
-> 
-> [...]
-> 
-> > Based on these assumptions, my preferred strategy would be to a new
-> > mach-nocrap directory with a documented set of rules (to be adapted when
-> > necessary):
-> 
-> This is a nice idea, but I don't think it's entirely practical:
-> 
-> > * Strictly no crap
-> >  * No board files
-> 
-> I don't understand how you can handle `early quirks' without board
-> files. Does this follow on from Linus' suggestion about moving code out
-> of the kernel and into the bootloader?
-
-There are multiple ways of dealing with this. One way would be to
-mandate that the boot loader does the quirks, ideally as little
-as possible.
-
-Another option is to have a boot wrapper with board specific code,
-which gets run between the regular boot loader and the common
-kernel entry point. We might need such a wrapper anyway to pass the
-device tree to the kernel.
-
-> Realistically, I don't think you will ever get away from board files.
-> The trick is probably to make them as small as possible and common to as
-> many boards as possible (like the platforms directory for PowerPC).
-
-Perhaps. But we can start out with strict rules and add exceptions
-later when we run out of options.
-
-> >  * No hardcoded memory maps
-> >  * No lists of interrupts and GPIOs
-> 
-> This is largely just data, so should be do-able once this stuff isn't
-> needed at compile-time (which is becoming the case with stuff like
-> dynamic p2v).
-
-Right.
-
-	Arnd
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index fe9e1de..ce1d1a5 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -666,7 +666,8 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	struct scatterlist	*sg;
+ 	size_t			total_len = 0;
+ 
+-	dev_vdbg(chan2dev(chan), "prep_slave_sg: %s f0x%lx\n",
++	dev_vdbg(chan2dev(chan), "prep_slave_sg (%d): %s f0x%lx\n",
++			sg_len,
+ 			direction == DMA_TO_DEVICE ? "TO DEVICE" : "FROM DEVICE",
+ 			flags);
+ 
+-- 
+1.7.3
