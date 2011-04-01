@@ -1,116 +1,89 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Thu, 31 Mar 2011 21:35:43 -0700
-Subject: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
-In-Reply-To: <AANLkTimf+s7NNGc=SczGjeXNP_5VYFfALC65DZ8FSEvq@mail.gmail.com>
-References: <1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
-	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTimf+s7NNGc=SczGjeXNP_5VYFfALC65DZ8FSEvq@mail.gmail.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05CEEB84A9@SC-VEXCH1.marvell.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 31 Mar 2011 21:50:58 -0700
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <alpine.LFD.2.00.1103311649450.28032@xanadu.home> (Nicolas
+	Pitre's message of "Thu, 31 Mar 2011 18:49:11 -0400 (EDT)")
+References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
+	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
+	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
+	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
+	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
+	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
+	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<20110331080634.GA18022@elte.hu>
+	<20110331083044.GB14323@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
+	<20110331164539.GB19452@n2100.arm.linux.org.uk>
+	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
+	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
+	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
+	<alpine.LFD.2.00.1103311649450.28032@xanadu.home>
+Message-ID: <8ya39m2mv65.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 31 2011, Nicolas Pitre wrote:
 
+> Leaf nodes on ARM are people coming from corporate background with the 
+> old school software development methodologies.  They do it as a _job_ 
+> first and foremost.  They only work on Linux because that's what their 
+> boss assigned them to. Don't get me wrong: that doesn't mean they are 
+> bad people.  Simply that they are not into it for the public recognition 
+> (or flaming) from their peers.  Once their code works they lose interest 
+> and move on.  That mindset is extremely hard to change and take time, on 
+> a scale of years.  Much more time than required to produce the code 
+> needed to support that new SOC out of the pipeline.  There are notable 
+> exceptions obviously.  But this is still a scalability problem in 
+> itself.  So we need men-in-the-middle attacks.
 
->-----Original Message-----
->From: Eric Miao [mailto:eric.y.miao at gmail.com]
->Sent: 2011?4?1? 11:46 AM
->To: Haojian Zhuang
->Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH 2/9] ARM: pxa: enable sparsemem in saarb
->
->On Fri, Apr 1, 2011 at 10:39 AM, Haojian Zhuang
-><haojian.zhuang@marvell.com> wrote:
->> Make sparsemem to support 512MB low memory with two banks in SAARB.
->>
->> Change-Id: I1688dde366b5f3b13b48b7167bf6b88afc4f9a92
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
->The concern is that this will exclude SAARB from being built into a
->single
->binary with other boards. Did you ever try HIGHMEM?
->
-If I use HIGHMEM now, our some drivers and apps should be changed also. We don't want to change them.
+An additional mindset that is difficult to work with in this environment
+is that the corporate development methodology has a focus on schedules
+and deliverables.  Even people who would otherwise like to contribute
+will have pressure to get something done.  Many think of "submit to
+mainline" is kind of a last step in a development process, instead of
+even a goal to accomplish.
 
->> ---
->> ?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-pxa/include/mach/memory.h | ? 36
->++++++++++++++++++++++++++++++-
->> ?2 files changed, 36 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
->> index 2fc9f94..e8615ee 100644
->> --- a/arch/arm/mach-pxa/Kconfig
->> +++ b/arch/arm/mach-pxa/Kconfig
->> @@ -53,6 +53,7 @@ config MACH_SAAR
->> ?config MACH_SAARB
->> ? ? ? ?bool "PXA955 Handheld Platform (aka SAARB)"
->> ? ? ? ?select CPU_PXA955
->> + ? ? ? select ARCH_SPARSEMEM_ENABLE
->>
->> ?comment "Third Party Dev Platforms (sorted by vendor name)"
->>
->> diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-
->pxa/include/mach/memory.h
->> index 92361a6..9a3f265 100644
->> --- a/arch/arm/mach-pxa/include/mach/memory.h
->> +++ b/arch/arm/mach-pxa/include/mach/memory.h
->> @@ -3,6 +3,7 @@
->> ?*
->> ?* Author: ? ? Nicolas Pitre
->> ?* Copyright: ?(C) 2001 MontaVista Software Inc.
->> + * Copyright: ?(C) 2010 Marvell Semiconductor Inc.
->> ?*
->> ?* This program is free software; you can redistribute it and/or
->modify
->> ?* it under the terms of the GNU General Public License version 2 as
->> @@ -27,4 +28,37 @@ void cmx2xx_pci_adjust_zones(unsigned long *size,
->unsigned long *holes);
->> ?#define MAX_DMA_ADDRESS ? ? ? ? ? ? ? ?(PAGE_OFFSET + SZ_64M)
->> ?#endif
->>
->> -#endif
->> +
->> +#ifdef CONFIG_SPARSEMEM
->> +
->> +#if defined(CONFIG_MACH_SAARB) || defined(CONFIG_MACH_SAARB_MG1)
->> +/*
->> + * There're two DRAM banks in PXA955 Saarb board.
->> + *
->> + * The macros below define sections with 256MB size and a non-linear
->virtual to
->> + * physical mapping:
->> + *
->> + * node 0: 0x80000000-0x8fffffff -> 0xc0000000-0xcfffffff
->> + * node 1: 0xc0000000-0xcfffffff -> 0xd0000000-0xdfffffff
->> + *
->> + * Since DRAM can be wrapped, 0xa0000000 equals to 0x80000000.
->> + */
->> +#define MAX_PHYSMEM_BITS ? ? ? 32
->> +#define SECTION_SIZE_BITS ? ? ?28
->> +
->> +/* bank page offsets */
->> +#define BANK_PAGE_OFFSET ? ? ? (PAGE_OFFSET + 0x10000000)
->> +
->> +#define
->__phys_to_virt(phys) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ((phys) >= 0xc0000000 ? (phys) - 0xc0000000 +
->BANK_PAGE_OFFSET :\
->> + ? ? ? ?(phys) >= 0xa0000000 ? (phys) - 0xa0000000 +
->PAGE_OFFSET : ? ? \
->> + ? ? ? ?(phys) - 0x80000000 +
->PAGE_OFFSET) ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> +
->> +#define
->__virt_to_phys(virt) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ((virt) >= BANK_PAGE_OFFSET ? (virt) - BANK_PAGE_OFFSET +
->0xc0000000 :\
->> + ? ? ? ?(virt) - PAGE_OFFSET + PLAT_PHYS_OFFSET)
->> +#endif /* CONFIG_MACH_SAARB || CONFIG_MACH_SAARB_MG1 */
->> +
->> +#endif /* CONFIG_SPARSEMEM */
->> +
->> +#endif /* __ASM_ARCH_MEMORY_H */
->> --
->> 1.5.6.5
->>
->>
+When we push back, there is a good chance they just won't bother, not
+because they don't want to do it, but because it doesn't fit a schedule,
+and there is already something else for them to work on.
+
+So what's the right answer here.  Practically, someone just sent out a
+fairly complete DMA driver for a new MSM device.  Naturally, this
+hardware is nothing like anyone else's DMA, but the driver itself pretty
+much independent from other kernel APIs.  It isn't even similar to the
+existing DMA driver in the MSM.  With it are patches to ifdef-up various
+drivers to use the appropriate DMA.
+
+The DMA code, by itself, seems reasonably well written (with some
+cleanup and such needed), but it makes everything that uses it messy.
+In this particular case, DMA engine will probably need some work to
+either incorporate the unique capabilities of this hardware, or at least
+allow them to be used.  The author probably won't be able to do this on
+their own.
+
+I could pull the driver into the tree, and now we have yet another
+driver with yet another API.  If I push back, realistically, it will
+probably end up out-of-tree, along with everything that depends on it.
+
+Up until now, it seems that attitude has been that it is better to be
+in-tree than out of tree, but are we getting too much stuff to continue
+that?
+
+Today, most of the MSM code lives out of tree.  The QuIC tree for MSM
+(currently based off of 2.6.35):
+
+  git diff --stat v2.6.35..HEAD | tail -1
+   3432 files changed, 1144473 insertions(+), 17315 deletions(-)
+  git diff --stat v2.6.35..HEAD arch/arm/mach-msm | tail -1
+   595 files changed, 286054 insertions(+), 1928 deletions(-)
+
+There's a large amount of work just to get the code up to kernel
+standards (the coding style has been fairly well enforced), and there is
+constant development for new hardware.
+
+Thanks,
+David Brown
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
