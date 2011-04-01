@@ -1,73 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 01 Apr 2011 16:27:35 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104011554.07924.arnd@arndb.de>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<8ya39m2mv65.fsf@huya.qualcomm.com> <20110401074519.GC7594@elte.hu>
-	<201104011554.07924.arnd@arndb.de>
-Message-ID: <1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Apr 2011 17:40:11 +0200
+Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
+In-Reply-To: <20110330190857.GC2939@n2100.arm.linux.org.uk>
+References: <1301391619-4499-1-git-send-email-arend@broadcom.com>
+	<201103302024.49921.arnd@arndb.de>
+	<20110330190857.GC2939@n2100.arm.linux.org.uk>
+Message-ID: <201104011740.11236.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, 2011-04-01 at 14:54 +0100, Arnd Bergmann wrote:
-> I would actually suggest a different much more radical start: Fork the way
-> that platforms are managed today, and start an alternative way of setting
-> up boards and devices together with the proven ARM core kernel infrastructure,
-> based on these observations (please correct me if some of them they don't make
-> sense):
+On Wednesday 30 March 2011, Russell King - ARM Linux wrote:
+> On Wed, Mar 30, 2011 at 08:24:49PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 30 March 2011 19:40:10 Russell King - ARM Linux wrote:
+> > 
+> > > The reason we don't do automatic scanning (which we could on the various
+> > > ARM platforms) is because of the platform data necessary to make some of
+> > > the primecell drivers work.
+> > > 
+> > > Unfortunately, these buses are not as simple as PCI, where a device
+> > > typically sits on its own card and is totally self-contained.  With
+> > > primecell stuff, there's normally some interdependencies between the
+> > > various primecells.
+> > > 
+> > > That doesn't stop there being an automatic enumeration layer, but such
+> > > a layer would need some way of attaching platform specific data to
+> > > specific amba devices.
+> > 
+> > Right, I understand that this would not completely remove the need for
+> > platform devices, but I think it would be a great step in the right
+> > direction if we could scan all simple devices automatically, or
+> > possibly even all devices in some simple machines.
 > 
-> 1. The core arch code is not a problem (Russell does a great job here)
-> 2. The platform specific code contains a lot of crap that doesn't belong there
->    (not enough reviewers to push back on crap)
-> 3. The amount of crap in platform specfic files is growing exponentially,
->    despite the best efforts of a handful of people to clean it up.
-> 4. Having one source file per board does not scale any more.
-> 5. Discoverable hardware would solve this, but is not going to happen
->    in practice.
-> 6. Board firmware would not solve this and is usually not present.
-> 7. Boot loaders can not be trusted to pass valid information
-> 8. Device tree blobs can solve a lot of the problems, and nobody has
->    come up with a better solution.
+> I'm not talking about platform devices at all.  I'm talking about the data
+> which platforms need to supply to their drivers in order for the drivers
+> to work.
 
-Right, so this is directly related to point (5) because in essence FDT
-is a way to make undiscoverable hardware discoverable by probing the
-tree. The `it's just data' mantra sums it up nicely.
+Yes, I meant platform_data, not platform_device.
 
-> 9. All interesting work is going into a handful of platforms, all of which
->    are ARMv7 based.
+> This kind of data is precisely why I went down the static declaration
+> route for all ARM dev platforms, despite most devices being trivially
+> discoverable.  I couldn't work out a decent way to automatically scan
+> the devices while ensuring that the right platform specific driver data
+> was attached to its correct device.
 
-I think starting out ARMv7-only might make this more manageable but
-there are still shed loads of pre-v7 chips out there which we should try
-not to break.
+Maybe we can look at this again. The device tree scanning code 
+is able to connect properties from the device tree to e.g. PCI
+devices that are probed from hardware. It may not be easy to
+do, but my feeling is that there is a lot to gain if we manage
+to do it.
+ 
+> > The device tree work has shown that it's possible to describe very
+> > complex hardware in simple data structures, but it would be much
+> > better if we needed neither a device tree nor a board file for this.
+> 
+> The device tree goes against automatic device discovery - unless you
+> have a shim which runs before the kernel executes to adjust the device
+> tree appropriately.  Otherwise, I can't see anyway you could cope with
+> (eg) a platform having MMC controllers at 0x10004000 and 0x10008000,
+> and another with just one MMC controller at 0x10008000 but using the
+> card detect lines from 0x10004000.
 
-> 10. We do not want to discontinue support for old boards that work fine.
+The device tree is just another way to do automatic device discovery.
+Fundamentally there is not much difference between reading data in
+a fixed format from a PCI config space, a hardware ROM on AMBA or
+a blob passed into the kernel.
 
-[...]
+The disadvantage of the device tree is that it's harder to get it
+to match the actual hardware, while the advantage is that it's
+flexible enough to describe the example you just gave.
 
-> Based on these assumptions, my preferred strategy would be to a new
-> mach-nocrap directory with a documented set of rules (to be adapted when
-> necessary):
+As I mentioned above, it's possible to describe devices in the
+device tree format that are also detected from hardware
+scanning, and to combine information from both sources.
 
-This is a nice idea, but I don't think it's entirely practical:
+If the information in the hardware is complete, as is usually
+the case on PCI or USB buses, the device trees we use on other
+architectures only list the root node of a bus that gets scanned
+in hardware.
 
-> * Strictly no crap
->  * No board files
+> > I remember PCI cards
+> > from the 1990s that could not be probed properly and required
+> > setting a lot of module parameters copied from a web site depending
+> > on what hardware you had bought. The reason we don't have that 
+> > as much today is that the manufacturers realized that it's impossible
+> > to write proper drivers if you cannot detect the hardware.
+> 
+> I think you're going to be waiting a very long time for that to happen.
+> No SoC vendor adds device IDs to their on-chip devices to allow them to
+> be automatically discovered - it's only through ARM Ltd's development of
+> their Primecells, and then vendors integrating those into their SoC (maybe
+> with their own modifications) that we've started to see this kind of ID
+> system appearing.
+> 
+> Outside of the Primecell stuff, I'm unaware of anyone adding any kind
+> of discovery mechanism to SoC based devices.
 
-I don't understand how you can handle `early quirks' without board
-files. Does this follow on from Linus' suggestion about moving code out
-of the kernel and into the bootloader?
+I'm willing to try to keep pushing for it, once I figure out where ;-)
 
-Realistically, I don't think you will ever get away from board files.
-The trick is probably to make them as small as possible and common to as
-many boards as possible (like the platforms directory for PowerPC).
+If we have support for automatic probing of some devices in the kernel,
+that might be a way to convince hardware vendors that simply putting
+correct information in the hardware can improve their time to market,
+which directly translates into money.
 
->  * No hardcoded memory maps
->  * No lists of interrupts and GPIOs
-
-This is largely just data, so should be do-able once this stuff isn't
-needed at compile-time (which is becoming the case with stuff like
-dynamic p2v).
-
-Will
+	Arnd
