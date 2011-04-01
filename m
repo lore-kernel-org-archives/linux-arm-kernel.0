@@ -1,31 +1,40 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  1 Apr 2011 19:19:14 +0200
-Subject: [PATCH 3/5] dmaengine: at_hdmac: debug information sg_len for
-	prep_slave_sg
+Date: Fri,  1 Apr 2011 19:19:15 +0200
+Subject: [PATCH 4/5] dmaengine: at_hdmac: remove channel status testing in
+	tasklet
 In-Reply-To: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
 References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
-Message-ID: <d3d6a732d9d6baf8a82f4121c84df05cc8a173b6.1301678094.git.nicolas.ferre@atmel.com>
+Message-ID: <7b981aa5c99c76e42b47dd604cb0e87fa923f41e.1301678094.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is no need to test if channel is enabled in tasklet:
+- in error path, channel is disabled in interrupt routine
+- in normal path, this test is performed in sub functions to report
+a misuse of the engine.
+
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/dma/at_hdmac.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/dma/at_hdmac.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index fe9e1de..ce1d1a5 100644
+index ce1d1a5..6d0fb1f 100644
 --- a/drivers/dma/at_hdmac.c
 +++ b/drivers/dma/at_hdmac.c
-@@ -666,7 +666,8 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	struct scatterlist	*sg;
- 	size_t			total_len = 0;
+@@ -451,13 +451,6 @@ static void atc_tasklet(unsigned long data)
+ {
+ 	struct at_dma_chan *atchan = (struct at_dma_chan *)data;
  
--	dev_vdbg(chan2dev(chan), "prep_slave_sg: %s f0x%lx\n",
-+	dev_vdbg(chan2dev(chan), "prep_slave_sg (%d): %s f0x%lx\n",
-+			sg_len,
- 			direction == DMA_TO_DEVICE ? "TO DEVICE" : "FROM DEVICE",
- 			flags);
- 
+-	/* Channel cannot be enabled here */
+-	if (atc_chan_is_enabled(atchan)) {
+-		dev_err(chan2dev(&atchan->chan_common),
+-			"BUG: channel enabled in tasklet\n");
+-		return;
+-	}
+-
+ 	spin_lock(&atchan->lock);
+ 	if (test_and_clear_bit(ATC_IS_ERROR, &atchan->status))
+ 		atc_handle_error(atchan);
 -- 
 1.7.3
