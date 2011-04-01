@@ -1,40 +1,55 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 01 Apr 2011 23:27:55 +0200
-Subject: kirkwood build failure on mainline
-Message-ID: <87r59lr7ac.fsf@lebrac.rtp-net.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Apr 2011 23:32:23 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <87vcyxllub.fsf@ti.com>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104011659.40443.arnd@arndb.de> <87vcyxllub.fsf@ti.com>
+Message-ID: <201104012332.24319.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 01 April 2011 23:10:04 Kevin Hilman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Friday 01 April 2011, Detlef Vollmann wrote:
+> >> On 04/01/11 15:54, Arnd Bergmann wrote:
+> >
+> >> > 9. All interesting work is going into a handful of platforms, all of which
+> >> >     are ARMv7 based.
+> >> Define interesting.
+> >
+> > The ones that are causing the churn that we're talking about.
+> > Platforms that have been working forever and only need to get
+> > the occasional bug fix are boring, i.e. not the problem.
+> 
+> I'm not sure I follow the ARMv7-only thinking either.  
+> 
+> Picking ARMv7 only would be a good way to avoid part of the problem, but
+> IMO, it doesn't really address the root causes.  Part of the ugliness of
+> the platform-specific hackery (and the "churn" to clean some of it up)
+> is precisely due to support for multiple ARM architecture versions, and
+> the various SoCs in a family that use them.  For example, linux-omap
+> supports OMAP1 (ARMv5), OMAP2 (ARMv6), OMAP3 (ARMv7) and OMAP4 (ARMv7
+> SMP), and OMAP2/3/4 in a single binary.
+> 
+> Also, since we've only very recently got to the point of being able to
+> support ARMv6 + ARMv7 UP & SMP in the same kernel, making a decision now
+> that only ARMv7 is important seems like a step backwards.  If the
+> ultimate goal is getting to a point where we have infrastrucure that can
+> be cross-SoC, surely this same infrastrucure should support multiple ARM
+> architecture revisions.
 
-Thanks to kautobuild, I've noticed that -rc1 is not building on kirkwood
-with following error [1]:
+Yes, forget about the ARMv7 part of my proposal, that was not a main point.
 
-arch/arm/kernel/built-in.o: In function `cpu_suspend':
-io.c:(.text+0x4544): undefined reference to `cpu_feroceon_do_suspend'
-io.c:(.text+0x4554): undefined reference to `cpu_feroceon_suspend_size'
-arch/arm/kernel/built-in.o: In function `cpu_resume':
-io.c:(.data+0x1e8): undefined reference to `cpu_feroceon_do_resume'
+If we decide to have a new clean platform variant the way I suggested,
+it would be nice to support all machines in a single kernel binary,
+and at least v6+v7 is a solved problem.
 
-After looking at other build logs, there are other platform failing with
-similar error. I guess it's failing since commit
-f6b0fa02e8b0708d17d631afce456524eadf87ff "ARM: pm: add generic CPU
-suspend/resume support". In fact, I would say that this commit only
-shows that there's a problem and is not really the cause.
-A naive explanation would be that ARCH_SUSPEND_POSSIBLE is selected for
-theses systems even if suspend is not supported. Adding a "depends on
-!CPU_FEROCEON" is making the kernel build.
+Supporting a second kernel binary up to v5 with the same source is also
+simple, as would be big-endian/little-endian variants, or thumb2/arm variants.
+We might not want to do all combinations from the start though, and I would
+choose ARMv6/v7-thumb2-le simply because that's what Linaro is focusing
+on. The idea is to start with a clearly defined set, but write the code
+in a way that makes it possible to extend in other directions.
 
-Would a patch disabling ARCH_SUSPEND_POSSIBLE for all cpu failing to
-build with similar error be accepted/welcome or it's just a really
-stupid idea ? In case of it being a stupid idea, what would be the right
-approach to fix that given that implementing suspend for all failing SoC
-is excluded ?
-
-Thanks,
-Arnaud
-
-[1]
-http://armlinux.simtec.co.uk/kautobuild/2.6.39-rc1-git2/kirkwood_defconfig/zimage.log
-[2] for instance:
-http://armlinux.simtec.co.uk/kautobuild/2.6.39-rc1-git2/pxa910_defconfig/zimage.log
+	Arnd
