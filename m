@@ -1,39 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Apr 2011 12:24:16 +0100
-Subject: [PATCH] ARM: hw_breakpoint: clear DBGVCR out of reset
-Message-ID: <1301657056-30065-1-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Apr 2011 13:29:42 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <87y63vav01.fsf@ti.com>
+References: <201103301906.42429.arnd@arndb.de>
+	<201103311723.02301.arnd@arndb.de> <87y63vav01.fsf@ti.com>
+Message-ID: <201104011329.42191.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DBGVCR, used for configuring vector catch debug events, is UNKNOWN
-out of reset on ARMv7. When enabling monitor mode, this must be zeroed
-to avoid UNPREDICTABLE behaviour.
+On Thursday 31 March 2011, Kevin Hilman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> >
+> > But that's the point. The incentive is there for managing the infrastructure
+> > within the SoC, but not across SoCs. 
+> 
+> OK, but the rest of my thread went on to describe how at least a few ARM
+> SoC maintainers are actually actively working infrastructure that is
+> cross SoC, like runtime PM.  It might start because of an abstraction
+> within an SoC family like supporting both SH and SH-mobile, or
+> OMAP[12345], but it does sometimes result in not only cross-SoC code but
+> cross-platform frameworks.
+> 
+> Admiteddly, the percentage of ARM SoC developers actively working on
+> these common, cross-platform infrastructure layers is rather small, but
+> at least it is non-zero. :)    
 
-This patch adds the zeroing code to the debug reset path.
+True, I was oversimplifying. Still, the problem exists that to a large
+degree, infrastructure also gets added to platform specific code where it
+has no place.
 
-Reported-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/hw_breakpoint.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+> With that as background, hwmod was never inteded as something to be
+> cross-SoC.  If you look at the data that's in an omap_hwmod, it's
+> entirely OMAP hardware specific, and mostly focused on power management
+> hardware details, register descriptions, feature capabilities etc.  This
+> allows the OMAP PM core code to be generalized and work across all SoCs
+> in the OMAP family.  But again, it was intended for OMAP PM core code.
+> At that level, there really isn't much to share with other SoCs since
+> the PM hardware for the various SoC vendors is so "differentiated"
+> (a.k.a fsck'd up in extremely different ways.)
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 8dbc126..87acc25 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -868,6 +868,13 @@ static void reset_ctrl_regs(void *info)
- 		 */
- 		asm volatile("mcr p14, 0, %0, c1, c0, 4" : : "r" (0));
- 		isb();
-+
-+		/*
-+		 * Clear any configured vector-catch events before
-+		 * enabling monitor mode.
-+		 */
-+		asm volatile("mcr p14, 0, %0, c0, c7, 0" : : "r" (0));
-+		isb();
- 	}
- 
- 	if (enable_monitor_mode())
--- 
-1.7.0.4
+There is an important difference between code that knows about board,
+soc and platform specific issues ("drivers") and code that manages
+these ("infrastructure"). Obviously, any hardware implementation, broadly
+speaking, that is different from the other ones needs a driver.
+
+However, the infrastructure for managing multiple drivers should be
+written in a way that works for as many similar drivers as possible.
+
+My complaint about the four examples I've given is that they mix the
+driver with the infrastructure.
+
+	Arnd
