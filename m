@@ -1,89 +1,290 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 31 Mar 2011 21:50:58 -0700
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1103311649450.28032@xanadu.home> (Nicolas
-	Pitre's message of "Thu, 31 Mar 2011 18:49:11 -0400 (EDT)")
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<AANLkTim6zg-U6HtAQbqnENqoK7x8erXSqOuTFVC0YE5r@mail.gmail.com>
-	<alpine.LFD.2.00.1103301814250.28032@xanadu.home>
-	<alpine.DEB.2.00.1103301728000.15330@asgard.lang.hm>
-	<alpine.LFD.2.00.1103302255280.28032@xanadu.home>
-	<alpine.DEB.2.00.1103302130500.29543@asgard.lang.hm>
-	<alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<20110331080634.GA18022@elte.hu>
-	<20110331083044.GB14323@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1103310855450.29543@asgard.lang.hm>
-	<20110331164539.GB19452@n2100.arm.linux.org.uk>
-	<AANLkTi=tyifvJU-hhdd7gT74GMctrCbQBdUAoEaRXOCy@mail.gmail.com>
-	<alpine.LFD.2.00.1103311429590.28032@xanadu.home>
-	<AANLkTi=kbozPcWEk9wVZb7emSWx48BJQS=7Uzaya9Lor@mail.gmail.com>
-	<alpine.LFD.2.00.1103311649450.28032@xanadu.home>
-Message-ID: <8ya39m2mv65.fsf@huya.qualcomm.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Thu, 31 Mar 2011 22:09:05 -0700
+Subject: [PATCH 3/9] ARM: mmp: remove redundant macro definition in mfp
+In-Reply-To: <AANLkTi=4vK_626Wv5DE_F1j7tqy-ZxEJr1NitgA13GOo@mail.gmail.com>
+References: <1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-3-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTi=4vK_626Wv5DE_F1j7tqy-ZxEJr1NitgA13GOo@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05CEEB84B9@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31 2011, Nicolas Pitre wrote:
 
-> Leaf nodes on ARM are people coming from corporate background with the 
-> old school software development methodologies.  They do it as a _job_ 
-> first and foremost.  They only work on Linux because that's what their 
-> boss assigned them to. Don't get me wrong: that doesn't mean they are 
-> bad people.  Simply that they are not into it for the public recognition 
-> (or flaming) from their peers.  Once their code works they lose interest 
-> and move on.  That mindset is extremely hard to change and take time, on 
-> a scale of years.  Much more time than required to produce the code 
-> needed to support that new SOC out of the pipeline.  There are notable 
-> exceptions obviously.  But this is still a scalability problem in 
-> itself.  So we need men-in-the-middle attacks.
 
-An additional mindset that is difficult to work with in this environment
-is that the corporate development methodology has a focus on schedules
-and deliverables.  Even people who would otherwise like to contribute
-will have pressure to get something done.  Many think of "submit to
-mainline" is kind of a last step in a development process, instead of
-even a goal to accomplish.
+>-----Original Message-----
+>From: Eric Miao [mailto:eric.y.miao at gmail.com]
+>Sent: 2011?4?1? 12:51 PM
+>To: Haojian Zhuang
+>Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH 3/9] ARM: mmp: remove redundant macro definition in
+>mfp
+>
+>On Fri, Apr 1, 2011 at 10:39 AM, Haojian Zhuang
+><haojian.zhuang@marvell.com> wrote:
+>> There're two layers in MFP implementation. One is MFP layer that is
+>logical
+>> pin setting. And the other is MFPR layer that is physical register
+>setting.
+>>
+>> MFP drive setting is different between PXA168 and PXA910. But the
+>difference
+>> was stored in logical layer, not physical layer. And some unnecessary
+>macro
+>> definition were added for ARCH_MMP.
+>
+>The implementation is indeed a bit complicated, yet I don't see the
+>change here is necessary so far.
+>
+>The MFPR bit definitions for pxa168/910 and mmp2 are basically
+>following the pxa3xx's.
+>
+>And definitions like DRIVE_SLOW, DRIVE_VERY_SLOW are really
+>pxa168/910, mmp2 specific. And it's no equivalent to DS01X, DS02X
+>..., which is more pxa3xx specific.
+>
+>BTW, does the existing code cause any bug/limitation?
+>
+Yes, there's some limitation in existing code since it's for pxa3xx. For example, driver strength is bit[12..10] in PXA3xx. In PXA955/910/MMP2, it's bit[12..11]. In PXA168, it's bit[11..10]. And there's no sleep mode in PXA168. Sleep mode bit is different in PXA910.
 
-When we push back, there is a good chance they just won't bother, not
-because they don't want to do it, but because it doesn't fit a schedule,
-and there is already something else for them to work on.
-
-So what's the right answer here.  Practically, someone just sent out a
-fairly complete DMA driver for a new MSM device.  Naturally, this
-hardware is nothing like anyone else's DMA, but the driver itself pretty
-much independent from other kernel APIs.  It isn't even similar to the
-existing DMA driver in the MSM.  With it are patches to ifdef-up various
-drivers to use the appropriate DMA.
-
-The DMA code, by itself, seems reasonably well written (with some
-cleanup and such needed), but it makes everything that uses it messy.
-In this particular case, DMA engine will probably need some work to
-either incorporate the unique capabilities of this hardware, or at least
-allow them to be used.  The author probably won't be able to do this on
-their own.
-
-I could pull the driver into the tree, and now we have yet another
-driver with yet another API.  If I push back, realistically, it will
-probably end up out-of-tree, along with everything that depends on it.
-
-Up until now, it seems that attitude has been that it is better to be
-in-tree than out of tree, but are we getting too much stuff to continue
-that?
-
-Today, most of the MSM code lives out of tree.  The QuIC tree for MSM
-(currently based off of 2.6.35):
-
-  git diff --stat v2.6.35..HEAD | tail -1
-   3432 files changed, 1144473 insertions(+), 17315 deletions(-)
-  git diff --stat v2.6.35..HEAD arch/arm/mach-msm | tail -1
-   595 files changed, 286054 insertions(+), 1928 deletions(-)
-
-There's a large amount of work just to get the code up to kernel
-standards (the coding style has been fairly well enforced), and there is
-constant development for new hardware.
-
-Thanks,
-David Brown
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?arch/arm/mach-mmp/include/mach/mfp-mmp2.h ? | ? ?7 +----
+>> ?arch/arm/mach-mmp/include/mach/mfp-pxa168.h | ? ?7 +----
+>> ?arch/arm/mach-mmp/include/mach/mfp-pxa910.h | ? ?7 +----
+>> ?arch/arm/mach-mmp/include/mach/mfp.h ? ? ? ?| ? 34 ------------------
+>---------
+>> ?arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-mmp/pxa910.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/plat-pxa/include/plat/mfp.h ? ? ? ?| ? ?4 +++
+>> ?arch/arm/plat-pxa/mfp.c ? ? ? ? ? ? ? ? ? ? | ? 22 +++++++++++++++-
+>> ?9 files changed, 30 insertions(+), 57 deletions(-)
+>> ?delete mode 100644 arch/arm/mach-mmp/include/mach/mfp.h
+>>
+>> diff --git a/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>b/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> index 4ad3862..c66eaea 100644
+>> --- a/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> +++ b/arch/arm/mach-mmp/include/mach/mfp-mmp2.h
+>> @@ -1,12 +1,7 @@
+>> ?#ifndef __ASM_MACH_MFP_MMP2_H
+>> ?#define __ASM_MACH_MFP_MMP2_H
+>>
+>> -#include <mach/mfp.h>
+>> -
+>> -#define MFP_DRIVE_VERY_SLOW ? ?(0x0 << 13)
+>> -#define MFP_DRIVE_SLOW ? ? ? ? (0x2 << 13)
+>> -#define MFP_DRIVE_MEDIUM ? ? ? (0x4 << 13)
+>> -#define MFP_DRIVE_FAST ? ? ? ? (0x6 << 13)
+>> +#include <plat/mfp.h>
+>>
+>> ?/* GPIO */
+>> ?#define GPIO0_GPIO ? ? MFP_CFG(GPIO0, AF0)
+>> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+>b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+>> index 4621067..4aadbea 100644
+>> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+>> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+>> @@ -1,12 +1,7 @@
+>> ?#ifndef __ASM_MACH_MFP_PXA168_H
+>> ?#define __ASM_MACH_MFP_PXA168_H
+>>
+>> -#include <mach/mfp.h>
+>> -
+>> -#define MFP_DRIVE_VERY_SLOW ? ?(0x0 << 13)
+>> -#define MFP_DRIVE_SLOW ? ? ? ? (0x1 << 13)
+>> -#define MFP_DRIVE_MEDIUM ? ? ? (0x2 << 13)
+>> -#define MFP_DRIVE_FAST ? ? ? ? (0x3 << 13)
+>> +#include <plat/mfp.h>
+>>
+>> ?/* GPIO */
+>> ?#define GPIO0_GPIO ? ? ? ? ? ? MFP_CFG(GPIO0, AF5)
+>> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+>b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+>> index fbd7ee8..f5d33be 100644
+>> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+>> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+>> @@ -1,12 +1,7 @@
+>> ?#ifndef __ASM_MACH_MFP_PXA910_H
+>> ?#define __ASM_MACH_MFP_PXA910_H
+>>
+>> -#include <mach/mfp.h>
+>> -
+>> -#define MFP_DRIVE_VERY_SLOW ? ?(0x0 << 13)
+>> -#define MFP_DRIVE_SLOW ? ? ? ? (0x2 << 13)
+>> -#define MFP_DRIVE_MEDIUM ? ? ? (0x4 << 13)
+>> -#define MFP_DRIVE_FAST ? ? ? ? (0x6 << 13)
+>> +#include <plat/mfp.h>
+>>
+>> ?/* UART2 */
+>> ?#define GPIO47_UART2_RXD ? ? ? MFP_CFG(GPIO47, AF6)
+>> diff --git a/arch/arm/mach-mmp/include/mach/mfp.h b/arch/arm/mach-
+>mmp/include/mach/mfp.h
+>> deleted file mode 100644
+>> index 62e510e..0000000
+>> --- a/arch/arm/mach-mmp/include/mach/mfp.h
+>> +++ /dev/null
+>> @@ -1,34 +0,0 @@
+>> -#ifndef __ASM_MACH_MFP_H
+>> -#define __ASM_MACH_MFP_H
+>> -
+>> -#include <plat/mfp.h>
+>> -
+>> -/*
+>> - * NOTE: the MFPR register bit definitions on PXA168 processor lines
+>are a
+>> - * bit different from those on PXA3xx. ?Bit [7:10] are now reserved,
+>which
+>> - * were SLEEP_OE_N, SLEEP_DATA, SLEEP_SEL and the LSB of DRIVE bits.
+>> - *
+>> - * To cope with this difference and re-use the pxa3xx mfp code as
+>much as
+>> - * possible, we make the following compromise:
+>> - *
+>> - * 1. SLEEP_OE_N will always be programmed to '1' (by MFP_LPM_FLOAT)
+>> - * 2. DRIVE strength definitions redefined to include the reserved
+>bit
+>> - * ? ?- the reserved bit differs between pxa168 and pxa910, and the
+>> - * ? ? ?MFP_DRIVE_* macros are individually defined in mfp-
+>pxa{168,910}.h
+>> - * 3. Override MFP_CFG() and MFP_CFG_DRV()
+>> - * 4. Drop the use of MFP_CFG_LPM() and MFP_CFG_X()
+>> - */
+>> -
+>> -#undef MFP_CFG
+>> -#undef MFP_CFG_DRV
+>> -#undef MFP_CFG_LPM
+>> -#undef MFP_CFG_X
+>> -#undef MFP_CFG_DEFAULT
+>> -
+>> -#define MFP_CFG(pin, af) ? ? ? ? ? ? ? \
+>> - ? ? ? (MFP_LPM_FLOAT | MFP_PIN(MFP_PIN_##pin) | MFP_##af |
+>MFP_DRIVE_MEDIUM)
+>> -
+>> -#define MFP_CFG_DRV(pin, af, drv) ? ? ?\
+>> - ? ? ? (MFP_LPM_FLOAT | MFP_PIN(MFP_PIN_##pin) | MFP_##af |
+>MFP_DRIVE_##drv)
+>> -
+>> -#endif /* __ASM_MACH_MFP_H */
+>> diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+>> index 8e6c3ac..14e6a23 100644
+>> --- a/arch/arm/mach-mmp/mmp2.c
+>> +++ b/arch/arm/mach-mmp/mmp2.c
+>> @@ -24,10 +24,10 @@
+>> ?#include <mach/cputype.h>
+>> ?#include <mach/irqs.h>
+>> ?#include <mach/dma.h>
+>> -#include <mach/mfp.h>
+>> ?#include <mach/gpio.h>
+>> ?#include <mach/devices.h>
+>> ?#include <mach/mmp2.h>
+>> +#include <plat/mfp.h>
+>>
+>> ?#include "common.h"
+>> ?#include "clock.h"
+>> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+>> index 72b4e76..34df2b1 100644
+>> --- a/arch/arm/mach-mmp/pxa168.c
+>> +++ b/arch/arm/mach-mmp/pxa168.c
+>> @@ -24,7 +24,7 @@
+>> ?#include <mach/gpio.h>
+>> ?#include <mach/dma.h>
+>> ?#include <mach/devices.h>
+>> -#include <mach/mfp.h>
+>> +#include <plat/mfp.h>
+>>
+>> ?#include "common.h"
+>> ?#include "clock.h"
+>> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+>> index 8f92ccd..93b3b25 100644
+>> --- a/arch/arm/mach-mmp/pxa910.c
+>> +++ b/arch/arm/mach-mmp/pxa910.c
+>> @@ -22,8 +22,8 @@
+>> ?#include <mach/irqs.h>
+>> ?#include <mach/gpio.h>
+>> ?#include <mach/dma.h>
+>> -#include <mach/mfp.h>
+>> ?#include <mach/devices.h>
+>> +#include <plat/mfp.h>
+>>
+>> ?#include "common.h"
+>> ?#include "clock.h"
+>> diff --git a/arch/arm/plat-pxa/include/plat/mfp.h b/arch/arm/plat-
+>pxa/include/plat/mfp.h
+>> index 75f6564..b7dde0c 100644
+>> --- a/arch/arm/plat-pxa/include/plat/mfp.h
+>> +++ b/arch/arm/plat-pxa/include/plat/mfp.h
+>> @@ -378,6 +378,10 @@ typedef unsigned long mfp_cfg_t;
+>> ?#define MFP_DS13X ? ? ? ? ? ? ?(0x7 << 13)
+>> ?#define MFP_DS_MASK ? ? ? ? ? ?(0x7 << 13)
+>> ?#define MFP_DS(x) ? ? ? ? ? ? ?(((x) >> 13) & 0x7)
+>> +#define MFP_VERY_SLOW ? ? ? ? ?MFP_DS01X
+>> +#define MFP_SLOW ? ? ? ? ? ? ? MFP_DS02X
+>> +#define MFP_MEDIUM ? ? ? ? ? ? MFP_DS03X
+>> +#define MFP_FAST ? ? ? ? ? ? ? MFP_DS04X
+>>
+>> ?#define MFP_LPM_DEFAULT ? ? ? ? ? ? ? ?(0x0 << 16)
+>> ?#define MFP_LPM_DRIVE_LOW ? ? ?(0x1 << 16)
+>> diff --git a/arch/arm/plat-pxa/mfp.c b/arch/arm/plat-pxa/mfp.c
+>> index a9aa5ad..d335551 100644
+>> --- a/arch/arm/plat-pxa/mfp.c
+>> +++ b/arch/arm/plat-pxa/mfp.c
+>> @@ -19,6 +19,10 @@
+>> ?#include <linux/io.h>
+>> ?#include <linux/sysdev.h>
+>>
+>> +#ifdef CONFIG_ARCH_MMP
+>> +#include <mach/cputype.h>
+>> +#endif
+>> +
+>> ?#include <plat/mfp.h>
+>>
+>> ?#define MFPR_SIZE ? ? ?(PAGE_SIZE)
+>> @@ -165,8 +169,14 @@ static inline void __mfp_config_lpm(struct
+>mfp_pin *p)
+>> ?void mfp_config(unsigned long *mfp_cfgs, int num)
+>> ?{
+>> ? ? ? ?unsigned long flags;
+>> - ? ? ? int i;
+>> -
+>> + ? ? ? int i, drv_b11 = 0, no_lpm = 0;
+>> +
+>> +#ifdef CONFIG_ARCH_MMP
+>> + ? ? ? if (cpu_is_pxa910() || cpu_is_mmp2())
+>> + ? ? ? ? ? ? ? drv_b11 = 1;
+>> + ? ? ? if (cpu_is_pxa168() || cpu_is_pxa910())
+>> + ? ? ? ? ? ? ? no_lpm = 1;
+>> +#endif
+>> ? ? ? ?spin_lock_irqsave(&mfp_spin_lock, flags);
+>>
+>> ? ? ? ?for (i = 0; i < num; i++, mfp_cfgs++) {
+>> @@ -183,6 +193,10 @@ void mfp_config(unsigned long *mfp_cfgs, int num)
+>> ? ? ? ? ? ? ? ?lpm = MFP_LPM_STATE(c);
+>> ? ? ? ? ? ? ? ?edge = MFP_LPM_EDGE(c);
+>> ? ? ? ? ? ? ? ?pull = MFP_PULL(c);
+>> + ? ? ? ? ? ? ? if (drv_b11)
+>> + ? ? ? ? ? ? ? ? ? ? ? drv = drv << 1;
+>> + ? ? ? ? ? ? ? if (no_lpm)
+>> + ? ? ? ? ? ? ? ? ? ? ? lpm = 0;
+>>
+>> ? ? ? ? ? ? ? ?/* run-mode pull settings will conflict with MFPR bits
+>of
+>> ? ? ? ? ? ? ? ? * low power mode state, ?calculate mfpr_run and
+>mfpr_lpm
+>> @@ -272,6 +286,10 @@ void mfp_config_lpm(void)
+>> ? ? ? ?struct mfp_pin *p = &mfp_table[0];
+>> ? ? ? ?int pin;
+>>
+>> +#ifdef CONFIG_ARCH_MMP
+>> + ? ? ? if (cpu_is_pxa168() || cpu_is_pxa910())
+>> + ? ? ? ? ? ? ? return;
+>> +#endif
+>> ? ? ? ?for (pin = 0; pin < ARRAY_SIZE(mfp_table); pin++, p++)
+>> ? ? ? ? ? ? ? ?__mfp_config_lpm(p);
+>> ?}
+>> --
+>> 1.5.6.5
+>>
+>>
