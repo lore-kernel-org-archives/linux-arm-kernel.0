@@ -1,50 +1,38 @@
-From: ameya.palande@nokia.com (Ameya Palande)
-Date: Fri, 1 Apr 2011 12:58:16 +0300
-Subject: [PATCHv2] omap: rx51: Platform support for lp5523 led chip
-In-Reply-To: <20110331154421.GN5465@legolas.emea.dhcp.ti.com>
-References: <alpine.DEB.1.10.1103311524420.2634@esdhcp041196.research.nokia.com>
-	<1301578692-29286-1-git-send-email-ameya.palande@nokia.com>
-	<20110331142635.GF5465@legolas.emea.dhcp.ti.com>
-	<4D949E18.6090704@nokia.com>
-	<20110331154421.GN5465@legolas.emea.dhcp.ti.com>
-Message-ID: <4D95A1B8.2090007@nokia.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 1 Apr 2011 13:03:59 +0300
+Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
+In-Reply-To: <AANLkTikyrfYn02yg3S9_4vBGfon+BNHbPiQkaHaq_Xaq@mail.gmail.com>
+References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
+	<AANLkTikyrfYn02yg3S9_4vBGfon+BNHbPiQkaHaq_Xaq@mail.gmail.com>
+Message-ID: <201104011303.59668.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Friday 01 April 2011 10:26:37 Eric Miao wrote:
+> On Mon, Mar 14, 2011 at 6:27 AM, Vasily Khoruzhick <anarsoul@gmail.com> 
+wrote:
+> > There's a race condition in stop_queue(),
+> > if drv_data->queue is empty, but drv_data->busy is still set
+> > (or opposite situation) stop_queue will return -EBUSY.
+> > So fix loop condition to check that both drv_data->queue is empty
+> > and drv_data->busy is not set.
+> 
+> I think this is a good catch if the queue could be stopped only when
+> 1) queue is empty AND 2) transfer is not in progress.
 
-On 03/31/2011 06:44 PM, ext Felipe Balbi wrote:
-> On Thu, Mar 31, 2011 at 06:30:32PM +0300, Ameya Palande wrote:
->> Hi Felipe,
->>
->> On 03/31/2011 05:26 PM, ext Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Thu, Mar 31, 2011 at 04:38:12PM +0300, Ameya Palande wrote:
->>>> +static int rx51_lp5523_setup(void)
->>>> +{
->>>> +	int err;
->>>> +
->>>> +	err = gpio_request_one(RX51_LP5523_CHIP_EN_GPIO, GPIOF_DIR_OUT,
->>>> +			"lp5523_enable");
->>>> +	if (err<   0) {
->>>> +		pr_err("Unable to get lp5523_enable GPIO\n");
->>>> +		return err;
->>>> +	}
->>>> +
->>>> +	return err;
->>>
->>> isn't enough to return gpio_request_one(RX51_LP5523_CHIP_EN_GPIO,
->>> GPIOF_DIR_OUT, "lp5523_enable"); ??
->>
->> But then we won't know the failure reason for lp5523_probe()
->> I would prefer printing an error!
->
-> see that both gpio_request() and gpio_direction_output() have debugging
-> prints for error cases ;-)
+It has check later (under while):
 
-Agreed :) Thanks for the review!
-Will send v3.
+if (!list_empty(&drv_data->queue) || drv_data->busy)
+	status = -EBUSY;
 
-Cheers,
-Ameya.
+And I'm hitting it on Z2 when I'm trying to enter suspend - it fails, because 
+spi driver refuses to enter suspend.
+
+> There are several other places you might need to change accordingly,
+> e.g. spi_bfin5xx.c
+
+I can make a patch for other drivers, but I can't test it - I have no 
+appropriate boards, and even toolchain.
+
+Regards
+Vasily
