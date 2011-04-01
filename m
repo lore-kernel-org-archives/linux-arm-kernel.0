@@ -1,44 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Apr 2011 14:41:38 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <BANLkTinmoTyceJCT+K-RCm4NC76qfDyeVw@mail.gmail.com>
-References: <alpine.LFD.2.00.1103301531420.28032@xanadu.home>
-	<20110331130123.GB17547@n2100.arm.linux.org.uk>
-	<BANLkTinmoTyceJCT+K-RCm4NC76qfDyeVw@mail.gmail.com>
-Message-ID: <201104011441.38902.arnd@arndb.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 01 Apr 2011 15:49:48 +0300
+Subject: [PATCH 1/3] MTD: atmel_nand: modify test case for using DMA
+	operations
+In-Reply-To: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
+References: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <1301662188.2789.57.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 March 2011, Bill Gatliff wrote:
-> On Thu, Mar 31, 2011 at 8:01 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> > Just look at the removal of AAEC2000, LH7A40x and 2000 lines from the
-> > mach-types file removed 6000 lines, which in itself is about the number
-> > of lines of change submitted during the last merge window for any one
-> > non-ARM architecture.  At this point in time with this complaint, I've
-> > absolutely no idea why I bothered to do that.  I should've left it well
-> > alone and then the diffstat percentage would've been smaller.  After
-> > all, it's "pointless churn".
+On Wed, 2011-03-30 at 16:26 +0800, Hong Xu wrote:
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> I think you did it because it was the Right Thing To Do.  Even
-> positive change can be painful at times.
+> We have better performances not using DMA for oob operations.
+
+Would it be possible to have this comment in the code, not only in the
+commit message?
+
+> Modify size test so that it is using DMA for size greater than oobsize.
 > 
-> The majority is exceedingly grateful for the effort you make.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Defintely. I haven't seen anyone in this thread blame Russell for the
-mess. As far as I'm concerned, the code in arch/arm consists of
-the well-maintained {mm,kernel,lib,common,tools,include} directories
-that are actively being taken care of by Russell, and a huge amount
-of crap that has accumulated in mach-* and plat-*. Some of it is
-arguably better than other parts, but the problem is not that someone
-in particular did a bad job writing the code. The problem is that
-nobody today is pushing back hard enough on crap getting added.
-
-There is a lot of good work going on to reduce the amount of crap in
-the mach code, but my feeling is that it's not keeping up with the
-rate of crap getting added by other people. In some ways, the Linaro
-project has actually made this worse by helping people get their code
-into shape for inclusion (which of course is generally a good thing
-to do).
-
-	Arnd
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
