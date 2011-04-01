@@ -1,105 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Apr 2011 17:40:11 +0200
-Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
-In-Reply-To: <20110330190857.GC2939@n2100.arm.linux.org.uk>
-References: <1301391619-4499-1-git-send-email-arend@broadcom.com>
-	<201103302024.49921.arnd@arndb.de>
-	<20110330190857.GC2939@n2100.arm.linux.org.uk>
-Message-ID: <201104011740.11236.arnd@arndb.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 01 Apr 2011 21:10:40 +0530
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <4D95E681.4070605@ti.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>
+	<4D7A22F6.5050806@ti.com> <871v2dbo3q.fsf@ti.com>
+	<4D8711A5.6070301@ti.com>
+	<alpine.DEB.2.00.1103281036060.26455@utopia.booyaka.com>
+	<4D91824F.8020702@ti.com> <4D95E681.4070605@ti.com>
+Message-ID: <4D95F1F8.5060702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 March 2011, Russell King - ARM Linux wrote:
-> On Wed, Mar 30, 2011 at 08:24:49PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 30 March 2011 19:40:10 Russell King - ARM Linux wrote:
-> > 
-> > > The reason we don't do automatic scanning (which we could on the various
-> > > ARM platforms) is because of the platform data necessary to make some of
-> > > the primecell drivers work.
-> > > 
-> > > Unfortunately, these buses are not as simple as PCI, where a device
-> > > typically sits on its own card and is totally self-contained.  With
-> > > primecell stuff, there's normally some interdependencies between the
-> > > various primecells.
-> > > 
-> > > That doesn't stop there being an automatic enumeration layer, but such
-> > > a layer would need some way of attaching platform specific data to
-> > > specific amba devices.
-> > 
-> > Right, I understand that this would not completely remove the need for
-> > platform devices, but I think it would be a great step in the right
-> > direction if we could scan all simple devices automatically, or
-> > possibly even all devices in some simple machines.
-> 
-> I'm not talking about platform devices at all.  I'm talking about the data
-> which platforms need to supply to their drivers in order for the drivers
-> to work.
+On 4/1/2011 8:21 PM, Rajendra Nayak wrote:
+> Hi Paul,
+>
+> <snip>..
+>>>
+>>> In omap_hwmod.c:_enable(), what do you think about:
+>>>
+>>> 1. saving the current idle mode of the clockdomain,
+>>>
+>>> 2. forcing the clockdomain to software-supervised wakeup.
+>>>
+>>> 3. enabling clocks and waiting for the module as we currently do, then
+>>>
+>>> 4. switching the clockdomain's idle mode back to its original state?
+>>>
+>>> Seems like that would be a reasonable approach for the short term, at
+>>> least for drivers that have been converted to PM runtime.
+>>
+>> Ok, I'll try and get some RFC patches in these lines soon.
+>
+> I tried some of what you were suggesting here and it seems to
+> work well, like you said, for the drivers which are converted
+> to PM runtime.
+>
+> Now the issue seems to be, how do we handle the ones which
+> are *still* using clock framework to enable main clocks and
+> are yet to be converted to PM runtime.
+>
+> One such, MMC, is showing me issues on OMAP4 even at boot
+> and causes a crash.
+>
+> Its a different thing that some of these drivers which use
+> direct clock calls are working by fluke on OMAP4 since the
+> clock framework does not even wait for the modules to become
+> accessible after the clock enable.
+>
+> I know the right way seems to be to get all these drivers
+> converted to PM runtime, but that might take sometime.
 
-Yes, I meant platform_data, not platform_device.
+One way I am able to get this working (atleast MMC)
+is by preventing the clock domain belonging to MMC module
+from being programmed into HW_SUP mode.
+Acceptable hack in the interim while we wait for the MMC
+driver to be using PM runtime?
 
-> This kind of data is precisely why I went down the static declaration
-> route for all ARM dev platforms, despite most devices being trivially
-> discoverable.  I couldn't work out a decent way to automatically scan
-> the devices while ensuring that the right platform specific driver data
-> was attached to its correct device.
-
-Maybe we can look at this again. The device tree scanning code 
-is able to connect properties from the device tree to e.g. PCI
-devices that are probed from hardware. It may not be easy to
-do, but my feeling is that there is a lot to gain if we manage
-to do it.
- 
-> > The device tree work has shown that it's possible to describe very
-> > complex hardware in simple data structures, but it would be much
-> > better if we needed neither a device tree nor a board file for this.
-> 
-> The device tree goes against automatic device discovery - unless you
-> have a shim which runs before the kernel executes to adjust the device
-> tree appropriately.  Otherwise, I can't see anyway you could cope with
-> (eg) a platform having MMC controllers at 0x10004000 and 0x10008000,
-> and another with just one MMC controller at 0x10008000 but using the
-> card detect lines from 0x10004000.
-
-The device tree is just another way to do automatic device discovery.
-Fundamentally there is not much difference between reading data in
-a fixed format from a PCI config space, a hardware ROM on AMBA or
-a blob passed into the kernel.
-
-The disadvantage of the device tree is that it's harder to get it
-to match the actual hardware, while the advantage is that it's
-flexible enough to describe the example you just gave.
-
-As I mentioned above, it's possible to describe devices in the
-device tree format that are also detected from hardware
-scanning, and to combine information from both sources.
-
-If the information in the hardware is complete, as is usually
-the case on PCI or USB buses, the device trees we use on other
-architectures only list the root node of a bus that gets scanned
-in hardware.
-
-> > I remember PCI cards
-> > from the 1990s that could not be probed properly and required
-> > setting a lot of module parameters copied from a web site depending
-> > on what hardware you had bought. The reason we don't have that 
-> > as much today is that the manufacturers realized that it's impossible
-> > to write proper drivers if you cannot detect the hardware.
-> 
-> I think you're going to be waiting a very long time for that to happen.
-> No SoC vendor adds device IDs to their on-chip devices to allow them to
-> be automatically discovered - it's only through ARM Ltd's development of
-> their Primecells, and then vendors integrating those into their SoC (maybe
-> with their own modifications) that we've started to see this kind of ID
-> system appearing.
-> 
-> Outside of the Primecell stuff, I'm unaware of anyone adding any kind
-> of discovery mechanism to SoC based devices.
-
-I'm willing to try to keep pushing for it, once I figure out where ;-)
-
-If we have support for automatic probing of some devices in the kernel,
-that might be a way to convince hardware vendors that simply putting
-correct information in the hardware can improve their time to market,
-which directly translates into money.
-
-	Arnd
+>
+> regards,
+> Rajendra
