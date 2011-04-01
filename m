@@ -1,22 +1,40 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Fri, 1 Apr 2011 23:19:23 +0200
-Subject: [PATCH V2 1/3] arm: lpc32xx: add tsc-device
-In-Reply-To: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
-References: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <083DF309106F364B939360100EC290F811ED78EE79@eu1rdcrdc1wx030.exi.nxp.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 01 Apr 2011 23:27:55 +0200
+Subject: kirkwood build failure on mainline
+Message-ID: <87r59lr7ac.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> Subject: [PATCH V2 1/3] arm: lpc32xx: add tsc-device
-> 
-> Fix the clock name, too.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Thanks to kautobuild, I've noticed that -rc1 is not building on kirkwood
+with following error [1]:
 
-These 3 patches look good and work/build fine. Thanks again!
-Tested-by: Kevin Wells <Kevin.wells@nxp.com>
+arch/arm/kernel/built-in.o: In function `cpu_suspend':
+io.c:(.text+0x4544): undefined reference to `cpu_feroceon_do_suspend'
+io.c:(.text+0x4554): undefined reference to `cpu_feroceon_suspend_size'
+arch/arm/kernel/built-in.o: In function `cpu_resume':
+io.c:(.data+0x1e8): undefined reference to `cpu_feroceon_do_resume'
 
-> ---
->  arch/arm/mach-lpc32xx/clock.c  |    2 +-
->  arch/arm/mach-lpc32xx/common.c |   21 +++++++++++++++++++++
+After looking at other build logs, there are other platform failing with
+similar error. I guess it's failing since commit
+f6b0fa02e8b0708d17d631afce456524eadf87ff "ARM: pm: add generic CPU
+suspend/resume support". In fact, I would say that this commit only
+shows that there's a problem and is not really the cause.
+A naive explanation would be that ARCH_SUSPEND_POSSIBLE is selected for
+theses systems even if suspend is not supported. Adding a "depends on
+!CPU_FEROCEON" is making the kernel build.
+
+Would a patch disabling ARCH_SUSPEND_POSSIBLE for all cpu failing to
+build with similar error be accepted/welcome or it's just a really
+stupid idea ? In case of it being a stupid idea, what would be the right
+approach to fix that given that implementing suspend for all failing SoC
+is excluded ?
+
+Thanks,
+Arnaud
+
+[1]
+http://armlinux.simtec.co.uk/kautobuild/2.6.39-rc1-git2/kirkwood_defconfig/zimage.log
+[2] for instance:
+http://armlinux.simtec.co.uk/kautobuild/2.6.39-rc1-git2/pxa910_defconfig/zimage.log
