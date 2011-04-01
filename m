@@ -1,88 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Apr 2011 16:59:40 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <4D95E112.4020400@vollmann.ch>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011554.07924.arnd@arndb.de> <4D95E112.4020400@vollmann.ch>
-Message-ID: <201104011659.40443.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  1 Apr 2011 15:50:39 +0100
+Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
+References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1301669441-13744-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 April 2011, Detlef Vollmann wrote:
-> On 04/01/11 15:54, Arnd Bergmann wrote:
+This patch updates the MSM gpio chained IRQ handler to use the chained
+IRQ enter/exit functions in order to function correctly on primary
+controllers with different methods of flow control.
 
-> > 9. All interesting work is going into a handful of platforms, all of which
-> >     are ARMv7 based.
-> Define interesting.
+Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-msm/gpio-v2.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-The ones that are causing the churn that we're talking about.
-Platforms that have been working forever and only need to get
-the occasional bug fix are boring, i.e. not the problem.
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+index 56a964e..483f007 100644
+--- a/arch/arm/mach-msm/gpio-v2.c
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -311,6 +311,9 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct irq_data *data = irq_desc_get_irq_data(desc);
+ 	unsigned long i;
++	struct irq_chip *chip = get_irq_desc_chip(desc);
++
++	chained_irq_enter(chip, desc);
  
-> > 12. Supporting many different boards with a single kernel binary is a
-> >      useful goal.
-> Generally not for embedded systems (for me, a mobile PDA/phone is just a
-> small computer with a crappy keyboard, but not an embedded system).
-
-True. For embedded, this would not be an important thing to do, but
-also not hurt. For anything that a user might want to put a new
-kernel on, this would be helpful though.
-
-> >
-> > Based on these assumptions, my preferred strategy would be to a new
-> > mach-nocrap directory with a documented set of rules (to be adapted when
-> > necessary):
-> >
-> > * Strictly no crap
-> >   * No board files
-> Where do you put code that needs to run very early (e.g. pinging the
-> watchdog)?
-
-Don't know. I'd hope we can get fast enough to the phase where device
-drivers get initialized.
+ 	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
+ 	     i < NR_GPIO_IRQS;
+@@ -319,7 +322,8 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+ 							   i));
+ 	}
+-	data->chip->irq_ack(data);
++
++	chained_irq_exit(chip, desc);
+ }
  
-> >   * No hardcoded memory maps
-> >   * No lists of interrupts and GPIOs
-> > * All infrastructure added must be portable to all ARMv7 based SoCs.
-> >    (ARMv6 can be added later)
-> > * 64 bit safe code only.
-> > * SMP safe code only.
-> > * All board specific information must come from a device tree and
-> >    be run-time detected.
-> What do you mean by "run-time detected"?
-> For powerpc, we currently have the device tree as DTS in the kernel
-> and compile and bundle it together with the kernel.
-> As you wrote above: "Discoverable hardware [...] is not going to happen"
-
-I mean writing
-
-	if (device_is_compatible(dev, SOMETHING))
-		do_something();
-
-instead of
-
-#ifdef CONFIG_SOMETHING
-	do_something();
-#endif
-
-The run-time information could come from anywhere (device tree, hardware
-registers, today one might use the board number), the important point is
-not to assume that hardware is present just because someone enabled
-a Kconfig option.
-
-I believe that rule is generally accepted today, but we don't always
-enforce it.
-
-> > * Must use the same device drivers as existing platforms
-> > * Should share platform drivers (interrupt controller, gpio, timer, ...)
-> >    with existing platforms where appropriate.
-> > * Code quality takes priority over stability in mach-nocrap, but must not
-> >    break other platforms.
-> 
-> I agree with the general idea, but nailing down the details in a world
-> as diverse as the ARM world will not be easy...
-
-Absolutely, I did not claim to have the single solution that everyone else
-couldn't see. Please see this more as an RFC.
-
-	Arnd
+ static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+-- 
+1.7.0.4
