@@ -1,33 +1,21 @@
 From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 01 Apr 2011 17:17:38 +0300
-Subject: [PATCH 3/3] MTD/atmel_nand: Fix support for CPUs that do not
-	support DMA access
-In-Reply-To: <4D95D517.30002@atmel.com>
-References: <1301473601-29570-1-git-send-email-hong.xu@atmel.com>
-	<1301473601-29570-3-git-send-email-hong.xu@atmel.com>
-	<1301662470.2789.59.camel@localhost>  <4D95D517.30002@atmel.com>
-Message-ID: <1301667458.2789.85.camel@localhost>
+Date: Fri, 01 Apr 2011 17:20:12 +0300
+Subject: [PATCH] MTD: atmel_nand: Fall back to CPU I/O when buffer is
+	in vmalloc(ed) region
+In-Reply-To: <1301567595-31075-1-git-send-email-hong.xu@atmel.com>
+References: <1301567595-31075-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <1301667612.2789.86.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-01 at 15:37 +0200, Nicolas Ferre wrote:
-> Le 01/04/2011 14:54, Artem Bityutskiy :
-> > On Wed, 2011-03-30 at 16:26 +0800, Hong Xu wrote:
-> >> use_dma was always "1" even if the CPU does not support DMA
-> >>
-> >> Tested on AT91SAM9261EK by Jean-Christophe PLAGNIOL-VILLARD
-> >>
-> >> Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> > 
-> > Pushed to l2-mtd-2.6.git tree. This looks like a candidate for the
-> > stable tree - should it be sent there?
+On Thu, 2011-03-31 at 18:33 +0800, Hong Xu wrote:
+> The previous way of dealing with vmalloc(ed) region by walking though the pages can not work well actually.
+> We just fall back to CPU I/O when the buffer address is higher than `high_memory'.
 > 
-> Well, definitively the whole series is a candidate for .39-xx (also with
-> the "[PATCH] MTD: atmel_nand: Fall back to CPU I/O when buffer is in
-> vmalloc(ed) region" that follows.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Hong Xu <hong.xu@atmel.com>
 
-Thanks for pointing this, I could miss that patch.
+Pushed to l2-mtd-2.6.git, thanks!
 
 -- 
 Best Regards,
