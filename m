@@ -1,65 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 1 Apr 2011 23:00:36 +0200
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 01 Apr 2011 14:10:04 -0700
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1104011441150.28032@xanadu.home>
+In-Reply-To: <201104011659.40443.arnd@arndb.de> (Arnd Bergmann's message of
+	"Fri, 1 Apr 2011 16:59:40 +0200")
 References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011659.40443.arnd@arndb.de> <4D95EF8E.9080902@vollmann.ch>
-	<201104011750.17344.arnd@arndb.de>
-	<alpine.LFD.2.00.1104011441150.28032@xanadu.home>
-Message-ID: <20110401210036.GB30938@pengutronix.de>
+	<201104011554.07924.arnd@arndb.de> <4D95E112.4020400@vollmann.ch>
+	<201104011659.40443.arnd@arndb.de>
+Message-ID: <87vcyxllub.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On Fri, Apr 01, 2011 at 03:54:47PM -0400, Nicolas Pitre wrote:
-> It would be more useful and scalable to simply sit down, look at the 
-> current mess, and identify common patterns that can be easily factored 
-> out into some shared library code, and all that would be left in the 
-> board or SOC specific files eventually is the data to register with that 
-> library code.  Nothing so complicated as grand plans or planification 
-> that makes it look like a mountain.
-> 
-> Two patterns were identified so far, and they are:
-> 
-> 1) GPIO drivers
-> 
->    As Linus observed, in the majority of the cases GPIOs are accessed 
->    through simple memory-mapped registers.  Some have absolute state 
->    registers, the others have separate clear/set registers.  Suffice to 
->    create two generic GPIO drivers each covering those two common cases, 
->    and those generic drivers would simply register with the higher level 
->    gpiolib code, and all the board code would have to do is to provide 
->    the data for those GPIOs (register offsets, number of GPIOs, etc.).  
->    Whether this data eventually comes from DT is an orthogonal issue.
-> 
-> 2) IRQ chip drivers
-> 
->    Again, as Thomas observed, the same issue exists with the majority of 
->    the IRQ chip drivers.  Most of them follow a common simple pattern 
->    that can be abstracted in some generic library code due to their very 
->    similar mode of operation.  Writing a common driver would leave the 
->    board specific code with only a data table describing hardware 
->    registers.
-> 
-> A good example of such rationalization that already happened is the 
-> leds-gpio driver (./drivers/leds/leds-gpio.c), or similarly the 
-> gpio-keys driver (drivers/input/keyboard/gpio_keys.c).  I remember when 
-> those board files were implementing their own simple drivers hooking 
-> directly to the input API or the LED API.
-> 
-> After that let's take another identified common pattern and factorize it 
-> out from board code.  That might be timers (see RMK's recent 
-> sched_clock() rationalization).  That might be clocks (patches from 
-> Jeremy Kerr exist and need merged). Etc.
-Another one is pwm (git ls-files arch/arm | grep pwm). A general
-pwm framework was already discussed on lkml and linux-embedded
-(http://thread.gmane.org/gmane.linux.ports.mips.general/29037/focus=44475);
-I don't know the details though.
+> On Friday 01 April 2011, Detlef Vollmann wrote:
+>> On 04/01/11 15:54, Arnd Bergmann wrote:
+>
+>> > 9. All interesting work is going into a handful of platforms, all of which
+>> >     are ARMv7 based.
+>> Define interesting.
+>
+> The ones that are causing the churn that we're talking about.
+> Platforms that have been working forever and only need to get
+> the occasional bug fix are boring, i.e. not the problem.
 
-Best regards
-Uwe
+I'm not sure I follow the ARMv7-only thinking either.  
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Picking ARMv7 only would be a good way to avoid part of the problem, but
+IMO, it doesn't really address the root causes.  Part of the ugliness of
+the platform-specific hackery (and the "churn" to clean some of it up)
+is precisely due to support for multiple ARM architecture versions, and
+the various SoCs in a family that use them.  For example, linux-omap
+supports OMAP1 (ARMv5), OMAP2 (ARMv6), OMAP3 (ARMv7) and OMAP4 (ARMv7
+SMP), and OMAP2/3/4 in a single binary.
+
+Also, since we've only very recently got to the point of being able to
+support ARMv6 + ARMv7 UP & SMP in the same kernel, making a decision now
+that only ARMv7 is important seems like a step backwards.  If the
+ultimate goal is getting to a point where we have infrastrucure that can
+be cross-SoC, surely this same infrastrucure should support multiple ARM
+architecture revisions.
+
+The kernel is only part of many open-source projects, and many of these
+projects are still using older hardware because it's cheap, available
+and hackable.  Supporting ARMv7 only might be a win for those selling
+new hardware, but not necessarily a win for the broader open-source
+community.
+
+Kevin (obviously not speaking for my new employer)
