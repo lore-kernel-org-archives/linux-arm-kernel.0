@@ -1,57 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Apr 2011 15:50:36 +0100
-Subject: [PATCH 1/6] ARM: omap: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1301669441-13744-2-git-send-email-will.deacon@arm.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 01 Apr 2011 17:30:22 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <201104011659.40443.arnd@arndb.de>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104011554.07924.arnd@arndb.de> <4D95E112.4020400@vollmann.ch>
+	<201104011659.40443.arnd@arndb.de>
+Message-ID: <4D95EF8E.9080902@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the OMAP gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
+On 04/01/11 16:59, Arnd Bergmann wrote:
+> On Friday 01 April 2011, Detlef Vollmann wrote:
+>> On 04/01/11 15:54, Arnd Bergmann wrote:
+>
+>>> 9. All interesting work is going into a handful of platforms, all of which
+>>>      are ARMv7 based.
+>> Define interesting.
+>
+> The ones that are causing the churn that we're talking about.
+> Platforms that have been working forever and only need to get
+> the occasional bug fix are boring, i.e. not the problem.
+In the ARM tree I only know mach-at91.
+Atmel still introduces new SOCs based on ARM926EJ-S, and that makes
+perfect sense for lots of applications.
+And if they add support for a new SOC, they just copy an existing one,
+change some GPIOs, and submit it as new files (sorry, I'm over-
+simplifying here).
+And if you happen to wire your board a bit differently than they do,
+you have to patch theur generic file (in addidtion to add your own
+board file).
+And though I only know the mach-at91 closely, I'm pretty sure quite
+a number of other mach-* are not better.
+So this is actually why the ARM tree has such a bad reputation:
+lot's of code repetition, and still more of that.
 
-Cc: Colin Cross <ccross@google.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/plat-omap/gpio.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+>>> 12. Supporting many different boards with a single kernel binary is a
+>>>       useful goal.
+>> Generally not for embedded systems (for me, a mobile PDA/phone is just a
+>> small computer with a crappy keyboard, but not an embedded system).
+>
+> True. For embedded, this would not be an important thing to do, but
+> also not hurt.
+It costs you flash space.
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index d2adcdd..8f5296a 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1137,8 +1137,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct gpio_bank *bank;
- 	u32 retrigger = 0;
- 	int unmasked = 0;
-+	struct irq_chip *chip = get_irq_desc_chip(desc);
- 
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
-+	chained_irq_enter(chip, desc);
- 
- 	bank = irq_get_handler_data(irq);
- #ifdef CONFIG_ARCH_OMAP1
-@@ -1195,7 +1196,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		configured, we could unmask GPIO bank interrupt immediately */
- 		if (!level_mask && !unmasked) {
- 			unmasked = 1;
--			desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+			chained_irq_exit(chip, desc);
- 		}
- 
- 		isr |= retrigger;
-@@ -1231,7 +1232,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	interrupt */
- exit:
- 	if (!unmasked)
--		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+		chained_irq_exit(chip, desc);
- }
- 
- static void gpio_irq_shutdown(struct irq_data *d)
--- 
-1.7.0.4
+>>> * Strictly no crap
+>>>    * No board files
+>> Where do you put code that needs to run very early (e.g. pinging the
+>> watchdog)?
+>
+> Don't know. I'd hope we can get fast enough to the phase where device
+> drivers get initialized.
+Nope, never happened for me :-(
+(Watchdog timeouts are often 1s or less.)
+
+>>> * All board specific information must come from a device tree and
+>>>     be run-time detected.
+>> What do you mean by "run-time detected"?
+>> For powerpc, we currently have the device tree as DTS in the kernel
+>> and compile and bundle it together with the kernel.
+>> As you wrote above: "Discoverable hardware [...] is not going to happen"
+>
+> I mean writing
+>
+> 	if (device_is_compatible(dev, SOMETHING))
+> 		do_something();
+>
+> instead of
+>
+> #ifdef CONFIG_SOMETHING
+> 	do_something();
+> #endif
+>
+> The run-time information could come from anywhere (device tree, hardware
+> registers, today one might use the board number), the important point is
+> not to assume that hardware is present just because someone enabled
+> a Kconfig option.
+Understood and I agree.
+
+> I believe that rule is generally accepted today, but we don't always
+> enforce it.
+Without device tree, Kconfig option is the only way that really
+works today (no runtime HW detection, and same board ID with different
+setups).
+Device tree in my world is just one big Kconfig option instead of
+many small...
+
+   Detlef
