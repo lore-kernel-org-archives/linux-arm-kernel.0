@@ -1,63 +1,115 @@
 From: ccross@google.com (Colin Cross)
-Date: Fri, 1 Apr 2011 13:29:54 -0700
-Subject: [PATCH 2/6] ARM: tegra: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1301669441-13744-3-git-send-email-will.deacon@arm.com>
+Date: Fri, 1 Apr 2011 13:31:00 -0700
+Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <1301669441-13744-7-git-send-email-will.deacon@arm.com>
 References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-	<1301669441-13744-3-git-send-email-will.deacon@arm.com>
-Message-ID: <BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
+	<1301669441-13744-7-git-send-email-will.deacon@arm.com>
+Message-ID: <BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 1, 2011 at 7:50 AM, Will Deacon <will.deacon@arm.com> wrote:
-> This patch updates the Tegra gpio chained IRQ handler to use the chained
-> IRQ enter/exit functions in order to function correctly on primary
-> controllers with different methods of flow control.
+> Currently, the gic uses handle_level_irq for handling SPIs (Shared
+> Peripheral Interrupts), requiring active interrupts to be masked at
+> the distributor level during IRQ handling.
 >
-> This is required for the GIC to move to fasteoi interrupt handling.
+> On a virtualised system, only the CPU interfaces are virtualised in
+> hardware. Accesses to the distributor must be trapped by the
+> hypervisor, adding latency to the critical interrupt path in Linux.
 >
-> Cc: Colin Cross <ccross@android.com>
+> This patch modifies the GIC code to use handle_fasteoi_irq for handling
+> interrupts, which only requires us to signal EOI to the CPU interface
+> when handling is complete. Cascaded IRQ handling is also updated to use
+> the chained IRQ enter/exit functions to honour the flow control of the
+> parent chip.
+>
+> Note that commit 846afbd1 ("GIC: Dont disable INT in ack callback")
+> broke cascading interrupts by forgetting to add IRQ masking. This is
+> no longer an issue because the unmask call is now unnecessary.
+>
+> Tested on Versatile Express and Realview EB (1176 w/ cascaded GICs).
+>
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
-> ?arch/arm/mach-tegra/gpio.c | ? ?7 ++++---
-> ?1 files changed, 4 insertions(+), 3 deletions(-)
+> ?arch/arm/common/gic.c | ? 24 +++++++++---------------
+> ?1 files changed, 9 insertions(+), 15 deletions(-)
 >
-> diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-> index 76a3f65..08c43dd 100644
-> --- a/arch/arm/mach-tegra/gpio.c
-> +++ b/arch/arm/mach-tegra/gpio.c
-> @@ -221,8 +221,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ?int port;
-> ? ? ? ?int pin;
-> ? ? ? ?int unmasked = 0;
-> + ? ? ? struct irq_chip chip = get_irq_desc_chip(desc);
-Should be a pointer, and 35e857c changed get_irq_desc_chip to irq_desc_get_chip
-
-> - ? ? ? desc->irq_data.chip->irq_ack(&desc->irq_data);
-> + ? ? ? chained_irq_enter(chip, desc);
-asm/mach/irq.h needs to be included to use this function
-
-> ? ? ? ?bank = irq_get_handler_data(irq);
->
-> @@ -241,7 +242,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ? ? ? ? ? ? ? ? ? */
-> ? ? ? ? ? ? ? ? ? ? ? ?if (lvl & (0x100 << pin)) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unmasked = 1;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chained_irq_exit(chip, desc);
-> ? ? ? ? ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ? ? ? ? ?generic_handle_irq(gpio_to_irq(gpio + pin));
-> @@ -249,7 +250,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ?}
->
-> ? ? ? ?if (!unmasked)
-> - ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> + ? ? ? ? ? ? ? chained_irq_exit(chip, desc);
->
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index f70ec7d..f8719ec 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -84,15 +84,6 @@ static inline unsigned int gic_irq(struct irq_data *d)
+> ?/*
+> ?* Routines to acknowledge, disable and enable interrupts
+> ?*/
+> -static void gic_ack_irq(struct irq_data *d)
+> -{
+> - ? ? ? spin_lock(&irq_controller_lock);
+> - ? ? ? if (gic_arch_extn.irq_ack)
+> - ? ? ? ? ? ? ? gic_arch_extn.irq_ack(d);
+> - ? ? ? writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+> - ? ? ? spin_unlock(&irq_controller_lock);
+> -}
+> -
+> ?static void gic_mask_irq(struct irq_data *d)
+> ?{
+> ? ? ? ?u32 mask = 1 << (d->irq % 32);
+> @@ -115,6 +106,11 @@ static void gic_unmask_irq(struct irq_data *d)
+> ? ? ? ?spin_unlock(&irq_controller_lock);
 > ?}
 >
+> +static void gic_eoi_irq(struct irq_data *d)
+> +{
+> + ? ? ? writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+> +}
+> +
+> ?static int gic_set_type(struct irq_data *d, unsigned int type)
+> ?{
+> ? ? ? ?void __iomem *base = gic_dist_base(d);
+> @@ -218,8 +214,7 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?unsigned int cascade_irq, gic_irq;
+> ? ? ? ?unsigned long status;
+>
+> - ? ? ? /* primary controller ack'ing */
+> - ? ? ? chip->irq_ack(&desc->irq_data);
+> + ? ? ? chained_irq_enter(chip, desc);
+>
+> ? ? ? ?spin_lock(&irq_controller_lock);
+> ? ? ? ?status = readl(chip_data->cpu_base + GIC_CPU_INTACK);
+> @@ -236,15 +231,14 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ?generic_handle_irq(cascade_irq);
+>
+> ?out:
+> - ? ? ? /* primary controller unmasking */
+> - ? ? ? chip->irq_unmask(&desc->irq_data);
+> + ? ? ? chained_irq_exit(chip, desc);
+> ?}
+>
+> ?static struct irq_chip gic_chip = {
+> ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "GIC",
+> - ? ? ? .irq_ack ? ? ? ? ? ? ? ?= gic_ack_irq,
+> ? ? ? ?.irq_mask ? ? ? ? ? ? ? = gic_mask_irq,
+> ? ? ? ?.irq_unmask ? ? ? ? ? ? = gic_unmask_irq,
+> + ? ? ? .irq_eoi ? ? ? ? ? ? ? ?= gic_eoi_irq,
+> ? ? ? ?.irq_set_type ? ? ? ? ? = gic_set_type,
+> ? ? ? ?.irq_retrigger ? ? ? ? ?= gic_retrigger,
+> ?#ifdef CONFIG_SMP
+> @@ -319,7 +313,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+> ? ? ? ? * Setup the Linux IRQ subsystem.
+> ? ? ? ? */
+> ? ? ? ?for (i = irq_start; i < irq_limit; i++) {
+> - ? ? ? ? ? ? ? irq_set_chip_and_handler(i, &gic_chip, handle_level_irq);
+> + ? ? ? ? ? ? ? irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
+> ? ? ? ? ? ? ? ?irq_set_chip_data(i, gic);
+> ? ? ? ? ? ? ? ?set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+> ? ? ? ?}
 > --
 > 1.7.0.4
 >
 >
+
+Tested-by: Colin Cross <ccross@android.com>
+Works on tegra after fixing the problems with the tegra gpio patch.
