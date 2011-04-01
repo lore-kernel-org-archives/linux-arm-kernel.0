@@ -1,62 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Apr 2011 22:51:19 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104012332.24319.arnd@arndb.de>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011659.40443.arnd@arndb.de> <87vcyxllub.fsf@ti.com>
-	<201104012332.24319.arnd@arndb.de>
-Message-ID: <AANLkTin46Hu7BRNrTYYxHwaE10emUM7VNPWwg9w4r9n6@mail.gmail.com>
+From: bryanh@codeaurora.org (Bryan Huntsman)
+Date: Fri, 01 Apr 2011 14:54:35 -0700
+Subject: accessing vfpinstr macros from outside vfp directory
+In-Reply-To: <1301678843.17592.5.camel@e102144-lin.cambridge.arm.com>
+References: <4D924966.2050707@codeaurora.org>
+	<1301678843.17592.5.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4D96499B.5070402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, 1 April 2011, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 01 April 2011 23:10:04 Kevin Hilman wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
+On 04/01/11 10:27, Will Deacon wrote:
+> Neil,
+> 
+> On Tue, 2011-03-29 at 22:04 +0100, Neil Leeder wrote:
+>> Any opinions on what would be the best thing to do here? Choices appear to be:
 >>
->> > On Friday 01 April 2011, Detlef Vollmann wrote:
->> >> On 04/01/11 15:54, Arnd Bergmann wrote:
->> >
->> >> > 9. All interesting work is going into a handful of platforms, all of which
->> >> > ? ? are ARMv7 based.
->> >> Define interesting.
->> >
->> > The ones that are causing the churn that we're talking about.
->> > Platforms that have been working forever and only need to get
->> > the occasional bug fix are boring, i.e. not the problem.
+>> 1) allow the relative include path of ../vfp/vfpinstr.h
+>> 2) move the definitions of fmrx, fmxr from vfp/vfpinstr.h to include/asm/vfp.h
+>> 3) move vfp/vfpinstr.h to include/asm
+>> 4) other...?
 >>
->> I'm not sure I follow the ARMv7-only thinking either.
+>> If it helps, I can create a patch for whichever is considered the preferred solution.
 >>
->> Picking ARMv7 only would be a good way to avoid part of the problem, but
->> IMO, it doesn't really address the root causes. ?Part of the ugliness of
->> the platform-specific hackery (and the "churn" to clean some of it up)
->> is precisely due to support for multiple ARM architecture versions, and
->> the various SoCs in a family that use them. ?For example, linux-omap
->> supports OMAP1 (ARMv5), OMAP2 (ARMv6), OMAP3 (ARMv7) and OMAP4 (ARMv7
->> SMP), and OMAP2/3/4 in a single binary.
->>
->> Also, since we've only very recently got to the point of being able to
->> support ARMv6 + ARMv7 UP & SMP in the same kernel, making a decision now
->> that only ARMv7 is important seems like a step backwards. ?If the
->> ultimate goal is getting to a point where we have infrastrucure that can
->> be cross-SoC, surely this same infrastrucure should support multiple ARM
->> architecture revisions.
->
-> Yes, forget about the ARMv7 part of my proposal, that was not a main point.
->
-> If we decide to have a new clean platform variant the way I suggested,
-> it would be nice to support all machines in a single kernel binary,
-> and at least v6+v7 is a solved problem.
->
-> Supporting a second kernel binary up to v5 with the same source is also
-> simple, as would be big-endian/little-endian variants, or thumb2/arm variants.
-> We might not want to do all combinations from the start though, and I would
-> choose ARMv6/v7-thumb2-le simply because that's what Linaro is focusing
-> on. The idea is to start with a clearly defined set, but write the code
-> in a way that makes it possible to extend in other directions.
+> 
+> I personally don't find option (1) that offensive - Bryan seemed to
+> differ though so perhaps option (2) would keep him happy?
+> 
+> I don't think option (3) is sensible given that the majority of the
+> header file is private to /vfp.
+> 
+> Will
 
-Thumb-2 is ARMv7 only. If you want a v6+v7 binary it would need to be
-compiled to ARM.
+I raised it as a question.  If that's the only sane thing to do here,
+then do it.  Since no one else seems to have chimed in on (2) or (3),
+I'm fine with the patch as-is.
 
+- Bryan
 
 -- 
-Catalin
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
