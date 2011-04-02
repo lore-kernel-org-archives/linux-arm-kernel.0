@@ -1,33 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Apr 2011 23:02:49 +0200
+From: rubini@unipv.it (Alessandro Rubini)
+Date: Sat, 2 Apr 2011 23:19:54 +0200
 Subject: [PATCH] arm: nomadik: avoid assigning u32 to bool
-In-Reply-To: <20110401235113.083787a7@absol.kitzblitz>
-References: <20110401235113.083787a7@absol.kitzblitz>
-Message-ID: <BANLkTikAG4diz-A6qfFx4cODvyR0c4oQ6g@mail.gmail.com>
+In-Reply-To: <BANLkTikAG4diz-A6qfFx4cODvyR0c4oQ6g@mail.gmail.com>
+References: <BANLkTikAG4diz-A6qfFx4cODvyR0c4oQ6g@mail.gmail.com>
+	<20110401235113.083787a7@absol.kitzblitz>
+Message-ID: <20110402211954.GA22545@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/1 Nicolas Kaiser <nikai@nikai.net>:
+>> -       enabled = nmk_chip->enabled & bitmask;
+>> +       enabled = !!(nmk_chip->enabled & bitmask);
+> 
+> I've learned to live this way of casting stuff into boolean,
 
-> Avoid assigning u32 to the bool 'enabled'.
->
-> Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
-> ---
-> ?arch/arm/plat-nomadik/gpio.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
-> index f49748e..8b722f7 100644
-> --- a/arch/arm/plat-nomadik/gpio.c
-> +++ b/arch/arm/plat-nomadik/gpio.c
-> @@ -636,7 +636,7 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
-> ? ? ? ?if (type & IRQ_TYPE_LEVEL_LOW)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? enabled = nmk_chip->enabled & bitmask;
-> + ? ? ? enabled = !!(nmk_chip->enabled & bitmask);
+I use (and love) !! since I learnt C. What I really dislike is the
+concept of boolean that doesn't fit in the C way of thinking, in my opinion.
+But I'm not going to change that.
 
-I've learned to live this way of casting stuff into boolean,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Alessandro Rubini <rubini@unipv.it>
 
-Linus Walleij
+/alessandro
