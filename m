@@ -1,39 +1,66 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 2 Apr 2011 18:46:18 +0400
-Subject: [PATCH 6/7] pxa25x: drop handling of udc_is_connected
-In-Reply-To: <4D962149.9090507@ru.mvista.com>
-References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
-	<1301666188-11822-6-git-send-email-dbaryshkov@gmail.com>
-	<4D962149.9090507@ru.mvista.com>
-Message-ID: <AANLkTimwwCvXNZeMyf-P76Con15D6PKKQZE_npASYmAQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 02 Apr 2011 10:59:32 -0500
+Subject: [PATCH] arm/dt: Add a make rule to build dtb for enabled platform
+In-Reply-To: <1301740783-23147-1-git-send-email-shawn.guo@linaro.org>
+References: <1301740783-23147-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4D9747E4.3050902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/1/11, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> Dmitry Eremin-Solenikov wrote:
->
->> There are no more users of udc_is_connected. Drop this field from
->> mach_info
->
->     If I don't mistake, this patch does more than just that.
->
->> and stop using it in pxa25x_udc.
->
->     Hm, I don't see where you're doing that. Instead you're changing some
-> checks
-> for gadget speed and adding some code. And you've said that the driver never
-> used that thing before. Hm?
+Shawn,
 
-Strange. I thought I cleaned up this patch. There are some leftovers
-from previous
-rebases. Correct patch as it is now includes only the part regarding
-udc_is_connected
-field.
+On 04/02/2011 05:39 AM, Shawn Guo wrote:
+> It's based on commit fe8e6d0b0e601ca0a63fe768d4b812d5a45a9da7
+> "arm/dt: Add dtb make rule" from Rob Herring.
+>
+> With 'make ARCH=arm dtb', it builds Device Tree Blobs for those
+> platforms enabled by CONFIG.
+>
+> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> ---
+> This patch works against Linaro kernel tree.  But it needs to go
+> through mainline review before it gets applied.
+>
+>   arch/arm/Makefile      |    3 +++
+>   arch/arm/boot/Makefile |   14 ++++++++++++++
+>   2 files changed, 17 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index d51ab6c..7fd2af9 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -292,6 +292,9 @@ zinstall uinstall install: vmlinux
+>   %.dtb:
+>   	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+>
+> +dtb:
+> +	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+> +
+>   # We use MRPROPER_FILES and CLEAN_FILES now
+>   archclean:
+>   	$(Q)$(MAKE) $(clean)=$(boot)
+> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> index 08fc37f..dcea984 100644
+> --- a/arch/arm/boot/Makefile
+> +++ b/arch/arm/boot/Makefile
+> @@ -63,6 +63,20 @@ endif
+>   $(obj)/%.dtb: $(src)/dts/%.dts
+>   	$(call cmd,dtc)
+>
+> +dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
+> +dtb-$(CONFIG_MACH_MX51_BABBAGE) += mx51-babbage.dtb
+> +dtb-$(CONFIG_MACH_MX51_EFIKAMX) += genesi-efikamx.dtb
+> +dtb-$(CONFIG_MACH_MX51_EFIKASB) += genesi-efikasb.dtb
+> +dtb-$(CONFIG_MACH_MX53_LOCO) += mx53-loco.dtb
+> +dtb-$(CONFIG_MACH_OMAP3_BEAGLE) += omap3-beagle.dtb
+> +dtb-$(CONFIG_MACH_OMAP4_PANDA) += omap4-panda.dtb
+> +dtb-$(CONFIG_MACH_OVERO) += omap3-overo.dtb
+> +dtb-$(CONFIG_MACH_SMDKV310) += exynos4-smdkv310.dtb
+> +dtb-$(CONFIG_ARCH_VERSATILE_PB) += versatile-pb.dtb
+> +dtb-$(CONFIG_MACH_VERSATILE_AB) += versatile-ab.dtb
 
-I'll wait for more review comments and then resend the whole serie.
+And now this file has to be touched for every platform added. Perhaps 
+this can pick-up the dts name from Makefile.boot. Although Makefile.boot 
+could possibly be removed on some platforms.
 
--- 
-With best wishes
-Dmitry
+Rob
