@@ -1,33 +1,79 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  2 Apr 2011 03:43:16 +0200
-Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
+Date: Sat,  2 Apr 2011 03:43:17 +0200
+Subject: [PATCH 3/3] PXA: Reorganise pxa2xx_base init() function
 In-Reply-To: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
 References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1301708597-7413-3-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This kills dead code and kills some redundant code.
+
+Original idea by: Cyril Hrubis <metan@ucw.cz>
+
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/video/backlight/corgi_lcd.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/pcmcia/pxa2xx_base.c |   30 +++++++++++++-----------------
+ 1 files changed, 13 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
-index 1e71c35..8c80cb7 100644
---- a/drivers/video/backlight/corgi_lcd.c
-+++ b/drivers/video/backlight/corgi_lcd.c
-@@ -409,10 +409,10 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
- 	cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index 2c54054..687d203 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -296,18 +296,20 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 		goto err0;
+ 	}
  
- 	if (gpio_is_valid(lcd->gpio_backlight_cont))
--		gpio_set_value(lcd->gpio_backlight_cont, cont);
-+		gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
+-	clk = clk_get(&dev->dev, NULL);
+-	if (!clk)
+-		return -ENODEV;
+-
+-	pxa2xx_drv_pcmcia_ops(ops);
+-
+ 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+ 	if (!sinfo) {
+-		clk_put(clk);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto err0;
+ 	}
  
- 	if (gpio_is_valid(lcd->gpio_backlight_on))
--		gpio_set_value(lcd->gpio_backlight_on, intensity);
-+		gpio_set_value_cansleep(lcd->gpio_backlight_on, intensity);
++	clk = clk_get(&dev->dev, NULL);
++	if (!clk) {
++		ret = -ENODEV;
++		goto err0;
++	}
++
++	pxa2xx_drv_pcmcia_ops(ops);
++
+ 	sinfo->nskt = ops->nr;
+ 	sinfo->clk = clk;
  
- 	if (lcd->kick_battery)
- 		lcd->kick_battery();
+@@ -327,15 +329,8 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 			goto err1;
+ 	}
+ 
+-	if (ret) {
+-		while (--i >= 0)
+-			soc_pcmcia_remove_one(&sinfo->skt[i]);
+-		kfree(sinfo);
+-		clk_put(clk);
+-	} else {
+-		pxa2xx_configure_sockets(&dev->dev);
+-		dev_set_drvdata(&dev->dev, sinfo);
+-	}
++	pxa2xx_configure_sockets(&dev->dev);
++	dev_set_drvdata(&dev->dev, sinfo);
+ 
+ 	return 0;
+ 
+@@ -343,6 +338,7 @@ err1:
+ 	while (--i >= 0)
+ 		soc_pcmcia_remove_one(&sinfo->skt[i]);
+ 	kfree(sinfo);
++	clk_put(clk);
+ err0:
+ 	return ret;
+ }
 -- 
 1.7.4.1
