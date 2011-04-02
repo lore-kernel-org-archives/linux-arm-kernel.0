@@ -1,146 +1,63 @@
-From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Sat,  2 Apr 2011 15:14:23 +0530
-Subject: [PATCH v18 13/13] davinci: dm644x EVM: add support for VPBE display
-Message-ID: <1301737463-4589-1-git-send-email-manjunath.hadli@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat,  2 Apr 2011 18:39:43 +0800
+Subject: [PATCH] arm/dt: Add a make rule to build dtb for enabled platform
+Message-ID: <1301740783-23147-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for V4L2 video display to DM6446 EVM.
-Support for SD and ED modes is provided, along with Composite
-and Component outputs.Also added vpbe_config as a parameter for
-dm644x_init_video to allow for registration of vpbe platform devices.
+It's based on commit fe8e6d0b0e601ca0a63fe768d4b812d5a45a9da7
+"arm/dt: Add dtb make rule" from Rob Herring.
 
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+With 'make ARCH=arm dtb', it builds Device Tree Blobs for those
+platforms enabled by CONFIG.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c |  108 +++++++++++++++++++++++++++++-
- 1 files changed, 107 insertions(+), 1 deletions(-)
+This patch works against Linaro kernel tree.  But it needs to go
+through mainline review before it gets applied.
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index afa88ac..4a642dd 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -616,6 +616,112 @@ static void __init evm_init_i2c(void)
- 	i2c_register_board_info(1, i2c_info, ARRAY_SIZE(i2c_info));
- }
+ arch/arm/Makefile      |    3 +++
+ arch/arm/boot/Makefile |   14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index d51ab6c..7fd2af9 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -292,6 +292,9 @@ zinstall uinstall install: vmlinux
+ %.dtb:
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
  
-+#define VENC_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
++dtb:
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 +
-+/* venc standard timings */
-+static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
-+	{
-+		.name		= "ntsc",
-+		.timings_type	= VPBE_ENC_STD,
-+		.timings	= {V4L2_STD_525_60},
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {11, 10},
-+		.fps		= {30000, 1001},
-+		.left_margin	= 0x79,
-+		.upper_margin	= 0x10,
-+	},
-+	{
-+		.name		= "pal",
-+		.timings_type	= VPBE_ENC_STD,
-+		.timings	= {V4L2_STD_625_50},
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {54, 59},
-+		.fps		= {25, 1},
-+		.left_margin	= 0x7E,
-+		.upper_margin	= 0x16,
-+	},
-+};
-+
-+/* venc dv preset timings */
-+static struct vpbe_enc_mode_info dm644xevm_enc_preset_timing[] = {
-+	{
-+		.name		= "480p59_94",
-+		.timings_type	= VPBE_ENC_DV_PRESET,
-+		.timings	= {V4L2_DV_480P59_94},
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {1, 1},
-+		.fps		= {5994, 100},
-+		.left_margin	= 0x80,
-+		.upper_margin	= 0x20,
-+	},
-+	{
-+		.name		= "576p50",
-+		.timings_type	= VPBE_ENC_DV_PRESET,
-+		.timings	= {V4L2_DV_576P50},
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {1, 1},
-+		.fps		= {50, 1},
-+		.left_margin	= 0x7E,
-+		.upper_margin	= 0x30,
-+	},
-+};
-+
-+/*
-+ * The outputs available from VPBE + encoders. Keep the order same
-+ * as that of encoders. First those from venc followed by that from
-+ * encoders. Index in the output refers to index on a particular encoder.
-+ * Driver uses this index to pass it to encoder when it supports more than
-+ * one output. Application uses index of the array to set an output.
-+ */
-+static struct vpbe_output dm644xevm_vpbe_outputs[] = {
-+	{
-+		.output		= {
-+			.index		= 0,
-+			.name		= "Composite",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.std		= VENC_STD_ALL,
-+			.capabilities	= V4L2_OUT_CAP_STD,
-+		},
-+		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "ntsc",
-+		.num_modes	= ARRAY_SIZE(dm644xevm_enc_std_timing),
-+		.modes		= dm644xevm_enc_std_timing,
-+	},
-+	{
-+		.output		= {
-+			.index		= 1,
-+			.name		= "Component",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities	= V4L2_OUT_CAP_PRESETS,
-+		},
-+		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "480p59_94",
-+		.num_modes	= ARRAY_SIZE(dm644xevm_enc_preset_timing),
-+		.modes		= dm644xevm_enc_preset_timing,
-+	},
-+};
-+
-+static struct vpbe_config dm644xevm_display_cfg = {
-+	.module_name	= "dm644x-vpbe-display",
-+	.i2c_adapter_id	= 1,
-+	.osd		= {
-+		.module_name	= VPBE_OSD_SUBDEV_NAME,
-+	},
-+	.venc		= {
-+		.module_name	= VPBE_VENC_SUBDEV_NAME,
-+	},
-+	.num_outputs	= ARRAY_SIZE(dm644xevm_vpbe_outputs),
-+	.outputs	= dm644xevm_vpbe_outputs,
-+};
-+
- static struct platform_device *davinci_evm_devices[] __initdata = {
- 	&davinci_fb_device,
- 	&rtc_dev,
-@@ -699,7 +805,7 @@ static __init void davinci_evm_init(void)
- 	evm_init_i2c();
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
+ 	$(Q)$(MAKE) $(clean)=$(boot)
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 08fc37f..dcea984 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -63,6 +63,20 @@ endif
+ $(obj)/%.dtb: $(src)/dts/%.dts
+ 	$(call cmd,dtc)
  
- 	davinci_setup_mmc(0, &dm6446evm_mmc_config);
--	dm644x_init_video(&dm644xevm_capture_cfg, NULL);
-+	dm644x_init_video(&dm644xevm_capture_cfg, &dm644xevm_display_cfg);
- 
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_evm_snd_data);
++dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
++dtb-$(CONFIG_MACH_MX51_BABBAGE) += mx51-babbage.dtb
++dtb-$(CONFIG_MACH_MX51_EFIKAMX) += genesi-efikamx.dtb
++dtb-$(CONFIG_MACH_MX51_EFIKASB) += genesi-efikasb.dtb
++dtb-$(CONFIG_MACH_MX53_LOCO) += mx53-loco.dtb
++dtb-$(CONFIG_MACH_OMAP3_BEAGLE) += omap3-beagle.dtb
++dtb-$(CONFIG_MACH_OMAP4_PANDA) += omap4-panda.dtb
++dtb-$(CONFIG_MACH_OVERO) += omap3-overo.dtb
++dtb-$(CONFIG_MACH_SMDKV310) += exynos4-smdkv310.dtb
++dtb-$(CONFIG_ARCH_VERSATILE_PB) += versatile-pb.dtb
++dtb-$(CONFIG_MACH_VERSATILE_AB) += versatile-ab.dtb
++
++$(obj)/dtb: $(addprefix $(obj)/, $(dtb-y))
++
+ quiet_cmd_uimage = UIMAGE  $@
+       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+ 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
 -- 
-1.6.2.4
+1.7.1
