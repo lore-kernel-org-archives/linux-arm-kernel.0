@@ -1,27 +1,33 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Sat, 02 Apr 2011 22:55:17 +0200
-Subject: [PATCH v4 0/10] Support for NXP LPC2K SoCs
-In-Reply-To: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-References: <1301394656-24853-1-git-send-email-ithamar.adema@team-embedded.nl>
-Message-ID: <1301777717.2838.2.camel@team-embedded-2>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 2 Apr 2011 23:02:49 +0200
+Subject: [PATCH] arm: nomadik: avoid assigning u32 to bool
+In-Reply-To: <20110401235113.083787a7@absol.kitzblitz>
+References: <20110401235113.083787a7@absol.kitzblitz>
+Message-ID: <BANLkTikAG4diz-A6qfFx4cODvyR0c4oQ6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+2011/4/1 Nicolas Kaiser <nikai@nikai.net>:
 
-On Tue, 2011-03-29 at 12:30 +0200, Ithamar R. Adema wrote:
-> The following patch series implements support for the ARM7TDMI-S based
-> NXP LPC2K System-on-Chips, and, as first board, the EmbeddedArtists
-> LPC2478 Developer's Kit.
-[snip]
+> Avoid assigning u32 to the bool 'enabled'.
+>
+> Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+> ---
+> ?arch/arm/plat-nomadik/gpio.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+> index f49748e..8b722f7 100644
+> --- a/arch/arm/plat-nomadik/gpio.c
+> +++ b/arch/arm/plat-nomadik/gpio.c
+> @@ -636,7 +636,7 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+> ? ? ? ?if (type & IRQ_TYPE_LEVEL_LOW)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> - ? ? ? enabled = nmk_chip->enabled & bitmask;
+> + ? ? ? enabled = !!(nmk_chip->enabled & bitmask);
 
-Since there have been no further comments, can I send these patches to
-your patch system or do you prefer to have a git repository to pull
-from?
+I've learned to live this way of casting stuff into boolean,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-If there are still other things to take care of first, please let me
-know and I'll try to take care of it.
-
-Regards,
-
-Ithamar.
+Linus Walleij
