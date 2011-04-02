@@ -1,25 +1,39 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 2 Apr 2011 13:03:04 +0200
-Subject: [PATCH V2 1/3] arm: lpc32xx: add tsc-device
-In-Reply-To: <083DF309106F364B939360100EC290F811ED78EE79@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
-	<083DF309106F364B939360100EC290F811ED78EE79@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20110402110304.GD21760@pengutronix.de>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 2 Apr 2011 18:46:18 +0400
+Subject: [PATCH 6/7] pxa25x: drop handling of udc_is_connected
+In-Reply-To: <4D962149.9090507@ru.mvista.com>
+References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
+	<1301666188-11822-6-git-send-email-dbaryshkov@gmail.com>
+	<4D962149.9090507@ru.mvista.com>
+Message-ID: <AANLkTimwwCvXNZeMyf-P76Con15D6PKKQZE_npASYmAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> These 3 patches look good and work/build fine. Thanks again!
-> Tested-by: Kevin Wells <Kevin.wells@nxp.com>
+On 4/1/11, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+> Dmitry Eremin-Solenikov wrote:
+>
+>> There are no more users of udc_is_connected. Drop this field from
+>> mach_info
+>
+>     If I don't mistake, this patch does more than just that.
+>
+>> and stop using it in pxa25x_udc.
+>
+>     Hm, I don't see where you're doing that. Instead you're changing some
+> checks
+> for gadget speed and adding some code. And you've said that the driver never
+> used that thing before. Hm?
 
-Uhm, aren't you pushing lpc32xx to Russell anymore?
+Strange. I thought I cleaned up this patch. There are some leftovers
+from previous
+rebases. Correct patch as it is now includes only the part regarding
+udc_is_connected
+field.
+
+I'll wait for more review comments and then resend the whole serie.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110402/815e86c6/attachment.sig>
+With best wishes
+Dmitry
