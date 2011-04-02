@@ -1,98 +1,127 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  2 Apr 2011 03:43:15 +0200
-Subject: [PATCH 1/3] sound/spitz: Properly handle MIC GPIO
-Message-ID: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 01 Apr 2011 22:24:49 -0400 (EDT)
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <201104020008.16795.arnd@arndb.de>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104011750.17344.arnd@arndb.de>
+	<alpine.LFD.2.00.1104011441150.28032@xanadu.home>
+	<201104020008.16795.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1104012129320.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch firstly restructurizes the code a bit by getting rid of continuous
-checking for machine type in spitz_mic_bias().
+On Sat, 2 Apr 2011, Arnd Bergmann wrote:
 
-Then the patch properly requests the MIC GPIO in the spitz_init() and frees it
-in spitz_exit().
+> On Friday 01 April 2011 21:54:47 Nicolas Pitre wrote:
+> > I however don't think it is practical to go off in a separate 
+> > mach-nocrap space and do things in parallel.  Taking OMAP as an example, 
+> > there is already way too big of an infrastructure in place to simply 
+> > rewrite it in parallel to new OMAP versions coming up.
+> >
+> > It would be more useful and scalable to simply sit down, look at the 
+> > current mess, and identify common patterns that can be easily factored 
+> > out into some shared library code, and all that would be left in the 
+> > board or SOC specific files eventually is the data to register with that 
+> > library code.  Nothing so complicated as grand plans or planification 
+> > that makes it look like a mountain.
+> 
+> This is exactly the question it comes down to. So far, we have focused
+> on cleaning up platforms bit by bit. Given sufficient resources, I'm
+> sure this can work. You assume that continuing on this path is the
+> fastest way to clean up the whole mess, while my suggestion is based
+> on the assumption that we can do better by starting a small fork.
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- sound/soc/pxa/spitz.c |   41 +++++++++++++++++++++++++++++------------
- 1 files changed, 29 insertions(+), 12 deletions(-)
+I don't think any fork would gain any traction.  That would only, heh, 
+fork the work force into two suboptimal branches for quite a while, and 
+given that we're talking about platform code, by the time the new branch 
+is usable and useful the hardware will probably be obsolete.  The only 
+way this may work is for totally new platforms but we're not talking 
+about a fork in that case.
 
-diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
-index 8e15713..b253d86 100644
---- a/sound/soc/pxa/spitz.c
-+++ b/sound/soc/pxa/spitz.c
-@@ -42,6 +42,7 @@
- 
- static int spitz_jack_func;
- static int spitz_spk_func;
-+static int spitz_mic_gpio;
- 
- static void spitz_ext_control(struct snd_soc_codec *codec)
- {
-@@ -217,14 +218,7 @@ static int spitz_set_spk(struct snd_kcontrol *kcontrol,
- static int spitz_mic_bias(struct snd_soc_dapm_widget *w,
- 	struct snd_kcontrol *k, int event)
- {
--	if (machine_is_borzoi() || machine_is_spitz())
--		gpio_set_value(SPITZ_GPIO_MIC_BIAS,
--				SND_SOC_DAPM_EVENT_ON(event));
--
--	if (machine_is_akita())
--		gpio_set_value(AKITA_GPIO_MIC_BIAS,
--				SND_SOC_DAPM_EVENT_ON(event));
--
-+	gpio_set_value_cansleep(spitz_mic_gpio, SND_SOC_DAPM_EVENT_ON(event));
- 	return 0;
- }
- 
-@@ -339,22 +333,45 @@ static int __init spitz_init(void)
- 	if (!(machine_is_spitz() || machine_is_borzoi() || machine_is_akita()))
- 		return -ENODEV;
- 
-+	if (machine_is_borzoi() || machine_is_spitz())
-+		spitz_mic_gpio = SPITZ_GPIO_MIC_BIAS;
-+	else
-+		spitz_mic_gpio = AKITA_GPIO_MIC_BIAS;
-+
-+	ret = gpio_request(spitz_mic_gpio, "MIC GPIO");
-+	if (ret)
-+		goto err1;
-+
-+	ret = gpio_direction_output(spitz_mic_gpio, 0);
-+	if (ret)
-+		goto err2;
-+
- 	spitz_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!spitz_snd_device)
--		return -ENOMEM;
-+	if (!spitz_snd_device) {
-+		ret = -ENOMEM;
-+		goto err2;
-+	}
- 
- 	platform_set_drvdata(spitz_snd_device, &snd_soc_spitz);
--	ret = platform_device_add(spitz_snd_device);
- 
-+	ret = platform_device_add(spitz_snd_device);
- 	if (ret)
--		platform_device_put(spitz_snd_device);
-+		goto err3;
-+
-+	return 0;
- 
-+err3:
-+	platform_device_put(spitz_snd_device);
-+err2:
-+	gpio_free(spitz_mic_gpio);
-+err1:
- 	return ret;
- }
- 
- static void __exit spitz_exit(void)
- {
- 	platform_device_unregister(spitz_snd_device);
-+	gpio_free(spitz_mic_gpio);
- }
- 
- module_init(spitz_init);
--- 
-1.7.4.1
+> I think we can both agree that by equally distributing the workforce
+> to both approaches, we'd be off worse than doing one of them right ;-)
+
+Absolutely.
+
+> > I think what is needed here is a bunch of people willing to work on such 
+> > things, extracting those common patterns, and creating the 
+> > infrastructure to cover them.  Once that is in place then we will be in 
+> > a position to push back on code submissions that don't use that 
+> > infrastructure, and be on the lookout for new patterns to emerge.
+> > 
+> > Just with the above I think there is sufficient work to keep us busy for 
+> > a while.
+> 
+> That is true, and I think we will need to do this. But as far as I can tell,
+> the problems that you talk about addressing are a different class from the
+> ones I was thinking of, because they only deal with areas that are already
+> isolated drivers with an existing API.
+
+They are areas with the best return on the investment.  This has the 
+potential of making quite a bunch of code go away quickly.  And the 
+goal is indeed to keep platform code hooking into existing APIs under 
+control, so that global maintenance tasks such as the one tglx did are 
+less painful.  Obscure board code that no one else care about because no 
+other boards share the same hardware model, and which doesn't rely on 
+common kernel infrastructure, is not really a problem even if it looks 
+like crap because no one will have to touch it.  And eventually the 
+board will become unused and we'll just delete that code.
+
+> The things that I see as harder to do are where we need to change the
+> way that parts of the platform code interact with each other:
+> 
+> * platform specific IOMMU interfaces that need to be migrated to common
+>   interfaces
+
+This can be done by actually forking the platform specific IOMMU code 
+only, just for the time required to migrate drivers to the common 
+interface.
+
+> * duplicated but slightly different header files in include/mach/
+
+Oh, actually that's part of the easy problems.  This simply require time 
+to progressively do the boring work.
+
+With CONFIG_ARM_PATCH_PHYS_VIRT turned on we can get rid of almost all 
+instances of arch/arm/mach-*/include/mach/memory.h already.
+
+Getting rid of all instances of arch/arm/mach-*/include/mach/vmalloc.h 
+can be trivially achieved by simply moving the VMALLOC_END values into 
+the corresponding struct machine_desc instances.
+
+And so on for many other files.  This is all necessary for the 
+single-binary multi-SOC kernel work anyway.
+
+> * static platform device definitions that get migrated to device tree
+>   definitions.
+
+That require some kind of compatibility layer to make the transition 
+transparent to users.  I think Grant had some good ideas for this.
+
+> Changing these tree-wide feels like open-heart surgery, and we'd spend
+> much time trying not to break stuff that could better be used to fix
+> other stuff.
+
+Well, depends how you see it.  Sure this might cause some occasional 
+breakages, but normally those should be pretty obvious and easy to fix.  
+And the more we can do that stuff, the better future code adhering to the 
+new model will be.
+
+> The example that I have in mind is the time when we had a powerpc and a
+> ppc architecture in parallel, with ppc supporting a lot of hardware
+> that powerpc did not, but all new development getting done on powerpc.
+> 
+> This took years longer than we had expected at first, but I still think
+> it was a helpful fork. On ARM, we are in a much better shape in the
+> core code than what arch/ppc was, so there would be no point forking
+> that, but the problem on the platform code is quite similar.
+
+Nah, I don't think we want to go there at all. The problem on the 
+platform code is probably much worse on ARM due to the greater diversity 
+of supported hardware.  If on PPC moving stuff across the fork took more 
+time on a year scale than expected, I think that on ARM we would simply 
+never see the end of it.  And the incentive would not really be there 
+either, unlike when the core code is concerned and everyone is affected.
+
+
+Nicolas
