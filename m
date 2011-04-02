@@ -1,27 +1,33 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sat, 2 Apr 2011 06:38:04 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <alpine.LFD.2.00.1104011557080.28032@xanadu.home>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011554.07924.arnd@arndb.de>
-	<1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
-	<201104011755.57412.arnd@arndb.de>
-	<alpine.LFD.2.00.1104011557080.28032@xanadu.home>
-Message-ID: <20110402043804.GB3989@riccoc20.at.omicron.at>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 2 Apr 2011 13:27:05 +0800
+Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
+	pandaboard
+In-Reply-To: <4D95E244.1050400@linux.vnet.ibm.com>
+References: <4D95E244.1050400@linux.vnet.ibm.com>
+Message-ID: <BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2011 at 04:19:31PM -0400, Nicolas Pitre wrote:
-> 
-> In a perfect world the bootloader would be bug free and always up to 
-> date with the best DT data.  In practice I'm very skeptical this will 
-> always be the case and painless.  At least the above makes it very 
-> simple to have a self contained kernel when (not if) need be.
+Hi Avik,
 
-Yes, my experience with DT on powerpc teaches me that, although DT
-sounds wonderful in theory, in practice kernel/dtb/uboot form a love
-triangle (or perhaps a hate triangle) where all three points must be
-exactly up to date with each other. If one part is even just a month
-or two too old/new, then your kernel might not boot.
+2011/4/1 Avik Sil <aviksil@linux.vnet.ibm.com>:
+> Hi,
+>
+> I've applied the patches in
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045283.html
+> on top of a linaro kernel which resulted in booting problem on Pandaboard.
+> It hangs inside the cti_unlock() while reading the LOCKSTATUS value, which
+> happens when omap_init_pmu() is called. Please help me debug the issue.
 
-Richard
+Please check if  l3 clocks are enabled to drive CTI, such as done in below:
+
+       omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
+       omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
+       omap_writel(2, CM_EMU_CLKSTCTRL);
+       while ((omap_readl(CM_EMU_CLKSTCTRL) & 0x300) != 0x300);
+
+No such issue on mainline since this clocks are enabled automatically.
+
+thanks,
+-- 
+Ming Lei
