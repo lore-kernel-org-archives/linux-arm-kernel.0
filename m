@@ -1,53 +1,96 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 2 Apr 2011 22:47:57 -0600
-Subject: RFC, GIC based smp_cross_call cleanup suggestion
-In-Reply-To: <BANLkTim+bco_90iPLrc1ioV4bdSw+LRzQQ@mail.gmail.com>
-References: <10921831-0170-4106-bb3a-a52515a32c3e@VA3EHSMHS002.ehs.local>
-	<BANLkTimY+mRXqT7NwUQ86SxnfKw0HX-pTQ@mail.gmail.com>
-	<20110402085133.GE8482@n2100.arm.linux.org.uk>
-	<BANLkTim+bco_90iPLrc1ioV4bdSw+LRzQQ@mail.gmail.com>
-Message-ID: <BANLkTimjyBzh3Kc+1njcBBYCouKdSWhgng@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 03 Apr 2011 11:21:00 +0530
+Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
+	support
+In-Reply-To: <BANLkTi=DjoDndvnhJyBSUGChdPuAKDL3mg@mail.gmail.com>
+References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>	<BANLkTimWTX9HKhpkkjODCSEiuBNuV-rN-g@mail.gmail.com>	<4D96EEF4.8000500@ti.com>
+	<BANLkTi=DjoDndvnhJyBSUGChdPuAKDL3mg@mail.gmail.com>
+Message-ID: <4D980AC4.2050903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 2, 2011 at 3:10 AM, Colin Cross <ccross@google.com> wrote:
-> On Sat, Apr 2, 2011 at 1:51 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Apr 01, 2011 at 04:55:02PM -0600, Grant Likely wrote:
->>> On Fri, Apr 1, 2011 at 4:26 PM, John Linn <John.Linn@xilinx.com> wrote:
->>> > I?m getting ready to submit a patch to add SMP to Xilinx code. I notice that
->>> > smp_cross_call for all GIC based platforms is duplicated across each
->>> > platform in smp.h.
->>> >
->>> >
->>> >
->>> > I thought I?d try to jump in to help with some cleanup, although I realize
->>> > it?s minimal, I have to start somewhere.
->>> >
->>> >
->>> >
->>> > What about moving the smp_cross_call for GIC based designs into gic.h?
+On 4/3/2011 1:17 AM, Colin Cross wrote:
+> On Sat, Apr 2, 2011 at 2:40 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com>  wrote:
+>> On 4/2/2011 11:40 AM, Colin Cross wrote:
+
+[....]
+
+>>>> +#ifdef CONFIG_PM
+>>>> +/*
+>>>> + * Architecture specific set_wake extension
+>>>> + */
+>>>> +static int wakeupgen_set_wake(struct irq_data *d, unsigned int on)
+>>>> +{
+>>>> +       spin_lock(&wakeupgen_lock);
+>>>> +       if (on)
+>>>> +               _wakeupgen_set(d->irq);
+>>>> +       else
+>>>> +               _wakeupgen_clear(d->irq);
+>>>> +       spin_unlock(&wakeupgen_lock);
+>>>> +
+>>>> +       return 0;
+>>>> +}
+>>>> +
+>>>> +#else
+>>>> +#define wakeupgen_set_wake     NULL
+>>>> +#endif
 >>>
->>> Go for it. ?It's an obvious cleanup.
->>
->> That assumes that all SMP implementations will always have a GIC. ?It
->> looks to me like this is conditional on shmobile, and so I don't think
->> its that trivial - maybe Paul or Magnus can first indicate why this is.
+>>> I don't think these are correct, and it probably only works at all due
+>>> to lazy disabling of interrupts during suspend.
+>>>
+>>> First, unless I'm missing some code somewhere, all interrupts are
+>>> still enabled during suspend.  Any interrupt that has had enable_irq
+>>> on it resulted in a call to wakeupgen_unmask, but when disable_irq is
+>>> called on all the interrupts during suspend, masking is delayed until
+>>> an interrupt is delivered.  If no interrupt is delivered, all enabled
+>>> irqs will still be enabled in the wakeupgen module in suspend, and
+>>> they will all wake the device out of suspend.
+>>>
+>> During suspend it's expected that the drivers disables there interrupts
+>> as part of suspend hooks. One can used "set_wake" API's to
+>> enable/disable wakeups from suspend.
 >
-> OMAP4 may also require a custom smp_cross_call implementation if CPU
-> idle is going to be supported in SMP - in CPU off idle modes, a GIC
-> SGI will not wake the CPU, and a write directly to the CPU's power
-> management controller or an external interrupt source would be
-> required.
+> But because of lazy masking, disabling an interrupt is not the same as
+> masking.  None of the interrupts will get masked, and they will all
+> act as wakeup interrupts, even if enable_irq_wake was never called on
+> it.
+>
+>>
+>>> Second, it is possible for a wake interrupt that should be enabled to
+>>> end up disabled in suspend.  Consider the following calls that occur
+>>> in a driver during its suspend handler:
+>>>
+>>> enable_irq_wake
+>>>    ...
+>>>    wakeupgen_unmask (irq is now unmasked)
+>>> disable_irq (lazy disable, wakeupgen_mask is not called, irq is still
+>>> unmasked)
+>>> <irq occurs>
+>>> handle_level_irq
+>>>    ...
+>>>    wakeupgen_mask (irq is now masked)
+>>>
+>>> The irq will never get unmasked because it is marked disabled, and the
+>>> irq will not wake the device from suspend.
+>>>
+>>> wakeupgen_set_wake needs to set or clear bits in memory, and then
+>>> those suspend masks need to be copied into the wakeupgen registers
+>>> very late in suspend, after interrupts have been disabled at the cpu.
+>>> I think syscore_ops is the right place.
+>>>
+>> This is a good point about lazy disabling. Copy to memory happens
+>> already as part of save in SAR layout.
+>> Will think over this one. Thanks for bringing this point here.
+>
+> The key is that mask/unmask and set_wake must act on different mask
+> data - mask/unmask must take effect immediately, so they must write to
+> the mask registers, but set_wake takes effect only during suspend, so
+> it must write to a copy of the mask registers that gets switched in
+> during suspend.
+>
+Right. I shall fix the set_wake() API to take care of lazy
+disabling of IRQs.
 
-What John proposes appears to be a pretty sane default though.  It
-would make sense to move it to common code, and require explicit
-action on the part of the subarch to compile it out for a different
-behaviour.  Requiring each subarch to define it explicitly doesn't
-seem optimal.
-
-g.
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards
+Santosh
