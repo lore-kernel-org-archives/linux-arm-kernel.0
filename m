@@ -1,19 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 3 Apr 2011 22:18:16 +0900
-Subject: [PATCH 1/3] sound/spitz: Properly handle MIC GPIO
-In-Reply-To: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20110403131814.GB17566@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 3 Apr 2011 14:48:37 +0100
+Subject: RFC, GIC based smp_cross_call cleanup suggestion
+In-Reply-To: <4D9851B5.20100@ti.com>
+References: <10921831-0170-4106-bb3a-a52515a32c3e@VA3EHSMHS002.ehs.local>
+	<BANLkTimY+mRXqT7NwUQ86SxnfKw0HX-pTQ@mail.gmail.com>
+	<20110402085133.GE8482@n2100.arm.linux.org.uk>
+	<BANLkTim+bco_90iPLrc1ioV4bdSw+LRzQQ@mail.gmail.com>
+	<BANLkTimjyBzh3Kc+1njcBBYCouKdSWhgng@mail.gmail.com>
+	<20110403103730.GB4213@n2100.arm.linux.org.uk>
+	<4D9851B5.20100@ti.com>
+Message-ID: <20110403134837.GE4213@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2011 at 03:43:15AM +0200, Marek Vasut wrote:
-> This patch firstly restructurizes the code a bit by getting rid of continuous
-> checking for machine type in spitz_mic_bias().
-> 
-> Then the patch properly requests the MIC GPIO in the spitz_init() and frees it
-> in spitz_exit().
-> 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+On Sun, Apr 03, 2011 at 04:23:41PM +0530, Santosh Shilimkar wrote:
+> If you plan to commit this change then I can move these to
+> other OMAP4 header file.
 
-Applied, thanks.
+Can you send me a patch to do that please?
+
+Thanks.
