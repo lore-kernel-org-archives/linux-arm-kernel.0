@@ -1,96 +1,151 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 03 Apr 2011 11:21:00 +0530
-Subject: [pm-core][PATCH v3 01/21] OMAP4: PM: Add omap WakeupGen module
-	support
-In-Reply-To: <BANLkTi=DjoDndvnhJyBSUGChdPuAKDL3mg@mail.gmail.com>
-References: <1301304157-2466-1-git-send-email-santosh.shilimkar@ti.com>	<1301304157-2466-2-git-send-email-santosh.shilimkar@ti.com>	<BANLkTimWTX9HKhpkkjODCSEiuBNuV-rN-g@mail.gmail.com>	<4D96EEF4.8000500@ti.com>
-	<BANLkTi=DjoDndvnhJyBSUGChdPuAKDL3mg@mail.gmail.com>
-Message-ID: <4D980AC4.2050903@ti.com>
+Date: Sun, 03 Apr 2011 11:36:47 +0530
+Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
+References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>	<1301669441-13744-7-git-send-email-will.deacon@arm.com>	<BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>
+	<BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
+Message-ID: <4D980E77.10907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2011 1:17 AM, Colin Cross wrote:
-> On Sat, Apr 2, 2011 at 2:40 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com>  wrote:
->> On 4/2/2011 11:40 AM, Colin Cross wrote:
+Colin,
 
-[....]
-
->>>> +#ifdef CONFIG_PM
->>>> +/*
->>>> + * Architecture specific set_wake extension
->>>> + */
->>>> +static int wakeupgen_set_wake(struct irq_data *d, unsigned int on)
->>>> +{
->>>> +       spin_lock(&wakeupgen_lock);
->>>> +       if (on)
->>>> +               _wakeupgen_set(d->irq);
->>>> +       else
->>>> +               _wakeupgen_clear(d->irq);
->>>> +       spin_unlock(&wakeupgen_lock);
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>> +#else
->>>> +#define wakeupgen_set_wake     NULL
->>>> +#endif
+On 4/3/2011 8:57 AM, Colin Cross wrote:
+> On Fri, Apr 1, 2011 at 1:31 PM, Colin Cross<ccross@google.com>  wrote:
+>> On Fri, Apr 1, 2011 at 7:50 AM, Will Deacon<will.deacon@arm.com>  wrote:
+>>> Currently, the gic uses handle_level_irq for handling SPIs (Shared
+>>> Peripheral Interrupts), requiring active interrupts to be masked at
+>>> the distributor level during IRQ handling.
 >>>
->>> I don't think these are correct, and it probably only works at all due
->>> to lazy disabling of interrupts during suspend.
+>>> On a virtualised system, only the CPU interfaces are virtualised in
+>>> hardware. Accesses to the distributor must be trapped by the
+>>> hypervisor, adding latency to the critical interrupt path in Linux.
 >>>
->>> First, unless I'm missing some code somewhere, all interrupts are
->>> still enabled during suspend.  Any interrupt that has had enable_irq
->>> on it resulted in a call to wakeupgen_unmask, but when disable_irq is
->>> called on all the interrupts during suspend, masking is delayed until
->>> an interrupt is delivered.  If no interrupt is delivered, all enabled
->>> irqs will still be enabled in the wakeupgen module in suspend, and
->>> they will all wake the device out of suspend.
+>>> This patch modifies the GIC code to use handle_fasteoi_irq for handling
+>>> interrupts, which only requires us to signal EOI to the CPU interface
+>>> when handling is complete. Cascaded IRQ handling is also updated to use
+>>> the chained IRQ enter/exit functions to honour the flow control of the
+>>> parent chip.
 >>>
->> During suspend it's expected that the drivers disables there interrupts
->> as part of suspend hooks. One can used "set_wake" API's to
->> enable/disable wakeups from suspend.
->
-> But because of lazy masking, disabling an interrupt is not the same as
-> masking.  None of the interrupts will get masked, and they will all
-> act as wakeup interrupts, even if enable_irq_wake was never called on
-> it.
->
+>>> Note that commit 846afbd1 ("GIC: Dont disable INT in ack callback")
+>>> broke cascading interrupts by forgetting to add IRQ masking. This is
+>>> no longer an issue because the unmask call is now unnecessary.
+>>>
+>>> Tested on Versatile Express and Realview EB (1176 w/ cascaded GICs).
+>>>
+>>> Cc: Abhijeet Dharmapurikar<adharmap@codeaurora.org>
+>>> Cc: Russell King - ARM Linux<linux@arm.linux.org.uk>
+>>> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
+>>> Signed-off-by: Will Deacon<will.deacon@arm.com>
+>>> ---
+>>>   arch/arm/common/gic.c |   24 +++++++++---------------
+>>>   1 files changed, 9 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>> index f70ec7d..f8719ec 100644
+>>> --- a/arch/arm/common/gic.c
+>>> +++ b/arch/arm/common/gic.c
+>>> @@ -84,15 +84,6 @@ static inline unsigned int gic_irq(struct irq_data *d)
+>>>   /*
+>>>   * Routines to acknowledge, disable and enable interrupts
+>>>   */
+>>> -static void gic_ack_irq(struct irq_data *d)
+>>> -{
+>>> -       spin_lock(&irq_controller_lock);
+>>> -       if (gic_arch_extn.irq_ack)
+>>> -               gic_arch_extn.irq_ack(d);
+>>> -       writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>>> -       spin_unlock(&irq_controller_lock);
+>>> -}
+>>> -
+>>>   static void gic_mask_irq(struct irq_data *d)
+>>>   {
+>>>         u32 mask = 1<<  (d->irq % 32);
+>>> @@ -115,6 +106,11 @@ static void gic_unmask_irq(struct irq_data *d)
+>>>         spin_unlock(&irq_controller_lock);
+>>>   }
+>>>
+>>> +static void gic_eoi_irq(struct irq_data *d)
+>>> +{
+>>> +       writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>>> +}
+>>> +
+>>>   static int gic_set_type(struct irq_data *d, unsigned int type)
+>>>   {
+>>>         void __iomem *base = gic_dist_base(d);
+>>> @@ -218,8 +214,7 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>>>         unsigned int cascade_irq, gic_irq;
+>>>         unsigned long status;
+>>>
+>>> -       /* primary controller ack'ing */
+>>> -       chip->irq_ack(&desc->irq_data);
+>>> +       chained_irq_enter(chip, desc);
+>>>
+>>>         spin_lock(&irq_controller_lock);
+>>>         status = readl(chip_data->cpu_base + GIC_CPU_INTACK);
+>>> @@ -236,15 +231,14 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>>>                 generic_handle_irq(cascade_irq);
+>>>
+>>>   out:
+>>> -       /* primary controller unmasking */
+>>> -       chip->irq_unmask(&desc->irq_data);
+>>> +       chained_irq_exit(chip, desc);
+>>>   }
+>>>
+>>>   static struct irq_chip gic_chip = {
+>>>         .name                   = "GIC",
+>>> -       .irq_ack                = gic_ack_irq,
+>>>         .irq_mask               = gic_mask_irq,
+>>>         .irq_unmask             = gic_unmask_irq,
+>>> +       .irq_eoi                = gic_eoi_irq,
+>>>         .irq_set_type           = gic_set_type,
+>>>         .irq_retrigger          = gic_retrigger,
+>>>   #ifdef CONFIG_SMP
+>>> @@ -319,7 +313,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+>>>          * Setup the Linux IRQ subsystem.
+>>>          */
+>>>         for (i = irq_start; i<  irq_limit; i++) {
+>>> -               irq_set_chip_and_handler(i,&gic_chip, handle_level_irq);
+>>> +               irq_set_chip_and_handler(i,&gic_chip, handle_fasteoi_irq);
+>>>                 irq_set_chip_data(i, gic);
+>>>                 set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+>>>         }
+>>> --
+>>> 1.7.0.4
+>>>
+>>>
 >>
->>> Second, it is possible for a wake interrupt that should be enabled to
->>> end up disabled in suspend.  Consider the following calls that occur
->>> in a driver during its suspend handler:
->>>
->>> enable_irq_wake
->>>    ...
->>>    wakeupgen_unmask (irq is now unmasked)
->>> disable_irq (lazy disable, wakeupgen_mask is not called, irq is still
->>> unmasked)
->>> <irq occurs>
->>> handle_level_irq
->>>    ...
->>>    wakeupgen_mask (irq is now masked)
->>>
->>> The irq will never get unmasked because it is marked disabled, and the
->>> irq will not wake the device from suspend.
->>>
->>> wakeupgen_set_wake needs to set or clear bits in memory, and then
->>> those suspend masks need to be copied into the wakeupgen registers
->>> very late in suspend, after interrupts have been disabled at the cpu.
->>> I think syscore_ops is the right place.
->>>
->> This is a good point about lazy disabling. Copy to memory happens
->> already as part of save in SAR layout.
->> Will think over this one. Thanks for bringing this point here.
+>> Tested-by: Colin Cross<ccross@android.com>
+>> Works on tegra after fixing the problems with the tegra gpio patch.
+>>
 >
-> The key is that mask/unmask and set_wake must act on different mask
-> data - mask/unmask must take effect immediately, so they must write to
-> the mask registers, but set_wake takes effect only during suspend, so
-> it must write to a copy of the mask registers that gets switched in
-> during suspend.
+> In further testing I found one bug.  d7ed36a added gic_arch_extn,
+> which needs to be used in gic_eoi.   arch/arm/mach-tegra/irq.c will
+> need to be fixed to replace tegra_ack with tegra_eoi, and any other
+> platform that uses gic_arch_extn also needs to be checked (omap4?).
+> This patch fixes gic.c:
 >
-Right. I shall fix the set_wake() API to take care of lazy
-disabling of IRQs.
+OMAP4 interrupt controller extension doesn't use 'irq_ack' extension.
+So it should be ok.
 
-Regards
-Santosh
+Will,
+Have already tested your V3 vesrion while generating the GIC
+IO_relaxed patch and it worked OK. This series seems to be same.
+I shall try this on OMAP4 and let you know ?
+
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 6ecd5c7..8e46dac 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -118,7 +118,11 @@ static void gic_unmask_irq(struct irq_data *d)
+>
+>   static void gic_eoi_irq(struct irq_data *d)
+>   {
+> +       spin_lock(&irq_controller_lock);
+> +       if (gic_arch_extn.irq_eoi)
+> +               gic_arch_extn.irq_eoi(d);
+>          writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+> +       spin_unlock(&irq_controller_lock);
+>   }
+>
+>   static int gic_set_type(struct irq_data *d, unsigned int type)
