@@ -1,31 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Sun, 03 Apr 2011 00:15:55 -0700
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>	<4D959058.7010606@codeaurora.org>
-	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
-Message-ID: <4D981EAB.8070209@codeaurora.org>
+Date: Sun, 03 Apr 2011 00:25:10 -0700
+Subject: [PATCH] ARM: hw_breakpoint: clear DBGVCR out of reset
+In-Reply-To: <1301657056-30065-1-git-send-email-will.deacon@arm.com>
+References: <1301657056-30065-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4D9820D6.5040502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Please stop top posting)
-
-On 4/1/2011 3:29 PM, Simon Glass wrote:
-> Hi Stephen,
+On 4/1/2011 4:24 AM, Will Deacon wrote:
+> The DBGVCR, used for configuring vector catch debug events, is UNKNOWN
+> out of reset on ARMv7. When enabling monitor mode, this must be zeroed
+> to avoid UNPREDICTABLE behaviour.
 >
-> Sorry for the confusion, but in fact I was talking about the patch to
-> make ARM use the generic bug handling via an undef instruction instead
-> of calling ______bug() or writing to memory address 0. Please see
-> here:
+> This patch adds the zeroing code to the debug reset path.
 >
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6808/1
+> Reported-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Yes I've seen your patch (and even posted comments on it which have not
-been responded to).
-
-Correct me if I'm wrong, but that patch with CONFIG_BUG=n would lead to
-the same error that Omar is seeing because the code only modifies the
-bug infrastructure when CONFIG_BUG=y.
+Please Cc stable as this fix should go to the 37 and 38 stable trees.
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
