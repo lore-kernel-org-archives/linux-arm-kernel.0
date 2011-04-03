@@ -1,40 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 03 Apr 2011 13:13:53 +0100
-Subject: [PATCH 2/6] ARM: tegra: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
+Date: Sun, 03 Apr 2011 13:17:01 +0100
+Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
 References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-	<1301669441-13744-3-git-send-email-will.deacon@arm.com>
-	<BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
-Message-ID: <1301832833.5022.1.camel@jazzbox>
+	<1301669441-13744-7-git-send-email-will.deacon@arm.com>
+	<BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>
+	<BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
+Message-ID: <1301833021.5022.4.camel@jazzbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+Hello,
 
-On Fri, 2011-04-01 at 21:29 +0100, Colin Cross wrote:
-> > diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-> > index 76a3f65..08c43dd 100644
-> > --- a/arch/arm/mach-tegra/gpio.c
-> > +++ b/arch/arm/mach-tegra/gpio.c
-> > @@ -221,8 +221,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> >        int port;
-> >        int pin;
-> >        int unmasked = 0;
-> > +       struct irq_chip chip = get_irq_desc_chip(desc);
-> Should be a pointer, and 35e857c changed get_irq_desc_chip to irq_desc_get_chip
+
+On Sun, 2011-04-03 at 04:27 +0100, Colin Cross wrote:
+> In further testing I found one bug.  d7ed36a added gic_arch_extn,
+> which needs to be used in gic_eoi.   arch/arm/mach-tegra/irq.c will
+> need to be fixed to replace tegra_ack with tegra_eoi, and any other
+> platform that uses gic_arch_extn also needs to be checked (omap4?).
+
+Ok, I'll do some grepping around for those guys. I didn't realise they
+were already being used.
+
+> This patch fixes gic.c:
 > 
-
-Thanks for pointing that out, I'll check the rest of the series too. I
-thought the rebase onto -rc1 went a little too smoothly...
-
-> > -       desc->irq_data.chip->irq_ack(&desc->irq_data);
-> > +       chained_irq_enter(chip, desc);
-> asm/mach/irq.h needs to be included to use this function
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 6ecd5c7..8e46dac 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -118,7 +118,11 @@ static void gic_unmask_irq(struct irq_data *d)
 > 
+>  static void gic_eoi_irq(struct irq_data *d)
+>  {
+> +       spin_lock(&irq_controller_lock);
+> +       if (gic_arch_extn.irq_eoi)
+> +               gic_arch_extn.irq_eoi(d);
+>         writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+> +       spin_unlock(&irq_controller_lock);
+>  }
+> 
+>  static int gic_set_type(struct irq_data *d, unsigned int type)
 
-Yup, assumed that was already included. Will add the #include line.
 
-Thanks for looking at this,
+Hmm, I don't like that spinlock. Are the gic_arch_extn.* pointers ever
+modified after being set initially? If not, can we make the locking
+conditional on that pointer being non-NULL?
 
 Will
