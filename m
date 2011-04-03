@@ -1,53 +1,41 @@
-From: ccross@google.com (Colin Cross)
-Date: Sun, 3 Apr 2011 15:38:37 -0700
-Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <1301833021.5022.4.camel@jazzbox>
-References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
-	<1301669441-13744-7-git-send-email-will.deacon@arm.com>
-	<BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>
-	<BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
-	<1301833021.5022.4.camel@jazzbox>
-Message-ID: <BANLkTimEvUYzKg3EkRj_5NR9xdZJSvjXYQ@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Sun, 3 Apr 2011 20:28:13 -0300
+Subject: [PATCH 1/3] ARM: mx5/mx53_loco: Add write-protect and card-detect
+	for SD3
+In-Reply-To: <1301686188-14827-1-git-send-email-fabio.estevam@freescale.com>
+References: <1301686188-14827-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4D99028D.4000808@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 3, 2011 at 5:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hello,
->
->
-> On Sun, 2011-04-03 at 04:27 +0100, Colin Cross wrote:
->> In further testing I found one bug. ?d7ed36a added gic_arch_extn,
->> which needs to be used in gic_eoi. ? arch/arm/mach-tegra/irq.c will
->> need to be fixed to replace tegra_ack with tegra_eoi, and any other
->> platform that uses gic_arch_extn also needs to be checked (omap4?).
->
-> Ok, I'll do some grepping around for those guys. I didn't realise they
-> were already being used.
->
->> This patch fixes gic.c:
->>
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> index 6ecd5c7..8e46dac 100644
->> --- a/arch/arm/common/gic.c
->> +++ b/arch/arm/common/gic.c
->> @@ -118,7 +118,11 @@ static void gic_unmask_irq(struct irq_data *d)
->>
->> ?static void gic_eoi_irq(struct irq_data *d)
->> ?{
->> + ? ? ? spin_lock(&irq_controller_lock);
->> + ? ? ? if (gic_arch_extn.irq_eoi)
->> + ? ? ? ? ? ? ? gic_arch_extn.irq_eoi(d);
->> ? ? ? ? writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
->> + ? ? ? spin_unlock(&irq_controller_lock);
->> ?}
->>
->> ?static int gic_set_type(struct irq_data *d, unsigned int type)
->
->
-> Hmm, I don't like that spinlock. Are the gic_arch_extn.* pointers ever
-> modified after being set initially? If not, can we make the locking
-> conditional on that pointer being non-NULL?
+Hi Sascha,
 
-The gic_arch_extn pointers should be initialized in init_irq and
-untouched later, so it should be fine to make the locking conditional.
- There is currently no way to set the pointer under the lock anyways.
+On 4/1/2011 4:29 PM, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx5/board-mx53_loco.c |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+
+Please don?t apply this patch yet. 
+
+After further testing I realize that I get the following errors after applying this patch:
+
+mmc1: new high speed SDHC card at address aaaa                
+mmcblk1: mmc1:aaaa SD08G 7.40 GiB                                               
+ mmcblk1: p1 p2                                                                 
+mmc1: Timeout waiting for hardware interrupt.                                   
+mmcblk1: retrying using single block read                                       
+mmcblk1: error -84 transferring data, sector 32769, nr 32, card status 0x900    
+end_request: I/O error, dev mmcblk1, sector 32769                               
+Buffer I/O error on device mmcblk1p2, logical block 0                           
+mmcblk1: error -84 transferring data, sector 32770, nr 31, card status 0x900    
+end_request: I/O error, dev mmcblk1, sector 32770                               
+Buffer I/O error on device mmcblk1p2, logical block 1                           
+mmcblk1: error -84 transferring data, sector 32771, nr 30, card status 0x900    
+end_request: I/O error, dev mmcblk1, sector 32771                               
+
+Will start debugging it.
+
+Regards,
+
+Fabio Estevam
