@@ -1,76 +1,111 @@
-From: ccross@google.com (Colin Cross)
-Date: Sat, 2 Apr 2011 23:36:41 -0700
-Subject: RFC, GIC based smp_cross_call cleanup suggestion
-In-Reply-To: <4D98124B.6090005@ti.com>
-References: <10921831-0170-4106-bb3a-a52515a32c3e@VA3EHSMHS002.ehs.local>
-	<BANLkTimY+mRXqT7NwUQ86SxnfKw0HX-pTQ@mail.gmail.com>
-	<20110402085133.GE8482@n2100.arm.linux.org.uk>
-	<BANLkTim+bco_90iPLrc1ioV4bdSw+LRzQQ@mail.gmail.com>
-	<4D98124B.6090005@ti.com>
-Message-ID: <BANLkTinZyiW74enShWguTy_2pBZ9xbsGDA@mail.gmail.com>
+From: kostap@marvell.com (Konstantin Porotchkin)
+Date: Sun,  3 Apr 2011 10:13:12 +0300
+Subject: [PATCH] Moving Marvell Dove platform defaults to ARMv7
+Message-ID: <1301814792-9438-1-git-send-email-kostap@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 2, 2011 at 11:23 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> + Thomas G,
->
-> On 4/2/2011 2:40 PM, Colin Cross wrote:
->>
->> On Sat, Apr 2, 2011 at 1:51 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> ?wrote:
->>>
->>> On Fri, Apr 01, 2011 at 04:55:02PM -0600, Grant Likely wrote:
->>>>
->>>> On Fri, Apr 1, 2011 at 4:26 PM, John Linn<John.Linn@xilinx.com> ?wrote:
->>>>>
->>>>> I?m getting ready to submit a patch to add SMP to Xilinx code. I notice
->>>>> that
->>>>> smp_cross_call for all GIC based platforms is duplicated across each
->>>>> platform in smp.h.
->>>>>
->>>>>
->>>>>
->>>>> I thought I?d try to jump in to help with some cleanup, although I
->>>>> realize
->>>>> it?s minimal, I have to start somewhere.
->>>>>
->>>>>
->>>>>
->>>>> What about moving the smp_cross_call for GIC based designs into gic.h?
->>>>
->>>> Go for it. ?It's an obvious cleanup.
->>>
->>> That assumes that all SMP implementations will always have a GIC. ?It
->>> looks to me like this is conditional on shmobile, and so I don't think
->>> its that trivial - maybe Paul or Magnus can first indicate why this is.
->>
->> OMAP4 may also require a custom smp_cross_call implementation if CPU
->> idle is going to be supported in SMP - in CPU off idle modes, a GIC
->> SGI will not wake the CPU, and a write directly to the CPU's power
->> management controller or an external interrupt source would be
->> required.
->
-> This can be done without making smp_cross_call() platform
-> specific.
-> While working on broad-cast notifiers for ARM with Thomas G, this
-> point was discussed.
->
-> Where the TWD can't wakeup its own local CPU from C3 mode, how do we
-> provide a platform specific method to perform this wakeup ?
->
-> Thomas Quoted....
-> "It would not complicate the OMAP code that much. All it needs is
-> extending the clock event device callbacks by an broadcast_affinity()
-> function which would be called from the broadcast code when the
-> broadcast device is armed. The argument would be a cpumask which would
-> tell you which core(s) to wake up when the broadcast timer fires next.
->
-> So OMAP would fill in that hook and implement the wakeup redirector
-> setup, which I guess would be a couple of lines."
->
-> From above it's should be trivial once the broad-cast notifiers
-> are extended to have "broadcast_affinity()" supported
+Disabled legacy support for ARMv6 archtecture on Dove platform.
+Latest Dove HW uses only ARMv7 model.
 
-That fixes the localtimer, but not calls to generic_exec_single, which
-also calls smp_cross_call.
+Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+---
+ arch/arm/Kconfig                |    2 +-
+ arch/arm/configs/dove_defconfig |   12 +-----------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 599e163..e9d9a4f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -463,7 +463,7 @@ config ARCH_IXP4XX
+ 
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+-	select CPU_V6K
++	select CPU_V7
+ 	select PCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+index 54bf5ee..40db34c 100644
+--- a/arch/arm/configs/dove_defconfig
++++ b/arch/arm/configs/dove_defconfig
+@@ -8,8 +8,6 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_DOVE=y
+ CONFIG_MACH_DOVE_DB=y
+-CONFIG_CPU_V6=y
+-CONFIG_CPU_32v6K=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_AEABI=y
+@@ -44,7 +42,6 @@ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=1
+-# CONFIG_MISC_DEVICES is not set
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+@@ -59,12 +56,12 @@ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+ # CONFIG_MOUSE_PS2 is not set
+ # CONFIG_SERIO is not set
++CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ # CONFIG_SERIAL_8250_PCI is not set
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+-CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+@@ -72,12 +69,10 @@ CONFIG_I2C_MV64XXX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_USB=y
+ CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+-CONFIG_USB_EHCI_TT_NEWSCHED=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MV=y
+@@ -86,7 +81,6 @@ CONFIG_MV_XOR=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_INOTIFY=y
+ CONFIG_ISO9660_FS=y
+ CONFIG_JOLIET=y
+ CONFIG_UDF_FS=m
+@@ -110,23 +104,19 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_TIMER_STATS=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_ERRORS=y
+ CONFIG_CRYPTO_NULL=y
+-CONFIG_CRYPTO_CBC=y
+ CONFIG_CRYPTO_ECB=m
+ CONFIG_CRYPTO_PCBC=m
+ CONFIG_CRYPTO_HMAC=y
+ CONFIG_CRYPTO_MD4=y
+-CONFIG_CRYPTO_MD5=y
+ CONFIG_CRYPTO_SHA1=y
+ CONFIG_CRYPTO_SHA256=y
+ CONFIG_CRYPTO_SHA512=y
+ CONFIG_CRYPTO_AES=y
+ CONFIG_CRYPTO_BLOWFISH=y
+-CONFIG_CRYPTO_DES=y
+ CONFIG_CRYPTO_TEA=y
+ CONFIG_CRYPTO_TWOFISH=y
+ CONFIG_CRYPTO_DEFLATE=y
+-- 
+1.7.4.1
