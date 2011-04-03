@@ -1,61 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 03 Apr 2011 17:30:22 +0530
-Subject: RFC, GIC based smp_cross_call cleanup suggestion
-In-Reply-To: <20110403114610.GC4213@n2100.arm.linux.org.uk>
-References: <10921831-0170-4106-bb3a-a52515a32c3e@VA3EHSMHS002.ehs.local>
-	<BANLkTimY+mRXqT7NwUQ86SxnfKw0HX-pTQ@mail.gmail.com>
-	<20110402085133.GE8482@n2100.arm.linux.org.uk>
-	<BANLkTim+bco_90iPLrc1ioV4bdSw+LRzQQ@mail.gmail.com>
-	<BANLkTimjyBzh3Kc+1njcBBYCouKdSWhgng@mail.gmail.com>
-	<20110403103730.GB4213@n2100.arm.linux.org.uk>
-	<4D9851B5.20100@ti.com>
-	<20110403114610.GC4213@n2100.arm.linux.org.uk>
-Message-ID: <4D986156.8010000@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 03 Apr 2011 13:13:53 +0100
+Subject: [PATCH 2/6] ARM: tegra: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
+References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
+	<1301669441-13744-3-git-send-email-will.deacon@arm.com>
+	<BANLkTikVHUUGtThJkbyXrmxg8Whmaji7DA@mail.gmail.com>
+Message-ID: <1301832833.5022.1.camel@jazzbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2011 5:16 PM, Russell King - ARM Linux wrote:
-> On Sun, Apr 03, 2011 at 04:23:41PM +0530, Santosh Shilimkar wrote:
->> Sure, it does break OMAP4. These functions are there because they
->> are used/compiled only for SMP support.
->
-> If they're only used privately within the mach-omap2 code, then putting
-> them in a header file in arch/arm/mach-omap2 would've been the logical
-> thing to do, rather than telling the entire SMP kernel about the
-> functions.
->
-Ok. Make sense.
+Hi Colin,
 
-> Header files in arch/arm/*/include/mach included from
-> arch/arm/include/asm/*.h are there to provide necessary definitions for
-> either the rest of the kernel or the ARM specific parts.  They shouldn't
-> be polluted with *any* platform private stuff which is not absolutely
-> necessary to satisfy the rest of the kernel.  Those mach/ includes
-> being:
->
-> mach/barriers.h
-> mach/clkdev.h
-> mach/floppy.h
-> mach/gpio.h
-> mach/hardware.h
-> mach/io.h
-> mach/irqs.h
-> mach/isa-dma.h
-> mach/memory.h
-> mach/mtd-xip.h
-> mach/smp.h
-> mach/timex.h
-> mach/vmalloc.h
->
-Thanks for the list. I shall move those to omap4-common.h
-I didn't do it last time thinking file
-"arch/arm/plat-omap/include/plat/smp.h" can have platform
-specific functions as well.
+On Fri, 2011-04-01 at 21:29 +0100, Colin Cross wrote:
+> > diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+> > index 76a3f65..08c43dd 100644
+> > --- a/arch/arm/mach-tegra/gpio.c
+> > +++ b/arch/arm/mach-tegra/gpio.c
+> > @@ -221,8 +221,9 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> >        int port;
+> >        int pin;
+> >        int unmasked = 0;
+> > +       struct irq_chip chip = get_irq_desc_chip(desc);
+> Should be a pointer, and 35e857c changed get_irq_desc_chip to irq_desc_get_chip
+> 
 
-I missed the point that "mach/smp.h" would be included
-indirectly by "linux/smp.h"
+Thanks for pointing that out, I'll check the rest of the series too. I
+thought the rebase onto -rc1 went a little too smoothly...
 
-Thanks for making this clear to me.
+> > -       desc->irq_data.chip->irq_ack(&desc->irq_data);
+> > +       chained_irq_enter(chip, desc);
+> asm/mach/irq.h needs to be included to use this function
+> 
 
-Regards
-Santosh
+Yup, assumed that was already included. Will add the #include line.
+
+Thanks for looking at this,
+
+Will
