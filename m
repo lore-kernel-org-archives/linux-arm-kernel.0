@@ -1,73 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Apr 2011 17:03:25 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <201104031726.37420.arnd@arndb.de>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104020008.16795.arnd@arndb.de>
-	<alpine.LFD.2.00.1104012129320.28032@xanadu.home>
-	<201104031726.37420.arnd@arndb.de>
-Message-ID: <20110403160324.GA8050@n2100.arm.linux.org.uk>
+From: John.Linn@xilinx.com (John Linn)
+Date: Sun, 3 Apr 2011 12:44:49 -0600
+Subject: [GIT PULL] Xilinx ARM support for 2.6.40
+Message-ID: <e090f8f9-edc6-47f9-9519-81b252262c64@VA3EHSMHS029.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2011 at 05:26:37PM +0200, Arnd Bergmann wrote:
-> There are a few other examples that were done in a similar way:
-> * The drivers/ide code still serves a few hardware platforms that
->   never had anyone write a new libata code. Libata itself has
->   been in a good shape for a long time though.
+Hi Russell,
 
-And there are platforms where libata just doesn't work but the old
-ide driver does.  My firewall with a CF card in is completely unusable
-with libata, but works fine with the old IDE driver.
+This is a resend from last week as my new machine lost me email settings
+and it was sent in html rather than plain text.  This should be better.
 
-That's partly caused by there being no support for the ISA IOCS16 signal
-on that hardware, so the ISA bus needs specific handling depending on
-the behaviour of the ISA device being addressed.  Yes, crap hardware,
-nothing new there.
+Please pull Xilinx ARM changes for the next merge window from the
+following.
 
-> We generally try to do gradual cleanups to any kernel code that is
-> worth keeping, because as you say the duplication itself causes a
-> lot of friction. For particularly hard cases, doing a replacement
-> implementation is an exceptional way out. What we need to find a
-> consensus on is how bad the problem in arch/arm/mach-*/ is:
-> 
-> 1. No fundamental problem, just needs some care to clean up (your
->    position, I guess), so we do do what we always do and keep doing
->    gradual improvements, including treewide API changes.
-> 2. Bad enough that starting a new competing implementation is easier
->    because it lets us try different things more easily and reduce
->    the number of treewide changes to all existing platforms.
->    (this is where I think we are) Like IDE and OSS, the old code
->    can still get improved and bug fixed, but concentrating on new
->    code gives us better freedom to make progress more quickly.
-> 3. In need of a complete replacement, like arch/ppc and a lot of
->    drivers/staging. I'm not arguing that it's that bad.
+git://git.xilinx.com/linux-2.6-xlnx arm-next
 
-Having just looked at the clocksource stuff, there's 9 up-counting 32-bit
-clocksources which are relatively easy to port to a single piece of code.
+This branch contains support for the Xilinx ARM platform on the EP107
+board.
 
-There's a number of down-counting clocksources using various methods to
-convert to an up-counting value - sometimes -readl(), sometimes
-cs->mask - readl() and sometimes ~readl().
+I got this tree into linux-next. If there's something else I need to do
+please let me know.  
 
-Then there's those which are either 16-bit or 32-bit, and some of those
-16-bit implementations must use readw() to avoid bus faults.
+Thanks for your help,
+John
 
-Combining all those together you end up with something pretty disgusting,
-and an initialization function taking 7 arguments (iomem pointer, name,
-rating, tick rate, size, up/down counter, clocksource flags).
+The following changes since commit
+0ce790e7d736cedc563e1fb4e998babf5a4dbc3d:
+  Linus Torvalds (1):
+        Linux 2.6.39-rc1
 
-Does it lead to more maintainable code?  I'm not convinced - while it
-certainly reduces the amount of code, but the reduced code is rather
-more complex.
+are available in the git repository at:
 
-Would an alternative be to introduce separate mmio-32bit-up, mmio-32bit-down,
-mmio-16bit-up and mmio-16bit-down clocksources?  That also doesn't give
-me a good feeling about the result.
+  git://git.xilinx.com/linux-2.6-xlnx arm-next
 
-Then there's those which change the cs->read function pointer at runtime,
-and those which share that pointer with their sched_clock() implementation.
+John Linn (4):
+      ARM: Xilinx: Adding Xilinx board support
+      ARM: Xilinx: Adding timer support to the platform
+      ARM: Xilinx: base header files and assembly macros
+      ARM: Xilinx: Adding Xilinx platform infrastructure support
 
-And those which need to do special things (like loop until read values are
-stable) in their read functions which probably can't ever be supported by
-common code.
+arch/arm/Kconfig                                |   14 +
+arch/arm/Makefile                               |    1 +
+arch/arm/mach-xilinx/Kconfig                    |   14 +
+arch/arm/mach-xilinx/Makefile                   |    7 +
+arch/arm/mach-xilinx/Makefile.boot              |    3 +
+arch/arm/mach-xilinx/board_ep107.c              |   85 +++++++
+arch/arm/mach-xilinx/common.c                   |  114 +++++++++
+arch/arm/mach-xilinx/common.h                   |   30 +++
+arch/arm/mach-xilinx/include/mach/clkdev.h      |   33 +++
+arch/arm/mach-xilinx/include/mach/debug-macro.S |   36 +++
+arch/arm/mach-xilinx/include/mach/entry-macro.S |   30 +++
+arch/arm/mach-xilinx/include/mach/hardware.h    |   18 ++
+arch/arm/mach-xilinx/include/mach/io.h          |   33 +++
+arch/arm/mach-xilinx/include/mach/irqs.h        |   29 +++
+arch/arm/mach-xilinx/include/mach/memory.h      |   23 ++
+arch/arm/mach-xilinx/include/mach/system.h      |   28 +++
+arch/arm/mach-xilinx/include/mach/timex.h       |   23 ++
+arch/arm/mach-xilinx/include/mach/uart.h        |   25 ++
+arch/arm/mach-xilinx/include/mach/uncompress.h  |   51 ++++
+arch/arm/mach-xilinx/include/mach/vmalloc.h     |   20 ++
+arch/arm/mach-xilinx/include/mach/xilinx_soc.h  |   48 ++++
+arch/arm/mach-xilinx/timer.c                    |  297
++++++++++++++++++++++++
+arch/arm/mm/Kconfig                             |    2 +-
+23 files changed, 963 insertions(+), 1 deletions(-)
+create mode 100644 arch/arm/mach-xilinx/Kconfig
+create mode 100644 arch/arm/mach-xilinx/Makefile
+create mode 100644 arch/arm/mach-xilinx/Makefile.boot
+create mode 100644 arch/arm/mach-xilinx/board_ep107.c
+create mode 100644 arch/arm/mach-xilinx/common.c
+create mode 100644 arch/arm/mach-xilinx/common.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/clkdev.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/debug-macro.S
+create mode 100644 arch/arm/mach-xilinx/include/mach/entry-macro.S
+create mode 100644 arch/arm/mach-xilinx/include/mach/hardware.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/io.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/irqs.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/memory.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/system.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/timex.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/uart.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/uncompress.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/vmalloc.h
+create mode 100644 arch/arm/mach-xilinx/include/mach/xilinx_soc.h
+create mode 100644 arch/arm/mach-xilinx/timer.c
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
