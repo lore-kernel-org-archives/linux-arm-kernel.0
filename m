@@ -1,21 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Apr 2011 13:27:13 +0100
-Subject: [PATCH 1/2] ARM: Make consolidated PM sleep code depend on
-	PM_SLEEP
-In-Reply-To: <87ipuvr2xg.fsf@lebrac.rtp-net.org>
-References: <20110402091904.GH8482@n2100.arm.linux.org.uk>
-	<E1Q5x0g-0001Yw-Vb@rmk-PC.arm.linux.org.uk>
-	<87ipuvr2xg.fsf@lebrac.rtp-net.org>
-Message-ID: <20110403122713.GD4213@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 3 Apr 2011 22:18:16 +0900
+Subject: [PATCH 1/3] sound/spitz: Properly handle MIC GPIO
+In-Reply-To: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20110403131814.GB17566@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2011 at 01:26:35PM +0200, Arnaud Patard wrote:
-> I've build-tested on some failing platforms theses 2 patches and the
-> build are now succeeding. The only PM related zImage build error I found
-> was for s5pc100:
+On Sat, Apr 02, 2011 at 03:43:15AM +0200, Marek Vasut wrote:
+> This patch firstly restructurizes the code a bit by getting rid of continuous
+> checking for machine type in spitz_mic_bias().
 > 
-> arch/arm/plat-samsung/pm.c:32:26: fatal error: mach/pm-core.h: No such file or directory
+> Then the patch properly requests the MIC GPIO in the spitz_init() and frees it
+> in spitz_exit().
+> 
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-That probably existing from before the consolidation patch, so I won't
-worry about it.
+Applied, thanks.
