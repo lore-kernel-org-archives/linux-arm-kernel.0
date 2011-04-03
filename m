@@ -1,31 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 03 Apr 2011 13:22:54 +0100
-Subject: [PATCH] ARM: hw_breakpoint: clear DBGVCR out of reset
-In-Reply-To: <4D9820D6.5040502@codeaurora.org>
-References: <1301657056-30065-1-git-send-email-will.deacon@arm.com>
-	<4D9820D6.5040502@codeaurora.org>
-Message-ID: <1301833374.5022.9.camel@jazzbox>
+Date: Sun, 03 Apr 2011 13:24:40 +0100
+Subject: accessing vfpinstr macros from outside vfp directory
+In-Reply-To: <4D96499B.5070402@codeaurora.org>
+References: <4D924966.2050707@codeaurora.org>
+	<1301678843.17592.5.camel@e102144-lin.cambridge.arm.com>
+	<4D96499B.5070402@codeaurora.org>
+Message-ID: <1301833480.5022.11.camel@jazzbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Bryan,
 
-On Sun, 2011-04-03 at 08:25 +0100, Stephen Boyd wrote:
-> On 4/1/2011 4:24 AM, Will Deacon wrote:
-> > The DBGVCR, used for configuring vector catch debug events, is UNKNOWN
-> > out of reset on ARMv7. When enabling monitor mode, this must be zeroed
-> > to avoid UNPREDICTABLE behaviour.
+On Fri, 2011-04-01 at 22:54 +0100, Bryan Huntsman wrote:
+> On 04/01/11 10:27, Will Deacon wrote:
+> > Neil,
 > >
-> > This patch adds the zeroing code to the debug reset path.
+> > On Tue, 2011-03-29 at 22:04 +0100, Neil Leeder wrote:
+> >> Any opinions on what would be the best thing to do here? Choices
+> appear to be:
+> >>
+> >> 1) allow the relative include path of ../vfp/vfpinstr.h
+> >> 2) move the definitions of fmrx, fmxr from vfp/vfpinstr.h to
+> include/asm/vfp.h
+> >> 3) move vfp/vfpinstr.h to include/asm
+> >> 4) other...?
+> >>
+> >> If it helps, I can create a patch for whichever is considered the
+> preferred solution.
+> >>
 > >
-> > Reported-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > I personally don't find option (1) that offensive - Bryan seemed to
+> > differ though so perhaps option (2) would keep him happy?
+> >
+> > I don't think option (3) is sensible given that the majority of the
+> > header file is private to /vfp.
+> >
+> > Will
 > 
-> Please Cc stable as this fix should go to the 37 and 38 stable trees.
+> I raised it as a question.  If that's the only sane thing to do here,
+> then do it.  Since no one else seems to have chimed in on (2) or (3),
+> I'm fine with the patch as-is.
 
-Will do. If you could please confirm that it fixes the problems reported
-initially then that would be great.
+Ok, great. Let's leave it like it is for the time-being and if other
+people start using things from the vfp headers then we should consider
+refactoring some of that code (currently I think it's restricted to this
+patch series and some files under vfp/).
 
-Thanks,
+Cheers,
 
 Will
