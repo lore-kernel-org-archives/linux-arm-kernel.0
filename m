@@ -1,24 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 03 Apr 2011 17:50:57 +0530
-Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <1301833138.5022.6.camel@jazzbox>
-References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>	<1301669441-13744-7-git-send-email-will.deacon@arm.com>	<BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>	<BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>	<4D980E77.10907@ti.com>
-	<1301833138.5022.6.camel@jazzbox>
-Message-ID: <4D986629.1050706@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 03 Apr 2011 13:22:54 +0100
+Subject: [PATCH] ARM: hw_breakpoint: clear DBGVCR out of reset
+In-Reply-To: <4D9820D6.5040502@codeaurora.org>
+References: <1301657056-30065-1-git-send-email-will.deacon@arm.com>
+	<4D9820D6.5040502@codeaurora.org>
+Message-ID: <1301833374.5022.9.camel@jazzbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2011 5:48 PM, Will Deacon wrote:
-> On Sun, 2011-04-03 at 07:06 +0100, Santosh Shilimkar wrote:
->> Will,
->
-> Hi Santosh,
->
->> Have already tested your V3 vesrion while generating the GIC
->> IO_relaxed patch and it worked OK. This series seems to be same.
->> I shall try this on OMAP4 and let you know ?
->
-> If you hold your horses then I'll post a newer series addressing the
-> points from Colin. Testing that on OMAP4 would be much appreciated!
->
-Sure.
+Hi Stephen,
+
+On Sun, 2011-04-03 at 08:25 +0100, Stephen Boyd wrote:
+> On 4/1/2011 4:24 AM, Will Deacon wrote:
+> > The DBGVCR, used for configuring vector catch debug events, is UNKNOWN
+> > out of reset on ARMv7. When enabling monitor mode, this must be zeroed
+> > to avoid UNPREDICTABLE behaviour.
+> >
+> > This patch adds the zeroing code to the debug reset path.
+> >
+> > Reported-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Please Cc stable as this fix should go to the 37 and 38 stable trees.
+
+Will do. If you could please confirm that it fixes the problems reported
+initially then that would be great.
+
+Thanks,
+
+Will
