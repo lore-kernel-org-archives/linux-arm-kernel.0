@@ -1,41 +1,31 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sun, 3 Apr 2011 12:37:11 +0900
-Subject: RFC, GIC based smp_cross_call cleanup suggestion
-In-Reply-To: <20110402085133.GE8482@n2100.arm.linux.org.uk>
-References: <10921831-0170-4106-bb3a-a52515a32c3e@VA3EHSMHS002.ehs.local>
-	<BANLkTimY+mRXqT7NwUQ86SxnfKw0HX-pTQ@mail.gmail.com>
-	<20110402085133.GE8482@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikqYMe4LFDAPqJf36vYVTBXDE=JD_AW4rNrTp2e@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 3 Apr 2011 09:28:37 +0530
+Subject: [PATCH] arm: nomadik: avoid assigning u32 to bool
+In-Reply-To: <20110401235113.083787a7@absol.kitzblitz>
+References: <20110401235113.083787a7@absol.kitzblitz>
+Message-ID: <BANLkTinujPcSq86wjue+SGw5ZMiiLRaT_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 2, 2011 at 5:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 01, 2011 at 04:55:02PM -0600, Grant Likely wrote:
->> On Fri, Apr 1, 2011 at 4:26 PM, John Linn <John.Linn@xilinx.com> wrote:
->> > I?m getting ready to submit a patch to add SMP to Xilinx code. I notice that
->> > smp_cross_call for all GIC based platforms is duplicated across each
->> > platform in smp.h.
->> >
->> >
->> >
->> > I thought I?d try to jump in to help with some cleanup, although I realize
->> > it?s minimal, I have to start somewhere.
->> >
->> >
->> >
->> > What about moving the smp_cross_call for GIC based designs into gic.h?
->>
->> Go for it. ?It's an obvious cleanup.
+On Sat, Apr 2, 2011 at 03:21, Nicolas Kaiser <nikai@nikai.net> wrote:
+> Avoid assigning u32 to the bool 'enabled'.
 >
-> That assumes that all SMP implementations will always have a GIC. ?It
-> looks to me like this is conditional on shmobile, and so I don't think
-> its that trivial - maybe Paul or Magnus can first indicate why this is.
+> Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+> ---
+> ?arch/arm/plat-nomadik/gpio.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+> index f49748e..8b722f7 100644
+> --- a/arch/arm/plat-nomadik/gpio.c
+> +++ b/arch/arm/plat-nomadik/gpio.c
+> @@ -636,7 +636,7 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+> ? ? ? ?if (type & IRQ_TYPE_LEVEL_LOW)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> - ? ? ? enabled = nmk_chip->enabled & bitmask;
+> + ? ? ? enabled = !!(nmk_chip->enabled & bitmask);
 
-Our SMP implementations all come with GIC. All shmobile SoCs don't
-come with SMP though, so the conditional is most likely related to
-that.
-
-Thanks,
-
-/ magnus
+Why?  There are dozens of places in the kernel where this done, the code
+generated should be the same, and it's pretty obvious what is being done
+as it is.
