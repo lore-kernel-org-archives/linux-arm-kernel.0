@@ -1,38 +1,53 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 04 Apr 2011 08:18:17 +1000
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <4D95E112.4020400@vollmann.ch>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<8ya39m2mv65.fsf@huya.qualcomm.com> <20110401074519.GC7594@elte.hu>
-	<201104011554.07924.arnd@arndb.de>  <4D95E112.4020400@vollmann.ch>
-Message-ID: <1301869097.2549.36.camel@pasglop>
+From: ccross@google.com (Colin Cross)
+Date: Sun, 3 Apr 2011 15:38:37 -0700
+Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <1301833021.5022.4.camel@jazzbox>
+References: <1301669441-13744-1-git-send-email-will.deacon@arm.com>
+	<1301669441-13744-7-git-send-email-will.deacon@arm.com>
+	<BANLkTi=xeCaF4HwOsEnqCzkiywPu6R0XbA@mail.gmail.com>
+	<BANLkTimJwCkabdEhQ89NgEaWyYaX6kSgUQ@mail.gmail.com>
+	<1301833021.5022.4.camel@jazzbox>
+Message-ID: <BANLkTimEvUYzKg3EkRj_5NR9xdZJSvjXYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-01 at 16:28 +0200, Detlef Vollmann wrote:
-> >   * No board files
-> Where do you put code that needs to run very early (e.g. pinging the
-> watchdog)? 
+On Sun, Apr 3, 2011 at 5:17 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hello,
+>
+>
+> On Sun, 2011-04-03 at 04:27 +0100, Colin Cross wrote:
+>> In further testing I found one bug. ?d7ed36a added gic_arch_extn,
+>> which needs to be used in gic_eoi. ? arch/arm/mach-tegra/irq.c will
+>> need to be fixed to replace tegra_ack with tegra_eoi, and any other
+>> platform that uses gic_arch_extn also needs to be checked (omap4?).
+>
+> Ok, I'll do some grepping around for those guys. I didn't realise they
+> were already being used.
+>
+>> This patch fixes gic.c:
+>>
+>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>> index 6ecd5c7..8e46dac 100644
+>> --- a/arch/arm/common/gic.c
+>> +++ b/arch/arm/common/gic.c
+>> @@ -118,7 +118,11 @@ static void gic_unmask_irq(struct irq_data *d)
+>>
+>> ?static void gic_eoi_irq(struct irq_data *d)
+>> ?{
+>> + ? ? ? spin_lock(&irq_controller_lock);
+>> + ? ? ? if (gic_arch_extn.irq_eoi)
+>> + ? ? ? ? ? ? ? gic_arch_extn.irq_eoi(d);
+>> ? ? ? ? writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>> + ? ? ? spin_unlock(&irq_controller_lock);
+>> ?}
+>>
+>> ?static int gic_set_type(struct irq_data *d, unsigned int type)
+>
+>
+> Hmm, I don't like that spinlock. Are the gic_arch_extn.* pointers ever
+> modified after being set initially? If not, can we make the locking
+> conditional on that pointer being non-NULL?
 
-Even on powerpc I keep board files :-)
-
-The main thing is:
-
-- The generic -> board linkage must not be hard (ie, no
-platform_restart, but a board_ops.restart() etc....)
-
-- An average board file is a few hundreds line long, that's it, mostly
-it hooks up to generically provided functions, tho it gets the choice of
-_which_ ones to hookup.
-
-- It can still quirk/fixup a thing or two if needed, I thinkt it's
-useful to keep that around, as long as such "quirks" remain small and
-few. At the end of the day, if dealing with one board special case gives
-you the choice between changing a ton of infrastructure/core to
-introduce a new abstraction to deal with -that- special case vs. having
-a one liner fixup in the platform code, the later is the most sensible
-option. The hard part of course is to have sensible maintainers to make
-sure this doesn't grow back to the old mess.
-
-Cheers,
-Ben.
+The gic_arch_extn pointers should be initialized in init_irq and
+untouched later, so it should be fine to make the locking conditional.
+ There is currently no way to set the pointer under the lock anyways.
