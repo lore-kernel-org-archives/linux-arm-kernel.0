@@ -1,29 +1,22 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 4 Apr 2011 10:19:26 -0300
-Subject: [PATCH] ARM: mx3/pcm043: Remove unneeded esdhc.h define
-Message-ID: <1301923166-13220-1-git-send-email-fabio.estevam@freescale.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Mon, 4 Apr 2011 15:22:26 +0200
+Subject: WARNING: at mm/page_alloc.c
+Message-ID: <20110404132226.GA14806@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"devices-imx35.h" includes <mach/devices-common.h>; and the latter
-includes <mach/esdhc.h>, so no need to include it again in mach-pcm043.c.
+Hi!
+I'm playing with uinput on zaurus (spitz) I've a pxa-2.6 kernel flashed in the
+uinput is loaded as module. Right after my program called:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx3/mach-pcm043.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ioctl(fd, UI_DEV_CREATE);
 
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index 036ba1a..9caf38b 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -40,7 +40,6 @@
- #include <mach/mx3fb.h>
- #include <mach/ulpi.h>
- #include <mach/audmux.h>
--#include <mach/esdhc.h>
- 
- #include "devices-imx35.h"
- #include "devices.h"
+I've got:
+
+WARNING: at mm/page_alloc.c:2012 __alloc_pages_nodemask+0148/0x5a8()
+
+and the ioctl() has failed.
+
+Anybody has an idea what went wrong?
 -- 
-1.6.0.4
+metan
