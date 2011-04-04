@@ -1,308 +1,333 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Mon, 4 Apr 2011 15:47:09 +0100 (BST)
-Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
-Message-ID: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Mon,  4 Apr 2011 16:55:50 +0200
+Subject: [PATCH] [ARM] mx27: Add ARMadeus Systems APF27 board support
+Message-ID: <1301928950-4894-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-some status on making hibernation (suspend-to-disk) work on ARM.
+The APF27 is an i.M27 based SOM (System On Module) that can be plugged on
+several docking/development boards. Here only basic module support
+is added (Ethernet, Serial, NAND Flash, USB OTG).
 
-I've simplified an updated patch set again, to make the pieces obvious. 
-The attached patch set also cleanly compiles when adding TuxOnIce to it.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
+Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
+---
+ arch/arm/mach-imx/Kconfig                   |   13 ++
+ arch/arm/mach-imx/Makefile                  |    1 +
+ arch/arm/mach-imx/mach-apf27.c              |  258 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
+ 4 files changed, 273 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-apf27.c
 
-
-Pls. don't take this as a formal patch submission; this is discussion 
-material and hence not currently based on any specific kernel revision.
-
-
-The code essentially splits into two - a generic bit supplying the glue 
-code that the framework needs, and SoC-specific code to do the core state 
-suspend/resume.
-
-The generic bits do two things:
-
- 	* implement some glue the suspend-to-disk framework requires:
-
- 		- pfn_is_nosave
- 		- save/restore_processor_state
- 		- swsusp_arch_suspend/resume entrypoints
-
- 	* ARM assembly for the "guts" of swsusp_arch_suspend/resume
-
- 		- save/restore current regset, CPSR and svc stack/lr
- 		- page restore loop to copy the pageset back
- 		- redirect to SoC-specific code for core suspend/resume
-
-Hopefully what's in there is actually agnostic enough to qualify as "ARM 
-generic". This stuff is quite clean by now.
-
-There's one ugly thing in this set - I've changed a generic kernel header, 
-<linux/suspend.h> to #define save/restore_processor_state() on ARM so that 
-it only does preempt_disable/enable(). It's surprising that this isn't the 
-default behaviour; all platforms need swsusp_arch_suspend/resume anyway so 
-why force the existance of _two_ arch-specific hooks ?
-
-
-
-In addition to this glue, one needs:
-
- 	* a SoC-dependent __save/__restore_processor_state.
-           There's two examples attached for that, OMAP3 and Samsung 6450.
-
-This bit is the "hacky" part of the patch; on ARM, the platform code is 
-blissfully unaware of suspend-to-disk while suspend-to-ram is partially 
-very complex code.
-
-The shown diffs hook into the "inner guts" of existing suspend-to-ram on 
-ARM, and while that looks like it does a large part of the job, there's 
-surely a better way.
-
-I've supplied those as merely illustrative... to show that the inline 
-assembly orgies from previous patches are just unnecessarily duplicating 
-already-existing functionality. The way this is reused here might not be 
-the perfect way - intent only was to show how much code re-use is 
-actually possible in the area.
-
-Whoever wishes can instead substitute the __save/__restore_processor_state 
-inline assembly orgies from previously posted patches here - it all hooks 
-in very cleanly.
-
-
-
-To test / extend this code on an ARM architecture other than the two 
-shown, one can start with the generic bits and simply make NOP-impls for 
-the SoC-specific bits; that should at the very least allow a snapshot to 
-be created, and so validate that device tree quiesce/freeze resume/thaw 
-work correctly. Resume from such an image wouldn't work, though. At least 
-the MMU state is absolutely critical.
-
-
-
-
-Re, how (if at all) to get this towards mainline:
-
-It looks like the various ARM boards have _very_ different views towards 
-what suspend_ops.enter() will have to do; some are quite simple there, 
-others are exceedingly complex.
-
-One would ultimately hope for as much code sharing between hibernation and 
-suspend-to-mem as possible, for sure, but the current code isn't aware of 
-this; in many cases, saving/restoring state is done all over the place in 
-the "arch framework" bits of suspend_ops.enter(), before the actual CPU 
-core state is saved/resumed. ARM is heavily biased towards optimizing the 
-hell out of suspend-to-mem, and a "grand central store" for system state 
-isn't really there, all boards have their own strategy for this, and their 
-own assumptions on what the CPU state is when resumed from RAM. This is 
-even harder to do for "secure" SoCs, where part of the functionality is 
-handled by (non-kernel) internal ROM code.
-
-
-Russell King has recently done a change to the CPU suspend core code to 
-make that use a "more generic" interface (have them all dump state into a 
-caller-supplied buffer, at the least). The attached patches aren't yet 
-fully aware of that because of the need _not_ to suspend (but return after 
-state save) when called through the hibernation code. My brain hasn't yet 
-grown big enough to solve this well ...
-
-
-
-Re, success with this patch: On OMAP3, I've got issues; the console 
-doesn't properly suspend/resume and using no_console_suspend keeps the 
-messages but looses console input after resume. Also, graphics doesn't 
-come back, and successive hibernation attempts cause crashes in the USB 
-stack. It works much better on the Samsung 64xx boards, for me at least. 
-But then, quite a few people reported success with the older patches on 
-OMAP, hence I wonder, who's got it "fully working" ?
-
-
-
-Any comments ? What can be improved ?
-
-
-Have fun,
-FrankH.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: hibernate-core-04Apr2011.patch
-Type: text/x-diff
-Size: 9586 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110404/10ee57ea/attachment-0001.bin>
--------------- next part --------------
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index df5ce56..b4713ba 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -23,6 +23,7 @@ config ARCH_OMAP3
- 	select CPU_V7
- 	select COMMON_CLKDEV
- 	select OMAP_IOMMU
-+	select ARCH_HIBERNATION_POSSIBLE
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 5eec099..433a420 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -312,4 +312,17 @@ config MACH_IMX27IPCAM
+ 	  Include support for IMX27 IPCAM platform. This includes specific
+ 	  configurations for the board and its peripherals.
  
- config ARCH_OMAP4
- 	bool "TI OMAP4"
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index ea4e498..fd48417 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -328,6 +328,17 @@ restore:
- 	.word	0xE1600071		@ call SMI monitor (smi #1)
- #endif
- 	b	logic_l1_restore
-+#ifdef CONFIG_HIBERNATION
-+ENTRY(__restore_processor_state)
-+	stmfd	sp!, { r0 - r12, lr }
-+	str	sp, [r0]		@ fixup saved stack pointer
-+	str	lr, [r0, #8]		@ fixup saved link register
-+	mov	r3, r0
-+	mov	r1, #1
-+	b	.Llogic_l1_restore_internal
-+ENDPROC(__restore_processor_state)
-+#endif
++config MACH_APF27
++	bool "Armadeus Systems APF27"
++	select SOC_IMX27
++	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
++	select IMX_HAVE_PLATFORM_IMX2_WDT
++	select IMX_HAVE_PLATFORM_IMX_I2C
++	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_MXC_NAND
++	select MXC_ULPI if USB_ULPI
++	help
++	  Include support for APF27 platform. This includes specific
++	  configurations for the module and its peripherals.
 +
- l2_inv_api_params:
- 	.word   0x1, 0x00
- l2_inv_gp:
-@@ -358,6 +369,7 @@ logic_l1_restore:
- 	ldr	r4, scratchpad_base
- 	ldr	r3, [r4,#0xBC]
- 	adds	r3, r3, #16
-+.Llogic_l1_restore_internal:
- 	ldmia	r3!, {r4-r6}
- 	mov	sp, r4
- 	msr	spsr_cxsf, r5
-@@ -433,6 +445,10 @@ ttbr_error:
- 	*/
- 	b	ttbr_error
- usettbr0:
-+#ifdef CONFIG_HIBERNATION
-+	cmp	r1, #1
-+	ldmeqfd	sp!, { r0 - r12, pc }	@ early return from __restore_processor_state
-+#endif
- 	mrc	p15, 0, r2, c2, c0, 0
- 	ldr	r5, ttbrbit_mask
- 	and	r2, r5
-@@ -471,6 +487,16 @@ usettbr0:
- 	mcr	p15, 0, r4, c1, c0, 0
- 
- 	ldmfd	sp!, {r0-r12, pc}		@ restore regs and return
+ endif
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index b85794d..8d557a4 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -37,3 +37,4 @@ obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
+ obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
+ obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
+ obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
++obj-$(CONFIG_MACH_APF27) += mach-apf27.o
+diff --git a/arch/arm/mach-imx/mach-apf27.c b/arch/arm/mach-imx/mach-apf27.c
+new file mode 100644
+index 0000000..f963953
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-apf27.c
+@@ -0,0 +1,258 @@
++ /*
++ * Support for the APF27 System On Module
++ *
++ * Copyright (C) 2008-2011 ARMadeus Systems <support@armadeus.com>
++ *
++ * Based on code which is:
++ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
++ * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
++ * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA  02110-1301, USA.
++ */
 +
-+#ifdef CONFIG_HIBERNATION
-+ENTRY(__save_processor_state)
-+	stmfd	sp!, {r0-r12, lr}
-+	mov	r1, #0x4
-+	mov	r8, r0
-+	b	l1_logic_lost
-+ENDPROC(__save_processor_state)
-+#endif
++#include <linux/platform_device.h>
++#include <linux/i2c.h>
++#include <linux/serial.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
++#include <linux/phy.h>
 +
- save_context_wfi:
- 	/*b	save_context_wfi*/	@ enable to debug save code
- 	mov	r8, r0 /* Store SDRAM address in r8 */
-@@ -545,6 +571,10 @@ l1_logic_lost:
- 	mrc	p15, 0, r4, c1, c0, 0
- 	/* save control register */
- 	stmia	r8!, {r4}
-+#ifdef CONFIG_HIBERNATION
-+	cmp	r1, #4
-+	ldmeqfd	sp!, {r0-r12, pc}	@ early return from __save_processor_state
-+#endif
- clean_caches:
- 	/* Clean Data or unified cache to POU*/
- 	/* How to invalidate only L1 cache???? - #FIX_ME# */
--------------- next part --------------
-diff --git a/arch/arm/plat-s5p/sleep.S b/arch/arm/plat-s5p/sleep.S
-index 2cdae4a..fd2b0a1 100644
---- a/arch/arm/plat-s5p/sleep.S
-+++ b/arch/arm/plat-s5p/sleep.S
-@@ -48,10 +48,17 @@
- 	 *
- 	 * entry:
- 	 *	r0 = save address (virtual addr of s3c_sleep_save_phys)
--	*/
-+	 *	r1 (_internal_ only) = CPU sleep trampoline (if any)
-+	 */
- 
--ENTRY(s3c_cpu_save)
-+ENTRY(__save_processor_state)
-+	mov	r1, #0
-+	b	.Ls3c_cpu_save_internal
-+ENDPROC(__save_processor_state)
- 
-+ENTRY(s3c_cpu_save)
-+	ldr	r1, =pm_cpu_sleep	@ set trampoline
-+.Ls3c_cpu_save_internal:
- 	stmfd	sp!, { r3 - r12, lr }
- 
- 	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
-@@ -67,11 +74,13 @@ ENTRY(s3c_cpu_save)
- 
- 	stmia	r0, { r3 - r13 }
- 
-+	mov	r4, r1
- 	@@ write our state back to RAM
- 	bl	s3c_pm_cb_flushcache
- 
-+	mov	r0, r4
-+	ldmeqfd	sp!, { r3 - r12, pc }	@ if there was no trampoline, return
- 	@@ jump to final code to send system to sleep
--	ldr	r0, =pm_cpu_sleep
- 	@@ldr	pc, [ r0 ]
- 	ldr	r0, [ r0 ]
- 	mov	pc, r0
-@@ -86,9 +95,19 @@ resume_with_mmu:
- 	str	r12, [r4]
- 
- 	ldmfd	sp!, { r3 - r12, pc }
-+ENDPROC(s3c_cpu_save)
++#include <asm/mach/flash.h>
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++#include <asm/mach/time.h>
++#include <mach/common.h>
++#include <mach/hardware.h>
++#include <mach/iomux-mx27.h>
++#include <mach/gpio.h>
++#include <mach/imx-uart.h>
++#include <mach/mxc_nand.h>
++#include <mach/mxc_ehci.h>
++#include <mach/ulpi.h>
 +
-+ENTRY(__restore_processor_state)
-+	stmfd	sp!, { r3 - r12, lr }
-+	ldr	r2, =.Ls3c_cpu_resume_internal
-+	mov	r1, #1
-+	str	sp, [r0, #40]		@ fixup sp in restore context
-+	mov	pc, r2
-+ENDPROC(__restore_processor_state)
- 
- 	.ltorg
- 
++#include "devices-imx27.h"
 +
- 	@@ the next bits sit in the .data segment, even though they
- 	@@ happen to be code... the s5pv210_sleep_save_phys needs to be
- 	@@ accessed by the resume code before it can restore the MMU.
-@@ -131,6 +150,7 @@ ENTRY(s3c_cpu_resume)
- 	mcr	p15, 0, r1, c7, c5, 0		@@ invalidate I Cache
- 
- 	ldr	r0, s3c_sleep_save_phys	@ address of restore block
-+.Ls3c_cpu_resume_internal:
- 	ldmia	r0, { r3 - r13 }
- 
- 	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
-@@ -152,6 +172,9 @@ ENTRY(s3c_cpu_resume)
- 	mcr	p15, 0, r12, c10, c2, 0	@ write PRRR
- 	mcr	p15, 0, r3, c10, c2, 1	@ write NMRR
- 
-+	cmp	r1, #0
-+	bne	0f			@ only do MMU phys init
-+					@ not called by __restore_processor_state
- 	/* calculate first section address into r8 */
- 	mov	r4, r6
- 	ldr	r5, =0x3fff
-@@ -175,6 +198,7 @@ ENTRY(s3c_cpu_resume)
- 	str	r10, [r4]
- 
- 	ldr	r2, =resume_with_mmu
-+0:
- 	mcr	p15, 0, r9, c1, c0, 0		@ turn on MMU, etc
- 
-         nop
-@@ -183,6 +207,7 @@ ENTRY(s3c_cpu_resume)
-         nop
-         nop					@ second-to-last before mmu
- 
-+	ldmnefd	sp!, { r3 - r12, pc }
- 	mov	pc, r2				@ go back to virtual address
- 
- 	.ltorg
++
++static const int apf27_pins[] __initconst = {
++	/* UART1 */
++	PE12_PF_UART1_TXD,
++	PE13_PF_UART1_RXD,
++	/* USB_OTG */
++	PE0_PF_USBOTG_NXT,
++	PE1_PF_USBOTG_STP,
++	PE2_PF_USBOTG_DIR,
++	PE24_PF_USBOTG_CLK,
++	PE25_PF_USBOTG_DATA7,
++	PC7_PF_USBOTG_DATA5,
++	PC8_PF_USBOTG_DATA6,
++	PC9_PF_USBOTG_DATA0,
++	PC10_PF_USBOTG_DATA2,
++	PC11_PF_USBOTG_DATA1,
++	PC12_PF_USBOTG_DATA4,
++	PC13_PF_USBOTG_DATA3,
++	/* UART3 */
++	PE8_PF_UART3_TXD,
++	PE9_PF_UART3_RXD,
++	PE10_PF_UART3_CTS,
++	PE11_PF_UART3_RTS,
++	/* ETHERNET */
++	PD0_AIN_FEC_TXD0,
++	PD1_AIN_FEC_TXD1,
++	PD2_AIN_FEC_TXD2,
++	PD3_AIN_FEC_TXD3,
++	PD4_AOUT_FEC_RX_ER,
++	PD5_AOUT_FEC_RXD1,
++	PD6_AOUT_FEC_RXD2,
++	PD7_AOUT_FEC_RXD3,
++	PD8_AF_FEC_MDIO,
++	PD9_AIN_FEC_MDC,
++	PD10_AOUT_FEC_CRS,
++	PD11_AOUT_FEC_TX_CLK,
++	PD12_AOUT_FEC_RXD0,
++	PD13_AOUT_FEC_RX_DV,
++	PD14_AOUT_FEC_RX_CLK,
++	PD15_AOUT_FEC_COL,
++	PD16_AIN_FEC_TX_ER,
++	PF23_AIN_FEC_TX_EN,
++	/* I2C2 */
++	PC5_PF_I2C2_SDA,
++	PC6_PF_I2C2_SCL,
++};
++
++/* APF27 has an "on module" Ethernet transceiver */
++int lan8700_wakeup(struct phy_device *phydev)
++{
++#define LAN87xx_SPECIAL_REG 0x12
++
++	int rc = phy_read(phydev, LAN87xx_SPECIAL_REG);
++
++	phy_write(phydev, LAN87xx_SPECIAL_REG, rc | 0xE0);
++	phy_write(phydev, MII_BMCR, BMCR_RESET);
++	udelay(1000);
++	return 0;
++}
++
++/* APF27 has a Micron 128MiB 1,8V NAND flash, 16 bits width */
++static const struct mxc_nand_platform_data apf27_nand_board_info __initconst = {
++	.width = 2,
++	.hw_ecc = 1,
++	.flash_bbt = 1, /* we handle Bad Block Table */
++};
++
++/* APF27 has an I2C EEPROM on I2C2 Bus */
++static const struct imxi2c_platform_data apf27_i2c_1_data __initconst = {
++	.bitrate = 100000,
++};
++
++static struct i2c_board_info apf27_i2c_devices_bus1[] = {
++	{
++		I2C_BOARD_INFO("24c02", 0x50),
++	},
++};
++
++/* APF27 has an RS232 debug port/console on UART1 with "on module"
++   transceiver */
++static struct imxuart_platform_data uart0_pdata = {
++	.flags = 0,
++};
++
++/* APF27 has an "on module" transceiver for UART3 */
++static struct imxuart_platform_data uart2_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++/* APF27 has an "on module" transceiver for USB OTG */
++static int otg_mode_host = 1;
++
++static int __init apf27_otg_mode(char *options)
++{
++	if (!strcmp(options, "host"))
++		otg_mode_host = 1;
++	else if (!strcmp(options, "device"))
++		otg_mode_host = 0;
++	else
++		pr_info("otg_mode neither \"host\" nor \"device\". "
++			"Defaulting to host\n");
++
++	return 0;
++}
++__setup("otg_mode=", apf27_otg_mode);
++
++static void apf27_usbotg_phy_init(void)
++{
++#define USBCTRL_OFFSET		0x600
++#define USBCTRL_UIE_BIT		(1 << 28)
++#define USBCTRL_WIE_BIT		(1 << 27)
++#define USBCMD_OFFSET		0x140
++#define USBCMD_RST_BIT		(1 << 1)
++#define PORTSC1_OFFSET		0x184
++#define PORTSC_PTS_MASK		(3 << 30)
++#define PORTSC_PTS_ULPI		(2 << 30)
++
++	unsigned int reg;
++
++	/* Tweak power/wake up handling */
++	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCTRL_OFFSET);
++	reg |= USBCTRL_WIE_BIT | USBCTRL_UIE_BIT;
++	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCTRL_OFFSET);
++
++	/* Select ULPI PHY */
++	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + PORTSC1_OFFSET);
++	reg = (reg & ~PORTSC_PTS_MASK) | PORTSC_PTS_ULPI;
++	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + PORTSC1_OFFSET);
++	mdelay(10);
++
++	/* Reset PHY */
++	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCMD_OFFSET);
++	reg |= USBCMD_RST_BIT;
++	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCMD_OFFSET);
++	mdelay(10);
++}
++
++static int apf27_otg_init(struct platform_device *pdev)
++{
++	int ret;
++
++	ret = mx27_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_DIFF_UNI);
++	apf27_usbotg_phy_init(); /* PHY is in powerdown mode by default */
++
++	return ret;
++}
++
++static struct mxc_usbh_platform_data otg_pdata __initdata = {
++	.init	= apf27_otg_init,
++	.portsc = MXC_EHCI_MODE_ULPI,
++};
++
++static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
++	.operating_mode = FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
++};
++
++static void __init apf27_init(void)
++{
++	int ret;
++
++	ret = mxc_gpio_setup_multiple_pins(apf27_pins,
++			ARRAY_SIZE(apf27_pins), "APF27");
++	if (ret)
++		printk(KERN_ERR "apf27: Failed to setup pins (%d)\n", ret);
++
++	imx27_add_imx_uart0(&uart0_pdata);
++	imx27_add_imx_uart2(&uart2_pdata);
++
++	/* bring lan8700 out of power down mode */
++	phy_register_fixup_for_id("1:1f", lan8700_wakeup);
++	imx27_add_fec(NULL);
++
++	imx27_add_mxc_nand(&apf27_nand_board_info);
++
++	imx27_add_imx2_wdt(NULL);
++
++	if (otg_mode_host) {
++		otg_pdata.otg = imx_otg_ulpi_create(ULPI_OTG_DRVVBUS |
++				ULPI_OTG_DRVVBUS_EXT);
++		if (otg_pdata.otg)
++			imx27_add_mxc_ehci_otg(&otg_pdata);
++	}
++	if (!otg_mode_host)
++		imx27_add_fsl_usb2_udc(&otg_device_pdata);
++
++	i2c_register_board_info(1, apf27_i2c_devices_bus1,
++				ARRAY_SIZE(apf27_i2c_devices_bus1));
++	imx27_add_imx_i2c(1, &apf27_i2c_1_data);
++}
++
++static void __init apf27_timer_init(void)
++{
++	mx27_clocks_init(26000000); /* init ext ref, even if not used */
++}
++
++static struct sys_timer apf27_timer = {
++	.init = apf27_timer_init,
++};
++
++MACHINE_START(APF27, "Armadeus APF27")
++	/* Maintainer: Julien Boibessot <julien.boibessot@armadeus.com> */
++	.boot_params = MX27_PHYS_OFFSET + 0x100,
++	.map_io = mx27_map_io,
++	.init_early = imx27_init_early,
++	.init_irq = mx27_init_irq,
++	.timer = &apf27_timer,
++	.init_machine = apf27_init,
++MACHINE_END
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+index 4864b0a..e3ef62c 100644
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -85,6 +85,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ 	case MACH_TYPE_PCA100:
+ 	case MACH_TYPE_MXT_TD60:
+ 	case MACH_TYPE_IMX27IPCAM:
++	case MACH_TYPE_APF27:
+ 		uart_base = MX2X_UART1_BASE_ADDR;
+ 		break;
+ 	case MACH_TYPE_MX31LITE:
+-- 
+1.6.0.4
