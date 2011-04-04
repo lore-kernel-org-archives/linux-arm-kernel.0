@@ -1,38 +1,34 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Apr 2011 20:47:17 +0900
-Subject: [PATCH] ARM: Suspend: Fix build error on ARCH_S5PC100
-In-Reply-To: <20110402091904.GH8482@n2100.arm.linux.org.uk>
-References: <1301710155-16373-1-git-send-email-kgene.kim@samsung.com>
-	<20110402091904.GH8482@n2100.arm.linux.org.uk>
-Message-ID: <02c701cbf2be$0ebebb80$2c3c3280$%kim@samsung.com>
+Date: Mon, 04 Apr 2011 20:50:33 +0900
+Subject: [PATCH 1/2] ARM: Make consolidated PM sleep code depend
+	on	PM_SLEEP
+In-Reply-To: <20110403122713.GD4213@n2100.arm.linux.org.uk>
+References: <20110402091904.GH8482@n2100.arm.linux.org.uk>
+	<E1Q5x0g-0001Yw-Vb@rmk-PC.arm.linux.org.uk>
+	<87ipuvr2xg.fsf@lebrac.rtp-net.org>
+	<20110403122713.GD4213@n2100.arm.linux.org.uk>
+Message-ID: <02c801cbf2be$843a9190$8cafb4b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell King - ARM Linux wrote:
 > 
-> On Sat, Apr 02, 2011 at 11:09:15AM +0900, Kukjin Kim wrote:
-> > The current mainline codes of ARCH_S5PC100 can not support
-> > suspend to ram. So needs this for preventing build error.
+> On Sun, Apr 03, 2011 at 01:26:35PM +0200, Arnaud Patard wrote:
+> > I've build-tested on some failing platforms theses 2 patches and the
+> > build are now succeeding. The only PM related zImage build error I found
+> > was for s5pc100:
 > >
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > Oops, I missed this in my previous patch.
-> >
-> > As I know, firstly ARCH_S5P64X0 will support suspend to ram
-> > then ARCH_S5PC100 will do it. But right now, we need this.
+> > arch/arm/plat-samsung/pm.c:32:26: fatal error: mach/pm-core.h: No such
+file
+> or directory
 > 
-> I'd much rather do this a different way - let me know if this means
-> the SoC based dependencies can be dropped.  Patches to follow.
+> That probably existing from before the consolidation patch, so I won't
+> worry about it.
 
-Yeah, I checked your patches. It's ok to me but this is also needed right
-now for preventing build errors with s5pc100_defconfig...because there is no
-regarding headers for supporting suspend to ram.
+Yeah, Russell is right :)
 
-However as I mentioned, the suspend to ram will be supported soon on them
-then we can drop its dependencies.
-
-Thanks.
+I will sort it out.
+Thanks for your pointing out.
 
 Best regards,
 Kgene.
