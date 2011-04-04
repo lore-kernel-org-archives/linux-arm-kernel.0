@@ -1,79 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Apr 2011 12:21:04 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104031726.37420.arnd@arndb.de>
-	<20110403160324.GA8050@n2100.arm.linux.org.uk>
-	<201104040259.26601.arnd@arndb.de>
-	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110404112104.GB19854@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Apr 2011 20:47:17 +0900
+Subject: [PATCH] ARM: Suspend: Fix build error on ARCH_S5PC100
+In-Reply-To: <20110402091904.GH8482@n2100.arm.linux.org.uk>
+References: <1301710155-16373-1-git-send-email-kgene.kim@samsung.com>
+	<20110402091904.GH8482@n2100.arm.linux.org.uk>
+Message-ID: <02c701cbf2be$0ebebb80$2c3c3280$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 12:03:42PM +0100, Catalin Marinas wrote:
-> On Mon, 2011-04-04 at 01:59 +0100, Arnd Bergmann wrote:
-> > On Sunday 03 April 2011, Russell King - ARM Linux wrote:
-> > > Then there's those which change the cs->read function pointer at runtime,
-> ...
-> > > and those which share that pointer with their sched_clock() implementation.
-> > 
-> > Abstracting sched_clock() to be run-time selected is something that
-> > needs to be taken care of. Maybe we could have a generic sched_clock
-> > implementation that is written on top of clocksource instead of jiffies,
-> > and always select that on architectures that have a decent clocksource.
+Russell King - ARM Linux wrote:
 > 
-> On Cortex-A15 with the virtualisation extensions and architected timers
-> the clocksource is implemented using a physical counter (as we want
-> wall-clock timing). But for sched_clock() we may want to use a virtual
-> counter (which is basically an offset from the physical one, set by the
-> hypervisor during guest OS switching). Marc already posted some patches
-> for this.
+> On Sat, Apr 02, 2011 at 11:09:15AM +0900, Kukjin Kim wrote:
+> > The current mainline codes of ARCH_S5PC100 can not support
+> > suspend to ram. So needs this for preventing build error.
+> >
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > Oops, I missed this in my previous patch.
+> >
+> > As I know, firstly ARCH_S5P64X0 will support suspend to ram
+> > then ARCH_S5PC100 will do it. But right now, we need this.
+> 
+> I'd much rather do this a different way - let me know if this means
+> the SoC based dependencies can be dropped.  Patches to follow.
 
-I had a quick look at the two patches, but I was far from impressed
-due to the apparant complexity I saw.
+Yeah, I checked your patches. It's ok to me but this is also needed right
+now for preventing build errors with s5pc100_defconfig...because there is no
+regarding headers for supporting suspend to ram.
 
-There's no point in trying to consolidate stuff if it results in a net
-increase in the amount of code to be maintained as that just increases
-the burden, churn and maintainence headache.
+However as I mentioned, the suspend to ram will be supported soon on them
+then we can drop its dependencies.
 
-Is there an easier way to consolidate it across all platforms?  I think
-so:
+Thanks.
 
-static DEFINE_CLOCK_DATA(cd);
-static u32 sched_clock_mask;
-static u32 (*read_sched_clock)(void);
-
-unsigned long long notrace sched_clock(void)
-{
-	if (read_sched_clock) {
-		u32 cyc = read_sched_clock();
-		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
-	} else {
-		/* jiffies based code */
-	}
-}
-
-static void notrace update_sched_clock(void)
-{
-	u32 cyc = read_sched_clock();
-	update_sched_clock(&cd, cyc, sched_clock_mask);
-}
-
-void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
-{
-	BUG_ON(bits > 32);
-	read_sched_clock = read;
-	sched_clock_mask = (1 << bits) - 1;
-	init_sched_clock(&cd, update_sched_clock, bits, rate);
-}
-
-and then get rid of the per-platform implementations entirely - all
-that platforms then have to provide is a read function and a call to
-setup_sched_clock().
-
-Whether its worth it or not is questionable - the above is more lines
-of code than many of the existing implementations, and we're not going
-to shrink the existing implementations by much (maybe one to three
-lines.)  The only thing we gain is the ability to select an implementation
-at runtime.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
