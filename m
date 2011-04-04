@@ -1,160 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Apr 2011 17:50:11 +0100
-Subject: [PATCH 2/3] ARM: Xilinx: add SMP specific support files
-In-Reply-To: <5ad00b91-47d8-4f02-aa72-5a413957cdb5@VA3EHSMHS005.ehs.local>
-References: <1301864418-12425-1-git-send-email-john.linn@xilinx.com>
-	<1301864418-12425-2-git-send-email-john.linn@xilinx.com>
-	<5ad00b91-47d8-4f02-aa72-5a413957cdb5@VA3EHSMHS005.ehs.local>
-Message-ID: <20110404165011.GE22480@n2100.arm.linux.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 4 Apr 2011 14:06:45 -0300
+Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
+Message-ID: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2011 at 03:00:17PM -0600, John Linn wrote:
-> +#include <linux/jiffies.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_scu.h>
-> +#include <mach/xilinx_soc.h>
-> +#include <mach/smp.h>
-> +#include "common.h"
-> +
-> +static void __iomem *scu_base = SCU_PERIPH_BASE;
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/plat-mxc/devices/Kconfig               |    3 +++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-gpio_leds.c  |   22 ++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |    4 ++++
+ 4 files changed, 30 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_leds.c
 
-You don't need this if its known at build time.
-
-> +
-> +static DEFINE_SPINLOCK(boot_lock);
-> +
-> +/* Secondary CPU kernel startup is a 2 phase process.
-> + * 1st phase is transition from a boot loader to the kernel, but
-> + * then wait not starting the kernel yet. 2nd phase starts the
-> + * the kernel. In both phases, the secondary CPU waits for an
-> + * event before it continues.
-> + */
-> +
-> +void __cpuinit platform_secondary_init(unsigned int cpu)
-> +{
-> +	/*
-> +	 * if any interrupts are already enabled for the primary
-> +	 * core (e.g. timer irq), then they will not have been enabled
-> +	 * for us: do so
-> +	 */
-> +	gic_secondary_init(0);
-> +
-> +	/*
-> +	 * Synchronise with the boot thread.
-> +	 */
-> +	spin_lock(&boot_lock);
-> +	spin_unlock(&boot_lock);
-> +}
-> +
-> +int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	unsigned long timeout;
-> +
-> +	/*
-> +	 * set synchronisation state between this boot processor
-> +	 * and the secondary one
-> +	 */
-> +	spin_lock(&boot_lock);
-> +
-> +	printk(KERN_INFO "Xilinx SMP: booting CPU1 now\n");
-
-Aren't the messages which are already printed enough?
-
-> +
-> +	/*
-> +	 * Update boot lock register with the boot key to allow the
-> +	 * secondary processor to start the kernel after an SEV.
-> +	 */
-> +	__raw_writel(BOOT_LOCK_KEY, OCM_HIGH_BASE + BOOT_LOCK_OFFSET);
-> +
-> +	/* Flush the kernel cache to ensure that the page tables are
-> +	 * available for the secondary CPU to use and make sure that
-> +	 * the write buffer is drained before doing an SEV.
-> +	 */
-> +	flush_cache_all();
-> +	smp_wmb();
-
-The page tables and everything else required should already be visible
-to the secondary CPU - if not that points to a bug in the generic code.
-All that you should need to do here is to make sure your write above
-is visible to the secondary CPU (and the address for it to boot from).
-
-> +
-> +	/*
-> +	 * Send an event to wake the secondary core from WFE state.
-> +	 */
-> +	sev();
-> +
-> +	timeout = jiffies + (1 * HZ);
-> +	while (time_before(jiffies, timeout))
-> +		;
-
-Have you no way to determine that the secondary CPU has started?
-
-> +void __init smp_init_cpus(void)
-> +{
-> +	unsigned int i, ncores;
-> +
-> +	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-
-	unsigned int i, ncores = scu_get_core_count(SCU_PERIPH_BASE);
-
-> +
-> +	/* sanity check */
-> +	if (ncores > NR_CPUS) {
-> +		printk(KERN_WARNING
-> +		       "Realview: no. of cores (%d) greater than configured "
-> +		       "maximum of %d - clipping\n",
-> +		       ncores, NR_CPUS);
-> +		ncores = NR_CPUS;
-> +	}
-
-Firstly, you're not Realview.  Secondly, I think this kind of check should
-be inside scu_get_core_count() if it has to exist.
-
-> +
-> +	for (i = 0; i < ncores; i++)
-> +		set_cpu_possible(i, true);
-> +}
-> +
-> +void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	int i;
-> +
-> +	/*
-> +	 * Initialise the present map, which describes the set of CPUs
-> +	 * actually populated at the present time.
-> +	 */
-> +	for (i = 0; i < max_cpus; i++)
-> +		set_cpu_present(i, true);
-> +
-> +	scu_enable(scu_base);
-> +
-> +	/* Initialize the boot lock register to prevent CPU1 from
-> +	   starting the kernel before CPU0 is ready for that.
-> +	*/
-> +	__raw_writel(0, OCM_HIGH_BASE + BOOT_LOCK_OFFSET);
-> +
-> +	/*
-> +	 * Write the address of secondary startup routine into the
-> +	 * boot address. The secondary CPU will use this value
-> +	 * to get into the kernel after it's awake from WFE state.
-> +	 *
-> +	 * Note the physical address is needed as the secondary CPU
-> +	 * will not have the MMU on yet. A barrier is added to ensure
-> +	 * that write buffer is drained.
-> +	 */
-> +	__raw_writel(virt_to_phys(xilinx_secondary_startup),
-> +					OCM_HIGH_BASE + BOOT_ADDR_OFFSET);
-> +	smp_wmb();
-> +
-> +	/*
-> +	 * Send an event to wake the secondary core from WFE state.
-> +	 */
-> +	sev();
-
-This looks like it shouldn't be necessary - you send an event in the
-boot_secondary() path which should be enough to get the CPU going.
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index b9ab1d5..3d4f63c 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -13,6 +13,9 @@ config IMX_HAVE_PLATFORM_GPIO_KEYS
+ 	bool
+ 	default y if SOC_IMX51
+ 
++config IMX_HAVE_PLATFORM_GPIO_LEDS
++	bool
++
+ config IMX_HAVE_PLATFORM_IMX21_HCD
+ 	bool
+ 	
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 75cd2ec..ceefca6 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -2,6 +2,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_FSL_USB2_UDC) += platform-fsl-usb2-udc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_LEDS) += platform-gpio_leds.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
+diff --git a/arch/arm/plat-mxc/devices/platform-gpio_leds.c b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
+new file mode 100644
+index 0000000..a430213
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <asm/sizes.h>
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++struct platform_device *__init imx_add_gpio_leds(
++		 const struct gpio_led_platform_data *pdata)
++{
++	return imx_add_platform_device("leds-gpio", -1, NULL,
++		 0, pdata, sizeof(*pdata));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8658c9c..94ee936 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -57,6 +57,10 @@ struct platform_device *__init imx_add_fsl_usb2_udc(
+ struct platform_device *__init imx_add_gpio_keys(
+ 		const struct gpio_keys_platform_data *pdata);
+ 
++#include <linux/leds.h>
++struct platform_device *__init imx_add_gpio_leds(
++		const struct gpio_led_platform_data *pdata);
++
+ #include <mach/mx21-usbhost.h>
+ struct imx_imx21_hcd_data {
+ 	resource_size_t iobase;
+-- 
+1.6.0.4
