@@ -1,447 +1,56 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon,  4 Apr 2011 10:24:52 +0100
-Subject: [PATCH 2/2] ARM: ptrace: Migrate to regsets framework
-In-Reply-To: <1301909092-24527-1-git-send-email-dave.martin@linaro.org>
-References: <1301909092-24527-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1301909092-24527-2-git-send-email-dave.martin@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Apr 2011 10:24:34 +0100
+Subject: [PATCH] ARCH arm: adding new board: CDU
+In-Reply-To: <20110404091635.GA19841@n2100.arm.linux.org.uk>
+References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
+	<1300949648-15078-2-git-send-email-horms@verge.net.au>
+	<4D8B2068.60402@aksignal.cz> <4D8BA47B.8050904@bluewatersys.com>
+	<4D998B12.1040909@aksignal.cz>
+	<20110404091635.GA19841@n2100.arm.linux.org.uk>
+Message-ID: <20110404092434.GB19841@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch migrates the implementation of the ptrace interface for
-the core integer registers, legacy FPA registers and VFP registers
-to use the regsets framework.
+On Mon, Apr 04, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 04, 2011 at 11:10:42AM +0200, Prchal Ji?? wrote:
+> > Hi,
+> > this is separated PATCH adding new board CDU.
+> 
+> What does this have to do with
+> 
+> "[PATCH 1/2] mmc, ARM: Rename SuperH Mobile ARM zboot helpers" ?
+> 
+> which is the message which you hit your mailer's "reply" button on?
+> Please don't pollute email threads.
 
-As an added bonus, all this stuff gets included in coredumps
-at no extra cost.  Without this patch, coredumps contained no
-VFP state.
+Sorry, it's not as trivial as I thought.  For some reason your mailer is
+introducing additional message IDs in the 'References' header which are
+causing the message to be incorrectly threaded.  Here are the original
+two messages:
 
-Third-party extension register sets (iwmmx, crunch) are not migrated
-by this patch, and continue to use the old implementation;
-these should be migratable without much extra work.
+From: Simon Horman <horms@verge.net.au>
+Subject: [PATCH 0/2] mmc: zboot helpers
+Message-Id: <1300949648-15078-1-git-send-email-horms@verge.net.au>
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Will Deacon <Will.Deacon@arm.com>
----
- arch/arm/include/asm/elf.h |    1 +
- arch/arm/kernel/ptrace.c   |  348 ++++++++++++++++++++++++++++++--------------
- 2 files changed, 240 insertions(+), 109 deletions(-)
+From: Simon Horman <horms@verge.net.au>
+Subject: [PATCH 1/2] mmc, ARM: Rename SuperH Mobile ARM zboot helpers
+Message-Id: <1300949648-15078-2-git-send-email-horms@verge.net.au>
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index c3cd875..0e9ce8d 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -108,6 +108,7 @@ struct task_struct;
- int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
- #define ELF_CORE_COPY_TASK_REGS dump_task_regs
- 
-+#define CORE_DUMP_USE_REGSET
- #define ELF_EXEC_PAGESIZE	4096
- 
- /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 2bf27f3..d07c751 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -21,6 +21,7 @@
- #include <linux/uaccess.h>
- #include <linux/perf_event.h>
- #include <linux/hw_breakpoint.h>
-+#include <linux/regset.h>
- 
- #include <asm/pgtable.h>
- #include <asm/system.h>
-@@ -308,58 +309,6 @@ static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
- 	return put_user_reg(tsk, off >> 2, val);
- }
- 
--/*
-- * Get all user integer registers.
-- */
--static int ptrace_getregs(struct task_struct *tsk, void __user *uregs)
--{
--	struct pt_regs *regs = task_pt_regs(tsk);
--
--	return copy_to_user(uregs, regs, sizeof(struct pt_regs)) ? -EFAULT : 0;
--}
--
--/*
-- * Set all user integer registers.
-- */
--static int ptrace_setregs(struct task_struct *tsk, void __user *uregs)
--{
--	struct pt_regs newregs;
--	int ret;
--
--	ret = -EFAULT;
--	if (copy_from_user(&newregs, uregs, sizeof(struct pt_regs)) == 0) {
--		struct pt_regs *regs = task_pt_regs(tsk);
--
--		ret = -EINVAL;
--		if (valid_user_regs(&newregs)) {
--			*regs = newregs;
--			ret = 0;
--		}
--	}
--
--	return ret;
--}
--
--/*
-- * Get the child FPU state.
-- */
--static int ptrace_getfpregs(struct task_struct *tsk, void __user *ufp)
--{
--	return copy_to_user(ufp, &task_thread_info(tsk)->fpstate,
--			    sizeof(struct user_fp)) ? -EFAULT : 0;
--}
--
--/*
-- * Set the child FPU state.
-- */
--static int ptrace_setfpregs(struct task_struct *tsk, void __user *ufp)
--{
--	struct thread_info *thread = task_thread_info(tsk);
--	thread->used_cp[1] = thread->used_cp[2] = 1;
--	return copy_from_user(&thread->fpstate, ufp,
--			      sizeof(struct user_fp)) ? -EFAULT : 0;
--}
--
- #ifdef CONFIG_IWMMXT
- 
- /*
-@@ -418,56 +367,6 @@ static int ptrace_setcrunchregs(struct task_struct *tsk, void __user *ufp)
- }
- #endif
- 
--#ifdef CONFIG_VFP
--/*
-- * Get the child VFP state.
-- */
--static int ptrace_getvfpregs(struct task_struct *tsk, void __user *data)
--{
--	struct thread_info *thread = task_thread_info(tsk);
--	union vfp_state *vfp = &thread->vfpstate;
--	struct user_vfp __user *ufp = data;
--
--	vfp_sync_hwstate(thread);
--
--	/* copy the floating point registers */
--	if (copy_to_user(&ufp->fpregs, &vfp->hard.fpregs,
--			 sizeof(vfp->hard.fpregs)))
--		return -EFAULT;
--
--	/* copy the status and control register */
--	if (put_user(vfp->hard.fpscr, &ufp->fpscr))
--		return -EFAULT;
--
--	return 0;
--}
--
--/*
-- * Set the child VFP state.
-- */
--static int ptrace_setvfpregs(struct task_struct *tsk, void __user *data)
--{
--	struct thread_info *thread = task_thread_info(tsk);
--	union vfp_state *vfp = &thread->vfpstate;
--	struct user_vfp __user *ufp = data;
--
--	vfp_sync_hwstate(thread);
--
--	/* copy the floating point registers */
--	if (copy_from_user(&vfp->hard.fpregs, &ufp->fpregs,
--			   sizeof(vfp->hard.fpregs)))
--		return -EFAULT;
--
--	/* copy the status and control register */
--	if (get_user(vfp->hard.fpscr, &ufp->fpscr))
--		return -EFAULT;
--
--	vfp_flush_hwstate(thread);
--
--	return 0;
--}
--#endif
--
- #ifdef CONFIG_HAVE_HW_BREAKPOINT
- /*
-  * Convert a virtual register number into an index for a thread_info
-@@ -694,6 +593,219 @@ out:
- }
- #endif
- 
-+/* regset get/set implementations */
-+
-+static int gpr_get(struct task_struct *target,
-+		   const struct user_regset *regset,
-+		   unsigned int pos, unsigned int count,
-+		   void *kbuf, void __user *ubuf)
-+{
-+	struct pt_regs *regs = task_pt_regs(target);
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				   regs,
-+				   0, sizeof(*regs));
-+}
-+
-+static int gpr_set(struct task_struct *target,
-+		   const struct user_regset *regset,
-+		   unsigned int pos, unsigned int count,
-+		   const void *kbuf, const void __user *ubuf)
-+{
-+	int ret;
-+	struct pt_regs newregs;
-+
-+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+				 &newregs,
-+				 0, sizeof(newregs));
-+	if (ret)
-+		return ret;
-+
-+	if (!valid_user_regs(&newregs))
-+		return -EINVAL;
-+
-+	*task_pt_regs(target) = newregs;
-+	return 0;
-+}
-+
-+static int fpa_get(struct task_struct *target,
-+		   const struct user_regset *regset,
-+		   unsigned int pos, unsigned int count,
-+		   void *kbuf, void __user *ubuf)
-+{
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				   &task_thread_info(target)->fpstate,
-+				   0, sizeof(struct user_fp));
-+}
-+
-+static int fpa_set(struct task_struct *target,
-+		   const struct user_regset *regset,
-+		   unsigned int pos, unsigned int count,
-+		   const void *kbuf, const void __user *ubuf)
-+{
-+	struct thread_info *thread = task_thread_info(target);
-+
-+	thread->used_cp[1] = thread->used_cp[2] = 1;
-+
-+	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+		&thread->fpstate,
-+		0, sizeof(struct user_fp));
-+}
-+
-+#ifdef CONFIG_VFP
-+/*
-+ * VFP register get/set implementations.
-+ *
-+ * With respect to the kernel, struct user_fp is divided into three chunks:
-+ * 16 or 32 real VFP registers (d0-d15 or d0-31)
-+ *	These are transferred to/from the real registers in the task's
-+ *	vfp_hard_struct.  The number of registers depends on the kernel
-+ *	configuration.
-+ *
-+ * 16 or 0 fake VFP registers (d16-d31 or empty)
-+ *	i.e., the user_vfp structure has space for 32 registers even if
-+ *	the kernel doesn't have them all.
-+ *
-+ *	vfp_get() reads this chunk as zero where applicable
-+ *	vfp_set() ignores this chunk
-+ *
-+ * 1 word for the FPSCR
-+ *
-+ * The bounds-checking logic built into user_regset_copyout and friends
-+ * means that we can make a simple sequence of calls to map the relevant data
-+ * to/from the specified slice of the user regset structure.
-+ */
-+static int vfp_get(struct task_struct *target,
-+		   const struct user_regset *regset,
-+		   unsigned int pos, unsigned int count,
-+		   void *kbuf, void __user *ubuf)
-+{
-+	int ret;
-+	struct thread_info *thread = task_thread_info(target);
-+	struct vfp_hard_struct const *vfp = &thread->vfpstate.hard;
-+	const size_t user_fpregs_offset = offsetof(struct user_vfp, fpregs);
-+	const size_t user_fpscr_offset = offsetof(struct user_vfp, fpscr);
-+
-+	vfp_sync_hwstate(thread);
-+
-+	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				  &vfp->fpregs,
-+				  user_fpregs_offset,
-+				  user_fpregs_offset + sizeof(vfp->fpregs));
-+	if (ret)
-+		return ret;
-+
-+	ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
-+				       user_fpregs_offset + sizeof(vfp->fpregs),
-+				       user_fpscr_offset);
-+	if (ret)
-+		return ret;
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				   &vfp->fpscr,
-+				   user_fpscr_offset,
-+				   user_fpscr_offset + sizeof(vfp->fpscr));
-+}
-+
-+/*
-+ * For vfp_set() a read-modify-write is done on the VFP registers,
-+ * in order to avoid writing back a half-modified set of registers on
-+ * failure.
-+ */
-+static int vfp_set(struct task_struct *target,
-+			  const struct user_regset *regset,
-+			  unsigned int pos, unsigned int count,
-+			  const void *kbuf, const void __user *ubuf)
-+{
-+	int ret;
-+	struct thread_info *thread = task_thread_info(target);
-+	struct vfp_hard_struct new_vfp = thread->vfpstate.hard;
-+	const size_t user_fpregs_offset = offsetof(struct user_vfp, fpregs);
-+	const size_t user_fpscr_offset = offsetof(struct user_vfp, fpscr);
-+
-+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+				  &new_vfp.fpregs,
-+				  user_fpregs_offset,
-+				  user_fpregs_offset + sizeof(new_vfp.fpregs));
-+	if (ret)
-+		return ret;
-+
-+	ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
-+				user_fpregs_offset + sizeof(new_vfp.fpregs),
-+				user_fpscr_offset);
-+	if (ret)
-+		return ret;
-+
-+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+				 &new_vfp.fpscr,
-+				 user_fpscr_offset,
-+				 user_fpscr_offset + sizeof(new_vfp.fpscr));
-+	if (ret)
-+		return ret;
-+
-+	vfp_sync_hwstate(thread);
-+	thread->vfpstate.hard = new_vfp;
-+	vfp_flush_hwstate(thread);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_VFP */
-+
-+enum arm_regset {
-+	REGSET_GPR,
-+	REGSET_FPR,
-+#ifdef CONFIG_VFP
-+	REGSET_VFP,
-+#endif
-+};
-+
-+static const struct user_regset arm_regsets[] = {
-+	[REGSET_GPR] = {
-+		.core_note_type = NT_PRSTATUS,
-+		.n = ELF_NGREG,
-+		.size = sizeof(u32),
-+		.align = sizeof(u32),
-+		.get = gpr_get,
-+		.set = gpr_set
-+	},
-+	[REGSET_FPR] = {
-+		/*
-+		 * For the FPA regs in fpstate, the real fields are a mixture
-+		 * of sizes, so pretend that the registers are word-sized:
-+		 */
-+		.core_note_type = NT_PRFPREG,
-+		.n = sizeof(struct user_fp) / sizeof(u32),
-+		.size = sizeof(u32),
-+		.align = sizeof(u32),
-+		.get = fpa_get,
-+		.set = fpa_set
-+	},
-+#ifdef CONFIG_VFP
-+	[REGSET_VFP] = {
-+		/*
-+		 * Pretend that the VFP regs are word-sized, since the FPSCR is
-+		 * a single word dangling at the end of struct user_vfp:
-+		 */
-+		.core_note_type = NT_ARM_VFP,
-+		.n = sizeof(struct user_vfp) / sizeof(u32),
-+		.size = sizeof(u32),
-+		.align = sizeof(u32),
-+		.get = vfp_get,
-+		.set = vfp_set
-+	},
-+#endif /* CONFIG_VFP */
-+};
-+
-+static const struct user_regset_view user_arm_view = {
-+	.name = "arm", .e_machine = ELF_ARCH, .ei_osabi = ELF_OSABI,
-+	.regsets = arm_regsets, .n = ARRAY_SIZE(arm_regsets)
-+};
-+
-+const struct user_regset_view *task_user_regset_view(struct task_struct *task)
-+{
-+	return &user_arm_view;
-+}
-+
- long arch_ptrace(struct task_struct *child, long request,
- 		 unsigned long addr, unsigned long data)
- {
-@@ -710,19 +822,31 @@ long arch_ptrace(struct task_struct *child, long request,
- 			break;
- 
- 		case PTRACE_GETREGS:
--			ret = ptrace_getregs(child, datap);
-+			ret = copy_regset_to_user(child,
-+						  &user_arm_view, REGSET_GPR,
-+						  0, sizeof(struct pt_regs),
-+						  datap);
- 			break;
- 
- 		case PTRACE_SETREGS:
--			ret = ptrace_setregs(child, datap);
-+			ret = copy_regset_from_user(child,
-+						    &user_arm_view, REGSET_GPR,
-+						    0, sizeof(struct pt_regs),
-+						    datap);
- 			break;
- 
- 		case PTRACE_GETFPREGS:
--			ret = ptrace_getfpregs(child, datap);
-+			ret = copy_regset_to_user(child,
-+						  &user_arm_view, REGSET_FPR,
-+						  0, sizeof(union fp_state),
-+						  datap);
- 			break;
--		
-+
- 		case PTRACE_SETFPREGS:
--			ret = ptrace_setfpregs(child, datap);
-+			ret = copy_regset_from_user(child,
-+						    &user_arm_view, REGSET_FPR,
-+						    0, sizeof(union fp_state),
-+						    datap);
- 			break;
- 
- #ifdef CONFIG_IWMMXT
-@@ -757,11 +881,17 @@ long arch_ptrace(struct task_struct *child, long request,
- 
- #ifdef CONFIG_VFP
- 		case PTRACE_GETVFPREGS:
--			ret = ptrace_getvfpregs(child, datap);
-+			ret = copy_regset_to_user(child,
-+						  &user_arm_view, REGSET_VFP,
-+						  0, sizeof(struct user_vfp),
-+						  datap);
- 			break;
- 
- 		case PTRACE_SETVFPREGS:
--			ret = ptrace_setvfpregs(child, datap);
-+			ret = copy_regset_from_user(child,
-+						    &user_arm_view, REGSET_VFP,
-+						    0, sizeof(struct user_vfp),
-+						    datap);
- 			break;
- #endif
- 
--- 
-1.7.1
+And your messages:
+
+From: Prchal Ji?? <jiri.prchal@aksignal.cz>
+Subject: [PATCH] mmc, AT91: fix init fequency problem
+References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
+        <1300949648-15078-2-git-send-email-horms@verge.net.au>
+In-Reply-To: <1300949648-15078-2-git-send-email-horms@verge.net.au>
+
+From: Prchal Ji?? <jiri.prchal@aksignal.cz>
+Subject: [PATCH] ARCH arm: adding new board: CDU
+References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
+        <1300949648-15078-2-git-send-email-horms@verge.net.au>
+        <4D8B2068.60402@aksignal.cz> <4D8BA47B.8050904@bluewatersys.com>
+In-Reply-To: <4D8BA47B.8050904@bluewatersys.com>
+
+both of which reference Simon's unrelated emails.  No idea how you're
+doing that, but both of your messages seem to be completely unrelated
+to Simon's two.
