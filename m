@@ -1,67 +1,29 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 04 Apr 2011 15:15:07 +0200
-Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
-In-Reply-To: <1301666596.30870.176.camel@nimitz>
-References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
-	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
-	<1301587083.31087.1032.camel@nimitz>
-	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
-	<1301606078.31087.1275.camel@nimitz>
-	<op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
-	<1301610411.30870.29.camel@nimitz>
-	<op.vs8cf5xd3l0zgt@mnazarewicz-glaptop>
-	<1301666596.30870.176.camel@nimitz>
-Message-ID: <op.vte0fgez3l0zgt@mnazarewicz-glaptop>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 4 Apr 2011 10:19:26 -0300
+Subject: [PATCH] ARM: mx3/pcm043: Remove unneeded esdhc.h define
+Message-ID: <1301923166-13220-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, 2011-04-01 at 00:51 +0200, Michal Nazarewicz wrote:
->> The function is called from alloc_contig_range() (see patch 05/12) which
->> makes sure that the PFN is valid.  Situation where there is not enough
->> space is caught earlier in alloc_contig_range().
->>
->> alloc_contig_freed_pages() must be given a valid PFN range such that all
->> the pages in that range are free (as in are within the region tracked by
->> page allocator) and of MIGRATE_ISOLATE so that page allocator won't
->> touch them.
+"devices-imx35.h" includes <mach/devices-common.h>; and the latter
+includes <mach/esdhc.h>, so no need to include it again in mach-pcm043.c.
 
-On Fri, 01 Apr 2011 16:03:16 +0200, Dave Hansen wrote:
-> OK, so it really is a low-level function only.  How about a comment that
-> explicitly says this?  "Only called from $FOO with the area already
-> isolated."  It probably also deserves an __ prefix.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx3/mach-pcm043.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Yes, it's not really for general use.  Comment may indeed be useful here.
-
->> That's why invalid PFN is a bug in the caller and not an exception that
->> has to be handled.
->>
->> Also, the function is not called during boot time.  It is called while
->> system is already running.
-
-> What kind of success have you had running this in practice?  I'd be
-> worried that some silly task or a sticky dentry would end up in the
-> range that you want to allocate in.
-
-I'm not sure what you are asking.
-
-The function requires the range to be marked as MIGRATE_ISOLATE and all
-pages being free, so nothing can be allocated there while the function
-is running.
-
-If you are asking about CMA in general, the range that CMA uses is marked
-as MIGRATE_CMA (a new migrate type) which means that only MIGRATE_MOVABLE
-pages can be allocated there.  This means, that in theory, if there is
-enough memory the pages can always be moved out of the region.  At leasts
-that's my understanding of the type.  If this is correct, the allocation
-should always succeed provided enough memory for the pages within the
-region to be moved to is available.
-
-As of practice, I have run some simple test to see if the code works and
-they succeeded.  Also, Marek has run some test with actual hardware and
-those worked well as well (but I'll let Marek talk about any details).
-
+diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
+index 036ba1a..9caf38b 100644
+--- a/arch/arm/mach-mx3/mach-pcm043.c
++++ b/arch/arm/mach-mx3/mach-pcm043.c
+@@ -40,7 +40,6 @@
+ #include <mach/mx3fb.h>
+ #include <mach/ulpi.h>
+ #include <mach/audmux.h>
+-#include <mach/esdhc.h>
+ 
+ #include "devices-imx35.h"
+ #include "devices.h"
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+1.6.0.4
