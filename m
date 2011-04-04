@@ -1,76 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Apr 2011 11:31:01 -0700
-Subject: [PATCHv2] ARM: Use asm-generic/sizes.h
-Message-ID: <1301941861-465-1-git-send-email-sboyd@codeaurora.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 04 Apr 2011 22:35:42 +0400
+Subject: [PATCH v4 1/4] davinci: da8xx: add spi resources and registration
+	routine
+In-Reply-To: <1298486651-18882-2-git-send-email-michael.williamson@criticallink.com>
+References: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
+	<1298486651-18882-2-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <4D9A0F7E.1050606@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d232b12 (asm-generic headers: add sizes.h, 2011-01-15)
-introcuded a generic sizes.h. Use that instead of the ARM specific
-version.
+Michael Williamson wrote:
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+> Add IO resource structures, platform data, and a registration
+> routine in order to support spi device on DA850/OMAP-L138/AM18x
+> and DA830/OMAP-L137/AM17x platforms.
 
-Ok I gave in and just added SZ_48M to this header. I also
-left the copyright stuff alone. When/if generic asm stuff
-happens we can deal with the fallout.
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> ---
+>  arch/arm/mach-davinci/devices-da8xx.c      |  104 ++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/da8xx.h |    4 +
+>  2 files changed, 108 insertions(+), 0 deletions(-)
 
- arch/arm/include/asm/sizes.h |   42 ++----------------------------------------
- 1 files changed, 2 insertions(+), 40 deletions(-)
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index 119d46e..625d4b6 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -38,14 +38,20 @@
+>  #define DA8XX_EMAC_MDIO_BASE		0x01e24000
+>  #define DA8XX_GPIO_BASE			0x01e26000
+>  #define DA8XX_I2C1_BASE			0x01e28000
+> +#define DA8XX_SPI0_BASE			0x01c41000
+> +#define DA8XX_SPI1_BASE			0x01f0e000
 
-diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
-index 316bb2b..154b89b 100644
---- a/arch/arm/include/asm/sizes.h
-+++ b/arch/arm/include/asm/sizes.h
-@@ -16,44 +16,6 @@
- /*  Size definitions
-  *  Copyright (C) ARM Limited 1998. All rights reserved.
-  */
-+#include <asm-generic/sizes.h>
- 
--#ifndef __sizes_h
--#define __sizes_h                       1
--
--/* handy sizes */
--#define SZ_16				0x00000010
--#define SZ_32				0x00000020
--#define SZ_64				0x00000040
--#define SZ_128				0x00000080
--#define SZ_256				0x00000100
--#define SZ_512				0x00000200
--
--#define SZ_1K                           0x00000400
--#define SZ_2K                           0x00000800
--#define SZ_4K                           0x00001000
--#define SZ_8K                           0x00002000
--#define SZ_16K                          0x00004000
--#define SZ_32K                          0x00008000
--#define SZ_64K                          0x00010000
--#define SZ_128K                         0x00020000
--#define SZ_256K                         0x00040000
--#define SZ_512K                         0x00080000
--
--#define SZ_1M                           0x00100000
--#define SZ_2M                           0x00200000
--#define SZ_4M                           0x00400000
--#define SZ_8M                           0x00800000
--#define SZ_16M                          0x01000000
--#define SZ_32M                          0x02000000
--#define SZ_48M                          0x03000000
--#define SZ_64M                          0x04000000
--#define SZ_128M                         0x08000000
--#define SZ_256M                         0x10000000
--#define SZ_512M                         0x20000000
--
--#define SZ_1G                           0x40000000
--#define SZ_2G                           0x80000000
--
--#endif
--
--/*         END */
-+#define SZ_48M	(SZ_32M + SZ_16M)
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+    Unfortunately, DA830 and DA850 have SPI#1 mapped at different addresses, so 
+this will work only on DA850. I'll send a patch...
+
+WBR, Sergei
