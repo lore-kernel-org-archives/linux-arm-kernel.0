@@ -1,35 +1,58 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 4 Apr 2011 17:21:21 +0200
-Subject: [PATCH] plat-mxc: Provide irq_chip name for GPIO IRQs
-In-Reply-To: <20110404143408.GD22480@n2100.arm.linux.org.uk>
-References: <1296489624-21355-1-git-send-email-alexander.stein@systec-electronic.com>
-	<20110404142936.GF30938@pengutronix.de>
-	<20110404143408.GD22480@n2100.arm.linux.org.uk>
-Message-ID: <201104041721.22158.alexander.stein@systec-electronic.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 04 Apr 2011 16:29:08 +0100
+Subject: [PATCH v2] ARM: GIC: Convert GIC library to use the IO relaxed
+	operations
+In-Reply-To: <1301650321-28652-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1301650321-28652-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1301930948.15819.52.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 April 2011, 16:34:08 Russell King - ARM Linux wrote:
-> On Mon, Apr 04, 2011 at 04:29:36PM +0200, Uwe Kleine-K?nig wrote:
-> > On Tue, Mar 01, 2011 at 09:34:15AM +0100, Wolfram Sang wrote:
-> > > Hi,
-> > > 
-> > > > >  static struct irq_chip gpio_irq_chip = {
-> > > > > 
-> > > > > +	.name = "GPIO",
-> > > 
-> > > I'd suggest a more specific name, e.g. "i.MX GPIO"? You can then also
-> > > add my
-> > > 
-> > > Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-> > 
-> > This comment wasn't addressed. Does someone care to follow up?
+On Fri, 2011-04-01 at 10:32 +0100, Santosh Shilimkar wrote:
+> The GIC register accesses today make use of readl()/writel()
+> which prove to be very expensive when used along with mandatory
+> barriers. This mandatory barriers also introduces an un-necessary
+> and expensive l2x0_sync() operation. On Cortex-A9 MP cores, GIC
+> IO accesses from CPU are direct and doesn't go through L2X0 write
+> buffer.
 > 
-> And if we consolidate the GPIO implementations (I hope *someone* is
-> working on that) then this doesn't matter one ounce because platforms
-> won't be identifying that its an 'i.MX GPIO'.
+> Also since a DSB does not guarantee that the device state has
+> been changed, a read back from the device is introduced wherever
+> necessary.
+...
+> @@ -98,7 +98,8 @@ static void gic_mask_irq(struct irq_data *d)
+>         u32 mask = 1 << (d->irq % 32);
+> 
+>         spin_lock(&irq_controller_lock);
+> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>         if (gic_arch_extn.irq_mask)
+>                 gic_arch_extn.irq_mask(d);
+>         spin_unlock(&irq_controller_lock);
+> 
 
-The benefit from this patch is that it gets shown at /proc/interrupts. But I 
-personally don't care if it's "GPIO" as in mainline now or "i.MX GPIO"
+Talking to the hardware people, a readl back would guarantee that the
+GIC state has changed but you can still get spurious interrupts because
+of the signal propagation from the GIC to the CPU. That's difficult to
+reliably sort out in software as we don't know the hardware delays, so
+we'll have to cope with spurious interrupts (unlikely though).
 
-Alexander
+A better sequence would be something like below (but still no
+guarantees):
+
+	STR	[Device]
+	LDR	[Device]
+	DSB
+	ISB
+
+(the ISB is needed in case some instructions already in the pipeline
+sampled the state of the interrupt signal)
+
+But I'm more in favour of not even bothering with an additional
+readl_relaxed, we simply cope with a very rare spurious interrupt. In a
+virtualised environment accesses to the GIC distributor are trapped
+making things slower.
+
+-- 
+Catalin
