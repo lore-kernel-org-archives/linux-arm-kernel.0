@@ -1,37 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Apr 2011 20:50:33 +0900
-Subject: [PATCH 1/2] ARM: Make consolidated PM sleep code depend
-	on	PM_SLEEP
-In-Reply-To: <20110403122713.GD4213@n2100.arm.linux.org.uk>
-References: <20110402091904.GH8482@n2100.arm.linux.org.uk>
-	<E1Q5x0g-0001Yw-Vb@rmk-PC.arm.linux.org.uk>
-	<87ipuvr2xg.fsf@lebrac.rtp-net.org>
-	<20110403122713.GD4213@n2100.arm.linux.org.uk>
-Message-ID: <02c801cbf2be$843a9190$8cafb4b0$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 4 Apr 2011 13:06:34 +0100
+Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
+In-Reply-To: <BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
+References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+	<BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
+Message-ID: <20110404120633.GB26494@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Sun, Apr 03, 2011 at 01:26:35PM +0200, Arnaud Patard wrote:
-> > I've build-tested on some failing platforms theses 2 patches and the
-> > build are now succeeding. The only PM related zImage build error I found
-> > was for s5pc100:
-> >
-> > arch/arm/plat-samsung/pm.c:32:26: fatal error: mach/pm-core.h: No such
-file
-> or directory
-> 
-> That probably existing from before the consolidation patch, so I won't
-> worry about it.
+On Mon, Apr 04, 2011 at 06:45:46PM +0800, Eric Miao wrote:
+> Personally, I don't quite like the idea of an explicit _cansleep() version,
+> which is just confusing. A programmer shouldn't be aware of which
+> version to use.
 
-Yeah, Russell is right :)
+When working in interrupt context you need to pay attention to this
+stuff; personally I'd prefer an explict IRQ safe version but YMMV.  The
+only use the code makes of this is to generate warnings to make problems
+easier to diagnose.
 
-I will sort it out.
-Thanks for your pointing out.
+> David, you have any justification?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Sadly David passed away recently.
