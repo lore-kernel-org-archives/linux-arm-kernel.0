@@ -1,333 +1,114 @@
-From: julien.boibessot@free.fr (julien.boibessot at free.fr)
-Date: Mon,  4 Apr 2011 16:55:50 +0200
-Subject: [PATCH] [ARM] mx27: Add ARMadeus Systems APF27 board support
-Message-ID: <1301928950-4894-1-git-send-email-julien.boibessot@free.fr>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  4 Apr 2011 23:01:47 +0800
+Subject: [PATCH v2] arm/dt: Add a make rule to build dtb for enabled boards
+Message-ID: <1301929307-1838-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Boibessot <julien.boibessot@armadeus.com>
+With 'make ARCH=arm dtb', it builds Device Tree Blobs for those boards
+enabled by build CONFIG.
 
-The APF27 is an i.M27 based SOM (System On Module) that can be plugged on
-several docking/development boards. Here only basic module support
-is added (Ethernet, Serial, NAND Flash, USB OTG).
-
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
-Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Kconfig                   |   13 ++
- arch/arm/mach-imx/Makefile                  |    1 +
- arch/arm/mach-imx/mach-apf27.c              |  258 +++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
- 4 files changed, 273 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/mach-apf27.c
+It's based on commit fe8e6d0b0e601ca0a63fe768d4b812d5a45a9da7
+"arm/dt: Add dtb make rule" from Rob Herring.  And it works against
+Linaro kernel tree.  But it needs to go through mainline review
+before it gets applied.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 5eec099..433a420 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -312,4 +312,17 @@ config MACH_IMX27IPCAM
- 	  Include support for IMX27 IPCAM platform. This includes specific
- 	  configurations for the board and its peripherals.
+Changes since v1:
+* Take suggestion from Rob Herring to move .dts dection into machine
+  sepcific Makefile.boot, so that arch/arm/boot/Makefile can be as
+  clean as it is.
+
+ arch/arm/Makefile                     |    3 +++
+ arch/arm/boot/Makefile                |    2 ++
+ arch/arm/mach-exynos4/Makefile.boot   |    2 ++
+ arch/arm/mach-mx5/Makefile.boot       |    5 +++++
+ arch/arm/mach-omap2/Makefile.boot     |    4 ++++
+ arch/arm/mach-tegra/Makefile.boot     |    2 ++
+ arch/arm/mach-versatile/Makefile.boot |    2 ++
+ 7 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index d51ab6c..7fd2af9 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -292,6 +292,9 @@ zinstall uinstall install: vmlinux
+ %.dtb:
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
  
-+config MACH_APF27
-+	bool "Armadeus Systems APF27"
-+	select SOC_IMX27
-+	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
-+	select IMX_HAVE_PLATFORM_IMX_I2C
-+	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_MXC_NAND
-+	select MXC_ULPI if USB_ULPI
-+	help
-+	  Include support for APF27 platform. This includes specific
-+	  configurations for the module and its peripherals.
++dtb:
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 +
- endif
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index b85794d..8d557a4 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -37,3 +37,4 @@ obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
- obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
- obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
- obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
-+obj-$(CONFIG_MACH_APF27) += mach-apf27.o
-diff --git a/arch/arm/mach-imx/mach-apf27.c b/arch/arm/mach-imx/mach-apf27.c
-new file mode 100644
-index 0000000..f963953
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-apf27.c
-@@ -0,0 +1,258 @@
-+ /*
-+ * Support for the APF27 System On Module
-+ *
-+ * Copyright (C) 2008-2011 ARMadeus Systems <support@armadeus.com>
-+ *
-+ * Based on code which is:
-+ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-+ * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-+ * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA  02110-1301, USA.
-+ */
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
+ 	$(Q)$(MAKE) $(clean)=$(boot)
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 08fc37f..ce39850 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -63,6 +63,8 @@ endif
+ $(obj)/%.dtb: $(src)/dts/%.dts
+ 	$(call cmd,dtc)
+ 
++$(obj)/dtb: $(addprefix $(obj)/, $(dtb-y))
 +
-+#include <linux/platform_device.h>
-+#include <linux/i2c.h>
-+#include <linux/serial.h>
-+#include <linux/delay.h>
-+#include <linux/clk.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/phy.h>
+ quiet_cmd_uimage = UIMAGE  $@
+       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+ 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+diff --git a/arch/arm/mach-exynos4/Makefile.boot b/arch/arm/mach-exynos4/Makefile.boot
+index d65956f..fcee6b5 100644
+--- a/arch/arm/mach-exynos4/Makefile.boot
++++ b/arch/arm/mach-exynos4/Makefile.boot
+@@ -1,2 +1,4 @@
+    zreladdr-y	:= 0x40008000
+ params_phys-y	:= 0x40000100
 +
-+#include <asm/mach/flash.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/time.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/iomux-mx27.h>
-+#include <mach/gpio.h>
-+#include <mach/imx-uart.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/mxc_ehci.h>
-+#include <mach/ulpi.h>
++dtb-$(CONFIG_MACH_SMDKV310) += exynos4-smdkv310.dtb
+diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+index e928be1..4111462 100644
+--- a/arch/arm/mach-mx5/Makefile.boot
++++ b/arch/arm/mach-mx5/Makefile.boot
+@@ -7,3 +7,8 @@ initrd_phys-$(CONFIG_ARCH_MX51)	:= 0x90800000
+    zreladdr-$(CONFIG_ARCH_MX53)	:= 0x70008000
+ params_phys-$(CONFIG_ARCH_MX53)	:= 0x70000100
+ initrd_phys-$(CONFIG_ARCH_MX53)	:= 0x70800000
 +
-+#include "devices-imx27.h"
++dtb-$(CONFIG_MACH_MX51_BABBAGE) += mx51-babbage.dtb
++dtb-$(CONFIG_MACH_MX51_EFIKAMX) += genesi-efikamx.dtb
++dtb-$(CONFIG_MACH_MX51_EFIKASB) += genesi-efikasb.dtb
++dtb-$(CONFIG_MACH_MX53_LOCO) += mx53-loco.dtb
+diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
+index 565aff7..0f54901 100644
+--- a/arch/arm/mach-omap2/Makefile.boot
++++ b/arch/arm/mach-omap2/Makefile.boot
+@@ -1,3 +1,7 @@
+   zreladdr-y		:= 0x80008000
+ params_phys-y		:= 0x80000100
+ initrd_phys-y		:= 0x80800000
 +
++dtb-$(CONFIG_MACH_OMAP3_BEAGLE) += omap3-beagle.dtb
++dtb-$(CONFIG_MACH_OMAP4_PANDA) += omap4-panda.dtb
++dtb-$(CONFIG_MACH_OVERO) += omap3-overo.dtb
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index db52d61..c98addf 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -1,3 +1,5 @@
+ zreladdr-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00008000
+ params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
+ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
 +
-+static const int apf27_pins[] __initconst = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	/* USB_OTG */
-+	PE0_PF_USBOTG_NXT,
-+	PE1_PF_USBOTG_STP,
-+	PE2_PF_USBOTG_DIR,
-+	PE24_PF_USBOTG_CLK,
-+	PE25_PF_USBOTG_DATA7,
-+	PC7_PF_USBOTG_DATA5,
-+	PC8_PF_USBOTG_DATA6,
-+	PC9_PF_USBOTG_DATA0,
-+	PC10_PF_USBOTG_DATA2,
-+	PC11_PF_USBOTG_DATA1,
-+	PC12_PF_USBOTG_DATA4,
-+	PC13_PF_USBOTG_DATA3,
-+	/* UART3 */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+	PE10_PF_UART3_CTS,
-+	PE11_PF_UART3_RTS,
-+	/* ETHERNET */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C2 */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+};
-+
-+/* APF27 has an "on module" Ethernet transceiver */
-+int lan8700_wakeup(struct phy_device *phydev)
-+{
-+#define LAN87xx_SPECIAL_REG 0x12
-+
-+	int rc = phy_read(phydev, LAN87xx_SPECIAL_REG);
-+
-+	phy_write(phydev, LAN87xx_SPECIAL_REG, rc | 0xE0);
-+	phy_write(phydev, MII_BMCR, BMCR_RESET);
-+	udelay(1000);
-+	return 0;
-+}
-+
-+/* APF27 has a Micron 128MiB 1,8V NAND flash, 16 bits width */
-+static const struct mxc_nand_platform_data apf27_nand_board_info __initconst = {
-+	.width = 2,
-+	.hw_ecc = 1,
-+	.flash_bbt = 1, /* we handle Bad Block Table */
-+};
-+
-+/* APF27 has an I2C EEPROM on I2C2 Bus */
-+static const struct imxi2c_platform_data apf27_i2c_1_data __initconst = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info apf27_i2c_devices_bus1[] = {
-+	{
-+		I2C_BOARD_INFO("24c02", 0x50),
-+	},
-+};
-+
-+/* APF27 has an RS232 debug port/console on UART1 with "on module"
-+   transceiver */
-+static struct imxuart_platform_data uart0_pdata = {
-+	.flags = 0,
-+};
-+
-+/* APF27 has an "on module" transceiver for UART3 */
-+static struct imxuart_platform_data uart2_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+/* APF27 has an "on module" transceiver for USB OTG */
-+static int otg_mode_host = 1;
-+
-+static int __init apf27_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to host\n");
-+
-+	return 0;
-+}
-+__setup("otg_mode=", apf27_otg_mode);
-+
-+static void apf27_usbotg_phy_init(void)
-+{
-+#define USBCTRL_OFFSET		0x600
-+#define USBCTRL_UIE_BIT		(1 << 28)
-+#define USBCTRL_WIE_BIT		(1 << 27)
-+#define USBCMD_OFFSET		0x140
-+#define USBCMD_RST_BIT		(1 << 1)
-+#define PORTSC1_OFFSET		0x184
-+#define PORTSC_PTS_MASK		(3 << 30)
-+#define PORTSC_PTS_ULPI		(2 << 30)
-+
-+	unsigned int reg;
-+
-+	/* Tweak power/wake up handling */
-+	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCTRL_OFFSET);
-+	reg |= USBCTRL_WIE_BIT | USBCTRL_UIE_BIT;
-+	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCTRL_OFFSET);
-+
-+	/* Select ULPI PHY */
-+	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + PORTSC1_OFFSET);
-+	reg = (reg & ~PORTSC_PTS_MASK) | PORTSC_PTS_ULPI;
-+	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + PORTSC1_OFFSET);
-+	mdelay(10);
-+
-+	/* Reset PHY */
-+	reg = readl(MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCMD_OFFSET);
-+	reg |= USBCMD_RST_BIT;
-+	writel(reg, MX27_IO_ADDRESS(MX27_USB_BASE_ADDR) + USBCMD_OFFSET);
-+	mdelay(10);
-+}
-+
-+static int apf27_otg_init(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	ret = mx27_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_DIFF_UNI);
-+	apf27_usbotg_phy_init(); /* PHY is in powerdown mode by default */
-+
-+	return ret;
-+}
-+
-+static struct mxc_usbh_platform_data otg_pdata __initdata = {
-+	.init	= apf27_otg_init,
-+	.portsc = MXC_EHCI_MODE_ULPI,
-+};
-+
-+static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
-+	.operating_mode = FSL_USB2_DR_DEVICE,
-+	.phy_mode	= FSL_USB2_PHY_ULPI,
-+};
-+
-+static void __init apf27_init(void)
-+{
-+	int ret;
-+
-+	ret = mxc_gpio_setup_multiple_pins(apf27_pins,
-+			ARRAY_SIZE(apf27_pins), "APF27");
-+	if (ret)
-+		printk(KERN_ERR "apf27: Failed to setup pins (%d)\n", ret);
-+
-+	imx27_add_imx_uart0(&uart0_pdata);
-+	imx27_add_imx_uart2(&uart2_pdata);
-+
-+	/* bring lan8700 out of power down mode */
-+	phy_register_fixup_for_id("1:1f", lan8700_wakeup);
-+	imx27_add_fec(NULL);
-+
-+	imx27_add_mxc_nand(&apf27_nand_board_info);
-+
-+	imx27_add_imx2_wdt(NULL);
-+
-+	if (otg_mode_host) {
-+		otg_pdata.otg = imx_otg_ulpi_create(ULPI_OTG_DRVVBUS |
-+				ULPI_OTG_DRVVBUS_EXT);
-+		if (otg_pdata.otg)
-+			imx27_add_mxc_ehci_otg(&otg_pdata);
-+	}
-+	if (!otg_mode_host)
-+		imx27_add_fsl_usb2_udc(&otg_device_pdata);
-+
-+	i2c_register_board_info(1, apf27_i2c_devices_bus1,
-+				ARRAY_SIZE(apf27_i2c_devices_bus1));
-+	imx27_add_imx_i2c(1, &apf27_i2c_1_data);
-+}
-+
-+static void __init apf27_timer_init(void)
-+{
-+	mx27_clocks_init(26000000); /* init ext ref, even if not used */
-+}
-+
-+static struct sys_timer apf27_timer = {
-+	.init = apf27_timer_init,
-+};
-+
-+MACHINE_START(APF27, "Armadeus APF27")
-+	/* Maintainer: Julien Boibessot <julien.boibessot@armadeus.com> */
-+	.boot_params = MX27_PHYS_OFFSET + 0x100,
-+	.map_io = mx27_map_io,
-+	.init_early = imx27_init_early,
-+	.init_irq = mx27_init_irq,
-+	.timer = &apf27_timer,
-+	.init_machine = apf27_init,
-+MACHINE_END
-diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-index 4864b0a..e3ef62c 100644
---- a/arch/arm/plat-mxc/include/mach/uncompress.h
-+++ b/arch/arm/plat-mxc/include/mach/uncompress.h
-@@ -85,6 +85,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 	case MACH_TYPE_PCA100:
- 	case MACH_TYPE_MXT_TD60:
- 	case MACH_TYPE_IMX27IPCAM:
-+	case MACH_TYPE_APF27:
- 		uart_base = MX2X_UART1_BASE_ADDR;
- 		break;
- 	case MACH_TYPE_MX31LITE:
++dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
+diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
+index c7e75ac..e2227d3 100644
+--- a/arch/arm/mach-versatile/Makefile.boot
++++ b/arch/arm/mach-versatile/Makefile.boot
+@@ -2,3 +2,5 @@
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+ 
++dtb-$(CONFIG_ARCH_VERSATILE_PB) += versatile-pb.dtb
++dtb-$(CONFIG_MACH_VERSATILE_AB) += versatile-ab.dtb
 -- 
-1.6.0.4
+1.7.1
