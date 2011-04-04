@@ -1,41 +1,32 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Sun, 3 Apr 2011 20:28:13 -0300
-Subject: [PATCH 1/3] ARM: mx5/mx53_loco: Add write-protect and card-detect
-	for SD3
-In-Reply-To: <1301686188-14827-1-git-send-email-fabio.estevam@freescale.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 4 Apr 2011 02:01:25 +0200
+Subject: [PATCH 1/3] ARM: mx5/mx53_loco: Add write-protect and
+	card-detect for SD3
+In-Reply-To: <4D99028D.4000808@freescale.com>
 References: <1301686188-14827-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <4D99028D.4000808@freescale.com>
+	<4D99028D.4000808@freescale.com>
+Message-ID: <20110404000125.GA19849@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Fabio,
 
-On 4/1/2011 4:29 PM, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx53_loco.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
+> mmcblk1: error -84 transferring data, sector 32769, nr 32, card status 0x900    
 
-Please don?t apply this patch yet. 
+Last time I had -EILSEQ, the buswidth-caps were wrong. Does the board support
+8bit-width?
 
-After further testing I realize that I get the following errors after applying this patch:
+Hope it helps,
 
-mmc1: new high speed SDHC card at address aaaa                
-mmcblk1: mmc1:aaaa SD08G 7.40 GiB                                               
- mmcblk1: p1 p2                                                                 
-mmc1: Timeout waiting for hardware interrupt.                                   
-mmcblk1: retrying using single block read                                       
-mmcblk1: error -84 transferring data, sector 32769, nr 32, card status 0x900    
-end_request: I/O error, dev mmcblk1, sector 32769                               
-Buffer I/O error on device mmcblk1p2, logical block 0                           
-mmcblk1: error -84 transferring data, sector 32770, nr 31, card status 0x900    
-end_request: I/O error, dev mmcblk1, sector 32770                               
-Buffer I/O error on device mmcblk1p2, logical block 1                           
-mmcblk1: error -84 transferring data, sector 32771, nr 30, card status 0x900    
-end_request: I/O error, dev mmcblk1, sector 32771                               
+   Wolfram
 
-Will start debugging it.
-
-Regards,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110404/aad41c86/attachment.sig>
