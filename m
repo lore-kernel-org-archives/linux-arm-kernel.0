@@ -1,22 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Apr 2011 10:16:35 +0100
-Subject: [PATCH] ARCH arm: adding new board: CDU
-In-Reply-To: <4D998B12.1040909@aksignal.cz>
-References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
-	<1300949648-15078-2-git-send-email-horms@verge.net.au>
-	<4D8B2068.60402@aksignal.cz> <4D8BA47B.8050904@bluewatersys.com>
-	<4D998B12.1040909@aksignal.cz>
-Message-ID: <20110404091635.GA19841@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon,  4 Apr 2011 10:24:51 +0100
+Subject: [PATCH 1/2] ARM: ELF: Define new core note type for VFP registers
+Message-ID: <1301909092-24527-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 11:10:42AM +0200, Prchal Ji?? wrote:
-> Hi,
-> this is separated PATCH adding new board CDU.
+The VFP registers are not currently included in coredumps,
+and there's no existing note type where they can sensibly be
+included, so this patch defines a dedicated note type for them.
 
-What does this have to do with
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Will Deacon <Will.Deacon@arm.com>
+---
+ include/linux/elf.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-"[PATCH 1/2] mmc, ARM: Rename SuperH Mobile ARM zboot helpers" ?
-
-which is the message which you hit your mailer's "reply" button on?
-Please don't pollute email threads.
+diff --git a/include/linux/elf.h b/include/linux/elf.h
+index 4d60801..110821c 100644
+--- a/include/linux/elf.h
++++ b/include/linux/elf.h
+@@ -395,6 +395,7 @@ typedef struct elf64_shdr {
+ #define NT_S390_CTRS	0x304		/* s390 control registers */
+ #define NT_S390_PREFIX	0x305		/* s390 prefix register */
+ #define NT_S390_LAST_BREAK	0x306	/* s390 breaking event address */
++#define NT_ARM_VFP	0x400		/* ARM VFP/NEON registers */
+ 
+ 
+ /* Note header in a PT_NOTE section */
+-- 
+1.7.1
