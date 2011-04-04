@@ -1,77 +1,35 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 4 Apr 2011 09:50:49 -0300
-Subject: [PATCH v3] ARM: mx5/mx53_smd: Add esdhc support
-Message-ID: <1301921449-32194-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Apr 2011 13:49:26 +0100
+Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
+In-Reply-To: <1301921057.2219.2.camel@konomi>
+References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+	<BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
+	<20110404120633.GB26494@opensource.wolfsonmicro.com>
+	<BANLkTikqZ3ptO2iwbFy+9GQBt4nAj+3y8g@mail.gmail.com>
+	<1301921057.2219.2.camel@konomi>
+Message-ID: <20110404124926.GA22480@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Add esdhc entry into Kconfig
-Changes since v1:
-- Do not use CD detecion via GPIO as it is not working for MX53 yet.
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx53_smd.c |   28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 83ee088..697f44b 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -154,6 +154,7 @@ config MACH_MX53_SMD
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	help
- 	  Include support for MX53 SMD platform. This includes specific
- 	  configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-index 31e1732..e510c27 100644
---- a/arch/arm/mach-mx5/board-mx53_smd.c
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c
-@@ -52,6 +52,31 @@ static iomux_v3_cfg_t mx53_smd_pads[] = {
- 	/* I2C1 */
- 	MX53_PAD_CSI0_DAT8__I2C1_SDA,
- 	MX53_PAD_CSI0_DAT9__I2C1_SCL,
-+	/* SD1 */
-+	MX53_PAD_SD1_CMD__ESDHC1_CMD,
-+	MX53_PAD_SD1_CLK__ESDHC1_CLK,
-+	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
-+	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
-+	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
-+	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
-+	/* SD2 */
-+	MX53_PAD_SD2_CMD__ESDHC2_CMD,
-+	MX53_PAD_SD2_CLK__ESDHC2_CLK,
-+	MX53_PAD_SD2_DATA0__ESDHC2_DAT0,
-+	MX53_PAD_SD2_DATA1__ESDHC2_DAT1,
-+	MX53_PAD_SD2_DATA2__ESDHC2_DAT2,
-+	MX53_PAD_SD2_DATA3__ESDHC2_DAT3,
-+	/* SD3 */
-+	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
-+	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
-+	MX53_PAD_PATA_DATA10__ESDHC3_DAT2,
-+	MX53_PAD_PATA_DATA11__ESDHC3_DAT3,
-+	MX53_PAD_PATA_DATA0__ESDHC3_DAT4,
-+	MX53_PAD_PATA_DATA1__ESDHC3_DAT5,
-+	MX53_PAD_PATA_DATA2__ESDHC3_DAT6,
-+	MX53_PAD_PATA_DATA3__ESDHC3_DAT7,
-+	MX53_PAD_PATA_IORDY__ESDHC3_CLK,
-+	MX53_PAD_PATA_RESET_B__ESDHC3_CMD,
- };
- 
- static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
-@@ -97,6 +122,9 @@ static void __init mx53_smd_board_init(void)
- 	imx53_add_fec(&mx53_smd_fec_data);
- 	imx53_add_imx2_wdt(0, NULL);
- 	imx53_add_imx_i2c(0, &mx53_smd_i2c_data);
-+	imx53_add_sdhci_esdhc_imx(0, NULL);
-+	imx53_add_sdhci_esdhc_imx(1, NULL);
-+	imx53_add_sdhci_esdhc_imx(2, NULL);
- }
- 
- static void __init mx53_smd_timer_init(void)
--- 
-1.6.0.4
+On Mon, Apr 04, 2011 at 02:44:17PM +0200, Marek Vasut wrote:
+> > On Mon, Apr 4, 2011 at 8:06 PM, Mark Brown
+> > <broonie@opensource.wolfsonmicro.com> wrote:
+> > > On Mon, Apr 04, 2011 at 06:45:46PM +0800, Eric Miao wrote:
+> > > > Personally, I don't quite like the idea of an explicit _cansleep()
+> > > > version, which is just confusing. A programmer shouldn't be aware of
+> > > > which version to use.
+> > > 
+> > > When working in interrupt context you need to pay attention to this
+> > > stuff; personally I'd prefer an explict IRQ safe version but YMMV. ?The
+> > > only use the code makes of this is to generate warnings to make
+> > > problems easier to diagnose.
+> > > 
+> > > > David, you have any justification?
+> > > 
+> > > Sadly David passed away recently.
+> > > 
+> > 
+> > What????!!!!????? I didn't know that.
+> 
+> Me neither. I'm shocked. What happened?
