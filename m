@@ -1,31 +1,33 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 4 Apr 2011 14:40:32 +0200
-Subject: [PATCH v2] ARM: mx5/mx53_smd: Add esdhc support
-In-Reply-To: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
-References: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110404124032.GA20421@pengutronix.de>
+From: marek.vasut.n900@gmail.com (Marek Vasut)
+Date: Mon, 04 Apr 2011 14:44:17 +0200
+Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
+In-Reply-To: <BANLkTikqZ3ptO2iwbFy+9GQBt4nAj+3y8g@mail.gmail.com>
+References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+	<BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
+	<20110404120633.GB26494@opensource.wolfsonmicro.com>
+	<BANLkTikqZ3ptO2iwbFy+9GQBt4nAj+3y8g@mail.gmail.com>
+Message-ID: <1301921057.2219.2.camel@konomi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 09:32:55AM -0300, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Do not use CD and WP detecion via GPIO as it is not working for MX53 yet.
+> On Mon, Apr 4, 2011 at 8:06 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Mon, Apr 04, 2011 at 06:45:46PM +0800, Eric Miao wrote:
+> > > Personally, I don't quite like the idea of an explicit _cansleep()
+> > > version, which is just confusing. A programmer shouldn't be aware of
+> > > which version to use.
+> > 
+> > When working in interrupt context you need to pay attention to this
+> > stuff; personally I'd prefer an explict IRQ safe version but YMMV. ?The
+> > only use the code makes of this is to generate warnings to make
+> > problems easier to diagnose.
+> > 
+> > > David, you have any justification?
+> > 
+> > Sadly David passed away recently.
+> > 
+> 
+> What????!!!!????? I didn't know that.
 
-WP, too? I thought Richard had only issues with CD?
-
-Otherwise:
-
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110404/47f47efd/attachment.sig>
+Me neither. I'm shocked. What happened?
