@@ -1,102 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon,  4 Apr 2011 15:32:05 +0530
-Subject: [PATCH] OMAP2+: Fix 9 section mismatch(es) warnings from
-	mach-omap2/built-in.o
-Message-ID: <1301911325-2275-1-git-send-email-santosh.shilimkar@ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 4 Apr 2011 18:45:46 +0800
+Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
+In-Reply-To: <1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
+	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The serial*_data should have been marked as __initdata as per
-it's usage in the board files. Fix the same to remove the
-section mismatch warnings caused by it.
+Personally, I don't quite like the idea of an explicit _cansleep() version,
+which is just confusing. A programmer shouldn't be aware of which
+version to use.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/board-3430sdp.c    |    6 +++---
- arch/arm/mach-omap2/board-4430sdp.c    |    6 +++---
- arch/arm/mach-omap2/board-omap4panda.c |    6 +++---
- 3 files changed, 9 insertions(+), 9 deletions(-)
+David, you have any justification?
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 9afd087..a0f85a8 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -719,19 +719,19 @@ static struct omap_device_pad serial3_pads[] __initdata = {
- 			 OMAP_MUX_MODE0),
- };
- 
--static struct omap_board_data serial1_data = {
-+static struct omap_board_data serial1_data __initdata = {
- 	.id		= 0,
- 	.pads		= serial1_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial1_pads),
- };
- 
--static struct omap_board_data serial2_data = {
-+static struct omap_board_data serial2_data __initdata = {
- 	.id		= 1,
- 	.pads		= serial2_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial2_pads),
- };
- 
--static struct omap_board_data serial3_data = {
-+static struct omap_board_data serial3_data __initdata = {
- 	.id		= 2,
- 	.pads		= serial3_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial3_pads),
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 56702c5..c98e955 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -736,19 +736,19 @@ static struct omap_device_pad serial4_pads[] __initdata = {
- 			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
- };
- 
--static struct omap_board_data serial2_data = {
-+static struct omap_board_data serial2_data __initdata = {
- 	.id		= 1,
- 	.pads		= serial2_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial2_pads),
- };
- 
--static struct omap_board_data serial3_data = {
-+static struct omap_board_data serial3_data __initdata = {
- 	.id		= 2,
- 	.pads		= serial3_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial3_pads),
- };
- 
--static struct omap_board_data serial4_data = {
-+static struct omap_board_data serial4_data __initdata = {
- 	.id		= 3,
- 	.pads		= serial4_pads,
- 	.pads_cnt	= ARRAY_SIZE(serial4_pads),
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index f3a7b10..eeb22cd 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -551,19 +551,19 @@ static struct omap_device_pad serial4_pads[] __initdata = {
- 			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
- };
- 
--static struct omap_board_data serial2_data = {
-+static struct omap_board_data serial2_data __initdata = {
- 	.id             = 1,
- 	.pads           = serial2_pads,
- 	.pads_cnt       = ARRAY_SIZE(serial2_pads),
- };
- 
--static struct omap_board_data serial3_data = {
-+static struct omap_board_data serial3_data __initdata = {
- 	.id             = 2,
- 	.pads           = serial3_pads,
- 	.pads_cnt       = ARRAY_SIZE(serial3_pads),
- };
- 
--static struct omap_board_data serial4_data = {
-+static struct omap_board_data serial4_data __initdata = {
- 	.id             = 3,
- 	.pads           = serial4_pads,
- 	.pads_cnt       = ARRAY_SIZE(serial4_pads),
--- 
-1.6.0.4
+
+On Sat, Apr 2, 2011 at 9:43 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?drivers/video/backlight/corgi_lcd.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
+> index 1e71c35..8c80cb7 100644
+> --- a/drivers/video/backlight/corgi_lcd.c
+> +++ b/drivers/video/backlight/corgi_lcd.c
+> @@ -409,10 +409,10 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
+> ? ? ? ?cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
+>
+> ? ? ? ?if (gpio_is_valid(lcd->gpio_backlight_cont))
+> - ? ? ? ? ? ? ? gpio_set_value(lcd->gpio_backlight_cont, cont);
+> + ? ? ? ? ? ? ? gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
+>
+> ? ? ? ?if (gpio_is_valid(lcd->gpio_backlight_on))
+> - ? ? ? ? ? ? ? gpio_set_value(lcd->gpio_backlight_on, intensity);
+> + ? ? ? ? ? ? ? gpio_set_value_cansleep(lcd->gpio_backlight_on, intensity);
+>
+> ? ? ? ?if (lcd->kick_battery)
+> ? ? ? ? ? ? ? ?lcd->kick_battery();
+> --
+> 1.7.4.1
+>
+>
