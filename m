@@ -1,32 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Apr 2011 17:05:49 +0200
-Subject: [PATCH 4/6] ARM: mx3/mx31moboard: properly allocate memory for
-	mx3-camera
-In-Reply-To: <201103070900.45258.philippe.retornaz@epfl.ch>
-References: <20110304205008.GX22310@pengutronix.de>
-	<1299271882-2130-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<201103070900.45258.philippe.retornaz@epfl.ch>
-Message-ID: <20110404150549.GC13963@pengutronix.de>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Mon, 4 Apr 2011 16:06:35 +0100 (BST)
+Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
+In-Reply-To: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1104041600410.690@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2011 at 09:00:45AM +0100, Philippe R?tornaz wrote:
-> Le vendredi, 4 mars 2011 21.51:20, Uwe Kleine-K?nig a ?crit :
-> > It's not allowed to create an alias of system RAM for DMA.  So the memory
-> > used must not be allocated using dma_alloc_coherent but has to be reserved
-> > before using memblock routines.
-> > 
-> > There is no need to memzero the buffer because dma_alloc_coherent zeros
-> > the memory for us.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Thank you very much for this patch ! 
-Is this an Ack?
+Hi,
 
-Best regards
-Uwe
+sorry for double posting, the mailing list processor tells me "a non-text 
+attachment was scrubbed"; just for the critical piece ...
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Hopefully this one goes through. It's only "git diff" output; what could 
+it have tripped over ?
+
+Thanks,
+FrankH.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: hibernate-core-04Apr2011.patch
+Type: text/x-diff
+Size: 9586 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110404/bae266a3/attachment.bin>
