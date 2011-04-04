@@ -1,48 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Apr 2011 13:59:09 +0100
-Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
-In-Reply-To: <20110404124926.GA22480@n2100.arm.linux.org.uk>
-References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
-	<BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
-	<20110404120633.GB26494@opensource.wolfsonmicro.com>
-	<BANLkTikqZ3ptO2iwbFy+9GQBt4nAj+3y8g@mail.gmail.com>
-	<1301921057.2219.2.camel@konomi>
-	<20110404124926.GA22480@n2100.arm.linux.org.uk>
-Message-ID: <20110404125909.GB22480@n2100.arm.linux.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 04 Apr 2011 15:15:07 +0200
+Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1301666596.30870.176.camel@nimitz>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
+	<1301587083.31087.1032.camel@nimitz>
+	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
+	<1301606078.31087.1275.camel@nimitz>
+	<op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
+	<1301610411.30870.29.camel@nimitz>
+	<op.vs8cf5xd3l0zgt@mnazarewicz-glaptop>
+	<1301666596.30870.176.camel@nimitz>
+Message-ID: <op.vte0fgez3l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 01:49:26PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 04, 2011 at 02:44:17PM +0200, Marek Vasut wrote:
-> > > On Mon, Apr 4, 2011 at 8:06 PM, Mark Brown
-> > > <broonie@opensource.wolfsonmicro.com> wrote:
-> > > > On Mon, Apr 04, 2011 at 06:45:46PM +0800, Eric Miao wrote:
-> > > > > Personally, I don't quite like the idea of an explicit _cansleep()
-> > > > > version, which is just confusing. A programmer shouldn't be aware of
-> > > > > which version to use.
-> > > > 
-> > > > When working in interrupt context you need to pay attention to this
-> > > > stuff; personally I'd prefer an explict IRQ safe version but YMMV. ?The
-> > > > only use the code makes of this is to generate warnings to make
-> > > > problems easier to diagnose.
-> > > > 
-> > > > > David, you have any justification?
-> > > > 
-> > > > Sadly David passed away recently.
-> > > > 
-> > > 
-> > > What????!!!!????? I didn't know that.
-> > 
-> > Me neither. I'm shocked. What happened?
-> 
-> >From what I can tell, so far it's been passed around in private mail
-> only, and so people are hearing about it 3rd, 4th or more hand - which
-> really isn't the way to go about giving this news.
-> 
-> So, I'm not going to pass on the details which I've heard, instead
-> I'd suggest people wait for (or try to find) an official announcement.
+> On Fri, 2011-04-01 at 00:51 +0200, Michal Nazarewicz wrote:
+>> The function is called from alloc_contig_range() (see patch 05/12) which
+>> makes sure that the PFN is valid.  Situation where there is not enough
+>> space is caught earlier in alloc_contig_range().
+>>
+>> alloc_contig_freed_pages() must be given a valid PFN range such that all
+>> the pages in that range are free (as in are within the region tracked by
+>> page allocator) and of MIGRATE_ISOLATE so that page allocator won't
+>> touch them.
 
-Additionally, I'd like to say that I've requested from the person I heard
-the news from the details for sending condolences, but so far I'm none
-the wiser.
+On Fri, 01 Apr 2011 16:03:16 +0200, Dave Hansen wrote:
+> OK, so it really is a low-level function only.  How about a comment that
+> explicitly says this?  "Only called from $FOO with the area already
+> isolated."  It probably also deserves an __ prefix.
+
+Yes, it's not really for general use.  Comment may indeed be useful here.
+
+>> That's why invalid PFN is a bug in the caller and not an exception that
+>> has to be handled.
+>>
+>> Also, the function is not called during boot time.  It is called while
+>> system is already running.
+
+> What kind of success have you had running this in practice?  I'd be
+> worried that some silly task or a sticky dentry would end up in the
+> range that you want to allocate in.
+
+I'm not sure what you are asking.
+
+The function requires the range to be marked as MIGRATE_ISOLATE and all
+pages being free, so nothing can be allocated there while the function
+is running.
+
+If you are asking about CMA in general, the range that CMA uses is marked
+as MIGRATE_CMA (a new migrate type) which means that only MIGRATE_MOVABLE
+pages can be allocated there.  This means, that in theory, if there is
+enough memory the pages can always be moved out of the region.  At leasts
+that's my understanding of the type.  If this is correct, the allocation
+should always succeed provided enough memory for the pages within the
+region to be moved to is available.
+
+As of practice, I have run some simple test to see if the code works and
+they succeeded.  Also, Marek has run some test with actual hardware and
+those worked well as well (but I'll let Marek talk about any details).
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
