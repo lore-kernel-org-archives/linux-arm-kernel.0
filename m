@@ -1,59 +1,50 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Mon, 04 Apr 2011 10:16:38 -0400
-Subject: accessing vfpinstr macros from outside vfp directory
-In-Reply-To: <1301833480.5022.11.camel@jazzbox>
-References: <4D924966.2050707@codeaurora.org>	
-	<1301678843.17592.5.camel@e102144-lin.cambridge.arm.com>	
-	<4D96499B.5070402@codeaurora.org>
-	<1301833480.5022.11.camel@jazzbox>
-Message-ID: <4D99D2C6.4040206@codeaurora.org>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 4 Apr 2011 22:23:18 +0800
+Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
+	pandaboard
+In-Reply-To: <4D99D251.6000901@linux.vnet.ibm.com>
+References: <4D95E244.1050400@linux.vnet.ibm.com>
+	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
+	<4D99D251.6000901@linux.vnet.ibm.com>
+Message-ID: <BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will and Bryan,
+Hi,
 
-On 4/3/2011 8:24 AM, Will Deacon wrote:
-> Hi Bryan,
+2011/4/4 Avik Sil <aviksil@linux.vnet.ibm.com>:
+> Hi Ming,
 >
-> On Fri, 2011-04-01 at 22:54 +0100, Bryan Huntsman wrote:
->> On 04/01/11 10:27, Will Deacon wrote:
->>> Neil,
->>>
->>> On Tue, 2011-03-29 at 22:04 +0100, Neil Leeder wrote:
->>>> Any opinions on what would be the best thing to do here? Choices
->> appear to be:
->>>>
->>>> 1) allow the relative include path of ../vfp/vfpinstr.h
->>>> 2) move the definitions of fmrx, fmxr from vfp/vfpinstr.h to
->> include/asm/vfp.h
->>>> 3) move vfp/vfpinstr.h to include/asm
->>>> 4) other...?
->>>>
->>>> If it helps, I can create a patch for whichever is considered the
->> preferred solution.
->>>>
->>>
->>> I personally don't find option (1) that offensive - Bryan seemed to
->>> differ though so perhaps option (2) would keep him happy?
->>>
->>> I don't think option (3) is sensible given that the majority of the
->>> header file is private to /vfp.
->>>
->>> Will
+> On Saturday 02 April 2011 10:57 AM, Ming Lei wrote:
 >>
->> I raised it as a question.  If that's the only sane thing to do here,
->> then do it.  Since no one else seems to have chimed in on (2) or (3),
->> I'm fine with the patch as-is.
->
-> Ok, great. Let's leave it like it is for the time-being and if other
-> people start using things from the vfp headers then we should consider
-> refactoring some of that code (currently I think it's restricted to this
-> patch series and some files under vfp/).
+>> Hi Avik,
+>>
+>> 2011/4/1 Avik Sil<aviksil@linux.vnet.ibm.com>:
+>>>
+>>> Hi,
+>>>
+>>> I've applied the patches in
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045283.html
+>>> on top of a linaro kernel which resulted in booting problem on
+>>> Pandaboard.
+>>> It hangs inside the cti_unlock() while reading the LOCKSTATUS value,
+>>> which
+>>> happens when omap_init_pmu() is called. Please help me debug the issue.
+>>
+>> Please check if ?l3 clocks are enabled to drive CTI, such as done in
+>> below:
+>>
+>> ? ? ? ?omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
+>> ? ? ? ?omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
+>> ? ? ? ?omap_writel(2, CM_EMU_CLKSTCTRL);
+>> ? ? ? ?while ((omap_readl(CM_EMU_CLKSTCTRL)& ?0x300) != 0x300);
+>>
+> Can you please tell me where should I insert the above code to enable l3
+> clocks to drive CTI?
 
-Sounds good to me - thank you both for the comments.
+It should be inserted before calling omap4_configure_pmu_irq.
 
-Neil
-
+thanks,
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+Ming Lei
