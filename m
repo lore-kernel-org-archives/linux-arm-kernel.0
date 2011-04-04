@@ -1,32 +1,61 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 4 Apr 2011 02:01:25 +0200
-Subject: [PATCH 1/3] ARM: mx5/mx53_loco: Add write-protect and
-	card-detect for SD3
-In-Reply-To: <4D99028D.4000808@freescale.com>
-References: <1301686188-14827-1-git-send-email-fabio.estevam@freescale.com>
-	<4D99028D.4000808@freescale.com>
-Message-ID: <20110404000125.GA19849@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Apr 2011 02:14:16 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <1301869097.2549.36.camel@pasglop>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<4D95E112.4020400@vollmann.ch> <1301869097.2549.36.camel@pasglop>
+Message-ID: <201104040214.16581.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Monday 04 April 2011, Benjamin Herrenschmidt wrote:
+> On Fri, 2011-04-01 at 16:28 +0200, Detlef Vollmann wrote:
+> > >   * No board files
+> > Where do you put code that needs to run very early (e.g. pinging the
+> > watchdog)? 
+> 
+> Even on powerpc I keep board files :-)
+> 
+> The main thing is:
+> 
+> - The generic -> board linkage must not be hard (ie, no
+> platform_restart, but a board_ops.restart() etc....)
+> 
+> - An average board file is a few hundreds line long, that's it, mostly
+> it hooks up to generically provided functions, tho it gets the choice of
+> _which_ ones to hookup.
 
-> mmcblk1: error -84 transferring data, sector 32769, nr 32, card status 0x900    
+I believe a machine_type is more general than a board file, i.e. what
+gets described as a machine in powerpc would often currently correspond
+to multiple board files, if I am not mistaken.
 
-Last time I had -EILSEQ, the buswidth-caps were wrong. Does the board support
-8bit-width?
+The fact that we have a more diverse set of hardware on ARM, and that
+it's growing quicker than powerpc also means that we should try harder
+to reduce duplication than is necessary there.
 
-Hope it helps,
+> - It can still quirk/fixup a thing or two if needed, I thinkt it's
+> useful to keep that around, as long as such "quirks" remain small and
+> few. At the end of the day, if dealing with one board special case gives
+> you the choice between changing a ton of infrastructure/core to
+> introduce a new abstraction to deal with -that- special case vs. having
+> a one liner fixup in the platform code, the later is the most sensible
+> option. The hard part of course is to have sensible maintainers to make
+> sure this doesn't grow back to the old mess.
 
-   Wolfram
+I guess quirks are fine, as long as it's not required to have a them
+for each board. We can have a function that gets called for any matching
+"compatible" property of the root node, but I think the default should
+be not to need it eventually.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110404/aad41c86/attachment.sig>
+This is one area where I think I can illustrate how a gradual change
+from the status quo differs from a parallel new platform implementation:
+To gradually change one board file, you would convert the existing
+machine description to match the compatible property of the device
+tree root node and possibly at a later stage remove that code again
+once it's possible to work without it.
+When starting out with a fresh implementation, we first need to
+change all device drivers that are used on the board to work
+without a machine description, but then would not have to change
+any code twice, and the work for a similar board is almost done.
+
+	Arnd
