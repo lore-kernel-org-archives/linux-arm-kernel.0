@@ -1,44 +1,32 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 4 Apr 2011 18:45:46 +0800
-Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
-In-Reply-To: <1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
-References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
-Message-ID: <BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 04 Apr 2011 12:03:42 +0100
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <201104040259.26601.arnd@arndb.de>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104031726.37420.arnd@arndb.de>
+	<20110403160324.GA8050@n2100.arm.linux.org.uk>
+	<201104040259.26601.arnd@arndb.de>
+Message-ID: <1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Personally, I don't quite like the idea of an explicit _cansleep() version,
-which is just confusing. A programmer shouldn't be aware of which
-version to use.
+On Mon, 2011-04-04 at 01:59 +0100, Arnd Bergmann wrote:
+> On Sunday 03 April 2011, Russell King - ARM Linux wrote:
+> > Then there's those which change the cs->read function pointer at runtime,
+...
+> > and those which share that pointer with their sched_clock() implementation.
+> 
+> Abstracting sched_clock() to be run-time selected is something that
+> needs to be taken care of. Maybe we could have a generic sched_clock
+> implementation that is written on top of clocksource instead of jiffies,
+> and always select that on architectures that have a decent clocksource.
 
-David, you have any justification?
+On Cortex-A15 with the virtualisation extensions and architected timers
+the clocksource is implemented using a physical counter (as we want
+wall-clock timing). But for sched_clock() we may want to use a virtual
+counter (which is basically an offset from the physical one, set by the
+hypervisor during guest OS switching). Marc already posted some patches
+for this.
 
-
-On Sat, Apr 2, 2011 at 9:43 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> ?drivers/video/backlight/corgi_lcd.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
-> index 1e71c35..8c80cb7 100644
-> --- a/drivers/video/backlight/corgi_lcd.c
-> +++ b/drivers/video/backlight/corgi_lcd.c
-> @@ -409,10 +409,10 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
-> ? ? ? ?cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
->
-> ? ? ? ?if (gpio_is_valid(lcd->gpio_backlight_cont))
-> - ? ? ? ? ? ? ? gpio_set_value(lcd->gpio_backlight_cont, cont);
-> + ? ? ? ? ? ? ? gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
->
-> ? ? ? ?if (gpio_is_valid(lcd->gpio_backlight_on))
-> - ? ? ? ? ? ? ? gpio_set_value(lcd->gpio_backlight_on, intensity);
-> + ? ? ? ? ? ? ? gpio_set_value_cansleep(lcd->gpio_backlight_on, intensity);
->
-> ? ? ? ?if (lcd->kick_battery)
-> ? ? ? ? ? ? ? ?lcd->kick_battery();
-> --
-> 1.7.4.1
->
->
+-- 
+Catalin
