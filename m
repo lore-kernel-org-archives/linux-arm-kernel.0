@@ -1,113 +1,103 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 4 Apr 2011 07:16:23 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <4D95EF8E.9080902@vollmann.ch>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104011554.07924.arnd@arndb.de> <4D95E112.4020400@vollmann.ch>
-	<201104011659.40443.arnd@arndb.de> <4D95EF8E.9080902@vollmann.ch>
-Message-ID: <20110404051623.GJ7420@game.jcrosoft.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Apr 2011 08:29:05 +0200
+Subject: [PATCH] ARM: mx5/mx53_smd: Add esdhc support
+In-Reply-To: <1301865479-21168-1-git-send-email-festevam@gmail.com>
+References: <1301865479-21168-1-git-send-email-festevam@gmail.com>
+Message-ID: <20110404062905.GC30938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:30 Fri 01 Apr     , Detlef Vollmann wrote:
-> On 04/01/11 16:59, Arnd Bergmann wrote:
-> >On Friday 01 April 2011, Detlef Vollmann wrote:
-> >>On 04/01/11 15:54, Arnd Bergmann wrote:
-> >
-> >>>9. All interesting work is going into a handful of platforms, all of which
-> >>>     are ARMv7 based.
-> >>Define interesting.
-> >
-> >The ones that are causing the churn that we're talking about.
-> >Platforms that have been working forever and only need to get
-> >the occasional bug fix are boring, i.e. not the problem.
-> In the ARM tree I only know mach-at91.
-> Atmel still introduces new SOCs based on ARM926EJ-S, and that makes
-> perfect sense for lots of applications.
-> And if they add support for a new SOC, they just copy an existing one,
-> change some GPIOs, and submit it as new files (sorry, I'm over-
-> simplifying here).
-at SoC level quite a lot as we do the necessarly to factorise as much as we
-can you can take a look when we add the g20, g10 of g45, etc...
-> And if you happen to wire your board a bit differently than they do,
-> you have to patch theur generic file (in addidtion to add your own
-> board file).
-> And though I only know the mach-at91 closely, I'm pretty sure quite
-> a number of other mach-* are not better.
-> So this is actually why the ARM tree has such a bad reputation:
-> lot's of code repetition, and still more of that.
-On AT91 it's not anymore the case now we do start reduce the number of machine
-and we not allow this anymore
+On Sun, Apr 03, 2011 at 06:17:59PM -0300, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx5/board-mx53_smd.c |   36 ++++++++++++++++++++++++++++++++++++
+>  1 files changed, 36 insertions(+), 0 deletions(-)
 > 
-> >>>12. Supporting many different boards with a single kernel binary is a
-> >>>      useful goal.
-> >>Generally not for embedded systems (for me, a mobile PDA/phone is just a
-> >>small computer with a crappy keyboard, but not an embedded system).
-> >
-> >True. For embedded, this would not be an important thing to do, but
-> >also not hurt.
-> It costs you flash space.
-I disagree have a single kernel with mutliple board is very usefull as it can
-allow you to have one firmware for multiple version of product. It will really
-simplify the maintanance
+> diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+> index 31e1732..fac5d8f 100644
+> --- a/arch/arm/mach-mx5/board-mx53_smd.c
+> +++ b/arch/arm/mach-mx5/board-mx53_smd.c
+> @@ -28,6 +28,7 @@
+>  #include <mach/hardware.h>
+>  #include <mach/imx-uart.h>
+>  #include <mach/iomux-mx53.h>
+> +#include <mach/esdhc.h>
+"devices-imx53.h" #includes <mach/devices-common.h>; and the latter
+#includes <mach/esdhc.h>, so you don't need to add it here once more.
 
-And it's also allow to simplify kernel maintanance
-> 
-> >>>* Strictly no crap
-> >>>   * No board files
-> >>Where do you put code that needs to run very early (e.g. pinging the
-> >>watchdog)?
-> >
-> >Don't know. I'd hope we can get fast enough to the phase where device
-> >drivers get initialized.
-> Nope, never happened for me :-(
-> (Watchdog timeouts are often 1s or less.)
-you can do a lot in 1s
-you start the board dowload the code from nfs and jump in the kernel
-as I do on at91sam9261ek with barebox
-> 
-> >>>* All board specific information must come from a device tree and
-> >>>    be run-time detected.
-> >>What do you mean by "run-time detected"?
-> >>For powerpc, we currently have the device tree as DTS in the kernel
-> >>and compile and bundle it together with the kernel.
-> >>As you wrote above: "Discoverable hardware [...] is not going to happen"
-> >
-> >I mean writing
-> >
-> >	if (device_is_compatible(dev, SOMETHING))
-> >		do_something();
-> >
-> >instead of
-> >
-> >#ifdef CONFIG_SOMETHING
-> >	do_something();
-> >#endif
-> >
-> >The run-time information could come from anywhere (device tree, hardware
-> >registers, today one might use the board number), the important point is
-> >not to assume that hardware is present just because someone enabled
-> >a Kconfig option.
-> Understood and I agree.
-> 
-> >I believe that rule is generally accepted today, but we don't always
-> >enforce it.
-> Without device tree, Kconfig option is the only way that really
-> works today (no runtime HW detection, and same board ID with different
-> setups).
-you can do it already today with system_rev DTS will allow to make it more
-generic and pass more information and on at91 we could easly have only few
-boards. Except for few case such as really short boottime requirement this
-will not impact the system on contrary
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -37,6 +38,8 @@
+>  #include "devices-imx53.h"
+>  
+>  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+> +#define SMD_SD1_CD		IMX_GPIO_NR(3, 13)
+> +#define SMD_SD1_WP		IMX_GPIO_NR(4, 11)
+>  
+>  static iomux_v3_cfg_t mx53_smd_pads[] = {
+>  	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+> @@ -52,6 +55,31 @@ static iomux_v3_cfg_t mx53_smd_pads[] = {
+>  	/* I2C1 */
+>  	MX53_PAD_CSI0_DAT8__I2C1_SDA,
+>  	MX53_PAD_CSI0_DAT9__I2C1_SCL,
+> +	/* SD1 */
+> +	MX53_PAD_SD1_CMD__ESDHC1_CMD,
+> +	MX53_PAD_SD1_CLK__ESDHC1_CLK,
+> +	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
+> +	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
+> +	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
+> +	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
+> +	/* SD2 */
+> +	MX53_PAD_SD2_CMD__ESDHC2_CMD,
+> +	MX53_PAD_SD2_CLK__ESDHC2_CLK,
+> +	MX53_PAD_SD2_DATA0__ESDHC2_DAT0,
+> +	MX53_PAD_SD2_DATA1__ESDHC2_DAT1,
+> +	MX53_PAD_SD2_DATA2__ESDHC2_DAT2,
+> +	MX53_PAD_SD2_DATA3__ESDHC2_DAT3,
+> +	/* SD3 */
+> +	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
+> +	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
+> +	MX53_PAD_PATA_DATA10__ESDHC3_DAT2,
+> +	MX53_PAD_PATA_DATA11__ESDHC3_DAT3,
+> +	MX53_PAD_PATA_DATA0__ESDHC3_DAT4,
+> +	MX53_PAD_PATA_DATA1__ESDHC3_DAT5,
+> +	MX53_PAD_PATA_DATA2__ESDHC3_DAT6,
+> +	MX53_PAD_PATA_DATA3__ESDHC3_DAT7,
+> +	MX53_PAD_PATA_IORDY__ESDHC3_CLK,
+> +	MX53_PAD_PATA_RESET_B__ESDHC3_CMD,
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+> @@ -88,6 +116,11 @@ static const struct imxi2c_platform_data mx53_smd_i2c_data __initconst = {
+>  	.bitrate = 100000,
+>  };
+>  
+> +static struct esdhc_platform_data sd1_pdata = {
+please something like:
 
-Best Regards,
-J.
-> Device tree in my world is just one big Kconfig option instead of
-> many small...
-> 
->   Detlef
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+static const struct esdhc_platform_data mx53_smd_sd1_pdata __initconst = {
+
+> +	.wp_gpio = SMD_SD1_WP,
+> +	.cd_gpio = SMD_SD1_CD,
+> +};
+> +
+>  static void __init mx53_smd_board_init(void)
+>  {
+>  	mxc_iomux_v3_setup_multiple_pads(mx53_smd_pads,
+> @@ -97,6 +130,9 @@ static void __init mx53_smd_board_init(void)
+>  	imx53_add_fec(&mx53_smd_fec_data);
+>  	imx53_add_imx2_wdt(0, NULL);
+>  	imx53_add_imx_i2c(0, &mx53_smd_i2c_data);
+> +	imx53_add_sdhci_esdhc_imx(0, &sd1_pdata);
+> +	imx53_add_sdhci_esdhc_imx(1, NULL);
+> +	imx53_add_sdhci_esdhc_imx(2, NULL);
+>  }
+>  
+>  static void __init mx53_smd_timer_init(void)
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
