@@ -1,48 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 4 Apr 2011 14:29:58 +0200 (CEST)
-Subject: [PATCH] arm: plat-mxc: Add missing lockdep annotation
-Message-ID: <alpine.LFD.2.00.1104041416290.19945@localhost6.localdomain6>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 4 Apr 2011 09:32:55 -0300
+Subject: [PATCH v2] ARM: mx5/mx53_smd: Add esdhc support
+Message-ID: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_set_wake() function of the gpio irq_chip calls
-enable/disable_irq_wake() on the demultiplex interrupt. That leads to
-a lockdep warning "INFO: possible recursive locking detected" because
-irq_set_type() is called under irq_desc->lock and the *_irq_wake()
-calls take irq_desc->lock of the demux interrupt.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Do not use CD and WP detecion via GPIO as it is not working for MX53 yet.
 
-Tell lockdep that the gpio irqs are in a different lock class.
+ arch/arm/mach-mx5/board-mx53_smd.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-Documentation/SubmitChecklist:
- 15: All codepaths have been exercised with all lockdep features enabled.
-
-That's a non-optional requirement, AFAICT.
-
-Reported-and-tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 7a10724..6cd6d7f 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -295,6 +295,12 @@ static int mxc_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
+diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+index 31e1732..e510c27 100644
+--- a/arch/arm/mach-mx5/board-mx53_smd.c
++++ b/arch/arm/mach-mx5/board-mx53_smd.c
+@@ -52,6 +52,31 @@ static iomux_v3_cfg_t mx53_smd_pads[] = {
+ 	/* I2C1 */
+ 	MX53_PAD_CSI0_DAT8__I2C1_SDA,
+ 	MX53_PAD_CSI0_DAT9__I2C1_SCL,
++	/* SD1 */
++	MX53_PAD_SD1_CMD__ESDHC1_CMD,
++	MX53_PAD_SD1_CLK__ESDHC1_CLK,
++	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
++	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
++	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
++	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
++	/* SD2 */
++	MX53_PAD_SD2_CMD__ESDHC2_CMD,
++	MX53_PAD_SD2_CLK__ESDHC2_CLK,
++	MX53_PAD_SD2_DATA0__ESDHC2_DAT0,
++	MX53_PAD_SD2_DATA1__ESDHC2_DAT1,
++	MX53_PAD_SD2_DATA2__ESDHC2_DAT2,
++	MX53_PAD_SD2_DATA3__ESDHC2_DAT3,
++	/* SD3 */
++	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
++	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
++	MX53_PAD_PATA_DATA10__ESDHC3_DAT2,
++	MX53_PAD_PATA_DATA11__ESDHC3_DAT3,
++	MX53_PAD_PATA_DATA0__ESDHC3_DAT4,
++	MX53_PAD_PATA_DATA1__ESDHC3_DAT5,
++	MX53_PAD_PATA_DATA2__ESDHC3_DAT6,
++	MX53_PAD_PATA_DATA3__ESDHC3_DAT7,
++	MX53_PAD_PATA_IORDY__ESDHC3_CLK,
++	MX53_PAD_PATA_RESET_B__ESDHC3_CMD,
+ };
+ 
+ static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+@@ -97,6 +122,9 @@ static void __init mx53_smd_board_init(void)
+ 	imx53_add_fec(&mx53_smd_fec_data);
+ 	imx53_add_imx2_wdt(0, NULL);
+ 	imx53_add_imx_i2c(0, &mx53_smd_i2c_data);
++	imx53_add_sdhci_esdhc_imx(0, NULL);
++	imx53_add_sdhci_esdhc_imx(1, NULL);
++	imx53_add_sdhci_esdhc_imx(2, NULL);
  }
  
-+/*
-+ * This lock class tells lockdep that GPIO irqs are in a different
-+ * category than their parents, so it won't report false recursion.
-+ */
-+static struct lock_class_key gpio_lock_class;
-+
- int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- {
- 	int i, j;
-@@ -311,6 +317,7 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 		__raw_writel(~0, port[i].base + GPIO_ISR);
- 		for (j = port[i].virtual_irq_start;
- 			j < port[i].virtual_irq_start + 32; j++) {
-+			irq_set_lockdep_class(j, &gpio_lock_class);
- 			irq_set_chip_and_handler(j, &gpio_irq_chip,
- 						 handle_level_irq);
- 			set_irq_flags(j, IRQF_VALID);
+ static void __init mx53_smd_timer_init(void)
+-- 
+1.6.0.4
