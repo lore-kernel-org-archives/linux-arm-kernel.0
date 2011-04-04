@@ -1,32 +1,38 @@
-From: bill_carson@126.com (rocky)
-Date: Sat, 02 Apr 2011 03:59:14 -0000
-Subject: cachepolicy on arm UP/SMP
-Message-ID: <163eed8.b6ba.12f1441357c.Coremail.bill_carson@126.com>
+From: john@johnandjuliet.com (john at johnandjuliet.com)
+Date: Mon, 04 Apr 2011 08:41:08 -0700
+Subject: [TuxOnIce-devel] [RFC PATCH] Current status,
+	suspend-to-disk support on ARM
+Message-ID: <20110404084108.98fd97237cc930a62b888eb89e535f85.03cdcb032e.wbe@email12.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+Wow.. More stuff to look at.
 
-I am a little confused about arm cachepolicy for UP/SMP.
+My status with the past patch is this:
 
-in arch/arm/mm/mmu.c
-for UP , default cache policy is CPOLICY_WRITEBACK;
-while for SMP, cache policy is overrided with  WRITEALLOC.
+1) I can suspend (swsusp) or at least it is pretending to
 
-why does SMP cannot use WRITEBACK?
-It is about coherency issue?
+2) Cannot resume... Using resume=/dev/block/mmcblk1p2 or
+CONFIG_PM_STD_PARTITION="/dev/block/mmcblk1p2"
+does nothing.. the system just boots normally.
 
-Please give me some tips.
-thanks
+Going through the previous patches and found a few discrepencies that I
+am looking closer at and will comment on soon.
 
-rocky
-
-
+Meanwhile doing a side build anyway to start to look at the TOI patches
+into this (OMAP4 Android) kernel.
 
 
+Ive got a small group here now interested to make this work so we may be
+able to get more progress.  Not all are kernel experts but they are
+fairly sharp guys with low-level experience...
 
 
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110402/a8adfc37/attachment-0001.html>
+> Hi,
+> 
+> some status on making hibernation (suspend-to-disk) work on ARM.
+> 
+> I've simplified an updated patch set again, to make the pieces obvious. 
+> The attached patch set also cleanly compiles when adding TuxOnIce to it.
+> 
