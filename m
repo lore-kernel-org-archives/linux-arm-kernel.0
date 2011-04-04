@@ -1,40 +1,64 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Mon, 04 Apr 2011 13:03:13 -0700
-Subject: [PATCH] ARM: hw_breakpoint: clear DBGVCR out of reset
-In-Reply-To: <1301833374.5022.9.camel@jazzbox>
-References: <1301657056-30065-1-git-send-email-will.deacon@arm.com>	
-	<4D9820D6.5040502@codeaurora.org> <1301833374.5022.9.camel@jazzbox>
-Message-ID: <4D9A2401.70504@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Apr 2011 22:08:50 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104031726.37420.arnd@arndb.de>
+	<20110403160324.GA8050@n2100.arm.linux.org.uk>
+	<201104040259.26601.arnd@arndb.de>
+	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
+	<20110404112104.GB19854@n2100.arm.linux.org.uk>
+	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>
+	<20110404133104.GA23266@n2100.arm.linux.org.uk>
+	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2011 5:22 AM, Will Deacon wrote:
-> Hi Stephen,
+2011/4/4 Marc Zyngier <Marc.Zyngier@arm.com>:
+> On Mon, 2011-04-04 at 14:31 +0100, Russell King - ARM Linux wrote:
+>>
+>> If ARM are going to architect a set of timers into the hardware, let's
+>> make sure that all such hardware has them so we can dig ourselves out
+>> of this crappy mess that we find ourselves in today.
 >
-> On Sun, 2011-04-03 at 08:25 +0100, Stephen Boyd wrote:
->> On 4/1/2011 4:24 AM, Will Deacon wrote:
->>> The DBGVCR, used for configuring vector catch debug events, is UNKNOWN
->>> out of reset on ARMv7. When enabling monitor mode, this must be zeroed
->>> to avoid UNPREDICTABLE behaviour.
->>>
->>> This patch adds the zeroing code to the debug reset path.
->>>
->>> Reported-by: Stepan Moskovchenko<stepanm@codeaurora.org>
->>> Signed-off-by: Will Deacon<will.deacon@arm.com>
->> Please Cc stable as this fix should go to the 37 and 38 stable trees.
-> Will do. If you could please confirm that it fixes the problems reported
-> initially then that would be great.
+> As far as I know, A15 always has a set of generic timers.
 >
-> Thanks,
->
-> Will
->
+> It may be that they are not available (frequency not programmed into the
+> CNTFREQ register), or that someone decided to use a better alternative
+> (for some particular interpretation of "better").
 
-I confirm that this fixes the problem I was seeing.
+I guess this thing is inside that A15 core?
 
-Thanks
-Steve
+First, what happens the day any vendors start making SoCs on this is
+they turn the A15 core off whenever it is not used, loosing all state
+including this timer, I believe.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+This forces them all to add some totally different clocksource, event and
+wakeup in some always-on voltage domain and rate that higher than
+the A15 timer(s). They will then implement sched_clock() and
+clocksource on that instead and only use A15 for localtimers.
+
+(Leading to the proliferation of board/SoC timer hacks discussed
+so much recently...)
+
+The only way to reuse that poor thing in practice is if you engineer
+a separate power domain with stuff that is supposed to be always-on
+in the A15 macro (including these timers) so vendors must implement
+this so as not to loose its state. Is this the case?
+
+Else, in effect it will only be used as clocksource and sched_clock()
+with these Versatile boards where the power is always on anyway.
+
+Second, have you taken into account the effect of changing the
+frequency of the A15 core, which is something every vendor also
+does, as you know Colin Cross already has a patch pending
+for that on the TWD localtimer which has not yet reached
+the kernel. (Or is A15 fixed frequency? Forgive my ignorance...)
+
+(And third it will also eventually need to hook into the timer-based
+delay framework that I think Nokia is working on to be really
+useful, else all delays become unpredictable.)
+
+Yours,
+Linus Walleij
