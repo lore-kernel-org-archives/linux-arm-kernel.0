@@ -1,60 +1,82 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 4 Apr 2011 23:42:49 +0800
-Subject: [PATCH 3/3] video: mxsfb: add DOTCLK polarity configuration
-	support
-In-Reply-To: <20110404150430.GB13963@pengutronix.de>
-References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
-	<1299341931-30241-4-git-send-email-shawn.guo@freescale.com>
-	<20110404150430.GB13963@pengutronix.de>
-Message-ID: <20110404154248.GB27933@S2100-06.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Apr 2011 18:00:12 +0200
+Subject: [PATCH v2] ARM: mx5/mx53_smd: Add esdhc support
+In-Reply-To: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
+References: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110404160012.GE13963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 05:04:30PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
+On Mon, Apr 04, 2011 at 09:32:55AM -0300, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Do not use CD and WP detecion via GPIO as it is not working for MX53 yet.
 > 
-> On Sun, Mar 06, 2011 at 12:18:51AM +0800, Shawn Guo wrote:
-> > The current implementation provides configuration for HSYNC_POL,
-> > VSYNC_POL and ENABLE_POL via 'sync' of fb_videomode, but DOTCLK_POL
-> > is missing there.  It's assuming that data sampling at rising/positive
-> > edge is always the case.  However, it's not true.  For example, the
-> > panel on mx28evk board (Seiko 43WVF1G) samples data at
-> > failing/negative edge.  The patch is to add this configuration.
-> s/failing/falling?
+>  arch/arm/mach-mx5/board-mx53_smd.c |   28 ++++++++++++++++++++++++++++
+You need to let MACH_MX53_SMD select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX.
+
+Best regards
+Uwe
+>  1 files changed, 28 insertions(+), 0 deletions(-)
 > 
-> > 
-> > Also, to unify the naming schema of all these polarity configurations
-> > and match them with the bits name in Reference Manual, a couple of
-> > definitions are renamed.
-> > 
-> > Lastly, to reduce the chance of defining customized 'FB_SYNC_' flag
-> > by incrementing the preceeding value, the definitions are changed to
-> > bit shifting way.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/include/mach/mxsfb.h |    3 ++-
-> >  drivers/video/mxsfb.c                  |    8 +++++---
-> >  2 files changed, 7 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/include/mach/mxsfb.h b/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > index 923f397..e4d7979 100644
-> > --- a/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > +++ b/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > @@ -24,7 +24,8 @@
-> >  #define STMLCDIF_18BIT 2 /** pixel data bus to the display is of 18 bit width */
-> >  #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
-> >  
-> > -#define FB_SYNC_DATA_ENABLE_HIGH_ACT	64
-> > +#define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
-> > +#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
-> ditto + s/negtive/negative/
+> diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+> index 31e1732..e510c27 100644
+> --- a/arch/arm/mach-mx5/board-mx53_smd.c
+> +++ b/arch/arm/mach-mx5/board-mx53_smd.c
+> @@ -52,6 +52,31 @@ static iomux_v3_cfg_t mx53_smd_pads[] = {
+>  	/* I2C1 */
+>  	MX53_PAD_CSI0_DAT8__I2C1_SDA,
+>  	MX53_PAD_CSI0_DAT9__I2C1_SCL,
+> +	/* SD1 */
+> +	MX53_PAD_SD1_CMD__ESDHC1_CMD,
+> +	MX53_PAD_SD1_CLK__ESDHC1_CLK,
+> +	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
+> +	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
+> +	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
+> +	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
+> +	/* SD2 */
+> +	MX53_PAD_SD2_CMD__ESDHC2_CMD,
+> +	MX53_PAD_SD2_CLK__ESDHC2_CLK,
+> +	MX53_PAD_SD2_DATA0__ESDHC2_DAT0,
+> +	MX53_PAD_SD2_DATA1__ESDHC2_DAT1,
+> +	MX53_PAD_SD2_DATA2__ESDHC2_DAT2,
+> +	MX53_PAD_SD2_DATA3__ESDHC2_DAT3,
+> +	/* SD3 */
+> +	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
+> +	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
+> +	MX53_PAD_PATA_DATA10__ESDHC3_DAT2,
+> +	MX53_PAD_PATA_DATA11__ESDHC3_DAT3,
+> +	MX53_PAD_PATA_DATA0__ESDHC3_DAT4,
+> +	MX53_PAD_PATA_DATA1__ESDHC3_DAT5,
+> +	MX53_PAD_PATA_DATA2__ESDHC3_DAT6,
+> +	MX53_PAD_PATA_DATA3__ESDHC3_DAT7,
+> +	MX53_PAD_PATA_IORDY__ESDHC3_CLK,
+> +	MX53_PAD_PATA_RESET_B__ESDHC3_CMD,
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+> @@ -97,6 +122,9 @@ static void __init mx53_smd_board_init(void)
+>  	imx53_add_fec(&mx53_smd_fec_data);
+>  	imx53_add_imx2_wdt(0, NULL);
+>  	imx53_add_imx_i2c(0, &mx53_smd_i2c_data);
+> +	imx53_add_sdhci_esdhc_imx(0, NULL);
+> +	imx53_add_sdhci_esdhc_imx(1, NULL);
+> +	imx53_add_sdhci_esdhc_imx(2, NULL);
+>  }
+>  
+>  static void __init mx53_smd_timer_init(void)
+> -- 
+> 1.6.0.4
 > 
-> As your patch is already in mainline, do you care to send a followup?
 > 
-It depends on if Sascha would pick up this follow-up.  I feel that he
-may not care too much about such cosmetic patch.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
