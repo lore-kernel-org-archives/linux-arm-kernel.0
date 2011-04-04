@@ -1,27 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 4 Apr 2011 14:21:10 -0300
-Subject: [PATCH v2] ARM: mx5/mx53_smd: Add esdhc support
-In-Reply-To: <20110404160012.GE13963@pengutronix.de>
-References: <1301920375-31761-1-git-send-email-fabio.estevam@freescale.com>
-	<20110404160012.GE13963@pengutronix.de>
-Message-ID: <BANLkTikc8=iwPk0vtUHMqYn5Hg2Xg=3u2w@mail.gmail.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Mon, 4 Apr 2011 13:35:14 -0400
+Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
+In-Reply-To: <201104011303.59668.anarsoul@gmail.com>
+References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
+	<AANLkTikyrfYn02yg3S9_4vBGfon+BNHbPiQkaHaq_Xaq@mail.gmail.com>
+	<201104011303.59668.anarsoul@gmail.com>
+Message-ID: <BANLkTimBfLF_ef70dYsVDwKCU=fEe_+Z3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-2011/4/4 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Mon, Apr 04, 2011 at 09:32:55AM -0300, Fabio Estevam wrote:
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Changes since v1:
->> - Do not use CD and WP detecion via GPIO as it is not working for MX53 yet.
+On Fri, Apr 1, 2011 at 06:03, Vasily Khoruzhick wrote:
+> On Friday 01 April 2011 10:26:37 Eric Miao wrote:
+>> On Mon, Mar 14, 2011 at 6:27 AM, Vasily Khoruzhick wrote:
+>> > There's a race condition in stop_queue(),
+>> > if drv_data->queue is empty, but drv_data->busy is still set
+>> > (or opposite situation) stop_queue will return -EBUSY.
+>> > So fix loop condition to check that both drv_data->queue is empty
+>> > and drv_data->busy is not set.
 >>
->> ?arch/arm/mach-mx5/board-mx53_smd.c | ? 28 ++++++++++++++++++++++++++++
-> You need to let MACH_MX53_SMD select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX.
+>> I think this is a good catch if the queue could be stopped only when
+>> 1) queue is empty AND 2) transfer is not in progress.
+>
+> It has check later (under while):
+>
+> if (!list_empty(&drv_data->queue) || drv_data->busy)
+> ? ? ? ?status = -EBUSY;
+>
+> And I'm hitting it on Z2 when I'm trying to enter suspend - it fails, because
+> spi driver refuses to enter suspend.
+>
+>> There are several other places you might need to change accordingly,
+>> e.g. spi_bfin5xx.c
+>
+> I can make a patch for other drivers, but I can't test it - I have no
+> appropriate boards, and even toolchain.
 
-Correct. I have already sent v3 that addresses this point.
-
-Regards,
-
-Fabio Estevam
+that's fine, i do.  was this patch actually merged ?  or is there a
+new version on the way ?
+-mike
