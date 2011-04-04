@@ -1,59 +1,55 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 4 Apr 2011 10:51:24 +0200
-Subject: [PATCH 2/2] mach-ux500: complete regulator constraints for MOP500
-	board
-Message-ID: <1301907084-16769-1-git-send-email-linus.walleij@stericsson.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon,  4 Apr 2011 14:34:56 +0530
+Subject: [PATCH] OMAP4: SRAM: Fix warning: format '%08lx' expects type 'long
+	unsigned int'
+Message-ID: <1301907896-30954-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Fix below build warning.
 
-This board now has complete regulation constraints and can turn
-off unused regulators. For the moment we need to wire VAUX1
-(V-DISPLAY rail) always on since it somehow affects the external
-MMC.
+ CC	arch/arm/plat-omap/sram.o
+	arch/arm/plat-omap/sram.c: In function 'omap_map_sram':
+	arch/arm/plat-omap/sram.c:224: warning: format '%08lx' expects
+	type 'long unsigned int', but argument 2 has type 'unsigned int'
 
-Cc: Liam Girdwood <lrg@slimlogic.co.uk>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+While at this, convert SRAM printk(* "") to pr_*("").
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-ux500/board-mop500-regulators.c |    9 ++++++++-
- arch/arm/mach-ux500/board-mop500.c            |    3 +++
- 2 files changed, 11 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/sram.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 9ed0f90..c0bc833 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -272,7 +272,14 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.max_uV = 2900000,
- 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
- 					  REGULATOR_CHANGE_STATUS,
--			.boot_on = 1, /* must be on for display */
-+			.boot_on = 1, /* display is on at boot */
-+			/*
-+			 * This voltage cannot be disabled right now because
-+			 * it is somehow affecting the external MMC
-+			 * functionality, though that typically will use
-+			 * AUX3.
-+			 */
-+			.always_on = 1,
- 		},
- 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
- 		.consumer_supplies = ab8500_vaux1_consumers,
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index c271cfe..e4711f4 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -456,6 +456,9 @@ static void __init mop500_init_machine(void)
- 	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 	i2c_register_board_info(2, mop500_i2c2_devices,
- 				ARRAY_SIZE(mop500_i2c2_devices));
-+
-+	/* This board has full regulator constraints */
-+	regulator_has_full_constraints();
- }
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index a3f50b3..7857146 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -166,7 +166,7 @@ static void __init omap_detect_sram(void)
+ 		else if (cpu_is_omap1611())
+ 			omap_sram_size = SZ_256K;
+ 		else {
+-			printk(KERN_ERR "Could not detect SRAM size\n");
++			pr_err("Could not detect SRAM size\n");
+ 			omap_sram_size = 0x4000;
+ 		}
+ 	}
+@@ -221,7 +221,7 @@ static void __init omap_map_sram(void)
+ 	omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size, PAGE_SIZE);
+ 	iotable_init(omap_sram_io_desc, ARRAY_SIZE(omap_sram_io_desc));
  
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+-	printk(KERN_INFO "SRAM: Mapped pa 0x%08lx to va 0x%08lx size: 0x%lx\n",
++	pr_info("SRAM: Mapped pa 0x%08x to va 0x%08lx size: 0x%lx\n",
+ 	__pfn_to_phys(omap_sram_io_desc[0].pfn),
+ 	omap_sram_io_desc[0].virtual,
+ 	       omap_sram_io_desc[0].length);
+@@ -252,7 +252,7 @@ static void __init omap_map_sram(void)
+ void *omap_sram_push_address(unsigned long size)
+ {
+ 	if (size > (omap_sram_ceil - (omap_sram_base + SRAM_BOOTLOADER_SZ))) {
+-		printk(KERN_ERR "Not enough space in SRAM\n");
++		pr_err("Not enough space in SRAM\n");
+ 		return NULL;
+ 	}
+ 
 -- 
-1.7.3.2
+1.6.0.4
