@@ -1,97 +1,99 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Apr 2011 14:24:17 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <20110404112104.GB19854@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104031726.37420.arnd@arndb.de>
-	<20110403160324.GA8050@n2100.arm.linux.org.uk>
-	<201104040259.26601.arnd@arndb.de>
-	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
-	<20110404112104.GB19854@n2100.arm.linux.org.uk>
-Message-ID: <1301923457.417.34.camel@e102391-lin.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Apr 2011 15:24:19 +0200
+Subject: [PATCH] ARM: mx5/mx53_evk: Add LED support
+In-Reply-To: <1301068415-18989-1-git-send-email-fabio.estevam@freescale.com>
+References: <1301068415-18989-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110404132419.GD30938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-04 at 12:21 +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 04, 2011 at 12:03:42PM +0100, Catalin Marinas wrote:
-> > On Mon, 2011-04-04 at 01:59 +0100, Arnd Bergmann wrote:
-> > > On Sunday 03 April 2011, Russell King - ARM Linux wrote:
-> > > > Then there's those which change the cs->read function pointer at runtime,
-> > ...
-> > > > and those which share that pointer with their sched_clock() implementation.
-> > > 
-> > > Abstracting sched_clock() to be run-time selected is something that
-> > > needs to be taken care of. Maybe we could have a generic sched_clock
-> > > implementation that is written on top of clocksource instead of jiffies,
-> > > and always select that on architectures that have a decent clocksource.
-> > 
-> > On Cortex-A15 with the virtualisation extensions and architected timers
-> > the clocksource is implemented using a physical counter (as we want
-> > wall-clock timing). But for sched_clock() we may want to use a virtual
-> > counter (which is basically an offset from the physical one, set by the
-> > hypervisor during guest OS switching). Marc already posted some patches
-> > for this.
-> 
-> I had a quick look at the two patches, but I was far from impressed
-> due to the apparant complexity I saw.
->
-> There's no point in trying to consolidate stuff if it results in a net
-> increase in the amount of code to be maintained as that just increases
-> the burden, churn and maintainence headache.
-> 
-> Is there an easier way to consolidate it across all platforms?  I think
-> so:
-> 
-> static DEFINE_CLOCK_DATA(cd);
-> static u32 sched_clock_mask;
-> static u32 (*read_sched_clock)(void);
-> 
-> unsigned long long notrace sched_clock(void)
-> {
-> 	if (read_sched_clock) {
-> 		u32 cyc = read_sched_clock();
-> 		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
-> 	} else {
-> 		/* jiffies based code */
-> 	}
-> }
-> 
-> static void notrace update_sched_clock(void)
-> {
-> 	u32 cyc = read_sched_clock();
-> 	update_sched_clock(&cd, cyc, sched_clock_mask);
-> }
-> 
-> void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
-> {
-> 	BUG_ON(bits > 32);
-> 	read_sched_clock = read;
-> 	sched_clock_mask = (1 << bits) - 1;
-> 	init_sched_clock(&cd, update_sched_clock, bits, rate);
-> }
-> 
-> and then get rid of the per-platform implementations entirely - all
-> that platforms then have to provide is a read function and a call to
-> setup_sched_clock().
+Hello Fabio,
 
-The complexity mostly comes the fact that I tried to avoid having more
-runtime complexity on platforms that didn't need to select their
-sched_clock() implementation at runtime (no indirection while calling
-sched_clock()).
+On Fri, Mar 25, 2011 at 12:53:35PM -0300, Fabio Estevam wrote:
+> On the mx53evk board there is an LED connected to GPIO7_7.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx5/board-mx53_evk.c |   31 +++++++++++++++++++++++++++++++
+>  1 files changed, 31 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+> index 7b5735c..f2c5151 100644
+> --- a/arch/arm/mach-mx5/board-mx53_evk.c
+> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/fec.h>
+>  #include <linux/delay.h>
+>  #include <linux/gpio.h>
+> +#include <linux/leds.h>
+>  #include <linux/spi/flash.h>
+>  #include <linux/spi/spi.h>
+>  #include <mach/common.h>
+> @@ -37,6 +38,7 @@
+>  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+>  #define EVK_ECSPI1_CS0		IMX_GPIO_NR(2, 30)
+>  #define EVK_ECSPI1_CS1		IMX_GPIO_NR(3, 19)
+> +#define MX53EVK_LED		IMX_GPIO_NR(7, 7)
+>  
+>  #include "crm_regs.h"
+>  #include "devices-imx53.h"
+> @@ -60,6 +62,8 @@ static iomux_v3_cfg_t mx53_evk_pads[] = {
+>  	/* ecspi chip select lines */
+>  	MX53_PAD_EIM_EB2__GPIO2_30,
+>  	MX53_PAD_EIM_D19__GPIO3_19,
+> +	/* LED */
+> +	MX53_PAD_PATA_DA_1__GPIO7_7,
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
+> @@ -118,6 +122,32 @@ static const struct spi_imx_master mx53_evk_spi_data __initconst = {
+>  	.num_chipselect = ARRAY_SIZE(mx53_evk_spi_cs),
+>  };
+>  
+> +static struct gpio_led mx53_evk_leds[] = {
+> +	{
+> +		.name			= "led-green",
+> +		.default_trigger	= "heartbeat",
+> +		.active_low		= 0,
+> +		.gpio			= MX53EVK_LED,
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data mx53_evk_leds_data = {
+> +	.leds = mx53_evk_leds,
+> +	.num_leds = ARRAY_SIZE(mx53_evk_leds),
+> +};
+> +
+> +static struct platform_device mx53_evk_leds_device = {
+> +	.name = "leds-gpio",
+> +	.id = -1,
+> +	.dev = {
+> +		.platform_data = &mx53_evk_leds_data,
+> +	},
+> +};
+> +
+> +static struct platform_device *platform_devices[] __initdata = {
+> +	&mx53_evk_leds_device,
+> +};
+> +
+>  static void __init mx53_evk_board_init(void)
+>  {
+>  	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+> @@ -136,6 +166,7 @@ static void __init mx53_evk_board_init(void)
+>  		ARRAY_SIZE(mx53_evk_spi_board_info));
+>  	imx53_add_ecspi(0, &mx53_evk_spi_data);
+>  	imx53_add_imx2_wdt(0, NULL);
+> +	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+>  }
+>  
+>  static void __init mx53_evk_timer_init(void)
+Can you please instead add a function imx_add_leds_gpio?
 
-If this can be relaxed, then your implementation is definitely better.
+Best regards
+Uwe
 
-> Whether its worth it or not is questionable - the above is more lines
-> of code than many of the existing implementations, and we're not going
-> to shrink the existing implementations by much (maybe one to three
-> lines.)  The only thing we gain is the ability to select an implementation
-> at runtime.
-
-I believe this last point to be rather important if we plan to have this
-mythical single kernel covering several architectures. It's also nice
-for the A15 to be able to use some default sched_clock() implementation
-as a fallback if the generic timers are not available for some reason.
-
-	M.
 -- 
-Reality is an implementation detail.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
