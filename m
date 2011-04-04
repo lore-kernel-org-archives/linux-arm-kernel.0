@@ -1,110 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Apr 2011 19:42:44 +0200
-Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
-In-Reply-To: <20110404171927.GG7285@pengutronix.de>
-References: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
-	<20110404171927.GG7285@pengutronix.de>
-Message-ID: <20110404174244.GH13963@pengutronix.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 4 Apr 2011 14:49:51 -0300
+Subject: [PATCH v3] ARM: mx5/mx53_evk.c: Add LED support
+Message-ID: <1301939391-11538-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 07:19:27PM +0200, Sascha Hauer wrote:
-> On Mon, Apr 04, 2011 at 02:06:45PM -0300, Fabio Estevam wrote:
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/plat-mxc/devices/Kconfig               |    3 +++
-> >  arch/arm/plat-mxc/devices/Makefile              |    1 +
-> >  arch/arm/plat-mxc/devices/platform-gpio_leds.c  |   22 ++++++++++++++++++++++
-> >  arch/arm/plat-mxc/include/mach/devices-common.h |    4 ++++
-> >  4 files changed, 30 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_leds.c
-> > 
-> > diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-> > index b9ab1d5..3d4f63c 100644
-> > --- a/arch/arm/plat-mxc/devices/Kconfig
-> > +++ b/arch/arm/plat-mxc/devices/Kconfig
-> > @@ -13,6 +13,9 @@ config IMX_HAVE_PLATFORM_GPIO_KEYS
-> >  	bool
-> >  	default y if SOC_IMX51
-> >  
-> > +config IMX_HAVE_PLATFORM_GPIO_LEDS
-> > +	bool
-> > +
-> >  config IMX_HAVE_PLATFORM_IMX21_HCD
-> >  	bool
-> >  	
-> > diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-> > index 75cd2ec..ceefca6 100644
-> > --- a/arch/arm/plat-mxc/devices/Makefile
-> > +++ b/arch/arm/plat-mxc/devices/Makefile
-> > @@ -2,6 +2,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_FSL_USB2_UDC) += platform-fsl-usb2-udc.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
-> > +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_LEDS) += platform-gpio_leds.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
-> >  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
-> > diff --git a/arch/arm/plat-mxc/devices/platform-gpio_leds.c b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
-> > new file mode 100644
-> > index 0000000..a430213
-> > --- /dev/null
-> > +++ b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
-> > @@ -0,0 +1,22 @@
-> > +/*
-> > + * Copyright (C) 2011 Freescale Semiconductor, Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License
-> > + * as published by the Free Software Foundation; either version 2
-> > + * of the License, or (at your option) any later version.
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +#include <asm/sizes.h>
-> > +#include <mach/hardware.h>
-> > +#include <mach/devices-common.h>
-> > +
-> > +struct platform_device *__init imx_add_gpio_leds(
-> > +		 const struct gpio_led_platform_data *pdata)
-> > +{
-> > +	return imx_add_platform_device("leds-gpio", -1, NULL,
-> > +		 0, pdata, sizeof(*pdata));
-> > +}
-> 
-> Does this really make sense? There's nothing imx specific in this
-> function, so it shouldn't be named imx_* and it shouldn't be under
-> plat-mxc. Also, any user of imx_add_gpio_leds could call
-> platform_device_register_resndata instead.
-hmm, as long as the function lives in plat-mxc it's IMHO even required
-to be named imx_*. But other than that, you're obivously right.
-(Well, the central approach would assert that only one instance of
-"leds-gpio" is used. But that alone probably isn't worth the
-optimisation.)
+On the mx53evk board there is an LED connected to GPIO7_7.
 
-The mechanims could be made a bit more aggressive by something like
-that:
+Add support for it.
 
-	struct gpio_led_platform_data *_pdata = *pdata;
-	_pdata->leds = kmemdup(pdata->leds, pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL)
-	if (!_pdata->leds)
-		return ...
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_evk.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-	ret = imx_add_platform_device("leds-gpio", -1, NULL, 0, _pdata, sizeof(_pdata));
-	if (IS_ERR(ret))
-		kfree(_pdata->leds);
-
-	return PTR_RET(ret);
-
-This would allow to have the struct gpio_led array in init memory, too.
-
-Is it worth the effort?
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index 2af3f43..3e4e40b 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -37,6 +37,7 @@
+ #define MX53_EVK_FEC_PHY_RST	IMX_GPIO_NR(7, 6)
+ #define EVK_ECSPI1_CS0		IMX_GPIO_NR(2, 30)
+ #define EVK_ECSPI1_CS1		IMX_GPIO_NR(3, 19)
++#define MX53EVK_LED		IMX_GPIO_NR(7, 7)
+ 
+ #include "crm_regs.h"
+ #include "devices-imx53.h"
+@@ -60,6 +61,8 @@ static iomux_v3_cfg_t mx53_evk_pads[] = {
+ 	/* ecspi chip select lines */
+ 	MX53_PAD_EIM_EB2__GPIO2_30,
+ 	MX53_PAD_EIM_D19__GPIO3_19,
++	/* LED */
++	MX53_PAD_PATA_DA_1__GPIO7_7,
+ };
+ 
+ static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
+@@ -117,6 +120,20 @@ static const struct spi_imx_master mx53_evk_spi_data __initconst = {
+ 	.num_chipselect = ARRAY_SIZE(mx53_evk_spi_cs),
+ };
+ 
++static struct gpio_led mx53_evk_leds[] = {
++	{
++		.name			= "led-green",
++		.default_trigger	= "heartbeat",
++		.active_low		= 0,
++		.gpio			= MX53EVK_LED,
++	},
++};
++
++static struct gpio_led_platform_data mx53_evk_leds_data = {
++	.leds = mx53_evk_leds,
++	.num_leds = ARRAY_SIZE(mx53_evk_leds),
++};
++
+ static void __init mx53_evk_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+@@ -135,6 +152,8 @@ static void __init mx53_evk_board_init(void)
+ 		ARRAY_SIZE(mx53_evk_spi_board_info));
+ 	imx53_add_ecspi(0, &mx53_evk_spi_data);
+ 	imx53_add_imx2_wdt(0, NULL);
++	platform_device_register_resndata(NULL, "leds-gpio", -1,
++		NULL, 0, &mx53_evk_leds_data, sizeof(mx53_evk_leds_data));
+ }
+ 
+ static void __init mx53_evk_timer_init(void)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.0.4
