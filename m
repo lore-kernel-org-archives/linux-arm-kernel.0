@@ -1,56 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Apr 2011 10:24:34 +0100
-Subject: [PATCH] ARCH arm: adding new board: CDU
-In-Reply-To: <20110404091635.GA19841@n2100.arm.linux.org.uk>
-References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
-	<1300949648-15078-2-git-send-email-horms@verge.net.au>
-	<4D8B2068.60402@aksignal.cz> <4D8BA47B.8050904@bluewatersys.com>
-	<4D998B12.1040909@aksignal.cz>
-	<20110404091635.GA19841@n2100.arm.linux.org.uk>
-Message-ID: <20110404092434.GB19841@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 04 Apr 2011 11:27:41 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <4D95EF8E.9080902@vollmann.ch>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>	<201104011554.07924.arnd@arndb.de>
+	<4D95E112.4020400@vollmann.ch>	<201104011659.40443.arnd@arndb.de>
+	<4D95EF8E.9080902@vollmann.ch>
+Message-ID: <4D998F0D.8070300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 04, 2011 at 11:10:42AM +0200, Prchal Ji?? wrote:
-> > Hi,
-> > this is separated PATCH adding new board CDU.
-> 
-> What does this have to do with
-> 
-> "[PATCH 1/2] mmc, ARM: Rename SuperH Mobile ARM zboot helpers" ?
-> 
-> which is the message which you hit your mailer's "reply" button on?
-> Please don't pollute email threads.
+Le 01/04/2011 17:30, Detlef Vollmann :
+> On 04/01/11 16:59, Arnd Bergmann wrote:
+>> On Friday 01 April 2011, Detlef Vollmann wrote:
+>>> On 04/01/11 15:54, Arnd Bergmann wrote:
+>>
+>>>> 9. All interesting work is going into a handful of platforms, all of
+>>>> which
+>>>>      are ARMv7 based.
+>>> Define interesting.
+>>
+>> The ones that are causing the churn that we're talking about.
+>> Platforms that have been working forever and only need to get
+>> the occasional bug fix are boring, i.e. not the problem.
+> In the ARM tree I only know mach-at91.
+> Atmel still introduces new SOCs based on ARM926EJ-S, and that makes
+> perfect sense for lots of applications.
+> And if they add support for a new SOC, they just copy an existing one,
+> change some GPIOs, and submit it as new files (sorry, I'm over-
+> simplifying here).
+> And if you happen to wire your board a bit differently than they do,
+> you have to patch theur generic file (in addidtion to add your own
+> board file).
+> And though I only know the mach-at91 closely, I'm pretty sure quite
+> a number of other mach-* are not better.
+> So this is actually why the ARM tree has such a bad reputation:
+> lot's of code repetition, and still more of that.
 
-Sorry, it's not as trivial as I thought.  For some reason your mailer is
-introducing additional message IDs in the 'References' header which are
-causing the message to be incorrectly threaded.  Here are the original
-two messages:
+Yes, certainly time has come for a change.
 
-From: Simon Horman <horms@verge.net.au>
-Subject: [PATCH 0/2] mmc: zboot helpers
-Message-Id: <1300949648-15078-1-git-send-email-horms@verge.net.au>
+Note however that AT91 community is making great effort to:
+- publish and maintain every single chip/board support since more than 5
+years (and far before for first venerable at91rm9200) : if you recall
+well, it was before most of code that appeared in arch/arm/mach-*
+directories ;-)
+- integrate ideas and patches from contributors for simplifying and
+reducing board duplication
+- try to conform to new infrastructures that are appearing on ARM Linux
+for better convergence of code: gpiolib, leds, buttons, clocks (work in
+progress)...
 
-From: Simon Horman <horms@verge.net.au>
-Subject: [PATCH 1/2] mmc, ARM: Rename SuperH Mobile ARM zboot helpers
-Message-Id: <1300949648-15078-2-git-send-email-horms@verge.net.au>
+We know that work has to be done and we will for sure follow this effort
+of consolidation. And remember: contributions welcomed ;-).
 
-And your messages:
-
-From: Prchal Ji?? <jiri.prchal@aksignal.cz>
-Subject: [PATCH] mmc, AT91: fix init fequency problem
-References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
-        <1300949648-15078-2-git-send-email-horms@verge.net.au>
-In-Reply-To: <1300949648-15078-2-git-send-email-horms@verge.net.au>
-
-From: Prchal Ji?? <jiri.prchal@aksignal.cz>
-Subject: [PATCH] ARCH arm: adding new board: CDU
-References: <1300949648-15078-1-git-send-email-horms@verge.net.au>
-        <1300949648-15078-2-git-send-email-horms@verge.net.au>
-        <4D8B2068.60402@aksignal.cz> <4D8BA47B.8050904@bluewatersys.com>
-In-Reply-To: <4D8BA47B.8050904@bluewatersys.com>
-
-both of which reference Simon's unrelated emails.  No idea how you're
-doing that, but both of your messages seem to be completely unrelated
-to Simon's two.
+Best regards,
+-- 
+Nicolas Ferre
