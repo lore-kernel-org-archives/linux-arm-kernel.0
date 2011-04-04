@@ -1,104 +1,87 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Mon, 04 Apr 2011 10:13:08 -0700
-Subject: [PATCH 1/2] regulator: pm8921-regulator: Add regulator driver
-	for PM8921
-In-Reply-To: <20110402025012.GD25424@opensource.wolfsonmicro.com>
-References: <1301523361-5982-1-git-send-email-collinsd@codeaurora.org>
-	<1301523432-6017-1-git-send-email-collinsd@codeaurora.org>
-	<20110330234613.GA21487@opensource.wolfsonmicro.com>
-	<4D93DAD2.5080501@codeaurora.org>
-	<20110331234359.GD21726@opensource.wolfsonmicro.com>
-	<4D965F9D.3060907@codeaurora.org>
-	<20110402025012.GD25424@opensource.wolfsonmicro.com>
-Message-ID: <4D99FC24.4060007@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Apr 2011 19:19:27 +0200
+Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
+In-Reply-To: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
+References: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110404171927.GG7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2011 07:50 PM, Mark Brown wrote:
-> This all seems fairly standard and like many other regulators except for
-> the the masking off the pin control.  The only unusual thing is that the
-> hardware control is being managed by software at runtime, usually it's
-> set up and then left alone by software.
+On Mon, Apr 04, 2011 at 02:06:45PM -0300, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/plat-mxc/devices/Kconfig               |    3 +++
+>  arch/arm/plat-mxc/devices/Makefile              |    1 +
+>  arch/arm/plat-mxc/devices/platform-gpio_leds.c  |   22 ++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    4 ++++
+>  4 files changed, 30 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_leds.c
 > 
-> The first thing I'm thinking here is that this maps fairly well onto a
-> semi-virtual regulator where the operations map onto the control for the
-> hardware mode.  The enable/disable control via the pin is totally
-> orthogonal to the control via the regular register interface, and it
-> sounds like the mode control is too though that was less clear to me.
-> Enabling would then translate into turning pin control on rather than
-> actually enabling but that seems OK.  Does that sound like it'd work?
+> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+> index b9ab1d5..3d4f63c 100644
+> --- a/arch/arm/plat-mxc/devices/Kconfig
+> +++ b/arch/arm/plat-mxc/devices/Kconfig
+> @@ -13,6 +13,9 @@ config IMX_HAVE_PLATFORM_GPIO_KEYS
+>  	bool
+>  	default y if SOC_IMX51
+>  
+> +config IMX_HAVE_PLATFORM_GPIO_LEDS
+> +	bool
+> +
+>  config IMX_HAVE_PLATFORM_IMX21_HCD
+>  	bool
+>  	
+> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+> index 75cd2ec..ceefca6 100644
+> --- a/arch/arm/plat-mxc/devices/Makefile
+> +++ b/arch/arm/plat-mxc/devices/Makefile
+> @@ -2,6 +2,7 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FSL_USB2_UDC) += platform-fsl-usb2-udc.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
+> +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_LEDS) += platform-gpio_leds.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
+> diff --git a/arch/arm/plat-mxc/devices/platform-gpio_leds.c b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
+> new file mode 100644
+> index 0000000..a430213
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/devices/platform-gpio_leds.c
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <asm/sizes.h>
+> +#include <mach/hardware.h>
+> +#include <mach/devices-common.h>
+> +
+> +struct platform_device *__init imx_add_gpio_leds(
+> +		 const struct gpio_led_platform_data *pdata)
+> +{
+> +	return imx_add_platform_device("leds-gpio", -1, NULL,
+> +		 0, pdata, sizeof(*pdata));
+> +}
 
-So what you are suggesting is that two regulators are registered for a
-single physical regulator.  The first operates normally with respect to
-enable, set mode, set voltage, etc.  The second will be used exclusively
-for pin control in which regulator_enable and regulator_disable will map
-to enabling and disabling pin control.  I suppose that this should be ok
-as long as it isn't confusing for consumers to utilize.  However, I will
-definitely only register pin control regulators which are marked for use
-with pin control via some of the platform data values.  Otherwise the
-number of regulators registered would double unnecessarily.
+Does this really make sense? There's nothing imx specific in this
+function, so it shouldn't be named imx_* and it shouldn't be under
+plat-mxc. Also, any user of imx_add_gpio_leds could call
+platform_device_register_resndata instead.
 
-Also, while conceptually pin control should be independent of other
-regulator features, it becomes nonorthogonal in practice.  For instance,
-some regulators have finer voltage stepping available in advanced
-operating mode, but pin control cannot be used in this advanced mode.  The
-result is that set_voltage becomes tried to pin control for these
-regulators.  The outcome is that the new pin control semi-virtual
-regulator would be tightly coupled to its real sibling regulator.
-Implementing it in this manner may get complicated.
+Sascha
 
-I suppose there is also a question of what regulator_disable should mean
-in terms of outcome regulator state.  Thus far, I have interpreted it to
-mean that the regulator is definitely turned off physically.  As such, pin
-control must be disabled if it was previously enabled.  Do you think this
-is the best approach to take, or should the concepts of regulator enable
-and regulator pin control enable be orthogonal?
-
->> The regulator probe function reads the regulator register values to figure
->> out the initial hardware state.  It also sets some regulator controls not
->> handled by other regulator framework callback functions; e.g.: pull down
-> 
-> That just sounds like platform data which could just work in the same
-> way as the regulator core - no platform data would mean nothing gets
-> changed.
-
-That is more or less how the patch already works.  If platform data for a
-given regulator is not passed to the pm8921-core, then that regulator is
-never probed (via platform device) and the regulator_dev is not created
-for it (in the platform driver probe).  The loop in pm8921_add_subdevices
-which adds the pm8921-regulator devices is important because it must
-iterate in topological order with respect to the regulator supply chain.
-This ordering is arbitrary and unknown to either the pm8921-core or the
-pm8921-regulator.  If there is no strong requirement for this to change, I
-would prefer to keep it as is.
-
->> enable.  I'm not sure if this could be moved into an init_data
->> regulator_init callback because that pointer would need to be specified in
->> the board file where the function would be unknown.
-> 
-> I'm sorry, I don't understand what you're saying here.  Could you
-> clarify?
-
-struct regulator_init_data has a member: regulator_init.  However, I don't
-think there is a good way to make use of it for this system because that
-function pointer must be specified statically in a board file, but the
-regulator register init function is private to the pm8921-regulator driver.
-
->> Also, it would pollute the system with unusable devices if all natively
->> controlled regulator devices were registered if the shared driver was
->> being used for many regulators.
-> 
-> Depends if you view it as pollution or not; also note that the devices
-> aren't totally unusuable as you can still use them for readback.
-
-They wouldn't be useful for readback either because register values are
-only read during initialization.  The remainder of the regulator usage is
-write-only.  This works under the assumption that PMIC registers will not
-be modified by any other writers.  This assumption is true except in the
-case of a regulator managed via the shared interface.
-
-- David
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
