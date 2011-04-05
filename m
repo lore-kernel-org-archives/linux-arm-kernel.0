@@ -1,100 +1,184 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue,  5 Apr 2011 17:38:06 -0400
-Subject: [PATCH 3/6] i2c-davinci: introduce a dev-> function pointer for scl
-	pulsing
+Date: Tue,  5 Apr 2011 17:38:07 -0400
+Subject: [PATCH 4/6] i2c-davinci: use the DA8xx's ICPFUNC to toggle I2C as gpio
 In-Reply-To: <cover.1302031487.git.bengardiner@nanometrics.ca>
 References: <cover.1302031487.git.bengardiner@nanometrics.ca>
-Message-ID: <392ee718990c7f0f315d2273a1c74337149a0e1b.1302031487.git.bengardiner@nanometrics.ca>
+Message-ID: <b370ead67f06434d2f8ae1e94ede12f625c3edfc.1302031487.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of the I2C recovery routine checks whether
-platform data ->scl_pin has been assigned and if so, the generic_i2c_clock_pulse
-routine is executed.
+On the da850evm, with the default config of polling keys enabled, several
+"controller timed out" errors were observed on the console; as well as the
+same error observed on custom hardware when communicating with a i2c
+touchscreen device. [1]
 
-In preparation for an alternative recovery routine; introduce a pulse_scl
-function pointer to the driver private structure and assign it the value of
-generic_i2c_clock_pulse on init if the scl_pin is assigned in platform data.
+Discussion of the causes and potential workarounds began on the e2e forums [2]
+where Brad Griffis pointed out that the da850 (and da830) has an i2c controller
+whose SCL and SDA may be manipulated as GPIOs by using the ICPFUNC registers
+of the i2c controller. He further suggested a means of using this feature to
+send clock pulses on the I2C bus to free the frozen slave device.
 
-Signed-off-by: Ben Gardiner<bengardiner@nanometrics.ca>
+Implement the suggested procedure by toggling SCL and checking SDA using the
+ICPFUNC registers of the I2C controller when present. Allow platforms to
+indicate the presence of the ICPFUNC registers with a has_pfunc platform data
+flag.
+
+[1] http://permalink.gmane.org/gmane.linux.davinci/22291
+[2] http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/p/99895/350610.aspx
+
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+Cc: Bastian Ruppert <Bastian.Ruppert@sewerin.de>
+Cc: Brad Griffis <bgriffis@ti.com>
+Cc: Jon Povey <jon.povey@racelogic.co.uk>
+Cc: Philby John <pjohn@in.mvista.com>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Ben Dooks <ben-linux@fluff.org>
 
 ---
- drivers/i2c/busses/i2c-davinci.c |   20 +++++++++++++-------
- 1 files changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/mach-davinci/include/mach/i2c.h |    6 ++-
+ drivers/i2c/busses/i2c-davinci.c         |   88 ++++++++++++++++++++++++++++++
+ 2 files changed, 93 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/include/mach/i2c.h b/arch/arm/mach-davinci/include/mach/i2c.h
+index ab07a44..858c5c6 100644
+--- a/arch/arm/mach-davinci/include/mach/i2c.h
++++ b/arch/arm/mach-davinci/include/mach/i2c.h
+@@ -19,12 +19,16 @@
+  * @bus_delay:	post-transaction delay (usec)
+  * @sda_pin:	GPIO pin ID to use for SDA
+  * @scl_pin:	GPIO pin ID to use for SCL
++ * @has_pfunc:	set this to true if the i2c controller on your chip has a
++ *		ICPFUNC register which allows the SDA and SCL pins to be
++ *		controlled as gpio (like in DA850)
+  */
+ struct davinci_i2c_platform_data {
+ 	unsigned int	bus_freq;
+ 	unsigned int	bus_delay;
+ 	unsigned int	sda_pin;
+ 	unsigned int	scl_pin;
++	bool		has_pfunc;
+ };
+ 
+ /* for board setup code */
 diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 7011222..0a2c697 100644
+index 0a2c697..5bdc98c 100644
 --- a/drivers/i2c/busses/i2c-davinci.c
 +++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -110,6 +110,7 @@ struct davinci_i2c_dev {
- 	int			stop;
- 	u8			terminate;
- 	struct i2c_adapter	adapter;
-+	void			(*pulse_scl) (struct davinci_i2c_dev *dev);
- #ifdef CONFIG_CPU_FREQ
- 	struct completion	xfr_complete;
- 	struct notifier_block	freq_transition;
-@@ -165,16 +166,17 @@ static void i2c_davinci_dump_regs(struct davinci_i2c_dev *dev)
+@@ -65,6 +65,11 @@
+ #define DAVINCI_I2C_IVR_REG	0x28
+ #define DAVINCI_I2C_EMDR_REG	0x2c
+ #define DAVINCI_I2C_PSC_REG	0x30
++#define DAVINCI_I2C_PFUNC_REG	0x48
++#define DAVINCI_I2C_PDIR_REG	0x4c
++#define DAVINCI_I2C_PDIN_REG	0x50
++#define DAVINCI_I2C_DSET_REG	0x58
++#define DAVINCI_I2C_DCLR_REG	0x5c
+ 
+ #define DAVINCI_I2C_IVR_AAS	0x07
+ #define DAVINCI_I2C_IVR_SCD	0x06
+@@ -98,6 +103,29 @@
+ #define DAVINCI_I2C_IMR_NACK	BIT(1)
+ #define DAVINCI_I2C_IMR_AL	BIT(0)
+ 
++/* set SDA and SCL as GPIO */
++#define DAVINCI_I2C_PFUNC_PFUNC0	BIT(0)
++
++/* set SCL as output when used as GPIO*/
++#define DAVINCI_I2C_PDIR_PDIR0	BIT(0)
++/* set SDA as output when used as GPIO*/
++#define DAVINCI_I2C_PDIR_PDIR1	BIT(1)
++
++/* read SCL GPIO level */
++#define DAVINCI_I2C_PDIN_PDIN0 BIT(0)
++/* read SDA GPIO level */
++#define DAVINCI_I2C_PDIN_PDIN1 BIT(1)
++
++/*set the SCL GPIO high */
++#define DAVINCI_I2C_DSET_PDSET0	BIT(0)
++/*set the SDA GPIO high */
++#define DAVINCI_I2C_DSET_PDSET1	BIT(1)
++
++/* set the SCL GPIO low */
++#define DAVINCI_I2C_DCLR_PDCLR0	BIT(0)
++/* set the SDA GPIO low */
++#define DAVINCI_I2C_DCLR_PDCLR1	BIT(1)
++
+ struct davinci_i2c_dev {
+ 	struct device           *dev;
+ 	void __iomem		*base;
+@@ -182,6 +210,64 @@ static void generic_i2c_clock_pulse(struct davinci_i2c_dev *dev)
+ 	}
  }
  
- /* Generate a pulse on the i2c clock pin. */
--static void generic_i2c_clock_pulse(unsigned int scl_pin)
-+static void generic_i2c_clock_pulse(struct davinci_i2c_dev *dev)
- {
-+	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
- 	u16 i;
- 
--	if (scl_pin) {
-+	if (pdata->scl_pin) {
- 		/* Send high and low on the SCL line */
- 		for (i = 0; i < 9; i++) {
--			gpio_set_value(scl_pin, 0);
-+			gpio_set_value(pdata->scl_pin, 0);
- 			udelay(20);
--			gpio_set_value(scl_pin, 1);
-+			gpio_set_value(pdata->scl_pin, 1);
- 			udelay(20);
- 		}
- 	}
-@@ -186,7 +188,6 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
- static void i2c_recover_bus(struct davinci_i2c_dev *dev)
- {
- 	u32 flag = 0;
--	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
- 
- 	i2c_davinci_dump_regs(dev);
- 	dev_err(dev->dev, "initiating i2c bus recovery\n");
-@@ -195,8 +196,8 @@ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
- 	flag |=  DAVINCI_I2C_MDR_NACK;
- 	/* write the data into mode register */
- 	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
--	if (pdata)
--		generic_i2c_clock_pulse(pdata->scl_pin);
-+	if (dev->pulse_scl)
-+		dev->pulse_scl(dev);
- 	/* Send STOP */
- 	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
- 	flag |= DAVINCI_I2C_MDR_STP;
-@@ -669,6 +670,7 @@ static struct i2c_algorithm i2c_davinci_algo = {
- 
- static int davinci_i2c_probe(struct platform_device *pdev)
- {
-+	struct davinci_i2c_platform_data *pdata;
- 	struct davinci_i2c_dev *dev;
- 	struct i2c_adapter *adap;
- 	struct resource *mem, *irq, *ioarea;
-@@ -751,6 +753,10 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 		goto err_free_irq;
- 	}
- 
-+	pdata = dev->dev->platform_data;
-+	if (pdata->scl_pin)
-+		dev->pulse_scl = generic_i2c_clock_pulse;
++static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
++								int val);
 +
++/* Generate gpio a pulse on the i2c clock pin. */
++static void i2c_davinci_pfunc_i2c_clock_pulse(struct davinci_i2c_dev *dev)
++{
++	u32 flag = 0;
++	u16 i;
++
++	davinci_i2c_reset_ctrl(dev, 0);
++
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, 0x00);
++
++	/* SCL output, SDA input */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_PDIR_REG,
++				DAVINCI_I2C_PDIR_PDIR0);
++
++	/* change to GPIO mode */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_PFUNC_REG,
++				DAVINCI_I2C_PFUNC_PFUNC0);
++
++	/* SCL high */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_DSET_REG,
++				DAVINCI_I2C_DSET_PDSET0);
++	udelay(5);
++	for (i = 0; i < 16; i++) {
++		/* SCL low */
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_DCLR_REG,
++					DAVINCI_I2C_DCLR_PDCLR0);
++		udelay(5);
++		/* SCL high */
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_DSET_REG,
++					DAVINCI_I2C_DSET_PDSET0);
++		udelay(5);
++
++		/* read the state of SDA */
++		flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_PDIN_REG);
++		if (flag & DAVINCI_I2C_PDIN_PDIN1) {
++			dev_dbg(dev->dev, "recovered after %d SCL pulses",
++					i + 1);
++			break;
++		}
++	}
++
++	/* change back to I2C mode */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_PFUNC_REG, 0);
++
++	/* take the I2C dev out of reset */
++	davinci_i2c_reset_ctrl(dev, 1);
++
++	/* read the state of SDA */
++	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_PDIN_REG);
++	if (flag & DAVINCI_I2C_PDIN_PDIN1)
++		return;
++
++	dev_err(dev->dev, "I2C slave will not release SDA.\n");
++}
++
+ /* This routine does i2c bus recovery as specified in the
+  * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+  */
+@@ -756,6 +842,8 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	pdata = dev->dev->platform_data;
+ 	if (pdata->scl_pin)
+ 		dev->pulse_scl = generic_i2c_clock_pulse;
++	else if (pdata->has_pfunc)
++		dev->pulse_scl = i2c_davinci_pfunc_i2c_clock_pulse;
+ 
  	return 0;
  
- err_free_irq:
 -- 
 1.7.1
