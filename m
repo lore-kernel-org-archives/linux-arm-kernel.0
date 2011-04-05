@@ -1,54 +1,135 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Tue, 05 Apr 2011 08:30:24 +0100
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104031726.37420.arnd@arndb.de>
-	<20110403160324.GA8050@n2100.arm.linux.org.uk>
-	<201104040259.26601.arnd@arndb.de>
-	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
-	<20110404112104.GB19854@n2100.arm.linux.org.uk>
-	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>
-	<20110404133104.GA23266@n2100.arm.linux.org.uk>
-	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
-	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
-Message-ID: <1301988624.417.71.camel@e102391-lin.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Apr 2011 09:30:30 +0200
+Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
+In-Reply-To: <0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
+References: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
+	<20110404171927.GG7285@pengutronix.de>
+	<20110404174244.GH13963@pengutronix.de>
+	<20110404175240.GF22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C13BB8@AUSP01VMBX24.collaborationhost.net>
+	<20110404181759.GG22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110405073030.GI13963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-04 at 22:08 +0200, Linus Walleij wrote:
-> 2011/4/4 Marc Zyngier <Marc.Zyngier@arm.com>:
-> > On Mon, 2011-04-04 at 14:31 +0100, Russell King - ARM Linux wrote:
-> >>
-> >> If ARM are going to architect a set of timers into the hardware, let's
-> >> make sure that all such hardware has them so we can dig ourselves out
-> >> of this crappy mess that we find ourselves in today.
+Hello,
+
+On Mon, Apr 04, 2011 at 04:52:43PM -0500, H Hartley Sweeten wrote:
+> On Monday, April 04, 2011 11:18 AM, Russell King wrote:
+> >>> If you go to the effort of making it _that_ generic, then it shouldn't
+> >>> even be in plat-mxc, but somewhere *everyone* can benefit from it.  See
+> >>> Linus' complaints in the OMAP pull request thread about the amount of
+> >>> largely similar arch/arm code.
+> >> 
+> >> If it's made generic, mach-ep93xx/core.c could use it to register it's two
+> >> platform leds.  Please keep me in the loop if this is done.
 > >
-> > As far as I know, A15 always has a set of generic timers.
-> >
-> > It may be that they are not available (frequency not programmed into the
-> > CNTFREQ register), or that someone decided to use a better alternative
-> > (for some particular interpretation of "better").
+> > In which case we don't want "if it's made generic", we *require* it to be
+> > generic.
+
+Yeah, definitely. I already tried once to make the device registration
+that we use on mxc globally available.
+
+> > As I say, we *must* get away from the idea that something in mach-xyz has
+> > nothing to do with our own development in mach-abc, and start taking an
+> > interest in consolidating some of this stuff.  Otherwise we may get to
+> > the point where further arch/arm development is barred from the mainline
+> > kernel.
 > 
-> I guess this thing is inside that A15 core?
+> How about something like this:
 > 
-> First, what happens the day any vendors start making SoCs on this is
-> they turn the A15 core off whenever it is not used, loosing all state
-> including this timer, I believe.
+> int __init gpio_led_platform_register(int id, struct gpio_led *leds, int nr)
+> {
+> 	struct gpio_led_platform_data *pdata;
+> 	struct platform_device *pdev;
+> 	int ret;
+> 
+> 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+> 	if (!pdata)
+> 		return -ENOMEM;
+> 
+> 	pdev = platform_device_alloc("leds-gpio", id);
+> 	if (!pdev) {
+> 		ret = -ENOMEM;
+> 		goto out_free;
+> 	}
+> 
+> 	pdata->leds = leds;
+> 	pdata->num_leds = nr;
+> 	pdev->dev.platform_data = pdata;
+> 	ret = platform_device_add(pdev);
+> 	if (ret)
+> 		goto out_pdev;
+> 	return 0;
+> 
+> out_pdev:
+> 	platform_device_put(pdev);
+> out_free:
+> 	kfree(pdata);
+> 	return ret;
+> }
+I like my approach better, without using mxc specific functions it would
+look as follows:
 
-The main counter is located in an ALWAYS_ON power domain, and should
-keep going whatever happens in the system.
+struct platform_device *__init gpio_led_register_device(
+		const gpio_led_platform_data *pdata)
+{
+	struct platform_device *ret = ERR_PTR(-ENOMEM);
+	struct gpio_led_platform_data *_pdata = *pdata;
+	_pdata->leds = kmemdup(pdata->leds,
+			 pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
 
-[...]
+	if (!_pdata->leds)
+		return ERR_PTR(-ENOMEM);
 
-> Second, have you taken into account the effect of changing the
-> frequency of the A15 core, which is something every vendor also
-> does, as you know Colin Cross already has a patch pending
-> for that on the TWD localtimer which has not yet reached
-> the kernel. (Or is A15 fixed frequency? Forgive my ignorance...)
+	ret = platform_device_register_resndata(NULL, "leds-gpio", -1,
+		NULL, 0, _pdata, sizeof(_pdata));
 
-Fixed frequency, with a minimal roll-over time of 40 years.
+	if (IS_ERR(ret))
+		kfree(_pdata->leds);
 
-	M.
+	return ret;
+}
+
+> The the mach-xyz init code just has to:
+> 
+> static struct gpio_led gpio_leds[] = {
+> 	{
+> 		.name	= "foo:fooclr",
+> 		.gpio	= FOO_GPIO_NUM,
+> 	}, {
+> 		.name	= "bar:barclr",
+> 		.gpio	= BAR_LED_NUM,
+> 	},
+> 	/* etc. */
+> };
+> 
+> 
+> 	gpio_led_platform_register(-1, gpio_leds, ARRAY_SIZE(gpio_leds));
+Compared to your approach with mine
+ - gpio_leds could be const __initconst;
+ - uses only a single parameter which AFAIK saves a few bytes to call
+   the function;
+ - you don't have control about the .id member (which IMHO is OK but
+   might be changed easily);
+ - you have to call a function with a different name;
+
+(Note all of these are no hard requirements for me, just my thoughts.)
+
+> If some one could suggest a good place for the gpio_led_platform_register function
+> I can create a proper patch.  Maybe just add it to the end of the leds-gpio.c driver?
+mxc uses a central place to register all devices
+(arch/arm/plat-mxc/devices).  I think for a global approach this won't
+scale (e.g. because a single header file is used for all devices), so a
+place near the driver is the right thing to do. leds-gpio.c doesn't work
+though because then it might end in a module.
+
+I'll send a patch as a reply to this mail.
+
+Best regards
+Uwe
+
 -- 
-Reality is an implementation detail.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
