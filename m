@@ -1,72 +1,81 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Tue,  5 Apr 2011 14:40:51 -0700
-Subject: [PM8921 MFD V5 0/6] pm8921 core and subdevices
-Message-ID: <1302039657-19395-1-git-send-email-adharmap@codeaurora.org>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Tue,  5 Apr 2011 17:38:04 -0400
+Subject: [PATCH 1/6] i2c-davinci: register dump before attempted bus recovery
+In-Reply-To: <cover.1302031487.git.bengardiner@nanometrics.ca>
+References: <cover.1302031487.git.bengardiner@nanometrics.ca>
+Message-ID: <1f1cfc8d37d01097ccfd860098807d1aafd89a49.1302031487.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for pmic 8921 chip and its subdevices.
-The pmic 8921 chip is used as a power management ic for 8960 based boards. It
-communicates over the ssbi bus, ssbi bus can be found here
+Produce a dump of the register contents of the I2C controller (at the debug
+level) whenever an i2c recovery is initiated.
 
-https://patchwork.kernel.org/patch/601771/
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+Cc: Bastian Ruppert <Bastian.Ruppert@sewerin.de>
+Cc: Brad Griffis <bgriffis@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 
-The patch set contains support for interrupt, gpio and mpp (multi purpose pin)
-subdevices.
+---
 
-Note that gpio and mpp subdevices need the interrupt subdevice to
-be operational, this is becuase the reading the the value of gpio/mpp lines
-happens by doing a transaction over registers managed by the interrupt subdev.
-The code invokes a call on interrupt subdevice, rather than writing to those
-registers directly, avoiding race conditions.
+The motivation for the introduction of this additional debugging information is
+that when I2C recovery on da850 began discussion in the e2e forums [1] a
+register dump was requested.
 
-Updates from V4
-Few things have changed in kernel proper since I last sent this series
--The interrupt macro names have changed (more structured)- had to update the irq
-patch to use the new macro names
-- mfd_cell does not have platfrom_data anymore - use mfd data instead.
-- Had a mutex_destroy in the mpp code, I had updated mpp driver to use spinlocks
-but that mutex_destroy was still hanging there. Removed the mutex_destroy.
-- since mpp code has been moved to gpio, updated the CONFIG name to reflect it 
-is a gpio instead of a subdevice for mfd IOW use CONFIG_GPIO_PM8XXX_MPP instead
-of CONFIG_MFD_PM8XXX_MPP
+[1] http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/p/99895/350610.aspx#350610
 
-Abhijeet Dharmapurikar (5):
-  mfd: pm8921: Add PMIC 8921 core driver
-  mfd: pm8xxx: Add irq support
-  gpio: pm8xxx-gpio: Add pm8xxx gpio driver
-  MAINTAINERS: Add patterns for pmic 8921 files to MSM subsystem
-  msm: board-8960: Add support for pm8921
+ drivers/i2c/busses/i2c-davinci.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-David Collins (1):
-  mfd: pm8xxx-mpp: Add pm8xxx MPP driver
-
- MAINTAINERS                                |    2 +
- arch/arm/mach-msm/board-msm8960.c          |   40 +++-
- arch/arm/mach-msm/include/mach/irqs-8960.h |    9 +-
- drivers/gpio/Kconfig                       |   17 +
- drivers/gpio/Makefile                      |    2 +
- drivers/gpio/pm8xxx-gpio.c                 |  455 ++++++++++++++++++++++++++++
- drivers/gpio/pm8xxx-mpp.c                  |  325 ++++++++++++++++++++
- drivers/mfd/Kconfig                        |   28 ++
- drivers/mfd/Makefile                       |    2 +
- drivers/mfd/pm8921-core.c                  |  277 +++++++++++++++++
- drivers/mfd/pm8xxx-irq.c                   |  371 +++++++++++++++++++++++
- include/linux/mfd/pm8xxx/core.h            |   81 +++++
- include/linux/mfd/pm8xxx/gpio.h            |  136 +++++++++
- include/linux/mfd/pm8xxx/irq.h             |   59 ++++
- include/linux/mfd/pm8xxx/mpp.h             |  233 ++++++++++++++
- include/linux/mfd/pm8xxx/pm8921.h          |   49 +++
- 16 files changed, 2077 insertions(+), 9 deletions(-)
- create mode 100644 drivers/gpio/pm8xxx-gpio.c
- create mode 100644 drivers/gpio/pm8xxx-mpp.c
- create mode 100644 drivers/mfd/pm8921-core.c
- create mode 100644 drivers/mfd/pm8xxx-irq.c
- create mode 100644 include/linux/mfd/pm8xxx/core.h
- create mode 100644 include/linux/mfd/pm8xxx/gpio.h
- create mode 100644 include/linux/mfd/pm8xxx/irq.h
- create mode 100644 include/linux/mfd/pm8xxx/mpp.h
- create mode 100644 include/linux/mfd/pm8xxx/pm8921.h
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index 5795c83..7011222 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -133,6 +133,37 @@ static inline u16 davinci_i2c_read_reg(struct davinci_i2c_dev *i2c_dev, int reg)
+ 	return __raw_readw(i2c_dev->base + reg);
+ }
+ 
++static void i2c_davinci_dump_regs(struct davinci_i2c_dev *dev)
++{
++	dev_dbg(dev->dev, "PSC  = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_PSC_REG));
++	dev_dbg(dev->dev, "CLKL = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_CLKL_REG));
++	dev_dbg(dev->dev, "CLKH = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_CLKH_REG));
++	dev_dbg(dev->dev, "MDR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG));
++
++	dev_dbg(dev->dev, "OAR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_OAR_REG));
++	dev_dbg(dev->dev, "IMR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_IMR_REG));
++	dev_dbg(dev->dev, "STR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_STR_REG));
++	dev_dbg(dev->dev, "CNT = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_CNT_REG));
++	dev_dbg(dev->dev, "DRR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_DRR_REG));
++	dev_dbg(dev->dev, "SAR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_SAR_REG));
++	dev_dbg(dev->dev, "DXR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_DXR_REG));
++	dev_dbg(dev->dev, "IVR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_IVR_REG));
++	dev_dbg(dev->dev, "EMDR = %08x\n",
++		davinci_i2c_read_reg(dev, DAVINCI_I2C_EMDR_REG));
++}
++
+ /* Generate a pulse on the i2c clock pin. */
+ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+ {
+@@ -157,6 +188,7 @@ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+ 	u32 flag = 0;
+ 	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+ 
++	i2c_davinci_dump_regs(dev);
+ 	dev_err(dev->dev, "initiating i2c bus recovery\n");
+ 	/* Send NACK to the slave */
+ 	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-- 
+1.7.1
