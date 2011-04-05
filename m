@@ -1,543 +1,71 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue,  5 Apr 2011 09:40:56 +0200
-Subject: =?UTF-8?q?=5BPATCH=20v2=5D=20at91sam9263=3A=20merge=20all=20boards=20defconfig=20into=20only=20one?=
-In-Reply-To: <1301940585-22289-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1301940585-22289-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1301989256-2958-1-git-send-email-plagnioj@jcrosoft.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Apr 2011 09:51:18 +0200
+Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
+In-Reply-To: <20110405074754.GB4633@n2100.arm.linux.org.uk>
+References: <20110404171927.GG7285@pengutronix.de>
+	<20110404174244.GH13963@pengutronix.de>
+	<20110404175240.GF22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C13BB8@AUSP01VMBX24.collaborationhost.net>
+	<20110404181759.GG22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
+	<20110405073030.GI13963@pengutronix.de>
+	<20110405074017.GA4633@n2100.arm.linux.org.uk>
+	<20110405074315.GL13963@pengutronix.de>
+	<20110405074754.GB4633@n2100.arm.linux.org.uk>
+Message-ID: <20110405075118.GM13963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on at91same9263ek
+On Tue, Apr 05, 2011 at 08:47:54AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 05, 2011 at 09:43:15AM +0200, Uwe Kleine-K?nig wrote:
+> > On Tue, Apr 05, 2011 at 08:40:17AM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Apr 05, 2011 at 09:30:30AM +0200, Uwe Kleine-K?nig wrote:
+> > > > I like my approach better, without using mxc specific functions it would
+> > > > look as follows:
+> > > > 
+> > > > struct platform_device *__init gpio_led_register_device(
+> > > > 		const gpio_led_platform_data *pdata)
+> > > > {
+> > > > 	struct platform_device *ret = ERR_PTR(-ENOMEM);
+> > > > 	struct gpio_led_platform_data *_pdata = *pdata;
+> > > > 	_pdata->leds = kmemdup(pdata->leds,
+> > > > 			 pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
+> > > > 
+> > > > 	if (!_pdata->leds)
+> > > > 		return ERR_PTR(-ENOMEM);
+> > > > 
+> > > > 	ret = platform_device_register_resndata(NULL, "leds-gpio", -1,
+> > > > 		NULL, 0, _pdata, sizeof(_pdata));
+> > > > 
+> > > > 	if (IS_ERR(ret))
+> > > > 		kfree(_pdata->leds);
+> > > > 
+> > > > 	return ret;
+> > > > }
+> > > 
+> > > But this is inconsistent.  The gpio_led_platform_data isn't copied,
+> > > but a sub-structure is - which makes this a candidate for people adding
+> > > __initdata to the wrong thing.  Also marking the LEDs array as __initdata
+> > > but leaving the gpio_led_platform_data without __initdata will lead to
+> > > warnings.
+> > platform_device_register_resndata does the copying.
+> 
+> Ok, but you're still modifying the leds pointer in the platform data,
+> which you've also marked as const.  That's an error.
+> 
+> If you want gpio_led_platform_data to be const, you also have to make
+> a copy of it here, even if you have to free it after
+> platform_device_register_resndata().
+This was intended by
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Guillaume GARDET <guillaume.gardet@free.fr>
-Cc: Gr?gory Hermant <gregory.hermant@calao-systems.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+	struct gpio_led_platform_data *_pdata = *pdata;
 
----
-v2:
+I'm just fighting with the compiler at this line because it doesn't like
+_pdata being initialized by a const pointer.
 
-	enable
-	 - audio
-	 - boot logo
-	 - wireless
- arch/arm/configs/at91sam9263_defconfig   |  168 ++++++++++++++++++++++++++++++
- arch/arm/configs/at91sam9263ek_defconfig |  106 -------------------
- arch/arm/configs/neocore926_defconfig    |  104 ------------------
- arch/arm/configs/usb-a9263_defconfig     |  106 -------------------
- 4 files changed, 168 insertions(+), 316 deletions(-)
- create mode 100644 arch/arm/configs/at91sam9263_defconfig
- delete mode 100644 arch/arm/configs/at91sam9263ek_defconfig
- delete mode 100644 arch/arm/configs/neocore926_defconfig
- delete mode 100644 arch/arm/configs/usb-a9263_defconfig
+Best regards
+Uwe
 
-diff --git a/arch/arm/configs/at91sam9263_defconfig b/arch/arm/configs/at91sam9263_defconfig
-new file mode 100644
-index 0000000..1cf9626
---- /dev/null
-+++ b/arch/arm/configs/at91sam9263_defconfig
-@@ -0,0 +1,168 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_KERNEL_LZMA=y
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_NAMESPACES=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_ARCH_AT91SAM9263=y
-+CONFIG_MACH_AT91SAM9263EK=y
-+CONFIG_MACH_USB_A9263=y
-+CONFIG_MACH_NEOCORE926=y
-+CONFIG_MTD_AT91_DATAFLASH_CARD=y
-+# CONFIG_ARM_THUMB is not set
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_NET_KEY=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_ROUTE_VERBOSE=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_IP_PNP_RARP=y
-+CONFIG_NET_IPIP=y
-+CONFIG_IP_MROUTE=y
-+CONFIG_IP_PIMSM_V1=y
-+CONFIG_IP_PIMSM_V2=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+CONFIG_IPV6=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_NFTL=y
-+CONFIG_NFTL_RW=y
-+CONFIG_MTD_DATAFLASH=y
-+CONFIG_MTD_BLOCK2MTD=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
-+CONFIG_MTD_UBI=y
-+CONFIG_MTD_UBI_GLUEBI=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_MISC_DEVICES=y
-+CONFIG_ATMEL_PWM=y
-+CONFIG_ATMEL_TCLIB=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_NETDEVICES=y
-+CONFIG_MII=y
-+CONFIG_SMSC_PHY=y
-+CONFIG_NET_ETHERNET=y
-+CONFIG_MACB=y
-+# CONFIG_NETDEV_1000 is not set
-+# CONFIG_NETDEV_10000 is not set
-+CONFIG_USB_ZD1201=m
-+CONFIG_INPUT_POLLDEV=m
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ADS7846=y
-+CONFIG_LEGACY_PTY_COUNT=4
-+CONFIG_SERIAL_ATMEL=y
-+CONFIG_SERIAL_ATMEL_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ATMEL=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_WATCHDOG_NOWAYOUT=y
-+CONFIG_AT91SAM9X_WATCHDOG=y
-+CONFIG_FB=y
-+CONFIG_FB_ATMEL=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_ATMEL_LCDC=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_LOGO=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SEQUENCER=y
-+CONFIG_SND_MIXER_OSS=y
-+CONFIG_SND_PCM_OSS=y
-+# CONFIG_SND_SUPPORT_OLD_API is not set
-+# CONFIG_SND_VERBOSE_PROCFS is not set
-+# CONFIG_SND_DRIVERS is not set
-+# CONFIG_SND_ARM is not set
-+CONFIG_SND_ATMEL_AC97C=y
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_USB_AUDIO=m
-+CONFIG_USB=y
-+CONFIG_USB_DEVICEFS=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_ZERO=m
-+CONFIG_USB_ETH=m
-+CONFIG_USB_GADGETFS=m
-+CONFIG_USB_FILE_STORAGE=m
-+CONFIG_USB_G_SERIAL=m
-+CONFIG_MMC=y
-+CONFIG_SDIO_UART=m
-+CONFIG_MMC_AT91=m
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_ATMEL_PWM=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_AT91SAM9=y
-+CONFIG_EXT2_FS=y
-+CONFIG_FUSE_FS=m
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_UBIFS_FS=y
-+CONFIG_UBIFS_FS_ADVANCED_COMPR=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_FTRACE=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_XZ_DEC=y
-diff --git a/arch/arm/configs/at91sam9263ek_defconfig b/arch/arm/configs/at91sam9263ek_defconfig
-deleted file mode 100644
-index 8a04d6f..0000000
---- a/arch/arm/configs/at91sam9263ek_defconfig
-+++ /dev/null
-@@ -1,106 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_LOCALVERSION_AUTO is not set
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_AT91=y
--CONFIG_ARCH_AT91SAM9263=y
--CONFIG_MACH_AT91SAM9263EK=y
--CONFIG_MTD_AT91_DATAFLASH_CARD=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
--CONFIG_FPE_NWFPE=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_BOOTP=y
--CONFIG_IP_PNP_RARP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_DATAFLASH=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_ATMEL=y
--CONFIG_BLK_DEV_LOOP=y
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_SSC=y
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
--CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MII=y
--CONFIG_MACB=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ADS7846=y
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_ATMEL=y
--CONFIG_SERIAL_ATMEL_CONSOLE=y
--CONFIG_HW_RANDOM=y
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_GPIO=y
--CONFIG_SPI=y
--CONFIG_SPI_ATMEL=y
--# CONFIG_HWMON is not set
--CONFIG_WATCHDOG=y
--CONFIG_WATCHDOG_NOWAYOUT=y
--CONFIG_AT91SAM9X_WATCHDOG=y
--CONFIG_FB=y
--CONFIG_FB_ATMEL=y
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_USB_HID is not set
--CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
--CONFIG_USB_MON=y
--CONFIG_USB_OHCI_HCD=y
--CONFIG_USB_STORAGE=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_ZERO=m
--CONFIG_USB_GADGETFS=m
--CONFIG_USB_FILE_STORAGE=m
--CONFIG_USB_G_SERIAL=m
--CONFIG_MMC=y
--CONFIG_MMC_AT91=m
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_AT91SAM9=y
--CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_CRAMFS=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_CODEPAGE_850=y
--CONFIG_NLS_ISO8859_1=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
-diff --git a/arch/arm/configs/neocore926_defconfig b/arch/arm/configs/neocore926_defconfig
-deleted file mode 100644
-index 462dd18..0000000
---- a/arch/arm/configs/neocore926_defconfig
-+++ /dev/null
-@@ -1,104 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_LOCALVERSION_AUTO is not set
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_BLK_DEV_INITRD=y
--# CONFIG_COMPAT_BRK is not set
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_AT91=y
--CONFIG_ARCH_AT91SAM9263=y
--CONFIG_MACH_NEOCORE926=y
--CONFIG_MTD_AT91_DATAFLASH_CARD=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_FPE_NWFPE=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_NET_KEY=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--CONFIG_IP_PNP_BOOTP=y
--CONFIG_IP_PNP_RARP=y
--CONFIG_NET_IPIP=y
--# CONFIG_INET_LRO is not set
--CONFIG_IPV6=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--# CONFIG_PREVENT_FIRMWARE_BUILD is not set
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_NFTL=y
--CONFIG_NFTL_RW=y
--CONFIG_MTD_BLOCK2MTD=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_ECC_SMC=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
--CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_PLATFORM=y
--CONFIG_BLK_DEV_LOOP=y
--CONFIG_BLK_DEV_NBD=y
--CONFIG_ATMEL_PWM=y
--CONFIG_ATMEL_TCLIB=y
--CONFIG_SCSI=y
--CONFIG_CHR_DEV_SG=y
--CONFIG_NETDEVICES=y
--CONFIG_SMSC_PHY=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MACB=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ADS7846=y
--CONFIG_VT_HW_CONSOLE_BINDING=y
--# CONFIG_DEVKMEM is not set
--CONFIG_SERIAL_NONSTANDARD=y
--CONFIG_SERIAL_ATMEL=y
--CONFIG_SERIAL_ATMEL_CONSOLE=y
--# CONFIG_SERIAL_ATMEL_PDC is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_SPI=y
--CONFIG_SPI_ATMEL=y
--# CONFIG_HWMON is not set
--CONFIG_VIDEO_OUTPUT_CONTROL=y
--CONFIG_FB=y
--CONFIG_FB_ATMEL=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_ATMEL_LCDC=y
--# CONFIG_VGA_CONSOLE is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_LOGO=y
--CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
--CONFIG_USB_MON=y
--CONFIG_USB_OHCI_HCD=y
--CONFIG_USB_STORAGE=y
--CONFIG_MMC=y
--CONFIG_SDIO_UART=y
--CONFIG_MMC_AT91=m
--CONFIG_EXT2_FS=y
--# CONFIG_DNOTIFY is not set
--CONFIG_AUTOFS_FS=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_FS_WBUF_VERIFY=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--# CONFIG_ENABLE_MUST_CHECK is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
--# CONFIG_CRYPTO_HW is not set
-diff --git a/arch/arm/configs/usb-a9263_defconfig b/arch/arm/configs/usb-a9263_defconfig
-deleted file mode 100644
-index ee82d09..0000000
---- a/arch/arm/configs/usb-a9263_defconfig
-+++ /dev/null
-@@ -1,106 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_LOCALVERSION_AUTO is not set
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_AT91=y
--CONFIG_ARCH_AT91SAM9263=y
--CONFIG_MACH_USB_A9263=y
--CONFIG_AT91_SLOW_CLOCK=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyS0,115200"
--CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_MULTICAST=y
--CONFIG_IP_ADVANCED_ROUTER=y
--CONFIG_IP_ROUTE_VERBOSE=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_BOOTP=y
--CONFIG_IP_PNP_RARP=y
--CONFIG_IP_MROUTE=y
--CONFIG_IP_PIMSM_V1=y
--CONFIG_IP_PIMSM_V2=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_DATAFLASH=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
--CONFIG_BLK_DEV_LOOP=y
--# CONFIG_MISC_DEVICES is not set
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
--CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MII=y
--CONFIG_MACB=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--CONFIG_INPUT_EVBUG=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_ATMEL=y
--CONFIG_SERIAL_ATMEL_CONSOLE=y
--CONFIG_HW_RANDOM=y
--CONFIG_SPI=y
--CONFIG_SPI_ATMEL=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_USB_HID is not set
--CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
--CONFIG_USB_MON=y
--CONFIG_USB_OHCI_HCD=y
--CONFIG_USB_STORAGE=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_ETH=m
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
--CONFIG_FUSE_FS=m
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
--CONFIG_NFS_V3_ACL=y
--CONFIG_NFS_V4=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_CODEPAGE_850=y
--CONFIG_NLS_ISO8859_1=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
--# CONFIG_CRYPTO_HW is not set
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
