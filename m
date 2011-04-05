@@ -1,53 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Apr 2011 15:03:39 +0300
-Subject: [PATCHv2] omap: rx51: Platform support for lp5523 led chip
-In-Reply-To: <4D9B044B.7000604@nokia.com>
-References: <alpine.DEB.1.10.1103311524420.2634@esdhcp041196.research.nokia.com>
-	<1301578692-29286-1-git-send-email-ameya.palande@nokia.com>
-	<20110331142635.GF5465@legolas.emea.dhcp.ti.com>
-	<4D949E18.6090704@nokia.com>
-	<20110331154421.GN5465@legolas.emea.dhcp.ti.com>
-	<4D9B044B.7000604@nokia.com>
-Message-ID: <20110405120339.GD30505@legolas.emea.dhcp.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 5 Apr 2011 13:57:51 +0200
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110405114754.GG4797@pulham.picochip.com>
+References: <20110321111838.GC2610@pulham.picochip.com>
+	<20110322161811.GF6466@game.jcrosoft.org>
+	<20110322163917.GD10058@pulham.picochip.com>
+	<20110322175523.GE10058@pulham.picochip.com>
+	<20110324162517.GI6466@game.jcrosoft.org>
+	<20110331094041.GD3371@pulham.picochip.com>
+	<20110405102842.GC22192@game.jcrosoft.org>
+	<20110405104910.GE4797@pulham.picochip.com>
+	<20110405112102.GB19268@game.jcrosoft.org>
+	<20110405114754.GG4797@pulham.picochip.com>
+Message-ID: <20110405115751.GA24997@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 03:00:11PM +0300, Ameya Palande wrote:
-> Hi Felipe,
+On 12:47 Tue 05 Apr     , Jamie Iles wrote:
+> On Tue, Apr 05, 2011 at 01:21:02PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:49 Tue 05 Apr     , Jamie Iles wrote:
+> > > On Tue, Apr 05, 2011 at 12:28:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > work fine on 9263ek except the IP version detection.
+> > > > 
+> > > > the at91 macb ip version is supposed to be at 0x0601010C but it's not.
+> > > > At least on 9263 it's 0x0001010C. So we can not detect the arch at runtime
+> > > > but we can detect that it's a macb.
+> > > > 
+> > > > So could keep the ifdef for 2 archs but use the ip version on arm
+> > > 
+> > > OK, well I think my patches are already doing that so should be OK as 
+> > > they are.
+> > > 
+> > > Russell, are you able to take these through your tree (I think they 
+> > > count as consolidation work) or should I ask Stephen for a tree in 
+> > > linux-next for a while first?
+> > no please do not us the is_gem but the same way as I did in the ip detection
+> > keep the version register and then check it.
+> > 
+> > as this ip can be used on other arch we do not want to see thousands 
+> > of is_xxx
 > 
-> On 03/31/2011 06:44 PM, ext Felipe Balbi wrote:
-> >On Thu, Mar 31, 2011 at 06:30:32PM +0300, Ameya Palande wrote:
-> >>Hi Felipe,
-> >>
-> >>On 03/31/2011 05:26 PM, ext Felipe Balbi wrote:
-> >>>Hi,
-> >>>
-> >>>On Thu, Mar 31, 2011 at 04:38:12PM +0300, Ameya Palande wrote:
-> >>>>+static int rx51_lp5523_setup(void)
-> >>>>+{
-> >>>>+	int err;
-> >>>>+
-> >>>>+	err = gpio_request_one(RX51_LP5523_CHIP_EN_GPIO, GPIOF_DIR_OUT,
-> >>>>+			"lp5523_enable");
-> >>>>+	if (err<   0) {
-> >>>>+		pr_err("Unable to get lp5523_enable GPIO\n");
-> >>>>+		return err;
-> >>>>+	}
-> >>>>+
-> >>>>+	return err;
-> >>>
-> >>>isn't enough to return gpio_request_one(RX51_LP5523_CHIP_EN_GPIO,
-> >>>GPIOF_DIR_OUT, "lp5523_enable"); ??
-> >>
-> >>But then we won't know the failure reason for lp5523_probe()
-> >>I would prefer printing an error!
-> >
-> >see that both gpio_request() and gpio_direction_output() have debugging
-> >prints for error cases ;-)
+> But GEM isn't an architecture/machine type, it's a new Cadence Ethernet 
+> controller that follows on from MACB, not some arch specific tweaks so 
+> we really only have two options - MACB or GEM.
+I agree but you can have this ip in other soc so we need to try to make it
+as generic as possible
+and socs can have specific tweaks
+So use the version register and mask it is better in my mind and more flexible
+It's a shame that we can not detect the diff between avr32 and at91 via ip
+version.
+
+I hope that ip variation could be detected via version register.
+Next time.
 > 
-> Any comments about the version 3 of this patch?
+> Still, if it's important to you then I'll make the change.
+If you don't ming please
 
-looks good to me. Replied with my Reviewed-by tag.
-
--- 
-balbi
+Best Regards,
+J.
