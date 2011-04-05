@@ -1,19 +1,16 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Apr 2011 09:13:09 +0900
-Subject: [PATCH 1/2] mach-ux500: voltage domain regulators for DB8500
-In-Reply-To: <1301907068-16733-1-git-send-email-linus.walleij@stericsson.com>
-References: <1301907068-16733-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110405001308.GC5376@opensource.wolfsonmicro.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Tue,  5 Apr 2011 09:28:41 +0900
+Subject: [PATCH 0/4] ARM: S5P: Replace exynos4 kernel timer with s5p_timer
+Message-ID: <1301963325-22349-1-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 10:51:08AM +0200, Linus Walleij wrote:
+Exynos4 arch used exynos4_timer as kernel timer.
+But In the plat-s5p, we already have a common s5p_timer for hrt.
+In this patch, I replace exynos4_timer with common s5p_timer.
+This patch is tested on SMDKV310 and SMDKC210.
 
->  arch/arm/mach-ux500/regulator-db8500.c |  562 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-ux500/regulator-db8500.h |   45 +++
-
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-though I would prefer to see the regulator driver in drivers/regulator
-(though splitting the underlying integration with cpuidle isn't a
-problem) as this makes it easier to find all regulator drivers.
+[PATCH 1/4] ARM: S5P: Change s5p_timer for local timer support
+[PATCH 2/4] ARM: EXYNOS4: Update Kconfig and Makefile for s5p_timer
+[PATCH 3/4] ARM: EXYNOS4: Change each platform kernel timer using s5p_timer
+[PATCH 4/4] ARM: EXYNOS4: Delete exynos4 kernel timer
