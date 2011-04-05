@@ -1,50 +1,285 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 5 Apr 2011 12:28:42 +0200
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-In-Reply-To: <20110331094041.GD3371@pulham.picochip.com>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<20110316.131734.242138246.davem@davemloft.net>
-	<4D86F25A.7060405@atmel.com>
-	<20110321111838.GC2610@pulham.picochip.com>
-	<20110322161811.GF6466@game.jcrosoft.org>
-	<20110322163917.GD10058@pulham.picochip.com>
-	<20110322175523.GE10058@pulham.picochip.com>
-	<20110324162517.GI6466@game.jcrosoft.org>
-	<20110331094041.GD3371@pulham.picochip.com>
-Message-ID: <20110405102842.GC22192@game.jcrosoft.org>
+Date: Tue,  5 Apr 2011 12:40:18 +0200
+Subject: [PATCH] at91sam9261: rename at91sam9261ek to at91sam9261 defconfig
+Message-ID: <1302000018-20576-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:40 Thu 31 Mar     , Jamie Iles wrote:
-> Hi Jean-Christophe,
-> 
-> On Thu, Mar 24, 2011 at 05:25:17PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 17:55 Tue 22 Mar     , Jamie Iles wrote:
-> > > Hi Jean-Christophe,
-> > > > Also, can you confirm that the module ID's that you are using to 
-> > > > differentiate between AT91 and AVR32 won't clash with MACB uses in 
-> > > > other, non-at91/avr32 chips, or that it doesn't matter?
-> > > 
-> > > If this does work, then it would be nice if we made the else path of the 
-> > > RMII AT91 tests also test for avr32 too so we aren't driving the USRIO 
-> > > pins on platforms that aren't at91 but also aren't avr32.  So something 
-> > > the patch below instead.
-> > I'm currently traveling so I can not test it yet will test it next week
-> > but looks good
-> 
-> Just wondering if you'd had chance to test.  If so, would you mind 
-> reposting and I'll rebase my patches on top of it.
-> 
-> I also have patches for checksum offloading, receive packet timestamping 
-> and wake-on-lan support but I'd like to get the basic GEM ones into next 
-> first.
-work fine on 9263ek except the IP version detection.
+and update it with ubi, sound, nfs support etc...
 
-the at91 macb ip version is supposed to be at 0x0601010C but it's not.
-At least on 9263 it's 0x0001010C. So we can not detect the arch at runtime
-but we can detect that it's a macb.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91sam9261_defconfig   |  158 ++++++++++++++++++++++++++++++
+ arch/arm/configs/at91sam9261ek_defconfig |   95 ------------------
+ 2 files changed, 158 insertions(+), 95 deletions(-)
+ create mode 100644 arch/arm/configs/at91sam9261_defconfig
+ delete mode 100644 arch/arm/configs/at91sam9261ek_defconfig
 
-So could keep the ifdef for 2 archs but use the ip version on arm
-
-Best Regards,
-J.
+diff --git a/arch/arm/configs/at91sam9261_defconfig b/arch/arm/configs/at91sam9261_defconfig
+new file mode 100644
+index 0000000..ade6b2f
+--- /dev/null
++++ b/arch/arm/configs/at91sam9261_defconfig
+@@ -0,0 +1,158 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_KERNEL_LZMA=y
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_NAMESPACES=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_AT91=y
++CONFIG_ARCH_AT91SAM9261=y
++CONFIG_MACH_AT91SAM9261EK=y
++CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
++# CONFIG_ARM_THUMB is not set
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_VFP=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++CONFIG_CFG80211=y
++CONFIG_LIB80211=y
++CONFIG_MAC80211=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ATMEL=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_GLUEBI=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_MISC_DEVICES=y
++CONFIG_ATMEL_TCLIB=y
++CONFIG_ATMEL_SSC=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_SCSI_MULTI_LUN=y
++CONFIG_NETDEVICES=y
++CONFIG_NET_ETHERNET=y
++CONFIG_DM9000=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++CONFIG_USB_ZD1201=m
++CONFIG_RTL8187=m
++CONFIG_LIBERTAS=m
++CONFIG_LIBERTAS_USB=m
++CONFIG_LIBERTAS_SDIO=m
++CONFIG_LIBERTAS_SPI=m
++CONFIG_RT2X00=m
++CONFIG_RT2500USB=m
++CONFIG_RT73USB=m
++CONFIG_ZD1211RW=m
++CONFIG_INPUT_POLLDEV=m
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_ADS7846=y
++CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
++CONFIG_SERIAL_ATMEL=y
++CONFIG_SERIAL_ATMEL_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_GPIO=y
++CONFIG_SPI=y
++CONFIG_SPI_ATMEL=y
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++CONFIG_AT91SAM9X_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_FB_ATMEL=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++# CONFIG_LCD_CLASS_DEVICE is not set
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_ATMEL_LCDC=y
++# CONFIG_BACKLIGHT_GENERIC is not set
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_LOGO=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SEQUENCER=y
++CONFIG_SND_MIXER_OSS=y
++CONFIG_SND_PCM_OSS=y
++# CONFIG_SND_SUPPORT_OLD_API is not set
++# CONFIG_SND_VERBOSE_PROCFS is not set
++# CONFIG_SND_DRIVERS is not set
++# CONFIG_SND_ARM is not set
++CONFIG_SND_AT73C213=y
++CONFIG_SND_USB_AUDIO=m
++# CONFIG_USB_HID is not set
++CONFIG_USB=y
++CONFIG_USB_DEVICEFS=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_ZERO=m
++CONFIG_USB_ETH=m
++CONFIG_USB_GADGETFS=m
++CONFIG_USB_FILE_STORAGE=m
++CONFIG_USB_G_SERIAL=m
++CONFIG_MMC=y
++CONFIG_MMC_AT91=m
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_AT91SAM9=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_UBIFS_FS=y
++CONFIG_UBIFS_FS_ADVANCED_COMPR=y
++CONFIG_SQUASHFS=y
++CONFIG_SQUASHFS_LZO=y
++CONFIG_SQUASHFS_XZ=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_15=y
++CONFIG_NLS_UTF8=y
++CONFIG_FTRACE=y
++CONFIG_CRC_CCITT=m
+diff --git a/arch/arm/configs/at91sam9261ek_defconfig b/arch/arm/configs/at91sam9261ek_defconfig
+deleted file mode 100644
+index b46025b..0000000
+--- a/arch/arm/configs/at91sam9261ek_defconfig
++++ /dev/null
+@@ -1,95 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-# CONFIG_LOCALVERSION_AUTO is not set
+-# CONFIG_SWAP is not set
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-# CONFIG_IOSCHED_DEADLINE is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_AT91=y
+-CONFIG_ARCH_AT91SAM9261=y
+-CONFIG_MACH_AT91SAM9261EK=y
+-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
+-CONFIG_FPE_NWFPE=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_BOOTP=y
+-# CONFIG_INET_LRO is not set
+-# CONFIG_IPV6 is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_NAND=y
+-CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_ATMEL_SSC=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+-CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_DM9000=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_KEYBOARD_ATKBD is not set
+-CONFIG_KEYBOARD_GPIO=y
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ADS7846=y
+-CONFIG_SERIAL_ATMEL=y
+-CONFIG_SERIAL_ATMEL_CONSOLE=y
+-CONFIG_HW_RANDOM=y
+-CONFIG_I2C=y
+-CONFIG_I2C_CHARDEV=y
+-CONFIG_I2C_GPIO=y
+-CONFIG_SPI=y
+-CONFIG_SPI_ATMEL=y
+-# CONFIG_HWMON is not set
+-CONFIG_WATCHDOG=y
+-CONFIG_WATCHDOG_NOWAYOUT=y
+-CONFIG_AT91SAM9X_WATCHDOG=y
+-CONFIG_FB=y
+-CONFIG_FB_ATMEL=y
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_USB_HID is not set
+-CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+-CONFIG_USB_MON=y
+-CONFIG_USB_OHCI_HCD=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_USB_STORAGE_DEBUG=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_ZERO=m
+-CONFIG_USB_GADGETFS=m
+-CONFIG_USB_FILE_STORAGE=m
+-CONFIG_USB_G_SERIAL=m
+-CONFIG_MMC=y
+-CONFIG_MMC_AT91=m
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_AT91SAM9=y
+-CONFIG_EXT2_FS=y
+-CONFIG_INOTIFY=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_CRAMFS=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_CODEPAGE_850=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_LL=y
+-- 
+1.7.4.1
