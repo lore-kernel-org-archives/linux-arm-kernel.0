@@ -1,67 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 5 Apr 2011 15:09:05 +0800
-Subject: [PATCH v2] arm/dt: Add a make rule to build dtb for enabled boards
-In-Reply-To: <20110405044827.GA28817@ponder.secretlab.ca>
-References: <1301929307-1838-1-git-send-email-shawn.guo@linaro.org>
-	<20110405044827.GA28817@ponder.secretlab.ca>
-Message-ID: <20110405070904.GB28171@S2100-06.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 05 Apr 2011 09:23:53 +0200
+Subject: [PATCH 04/12] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.vte0fgez3l0zgt@mnazarewicz-glaptop>
+References: <1301577368-16095-1-git-send-email-m.szyprowski@samsung.com>
+	<1301577368-16095-5-git-send-email-m.szyprowski@samsung.com>
+	<1301587083.31087.1032.camel@nimitz>
+	<op.vs77qfx03l0zgt@mnazarewicz-glaptop>
+	<1301606078.31087.1275.camel@nimitz>
+	<op.vs8awkrx3l0zgt@mnazarewicz-glaptop>
+	<1301610411.30870.29.camel@nimitz>
+	<op.vs8cf5xd3l0zgt@mnazarewicz-glaptop>
+	<1301666596.30870.176.camel@nimitz>
+	<op.vte0fgez3l0zgt@mnazarewicz-glaptop>
+Message-ID: <008b01cbf362$6fb52c40$4f1f84c0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2011 at 10:48:27PM -0600, Grant Likely wrote:
-> On Mon, Apr 04, 2011 at 11:01:47PM +0800, Shawn Guo wrote:
-> > With 'make ARCH=arm dtb', it builds Device Tree Blobs for those boards
-> > enabled by build CONFIG.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > It's based on commit fe8e6d0b0e601ca0a63fe768d4b812d5a45a9da7
-> > "arm/dt: Add dtb make rule" from Rob Herring.  And it works against
-> > Linaro kernel tree.  But it needs to go through mainline review
-> > before it gets applied.
-> > 
-> > Changes since v1:
-> > * Take suggestion from Rob Herring to move .dts dection into machine
-> >   sepcific Makefile.boot, so that arch/arm/boot/Makefile can be as
-> >   clean as it is.
-> 
-> Looks good, some minor comments below, but I've picked it up and asked
-> Nicolas to merge it.
-> 
-> Cheers,
-> g.
-> 
-> > 
-> >  arch/arm/Makefile                     |    3 +++
-> >  arch/arm/boot/Makefile                |    2 ++
-> >  arch/arm/mach-exynos4/Makefile.boot   |    2 ++
-> >  arch/arm/mach-mx5/Makefile.boot       |    5 +++++
-> >  arch/arm/mach-omap2/Makefile.boot     |    4 ++++
-> >  arch/arm/mach-tegra/Makefile.boot     |    2 ++
-> >  arch/arm/mach-versatile/Makefile.boot |    2 ++
-> >  7 files changed, 20 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > index d51ab6c..7fd2af9 100644
-> > --- a/arch/arm/Makefile
-> > +++ b/arch/arm/Makefile
-> > @@ -292,6 +292,9 @@ zinstall uinstall install: vmlinux
-> >  %.dtb:
-> >  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> >  
-> > +dtb:
-> > +	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> > +
-> 
-> Since the target is the same, I've merged this rule with the %.dtb
-> rule.  I also renamed the target 'dtbs' because it will build more
-> than one .dtb file.
-> 
-I started with 'dtbs' as target name, and later changed it to 'dtb'
-to align with $(dtb-y).  And 'dtbs' looks truly fine for me, but you
-may want to change commit message accordingly, as there is
-'make ARCH=arm dtb' in it.
+Hello,
 
--- 
-Regards,
-Shawn
+On Monday, April 04, 2011 3:15 PM Micha? Nazarewicz wrote:
+
+> > What kind of success have you had running this in practice?  I'd be
+> > worried that some silly task or a sticky dentry would end up in the
+> > range that you want to allocate in.
+> 
+> I'm not sure what you are asking.
+> 
+> The function requires the range to be marked as MIGRATE_ISOLATE and all
+> pages being free, so nothing can be allocated there while the function
+> is running.
+> 
+> If you are asking about CMA in general, the range that CMA uses is marked
+> as MIGRATE_CMA (a new migrate type) which means that only MIGRATE_MOVABLE
+> pages can be allocated there.  This means, that in theory, if there is
+> enough memory the pages can always be moved out of the region.  At leasts
+> that's my understanding of the type.  If this is correct, the allocation
+> should always succeed provided enough memory for the pages within the
+> region to be moved to is available.
+> 
+> As of practice, I have run some simple test to see if the code works and
+> they succeeded.  Also, Marek has run some test with actual hardware and
+> those worked well as well (but I'll let Marek talk about any details).
+
+We did the tests with real multimedia drivers - video codec and video
+converter (s5p-mfc and s5p-fimc). These drivers allocate large contiguous 
+buffers for video data. The allocation is performed when driver is opened
+by user space application. 
+
+First we consumed system memory by running a set of simple applications
+that just did some malloc() and filled memory with random pattern to consume
+free pages. Then some of that memory has been freed and we ran the video
+decoding application. Multimedia drivers successfully managed to allocate
+required contiguous buffers from MIGRATE_CMA ranges.
+
+The tests have been performed with different system usage patterns (malloc(),
+heavy filesystem load, anonymous memory mapping). In all these cases CMA
+worked surprisingly good allowing the drivers to allocate the required 
+contiguous buffers.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
