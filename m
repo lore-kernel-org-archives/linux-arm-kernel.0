@@ -1,325 +1,133 @@
 From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Tue,  5 Apr 2011 09:28:45 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS4: Delete exynos4 kernel timer
+Date: Tue,  5 Apr 2011 09:28:44 +0900
+Subject: [PATCH 3/4] ARM: EXYNOS4: Change each platform kernel timer using
+	s5p_timer
 In-Reply-To: <1301963325-22349-1-git-send-email-sbkim73@samsung.com>
 References: <1301963325-22349-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1301963325-22349-5-git-send-email-sbkim73@samsung.com>
+Message-ID: <1301963325-22349-4-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-exynos4 time.c is useless by replacing s5p_timer.
-So It can be deleted.
+This patch replace exynos4 dedicated timer with s5p_timer.
+Defualt clocksource is pwm4 and clockevent is pwm2.
+It can be deleted time.c by using s5p_timer.
 
 Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-exynos4/time.c |  299 ------------------------------------------
- 1 files changed, 0 insertions(+), 299 deletions(-)
- delete mode 100644 arch/arm/mach-exynos4/time.c
+ arch/arm/mach-exynos4/mach-nuri.c           |    4 +++-
+ arch/arm/mach-exynos4/mach-smdkc210.c       |    4 +++-
+ arch/arm/mach-exynos4/mach-smdkv310.c       |    5 ++++-
+ arch/arm/mach-exynos4/mach-universal_c210.c |    4 +++-
+ 4 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
-deleted file mode 100644
-index 86b9fa0..0000000
---- a/arch/arm/mach-exynos4/time.c
-+++ /dev/null
-@@ -1,299 +0,0 @@
--/* linux/arch/arm/mach-exynos4/time.c
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4 (and compatible) HRT support
-- * PWM 2/4 is used for this feature
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/sched.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/clockchips.h>
--#include <linux/platform_device.h>
--
--#include <asm/smp_twd.h>
--
--#include <mach/map.h>
--#include <plat/regs-timer.h>
--#include <asm/mach/time.h>
--
--static unsigned long clock_count_per_tick;
--
--static struct clk *tin2;
--static struct clk *tin4;
--static struct clk *tdiv2;
--static struct clk *tdiv4;
--static struct clk *timerclk;
--
--static void exynos4_pwm_stop(unsigned int pwm_id)
--{
--	unsigned long tcon;
--
--	tcon = __raw_readl(S3C2410_TCON);
--
--	switch (pwm_id) {
--	case 2:
--		tcon &= ~S3C2410_TCON_T2START;
--		break;
--	case 4:
--		tcon &= ~S3C2410_TCON_T4START;
--		break;
--	default:
--		break;
--	}
--	__raw_writel(tcon, S3C2410_TCON);
--}
--
--static void exynos4_pwm_init(unsigned int pwm_id, unsigned long tcnt)
--{
--	unsigned long tcon;
--
--	tcon = __raw_readl(S3C2410_TCON);
--
--	/* timers reload after counting zero, so reduce the count by 1 */
--	tcnt--;
--
--	/* ensure timer is stopped... */
--	switch (pwm_id) {
--	case 2:
--		tcon &= ~(0xf<<12);
--		tcon |= S3C2410_TCON_T2MANUALUPD;
--
--		__raw_writel(tcnt, S3C2410_TCNTB(2));
--		__raw_writel(tcnt, S3C2410_TCMPB(2));
--		__raw_writel(tcon, S3C2410_TCON);
--
--		break;
--	case 4:
--		tcon &= ~(7<<20);
--		tcon |= S3C2410_TCON_T4MANUALUPD;
--
--		__raw_writel(tcnt, S3C2410_TCNTB(4));
--		__raw_writel(tcnt, S3C2410_TCMPB(4));
--		__raw_writel(tcon, S3C2410_TCON);
--
--		break;
--	default:
--		break;
--	}
--}
--
--static inline void exynos4_pwm_start(unsigned int pwm_id, bool periodic)
--{
--	unsigned long tcon;
--
--	tcon  = __raw_readl(S3C2410_TCON);
--
--	switch (pwm_id) {
--	case 2:
--		tcon |= S3C2410_TCON_T2START;
--		tcon &= ~S3C2410_TCON_T2MANUALUPD;
--
--		if (periodic)
--			tcon |= S3C2410_TCON_T2RELOAD;
--		else
--			tcon &= ~S3C2410_TCON_T2RELOAD;
--		break;
--	case 4:
--		tcon |= S3C2410_TCON_T4START;
--		tcon &= ~S3C2410_TCON_T4MANUALUPD;
--
--		if (periodic)
--			tcon |= S3C2410_TCON_T4RELOAD;
--		else
--			tcon &= ~S3C2410_TCON_T4RELOAD;
--		break;
--	default:
--		break;
--	}
--	__raw_writel(tcon, S3C2410_TCON);
--}
--
--static int exynos4_pwm_set_next_event(unsigned long cycles,
--					struct clock_event_device *evt)
--{
--	exynos4_pwm_init(2, cycles);
--	exynos4_pwm_start(2, 0);
--	return 0;
--}
--
--static void exynos4_pwm_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
--{
--	exynos4_pwm_stop(2);
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		exynos4_pwm_init(2, clock_count_per_tick);
--		exynos4_pwm_start(2, 1);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_RESUME:
--		break;
--	}
--}
--
--static struct clock_event_device pwm_event_device = {
--	.name		= "pwm_timer2",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 200,
--	.shift		= 32,
--	.set_next_event	= exynos4_pwm_set_next_event,
--	.set_mode	= exynos4_pwm_set_mode,
--};
--
--irqreturn_t exynos4_clock_event_isr(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = &pwm_event_device;
--
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
--}
--
--static struct irqaction exynos4_clock_event_irq = {
--	.name		= "pwm_timer2_irq",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= exynos4_clock_event_isr,
--};
--
--static void __init exynos4_clockevent_init(void)
--{
--	unsigned long pclk;
--	unsigned long clock_rate;
--	struct clk *tscaler;
--
--	pclk = clk_get_rate(timerclk);
--
--	/* configure clock tick */
--
--	tscaler = clk_get_parent(tdiv2);
--
--	clk_set_rate(tscaler, pclk / 2);
--	clk_set_rate(tdiv2, pclk / 2);
--	clk_set_parent(tin2, tdiv2);
--
--	clock_rate = clk_get_rate(tin2);
--
--	clock_count_per_tick = clock_rate / HZ;
--
--	pwm_event_device.mult =
--		div_sc(clock_rate, NSEC_PER_SEC, pwm_event_device.shift);
--	pwm_event_device.max_delta_ns =
--		clockevent_delta2ns(-1, &pwm_event_device);
--	pwm_event_device.min_delta_ns =
--		clockevent_delta2ns(1, &pwm_event_device);
--
--	pwm_event_device.cpumask = cpumask_of(0);
--	clockevents_register_device(&pwm_event_device);
--
--	setup_irq(IRQ_TIMER2, &exynos4_clock_event_irq);
--}
--
--static cycle_t exynos4_pwm4_read(struct clocksource *cs)
--{
--	return (cycle_t) ~__raw_readl(S3C_TIMERREG(0x40));
--}
--
--static void exynos4_pwm4_resume(struct clocksource *cs)
--{
--	unsigned long pclk;
--
--	pclk = clk_get_rate(timerclk);
--
--	clk_set_rate(tdiv4, pclk / 2);
--	clk_set_parent(tin4, tdiv4);
--
--	exynos4_pwm_init(4, ~0);
--	exynos4_pwm_start(4, 1);
--}
--
--struct clocksource pwm_clocksource = {
--	.name		= "pwm_timer4",
--	.rating		= 250,
--	.read		= exynos4_pwm4_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
--#ifdef CONFIG_PM
--	.resume		= exynos4_pwm4_resume,
--#endif
--};
--
--static void __init exynos4_clocksource_init(void)
--{
--	unsigned long pclk;
--	unsigned long clock_rate;
--
--	pclk = clk_get_rate(timerclk);
--
--	clk_set_rate(tdiv4, pclk / 2);
--	clk_set_parent(tin4, tdiv4);
--
--	clock_rate = clk_get_rate(tin4);
--
--	exynos4_pwm_init(4, ~0);
--	exynos4_pwm_start(4, 1);
--
--	if (clocksource_register_hz(&pwm_clocksource, clock_rate))
--		panic("%s: can't register clocksource\n", pwm_clocksource.name);
--}
--
--static void __init exynos4_timer_resources(void)
--{
--	struct platform_device tmpdev;
--
--	tmpdev.dev.bus = &platform_bus_type;
--
--	timerclk = clk_get(NULL, "timers");
--	if (IS_ERR(timerclk))
--		panic("failed to get timers clock for system timer");
--
--	clk_enable(timerclk);
--
--	tmpdev.id = 2;
--	tin2 = clk_get(&tmpdev.dev, "pwm-tin");
--	if (IS_ERR(tin2))
--		panic("failed to get pwm-tin2 clock for system timer");
--
--	tdiv2 = clk_get(&tmpdev.dev, "pwm-tdiv");
--	if (IS_ERR(tdiv2))
--		panic("failed to get pwm-tdiv2 clock for system timer");
--	clk_enable(tin2);
--
--	tmpdev.id = 4;
--	tin4 = clk_get(&tmpdev.dev, "pwm-tin");
--	if (IS_ERR(tin4))
--		panic("failed to get pwm-tin4 clock for system timer");
--
--	tdiv4 = clk_get(&tmpdev.dev, "pwm-tdiv");
--	if (IS_ERR(tdiv4))
--		panic("failed to get pwm-tdiv4 clock for system timer");
--
--	clk_enable(tin4);
--}
--
--static void __init exynos4_timer_init(void)
--{
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = S5P_VA_TWD;
--#endif
--
--	exynos4_timer_resources();
--	exynos4_clockevent_init();
--	exynos4_clocksource_init();
--}
--
--struct sys_timer exynos4_timer = {
--	.init		= exynos4_timer_init,
--};
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index b79ad01..cc50414 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -30,6 +30,7 @@
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/sdhci.h>
++#include <plat/s5p-time.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -282,6 +283,7 @@ static void __init nuri_map_io(void)
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(24000000);
+ 	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
++	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+ }
+ 
+ static void __init nuri_machine_init(void)
+@@ -301,5 +303,5 @@ MACHINE_START(NURI, "NURI")
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= nuri_map_io,
+ 	.init_machine	= nuri_machine_init,
+-	.timer		= &exynos4_timer,
++	.timer		= &s5p_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-smdkc210.c b/arch/arm/mach-exynos4/mach-smdkc210.c
+index e645f7a..c3a34c9 100644
+--- a/arch/arm/mach-exynos4/mach-smdkc210.c
++++ b/arch/arm/mach-exynos4/mach-smdkc210.c
+@@ -27,6 +27,7 @@
+ #include <plat/sdhci.h>
+ #include <plat/iic.h>
+ #include <plat/pd.h>
++#include <plat/s5p-time.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -196,6 +197,7 @@ static void __init smdkc210_map_io(void)
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(24000000);
+ 	s3c24xx_init_uarts(smdkc210_uartcfgs, ARRAY_SIZE(smdkc210_uartcfgs));
++	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+ }
+ 
+ static void __init smdkc210_machine_init(void)
+@@ -219,5 +221,5 @@ MACHINE_START(SMDKC210, "SMDKC210")
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkc210_map_io,
+ 	.init_machine	= smdkc210_machine_init,
+-	.timer		= &exynos4_timer,
++	.timer		= &s5p_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+index 1526764..03e3a61 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -29,6 +29,7 @@
+ #include <plat/sdhci.h>
+ #include <plat/iic.h>
+ #include <plat/pd.h>
++#include <plat/s5p-time.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -218,6 +219,8 @@ static void __init smdkv310_map_io(void)
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(24000000);
+ 	s3c24xx_init_uarts(smdkv310_uartcfgs, ARRAY_SIZE(smdkv310_uartcfgs));
++	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
++
+ }
+ 
+ static void __init smdkv310_machine_init(void)
+@@ -244,5 +247,5 @@ MACHINE_START(SMDKV310, "SMDKV310")
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+ 	.init_machine	= smdkv310_machine_init,
+-	.timer		= &exynos4_timer,
++	.timer		= &s5p_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+index 97d329f..57c17bc 100644
+--- a/arch/arm/mach-exynos4/mach-universal_c210.c
++++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+@@ -28,6 +28,7 @@
+ #include <plat/devs.h>
+ #include <plat/iic.h>
+ #include <plat/sdhci.h>
++#include <plat/s5p-time.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -624,6 +625,7 @@ static void __init universal_map_io(void)
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+ 	s3c24xx_init_clocks(24000000);
+ 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
++	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+ }
+ 
+ static void __init universal_machine_init(void)
+@@ -646,5 +648,5 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= universal_map_io,
+ 	.init_machine	= universal_machine_init,
+-	.timer		= &exynos4_timer,
++	.timer		= &s5p_timer,
+ MACHINE_END
 -- 
 1.7.1
