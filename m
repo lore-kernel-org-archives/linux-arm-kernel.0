@@ -1,115 +1,226 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 5 Apr 2011 17:49:28 +0100
-Subject: RFC: Status of kernel/fiq.c
-In-Reply-To: <20110405162443.GA11737@n2100.arm.linux.org.uk>
-References: <20110405160546.GA7976@arm.com>
-	<20110405162443.GA11737@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTine4UQjcDNDa_ECBbFQL+2RD0tXmA@mail.gmail.com>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Tue,  5 Apr 2011 16:51:08 +0000
+Subject: [PATCH v3] [ARM] MX1: Add ARMadeus Systems APF9328 board support
+Message-ID: <1302022268-42787-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 5, 2011 at 5:24 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 05, 2011 at 05:05:47PM +0100, Dave Martin wrote:
->> Hi all,
->>
->> I've hit a Thumb-2 compatibility issue in the assembler functions
->> in kernel/fiq.c, and I'm wondering how to proceed.
->>
->> With regard to set_fiq_regs() and get_fiq_regs(), does anyone know:
->>
->> ? * whether we still need the stack frame manipulation code in this
->> ? ? ? leaf function, e.g.
->>
->> ? ? ? ? "mov ? ?ip, sp\n\
->> ? ? ? ? stmfd ?sp!, {fp, ip, lr, pc}\n\
->> ? ? ? ? sub ? ?fp, ip, #4\n\
->
-> That's the standard APCS stack frame. ?Look at the function closely
-> and you'll notice that its declared NAKED, so the compiler doesn't
-> generate anything for it. ?So we have to do this by hand.
+APF9328 is an i.MXL based SOM (System On Module) that can be plugged on 
+several docking/development boards. Here only basic module support 
+is added (Ethernet, Serial, NOR Flash).
 
-I guess my question was more whether it's necessary to generate the
-stack frame at all for a leaf function such as this -- partly because
-the instruction forms involved are themselves deprecated in v7 (lr and
-pc in the same ldm/stm, stm of the pc).  We can code around that, but
-it gets increasingly ugly.
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
+Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
 
-I guess it we get a fault while transferring the registers, the stack
-frame might be needed in order to get an intelligible crash dump, but
-otherwise... ?
+Changes since v2:
+	- add const and __initconst attributes for platform_data and resource, 
+	- suppress boot_params.
 
-For Thumb-2 it's not applicable of course, since we don't have
-APCS-style stack frames there; and since coding the equivalent code in
-Thumb would be painful my preference would be to #ifdef it out.
+Changes since v1:
+	- merge pins tables for UART
+	- suppress init/exit driver callbacks for UART
 
->
->> ? * what the nop (mov r0,r0) after the CPSR writes is for
->> ? ? ? ? (I'm guessing there may have been some 1-instruction hazard
->> ? ? ? ? here for some old processors, but I'm not aware of a need
->> ? ? ? ? for this in anything current.)
->
-> You're correct, and its for ARMv3 CPUs. ?After writing the CPSR you
-> have to wait one cycle before accessing the banked registers. ?On
-> other platforms that has been solved so the nop is harmless even
-> though it's not necessary. ?Simplification of code dictates that we
-> don't try to ifdef it.
+ arch/arm/configs/mx1_defconfig   |    1 +
+ arch/arm/mach-imx/Kconfig        |    6 ++
+ arch/arm/mach-imx/Makefile       |    1 +
+ arch/arm/mach-imx/mach-apf9328.c |  145 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 153 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-apf9328.c
 
-OK; it's harmless to leave that instruction in there, but it's
-interesting to know.
-
->
->> ? * should anyone be using fiq.c on v7 platforms?
->
-> Is the FIQ wired to anything useful on ARMv7.
-
-FIQ gets used by TrustZone on platforms which use it, so I think it's
-becoming less common to use it for normal peripherals.  The latency
-difference between IRC and FIQ is also less important in more recent
-platforms, so I think it's generally seeing less use.
-
-I need to check my config -- maybe CONFIG_FIQ is getting pulled in
-inappropriately.
-
-set_fiq_regs() for example isn't used by much...
-
-linux$ git grep set_fiq_regs
-arch/arm/include/asm/fiq.h:extern void set_fiq_regs(struct pt_regs *regs);
-arch/arm/kernel/fiq.c:void __naked set_fiq_regs(struct pt_regs *regs)
-arch/arm/kernel/fiq.c:EXPORT_SYMBOL(set_fiq_regs);
-arch/arm/mach-omap1/ams-delta-fiq.c:	set_fiq_regs(&FIQ_regs);
-arch/arm/mach-rpc/dma.c:	set_fiq_regs(&regs);
-drivers/media/video/mx1_camera.c:	set_fiq_regs(&regs);
-drivers/spi/spi_s3c24xx.c:	set_fiq_regs(&regs);
-sound/soc/imx/imx-pcm-fiq.c:	set_fiq_regs(&regs);
-
->
->> As the code stands, it could also go wrong if the compiler
->> happens to allocate r8-r12 or lr for one of the inline asm
->> constraints -- though this is pretty unlikely to happen, and
->> I doubt if it ever has happened in practice.
->
-> Actually, that goes for r8 to r14 inclusive - as we switch the CPU mode to
-> FIQ, we lose access to any values held in those registers prior to the
-> assembly block being started.
-
-True -- I was assuming that the compiler won't touch sp for register
-allocation purposes, though the fact that we temporarily switch out
-this register provides yet another reason why the compiler shouldn't
-touch it (albeit a reason the compiler doesn't know about).
-
->
-> The only possibility of it being unsafe is if the compiler allocates 'ip'
-> for 'tmp'. ?We could work around that by getting rid of 'tmp' or telling
-> the compiler that 'tmp' is a register variable and it will be r3.
->
-
-That was basically my fix too.  Using the same style as the existing
-code but using register variables with explicit register assignments
-keeps things pretty clear.
-
-I find it hard to imagine the compiler being so crazy in its register
-allocation, but there are occasional surprises...
-
-Cheers
----Dave
+diff --git a/arch/arm/configs/mx1_defconfig b/arch/arm/configs/mx1_defconfig
+index b39b5ce..c9436d0 100644
+--- a/arch/arm/configs/mx1_defconfig
++++ b/arch/arm/configs/mx1_defconfig
+@@ -15,6 +15,7 @@ CONFIG_ARCH_MXC=y
+ CONFIG_ARCH_MX1=y
+ CONFIG_ARCH_MX1ADS=y
+ CONFIG_MACH_SCB9328=y
++CONFIG_MACH_APF9328=y
+ CONFIG_MXC_IRQ_PRIOR=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 56684b5..863ed2c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -51,6 +51,12 @@ config MACH_SCB9328
+ 	help
+ 	  Say Y here if you are using a Synertronixx scb9328 board
+ 
++config MACH_APF9328
++	bool "APF9328"
++	select IMX_HAVE_PLATFORM_IMX_UART
++	help
++	  Say Yes here if you are using the Armadeus APF9328 development board
++
+ endif
+ 
+ if ARCH_MX2
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 77100bf..444fdf7 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_MX1_VIDEO)	+= mx1-camera-fiq.o mx1-camera-fiq-ksym.o
+ 
+ obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
+ obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
++obj-$(CONFIG_MACH_APF9328) += mach-apf9328.o
+ 
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+ 
+diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
+new file mode 100644
+index 0000000..72584e5
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-apf9328.c
+@@ -0,0 +1,145 @@
++/*
++ * linux/arch/arm/mach-imx/mach-apf9328.c
++ *
++ * Copyright (c) 2005-2011 ARMadeus systems <support@armadeus.com>
++ *
++ * This work is based on mach-scb9328.c which is:
++ * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
++ * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++#include <linux/dm9000.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++
++#include <mach/common.h>
++#include <mach/hardware.h>
++#include <mach/irqs.h>
++#include <mach/iomux-mx1.h>
++
++#include "devices-imx1.h"
++
++static const int apf9328_pins[] __initconst = {
++	/* UART1 */
++	PC9_PF_UART1_CTS,
++	PC10_PF_UART1_RTS,
++	PC11_PF_UART1_TXD,
++	PC12_PF_UART1_RXD,
++	/* UART2 */
++	PB28_PF_UART2_CTS,
++	PB29_PF_UART2_RTS,
++	PB30_PF_UART2_TXD,
++	PB31_PF_UART2_RXD,
++};
++
++/*
++ * The APF9328 can have up to 32MB NOR Flash
++ */
++static const struct resource flash_resource __initconst = {
++	.start	= MX1_CS0_PHYS,
++	.end	= MX1_CS0_PHYS + (32 * 1024 * 1024) - 1,
++	.flags	= IORESOURCE_MEM,
++};
++
++static const struct physmap_flash_data apf9328_flash_data __initconst = {
++	.width  = 2,
++};
++
++static struct platform_device apf9328_flash_device = {
++	.name		= "physmap-flash",
++	.id		= 0,
++	.dev = {
++		.platform_data = &apf9328_flash_data,
++	},
++	.resource = &flash_resource,
++	.num_resources = 1,
++};
++
++/*
++ * APF9328 has a DM9000 Ethernet controller
++ */
++static const struct dm9000_plat_data dm9000_setup __initconst = {
++	.flags          = DM9000_PLATF_16BITONLY
++};
++
++static const struct resource dm9000_resources[] __initconst = {
++	[0] = {
++		.start  = (MX1_CS4_PHYS + 0x00C00000),
++		.end    = (MX1_CS4_PHYS + 0x00C00001),
++		.flags  = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start  = (MX1_CS4_PHYS + 0x00C00002),
++		.end    = (MX1_CS4_PHYS + 0x00C00003),
++		.flags  = IORESOURCE_MEM,
++	},
++	[2] = {
++		.start  = (IRQ_GPIOB(14)),
++		.end    = (IRQ_GPIOB(14)),
++		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
++	},
++};
++
++static struct platform_device dm9000x_device = {
++	.name		= "dm9000",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(dm9000_resources),
++	.resource	= dm9000_resources,
++	.dev		= {
++		.platform_data = &dm9000_setup,
++	}
++};
++
++/* --- SERIAL RESSOURCE --- */
++static const struct imxuart_platform_data uart0_pdata __initconst = {
++	.flags = 0,
++};
++
++static const struct imxuart_platform_data uart1_pdata __initconst = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static struct platform_device *devices[] __initdata = {
++	&apf9328_flash_device,
++	&dm9000x_device,
++};
++
++static void __init apf9328_init(void)
++{
++	mxc_gpio_setup_multiple_pins(apf9328_pins,
++			ARRAY_SIZE(apf9328_pins),
++			"APF9328");
++
++	imx1_add_imx_uart0(&uart0_pdata);
++	imx1_add_imx_uart1(&uart1_pdata);
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++}
++
++static void __init apf9328_timer_init(void)
++{
++	mx1_clocks_init(32768);
++}
++
++static struct sys_timer apf9328_timer = {
++	.init	= apf9328_timer_init,
++};
++
++MACHINE_START(APF9328, "Armadeus APF9328")
++	/* Maintainer: <gwenhael.goavec-merou@armadeus.com> */
++	.map_io       = mx1_map_io,
++	.init_irq     = mx1_init_irq,
++	.timer        = &apf9328_timer,
++	.init_machine = apf9328_init,
++MACHINE_END
+-- 
+1.7.3.4
