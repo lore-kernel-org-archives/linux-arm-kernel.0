@@ -1,33 +1,58 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 5 Apr 2011 10:03:36 +0800
-Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
-	pandaboard
-In-Reply-To: <4D99EB4B.3020303@linux.vnet.ibm.com>
-References: <4D95E244.1050400@linux.vnet.ibm.com>
-	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
-	<4D99D251.6000901@linux.vnet.ibm.com>
-	<BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
-	<4D99EB4B.3020303@linux.vnet.ibm.com>
-Message-ID: <BANLkTinQ-QQ7zu2KrhhhdWwnzo=a-KynoQ@mail.gmail.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 4 Apr 2011 21:29:45 -0500
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <4D981EAB.8070209@codeaurora.org>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+	<4D959058.7010606@codeaurora.org>
+	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
+	<4D981EAB.8070209@codeaurora.org>
+Message-ID: <BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon, Stephen,
 
-2011/4/5 Avik Sil <aviksil@linux.vnet.ibm.com>:
-> #define OMAP4430_CM_L3INSTR_L3_3_CLKCTRL
-> OMAP44XX_CM2_REGADDR(OMAP4430_CM2_CORE_INST, 0x0720)
-> [...]
+On Sun, Apr 3, 2011 at 2:15 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> (Please stop top posting)
 >
-> Should I use those identifier instead?
+> On 4/1/2011 3:29 PM, Simon Glass wrote:
+>> Hi Stephen,
+>>
+>> Sorry for the confusion, but in fact I was talking about the patch to
+>> make ARM use the generic bug handling via an undef instruction instead
+>> of calling ______bug() or writing to memory address 0. Please see
+>> here:
+>>
+>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6808/1
+>
+> Yes I've seen your patch (and even posted comments on it which have not
+> been responded to).
+>
+> Correct me if I'm wrong, but that patch with CONFIG_BUG=n would lead to
+> the same error that Omar is seeing because the code only modifies the
+> bug infrastructure when CONFIG_BUG=y.
 
-Yes, seems right, but you need to use the ioremap addresses of the identifiers.
+I am using CONFIG_BUG=y, however I don't have CONFIG_DEBUG_BUGVERBOSE
+and hence I fall into the part which doesn't print the file and the
+line where the BUG was found.
 
-> Are there other definitions for the identifiers you have used?
+With Simon's patch if my .config had:
 
-As I said  before, these are not needed for mainline, so I didn't try these.
+CONFIG_BUG=y
+CONFIG_GENERIC_BUG is not set
+CONFIG_DEBUG_BUGVERBOSE is not set
 
+I would fall into the same BUG definition that is causing issues:
 
-thanks,
--- 
-Ming Lei
+#define BUG()           do { *(int *)0 = 0; } while (1)
+
+OTOH, is not like "Use generic BUG() handler" gives the choice of
+removing GENERIC_BUG given that it is not prompted in menuconfig and
+auto selected, if this is the intention is there any reason to keep
+the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
+use it with this patch, right?
+
+Regards,
+
+Omar
