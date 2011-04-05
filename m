@@ -1,41 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Apr 2011 10:36:39 -0700
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <BANLkTimJkQ9afnO=6gKiBqWUo+Uv=hWx2Q@mail.gmail.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>	<4D959058.7010606@codeaurora.org>	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>	<4D981EAB.8070209@codeaurora.org>
-	<BANLkTimJkQ9afnO=6gKiBqWUo+Uv=hWx2Q@mail.gmail.com>
-Message-ID: <4D9B5327.1070709@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 5 Apr 2011 13:12:59 -0500
+Subject: [PATCH] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <4D9B4363.8010606@freescale.com>
+References: <20110405073030.GI13963@pengutronix.de>
+	<1301992655-8514-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4D9B3FA8.1010407@freescale.com> <4D9B4363.8010606@freescale.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D1CFC085@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2011 6:55 PM, Simon Glass wrote:
-> On Sun, Apr 3, 2011 at 12:15 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> Yes I've seen your patch (and even posted comments on it which have not
->> been responded to).
-> Hi Stephen,
+On Tuesday, April 05, 2011 9:29 AM, Fabio Estevam wrote:
+> On 4/5/2011 1:13 PM, Fabio Estevam wrote:
+>> Hi Uwe,
+>> 
+>> On 4/5/2011 5:37 AM, Uwe Kleine-K?nig wrote:
+>>> This function makes a deep copy of the platform data to allow it to live
+>>> in init memory.
+>>> The definition cannot go into leds-gpio.c because it needs to be builtin
+>>> to be usable by platforms.
+>>>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> 
+>> I tested your patch on a MX53EVK board, but I could only build it after unselecting the mmc driver.
+>> 
+>> This is the error I got when mmc was selected:
+>> 
+>>   CC      drivers/mmc/card/mmc_test.o
+>>   LD      drivers/mmc/card/built-in.o
+>>   CC      drivers/mmc/core/sdio_io.o
+>> In file included from include/linux/mmc/host.h:13,
+>>                  from drivers/mmc/core/sdio_io.c:12:
+>> include/linux/leds.h:220: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'gpio_led_register_device'
+>> make[3]: *** [drivers/mmc/core/sdio_io.o] Error 1
+>> make[2]: *** [drivers/mmc/core] Error 2
+>> make[1]: *** [drivers/mmc] Error 2
+>> make: *** [drivers] Error 2
 >
-> Not yet! Don't worry I will get to it. I like the suggestion and am
-> pleased that you pointed me to it, thank you.
->
+> If I declare it as "platform_device *gpio_led_register_device" then it builds fine.
 
-Great!
+With the change Fabio pointed out this builds and works fine on the ep93xx.
 
->> Correct me if I'm wrong, but that patch with CONFIG_BUG=n would lead to
->> the same error that Omar is seeing because the code only modifies the
->> bug infrastructure when CONFIG_BUG=y.
-> Well if CONFIG_BUG=n then there is no bug infrastructure, The whole
-> file is skipped and it falls back to the asm-generic/bug.h which has
-> even more #ifdefs in it. But I think we end up here:
->
-> #define BUG() do {} while(0)
->
-> After all the patch removes the *(int*)0 = 0 code by virtue of
-> CONFIG_GENERIC_BUG=y, right? If I have this wrong then I will have to
-> break out the C preprocessor...
->
-
-Ah you're right. Too many ifdefs going on there.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Hartley
