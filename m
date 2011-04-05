@@ -1,69 +1,126 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 05 Apr 2011 11:27:33 -0700
-Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout during
-	bootup
-In-Reply-To: <1302018015-8858-2-git-send-email-avinashhm@ti.com> (Avinash
-	H. M.'s message of "Tue, 5 Apr 2011 21:10:14 +0530")
-References: <1302018015-8858-1-git-send-email-avinashhm@ti.com>
-	<1302018015-8858-2-git-send-email-avinashhm@ti.com>
-Message-ID: <87mxk4zh7u.fsf@ti.com>
+From: john.linn@xilinx.com (John Linn)
+Date: Tue, 5 Apr 2011 12:28:01 -0600
+Subject: [PATCH V6 0/5] ARM: Basic Xilinx Support
+Message-ID: <9c88535e-0f32-4bae-ba87-05ee7c3cafdb@VA3EHSMHS024.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Avinash.H.M" <avinashhm@ti.com> writes:
 
-> The i2c module has a special reset sequence. The sequence is
-> - Disable the I2C.
-> - Write to SOFTRESET bit.
-> - Enable the I2C.
-> - Poll on the RESETDONE bit.
-> This sequence must be followed for i2c reset in omap2, omap3. The sequence is
-> implemented as a function and the i2c_class is updated with the correct
-> 'reset' pointer.
->
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Avinash.H.M <avinashhm@ti.com>
+Some minor updates since V5 listed below. This patch set was tested
+against the linus tree.  An extra optional patch for device tree
+is now in the series and is described below.
 
-[...]
+Thanks,
+John
 
-> +
-> +/**
-> + * omap_i2c_reset- reset the omap i2c module.
-> + * @oh: struct omap_hwmod *
-> + *
-> + * The i2c moudle in omap2, omap3 had a special sequence to reset. The
-> + * sequence is:
-> + * - Disable the I2C.
-> + * - Write to SOFTRESET bit.
-> + * - Enable the I2C.
-> + * - Poll on the RESETDONE bit.
-> + * The sequence is implemented in below function. This is called for 2420,
-> + * 2430 and omap3.
-> + */
-> +int omap_i2c_reset(struct omap_hwmod *oh)
-> +{
-> +	u32 v;
-> +	int c = 0;
-> +
-> +	/* Disable I2C */
-> +	v = omap_hwmod_read(oh, I2C_CON_OFFSET);
-> +	v = v & ~I2C_EN;
-> +	omap_hwmod_write(v, oh, I2C_CON_OFFSET);
-> +
-> +	/* Write to the SOFTRESET bit */
-> +	v = oh->_sysc_cache;
-> +	v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
-> +
-> +	oh->_sysc_cache = v;
-> +	omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
+V6
 
-Direct SYSCONFIG access isn't right here.   This should go through
-omap_hwmod.
+Renamed mach-xilinx to mach-zynq since the product name has been
+released. This rippled thru it all, but only a minor change.
 
-What is probably needed is exposing _ocp_softreset to device code
-via something like omap_hwmod_ocp_softreset() and calling that here.
+This patch series now includes an optional patch at the end as
+it supports device tree which is dependent on Grant's tree.
 
-Kevin
+V5
+
+Minor cleanups based on feedback from Russell, Jamie
+and Arnd.  Nothing big.
+
+This patch set was tested against a tree based on Linus's
+current 2.6.38-rcX tree, then Russell's p2v-stable merged in. 
+
+Other than the update to mach-types that is missing for the
+board, this should merge in easily in the next merge window
+is my hope.
+
+I'm making these patches available at git://git.xilinx.com in
+linux-2.6-xlnx/arm-mainline.
+
+V4
+
+I incorporated more feedback from Jamie Iles. It was 
+primariy cleanup with the only significant change
+being a move to using raw_read/write in the uncompressor
+uart code.
+
+The other changes were minor updates so that the patch
+set applies to linux-next.
+
+This patch set is now tested against the linux-next branch
+from pub/scm/linux/kernel/git/sfr/linux-next.git.
+
+V3
+
+I incorporated more feedback from Russell King.
+Primarily clean up of the license header to remove
+the address. 
+
+Also minor cleanup of the Kconfig and Makefile for the board
+to match the MACH_XILINX entry in the machine ID database.
+
+These changes were tested on 2.6.38-rc4 and rc5.
+
+V2
+
+I incorporated review comments from Russell King and Jamie Iles.
+
+Each patch has V2 comments describing the details. The order of
+each patch in the series did change.
+
+Thanks a lot to them for the detailed review as this patch set
+is much cleaner and improved (I think anyway).  
+
+Thanks for comments from Arnd and Grant also.
+
+This was tested against 2.6.38-rc4.
+
+----
+
+This patch series adds very basic support for the Xilinx ARM platform.
+The entire patch set must be used, I only broke it up into logical 
+pieces to make the review easier (I hope). 
+
+I would like to get the review feedback and make any changes, but after
+that I need to change mach-xilinx to the real product name.  The real
+product name is expected to be released by marketing very soon.
+
+There's always the option of keeping mach-xilinx and then only 
+documenting the product name in the Kconfig. I'm less in favor of that
+but it could be ok.
+
+This code has been tested against 2.6.38-rc2, r3, and against head. The
+only checkpatch warnings are about volatile in the uncompress.h file
+and this method I used seems normal.
+
+Thanks,
+John
+
+ Documentation/devicetree/bindings/arm/xilinx.txt |    7 
+ arch/arm/Kconfig                                 |   14 +
+ arch/arm/Makefile                                |    1 
+ arch/arm/boot/dts/zynq-ep107.dts                 |   52 ++++
+ arch/arm/mach-zynq/Kconfig                       |   14 +
+ arch/arm/mach-zynq/Makefile                      |    9 
+ arch/arm/mach-zynq/Makefile.boot                 |    3 
+ arch/arm/mach-zynq/board_ep107.c                 |   93 +++++++
+ arch/arm/mach-zynq/common.c                      |  127 +++++++++
+ arch/arm/mach-zynq/common.h                      |   31 ++
+ arch/arm/mach-zynq/include/mach/clkdev.h         |   33 ++
+ arch/arm/mach-zynq/include/mach/debug-macro.S    |   36 ++
+ arch/arm/mach-zynq/include/mach/entry-macro.S    |   30 ++
+ arch/arm/mach-zynq/include/mach/hardware.h       |   18 +
+ arch/arm/mach-zynq/include/mach/io.h             |   33 ++
+ arch/arm/mach-zynq/include/mach/irqs.h           |   29 ++
+ arch/arm/mach-zynq/include/mach/memory.h         |   23 +
+ arch/arm/mach-zynq/include/mach/system.h         |   28 ++
+ arch/arm/mach-zynq/include/mach/timex.h          |   23 +
+ arch/arm/mach-zynq/include/mach/uart.h           |   25 +
+ arch/arm/mach-zynq/include/mach/uncompress.h     |   51 +++
+ arch/arm/mach-zynq/include/mach/vmalloc.h        |   20 +
+ arch/arm/mach-zynq/include/mach/zynq_soc.h       |   49 +++
+ arch/arm/mach-zynq/timer.c                       |  298 ++++++++++++++++++++++-
+ arch/arm/mm/Kconfig                              |    3 
+ 25 files changed, 1042 insertions(+), 8 deletions(-)
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
