@@ -1,43 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 5 Apr 2011 13:12:59 -0500
-Subject: [PATCH] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <4D9B4363.8010606@freescale.com>
-References: <20110405073030.GI13963@pengutronix.de>
-	<1301992655-8514-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4D9B3FA8.1010407@freescale.com> <4D9B4363.8010606@freescale.com>
-Message-ID: <0D753D10438DA54287A00B027084269764D1CFC085@AUSP01VMBX24.collaborationhost.net>
+From: James.Bottomley@suse.de (James Bottomley)
+Date: Tue, 05 Apr 2011 11:16:52 -0700
+Subject: [PATCH 00/34] Make kernel build deterministic
+In-Reply-To: <20110405154918.GA31337@suse.de>
+References: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
+	<20110405154918.GA31337@suse.de>
+Message-ID: <1302027412.2924.7.camel@mulgrave.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 05, 2011 9:29 AM, Fabio Estevam wrote:
-> On 4/5/2011 1:13 PM, Fabio Estevam wrote:
->> Hi Uwe,
->> 
->> On 4/5/2011 5:37 AM, Uwe Kleine-K?nig wrote:
->>> This function makes a deep copy of the platform data to allow it to live
->>> in init memory.
->>> The definition cannot go into leds-gpio.c because it needs to be builtin
->>> to be usable by platforms.
->>>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> 
->> I tested your patch on a MX53EVK board, but I could only build it after unselecting the mmc driver.
->> 
->> This is the error I got when mmc was selected:
->> 
->>   CC      drivers/mmc/card/mmc_test.o
->>   LD      drivers/mmc/card/built-in.o
->>   CC      drivers/mmc/core/sdio_io.o
->> In file included from include/linux/mmc/host.h:13,
->>                  from drivers/mmc/core/sdio_io.c:12:
->> include/linux/leds.h:220: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'gpio_led_register_device'
->> make[3]: *** [drivers/mmc/core/sdio_io.o] Error 1
->> make[2]: *** [drivers/mmc/core] Error 2
->> make[1]: *** [drivers/mmc] Error 2
->> make: *** [drivers] Error 2
->
-> If I declare it as "platform_device *gpio_led_register_device" then it builds fine.
+On Tue, 2011-04-05 at 08:49 -0700, Greg KH wrote:
+> On Tue, Apr 05, 2011 at 04:58:47PM +0200, Michal Marek wrote:
+> > 
+> > Hi,
+> > 
+> > this series makes it possible to build bit-identical kernel image and
+> > modules from identical sources. Of course the build is already
+> > deterministic in terms of behavior of the code, but the various
+> > timestamps embedded in the object files make it hard to compare two
+> > builds, for instance to verify that a makefile cleanup didn't
+> > accidentally change something. A prime example is /proc/config.gz, which
+> > has both a timestamp in the gzip header and a timestamp in the payload
+> > data. With this series applied, a script like this will produce
+> > identical kernels each time:
+> 
+> Very nice stuff.  Do you want to take the individual patches through one
+> of your trees, or do you mind if the subsystem maintainers take them
+> through theirs?
 
-With the change Fabio pointed out this builds and works fine on the ep93xx.
+I'm happy for this to go through a single tree.
 
-Hartley
+James
