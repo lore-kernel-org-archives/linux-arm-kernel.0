@@ -1,56 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Apr 2011 10:01:00 +0100
-Subject: [PATCH] ARM: type casts update_sched_clock cyc_to_sched_clock
-	cyc_to_fixed_sched_clock
-In-Reply-To: <20110405083144.GN13963@pengutronix.de>
-References: <1301989401-11984-1-git-send-email-j.weitzel@phytec.de>
-	<20110405075622.GB4699@n2100.arm.linux.org.uk>
-	<20110405083144.GN13963@pengutronix.de>
-Message-ID: <20110405090100.GC4699@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 5 Apr 2011 10:07:38 +0100
+Subject: [PATCH v3 2/2] ARM: ptrace: Migrate to regsets framework
+In-Reply-To: <OFD28DD924.B2142DA2-ONC1257868.006781E8-C1257868.00679E79@de.ibm.com>
+References: <1301935406-10591-1-git-send-email-dave.martin@linaro.org>
+	<1301935406-10591-3-git-send-email-dave.martin@linaro.org>
+	<OFD28DD924.B2142DA2-ONC1257868.006781E8-C1257868.00679E79@de.ibm.com>
+Message-ID: <BANLkTi=vCAt6nk1hyEbJGodPwpysLYmPcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 10:31:44AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Apr 05, 2011 at 08:56:22AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Apr 05, 2011 at 09:43:21AM +0200, Jan Weitzel wrote:
-> > > parameter "u32 mask" type cast befor inversion
-> s/befor/before/
-> 
-> > Nak.  I want a 32-bit all ones quantity.
-> > 
-> > unsigned long long vali = (unsigned short)~0;
-> > unsigned long long vall = ~(unsigned short)0;
-> > 
-> BTW, the definiton of vall is equivalent to 
-> 
-> 	unsigned long long valu = ~(unsigned int)0;
-> 
-> because ~ converts the unsigned short to unsigned int.
+On Mon, Apr 4, 2011 at 7:51 PM, Ulrich Weigand
+<Ulrich.Weigand@de.ibm.com> wrote:
+> Dave Martin <dave.martin@linaro.org> wrote on 04/04/2011 06:43:26 PM:
+>
+>> +/*
+>> + * The size of the user-visible VFP state as seen by
+> PTRACE_GET/SETVFPREGS
+>> + * and core dumps.
+>> + */
+>> +#define ARM_VFPREGS_SIZE ( 32 * 4 /*fpregs*/ + 4 /*fpscr*/ )
+>
+> This should be 32 * 8 + 4, not 32 * 4 + 4, shouldn't it?
 
-No.  The value gets promoted to int not unsigned int.
+Umm, yeah -- dumb mistake
 
-> > compiles to:
-> > 
-> > vali:
-> >         .word   65535
-> >         .word   0
-> > 
-> > vall:
-> >         .word   -1
-> >         .word   -1
-> I really wonder about that. If I take a value of 0xffffffff (i.e. a 32
-> bit wide int == ~0U) and assign that to an 64-bit unsigned long long I'd
-> expect it to get the value 0x00000000ffffffffULL, not
-> 0xffffffffffffffffULL. What's wrong?
+I've reposted with this fixed.
 
-See above.  int not unsigned int.  And it makes a difference:
+Ideally, I'd have liked to defined that in terms of struct user_vfp,
+but that results in a cascade of header dependencies I prefer to
+avoid.  Also, since this definition is describing a binary protocol,
+using the type definition to define it could be undesirable.
 
-unsigned long long vals = ~(int)0;
-unsigned long long valu = ~(unsigned int)0;
-
-vals:
-        .word   -1
-        .word   -1
-valu:
-        .word   -1
-        .word   0
+Cheers
+---Dave
