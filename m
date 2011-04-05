@@ -1,83 +1,86 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 05 Apr 2011 12:10:24 +0530
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>	<201104031726.37420.arnd@arndb.de>	<20110403160324.GA8050@n2100.arm.linux.org.uk>	<201104040259.26601.arnd@arndb.de>	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>	<20110404112104.GB19854@n2100.arm.linux.org.uk>	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>	<20110404133104.GA23266@n2100.arm.linux.org.uk>	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
-	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
-Message-ID: <4D9AB958.5010304@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 5 Apr 2011 14:47:55 +0800
+Subject: [PATCH] video: mxsfb: correct typo 'FAILING' to 'FALLING'
+In-Reply-To: <20110404150430.GB13963@pengutronix.de>
+References: <20110404150430.GB13963@pengutronix.de>
+Message-ID: <1301986075-3168-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/5/2011 1:38 AM, Linus Walleij wrote:
-> 2011/4/4 Marc Zyngier<Marc.Zyngier@arm.com>:
->> On Mon, 2011-04-04 at 14:31 +0100, Russell King - ARM Linux wrote:
->>>
->>> If ARM are going to architect a set of timers into the hardware, let's
->>> make sure that all such hardware has them so we can dig ourselves out
->>> of this crappy mess that we find ourselves in today.
->>
->> As far as I know, A15 always has a set of generic timers.
->>
->> It may be that they are not available (frequency not programmed into the
->> CNTFREQ register), or that someone decided to use a better alternative
->> (for some particular interpretation of "better").
->
-> I guess this thing is inside that A15 core?
->
-Yes but the power domain partitioning can be used.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+The patch should probably be split into two to separate machine code
+changes from driver ones, but that will result in build failure,
+which could be a problem for bisect, so I keep them as one patch.  
 
-> First, what happens the day any vendors start making SoCs on this is
-> they turn the A15 core off whenever it is not used, loosing all state
-> including this timer, I believe.
->
-> This forces them all to add some totally different clocksource, event and
-> wakeup in some always-on voltage domain and rate that higher than
-> the A15 timer(s). They will then implement sched_clock() and
-> clocksource on that instead and only use A15 for localtimers.
->
-> (Leading to the proliferation of board/SoC timer hacks discussed
-> so much recently...)
->
-> The only way to reuse that poor thing in practice is if you engineer
-> a separate power domain with stuff that is supposed to be always-on
-> in the A15 macro (including these timers) so vendors must implement
-> this so as not to loose its state. Is this the case?
->
-Yes. From what I understood from A15 timer architeture so far is,
-A15 counter is suppose to be kept in ALWAYS ON domain by Soc vendors.
-That's the requirement.
+ arch/arm/mach-mxs/include/mach/mxsfb.h |    2 +-
+ arch/arm/mach-mxs/mach-mx23evk.c       |    2 +-
+ arch/arm/mach-mxs/mach-mx28evk.c       |    2 +-
+ drivers/video/mxsfb.c                  |    6 +++---
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-> Else, in effect it will only be used as clocksource and sched_clock()
-> with these Versatile boards where the power is always on anyway.
->
-> Second, have you taken into account the effect of changing the
-> frequency of the A15 core, which is something every vendor also
-> does, as you know Colin Cross already has a patch pending
-> for that on the TWD localtimer which has not yet reached
-> the kernel. (Or is A15 fixed frequency? Forgive my ignorance...)
->
-This one is also addressed. The counter will run on fixed
-frequency and even if the clock input has changed, the
-counting will be as if the clock source is constant.
-e.g
-- @6 MHz, counter will increment count by 1 for every ~166 nS
-- @32 KHz, counter will increment count by ~183 times for
-   every ~30 ms
-
-So overall clock-source should work in all scenario's including low
-power scenario'.
-
-The only issue I see is the clock-events implemented using
-local timers capabilities in low power modes. The local timers
-won't be able wakeup CPU from DORMANT or OFF state and hence
-you will need an additional wakeup capable clock-event
-working together with the local timers using clock-notifiers.
-
-> (And third it will also eventually need to hook into the timer-based
-> delay framework that I think Nokia is working on to be really
-> useful, else all delays become unpredictable.)
->
-Do you mean udelay()/mdelay() here ?
-
-Regards
-Santosh
+diff --git a/arch/arm/mach-mxs/include/mach/mxsfb.h b/arch/arm/mach-mxs/include/mach/mxsfb.h
+index e4d7979..491787e 100644
+--- a/arch/arm/mach-mxs/include/mach/mxsfb.h
++++ b/arch/arm/mach-mxs/include/mach/mxsfb.h
+@@ -25,7 +25,7 @@
+ #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
+ 
+ #define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
+-#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
++#define FB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* falling/negtive edge sampling */
+ 
+ struct mxsfb_platform_data {
+ 	struct fb_videomode *mode_list;
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index 214e5b6..bcf24c1 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -122,7 +122,7 @@ static struct fb_videomode mx23evk_video_modes[] = {
+ 		.hsync_len	= 1,
+ 		.vsync_len	= 1,
+ 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
++				  FB_SYNC_DOTCLK_FALLING_ACT,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index bb329b9..9753e85 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -311,7 +311,7 @@ static struct fb_videomode mx28evk_video_modes[] = {
+ 		.hsync_len	= 10,
+ 		.vsync_len	= 10,
+ 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
++				  FB_SYNC_DOTCLK_FALLING_ACT,
+ 	},
+ };
+ 
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 7d02848..aa27231 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -103,7 +103,7 @@
+ #define VDCTRL0_ENABLE_PRESENT		(1 << 28)
+ #define VDCTRL0_VSYNC_ACT_HIGH		(1 << 27)
+ #define VDCTRL0_HSYNC_ACT_HIGH		(1 << 26)
+-#define VDCTRL0_DOTCLK_ACT_FAILING	(1 << 25)
++#define VDCTRL0_DOTCLK_ACT_FALLING	(1 << 25)
+ #define VDCTRL0_ENABLE_ACT_HIGH		(1 << 24)
+ #define VDCTRL0_VSYNC_PERIOD_UNIT	(1 << 21)
+ #define VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	(1 << 20)
+@@ -453,8 +453,8 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+ 		vdctrl0 |= VDCTRL0_VSYNC_ACT_HIGH;
+ 	if (fb_info->var.sync & FB_SYNC_DATA_ENABLE_HIGH_ACT)
+ 		vdctrl0 |= VDCTRL0_ENABLE_ACT_HIGH;
+-	if (fb_info->var.sync & FB_SYNC_DOTCLK_FAILING_ACT)
+-		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FAILING;
++	if (fb_info->var.sync & FB_SYNC_DOTCLK_FALLING_ACT)
++		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FALLING;
+ 
+ 	writel(vdctrl0, host->base + LCDC_VDCTRL0);
+ 
+-- 
+1.7.1
