@@ -1,43 +1,50 @@
 From: jiri.pinkava@vscht.cz (jiri.pinkava at vscht.cz)
-Date: Wed, 6 Apr 2011 01:06:04 +0200
-Subject: [PATCH 2/6] n35: Update GPIO documentation
+Date: Wed, 6 Apr 2011 01:06:03 +0200
+Subject: [PATCH 1/6] n35: Fix key code values for some GPIO keys.
 In-Reply-To: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
 References: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
-Message-ID: <1302044768-7774-3-git-send-email-jiri.pinkava@vscht.cz>
+Message-ID: <1302044768-7774-2-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jiri Pinkava <jiri.pinkava@vscht.cz>
 
-Supply more detailed information about one GPIO pin.
+KEY_POWER is ordinary button, type PWR is invalid.
+
+Someone copy-pasted code for GPIO keys and forget change code values.
 
 Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
 ---
- arch/arm/mach-s3c2410/mach-n30.c |   12 +++++-------
- 1 files changed, 5 insertions(+), 7 deletions(-)
+ arch/arm/mach-s3c2410/mach-n30.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index 4f3413b..408dd88 100644
+index 66f4444..4f3413b 100644
 --- a/arch/arm/mach-s3c2410/mach-n30.c
 +++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -394,13 +394,11 @@ static struct s3c2410_platform_i2c __initdata n30_i2ccfg = {
- static void __init n30_hwinit(void)
- {
- 	/* GPA0-11 special functions -- unknown what they do
--	 * GPA12 N30 special function -- unknown what it does
--	 *       N35/PiN output -- unknown what it does
--	 *
--	 * A12 is nGCS1 on the N30 and an output on the N35/PiN.  I
--	 * don't think it does anything useful on the N30, so I ought
--	 * to make it an output there too since it always driven to 0
--	 * as far as I can tell. */
-+	 * GPA12 N30 special function (nGCS1) -- unknown what it does
-+	 *       PiN output -- unknown function
-+	 *       N35 output -- turn on/off red led, 0 = normal operation,
-+	 *       1 = turn off red led at all. Note: GPD9 must be input or
-+	 *       output with value set to 1 before setting GPA12 to 0. */
- 	if (machine_is_n30())
- 		__raw_writel(0x007fffff, S3C2410_GPACON);
- 	if (machine_is_n35())
+@@ -158,7 +158,6 @@ static struct gpio_keys_button n35_buttons[] = {
+ 	{
+ 		.gpio		= S3C2410_GPF(0),
+ 		.code		= KEY_POWER,
+-		.type		= EV_PWR,
+ 		.desc		= "Power",
+ 		.active_low	= 0,
+ 		.wakeup		= 1,
+@@ -177,13 +176,13 @@ static struct gpio_keys_button n35_buttons[] = {
+ 	},
+ 	{
+ 		.gpio		= S3C2410_GPG(6),
+-		.code		= KEY_DOWN,
++		.code		= KEY_LEFT,
+ 		.desc		= "Joystick Left",
+ 		.active_low	= 0,
+ 	},
+ 	{
+ 		.gpio		= S3C2410_GPG(5),
+-		.code		= KEY_DOWN,
++		.code		= KEY_RIGHT,
+ 		.desc		= "Joystick Right",
+ 		.active_low	= 0,
+ 	},
 -- 
 1.7.4.2
