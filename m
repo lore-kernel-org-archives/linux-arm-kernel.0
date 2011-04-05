@@ -1,5 +1,5 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Apr 2011 00:16:22 +0200
+Date: Wed, 6 Apr 2011 00:22:15 +0200
 Subject: [GIT PULL] omap changes for v2.6.39 merge window
 In-Reply-To: <4D9AB958.5010304@ti.com>
 References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
@@ -13,24 +13,23 @@ References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
 	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
 	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
 	<4D9AB958.5010304@ti.com>
-Message-ID: <BANLkTinZ+3PqkbbJp3fFs_Z8JBHQdPYM_g@mail.gmail.com>
+Message-ID: <BANLkTins_YaNYSRc1ryZuRSnGKO2MEemuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2011/4/5 Santosh Shilimkar <santosh.shilimkar@ti.com>:
-> [Me]
->> (And third it will also eventually need to hook into the timer-based
->> delay framework that I think Nokia is working on to be really
->> useful, else all delays become unpredictable.)
->>
-> Do you mean udelay()/mdelay() here ?
 
-Yes. Stephen Boyd from Qualcomm has floated patches to fix it for the
-ARM architecture, I just pushed him again. We use it in our
-ST-Ericsson products.
+> The only issue I see is the clock-events implemented using
+> local timers capabilities in low power modes. The local timers
+> won't be able wakeup CPU from DORMANT or OFF state and hence
+> you will need an additional wakeup capable clock-event
+> working together with the local timers using clock-notifiers.
 
-Ideally you'd want that to go along with the A15 timer stuff so that this
-monotonic high-precision timer is also used for udelay()/mdelay().
+And this is because the IRQs it emits are local and thus cannot wake
+the system? This sounds way backwards... A simple na?ve solution
+would have been to just route out an external IRQ line back from a
+selected timer and into the GIC so it will be able to wake up the
+system, right?
 
 Yours,
 Linus Walleij
