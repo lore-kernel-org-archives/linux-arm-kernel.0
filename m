@@ -1,91 +1,58 @@
-From: jiri.pinkava@vscht.cz (jiri.pinkava at vscht.cz)
-Date: Wed, 6 Apr 2011 01:06:05 +0200
-Subject: [PATCH 3/6] n30: Clean-up UARTs configuration
-In-Reply-To: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
-References: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
-Message-ID: <1302044768-7774-4-git-send-email-jiri.pinkava@vscht.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Apr 2011 01:19:34 +0200
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <AANLkTikfBhCH5wrpYzKbws0F_UVaskhtN_SUGQ+hU8Ab@mail.gmail.com>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
+	<201104011554.07924.arnd@arndb.de>
+	<1301671655.28467.52.camel@e102144-lin.cambridge.arm.com>
+	<201104011755.57412.arnd@arndb.de>
+	<AANLkTikfBhCH5wrpYzKbws0F_UVaskhtN_SUGQ+hU8Ab@mail.gmail.com>
+Message-ID: <BANLkTinDgAwu7jg+rciMUU19fj+TKPRwmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiri Pinkava <jiri.pinkava@vscht.cz>
+2011/4/1 Linus Torvalds <torvalds@linux-foundation.org>:
 
-Replace numbers by names of constants defined in header files.
+> If you have discoverable hardware, use it.
+>
+> But by "discoverable hardware" I mean something like PCI config
+> cycles. IOW, real hardware features.
 
-Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
----
- arch/arm/mach-s3c2410/mach-n30.c                 |   28 +++++++++++++++-------
- arch/arm/plat-samsung/include/plat/regs-serial.h |    3 ++
- 2 files changed, 22 insertions(+), 9 deletions(-)
+The ARM AMBA architecture actually has such a thing, or a
+little of it, found in drivers/amba/bus.c.
 
-diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index 408dd88..d98d7b5 100644
---- a/arch/arm/mach-s3c2410/mach-n30.c
-+++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -55,32 +55,42 @@ static struct map_desc n30_iodesc[] __initdata = {
- 	/* nothing here yet */
- };
- 
-+#define UCON	(S3C2410_UCON_DEFAULT | \
-+		 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define ULCON	(S3C2410_LCON_CS8 | \
-+		 S3C2410_LCON_PNONE)
-+
-+#define UFCON	(S3C2410_UFCON_FIFOMODE | \
-+		 S3C2410_UFCON_RXTRIG8 | \
-+		 S3C2410_UFCON_TXTRIG4)
-+
- static struct s3c2410_uartcfg n30_uartcfgs[] = {
- 	/* Normal serial port */
- 	[0] = {
- 		.hwport	     = 0,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- 	/* IR port */
- 	[1] = {
- 		.hwport	     = 1,
- 		.flags	     = 0,
- 		.uart_flags  = UPF_CONS_FLOW,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x43,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON | S3C2410_LCON_IRM,
-+		.ufcon	     = UFCON,
- 	},
- 	/* On the N30 the bluetooth controller is connected here.
- 	 * On the N35 and variants the GPS receiver is connected here. */
- 	[2] = {
- 		.hwport	     = 2,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- };
- 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
-index 788837e..c64beca 100644
---- a/arch/arm/plat-samsung/include/plat/regs-serial.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
-@@ -114,6 +114,9 @@
- 
- #define S3C2410_UFCON_FIFOMODE	  (1<<0)
- #define S3C2410_UFCON_TXTRIG0	  (0<<6)
-+#define S3C2410_UFCON_TXTRIG4	  (1<<6)
-+#define S3C2410_UFCON_TXTRIG8	  (2<<6)
-+#define S3C2410_UFCON_TXTRIG12	  (3<<6)
- #define S3C2410_UFCON_RXTRIG8	  (1<<4)
- #define S3C2410_UFCON_RXTRIG12	  (2<<4)
- 
--- 
-1.7.4.2
+Basically it requires you to get the physical address and size of
+each peripheral, then at offset -0x10 from the end address (usually
+at even 4K pages), if you find the magic number 0xB105F00D
+(ARM has a sense of humour, obviously) you can find something
+alike the PCI IDs at offset -0x20, manufacturer ID, version number
+and revision of the hardware.
+
+It isn't very hard to imagine that mechanism providing IRQ
+numbers or DMA channel allocation and other such data
+so it becomes more plug'n'play-ish. If the hardware had a
+list of device physical whereabouts in a specific location too,
+the system would be quite self-describing.
+
+Not as sexy as the separate PCI configuration space
+though, it's just hardcoded in along with the device I/O pages.
+
+Apparently ARM pushed this in their few initial cells
+and manufacturers are free to reuse this system for their
+silicon. ST Microelectronics for example actually use it to
+a larger extent. But since it was not mandatory and there
+was no clear way on how to register magic numbers with
+this system (like the PCI-SIG), it simply failed. Silicon
+foundries didn't care or even know about it, neglecting to put
+this 0xB105F00D in place.
+
+IMO the world would have been much better off if
+ARM mandated that all vendors *must* use this scheme
+for their hardware blocks if they are to license the AMBA
+bus incarnations, but they don't.
+
+Maybe the ARM guys on the list has some background on
+this?
+
+Yours,
+Linus Walleij
