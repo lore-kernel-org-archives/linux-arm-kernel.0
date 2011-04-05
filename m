@@ -1,35 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Apr 2011 00:22:15 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <4D9AB958.5010304@ti.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<201104031726.37420.arnd@arndb.de>
-	<20110403160324.GA8050@n2100.arm.linux.org.uk>
-	<201104040259.26601.arnd@arndb.de>
-	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>
-	<20110404112104.GB19854@n2100.arm.linux.org.uk>
-	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>
-	<20110404133104.GA23266@n2100.arm.linux.org.uk>
-	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
-	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
-	<4D9AB958.5010304@ti.com>
-Message-ID: <BANLkTins_YaNYSRc1ryZuRSnGKO2MEemuA@mail.gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Wed, 6 Apr 2011 00:45:31 +0200
+Subject: GIT pull request:lpc32xx core updates
+Message-ID: <083DF309106F364B939360100EC290F811EDEE8ABA@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/5 Santosh Shilimkar <santosh.shilimkar@ti.com>:
+(resend - original stuck in moderator review)
 
-> The only issue I see is the clock-events implemented using
-> local timers capabilities in low power modes. The local timers
-> won't be able wakeup CPU from DORMANT or OFF state and hence
-> you will need an additional wakeup capable clock-event
-> working together with the local timers using clock-notifiers.
+Hi Russell,
 
-And this is because the IRQs it emits are local and thus cannot wake
-the system? This sounds way backwards... A simple na?ve solution
-would have been to just route out an external IRQ line back from a
-selected timer and into the GIC so it will be able to wake up the
-system, right?
+Can you please pull these reviewed updates for the LPC32xx?
 
-Yours,
-Linus Walleij
+  git://git.lpclinux.com/linux-2.6-lpc for_rmk_32xx_04_05
+
+Wolfram Sang (3):
+      arm: lpc32xx: add tsc-device
+      arm: lpc32xx: add rtc-device
+      arm: lpc32xx: clock: use bool logic instead of binary
+
+ arch/arm/mach-lpc32xx/clock.c  |    4 +-
+ arch/arm/mach-lpc32xx/common.c |   42 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-lpc32xx/common.h |    2 +
+ 3 files changed, 46 insertions(+), 2 deletions(-)
+
+thanks,
+Kevin Wells
+NXP Semicon1
+ductors
