@@ -1,63 +1,83 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 05 Apr 2011 11:50:17 +0530
-Subject: [PATCH v2] ARM: GIC: Convert GIC library to use the IO relaxed
-	operations
-In-Reply-To: <1301930948.15819.52.camel@e102109-lin.cambridge.arm.com>
-References: <1301650321-28652-1-git-send-email-santosh.shilimkar@ti.com>
-	<1301930948.15819.52.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <4D9AB4A1.9050508@ti.com>
+Date: Tue, 05 Apr 2011 12:10:24 +0530
+Subject: [GIT PULL] omap changes for v2.6.39 merge window
+In-Reply-To: <BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
+References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>	<201104031726.37420.arnd@arndb.de>	<20110403160324.GA8050@n2100.arm.linux.org.uk>	<201104040259.26601.arnd@arndb.de>	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>	<20110404112104.GB19854@n2100.arm.linux.org.uk>	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>	<20110404133104.GA23266@n2100.arm.linux.org.uk>	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>
+	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>
+Message-ID: <4D9AB958.5010304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2011 8:59 PM, Catalin Marinas wrote:
-> On Fri, 2011-04-01 at 10:32 +0100, Santosh Shilimkar wrote:
->> The GIC register accesses today make use of readl()/writel()
->> which prove to be very expensive when used along with mandatory
->> barriers. This mandatory barriers also introduces an un-necessary
->> and expensive l2x0_sync() operation. On Cortex-A9 MP cores, GIC
->> IO accesses from CPU are direct and doesn't go through L2X0 write
->> buffer.
+On 4/5/2011 1:38 AM, Linus Walleij wrote:
+> 2011/4/4 Marc Zyngier<Marc.Zyngier@arm.com>:
+>> On Mon, 2011-04-04 at 14:31 +0100, Russell King - ARM Linux wrote:
+>>>
+>>> If ARM are going to architect a set of timers into the hardware, let's
+>>> make sure that all such hardware has them so we can dig ourselves out
+>>> of this crappy mess that we find ourselves in today.
 >>
->> Also since a DSB does not guarantee that the device state has
->> been changed, a read back from the device is introduced wherever
->> necessary.
-> ...
->> @@ -98,7 +98,8 @@ static void gic_mask_irq(struct irq_data *d)
->>          u32 mask = 1<<  (d->irq % 32);
+>> As far as I know, A15 always has a set of generic timers.
 >>
->>          spin_lock(&irq_controller_lock);
->> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->>          if (gic_arch_extn.irq_mask)
->>                  gic_arch_extn.irq_mask(d);
->>          spin_unlock(&irq_controller_lock);
->>
+>> It may be that they are not available (frequency not programmed into the
+>> CNTFREQ register), or that someone decided to use a better alternative
+>> (for some particular interpretation of "better").
 >
-> Talking to the hardware people, a readl back would guarantee that the
-> GIC state has changed but you can still get spurious interrupts because
-> of the signal propagation from the GIC to the CPU. That's difficult to
-> reliably sort out in software as we don't know the hardware delays, so
-> we'll have to cope with spurious interrupts (unlikely though).
+> I guess this thing is inside that A15 core?
 >
-> A better sequence would be something like below (but still no
-> guarantees):
+Yes but the power domain partitioning can be used.
+
+> First, what happens the day any vendors start making SoCs on this is
+> they turn the A15 core off whenever it is not used, loosing all state
+> including this timer, I believe.
 >
-> 	STR	[Device]
-> 	LDR	[Device]
-> 	DSB
-> 	ISB
+> This forces them all to add some totally different clocksource, event and
+> wakeup in some always-on voltage domain and rate that higher than
+> the A15 timer(s). They will then implement sched_clock() and
+> clocksource on that instead and only use A15 for localtimers.
 >
-> (the ISB is needed in case some instructions already in the pipeline
-> sampled the state of the interrupt signal)
+> (Leading to the proliferation of board/SoC timer hacks discussed
+> so much recently...)
 >
-> But I'm more in favour of not even bothering with an additional
-> readl_relaxed, we simply cope with a very rare spurious interrupt. In a
-> virtualised environment accesses to the GIC distributor are trapped
-> making things slower.
+> The only way to reuse that poor thing in practice is if you engineer
+> a separate power domain with stuff that is supposed to be always-on
+> in the A15 macro (including these timers) so vendors must implement
+> this so as not to loose its state. Is this the case?
 >
-Ok. Thanks for addition information.
-Will drop readl_relaxed() then.
+Yes. From what I understood from A15 timer architeture so far is,
+A15 counter is suppose to be kept in ALWAYS ON domain by Soc vendors.
+That's the requirement.
+
+> Else, in effect it will only be used as clocksource and sched_clock()
+> with these Versatile boards where the power is always on anyway.
+>
+> Second, have you taken into account the effect of changing the
+> frequency of the A15 core, which is something every vendor also
+> does, as you know Colin Cross already has a patch pending
+> for that on the TWD localtimer which has not yet reached
+> the kernel. (Or is A15 fixed frequency? Forgive my ignorance...)
+>
+This one is also addressed. The counter will run on fixed
+frequency and even if the clock input has changed, the
+counting will be as if the clock source is constant.
+e.g
+- @6 MHz, counter will increment count by 1 for every ~166 nS
+- @32 KHz, counter will increment count by ~183 times for
+   every ~30 ms
+
+So overall clock-source should work in all scenario's including low
+power scenario'.
+
+The only issue I see is the clock-events implemented using
+local timers capabilities in low power modes. The local timers
+won't be able wakeup CPU from DORMANT or OFF state and hence
+you will need an additional wakeup capable clock-event
+working together with the local timers using clock-notifiers.
+
+> (And third it will also eventually need to hook into the timer-based
+> delay framework that I think Nokia is working on to be really
+> useful, else all delays become unpredictable.)
+>
+Do you mean udelay()/mdelay() here ?
 
 Regards
 Santosh
