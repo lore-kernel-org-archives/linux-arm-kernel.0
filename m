@@ -1,35 +1,71 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 5 Apr 2011 11:49:10 +0100
-Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
-In-Reply-To: <20110405102842.GC22192@game.jcrosoft.org>
-References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
-	<20110316.131734.242138246.davem@davemloft.net>
-	<4D86F25A.7060405@atmel.com>
-	<20110321111838.GC2610@pulham.picochip.com>
-	<20110322161811.GF6466@game.jcrosoft.org>
-	<20110322163917.GD10058@pulham.picochip.com>
-	<20110322175523.GE10058@pulham.picochip.com>
-	<20110324162517.GI6466@game.jcrosoft.org>
-	<20110331094041.GD3371@pulham.picochip.com>
-	<20110405102842.GC22192@game.jcrosoft.org>
-Message-ID: <20110405104910.GE4797@pulham.picochip.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 5 Apr 2011 16:28:33 +0530
+Subject: [PATCH v18 08/13] davinci: eliminate use of IO_ADDRESS() on sysmod
+In-Reply-To: <1301737397-4327-1-git-send-email-manjunath.hadli@ti.com>
+References: <1301737397-4327-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C75E97E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 12:28:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> work fine on 9263ek except the IP version detection.
+Hi Manju,
+
+On Sat, Apr 02, 2011 at 15:13:17, Hadli, Manjunath wrote:
+> Current devices.c file has a number of instances where
+> IO_ADDRESS() is used for system module register
+> access. Eliminate this in favor of a ioremap()
+> based access.
 > 
-> the at91 macb ip version is supposed to be at 0x0601010C but it's not.
-> At least on 9263 it's 0x0001010C. So we can not detect the arch at runtime
-> but we can detect that it's a macb.
+> Consequent to this, a new global pointer davinci_sysmodbase
+> has been introduced which gets initialized during
+> the initialization of each relevant SoC
 > 
-> So could keep the ifdef for 2 archs but use the ip version on arm
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> ---
 
-OK, well I think my patches are already doing that so should be OK as 
-they are.
+> diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
+> index 414e0b9..2a6b560 100644
+> --- a/arch/arm/mach-davinci/include/mach/hardware.h
+> +++ b/arch/arm/mach-davinci/include/mach/hardware.h
+> @@ -21,6 +21,12 @@
+>   */
+>  #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
+>  
+> +#ifndef __ASSEMBLER__
+> +extern void __iomem *davinci_sysmodbase;
+> +#define DAVINCI_SYSMODULE_VIRT(x)	(davinci_sysmodbase + (x))
+> +void davinci_map_sysmod(void);
+> +#endif
 
-Russell, are you able to take these through your tree (I think they 
-count as consolidation work) or should I ask Stephen for a tree in 
-linux-next for a while first?
+Russell has posted[1] that the hardware.h file should
+not be polluted with platform private stuff like this.
 
-Jamie
+Your patch 7/13 actually helped towards that goal, but
+this one takes us back. This patch cannot be used in
+the current form.
+
+Currently there are separate header files for dm644x,
+dm355, dm646x and dm365. I would like to start by
+removing unnecessary code from these files and trying
+to consolidate them into a single file.
+
+Example, the EMAC base address definitions in dm365.h
+should be moved into dm365.c. Similarly, there is a lot
+of VPIF specific stuff in dm646x.h which is not really
+specific to dm646x.h and so should probably be moved to
+include/media/ or arch/arm/mach-davinci/include/mach/vpif.h
+
+Once consolidated into a single file, davinci_sysmodbase
+can be moved into that file.
+
+Also, Russell has said[2] that at least for this merge
+window only consolidation and bug fixes will go through
+his tree. This means that as far as mach-davinci is
+concerned, the clean-up part of this series can go to
+2.6.40 - but not the stuff which adds new support.
+
+Thanks,
+Sekhar
+
+[1] http://www.spinics.net/lists/arm-kernel/msg120410.html
+[2] http://www.spinics.net/lists/arm-kernel/msg120606.html
