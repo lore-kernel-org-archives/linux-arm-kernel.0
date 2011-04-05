@@ -1,56 +1,58 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 5 Apr 2011 11:41:03 -0500
-Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
-In-Reply-To: <20110405073030.GI13963@pengutronix.de>
-References: <1301936806-9116-1-git-send-email-fabio.estevam@freescale.com>
-	<20110404171927.GG7285@pengutronix.de>
-	<20110404174244.GH13963@pengutronix.de>
-	<20110404175240.GF22480@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D1C13BB8@AUSP01VMBX24.collaborationhost.net>
-	<20110404181759.GG22480@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
-	<20110405073030.GI13963@pengutronix.de>
-Message-ID: <0D753D10438DA54287A00B027084269764D1C8A7C5@AUSP01VMBX24.collaborationhost.net>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 5 Apr 2011 09:43:22 -0700
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+	<4D959058.7010606@codeaurora.org>
+	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
+	<4D981EAB.8070209@codeaurora.org>
+	<BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
+	<BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
+	<BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
+Message-ID: <BANLkTima5DM6gm-1E_uGsM3cqPGd-U_how@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 05, 2011 12:31 AM, Uwe Kleine-K?nig wrote:
-> I like my approach better, without using mxc specific functions it would
-> look as follows:
+On Tue, Apr 5, 2011 at 9:02 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+> Hi,
 >
-> struct platform_device *__init gpio_led_register_device(
-> 		const gpio_led_platform_data *pdata)
-> {
-> 	struct platform_device *ret = ERR_PTR(-ENOMEM);
-> 	struct gpio_led_platform_data *_pdata = *pdata;
-> 	_pdata->leds = kmemdup(pdata->leds,
-> 			 pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
-> 
-> 	if (!_pdata->leds)
-> 		return ERR_PTR(-ENOMEM);
-> 
-> 	ret = platform_device_register_resndata(NULL, "leds-gpio", -1,
-> 		NULL, 0, _pdata, sizeof(_pdata));
-> 
-> 	if (IS_ERR(ret))
-> 		kfree(_pdata->leds);
-> 
-> 	return ret;
-> }
+> On Tue, Apr 5, 2011 at 12:46 AM, Simon Glass <sjg@chromium.org> wrote:
+>> On Mon, Apr 4, 2011 at 7:29 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+>> ...
+
+>>> OTOH, is not like "Use generic BUG() handler" gives the choice of
+>>> removing GENERIC_BUG given that it is not prompted in menuconfig and
+>>> auto selected, if this is the intention is there any reason to keep
+>>> the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
+>>> use it with this patch, right?
+>>
+>> Well, er, the intention is that you use the patch. I kept the old code
+>> around since people can then simply change the Kconfig option and be
+>> back where they were, as indeed you have. I would be happy to remove
+>> the old behavior, but I was concerned about a possible roasting in
+>> this forum. Changing long-established behavior is sometimes tricky.
 >
-> Compared to your approach with mine
->  - gpio_leds could be const __initconst;
->  - uses only a single parameter which AFAIK saves a few bytes to call
->    the function;
->  - you don't have control about the .id member (which IMHO is OK but
->    might be changed easily);
->  - you have to call a function with a different name;
+> Yes, but you can't change the Kconfig because it is not prompted with
+> your patch, if that was the intention then an option to de/select
+> GENERIC_BUG or not is needed:
+>
+> arch/arm/Kconfig
+> @@ -204,6 +204,10 @@ config MMU
+> ? ? ? ? ?Select if you want MMU-based virtualised addressing space
+> ? ? ? ? ?support by paged memory management. If unsure, say 'Y'.
+>
+> +config GENERIC_BUG
+> + ? ? ? bool "Generic BUG"
+> + ? ? ? default y
+> + ? ? ? depends on BUG
 
-Your approach is fine with me.
+Yes that's right, it is a manual edit. But if there are no objections
+I will create a patch to remove this and replace the old bug
+infrastructure entirely. - Simon
 
-I think you should pass the .id number.  I noticed a couple platforms that
-register more than one leds-gpio platform device and some that currently
-use and id of 0.
-
-Regards,
-Hartley
+>
+> Regards,
+>
+> Omar
+>
