@@ -1,133 +1,57 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Tue,  5 Apr 2011 09:28:44 +0900
-Subject: [PATCH 3/4] ARM: EXYNOS4: Change each platform kernel timer using
-	s5p_timer
-In-Reply-To: <1301963325-22349-1-git-send-email-sbkim73@samsung.com>
-References: <1301963325-22349-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1301963325-22349-4-git-send-email-sbkim73@samsung.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Mon, 4 Apr 2011 18:55:31 -0700
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <4D981EAB.8070209@codeaurora.org>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+	<4D959058.7010606@codeaurora.org>
+	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
+	<4D981EAB.8070209@codeaurora.org>
+Message-ID: <BANLkTimJkQ9afnO=6gKiBqWUo+Uv=hWx2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replace exynos4 dedicated timer with s5p_timer.
-Defualt clocksource is pwm4 and clockevent is pwm2.
-It can be deleted time.c by using s5p_timer.
+On Sun, Apr 3, 2011 at 12:15 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> (Please stop top posting)
+>
+> On 4/1/2011 3:29 PM, Simon Glass wrote:
+>> Hi Stephen,
+>>
+>> Sorry for the confusion, but in fact I was talking about the patch to
+>> make ARM use the generic bug handling via an undef instruction instead
+>> of calling ______bug() or writing to memory address 0. Please see
+>> here:
+>>
+>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6808/1
+>
+> Yes I've seen your patch (and even posted comments on it which have not
+> been responded to).
 
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
----
- arch/arm/mach-exynos4/mach-nuri.c           |    4 +++-
- arch/arm/mach-exynos4/mach-smdkc210.c       |    4 +++-
- arch/arm/mach-exynos4/mach-smdkv310.c       |    5 ++++-
- arch/arm/mach-exynos4/mach-universal_c210.c |    4 +++-
- 4 files changed, 13 insertions(+), 4 deletions(-)
+Hi Stephen,
 
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index b79ad01..cc50414 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -30,6 +30,7 @@
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/sdhci.h>
-+#include <plat/s5p-time.h>
- 
- #include <mach/map.h>
- 
-@@ -282,6 +283,7 @@ static void __init nuri_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
- }
- 
- static void __init nuri_machine_init(void)
-@@ -301,5 +303,5 @@ MACHINE_START(NURI, "NURI")
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= nuri_map_io,
- 	.init_machine	= nuri_machine_init,
--	.timer		= &exynos4_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-smdkc210.c b/arch/arm/mach-exynos4/mach-smdkc210.c
-index e645f7a..c3a34c9 100644
---- a/arch/arm/mach-exynos4/mach-smdkc210.c
-+++ b/arch/arm/mach-exynos4/mach-smdkc210.c
-@@ -27,6 +27,7 @@
- #include <plat/sdhci.h>
- #include <plat/iic.h>
- #include <plat/pd.h>
-+#include <plat/s5p-time.h>
- 
- #include <mach/map.h>
- 
-@@ -196,6 +197,7 @@ static void __init smdkc210_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkc210_uartcfgs, ARRAY_SIZE(smdkc210_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
- }
- 
- static void __init smdkc210_machine_init(void)
-@@ -219,5 +221,5 @@ MACHINE_START(SMDKC210, "SMDKC210")
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdkc210_map_io,
- 	.init_machine	= smdkc210_machine_init,
--	.timer		= &exynos4_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
-index 1526764..03e3a61 100644
---- a/arch/arm/mach-exynos4/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-@@ -29,6 +29,7 @@
- #include <plat/sdhci.h>
- #include <plat/iic.h>
- #include <plat/pd.h>
-+#include <plat/s5p-time.h>
- 
- #include <mach/map.h>
- 
-@@ -218,6 +219,8 @@ static void __init smdkv310_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkv310_uartcfgs, ARRAY_SIZE(smdkv310_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
-+
- }
- 
- static void __init smdkv310_machine_init(void)
-@@ -244,5 +247,5 @@ MACHINE_START(SMDKV310, "SMDKV310")
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdkv310_map_io,
- 	.init_machine	= smdkv310_machine_init,
--	.timer		= &exynos4_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
-index 97d329f..57c17bc 100644
---- a/arch/arm/mach-exynos4/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-@@ -28,6 +28,7 @@
- #include <plat/devs.h>
- #include <plat/iic.h>
- #include <plat/sdhci.h>
-+#include <plat/s5p-time.h>
- 
- #include <mach/map.h>
- 
-@@ -624,6 +625,7 @@ static void __init universal_map_io(void)
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
-+	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
- }
- 
- static void __init universal_machine_init(void)
-@@ -646,5 +648,5 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= universal_map_io,
- 	.init_machine	= universal_machine_init,
--	.timer		= &exynos4_timer,
-+	.timer		= &s5p_timer,
- MACHINE_END
--- 
-1.7.1
+Not yet! Don't worry I will get to it. I like the suggestion and am
+pleased that you pointed me to it, thank you.
+
+> Correct me if I'm wrong, but that patch with CONFIG_BUG=n would lead to
+> the same error that Omar is seeing because the code only modifies the
+> bug infrastructure when CONFIG_BUG=y.
+
+Well if CONFIG_BUG=n then there is no bug infrastructure, The whole
+file is skipped and it falls back to the asm-generic/bug.h which has
+even more #ifdefs in it. But I think we end up here:
+
+#define BUG() do {} while(0)
+
+After all the patch removes the *(int*)0 = 0 code by virtue of
+CONFIG_GENERIC_BUG=y, right? If I have this wrong then I will have to
+break out the C preprocessor...
+
+Regards,
+Simon
+
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
