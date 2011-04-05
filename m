@@ -1,64 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 5 Apr 2011 14:24:11 +0800
-Subject: [PATCH 3/3] video: mxsfb: add DOTCLK polarity configuration
-	support
-In-Reply-To: <19866.44608.806212.298794@ipc1.ka-ro>
-References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
-	<1299341931-30241-4-git-send-email-shawn.guo@freescale.com>
-	<20110404150430.GB13963@pengutronix.de>
-	<20110404154248.GB27933@S2100-06.ap.freescale.net>
-	<19866.44608.806212.298794@ipc1.ka-ro>
-Message-ID: <20110405062410.GA28171@S2100-06.ap.freescale.net>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Tue, 5 Apr 2011 12:10:46 +0530
+Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
+In-Reply-To: <201103301259.28483.arnd@arndb.de>
+References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
+	<201103111628.57549.arnd@arndb.de>
+	<17BF3847C06240EC921FB684D3120DEC@subhasishg>
+	<201103301259.28483.arnd@arndb.de>
+Message-ID: <34890DB1679E41119ADB156E2CFEC4C9@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 07:53:04AM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > On Mon, Apr 04, 2011 at 05:04:30PM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > On Sun, Mar 06, 2011 at 12:18:51AM +0800, Shawn Guo wrote:
-> > > > The current implementation provides configuration for HSYNC_POL,
-> > > > VSYNC_POL and ENABLE_POL via 'sync' of fb_videomode, but DOTCLK_POL
-> > > > is missing there.  It's assuming that data sampling at rising/positive
-> > > > edge is always the case.  However, it's not true.  For example, the
-> > > > panel on mx28evk board (Seiko 43WVF1G) samples data at
-> > > > failing/negative edge.  The patch is to add this configuration.
-> > > s/failing/falling?
-> > > 
-> > > > 
-> > > > Also, to unify the naming schema of all these polarity configurations
-> > > > and match them with the bits name in Reference Manual, a couple of
-> > > > definitions are renamed.
-> > > > 
-> > > > Lastly, to reduce the chance of defining customized 'FB_SYNC_' flag
-> > > > by incrementing the preceeding value, the definitions are changed to
-> > > > bit shifting way.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > > ---
-> > > >  arch/arm/mach-mxs/include/mach/mxsfb.h |    3 ++-
-> > > >  drivers/video/mxsfb.c                  |    8 +++++---
-> > > >  2 files changed, 7 insertions(+), 4 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-mxs/include/mach/mxsfb.h b/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > > > index 923f397..e4d7979 100644
-> > > > --- a/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > > > +++ b/arch/arm/mach-mxs/include/mach/mxsfb.h
-> > > > @@ -24,7 +24,8 @@
-> > > >  #define STMLCDIF_18BIT 2 /** pixel data bus to the display is of 18 bit width */
-> > > >  #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
-> > > >  
-> > > > -#define FB_SYNC_DATA_ENABLE_HIGH_ACT	64
-> > > > +#define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
-> > > > +#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
-> >
-> s/FAILING/FALLING/
-> 
-OK, since so many people care, let me send a patch to test Sascha.
 
--- 
-Regards,
-Shawn
+> On Wednesday 30 March 2011, Subhasish Ghosh wrote:
+>>
+>> >> +s32 pruss_disable(struct device *dev, u8 pruss_num)
+>> >> +{
+>> >> + struct da8xx_pruss *pruss = dev_get_drvdata(dev->parent);
+>> >> + struct da8xx_prusscore_regs *h_pruss;
+>> >> + struct pruss_map *pruss_mmap = (struct pruss_map *)pruss->ioaddr;
+>> >> + u32 temp_reg;
+>> >> + u32 delay_cnt;
+>> >
+>> > Can you explain the significance of pruss_num? As far as I
+>> > can tell, you always pass constants in here, so it should
+>> > be possible to determine the number from the device.
+>>
+>> SG - The number is not programmed in the device, I need something to 
+>> decide
+>> which PRU to disable or enable.
+>
+> I still don't understand. Please explain how the devices
+> relate to the multiple PRUs in hardware.
+
+There are two devices, CAN and UART, in our case we use the PRU as follows:
+1. CAN-TX on PRU0, CAN-RX on PRU1
+2. SUART-TX on PRU0, SUART-RX on PRU1
+3. SUART-TXRX on PRU0, SUART-TXRX on PRU1
+
+
+ 
