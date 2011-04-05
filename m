@@ -1,47 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Apr 2011 12:54:47 +0300
-Subject: [PATCH] arm: omap: introduce OMAP MCOP board file
-In-Reply-To: <20110405095119.GD4699@n2100.arm.linux.org.uk>
-References: <1301995970-23699-1-git-send-email-balbi@ti.com>
-	<20110405093656.GS2176@legolas.emea.dhcp.ti.com>
-	<20110405095119.GD4699@n2100.arm.linux.org.uk>
-Message-ID: <20110405095446.GF23776@legolas.emea.dhcp.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 5 Apr 2011 12:28:42 +0200
+Subject: [PATCHv2 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110331094041.GD3371@pulham.picochip.com>
+References: <1300184096-13937-1-git-send-email-jamie@jamieiles.com>
+	<20110316.131734.242138246.davem@davemloft.net>
+	<4D86F25A.7060405@atmel.com>
+	<20110321111838.GC2610@pulham.picochip.com>
+	<20110322161811.GF6466@game.jcrosoft.org>
+	<20110322163917.GD10058@pulham.picochip.com>
+	<20110322175523.GE10058@pulham.picochip.com>
+	<20110324162517.GI6466@game.jcrosoft.org>
+	<20110331094041.GD3371@pulham.picochip.com>
+Message-ID: <20110405102842.GC22192@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10:40 Thu 31 Mar     , Jamie Iles wrote:
+> Hi Jean-Christophe,
+> 
+> On Thu, Mar 24, 2011 at 05:25:17PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 17:55 Tue 22 Mar     , Jamie Iles wrote:
+> > > Hi Jean-Christophe,
+> > > > Also, can you confirm that the module ID's that you are using to 
+> > > > differentiate between AT91 and AVR32 won't clash with MACB uses in 
+> > > > other, non-at91/avr32 chips, or that it doesn't matter?
+> > > 
+> > > If this does work, then it would be nice if we made the else path of the 
+> > > RMII AT91 tests also test for avr32 too so we aren't driving the USRIO 
+> > > pins on platforms that aren't at91 but also aren't avr32.  So something 
+> > > the patch below instead.
+> > I'm currently traveling so I can not test it yet will test it next week
+> > but looks good
+> 
+> Just wondering if you'd had chance to test.  If so, would you mind 
+> reposting and I'll rebase my patches on top of it.
+> 
+> I also have patches for checksum offloading, receive packet timestamping 
+> and wake-on-lan support but I'd like to get the basic GEM ones into next 
+> first.
+work fine on 9263ek except the IP version detection.
 
-On Tue, Apr 05, 2011 at 10:51:19AM +0100, Russell King - ARM Linux wrote:
-> > I don't think Linus will like if we add yet another hwmod + clk data
-> > file just for MCOP, so we need to re-use what's in tree.
-> 
-> I'd suggest holding fire on new stuff.
-> 
-> We *absolutely* *must* show that we're taking Linus' complaint seriously
-> and make headway towards consolidating some of the code.  I don't see that
-> activity as optional.
-> 
-> I've now made the decision (as I mentioned I may do in the thread) that
-> for the next merge window I'm only taking consolidations and bug fixes
-> through my tree, and I encourage everyone else to do the same.  At the
-> moment, I'm planning for this up until the next merge window, but if
-> sufficient progress hasn't been done, I'll extend it thereafter.
-> 
-> In other words, no new platform code and no new platform class code.
-> 
-> The longer it takes to get the consolidation effort producing results, the
-> longer we will have to keep the restriction in place, and the more painful
-> it'll be for people who want to have their platforms merged.
-> 
-> So I hope *no* one is thinking "this isn't my problem, someone else will
-> solve it" - if you're thinking that then we're doomed.
+the at91 macb ip version is supposed to be at 0x0601010C but it's not.
+At least on 9263 it's 0x0001010C. So we can not detect the arch at runtime
+but we can detect that it's a macb.
 
-Ok Russell, we will hold on to this patch and try to help as we can on
-the code consolidation effort.
+So could keep the ifdef for 2 archs but use the ip version on arm
 
-Let's hope to get this sorted out soon as it would be really great for
-us to start pre-silicon validation with mainline kernel with little to
-no effort needed :-D
-
--- 
-balbi
+Best Regards,
+J.
