@@ -1,18 +1,114 @@
 From: jiri.pinkava@vscht.cz (jiri.pinkava at vscht.cz)
-Date: Wed, 6 Apr 2011 01:06:02 +0200
-Subject: [PATCH 0/6] n35: Fixes and clean up for Acer n30/n35
-Message-ID: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
+Date: Wed, 6 Apr 2011 01:06:08 +0200
+Subject: [PATCH 6/6] n35: Add support for LCD backlight regulation
+In-Reply-To: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
+References: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
+Message-ID: <1302044768-7774-7-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[PATCH 1/6] n35: Fix key code values for some GPIO keys.
-[PATCH 2/6] n35: Update GPIO documentation
-[PATCH 3/6] n30: Clean up UARTs configuration
-[PATCH 4/6] n30: Fix MMC power management
-[PATCH 5/6] n30: Add touchscreen support for Acer n30 / n35
-[PATCH 6/6] n35: Add support for LCD backlight regulation
+From: Jiri Pinkava <jiri.pinkava@vscht.cz>
 
- arch/arm/mach-s3c2410/Kconfig                    |    1 +
- arch/arm/mach-s3c2410/mach-n30.c                 |  133 ++++++++++++++++++----
- arch/arm/plat-samsung/include/plat/regs-serial.h |    3 +
- 3 files changed, 116 insertions(+), 21 deletions(-)
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+ arch/arm/mach-s3c2410/mach-n30.c |   71 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+index 00afa2f..79f4890 100644
+--- a/arch/arm/mach-s3c2410/mach-n30.c
++++ b/arch/arm/mach-s3c2410/mach-n30.c
+@@ -23,6 +23,7 @@
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/serial_core.h>
+ #include <linux/timer.h>
+ #include <linux/io.h>
+@@ -353,6 +354,74 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
+ 	.lpcsel		= 0x06,
+ };
+ 
++static int n35_backlight_init(struct device *dev)
++{
++	int ret;
++
++	ret = gpio_request(S3C2410_GPB(0), "Backlight PWM output");
++	if (ret)
++		goto request_gpb0_fail;
++	ret = gpio_request(S3C2410_GPB(1), "Backlight power");
++	if (ret)
++		goto request_gpb1_fail;
++
++	/* set GPB0 as output of PWM timer */
++	gpio_set_value(S3C2410_GPB(0), 0);
++	s3c_gpio_setpull(S3C2410_GPB(0), S3C_GPIO_PULL_DOWN);
++	s3c_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
++
++	/* backlight power */
++	ret = gpio_direction_output(S3C2410_GPB(1), 1);
++	if (ret)
++		goto direction_gpb1_fail;
++	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
++
++	return 0;
++
++direction_gpb1_fail:
++	gpio_free(S3C2410_GPB(1));
++request_gpb1_fail:
++	gpio_free(S3C2410_GPB(0));
++request_gpb0_fail:
++	return ret;
++}
++
++static int n35_backlight_notify(struct device *dev, int brightness)
++{
++	/* power off backlight, values less than 14 are useless */
++	gpio_set_value(S3C2410_GPB(1), brightness > 14 ? 1 : 0);
++	return (brightness > 14 ? brightness : 0);
++}
++
++static void n35_backlight_exit(struct device *dev)
++{
++	gpio_direction_output(S3C2410_GPB(0), 0);
++	gpio_free(S3C2410_GPB(0));
++
++	gpio_set_value(S3C2410_GPB(1), 0);
++	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
++	gpio_free(S3C2410_GPB(1));
++}
++
++static struct platform_pwm_backlight_data backlight_data = {
++	.pwm_id         = 0,
++	.max_brightness = 100,
++	.dft_brightness = 50,
++	.pwm_period_ns  = 3*1000*1000,
++	.init           = n35_backlight_init,
++	.notify         = n35_backlight_notify,
++	.exit           = n35_backlight_exit,
++};
++
++static struct platform_device n35_backlight = {
++	.name = "pwm-backlight",
++	.dev  = {
++		.parent = &s3c_device_timer[0].dev,
++		.platform_data = &backlight_data,
++	},
++	.id   = -1,
++};
++
+ static void n30_sdi_set_power(unsigned char power_mode, unsigned short vdd)
+ {
+ 	switch (power_mode) {
+@@ -400,6 +469,8 @@ static struct platform_device *n35_devices[] __initdata = {
+ 	&s3c_device_sdi,
+ 	&s3c_device_adc,
+ 	&s3c_device_ts,
++	&s3c_device_timer[0],
++	&n35_backlight,
+ 	&n35_button_device,
+ 	&n35_blue_led,
+ 	&n35_warning_led,
+-- 
+1.7.4.2
