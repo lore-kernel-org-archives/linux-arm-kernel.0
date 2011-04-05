@@ -1,30 +1,66 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 5 Apr 2011 08:49:18 -0700
-Subject: [PATCH 00/34] Make kernel build deterministic
-In-Reply-To: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
-References: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
-Message-ID: <20110405154918.GA31337@suse.de>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Tue, 5 Apr 2011 11:02:56 -0500
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
+	<4D959058.7010606@codeaurora.org>
+	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
+	<4D981EAB.8070209@codeaurora.org>
+	<BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
+	<BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
+Message-ID: <BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 04:58:47PM +0200, Michal Marek wrote:
-> 
-> Hi,
-> 
-> this series makes it possible to build bit-identical kernel image and
-> modules from identical sources. Of course the build is already
-> deterministic in terms of behavior of the code, but the various
-> timestamps embedded in the object files make it hard to compare two
-> builds, for instance to verify that a makefile cleanup didn't
-> accidentally change something. A prime example is /proc/config.gz, which
-> has both a timestamp in the gzip header and a timestamp in the payload
-> data. With this series applied, a script like this will produce
-> identical kernels each time:
+Hi,
 
-Very nice stuff.  Do you want to take the individual patches through one
-of your trees, or do you mind if the subsystem maintainers take them
-through theirs?
+On Tue, Apr 5, 2011 at 12:46 AM, Simon Glass <sjg@chromium.org> wrote:
+> On Mon, Apr 4, 2011 at 7:29 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
+> ...
+>> I am using CONFIG_BUG=y, however I don't have CONFIG_DEBUG_BUGVERBOSE
+>> and hence I fall into the part which doesn't print the file and the
+>> line where the BUG was found.
+>>
+>> With Simon's patch if my .config had:
+>>
+>> CONFIG_BUG=y
+>> CONFIG_GENERIC_BUG is not set
+>
+> In this case the patch is like a nop.
+>
+>> CONFIG_DEBUG_BUGVERBOSE is not set
+>>
+>> I would fall into the same BUG definition that is causing issues:
+>>
+>> #define BUG() ? ? ? ? ? do { *(int *)0 = 0; } while (1)
+>>
+>> OTOH, is not like "Use generic BUG() handler" gives the choice of
+>> removing GENERIC_BUG given that it is not prompted in menuconfig and
+>> auto selected, if this is the intention is there any reason to keep
+>> the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
+>> use it with this patch, right?
+>
+> Well, er, the intention is that you use the patch. I kept the old code
+> around since people can then simply change the Kconfig option and be
+> back where they were, as indeed you have. I would be happy to remove
+> the old behavior, but I was concerned about a possible roasting in
+> this forum. Changing long-established behavior is sometimes tricky.
 
-thanks,
+Yes, but you can't change the Kconfig because it is not prompted with
+your patch, if that was the intention then an option to de/select
+GENERIC_BUG or not is needed:
 
-greg k-h
+arch/arm/Kconfig
+@@ -204,6 +204,10 @@ config MMU
+          Select if you want MMU-based virtualised addressing space
+          support by paged memory management. If unsure, say 'Y'.
+
++config GENERIC_BUG
++       bool "Generic BUG"
++       default y
++       depends on BUG
+
+Regards,
+
+Omar
