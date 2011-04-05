@@ -1,53 +1,69 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Mon, 4 Apr 2011 22:46:58 -0700
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
-	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
-	<4D959058.7010606@codeaurora.org>
-	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
-	<4D981EAB.8070209@codeaurora.org>
-	<BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
-Message-ID: <BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 5 Apr 2011 07:53:04 +0200
+Subject: [PATCH 3/3] video: mxsfb: add DOTCLK polarity configuration
+	support
+In-Reply-To: <20110404154248.GB27933@S2100-06.ap.freescale.net>
+References: <1299341931-30241-1-git-send-email-shawn.guo@freescale.com>
+	<1299341931-30241-4-git-send-email-shawn.guo@freescale.com>
+	<20110404150430.GB13963@pengutronix.de>
+	<20110404154248.GB27933@S2100-06.ap.freescale.net>
+Message-ID: <19866.44608.806212.298794@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 4, 2011 at 7:29 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-...
-> I am using CONFIG_BUG=y, however I don't have CONFIG_DEBUG_BUGVERBOSE
-> and hence I fall into the part which doesn't print the file and the
-> line where the BUG was found.
->
-> With Simon's patch if my .config had:
->
-> CONFIG_BUG=y
-> CONFIG_GENERIC_BUG is not set
+Hi,
 
-In this case the patch is like a nop.
+Shawn Guo writes:
+> On Mon, Apr 04, 2011 at 05:04:30PM +0200, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Sun, Mar 06, 2011 at 12:18:51AM +0800, Shawn Guo wrote:
+> > > The current implementation provides configuration for HSYNC_POL,
+> > > VSYNC_POL and ENABLE_POL via 'sync' of fb_videomode, but DOTCLK_POL
+> > > is missing there.  It's assuming that data sampling at rising/positive
+> > > edge is always the case.  However, it's not true.  For example, the
+> > > panel on mx28evk board (Seiko 43WVF1G) samples data at
+> > > failing/negative edge.  The patch is to add this configuration.
+> > s/failing/falling?
+> > 
+> > > 
+> > > Also, to unify the naming schema of all these polarity configurations
+> > > and match them with the bits name in Reference Manual, a couple of
+> > > definitions are renamed.
+> > > 
+> > > Lastly, to reduce the chance of defining customized 'FB_SYNC_' flag
+> > > by incrementing the preceeding value, the definitions are changed to
+> > > bit shifting way.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/mach-mxs/include/mach/mxsfb.h |    3 ++-
+> > >  drivers/video/mxsfb.c                  |    8 +++++---
+> > >  2 files changed, 7 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-mxs/include/mach/mxsfb.h b/arch/arm/mach-mxs/include/mach/mxsfb.h
+> > > index 923f397..e4d7979 100644
+> > > --- a/arch/arm/mach-mxs/include/mach/mxsfb.h
+> > > +++ b/arch/arm/mach-mxs/include/mach/mxsfb.h
+> > > @@ -24,7 +24,8 @@
+> > >  #define STMLCDIF_18BIT 2 /** pixel data bus to the display is of 18 bit width */
+> > >  #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
+> > >  
+> > > -#define FB_SYNC_DATA_ENABLE_HIGH_ACT	64
+> > > +#define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
+> > > +#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
+>
+s/FAILING/FALLING/
 
-> CONFIG_DEBUG_BUGVERBOSE is not set
->
-> I would fall into the same BUG definition that is causing issues:
->
-> #define BUG() ? ? ? ? ? do { *(int *)0 = 0; } while (1)
->
-> OTOH, is not like "Use generic BUG() handler" gives the choice of
-> removing GENERIC_BUG given that it is not prompted in menuconfig and
-> auto selected, if this is the intention is there any reason to keep
-> the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
-> use it with this patch, right?
 
-Well, er, the intention is that you use the patch. I kept the old code
-around since people can then simply change the Kconfig option and be
-back where they were, as indeed you have. I would be happy to remove
-the old behavior, but I was concerned about a possible roasting in
-this forum. Changing long-established behavior is sometimes tricky.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Regards,
-Simon
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
->
-> Regards,
->
-> Omar
->
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
