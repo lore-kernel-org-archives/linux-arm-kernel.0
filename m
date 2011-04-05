@@ -1,71 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Apr 2011 09:51:18 +0200
-Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
-In-Reply-To: <20110405074754.GB4633@n2100.arm.linux.org.uk>
-References: <20110404171927.GG7285@pengutronix.de>
-	<20110404174244.GH13963@pengutronix.de>
-	<20110404175240.GF22480@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D1C13BB8@AUSP01VMBX24.collaborationhost.net>
-	<20110404181759.GG22480@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
-	<20110405073030.GI13963@pengutronix.de>
-	<20110405074017.GA4633@n2100.arm.linux.org.uk>
-	<20110405074315.GL13963@pengutronix.de>
-	<20110405074754.GB4633@n2100.arm.linux.org.uk>
-Message-ID: <20110405075118.GM13963@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Apr 2011 08:56:22 +0100
+Subject: [PATCH] ARM: type casts update_sched_clock cyc_to_sched_clock
+	cyc_to_fixed_sched_clock
+In-Reply-To: <1301989401-11984-1-git-send-email-j.weitzel@phytec.de>
+References: <1301989401-11984-1-git-send-email-j.weitzel@phytec.de>
+Message-ID: <20110405075622.GB4699@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 08:47:54AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 05, 2011 at 09:43:15AM +0200, Uwe Kleine-K?nig wrote:
-> > On Tue, Apr 05, 2011 at 08:40:17AM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, Apr 05, 2011 at 09:30:30AM +0200, Uwe Kleine-K?nig wrote:
-> > > > I like my approach better, without using mxc specific functions it would
-> > > > look as follows:
-> > > > 
-> > > > struct platform_device *__init gpio_led_register_device(
-> > > > 		const gpio_led_platform_data *pdata)
-> > > > {
-> > > > 	struct platform_device *ret = ERR_PTR(-ENOMEM);
-> > > > 	struct gpio_led_platform_data *_pdata = *pdata;
-> > > > 	_pdata->leds = kmemdup(pdata->leds,
-> > > > 			 pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
-> > > > 
-> > > > 	if (!_pdata->leds)
-> > > > 		return ERR_PTR(-ENOMEM);
-> > > > 
-> > > > 	ret = platform_device_register_resndata(NULL, "leds-gpio", -1,
-> > > > 		NULL, 0, _pdata, sizeof(_pdata));
-> > > > 
-> > > > 	if (IS_ERR(ret))
-> > > > 		kfree(_pdata->leds);
-> > > > 
-> > > > 	return ret;
-> > > > }
-> > > 
-> > > But this is inconsistent.  The gpio_led_platform_data isn't copied,
-> > > but a sub-structure is - which makes this a candidate for people adding
-> > > __initdata to the wrong thing.  Also marking the LEDs array as __initdata
-> > > but leaving the gpio_led_platform_data without __initdata will lead to
-> > > warnings.
-> > platform_device_register_resndata does the copying.
-> 
-> Ok, but you're still modifying the leds pointer in the platform data,
-> which you've also marked as const.  That's an error.
-> 
-> If you want gpio_led_platform_data to be const, you also have to make
-> a copy of it here, even if you have to free it after
-> platform_device_register_resndata().
-This was intended by
+On Tue, Apr 05, 2011 at 09:43:21AM +0200, Jan Weitzel wrote:
+> parameter "u32 mask" type cast befor inversion
 
-	struct gpio_led_platform_data *_pdata = *pdata;
+Nak.  I want a 32-bit all ones quantity.
 
-I'm just fighting with the compiler at this line because it doesn't like
-_pdata being initialized by a const pointer.
+unsigned long long vali = (unsigned short)~0;
+unsigned long long vall = ~(unsigned short)0;
 
-Best regards
-Uwe
+compiles to:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+vali:
+        .word   65535
+        .word   0
+
+vall:
+        .word   -1
+        .word   -1
+
+So moving the ~ to be evaluated after the cast has the effect of making
+the cast pointless, and produces wrong values.  (u32)~0 does the 32-bit
+cast _after_ the inversion which ensures that its always truncated to
+a 32-bit value.
+
+As the function is declared as taking a u32, the cast isn't needed.  If
+the function gets changed to take a u64, the casts will need to be
+re-added.  So, (u32)~0 makes the fact that we want a 32-bit all-ones
+mask explicit.
