@@ -1,86 +1,80 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 5 Apr 2011 14:47:55 +0800
-Subject: [PATCH] video: mxsfb: correct typo 'FAILING' to 'FALLING'
-In-Reply-To: <20110404150430.GB13963@pengutronix.de>
-References: <20110404150430.GB13963@pengutronix.de>
-Message-ID: <1301986075-3168-1-git-send-email-shawn.guo@freescale.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Tue, 05 Apr 2011 07:53:20 +0100
+Subject: [PATCH 1/4] ARM: kprobes: Fix probing of conditionally
+	executed instructions
+In-Reply-To: <alpine.LFD.2.00.1104041647400.28032@xanadu.home>
+References: <1301949198-31570-1-git-send-email-tixy@yxit.co.uk>
+	<1301949198-31570-2-git-send-email-tixy@yxit.co.uk>
+	<alpine.LFD.2.00.1104041647400.28032@xanadu.home>
+Message-ID: <1301986400.2609.26.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-The patch should probably be split into two to separate machine code
-changes from driver ones, but that will result in build failure,
-which could be a problem for bisect, so I keep them as one patch.  
+On Mon, 2011-04-04 at 17:00 -0400, Nicolas Pitre wrote:
+> On Mon, 4 Apr 2011, Tixy wrote:
+> 
+> > diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+> > index 8f6ed43..c88c8d2 100644
+> > --- a/arch/arm/kernel/kprobes-decode.c
+> > +++ b/arch/arm/kernel/kprobes-decode.c
+> > @@ -63,6 +63,7 @@
+> >  
+> >  #include <linux/kernel.h>
+> >  #include <linux/kprobes.h>
+> > +#include "kprobes-decode.h"
+> >  
+> >  #define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
+> >  
+> > @@ -1384,6 +1385,13 @@ space_cccc_111x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+> >  	return INSN_GOOD;
+> >  }
+> >  
+> > +static kprobe_check_cc* const condition_checks[16] = {
+> > +	&__check_eq, &__check_ne, &__check_cs, &__check_cc,
+> > +	&__check_mi, &__check_pl, &__check_vs, &__check_vc,
+> > +	&__check_hi, &__check_ls, &__check_ge, &__check_lt,
+> > +	&__check_gt, &__check_le, &__check_al, &__check_al
+> > +};
+> 
+> Here you create an array of function pointers.
+> 
+> > diff --git a/arch/arm/kernel/kprobes-decode.h b/arch/arm/kernel/kprobes-decode.h
+> > new file mode 100644
+> > index 0000000..d6b4337
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/kprobes-decode.h
+> > @@ -0,0 +1,98 @@
+> > +/*
+> > + * arch/arm/kernel/kprobes-decode.h
+> > + *
+> > + * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +static inline unsigned long __kprobes __check_eq(unsigned long cpsr)
+> > +{
+> > +	return cpsr & PSR_Z_BIT;
+> > +}
+> 
+> And those functions are declared static inline in a header file.
+> 
+> Because the array needs pointers to those functions, there is no way the 
+> compiler will be able to make them inline.  Better put them right before 
+> the array.
 
- arch/arm/mach-mxs/include/mach/mxsfb.h |    2 +-
- arch/arm/mach-mxs/mach-mx23evk.c       |    2 +-
- arch/arm/mach-mxs/mach-mx28evk.c       |    2 +-
- drivers/video/mxsfb.c                  |    6 +++---
- 4 files changed, 6 insertions(+), 6 deletions(-)
+Those functions will also be needed in future for use in a switch
+statement for thumb handling code. I wanted to avoid cut'n'paste of the
+tests.
 
-diff --git a/arch/arm/mach-mxs/include/mach/mxsfb.h b/arch/arm/mach-mxs/include/mach/mxsfb.h
-index e4d7979..491787e 100644
---- a/arch/arm/mach-mxs/include/mach/mxsfb.h
-+++ b/arch/arm/mach-mxs/include/mach/mxsfb.h
-@@ -25,7 +25,7 @@
- #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
- 
- #define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
--#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
-+#define FB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* falling/negtive edge sampling */
- 
- struct mxsfb_platform_data {
- 	struct fb_videomode *mode_list;
-diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-index 214e5b6..bcf24c1 100644
---- a/arch/arm/mach-mxs/mach-mx23evk.c
-+++ b/arch/arm/mach-mxs/mach-mx23evk.c
-@@ -122,7 +122,7 @@ static struct fb_videomode mx23evk_video_modes[] = {
- 		.hsync_len	= 1,
- 		.vsync_len	= 1,
- 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
-+				  FB_SYNC_DOTCLK_FALLING_ACT,
- 	},
- };
- 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index bb329b9..9753e85 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -311,7 +311,7 @@ static struct fb_videomode mx28evk_video_modes[] = {
- 		.hsync_len	= 10,
- 		.vsync_len	= 10,
- 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
-+				  FB_SYNC_DOTCLK_FALLING_ACT,
- 	},
- };
- 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 7d02848..aa27231 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -103,7 +103,7 @@
- #define VDCTRL0_ENABLE_PRESENT		(1 << 28)
- #define VDCTRL0_VSYNC_ACT_HIGH		(1 << 27)
- #define VDCTRL0_HSYNC_ACT_HIGH		(1 << 26)
--#define VDCTRL0_DOTCLK_ACT_FAILING	(1 << 25)
-+#define VDCTRL0_DOTCLK_ACT_FALLING	(1 << 25)
- #define VDCTRL0_ENABLE_ACT_HIGH		(1 << 24)
- #define VDCTRL0_VSYNC_PERIOD_UNIT	(1 << 21)
- #define VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	(1 << 20)
-@@ -453,8 +453,8 @@ static int mxsfb_set_par(struct fb_info *fb_info)
- 		vdctrl0 |= VDCTRL0_VSYNC_ACT_HIGH;
- 	if (fb_info->var.sync & FB_SYNC_DATA_ENABLE_HIGH_ACT)
- 		vdctrl0 |= VDCTRL0_ENABLE_ACT_HIGH;
--	if (fb_info->var.sync & FB_SYNC_DOTCLK_FAILING_ACT)
--		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FAILING;
-+	if (fb_info->var.sync & FB_SYNC_DOTCLK_FALLING_ACT)
-+		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FALLING;
- 
- 	writel(vdctrl0, host->base + LCDC_VDCTRL0);
- 
+If you want, I can put them in the C file now, and move them to a header
+when the thumb code gets released. I guess I should have done that
+anyway, the thumb code could evolve.
+
+I'm still getting use to juggling patches and branches now the ARM fixes
+have interrupted the thumb work.
+
 -- 
-1.7.1
+Tixy 
