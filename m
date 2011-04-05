@@ -1,52 +1,86 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 5 Apr 2011 14:12:13 -0700
-Subject: [PATCH] ARM: tegra: harmony: Register and configure WM8903 IRQ
-	GPIO
-In-Reply-To: <1299875143-19096-1-git-send-email-swarren@nvidia.com>
-References: <1299875143-19096-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0493EB3594@HQMAIL01.nvidia.com>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Tue,  5 Apr 2011 17:38:03 -0400
+Subject: [PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC
+Message-ID: <cover.1302031487.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Friday, March 11, 2011 1:26 PM:
-> Technically, we need to request and configure the GPIO used as the WM8903
-> interrupt. This prevents conflicting registrations, and assures that the
-> GPIO is correctly configured in all cases, e.g. if the bootloader left the
-> GPIO in some unexpected state.
-> 
-> In practice, the previous code works as-is, at least when using ChromeOS's
-> U-Boot as the boot-loader.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+This series for the i2c-davinci driver implements both a register dump and
+a pulsed-SCL recovery of the bus on those controllers that have ICPFUNC
+registers which is, so far, the da850 and da830 based platforms.
 
-Olof,
+I2C "controller timed out" messages were being observed by both myself on the
+da850evm and Bastian Ruppert on some custom da850 hardware [1]. Originally I 
+thought it was the existing pulse-SCL routine but was quickly proven wrong; my
+apologies to John Povey and Philby John for jumping to conclusions.
 
-I think this patch got missed. It's not especially important in practice,
-but the code may as well be complete.
+A discussion was spawned on the e2e forums [2] where Brad Griffis was
+instrumental in the development of the recovery routine proposed by this patch
+series. It was pointed out by him that the da850's i2c controller has the
+ability to control the SDA and SCL pins as GPIOS through its ICPFUNC registers.
+The recovery routine implemented by the patch series toggles the SCL pin and 
+reads the SDA state using the ICPFUNC registers.
 
-Thanks.
+The changes in this series are staged in increments of features and each patch
+depends on the changes introduced by the patch before it with the exception of 
+patch 2/6 which is largely independent of 1/6.
 
-> ---
->  arch/arm/mach-tegra/board-harmony.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-
-> tegra/board-harmony.c
-> index e7c2fea..91178a6 100644
-> --- a/arch/arm/mach-tegra/board-harmony.c
-> +++ b/arch/arm/mach-tegra/board-harmony.c
-> @@ -130,6 +130,9 @@ static void __init harmony_i2c_init(void)
->  	platform_device_register(&tegra_i2c_device3);
->  	platform_device_register(&tegra_i2c_device4);
-> 
-> +	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
-> +	gpio_direction_input(TEGRA_GPIO_CDC_IRQ);
-> +
->  	i2c_register_board_info(0, &wm8903_board_info, 1);
->  }
-> 
-> --
-> 1.7.1
+The real meat of the series in in patch 4/6. First we introduce a register
+dump routine in 1/6 since this information was requested immeadiately by Brad
+Griffis when the conversation began; then the i2c-davinci platform data 
+structure's comments are converted to kerneldoc in 2/6. Then in 3/6 a level of
+indirection is introduced so that the implementation of the recovery procedure
+can be switched at runtime; this level of indirection is used in the subsequent
+patch, 4/6, to execute a pulsed-SCL recovery routine using the ICPFUNC
+registers if they are present. Where the presence of the registers is indicated
+by the platform in a has_pfunc flag in platform data. Finally since all da8xx
+platforms' i2c controllers have the ICPFUNC registers, the da8xx utility
+function to register i2c controllers is modified to set the flag so that the
+new recovery routine is used in all da8xx platforms.
 
--- 
-nvpublic
+I developed this patch against v2.6.38 but I have also tested it against 
+v2.6.39-rc1: it applies cleanly and the recovery routine is executed as it was
+in v2.6.38.
+
+When creating this series I noticed that there are obvious similarities between
+the existing recovery routine implemented by Philby John and John Povey and the
+recovery routine proposed in this series. Testing was performed using the
+ICPFUNC regsiters to toggle SCL as prescribed by the existing routine and it
+was found that the recovery did not work. The method described initially by Brad
+Griffis had the initial state of SCL high and delays of 5us with a maximum of
+8 pulses with a check of SDA each time as compared to the existing routine with
+undetermined SCL initial state, 20us delays and a maximum of 8 pulses. I tested
+and found that if I changed the initial state of SCL or the number of pulses
+(Bastian had success with 16) that the recovery did not occur as expected;
+furthermore Brad pointed out that it was important to check the state of SDA
+after each pulse to see if the slave had released the line. Indeed, adding the
+check of SDA resulted in a quicker recovery. On my da850evm, at least, the
+recovery took only one SCL pulse every time.
+
+It would be nice to consolidate the two recovery routines and -- since they
+are gpio-based -- put the shared recovery routine in i2c-algo-bit so it can
+also be used by bitbanging i2c masters. I did not undertake the former because
+I don't have access to the hardware on which the existing recovery routine was
+tested. I did not undertake the latter since 1) it seems premature until the
+recovery routines are consolidated (or not) and 2) it would require more
+changes of a broad scope which I feared might mire the review process of this
+series which is, at its core, a functioning workaround of an observed problem
+with da850evm hardware (plus some regsiter dumps). It is my hope that both the
+consolidation of the recovery routines and the extraction to common bitbanging
+code can be done in a later series.
+
+[1] http://permalink.gmane.org/gmane.linux.davinci/22291
+[2] http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/p/99895/350610.aspx
+
+Ben Gardiner (6):
+  i2c-davinci: register dump before attempted bus recovery
+  i2c-davinci: convert davinci_i2c_platform_data to kerneldoc
+  i2c-davinci: introduce a dev-> function pointer for scl pulsing
+  i2c-davinci: use the DA8xx's ICPFUNC to toggle I2C as gpio
+  i2c-davinci: if device has pfunc register, dump that group also
+  da8xx: enable the use of the ICPFUNC in i2c-davinci
+
+ arch/arm/mach-davinci/devices-da8xx.c    |    6 +
+ arch/arm/mach-davinci/include/mach/i2c.h |   21 +++-
+ drivers/i2c/busses/i2c-davinci.c         |  155 ++++++++++++++++++++++++++++--
+ 3 files changed, 170 insertions(+), 12 deletions(-)
