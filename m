@@ -1,34 +1,80 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Tue, 5 Apr 2011 13:22:33 +0100 (BST)
-Subject: [RFC PATCH v2] Current status, suspend-to-disk support on ARM
-In-Reply-To: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-Message-ID: <alpine.DEB.2.00.1104051315240.690@localhost6.localdomain6>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue,  5 Apr 2011 18:14:54 +0530
+Subject: [PATCH 1/4] OMAP2+: clockdomain: Add an api to read idle mode
+In-Reply-To: <1302007497-10525-1-git-send-email-rnayak@ti.com>
+References: <1302007497-10525-1-git-send-email-rnayak@ti.com>
+Message-ID: <1302007497-10525-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a clockdomain api to check if hardware supervised
+idle transitions are enabled on a clockdomain.
 
-Updated version of yesterday's core ARM hibernation code bits.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clockdomain.c |   21 +++++++++++++++++++++
+ arch/arm/mach-omap2/clockdomain.h |    3 +++
+ 2 files changed, 24 insertions(+), 0 deletions(-)
 
-I've found that the use of cpu_switch_mm() breaks resume on OMAP3; leaving 
-it out for now. It's unnecessary for direct resume (via kernel command 
-line or TuxOnIce), only needed for uswsusp.
-
-Also, me bad, apologies for posting refactored code one too early ... I've 
-tried many ways of getting the actual swsusp_arch_suspend/resume 
-entrypoints to be C code (and only the absolute essentials assembly), but 
-for the case of swsusp_arch_suspend, assembly entry is mandatory because 
-the framework relies on resuming into to the caller (i.e. no change can be 
-made to the return address / LR reg before storing it, that makes it 
-impossible to use a C wrapper function).
-
-Thanks for any thoughts, feedback, reviews on this.
-
-FrankH.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: hibernate-core-05Apr2011.patch
-Type: text/x-diff
-Size: 9758 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110405/ed330412/attachment-0001.bin>
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index ab87854..1de6def 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -795,6 +795,27 @@ void clkdm_deny_idle(struct clockdomain *clkdm)
+ 	arch_clkdm->clkdm_deny_idle(clkdm);
+ }
+ 
++/**
++ * clkdm_is_idle - Check if the clkdm hwsup/autoidle is enabled
++ * @clkdm: struct clockdomain *
++ *
++ * Returns true if the clockdomain is in hardware-supervised
++ * idle mode, or 0 otherwise.
++ *
++ */
++int clkdm_is_idle(struct clockdomain *clkdm)
++{
++	if (!clkdm)
++		return -EINVAL;
++
++	if (!arch_clkdm || !arch_clkdm->clkdm_is_idle)
++		return -EINVAL;
++
++	pr_debug("clockdomain: reading idle state for %s\n", clkdm->name);
++
++	return arch_clkdm->clkdm_is_idle(clkdm);
++}
++
+ 
+ /* Clockdomain-to-clock framework interface code */
+ 
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index 85b3dce..2fe3412 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -138,6 +138,7 @@ struct clockdomain {
+  * @clkdm_wakeup: Force a clockdomain to wakeup
+  * @clkdm_allow_idle: Enable hw supervised idle transitions for clock domain
+  * @clkdm_deny_idle: Disable hw supervised idle transitions for clock domain
++ * @clkdm_is_idle: Check if hw supervised idle transitions are enabled
+  * @clkdm_clk_enable: Put the clkdm in right state for a clock enable
+  * @clkdm_clk_disable: Put the clkdm in right state for a clock disable
+  */
+@@ -154,6 +155,7 @@ struct clkdm_ops {
+ 	int	(*clkdm_wakeup)(struct clockdomain *clkdm);
+ 	void	(*clkdm_allow_idle)(struct clockdomain *clkdm);
+ 	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
++	int	(*clkdm_is_idle)(struct clockdomain *clkdm);
+ 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
+ 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
+ };
+@@ -177,6 +179,7 @@ int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm);
+ 
+ void clkdm_allow_idle(struct clockdomain *clkdm);
+ void clkdm_deny_idle(struct clockdomain *clkdm);
++int clkdm_is_idle(struct clockdomain *clkdm);
+ 
+ int clkdm_wakeup(struct clockdomain *clkdm);
+ int clkdm_sleep(struct clockdomain *clkdm);
+-- 
+1.7.0.4
