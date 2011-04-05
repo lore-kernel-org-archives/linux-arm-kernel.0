@@ -1,58 +1,115 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 5 Apr 2011 09:43:22 -0700
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
-	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
-	<4D959058.7010606@codeaurora.org>
-	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
-	<4D981EAB.8070209@codeaurora.org>
-	<BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
-	<BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
-	<BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
-Message-ID: <BANLkTima5DM6gm-1E_uGsM3cqPGd-U_how@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 5 Apr 2011 17:49:28 +0100
+Subject: RFC: Status of kernel/fiq.c
+In-Reply-To: <20110405162443.GA11737@n2100.arm.linux.org.uk>
+References: <20110405160546.GA7976@arm.com>
+	<20110405162443.GA11737@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTine4UQjcDNDa_ECBbFQL+2RD0tXmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 5, 2011 at 9:02 AM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> Hi,
->
-> On Tue, Apr 5, 2011 at 12:46 AM, Simon Glass <sjg@chromium.org> wrote:
->> On Mon, Apr 4, 2011 at 7:29 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
->> ...
-
->>> OTOH, is not like "Use generic BUG() handler" gives the choice of
->>> removing GENERIC_BUG given that it is not prompted in menuconfig and
->>> auto selected, if this is the intention is there any reason to keep
->>> the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
->>> use it with this patch, right?
+On Tue, Apr 5, 2011 at 5:24 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 05, 2011 at 05:05:47PM +0100, Dave Martin wrote:
+>> Hi all,
 >>
->> Well, er, the intention is that you use the patch. I kept the old code
->> around since people can then simply change the Kconfig option and be
->> back where they were, as indeed you have. I would be happy to remove
->> the old behavior, but I was concerned about a possible roasting in
->> this forum. Changing long-established behavior is sometimes tricky.
+>> I've hit a Thumb-2 compatibility issue in the assembler functions
+>> in kernel/fiq.c, and I'm wondering how to proceed.
+>>
+>> With regard to set_fiq_regs() and get_fiq_regs(), does anyone know:
+>>
+>> ? * whether we still need the stack frame manipulation code in this
+>> ? ? ? leaf function, e.g.
+>>
+>> ? ? ? ? "mov ? ?ip, sp\n\
+>> ? ? ? ? stmfd ?sp!, {fp, ip, lr, pc}\n\
+>> ? ? ? ? sub ? ?fp, ip, #4\n\
 >
-> Yes, but you can't change the Kconfig because it is not prompted with
-> your patch, if that was the intention then an option to de/select
-> GENERIC_BUG or not is needed:
->
-> arch/arm/Kconfig
-> @@ -204,6 +204,10 @@ config MMU
-> ? ? ? ? ?Select if you want MMU-based virtualised addressing space
-> ? ? ? ? ?support by paged memory management. If unsure, say 'Y'.
->
-> +config GENERIC_BUG
-> + ? ? ? bool "Generic BUG"
-> + ? ? ? default y
-> + ? ? ? depends on BUG
+> That's the standard APCS stack frame. ?Look at the function closely
+> and you'll notice that its declared NAKED, so the compiler doesn't
+> generate anything for it. ?So we have to do this by hand.
 
-Yes that's right, it is a manual edit. But if there are no objections
-I will create a patch to remove this and replace the old bug
-infrastructure entirely. - Simon
+I guess my question was more whether it's necessary to generate the
+stack frame at all for a leaf function such as this -- partly because
+the instruction forms involved are themselves deprecated in v7 (lr and
+pc in the same ldm/stm, stm of the pc).  We can code around that, but
+it gets increasingly ugly.
+
+I guess it we get a fault while transferring the registers, the stack
+frame might be needed in order to get an intelligible crash dump, but
+otherwise... ?
+
+For Thumb-2 it's not applicable of course, since we don't have
+APCS-style stack frames there; and since coding the equivalent code in
+Thumb would be painful my preference would be to #ifdef it out.
 
 >
-> Regards,
+>> ? * what the nop (mov r0,r0) after the CPSR writes is for
+>> ? ? ? ? (I'm guessing there may have been some 1-instruction hazard
+>> ? ? ? ? here for some old processors, but I'm not aware of a need
+>> ? ? ? ? for this in anything current.)
 >
-> Omar
+> You're correct, and its for ARMv3 CPUs. ?After writing the CPSR you
+> have to wait one cycle before accessing the banked registers. ?On
+> other platforms that has been solved so the nop is harmless even
+> though it's not necessary. ?Simplification of code dictates that we
+> don't try to ifdef it.
+
+OK; it's harmless to leave that instruction in there, but it's
+interesting to know.
+
 >
+>> ? * should anyone be using fiq.c on v7 platforms?
+>
+> Is the FIQ wired to anything useful on ARMv7.
+
+FIQ gets used by TrustZone on platforms which use it, so I think it's
+becoming less common to use it for normal peripherals.  The latency
+difference between IRC and FIQ is also less important in more recent
+platforms, so I think it's generally seeing less use.
+
+I need to check my config -- maybe CONFIG_FIQ is getting pulled in
+inappropriately.
+
+set_fiq_regs() for example isn't used by much...
+
+linux$ git grep set_fiq_regs
+arch/arm/include/asm/fiq.h:extern void set_fiq_regs(struct pt_regs *regs);
+arch/arm/kernel/fiq.c:void __naked set_fiq_regs(struct pt_regs *regs)
+arch/arm/kernel/fiq.c:EXPORT_SYMBOL(set_fiq_regs);
+arch/arm/mach-omap1/ams-delta-fiq.c:	set_fiq_regs(&FIQ_regs);
+arch/arm/mach-rpc/dma.c:	set_fiq_regs(&regs);
+drivers/media/video/mx1_camera.c:	set_fiq_regs(&regs);
+drivers/spi/spi_s3c24xx.c:	set_fiq_regs(&regs);
+sound/soc/imx/imx-pcm-fiq.c:	set_fiq_regs(&regs);
+
+>
+>> As the code stands, it could also go wrong if the compiler
+>> happens to allocate r8-r12 or lr for one of the inline asm
+>> constraints -- though this is pretty unlikely to happen, and
+>> I doubt if it ever has happened in practice.
+>
+> Actually, that goes for r8 to r14 inclusive - as we switch the CPU mode to
+> FIQ, we lose access to any values held in those registers prior to the
+> assembly block being started.
+
+True -- I was assuming that the compiler won't touch sp for register
+allocation purposes, though the fact that we temporarily switch out
+this register provides yet another reason why the compiler shouldn't
+touch it (albeit a reason the compiler doesn't know about).
+
+>
+> The only possibility of it being unsafe is if the compiler allocates 'ip'
+> for 'tmp'. ?We could work around that by getting rid of 'tmp' or telling
+> the compiler that 'tmp' is a register variable and it will be r3.
+>
+
+That was basically my fix too.  Using the same style as the existing
+code but using register variables with explicit register assignments
+keeps things pretty clear.
+
+I find it hard to imagine the compiler being so crazy in its register
+allocation, but there are occasional surprises...
+
+Cheers
+---Dave
