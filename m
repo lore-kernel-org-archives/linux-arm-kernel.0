@@ -1,66 +1,51 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Tue, 5 Apr 2011 11:02:56 -0500
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
-	<BANLkTimtAcPLmcFKoHkCtWcJipy+rSSP+A@mail.gmail.com>
-	<4D959058.7010606@codeaurora.org>
-	<BANLkTim8GhUAZ7L-MiJiqi6xM=P_Q8kqfg@mail.gmail.com>
-	<4D981EAB.8070209@codeaurora.org>
-	<BANLkTimhk_G0fapzHAf0Gc-XhqT0qu+VbQ@mail.gmail.com>
-	<BANLkTinvbd9hmcsxhWQtM70uBzgv7sESTQ@mail.gmail.com>
-Message-ID: <BANLkTik3Rf_NUNnqQLPxRdokJzFLcZPK9w@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 5 Apr 2011 17:05:47 +0100
+Subject: RFC: Status of kernel/fiq.c
+Message-ID: <20110405160546.GA7976@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Tue, Apr 5, 2011 at 12:46 AM, Simon Glass <sjg@chromium.org> wrote:
-> On Mon, Apr 4, 2011 at 7:29 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> ...
->> I am using CONFIG_BUG=y, however I don't have CONFIG_DEBUG_BUGVERBOSE
->> and hence I fall into the part which doesn't print the file and the
->> line where the BUG was found.
->>
->> With Simon's patch if my .config had:
->>
->> CONFIG_BUG=y
->> CONFIG_GENERIC_BUG is not set
->
-> In this case the patch is like a nop.
->
->> CONFIG_DEBUG_BUGVERBOSE is not set
->>
->> I would fall into the same BUG definition that is causing issues:
->>
->> #define BUG() ? ? ? ? ? do { *(int *)0 = 0; } while (1)
->>
->> OTOH, is not like "Use generic BUG() handler" gives the choice of
->> removing GENERIC_BUG given that it is not prompted in menuconfig and
->> auto selected, if this is the intention is there any reason to keep
->> the #else part of /* not CONFIG_GENERIC_BUG */? there is no way we can
->> use it with this patch, right?
->
-> Well, er, the intention is that you use the patch. I kept the old code
-> around since people can then simply change the Kconfig option and be
-> back where they were, as indeed you have. I would be happy to remove
-> the old behavior, but I was concerned about a possible roasting in
-> this forum. Changing long-established behavior is sometimes tricky.
+I've hit a Thumb-2 compatibility issue in the assembler functions
+in kernel/fiq.c, and I'm wondering how to proceed.
 
-Yes, but you can't change the Kconfig because it is not prompted with
-your patch, if that was the intention then an option to de/select
-GENERIC_BUG or not is needed:
+With regard to set_fiq_regs() and get_fiq_regs(), does anyone know:
 
-arch/arm/Kconfig
-@@ -204,6 +204,10 @@ config MMU
-          Select if you want MMU-based virtualised addressing space
-          support by paged memory management. If unsure, say 'Y'.
+  * whether we still need the stack frame manipulation code in this
+	leaf function, e.g.
 
-+config GENERIC_BUG
-+       bool "Generic BUG"
-+       default y
-+       depends on BUG
+        "mov    ip, sp\n\
+        stmfd  sp!, {fp, ip, lr, pc}\n\
+        sub    fp, ip, #4\n\
 
-Regards,
+	etc.
 
-Omar
+  * what the nop (mov r0,r0) after the CPSR writes is for
+        (I'm guessing there may have been some 1-instruction hazard
+        here for some old processors, but I'm not aware of a need
+        for this in anything current.)
+
+  * should anyone be using fiq.c on v7 platforms?
+
+As the code stands, it could also go wrong if the compiler
+happens to allocate r8-r12 or lr for one of the inline asm
+constraints -- though this is pretty unlikely to happen, and
+I doubt if it ever has happened in practice.
+
+
+To make this Thumb-2/v7 compatible, I'd prefer to recode a single
+version that works for ARM and Thumb and avoids deprecated
+instruction forms, but that may result in some ugly ifdefs to work
+around the stack frame manipulation etc., unless we can conclude
+that that code isn't needed.
+
+Splitting these functions out into a separate assembler file might
+also make sense, since that makes it impossible for the compiler
+to mess things up, and makes is possible to use ARM()/THUMB()
+which is a bit cleaner than #ifdefs.
+
+Comments welcome.
+
+Cheers
+---Dave
