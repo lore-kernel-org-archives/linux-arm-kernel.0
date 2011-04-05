@@ -1,70 +1,158 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 5 Apr 2011 08:50:28 -0600
-Subject: [PATCH v2] arm/dt: Add a make rule to build dtb for enabled boards
-In-Reply-To: <20110405070904.GB28171@S2100-06.ap.freescale.net>
-References: <1301929307-1838-1-git-send-email-shawn.guo@linaro.org>
-	<20110405044827.GA28817@ponder.secretlab.ca>
-	<20110405070904.GB28171@S2100-06.ap.freescale.net>
-Message-ID: <20110405145028.GD30849@ponder.secretlab.ca>
+From: mmarek@suse.cz (Michal Marek)
+Date: Tue,  5 Apr 2011 16:58:47 +0200
+Subject: [PATCH 00/34] Make kernel build deterministic
+Message-ID: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 03:09:05PM +0800, Shawn Guo wrote:
-> On Mon, Apr 04, 2011 at 10:48:27PM -0600, Grant Likely wrote:
-> > On Mon, Apr 04, 2011 at 11:01:47PM +0800, Shawn Guo wrote:
-> > > With 'make ARCH=arm dtb', it builds Device Tree Blobs for those boards
-> > > enabled by build CONFIG.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > > It's based on commit fe8e6d0b0e601ca0a63fe768d4b812d5a45a9da7
-> > > "arm/dt: Add dtb make rule" from Rob Herring.  And it works against
-> > > Linaro kernel tree.  But it needs to go through mainline review
-> > > before it gets applied.
-> > > 
-> > > Changes since v1:
-> > > * Take suggestion from Rob Herring to move .dts dection into machine
-> > >   sepcific Makefile.boot, so that arch/arm/boot/Makefile can be as
-> > >   clean as it is.
-> > 
-> > Looks good, some minor comments below, but I've picked it up and asked
-> > Nicolas to merge it.
-> > 
-> > Cheers,
-> > g.
-> > 
-> > > 
-> > >  arch/arm/Makefile                     |    3 +++
-> > >  arch/arm/boot/Makefile                |    2 ++
-> > >  arch/arm/mach-exynos4/Makefile.boot   |    2 ++
-> > >  arch/arm/mach-mx5/Makefile.boot       |    5 +++++
-> > >  arch/arm/mach-omap2/Makefile.boot     |    4 ++++
-> > >  arch/arm/mach-tegra/Makefile.boot     |    2 ++
-> > >  arch/arm/mach-versatile/Makefile.boot |    2 ++
-> > >  7 files changed, 20 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > > index d51ab6c..7fd2af9 100644
-> > > --- a/arch/arm/Makefile
-> > > +++ b/arch/arm/Makefile
-> > > @@ -292,6 +292,9 @@ zinstall uinstall install: vmlinux
-> > >  %.dtb:
-> > >  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> > >  
-> > > +dtb:
-> > > +	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> > > +
-> > 
-> > Since the target is the same, I've merged this rule with the %.dtb
-> > rule.  I also renamed the target 'dtbs' because it will build more
-> > than one .dtb file.
-> > 
-> I started with 'dtbs' as target name, and later changed it to 'dtb'
-> to align with $(dtb-y).  And 'dtbs' looks truly fine for me, but you
-> may want to change commit message accordingly, as there is
-> 'make ARCH=arm dtb' in it.
 
-Thanks, fixed in my devicetree/test tree and also added something to
-the help text.
+Hi,
 
-g.
+this series makes it possible to build bit-identical kernel image and
+modules from identical sources. Of course the build is already
+deterministic in terms of behavior of the code, but the various
+timestamps embedded in the object files make it hard to compare two
+builds, for instance to verify that a makefile cleanup didn't
+accidentally change something. A prime example is /proc/config.gz, which
+has both a timestamp in the gzip header and a timestamp in the payload
+data. With this series applied, a script like this will produce
+identical kernels each time:
+
+#!/bin/bash
+rm -rf /dev/shm/{source,build}{,1,2}
+export KCONFIG_NOTIMESTAMP=1
+export KBUILD_BUILD_TIMESTAMP='Sun May  1 12:00:00 CEST 2011'
+export KBUILD_BUILD_USER=user
+export KBUILD_BUILD_HOST=host
+export ROOT_DEV=FLOPPY
+for i in 1 2; do
+	mkdir /dev/shm/source
+	# randomize the inode order just for fun
+	git ls-tree -r -z --name-only HEAD | sort -R -z | xargs -0 \
+		cp --parents --target=/dev/shm/source
+	pushd /dev/shm/source
+	mkdir /dev/shm/build
+	>/dev/shm/build/all.config
+	for opt in GCOV_KERNEL UBIFS_FS_DEBUG; do
+		echo "# CONFIG_$opt is not set" >>"/dev/shm/build"/all.config
+	done
+	make O="/dev/shm/build" KCONFIG_ALLCONFIG=1 allmodconfig
+	make O="/dev/shm/build" -j64
+	popd
+	mv /dev/shm/source /dev/shm/source$i
+	mv /dev/shm/build /dev/shm/build$i
+done
+diff -rq /dev/shm/build{1,2}
+
+Unfortunatelly, this cannot be used to validate indentation-only
+patches, even if CONFIG_DEBUG_INFO is turned off. This is because of the
+__FILE__ and __LINE__ macros used in many places. For the same reason,
+the source and build directory needs to be the same, otherwise the
+results will differ. This was tested on
+x86_64/{defconfig,allmodconfig,allyesconfig} and ppc64/defconfig. The
+series is also available at
+
+git://git.kernel.org/pub/scm/linux/kernel/git/mmarek/kbuild-2.6.git deterministic-build-v1
+
+Michal
+
+
+Michal Marek (34):
+  kconfig: Do not record timestamp in auto.conf and autoconf.h
+  kbuild: Call gzip with -n
+  powerpc: Call gzip with -n
+  kbuild: Use the deterministic mode of ar
+  powerpc: Use the deterministic mode of ar
+  kbuild: Drop unused LINUX_COMPILE_TIME and LINUX_COMPILE_DOMAIN
+    macros
+  kbuild: Allow to override LINUX_COMPILE_BY and LINUX_COMPILE_HOST
+    macros
+  initramfs: Use KBUILD_BUILD_TIMESTAMP for generated entries
+  x86: Allow to override the ROOT_DEV variable
+  cyclades: Drop __TIME__ usage
+  nozomi: Drop __TIME__ usage
+  isdn/diva: Drop __TIME__ usage
+  media/radio-maxiradio: Drop __TIME__ usage
+  media/cx231xx: Drop __TIME__ usage
+  baycom: Drop __TIME__ usage
+  nand/denali: Drop __TIME__ usage
+  hdlcdrv: Drop __TIME__ usage
+  wan/pc300: Drop __TIME__ usage
+  rt2x00: Drop __TIME__ usage
+  parport: Drop __TIME__ usage
+  aacraid: Drop __TIME__ usage
+  scsi/in2000: Drop __TIME__ usage
+  scsi/wd33c93: Drop __TIME__ usage
+  usb/u132-hcd: Drop __TIME__ usage
+  usb/ftdi-elan: Drop __TIME__ usage
+  dlm: Drop __TIME__ usage
+  gfs2: Drop __TIME__ usage
+  atm: Drop __TIME__ usage
+  tipc: Drop __TIME__ usage
+  rio: Drop __DATE__ usage
+  edac: Drop __DATE__ usage
+  pmcraid: Drop __DATE__ usage
+  usb/lh7a40x_udc: Drop __DATE__ usage
+  checkpatch: Warn about usage of __DATE__, __TIME__ and __TIMESTAMP__
+
+ Documentation/kbuild/kbuild.txt              |   12 ++++++++++
+ arch/powerpc/boot/Makefile                   |    2 +-
+ arch/powerpc/boot/wrapper                    |    6 ++--
+ arch/x86/boot/Makefile                       |    2 +-
+ drivers/char/cyclades.c                      |    3 +-
+ drivers/char/nozomi.c                        |    3 +-
+ drivers/char/rio/rioinit.c                   |    2 +-
+ drivers/edac/amd76x_edac.c                   |    2 +-
+ drivers/edac/amd8111_edac.c                  |    2 +-
+ drivers/edac/amd8131_edac.c                  |    2 +-
+ drivers/edac/cpc925_edac.c                   |    2 +-
+ drivers/edac/e752x_edac.c                    |    2 +-
+ drivers/edac/e7xxx_edac.c                    |    2 +-
+ drivers/edac/edac_module.c                   |    2 +-
+ drivers/edac/i5000_edac.c                    |    2 +-
+ drivers/edac/i5400_edac.c                    |    2 +-
+ drivers/edac/i7300_edac.c                    |    2 +-
+ drivers/edac/i7core_edac.c                   |    2 +-
+ drivers/edac/i82860_edac.c                   |    2 +-
+ drivers/edac/i82875p_edac.c                  |    2 +-
+ drivers/edac/i82975x_edac.c                  |    2 +-
+ drivers/edac/mpc85xx_edac.h                  |    2 +-
+ drivers/edac/mv64x60_edac.h                  |    2 +-
+ drivers/edac/ppc4xx_edac.c                   |    2 +-
+ drivers/edac/r82600_edac.c                   |    2 +-
+ drivers/isdn/hardware/eicon/divasfunc.c      |    5 +--
+ drivers/media/radio/radio-maxiradio.c        |    3 +-
+ drivers/media/video/cx231xx/cx231xx-avcore.c |    2 +-
+ drivers/mtd/nand/denali.c                    |    3 +-
+ drivers/net/hamradio/baycom_epp.c            |    2 +-
+ drivers/net/hamradio/baycom_par.c            |    2 +-
+ drivers/net/hamradio/baycom_ser_fdx.c        |    2 +-
+ drivers/net/hamradio/baycom_ser_hdx.c        |    2 +-
+ drivers/net/hamradio/hdlcdrv.c               |    2 +-
+ drivers/net/wan/pc300_drv.c                  |    3 +-
+ drivers/net/wireless/rt2x00/rt2x00debug.c    |    1 -
+ drivers/parport/parport_ip32.c               |    1 -
+ drivers/scsi/aacraid/linit.c                 |    3 +-
+ drivers/scsi/in2000.c                        |    2 +-
+ drivers/scsi/pmcraid.c                       |    9 +++----
+ drivers/scsi/pmcraid.h                       |    1 -
+ drivers/scsi/wd33c93.c                       |    7 ++---
+ drivers/usb/gadget/lh7a40x_udc.c             |    7 ++---
+ drivers/usb/host/u132-hcd.c                  |    3 +-
+ drivers/usb/misc/ftdi-elan.c                 |    3 +-
+ fs/dlm/main.c                                |    2 +-
+ fs/gfs2/main.c                               |    2 +-
+ net/atm/lec.c                                |    2 +-
+ net/atm/mpc.c                                |    2 +-
+ net/tipc/core.c                              |    3 +-
+ scripts/Makefile.build                       |    4 +-
+ scripts/Makefile.lib                         |    2 +-
+ scripts/checkpatch.pl                        |    5 ++++
+ scripts/gen_initramfs_list.sh                |    8 +++++-
+ scripts/kconfig/confdata.c                   |    8 +-----
+ scripts/mkcompile_h                          |   30 ++++++++++++-------------
+ usr/gen_init_cpio.c                          |   17 +++++++++-----
+ 57 files changed, 109 insertions(+), 105 deletions(-)
+
+-- 
+1.7.4.1
