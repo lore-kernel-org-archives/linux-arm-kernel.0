@@ -1,250 +1,142 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Apr 2011 16:06:44 +0200
-Subject: [PATCH 1/7] ARM: EXYNOS4: power domains: fixes and code cleanup
-In-Reply-To: <1302012410-17984-1-git-send-email-m.szyprowski@samsung.com>
-References: <1302012410-17984-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1302012410-17984-2-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 05 Apr 2011 16:06:43 +0200
+Subject: [RFC/PATCH v2 0/7] Samsung IOMMU videobuf2 allocator and s5p-fimc
+	update
+Message-ID: <1302012410-17984-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Stanislawski <t.stanislaws@samsung.com>
+Hello,
 
-This patch extends power domain driver with support for enabling and
-disabling modules in S5P_CLKGATE_BLOCK register. It also performs a
-little code cleanup to avoid confusion between exynos4_device_pd array
-index and power domain id.
+This is a second version of the Samsung IOMMU driver, videobuf2
+allocator for IOMMU mapped memory and FIMC driver update. The main
+change from the previous version is a complete rewrite of the IOMMU
+driver API. As suggested by Arnd Bergmann we decided to drop the custom
+interface and use the kernel wide, common iommu API defined in
+linux/include/iommu.h. This way the videobuf2 iommu allocator become
+much more generic framework, because it is no longer tied to any
+particular iommu implementation.
 
-Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-exynos4/dev-pd.c                  |   93 +++++++++++++++++------
- arch/arm/mach-exynos4/include/mach/regs-clock.h |    7 ++
+This patch series introduces new type of videbuf2 memory allocator -
+vb2-dma-iommu. This allocator can be used on the platforms that support
+linux/include/iommu.h style IOMMU driver. An IOMMU driver for Samsung
+EXYNOS4 (called SYSMMU) platform is also included. The allocator and
+IOMMU driver is then used by s5p-fimc driver. To make it possible some
+additional changes are required. Mainly the platform support for s5p-fimc
+for EXYNOS4 machines need to be defined. The proposed solution has been
+tested on Universal C210 board (Samsung S5PC210/EXYNOS4 based).
+This IOMMU allocator has no dependences on any external subsystems.
+
+We also ported s5p-mfc and s5p-tv drivers to this allocator, they will
+be posted in separate patch series. This will enable to get them working
+on mainline Linux kernel for EXYNOS4 platform. Support for
+S5PV210/S5PC110 platform still depends on CMA allocator that needs more
+discussion on memory management mailing list and further development.
+The patches with updated s5p-mfc and s5p-tv drivers will follow.
+
+To get FIMC module working on EXYNOS4 platform on UniversalC210 board we
+also added support for power domains and power gating.
+
+This patch series contains a collection of patches for various platform
+subsystems. Here is a detailed list:
+
+[PATCH 1/7] ARM: EXYNOS4: power domains: fixes and code cleanup
+- adds support for block gating in Samsung power domain driver and
+  performs some cleanup
+
+[PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU) driver
+- a complete rewrite of sysmmu driver for Samsung platform, now uses
+  linux/include/iommu.h api
+
+[PATCH 3/7] v4l: videobuf2: dma-sg: move some generic functions to memops
+- a little cleanup and preparations for the dma-iommu allocator
+
+[PATCH 4/7] v4l: videobuf2: add IOMMU based DMA memory allocator
+- introduces new memory allocator for videobuf2 for drivers that support
+  iommu dma memory mappings
+
+[PATCH 5/7] v4l: s5p-fimc: add pm_runtime support
+- adds support for pm_runtime in s5p-fimc driver
+
+[PATCH 6/7] v4l: s5p-fimc: Add support for vb2-dma-iommu allocator
+- adds support for the newly introduces videbuf2-s5p-iommu allocator
+  on EXYNOS4 platform
+
+[PATCH 7/7] ARM: EXYNOS4: enable FIMC on Universal_C210
+- adds all required machine definitions to get FIMC modules working
+  on Universal C210 boards
+
+
+Changelog:
+
+V2:
+ - custom SYSMMU interface has been dropped in favour of linux/include/iommu.h
+   and rewritten SYSMMU driver again
+ - added support to SYSMMU for mapping pages larger than 4Kb
+ - dropped ARM shared mode
+ - videobuf2-s5p-iommu allocator has been renamed to videobuf2-dma-iommu,
+   because it has no dependenco on any Samsung platform specific API,
+   the allocator still uses only 4Kb pages, but this will be changed in the
+   next version
+ - dropped FIMC platform patch that have been merged mainline
+ - rebased all patches onto Linux kernel v2.6.39-rc1
+
+V1: http://www.spinics.net/lists/linux-media/msg29751.html
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+
+Complete patch summary:
+
+Andrzej Pietrasiewicz (3):
+  ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU) driver
+  v4l: videobuf2: dma-sg: move some generic functions to memops
+  v4l: videobuf2: add IOMMU based DMA memory allocator
+
+Marek Szyprowski (3):
+  v4l: s5p-fimc: add pm_runtime support
+  v4l: s5p-fimc: Add support for vb2-dma-iommu allocator
+  ARM: EXYNOS4: enable FIMC on Universal_C210
+
+Tomasz Stanislawski (1):
+  ARM: EXYNOS4: power domains: fixes and code cleanup
+
+ arch/arm/mach-exynos4/Kconfig                   |    6 +
+ arch/arm/mach-exynos4/clock.c                   |   68 +-
+ arch/arm/mach-exynos4/dev-pd.c                  |   93 ++-
+ arch/arm/mach-exynos4/dev-sysmmu.c              |  615 ++++++++-----
+ arch/arm/mach-exynos4/include/mach/irqs.h       |   35 +-
+ arch/arm/mach-exynos4/include/mach/regs-clock.h |    7 +
+ arch/arm/mach-exynos4/include/mach/sysmmu.h     |   46 -
+ arch/arm/mach-exynos4/mach-universal_c210.c     |   22 +
+ arch/arm/plat-s5p/Kconfig                       |   20 +-
+ arch/arm/plat-s5p/include/plat/sysmmu.h         |  165 ++--
+ arch/arm/plat-s5p/sysmmu.c                      | 1103 ++++++++++++++++-------
+ arch/arm/plat-samsung/include/plat/devs.h       |    2 +-
  arch/arm/plat-samsung/include/plat/pd.h         |    1 +
- 3 files changed, 79 insertions(+), 22 deletions(-)
+ drivers/media/video/Kconfig                     |   11 +-
+ drivers/media/video/Makefile                    |    1 +
+ drivers/media/video/s5p-fimc/fimc-capture.c     |    9 +-
+ drivers/media/video/s5p-fimc/fimc-core.c        |   38 +-
+ drivers/media/video/s5p-fimc/fimc-core.h        |    1 +
+ drivers/media/video/s5p-fimc/fimc-mem.h         |  103 +++
+ drivers/media/video/videobuf2-dma-iommu.c       |  469 ++++++++++
+ drivers/media/video/videobuf2-dma-sg.c          |   37 +-
+ drivers/media/video/videobuf2-memops.c          |   76 ++
+ include/media/videobuf2-dma-iommu.h             |   48 +
+ include/media/videobuf2-memops.h                |    5 +
+ 24 files changed, 2180 insertions(+), 801 deletions(-)
+ rewrite arch/arm/mach-exynos4/dev-sysmmu.c (88%)
+ delete mode 100644 arch/arm/mach-exynos4/include/mach/sysmmu.h
+ rewrite arch/arm/plat-s5p/include/plat/sysmmu.h (83%)
+ rewrite arch/arm/plat-s5p/sysmmu.c (87%)
+ create mode 100644 drivers/media/video/s5p-fimc/fimc-mem.h
+ create mode 100644 drivers/media/video/videobuf2-dma-iommu.c
+ create mode 100644 include/media/videobuf2-dma-iommu.h
 
-diff --git a/arch/arm/mach-exynos4/dev-pd.c b/arch/arm/mach-exynos4/dev-pd.c
-index 3273f25..44c6597 100644
---- a/arch/arm/mach-exynos4/dev-pd.c
-+++ b/arch/arm/mach-exynos4/dev-pd.c
-@@ -16,13 +16,17 @@
- #include <linux/delay.h>
- 
- #include <mach/regs-pmu.h>
-+#include <mach/regs-clock.h>
- 
- #include <plat/pd.h>
- 
-+static DEFINE_SPINLOCK(gate_block_slock);
-+
- static int exynos4_pd_enable(struct device *dev)
- {
- 	struct samsung_pd_info *pdata =  dev->platform_data;
- 	u32 timeout;
-+	int ret = 0;
- 
- 	__raw_writel(S5P_INT_LOCAL_PWR_EN, pdata->base);
- 
-@@ -31,21 +35,39 @@ static int exynos4_pd_enable(struct device *dev)
- 	while ((__raw_readl(pdata->base + 0x4) & S5P_INT_LOCAL_PWR_EN)
- 		!= S5P_INT_LOCAL_PWR_EN) {
- 		if (timeout == 0) {
--			printk(KERN_ERR "Power domain %s enable failed.\n",
--				dev_name(dev));
--			return -ETIMEDOUT;
-+			dev_err(dev, "enable failed\n");
-+			ret = -ETIMEDOUT;
-+			goto done;
- 		}
- 		timeout--;
- 		udelay(100);
- 	}
- 
--	return 0;
-+	/* configure clk gate mask if it is present */
-+	if (pdata->gate_mask) {
-+		unsigned long flags;
-+		unsigned long value;
-+
-+		spin_lock_irqsave(&gate_block_slock, flags);
-+
-+		value  = __raw_readl(S5P_CLKGATE_BLOCK);
-+		value |= pdata->gate_mask;
-+		__raw_writel(value, S5P_CLKGATE_BLOCK);
-+
-+		spin_unlock_irqrestore(&gate_block_slock, flags);
-+	}
-+
-+done:
-+	dev_info(dev, "enable finished\n");
-+
-+	return ret;
- }
- 
- static int exynos4_pd_disable(struct device *dev)
- {
- 	struct samsung_pd_info *pdata =  dev->platform_data;
- 	u32 timeout;
-+	int ret = 0;
- 
- 	__raw_writel(0, pdata->base);
- 
-@@ -53,81 +75,108 @@ static int exynos4_pd_disable(struct device *dev)
- 	timeout = 10;
- 	while (__raw_readl(pdata->base + 0x4) & S5P_INT_LOCAL_PWR_EN) {
- 		if (timeout == 0) {
--			printk(KERN_ERR "Power domain %s disable failed.\n",
--				dev_name(dev));
--			return -ETIMEDOUT;
-+			dev_err(dev, "disable failed\n");
-+			ret = -ETIMEDOUT;
-+			goto done;
- 		}
- 		timeout--;
- 		udelay(100);
- 	}
- 
--	return 0;
-+	if (pdata->gate_mask) {
-+		unsigned long flags;
-+		unsigned long value;
-+
-+		spin_lock_irqsave(&gate_block_slock, flags);
-+
-+		value  = __raw_readl(S5P_CLKGATE_BLOCK);
-+		value &= ~pdata->gate_mask;
-+		__raw_writel(value, S5P_CLKGATE_BLOCK);
-+
-+		spin_unlock_irqrestore(&gate_block_slock, flags);
-+	}
-+done:
-+	dev_info(dev, "disable finished\n");
-+
-+	return ret;
- }
- 
- struct platform_device exynos4_device_pd[] = {
--	{
-+	[PD_MFC] = {
- 		.name		= "samsung-pd",
--		.id		= 0,
-+		.id		= PD_MFC,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_MFC_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_MFC,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_G3D] = {
- 		.name		= "samsung-pd",
--		.id		= 1,
-+		.id		= PD_G3D,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_G3D_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_G3D,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_LCD0] = {
- 		.name		= "samsung-pd",
--		.id		= 2,
-+		.id		= PD_LCD0,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_LCD0_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_LCD0,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_LCD1] = {
- 		.name		= "samsung-pd",
--		.id		= 3,
-+		.id		= PD_LCD1,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_LCD1_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_LCD1,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_TV] = {
- 		.name		= "samsung-pd",
--		.id		= 4,
-+		.id		= PD_TV,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_TV_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_TV,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_CAM] = {
- 		.name		= "samsung-pd",
--		.id		= 5,
-+		.id		= PD_CAM,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
- 				.disable	= exynos4_pd_disable,
- 				.base		= S5P_PMU_CAM_CONF,
-+				.gate_mask	= S5P_CLKGATE_BLOCK_CAM,
- 			},
- 		},
--	}, {
-+	},
-+	[PD_GPS] = {
- 		.name		= "samsung-pd",
--		.id		= 6,
-+		.id		= PD_GPS,
- 		.dev = {
- 			.platform_data = &(struct samsung_pd_info) {
- 				.enable		= exynos4_pd_enable,
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-index 6e311c1..2c1472b 100644
---- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-@@ -171,6 +171,13 @@
- #define S5P_CLKDIV_BUS_GPLR_SHIFT	(4)
- #define S5P_CLKDIV_BUS_GPLR_MASK	(0x7 << S5P_CLKDIV_BUS_GPLR_SHIFT)
- 
-+#define S5P_CLKGATE_BLOCK_CAM		(1 << 0)
-+#define S5P_CLKGATE_BLOCK_TV		(1 << 1)
-+#define S5P_CLKGATE_BLOCK_MFC		(1 << 2)
-+#define S5P_CLKGATE_BLOCK_G3D		(1 << 3)
-+#define S5P_CLKGATE_BLOCK_LCD0		(1 << 4)
-+#define S5P_CLKGATE_BLOCK_LCD1		(1 << 5)
-+
- /* Compatibility defines and inclusion */
- 
- #include <mach/regs-pmu.h>
-diff --git a/arch/arm/plat-samsung/include/plat/pd.h b/arch/arm/plat-samsung/include/plat/pd.h
-index abb4bc3..ef545ed 100644
---- a/arch/arm/plat-samsung/include/plat/pd.h
-+++ b/arch/arm/plat-samsung/include/plat/pd.h
-@@ -15,6 +15,7 @@ struct samsung_pd_info {
- 	int (*enable)(struct device *dev);
- 	int (*disable)(struct device *dev);
- 	void __iomem *base;
-+	unsigned long gate_mask;
- };
- 
- enum exynos4_pd_block {
 -- 
 1.7.1.569.g6f426
