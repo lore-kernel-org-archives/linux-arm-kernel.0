@@ -1,66 +1,88 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  5 Apr 2011 16:56:37 -0700
-Subject: [PATCHv5 0/3] Constant udelay() for SMP and non-SMP systems
-Message-ID: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue,  5 Apr 2011 16:56:39 -0700
+Subject: [PATCHv5 2/3] ARM: Allow machines to override __delay()
+In-Reply-To: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
+References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1302047800-26720-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: I will submit this to the patch tracker in 48 hours.
-Tested by are appreciated.
+Some machines want to implement their own __delay() routine based
+on fixed rate timers. Expose functionality to set the __delay()
+routine at runtime. This should allow two machines with different
+__delay() routines to happily co-exist within the same kernel
+with minimal overhead.
 
-These patches fix the udelay() issue pointed out on
-arm-lkml[1][2]. A quick recap: some SMP machines can scale
-their CPU frequencies independent of one another. loops_per_jiffy
-is calibrated globally and used in __const_udelay(). If one CPU
-is running faster than what the loops_per_jiffy is calculated
-(or scaled) for, udelay() will be incorrect and not wait long
-enough (or too long). A similar problem occurs if the cpu
-frequency is scaled during a udelay() call.
+Russell expressed concern that using a timer based __delay()
+would cause problems when an iomapped device isn't mapped in
+prior to a delay call being made (see
+http://article.gmane.org/gmane.linux.ports.arm.kernel/78543 for
+more info). We can sidestep that issue with this approach since
+the __delay() routine _should_ only be pointed to a timer based
+delay once the timer has been properly mapped. Up until that
+point __delay() and udelay() will use delay_loop() which is
+always safe to call.
 
-We could fix this issue a couple ways, wholesale replacement
-of __udelay() and __const_udelay() (see [2] for that approach),
-or replacement of __delay() (this series). Option 1 can fail if
-anybody uses udelay() before memory is mapped and also duplicates
-most of the code in asm/delay.h. It also needs to hardcode the
-timer tick frequency, which can sometimes be inaccurate. The
-benefit is that loops_per_jiffy stays the same and thus BogoMIPS
-is unchanged.  Option 2 cannot fail since the __delay() loop is
-repointed after memory is mapped in, but it suffers from a low
-BogoMIPS when timers are clocked slowly. It also more accurately
-calculates the timer tick frequency through the use of
-calibrate_delay_direct().
+This patch is inspired by x86's delay.c
 
--- Reference --
-[1] http://article.gmane.org/gmane.linux.kernel/977567
-[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/78496 
+Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/delay.h |    7 +++++++
+ arch/arm/lib/delay.c         |   14 +++++++++++---
+ 2 files changed, 18 insertions(+), 3 deletions(-)
 
-Changes since v4:
- * Rebased against changes to udelay.S
-
-Changes since v3:
- * Inlined set_delay_fn()
-
-Changes since v2:
- * Additional patch using the timer based delay
-
-Changes since v1:
- * likely() in delay.c
- * comment fixup for read_current_timer_delay_loop()
- * cosmetic improvements to commit text
-
-Stephen Boyd (3):
-  ARM: Translate delay.S into (mostly) C
-  ARM: Allow machines to override __delay()
-  ARM: Implement a timer based __delay() loop
-
- arch/arm/include/asm/delay.h |   11 +++++-
- arch/arm/kernel/armksyms.c   |    4 --
- arch/arm/lib/delay.S         |   69 ---------------------------------
- arch/arm/lib/delay.c         |   87 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 97 insertions(+), 74 deletions(-)
- delete mode 100644 arch/arm/lib/delay.S
- create mode 100644 arch/arm/lib/delay.c
-
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index ccc5ed5..82ef82a 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -40,5 +40,12 @@ extern void __const_udelay(unsigned long);
+ 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
+ 	  __udelay(n))
+ 
++extern void (*delay_fn)(unsigned long);
++
++static inline void set_delay_fn(void (*fn)(unsigned long))
++{
++	delay_fn = fn;
++}
++
+ #endif /* defined(_ARM_DELAY_H) */
+ 
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index daca2be..42cda15 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -11,11 +11,9 @@
+ #include <linux/delay.h>
+ 
+ /*
+- * loops = usecs * HZ * loops_per_jiffy / 1000000
+- *
+  * Oh, if only we had a cycle counter...
+  */
+-void __delay(unsigned long loops)
++static void delay_loop(unsigned long loops)
+ {
+ 	asm volatile(
+ 	"1:	subs %0, %0, #1 \n"
+@@ -24,6 +22,16 @@ void __delay(unsigned long loops)
+ 	: "r" (loops)
+ 	);
+ }
++
++void (*delay_fn)(unsigned long) = delay_loop;
++
++/*
++ * loops = usecs * HZ * loops_per_jiffy / 1000000
++ */
++void __delay(unsigned long loops)
++{
++	delay_fn(loops);
++}
+ EXPORT_SYMBOL(__delay);
+ 
+ /*
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
