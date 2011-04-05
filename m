@@ -1,37 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Apr 2011 08:56:22 +0100
-Subject: [PATCH] ARM: type casts update_sched_clock cyc_to_sched_clock
-	cyc_to_fixed_sched_clock
-In-Reply-To: <1301989401-11984-1-git-send-email-j.weitzel@phytec.de>
-References: <1301989401-11984-1-git-send-email-j.weitzel@phytec.de>
-Message-ID: <20110405075622.GB4699@n2100.arm.linux.org.uk>
+Date: Tue, 5 Apr 2011 08:59:32 +0100
+Subject: [PATCH v2 1/2] ARM: mxc: Introduce imx_add_gpio_leds
+In-Reply-To: <20110405075118.GM13963@pengutronix.de>
+References: <20110404174244.GH13963@pengutronix.de>
+	<20110404175240.GF22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C13BB8@AUSP01VMBX24.collaborationhost.net>
+	<20110404181759.GG22480@n2100.arm.linux.org.uk>
+	<0D753D10438DA54287A00B027084269764D1C89CC6@AUSP01VMBX24.collaborationhost.net>
+	<20110405073030.GI13963@pengutronix.de>
+	<20110405074017.GA4633@n2100.arm.linux.org.uk>
+	<20110405074315.GL13963@pengutronix.de>
+	<20110405074754.GB4633@n2100.arm.linux.org.uk>
+	<20110405075118.GM13963@pengutronix.de>
+Message-ID: <20110405075932.GC4633@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 09:43:21AM +0200, Jan Weitzel wrote:
-> parameter "u32 mask" type cast befor inversion
+On Tue, Apr 05, 2011 at 09:51:18AM +0200, Uwe Kleine-K?nig wrote:
+> This was intended by
+> 
+> 	struct gpio_led_platform_data *_pdata = *pdata;
+> 
+> I'm just fighting with the compiler at this line because it doesn't like
+> _pdata being initialized by a const pointer.
 
-Nak.  I want a 32-bit all ones quantity.
-
-unsigned long long vali = (unsigned short)~0;
-unsigned long long vall = ~(unsigned short)0;
-
-compiles to:
-
-vali:
-        .word   65535
-        .word   0
-
-vall:
-        .word   -1
-        .word   -1
-
-So moving the ~ to be evaluated after the cast has the effect of making
-the cast pointless, and produces wrong values.  (u32)~0 does the 32-bit
-cast _after_ the inversion which ensures that its always truncated to
-a 32-bit value.
-
-As the function is declared as taking a u32, the cast isn't needed.  If
-the function gets changed to take a u64, the casts will need to be
-re-added.  So, (u32)~0 makes the fact that we want a 32-bit all-ones
-mask explicit.
+That's idiotic and revolting.  Casting away const means you're writing
+broken code, which can fail for XIP users.  If you're going to play
+such games, there's *NO* point in marking it const in the first place.
