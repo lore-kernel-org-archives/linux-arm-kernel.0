@@ -1,83 +1,91 @@
 From: jiri.pinkava@vscht.cz (jiri.pinkava at vscht.cz)
-Date: Wed, 6 Apr 2011 01:06:07 +0200
-Subject: [PATCH 5/6] n30: Add touchscreen support for Acer n30 / n35
+Date: Wed, 6 Apr 2011 01:06:05 +0200
+Subject: [PATCH 3/6] n30: Clean-up UARTs configuration
 In-Reply-To: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
 References: <1302044768-7774-1-git-send-email-jiri.pinkava@vscht.cz>
-Message-ID: <1302044768-7774-6-git-send-email-jiri.pinkava@vscht.cz>
+Message-ID: <1302044768-7774-4-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jiri Pinkava <jiri.pinkava@vscht.cz>
 
+Replace numbers by names of constants defined in header files.
+
 Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
 ---
- arch/arm/mach-s3c2410/Kconfig    |    1 +
- arch/arm/mach-s3c2410/mach-n30.c |   13 +++++++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/mach-n30.c                 |   28 +++++++++++++++-------
+ arch/arm/plat-samsung/include/plat/regs-serial.h |    3 ++
+ 2 files changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
-index 7245a55..1d55349 100644
---- a/arch/arm/mach-s3c2410/Kconfig
-+++ b/arch/arm/mach-s3c2410/Kconfig
-@@ -100,6 +100,7 @@ config MACH_N30
- 	select MACH_N35
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_NAND
-+	select S3C2410_SETUP_TS
- 	help
- 	  Say Y here if you want suppt for the Acer N30, Acer N35,
- 	  Navman PiN570, Yakumo AlphaX or Airis NC05 PDAs.
 diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index 6396827..00afa2f 100644
+index 408dd88..d98d7b5 100644
 --- a/arch/arm/mach-s3c2410/mach-n30.c
 +++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -49,6 +49,7 @@
- #include <plat/devs.h>
- #include <plat/mci.h>
- #include <plat/s3c2410.h>
-+#include <plat/ts.h>
- #include <plat/udc.h>
- 
- static struct map_desc n30_iodesc[] __initdata = {
-@@ -100,6 +101,13 @@ static struct s3c2410_udc_mach_info n30_udc_cfg __initdata = {
- 	.pullup_pin		= S3C2410_GPB(3),
+@@ -55,32 +55,42 @@ static struct map_desc n30_iodesc[] __initdata = {
+ 	/* nothing here yet */
  };
  
-+static struct s3c2410_ts_mach_info n30_ts_cfg __initdata = {
-+	.delay = 16383,
-+	.presc = 49,
-+	.oversampling_shift = 3,
-+	.cfg_gpio = s3c24xx_ts_cfg_gpio,
-+};
++#define UCON	(S3C2410_UCON_DEFAULT | \
++		 S3C2443_UCON_RXERR_IRQEN)
 +
- static struct gpio_keys_button n30_buttons[] = {
- 	{
- 		.gpio		= S3C2410_GPF(0),
-@@ -375,6 +383,8 @@ static struct platform_device *n30_devices[] __initdata = {
- 	&s3c_device_rtc,
- 	&s3c_device_usbgadget,
- 	&s3c_device_sdi,
-+	&s3c_device_adc,
-+	&s3c_device_ts,
- 	&n30_button_device,
- 	&n30_blue_led,
- 	&n30_warning_led,
-@@ -388,6 +398,8 @@ static struct platform_device *n35_devices[] __initdata = {
- 	&s3c_device_rtc,
- 	&s3c_device_usbgadget,
- 	&s3c_device_sdi,
-+	&s3c_device_adc,
-+	&s3c_device_ts,
- 	&n35_button_device,
- 	&n35_blue_led,
- 	&n35_warning_led,
-@@ -550,6 +562,7 @@ static void __init n30_init(void)
- 	WARN_ON(gpio_request(S3C2410_GPG(4), "mmc power"));
++#define ULCON	(S3C2410_LCON_CS8 | \
++		 S3C2410_LCON_PNONE)
++
++#define UFCON	(S3C2410_UFCON_FIFOMODE | \
++		 S3C2410_UFCON_RXTRIG8 | \
++		 S3C2410_UFCON_TXTRIG4)
++
+ static struct s3c2410_uartcfg n30_uartcfgs[] = {
+ 	/* Normal serial port */
+ 	[0] = {
+ 		.hwport	     = 0,
+ 		.flags	     = 0,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x03,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
+ 	},
+ 	/* IR port */
+ 	[1] = {
+ 		.hwport	     = 1,
+ 		.flags	     = 0,
+ 		.uart_flags  = UPF_CONS_FLOW,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x43,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON | S3C2410_LCON_IRM,
++		.ufcon	     = UFCON,
+ 	},
+ 	/* On the N30 the bluetooth controller is connected here.
+ 	 * On the N35 and variants the GPS receiver is connected here. */
+ 	[2] = {
+ 		.hwport	     = 2,
+ 		.flags	     = 0,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x03,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
+ 	},
+ };
  
- 	s3c24xx_fb_set_platdata(&n30_fb_info);
-+	s3c24xx_ts_set_platdata(&n30_ts_cfg);
- 	s3c24xx_udc_set_platdata(&n30_udc_cfg);
- 	s3c24xx_mci_set_platdata(&n30_mci_cfg);
- 	s3c_i2c0_set_platdata(&n30_i2ccfg);
+diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
+index 788837e..c64beca 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-serial.h
++++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
+@@ -114,6 +114,9 @@
+ 
+ #define S3C2410_UFCON_FIFOMODE	  (1<<0)
+ #define S3C2410_UFCON_TXTRIG0	  (0<<6)
++#define S3C2410_UFCON_TXTRIG4	  (1<<6)
++#define S3C2410_UFCON_TXTRIG8	  (2<<6)
++#define S3C2410_UFCON_TXTRIG12	  (3<<6)
+ #define S3C2410_UFCON_RXTRIG8	  (1<<4)
+ #define S3C2410_UFCON_RXTRIG12	  (2<<4)
+ 
 -- 
 1.7.4.2
