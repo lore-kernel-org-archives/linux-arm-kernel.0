@@ -1,41 +1,63 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 5 Apr 2011 12:10:46 +0530
-Subject: [PATCH v3 1/7] mfd: add pruss mfd driver.
-In-Reply-To: <201103301259.28483.arnd@arndb.de>
-References: <1299592667-21367-1-git-send-email-subhasish@mistralsolutions.com>
-	<201103111628.57549.arnd@arndb.de>
-	<17BF3847C06240EC921FB684D3120DEC@subhasishg>
-	<201103301259.28483.arnd@arndb.de>
-Message-ID: <34890DB1679E41119ADB156E2CFEC4C9@subhasishg>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 05 Apr 2011 11:50:17 +0530
+Subject: [PATCH v2] ARM: GIC: Convert GIC library to use the IO relaxed
+	operations
+In-Reply-To: <1301930948.15819.52.camel@e102109-lin.cambridge.arm.com>
+References: <1301650321-28652-1-git-send-email-santosh.shilimkar@ti.com>
+	<1301930948.15819.52.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <4D9AB4A1.9050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Wednesday 30 March 2011, Subhasish Ghosh wrote:
+On 4/4/2011 8:59 PM, Catalin Marinas wrote:
+> On Fri, 2011-04-01 at 10:32 +0100, Santosh Shilimkar wrote:
+>> The GIC register accesses today make use of readl()/writel()
+>> which prove to be very expensive when used along with mandatory
+>> barriers. This mandatory barriers also introduces an un-necessary
+>> and expensive l2x0_sync() operation. On Cortex-A9 MP cores, GIC
+>> IO accesses from CPU are direct and doesn't go through L2X0 write
+>> buffer.
 >>
->> >> +s32 pruss_disable(struct device *dev, u8 pruss_num)
->> >> +{
->> >> + struct da8xx_pruss *pruss = dev_get_drvdata(dev->parent);
->> >> + struct da8xx_prusscore_regs *h_pruss;
->> >> + struct pruss_map *pruss_mmap = (struct pruss_map *)pruss->ioaddr;
->> >> + u32 temp_reg;
->> >> + u32 delay_cnt;
->> >
->> > Can you explain the significance of pruss_num? As far as I
->> > can tell, you always pass constants in here, so it should
->> > be possible to determine the number from the device.
+>> Also since a DSB does not guarantee that the device state has
+>> been changed, a read back from the device is introduced wherever
+>> necessary.
+> ...
+>> @@ -98,7 +98,8 @@ static void gic_mask_irq(struct irq_data *d)
+>>          u32 mask = 1<<  (d->irq % 32);
 >>
->> SG - The number is not programmed in the device, I need something to 
->> decide
->> which PRU to disable or enable.
+>>          spin_lock(&irq_controller_lock);
+>> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+>>          if (gic_arch_extn.irq_mask)
+>>                  gic_arch_extn.irq_mask(d);
+>>          spin_unlock(&irq_controller_lock);
+>>
 >
-> I still don't understand. Please explain how the devices
-> relate to the multiple PRUs in hardware.
+> Talking to the hardware people, a readl back would guarantee that the
+> GIC state has changed but you can still get spurious interrupts because
+> of the signal propagation from the GIC to the CPU. That's difficult to
+> reliably sort out in software as we don't know the hardware delays, so
+> we'll have to cope with spurious interrupts (unlikely though).
+>
+> A better sequence would be something like below (but still no
+> guarantees):
+>
+> 	STR	[Device]
+> 	LDR	[Device]
+> 	DSB
+> 	ISB
+>
+> (the ISB is needed in case some instructions already in the pipeline
+> sampled the state of the interrupt signal)
+>
+> But I'm more in favour of not even bothering with an additional
+> readl_relaxed, we simply cope with a very rare spurious interrupt. In a
+> virtualised environment accesses to the GIC distributor are trapped
+> making things slower.
+>
+Ok. Thanks for addition information.
+Will drop readl_relaxed() then.
 
-There are two devices, CAN and UART, in our case we use the PRU as follows:
-1. CAN-TX on PRU0, CAN-RX on PRU1
-2. SUART-TX on PRU0, SUART-RX on PRU1
-3. SUART-TXRX on PRU0, SUART-TXRX on PRU1
-
-
- 
+Regards
+Santosh
