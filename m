@@ -1,197 +1,261 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 6 Apr 2011 15:31:59 +0800
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <BANLkTimkHZ01LfRoOha79QPyRaaDKo7T-Q@mail.gmail.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<8ya39m2mv65.fsf@huya.qualcomm.com> <20110401074519.GC7594@elte.hu>
-	<201104011554.07924.arnd@arndb.de>
-	<BANLkTimkHZ01LfRoOha79QPyRaaDKo7T-Q@mail.gmail.com>
-Message-ID: <BANLkTimJJt7dhVBHp22t+QbmDp42hZL1bQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 6 Apr 2011 10:01:21 +0200
+Subject: [PATCH] Add Board Support for Siemens L0 Board
+In-Reply-To: <20110404133309.GI2758@linutronix.de>
+References: <20110404133309.GI2758@linutronix.de>
+Message-ID: <20110406080121.GY13963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 6, 2011 at 2:11 PM, Barry Song <21cnbao@gmail.com> wrote:
-> 2011/4/1 Arnd Bergmann <arnd@arndb.de>:
->> On Friday 01 April 2011, Ingo Molnar wrote:
->>> IMO the right answer is what Linus and Thomas outlined:
->>>
->>> ? ?1) provide a small number of clean examples and clean abstractions
->>> ? ?2) to not pull new crap from that point on
->>> ? ?3) do this gradually but consistently
->>>
->>> I.e. make all your requirements technical and actionable - avoid sweeping,
->>> impossible to meet requirements. Do not require people to clean up all of the
->>> existing mess straight away (they cannot realistically do it), do not summarily
->>> block the flow of patches, but be firm about drawing a line in the sand and be
->>> firm about not introducing new mess in a gradually growing list of well-chosen
->>> areas of focus.
->>>
->>> Rinse, repeat.
->>
->> I believe getting to point 1 is the hard part here. There are a lot of things
->> that are wrong with the mach-* (and also plat-*) implementations, and I don't
->> think we have one today that can really serve as an example. Most decisions
->> made in there made a lot of sense when they were introduced, and declaring
->> code that was perfectly acceptable yesterday to be unacceptable crap today
->> is not going to be met with much understanding by the someone who just
->> wants to add support for one more board to 100 already existing ones in the
->> same SoC family.
->>
->> I would actually suggest a different much more radical start: Fork the way
->> that platforms are managed today, and start an alternative way of setting
->> up boards and devices together with the proven ARM core kernel infrastructure,
->> based on these observations (please correct me if some of them they don't make
->> sense):
->>
->> 1. The core arch code is not a problem (Russell does a great job here)
->> 2. The platform specific code contains a lot of crap that doesn't belong there
->> ? (not enough reviewers to push back on crap)
->> 3. The amount of crap in platform specfic files is growing exponentially,
->> ? despite the best efforts of a handful of people to clean it up.
->> 4. Having one source file per board does not scale any more.
->> 5. Discoverable hardware would solve this, but is not going to happen
->> ? in practice.
->> 6. Board firmware would not solve this and is usually not present.
->> 7. Boot loaders can not be trusted to pass valid information
->> 8. Device tree blobs can solve a lot of the problems, and nobody has
->> ? come up with a better solution.
->
-> ARM BSP is still blasting! we are planning to merge our new ARM
-> cortex-a9 SoC into kernel.
+On Mon, Apr 04, 2011 at 03:33:09PM +0200, Manuel Traut wrote:
+> Add Board Support for Siemens L0 Board
+> 
+> Siemens L0 is a ARM9 AT91 SAM9263 SoC based board with NAND Flash.
+> 
+> Signed-off-by: Manuel Traut <manut@linutronix.de>
+> 
+> Index: linux-2.6.39-rc1/arch/arm/mach-at91/Kconfig
+> ===================================================================
+> --- linux-2.6.39-rc1.orig/arch/arm/mach-at91/Kconfig	2011-04-01 11:43:41.000000000 +0000
+> +++ linux-2.6.39-rc1/arch/arm/mach-at91/Kconfig	2011-04-04 18:51:25.000000000 +0000
+> @@ -306,6 +306,12 @@
+>  	  Select this if you are using Atmel's AT91SAM9263-EK Evaluation Kit.
+>  	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4057>
+>  
+> +config MACH_SIEMENS_L0
+> +	bool "Siemens L0"
+> +	select HAVE_NAND_ATMEL_BUSWIDTH_16
+hmm, isn't that a stopper for a multi-machine kernel? I havn't checked
+deeply, but the only thing HAVE_NAND_ATMEL_BUSWIDTH_16 does is allowing
+to select CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16. When looking at
+arch/arm/mach-at91/board-at572d940hf_ek.c the latter looks like
+something that should be possible to be different per board.
+(Obviously that's not a comment that should stop your patch getting in,
+but (maybe) a for the at91 maintainers to solve.)
 
-As far as I know, Barry is working on a new SoC family based on
-Cortex-A9. He asked me/Eric personally before about this issue, it is
-quite confused for new comers. On one hand, they wanna follow the
-mainline style to join our upstream family, on the other hand if they
-duplicate some crap from other SoC families, they will bring us
-trouble or more crap.
+> +	help
+> +	  Select this if you are using the Siemens L0 board.
+> +
+>  config MACH_USB_A9263
+>  	bool "CALAO USB-A9263"
+>  	help
+> Index: linux-2.6.39-rc1/arch/arm/mach-at91/Makefile
+> ===================================================================
+> --- linux-2.6.39-rc1.orig/arch/arm/mach-at91/Makefile	2011-04-01 11:43:41.000000000 +0000
+> +++ linux-2.6.39-rc1/arch/arm/mach-at91/Makefile	2011-04-04 18:51:25.000000000 +0000
+> @@ -54,6 +54,7 @@
+>  
+>  # AT91SAM9263 board-specific support
+>  obj-$(CONFIG_MACH_AT91SAM9263EK) += board-sam9263ek.o
+> +obj-$(CONFIG_MACH_SIEMENS_L0)	+= board-siemens-l0.o
+>  obj-$(CONFIG_MACH_USB_A9263)	+= board-usb-a9263.o
+>  obj-$(CONFIG_MACH_NEOCORE926)	+= board-neocore926.o
+>  
+> Index: linux-2.6.39-rc1/arch/arm/mach-at91/board-siemens-l0.c
+> ===================================================================
+> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
+> +++ linux-2.6.39-rc1/arch/arm/mach-at91/board-siemens-l0.c	2011-04-04 18:52:48.000000000 +0000
+> @@ -0,0 +1,189 @@
+> +/*
+> + * linux/arch/arm/mach-at91/board-siemens-l0.c
+> + * based on linux/arch/arm/mach-at91/board-sam9263ek.c
+> + *
+> + *  Copyright (C) 2005 SAN People
+> + *  Copyright (C) 2007 Atmel Corporation.
+> + *  Copyright (C) 2011 Linutronix GmbH
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+This address isn't valid any more. I suggest to just skip the whole
+paragraph as this should be already handled good enough by the toplevel
+copyright file.
 
-> So I am just wondering whether traditional
-> ARM BSP way can still be accepted, or we must move to use device tree?
-> but i have't seen any arm device tree codes enter mainline yet. but we
-> can get those patches from linaro 2.6.38. So what's the plan for
-> merging arm device tree?
->
+> + */
+> +
+> +#include <linux/types.h>
+> +#include <linux/init.h>
+> +#include <linux/mm.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/gpio_keys.h>
+> +
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/irq.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/irq.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/board.h>
+> +#include <mach/gpio.h>
+> +#include <mach/at91sam9_smc.h>
+> +#include <mach/at91_shdwc.h>
+> +
+> +#include "sam9_smc.h"
+> +#include "generic.h"
+> +
+> +static void __init l0_map_io(void)
+> +{
+> +	/* Initialize processor: 16.000 MHz crystal */
+> +	at91sam9263_initialize(16000000);
+> +
+> +	/* DBGU on ttyS0. (Rx & Tx only) */
+> +	at91_register_uart(0, 0, 0);
+> +
+> +	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
+> +	at91_register_uart(AT91SAM9263_ID_US0, 1,
+> +		ATMEL_UART_CTS | ATMEL_UART_RTS);
+> +
+> +	/* set serial console to ttyS0 (ie, DBGU) */
+> +	at91_set_serial_console(0);
+> +}
+> +
+> +static void __init l0_init_irq(void)
+> +{
+> +	at91sam9263_init_interrupts(NULL);
+> +}
+> +
+> +/*
+> + * USB Host port
+> + */
+> +static struct at91_usbh_data __initdata l0_usbh_data = {
+> +	.ports		= 2,
+> +	.vbus_pin	= { AT91_PIN_PE2, AT91_PIN_PE5 },
+> +};
+> +
+> +/*
+> + * USB Device port
+> + */
+> +static struct at91_udc_data __initdata l0_udc_data = {
+> +	.vbus_pin	= AT91_PIN_PE1,
+> +	.pullup_pin	= 0,		/* pull-up driven by UDC */
+> +};
+> +
+> +/*
+> + * MCI (SD/MMC)
+> + */
+> +static struct at91_mmc_data __initdata l0_mmc_data = {
+> +	.slot_b		= 0,
+> +	.wire4		= 1,
+> +	.det_pin	= AT91_PIN_PA16,
+> +	.wp_pin		= AT91_PIN_PE0,
+> +/*	.vcc_pin	= ... not connected */
+> +};
+> +
+> +/*
+> + * MACB Ethernet device
+> + */
+> +static struct at91_eth_data __initdata l0_macb_data = {
+> +	.phy_irq_pin	= AT91_PIN_PE31,
+> +	.is_rmii	= 1,
+> +};
+> +
+> +/*
+> + * CAN
+> + */
+> +static void sam9263l0_transceiver_switch(int on)
+> +{
+> +	if (on) {
+> +		at91_set_gpio_output(AT91_PIN_PA18, 1); /* CANRXEN */
+> +		at91_set_gpio_output(AT91_PIN_PA19, 0); /* CANRS */
+> +	} else {
+> +		at91_set_gpio_output(AT91_PIN_PA18, 0); /* CANRXEN */
+> +		at91_set_gpio_output(AT91_PIN_PA19, 1); /* CANRS */
+> +	}
+> +}
+> +
+> +static struct at91_can_data l0_can_data = {
+> +	.transceiver_switch = sam9263l0_transceiver_switch,
+> +};
+> +
+> +/*
+> + * Nand flash
+> + */
+> +static struct mtd_partition __initdata l0_nand_partition[] = {
+> +	{
+> +		.name   = "bootloader",
+> +		.offset = 0,
+> +		.size   = SZ_256K,
+> +	},
+> +	{
+> +		.name   = "ubi",
+> +		.offset = MTDPART_OFS_NXTBLK,
+> +		.size   = MTDPART_SIZ_FULL,
+> +	},
+> +};
+> +
+> +static struct mtd_partition * __init nand_partitions(int size,
+> +	int *num_partitions)
+> +{
+> +	*num_partitions = ARRAY_SIZE(l0_nand_partition);
+> +	return l0_nand_partition;
+> +}
+> +
+> +static struct atmel_nand_data __initdata l0_nand_data = {
+> +	.ale		= 21,
+> +	.cle		= 22,
+> +/*	.det_pin	= ... not connected */
+> +	.rdy_pin	= AT91_PIN_PA22,
+> +	.enable_pin	= AT91_PIN_PD15,
+> +	.partition_info	= nand_partitions,
+> +	.bus_width_16	= 1,
+> +};
+> +
+> +static void __init l0_add_device_nand(void)
+> +{
+> +	at91_add_device_nand(&l0_nand_data);
+> +}
+> +
+> +/*
+> + *   Init Board
+> + */
+> +static void __init l0_board_init(void)
+> +{
+> +	/* Serial */
+> +	at91_add_device_serial();
+> +	/* USB Host */
+> +	at91_add_device_usbh(&l0_usbh_data);
+> +	/* USB Device */
+> +	at91_add_device_udc(&l0_udc_data);
+> +	/* MMC */
+> +	at91_add_device_mmc(1, &l0_mmc_data);
+> +	/* Ethernet */
+> +	at91_add_device_eth(&l0_macb_data);
+> +	/* NAND */
+> +	l0_add_device_nand();
+> +	/* CAN */
+> +	at91_add_device_can(&l0_can_data);
+> +}
+> +
+> +MACHINE_START(SIEMENS_L0, "Siemens L0")
+> +	/* Maintainer: Atmel */
+> +	.boot_params	= AT91_SDRAM_BASE + 0x100,
+Do you really need this? With a recent bootloader it's not necessary.
 
-I suggest you need a dedicated guy who will work on DT supporting for
-your SoC. As I can tell from this thread, DT will be heavily supported
-by other SoC soon.
+> +	.timer		= &at91sam926x_timer,
+> +	.map_io		= l0_map_io,
+> +	.init_irq	= l0_init_irq,
+> +	.init_machine	= l0_board_init,
+Regarding http://article.gmane.org/gmane.linux.ports.arm.omap/50721
+this isn't in the right order.
 
-> What i have seen is that the BSP architecture of different ARM SoC
-> companies is even different.
->
-> samsung has three levels:
-> plat-samsung
-> ? ? ? ? ? ?plat-s3c24xx
-> ? ? ? ? ? ? ? ? ? ? mach-s3c2410
-> ? ? ? ? ? ? ? ? ? ? mach-s3c2440
-> ? ? ? ? ? ?plat-s5p
-> ? ? ? ? ? ? ? ? ? ? mach-s5pv210
-> ? ? ? ? ? ? ? ? ? ? mach-s5pv310
->
-> TI has two levels:
-> plat-omap
-> ? ? ? ? ? ?mach-omap1
-> ? ? ? ? ? ?mach-omap2
->
-> Nvidia has one level:
-> mach-tegra
->
-> I didn't find any rule about what codes should be placed in what
-> directories. Different companies have different ways. It looks like
-> the only agreement is board files are in mach-xxx. Any suggestions for
-> that?
->
+Best regards
+Uwe
 
-That's totally frustrated for a new comer, I think. It's that possible
-we do more unification firstly and then allow new comers to follow,
-like:
-plat-common (or just named 'plat')- common plat-common framework for
-all ARM based SoC, which might contains IRQ framework, GPIO, Timer,
-Clock, PWM or other common things
-SoC players just need add one file to enable the platform common
-things on their SoC such as plat-omap.c, plat-imx.c, plat-samsung.c
-and etc.
-
-mach-'soc' - for machine or board related code, such as mach-omap,
-mach-imx .., or maybe we can also introduce mach-common to share other
-machine or board layer common code. I guess it will be some machine
-related API common functions.
-
-It's just a simple idea, we still need lots of work to make that happen.
-
-Thanks,
--Bryan
-
-> BTW, we don't want to "dick around", which Linus has been very angry.
-> we want to fix more issues this email pointed out before we send
-> patches.
->
->> 9. All interesting work is going into a handful of platforms, all of which
->> ? are ARMv7 based.
->> 10. We do not want to discontinue support for old boards that work fine.
->> 11. Massive changes to existing platforms would cause massive breakage.
->> 12. Supporting many different boards with a single kernel binary is a
->> ? ?useful goal.
->> 13. Infrastructure code should be cross-platform, not duplicated across
->> ? ?platforms.
->> 14. 32 bit ARM is hitting the wall in the next years (Cortex-A15 is
->> ? ?actually adding PAE support, which has failed to solve this on
->> ? ?other architectures).
->> 15. We need to solve the platform problem before 64 bit support comes
->> ? ?and adds another dimension to the complexity.
->>
->> Based on these assumptions, my preferred strategy would be to a new
->> mach-nocrap directory with a documented set of rules (to be adapted when
->> necessary):
->>
->> * Strictly no crap
->> ?* No board files
->> ?* No hardcoded memory maps
->> ?* No lists of interrupts and GPIOs
->> * All infrastructure added must be portable to all ARMv7 based SoCs.
->> ?(ARMv6 can be added later)
->> * 64 bit safe code only.
->> * SMP safe code only.
->> * All board specific information must come from a device tree and
->> ?be run-time detected.
->> * Must use the same device drivers as existing platforms
->> * Should share platform drivers (interrupt controller, gpio, timer, ...)
->> ?with existing platforms where appropriate.
->> * Code quality takes priority over stability in mach-nocrap, but must not
->> ?break other platforms.
->>
->> Until we have something working there, I think we should still generally
->> allow new code to the existing platforms, and even new platforms to be
->> added, while trying to keep the quality as high as possible but without
->> changing the rules for them or doing any major treewide reworks.
->>
->> Once the mach-nocrap approach has turned into something usable, we can
->> proceed on three fronts:
->> 1. delete actively maintained boards from the other platforms once they
->> ? are no longer needed there
->> 2. generalize concepts from mach-nocrap by applying them to all boards,
->> ? similar to the cleanup work that people have always been doing.
->> 3. gradually make the rules for adding new code in other platforms stricter,
->> ? up to the point where they are bugfix only.
->>
->>> If companies do not 'bother to push upstream', then management will eventually
->>> notice negative economic consequences:
->>>
->>> ...
->>
->> Good points, I fully agree with these. I also think that the SoC companies
->> are actually understanding this nowadays, and that is exactly the reason
->> why we see so much code getting pushed in.
->>
->> ? ? ? ?Arnd
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
