@@ -1,8 +1,7 @@
-From: mb@bu3sch.de (Michael =?ISO-8859-1?Q?B=FCsch?=)
-Date: Wed, 06 Apr 2011 23:20:46 +0200
+From: george@znau.edu.ua (George Kashperko)
+Date: Thu, 07 Apr 2011 00:18:57 +0300
 Subject: [RFC][PATCH] bcmai: introduce AI driver
 In-Reply-To: <BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	(sfid-20110406_231255_603822_1FED7627)
 References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
 	<op.vtisojsk3ri7v4@arend-laptop>
 	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
@@ -13,12 +12,11 @@ References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
 	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
 	<1302124112.20093.11.camel@maggie>
 	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	(sfid-20110406_231255_603822_1FED7627)
-Message-ID: <1302124846.20093.16.camel@maggie>
+Message-ID: <1302124737.27258.7.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-04-06 at 23:12 +0200, Rafa? Mi?ecki wrote: 
+
 > W dniu 6 kwietnia 2011 23:08 u?ytkownik Michael B?sch <mb@bu3sch.de> napisa?:
 > > On Wed, 2011-04-06 at 23:01 +0200, Rafa? Mi?ecki wrote:
 > >> W dniu 6 kwietnia 2011 22:57 u?ytkownik Michael B?sch <mb@bu3sch.de> napisa?:
@@ -75,21 +73,18 @@ On Wed, 2011-04-06 at 23:12 +0200, Rafa? Mi?ecki wrote:
 > working drivers. No driver need to reset core really often (and not
 > inside interrupt context) so we will switch driver's window to agent
 > (from core) only at init/reset.
-
-On SSB one major assumption is that on non-embedded no coreswitch will
-happen after init. (On embedded, the I/O accesses are safe anyway,
-because all cores are always mapped).
-
+> 
 > The question is what amount of driver we will need to support at the same time.
+> 
 
-I guess (guess!) that the answer will be similar to SSB:
-On non-embedded after init only one core is accessed: The wireless core.
-And on embedded cores are accessed in random order. But it's safe
-because the MMIO is always mapped.
-Does this also apply to AXI?
-Even if we would need to access two cores after init (wireless and
-chipcommon, perhaps), we would use the two windows to survive without
-an actual core switch while running.
+I guess (correct me please, Broadcom guys if I'm wrong) there are two
+functions two-head w11 pci host and therefore 4 sliding windows, 2 per
+each function.
 
--- 
-Greetings Michael.
+You really was in need for core switching for PCI SSB hosts, but seem
+all that stuff for PCI switching in current bcm80211/utils code is
+rudimentary stuff left from PCI times when you was required to use
+sliding window for chipcommon and pci bridge core access.
+
+Have nice day,
+George
