@@ -1,23 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Apr 2011 20:41:21 +0200
-Subject: [PATCH] ARM: mx51: Remove imx51_add_gpio_keys
-In-Reply-To: <1302105926-20574-1-git-send-email-fabio.estevam@freescale.com>
-References: <1302105926-20574-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110406184121.GJ13963@pengutronix.de>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Apr 2011 03:47:48 +0900
+Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
+In-Reply-To: <20110406184022.GI13963@pengutronix.de>
+References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110406163805.GA11820@linux-sh.org>
+	<20110406184022.GI13963@pengutronix.de>
+Message-ID: <20110406184746.GE18426@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2011 at 01:05:26PM -0300, Fabio Estevam wrote:
-> There is no need for using a MX51-specific version of imx_add_gpio_keys.
+On Wed, Apr 06, 2011 at 08:40:22PM +0200, Uwe Kleine-K?nig wrote:
+> On Thu, Apr 07, 2011 at 01:38:13AM +0900, Paul Mundt wrote:
+> > On Wed, Apr 06, 2011 at 04:29:04PM +0200, Uwe Kleine-K??nig wrote:
+> > > All machines having a imx-fb device now select IMX_HAVE_PLATFORM_IMX_FB,
+> > > so HAVE_FB_IMX can go away and there is no need anymore to explicitly
+> > > depend on ARCH_MX1 or ARCH_MX2.
+> > > 
+> > > Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> > > Hello,
+> > > 
+> > > should this go via Sascha's or Paul's tree?
+> > > 
+> > There shouldn't be anything it conflicts with in my tree, so it can go
+> > via either. Most of the imx changes have bypassed the fbdev tree, so I'm
+> > unaware if there are outstanding patches in Sascha's tree at the moment
+> > or not. I can of course take it though.
+> I currently collect imx patches for Sascha because he is busy doing
+> other stuff.  Can I have your ack for the patch that Baruch pointed out?
+> Then I'd take it for the imx tree.
 > 
-> Remove imx51_add_gpio_keys and use imx_add_gpio_keys instead.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Nice, this was already on my mental todo list, too.
+That's fine for this, but in the future it would be nice to have changes
+that impact the fb driver go through the fb tree. In cases like this
+where you have clear interdependencies in Kconfig language it obviously
+doesn't make much sense to split things up, but it's something to keep in
+mind for the things that can be.
 
-Thanks, I'll take it in my tree that I prepare for Sascha.
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Paul Mundt <lethal@linux-sh.org>
