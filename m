@@ -1,168 +1,132 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed,  6 Apr 2011 11:17:09 +0100
-Subject: [PATCH v2 1/4] ARM: kprobes: Fix probing of conditionally executed
-	instructions
+Date: Wed,  6 Apr 2011 11:17:10 +0100
+Subject: [PATCH v2 2/4] ARM: kprobes: Remove redundant condition checks from
+	simulation routines
 In-Reply-To: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
 References: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1302085032-30415-2-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1302085032-30415-3-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-When a kprobe is placed onto conditionally executed ARM instructions,
-many of the emulation routines used to single step them produce corrupt
-register results. Rather than fix all of these cases we modify the
-framework which calls them to test the relevant condition flags and, if
-the test fails, skip calling the emulation code.
+Now we have the framework code handling conditionally executed
+instructions we can remove redundant checks in individual simulation
+routines.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/include/asm/kprobes.h   |    3 +
- arch/arm/kernel/kprobes-decode.c |   91 ++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/kprobes.c        |    3 +-
- 3 files changed, 96 insertions(+), 1 deletions(-)
+ arch/arm/kernel/kprobes-decode.c |   30 +++---------------------------
+ 1 files changed, 3 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
-index bb8a19b..e46bdd0 100644
---- a/arch/arm/include/asm/kprobes.h
-+++ b/arch/arm/include/asm/kprobes.h
-@@ -39,10 +39,13 @@ typedef u32 kprobe_opcode_t;
- struct kprobe;
- typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
- 
-+typedef unsigned long (kprobe_check_cc)(unsigned long);
-+
- /* Architecture specific copy of original instruction. */
- struct arch_specific_insn {
- 	kprobe_opcode_t		*insn;
- 	kprobe_insn_handler_t	*insn_handler;
-+	kprobe_check_cc		*insn_check_cc;
- };
- 
- struct prev_kprobe {
 diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 3b0cf90..3e313e5 100644
+index 3e313e5..faa976c 100644
 --- a/arch/arm/kernel/kprobes-decode.c
 +++ b/arch/arm/kernel/kprobes-decode.c
-@@ -1396,6 +1396,96 @@ space_cccc_111x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	return INSN_GOOD;
+@@ -71,10 +71,6 @@
+ #define PSR_fs	(PSR_f|PSR_s)
+ 
+ #define KPROBE_RETURN_INSTRUCTION	0xe1a0f00e	/* mov pc, lr */
+-#define SET_R0_TRUE_INSTRUCTION		0xe3a00001	/* mov	r0, #1 */
+-
+-#define	truecc_insn(insn)	(((insn) & 0xf0000000) | \
+-				 (SET_R0_TRUE_INSTRUCTION & 0x0fffffff))
+ 
+ typedef long (insn_0arg_fn_t)(void);
+ typedef long (insn_1arg_fn_t)(long);
+@@ -419,14 +415,10 @@ insnslot_llret_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
+ 
+ static void __kprobes simulate_bbl(struct kprobe *p, struct pt_regs *regs)
+ {
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+ 	kprobe_opcode_t insn = p->opcode;
+ 	long iaddr = (long)p->addr;
+ 	int disp  = branch_displacement(insn);
+ 
+-	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
+-		return;
+-
+ 	if (insn & (1 << 24))
+ 		regs->ARM_lr = iaddr + 4;
+ 
+@@ -446,14 +438,10 @@ static void __kprobes simulate_blx1(struct kprobe *p, struct pt_regs *regs)
+ 
+ static void __kprobes simulate_blx2bx(struct kprobe *p, struct pt_regs *regs)
+ {
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+ 	kprobe_opcode_t insn = p->opcode;
+ 	int rm = insn & 0xf;
+ 	long rmv = regs->uregs[rm];
+ 
+-	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
+-		return;
+-
+ 	if (insn & (1 << 5))
+ 		regs->ARM_lr = (long)p->addr + 4;
+ 
+@@ -465,7 +453,6 @@ static void __kprobes simulate_blx2bx(struct kprobe *p, struct pt_regs *regs)
+ 
+ static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
+ {
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+ 	kprobe_opcode_t insn = p->opcode;
+ 	int rn = (insn >> 16) & 0xf;
+ 	int lbit = insn & (1 << 20);
+@@ -476,9 +463,6 @@ static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
+ 	int reg_bit_vector;
+ 	int reg_count;
+ 
+-	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
+-		return;
+-
+ 	reg_count = 0;
+ 	reg_bit_vector = insn & 0xffff;
+ 	while (reg_bit_vector) {
+@@ -510,11 +494,6 @@ static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
+ 
+ static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
+ {
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-
+-	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
+-		return;
+-
+ 	regs->ARM_pc = (long)p->addr + str_pc_offset;
+ 	simulate_ldm1stm1(p, regs);
+ 	regs->ARM_pc = (long)p->addr + 4;
+@@ -1056,9 +1035,8 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 		/* BLX(2) : cccc 0001 0010 xxxx xxxx xxxx 0011 xxxx */
+ 		/* BX     : cccc 0001 0010 xxxx xxxx xxxx 0001 xxxx */
+ 		if ((insn & 0x0ff000d0) == 0x01200010) {
+-			asi->insn[0] = truecc_insn(insn);
+ 			asi->insn_handler = simulate_blx2bx;
+-			return INSN_GOOD;
++			return INSN_GOOD_NO_SLOT;
+ 		}
+ 
+ 		/* CLZ : cccc 0001 0110 xxxx xxxx xxxx 0001 xxxx */
+@@ -1333,10 +1311,9 @@ space_cccc_100x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 
+ 	/* LDM(1) : cccc 100x x0x1 xxxx xxxx xxxx xxxx xxxx */
+ 	/* STM(1) : cccc 100x x0x0 xxxx xxxx xxxx xxxx xxxx */
+-	asi->insn[0] = truecc_insn(insn);
+ 	asi->insn_handler = ((insn & 0x108000) == 0x008000) ? /* STM & R15 */
+ 				simulate_stm1_pc : simulate_ldm1stm1;
+-	return INSN_GOOD;
++	return INSN_GOOD_NO_SLOT;
  }
  
-+static unsigned long __kprobes __check_eq(unsigned long cpsr)
-+{
-+	return cpsr & PSR_Z_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ne(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_Z_BIT;
-+}
-+
-+static unsigned long __kprobes __check_cs(unsigned long cpsr)
-+{
-+	return cpsr & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_cc(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_mi(unsigned long cpsr)
-+{
-+	return cpsr & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_pl(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_vs(unsigned long cpsr)
-+{
-+	return cpsr & PSR_V_BIT;
-+}
-+
-+static unsigned long __kprobes __check_vc(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_V_BIT;
-+}
-+
-+static unsigned long __kprobes __check_hi(unsigned long cpsr)
-+{
-+	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return cpsr & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ls(unsigned long cpsr)
-+{
-+	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return (~cpsr) & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ge(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	return (~cpsr) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_lt(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	return cpsr & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_gt(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	cpsr |= (cpsr << 1); /* PSR_N_BIT |= PSR_Z_BIT */
-+	return (~cpsr) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_le(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	cpsr |= (cpsr << 1); /* PSR_N_BIT |= PSR_Z_BIT */
-+	return cpsr & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_al(unsigned long cpsr)
-+{
-+	return true;
-+}
-+
-+static kprobe_check_cc * const condition_checks[16] = {
-+	&__check_eq, &__check_ne, &__check_cs, &__check_cc,
-+	&__check_mi, &__check_pl, &__check_vs, &__check_vc,
-+	&__check_hi, &__check_ls, &__check_ge, &__check_lt,
-+	&__check_gt, &__check_le, &__check_al, &__check_al
-+};
-+
- /* Return:
-  *   INSN_REJECTED     If instruction is one not allowed to kprobe,
-  *   INSN_GOOD         If instruction is supported and uses instruction slot,
-@@ -1411,6 +1501,7 @@ space_cccc_111x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- enum kprobe_insn __kprobes
- arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ static enum kprobe_insn __kprobes
+@@ -1344,9 +1321,8 @@ space_cccc_101x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
  {
-+	asi->insn_check_cc = condition_checks[insn>>28];
- 	asi->insn[1] = KPROBE_RETURN_INSTRUCTION;
- 
- 	if ((insn & 0xf0000000) == 0xf0000000) {
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 2ba7deb..1656c87 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -134,7 +134,8 @@ static void __kprobes singlestep(struct kprobe *p, struct pt_regs *regs,
- 				 struct kprobe_ctlblk *kcb)
- {
- 	regs->ARM_pc += 4;
--	p->ainsn.insn_handler(p, regs);
-+	if (p->ainsn.insn_check_cc(regs->ARM_cpsr))
-+		p->ainsn.insn_handler(p, regs);
+ 	/* B  : cccc 1010 xxxx xxxx xxxx xxxx xxxx xxxx */
+ 	/* BL : cccc 1011 xxxx xxxx xxxx xxxx xxxx xxxx */
+-	asi->insn[0] = truecc_insn(insn);
+ 	asi->insn_handler = simulate_bbl;
+-	return INSN_GOOD;
++	return INSN_GOOD_NO_SLOT;
  }
  
- /*
+ static enum kprobe_insn __kprobes
 -- 
 1.7.2.5
