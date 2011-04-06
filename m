@@ -1,109 +1,147 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  5 Apr 2011 16:56:40 -0700
-Subject: [PATCHv5 3/3] ARM: Implement a timer based __delay() loop
-In-Reply-To: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
-References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1302047800-26720-4-git-send-email-sboyd@codeaurora.org>
+From: jonghun.han@samsung.com (Jonghun Han)
+Date: Wed, 06 Apr 2011 09:37:09 +0900
+Subject: [PATCH 5/7] v4l: s5p-fimc: add pm_runtime support
+In-Reply-To: <1302012410-17984-6-git-send-email-m.szyprowski@samsung.com>
+References: <1302012410-17984-1-git-send-email-m.szyprowski@samsung.com>
+	<1302012410-17984-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <007c01cbf3f2$c6e7b420$54b71c60$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-udelay() can be incorrect on SMP machines that scale their CPU
-frequencies independently of one another (as pointed out here
-http://article.gmane.org/gmane.linux.kernel/977567). The delay
-loop can either be too fast or too slow depending on which CPU the
-loops_per_jiffy counter is calibrated on and which CPU the delay
-loop is running on. udelay() can also be incorrect if the
-CPU frequency switches during the __delay() loop, causing the loop
-to either terminate too early, or too late.
+AALQBmAGkAbQBjADoAIA
+	BhAGQAZAAgAHAAbQBfAHIAdQBuAHQAaQBtAGUAIABzAHUAcABwAG8AcgB0AA==
+x-cr-puzzleid: {0DF5696E-C27B-4620-A41E-B97F4C401FEA}
 
-Forcing udelay() to run on one CPU is unreasonable and taking the
-penalty of a rather large loops_per_jiffy in udelay() when the
-CPU is actually running slower is bad for performance. Solve the
-problem by adding a timer based__delay() loop unaffected by CPU
-frequency scaling. Machines should set this loop as their
-__delay() implementation by calling set_timer_fn() during their
-timer initialization.
 
-The kernel is already prepared for a timer based approach
-(evident by the read_current_timer() function). If an arch
-implements read_current_timer(), calibrate_delay() will use
-calibrate_delay_direct() to calculate loops_per_jiffy (in which
-case loops_per_jiffy should really be renamed to
-timer_ticks_per_jiffy). Since the loops_per_jiffy will be based
-on timer ticks, __delay() should be implemented as a loop around
-read_current_timer().
+Hi Marek,
 
-Doing this makes the expensive loops_per_jiffy calculation go
-away (saving ~150ms on boot time on my machine) and fixes
-udelay() by making it safe in the face of independently scaling
-CPUs. The only prerequisite is that read_current_timer() is
-monotonically increasing across calls (and doesn't overflow
-within ~2000us).
+runtime_pm is used to minimize current.
+In my opinion, the followings will be better.
+1. Adds pm_runtime_get_sync before running of the first job.
+   IMO, dma_run callback function is the best place for calling in case of
+M2M.
+2. And then in the ISR, call pm_runtime_put_sync in the ISR bottom-half if
+there is no remained job.
 
-There is a downside to this approach though. BogoMIPS is no
-longer "accurate" in that it reflects the BogoMIPS of the timer
-and not the CPU. On most SoC's the timer isn't running anywhere
-near as fast as the CPU so BogoMIPS will be ridiculously low (my
-timer runs at 4.8 MHz and thus my BogoMIPS is 9.6 compared to my
-CPU's 800). This shouldn't be too much of a concern though since
-BogoMIPS are bogus anyway (hence the name).
+I had already implemented and tested.
+But it remained code cleanup. I hope I can post it on the next week.
 
-This loop is pretty much a copy of AVR's version.
+Best regards,
+Jonghun Han
 
-Reported-and-reviewed-by: Saravana Kannan <skannan@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/delay.h |    2 ++
- arch/arm/lib/delay.c         |   17 +++++++++++++++++
- 2 files changed, 19 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index 82ef82a..91063a3 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -47,5 +47,7 @@ static inline void set_delay_fn(void (*fn)(unsigned long))
- 	delay_fn = fn;
- }
- 
-+extern void read_current_timer_delay_loop(unsigned long loops);
-+
- #endif /* defined(_ARM_DELAY_H) */
- 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 42cda15..b8825e9 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -9,6 +9,7 @@
-  */
- #include <linux/module.h>
- #include <linux/delay.h>
-+#include <linux/timex.h>
- 
- /*
-  * Oh, if only we had a cycle counter...
-@@ -23,6 +24,22 @@ static void delay_loop(unsigned long loops)
- 	);
- }
- 
-+#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+/*
-+ * Assumes read_current_timer() is monotonically increasing
-+ * across calls and wraps at most once within MAX_UDELAY_MS.
-+ */
-+void read_current_timer_delay_loop(unsigned long loops)
-+{
-+	unsigned long bclock, now;
-+
-+	read_current_timer(&bclock);
-+	do {
-+		read_current_timer(&now);
-+	} while ((now - bclock) < loops);
-+}
-+#endif
-+
- void (*delay_fn)(unsigned long) = delay_loop;
- 
- /*
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+On Tuesday, April 05, 2011 11:07 PM Marek Szyprowski wrote:
+> This patch adds basic support for pm_runtime to s5p-fimc driver. PM
+runtime
+> support is required to enable the driver on S5PV310 series with power
+domain
+> driver enabled.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/media/video/s5p-fimc/fimc-capture.c |    5 +++++
+>  drivers/media/video/s5p-fimc/fimc-core.c    |   14 ++++++++++++++
+>  2 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/media/video/s5p-fimc/fimc-capture.c
+> b/drivers/media/video/s5p-fimc/fimc-capture.c
+> index 95f8b4e1..f697ed1 100644
+> --- a/drivers/media/video/s5p-fimc/fimc-capture.c
+> +++ b/drivers/media/video/s5p-fimc/fimc-capture.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/device.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/list.h>
+>  #include <linux/slab.h>
+>  #include <linux/clk.h>
+> @@ -398,6 +399,8 @@ static int fimc_capture_open(struct file *file)
+>  	if (fimc_m2m_active(fimc))
+>  		return -EBUSY;
+> 
+> +	pm_runtime_get_sync(&fimc->pdev->dev);
+> +
+>  	if (++fimc->vid_cap.refcnt == 1) {
+>  		ret = fimc_isp_subdev_init(fimc, 0);
+>  		if (ret) {
+> @@ -428,6 +431,8 @@ static int fimc_capture_close(struct file *file)
+>  		fimc_subdev_unregister(fimc);
+>  	}
+> 
+> +	pm_runtime_put_sync(&fimc->pdev->dev);
+> +
+>  	return 0;
+>  }
+> 
+> diff --git a/drivers/media/video/s5p-fimc/fimc-core.c
+> b/drivers/media/video/s5p-fimc/fimc-core.c
+> index 6c919b3..ead5c0a 100644
+> --- a/drivers/media/video/s5p-fimc/fimc-core.c
+> +++ b/drivers/media/video/s5p-fimc/fimc-core.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/device.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/list.h>
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+> @@ -1410,6 +1411,8 @@ static int fimc_m2m_open(struct file *file)
+>  	if (fimc->vid_cap.refcnt > 0)
+>  		return -EBUSY;
+> 
+> +	pm_runtime_get_sync(&fimc->pdev->dev);
+> +
+>  	fimc->m2m.refcnt++;
+>  	set_bit(ST_OUTDMA_RUN, &fimc->state);
+> 
+> @@ -1452,6 +1455,8 @@ static int fimc_m2m_release(struct file *file)
+>  	if (--fimc->m2m.refcnt <= 0)
+>  		clear_bit(ST_OUTDMA_RUN, &fimc->state);
+> 
+> +	pm_runtime_put_sync(&fimc->pdev->dev);
+> +
+>  	return 0;
+>  }
+> 
+> @@ -1649,6 +1654,11 @@ static int fimc_probe(struct platform_device *pdev)
+>  		goto err_req_region;
+>  	}
+> 
+> +	pm_runtime_set_active(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+> +	pm_runtime_get_sync(&pdev->dev);
+> +
+>  	fimc->num_clocks = MAX_FIMC_CLOCKS - 1;
+> 
+>  	/* Check if a video capture node needs to be registered. */ @@ -
+1706,6
+> +1716,8 @@ static int fimc_probe(struct platform_device *pdev)
+>  	dev_dbg(&pdev->dev, "%s(): fimc-%d registered successfully\n",
+>  		__func__, fimc->id);
+> 
+> +	pm_runtime_put_sync(&pdev->dev);
+> +
+>  	return 0;
+> 
+>  err_m2m:
+> @@ -1740,6 +1752,8 @@ static int __devexit fimc_remove(struct
+platform_device
+> *pdev)
+> 
+>  	vb2_dma_contig_cleanup_ctx(fimc->alloc_ctx);
+> 
+> +	pm_runtime_disable(&pdev->dev);
+> +
+>  	iounmap(fimc->regs);
+>  	release_resource(fimc->regs_res);
+>  	kfree(fimc->regs_res);
+> --
+> 1.7.1.569.g6f426
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
