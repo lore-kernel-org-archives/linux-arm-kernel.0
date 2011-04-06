@@ -1,64 +1,42 @@
-From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Wed, 06 Apr 2011 08:10:36 -0700
-Subject: [RFC 1/5]arch/arm/common/Makefile Remove unused config in the
-	Makefile.
-In-Reply-To: <20110406080522.GZ13963@pengutronix.de>
-References: <1302022702-24541-1-git-send-email-justinmattock@gmail.com>
-	<20110406080522.GZ13963@pengutronix.de>
-Message-ID: <4D9C826C.5050802@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 06 Apr 2011 08:26:36 -0700
+Subject: [GIT PULL] OMAP PM fixes for 2.6.39-rc
+Message-ID: <87sjtvieoj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2011 01:05 AM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Tue, Apr 05, 2011 at 09:58:18AM -0700, Justin P. Mattock wrote:
->> The patch below removes an unused config variable found by using a kernel
->> cleanup script.
->> Note: I did try to cross compile these but hit erros while doing so..
->> (gcc is not setup to cross compile) and am unsure if anymore needs to be done.
->> Please have a look if/when anybody has free time.
->>
->> Signed-off-by: Justin P. Mattock<justinmattock@gmail.com>
->> CC: Russell King<linux@arm.linux.org.uk>
->> CC: linux-arm-kernel at lists.infradead.org
-> The file was removed by commit
->
-> 	6d803ba (ARM: 6483/1: arm&  sh: factorised duplicated clkdev.c)
->
-> (added the persons involved to Cc).
->
-> Acked-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
->
-> Thanks
-> Uwe
+Tony,
 
-o.k.!! Thanks for having a look at this..
+Please pull the following OMAP PM fixes for the 2.6.39-rc fixes cycle.
 
->
->> ---
->>   arch/arm/common/Makefile |    1 -
->>   1 files changed, 0 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
->> index e7521bca..6ea9b6f 100644
->> --- a/arch/arm/common/Makefile
->> +++ b/arch/arm/common/Makefile
->> @@ -16,5 +16,4 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
->>   obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
->>   obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
->>   obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->> -obj-$(CONFIG_COMMON_CLKDEV)	+= clkdev.o
->>   obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
->> --
->> 1.7.4.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+Thanks,
 
-Justin P. Mattock
+Kevin
+
+The following changes since commit 6221f222c0ebf1acdf7abcf927178f40e1a65e2a:
+
+  Linux 2.6.39-rc2 (2011-04-05 18:30:43 -0700)
+
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.39/pm-fixes
+
+Aaro Koskinen (5):
+      OMAP3+: smartreflex: fix sr_late_init() error path in probe
+      OMAP3+: smartreflex: request the memory region
+      OMAP3+: smartreflex: fix ioremap leak on probe error
+      OMAP3+: smartreflex: delete instance from sr_list on probe error
+      OMAP3+: smartreflex: delete debugfs entries on probe error
+
+Nishanth Menon (3):
+      OMAP3+: voltage: remove initial voltage
+      OMAP3+: voltage: remove spurious pr_notice for debugfs
+      OMAP4: PM: remove redundant #ifdef CONFIG_PM
+
+Shweta Gulati (1):
+      OMAP4: Intialize IVA Device in addition to DSP device.
+
+ arch/arm/mach-omap2/pm.c          |    1 +
+ arch/arm/mach-omap2/pm44xx.c      |    2 --
+ arch/arm/mach-omap2/smartreflex.c |   23 ++++++++++++++++++-----
+ arch/arm/mach-omap2/voltage.c     |    2 --
+ 4 files changed, 19 insertions(+), 9 deletions(-)
