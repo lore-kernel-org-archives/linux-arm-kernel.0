@@ -1,37 +1,31 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 07 Apr 2011 00:45:41 +0200
-Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
-	basis of the memory size.
-In-Reply-To: <alpine.LFD.2.00.1104061739100.28032@xanadu.home>
+From: ne@erfurth.eu (Nico Erfurth)
+Date: Thu, 07 Apr 2011 00:50:12 +0200
+Subject: [PATCH 0/2] ARM: Unify setup for Marvell SheevaPlugs and Seagate
+	DockStars
+In-Reply-To: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
 References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
-	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
-Message-ID: <4D9CED15.2010806@ahsoftware.de>
+Message-ID: <4D9CEE24.1080501@erfurth.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.04.2011 23:44, Nicolas Pitre wrote:
-> On Wed, 6 Apr 2011, Alexander Holler wrote:
->
->> It is possible to differentiate a SheevaPlugs and DockStars on the basis
->> of the memory size.
->>
->> This makes it possible to unify both setup files.
->
-> No no no !!!  This is an abomination!
->
-> We are not going to reduce the amount of code under arch/arm/ with such
-> fragile hacks.  This would create an even worse maintenance problem the
-> day either of those devices is released with more RAM or whatever.
+Alexander Holler wrote:
 
-DockStars are already obsolet and vanilla Linux was never supported by 
-the manufacturer (Seagate). And they never used the machine type in 
-question.
+> The first patch merges the setup for Seagate DockStars into the setup
+> for Marvell SheevaPlugs and the second one removes the machine type for
+> DockStars at all.
 
-So I don't think this in any way a fragile hack.
+That looks fine so far.
 
-Anyway, it was just a suggestion.
+> Removing the machine type for DockStar shouldn't be a big problem. Support
+> for them is already broken in mainline U-Boot since 2 versions, so changing the
+> stuff there is already needed and it shouldn't be a problem to use the same
+> machine type as used for SheevaPlugs there.
 
-Regards,
+This sounds like very bad reasoning to me. The Dockstar has a machine-id
+assigned, if the bootloader is broken, people should either use a
+working version, or fix the current one.
 
-Alexander
+Also, using the memory-size to differ between these two machines sounds
+like something thats doomed to fail in the future.
+
+Nico
