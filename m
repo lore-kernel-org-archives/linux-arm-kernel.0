@@ -1,32 +1,30 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 06 Apr 2011 10:21:47 +0300
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <4D9BEE5D.6000600@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-	<1299570622.2754.4.camel@localhost> <4D766A2F.9080001@codeaurora.org>
-	<4D86F295.8040409@codeaurora.org> <1300691551.2761.8.camel@localhost>
-	<4D87053A.70701@codeaurora.org>  <4D884489.1040205@codeaurora.org>
-	<1300781465.2735.0.camel@localhost> <4D9BEE5D.6000600@codeaurora.org>
-Message-ID: <1302074507.2742.1.camel@localhost>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 06 Apr 2011 09:25:45 +0200
+Subject: [PATCH 5/7] v4l: s5p-fimc: add pm_runtime support
+In-Reply-To: <007c01cbf3f2$c6e7b420$54b71c60$%han@samsung.com>
+References: <1302012410-17984-1-git-send-email-m.szyprowski@samsung.com>
+	<1302012410-17984-6-git-send-email-m.szyprowski@samsung.com>
+	<007c01cbf3f2$c6e7b420$54b71c60$%han@samsung.com>
+Message-ID: <000001cbf42b$dbd9db90$938d92b0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-04-06 at 10:08 +0530, Murali Nalajala wrote:
-> On 3/22/2011 1:41 PM, Artem Bityutskiy wrote:
-> > On Tue, 2011-03-22 at 12:11 +0530, Murali Nalajala wrote:
-> >> Still you have any issues/comments?
-> >
-> > No, not so far, just have not time now to look closer.
-> >
-> >
-> Did anybody got a chance to go through the patch?
+Hello,
 
-Could you start with trying to get an ack or reviewed-by from some
-maintainer form Codeaurora, e.g., David Brown? Unfortunately, MTD
-community does not have enough people who'd actively review other's
-work.
+On Wednesday, April 06, 2011 2:37 AM Jonghun Han wrote:
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+> runtime_pm is used to minimize current.
+> In my opinion, the followings will be better.
+> 1. Adds pm_runtime_get_sync before running of the first job.
+>    IMO, dma_run callback function is the best place for calling in case of
+> M2M.
+> 2. And then in the ISR, call pm_runtime_put_sync in the ISR bottom-half if
+> there is no remained job.
+
+Right my pm_runtime implementation is very simple. I've just added it to test
+if other subsystems are working.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
