@@ -1,287 +1,201 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 06 Apr 2011 15:38:27 +0530
-Subject: [PATCH 2/5] dmaengine: at_hdmac: add cyclic DMA operation support
-In-Reply-To: <426a1091ec74342f259f76ce404472b189730269.1301678094.git.nicolas.ferre@atmel.com>
-References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
-	<426a1091ec74342f259f76ce404472b189730269.1301678094.git.nicolas.ferre@atmel.com>
-Message-ID: <1302084507.27103.0.camel@vkoul-udesk3>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 6 Apr 2011 11:55:26 +0100
+Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
+In-Reply-To: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
+References: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <BANLkTik2NdDY_NNpHdA_jPc4N_8RMeXpQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-01 at 19:19 +0200, Nicolas Ferre wrote:
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Wed, Apr 6, 2011 at 11:29 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> ?* To remove the risk of inconvenient register allocation decisions
+> ? by the compiler, these functions are separated out as pure
+> ? assembler.
+>
+> ?* The apcs frame manipulation code is not applicable for Thumb-2
+> ? (and also not easily compatible). ?Since it's not essential to
+> ? have a full frame on these leaf assembler functions, the frame
+> ? manipulation is removed, in the interests of simplicity.
+>
+> ?* Split up ldm/stm instructions to be compatible with Thumb-2,
+> ? as well as avoiding instruction forms deprecated on >= ARMv7.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > ---
->  drivers/dma/at_hdmac.c      |  188 +++++++++++++++++++++++++++++++++++++++---
->  drivers/dma/at_hdmac_regs.h |   14 +++-
->  2 files changed, 186 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 13050e6..fe9e1de 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -14,6 +14,8 @@
->   * The driver has currently been tested with the Atmel AT91SAM9RL
->   * and AT91SAM9G45 series.
->   */
-> +#define DEBUG 12
-> +#define VERBOSE_DEBUG 12
-Please don't define here and use debug options available for build
-
->  
-> +/**
-> + * atc_handle_cyclic - at the end of a period, run callback function
-> + * @atchan: channel used for cyclic operations
-> + *
-> + * Called with atchan->lock held and bh disabled
-> + */
-> +static void atc_handle_cyclic(struct at_dma_chan *atchan)
+>
+> ?arch/arm/include/asm/fiq.h | ? 16 ++++++++++++-
+> ?arch/arm/kernel/Makefile ? | ? ?2 +-
+> ?arch/arm/kernel/fiq.c ? ? ?| ? 45 +--------------------------------------
+> ?arch/arm/kernel/fiqasm.S ? | ? 49 ++++++++++++++++++++++++++++++++++++++++++++
+> ?4 files changed, 66 insertions(+), 46 deletions(-)
+> ?create mode 100644 arch/arm/kernel/fiqasm.S
+>
+> diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+> index 2242ce2..45bb3ee 100644
+> --- a/arch/arm/include/asm/fiq.h
+> +++ b/arch/arm/include/asm/fiq.h
+> @@ -29,9 +29,21 @@ struct fiq_handler {
+> ?extern int claim_fiq(struct fiq_handler *f);
+> ?extern void release_fiq(struct fiq_handler *f);
+> ?extern void set_fiq_handler(void *start, unsigned int length);
+> -extern void set_fiq_regs(struct pt_regs *regs);
+> -extern void get_fiq_regs(struct pt_regs *regs);
+> ?extern void enable_fiq(int fiq);
+> ?extern void disable_fiq(int fiq);
+>
+> +/* helpers defined in fiqasm.S: */
+> +extern void __set_fiq_regs(unsigned long const *regs);
+> +extern void __get_fiq_regs(unsigned long *regs);
+> +
+> +static inline void set_fiq_regs(struct pt_regs const *regs)
 > +{
-> +	struct at_desc			*first = atc_first_active(atchan);
-> +	struct dma_async_tx_descriptor	*txd = &first->txd;
-> +	dma_async_tx_callback		callback = txd->callback;
-> +	void				*param = txd->callback_param;
-> +
-> +	dev_vdbg(chan2dev(&atchan->chan_common),
-> +			"new cyclic period llp 0x%08x\n",
-> +			channel_readl(atchan, DSCR));
-> +
-> +	if (callback)
-> +		callback(param);
-> +}
-You dont seem to be doing much expect calling callback, so doesn't it
-make sense to write so much code for just calling callback? 
->  
->  /*--  IRQ & Tasklet  ---------------------------------------------------*/
->  
-> @@ -434,8 +459,10 @@ static void atc_tasklet(unsigned long data)
->  	}
->  
->  	spin_lock(&atchan->lock);
-> -	if (test_and_clear_bit(0, &atchan->error_status))
-> +	if (test_and_clear_bit(ATC_IS_ERROR, &atchan->status))
->  		atc_handle_error(atchan);
-> +	else if (test_bit(ATC_IS_CYCLIC, &atchan->status))
-> +		atc_handle_cyclic(atchan);
->  	else
->  		atc_advance_work(atchan);
->  
-> @@ -469,7 +496,7 @@ static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
->  					/* Disable channel on AHB error */
->  					dma_writel(atdma, CHDR, atchan->mask);
->  					/* Give information to tasklet */
-> -					set_bit(0, &atchan->error_status);
-> +					set_bit(ATC_IS_ERROR, &atchan->status);
->  				}
->  				tasklet_schedule(&atchan->tasklet);
->  				ret = IRQ_HANDLED;
-> @@ -759,6 +786,127 @@ err_desc_get:
->  	return NULL;
->  }
->  
-> +/**
-> + * atc_dma_cyclic_prep - prepare the cyclic DMA transfer
-> + * @chan: the DMA channel to prepare
-> + * @buf_addr: physical DMA address where the buffer starts
-> + * @buf_len: total number of bytes for the entire buffer
-> + * @period_len: number of bytes for each period
-> + * @direction: transfer direction, to or from device
-> + */
-> +static struct dma_async_tx_descriptor *
-> +atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-> +		size_t period_len, enum dma_data_direction direction)
-> +{
-> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-> +	struct at_dma_slave	*atslave = chan->private;
-> +	struct at_desc		*first = NULL;
-> +	struct at_desc		*prev = NULL;
-> +	unsigned long		was_cyclic;
-> +	unsigned int		periods = buf_len / period_len;
-> +	unsigned int		reg_width;
-> +	u32			ctrla;
-> +	u32			ctrlb;
-> +	unsigned int		i;
-> +
-> +	dev_vdbg(chan2dev(chan), "prep_dma_cyclic: %s buf at 0x%08x - %d (%d/%d)\n",
-> +			direction == DMA_TO_DEVICE ? "TO DEVICE" : "FROM DEVICE",
-> +			buf_addr,
-> +			periods, buf_len, period_len);
-> +
-> +	if (unlikely(!atslave || !buf_len || !period_len)) {
-> +		dev_dbg(chan2dev(chan), "prep_dma_cyclic: length is zero!\n");
-> +		return NULL;
-> +	}
-> +
-> +	was_cyclic = test_and_set_bit(ATC_IS_CYCLIC, &atchan->status);
-> +	if (was_cyclic) {
-> +		dev_dbg(chan2dev(chan), "prep_dma_cyclic: channel in use!\n");
-> +		return NULL;
-> +	}
-> +
-> +	reg_width = atslave->reg_width;
-> +
-> +	/* Check for too big/unaligned periods and unaligned DMA buffer */
-> +	if (period_len > (ATC_BTSIZE_MAX << reg_width))
-> +		goto err_out;
-> +	if (unlikely(period_len & ((1 << reg_width) - 1)))
-> +		goto err_out;
-> +	if (unlikely(buf_addr & ((1 << reg_width) - 1)))
-> +		goto err_out;
-> +	if (unlikely(!(direction & (DMA_TO_DEVICE | DMA_FROM_DEVICE))))
-> +		goto err_out;
-> +
-> +	/* prepare common CRTLA/CTRLB values */
-> +	ctrla =   ATC_DEFAULT_CTRLA | atslave->ctrla
-> +		| ATC_DST_WIDTH(reg_width)
-> +		| ATC_SRC_WIDTH(reg_width)
-> +		| period_len >> reg_width;
-> +	ctrlb = ATC_DEFAULT_CTRLB;
-> +
-> +	/* build cyclic linked list */
-> +	for (i = 0; i < periods; i++) {
-would help making code look cleaner if you split this one to seprate
-function
-> +		struct at_desc	*desc;
-> +
-> +		desc = atc_desc_get(atchan);
-> +		if (!desc)
-> +			goto err_desc_get;
-> +
-> +		switch (direction) {
-> +		case DMA_TO_DEVICE:
-> +			desc->lli.saddr = buf_addr + (period_len * i);
-> +			desc->lli.daddr = atslave->tx_reg;
-> +			desc->lli.ctrla = ctrla;
-> +			desc->lli.ctrlb = ctrlb
-> +					| ATC_DST_ADDR_MODE_FIXED
-> +					| ATC_SRC_ADDR_MODE_INCR
-> +					| ATC_FC_MEM2PER;
-> +			break;
-> +
-> +		case DMA_FROM_DEVICE:
-> +			desc->lli.saddr = atslave->rx_reg;
-> +			desc->lli.daddr = buf_addr + (period_len * i);
-> +			desc->lli.ctrla = ctrla;
-> +			desc->lli.ctrlb = ctrlb
-> +					| ATC_DST_ADDR_MODE_INCR
-> +					| ATC_SRC_ADDR_MODE_FIXED
-> +					| ATC_FC_PER2MEM;
-> +			break;
-> +
-> +		default:
-> +			return NULL;
-> +		}
-> +
-> +		if (!first) {
-> +			first = desc;
-> +		} else {
-> +			/* inform the HW lli about chaining */
-> +			prev->lli.dscr = desc->txd.phys;
-> +			/* insert the link descriptor to the LD ring */
-> +			list_add_tail(&desc->desc_node,
-> +					&first->tx_list);
-> +		}
-> +		prev = desc;
-> +	}
-> +
-> +	/* lets make a cyclic list */
-> +	prev->lli.dscr = first->txd.phys;
-> +
-> +	/* First descriptor of the chain embedds additional information */
-> +	first->txd.cookie = -EBUSY;
-> +	first->len = buf_len;
-> +
-> +	return &first->txd;
-> +
-> +err_desc_get:
-> +	dev_err(chan2dev(chan), "not enough descriptors available\n");
-> +	atc_desc_put(atchan, first);
-> +err_out:
-> +	clear_bit(ATC_IS_CYCLIC, &atchan->status);
-> +	return NULL;
+> + ? ? ? __set_fiq_regs(&regs->ARM_r8);
 > +}
 > +
+> +static inline void get_fiq_regs(struct pt_regs *regs)
+> +{
+> + ? ? ? __get_fiq_regs(&regs->ARM_r8);
+> +}
 > +
->  static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  		       unsigned long arg)
->  {
-> @@ -793,6 +941,9 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	list_for_each_entry_safe(desc, _desc, &list, desc_node)
->  		atc_chain_complete(atchan, desc);
->  
-> +	/* if channel dedicated to cyclic operations, free it */
-> +	clear_bit(ATC_IS_CYCLIC, &atchan->status);
-> +
->  	spin_unlock_bh(&atchan->lock);
->  
->  	return 0;
-> @@ -853,6 +1004,10 @@ static void atc_issue_pending(struct dma_chan *chan)
->  
->  	dev_vdbg(chan2dev(chan), "issue_pending\n");
->  
-> +	/* Not needed for cyclic transfers */
-> +	if (test_bit(ATC_IS_CYCLIC, &atchan->status))
-> +		return;
-> +
->  	spin_lock_bh(&atchan->lock);
->  	if (!atc_chan_is_enabled(atchan)) {
->  		atc_advance_work(atchan);
-> @@ -1092,10 +1247,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  	if (dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask))
->  		atdma->dma_common.device_prep_dma_memcpy = atc_prep_dma_memcpy;
->  
-> -	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)) {
-> +	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask))
->  		atdma->dma_common.device_prep_slave_sg = atc_prep_slave_sg;
-> +
-> +	if (dma_has_cap(DMA_CYCLIC, atdma->dma_common.cap_mask))
-> +		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
-> +
-> +	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask) ||
-> +	    dma_has_cap(DMA_CYCLIC, atdma->dma_common.cap_mask))
->  		atdma->dma_common.device_control = atc_control;
-> -	}
->  
->  	dma_writel(atdma, EN, AT_DMA_ENABLE);
->  
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index 8303306..c79a9e0 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -181,12 +181,22 @@ txd_to_at_desc(struct dma_async_tx_descriptor *txd)
->  /*--  Channels  --------------------------------------------------------*/
->  
->  /**
-> + * atc_status - information bits stored in channel status flag
+> ?#endif
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 74554f1..689f4d9 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -24,7 +24,7 @@ obj-$(CONFIG_OC_ETM) ? ? ? ? ?+= etm.o
+>
+> ?obj-$(CONFIG_ISA_DMA_API) ? ? ?+= dma.o
+> ?obj-$(CONFIG_ARCH_ACORN) ? ? ? += ecard.o
+> -obj-$(CONFIG_FIQ) ? ? ? ? ? ? ?+= fiq.o
+> +obj-$(CONFIG_FIQ) ? ? ? ? ? ? ?+= fiq.o fiqasm.o
+> ?obj-$(CONFIG_MODULES) ? ? ? ? ?+= armksyms.o module.o
+> ?obj-$(CONFIG_ARTHUR) ? ? ? ? ? += arthur.o
+> ?obj-$(CONFIG_ISA_DMA) ? ? ? ? ?+= dma-isa.o
+> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+> index e72dc34..4c164ec 100644
+> --- a/arch/arm/kernel/fiq.c
+> +++ b/arch/arm/kernel/fiq.c
+> @@ -89,47 +89,6 @@ void set_fiq_handler(void *start, unsigned int length)
+> ? ? ? ? ? ? ? ?flush_icache_range(0x1c, 0x1c + length);
+> ?}
+>
+> -/*
+> - * Taking an interrupt in FIQ mode is death, so both these functions
+> - * disable irqs for the duration. ?Note - these functions are almost
+> - * entirely coded in assembly.
+> - */
+> -void __naked set_fiq_regs(struct pt_regs *regs)
+> -{
+> - ? ? ? register unsigned long tmp;
+> - ? ? ? asm volatile (
+> - ? ? ? "mov ? ?ip, sp\n\
+> - ? ? ? stmfd ? sp!, {fp, ip, lr, pc}\n\
+> - ? ? ? sub ? ? fp, ip, #4\n\
+> - ? ? ? mrs ? ? %0, cpsr\n\
+> - ? ? ? msr ? ? cpsr_c, %2 ? ? ?@ select FIQ mode\n\
+> - ? ? ? mov ? ? r0, r0\n\
+> - ? ? ? ldmia ? %1, {r8 - r14}\n\
+> - ? ? ? msr ? ? cpsr_c, %0 ? ? ?@ return to SVC mode\n\
+> - ? ? ? mov ? ? r0, r0\n\
+> - ? ? ? ldmfd ? sp, {fp, sp, pc}"
+> - ? ? ? : "=&r" (tmp)
+> - ? ? ? : "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
+> -}
+> -
+> -void __naked get_fiq_regs(struct pt_regs *regs)
+> -{
+> - ? ? ? register unsigned long tmp;
+> - ? ? ? asm volatile (
+> - ? ? ? "mov ? ?ip, sp\n\
+> - ? ? ? stmfd ? sp!, {fp, ip, lr, pc}\n\
+> - ? ? ? sub ? ? fp, ip, #4\n\
+> - ? ? ? mrs ? ? %0, cpsr\n\
+> - ? ? ? msr ? ? cpsr_c, %2 ? ? ?@ select FIQ mode\n\
+> - ? ? ? mov ? ? r0, r0\n\
+> - ? ? ? stmia ? %1, {r8 - r14}\n\
+> - ? ? ? msr ? ? cpsr_c, %0 ? ? ?@ return to SVC mode\n\
+> - ? ? ? mov ? ? r0, r0\n\
+> - ? ? ? ldmfd ? sp, {fp, sp, pc}"
+> - ? ? ? : "=&r" (tmp)
+> - ? ? ? : "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
+> -}
+> -
+> ?int claim_fiq(struct fiq_handler *f)
+> ?{
+> ? ? ? ?int ret = 0;
+> @@ -174,8 +133,8 @@ void disable_fiq(int fiq)
+> ?}
+>
+> ?EXPORT_SYMBOL(set_fiq_handler);
+> -EXPORT_SYMBOL(set_fiq_regs);
+> -EXPORT_SYMBOL(get_fiq_regs);
+> +EXPORT_SYMBOL(__set_fiq_regs); /* defined in fiqasm.S */
+> +EXPORT_SYMBOL(__get_fiq_regs); /* defined in fiqasm.S */
+> ?EXPORT_SYMBOL(claim_fiq);
+> ?EXPORT_SYMBOL(release_fiq);
+> ?EXPORT_SYMBOL(enable_fiq);
+> diff --git a/arch/arm/kernel/fiqasm.S b/arch/arm/kernel/fiqasm.S
+> new file mode 100644
+> index 0000000..0504bb8
+> --- /dev/null
+> +++ b/arch/arm/kernel/fiqasm.S
+> @@ -0,0 +1,49 @@
+> +/*
+> + * ?linux/arch/arm/kernel/fiqasm.S
 > + *
-> + * Manipulated with atomic operations.
+> + * ?Derived from code originally in linux/arch/arm/kernel/fiq.c:
+> + *
+> + * ?Copyright (C) 1998 Russell King
+> + * ?Copyright (C) 1998, 1999 Phil Blundell
+> + * ?Copyright (C) 2011, Linaro Limited
+> + *
+> + * ?FIQ support written by Philip Blundell <philb@gnu.org>, 1998.
+> + *
+> + * ?FIQ support re-written by Russell King to be more generic
+> + *
+> + * ?v7/Thumb-2 compatibility modifications by Linaro Limited, 2011.
 > + */
-> +enum atc_status {
-> +	ATC_IS_ERROR = 0,
-> +	ATC_IS_CYCLIC = 24,
-> +};
 > +
-> +/**
->   * struct at_dma_chan - internal representation of an Atmel HDMAC channel
->   * @chan_common: common dmaengine channel object members
->   * @device: parent device
->   * @ch_regs: memory mapped register base
->   * @mask: channel index in a mask
-> - * @error_status: transmit error status information from irq handler
-> + * @status: transmit status information from irq/prep* functions
->   *                to tasklet (use atomic operations)
->   * @tasklet: bottom half to finish transaction work
->   * @lock: serializes enqueue/dequeue operations to descriptors lists
-> @@ -201,7 +211,7 @@ struct at_dma_chan {
->  	struct at_dma		*device;
->  	void __iomem		*ch_regs;
->  	u8			mask;
-> -	unsigned long		error_status;
-> +	unsigned long		status;
->  	struct tasklet_struct	tasklet;
->  
->  	spinlock_t		lock;
+> +#include <arm/assembler.h>
+> +
+> +/*
+> + * Taking an interrupt in FIQ mode is death, so both these functions
+> + * disable irqs for the duration. ?Note - these functions are almost
+> + * entirely coded in assembly.
+> + */
+> +
+> +ENTRY(__set_fiq_regs)
+> + ? ? ? mov ? ? r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
+> + ? ? ? mrs ? ? r1, cpsr
+> + ? ? ? msr ? ? cpsr_c, r2 ? ? ?@ select FIQ mode
+> + ? ? ? mov ? ? r0, r0 ? ? ? ? ?@ avoid hazard prior to ARMv4
+> + ? ? ? ldmia ? r0!, {r8 - r12}
+> + ? ? ? ldr ? ? sp, [r0], #4
+> + ? ? ? ldr ? ? lr, [r0]
+> + ? ? ? msr ? ? cpsr_c, r1 ? ? ?@ return to SVC mode
+> + ? ? ? mov ? ? r0, r0 ? ? ? ? ?@ avoid hazard prior to ARMv4
+> + ? ? ? mov ? ? pc, lr
+> +ENDPROC(__set_fiq_regs)
+> +
+> +ENTRY(__get_fiq_regs)
+> + ? ? ? mov ? ? r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
+> + ? ? ? mrs ? ? r1, cpsr
+> + ? ? ? msr ? ? cpsr_c, r2 ? ? ?@ select FIQ mode
+> + ? ? ? mov ? ? r0, r0 ? ? ? ? ?@ avoid hazard prior to ARMv4
+> + ? ? ? stmia ? r0!, {r8 - r12}
+> + ? ? ? str ? ? sp, [r0], #4
+> + ? ? ? str ? ? lr, [r0]
+> + ? ? ? msr ? ? cpsr_c, r1 ? ? ?@ return to SVC mode
+> + ? ? ? mov ? ? r0, r0 ? ? ? ? ?@ avoid hazard prior to ARMv4
+> + ? ? ? mov ? ? pc, lr
+> +ENDPROC(__get_fiq_regs)
+> --
+> 1.7.1
+>
+>
 
+Note -- this patch contains some minor errors, but I'm more interested
+in feedback on the general idea for now.
 
-
--- 
-~Vinod
+Cheers
+---Dave
