@@ -1,57 +1,27 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Wed, 6 Apr 2011 08:42:48 -0600
-Subject: For SMP,
-	Is platform specific secondary startup functionreally needed?
-In-Reply-To: <1302100751.28846.6.camel@e102109-lin.cambridge.arm.com>
-References: <7b2e9aed-1162-43f3-8c33-59b43b0a1964@VA3EHSMHS036.ehs.local>
-	<1302100751.28846.6.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <a192437f-15b5-4783-b039-6f1128f5c730@VA3EHSMHS014.ehs.local>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 6 Apr 2011 17:46:43 +0300
+Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
+In-Reply-To: <BANLkTikZrjgjJBpeBoSHGzCshYrHQZ6hQg@mail.gmail.com>
+References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
+	<201104042047.55504.anarsoul@gmail.com>
+	<BANLkTikZrjgjJBpeBoSHGzCshYrHQZ6hQg@mail.gmail.com>
+Message-ID: <201104061746.44134.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Wednesday, April 06, 2011 8:39 AM
-> To: John Linn
-> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
-> Subject: Re: For SMP, Is platform specific secondary startup
-> functionreally needed?
+On Tuesday 05 April 2011 06:21:27 Eric Miao wrote:
+> On Tue, Apr 5, 2011 at 1:47 AM, Vasily Khoruzhick <anarsoul@gmail.com> 
+wrote:
+> > On Monday 04 April 2011 20:35:14 Mike Frysinger wrote:
+> >> that's fine, i do.  was this patch actually merged ?  or is there a
+> >> new version on the way ?
+> >> -mike
+> > 
+> > I suspect it's not merged yet. Btw, should I make a patch which fixes all
+> > drivers, or it's prefferable to make one patch per driver?
 > 
-> On Wed, 2011-04-06 at 14:48 +0100, John Linn wrote:
-> > I'm doing some cleanup of SMP patches based on Russell and Catalin's
-> > input which was real helpful. It seems to me that there is not
-always
-> a
-> > need for a platform specific secondary startup.
-> >
-> > I have tested with just letting CPU1 go straight to
-> secondary_startup()
-> > in head.S and it works fine.
-> >
-> > I'm probably missing something obvious, if so can you share it?
-> 
-> We use the pen release mechanism serialise the secondary CPUs booting.
+> Please come up with one patch, Mike can help add a Tested-by then.
 
-I'm not saying you can't have it, just that some platforms may not need
-it.
-
-Maybe I'm oversimplifying the boot process for our platform, but it
-seems to 
-be working fine.
-
--- John
-
-> 
-> --
-> Catalin
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Sorry, but I did not get if you want splitted patch or not :) Anyway, 4 on-
+line-patches does not look reasonable anyway, so I'm sending not-splitted 
+patch in few minutes.
