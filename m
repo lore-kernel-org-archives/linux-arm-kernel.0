@@ -1,73 +1,39 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 6 Apr 2011 13:05:26 -0300
-Subject: [PATCH] ARM: mx51: Remove imx51_add_gpio_keys
-Message-ID: <1302105926-20574-1-git-send-email-fabio.estevam@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 06 Apr 2011 17:36:07 +0100
+Subject: For SMP, Is platform specific secondary startup functionreally
+	needed?
+In-Reply-To: <a192437f-15b5-4783-b039-6f1128f5c730@VA3EHSMHS014.ehs.local>
+References: <7b2e9aed-1162-43f3-8c33-59b43b0a1964@VA3EHSMHS036.ehs.local>
+	<1302100751.28846.6.camel@e102109-lin.cambridge.arm.com>
+	<a192437f-15b5-4783-b039-6f1128f5c730@VA3EHSMHS014.ehs.local>
+Message-ID: <1302107767.28846.105.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need for using a MX51-specific version of imx_add_gpio_keys.
+On Wed, 2011-04-06 at 15:42 +0100, John Linn wrote:
+> > On Wed, 2011-04-06 at 14:48 +0100, John Linn wrote:
+> > > I'm doing some cleanup of SMP patches based on Russell and Catalin's
+> > > input which was real helpful. It seems to me that there is not always a
+> > > need for a platform specific secondary startup.
+> > >
+> > > I have tested with just letting CPU1 go straight to secondary_startup()
+> > > in head.S and it works fine.
+> > >
+> > > I'm probably missing something obvious, if so can you share it?
+> >
+> > We use the pen release mechanism serialise the secondary CPUs booting.
+> 
+> I'm not saying you can't have it, just that some platforms may not need
+> it.
+> 
+> Maybe I'm oversimplifying the boot process for our platform, but it
+> seems to be working fine.
 
-Remove imx51_add_gpio_keys and use imx_add_gpio_keys instead.
+I haven't looked at your code in detail. Does this platform only have
+two cores? If that's the case, you should be fine.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |    2 +-
- arch/arm/mach-mx5/board-mx51_efikamx.c |    2 +-
- arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
- arch/arm/mach-mx5/devices-imx51.h      |    2 --
- 4 files changed, 3 insertions(+), 5 deletions(-)
+But if you have more than one core and you don't serialise the entry to
+secondary_startup(), the __cpu_up() function may get confused.
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index bea4e41..3ce3806 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -361,7 +361,7 @@ static void __init mx51_babbage_init(void)
- 
- 	/* Set the PAD settings for the pwr key. */
- 	mxc_iomux_v3_setup_pad(power_key);
--	imx51_add_gpio_keys(&imx_button_data);
-+	imx_add_gpio_keys(&imx_button_data);
- 
- 	imx51_add_imx_i2c(0, &babbage_i2c_data);
- 	imx51_add_imx_i2c(1, &babbage_i2c_data);
-diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-index acab191..5a36862 100644
---- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-+++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-@@ -252,7 +252,7 @@ static void __init mx51_efikamx_init(void)
- 	}
- 
- 	platform_device_register(&mx51_efikamx_leds_device);
--	imx51_add_gpio_keys(&mx51_efikamx_powerkey_data);
-+	imx_add_gpio_keys(&mx51_efikamx_powerkey_data);
- 
- 	if (system_rev == 0x11) {
- 		gpio_request(EFIKAMX_RESET1_1, "reset");
-diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
-index db04ce8..01bece0 100644
---- a/arch/arm/mach-mx5/board-mx51_efikasb.c
-+++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
-@@ -260,7 +260,7 @@ static void __init efikasb_board_init(void)
- 	imx51_add_sdhci_esdhc_imx(1, NULL);
- 
- 	platform_device_register(&mx51_efikasb_leds_device);
--	imx51_add_gpio_keys(&mx51_efikasb_keys_data);
-+	imx_add_gpio_keys(&mx51_efikasb_keys_data);
- 
- }
- 
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-index 7fff485..25ce922 100644
---- a/arch/arm/mach-mx5/devices-imx51.h
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -13,8 +13,6 @@ extern const struct imx_fec_data imx51_fec_data __initconst;
- #define imx51_add_fec(pdata)	\
- 	imx_add_fec(&imx51_fec_data, pdata)
- 
--#define imx51_add_gpio_keys(pdata) imx_add_gpio_keys(pdata)
--
- extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
- #define imx51_add_imx_i2c(id, pdata)	\
- 	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
 -- 
-1.6.0.4
+Catalin
