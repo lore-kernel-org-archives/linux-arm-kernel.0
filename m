@@ -1,88 +1,63 @@
-From: chihau@gmail.com (Chihau Chau)
-Date: Wed,  6 Apr 2011 10:28:33 -0300
-Subject: [PATCH] arm: mach-msm: acpclock-arm11: Fix some code style issues
-Message-ID: <1302096513-18680-1-git-send-email-chihau@gmail.com>
+From: rpurdie@rpsys.net (Richard Purdie)
+Date: Wed, 06 Apr 2011 06:38:17 -0700
+Subject: [PATCH v2] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <20110406123310.GD13963@pengutronix.de>
+References: <20110405163338.GA11832@n2100.arm.linux.org.uk>
+	<1302035048-25819-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302090738.22904.8.camel@rex> <20110406123310.GD13963@pengutronix.de>
+Message-ID: <1302097097.22904.41.camel@rex>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fix some code style issues like braces in the incorrect position, assignments in a if condition and lack of a space before '&&'
+On Wed, 2011-04-06 at 14:33 +0200, Uwe Kleine-K?nig wrote:
+> On Wed, Apr 06, 2011 at 04:52:18AM -0700, Richard Purdie wrote:
+> > I guess the motivation might be that if a given platform has many
+> > different LED configurations, you're trying to remove the ones you don't
+> > need from memory? Given all the above I'd suggest that this function
+> > should really be added to the platform device code if anywhere and
+> "platform device code" means e.g. arch/arm/plat-mxc or drivers/base
+> here?
 
-Signed-off-by: Chihau Chau <chihau@gmail.com>
----
- arch/arm/mach-msm/acpuclock-arm11.c |   19 +++++++++++--------
- 1 files changed, 11 insertions(+), 8 deletions(-)
+Yes.
 
-diff --git a/arch/arm/mach-msm/acpuclock-arm11.c b/arch/arm/mach-msm/acpuclock-arm11.c
-index 7ffbd98..d716cf1 100644
---- a/arch/arm/mach-msm/acpuclock-arm11.c
-+++ b/arch/arm/mach-msm/acpuclock-arm11.c
-@@ -51,8 +51,7 @@
- #define PERF_SWITCH_DEBUG 0
- #define PERF_SWITCH_STEP_DEBUG 0
- 
--struct clock_state
--{
-+struct clock_state {
- 	struct clkctl_acpu_speed	*current_speed;
- 	struct mutex			lock;
- 	uint32_t			acpu_switch_time_us;
-@@ -88,7 +87,7 @@ struct clkctl_acpu_speed {
- 	unsigned int	ahbclk_khz;
- 	unsigned int	ahbclk_div;
- 	int		vdd;
--	unsigned int 	axiclk_khz;
-+	unsigned int	axiclk_khz;
- 	unsigned long	lpj; /* loops_per_jiffy */
- /* Index in acpu_freq_tbl[] for steppings. */
- 	short		down;
-@@ -176,7 +175,8 @@ static int pc_pll_request(unsigned id, unsigned on)
-  * ARM11 'owned' clock control
-  *---------------------------------------------------------------------------*/
- 
--unsigned long acpuclk_power_collapse(void) {
-+unsigned long acpuclk_power_collapse(void)
-+{
- 	int ret = acpuclk_get_rate();
- 	ret *= 1000;
- 	if (ret > drv_state.power_collapse_khz)
-@@ -189,7 +189,8 @@ unsigned long acpuclk_get_wfi_rate(void)
- 	return drv_state.wait_for_irq_khz;
- }
- 
--unsigned long acpuclk_wait_for_irq(void) {
-+unsigned long acpuclk_wait_for_irq(void)
-+{
- 	int ret = acpuclk_get_rate();
- 	ret *= 1000;
- 	if (ret > drv_state.wait_for_irq_khz)
-@@ -223,7 +224,8 @@ static int acpuclk_set_vdd_level(int vdd)
- }
- 
- /* Set proper dividers for the given clock speed. */
--static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
-+static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s)
-+{
- 	uint32_t reg_clkctl, reg_clksel, clk_div;
- 
- 	/* AHB_CLK_DIV */
-@@ -336,7 +338,8 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
- 		}
- 		/* Increase VDD if needed. */
- 		if (tgt_s->vdd > cur_s->vdd) {
--			if ((rc = acpuclk_set_vdd_level(tgt_s->vdd)) < 0) {
-+			rc = acpuclk_set_vdd_level(tgt_s->vdd)
-+			if (rc < 0) {
- 				printk(KERN_ERR "Unable to switch ACPU vdd\n");
- 				goto out;
- 			}
-@@ -378,7 +381,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
- 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
- 			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
- #endif
--		if (!for_power_collapse&& cur_s->pll != ACPU_PLL_TCXO
-+		if (!for_power_collapse && cur_s->pll != ACPU_PLL_TCXO
- 		    && !(plls_enabled & (1 << cur_s->pll))) {
- 			rc = pc_pll_request(cur_s->pll, 1);
- 			if (rc < 0) {
+> > doesn't belong in the LED subsystem as its not an LED specific problem.
+> yeap, that's it. Note that this thread[1] started on the linux-arm-kernel
+> mailing list with a imx-specific version of this function. With the
+> background of Linus' recent rant against churn in arch/arm several
+> people pointed out that this can better go to a more generic place where
+> not only arm/imx, but also arm/omap and even powerpc can use the same
+> code. So the (IMHO) obvious place to put the code is near the driver.
+> 
+> And yes, the problem is not LED specific, but a function that creates
+> and registers a leds-gpio device *is* LED specific. A while back I
+> thought about introducing something like drivers/register/*, but I'm
+> sure this won't scale. Either you need a header per device type (or at
+> subsystem) or a single header. Both look ugly in my eyes. Having the
+> prototype in include/linux/leds.h seems the right thing, because
+> platform code needs to include that anyhow to provide a struct
+> gpio_led_platform_data.
+> 
+> I don't consider something wrong here, because the Linux device model
+> requires that you have a driver and a device. Both have to match and the
+> device (usually) is created at boot time. Because of the needed match
+> it's natural to have device use (aka driver) and device creation at the
+> same place. Because of the boot time thing the code needs to be
+> built-in.
+
+It should only be built-in on platforms that both use leds-gpio and want
+to use this function at boot time. This is not the description of
+leds-core.c.
+
+I understand the issue and the desire to move it into common code, I
+think that is good but I don't think you've found the most appropriate
+place yet.
+
+I'm tempted to suggest making the function a static inline in leds.h (or
+create an leds-gpio.h and move the struct definition there too).
+
+Cheers,
+
+Richard
 -- 
-1.7.3.4
+Linux Foundation
+http://www.yoctoproject.org/
