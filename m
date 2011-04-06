@@ -1,39 +1,80 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 7 Apr 2011 03:47:48 +0900
-Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
-In-Reply-To: <20110406184022.GI13963@pengutronix.de>
-References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110406163805.GA11820@linux-sh.org>
-	<20110406184022.GI13963@pengutronix.de>
-Message-ID: <20110406184746.GE18426@linux-sh.org>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed,  6 Apr 2011 21:07:01 +0200
+Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize latency
+Message-ID: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2011 at 08:40:22PM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Apr 07, 2011 at 01:38:13AM +0900, Paul Mundt wrote:
-> > On Wed, Apr 06, 2011 at 04:29:04PM +0200, Uwe Kleine-K??nig wrote:
-> > > All machines having a imx-fb device now select IMX_HAVE_PLATFORM_IMX_FB,
-> > > so HAVE_FB_IMX can go away and there is no need anymore to explicitly
-> > > depend on ARCH_MX1 or ARCH_MX2.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Hello,
-> > > 
-> > > should this go via Sascha's or Paul's tree?
-> > > 
-> > There shouldn't be anything it conflicts with in my tree, so it can go
-> > via either. Most of the imx changes have bypassed the fbdev tree, so I'm
-> > unaware if there are outstanding patches in Sascha's tree at the moment
-> > or not. I can of course take it though.
-> I currently collect imx patches for Sascha because he is busy doing
-> other stuff.  Can I have your ack for the patch that Baruch pointed out?
-> Then I'd take it for the imx tree.
-> 
-That's fine for this, but in the future it would be nice to have changes
-that impact the fb driver go through the fb tree. In cases like this
-where you have clear interdependencies in Kconfig language it obviously
-doesn't make much sense to split things up, but it's something to keep in
-mind for the things that can be.
+How significant is the cache maintenance over head?
+It depends, the eMMC are much faster now
+compared to a few years ago and cache maintenance cost more due to
+multiple cache levels and speculative cache pre-fetch. In relation the
+cost for handling the caches have increased and is now a bottle neck
+dealing with fast eMMC together with DMA.
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+The intention for introducing none blocking mmc requests is to minimize the
+time between a mmc request ends and another mmc request starts. In the
+current implementation the MMC controller is idle when dma_map_sg and
+dma_unmap_sg is processing. Introducing none blocking mmc request makes it
+possible to prepare the caches for next job parallel with an active
+mmc request.
+
+This is done by making the issue_rw_rq() none blocking.
+The increase in throughput is proportional to the time it takes to
+prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+a request and how fast the memory is. The faster the MMC/SD is
+the more significant the prepare request time becomes. Measurements on U5500
+and Panda on eMMC and SD shows significant performance gain for for large
+reads when running DMA mode. In the PIO case the performance is unchanged.
+
+There are two optional hooks pre_req() and post_req() that the host driver
+may implement in order to move work to before and after the actual mmc_request
+function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
+the dma descriptor and post_req runs the dma_unmap_sg.
+
+Details on measurements from IOZone and mmc_test:
+https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Specs/StoragePerfMMC-async-req
+
+Changes since v1:
+ * Add support for omap_hsmmc
+ * Add test in mmc_test to compare performance with
+   and without none blocking request.
+ * Add random fault injection in mmc core to exercise error
+   handling in the mmc block code.
+ * Fix serveral issue in the mmc block error handling.
+ * Add a host_cookie member in mmc_data to be used by
+   pre_req to mark the data. The host driver will then
+   check this mark to see if the data is prepared or not.
+ * Previous patch subject was
+   "add double buffering for mmc block requests".
+
+Per Forlin (12):
+  mmc: add none blocking mmc request function
+  mmc: mmc_test: add debugfs file to list all tests
+  mmc: mmc_test: add test for none blocking transfers
+  mmc: add member in mmc queue struct to hold request data
+  mmc: add a block request prepare function
+  mmc: move error code in mmc_block_issue_rw_rq to a separate function.
+  mmc: add a second mmc queue request member
+  mmc: add handling for two parallel block requests in issue_rw_rq
+  mmc: test: add random fault injection in core.c
+  omap_hsmmc: use original sg_len for dma_unmap_sg
+  omap_hsmmc: add support for pre_req and post_req
+  mmci: implement pre_req() and post_req()
+
+ drivers/mmc/card/block.c      |  493 +++++++++++++++++++++++++++--------------
+ drivers/mmc/card/mmc_test.c   |  342 ++++++++++++++++++++++++++++-
+ drivers/mmc/card/queue.c      |  171 +++++++++------
+ drivers/mmc/card/queue.h      |   31 ++-
+ drivers/mmc/core/core.c       |  132 ++++++++++-
+ drivers/mmc/core/debugfs.c    |    5 +
+ drivers/mmc/host/mmci.c       |  146 +++++++++++-
+ drivers/mmc/host/mmci.h       |    8 +
+ drivers/mmc/host/omap_hsmmc.c |   90 +++++++-
+ include/linux/mmc/core.h      |    9 +-
+ include/linux/mmc/host.h      |   13 +-
+ lib/Kconfig.debug             |   11 +
+ 12 files changed, 1172 insertions(+), 279 deletions(-)
+
+-- 
+1.7.4.1
