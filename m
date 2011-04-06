@@ -1,83 +1,64 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed,  6 Apr 2011 17:49:15 +0300
-Subject: [PATCH] spi: Fix race condition in stop_queue()
-In-Reply-To: <201104061746.44134.anarsoul@gmail.com>
-References: <201104061746.44134.anarsoul@gmail.com>
-Message-ID: <1302101355-31187-1-git-send-email-anarsoul@gmail.com>
+From: justinmattock@gmail.com (Justin P. Mattock)
+Date: Wed, 06 Apr 2011 08:10:36 -0700
+Subject: [RFC 1/5]arch/arm/common/Makefile Remove unused config in the
+	Makefile.
+In-Reply-To: <20110406080522.GZ13963@pengutronix.de>
+References: <1302022702-24541-1-git-send-email-justinmattock@gmail.com>
+	<20110406080522.GZ13963@pengutronix.de>
+Message-ID: <4D9C826C.5050802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a race condition in stop_queue() in some drivers -
-if drv_data->queue is empty, but drv_data->busy is still set
-(or opposite situation) stop_queue will return -EBUSY.
-So fix loop condition to check that both drv_data->queue is empty
-and drv_data->busy is not set.
+On 04/06/2011 01:05 AM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Tue, Apr 05, 2011 at 09:58:18AM -0700, Justin P. Mattock wrote:
+>> The patch below removes an unused config variable found by using a kernel
+>> cleanup script.
+>> Note: I did try to cross compile these but hit erros while doing so..
+>> (gcc is not setup to cross compile) and am unsure if anymore needs to be done.
+>> Please have a look if/when anybody has free time.
+>>
+>> Signed-off-by: Justin P. Mattock<justinmattock@gmail.com>
+>> CC: Russell King<linux@arm.linux.org.uk>
+>> CC: linux-arm-kernel at lists.infradead.org
+> The file was removed by commit
+>
+> 	6d803ba (ARM: 6483/1: arm&  sh: factorised duplicated clkdev.c)
+>
+> (added the persons involved to Cc).
+>
+> Acked-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
+>
+> Thanks
+> Uwe
 
-This patch affects following drivers:
-pxa2xx_spi
-spi_bfin5xx
-amba-pl022
-dw_spi
+o.k.!! Thanks for having a look at this..
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/spi/amba-pl022.c  |    2 +-
- drivers/spi/dw_spi.c      |    2 +-
- drivers/spi/pxa2xx_spi.c  |    2 +-
- drivers/spi/spi_bfin5xx.c |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+>
+>> ---
+>>   arch/arm/common/Makefile |    1 -
+>>   1 files changed, 0 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+>> index e7521bca..6ea9b6f 100644
+>> --- a/arch/arm/common/Makefile
+>> +++ b/arch/arm/common/Makefile
+>> @@ -16,5 +16,4 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+>>   obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
+>>   obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
+>>   obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>> -obj-$(CONFIG_COMMON_CLKDEV)	+= clkdev.o
+>>   obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+>> --
+>> 1.7.4.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 71a1219..23aaaa9 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -1553,7 +1553,7 @@ static int stop_queue(struct pl022 *pl022)
- 	 * A wait_queue on the pl022->busy could be used, but then the common
- 	 * execution path (pump_messages) would be required to call wake_up or
- 	 * friends on every SPI message. Do this instead */
--	while (!list_empty(&pl022->queue) && pl022->busy && limit--) {
-+	while ((!list_empty(&pl022->queue) || pl022->busy) && limit--) {
- 		spin_unlock_irqrestore(&pl022->queue_lock, flags);
- 		msleep(10);
- 		spin_lock_irqsave(&pl022->queue_lock, flags);
-diff --git a/drivers/spi/dw_spi.c b/drivers/spi/dw_spi.c
-index 22af77f..b53be4d 100644
---- a/drivers/spi/dw_spi.c
-+++ b/drivers/spi/dw_spi.c
-@@ -821,7 +821,7 @@ static int stop_queue(struct dw_spi *dws)
- 
- 	spin_lock_irqsave(&dws->lock, flags);
- 	dws->run = QUEUE_STOPPED;
--	while (!list_empty(&dws->queue) && dws->busy && limit--) {
-+	while ((!list_empty(&dws->queue) || dws->busy) && limit--) {
- 		spin_unlock_irqrestore(&dws->lock, flags);
- 		msleep(10);
- 		spin_lock_irqsave(&dws->lock, flags);
-diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index 9592883..39cc10f 100644
---- a/drivers/spi/pxa2xx_spi.c
-+++ b/drivers/spi/pxa2xx_spi.c
-@@ -1493,7 +1493,7 @@ static int stop_queue(struct driver_data *drv_data)
- 	 * execution path (pump_messages) would be required to call wake_up or
- 	 * friends on every SPI message. Do this instead */
- 	drv_data->run = QUEUE_STOPPED;
--	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
-+	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
- 		spin_unlock_irqrestore(&drv_data->lock, flags);
- 		msleep(10);
- 		spin_lock_irqsave(&drv_data->lock, flags);
-diff --git a/drivers/spi/spi_bfin5xx.c b/drivers/spi/spi_bfin5xx.c
-index 3f22351..0e14f40 100644
---- a/drivers/spi/spi_bfin5xx.c
-+++ b/drivers/spi/spi_bfin5xx.c
-@@ -1244,7 +1244,7 @@ static inline int bfin_spi_stop_queue(struct bfin_spi_master_data *drv_data)
- 	 * friends on every SPI message. Do this instead
- 	 */
- 	drv_data->running = false;
--	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
-+	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
- 		spin_unlock_irqrestore(&drv_data->lock, flags);
- 		msleep(10);
- 		spin_lock_irqsave(&drv_data->lock, flags);
--- 
-1.7.4.1
+Justin P. Mattock
