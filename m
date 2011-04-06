@@ -1,65 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 5 Apr 2011 23:09:12 -0400 (EDT)
-Subject: RFC: Status of kernel/fiq.c
-In-Reply-To: <20110405160546.GA7976@arm.com>
-References: <20110405160546.GA7976@arm.com>
-Message-ID: <alpine.LFD.2.00.1104052302290.28032@xanadu.home>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Wed, 06 Apr 2011 10:08:53 +0530
+Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
+	standalone.
+In-Reply-To: <1300781465.2735.0.camel@localhost>
+References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>	
+	<1299570622.2754.4.camel@localhost>
+	<4D766A2F.9080001@codeaurora.org>	
+	<4D86F295.8040409@codeaurora.org>
+	<1300691551.2761.8.camel@localhost>	
+	<4D87053A.70701@codeaurora.org> <4D884489.1040205@codeaurora.org>
+	<1300781465.2735.0.camel@localhost>
+Message-ID: <4D9BEE5D.6000600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Apr 2011, Dave Martin wrote:
+On 3/22/2011 1:41 PM, Artem Bityutskiy wrote:
+> On Tue, 2011-03-22 at 12:11 +0530, Murali Nalajala wrote:
+>> Still you have any issues/comments?
+>
+> No, not so far, just have not time now to look closer.
+>
+>
+Did anybody got a chance to go through the patch?
 
-> Hi all,
-> 
-> I've hit a Thumb-2 compatibility issue in the assembler functions
-> in kernel/fiq.c, and I'm wondering how to proceed.
-> 
-> With regard to set_fiq_regs() and get_fiq_regs(), does anyone know:
-> 
->   * whether we still need the stack frame manipulation code in this
-> 	leaf function, e.g.
-> 
->         "mov    ip, sp\n\
->         stmfd  sp!, {fp, ip, lr, pc}\n\
->         sub    fp, ip, #4\n\
-> 
-> 	etc.
+Thanks,
+Murali N
 
-You could use #ifdef CONFIG_FRAME_POINTER ... #endif around it.
-
->   * what the nop (mov r0,r0) after the CPSR writes is for
->         (I'm guessing there may have been some 1-instruction hazard
->         here for some old processors, but I'm not aware of a need
->         for this in anything current.)
-
-It may not hurt either.
-
->   * should anyone be using fiq.c on v7 platforms?
-> 
-> As the code stands, it could also go wrong if the compiler
-> happens to allocate r8-r12 or lr for one of the inline asm
-> constraints -- though this is pretty unlikely to happen, and
-> I doubt if it ever has happened in practice.
-
-I don't think this is a high concern indeed.
-
-> To make this Thumb-2/v7 compatible, I'd prefer to recode a single
-> version that works for ARM and Thumb and avoids deprecated
-> instruction forms, but that may result in some ugly ifdefs to work
-> around the stack frame manipulation etc., unless we can conclude
-> that that code isn't needed.
-
-I don't think this is really needed. Many other assembly coded functions 
-in the kernel don't have frame pointer handling at all.  If some 
-backtrace is ever generated from within this function then the call 
-trace will still show the caller.
-
-> Splitting these functions out into a separate assembler file might
-> also make sense, since that makes it impossible for the compiler
-> to mess things up, and makes is possible to use ARM()/THUMB()
-> which is a bit cleaner than #ifdefs.
-
-That could effectively be a cleaner solution.
-
-
-Nicolas
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
