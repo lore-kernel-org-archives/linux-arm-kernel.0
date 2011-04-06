@@ -1,33 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 06 Apr 2011 12:13:54 +0530
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <BANLkTinZ+3PqkbbJp3fFs_Z8JBHQdPYM_g@mail.gmail.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>	<201104031726.37420.arnd@arndb.de>	<20110403160324.GA8050@n2100.arm.linux.org.uk>	<201104040259.26601.arnd@arndb.de>	<1301915022.15819.28.camel@e102109-lin.cambridge.arm.com>	<20110404112104.GB19854@n2100.arm.linux.org.uk>	<1301923457.417.34.camel@e102391-lin.cambridge.arm.com>	<20110404133104.GA23266@n2100.arm.linux.org.uk>	<1301925445.417.54.camel@e102391-lin.cambridge.arm.com>	<BANLkTi=d-rQpinSW9YPsZbkh9tDK5FLS+w@mail.gmail.com>	<4D9AB958.5010304@ti.com>
-	<BANLkTinZ+3PqkbbJp3fFs_Z8JBHQdPYM_g@mail.gmail.com>
-Message-ID: <4D9C0BAA.40602@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 06 Apr 2011 10:21:47 +0300
+Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
+	standalone.
+In-Reply-To: <4D9BEE5D.6000600@codeaurora.org>
+References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
+	<1299570622.2754.4.camel@localhost> <4D766A2F.9080001@codeaurora.org>
+	<4D86F295.8040409@codeaurora.org> <1300691551.2761.8.camel@localhost>
+	<4D87053A.70701@codeaurora.org>  <4D884489.1040205@codeaurora.org>
+	<1300781465.2735.0.camel@localhost> <4D9BEE5D.6000600@codeaurora.org>
+Message-ID: <1302074507.2742.1.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/6/2011 3:46 AM, Linus Walleij wrote:
-> 2011/4/5 Santosh Shilimkar<santosh.shilimkar@ti.com>:
->> [Me]
->>> (And third it will also eventually need to hook into the timer-based
->>> delay framework that I think Nokia is working on to be really
->>> useful, else all delays become unpredictable.)
->>>
->> Do you mean udelay()/mdelay() here ?
->
-> Yes. Stephen Boyd from Qualcomm has floated patches to fix it for the
-> ARM architecture, I just pushed him again. We use it in our
-> ST-Ericsson products.
->
-I remember the post.
+On Wed, 2011-04-06 at 10:08 +0530, Murali Nalajala wrote:
+> On 3/22/2011 1:41 PM, Artem Bityutskiy wrote:
+> > On Tue, 2011-03-22 at 12:11 +0530, Murali Nalajala wrote:
+> >> Still you have any issues/comments?
+> >
+> > No, not so far, just have not time now to look closer.
+> >
+> >
+> Did anybody got a chance to go through the patch?
 
-> Ideally you'd want that to go along with the A15 timer stuff so that this
-> monotonic high-precision timer is also used for udelay()/mdelay().
->
-The A15 counter which is always available and running can be used
-to emulate this.
+Could you start with trying to get an ack or reviewed-by from some
+maintainer form Codeaurora, e.g., David Brown? Unfortunately, MTD
+community does not have enough people who'd actively review other's
+work.
 
-Regards
-Santosh
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
