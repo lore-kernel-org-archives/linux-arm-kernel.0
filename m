@@ -1,77 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Apr 2011 17:37:02 +0200
-Subject: [PATCH 1/2] ARM: imx: use imx_add_gpio_keys to register
-	"gpio-keys" devices
-In-Reply-To: <1298912674-15153-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1298912674-15153-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110406153702.GG13963@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 06 Apr 2011 17:45:33 +0200
+Subject: [PATCH 2/5] dmaengine: at_hdmac: add cyclic DMA operation support
+In-Reply-To: <1302098555.27103.10.camel@vkoul-udesk3>
+References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>	
+	<426a1091ec74342f259f76ce404472b189730269.1301678094.git.nicolas.ferre@atmel.com>	
+	<1302084507.27103.0.camel@vkoul-udesk3>
+	<4D9C618A.9020708@atmel.com>
+	<1302098555.27103.10.camel@vkoul-udesk3>
+Message-ID: <4D9C8A9D.9070008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 06:04:33PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |   15 +++------------
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c    |   14 +++-----------
->  arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c   |   15 +++------------
->  arch/arm/mach-mx3/mach-armadillo5x0.c          |   15 +++------------
->  arch/arm/mach-mx3/mach-pcm037_eet.c            |   15 +++------------
->  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c   |   15 +++------------
-In the meantime arch/arm/mach-imx/mach-vpr200.c got another static
-struct platform_device registering a "gpio-keys" device.
-So I will squash the diff below in the commit for my pull request to
-Sascha.
+Le 06/04/2011 16:02, Koul, Vinod :
+> On Wed, 2011-04-06 at 14:50 +0200, Nicolas Ferre wrote:
+>> Le 06/04/2011 12:08, Koul, Vinod :
+>>> On Fri, 2011-04-01 at 19:19 +0200, Nicolas Ferre wrote:
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>> ---
+>>>>  drivers/dma/at_hdmac.c      |  188 +++++++++++++++++++++++++++++++++++++++---
+>>>>  drivers/dma/at_hdmac_regs.h |   14 +++-
+>>>>  2 files changed, 186 insertions(+), 16 deletions(-)
+>>>>
+>>>> +static void atc_handle_cyclic(struct at_dma_chan *atchan)
+>>>> +{
+>>>> +	struct at_desc			*first = atc_first_active(atchan);
+>>>> +	struct dma_async_tx_descriptor	*txd = &first->txd;
+>>>> +	dma_async_tx_callback		callback = txd->callback;
+>>>> +	void				*param = txd->callback_param;
+>>>> +
+>>>> +	dev_vdbg(chan2dev(&atchan->chan_common),
+>>>> +			"new cyclic period llp 0x%08x\n",
+>>>> +			channel_readl(atchan, DSCR));
+>>>> +
+>>>> +	if (callback)
+>>>> +		callback(param);
+>>>> +}
+>>> You dont seem to be doing much expect calling callback, so doesn't it
+>>> make sense to write so much code for just calling callback? 
+>>
+>> I do not totally follow you here: you mean that I should reduce the
+>> amount of variables in this function or is it a more global comment
+>> about my way of handling cyclic operations?
+> Well, in handling of cyclic operation you are only calling the callback
+> if set. If you plan to add more functionality to this function in future
+> then okay, otherwise you may reconsider this and avoid the function as
+> you are not doing much here, if it reduces code size. This is okay this
+> way also.
+> I had no comment on variables as I understand first two are unavoidable
 
-(In case someone objects that registering "gpio-keys" devices isn't imx
-specific, (s)he can have my full ack. It's already on my todo-list to
-make this more generic. Still I think this patch makes sense.)
+As far as code size and execution path is concerned, this function is
+expanded by the compiler as an inline one and I checked that it only
+takes a few lines of assembly (without function call) if the debug trace
+is not requested (~7 lines into atc_tasklet() with one call to
+atc_first_active() which is needed anyway).
 
-Best regards
-Uwe
+I would prefer to keep this simple "pseudo-inline" function just for a
+matter of code clarity.
 
-
-diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
-index feaa465..84100c6 100644
---- a/arch/arm/mach-imx/mach-vpr200.c
-+++ b/arch/arm/mach-imx/mach-vpr200.c
-@@ -136,18 +136,12 @@ static struct gpio_keys_button vpr200_gpio_keys_table[] = {
- 	{KEY_F9, GPIO_BUTTON8, 1, "vpr-keys: F9", 1, VPR_KEY_DEBOUNCE},
- };
- 
--static struct gpio_keys_platform_data vpr200_gpio_keys_data = {
-+static const struct gpio_keys_platform_data
-+		vpr200_gpio_keys_data __initconst = {
- 	.buttons = vpr200_gpio_keys_table,
- 	.nbuttons = ARRAY_SIZE(vpr200_gpio_keys_table),
- };
- 
--static struct platform_device vpr200_device_gpiokeys = {
--	.name = "gpio-keys",
--	.dev = {
--		.platform_data = &vpr200_gpio_keys_data,
--	}
--};
--
- static struct mc13xxx_platform_data vpr200_pmic = {
- 	.flags = MC13XXX_USE_ADC | MC13XXX_USE_TOUCHSCREEN,
- };
-@@ -261,7 +255,6 @@ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
- 
- static struct platform_device *devices[] __initdata = {
- 	&vpr200_flash,
--	&vpr200_device_gpiokeys,
- };
- 
- /*
-@@ -273,6 +266,7 @@ static void __init vpr200_board_init(void)
- 
- 	imx35_add_fec(NULL);
- 	imx35_add_imx2_wdt(NULL);
-+	imx_add_gpio_keys(&vpr200_gpio_keys_data);
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
-
+Best regards,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas Ferre
