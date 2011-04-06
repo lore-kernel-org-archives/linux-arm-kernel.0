@@ -1,52 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  6 Apr 2011 11:24:23 +0200
-Subject: [PATCH 3/5] driver core/platform_device_add_resources: set resource
-	to NULL if !res
-In-Reply-To: <20110301153438.GB15633@suse.de>
-References: <20110301153438.GB15633@suse.de>
-Message-ID: <1302081865-2962-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 06 Apr 2011 12:25:28 +0300
+Subject: [PATCH 00/34] Make kernel build deterministic
+In-Reply-To: <4D9C2D56.70700@suse.cz>
+References: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
+	<20110405154918.GA31337@suse.de> <1302031447.2608.41.camel@koala>
+	<4D9C2D56.70700@suse.cz>
+Message-ID: <1302081928.2742.40.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the res = NULL case more consistant to the res != NULL case
-as now both overwrite pdev->resource.
+On Wed, 2011-04-06 at 11:07 +0200, Michal Marek wrote:
+> > So additionally, I'd suggest:
+> > 1. Instrument checkpatch.pl and make it err or warn on timestamps.
+> 
+> This is patch 34/34 in this series: https://lkml.org/lkml/2011/4/5/198
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/base/platform.c |   19 +++++++++----------
- 1 files changed, 9 insertions(+), 10 deletions(-)
+Yeah, great, did not notice, thanks!
 
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 01caf61..812d8ff 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -191,18 +191,17 @@ EXPORT_SYMBOL_GPL(platform_device_alloc);
- int platform_device_add_resources(struct platform_device *pdev,
- 				  const struct resource *res, unsigned int num)
- {
--	struct resource *r;
-+	struct resource *r = NULL;
- 
--	if (!res)
--		return 0;
--
--	r = kmemdup(res, sizeof(struct resource) * num, GFP_KERNEL);
--	if (r) {
--		pdev->resource = r;
--		pdev->num_resources = num;
--		return 0;
-+	if (res) {
-+		r = kmemdup(res, sizeof(struct resource) * num, GFP_KERNEL);
-+		if (!r)
-+			return -ENOMEM;
- 	}
--	return -ENOMEM;
-+
-+	pdev->resource = r;
-+	pdev->num_resources = num;
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(platform_device_add_resources);
- 
+> > 2. Probably instrument linux-next to rise a warning when people break
+> >    this.
+> 
+> I'm not sure if Stephen has that much spare time, and I don't think it
+> is necessary. I think the checkpatch check is sufficient and I'll check
+> myself occasionally.
+
+Yes, that's fine, I just wanted to speak this out - there is a
+probability that someone gets excited and creates some instrumentation
+to kbuild to automatically detect bad things and then Stephen could
+easily use that.
+
+WRT "not necessary" - well, I think it is always better to cut bad
+things before they are merged, rather than afterwards.
+
+But anyway, let's forget about this.
+
 -- 
-1.7.2.3
+Best Regards,
+Artem Bityutskiy (????? ????????)
