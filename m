@@ -1,31 +1,46 @@
 From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Wed, 6 Apr 2011 21:24:31 +0400
-Subject: [PATCH 1/3] DA8xx: kill duplicate #define DA8XX_GPIO_BASE
-Message-ID: <201104062124.31206.sshtylyov@ru.mvista.com>
+Date: Wed, 6 Apr 2011 21:26:06 +0400
+Subject: [PATCH 2/3] DA8xx: kill duplicate #define DA8XX_PLL1_BASE
+Message-ID: <201104062126.06877.sshtylyov@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DA8XX_GPIO_BASE is #define'd in both <mach/da8xx.h> and devices-da8xx.c;
-moreover, it's not even used in the latter file...
+Commit 044ca01521d077a35b46a445b02b93f413109a4b (davinci: da850/omap-l138: add
+support for SoC suspend) introduced DA8XX_PLL1_BASE despite PLL1 exists only on
+DA850/OMAP-L138 and da850.c even already #define'd DA850_PLL1_BASE. Kill the
+duplicate macro, renaming an existing reference to it...
 
 Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
 ---
-The patch is against the recent DaVinci tree plus the fix that I've posted
-earlier today.
+The patch is against the recent DaVinci tree.
 
- arch/arm/mach-davinci/devices-da8xx.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-davinci/da850.c              |    2 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-Index: linux-davinci/arch/arm/mach-davinci/devices-da8xx.c
+Index: linux-davinci/arch/arm/mach-davinci/da850.c
 ===================================================================
---- linux-davinci.orig/arch/arm/mach-davinci/devices-da8xx.c
-+++ linux-davinci/arch/arm/mach-davinci/devices-da8xx.c
-@@ -36,7 +36,6 @@
- #define DA8XX_EMAC_CPGMACSS_BASE	0x01e22000
- #define DA8XX_EMAC_CPGMAC_BASE		0x01e23000
- #define DA8XX_EMAC_MDIO_BASE		0x01e24000
--#define DA8XX_GPIO_BASE			0x01e26000
- #define DA8XX_I2C1_BASE			0x01e28000
- #define DA8XX_SPI0_BASE			0x01c41000
- #define DA830_SPI1_BASE			0x01e12000
+--- linux-davinci.orig/arch/arm/mach-davinci/da850.c
++++ linux-davinci/arch/arm/mach-davinci/da850.c
+@@ -1055,7 +1055,7 @@ int da850_register_pm(struct platform_de
+ 	if (!pdata->cpupll_reg_base)
+ 		return -ENOMEM;
+ 
+-	pdata->ddrpll_reg_base = ioremap(DA8XX_PLL1_BASE, SZ_4K);
++	pdata->ddrpll_reg_base = ioremap(DA850_PLL1_BASE, SZ_4K);
+ 	if (!pdata->ddrpll_reg_base) {
+ 		ret = -ENOMEM;
+ 		goto no_ddrpll_mem;
+Index: linux-davinci/arch/arm/mach-davinci/include/mach/da8xx.h
+===================================================================
+--- linux-davinci.orig/arch/arm/mach-davinci/include/mach/da8xx.h
++++ linux-davinci/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -65,7 +65,6 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_GPIO_BASE		0x01e26000
+ #define DA8XX_PSC1_BASE		0x01e27000
+ #define DA8XX_LCD_CNTRL_BASE	0x01e13000
+-#define DA8XX_PLL1_BASE		0x01e1a000
+ #define DA8XX_MMCSD0_BASE	0x01c40000
+ #define DA8XX_AEMIF_CS2_BASE	0x60000000
+ #define DA8XX_AEMIF_CS3_BASE	0x62000000
