@@ -1,62 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 06 Apr 2011 17:45:33 +0200
-Subject: [PATCH 2/5] dmaengine: at_hdmac: add cyclic DMA operation support
-In-Reply-To: <1302098555.27103.10.camel@vkoul-udesk3>
-References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>	
-	<426a1091ec74342f259f76ce404472b189730269.1301678094.git.nicolas.ferre@atmel.com>	
-	<1302084507.27103.0.camel@vkoul-udesk3>
-	<4D9C618A.9020708@atmel.com>
-	<1302098555.27103.10.camel@vkoul-udesk3>
-Message-ID: <4D9C8A9D.9070008@atmel.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 6 Apr 2011 13:05:26 -0300
+Subject: [PATCH] ARM: mx51: Remove imx51_add_gpio_keys
+Message-ID: <1302105926-20574-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/04/2011 16:02, Koul, Vinod :
-> On Wed, 2011-04-06 at 14:50 +0200, Nicolas Ferre wrote:
->> Le 06/04/2011 12:08, Koul, Vinod :
->>> On Fri, 2011-04-01 at 19:19 +0200, Nicolas Ferre wrote:
->>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>> ---
->>>>  drivers/dma/at_hdmac.c      |  188 +++++++++++++++++++++++++++++++++++++++---
->>>>  drivers/dma/at_hdmac_regs.h |   14 +++-
->>>>  2 files changed, 186 insertions(+), 16 deletions(-)
->>>>
->>>> +static void atc_handle_cyclic(struct at_dma_chan *atchan)
->>>> +{
->>>> +	struct at_desc			*first = atc_first_active(atchan);
->>>> +	struct dma_async_tx_descriptor	*txd = &first->txd;
->>>> +	dma_async_tx_callback		callback = txd->callback;
->>>> +	void				*param = txd->callback_param;
->>>> +
->>>> +	dev_vdbg(chan2dev(&atchan->chan_common),
->>>> +			"new cyclic period llp 0x%08x\n",
->>>> +			channel_readl(atchan, DSCR));
->>>> +
->>>> +	if (callback)
->>>> +		callback(param);
->>>> +}
->>> You dont seem to be doing much expect calling callback, so doesn't it
->>> make sense to write so much code for just calling callback? 
->>
->> I do not totally follow you here: you mean that I should reduce the
->> amount of variables in this function or is it a more global comment
->> about my way of handling cyclic operations?
-> Well, in handling of cyclic operation you are only calling the callback
-> if set. If you plan to add more functionality to this function in future
-> then okay, otherwise you may reconsider this and avoid the function as
-> you are not doing much here, if it reduces code size. This is okay this
-> way also.
-> I had no comment on variables as I understand first two are unavoidable
+There is no need for using a MX51-specific version of imx_add_gpio_keys.
 
-As far as code size and execution path is concerned, this function is
-expanded by the compiler as an inline one and I checked that it only
-takes a few lines of assembly (without function call) if the debug trace
-is not requested (~7 lines into atc_tasklet() with one call to
-atc_first_active() which is needed anyway).
+Remove imx51_add_gpio_keys and use imx_add_gpio_keys instead.
 
-I would prefer to keep this simple "pseudo-inline" function just for a
-matter of code clarity.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
+ arch/arm/mach-mx5/devices-imx51.h      |    2 --
+ 4 files changed, 3 insertions(+), 5 deletions(-)
 
-Best regards,
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index bea4e41..3ce3806 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -361,7 +361,7 @@ static void __init mx51_babbage_init(void)
+ 
+ 	/* Set the PAD settings for the pwr key. */
+ 	mxc_iomux_v3_setup_pad(power_key);
+-	imx51_add_gpio_keys(&imx_button_data);
++	imx_add_gpio_keys(&imx_button_data);
+ 
+ 	imx51_add_imx_i2c(0, &babbage_i2c_data);
+ 	imx51_add_imx_i2c(1, &babbage_i2c_data);
+diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+index acab191..5a36862 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikamx.c
++++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+@@ -252,7 +252,7 @@ static void __init mx51_efikamx_init(void)
+ 	}
+ 
+ 	platform_device_register(&mx51_efikamx_leds_device);
+-	imx51_add_gpio_keys(&mx51_efikamx_powerkey_data);
++	imx_add_gpio_keys(&mx51_efikamx_powerkey_data);
+ 
+ 	if (system_rev == 0x11) {
+ 		gpio_request(EFIKAMX_RESET1_1, "reset");
+diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+index db04ce8..01bece0 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikasb.c
++++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+@@ -260,7 +260,7 @@ static void __init efikasb_board_init(void)
+ 	imx51_add_sdhci_esdhc_imx(1, NULL);
+ 
+ 	platform_device_register(&mx51_efikasb_leds_device);
+-	imx51_add_gpio_keys(&mx51_efikasb_keys_data);
++	imx_add_gpio_keys(&mx51_efikasb_keys_data);
+ 
+ }
+ 
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 7fff485..25ce922 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -13,8 +13,6 @@ extern const struct imx_fec_data imx51_fec_data __initconst;
+ #define imx51_add_fec(pdata)	\
+ 	imx_add_fec(&imx51_fec_data, pdata)
+ 
+-#define imx51_add_gpio_keys(pdata) imx_add_gpio_keys(pdata)
+-
+ extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
+ #define imx51_add_imx_i2c(id, pdata)	\
+ 	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
 -- 
-Nicolas Ferre
+1.6.0.4
