@@ -1,68 +1,56 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Wed, 6 Apr 2011 10:40:31 -0600
-Subject: For SMP,
-	Is platform specific secondary startup functionreally needed?
-In-Reply-To: <1302107767.28846.105.camel@e102109-lin.cambridge.arm.com>
-References: <7b2e9aed-1162-43f3-8c33-59b43b0a1964@VA3EHSMHS036.ehs.local>
-	<1302100751.28846.6.camel@e102109-lin.cambridge.arm.com>
-	<a192437f-15b5-4783-b039-6f1128f5c730@VA3EHSMHS014.ehs.local>
-	<1302107767.28846.105.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <65ba552f-d639-4d3f-b31b-553082ede41b@VA3EHSMHS001.ehs.local>
+From: john.linn@xilinx.com (John Linn)
+Date: Wed, 6 Apr 2011 11:15:10 -0600
+Subject: [PATCH V2 4/4] ARM: Xilinx: update of infrastructure for SMP
+In-Reply-To: <1302110110-32208-4-git-send-email-john.linn@xilinx.com>
+References: <1302110110-32208-1-git-send-email-john.linn@xilinx.com>
+	<1302110110-32208-2-git-send-email-john.linn@xilinx.com>
+	<1302110110-32208-3-git-send-email-john.linn@xilinx.com>
+	<1302110110-32208-4-git-send-email-john.linn@xilinx.com>
+Message-ID: <00563c7b-efa1-4480-b091-44972a71f160@VA3EHSMHS036.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Wednesday, April 06, 2011 10:36 AM
-> To: John Linn
-> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
-> Subject: RE: For SMP, Is platform specific secondary startup
-> functionreally needed?
-> 
-> On Wed, 2011-04-06 at 15:42 +0100, John Linn wrote:
-> > > On Wed, 2011-04-06 at 14:48 +0100, John Linn wrote:
-> > > > I'm doing some cleanup of SMP patches based on Russell and
-> Catalin's
-> > > > input which was real helpful. It seems to me that there is not
-> always a
-> > > > need for a platform specific secondary startup.
-> > > >
-> > > > I have tested with just letting CPU1 go straight to
-> secondary_startup()
-> > > > in head.S and it works fine.
-> > > >
-> > > > I'm probably missing something obvious, if so can you share it?
-> > >
-> > > We use the pen release mechanism serialise the secondary CPUs
-> booting.
-> >
-> > I'm not saying you can't have it, just that some platforms may not
-> need
-> > it.
-> >
-> > Maybe I'm oversimplifying the boot process for our platform, but it
-> > seems to be working fine.
-> 
-> I haven't looked at your code in detail. Does this platform only have
-> two cores? If that's the case, you should be fine.
+Only minor updates of Kconfig and Makefile to support
+SMP.
 
-Yes we?re only using 2 cores.  Sounds good as I prefer simple when possible.
-I'll put out a new version of patches with this simplified approach.
+Signed-off-by: John Linn <john.linn@xilinx.com>
+---
 
-> 
-> But if you have more than one core and you don't serialise the entry to
-> secondary_startup(), the __cpu_up() function may get confused.
-> 
+V2 Changes
 
-Understood, more complexity needed for more than 2 cores, makes sense.
+Minor cleanup for the change from mach-xilinx to mach-zynq and
+for the SMP boot process changes.
 
-Thanks for your time and input,
-John
+ arch/arm/Kconfig            |    2 +-
+ arch/arm/mach-zynq/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-> --
-> Catalin
-> 
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3bc4d86..bffa4f3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1339,7 +1339,7 @@ config SMP
+ 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+ 		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+-		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
++		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_ZYNQ
+ 	select USE_GENERIC_SMP_HELPERS
+ 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+ 	help
+diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+index 9983a3f..9692d7d 100644
+--- a/arch/arm/mach-zynq/Makefile
++++ b/arch/arm/mach-zynq/Makefile
+@@ -5,4 +5,5 @@
+ # Common support
+ obj-y 				:= common.o timer.o
+ obj-$(CONFIG_MACH_XILINX_EP107)	+= board_ep107.o
++obj-$(CONFIG_SMP)		+= platsmp.o
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+-- 
+1.5.4.7
+
 
 
 This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
