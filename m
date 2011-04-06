@@ -1,76 +1,77 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 6 Apr 2011 20:31:51 +0300
-Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
-In-Reply-To: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110406173151.GA7592@nataf.siach.name>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Wed, 6 Apr 2011 21:29:24 +0400
+Subject: [PATCH 3/3] DA8xx: move base address #define's to their proper place
+Message-ID: <201104062129.25085.sshtylyov@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Move DA8XX_MMCSD0_BASE, DA8XX_LCD_CNTRL_BASE,  and DA8XX_DDR2_CTL_BASE from
+<mach/da8xx.h> to devices-da8xx.c as the latter file is the only place where
+these macros are used.
 
-On Wed, Apr 06, 2011 at 04:29:04PM +0200, Uwe Kleine-K?nig wrote:
-> All machines having a imx-fb device now select IMX_HAVE_PLATFORM_IMX_FB,
-> so HAVE_FB_IMX can go away and there is no need anymore to explicitly
-> depend on ARCH_MX1 or ARCH_MX2.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
+While at it, restore sorting the base address macros by address value in
+devices-da8xx.c...
 
-Sascha has already sent a patch for this. See 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/109067.
+Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
-baruch
+---
+The patch is against the recent DaVinci tree plus the fix that I've posted
+earlier today.
 
-> Hello,
-> 
-> should this go via Sascha's or Paul's tree?
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/plat-mxc/devices/Kconfig |    1 -
->  drivers/video/Kconfig             |    5 +----
->  2 files changed, 1 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-> index b9ab1d5..e4dcf49 100644
-> --- a/arch/arm/plat-mxc/devices/Kconfig
-> +++ b/arch/arm/plat-mxc/devices/Kconfig
-> @@ -24,7 +24,6 @@ config IMX_HAVE_PLATFORM_IMXDI_RTC
->  
->  config IMX_HAVE_PLATFORM_IMX_FB
->  	bool
-> -	select HAVE_FB_IMX
->  
->  config IMX_HAVE_PLATFORM_IMX_I2C
->  	bool
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index e6a8d8c..62f337a 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -8,9 +8,6 @@ menu "Graphics support"
->  config HAVE_FB_ATMEL
->  	bool
->  
-> -config HAVE_FB_IMX
-> -	bool
-> -
->  config SH_MIPI_DSI
->  	tristate
->  	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-> @@ -359,7 +356,7 @@ config FB_SA1100
->  
->  config FB_IMX
->  	tristate "Freescale i.MX LCD support"
-> -	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
-> +	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
->  	select FB_CFB_IMAGEBLIT
-> -- 
+ arch/arm/mach-davinci/devices-da8xx.c      |   15 +++++++++------
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 ---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Index: linux-davinci/arch/arm/mach-davinci/devices-da8xx.c
+===================================================================
+--- linux-davinci.orig/arch/arm/mach-davinci/devices-da8xx.c
++++ linux-davinci/arch/arm/mach-davinci/devices-da8xx.c
+@@ -24,22 +24,25 @@
+ #include "clock.h"
+ 
+ #define DA8XX_TPCC_BASE			0x01c00000
+-#define DA850_MMCSD1_BASE		0x01e1b000
+-#define DA850_TPCC1_BASE		0x01e30000
+ #define DA8XX_TPTC0_BASE		0x01c08000
+ #define DA8XX_TPTC1_BASE		0x01c08400
+-#define DA850_TPTC2_BASE		0x01e38000
+ #define DA8XX_WDOG_BASE			0x01c21000 /* DA8XX_TIMER64P1_BASE */
+ #define DA8XX_I2C0_BASE			0x01c22000
+-#define DA8XX_RTC_BASE			0x01C23000
++#define DA8XX_RTC_BASE			0x01c23000
++#define DA8XX_MMCSD0_BASE		0x01c40000
++#define DA8XX_SPI0_BASE			0x01c41000
++#define DA830_SPI1_BASE			0x01e12000
++#define DA8XX_LCD_CNTRL_BASE		0x01e13000
++#define DA850_MMCSD1_BASE		0x01e1b000
+ #define DA8XX_EMAC_CPPI_PORT_BASE	0x01e20000
+ #define DA8XX_EMAC_CPGMACSS_BASE	0x01e22000
+ #define DA8XX_EMAC_CPGMAC_BASE		0x01e23000
+ #define DA8XX_EMAC_MDIO_BASE		0x01e24000
+ #define DA8XX_I2C1_BASE			0x01e28000
+-#define DA8XX_SPI0_BASE			0x01c41000
+-#define DA830_SPI1_BASE			0x01e12000
++#define DA850_TPCC1_BASE		0x01e30000
++#define DA850_TPTC2_BASE		0x01e38000
+ #define DA850_SPI1_BASE			0x01f0e000
++#define DA8XX_DDR2_CTL_BASE		0xb0000000
+ 
+ #define DA8XX_EMAC_CTRL_REG_OFFSET	0x3000
+ #define DA8XX_EMAC_MOD_REG_OFFSET	0x2000
+Index: linux-davinci/arch/arm/mach-davinci/include/mach/da8xx.h
+===================================================================
+--- linux-davinci.orig/arch/arm/mach-davinci/include/mach/da8xx.h
++++ linux-davinci/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -64,12 +64,9 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_TIMER64P1_BASE	0x01c21000
+ #define DA8XX_GPIO_BASE		0x01e26000
+ #define DA8XX_PSC1_BASE		0x01e27000
+-#define DA8XX_LCD_CNTRL_BASE	0x01e13000
+-#define DA8XX_MMCSD0_BASE	0x01c40000
+ #define DA8XX_AEMIF_CS2_BASE	0x60000000
+ #define DA8XX_AEMIF_CS3_BASE	0x62000000
+ #define DA8XX_AEMIF_CTL_BASE	0x68000000
+-#define DA8XX_DDR2_CTL_BASE	0xb0000000
+ #define DA8XX_ARM_RAM_BASE	0xffff0000
+ 
+ void __init da830_init(void);
