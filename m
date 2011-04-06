@@ -1,31 +1,35 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 6 Apr 2011 15:40:26 +0530
-Subject: [PATCH 5/5] driver core: let dev_set_drvdata return int instead
-	of void as it can fail
-In-Reply-To: <1302081865-2962-5-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110301153438.GB15633@suse.de>
-	<1302081865-2962-5-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4D9C3C12.4090408@st.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed,  6 Apr 2011 11:17:12 +0100
+Subject: [PATCH v2 4/4] ARM: kprobes: Fix emulation of Data-processing
+	(immediate) instructions
+In-Reply-To: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
+References: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1302085032-30415-5-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2011 02:54 PM, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I wasn't sure what to return when dev_set_drvdata is called with
-> dev=NULL.  I choosed 0, but -EINVAL would be OK for me, too. What do you
-> think?
+From: Jon Medhurst <tixy@yxit.co.uk>
 
-Uwe,
+Emulation of instructions like "ADD rd, rn, #<const>" would result in a
+corrupted value for rd.
 
-I feel -EINVAL would be more appropriate here.
-Return value of 0 would mean drvdata is set properly, which is not the case.
+Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+---
+ arch/arm/kernel/kprobes-decode.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Otherwise, patch series looks fine to me. Please add my reviewed-by for all patches.
-
-Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
-
+diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+index 98d2f87..a2240a5 100644
+--- a/arch/arm/kernel/kprobes-decode.c
++++ b/arch/arm/kernel/kprobes-decode.c
+@@ -1207,7 +1207,7 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 	 * *S (bit 20) updates condition codes
+ 	 * ADC/SBC/RSC reads the C flag
+ 	 */
+-	insn &= 0xffff0fff;	/* Rd = r0 */
++	insn &= 0xfff00fff;	/* Rn = r0 and Rd = r0 */
+ 	asi->insn[0] = insn;
+ 
+ 	if ((insn & 0x0f900000) == 0x03100000) {
 -- 
-viresh
+1.7.2.5
