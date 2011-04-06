@@ -1,19 +1,45 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Wed, 6 Apr 2011 10:49:20 +0200
-Subject: [PATCHv5 1/3] ARM: Translate delay.S into (mostly) C
-In-Reply-To: <1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
-References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
-	<1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4D9C2910.6020309@stericsson.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Wed, 6 Apr 2011 10:57:12 +0200
+Subject: [PATCH 00/34] Make kernel build deterministic
+In-Reply-To: <1302031447.2608.41.camel@koala>
+References: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
+	<20110405154918.GA31337@suse.de> <1302031447.2608.41.camel@koala>
+Message-ID: <20110406085712.GA16597@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2011 01:56 AM, Stephen Boyd wrote:
-> +void __udelay(unsigned long usecs)
-> +{
-> +	__const_udelay(usecs * ((2199023*HZ)>>11));
-This will overflow if HZ=1000.
-If I remember correct I fixed it like this:
-__const_udelay(usecs * ((2199023UL*HZ)>>11));
 
-/Mattias Wallin
+* Artem Bityutskiy <dedekind1@gmail.com> wrote:
+
+> On Tue, 2011-04-05 at 08:49 -0700, Greg KH wrote:
+> > On Tue, Apr 05, 2011 at 04:58:47PM +0200, Michal Marek wrote:
+> > > 
+> > > Hi,
+> > > 
+> > > this series makes it possible to build bit-identical kernel image and
+> > > modules from identical sources. Of course the build is already
+> > > deterministic in terms of behavior of the code, but the various
+> > > timestamps embedded in the object files make it hard to compare two
+> > > builds, for instance to verify that a makefile cleanup didn't
+> > > accidentally change something. A prime example is /proc/config.gz, which
+> > > has both a timestamp in the gzip header and a timestamp in the payload
+> > > data. With this series applied, a script like this will produce
+> > > identical kernels each time:
+> > 
+> > Very nice stuff.  Do you want to take the individual patches through one
+> > of your trees, or do you mind if the subsystem maintainers take them
+> > through theirs?
+> 
+> But unfortunately, it is very easy to break this and for sure it'll be
+> broken very soon.
+> 
+> So additionally, I'd suggest:
+> 1. Instrument checkpatch.pl and make it err or warn on timestamps.
+
+See the grandparent mail:
+
+  checkpatch: Warn about usage of __DATE__, __TIME__ and __TIMESTAMP__
+
+Thanks,
+
+	Ingo
