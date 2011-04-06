@@ -1,40 +1,64 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 7 Apr 2011 01:20:17 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <1302124737.27258.7.camel@dev.znau.edu.ua>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
-	<op.vti9ote53ri7v4@arend-laptop>
-	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
-	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
-	<1302123428.20093.6.camel@maggie>
-	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
-	<1302124112.20093.11.camel@maggie>
-	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	<1302124737.27258.7.camel@dev.znau.edu.ua>
-Message-ID: <BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 07 Apr 2011 01:22:27 +0200
+Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
+	basis of the memory size.
+In-Reply-To: <alpine.LFD.2.00.1104061850410.28032@xanadu.home>
+References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
+	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
+	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
+	<4D9CED15.2010806@ahsoftware.de>
+	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
+Message-ID: <4D9CF5B3.9020007@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 6 kwietnia 2011 23:18 u?ytkownik George Kashperko
-<george@znau.edu.ua> napisa?:
->> We have 2 windows. I didn't try this, but let's assume they have no
->> limitations. We can use first window for one driver only, second
->> driver for second driver only. That gives us 2 drivers simultaneously
->> working drivers. No driver need to reset core really often (and not
->> inside interrupt context) so we will switch driver's window to agent
->> (from core) only at init/reset.
->>
->> The question is what amount of driver we will need to support at the same time.
->>
+On 07.04.2011 01:01, Nicolas Pitre wrote:
+> On Thu, 7 Apr 2011, Alexander Holler wrote:
 >
-> I guess (correct me please, Broadcom guys if I'm wrong) there are two
-> functions two-head w11 pci host and therefore 4 sliding windows, 2 per
-> each function.
+>> On 06.04.2011 23:44, Nicolas Pitre wrote:
+>>> On Wed, 6 Apr 2011, Alexander Holler wrote:
+>>>
+>>>> It is possible to differentiate a SheevaPlugs and DockStars on the basis
+>>>> of the memory size.
+>>>>
+>>>> This makes it possible to unify both setup files.
+>>>
+>>> No no no !!!  This is an abomination!
+>>>
+>>> We are not going to reduce the amount of code under arch/arm/ with such
+>>> fragile hacks.  This would create an even worse maintenance problem the
+>>> day either of those devices is released with more RAM or whatever.
+>>
+>> DockStars are already obsolet and vanilla Linux was never supported by the
+>> manufacturer (Seagate). And they never used the machine type in question.
+>
+> Is the code for DockStar in mainline actually useful?  If no then we may
+> simply delete it.
 
-I don't understand you. Can you use more friendly language? functions?
-2head? w11?
+I don't know, I can't speak for others.
 
--- 
-Rafa?
+>> So I don't think this in any way a fragile hack.
+>
+> Determining a machine type based on its amount of RAM is fragile, ugly
+> and sets up a bad example for even more hacky tricks like this to crop
+> up. If someone is experimenting with his SheevaPlug by giving different
+> memory information in the kernel cmdline e.g. to create memory holes in
+> order to test some memory allocator changes, then the kernel may think
+> that it is not running on a SheevaPlug but a DockStar, and the resulting
+> behavior will certainly be unexpected.
+
+People doing such should now what they do. And the pr_info() in the 
+"abomination" should be enough to give those experimenters a hint (if it 
+is missing or new).
+
+>> Anyway, it was just a suggestion.
+>
+> Better luck next time.
+
+Sorry, I don't feel the need to waste my time prodcuing patches to get 
+them called "abominations". Which means my willingness to post further 
+patches just got below zero.
+
+Regards,
+
+Alexander
