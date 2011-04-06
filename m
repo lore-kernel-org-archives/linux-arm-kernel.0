@@ -1,95 +1,219 @@
 From: john.linn@xilinx.com (John Linn)
-Date: Wed, 6 Apr 2011 11:15:07 -0600
-Subject: [PATCH V2 1/4] ARM: Xilinx: Add on chip memory for SMP support
-In-Reply-To: <1302110110-32208-1-git-send-email-john.linn@xilinx.com>
+Date: Wed, 6 Apr 2011 11:15:09 -0600
+Subject: [PATCH V2 3/4] ARM: Xilinx: add SMP specific support files
+In-Reply-To: <1302110110-32208-3-git-send-email-john.linn@xilinx.com>
 References: <1302110110-32208-1-git-send-email-john.linn@xilinx.com>
-Message-ID: <c46a3b72-ef8c-40c4-8df1-a525248118ad@VA3EHSMHS036.ehs.local>
+	<1302110110-32208-2-git-send-email-john.linn@xilinx.com>
+	<1302110110-32208-3-git-send-email-john.linn@xilinx.com>
+Message-ID: <fc7b42da-f233-48a5-8662-0239be3c72ef@VA3EHSMHS017.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On chip memory (OCM) is always present and is used
-for communication between the CPUs when in SMP mode.
+These files are the core processing for SMP which are similar
+to most other platforms SMP. The biggest difference is the
+way the 2nd CPU is started.
 
 Signed-off-by: John Linn <john.linn@xilinx.com>
 ---
 
 V2 Changes
 
-These changes were broken out seperately in V2 as they were part of
-the patch for the timer in V1, at the request of Michal Simek.
+Minor cleanup for the change from mach-xilinx to mach-zynq. 
 
-The file name was previously xilinx_soc.h and it was changed to 
-zynq_soc.h when moving from mach-xilinx to mach-zynq.
+Quite a few changes to the SMP boot process based on input from Russell and 
+Catalin.  Maybe I have oversimplifed it too much, but testing has shown it 
+to work reliably and it's nice and clean (to me anyway).
 
-There were a few other minor changes in the boot process with the 
-2nd CPU so some minor #defines also changed.
+ arch/arm/mach-zynq/common.h           |    2 +
+ arch/arm/mach-zynq/include/mach/smp.h |   30 ++++++++
+ arch/arm/mach-zynq/platsmp.c          |  128 +++++++++++++++++++++++++++++++++
+ 3 files changed, 160 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-zynq/include/mach/smp.h
+ create mode 100644 arch/arm/mach-zynq/platsmp.c
 
- arch/arm/mach-zynq/common.c                |   16 +++++++++++++++-
- arch/arm/mach-zynq/include/mach/zynq_soc.h |   17 +++++++++++++++++
- 2 files changed, 32 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 9a626ba..ff11e04 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -101,7 +101,21 @@ static struct map_desc io_desc[] __initdata = {
- 		.type		= MT_DEVICE,
- 	},
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index a87bedc..c6c92d0 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -25,6 +25,8 @@ void __init xilinx_system_init(void);
+ void __init xilinx_irq_init(void);
+ void __init xilinx_map_io(void);
+ 
++void secondary_startup(void);
++
+ extern struct sys_timer xttcpss_sys_timer;
+ 
  #endif
--
-+	/* create a mapping for the OCM  (256K) leaving a hole for the
-+	 * interrupt vectors which are handled in the kernel
-+	 */
-+	{
-+		.virtual	= OCM_LOW_VIRT,
-+		.pfn		= __phys_to_pfn(OCM_LOW_PHYS),
-+		.length		= (192 * SZ_1K),
-+		.type		= MT_DEVICE_CACHED,
-+	},
-+	{
-+		.virtual	= OCM_HIGH_VIRT,
-+		.pfn		= __phys_to_pfn(OCM_HIGH_PHYS),
-+		.length		= (60 * SZ_1K),
-+		.type		= MT_DEVICE,
-+	},
- };
- 
- /**
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index d0d3f8f..ff5349c 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -31,6 +31,12 @@
- #define SCU_PERIPH_PHYS			0xF8F00000
- #define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
- 
-+#define OCM_LOW_PHYS			0xFFFC0000
-+#define OCM_LOW_VIRT			OCM_LOW_PHYS
-+
-+#define OCM_HIGH_PHYS			0xFFFF1000
-+#define OCM_HIGH_VIRT			OCM_HIGH_PHYS
-+
- /* The following are intended for the devices that are mapped early */
- 
- #define TTC0_BASE			IOMEM(TTC0_VIRT)
-@@ -38,6 +44,17 @@
- #define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
- #define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
- #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
-+#define OCM_LOW_BASE			IOMEM(OCM_LOW_VIRT)
-+#define OCM_HIGH_BASE			IOMEM(OCM_HIGH_VIRT)
-+
-+/* There are two OCM addresses needed for communication between CPUs in SMP.
-+ * The memory addresses are in the high on-chip RAM and these addresses are
-+ * mapped flat (virtual = physical). The memory must be mapped early and
-+ * non-cached.
+diff --git a/arch/arm/mach-zynq/include/mach/smp.h b/arch/arm/mach-zynq/include/mach/smp.h
+new file mode 100644
+index 0000000..c3aae15
+--- /dev/null
++++ b/arch/arm/mach-zynq/include/mach/smp.h
+@@ -0,0 +1,30 @@
++/* arch/arm/mach-xilinx/include/mach/smp.h
++ *
++ * Copyright (C) 2011 Xilinx
++ *
++ * based on arch/arm/mach-realview/include/mach/smp.h
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+#define BOOT_ADDR_OFFSET	0xEFF0
-+#define BOOT_STATUS_OFFSET	0xEFF4
-+#define BOOT_STATUS_CPU1_UP	1
- 
- /*
-  * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
++
++#ifndef __MACH_SMP_H__
++#define __MACH_SMP_H__
++
++#include <asm/hardware/gic.h>
++
++/*
++ * We use IRQ1 as the IPI
++ */
++static inline void smp_cross_call(const struct cpumask *mask, int ipi)
++{
++	gic_raise_softirq(mask, ipi);
++}
++
++#endif
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+new file mode 100644
+index 0000000..96367b0
+--- /dev/null
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -0,0 +1,128 @@
++/*
++ * arch/arm/mach-xilinx/platsmp.c
++ *
++ * This file contains Xilinx specific SMP code, used to start up
++ * the second processor.
++ *
++ * Copyright (C) 2011 Xilinx
++ *
++ * based on linux/arch/arm/mach-realview/platsmp.c
++ *
++ * Copyright (C) 2002 ARM Ltd.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/jiffies.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <asm/cacheflush.h>
++#include <asm/smp_scu.h>
++#include <mach/zynq_soc.h>
++#include <mach/smp.h>
++#include "common.h"
++
++static DEFINE_SPINLOCK(boot_lock);
++
++/* Secondary CPU kernel startup is a 2 step process. The primary CPU
++ * starts the secondary CPU by giving it the address of the kernel and
++ * then sending it an event to wake it up. The secondary CPU then
++ * starts the kernel and tells the primary CPU it's up and running.
++ */
++void __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_secondary_init(0);
++
++	/* Indicate to the primary core that the secondary is up and running.
++	 * Let the write buffer drain.
++	 */
++	__raw_writel(BOOT_STATUS_CPU1_UP, OCM_HIGH_BASE + BOOT_STATUS_OFFSET);
++	wmb();
++
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
++
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long timeout;
++
++	/*
++	 * set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++	/* Initialize the boot status and give the secondary core
++	 * the start address of the kernel, let the write buffer drain
++	 */
++	__raw_writel(0, OCM_HIGH_BASE + BOOT_STATUS_OFFSET);
++
++	__raw_writel(virt_to_phys(secondary_startup),
++					OCM_HIGH_BASE + BOOT_ADDR_OFFSET);
++	wmb();
++
++	/*
++	 * Send an event to wake the secondary core from WFE state.
++	 */
++	sev();
++
++	/*
++	 * Wait for the other CPU to boot, but timeout if it doesn't
++	 */
++	timeout = jiffies + (1 * HZ);
++	while ((__raw_readl(OCM_HIGH_BASE + BOOT_STATUS_OFFSET) !=
++				BOOT_STATUS_CPU1_UP) &&
++				(time_before(jiffies, timeout)))
++		rmb();
++
++	/*
++	 * now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return 0;
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++void __init smp_init_cpus(void)
++{
++	int i, ncores;
++
++	ncores = scu_get_core_count(SCU_PERIPH_BASE);
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++{
++	int i;
++
++	/*
++	 * Initialise the present map, which describes the set of CPUs
++	 * actually populated@the present time.
++	 */
++	for (i = 0; i < max_cpus; i++)
++		set_cpu_present(i, true);
++
++	scu_enable(SCU_PERIPH_BASE);
++}
 -- 
 1.5.4.7
 
