@@ -1,39 +1,88 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Apr 2011 09:05:08 -0400 (EDT)
-Subject: [PATCH] Moving Marvell Dove platform defaults to ARMv7
-In-Reply-To: <BANLkTinJP1S_tUfTG8jeeZRTq80bCE8kvw@mail.gmail.com>
-References: <1301814792-9438-1-git-send-email-kostap@marvell.com>
-	<BANLkTimsz==SVdg0C6XEX6bCvmhEe79dew@mail.gmail.com>
-	<alpine.LFD.2.00.1104051450550.28032@xanadu.home>
-	<BANLkTinJP1S_tUfTG8jeeZRTq80bCE8kvw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1104060903471.28032@xanadu.home>
+From: chihau@gmail.com (Chihau Chau)
+Date: Wed,  6 Apr 2011 10:28:33 -0300
+Subject: [PATCH] arm: mach-msm: acpclock-arm11: Fix some code style issues
+Message-ID: <1302096513-18680-1-git-send-email-chihau@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Apr 2011, saeed bishara wrote:
+This fix some code style issues like braces in the incorrect position, assignments in a if condition and lack of a space before '&&'
 
-> On Tue, Apr 5, 2011 at 9:55 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> >> > --- a/arch/arm/configs/dove_defconfig
-> >> > +++ b/arch/arm/configs/dove_defconfig
-> > [...]
-> >> > -# CONFIG_MISC_DEVICES is not set
-> >> > +CONFIG_LEGACY_PTY_COUNT=16
-> >> > -CONFIG_LEGACY_PTY_COUNT=16
-> >> > -# CONFIG_VGA_CONSOLE is not set
-> >> > -CONFIG_USB_EHCI_TT_NEWSCHED=y
-> >> > -CONFIG_INOTIFY=y
-> >> > -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-> >> > -CONFIG_CRYPTO_CBC=y
-> >> > -CONFIG_CRYPTO_MD5=y
-> >> > -CONFIG_CRYPTO_DES=y
-> >
-> > Those changes above are unrelated to the reason for this patch. ?Please
-> > remove.
-> should we prepare a separate patch that syncs the dove_defconfig with
-> latest kernel?
+Signed-off-by: Chihau Chau <chihau@gmail.com>
+---
+ arch/arm/mach-msm/acpuclock-arm11.c |   19 +++++++++++--------
+ 1 files changed, 11 insertions(+), 8 deletions(-)
 
-That would be preferable.  Only the removal of the CONFIG_ARMV6K items 
-are relevant for this patch.
-
-
-Nicolas
+diff --git a/arch/arm/mach-msm/acpuclock-arm11.c b/arch/arm/mach-msm/acpuclock-arm11.c
+index 7ffbd98..d716cf1 100644
+--- a/arch/arm/mach-msm/acpuclock-arm11.c
++++ b/arch/arm/mach-msm/acpuclock-arm11.c
+@@ -51,8 +51,7 @@
+ #define PERF_SWITCH_DEBUG 0
+ #define PERF_SWITCH_STEP_DEBUG 0
+ 
+-struct clock_state
+-{
++struct clock_state {
+ 	struct clkctl_acpu_speed	*current_speed;
+ 	struct mutex			lock;
+ 	uint32_t			acpu_switch_time_us;
+@@ -88,7 +87,7 @@ struct clkctl_acpu_speed {
+ 	unsigned int	ahbclk_khz;
+ 	unsigned int	ahbclk_div;
+ 	int		vdd;
+-	unsigned int 	axiclk_khz;
++	unsigned int	axiclk_khz;
+ 	unsigned long	lpj; /* loops_per_jiffy */
+ /* Index in acpu_freq_tbl[] for steppings. */
+ 	short		down;
+@@ -176,7 +175,8 @@ static int pc_pll_request(unsigned id, unsigned on)
+  * ARM11 'owned' clock control
+  *---------------------------------------------------------------------------*/
+ 
+-unsigned long acpuclk_power_collapse(void) {
++unsigned long acpuclk_power_collapse(void)
++{
+ 	int ret = acpuclk_get_rate();
+ 	ret *= 1000;
+ 	if (ret > drv_state.power_collapse_khz)
+@@ -189,7 +189,8 @@ unsigned long acpuclk_get_wfi_rate(void)
+ 	return drv_state.wait_for_irq_khz;
+ }
+ 
+-unsigned long acpuclk_wait_for_irq(void) {
++unsigned long acpuclk_wait_for_irq(void)
++{
+ 	int ret = acpuclk_get_rate();
+ 	ret *= 1000;
+ 	if (ret > drv_state.wait_for_irq_khz)
+@@ -223,7 +224,8 @@ static int acpuclk_set_vdd_level(int vdd)
+ }
+ 
+ /* Set proper dividers for the given clock speed. */
+-static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s) {
++static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s)
++{
+ 	uint32_t reg_clkctl, reg_clksel, clk_div;
+ 
+ 	/* AHB_CLK_DIV */
+@@ -336,7 +338,8 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
+ 		}
+ 		/* Increase VDD if needed. */
+ 		if (tgt_s->vdd > cur_s->vdd) {
+-			if ((rc = acpuclk_set_vdd_level(tgt_s->vdd)) < 0) {
++			rc = acpuclk_set_vdd_level(tgt_s->vdd)
++			if (rc < 0) {
+ 				printk(KERN_ERR "Unable to switch ACPU vdd\n");
+ 				goto out;
+ 			}
+@@ -378,7 +381,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
+ 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
+ 			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
+ #endif
+-		if (!for_power_collapse&& cur_s->pll != ACPU_PLL_TCXO
++		if (!for_power_collapse && cur_s->pll != ACPU_PLL_TCXO
+ 		    && !(plls_enabled & (1 << cur_s->pll))) {
+ 			rc = pc_pll_request(cur_s->pll, 1);
+ 			if (rc < 0) {
+-- 
+1.7.3.4
