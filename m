@@ -1,132 +1,190 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed,  6 Apr 2011 11:17:10 +0100
-Subject: [PATCH v2 2/4] ARM: kprobes: Remove redundant condition checks from
-	simulation routines
-In-Reply-To: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
-References: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1302085032-30415-3-git-send-email-tixy@yxit.co.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed,  6 Apr 2011 11:29:47 +0100
+Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
+Message-ID: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+ * To remove the risk of inconvenient register allocation decisions
+   by the compiler, these functions are separated out as pure
+   assembler.
 
-Now we have the framework code handling conditionally executed
-instructions we can remove redundant checks in individual simulation
-routines.
+ * The apcs frame manipulation code is not applicable for Thumb-2
+   (and also not easily compatible).  Since it's not essential to
+   have a full frame on these leaf assembler functions, the frame
+   manipulation is removed, in the interests of simplicity.
 
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+ * Split up ldm/stm instructions to be compatible with Thumb-2,
+   as well as avoiding instruction forms deprecated on >= ARMv7.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/kprobes-decode.c |   30 +++---------------------------
- 1 files changed, 3 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 3e313e5..faa976c 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -71,10 +71,6 @@
- #define PSR_fs	(PSR_f|PSR_s)
+ arch/arm/include/asm/fiq.h |   16 ++++++++++++-
+ arch/arm/kernel/Makefile   |    2 +-
+ arch/arm/kernel/fiq.c      |   45 +--------------------------------------
+ arch/arm/kernel/fiqasm.S   |   49 ++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 66 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm/kernel/fiqasm.S
+
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index 2242ce2..45bb3ee 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -29,9 +29,21 @@ struct fiq_handler {
+ extern int claim_fiq(struct fiq_handler *f);
+ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
+-extern void set_fiq_regs(struct pt_regs *regs);
+-extern void get_fiq_regs(struct pt_regs *regs);
+ extern void enable_fiq(int fiq);
+ extern void disable_fiq(int fiq);
  
- #define KPROBE_RETURN_INSTRUCTION	0xe1a0f00e	/* mov pc, lr */
--#define SET_R0_TRUE_INSTRUCTION		0xe3a00001	/* mov	r0, #1 */
--
--#define	truecc_insn(insn)	(((insn) & 0xf0000000) | \
--				 (SET_R0_TRUE_INSTRUCTION & 0x0fffffff))
++/* helpers defined in fiqasm.S: */
++extern void __set_fiq_regs(unsigned long const *regs);
++extern void __get_fiq_regs(unsigned long *regs);
++
++static inline void set_fiq_regs(struct pt_regs const *regs)
++{
++	__set_fiq_regs(&regs->ARM_r8);
++}
++
++static inline void get_fiq_regs(struct pt_regs *regs)
++{
++	__get_fiq_regs(&regs->ARM_r8);
++}
++
+ #endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 74554f1..689f4d9 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -24,7 +24,7 @@ obj-$(CONFIG_OC_ETM)		+= etm.o
  
- typedef long (insn_0arg_fn_t)(void);
- typedef long (insn_1arg_fn_t)(long);
-@@ -419,14 +415,10 @@ insnslot_llret_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
- 
- static void __kprobes simulate_bbl(struct kprobe *p, struct pt_regs *regs)
- {
--	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
- 	kprobe_opcode_t insn = p->opcode;
- 	long iaddr = (long)p->addr;
- 	int disp  = branch_displacement(insn);
- 
--	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
--		return;
--
- 	if (insn & (1 << 24))
- 		regs->ARM_lr = iaddr + 4;
- 
-@@ -446,14 +438,10 @@ static void __kprobes simulate_blx1(struct kprobe *p, struct pt_regs *regs)
- 
- static void __kprobes simulate_blx2bx(struct kprobe *p, struct pt_regs *regs)
- {
--	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
- 	kprobe_opcode_t insn = p->opcode;
- 	int rm = insn & 0xf;
- 	long rmv = regs->uregs[rm];
- 
--	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
--		return;
--
- 	if (insn & (1 << 5))
- 		regs->ARM_lr = (long)p->addr + 4;
- 
-@@ -465,7 +453,6 @@ static void __kprobes simulate_blx2bx(struct kprobe *p, struct pt_regs *regs)
- 
- static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
- {
--	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
- 	kprobe_opcode_t insn = p->opcode;
- 	int rn = (insn >> 16) & 0xf;
- 	int lbit = insn & (1 << 20);
-@@ -476,9 +463,6 @@ static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
- 	int reg_bit_vector;
- 	int reg_count;
- 
--	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
--		return;
--
- 	reg_count = 0;
- 	reg_bit_vector = insn & 0xffff;
- 	while (reg_bit_vector) {
-@@ -510,11 +494,6 @@ static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
- 
- static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
- {
--	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
--
--	if (!insnslot_1arg_rflags(0, regs->ARM_cpsr, i_fn))
--		return;
--
- 	regs->ARM_pc = (long)p->addr + str_pc_offset;
- 	simulate_ldm1stm1(p, regs);
- 	regs->ARM_pc = (long)p->addr + 4;
-@@ -1056,9 +1035,8 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 		/* BLX(2) : cccc 0001 0010 xxxx xxxx xxxx 0011 xxxx */
- 		/* BX     : cccc 0001 0010 xxxx xxxx xxxx 0001 xxxx */
- 		if ((insn & 0x0ff000d0) == 0x01200010) {
--			asi->insn[0] = truecc_insn(insn);
- 			asi->insn_handler = simulate_blx2bx;
--			return INSN_GOOD;
-+			return INSN_GOOD_NO_SLOT;
- 		}
- 
- 		/* CLZ : cccc 0001 0110 xxxx xxxx xxxx 0001 xxxx */
-@@ -1333,10 +1311,9 @@ space_cccc_100x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 
- 	/* LDM(1) : cccc 100x x0x1 xxxx xxxx xxxx xxxx xxxx */
- 	/* STM(1) : cccc 100x x0x0 xxxx xxxx xxxx xxxx xxxx */
--	asi->insn[0] = truecc_insn(insn);
- 	asi->insn_handler = ((insn & 0x108000) == 0x008000) ? /* STM & R15 */
- 				simulate_stm1_pc : simulate_ldm1stm1;
--	return INSN_GOOD;
-+	return INSN_GOOD_NO_SLOT;
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+ obj-$(CONFIG_ARCH_ACORN)	+= ecard.o 
+-obj-$(CONFIG_FIQ)		+= fiq.o
++obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
+ obj-$(CONFIG_MODULES)		+= armksyms.o module.o
+ obj-$(CONFIG_ARTHUR)		+= arthur.o
+ obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index e72dc34..4c164ec 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -89,47 +89,6 @@ void set_fiq_handler(void *start, unsigned int length)
+ 		flush_icache_range(0x1c, 0x1c + length);
  }
  
- static enum kprobe_insn __kprobes
-@@ -1344,9 +1321,8 @@ space_cccc_101x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-/*
+- * Taking an interrupt in FIQ mode is death, so both these functions
+- * disable irqs for the duration.  Note - these functions are almost
+- * entirely coded in assembly.
+- */
+-void __naked set_fiq_regs(struct pt_regs *regs)
+-{
+-	register unsigned long tmp;
+-	asm volatile (
+-	"mov	ip, sp\n\
+-	stmfd	sp!, {fp, ip, lr, pc}\n\
+-	sub	fp, ip, #4\n\
+-	mrs	%0, cpsr\n\
+-	msr	cpsr_c, %2	@ select FIQ mode\n\
+-	mov	r0, r0\n\
+-	ldmia	%1, {r8 - r14}\n\
+-	msr	cpsr_c, %0	@ return to SVC mode\n\
+-	mov	r0, r0\n\
+-	ldmfd	sp, {fp, sp, pc}"
+-	: "=&r" (tmp)
+-	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
+-}
+-
+-void __naked get_fiq_regs(struct pt_regs *regs)
+-{
+-	register unsigned long tmp;
+-	asm volatile (
+-	"mov	ip, sp\n\
+-	stmfd	sp!, {fp, ip, lr, pc}\n\
+-	sub	fp, ip, #4\n\
+-	mrs	%0, cpsr\n\
+-	msr	cpsr_c, %2	@ select FIQ mode\n\
+-	mov	r0, r0\n\
+-	stmia	%1, {r8 - r14}\n\
+-	msr	cpsr_c, %0	@ return to SVC mode\n\
+-	mov	r0, r0\n\
+-	ldmfd	sp, {fp, sp, pc}"
+-	: "=&r" (tmp)
+-	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
+-}
+-
+ int claim_fiq(struct fiq_handler *f)
  {
- 	/* B  : cccc 1010 xxxx xxxx xxxx xxxx xxxx xxxx */
- 	/* BL : cccc 1011 xxxx xxxx xxxx xxxx xxxx xxxx */
--	asi->insn[0] = truecc_insn(insn);
- 	asi->insn_handler = simulate_bbl;
--	return INSN_GOOD;
-+	return INSN_GOOD_NO_SLOT;
+ 	int ret = 0;
+@@ -174,8 +133,8 @@ void disable_fiq(int fiq)
  }
  
- static enum kprobe_insn __kprobes
+ EXPORT_SYMBOL(set_fiq_handler);
+-EXPORT_SYMBOL(set_fiq_regs);
+-EXPORT_SYMBOL(get_fiq_regs);
++EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
++EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(claim_fiq);
+ EXPORT_SYMBOL(release_fiq);
+ EXPORT_SYMBOL(enable_fiq);
+diff --git a/arch/arm/kernel/fiqasm.S b/arch/arm/kernel/fiqasm.S
+new file mode 100644
+index 0000000..0504bb8
+--- /dev/null
++++ b/arch/arm/kernel/fiqasm.S
+@@ -0,0 +1,49 @@
++/*
++ *  linux/arch/arm/kernel/fiqasm.S
++ *
++ *  Derived from code originally in linux/arch/arm/kernel/fiq.c:
++ *
++ *  Copyright (C) 1998 Russell King
++ *  Copyright (C) 1998, 1999 Phil Blundell
++ *  Copyright (C) 2011, Linaro Limited
++ *
++ *  FIQ support written by Philip Blundell <philb@gnu.org>, 1998.
++ *
++ *  FIQ support re-written by Russell King to be more generic
++ *
++ *  v7/Thumb-2 compatibility modifications by Linaro Limited, 2011.
++ */
++	
++#include <arm/assembler.h>
++
++/*
++ * Taking an interrupt in FIQ mode is death, so both these functions
++ * disable irqs for the duration.  Note - these functions are almost
++ * entirely coded in assembly.
++ */
++
++ENTRY(__set_fiq_regs)
++	mov	r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
++	mrs	r1, cpsr
++	msr	cpsr_c, r2	@ select FIQ mode
++	mov	r0, r0		@ avoid hazard prior to ARMv4
++	ldmia	r0!, {r8 - r12}
++	ldr	sp, [r0], #4
++	ldr	lr, [r0]
++	msr	cpsr_c, r1	@ return to SVC mode
++	mov	r0, r0		@ avoid hazard prior to ARMv4
++	mov	pc, lr
++ENDPROC(__set_fiq_regs)
++
++ENTRY(__get_fiq_regs)
++	mov	r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
++	mrs	r1, cpsr
++	msr	cpsr_c, r2	@ select FIQ mode
++	mov	r0, r0		@ avoid hazard prior to ARMv4
++	stmia	r0!, {r8 - r12}
++	str	sp, [r0], #4
++	str	lr, [r0]
++	msr	cpsr_c, r1	@ return to SVC mode
++	mov	r0, r0		@ avoid hazard prior to ARMv4
++	mov	pc, lr
++ENDPROC(__get_fiq_regs)
 -- 
-1.7.2.5
+1.7.1
