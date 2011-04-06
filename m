@@ -1,42 +1,39 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 06 Apr 2011 08:26:36 -0700
-Subject: [GIT PULL] OMAP PM fixes for 2.6.39-rc
-Message-ID: <87sjtvieoj.fsf@ti.com>
+Date: Wed, 06 Apr 2011 08:33:32 -0700
+Subject: [PATCH] OMAP2+: SR Layer Cleanup.
+In-Reply-To: <1301378352-29269-1-git-send-email-shweta.gulati@ti.com> (Shweta
+	Gulati's message of "Tue, 29 Mar 2011 11:29:12 +0530")
+References: <1301378352-29269-1-git-send-email-shweta.gulati@ti.com>
+Message-ID: <87mxk3iecz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Shweta,
 
-Please pull the following OMAP PM fixes for the 2.6.39-rc fixes cycle.
+Shweta Gulati <shweta.gulati@ti.com> writes:
+
+> As a part of Voltage Layer Cleanup Patches,
+> submitted by Kevin Hilman, Voltage domain
+> Information is removed from hwmod,
+> So the patch removes 'vdd_name' info from omap_hwmod
+> and adds that info into dev_attr as SR code uses vdd_name
+> to get voltagedomain sructure info.
+>
+> Tested on OMAP3630 SDP and OMAP4430 SDP Board
+>
+> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+
+Thanks for this.  It looks good.
+
+> ---
+> It apllies over Voltage Layer Cleanup Patch by
+> Kevin Hilman: 
+>  https://patchwork.kernel.org/patch/657421/ 
+
+Can you rebase on top of my pm-wip/voltdm_a branch?  It currently
+doesn't apply there because the some of the voltage domain names were
+changed, e.g. mpu -> mpu_iva, wkup -> wakeup.
 
 Thanks,
 
 Kevin
-
-The following changes since commit 6221f222c0ebf1acdf7abcf927178f40e1a65e2a:
-
-  Linux 2.6.39-rc2 (2011-04-05 18:30:43 -0700)
-
-are available in the git repository at:
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.39/pm-fixes
-
-Aaro Koskinen (5):
-      OMAP3+: smartreflex: fix sr_late_init() error path in probe
-      OMAP3+: smartreflex: request the memory region
-      OMAP3+: smartreflex: fix ioremap leak on probe error
-      OMAP3+: smartreflex: delete instance from sr_list on probe error
-      OMAP3+: smartreflex: delete debugfs entries on probe error
-
-Nishanth Menon (3):
-      OMAP3+: voltage: remove initial voltage
-      OMAP3+: voltage: remove spurious pr_notice for debugfs
-      OMAP4: PM: remove redundant #ifdef CONFIG_PM
-
-Shweta Gulati (1):
-      OMAP4: Intialize IVA Device in addition to DSP device.
-
- arch/arm/mach-omap2/pm.c          |    1 +
- arch/arm/mach-omap2/pm44xx.c      |    2 --
- arch/arm/mach-omap2/smartreflex.c |   23 ++++++++++++++++++-----
- arch/arm/mach-omap2/voltage.c     |    2 --
- 4 files changed, 19 insertions(+), 9 deletions(-)
