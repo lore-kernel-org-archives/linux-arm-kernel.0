@@ -1,61 +1,30 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  6 Apr 2011 16:29:04 +0200
-Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
-Message-ID: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed,  6 Apr 2011 16:31:02 +0200
+Subject: [PATCH] pcmcia/sa1100: put sa11x0_pcmcia_hw_init[] to .devinit.data
+Message-ID: <1302100262-18296-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All machines having a imx-fb device now select IMX_HAVE_PLATFORM_IMX_FB,
-so HAVE_FB_IMX can go away and there is no need anymore to explicitly
-depend on ARCH_MX1 or ARCH_MX2.
+sa11x0_pcmcia_hw_init is only used by sa11x0_drv_pcmcia_probe which
+lives in .devinit.text so it can go to .devinit.data.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-Hello,
+ drivers/pcmcia/sa1100_generic.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-should this go via Sascha's or Paul's tree?
-
-Best regards
-Uwe
-
- arch/arm/plat-mxc/devices/Kconfig |    1 -
- drivers/video/Kconfig             |    5 +----
- 2 files changed, 1 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index b9ab1d5..e4dcf49 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -24,7 +24,6 @@ config IMX_HAVE_PLATFORM_IMXDI_RTC
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index fb9740d..2eea664 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -43,7 +43,7 @@
  
- config IMX_HAVE_PLATFORM_IMX_FB
- 	bool
--	select HAVE_FB_IMX
+ int __init pcmcia_collie_init(struct device *dev);
  
- config IMX_HAVE_PLATFORM_IMX_I2C
- 	bool
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index e6a8d8c..62f337a 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -8,9 +8,6 @@ menu "Graphics support"
- config HAVE_FB_ATMEL
- 	bool
- 
--config HAVE_FB_IMX
--	bool
--
- config SH_MIPI_DSI
- 	tristate
- 	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-@@ -359,7 +356,7 @@ config FB_SA1100
- 
- config FB_IMX
- 	tristate "Freescale i.MX LCD support"
--	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
-+	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
+-static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
++static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) __devinitdata = {
+ #ifdef CONFIG_SA1100_ASSABET
+ 	pcmcia_assabet_init,
+ #endif
 -- 
 1.7.2.3
