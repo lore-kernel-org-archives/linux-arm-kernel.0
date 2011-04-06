@@ -1,45 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 06 Apr 2011 10:34:16 -0700
-Subject: [PATCHv5 1/3] ARM: Translate delay.S into (mostly) C
-In-Reply-To: <4D9C2910.6020309@stericsson.com>
-References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
-	<1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
-	<4D9C2910.6020309@stericsson.com>
-Message-ID: <4D9CA418.2030107@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Apr 2011 13:37:19 -0400 (EDT)
+Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for
+ Thumb-2
+In-Reply-To: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
+References: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1104061329520.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2011 01:49 AM, Mattias Wallin wrote:
-> On 04/06/2011 01:56 AM, Stephen Boyd wrote:
->> +void __udelay(unsigned long usecs)
->> +{
->> +    __const_udelay(usecs * ((2199023*HZ)>>11));
->
-> This will overflow if HZ=1000.
-> If I remember correct I fixed it like this:
-> __const_udelay(usecs * ((2199023UL*HZ)>>11));
->
+On Wed, 6 Apr 2011, Dave Martin wrote:
 
-Thanks. I see that my compiler spits out a warning when HZ is 1000.
+>  * To remove the risk of inconvenient register allocation decisions
+>    by the compiler, these functions are separated out as pure
+>    assembler.
+> 
+>  * The apcs frame manipulation code is not applicable for Thumb-2
+>    (and also not easily compatible).  Since it's not essential to
+>    have a full frame on these leaf assembler functions, the frame
+>    manipulation is removed, in the interests of simplicity.
+> 
+>  * Split up ldm/stm instructions to be compatible with Thumb-2,
+>    as well as avoiding instruction forms deprecated on >= ARMv7.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-I'll squash this in before sending to the tracker. Care to send a Tested-by?
+I like.  Minor nit:
 
------>8-----8<-----
+> +/*
+> + * Taking an interrupt in FIQ mode is death, so both these functions
+> + * disable irqs for the duration.  Note - these functions are almost
+> + * entirely coded in assembly.
+> + */
 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index f664002..e7229bf 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -80,6 +80,6 @@ EXPORT_SYMBOL(__const_udelay);
-  */
- void __udelay(unsigned long usecs)
- {
--       __const_udelay(usecs * ((2199023*HZ)>>11));
-+       __const_udelay(usecs * ((2199023UL*HZ)>>11));
- }
- EXPORT_SYMBOL(__udelay);
+I think it is obvious the last sentence may go, especially since 
+"almost" is not exactly true anymore.
+
+Other than that:
+
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Nicolas
