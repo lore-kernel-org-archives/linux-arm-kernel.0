@@ -1,37 +1,61 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Wed, 06 Apr 2011 15:11:01 +0100
-Subject: gpio.h interaction with other headers issue on pxa (maybe arm in
-	general?)
-Message-ID: <4D9C7475.6080900@cam.ac.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  6 Apr 2011 16:29:04 +0200
+Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
+Message-ID: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+All machines having a imx-fb device now select IMX_HAVE_PLATFORM_IMX_FB,
+so HAVE_FB_IMX can go away and there is no need anymore to explicitly
+depend on ARCH_MX1 or ARCH_MX2.
 
-Doing a quick test build of drivers staging/iio/gyro/adis16080_core.c for pxa27x
-gave me:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-  CHECK   drivers/staging/iio/gyro/adis16080_core.c
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:57:48: error: Expected ; at end of declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:57:48: error: got read_cpuid_id
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:59:16: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:59:16: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:60:1: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:60:1: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:64:16: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:64:16: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:65:1: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:65:1: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:69:16: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:69:16: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:70:1: error: Expected ; at the end of type declaration
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:70:1: error: got }
-/home/jic23/src/kernel/onwards/arch/arm/include/asm/cputype.h:59:16: error: undefined identifier '__val'
+should this go via Sascha's or Paul's tree?
 
-Simply reorder the header includes to have kernel.h before gpio.h fixes this, but is it an indication of
-an underlying problem that should have a more general fix?
+Best regards
+Uwe
 
-Give the driver was developed on blackfin, I'm guessing it's fine for them and given
-Greg's testing on x86 and friends I guess it is fine there as well.
+ arch/arm/plat-mxc/devices/Kconfig |    1 -
+ drivers/video/Kconfig             |    5 +----
+ 2 files changed, 1 insertions(+), 5 deletions(-)
 
-Jonathan
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index b9ab1d5..e4dcf49 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -24,7 +24,6 @@ config IMX_HAVE_PLATFORM_IMXDI_RTC
+ 
+ config IMX_HAVE_PLATFORM_IMX_FB
+ 	bool
+-	select HAVE_FB_IMX
+ 
+ config IMX_HAVE_PLATFORM_IMX_I2C
+ 	bool
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index e6a8d8c..62f337a 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -8,9 +8,6 @@ menu "Graphics support"
+ config HAVE_FB_ATMEL
+ 	bool
+ 
+-config HAVE_FB_IMX
+-	bool
+-
+ config SH_MIPI_DSI
+ 	tristate
+ 	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
+@@ -359,7 +356,7 @@ config FB_SA1100
+ 
+ config FB_IMX
+ 	tristate "Freescale i.MX LCD support"
+-	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
++	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+-- 
+1.7.2.3
