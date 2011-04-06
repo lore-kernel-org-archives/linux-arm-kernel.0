@@ -1,190 +1,94 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  6 Apr 2011 11:29:47 +0100
-Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
-Message-ID: <1302085787-15069-1-git-send-email-dave.martin@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 6 Apr 2011 18:32:19 +0800
+Subject: [PATCH V4 0/4] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <1301722240-15406-1-git-send-email-b32955@freescale.com>
+References: <1301722240-15406-1-git-send-email-b32955@freescale.com>
+Message-ID: <4D9C4133.6080708@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- * To remove the risk of inconvenient register allocation decisions
-   by the compiler, these functions are separated out as pure
-   assembler.
+Hi:
 
- * The apcs frame manipulation code is not applicable for Thumb-2
-   (and also not easily compatible).  Since it's not essential to
-   have a full frame on these leaf assembler functions, the frame
-   manipulation is removed, in the interests of simplicity.
+Does some one have any comments about this driver?
 
- * Split up ldm/stm instructions to be compatible with Thumb-2,
-   as well as avoiding instruction forms deprecated on >= ARMv7.
+Thanks
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
+Huang Shijie
 
- arch/arm/include/asm/fiq.h |   16 ++++++++++++-
- arch/arm/kernel/Makefile   |    2 +-
- arch/arm/kernel/fiq.c      |   45 +--------------------------------------
- arch/arm/kernel/fiqasm.S   |   49 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 66 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm/kernel/fiqasm.S
-
-diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
-index 2242ce2..45bb3ee 100644
---- a/arch/arm/include/asm/fiq.h
-+++ b/arch/arm/include/asm/fiq.h
-@@ -29,9 +29,21 @@ struct fiq_handler {
- extern int claim_fiq(struct fiq_handler *f);
- extern void release_fiq(struct fiq_handler *f);
- extern void set_fiq_handler(void *start, unsigned int length);
--extern void set_fiq_regs(struct pt_regs *regs);
--extern void get_fiq_regs(struct pt_regs *regs);
- extern void enable_fiq(int fiq);
- extern void disable_fiq(int fiq);
- 
-+/* helpers defined in fiqasm.S: */
-+extern void __set_fiq_regs(unsigned long const *regs);
-+extern void __get_fiq_regs(unsigned long *regs);
-+
-+static inline void set_fiq_regs(struct pt_regs const *regs)
-+{
-+	__set_fiq_regs(&regs->ARM_r8);
-+}
-+
-+static inline void get_fiq_regs(struct pt_regs *regs)
-+{
-+	__get_fiq_regs(&regs->ARM_r8);
-+}
-+
- #endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 74554f1..689f4d9 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -24,7 +24,7 @@ obj-$(CONFIG_OC_ETM)		+= etm.o
- 
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
- obj-$(CONFIG_ARCH_ACORN)	+= ecard.o 
--obj-$(CONFIG_FIQ)		+= fiq.o
-+obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
- obj-$(CONFIG_MODULES)		+= armksyms.o module.o
- obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index e72dc34..4c164ec 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -89,47 +89,6 @@ void set_fiq_handler(void *start, unsigned int length)
- 		flush_icache_range(0x1c, 0x1c + length);
- }
- 
--/*
-- * Taking an interrupt in FIQ mode is death, so both these functions
-- * disable irqs for the duration.  Note - these functions are almost
-- * entirely coded in assembly.
-- */
--void __naked set_fiq_regs(struct pt_regs *regs)
--{
--	register unsigned long tmp;
--	asm volatile (
--	"mov	ip, sp\n\
--	stmfd	sp!, {fp, ip, lr, pc}\n\
--	sub	fp, ip, #4\n\
--	mrs	%0, cpsr\n\
--	msr	cpsr_c, %2	@ select FIQ mode\n\
--	mov	r0, r0\n\
--	ldmia	%1, {r8 - r14}\n\
--	msr	cpsr_c, %0	@ return to SVC mode\n\
--	mov	r0, r0\n\
--	ldmfd	sp, {fp, sp, pc}"
--	: "=&r" (tmp)
--	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
--}
--
--void __naked get_fiq_regs(struct pt_regs *regs)
--{
--	register unsigned long tmp;
--	asm volatile (
--	"mov	ip, sp\n\
--	stmfd	sp!, {fp, ip, lr, pc}\n\
--	sub	fp, ip, #4\n\
--	mrs	%0, cpsr\n\
--	msr	cpsr_c, %2	@ select FIQ mode\n\
--	mov	r0, r0\n\
--	stmia	%1, {r8 - r14}\n\
--	msr	cpsr_c, %0	@ return to SVC mode\n\
--	mov	r0, r0\n\
--	ldmfd	sp, {fp, sp, pc}"
--	: "=&r" (tmp)
--	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
--}
--
- int claim_fiq(struct fiq_handler *f)
- {
- 	int ret = 0;
-@@ -174,8 +133,8 @@ void disable_fiq(int fiq)
- }
- 
- EXPORT_SYMBOL(set_fiq_handler);
--EXPORT_SYMBOL(set_fiq_regs);
--EXPORT_SYMBOL(get_fiq_regs);
-+EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
-+EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
- EXPORT_SYMBOL(claim_fiq);
- EXPORT_SYMBOL(release_fiq);
- EXPORT_SYMBOL(enable_fiq);
-diff --git a/arch/arm/kernel/fiqasm.S b/arch/arm/kernel/fiqasm.S
-new file mode 100644
-index 0000000..0504bb8
---- /dev/null
-+++ b/arch/arm/kernel/fiqasm.S
-@@ -0,0 +1,49 @@
-+/*
-+ *  linux/arch/arm/kernel/fiqasm.S
-+ *
-+ *  Derived from code originally in linux/arch/arm/kernel/fiq.c:
-+ *
-+ *  Copyright (C) 1998 Russell King
-+ *  Copyright (C) 1998, 1999 Phil Blundell
-+ *  Copyright (C) 2011, Linaro Limited
-+ *
-+ *  FIQ support written by Philip Blundell <philb@gnu.org>, 1998.
-+ *
-+ *  FIQ support re-written by Russell King to be more generic
-+ *
-+ *  v7/Thumb-2 compatibility modifications by Linaro Limited, 2011.
-+ */
-+	
-+#include <arm/assembler.h>
-+
-+/*
-+ * Taking an interrupt in FIQ mode is death, so both these functions
-+ * disable irqs for the duration.  Note - these functions are almost
-+ * entirely coded in assembly.
-+ */
-+
-+ENTRY(__set_fiq_regs)
-+	mov	r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
-+	mrs	r1, cpsr
-+	msr	cpsr_c, r2	@ select FIQ mode
-+	mov	r0, r0		@ avoid hazard prior to ARMv4
-+	ldmia	r0!, {r8 - r12}
-+	ldr	sp, [r0], #4
-+	ldr	lr, [r0]
-+	msr	cpsr_c, r1	@ return to SVC mode
-+	mov	r0, r0		@ avoid hazard prior to ARMv4
-+	mov	pc, lr
-+ENDPROC(__set_fiq_regs)
-+
-+ENTRY(__get_fiq_regs)
-+	mov	r2, #PSR_I_BIT | PSR_F_BIT | FIQ_MODE
-+	mrs	r1, cpsr
-+	msr	cpsr_c, r2	@ select FIQ mode
-+	mov	r0, r0		@ avoid hazard prior to ARMv4
-+	stmia	r0!, {r8 - r12}
-+	str	sp, [r0], #4
-+	str	lr, [r0]
-+	msr	cpsr_c, r1	@ return to SVC mode
-+	mov	r0, r0		@ avoid hazard prior to ARMv4
-+	mov	pc, lr
-+ENDPROC(__get_fiq_regs)
--- 
-1.7.1
+> The general-purpose media interface(GPMI) controller is a flexible interface
+> to up to several NAND flashs.
+>
+> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+>
+> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+> not.
+>
+> This driver is based the Shawn Guo's DMA patches for IMX23/IMX28,
+> please refer to :
+> 	http://git.infradead.org/users/vkoul/slave-dma.git/commit/a580b8c5429a624d120cd603e1498bf676e2b4da
+>
+> v3 --> v4:
+> 	[0] use the nand_ids{} as the nand database, drop my own database.
+> 	[1] remove the patch for DMA enginer, Shawn will submit his own version.
+> 	[2] use the platform_id to distinguish different Archs.
+> 	[3] fix the strange coding style.
+> 	[4] others.
+>
+> v2 --> v3:
+> 	[0] merge the imx23 and imx28 into one file(including the header file).
+> 	[1] remove the unuse registers in the headers.
+> 	[2] fix DMA bugs
+> 	[3] add bus width field to nand_attr{}
+> 	[4] others
+>
+> v1 --> v2:
+> 	[0] merge the common files into the gpmi-nfc-main.c
+> 	[1] change the code to get the clock.
+> 	[2] remove the timing in the nand_device_info{}
+> 	[3] fix DMA errors
+> 	[4] add the nand_device_info.[ch] to generic code
+> 	[5] use the chip->onfi_version for the ONFI nand
+> 	[6] useless init
+> 	[7] others
+>
+>
+> Huang Shijie (4):
+>   ARM: add GPMI support for imx23/imx28
+>   MTD : add the common code for GPMI controller driver
+>   MTD: add support for imx23 and imx28
+>   MTD : add GPMI driver in the config and Makefile
+>
+>  arch/arm/mach-mxs/Kconfig                       |    2 +
+>  arch/arm/mach-mxs/clock-mx23.c                  |    3 +
+>  arch/arm/mach-mxs/clock-mx28.c                  |    3 +
+>  arch/arm/mach-mxs/devices-mx23.h                |    3 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    3 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-gpmi.c       |  136 ++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
+>  arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   64 +
+>  arch/arm/mach-mxs/mach-mx23evk.c                |   37 +
+>  arch/arm/mach-mxs/mach-mx28evk.c                |   37 +
+>  drivers/mtd/nand/Kconfig                        |   10 +
+>  drivers/mtd/nand/Makefile                       |    1 +
+>  drivers/mtd/nand/gpmi-nfc/Makefile              |    5 +
+>  drivers/mtd/nand/gpmi-nfc/bch-mx23-mx28.h       |   88 +
+>  drivers/mtd/nand/gpmi-nfc/gpmi-mx23-mx28.h      |  163 ++
+>  drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c       | 2453 +++++++++++++++++++++++
+>  drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h            |  551 +++++
+>  drivers/mtd/nand/gpmi-nfc/hal-mx23-mx28.c       |  556 +++++
+>  drivers/mtd/nand/gpmi-nfc/rom-mx23.c            |  298 +++
+>  drivers/mtd/nand/gpmi-nfc/rom-mx28.c            |   66 +
+>  22 files changed, 4487 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
+>  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/Makefile
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/bch-mx23-mx28.h
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-mx23-mx28.h
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/hal-mx23-mx28.c
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-mx23.c
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/rom-mx28.c
+>
