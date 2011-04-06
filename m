@@ -1,210 +1,40 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Wed,  6 Apr 2011 16:18:10 -0700
-Subject: [PATCH v3] ARM: Use generic BUG() handler
-Message-ID: <1302131890-20953-1-git-send-email-sjg@chromium.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 7 Apr 2011 01:20:17 +0200
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <1302124737.27258.7.camel@dev.znau.edu.ua>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop>
+	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
+	<op.vti9ote53ri7v4@arend-laptop>
+	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
+	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
+	<1302123428.20093.6.camel@maggie>
+	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
+	<1302124112.20093.11.camel@maggie>
+	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
+	<1302124737.27258.7.camel@dev.znau.edu.ua>
+Message-ID: <BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Glass <sjg@google.com>
+W dniu 6 kwietnia 2011 23:18 u?ytkownik George Kashperko
+<george@znau.edu.ua> napisa?:
+>> We have 2 windows. I didn't try this, but let's assume they have no
+>> limitations. We can use first window for one driver only, second
+>> driver for second driver only. That gives us 2 drivers simultaneously
+>> working drivers. No driver need to reset core really often (and not
+>> inside interrupt context) so we will switch driver's window to agent
+>> (from core) only at init/reset.
+>>
+>> The question is what amount of driver we will need to support at the same time.
+>>
+>
+> I guess (correct me please, Broadcom guys if I'm wrong) there are two
+> functions two-head w11 pci host and therefore 4 sliding windows, 2 per
+> each function.
 
-ARM uses its own BUG() handler which makes its output slightly different
-from other archtectures.
+I don't understand you. Can you use more friendly language? functions?
+2head? w11?
 
-One of the problems is that the ARM implementation doesn't report the function
-with the BUG() in it, but always reports the PC being in __bug(). The generic
-implementation doesn't have this problem.
-
-Currently we get something like:
-
-kernel BUG at fs/proc/breakme.c:35!
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-...
-PC is at __bug+0x20/0x2c
-
-With this patch it displays:
-
-kernel BUG at fs/proc/breakme.c:35!
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
-...
-PC is at write_breakme+0xd0/0x1b4
-
-This implementation uses an undefined instruction to implement BUG, and sets up
-a bug table containing the relevant information. Many versions of gcc do not
-support %c properly for ARM (inserting a # when they shouldn't) so we work
-around this using distasteful macro magic.
-
-v1: Initial version to replace existing ARM BUG() implementation with something
-more similar to other architectures.
-
-v2: Add Thumb support, remove backtrace whitespace output changes. Change to
-use macros instead of requiring the asm %d flag to work (thanks to
-Dave Martin <dave.martin@linaro.org>)
-
-v3: Remove old BUG() implementation in favor of this one.
-Remove the Backtrace: message (will submit this separately).
-Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
-thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
-define GENERIC_BUG this might be academic.)
-Rebase to linux-2.6.git master.
-
-Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
-
-Signed-off-by: Simon Glass <sjg@chromium.org>
----
- arch/arm/Kconfig              |    4 +++
- arch/arm/include/asm/bug.h    |   55 ++++++++++++++++++++++++++++++++++------
- arch/arm/kernel/traps.c       |   23 +++++++++++++++++
- arch/arm/kernel/vmlinux.lds.S |    3 +-
- 4 files changed, 75 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b9f78b..7d7df40 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -207,6 +207,10 @@ config ARM_PATCH_PHYS_VIRT_16BIT
- 	def_bool y
- 	depends on ARM_PATCH_PHYS_VIRT && ARCH_MSM
- 
-+config GENERIC_BUG
-+	def_bool y
-+	depends on BUG
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 4d88425..2914724 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -3,21 +3,58 @@
- 
- 
- #ifdef CONFIG_BUG
--#ifdef CONFIG_DEBUG_BUGVERBOSE
--extern void __bug(const char *file, int line) __attribute__((noreturn));
--
--/* give file/line information */
--#define BUG()		__bug(__FILE__, __LINE__)
- 
-+/*
-+ * Use a suitable undefined instruction to use for ARM/Thumb2 bug handling.
-+ * We need to be careful not to conflict with those used by other modules and
-+ * the register_undef_hook() system.
-+ */
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define BUG_INSTR_VALUE 0xde02
-+#define BUG_INSTR_TYPE ".hword "
- #else
-+#define BUG_INSTR_VALUE 0xe7f001f2
-+#define BUG_INSTR_TYPE ".word "
-+#endif
- 
--/* this just causes an oops */
--#define BUG()		do { *(int *)0 = 0; } while (1)
- 
--#endif
-+#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
-+#define _BUG(file, line, value) __BUG(file, line, value)
-+
-+#ifdef CONFIG_DEBUG_BUGVERBOSE
-+
-+/*
-+ * The extra indirection is to ensure that the __FILE__ string comes through
-+ * OK. Many version of gcc do not support the asm %c parameter which would be
-+ * preferable to this unpleasantness. We use mergeable string sections to
-+ * avoid multiple copies of the string appearing in the kernel image.
-+ */
-+
-+#define __BUG(__file, __line, __value)				\
-+do {								\
-+	BUILD_BUG_ON(sizeof(struct bug_entry) != 12);		\
-+	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
-+		".pushsection .rodata.str, \"aMS\", 1\n"	\
-+		"2:\t.asciz " #__file "\n" 			\
-+		".popsection\n" 				\
-+		".pushsection __bug_table,\"a\"\n"		\
-+		"3:\t.word 1b, 2b\n"				\
-+		"\t.hword " #__line ", 0\n"			\
-+		".popsection");					\
-+	unreachable();						\
-+} while (0)
-+
-+#else  /* not CONFIG_DEBUG_BUGVERBOSE */
-+
-+#define __BUG(__file, __line, __value)				\
-+do {								\
-+	asm volatile(BUG_INSTR_TYPE #__value);			\
-+	unreachable();						\
-+} while (0)
-+#endif  /* CONFIG_DEBUG_BUGVERBOSE */
- 
- #define HAVE_ARCH_BUG
--#endif
-+#endif  /* CONFIG_BUG */
- 
- #include <asm-generic/bug.h>
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index f0000e1..25dc8dc 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -21,6 +21,7 @@
- #include <linux/kdebug.h>
- #include <linux/module.h>
- #include <linux/kexec.h>
-+#include <linux/bug.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-@@ -271,6 +272,8 @@ void die(const char *str, struct pt_regs *regs, int err)
- 	spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
-+	if (!user_mode(regs))
-+		report_bug(regs->ARM_pc, regs);
- 	ret = __die(str, err, thread, regs);
- 
- 	if (regs && kexec_should_crash(thread->task))
-@@ -302,6 +305,26 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
- 
-+#ifdef CONFIG_GENERIC_BUG
-+
-+int is_valid_bugaddr(unsigned long pc)
-+{
-+#ifdef CONFIG_THUMB2_KERNEL
-+	unsigned short bkpt;
-+#else
-+	unsigned long bkpt;
-+#endif
-+
-+	if (pc < PAGE_OFFSET)
-+		return 0;
-+	if (probe_kernel_address((unsigned *)pc, bkpt))
-+		return 0;
-+
-+	return bkpt == BUG_INSTR_VALUE;
-+}
-+
-+#endif
-+
- static LIST_HEAD(undef_hook);
- static DEFINE_SPINLOCK(undef_lock);
- 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b4348e6..81d4efe 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -21,7 +21,8 @@
- #define ARM_CPU_KEEP(x)
- #endif
- 
--#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
-+#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-+	defined(CONFIG_GENERIC_BUG)
- #define ARM_EXIT_KEEP(x)	x
- #else
- #define ARM_EXIT_KEEP(x)
 -- 
-1.7.3.1
+Rafa?
