@@ -1,19 +1,29 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Wed, 06 Apr 2011 11:23:40 +0200
-Subject: [PATCH 00/34] Make kernel build deterministic
-In-Reply-To: <20110405154918.GA31337@suse.de>
-References: <1302015561-21047-1-git-send-email-mmarek@suse.cz>
-	<20110405154918.GA31337@suse.de>
-Message-ID: <4D9C311C.4080008@suse.cz>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  6 Apr 2011 11:24:22 +0200
+Subject: [PATCH 2/5] driver core/platform_device_add_data: free platform data
+	before overwriting
+In-Reply-To: <20110301153438.GB15633@suse.de>
+References: <20110301153438.GB15633@suse.de>
+Message-ID: <1302081865-2962-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5.4.2011 17:49, Greg KH wrote:
-> Very nice stuff.  Do you want to take the individual patches through one
-> of your trees, or do you mind if the subsystem maintainers take them
-> through theirs?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/base/platform.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I'd leave it up to the subsystem maintainers. I'll check once the merge
-window opens and send the remaining patches to Linus directly.
-
-Michal
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index f836f2e..01caf61 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -227,6 +227,7 @@ int platform_device_add_data(struct platform_device *pdev, const void *data,
+ 			return -ENOMEM;
+ 	}
+ 
++	kfree(pdev->dev.platform_data);
+ 	pdev->dev.platform_data = d;
+ 	return 0;
+ }
+-- 
+1.7.2.3
