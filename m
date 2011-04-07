@@ -1,16 +1,51 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 7 Apr 2011 02:12:22 -0400
-Subject: [PATCH] spi: Fix race condition in stop_queue()
-In-Reply-To: <1302101355-31187-1-git-send-email-anarsoul@gmail.com>
-References: <201104061746.44134.anarsoul@gmail.com>
-	<1302101355-31187-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <BANLkTin8_WF4beQKP7fEF_wBPXZrgHOFHA@mail.gmail.com>
+From: shweta.gulati@ti.com (Gulati, Shweta)
+Date: Thu, 7 Apr 2011 11:55:35 +0530
+Subject: [PATCH] OMAP2+: SR Layer Cleanup.
+In-Reply-To: <87mxk3iecz.fsf@ti.com>
+References: <1301378352-29269-1-git-send-email-shweta.gulati@ti.com>
+	<87mxk3iecz.fsf@ti.com>
+Message-ID: <BANLkTimOv63R2c5EjsgR1MbMq0vK8dh2NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 6, 2011 at 10:49, Vasily Khoruzhick wrote:
-> ?drivers/spi/spi_bfin5xx.c | ? ?2 +-
+Hi,
 
-seems to past my smoke test.
-Acked-by: Mike Frysinger <vapier@gentoo.org>
--mike
+On Wed, Apr 6, 2011 at 9:03 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Shweta,
+>
+> Shweta Gulati <shweta.gulati@ti.com> writes:
+>
+>> As a part of Voltage Layer Cleanup Patches,
+>> submitted by Kevin Hilman, Voltage domain
+>> Information is removed from hwmod,
+>> So the patch removes 'vdd_name' info from omap_hwmod
+>> and adds that info into dev_attr as SR code uses vdd_name
+>> to get voltagedomain sructure info.
+>>
+>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
+>>
+>> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+>
+> Thanks for this. ?It looks good.
+>
+>> ---
+>> It apllies over Voltage Layer Cleanup Patch by
+>> Kevin Hilman:
+>> ?https://patchwork.kernel.org/patch/657421/
+>
+> Can you rebase on top of my pm-wip/voltdm_a branch? ?It currently
+> doesn't apply there because the some of the voltage domain names were
+> changed, e.g. mpu -> mpu_iva, wkup -> wakeup.
+Ok, I will do.
+Thanks.
+> Thanks,
+>
+> Kevin
+>
+
+
+
+-- 
+Thanks,
+Regards,
+Shweta
