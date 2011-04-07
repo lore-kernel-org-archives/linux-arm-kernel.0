@@ -1,63 +1,42 @@
-From: dima@android.com (Dima Zavin)
-Date: Wed, 6 Apr 2011 23:28:37 -0700
-Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
-	standalone.
-In-Reply-To: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
-Message-ID: <BANLkTimWFiKmvAi+9OeEsdZyP91599ibSw@mail.gmail.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Thu, 7 Apr 2011 12:15:50 +0530
+Subject: [PATCH 2/2 v2] OMAP2/3: hwmod: fix gpio-reset timeouts seen
+	during bootup.
+In-Reply-To: <BANLkTikwyk6b+d-QAz5LxuU_Lxgo4-A-hg@mail.gmail.com>
+References: <1302018015-8858-1-git-send-email-avinashhm@ti.com>
+	<1302018015-8858-3-git-send-email-avinashhm@ti.com>
+	<BANLkTikwyk6b+d-QAz5LxuU_Lxgo4-A-hg@mail.gmail.com>
+Message-ID: <20110407064550.GA19781@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Dima Zavin <dima@android.com>
+On Wed, Apr 06, 2011 at 11:28:00AM +0530, Gulati, Shweta wrote:
+> Hi,
+> 
+> On Tue, Apr 5, 2011 at 9:10 PM, Avinash.H.M <avinashhm@ti.com> wrote:
+> > GPIO module expects the debounce clocks to be enabled during reset. It doesn't
+> > reset properly and timeouts are seen, if this clock isn't enabled during
+> > reset. Add the HWMOD_CONTROL_OPT_CLKS_IN_RESET flags to the GPIO HWMODs, with
+> > which the debounce clocks are enabled during reset.
+> Minor comment,
+> Rephrase as " GPIO module doesn't reset properly and timeouts are seen
+> during bootup, if
+> debounce clock is not enabled"
+> to make commit log more clear.
 
-On Mon, Mar 7, 2011 at 4:08 PM, Murali Nalajala <mnalajal@codeaurora.org> wrote:
-> Lets non-standard NAND drivers take advantage of known NAND
-> chip information.
->
-> The initial development of msm nand driver, driver uses the supported
-> NAND devices information as a hardcoded table. Remove the existing
-> hardcoded supported flash device table and read the flash device
-> information from the flash id table which are part of the mtd subsystem.
->
-> Signed-off-by: Dima Zavin <dima@android.com>
-> Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
-> ---
-> Changes in V2
-> * Add more description to the commit text.
->
-> ?drivers/mtd/nand/Kconfig | ? 10 +++++++---
-> ?1 files changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index c895922..782275e 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -1,3 +1,10 @@
-> +config MTD_NAND_IDS
-> + ? ? ? tristate "Include chip ids for known NAND devices."
-> + ? ? ? depends on MTD
-> + ? ? ? help
-> + ? ? ? ? Useful for NAND drivers that do not use the NAND subsystem but
-> + ? ? ? ? still like to take advantage of the known chip information.
-> +
-> ?config MTD_NAND_ECC
-> ? ? ? ?tristate
->
-> @@ -123,9 +130,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
-> ? ? ? ? or in DMA interrupt mode.
-> ? ? ? ? Say y for DMA mode or MPU mode will be used
->
-> -config MTD_NAND_IDS
-> - ? ? ? tristate
-> -
-> ?config MTD_NAND_RICOH
-> ? ? ? ?tristate "Ricoh xD card reader"
-> ? ? ? ?default n
-> --
-> 1.7.1.1
->
-> --
-> Sent by a consultant of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
->
+
+Hi Shweta ,
+
+thanks for the review.
+
+i will fix the rephrase the change log .
+
+br ,
+
+- avinash
+
+> > Cc: Rajendra Nayak <rnayak@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Signed-off-by: Avinash.H.M <avinashhm@ti.com>
