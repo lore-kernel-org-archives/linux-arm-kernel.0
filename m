@@ -1,53 +1,31 @@
-From: pwaechtler@mac.com (Peter =?iso-8859-1?q?W=E4chtler?=)
-Date: Thu, 7 Apr 2011 21:13:48 +0200
-Subject: howto set some kernel pages to readonly?
-In-Reply-To: <201104072026.37303.pwaechtler@mac.com>
-References: <201104072026.37303.pwaechtler@mac.com>
-Message-ID: <201104072113.48515.pwaechtler@mac.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 Apr 2011 21:15:53 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+In-Reply-To: <1302182968-16708-1-git-send-email-oskar.andero@sonyericsson.com>
+References: <1302182968-16708-1-git-send-email-oskar.andero@sonyericsson.com>
+Message-ID: <20110407191553.GA8569@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 7. April 2011, 20:26:36 schrieb Peter W?chtler:
-> Hello Linux ARM developers,
-> 
-> on Linux x86 there is infrastructure to set rodata to, aeh, readonly. ;)
-> 
-> I also want to protect some pages to readonly  as a guard.
-> So if some kernel code writes to the memory the kernel panics.
-> 
-> I tried the following without success:
-> 
-> And I have to admit that I don't understand all the macros for
-> manipulating the page table entries ;(
-> Any clue what's wrong?
-> 
-> 
-> int set_page_ro(unsigned long addr)
-> {
->         pte_t new_pte;
->         unsigned long pfn;
->         pte_t *pte;
->         pgd_t *pgd;
->         pmd_t *pmd;
-> 
->         pgd = pgd_offset_k(addr);
->         pmd = pmd_offset(pgd, addr);
-> 
->         pfn = __phys_to_pfn(virt_to_phys((void*)addr));
-> 
->         pte = pte_offset_kernel(pmd, addr);
->         new_pte = pfn_pte(pfn, __pgprot(pgprot_val(pgprot_kernel) |
->                                                       (__PAGE_READONLY)) );
-> 
->         set_pte_ext(pte, new_pte, 0);
-> 
->         return 0;
-> }
-> 
-> 
-> set_page_ro( (unsigned long)pa );
-> flush_tlb_kernel_page((long)pa);
-> 
+Hello,
 
-While the variable is named "pa" - it's actually a virtual address.
-The code has to run on a SMP box - ARM 1136 multi core (ARMv6).
+On Thu, Apr 07, 2011 at 03:29:28PM +0200, oskar.andero at sonyericsson.com wrote:
+> From: Victor Boivie <victor.boivie@sonyericsson.com>
+> 
+> This patch allows the provided CONFIG_CMDLINE to be concatenated
+> with the one provided by the boot loader. This is useful to
+> merge the static values defined in CONFIG_CMDLINE with the
+> boot loader's (possibly) more dynamic values, such as startup
+> reasons and more.
+> 
+> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
