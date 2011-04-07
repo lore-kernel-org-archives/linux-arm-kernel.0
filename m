@@ -1,87 +1,85 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed,  6 Apr 2011 17:02:48 -0700
-Subject: [PATCH/RFC 5/6] ARM: use common clock-based runtime PM implementation
-	on SH-mobile & OMAP1
+Date: Wed,  6 Apr 2011 17:02:49 -0700
+Subject: [PATCH/RFC 6/6] Revert "driver core: platform_bus: allow runtime
+	override of dev_pm_ops"
 In-Reply-To: <1302134569-22825-1-git-send-email-khilman@ti.com>
 References: <1302134569-22825-1-git-send-email-khilman@ti.com>
-Message-ID: <1302134569-22825-6-git-send-email-khilman@ti.com>
+Message-ID: <1302134569-22825-7-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit c64a0926710153b9d44c979d2942f4a8648fd74e.
+
+The platform_bus_set_pm_ops() is deprecated in favor of the new device
+power domain infrastructre implemented in commit
+7538e3db6e015e890825fbd9f8659952896ddd5b (PM: add support for device
+power domains)
+
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap1/Makefile        |    2 +-
- arch/arm/mach-omap1/pm_runtime.c    |   18 ++++++++++++++++++
- arch/arm/mach-shmobile/pm_runtime.c |   23 +++++++++++++++++++++++
- 3 files changed, 42 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-omap1/pm_runtime.c
- create mode 100644 arch/arm/mach-shmobile/pm_runtime.c
+ drivers/base/platform.c         |   35 -----------------------------------
+ include/linux/platform_device.h |    3 ---
+ 2 files changed, 0 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index 1913c2d..04c60f9 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
- obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index f051cff..46335ca 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -976,41 +976,6 @@ struct bus_type platform_bus_type = {
+ };
+ EXPORT_SYMBOL_GPL(platform_bus_type);
  
- # Power Management
--obj-$(CONFIG_PM) += pm.o sleep.o
-+obj-$(CONFIG_PM) += pm.o sleep.o pm_runtime.o
+-/**
+- * platform_bus_get_pm_ops() - return pointer to busses dev_pm_ops
+- *
+- * This function can be used by platform code to get the current
+- * set of dev_pm_ops functions used by the platform_bus_type.
+- */
+-const struct dev_pm_ops * __init platform_bus_get_pm_ops(void)
+-{
+-	return platform_bus_type.pm;
+-}
+-
+-/**
+- * platform_bus_set_pm_ops() - update dev_pm_ops for the platform_bus_type
+- *
+- * @pm: pointer to new dev_pm_ops struct to be used for platform_bus_type
+- *
+- * Platform code can override the dev_pm_ops methods of
+- * platform_bus_type by using this function.  It is expected that
+- * platform code will first do a platform_bus_get_pm_ops(), then
+- * kmemdup it, then customize selected methods and pass a pointer to
+- * the new struct dev_pm_ops to this function.
+- *
+- * Since platform-specific code is customizing methods for *all*
+- * devices (not just platform-specific devices) it is expected that
+- * any custom overrides of these functions will keep existing behavior
+- * and simply extend it.  For example, any customization of the
+- * runtime PM methods should continue to call the pm_generic_*
+- * functions as the default ones do in addition to the
+- * platform-specific behavior.
+- */
+-void __init platform_bus_set_pm_ops(const struct dev_pm_ops *pm)
+-{
+-	platform_bus_type.pm = pm;
+-}
+-
+ int __init platform_bus_init(void)
+ {
+ 	int error;
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index d96db98..53745dc 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -145,9 +145,6 @@ extern struct platform_device *platform_create_bundle(struct platform_driver *dr
+ 					struct resource *res, unsigned int n_res,
+ 					const void *data, size_t size);
  
- # DSP
- obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
-diff --git a/arch/arm/mach-omap1/pm_runtime.c b/arch/arm/mach-omap1/pm_runtime.c
-new file mode 100644
-index 0000000..bbceb64
---- /dev/null
-+++ b/arch/arm/mach-omap1/pm_runtime.c
-@@ -0,0 +1,18 @@
-+/*
-+ * Runtime PM support code for TI OMAP1
-+ *
-+ *  Copyright (C) 2011 Texas Instruments, Inc.
-+ *  Author: Kevin Hilman <khilman@ti.com>
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include <asm/pm_runtime.h>
-+
-+static int __init omap1_pm_runtime_init(void)
-+{
-+	pm_runtime_clock_init();
-+	return 0;
-+}
-+core_initcall(omap1_pm_runtime_init);
-diff --git a/arch/arm/mach-shmobile/pm_runtime.c b/arch/arm/mach-shmobile/pm_runtime.c
-new file mode 100644
-index 0000000..edc0fa5
---- /dev/null
-+++ b/arch/arm/mach-shmobile/pm_runtime.c
-@@ -0,0 +1,23 @@
-+/*
-+ * arch/arm/mach-shmobile/pm_runtime.c
-+ *
-+ * Runtime PM support code for SuperH Mobile ARM
-+ *
-+ *  Copyright (C) 2009-2010 Magnus Damm
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include <asm/pm_runtime.h>
-+
-+static int __init sh_pm_runtime_init(void)
-+{
-+	pm_runtime_clock_init();
-+	return 0;
-+}
-+core_initcall(sh_pm_runtime_init);
+-extern const struct dev_pm_ops * platform_bus_get_pm_ops(void);
+-extern void platform_bus_set_pm_ops(const struct dev_pm_ops *pm);
+-
+ /* early platform driver interface */
+ struct early_platform_driver {
+ 	const char *class_str;
 -- 
 1.7.4
