@@ -1,71 +1,70 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 08 Apr 2011 10:56:20 +1200
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <alpine.LFD.2.00.1104071840430.28032@xanadu.home>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103112313.16128.arnd@arndb.de> <4D9DE532.5000802@linaro.org>
-	<201104072329.24243.arnd@arndb.de>
-	<4D9E30AE.9080105@bluewatersys.com>
-	<alpine.LFD.2.00.1104071756080.28032@xanadu.home>
-	<4D9E359D.50502@bluewatersys.com>
-	<alpine.LFD.2.00.1104071840430.28032@xanadu.home>
-Message-ID: <4D9E4114.3090102@bluewatersys.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 08 Apr 2011 01:04:01 +0200
+Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on	the
+	basis of the memory size.
+In-Reply-To: <20110407220855.GD17049@n2100.arm.linux.org.uk>
+References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
+	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
+	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
+	<4D9CED15.2010806@ahsoftware.de>
+	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
+	<4D9CF5B3.9020007@ahsoftware.de>
+	<toa078-0do.ln1@chipmunk.wormnet.eu>
+	<4D9E2D1C.7070102@ahsoftware.de>
+	<20110407220855.GD17049@n2100.arm.linux.org.uk>
+Message-ID: <4D9E42E1.1060902@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2011 10:45 AM, Nicolas Pitre wrote:
-> On Fri, 8 Apr 2011, Ryan Mallon wrote:
-> 
->> On 04/08/2011 10:01 AM, Nicolas Pitre wrote:
->>> On Fri, 8 Apr 2011, Ryan Mallon wrote:
->>>
->>>> On 04/08/2011 09:29 AM, Arnd Bergmann wrote:
->>>>> I'll try to capture the opinions from the other people as well,
->>>>> hopefully this represents a consensus. Please correct me otherwise.
->>>>>
->>>>> I believe the uncontroversial parts are:
->>>>>
->>>>> * Make it not an entry but a device with certain properties.
->>>>> * Make the naming so that you can have more than one of them.
->>>>> * Put all devices on an SoC that uses this scheme underneath that
->>>>>   device by setting their parents to the SoC device.
->>>>>
->>>>> For the location of the device, I have not seen a clear consensus yet,
->>>>> but I'm fine with eihter of these:
->>>>>
->>>>> /sys/devices/soc/${NAME}/
->>>>> /sys/devices/platform/soc${NUMBER}/
->>>>
->>>> I prefer the second format here since the path is always the same which
->>>> makes it easier to write parsing tools. The name should be an entry in
->>>> the directory rather than the name of the directory itself.
->>>>
->>>> Probably SoC number should match CPU number for SMP machines right?
->>>
->>> Not really.  SOC means System On Chip.  you usually have only one SOC on 
->>> a board, and within that SOC you may have one or more CPUs.  SMP 
->>> machines are still likely to have only one SOC.
->>
->> Ok. What is the situation where we have more than one SoC?
-> 
-> That would mean two separate instances of Linux, just like two systems.  
-> SMP across multiple SOCs doesn't make much sense, and I don't think they 
-> are likely to be designed for that ability either.
+Am 08.04.2011 00:08, schrieb Russell King - ARM Linux:
 
-So we probably don't need the ability to have multiple SoC directories
-under sysfs then?
+>> Requiring a machine ID and the needed stuff to handle that for a board
+>> which just is using two GPIOs different than another board is why the
+>> ARM tree exploded.
+>
+> You can not be any more wrong than that.
+>
+> The reason the ARM tree exploded is because of the compartmentalized
+> sub-community structure, where the vast majority of (eg) OMAP development
+> is done independently of the (eg) Samsung development.
+>
+> Consequently, there's no attempt to consolidate code between the SoCs,
+> even for basic stuff like 32-bit up-counting timers.  We've ended up with
+> _nine_ implementations of clocksources all doing the same thing in that
+> respect.
+>
+> That's got precisely zilch to do with machine IDs, and your attempt to
+> blame the bloat on machine IDs just shows how misinformed you are.
 
-For the other part of the question, do you think it makes sense for the
-CPU's to be child devices of the SoC (and for the CPU devices to be
-potentially symlinked from the SoC directory)?
+I had a look at what's going on in the OMAP linux world for more than a 
+year now and I think I've seen a lot of the stuff you are referring to.
 
-~Ryan
+And I think one of the reasons that the mess happened is the same I've 
+got trapped in. Why should anyone try to submit patches if he must fear 
+to get caught in some senseless endless discussion about one line.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+E.g. requiring people to use NULL than 0 or that stupid discussion now 
+about the simple patch I've posted. I'm writing whole (readable) C++ 
+applications (not crap!) in less time than what's is needed to submit 
+and discuss a small patch for some silly hw.
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+So for me it's fully understandable why companies don't try to work with 
+kernel people at first. They try to develop innovativ products they can 
+sell, and it doesn't help if their developers would have to fear that 
+they get called stupid, crap and abonimation writing aliens for things 
+like the small patch I've posted, which in turn requires them to defend 
+them against those people doing so (which ends in such stupid 
+discussions like this).
+
+It's one thing to say such to someone you know and work with, but it's a 
+totally different thing to say such to someone you almost know nothing 
+about. And not everybody who hasn't the name of a big company in his 
+email address is a moron.
+
+Sorry, I'm getting sick having to defend me here against people who like 
+to call others crap and abonimation writing ones just because they have 
+maintainer status or whatever.
+
+Regards,
+
+Alexander
