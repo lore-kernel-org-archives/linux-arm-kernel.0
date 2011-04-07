@@ -1,49 +1,47 @@
-From: aviksil@linux.vnet.ibm.com (Avik Sil)
-Date: Thu, 07 Apr 2011 14:36:22 +0530
-Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
-	pandaboard
-In-Reply-To: <BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
-References: <4D95E244.1050400@linux.vnet.ibm.com>
-	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
-	<4D99D251.6000901@linux.vnet.ibm.com>
-	<BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
-	<4D99EB4B.3020303@linux.vnet.ibm.com>
-	<BANLkTinQ-QQ7zu2KrhhhdWwnzo=a-KynoQ@mail.gmail.com>
-	<4D9AF790.7010504@linux.vnet.ibm.com>
-	<BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
-Message-ID: <4D9D7E8E.7020200@linux.vnet.ibm.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 07 Apr 2011 11:20:45 +0200
+Subject: [PATCH 0/2] ARM: Unify setup for Marvell SheevaPlugs and Seagate
+	DockStars
+In-Reply-To: <4D9CEE24.1080501@erfurth.eu>
+References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
+	<4D9CEE24.1080501@erfurth.eu>
+Message-ID: <4D9D81ED.7090809@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
-
-On Wednesday 06 April 2011 11:37 AM, Ming Lei wrote:
-> Hi Avik,
+Am 07.04.2011 00:50, schrieb Nico Erfurth:
+> Alexander Holler wrote:
 >
-> 2011/4/5 Avik Sil<aviksil@linux.vnet.ibm.com>:
->> Even after using ioremapped addresses in omap_writel() I'm getting the oops.
->> Can you please point me to the location in mainline, where these l3 clocks
->> are enabled?
+>> The first patch merges the setup for Seagate DockStars into the setup
+>> for Marvell SheevaPlugs and the second one removes the machine type for
+>> DockStars at all.
 >
-> I guess you can find here:
+> That looks fine so far.
 >
->           l3_main_3_ick&&  l3_instr_ick: arch/arm/mach-omap2/clock44xx_data.c
+>> Removing the machine type for DockStar shouldn't be a big problem. Support
+>> for them is already broken in mainline U-Boot since 2 versions, so changing the
+>> stuff there is already needed and it shouldn't be a problem to use the same
+>> machine type as used for SheevaPlugs there.
 >
-> the clocks are set as ENABLE_ON_INIT.
+> This sounds like very bad reasoning to me. The Dockstar has a machine-id
+> assigned, if the bootloader is broken, people should either use a
+> working version, or fix the current one.
+>
+> Also, using the memory-size to differ between these two machines sounds
+> like something thats doomed to fail in the future.
 
-Those clocks are also set ENABLE_ON_INIT in the linaro kernel. But still 
-it's hanging at "val = __raw_readl(base + LOCKSTATUS);" in cti_unlock(), 
-even after explicitly enabling it using:
+I wonder how many people believe that either there will be another 
+DockStar with the same HW and GPIOs for the LEDs but more memory (and 
+still without sata) or that there will be another SheevaPlug with just 
+128MB RAM or that someone could have a reason to change the memory 
+layout using a mem= parameter.
 
-omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
-omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
-omap_writel(2, CM_EMU_CLKSTCTRL);
-while ((omap_readl(CM_EMU_CLKSTCTRL) & 0x300) != 0x300);
+For me all that is pretty unlikely.
 
-BTW, the oops were fixed by replacing omap_writel with __raw_writel.
+Anyway, if someone wants, he could just use my patch 1/2 and replace 
+patch 2/2 with a patch which changes the one line which checks the 
+memory layout to be one bank with 128MB to machine_is_dockstar().
 
 Regards,
-Avik
 
->
-> thanks,
+Alexander
