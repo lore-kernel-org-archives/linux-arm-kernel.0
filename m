@@ -1,35 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Apr 2011 23:28:13 +0100
-Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
-In-Reply-To: <BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
-References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
-	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
-	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
-Message-ID: <20110407222813.GF17049@n2100.arm.linux.org.uk>
+From: rjw@suse.com (Rafael J. Wysocki)
+Date: Fri, 8 Apr 2011 00:31:23 +0200
+Subject: [PATCH/RFC 0/6] ARM: runtime PM: consolidate runtime PM
+	implementations
+In-Reply-To: <87hbaa7zhs.fsf@ti.com>
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+	<871v1eaz0u.fsf@ti.com> <87hbaa7zhs.fsf@ti.com>
+Message-ID: <201104080031.23452.rjw@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2011 at 11:02:18AM +0100, Dave Martin wrote:
-> The main reason for that is to code the ->ARM_r8 in C (as in the
-> existing code).  I feel safer doing that than hard-coding an offset in
-> the assembler, though possibly that is overkill since if the layout of
-> struct pt_regs changes we are probably in trouble for all kinds of
-> other reasons anyway...
+On Thursday, April 07, 2011, Kevin Hilman wrote:
+> Kevin Hilman <khilman@ti.com> writes:
+> 
+> [...]
+> 
+> > Replacing the PM ops for all devices was done on OMAP and SH-mobile
+> > because that was the only approach we had.  Now that we have device
+> > power domains (thanks Rafael!), we can be more selective about which
+> > devices to apply them to.
+> >
+> > Note that my RFC patch/series did not do the selective part of deciding
+> > which devices to override and which ones not to, that part will be
+> > platform specific.  
+> 
+> Actually, thinking about this a little more, my patch actually does
+> select only relevant devices, and not *all* platform devices.
+> 
+> In my patch, the device power domain pointers are only added for devices
+> where a clk_get() actually succeeds.  In the original version, the
+> runtime PM hooks are overridden for *all* platform devices, but ones
+> that have no clock (or where clk_get() failed) have the additional
+> overhead of still calling the custom PM ops, but the custom ops have
+> nothing to do.
 
-It may be worth looking up exactly what's allowed with naked functions.
-A naked function tells the compiler to omit the function prologue and
-epologue, which effectively means you can't do very much other than
-inline asm in them.  So I think we're pretty safe from register
-allocation issues.
+As I wrote in another message to Grant, the problem basically is that
+the platform bus type behavior is not the desirable one.  Namely, I don't
+generally want device driver callbacks to be invoked until we know that
+power will be removed from the devices.  However, the platform bus type
+executes driver callbacks automatically if they exist.  This currently is
+unavoidable, because power domain callbacks are executed in addition to and
+not instead the bus type callbacks.
 
-If the compiler was to do register allocation for &regs->ARM_r8, and it
-landed up in r8, then that would not only break the code, but also break
-the ABI as the compiler would be unable to save the value of r8.
+We've discussed that a bit at the LF Collab Summit with Grant and Paul and
+the conclusion is that to address this particular problem we'll need to change
+the core so that if there is a power domain for the given device, the
+power domain callbacks will be executed first and if they return a specific
+error code, the core will execute the bus type callbacks.  For devices that
+don't belong to any power domain, the bus type callbacks will be executed
+(which is the current behavior).
 
-> I could have used register variables with explicit register
-> assignments.  Alternatively, I could have added r8-r14 to the clobber
-> list -- but then the compiler would generate unnecessary save and
-> restore sequences for all those registers.
+I'm going to post a patch along these lines early next week.  Then, we
+can simply move the management of device clocks, the execution of device
+driver callbacks and the power removal into power domain callbacks.
 
-I doubt it would for a naked function.  You're expected to handle
-that stuff yourself with such things.
+At that point it may be possible to share some code between shmobile and
+OMAP, but I'm not sure yet how much of the code may be shared and it what
+way exactly.
+
+Thanks,
+Rafael
