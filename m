@@ -1,60 +1,22 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 7 Apr 2011 15:07:53 +0800
-Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
-	device accesses
-In-Reply-To: <1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
-References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
-	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Thu, 7 Apr 2011 09:27:42 +0200
+Subject: [PATCHv5 1/3] ARM: Translate delay.S into (mostly) C
+In-Reply-To: <4D9D12FD.6060608@codeaurora.org>
+References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>	<1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
+	<4D9C2910.6020309@stericsson.com> <4D9D12FD.6060608@codeaurora.org>
+Message-ID: <4D9D676E.6090608@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-2011/3/29 Catalin Marinas <catalin.marinas@arm.com>:
-> On Tue, 2011-03-29 at 16:02 +0100, Martin Furmanski wrote:
->> Do you have a reference on this?
+On 04/07/2011 03:27 AM, Saravana Kannan wrote:
+> Isn't this a big in the existing code too? I would prefer not combining
+> that with this patch series. That bug should be fixed before/after this
+> patch series. Not as part of it.
 >
-> Usually the ARM ARM but a document with examples is this:
->
-> http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
+> I would vote for after this patch series since this patch series has
+> been trying to get in for quite a while now.
+Ok for me.
+Leave it as is and I'll send a patch on top of it.
 
-After glancing over the above, I find DSB is only applied in the WFE/WFI
-example in section 6, but all other examples in this section do use DMB.
-
-So could you point out which example is the reference for the mandatory DSB
-wrt. read memory barrier?
-
-> (infocenter.arm.com -> Developer Guides and Articles -> ARM architecture
-> -> Barrier Litmus and Tests Cookbook)
->
->> I have been under the impression that DMB is a barrier for all memory
->> accesses. I find no support in ARMv7, for the hypothesis that DSB is
->> needed to order between Device and Normal.
->
-> The key point is that DMB only ensures the *observability* of memory
-> accesses by the processors and not arrival to the device or block of
-
-How could you conclude that the memory accesses order is different with
-the order of memory requests observed on the same type of memory?
-
-> memory. In the drawing below, DMB only ensures the ordering at point
-> (1). For arrival to RAM or Device you need a DSB.
->
-> ? ? ? +------+ ? ? +------+
-> ? ? ? | ?P1 ?| ? ? | ?P2 ?|
-> ? ? ? +------+ ? ? +------+
-> ? ? ? ? ?| ? ? (1) ? ? |
-> ? ? ? ? ?+------+------+
-> ? ? ? ? ? ? ? ? |
-> ? +-------------+-------------+
-> ? | ? ? ? ? ? ? | ? ? ? ? ? ? |
-> +------+ ? ? +------+ ? ? +--------+
-> | RAM1 | ? ? | RAM2 | ? ? | Device |
-> +------+ ? ? +------+ ? ? +--------+
-
-
-thanks,
--- 
-Ming Lei
+Yours,
+Mattias Wallin
