@@ -1,14 +1,18 @@
-From: avinashhm@ti.com (Mahadeva, Avinash)
-Date: Thu, 7 Apr 2011 12:12:37 +0530
-Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout during
-	bootup
-In-Reply-To: <87mxk4zh7u.fsf@ti.com>
-References: <1302018015-8858-1-git-send-email-avinashhm@ti.com>
-	<1302018015-8858-2-git-send-email-avinashhm@ti.com>
-	<87mxk4zh7u.fsf@ti.com>
-Message-ID: <BANLkTikrDS_U5u7=2z6ZNiWVcb6W8GoOTg@mail.gmail.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Thu, 7 Apr 2011 12:33:10 +0530
+Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout
+	during bootup
+Message-ID: <20110407070310.GA21701@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Date: Thu, 7 Apr 2011 12:12:37 +0530
+From: "Mahadeva, Avinash" <avinashhm@ti.com>
+To: Kevin Hilman <khilman@ti.com>
+Cc: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org,
+	Rajendra Nayak <rnayak@ti.com>, Paul Walmsley <paul@pwsan.com>,
+	Benoit Cousson <b-cousson@ti.com>
+Subject: Re: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
 
 On Tue, Apr 5, 2011 at 11:57 PM, Kevin Hilman <khilman@ti.com> wrote:
 
@@ -71,6 +75,9 @@ On Tue, Apr 5, 2011 at 11:57 PM, Kevin Hilman <khilman@ti.com> wrote:
 > via something like omap_hwmod_ocp_softreset() and calling that here.
 >
 >
+
+* Sorry, somehow the mail bounced from l-o. Resending it agian. *
+
 Hi Kevin ,
 
 thanks for the review.
@@ -85,6 +92,3 @@ b r ,
 
 > Kevin
 >
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110407/198e07f9/attachment-0001.html>
