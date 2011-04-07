@@ -1,20 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Apr 2011 23:23:48 +0100
-Subject: [RFC 1/5]arch/arm/common/Makefile Remove unused config in the
-	Makefile.
-In-Reply-To: <4D9C826C.5050802@gmail.com>
-References: <1302022702-24541-1-git-send-email-justinmattock@gmail.com>
-	<20110406080522.GZ13963@pengutronix.de>
-	<4D9C826C.5050802@gmail.com>
-Message-ID: <20110407222348.GE17049@n2100.arm.linux.org.uk>
+Date: Thu, 7 Apr 2011 23:28:13 +0100
+Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
+In-Reply-To: <BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
+References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
+	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
+	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
+Message-ID: <20110407222813.GF17049@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2011 at 08:10:36AM -0700, Justin P. Mattock wrote:
-> o.k.!! Thanks for having a look at this..
+On Thu, Apr 07, 2011 at 11:02:18AM +0100, Dave Martin wrote:
+> The main reason for that is to code the ->ARM_r8 in C (as in the
+> existing code).  I feel safer doing that than hard-coding an offset in
+> the assembler, though possibly that is overkill since if the layout of
+> struct pt_regs changes we are probably in trouble for all kinds of
+> other reasons anyway...
 
-Could you queue this up in the patch system with everyone's acks please?
-You don't need to include a Cc line for any of my addresses (and I'd
-prefer it not to be in submissions.)
+It may be worth looking up exactly what's allowed with naked functions.
+A naked function tells the compiler to omit the function prologue and
+epologue, which effectively means you can't do very much other than
+inline asm in them.  So I think we're pretty safe from register
+allocation issues.
 
-Thanks.
+If the compiler was to do register allocation for &regs->ARM_r8, and it
+landed up in r8, then that would not only break the code, but also break
+the ABI as the compiler would be unable to save the value of r8.
+
+> I could have used register variables with explicit register
+> assignments.  Alternatively, I could have added r8-r14 to the clobber
+> list -- but then the compiler would generate unnecessary save and
+> restore sequences for all those registers.
+
+I doubt it would for a naked function.  You're expected to handle
+that stuff yourself with such things.
