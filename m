@@ -1,39 +1,70 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 07 Apr 2011 11:44:02 +0200
-Subject: [PATCH 0/2] ARM: Unify setup for Marvell SheevaPlugs and Seagate
-	DockStars
-In-Reply-To: <4D9D85E4.2040606@erfurth.eu>
-References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<4D9CEE24.1080501@erfurth.eu> <4D9D81ED.7090809@ahsoftware.de>
-	<4D9D85E4.2040606@erfurth.eu>
-Message-ID: <4D9D8762.3080207@ahsoftware.de>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 7 Apr 2011 17:54:27 +0800
+Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
+	pandaboard
+In-Reply-To: <4D9D7E8E.7020200@linux.vnet.ibm.com>
+References: <4D95E244.1050400@linux.vnet.ibm.com>
+	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
+	<4D99D251.6000901@linux.vnet.ibm.com>
+	<BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
+	<4D99EB4B.3020303@linux.vnet.ibm.com>
+	<BANLkTinQ-QQ7zu2KrhhhdWwnzo=a-KynoQ@mail.gmail.com>
+	<4D9AF790.7010504@linux.vnet.ibm.com>
+	<BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
+	<4D9D7E8E.7020200@linux.vnet.ibm.com>
+Message-ID: <BANLkTinzr300_4AM9kJO-NVXx7zPj8GYVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.04.2011 11:37, schrieb Nico Erfurth:
-> Alexander Holler wrote:
+Hi Avik,
+
+Please check if the option CONFIG_PM is enabled or not.
+
+If not, please try to enable it to see you issue can be fixed.
+
+
+2011/4/7 Avik Sil <aviksil@linux.vnet.ibm.com>:
+> Hi Ming,
 >
->> I wonder how many people believe that either there will be another
->> DockStar with the same HW and GPIOs for the LEDs but more memory (and
->> still without sata) or that there will be another SheevaPlug with just
->> 128MB RAM or that someone could have a reason to change the memory
->> layout using a mem= parameter.
+> On Wednesday 06 April 2011 11:37 AM, Ming Lei wrote:
 >>
->> For me all that is pretty unlikely.
+>> Hi Avik,
+>>
+>> 2011/4/5 Avik Sil<aviksil@linux.vnet.ibm.com>:
+>>>
+>>> Even after using ioremapped addresses in omap_writel() I'm getting the
+>>> oops.
+>>> Can you please point me to the location in mainline, where these l3
+>>> clocks
+>>> are enabled?
+>>
+>> I guess you can find here:
+>>
+>> ? ? ? ? ?l3_main_3_ick&& ?l3_instr_ick:
+>> arch/arm/mach-omap2/clock44xx_data.c
+>>
+>> the clocks are set as ENABLE_ON_INIT.
 >
-> As Nicolas stated it's not just about "Oh, thats totally unlikely to
-> happen!". It is about maintainable code, if somebody looks at it in 3
-> years they should not think "WTF?!?!". Using machine ids and the
-> generated macros helps to keep the code clean and readable.
+> Those clocks are also set ENABLE_ON_INIT in the linaro kernel. But still
+> it's hanging at "val = __raw_readl(base + LOCKSTATUS);" in cti_unlock(),
+> even after explicitly enabling it using:
+>
+> omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
+> omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
+> omap_writel(2, CM_EMU_CLKSTCTRL);
+> while ((omap_readl(CM_EMU_CLKSTCTRL) & 0x300) != 0x300);
+>
+> BTW, the oops were fixed by replacing omap_writel with __raw_writel.
+>
+> Regards,
+> Avik
+>
+>>
+>> thanks,
+>
+>
 
-Sorry, I can't agree. For me some unique hardware identifier is more 
-reasonable, than some machine id which comes from outerspace.
 
-And in no way I see any argument for that "clean and readable", at least 
-not in the patch I posted.
-
-Anyway, I leave this discussion and wish all a nice day.
-
-Regards,
-
-Alexander
+thanks,
+-- 
+Ming Lei
