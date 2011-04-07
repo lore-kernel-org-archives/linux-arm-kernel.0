@@ -1,31 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Apr 2011 21:15:53 +0200
-Subject: [PATCH] ARM: Allow for kernel command line concatenation
-In-Reply-To: <1302182968-16708-1-git-send-email-oskar.andero@sonyericsson.com>
-References: <1302182968-16708-1-git-send-email-oskar.andero@sonyericsson.com>
-Message-ID: <20110407191553.GA8569@pengutronix.de>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Thu, 07 Apr 2011 12:57:06 -0700
+Subject: [PATCH] nohz: delay going tickless under CPU load to favor deeper
+	C states
+In-Reply-To: <1302200311-24263-1-git-send-email-khilman@ti.com>
+References: <1302200311-24263-1-git-send-email-khilman@ti.com>
+Message-ID: <4D9E1712.5090600@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 4/7/2011 11:18 AM, Kevin Hilman wrote:
+> From: Nicole Chalhoub<n-chalhoub@ti.com>
+>
+> While there is CPU load, continue the periodic tick in order to give
+> CPUidle another opportunity to pick a deeper C-state instead of
+> spending potentially long i
 
-On Thu, Apr 07, 2011 at 03:29:28PM +0200, oskar.andero at sonyericsson.com wrote:
-> From: Victor Boivie <victor.boivie@sonyericsson.com>
-> 
-> This patch allows the provided CONFIG_CMDLINE to be concatenated
-> with the one provided by the boot loader. This is useful to
-> merge the static values defined in CONFIG_CMDLINE with the
-> boot loader's (possibly) more dynamic values, such as startup
-> reasons and more.
-> 
-> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
-> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks
-Uwe
+so I don't really like this patch. It's actually a pretty bad hack (I'm 
+sure it'll work somewhat)
+[and I mean that in the most positive sense of the word ;-) ]
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+what we really need instead, and this is inside cpuidle, is the option 
+to set a timer when we enter the non-deepest C state,
+so that if that timer fires we then reevaluate.
+The duration of that timer will be dependent on the C state (so should 
+come from the C state structure of the state we pick).
+
+For the most shallow one this will be a relatively short time, but for 
+the deepest-but-one this might be a lot longer time.
+
+
+your patch abuses a completely different, unrelated timer for this, with 
+a pretty much unspecified frequency, that also has other side effects 
+that we probably don't want.
+
+
+it shouldn't be hard to do the right thing instead and make it a 
+separate timer with a per C state timeout.
+
+(and I would say a default timeout of 10x the break even time that we 
+already have in the structure)
