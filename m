@@ -1,46 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 06 Apr 2011 22:35:31 -0700
-Subject: [PATCH v3] ARM: Use generic BUG() handler
-In-Reply-To: <1302131890-20953-1-git-send-email-sjg@chromium.org>
-References: <1302131890-20953-1-git-send-email-sjg@chromium.org>
-Message-ID: <4D9D4D23.6000805@codeaurora.org>
+From: rjw@suse.com (Rafael J. Wysocki)
+Date: Thu, 7 Apr 2011 07:38:42 +0200
+Subject: [PATCH/RFC 0/6] ARM: runtime PM: consolidate runtime PM
+	implementations
+In-Reply-To: <1302134569-22825-1-git-send-email-khilman@ti.com>
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+Message-ID: <201104070738.42956.rjw@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/6/2011 4:18 PM, Simon Glass wrote:
-> v3: Remove old BUG() implementation in favor of this one.
-> Remove the Backtrace: message (will submit this separately).
-> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
-> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
-> define GENERIC_BUG this might be academic.)
+On Thursday, April 07, 2011, Kevin Hilman wrote:
+> This series aims to consolidate OMAP and SH-mobile runtime PM
+> implementations around the new device power domains.
+> 
+> In 2.6.39, device power domains were added (commit
+> 7538e3db6e015e890825fbd9f8659952896ddd5b, PM: add support for device
+> power domains).  In converting both OMAP and SH-mobile to use device
+> power domains, the overlap between implementations was almost 100%.  
+> 
+> To share the runtime PM implementation based on simple clock gating,
+> move it to arch/arm/common and initialize it from OMAP and SH-mobile.
+> 
+> Also, OMAP was the only user of platform_bus_set_pm_ops().  Now that
+> it has been converted to device power domains, remove
+> platform_bus_set_pm_ops().
 
-Its not entirely academic because CONFIG_BUG=n and CONFIG_SMP_ON_UP=n
-would allow us to remove the exit text. This could be huge for people
-who want to cram kernel's onto space constrained devices.
+Please, don't do it this way.
 
-> Rebase to linux-2.6.git master.
->
-> Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
+First, we'll still need platform_bus_set_pm_ops() on shmobile and the reason
+is that we want to override the platform bus type PM ops for _all_ devices on
+that platform, which power domains are not really suitable for.
 
-Don't forget to remove these before submitting to the patch tracker (and
-sending to the list).
+Second, we're going to introduce code for handling real power domains for
+shmobile that would conflict with the way you're using power domains for
+overriding the default PM ops.
 
-> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-> index 4d88425..2914724 100644
-> --- a/arch/arm/include/asm/bug.h
-> +++ b/arch/arm/include/asm/bug.h
-> @@ -3,21 +3,58 @@
->  
->  
->  #ifdef CONFIG_BUG
-> -#ifdef CONFIG_DEBUG_BUGVERBOSE
-> -extern void __bug(const char *file, int line) __attribute__((noreturn));
-> -
-> -/* give file/line information */
-> -#define BUG()		__bug(__FILE__, __LINE__)
+Besides, the way you've used power domains appears to assume that drivers
+will not define their own runtime PM callbacks, because if they do, those
+callbacks will be called _in_ _addition_ to the power domain callbacks you're
+trying to add (from the default platform bus type callbacks).
 
-Does anybody reference __bug() anymore? If not you can remove that too.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Rafael
