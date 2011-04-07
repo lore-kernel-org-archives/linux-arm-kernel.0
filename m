@@ -1,52 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Apr 2011 22:55:30 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
-	basis of the memory size.
-In-Reply-To: <4D9CF5B3.9020007@ahsoftware.de>
-References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
-	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
-	<4D9CED15.2010806@ahsoftware.de>
-	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
-	<4D9CF5B3.9020007@ahsoftware.de>
-Message-ID: <alpine.LFD.2.00.1104062228410.28032@xanadu.home>
+From: wni@nvidia.com (wni at nvidia.com)
+Date: Thu,  7 Apr 2011 11:30:00 +0800
+Subject: [PATCH v1] tegra: remove the clock sleepable WARNING
+Message-ID: <1302147000-17854-1-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Apr 2011, Alexander Holler wrote:
+From: Wei Ni <wni@nvidia.com>
 
-> > > So I don't think this in any way a fragile hack.
-> > 
-> > Determining a machine type based on its amount of RAM is fragile, ugly
-> > and sets up a bad example for even more hacky tricks like this to crop
-> > up. If someone is experimenting with his SheevaPlug by giving different
-> > memory information in the kernel cmdline e.g. to create memory holes in
-> > order to test some memory allocator changes, then the kernel may think
-> > that it is not running on a SheevaPlug but a DockStar, and the resulting
-> > behavior will certainly be unexpected.
-> 
-> People doing such should now what they do. And the pr_info() in the
-> "abomination" should be enough to give those experimenters a hint (if it is
-> missing or new).
+The dvfs will try to init clock, it trickles down to the child clock.
+Part of that init is to set cansleep flag. When setting a clock as cansleep,
+in which case the entire list of clocks is traversed to set the children as
+cansleep as well. in here, the clk_set_cansleep can only be called on clocks
+that are the sole parent of all of their child clocks, meaning the child clock
+can not be reparented onto a different, possibly non-sleeping, clock.
+If the child clock has the set_parent callback, the driver warns that this case
+is not proper, it will show WARNING:
+"can't make child clock xxx of xxx sleepable if it's parent could change"
+But Some clocks only has one parent, although they have set_parent callback.
+These clocks' flags is set to 0, not MUX, it means they can not be reparented.
+So we can remove this WARNING if !(flags & MUX).
 
-They shouldn't have to.  We have a well defined system to identify 
-machines/platforms with a unique number already.  It is completely 
-unambiguous.  What you're proposing is to break that system.
+Signed-off-by: Wei Ni <wni@nvidia.com>
+---
+v1: This patch against linux-tegra-2.6.37 branch in 
+git://android.git.kernel.org/kernel/tegra.git
 
-The proper way to go about this rationalization is to move that stuff 
-over to device tree.
+ arch/arm/mach-tegra/clock.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-> > > Anyway, it was just a suggestion.
-> > 
-> > Better luck next time.
-> 
-> Sorry, I don't feel the need to waste my time prodcuing patches to get them
-> called "abominations". Which means my willingness to post further patches just
-> got below zero.
-
-I'm sorry if you feel like that.  You shouldn't take this too personal.  
-It is not like if I qualified _you_ as a moron and a pariah (yes this 
-happened to me last week from our master penguin himself).
-
-
-Nicolas
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index f556977..d0b6b45 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -187,7 +187,8 @@ static void __clk_set_cansleep(struct clk *c)
+ 		if (child->parent != c)
+ 			continue;
+ 
+-		WARN(child->ops && child->ops->set_parent,
++		WARN(child->ops && child->ops->set_parent
++			&& (child->flags & MUX),
+ 			"can't make child clock %s of %s "
+ 			"sleepable if it's parent could change",
+ 			child->name, c->name);
+-- 
+1.7.0
