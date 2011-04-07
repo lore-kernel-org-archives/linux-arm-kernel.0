@@ -1,54 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  7 Apr 2011 10:50:43 +0200
-Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead of
-	VIDEOBUF_DMA_CONTIG
-Message-ID: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Thu, 7 Apr 2011 10:58:25 +0200
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <1302162886.10725.4.camel@maggie>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop>
+	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
+	<op.vti9ote53ri7v4@arend-laptop>
+	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
+	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
+	<1302123428.20093.6.camel@maggie>
+	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
+	<1302124112.20093.11.camel@maggie>
+	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
+	<1302124737.27258.7.camel@dev.znau.edu.ua>
+	<BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
+	<1302134429.27258.32.camel@dev.znau.edu.ua>
+	<BANLkTinfM0QLFwcKZXfWQ_jNYfBJg_et-Q@mail.gmail.com>
+	<1302162886.10725.4.camel@maggie>
+Message-ID: <op.vtj8jn133ri7v4@arend-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit
+On Thu, 07 Apr 2011 09:54:46 +0200, Michael B?sch <mb@bu3sch.de> wrote:
 
-	379fa5d ([media] V4L: mx3_camera: convert to videobuf2)
+>> Ahh, so while talking about 4 windows, I guess you counted fixes
+>> windows as well. That would be right, matching my knowledge.
+>>
+>> When asking question about amount of cores we may want to use
+>> simultaneously I didn't think about ChipCommon or PCIe. The real
+>> problem would be to support for example two 802.11 cores and one
+>> ethernet core at the same time. That gives us 3 cores while we have
+>> only 2 sliding windows.
+>
+> Would that really be a problem? Think of it. This combination
+> will only be available on embedded devices. But do we have windows
+> on embedded devices? I guess not. If AXI is similar to SSB, the MMIO
+> of all cores will always be mapped. So accesses can be done
+> without switch or lock.
 
-mx3_camera uses videobuf2, but that commit didn't upgrade the select
-resulting in the following build failure:
+Agree. For embedded systems there is no need to switch cores. Each core  
+register space and wrapper register space is mapped. In the brcm80211 we  
+have the concept of fast versus slow host interface. The criteria for fast  
+host interface is based on following expression:
 
-	drivers/built-in.o: In function `mx3_camera_init_videobuf':
-	clkdev.c:(.text+0x86580): undefined reference to `vb2_dma_contig_memops'
-	drivers/built-in.o: In function `mx3_camera_probe':
-	clkdev.c:(.devinit.text+0x3548): undefined reference to `vb2_dma_contig_init_ctx'
-	clkdev.c:(.devinit.text+0x3578): undefined reference to `vb2_dma_contig_cleanup_ctx'
-	drivers/built-in.o: In function `mx3_camera_remove':
-	clkdev.c:(.devexit.text+0x674): undefined reference to `vb2_dma_contig_cleanup_ctx'
-	make[2]: *** [.tmp_vmlinux1] Error 1
-	make[1]: *** [sub-make] Error 2
-	make: *** [all] Error 2
+fast_host_bus = (host_bus_coretype == PCIE_CORE_ID) ||
+	((host_bus_coretype == PCI_CORE_ID) && (host_bus_corerev >= 13))
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+If this is true, chipcommon and pci/pcie registers are accessed without  
+sliding the window using the fixed offsets Rafa? mentioned earlier. The  
+BAR0 window size is 16KB.
 
-does someone has a hint how to fix gcc not to believe the undefined
-references to be in clkdev.c?
+> I do really think that engineers at broadcom are clever enough
+> to design a hardware that does not require expensive window sliding
+> all the time while operating.
+>
 
-Best regards
-Uwe
+If a bigger window is clever enough ;-)
 
- drivers/media/video/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index 4498b94..00f51dd 100644
---- a/drivers/media/video/Kconfig
-+++ b/drivers/media/video/Kconfig
-@@ -875,7 +875,7 @@ config MX3_VIDEO
- config VIDEO_MX3
- 	tristate "i.MX3x Camera Sensor Interface driver"
- 	depends on VIDEO_DEV && MX3_IPU && SOC_CAMERA
--	select VIDEOBUF_DMA_CONTIG
-+	select VIDEOBUF2_DMA_CONTIG
- 	select MX3_VIDEO
- 	---help---
- 	  This is a v4l2 driver for the i.MX3x Camera Sensor Interface
+Gr. AvS
 -- 
-1.7.2.3
+"The most merciful thing in the world, I think, is the inability of the  
+human
+mind to correlate all its contents." - "The Call of Cthulhu"
