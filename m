@@ -1,51 +1,63 @@
-From: shweta.gulati@ti.com (Gulati, Shweta)
-Date: Thu, 7 Apr 2011 11:55:35 +0530
-Subject: [PATCH] OMAP2+: SR Layer Cleanup.
-In-Reply-To: <87mxk3iecz.fsf@ti.com>
-References: <1301378352-29269-1-git-send-email-shweta.gulati@ti.com>
-	<87mxk3iecz.fsf@ti.com>
-Message-ID: <BANLkTimOv63R2c5EjsgR1MbMq0vK8dh2NA@mail.gmail.com>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 6 Apr 2011 23:28:37 -0700
+Subject: [PATCH V2 1/2] mtd: nand: Allow NAND chip ids to be included
+	standalone.
+In-Reply-To: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
+References: <1299542935-20291-1-git-send-email-mnalajal@codeaurora.org>
+Message-ID: <BANLkTimWFiKmvAi+9OeEsdZyP91599ibSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Acked-by: Dima Zavin <dima@android.com>
 
-On Wed, Apr 6, 2011 at 9:03 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Shweta,
+On Mon, Mar 7, 2011 at 4:08 PM, Murali Nalajala <mnalajal@codeaurora.org> wrote:
+> Lets non-standard NAND drivers take advantage of known NAND
+> chip information.
 >
-> Shweta Gulati <shweta.gulati@ti.com> writes:
+> The initial development of msm nand driver, driver uses the supported
+> NAND devices information as a hardcoded table. Remove the existing
+> hardcoded supported flash device table and read the flash device
+> information from the flash id table which are part of the mtd subsystem.
 >
->> As a part of Voltage Layer Cleanup Patches,
->> submitted by Kevin Hilman, Voltage domain
->> Information is removed from hwmod,
->> So the patch removes 'vdd_name' info from omap_hwmod
->> and adds that info into dev_attr as SR code uses vdd_name
->> to get voltagedomain sructure info.
->>
->> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>
->> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+> Signed-off-by: Dima Zavin <dima@android.com>
+> Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+> ---
+> Changes in V2
+> * Add more description to the commit text.
 >
-> Thanks for this. ?It looks good.
+> ?drivers/mtd/nand/Kconfig | ? 10 +++++++---
+> ?1 files changed, 7 insertions(+), 3 deletions(-)
 >
->> ---
->> It apllies over Voltage Layer Cleanup Patch by
->> Kevin Hilman:
->> ?https://patchwork.kernel.org/patch/657421/
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index c895922..782275e 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -1,3 +1,10 @@
+> +config MTD_NAND_IDS
+> + ? ? ? tristate "Include chip ids for known NAND devices."
+> + ? ? ? depends on MTD
+> + ? ? ? help
+> + ? ? ? ? Useful for NAND drivers that do not use the NAND subsystem but
+> + ? ? ? ? still like to take advantage of the known chip information.
+> +
+> ?config MTD_NAND_ECC
+> ? ? ? ?tristate
 >
-> Can you rebase on top of my pm-wip/voltdm_a branch? ?It currently
-> doesn't apply there because the some of the voltage domain names were
-> changed, e.g. mpu -> mpu_iva, wkup -> wakeup.
-Ok, I will do.
-Thanks.
-> Thanks,
+> @@ -123,9 +130,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
+> ? ? ? ? or in DMA interrupt mode.
+> ? ? ? ? Say y for DMA mode or MPU mode will be used
 >
-> Kevin
+> -config MTD_NAND_IDS
+> - ? ? ? tristate
+> -
+> ?config MTD_NAND_RICOH
+> ? ? ? ?tristate "Ricoh xD card reader"
+> ? ? ? ?default n
+> --
+> 1.7.1.1
 >
-
-
-
--- 
-Thanks,
-Regards,
-Shweta
+> --
+> Sent by a consultant of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
