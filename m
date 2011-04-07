@@ -1,33 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Apr 2011 03:44:44 +0200
-Subject: [GIT PULL] omap changes for v2.6.39 merge window
-In-Reply-To: <1302079304.8718.7.camel@e102109-lin.cambridge.arm.com>
-References: <alpine.LFD.2.00.1103310145390.28032@xanadu.home>
-	<BANLkTinDgAwu7jg+rciMUU19fj+TKPRwmg@mail.gmail.com>
-	<1302079304.8718.7.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <201104070344.44568.arnd@arndb.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 7 Apr 2011 09:48:29 +0800
+Subject: [PATCH 4/7] pxa25x: separate lubbock handling to lubbock-usb
+	transceiver
+In-Reply-To: <BANLkTi=zo_LrpjhzNANAAqhXUEy_j-jd+w@mail.gmail.com>
+References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
+	<1301666188-11822-4-git-send-email-dbaryshkov@gmail.com>
+	<BANLkTik42CkEDKLU6BCkcZMVQ3HqQ07aLQ@mail.gmail.com>
+	<BANLkTikttxQMk136CoMYsUJFRbicOW+8og@mail.gmail.com>
+	<BANLkTi=zo_LrpjhzNANAAqhXUEy_j-jd+w@mail.gmail.com>
+Message-ID: <BANLkTinvjfrEbmeD711YP_ZtQ4UD3BEz0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 April 2011, Catalin Marinas wrote:
-> On Wed, 2011-04-06 at 00:19 +0100, Linus Walleij wrote:
-> > 2011/4/1 Linus Torvalds <torvalds@linux-foundation.org>:
-> > Basically it requires you to get the physical address and size of
-> > each peripheral, then at offset -0x10 from the end address (usually
-> > at even 4K pages), if you find the magic number 0xB105F00D
-> > (ARM has a sense of humour, obviously) you can find something
-> > alike the PCI IDs at offset -0x20, manufacturer ID, version number
-> > and revision of the hardware.
-> 
-> I don't think this was ever part of the AMBA specification. It was just
-> some convention used within ARM for the PrimeCell peripherals. Other
-> AMBA licensees did something else so it's not a reliable mechanism (I
-> think ARM gave up on this as well in recent peripherals).
+On Thu, Apr 7, 2011 at 5:21 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> On 4/4/11, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> David,
+>>
+>> Let me know if you're OK I take this patch, as several others following
+>> have dependency on this one.
+>
+> So, what is the current status of this patch?
 
-Do you think there is a way to get ARM ltd to make a better effort
-at this with a future specification? I suppose it would be extremely
-helpful if there was a way to specify more of the required information,
-and to require everybody to fill in correct data, in the same way that
-architecture compliance gets enforced on the CPU core.
-
-	Arnd
+Unfortunately, David passed away as Greg KH announced days ago.
+I'll take these patches.
