@@ -1,43 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Apr 2011 18:01:39 -0400 (EDT)
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <4D9E30AE.9080105@bluewatersys.com>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103112313.16128.arnd@arndb.de> <4D9DE532.5000802@linaro.org>
-	<201104072329.24243.arnd@arndb.de>
-	<4D9E30AE.9080105@bluewatersys.com>
-Message-ID: <alpine.LFD.2.00.1104071756080.28032@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Apr 2011 23:04:07 +0100
+Subject: howto set some kernel pages to readonly?
+In-Reply-To: <201104072026.37303.pwaechtler@mac.com>
+References: <201104072026.37303.pwaechtler@mac.com>
+Message-ID: <20110407220407.GC17049@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Apr 2011, Ryan Mallon wrote:
-
-> On 04/08/2011 09:29 AM, Arnd Bergmann wrote:
-> > I'll try to capture the opinions from the other people as well,
-> > hopefully this represents a consensus. Please correct me otherwise.
-> > 
-> > I believe the uncontroversial parts are:
-> > 
-> > * Make it not an entry but a device with certain properties.
-> > * Make the naming so that you can have more than one of them.
-> > * Put all devices on an SoC that uses this scheme underneath that
-> >   device by setting their parents to the SoC device.
-> > 
-> > For the location of the device, I have not seen a clear consensus yet,
-> > but I'm fine with eihter of these:
-> > 
-> > /sys/devices/soc/${NAME}/
-> > /sys/devices/platform/soc${NUMBER}/
+On Thu, Apr 07, 2011 at 08:26:36PM +0200, Peter W?chtler wrote:
+> Hello Linux ARM developers,
 > 
-> I prefer the second format here since the path is always the same which
-> makes it easier to write parsing tools. The name should be an entry in
-> the directory rather than the name of the directory itself.
+> on Linux x86 there is infrastructure to set rodata to, aeh, readonly. ;)
 > 
-> Probably SoC number should match CPU number for SMP machines right?
+> I also want to protect some pages to readonly  as a guard.
+> So if some kernel code writes to the memory the kernel panics.
+> 
+> I tried the following without success:
+> 
+> And I have to admit that I don't understand all the macros for 
+> manipulating the page table entries ;(
+> Any clue what's wrong?
 
-Not really.  SOC means System On Chip.  you usually have only one SOC on 
-a board, and within that SOC you may have one or more CPUs.  SMP 
-machines are still likely to have only one SOC.
+We don't map kernel space using pages, but section mappings which have a
+granularity of 1MB.
 
-
-Nicolas
+That makes it difficult to set read-only status on just small areas of
+memory because you'd have to ensure that the .rodata starts at a 1MB
+boundary, and the following data also starts at a 1MB boundary - which
+would be quite wasteful.
