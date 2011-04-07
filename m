@@ -1,55 +1,39 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 08 Apr 2011 10:07:25 +1200
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <alpine.LFD.2.00.1104071756080.28032@xanadu.home>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201103112313.16128.arnd@arndb.de> <4D9DE532.5000802@linaro.org>
-	<201104072329.24243.arnd@arndb.de>
-	<4D9E30AE.9080105@bluewatersys.com>
-	<alpine.LFD.2.00.1104071756080.28032@xanadu.home>
-Message-ID: <4D9E359D.50502@bluewatersys.com>
+From: chihau@gmail.com (Chihau Chau)
+Date: Thu,  7 Apr 2011 19:06:33 -0300
+Subject: [PATCH] arm: mach-msm: acpuclock-arm11: Using __func__ instead
+	__FUNCTION__
+Message-ID: <1302213993-32737-1-git-send-email-chihau@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2011 10:01 AM, Nicolas Pitre wrote:
-> On Fri, 8 Apr 2011, Ryan Mallon wrote:
-> 
->> On 04/08/2011 09:29 AM, Arnd Bergmann wrote:
->>> I'll try to capture the opinions from the other people as well,
->>> hopefully this represents a consensus. Please correct me otherwise.
->>>
->>> I believe the uncontroversial parts are:
->>>
->>> * Make it not an entry but a device with certain properties.
->>> * Make the naming so that you can have more than one of them.
->>> * Put all devices on an SoC that uses this scheme underneath that
->>>   device by setting their parents to the SoC device.
->>>
->>> For the location of the device, I have not seen a clear consensus yet,
->>> but I'm fine with eihter of these:
->>>
->>> /sys/devices/soc/${NAME}/
->>> /sys/devices/platform/soc${NUMBER}/
->>
->> I prefer the second format here since the path is always the same which
->> makes it easier to write parsing tools. The name should be an entry in
->> the directory rather than the name of the directory itself.
->>
->> Probably SoC number should match CPU number for SMP machines right?
-> 
-> Not really.  SOC means System On Chip.  you usually have only one SOC on 
-> a board, and within that SOC you may have one or more CPUs.  SMP 
-> machines are still likely to have only one SOC.
+Changing the __FUNCTION__ variable for the C99 standard __func__
 
-Ok. What is the situation where we have more than one SoC?
+Signed-off-by: Chihau Chau <chihau@gmail.com>
+---
+ arch/arm/mach-msm/acpuclock-arm11.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-~Ryan
-
+diff --git a/arch/arm/mach-msm/acpuclock-arm11.c b/arch/arm/mach-msm/acpuclock-arm11.c
+index d716cf1..18ba209 100644
+--- a/arch/arm/mach-msm/acpuclock-arm11.c
++++ b/arch/arm/mach-msm/acpuclock-arm11.c
+@@ -379,7 +379,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
+ 		}
+ #if PERF_SWITCH_STEP_DEBUG
+ 		printk(KERN_DEBUG "%s: STEP khz = %u, pll = %d\n",
+-			__FUNCTION__, cur_s->a11clk_khz, cur_s->pll);
++			__func__, cur_s->a11clk_khz, cur_s->pll);
+ #endif
+ 		if (!for_power_collapse && cur_s->pll != ACPU_PLL_TCXO
+ 		    && !(plls_enabled & (1 << cur_s->pll))) {
+@@ -428,7 +428,7 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
+ 	}
+ 
+ #if PERF_SWITCH_DEBUG
+-	printk(KERN_DEBUG "%s: ACPU speed change complete\n", __FUNCTION__);
++	printk(KERN_DEBUG "%s: ACPU speed change complete\n", __func__);
+ #endif
+ out:
+ 	if (!for_power_collapse)
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+1.7.3.4
