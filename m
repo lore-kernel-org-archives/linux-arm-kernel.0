@@ -1,31 +1,46 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 7 Apr 2011 00:58:42 -0400
-Subject: [PATCH] pxa2xx_spi: Fix race condition in stop_queue()
-In-Reply-To: <201104061746.44134.anarsoul@gmail.com>
-References: <1300055230-29628-1-git-send-email-anarsoul@gmail.com>
-	<201104042047.55504.anarsoul@gmail.com>
-	<BANLkTikZrjgjJBpeBoSHGzCshYrHQZ6hQg@mail.gmail.com>
-	<201104061746.44134.anarsoul@gmail.com>
-Message-ID: <BANLkTi=MqwvdTC0_6oinZLMtODgST7THzw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 06 Apr 2011 22:35:31 -0700
+Subject: [PATCH v3] ARM: Use generic BUG() handler
+In-Reply-To: <1302131890-20953-1-git-send-email-sjg@chromium.org>
+References: <1302131890-20953-1-git-send-email-sjg@chromium.org>
+Message-ID: <4D9D4D23.6000805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 6, 2011 at 10:46, Vasily Khoruzhick wrote:
-> On Tuesday 05 April 2011 06:21:27 Eric Miao wrote:
->> On Tue, Apr 5, 2011 at 1:47 AM, Vasily Khoruzhick wrote:
->> > On Monday 04 April 2011 20:35:14 Mike Frysinger wrote:
->> >> that's fine, i do. ?was this patch actually merged ? ?or is there a
->> >> new version on the way ?
->> >> -mike
->> >
->> > I suspect it's not merged yet. Btw, should I make a patch which fixes all
->> > drivers, or it's prefferable to make one patch per driver?
->>
->> Please come up with one patch, Mike can help add a Tested-by then.
->
-> Sorry, but I did not get if you want splitted patch or not :) Anyway, 4 on-
-> line-patches does not look reasonable anyway, so I'm sending not-splitted
-> patch in few minutes.
+On 4/6/2011 4:18 PM, Simon Glass wrote:
+> v3: Remove old BUG() implementation in favor of this one.
+> Remove the Backtrace: message (will submit this separately).
+> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
+> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
+> define GENERIC_BUG this might be academic.)
 
-yes, that is fine.  thanks :).
--mike
+Its not entirely academic because CONFIG_BUG=n and CONFIG_SMP_ON_UP=n
+would allow us to remove the exit text. This could be huge for people
+who want to cram kernel's onto space constrained devices.
+
+> Rebase to linux-2.6.git master.
+>
+> Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
+
+Don't forget to remove these before submitting to the patch tracker (and
+sending to the list).
+
+> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+> index 4d88425..2914724 100644
+> --- a/arch/arm/include/asm/bug.h
+> +++ b/arch/arm/include/asm/bug.h
+> @@ -3,21 +3,58 @@
+>  
+>  
+>  #ifdef CONFIG_BUG
+> -#ifdef CONFIG_DEBUG_BUGVERBOSE
+> -extern void __bug(const char *file, int line) __attribute__((noreturn));
+> -
+> -/* give file/line information */
+> -#define BUG()		__bug(__FILE__, __LINE__)
+
+Does anybody reference __bug() anymore? If not you can remove that too.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
