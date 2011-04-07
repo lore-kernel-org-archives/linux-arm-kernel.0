@@ -1,64 +1,129 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Thu, 7 Apr 2011 10:58:25 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <1302162886.10725.4.camel@maggie>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
-	<op.vti9ote53ri7v4@arend-laptop>
-	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
-	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
-	<1302123428.20093.6.camel@maggie>
-	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
-	<1302124112.20093.11.camel@maggie>
-	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	<1302124737.27258.7.camel@dev.znau.edu.ua>
-	<BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
-	<1302134429.27258.32.camel@dev.znau.edu.ua>
-	<BANLkTinfM0QLFwcKZXfWQ_jNYfBJg_et-Q@mail.gmail.com>
-	<1302162886.10725.4.camel@maggie>
-Message-ID: <op.vtj8jn133ri7v4@arend-laptop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 Apr 2011 11:01:25 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+In-Reply-To: <1302164236-1516-1-git-send-email-oskar.andero@sonyericsson.com>
+References: <1302164236-1516-1-git-send-email-oskar.andero@sonyericsson.com>
+Message-ID: <20110407090125.GH13963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Apr 2011 09:54:46 +0200, Michael B?sch <mb@bu3sch.de> wrote:
+On Thu, Apr 07, 2011 at 10:17:16AM +0200, oskar.andero at sonyericsson.com wrote:
+> From: Victor Boivie <victor.boivie@sonyericsson.com>
+> 
+> This patch allows the provided CONFIG_CMDLINE to be concatenated
+> with the one provided by the boot loader. This is useful to
+> merge the static values defined in CONFIG_CMDLINE with the
+> boot loader's (possibly) more dynamic values, such as startup
+> reasons and more.
+> 
+> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+> ---
+>  arch/arm/Kconfig        |   21 +++++++++++++++++++--
+>  arch/arm/kernel/setup.c |    9 ++++++++-
+>  2 files changed, 27 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5b9f78b..71b35e6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1743,6 +1743,24 @@ config CMDLINE
+>  	  time by entering them here. As a minimum, you should specify the
+>  	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+>  
+> +choice
+> +	prompt "Kernel command line type"
+> +	default CMDLINE_DEFAULT
+I'm not sure this works, but maybe use:
 
->> Ahh, so while talking about 4 windows, I guess you counted fixes
->> windows as well. That would be right, matching my knowledge.
->>
->> When asking question about amount of cores we may want to use
->> simultaneously I didn't think about ChipCommon or PCIe. The real
->> problem would be to support for example two 802.11 cores and one
->> ethernet core at the same time. That gives us 3 cores while we have
->> only 2 sliding windows.
->
-> Would that really be a problem? Think of it. This combination
-> will only be available on embedded devices. But do we have windows
-> on embedded devices? I guess not. If AXI is similar to SSB, the MMIO
-> of all cores will always be mapped. So accesses can be done
-> without switch or lock.
+	choice
+		prompt "Kernel command line type" if CMDLINE != ""
+		default CMDLINE_DEFAULT
 
-Agree. For embedded systems there is no need to switch cores. Each core  
-register space and wrapper register space is mapped. In the brcm80211 we  
-have the concept of fast versus slow host interface. The criteria for fast  
-host interface is based on following expression:
+and then remove the explicit
 
-fast_host_bus = (host_bus_coretype == PCIE_CORE_ID) ||
-	((host_bus_coretype == PCI_CORE_ID) && (host_bus_corerev >= 13))
+	depends on CMDLINE != ""
 
-If this is true, chipcommon and pci/pcie registers are accessed without  
-sliding the window using the fixed offsets Rafa? mentioned earlier. The  
-BAR0 window size is 16KB.
+from the options. This might hide the choice from the user if there is
+only a single option to choose.
 
-> I do really think that engineers at broadcom are clever enough
-> to design a hardware that does not require expensive window sliding
-> all the time while operating.
->
+Best regards
+Uwe
 
-If a bigger window is clever enough ;-)
+> +
+> +config CMDLINE_DEFAULT
+> +	bool "Use bootloader kernel arguments if available"
+> +	help
+> +	  Uses the command-line options passed by the boot loader. If
+> +	  the boot loader doesn't provide any, the default kernel command
+> +	  string provided in CMDLINE will be used.
+"CMDLINE_DEFAULT" isn't a good name IMHO. It conflicts with
 
-Gr. AvS
+	config CMDLINE
+		string "Default kernel command string"
+
+Maybe better use CMDLINE_FROM_BOOTLOADER or similar?
+
+> +
+> +config CMDLINE_EXTEND
+> +	bool "Extend bootloader kernel arguments"
+> +	depends on CMDLINE != ""
+> +	help
+> +	  The default kernel command string will be concatenated with the
+> +	  arguments provided by the boot loader.
+> +
+>  config CMDLINE_FORCE
+>  	bool "Always use the default kernel command string"
+>  	depends on CMDLINE != ""
+> @@ -1751,8 +1769,7 @@ config CMDLINE_FORCE
+>  	  loader passes other arguments to the kernel.
+>  	  This is useful if you cannot or don't want to change the
+>  	  command-line options your boot loader passes to the kernel.
+> -
+> -	  If unsure, say N.
+> +endchoice
+>  
+>  config XIP_KERNEL
+>  	bool "Kernel Execute-In-Place from ROM"
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 006c1e8..465bc7e 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -673,7 +673,14 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
+>  static int __init parse_tag_cmdline(const struct tag *tag)
+>  {
+>  #ifndef CONFIG_CMDLINE_FORCE
+> -	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
+> +#ifdef CONFIG_CMDLINE_EXTEND
+> +	strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
+> +	strlcat(default_command_line, tag->u.cmdline.cmdline,
+> +		COMMAND_LINE_SIZE);
+> +#else
+> +	strlcpy(default_command_line, tag->u.cmdline.cmdline,
+> +		COMMAND_LINE_SIZE);
+> +#endif
+>  #else
+>  	pr_warning("Ignoring tag cmdline (using the default kernel command line)\n");
+>  #endif /* CONFIG_CMDLINE_FORCE */
+> -- 
+> 1.7.4.2
+I would prefer
+
+	#ifdef CONFIG_CMDLINE_DEFAULT
+		strlcpy(default_command_line, tag->u.cmdline.cmdline,
+			COMMAND_LINE_SIZE);
+	#elif CONFIG_CMDLINE_EXTEND
+		...
+	#else /* CMDLINE_FORCE */
+		...
+	#endif
+
+as it is easier to parse for a human.
+
+Best regards
+Uwe
+
 -- 
-"The most merciful thing in the world, I think, is the inability of the  
-human
-mind to correlate all its contents." - "The Call of Cthulhu"
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
