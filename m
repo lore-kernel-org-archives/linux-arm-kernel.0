@@ -1,67 +1,87 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Thu, 07 Apr 2011 03:00:29 +0300
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
-	<op.vti9ote53ri7v4@arend-laptop>
-	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
-	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
-	<1302123428.20093.6.camel@maggie>
-	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
-	<1302124112.20093.11.camel@maggie>
-	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	<1302124737.27258.7.camel@dev.znau.edu.ua>
-	<BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
-Message-ID: <1302134429.27258.32.camel@dev.znau.edu.ua>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed,  6 Apr 2011 17:02:48 -0700
+Subject: [PATCH/RFC 5/6] ARM: use common clock-based runtime PM implementation
+	on SH-mobile & OMAP1
+In-Reply-To: <1302134569-22825-1-git-send-email-khilman@ti.com>
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+Message-ID: <1302134569-22825-6-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap1/Makefile        |    2 +-
+ arch/arm/mach-omap1/pm_runtime.c    |   18 ++++++++++++++++++
+ arch/arm/mach-shmobile/pm_runtime.c |   23 +++++++++++++++++++++++
+ 3 files changed, 42 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/pm_runtime.c
+ create mode 100644 arch/arm/mach-shmobile/pm_runtime.c
 
-> W dniu 6 kwietnia 2011 23:18 u?ytkownik George Kashperko
-> <george@znau.edu.ua> napisa?:
-> >> We have 2 windows. I didn't try this, but let's assume they have no
-> >> limitations. We can use first window for one driver only, second
-> >> driver for second driver only. That gives us 2 drivers simultaneously
-> >> working drivers. No driver need to reset core really often (and not
-> >> inside interrupt context) so we will switch driver's window to agent
-> >> (from core) only at init/reset.
-> >>
-> >> The question is what amount of driver we will need to support at the same time.
-> >>
-> >
-> > I guess (correct me please, Broadcom guys if I'm wrong) there are two
-> > functions two-head w11 pci host and therefore 4 sliding windows, 2 per
-> > each function.
-> 
-> I don't understand you. Can you use more friendly language? functions?
-> 2head? w11?
-> 
-
-For PCI function description take a look at PCI specs or PCI
-configuration space description (e. g.
-http://en.wikipedia.org/wiki/PCI_configuration_space)
-
-Sorry for missleading short-ups, w11 - bcm80211 core, under two-head I
-mean ssb/axi with two functional cores on same interconnect (like w11
-+w11, not a lot of these exists I guess). Also there were some b43+b44
-on single PCI ssb host and those where implemented as ssb interconnect
-on multifunctional PCI host therefore providing separate access windows
-for each function.
-
-Might I mussunderstood something (its late night here at my place) when
-you where talking about using coreswitching involved for two drivers
-therefore I remembered about those functions. Seems now you were talking
-about chipcommon+b43 access sharing same window.
-
-As for core switching requirments for earlier SSB interconnects on PCI
-hosts where there were no direct chipcommon access, that one can be
-accomplished without spin_lock/mutex for b43 or b44 cores with proper
-bus design.
-
-AXI doesn't need spinlocks/mutexes as both chipcommon and pci bridge are
-available directly and b43 will be the only one requiring window access.
-
-Have nice day,
-George
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index 1913c2d..04c60f9 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -11,7 +11,7 @@ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+ obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
+ 
+ # Power Management
+-obj-$(CONFIG_PM) += pm.o sleep.o
++obj-$(CONFIG_PM) += pm.o sleep.o pm_runtime.o
+ 
+ # DSP
+ obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
+diff --git a/arch/arm/mach-omap1/pm_runtime.c b/arch/arm/mach-omap1/pm_runtime.c
+new file mode 100644
+index 0000000..bbceb64
+--- /dev/null
++++ b/arch/arm/mach-omap1/pm_runtime.c
+@@ -0,0 +1,18 @@
++/*
++ * Runtime PM support code for TI OMAP1
++ *
++ *  Copyright (C) 2011 Texas Instruments, Inc.
++ *  Author: Kevin Hilman <khilman@ti.com>
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include <asm/pm_runtime.h>
++
++static int __init omap1_pm_runtime_init(void)
++{
++	pm_runtime_clock_init();
++	return 0;
++}
++core_initcall(omap1_pm_runtime_init);
+diff --git a/arch/arm/mach-shmobile/pm_runtime.c b/arch/arm/mach-shmobile/pm_runtime.c
+new file mode 100644
+index 0000000..edc0fa5
+--- /dev/null
++++ b/arch/arm/mach-shmobile/pm_runtime.c
+@@ -0,0 +1,23 @@
++/*
++ * arch/arm/mach-shmobile/pm_runtime.c
++ *
++ * Runtime PM support code for SuperH Mobile ARM
++ *
++ *  Copyright (C) 2009-2010 Magnus Damm
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include <asm/pm_runtime.h>
++
++static int __init sh_pm_runtime_init(void)
++{
++	pm_runtime_clock_init();
++	return 0;
++}
++core_initcall(sh_pm_runtime_init);
+-- 
+1.7.4
