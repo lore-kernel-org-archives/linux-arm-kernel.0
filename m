@@ -1,84 +1,54 @@
-From: oskar.andero@sonyericsson.com (oskar.andero at sonyericsson.com)
-Date: Thu, 7 Apr 2011 10:17:16 +0200
-Subject: [PATCH] ARM: Allow for kernel command line concatenation
-Message-ID: <1302164236-1516-1-git-send-email-oskar.andero@sonyericsson.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  7 Apr 2011 10:50:43 +0200
+Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead of
+	VIDEOBUF_DMA_CONTIG
+Message-ID: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Boivie <victor.boivie@sonyericsson.com>
+Since commit
 
-This patch allows the provided CONFIG_CMDLINE to be concatenated
-with the one provided by the boot loader. This is useful to
-merge the static values defined in CONFIG_CMDLINE with the
-boot loader's (possibly) more dynamic values, such as startup
-reasons and more.
+	379fa5d ([media] V4L: mx3_camera: convert to videobuf2)
 
-Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
-Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+mx3_camera uses videobuf2, but that commit didn't upgrade the select
+resulting in the following build failure:
+
+	drivers/built-in.o: In function `mx3_camera_init_videobuf':
+	clkdev.c:(.text+0x86580): undefined reference to `vb2_dma_contig_memops'
+	drivers/built-in.o: In function `mx3_camera_probe':
+	clkdev.c:(.devinit.text+0x3548): undefined reference to `vb2_dma_contig_init_ctx'
+	clkdev.c:(.devinit.text+0x3578): undefined reference to `vb2_dma_contig_cleanup_ctx'
+	drivers/built-in.o: In function `mx3_camera_remove':
+	clkdev.c:(.devexit.text+0x674): undefined reference to `vb2_dma_contig_cleanup_ctx'
+	make[2]: *** [.tmp_vmlinux1] Error 1
+	make[1]: *** [sub-make] Error 2
+	make: *** [all] Error 2
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/Kconfig        |   21 +++++++++++++++++++--
- arch/arm/kernel/setup.c |    9 ++++++++-
- 2 files changed, 27 insertions(+), 3 deletions(-)
+Hello,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b9f78b..71b35e6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1743,6 +1743,24 @@ config CMDLINE
- 	  time by entering them here. As a minimum, you should specify the
- 	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
- 
-+choice
-+	prompt "Kernel command line type"
-+	default CMDLINE_DEFAULT
-+
-+config CMDLINE_DEFAULT
-+	bool "Use bootloader kernel arguments if available"
-+	help
-+	  Uses the command-line options passed by the boot loader. If
-+	  the boot loader doesn't provide any, the default kernel command
-+	  string provided in CMDLINE will be used.
-+
-+config CMDLINE_EXTEND
-+	bool "Extend bootloader kernel arguments"
-+	depends on CMDLINE != ""
-+	help
-+	  The default kernel command string will be concatenated with the
-+	  arguments provided by the boot loader.
-+
- config CMDLINE_FORCE
- 	bool "Always use the default kernel command string"
- 	depends on CMDLINE != ""
-@@ -1751,8 +1769,7 @@ config CMDLINE_FORCE
- 	  loader passes other arguments to the kernel.
- 	  This is useful if you cannot or don't want to change the
- 	  command-line options your boot loader passes to the kernel.
--
--	  If unsure, say N.
-+endchoice
- 
- config XIP_KERNEL
- 	bool "Kernel Execute-In-Place from ROM"
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 006c1e8..465bc7e 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -673,7 +673,14 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
- static int __init parse_tag_cmdline(const struct tag *tag)
- {
- #ifndef CONFIG_CMDLINE_FORCE
--	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
-+#ifdef CONFIG_CMDLINE_EXTEND
-+	strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
-+	strlcat(default_command_line, tag->u.cmdline.cmdline,
-+		COMMAND_LINE_SIZE);
-+#else
-+	strlcpy(default_command_line, tag->u.cmdline.cmdline,
-+		COMMAND_LINE_SIZE);
-+#endif
- #else
- 	pr_warning("Ignoring tag cmdline (using the default kernel command line)\n");
- #endif /* CONFIG_CMDLINE_FORCE */
+does someone has a hint how to fix gcc not to believe the undefined
+references to be in clkdev.c?
+
+Best regards
+Uwe
+
+ drivers/media/video/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+index 4498b94..00f51dd 100644
+--- a/drivers/media/video/Kconfig
++++ b/drivers/media/video/Kconfig
+@@ -875,7 +875,7 @@ config MX3_VIDEO
+ config VIDEO_MX3
+ 	tristate "i.MX3x Camera Sensor Interface driver"
+ 	depends on VIDEO_DEV && MX3_IPU && SOC_CAMERA
+-	select VIDEOBUF_DMA_CONTIG
++	select VIDEOBUF2_DMA_CONTIG
+ 	select MX3_VIDEO
+ 	---help---
+ 	  This is a v4l2 driver for the i.MX3x Camera Sensor Interface
 -- 
-1.7.4.2
+1.7.2.3
