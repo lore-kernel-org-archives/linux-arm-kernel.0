@@ -1,191 +1,90 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Apr 2011 22:49:57 -0700
-Subject: [PATCH/RFC 2/6] OMAP2+: PM: move runtime PM implementation to
-	use device power domains
-In-Reply-To: <1302134569-22825-3-git-send-email-khilman@ti.com>
-References: <1302134569-22825-1-git-send-email-khilman@ti.com>
-	<1302134569-22825-3-git-send-email-khilman@ti.com>
-Message-ID: <20110407054957.GD6427@angua.secretlab.ca>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 7 Apr 2011 14:01:29 +0800
+Subject: [PATCH] spi: Fix race condition in stop_queue()
+In-Reply-To: <1302101355-31187-1-git-send-email-anarsoul@gmail.com>
+References: <201104061746.44134.anarsoul@gmail.com>
+	<1302101355-31187-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <BANLkTiku8538Q9wabEeoXi7scQbmc0U7yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2011 at 05:02:45PM -0700, Kevin Hilman wrote:
-> In commit 7538e3db6e015e890825fbd9f8659952896ddd5b (PM: add support
-> for device power domains) a better way for handling platform-specific
-> power hooks was introduced.
-> 
-> Rather than using the platform_bus dev_pm_ops overrides
-> (platform_bus_set_pm_ops()), this patch moves the OMAP runtime PM
-> implementation over to using device power domains.
-> 
-> Since OMAP is the only user of platform_bus_set_pm_ops(), that
-> interface can be removed (and will be in a forthcoming patch.)
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+On Wed, Apr 6, 2011 at 10:49 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> There's a race condition in stop_queue() in some drivers -
+> if drv_data->queue is empty, but drv_data->busy is still set
+> (or opposite situation) stop_queue will return -EBUSY.
+> So fix loop condition to check that both drv_data->queue is empty
+> and drv_data->busy is not set.
+>
+> This patch affects following drivers:
+> pxa2xx_spi
+> spi_bfin5xx
+> amba-pl022
+> dw_spi
+>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Looks right to me.
-
-Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
 > ---
->  arch/arm/mach-omap2/Makefile     |    6 +-
->  arch/arm/mach-omap2/pm_bus.c     |   85 --------------------------------------
->  arch/arm/plat-omap/omap_device.c |   22 ++++++++++
->  3 files changed, 25 insertions(+), 88 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/pm_bus.c
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index a45cd64..b353584 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -59,10 +59,10 @@ endif
->  # Power Management
->  ifeq ($(CONFIG_PM),y)
->  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
-> -obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o
-> +obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
->  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o \
-> -					   cpuidle34xx.o pm_bus.o
-> -obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o pm_bus.o
-> +					   cpuidle34xx.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o
->  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
->  obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
->  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
-> diff --git a/arch/arm/mach-omap2/pm_bus.c b/arch/arm/mach-omap2/pm_bus.c
-> deleted file mode 100644
-> index 5acd2ab..0000000
-> --- a/arch/arm/mach-omap2/pm_bus.c
-> +++ /dev/null
-> @@ -1,85 +0,0 @@
-> -/*
-> - * Runtime PM support code for OMAP
-> - *
-> - * Author: Kevin Hilman, Deep Root Systems, LLC
-> - *
-> - * Copyright (C) 2010 Texas Instruments, Inc.
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2. This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -#include <linux/init.h>
-> -#include <linux/kernel.h>
-> -#include <linux/io.h>
-> -#include <linux/pm_runtime.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/mutex.h>
-> -
-> -#include <plat/omap_device.h>
-> -#include <plat/omap-pm.h>
-> -
-> -#ifdef CONFIG_PM_RUNTIME
-> -static int omap_pm_runtime_suspend(struct device *dev)
-> -{
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	int r, ret = 0;
-> -
-> -	dev_dbg(dev, "%s\n", __func__);
-> -
-> -	ret = pm_generic_runtime_suspend(dev);
-> -
-> -	if (!ret && dev->parent == &omap_device_parent) {
-> -		r = omap_device_idle(pdev);
-> -		WARN_ON(r);
-> -	}
-> -
-> -	return ret;
-> -};
-> -
-> -static int omap_pm_runtime_resume(struct device *dev)
-> -{
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	int r;
-> -
-> -	dev_dbg(dev, "%s\n", __func__);
-> -
-> -	if (dev->parent == &omap_device_parent) {
-> -		r = omap_device_enable(pdev);
-> -		WARN_ON(r);
-> -	}
-> -
-> -	return pm_generic_runtime_resume(dev);
-> -};
-> -#else
-> -#define omap_pm_runtime_suspend NULL
-> -#define omap_pm_runtime_resume NULL
-> -#endif /* CONFIG_PM_RUNTIME */
-> -
-> -static int __init omap_pm_runtime_init(void)
-> -{
-> -	const struct dev_pm_ops *pm;
-> -	struct dev_pm_ops *omap_pm;
-> -
-> -	pm = platform_bus_get_pm_ops();
-> -	if (!pm) {
-> -		pr_err("%s: unable to get dev_pm_ops from platform_bus\n",
-> -			__func__);
-> -		return -ENODEV;
-> -	}
-> -
-> -	omap_pm = kmemdup(pm, sizeof(struct dev_pm_ops), GFP_KERNEL);
-> -	if (!omap_pm) {
-> -		pr_err("%s: unable to alloc memory for new dev_pm_ops\n",
-> -			__func__);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	omap_pm->runtime_suspend = omap_pm_runtime_suspend;
-> -	omap_pm->runtime_resume = omap_pm_runtime_resume;
-> -
-> -	platform_bus_set_pm_ops(omap_pm);
-> -
-> -	return 0;
-> -}
-> -core_initcall(omap_pm_runtime_init);
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index 9bbda9a..93cd2fb 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -536,6 +536,27 @@ int omap_early_device_register(struct omap_device *od)
->  	return 0;
->  }
->  
-> +static int _od_runtime_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	return omap_device_idle(pdev);
-> +}
-> +
-> +static int _od_runtime_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	return omap_device_enable(pdev);
-> +}
-> +
-> +static struct dev_power_domain omap_device_power_domain = {
-> +	.ops = {
-> +		.runtime_suspend = _od_runtime_suspend,
-> +		.runtime_resume = _od_runtime_resume,
-> +	}
-> +};
-> +
->  /**
->   * omap_device_register - register an omap_device with one omap_hwmod
->   * @od: struct omap_device * to register
-> @@ -549,6 +570,7 @@ int omap_device_register(struct omap_device *od)
->  	pr_debug("omap_device: %s: registering\n", od->pdev.name);
->  
->  	od->pdev.dev.parent = &omap_device_parent;
-> +	od->pdev.dev.pwr_domain = &omap_device_power_domain;
->  	return platform_device_register(&od->pdev);
->  }
->  
-> -- 
-> 1.7.4
-> 
+> ?drivers/spi/amba-pl022.c ?| ? ?2 +-
+> ?drivers/spi/dw_spi.c ? ? ?| ? ?2 +-
+> ?drivers/spi/pxa2xx_spi.c ?| ? ?2 +-
+> ?drivers/spi/spi_bfin5xx.c | ? ?2 +-
+> ?4 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+> index 71a1219..23aaaa9 100644
+> --- a/drivers/spi/amba-pl022.c
+> +++ b/drivers/spi/amba-pl022.c
+> @@ -1553,7 +1553,7 @@ static int stop_queue(struct pl022 *pl022)
+> ? ? ? ? * A wait_queue on the pl022->busy could be used, but then the common
+> ? ? ? ? * execution path (pump_messages) would be required to call wake_up or
+> ? ? ? ? * friends on every SPI message. Do this instead */
+> - ? ? ? while (!list_empty(&pl022->queue) && pl022->busy && limit--) {
+> + ? ? ? while ((!list_empty(&pl022->queue) || pl022->busy) && limit--) {
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&pl022->queue_lock, flags);
+> ? ? ? ? ? ? ? ?msleep(10);
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&pl022->queue_lock, flags);
+> diff --git a/drivers/spi/dw_spi.c b/drivers/spi/dw_spi.c
+> index 22af77f..b53be4d 100644
+> --- a/drivers/spi/dw_spi.c
+> +++ b/drivers/spi/dw_spi.c
+> @@ -821,7 +821,7 @@ static int stop_queue(struct dw_spi *dws)
+>
+> ? ? ? ?spin_lock_irqsave(&dws->lock, flags);
+> ? ? ? ?dws->run = QUEUE_STOPPED;
+> - ? ? ? while (!list_empty(&dws->queue) && dws->busy && limit--) {
+> + ? ? ? while ((!list_empty(&dws->queue) || dws->busy) && limit--) {
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&dws->lock, flags);
+> ? ? ? ? ? ? ? ?msleep(10);
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&dws->lock, flags);
+> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> index 9592883..39cc10f 100644
+> --- a/drivers/spi/pxa2xx_spi.c
+> +++ b/drivers/spi/pxa2xx_spi.c
+> @@ -1493,7 +1493,7 @@ static int stop_queue(struct driver_data *drv_data)
+> ? ? ? ? * execution path (pump_messages) would be required to call wake_up or
+> ? ? ? ? * friends on every SPI message. Do this instead */
+> ? ? ? ?drv_data->run = QUEUE_STOPPED;
+> - ? ? ? while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
+> + ? ? ? while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&drv_data->lock, flags);
+> ? ? ? ? ? ? ? ?msleep(10);
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&drv_data->lock, flags);
+> diff --git a/drivers/spi/spi_bfin5xx.c b/drivers/spi/spi_bfin5xx.c
+> index 3f22351..0e14f40 100644
+> --- a/drivers/spi/spi_bfin5xx.c
+> +++ b/drivers/spi/spi_bfin5xx.c
+> @@ -1244,7 +1244,7 @@ static inline int bfin_spi_stop_queue(struct bfin_spi_master_data *drv_data)
+> ? ? ? ? * friends on every SPI message. Do this instead
+> ? ? ? ? */
+> ? ? ? ?drv_data->running = false;
+> - ? ? ? while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
+> + ? ? ? while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&drv_data->lock, flags);
+> ? ? ? ? ? ? ? ?msleep(10);
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&drv_data->lock, flags);
+> --
+> 1.7.4.1
+>
+>
