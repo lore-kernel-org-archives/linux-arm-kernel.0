@@ -1,50 +1,43 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 07 Apr 2011 23:59:59 +0200
-Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
-	basis of the memory size.
-In-Reply-To: <20110407214457.GH26616@chipmunk>
-References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
-	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
-	<4D9CED15.2010806@ahsoftware.de>
-	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
-	<4D9CF5B3.9020007@ahsoftware.de>
-	<toa078-0do.ln1@chipmunk.wormnet.eu>
-	<4D9E2D1C.7070102@ahsoftware.de> <20110407214457.GH26616@chipmunk>
-Message-ID: <4D9E33DF.2020707@ahsoftware.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Apr 2011 18:01:39 -0400 (EDT)
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <4D9E30AE.9080105@bluewatersys.com>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201103112313.16128.arnd@arndb.de> <4D9DE532.5000802@linaro.org>
+	<201104072329.24243.arnd@arndb.de>
+	<4D9E30AE.9080105@bluewatersys.com>
+Message-ID: <alpine.LFD.2.00.1104071756080.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.04.2011 23:44, schrieb Alexander Clouter:
-> * Alexander Holler<holler@ahsoftware.de>  [2011-04-07 23:31:08+0200]:
->>
->> Requiring a machine ID and the needed stuff to handle that for a
->> board which just is using two GPIOs different than another board is
->> why the ARM tree exploded. And requiring a machine ID just to follow
->> the rule that a machine ID is much better than some pretty unique hw
->> feature is in my humble opinion senseless and that the resulting code
->> is more readable and better to maintain is a myth.
->>
-> It's something that most people agree with you on too.  However, I am
-> guessing it's around as no one else *at the time* of it's conception
-> could think of a better way.
->
-> Now this is why there is a lot of work being done on device-tree.
->
->> Sorry that I wanted to help there. Will not try it again.
->>
-> Yeah, as obviously no tries to help anyone improve around here:
+On Fri, 8 Apr 2011, Ryan Mallon wrote:
 
-That is future, I've tried to help with the existing stuff. Maybe I 
-should have suggested just to remove all boards now which never will get 
-support for DT. Linux might get happy.
+> On 04/08/2011 09:29 AM, Arnd Bergmann wrote:
+> > I'll try to capture the opinions from the other people as well,
+> > hopefully this represents a consensus. Please correct me otherwise.
+> > 
+> > I believe the uncontroversial parts are:
+> > 
+> > * Make it not an entry but a device with certain properties.
+> > * Make the naming so that you can have more than one of them.
+> > * Put all devices on an SoC that uses this scheme underneath that
+> >   device by setting their parents to the SoC device.
+> > 
+> > For the location of the device, I have not seen a clear consensus yet,
+> > but I'm fine with eihter of these:
+> > 
+> > /sys/devices/soc/${NAME}/
+> > /sys/devices/platform/soc${NUMBER}/
+> 
+> I prefer the second format here since the path is always the same which
+> makes it easier to write parsing tools. The name should be an entry in
+> the directory rather than the name of the directory itself.
+> 
+> Probably SoC number should match CPU number for SMP machines right?
 
-And than I get called that I'm writing an abomination, which would have 
-been nice with just the change of one line.
+Not really.  SOC means System On Chip.  you usually have only one SOC on 
+a board, and within that SOC you may have one or more CPUs.  SMP 
+machines are still likely to have only one SOC.
 
-Sorry guys, this isn't what motivates people, at least not without the 
-needed compensations to tolerate such manners.
 
-Regards,
-
-Alexander
+Nicolas
