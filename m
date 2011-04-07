@@ -1,28 +1,44 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 7 Apr 2011 07:36:23 +0300
-Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
-In-Reply-To: <20110406184022.GI13963@pengutronix.de>
-References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110406163805.GA11820@linux-sh.org>
-	<20110406184022.GI13963@pengutronix.de>
-Message-ID: <20110407043623.GA3905@jasper.tkos.co.il>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Thu, 07 Apr 2011 13:44:37 +0900
+Subject: [alsa-devel] [PATCH 3/3] SoC: SAMSUNG: Add WM8580 PCM Machine
+	driver
+In-Reply-To: <BANLkTinOadw2TkNMs2_Lvmskb=yU8XYUuw@mail.gmail.com>
+References: <1302136270-28776-1-git-send-email-sbkim73@samsung.com>
+	<1302136270-28776-4-git-send-email-sbkim73@samsung.com>
+	<BANLkTinOadw2TkNMs2_Lvmskb=yU8XYUuw@mail.gmail.com>
+Message-ID: <041f01cbf4de$85702f30$90508d90$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi! Jassi
 
-On Wed, Apr 06, 2011 at 08:40:22PM +0200, Uwe Kleine-K?nig wrote:
-> I currently collect imx patches for Sascha because he is busy doing
-> other stuff.
+On Thursday, April 07, 2011 12:43 PM, Jassi Brar wrote:
+> > +static struct snd_soc_dai_link smdk_dai[] = {
+> > +       {
+> > +               .name = "WM8580 PAIF PCM RX",
+> > +               .stream_name = "Playback",
+> > +               .cpu_dai_name = "samsung-pcm.0",
+> > +               .codec_dai_name = "wm8580-hifi-playback",
+> > +               .platform_name = "samsung-audio",
+> > +               .codec_name = "wm8580-codec.0-001b",
+> > +               .ops = &smdk_wm8580_pcm_ops,
+> > +       }, {
+> > +               .name = "WM8580 PAIF PCM TX",
+> > +               .stream_name = "Capture",
+> > +               .cpu_dai_name = "samsung-pcm.0",
+> > +               .codec_dai_name = "wm8580-hifi-capture",
+> > +               .platform_name = "samsung-audio",
+> > +               .codec_name = "wm8580-codec.0-001b",
+> > +               .ops = &smdk_wm8580_pcm_ops,
+> > +       },
+> > +};
+> 
+> IIRC the PCM DAI is connected to Secondary i/f of WM8580
+> on some SMDKs. Isn't it smdk6410 ?
 
-Can you take the following one then? I need this to enable multiple NAND chips 
-on i.MX25.
+Yes, Your remember is right. SMDK6410 has WM8580 PCM DAI.
+But, In this time, I couldn't test on SMDK6410.
+After testing on SMDK6410, I will submit related patch.
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/110313
-
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thanks and regards,
+SB Kim
