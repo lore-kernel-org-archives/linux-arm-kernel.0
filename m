@@ -1,103 +1,105 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 7 Apr 2011 15:29:32 +0100
-Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
-In-Reply-To: <alpine.DEB.2.00.1104071503340.1147@localhost6.localdomain6>
-References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
-	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
-	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
-	<alpine.DEB.2.00.1104071133340.1147@localhost6.localdomain6>
-	<BANLkTi==oi+Ebj3vrwB3Ev_49Gfj80gsAA@mail.gmail.com>
-	<alpine.DEB.2.00.1104071503340.1147@localhost6.localdomain6>
-Message-ID: <BANLkTikesVqvVQvxbFihEE2woHirvnX79A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 07 Apr 2011 07:58:57 -0700
+Subject: [PATCH/RFC 0/6] ARM: runtime PM: consolidate runtime PM
+	implementations
+In-Reply-To: <201104070738.42956.rjw@suse.com> (Rafael J. Wysocki's message of
+	"Thu, 7 Apr 2011 07:38:42 +0200")
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+	<201104070738.42956.rjw@suse.com>
+Message-ID: <871v1eaz0u.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 7, 2011 at 3:24 PM, Frank Hofmann <frank.hofmann@tomtom.com> wrote:
-> On Thu, 7 Apr 2011, Dave Martin wrote:
->
->> On Thu, Apr 7, 2011 at 12:35 PM, Frank Hofmann <frank.hofmann@tomtom.com>
->> wrote:
->>>
->>> On Thu, 7 Apr 2011, Dave Martin wrote:
->>>
->>> [ ... ]
->>>>
->>>> Well, I'm not hoping for the assembly to be inlined, *just* the C
->>>> wrapper. ?Since the C wrapper is trivial, I prefer to avoid emitting a
->>>> function body for this.
->>>
->>> _That_ specific bit is what isn't going to happen; it's a separate
->>> compilation unit, it needs to be callable from places not known at
->>> compile
->>> nor link time, and the function isn't "static". The "inline" is
->>> meaningless
->>> here.
->>
->> The wrapper functions _are_ static:
->>
->> +static inline void set_fiq_regs(struct pt_regs const *regs)
->> +{
->> + ? ? ? __set_fiq_regs(&regs->ARM_r8);
->> +}
->> +
->> +static inline void get_fiq_regs(struct pt_regs *regs)
->> +{
->> + ? ? ? __get_fiq_regs(&regs->ARM_r8);
->> +}
->
-> Ah ok ... now I get that bit, sorry <facepalm> - I had a patch mixup ...
-> You're right. When in the header these are fine.
->
-> Thx for the coding style pointer :)
->
->
->> IIUC, <arm/assembler.h> establishes the standard environment for .S
->> files for arm, which includes <asm/ptrace.h>. ?kernel/entry-header.S
->> gets those bit definitions by the same route, for example.
+[adding linux-pm, which I forgot to add in original post]
 
-Argh, that's me repeating the same typo I had in the patch...  yes, it
-should be <asm/assembler.h>
+"Rafael J. Wysocki" <rjw@suse.com> writes:
 
+> On Thursday, April 07, 2011, Kevin Hilman wrote:
+>> This series aims to consolidate OMAP and SH-mobile runtime PM
+>> implementations around the new device power domains.
+>> 
+>> In 2.6.39, device power domains were added (commit
+>> 7538e3db6e015e890825fbd9f8659952896ddd5b, PM: add support for device
+>> power domains).  In converting both OMAP and SH-mobile to use device
+>> power domains, the overlap between implementations was almost 100%.  
+>> 
+>> To share the runtime PM implementation based on simple clock gating,
+>> move it to arch/arm/common and initialize it from OMAP and SH-mobile.
+>> 
+>> Also, OMAP was the only user of platform_bus_set_pm_ops().  Now that
+>> it has been converted to device power domains, remove
+>> platform_bus_set_pm_ops().
 >
-> You're sure ? Sorry for being nitpicky there. "arm" vs. "asm", single
-> character typo.
+> Please, don't do it this way.
 >
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=arch/arm/kernel/entry-header.S;h=051166c2a932cfed1620bb3a5612383ffff12149;hb=HEAD#l4
->
-> says:
->
-> 4 #include <asm/assembler.h>
->
-> "grep -r arm/assembler.h" on my tree comes out empty.
->
-> Besides, without <linux/linkage.h> the ENTRY/ENDPROC aren't defined; where
-> does your environment pick them up from ? <asm/assembler.h> doesn't include
-> it.
+> First, we'll still need platform_bus_set_pm_ops() on shmobile and the reason
+> is that we want to override the platform bus type PM ops for _all_ devices on
+> that platform, which power domains are not really suitable for.
 
-Yup. <linux/linkage.h> is definitley needed too.
+That doesn't sound quite right to me.
 
->
->>
->>>
->>>
->>> [ ... ]
->>>>
->>>> Does that answer your concerns?
->>>
->>> I agree with you that this should be assembly, no arguing it's better to
->>> nip
->>> gcc's optimizer escapades in the bud ...
->>>
->>> The urgency I don't get, though; this code still looks a bit "hot".
->>
->> Well, I didn't say it was urgent... ?What do you mean by "hot"?
->
-> Not perfect ;-)
+Magnus should step in here to clarify the situation on SH-mobile, but
+like Grant, I'm pretty sure that we don't need (or want) to replace PM
+ops for _all_ platform devices.
 
-Ah, well that was perfectly true ;)
+Looking at the replacement ops used, they simply manage device clocks,
+and this probably only applies to on-chip devices (at least that's true
+on OMAP.)
 
-Take a look at the v2 I posted to the list this morning ... I believe
-it fixes all those issues.
+Replacing the PM ops for all devices was done on OMAP and SH-mobile
+because that was the only approach we had.  Now that we have device
+power domains (thanks Rafael!), we can be more selective about which
+devices to apply them to.
 
-Cheers
----Dave
+Note that my RFC patch/series did not do the selective part of deciding
+which devices to override and which ones not to, that part will be
+platform specific.  
+
+> Second, we're going to introduce code for handling real power domains for
+> shmobile that would conflict with the way you're using power domains for
+> overriding the default PM ops.
+
+Conflict in what way?
+
+If you have new device power domain callbacks for specific devices in a
+an on-chp power domain, they would just override the "default" ones that
+only do basic clock gating.  I'm guessing the new callbacks will do some
+management of the SoC specific powerdomains in addition to clock gating.
+That's how it works on OMAP.
+
+Put a different way, the device power domain callbacks in this proposal
+will be the defaults, providing a simple clock-gating only approach to
+device power management.   However, when new code comes along to manage
+the actual SoC power domains, devices in those power domains will just
+override these default clock-gating-only versions.
+
+This is exactly how things are working in OMAP.  On OMAP1, we use only
+the simple, clock-gating only callbacks because the OMAP1 PM
+capabilities are much more limited.  On OMAP2+, we override these
+callbacks with different ones that in addition to managing clocks, also
+manage the SoC power domains.
+
+> Besides, the way you've used power domains appears to assume that drivers
+> will not define their own runtime PM callbacks, because if they do, those
+> callbacks will be called _in_ _addition_ to the power domain callbacks you're
+> trying to add (from the default platform bus type callbacks).
+
+That was intentional.
+
+If all a driver needs to do for runtime PM is manage clocks, it doesn't
+need runtime PM callbacks since it's hanlded by core code.  If it has
+additional things to do (save context, quiesce hardware, wait for
+somthing to finish etc.) it can do that in it's own callbacks, and then
+the clock gating will happen in the device power domain callbacks.
+
+The point is use both levels of callbacks. The device power domain
+callbacks handle all the operations that are common to the device power
+domain, and the driver callbacks handle driver specific stuff.  
+
+It also means that drivers don't have to manage their own clocks, at
+least for PM purposes.  This is a big win for drivers that are used on
+multiple platforms, or even multiple SoCs in the same family where
+clocking may be different.  Drivers that can remain ignorant of the
+underlying clocking (and power domain layout) are much more portable.
+
+Kevin
