@@ -1,68 +1,446 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Thu, 07 Apr 2011 04:02:19 +0300
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <BANLkTinfM0QLFwcKZXfWQ_jNYfBJg_et-Q@mail.gmail.com>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
-	<op.vti9ote53ri7v4@arend-laptop>
-	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
-	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
-	<1302123428.20093.6.camel@maggie>
-	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
-	<1302124112.20093.11.camel@maggie>
-	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
-	<1302124737.27258.7.camel@dev.znau.edu.ua>
-	<BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
-	<1302134429.27258.32.camel@dev.znau.edu.ua>
-	<BANLkTinfM0QLFwcKZXfWQ_jNYfBJg_et-Q@mail.gmail.com>
-Message-ID: <1302138139.27258.35.camel@dev.znau.edu.ua>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Thu, 7 Apr 2011 06:46:03 +0530
+Subject: [PATCH 1/4] TI816X: prcm: Add module and register offsets
+In-Reply-To: <1301069982-8314-1-git-send-email-hemantp@ti.com>
+References: <1301069982-8314-1-git-send-email-hemantp@ti.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03747E0AAF@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-> W dniu 7 kwietnia 2011 02:00 u?ytkownik George Kashperko
-> <george@znau.edu.ua> napisa?:
-> > For PCI function description take a look at PCI specs or PCI
-> > configuration space description (e. g.
-> > http://en.wikipedia.org/wiki/PCI_configuration_space)
-> >
-> > Sorry for missleading short-ups, w11 - bcm80211 core, under two-head I
-> > mean ssb/axi with two functional cores on same interconnect (like w11
-> > +w11, not a lot of these exists I guess). Also there were some b43+b44
-> > on single PCI ssb host and those where implemented as ssb interconnect
-> > on multifunctional PCI host therefore providing separate access windows
-> > for each function.
-> >
-> > Might I mussunderstood something (its late night here at my place) when
-> > you where talking about using coreswitching involved for two drivers
-> > therefore I remembered about those functions. Seems now you were talking
-> > about chipcommon+b43 access sharing same window.
-> >
-> > As for core switching requirments for earlier SSB interconnects on PCI
-> > hosts where there were no direct chipcommon access, that one can be
-> > accomplished without spin_lock/mutex for b43 or b44 cores with proper
-> > bus design.
-> >
-> > AXI doesn't need spinlocks/mutexes as both chipcommon and pci bridge are
-> > available directly and b43 will be the only one requiring window access.
-> 
-> Ahh, so while talking about 4 windows, I guess you counted fixes
-> windows as well. That would be right, matching my knowledge.
-Nop, I mean sliding windows only.
+Pedanekar, Hemant wrote on Friday, March 25, 2011 9:50 PM:
 
-> 
-> When asking question about amount of cores we may want to use
-> simultaneously I didn't think about ChipCommon or PCIe. The real
-> problem would be to support for example two 802.11 cores and one
-> ethernet core at the same time. That gives us 3 cores while we have
-> only 2 sliding windows. But I would not care for that too much for
-> now.
-That will give us 3 PCI functions, each with own sliding windows.
+> This patch adds PRCM register offsets for TI816X device as
+> required for the
+> clock data.
+>
+> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+> ---
+>  arch/arm/mach-omap2/cm816x.h       |  228
+> ++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prm2xxx_3xxx.h |   17 +++
+>  2 files changed, 245 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/cm816x.h
+>
+> diff --git a/arch/arm/mach-omap2/cm816x.h
+> b/arch/arm/mach-omap2/cm816x.h
+> new file mode 100644
+> index 0000000..b1dbd3d
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/cm816x.h
+> @@ -0,0 +1,228 @@
+> +/*
+> + * TI816X CM register access macros. Also contains CM module offsets. + *
+> + * Copyright (C) 2010 Texas Instruments, Inc. - http://www.ti.com/ + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2. + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the
+> implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __ARCH_ARM_MACH_OMAP2_CM816X_H
+> +#define __ARCH_ARM_MACH_OMAP2_CM816X_H
+> +
+> +#include "prcm-common.h"
+> +
+> +#define TI816X_CM_REGADDR(module, reg)
+>               \
+> +     OMAP2_L4_IO_ADDRESS(TI816X_PRCM_BASE + (module) + (reg)) +
+> +/*
+> + * TI816X CM module offsets
+> + */
+> +
+> +#define TI816X_CM_DEVICE_MOD                 0x0100  /* 256B */
+> +#define TI816X_CM_DPLL_MOD                   0x0300  /* 256B */
+> +#define TI816X_CM_ACTIVE_MOD                 0x0400  /* 256B */
+> +#define TI816X_CM_DEFAULT_MOD                        0x0500
+> /* 256B */
+> +#define TI816X_CM_IVAHD0_MOD                 0x0600  /* 256B */
+> +#define TI816X_CM_IVAHD1_MOD                 0x0700  /* 256B */
+> +#define TI816X_CM_IVAHD2_MOD                 0x0800  /* 256B */
+> +#define TI816X_CM_SGX_MOD                    0x0900  /* 256B */
+> +#define TI816X_CM_ALWON_MOD                  0x1400  /* 1KB */
+> +
+> +/*
+> + * Clock domain register offsets - these are generally
+> CLKSTCTRL registers for
+> + * respective modules.
+> + */
+> +
+> +/* ALWON */
+> +#define TI816X_CM_ALWON_MPU_CLKDM            0x001C
+> +#define TI816X_CM_ALWON_L3_SLOW_CLKDM                0x0000
+> +#define TI816X_CM_ETHERNET_CLKDM             0x0004
+> +#define TI816X_CM_MMU_CLKDM                  0x000C
+> +#define TI816X_CM_MMUCFG_CLKDM                       0x0010
+> +
+> +/* ACTIVE */
+> +#define TI816X_CM_ACTIVE_GEM_CLKDM           0x0000
+> +
+> +/* IVAHD0 */
+> +#define TI816X_CM_IVAHD0_CLKDM                       0x0000
+> +
+> +/* IVAHD1 */
+> +#define TI816X_CM_IVAHD1_CLKDM                       0x0000
+> +
+> +/* IVAHD2 */
+> +#define TI816X_CM_IVAHD2_CLKDM                       0x0000
+> +
+> +/* SGX */
+> +#define TI816X_CM_SGX_CLKDM                  0x0000
+> +
+> +/* DEFAULT */
+> +#define TI816X_CM_DEFAULT_L3_MED_CLKDM               0x0004
+> +#define TI816X_CM_DEFAULT_DUCATI_CLKDM               0x0018
+> +#define TI816X_CM_DEFAULT_PCI_CLKDM          0x0010
+> +#define TI816X_CM_DEFAULT_L3_SLOW_CLKDM              0x0014
+> +
+> +/*
+> + * CM register addresses
+> + */
+> +
+> +/* CM_DPLL */
+> +#define TI816X_CM_DPLL_SYSCLK1_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0000)
+> +#define TI816X_CM_DPLL_SYSCLK2_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0004)
+> +#define TI816X_CM_DPLL_SYSCLK3_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0008)
+> +#define TI816X_CM_DPLL_SYSCLK4_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x000C)
+> +#define TI816X_CM_DPLL_SYSCLK5_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0010)
+> +#define TI816X_CM_DPLL_SYSCLK6_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0014)
+> +#define TI816X_CM_DPLL_SYSCLK7_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0018)
+> +#define TI816X_CM_DPLL_SYSCLK10_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0024)
+> +#define TI816X_CM_DPLL_SYSCLK11_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x002C)
+> +#define TI816X_CM_DPLL_SYSCLK12_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0030)
+> +#define TI816X_CM_DPLL_SYSCLK13_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0034)
+> +#define TI816X_CM_DPLL_SYSCLK15_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0038)
+> +#define TI816X_CM_DPLL_VPB3_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0040)
+> +#define TI816X_CM_DPLL_VPC1_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0044)
+> +#define TI816X_CM_DPLL_VPD1_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0048)
+> +#define TI816X_CM_DPLL_SYSCLK19_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x004C)
+> +#define TI816X_CM_DPLL_SYSCLK20_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0050)
+> +#define TI816X_CM_DPLL_SYSCLK21_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0054)
+> +#define TI816X_CM_DPLL_SYSCLK22_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0058)
+> +#define TI816X_CM_DPLL_APA_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x005C)
+> +#define TI816X_CM_DPLL_SYSCLK14_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0070)
+> +#define TI816X_CM_DPLL_SYSCLK16_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0074)
+> +#define TI816X_CM_DPLL_SYSCLK18_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0078)
+> +#define TI816X_CM_DPLL_AUDIOCLK_MCASP0_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x007C)
+> +#define TI816X_CM_DPLL_AUDIOCLK_MCASP1_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0080)
+> +#define TI816X_CM_DPLL_AUDIOCLK_MCASP2_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0084)
+> +#define TI816X_CM_DPLL_AUDIOCLK_MCBSP_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0088)
+> +#define TI816X_CM_DPLL_TIMER1_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0090)
+> +#define TI816X_CM_DPLL_TIMER2_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0094)
+> +#define TI816X_CM_DPLL_TIMER3_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x0098)
+> +#define TI816X_CM_DPLL_TIMER4_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x009C)
+> +#define TI816X_CM_DPLL_TIMER5_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00A0)
+> +#define TI816X_CM_DPLL_TIMER6_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00A4)
+> +#define TI816X_CM_DPLL_TIMER7_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00A8)
+> +#define TI816X_CM_DPLL_HDMI_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00AC)
+> +#define TI816X_CM_DPLL_SYSCLK23_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00B0)
+> +#define TI816X_CM_DPLL_SYSCLK24_CLKSEL
+> TI816X_CM_REGADDR(TI816X_CM_DPLL_MOD, 0x00B4)
+> +
+> +/* CM_DEFAULT */
+> +#define TI816X_CM_DEFAULT_L3_MED_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0004)
+> +#define TI816X_CM_DEFAULT_L3_FAST_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0008)
+> +#define TI816X_CM_DEFAULT_TPPSS_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x000C)
+> +#define TI816X_CM_DEFAULT_PCI_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0010)
+> +#define TI816X_CM_DEFAULT_L3_SLOW_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0014)
+> +#define TI816X_CM_DEFAULT_DUCATI_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0018)
+> +#define TI816X_CM_DEFAULT_EMIF_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0020)
+> +#define TI816X_CM_DEFAULT_EMIF_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0024)
+> +#define TI816X_CM_DEFAULT_DMM_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0028)
+> +#define TI816X_CM_DEFAULT_FW_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x002C)
+> +#define TI816X_CM_DEFAULT_TPPSS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0054)
+> +#define TI816X_CM_DEFAULT_USB_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0058)
+> +#define TI816X_CM_DEFAULT_SATA_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0060)
+> +#define TI816X_CM_DEFAULT_DUCATI_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0074)
+> +#define TI816X_CM_DEFAULT_PCI_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_DEFAULT_MOD, 0x0078)
+> +
+> +/* CM_IVAHD0 */
+> +#define TI816X_CM_IVAHD0_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD0_MOD, 0x0000)
+> +#define TI816X_CM_IVAHD0_IVAHD_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD0_MOD, 0x0020)
+> +#define TI816X_CM_IVAHD0_SL2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD0_MOD, 0x0024)
+> +
+> +/* CM_IVAHD1 */
+> +#define TI816X_CM_IVAHD1_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD1_MOD, 0x0000)
+> +#define TI816X_CM_IVAHD1_IVAHD_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD1_MOD, 0x0020)
+> +#define TI816X_CM_IVAHD1_SL2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD1_MOD, 0x0024)
+> +
+> +/* CM_IVAHD2 */
+> +#define TI816X_CM_IVAHD2_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD2_MOD, 0x0000)
+> +#define TI816X_CM_IVAHD2_IVAHD_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD2_MOD, 0x0020)
+> +#define TI816X_CM_IVAHD2_SL2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_IVAHD2_MOD, 0x0024)
+> +
+> +/* CM_SGX */
+> +#define TI816X_CM_SGX_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_SGX_MOD, 0x0000)
+> +#define TI816X_CM_SGX_SGX_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_SGX_MOD, 0x0020)
+> +
+> +/* CM_ALWON */
+> +#define TI816X_CM_ALWON_L3_SLOW_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0000)
+> +#define TI816X_CM_ETHERNET_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0004)
+> +#define TI816X_CM_ALWON_L3_MED_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0008)
+> +#define TI816X_CM_MMU_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x000C)
+> +#define TI816X_CM_MMUCFG_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0010)
+> +#define TI816X_CM_ALWON_OCMC_0_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0014)
+> +#define TI816X_CM_ALWON_OCMC_1_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0018)
+> +#define TI816X_CM_ALWON_MPU_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x001C)
+> +#define TI816X_CM_ALWON_SYSCLK4_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0020)
+> +#define TI816X_CM_ALWON_SYSCLK5_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0024)
+> +#define TI816X_CM_ALWON_SYSCLK6_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0028)
+> +#define TI816X_CM_ALWON_RTC_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x002C)
+> +#define TI816X_CM_ALWON_L3_FAST_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0030)
+> +#define TI816X_CM_ALWON_MCASP0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0140)
+> +#define TI816X_CM_ALWON_MCASP1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0144)
+> +#define TI816X_CM_ALWON_MCASP2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0148)
+> +#define TI816X_CM_ALWON_MCBSP_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x014C)
+> +#define TI816X_CM_ALWON_UART_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0150)
+> +#define TI816X_CM_ALWON_UART_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0154)
+> +#define TI816X_CM_ALWON_UART_2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0158)
+> +#define TI816X_CM_ALWON_GPIO_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x015C)
+> +#define TI816X_CM_ALWON_GPIO_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0160)
+> +#define TI816X_CM_ALWON_I2C_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0164)
+> +#define TI816X_CM_ALWON_I2C_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0168)
+> +#define TI816X_CM_ALWON_TIMER_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x016C)
+> +#define TI816X_CM_ALWON_TIMER_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0170)
+> +#define TI816X_CM_ALWON_TIMER_2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0174)
+> +#define TI816X_CM_ALWON_TIMER_3_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0178)
+> +#define TI816X_CM_ALWON_TIMER_4_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x017C)
+> +#define TI816X_CM_ALWON_TIMER_5_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0180)
+> +#define TI816X_CM_ALWON_TIMER_6_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0184)
+> +#define TI816X_CM_ALWON_TIMER_7_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0188)
+> +#define TI816X_CM_ALWON_WDTIMER_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x018C)
+> +#define TI816X_CM_ALWON_SPI_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0190)
+> +#define TI816X_CM_ALWON_MAILBOX_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0194)
+> +#define TI816X_CM_ALWON_SPINBOX_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0198)
+> +#define TI816X_CM_ALWON_MMUDATA_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x019C)
+> +#define TI816X_CM_ALWON_VLYNQ_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01A0)
+> +#define TI816X_CM_ALWON_MMUCFG_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01A8)
+> +#define TI816X_CM_ALWON_SDIO_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01B0)
+> +#define TI816X_CM_ALWON_OCMC_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01B4)
+> +#define TI816X_CM_ALWON_OCMC_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01B8)
+> +#define TI816X_CM_ALWON_SMARTCARD_0_CLKCTR
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01BC)
+> +#define TI816X_CM_ALWON_SMARTCARD_1_CLKCTR
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01C0)
+> +#define TI816X_CM_ALWON_CONTROL_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01C4)
+> +#define TI816X_CM_ALWON_SECSS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01C8)
+> +#define TI816X_CM_ALWON_GPMC_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01D0)
+> +#define TI816X_CM_ALWON_ETHERNET_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01D4)
+> +#define TI816X_CM_ALWON_ETHERNET_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01D8)
+> +#define TI816X_CM_ALWON_MPU_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01DC)
+> +#define TI816X_CM_ALWON_DEBUGSS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01E0)
+> +#define TI816X_CM_ALWON_L3_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01E4)
+> +#define TI816X_CM_ALWON_L4HS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01E8)
+> +#define TI816X_CM_ALWON_L4LS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01EC)
+> +#define TI816X_CM_ALWON_RTC_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01F0)
+> +#define TI816X_CM_ALWON_TPCC_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01F4)
+> +#define TI816X_CM_ALWON_TPTC0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01F8)
+> +#define TI816X_CM_ALWON_TPTC1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x01FC)
+> +#define TI816X_CM_ALWON_TPTC2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0200)
+> +#define TI816X_CM_ALWON_TPTC3_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0204)
+> +#define TI816X_CM_ALWON_SR_0_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0208)
+> +#define TI816X_CM_ALWON_SR_1_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x020C)
+> +#define TI816X_CM_ALWON_SR_2_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0210)
+> +#define TI816X_CM_ALWON_SR_3_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0214)
+> +#define TI816X_CM_ALWON_SR_4_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0218)
+> +#define TI816X_CM_ALWON_SR_5_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x021C)
+> +#define TI816X_CM_ALWON_SR_6_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0220)
+> +#define TI816X_CM_ALWON_SR_7_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0224)
+> +#define TI816X_CM_ALWON_CUST_EFUSE_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ALWON_MOD, 0x0228)
+> +
+> +#define TI816X_CM_ACTIVE_GEM_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0000)
+> +#define TI816X_CM_ACTIVE_HDDSS_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0004)
+> +#define TI816X_CM_ACTIVE_HDMI_CLKSTCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0008)
+> +#define TI816X_CM_ACTIVE_GEM_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0020)
+> +#define TI816X_CM_ACTIVE_HDDSS_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0024)
+> +#define TI816X_CM_ACTIVE_HDMI_CLKCTRL
+> TI816X_CM_REGADDR(TI816X_CM_ACTIVE_MOD, 0x0028)
+> +
+> +#endif
+> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> index a1fc62a..94d28d0 100644
+> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+> @@ -5,6 +5,9 @@
+>   * Copyright (C) 2008-2010 Nokia Corporation
+>   * Paul Walmsley
+>   *
+> + * Added TI86X PRM module offsets as most of the operations
+> fit with OMAP3.
+> + * Hemant Pedanekar (hemantp at ti.com)
+> + *
+>   * This program is free software; you can redistribute it
+> and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+> @@ -226,6 +229,20 @@
+>  #define OMAP3430_PRM_IRQSTATUS_IVA2                  0x00f8
+>  #define OMAP3430_PRM_IRQENABLE_IVA2                  0x00fc
+>
+> +/*
+> + * TI816X PRM module offsets
+> + */
+> +
+> +#define TI816X_PRM_DEVICE_MOD                        0x0000
+> /* 256B */
+> +#define TI816X_PRM_OCP_SOCKET_MOD            0x0200  /* 256B */
+> +#define TI816X_PRM_ACTIVE_MOD                        0x0a00
+> /* 256B */
+> +#define TI816X_PRM_DEFAULT_MOD                       0x0b00
+> /* 256B */
+> +#define TI816X_PRM_IVAHD0_MOD                        0x0c00
+> /* 256B */
+> +#define TI816X_PRM_IVAHD1_MOD                        0x0d00
+> /* 256B */
+> +#define TI816X_PRM_IVAHD2_MOD                        0x0e00
+> /* 256B */
+> +#define TI816X_PRM_SGX_MOD                   0x0f00  /* 256B */
+> +#define TI816X_PRM_ALWON_MOD                 0x1800  /* 1KB */
+> +
+>
+>  #ifndef __ASSEMBLER__
+>  /*
 
-> 
-> For the rest (PCI function) I have to sleep before reading specs ;)
-> 
-
-Have nice day,
-George
+Can you please provide comments on this series?
+Thanks.
+   Hemant
