@@ -1,31 +1,32 @@
 From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 7 Apr 2011 09:29:57 +0200
-Subject: [PATCHv5 1/3] ARM: Translate delay.S into (mostly) C
-In-Reply-To: <1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 7 Apr 2011 09:30:15 +0200
+Subject: [PATCHv5 2/3] ARM: Allow machines to override __delay()
+In-Reply-To: <1302047800-26720-3-git-send-email-sboyd@codeaurora.org>
 References: <1302047800-26720-1-git-send-email-sboyd@codeaurora.org>
-	<1302047800-26720-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4D9D67F5.8030703@stericsson.com>
+	<1302047800-26720-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <4D9D6807.40800@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/06/2011 01:56 AM, Stephen Boyd wrote:
-> We want to allow machines to override the __delay() implementation
-> at runtime so they can use a timer based __delay() routine. It's
-> easier to do this using C, so let's write udelay and friends in C.
+> Some machines want to implement their own __delay() routine based
+> on fixed rate timers. Expose functionality to set the __delay()
+> routine at runtime. This should allow two machines with different
+> __delay() routines to happily co-exist within the same kernel
+> with minimal overhead.
 >
-> We lose the #if 0 code, which according to Russell is used "to
-> make the delay loop more stable and predictable on older CPUs"
-> (seehttp://article.gmane.org/gmane.linux.kernel/888867  for more
-> info). We shouldn't be too worried though, since we'll soon add
-> functionality allowing a machine to set the __delay() loop
-> themselves, thus allowing machines to resurrect the commented out
-> code should they need it.
+> Russell expressed concern that using a timer based __delay()
+> would cause problems when an iomapped device isn't mapped in
+> prior to a delay call being made (see
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/78543  for
+> more info). We can sidestep that issue with this approach since
+> the __delay() routine_should_  only be pointed to a timer based
+> delay once the timer has been properly mapped. Up until that
+> point __delay() and udelay() will use delay_loop() which is
+> always safe to call.
 >
-> Nicolas expressed concern that fixed lpj cmdlines will break due to
-> compiler optimizations. That doesn't seem to be the case since
-> before and after this patch I get the same lpj value when running
-> my CPU at 19.2 MHz. That should be sufficiently slow enough to
-> cover any machine running Linux.
+> This patch is inspired by x86's delay.c
+>
 
 Tested-by: Mattias Wallin <mattias.wallin@stericsson.com>
 
