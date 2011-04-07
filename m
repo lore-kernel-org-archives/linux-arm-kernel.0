@@ -1,70 +1,78 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 7 Apr 2011 17:54:27 +0800
-Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
-	pandaboard
-In-Reply-To: <4D9D7E8E.7020200@linux.vnet.ibm.com>
-References: <4D95E244.1050400@linux.vnet.ibm.com>
-	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
-	<4D99D251.6000901@linux.vnet.ibm.com>
-	<BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
-	<4D99EB4B.3020303@linux.vnet.ibm.com>
-	<BANLkTinQ-QQ7zu2KrhhhdWwnzo=a-KynoQ@mail.gmail.com>
-	<4D9AF790.7010504@linux.vnet.ibm.com>
-	<BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
-	<4D9D7E8E.7020200@linux.vnet.ibm.com>
-Message-ID: <BANLkTinzr300_4AM9kJO-NVXx7zPj8GYVg@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 7 Apr 2011 11:55:03 +0200
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <1302162886.10725.4.camel@maggie>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop>
+	<BANLkTinubrmryu=Bco5_AVcj_arn7SWZxw@mail.gmail.com>
+	<op.vti9ote53ri7v4@arend-laptop>
+	<BANLkTin-u=U_-cUH9oCco0LjEBuQmh4wag@mail.gmail.com>
+	<BANLkTi=x89+52cMeutOB7J--QQta+mX_wg@mail.gmail.com>
+	<1302123428.20093.6.camel@maggie>
+	<BANLkTimGSoYzp0Z4vyCS_H5PDKhgjYuLBA@mail.gmail.com>
+	<1302124112.20093.11.camel@maggie>
+	<BANLkTik76dwwnmmPzXL9Kkk7fdt01QPzZA@mail.gmail.com>
+	<1302124737.27258.7.camel@dev.znau.edu.ua>
+	<BANLkTi=4-LgrkjG96+Ar3SjMOsKh-dMuLg@mail.gmail.com>
+	<1302134429.27258.32.camel@dev.znau.edu.ua>
+	<BANLkTinfM0QLFwcKZXfWQ_jNYfBJg_et-Q@mail.gmail.com>
+	<1302162886.10725.4.camel@maggie>
+Message-ID: <BANLkTim30i8kBkvsSvmWxQaNxWkfMjhOZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Avik,
-
-Please check if the option CONFIG_PM is enabled or not.
-
-If not, please try to enable it to see you issue can be fixed.
-
-
-2011/4/7 Avik Sil <aviksil@linux.vnet.ibm.com>:
-> Hi Ming,
->
-> On Wednesday 06 April 2011 11:37 AM, Ming Lei wrote:
+W dniu 7 kwietnia 2011 09:54 u?ytkownik Michael B?sch <mb@bu3sch.de> napisa?:
+> On Thu, 2011-04-07 at 02:54 +0200, Rafa? Mi?ecki wrote:
+>> W dniu 7 kwietnia 2011 02:00 u?ytkownik George Kashperko
+>> <george@znau.edu.ua> napisa?:
+>> > For PCI function description take a look at PCI specs or PCI
+>> > configuration space description (e. g.
+>> > http://en.wikipedia.org/wiki/PCI_configuration_space)
+>> >
+>> > Sorry for missleading short-ups, w11 - bcm80211 core, under two-head I
+>> > mean ssb/axi with two functional cores on same interconnect (like w11
+>> > +w11, not a lot of these exists I guess). Also there were some b43+b44
+>> > on single PCI ssb host and those where implemented as ssb interconnect
+>> > on multifunctional PCI host therefore providing separate access windows
+>> > for each function.
+>> >
+>> > Might I mussunderstood something (its late night here at my place) when
+>> > you where talking about using coreswitching involved for two drivers
+>> > therefore I remembered about those functions. Seems now you were talking
+>> > about chipcommon+b43 access sharing same window.
+>> >
+>> > As for core switching requirments for earlier SSB interconnects on PCI
+>> > hosts where there were no direct chipcommon access, that one can be
+>> > accomplished without spin_lock/mutex for b43 or b44 cores with proper
+>> > bus design.
+>> >
+>> > AXI doesn't need spinlocks/mutexes as both chipcommon and pci bridge are
+>> > available directly and b43 will be the only one requiring window access.
 >>
->> Hi Avik,
+>> Ahh, so while talking about 4 windows, I guess you counted fixes
+>> windows as well. That would be right, matching my knowledge.
 >>
->> 2011/4/5 Avik Sil<aviksil@linux.vnet.ibm.com>:
->>>
->>> Even after using ioremapped addresses in omap_writel() I'm getting the
->>> oops.
->>> Can you please point me to the location in mainline, where these l3
->>> clocks
->>> are enabled?
->>
->> I guess you can find here:
->>
->> ? ? ? ? ?l3_main_3_ick&& ?l3_instr_ick:
->> arch/arm/mach-omap2/clock44xx_data.c
->>
->> the clocks are set as ENABLE_ON_INIT.
+>> When asking question about amount of cores we may want to use
+>> simultaneously I didn't think about ChipCommon or PCIe. The real
+>> problem would be to support for example two 802.11 cores and one
+>> ethernet core at the same time. That gives us 3 cores while we have
+>> only 2 sliding windows.
 >
-> Those clocks are also set ENABLE_ON_INIT in the linaro kernel. But still
-> it's hanging at "val = __raw_readl(base + LOCKSTATUS);" in cti_unlock(),
-> even after explicitly enabling it using:
+> Would that really be a problem? Think of it. This combination
+> will only be available on embedded devices. But do we have windows
+> on embedded devices? I guess not. If AXI is similar to SSB, the MMIO
+> of all cores will always be mapped. So accesses can be done
+> without switch or lock.
 >
-> omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
-> omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
-> omap_writel(2, CM_EMU_CLKSTCTRL);
-> while ((omap_readl(CM_EMU_CLKSTCTRL) & 0x300) != 0x300);
->
-> BTW, the oops were fixed by replacing omap_writel with __raw_writel.
->
-> Regards,
-> Avik
->
->>
->> thanks,
->
->
+> I do really think that engineers at broadcom are clever enough
+> to design a hardware that does not require expensive window sliding
+> all the time while operating.
 
+I also think so. When asking about amount of cores (non PCIe, non
+ChipCommon) which has to work simultaneously. I'm not sure if we will
+meet AI board with 2 cores (non PCIe, non ChipCommon) on PCIe host. I
+don't think we will see more than 2 cores (non PCIe, non ChipCommon)
+on PCIe host.
 
-thanks,
 -- 
-Ming Lei
+Rafa?
