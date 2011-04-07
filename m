@@ -1,80 +1,52 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Thu, 07 Apr 2011 11:05:22 +0900
-Subject: [alsa-devel] [PATCH 3/3] SoC: SAMSUNG: Add WM8580 PCM	Machine
-	driver
-In-Reply-To: <20110407011704.GA21071@sirena.org.uk>
-References: <1302136270-28776-1-git-send-email-sbkim73@samsung.com>
-	<1302136270-28776-4-git-send-email-sbkim73@samsung.com>
-	<20110407011704.GA21071@sirena.org.uk>
-Message-ID: <041801cbf4c8$51ca7390$f55f5ab0$@com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 06 Apr 2011 22:55:30 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
+	basis of the memory size.
+In-Reply-To: <4D9CF5B3.9020007@ahsoftware.de>
+References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
+	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
+	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
+	<4D9CED15.2010806@ahsoftware.de>
+	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
+	<4D9CF5B3.9020007@ahsoftware.de>
+Message-ID: <alpine.LFD.2.00.1104062228410.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, 7 Apr 2011, Alexander Holler wrote:
 
-
-On Thu, Apr 07, 2011 at 10:17:10AM +0900, Mark Brown wrote:
-
-> > +config SND_SOC_SAMSUNG_SMDK_WM8580_PCM
-> > +	tristate
-> > +
+> > > So I don't think this in any way a fragile hack.
+> > 
+> > Determining a machine type based on its amount of RAM is fragile, ugly
+> > and sets up a bad example for even more hacky tricks like this to crop
+> > up. If someone is experimenting with his SheevaPlug by giving different
+> > memory information in the kernel cmdline e.g. to create memory holes in
+> > order to test some memory allocator changes, then the kernel may think
+> > that it is not running on a SheevaPlug but a DockStar, and the resulting
+> > behavior will certainly be unexpected.
 > 
-> What is the purpose of this variable?  Just the config for the machine
-> should be enough.
-Ok, I will remove it and use machine config.
+> People doing such should now what they do. And the pr_info() in the
+> "abomination" should be enough to give those experimenters a hint (if it is
+> missing or new).
 
-> 
-> > @@ -1,12 +1,12 @@
-> > -# S3c24XX Platform Support
-> > +# SAMSUNG Platform Support
-> >  snd-soc-s3c24xx-objs := dma.o
-> >  snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
-> >  snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
-> >  snd-soc-ac97-objs := ac97.o
-> >  snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
-> >  snd-soc-samsung-spdif-objs := spdif.o
-> > -snd-soc-pcm-objs := pcm.o
-> > -snd-soc-i2s-objs := i2s.o
-> > +snd-soc-samsung-pcm-objs := pcm.o
-> > +snd-soc-samsung-i2s-objs := i2s.o
-> 
-> These changes all look reasonable but they're unrelated to adding the
-> machine driver and should be split out.
-Ok, I will split out.
+They shouldn't have to.  We have a well defined system to identify 
+machines/platforms with a unique number already.  It is completely 
+unambiguous.  What you're proposing is to break that system.
 
-> 
-> > diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
-> > index 38aac7d..9c7e8b4 100644
-> > --- a/sound/soc/samsung/pcm.c
-> > +++ b/sound/soc/samsung/pcm.c
-> > @@ -350,8 +350,8 @@ static int s3c_pcm_set_fmt(struct snd_soc_dai
-> *cpu_dai,
-> >  	ctl = readl(regs + S3C_PCM_CTL);
-> >
-> >  	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
-> > -	case SND_SOC_DAIFMT_NB_NF:
-> > -		/* Nothing to do, NB_NF by default */
-> > +	case SND_SOC_DAIFMT_IB_NF:
-> > +		/* Nothing to do, IB_NF by default */
-> >  		break;
-> 
-> Similarly here, this is a bug fix so should be merged for 2.6.39.
-I will submit another bug fix patch for this.
+The proper way to go about this rationalization is to move that stuff 
+over to device tree.
 
+> > > Anyway, it was just a suggestion.
+> > 
+> > Better luck next time.
 > 
-> > +	smdk_snd_device = platform_device_alloc("soc-audio", -1);
-> > +	if (!smdk_snd_device)
-> > +		return -ENOMEM;
-> 
-> Please use snd_soc_register_card() for new machines rather than the
-> soc-audio device.  Otherwise the actual driver itself looks good.
-Ok I will apply it.
+> Sorry, I don't feel the need to waste my time prodcuing patches to get them
+> called "abominations". Which means my willingness to post further patches just
+> got below zero.
 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+I'm sorry if you feel like that.  You shouldn't take this too personal.  
+It is not like if I qualified _you_ as a moron and a pariah (yes this 
+happened to me last week from our master penguin himself).
 
 
-Thanks and Regards,
-SB Kim
+Nicolas
