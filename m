@@ -1,42 +1,60 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Thu, 7 Apr 2011 12:15:50 +0530
-Subject: [PATCH 2/2 v2] OMAP2/3: hwmod: fix gpio-reset timeouts seen
-	during bootup.
-In-Reply-To: <BANLkTikwyk6b+d-QAz5LxuU_Lxgo4-A-hg@mail.gmail.com>
-References: <1302018015-8858-1-git-send-email-avinashhm@ti.com>
-	<1302018015-8858-3-git-send-email-avinashhm@ti.com>
-	<BANLkTikwyk6b+d-QAz5LxuU_Lxgo4-A-hg@mail.gmail.com>
-Message-ID: <20110407064550.GA19781@avinash-laptop>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 7 Apr 2011 15:07:53 +0800
+Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
+	device accesses
+In-Reply-To: <1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
+References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
+	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2011 at 11:28:00AM +0530, Gulati, Shweta wrote:
-> Hi,
-> 
-> On Tue, Apr 5, 2011 at 9:10 PM, Avinash.H.M <avinashhm@ti.com> wrote:
-> > GPIO module expects the debounce clocks to be enabled during reset. It doesn't
-> > reset properly and timeouts are seen, if this clock isn't enabled during
-> > reset. Add the HWMOD_CONTROL_OPT_CLKS_IN_RESET flags to the GPIO HWMODs, with
-> > which the debounce clocks are enabled during reset.
-> Minor comment,
-> Rephrase as " GPIO module doesn't reset properly and timeouts are seen
-> during bootup, if
-> debounce clock is not enabled"
-> to make commit log more clear.
+Hi Catalin,
+
+2011/3/29 Catalin Marinas <catalin.marinas@arm.com>:
+> On Tue, 2011-03-29 at 16:02 +0100, Martin Furmanski wrote:
+>> Do you have a reference on this?
+>
+> Usually the ARM ARM but a document with examples is this:
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
+
+After glancing over the above, I find DSB is only applied in the WFE/WFI
+example in section 6, but all other examples in this section do use DMB.
+
+So could you point out which example is the reference for the mandatory DSB
+wrt. read memory barrier?
+
+> (infocenter.arm.com -> Developer Guides and Articles -> ARM architecture
+> -> Barrier Litmus and Tests Cookbook)
+>
+>> I have been under the impression that DMB is a barrier for all memory
+>> accesses. I find no support in ARMv7, for the hypothesis that DSB is
+>> needed to order between Device and Normal.
+>
+> The key point is that DMB only ensures the *observability* of memory
+> accesses by the processors and not arrival to the device or block of
+
+How could you conclude that the memory accesses order is different with
+the order of memory requests observed on the same type of memory?
+
+> memory. In the drawing below, DMB only ensures the ordering at point
+> (1). For arrival to RAM or Device you need a DSB.
+>
+> ? ? ? +------+ ? ? +------+
+> ? ? ? | ?P1 ?| ? ? | ?P2 ?|
+> ? ? ? +------+ ? ? +------+
+> ? ? ? ? ?| ? ? (1) ? ? |
+> ? ? ? ? ?+------+------+
+> ? ? ? ? ? ? ? ? |
+> ? +-------------+-------------+
+> ? | ? ? ? ? ? ? | ? ? ? ? ? ? |
+> +------+ ? ? +------+ ? ? +--------+
+> | RAM1 | ? ? | RAM2 | ? ? | Device |
+> +------+ ? ? +------+ ? ? +--------+
 
 
-Hi Shweta ,
-
-thanks for the review.
-
-i will fix the rephrase the change log .
-
-br ,
-
-- avinash
-
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Signed-off-by: Avinash.H.M <avinashhm@ti.com>
+thanks,
+-- 
+Ming Lei
