@@ -1,129 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Apr 2011 11:01:25 +0200
-Subject: [PATCH] ARM: Allow for kernel command line concatenation
-In-Reply-To: <1302164236-1516-1-git-send-email-oskar.andero@sonyericsson.com>
-References: <1302164236-1516-1-git-send-email-oskar.andero@sonyericsson.com>
-Message-ID: <20110407090125.GH13963@pengutronix.de>
+From: aviksil@linux.vnet.ibm.com (Avik Sil)
+Date: Thu, 07 Apr 2011 14:36:22 +0530
+Subject: arm: pmu: support pmu/perf on OMAP4 - booting problem on
+	pandaboard
+In-Reply-To: <BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
+References: <4D95E244.1050400@linux.vnet.ibm.com>
+	<BANLkTi=nOR=yX=QgbyCoYUE1U7DPxUCCzw@mail.gmail.com>
+	<4D99D251.6000901@linux.vnet.ibm.com>
+	<BANLkTikmC_OT5TsN_jfVoUjvvcSsR2p3HA@mail.gmail.com>
+	<4D99EB4B.3020303@linux.vnet.ibm.com>
+	<BANLkTinQ-QQ7zu2KrhhhdWwnzo=a-KynoQ@mail.gmail.com>
+	<4D9AF790.7010504@linux.vnet.ibm.com>
+	<BANLkTikxu3DaxWZ88wgCP2cCZD=kNm-YeQ@mail.gmail.com>
+Message-ID: <4D9D7E8E.7020200@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2011 at 10:17:16AM +0200, oskar.andero at sonyericsson.com wrote:
-> From: Victor Boivie <victor.boivie@sonyericsson.com>
-> 
-> This patch allows the provided CONFIG_CMDLINE to be concatenated
-> with the one provided by the boot loader. This is useful to
-> merge the static values defined in CONFIG_CMDLINE with the
-> boot loader's (possibly) more dynamic values, such as startup
-> reasons and more.
-> 
-> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
-> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
-> ---
->  arch/arm/Kconfig        |   21 +++++++++++++++++++--
->  arch/arm/kernel/setup.c |    9 ++++++++-
->  2 files changed, 27 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5b9f78b..71b35e6 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1743,6 +1743,24 @@ config CMDLINE
->  	  time by entering them here. As a minimum, you should specify the
->  	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
->  
-> +choice
-> +	prompt "Kernel command line type"
-> +	default CMDLINE_DEFAULT
-I'm not sure this works, but maybe use:
+Hi Ming,
 
-	choice
-		prompt "Kernel command line type" if CMDLINE != ""
-		default CMDLINE_DEFAULT
+On Wednesday 06 April 2011 11:37 AM, Ming Lei wrote:
+> Hi Avik,
+>
+> 2011/4/5 Avik Sil<aviksil@linux.vnet.ibm.com>:
+>> Even after using ioremapped addresses in omap_writel() I'm getting the oops.
+>> Can you please point me to the location in mainline, where these l3 clocks
+>> are enabled?
+>
+> I guess you can find here:
+>
+>           l3_main_3_ick&&  l3_instr_ick: arch/arm/mach-omap2/clock44xx_data.c
+>
+> the clocks are set as ENABLE_ON_INIT.
 
-and then remove the explicit
+Those clocks are also set ENABLE_ON_INIT in the linaro kernel. But still 
+it's hanging at "val = __raw_readl(base + LOCKSTATUS);" in cti_unlock(), 
+even after explicitly enabling it using:
 
-	depends on CMDLINE != ""
+omap_writel(1, CM_L3INSTR_L3_3_CLKCTRL);
+omap_writel(1, CM_L3INSTR_L3_INSTR_CLKCTRL);
+omap_writel(2, CM_EMU_CLKSTCTRL);
+while ((omap_readl(CM_EMU_CLKSTCTRL) & 0x300) != 0x300);
 
-from the options. This might hide the choice from the user if there is
-only a single option to choose.
+BTW, the oops were fixed by replacing omap_writel with __raw_writel.
 
-Best regards
-Uwe
+Regards,
+Avik
 
-> +
-> +config CMDLINE_DEFAULT
-> +	bool "Use bootloader kernel arguments if available"
-> +	help
-> +	  Uses the command-line options passed by the boot loader. If
-> +	  the boot loader doesn't provide any, the default kernel command
-> +	  string provided in CMDLINE will be used.
-"CMDLINE_DEFAULT" isn't a good name IMHO. It conflicts with
-
-	config CMDLINE
-		string "Default kernel command string"
-
-Maybe better use CMDLINE_FROM_BOOTLOADER or similar?
-
-> +
-> +config CMDLINE_EXTEND
-> +	bool "Extend bootloader kernel arguments"
-> +	depends on CMDLINE != ""
-> +	help
-> +	  The default kernel command string will be concatenated with the
-> +	  arguments provided by the boot loader.
-> +
->  config CMDLINE_FORCE
->  	bool "Always use the default kernel command string"
->  	depends on CMDLINE != ""
-> @@ -1751,8 +1769,7 @@ config CMDLINE_FORCE
->  	  loader passes other arguments to the kernel.
->  	  This is useful if you cannot or don't want to change the
->  	  command-line options your boot loader passes to the kernel.
-> -
-> -	  If unsure, say N.
-> +endchoice
->  
->  config XIP_KERNEL
->  	bool "Kernel Execute-In-Place from ROM"
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 006c1e8..465bc7e 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -673,7 +673,14 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
->  static int __init parse_tag_cmdline(const struct tag *tag)
->  {
->  #ifndef CONFIG_CMDLINE_FORCE
-> -	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
-> +#ifdef CONFIG_CMDLINE_EXTEND
-> +	strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
-> +	strlcat(default_command_line, tag->u.cmdline.cmdline,
-> +		COMMAND_LINE_SIZE);
-> +#else
-> +	strlcpy(default_command_line, tag->u.cmdline.cmdline,
-> +		COMMAND_LINE_SIZE);
-> +#endif
->  #else
->  	pr_warning("Ignoring tag cmdline (using the default kernel command line)\n");
->  #endif /* CONFIG_CMDLINE_FORCE */
-> -- 
-> 1.7.4.2
-I would prefer
-
-	#ifdef CONFIG_CMDLINE_DEFAULT
-		strlcpy(default_command_line, tag->u.cmdline.cmdline,
-			COMMAND_LINE_SIZE);
-	#elif CONFIG_CMDLINE_EXTEND
-		...
-	#else /* CMDLINE_FORCE */
-		...
-	#endif
-
-as it is easier to parse for a human.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> thanks,
