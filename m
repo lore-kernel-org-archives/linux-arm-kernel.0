@@ -1,8 +1,8 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 07 Apr 2011 23:31:08 +0200
-Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
-	basis of the memory size.
-In-Reply-To: <toa078-0do.ln1@chipmunk.wormnet.eu>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Thu, 7 Apr 2011 22:44:57 +0100
+Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on
+	the basis of the memory size.
+In-Reply-To: <4D9E2D1C.7070102@ahsoftware.de>
 References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
 	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
 	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
@@ -10,42 +10,38 @@ References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
 	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
 	<4D9CF5B3.9020007@ahsoftware.de>
 	<toa078-0do.ln1@chipmunk.wormnet.eu>
-Message-ID: <4D9E2D1C.7070102@ahsoftware.de>
+	<4D9E2D1C.7070102@ahsoftware.de>
+Message-ID: <20110407214457.GH26616@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.04.2011 10:55, schrieb Alexander Clouter:
-> In gmane.linux.kernel Alexander Holler<holler@ahsoftware.de>  wrote:
->>
->> Sorry, I don't feel the need to waste my time prodcuing patches to get
->> them called "abominations". Which means my willingness to post further
->> patches just got below zero.
->>
-> In a posting from Nico before you got offended it was explained to you
-> *why* it was a Bad Idea(tm) and that that sort of thing simply does not
-> work.  As a game, is it really a situation with *zero* probability of
-> occuring that someone might produce a kirkwood/Sheeva flavoured board
-> with only 128MB RAM?
+* Alexander Holler <holler@ahsoftware.de> [2011-04-07 23:31:08+0200]:
 >
-> As well as a willingness to 'produce' patches (which to be frank
-> *anyone* can do[1])...the hard part is producing *good* patches.  To
-> produce good patches you need to read and understand the wisdom you get
-> back from the mailing lists you post to.  If you do not understand the
-> reasoning, ask.
->
-> This is why you see [PATCHv${BIGNUM}] so often in a number of mailing
-> lists.  If you are not willing to accept *everyone*, including yourself,
-> writes crap code...well the value of your patches falls below zero.
+> Requiring a machine ID and the needed stuff to handle that for a
+> board which just is using two GPIOs different than another board is
+> why the ARM tree exploded. And requiring a machine ID just to follow
+> the rule that a machine ID is much better than some pretty unique hw
+> feature is in my humble opinion senseless and that the resulting code
+> is more readable and better to maintain is a myth.
+> 
+It's something that most people agree with you on too.  However, I am 
+guessing it's around as no one else *at the time* of it's conception 
+could think of a better way.
 
-Requiring a machine ID and the needed stuff to handle that for a board 
-which just is using two GPIOs different than another board is why the 
-ARM tree exploded. And requiring a machine ID just to follow the rule 
-that a machine ID is much better than some pretty unique hw feature is 
-in my humble opinion senseless and that the resulting code is more 
-readable and better to maintain is a myth.
+Now this is why there is a lot of work being done on device-tree.
 
-Sorry that I wanted to help there. Will not try it again.
+> Sorry that I wanted to help there. Will not try it again.
+> 
+Yeah, as obviously no tries to help anyone improve around here:
 
-Regards,
+http://groups.google.com/group/openrd/browse_frm/thread/7ba48f2d7916a88f/2b89c877c4f39098?tvc=1&fwc=1
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/022855.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/024072.html
 
-Alexander
+http://git.kernel.org/?p=linux/kernel/git/nico/orion.git;a=commit;h=f2ac38dc
+
+Regards
+
+-- 
+Alexander Clouter
+.sigmonster says: Graduate life: It's not just a job.  It's an indenture.
