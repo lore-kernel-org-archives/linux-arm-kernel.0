@@ -1,28 +1,55 @@
-From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Thu, 07 Apr 2011 16:40:54 -0700
-Subject: [RFC 1/5]arch/arm/common/Makefile Remove unused config in the
-	Makefile.
-In-Reply-To: <20110407222348.GE17049@n2100.arm.linux.org.uk>
-References: <1302022702-24541-1-git-send-email-justinmattock@gmail.com>
-	<20110406080522.GZ13963@pengutronix.de>
-	<4D9C826C.5050802@gmail.com>
-	<20110407222348.GE17049@n2100.arm.linux.org.uk>
-Message-ID: <4D9E4B86.1030102@gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 08 Apr 2011 00:47:44 +0100
+Subject: [PATCH] arm: Fix .size directive for xscale_dma_a0_map_area
+In-Reply-To: <1299900442.4146.79.camel@localhost>
+References: <1299900442.4146.79.camel@localhost>
+Message-ID: <1302220064.5282.10.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2011 03:23 PM, Russell King - ARM Linux wrote:
-> On Wed, Apr 06, 2011 at 08:10:36AM -0700, Justin P. Mattock wrote:
->> o.k.!! Thanks for having a look at this..
->
-> Could you queue this up in the patch system with everyone's acks please?
-> You don't need to include a Cc line for any of my addresses (and I'd
-> prefer it not to be in submissions.)
->
-> Thanks.
->
+On Sat, 2011-03-12 at 03:27 +0000, Ben Hutchings wrote:
+> gas used to accept (and ignore?) .size directives which referred to
+> undefined symbols, as this does.  In binutils 2.21 these are treated
+> as fatal errors.
 
+Please acknowledge and send this upstream.
 
-o.k. I resent.. hopefully I got the addresses proper.
+You also haven't responded to my patch fixing .size directives for
+__arm{7,9}tdmi_proc_info.
 
-Justin P. Mattock
+Ben.
+
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> ---
+> I missed this one previously because my 5-minute script didn't recognise
+> the ENDPROC macro as generating a .size directive.
+> 
+> Ben.
+> 
+>  arch/arm/mm/proc-xscale.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> index 5a37c5e..ab00b59 100644
+> --- a/arch/arm/mm/proc-xscale.S
+> +++ b/arch/arm/mm/proc-xscale.S
+> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+>  	teq	r2, #DMA_TO_DEVICE
+>  	beq	xscale_dma_clean_range
+>  	b	xscale_dma_flush_range
+> -ENDPROC(xscsale_dma_a0_map_area)
+> +ENDPROC(xscale_dma_a0_map_area)
+>  
+>  /*
+>   *	dma_unmap_area(start, size, dir)
+
+-- 
+Ben Hutchings
+Once a job is fouled up, anything done to improve it makes it worse.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110408/e0707e03/attachment.sig>
