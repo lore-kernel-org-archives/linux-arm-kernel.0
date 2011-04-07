@@ -1,66 +1,96 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu,  7 Apr 2011 11:18:31 -0700
-Subject: [PATCH] nohz: delay going tickless under CPU load to favor deeper C
-	states
-Message-ID: <1302200311-24263-1-git-send-email-khilman@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 7 Apr 2011 11:18:32 -0700
+Subject: [PATCH] spi: Fix race condition in stop_queue()
+In-Reply-To: <1302101355-31187-1-git-send-email-anarsoul@gmail.com>
+References: <201104061746.44134.anarsoul@gmail.com>
+	<1302101355-31187-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20110407181832.GB3261@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicole Chalhoub <n-chalhoub@ti.com>
+On Wed, Apr 06, 2011 at 05:49:15PM +0300, Vasily Khoruzhick wrote:
+> There's a race condition in stop_queue() in some drivers -
+> if drv_data->queue is empty, but drv_data->busy is still set
+> (or opposite situation) stop_queue will return -EBUSY.
+> So fix loop condition to check that both drv_data->queue is empty
+> and drv_data->busy is not set.
+> 
+> This patch affects following drivers:
+> pxa2xx_spi
+> spi_bfin5xx
+> amba-pl022
+> dw_spi
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-While there is CPU load, continue the periodic tick in order to give
-CPUidle another opportunity to pick a deeper C-state instead of
-spending potentially long idle times in a shallow C-state.
+Applied, thanks.
 
-Long winded version:
+g.
 
-When going idle with a high load average, CPUidle menu governor will
-decide to pick a shallow C-state since one of the guiding principles
-of the menu governor is "The busier the system, the less impact of C
-states is acceptable" (taken from cpuidle/governors/menu.c.)  That
-makes perfect sense.
-
-However, there are missed power-saving opportunities for bursty
-workloads with long idle times (e.g. MP3 playback.)  Given such a
-workload, because of the load average, CPUidle tends to pick a shallow
-C-state.  Because we also go tickless, this shallow C-state is used
-for the duration of the idle period.  If the idle period is long, a
-deeper C state would've resulted in better power savings.
-
-This patch delays going tickless when there is a load such that on the
-next tick, the CPUidle governor will have another opportunity to to
-pick a deeper C-state.  Since the system will have been idle for
-potentially a full tick, the load average will drop and a deeper C
-state will most likely be chosen.
-
-Delaying NOHZ decisions until the load is zero improved the load
-estimation on our ARM/OMAP4 platform where HZ=128 and increased the
-time spent in deep C-states (~50% of idle time in C-states deeper than
-C1).  A power saving of ~20mA at battery level is observed during MP3
-playback on OMAP4/Blaze board.
-
-Signed-off-by: Nicole Chalhoub <n-chalhoub@ti.com>
-Signed-off-by: Vincent Bour <v-bour@ti.com>
-Cc: Arjan van de Ven <arjan@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-[khilman at ti.com: rework changelog]
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- kernel/time/tick-sched.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index d5097c4..418066c 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -324,7 +324,7 @@ void tick_nohz_stop_sched_tick(int inidle)
- 	} while (read_seqretry(&xtime_lock, seq));
- 
- 	if (rcu_needs_cpu(cpu) || printk_needs_cpu(cpu) ||
--	    arch_needs_cpu(cpu)) {
-+	    arch_needs_cpu(cpu) || this_cpu_load()) {
- 		next_jiffies = last_jiffies + 1;
- 		delta_jiffies = 1;
- 	} else {
--- 
-1.7.4
+> ---
+>  drivers/spi/amba-pl022.c  |    2 +-
+>  drivers/spi/dw_spi.c      |    2 +-
+>  drivers/spi/pxa2xx_spi.c  |    2 +-
+>  drivers/spi/spi_bfin5xx.c |    2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+> index 71a1219..23aaaa9 100644
+> --- a/drivers/spi/amba-pl022.c
+> +++ b/drivers/spi/amba-pl022.c
+> @@ -1553,7 +1553,7 @@ static int stop_queue(struct pl022 *pl022)
+>  	 * A wait_queue on the pl022->busy could be used, but then the common
+>  	 * execution path (pump_messages) would be required to call wake_up or
+>  	 * friends on every SPI message. Do this instead */
+> -	while (!list_empty(&pl022->queue) && pl022->busy && limit--) {
+> +	while ((!list_empty(&pl022->queue) || pl022->busy) && limit--) {
+>  		spin_unlock_irqrestore(&pl022->queue_lock, flags);
+>  		msleep(10);
+>  		spin_lock_irqsave(&pl022->queue_lock, flags);
+> diff --git a/drivers/spi/dw_spi.c b/drivers/spi/dw_spi.c
+> index 22af77f..b53be4d 100644
+> --- a/drivers/spi/dw_spi.c
+> +++ b/drivers/spi/dw_spi.c
+> @@ -821,7 +821,7 @@ static int stop_queue(struct dw_spi *dws)
+>  
+>  	spin_lock_irqsave(&dws->lock, flags);
+>  	dws->run = QUEUE_STOPPED;
+> -	while (!list_empty(&dws->queue) && dws->busy && limit--) {
+> +	while ((!list_empty(&dws->queue) || dws->busy) && limit--) {
+>  		spin_unlock_irqrestore(&dws->lock, flags);
+>  		msleep(10);
+>  		spin_lock_irqsave(&dws->lock, flags);
+> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> index 9592883..39cc10f 100644
+> --- a/drivers/spi/pxa2xx_spi.c
+> +++ b/drivers/spi/pxa2xx_spi.c
+> @@ -1493,7 +1493,7 @@ static int stop_queue(struct driver_data *drv_data)
+>  	 * execution path (pump_messages) would be required to call wake_up or
+>  	 * friends on every SPI message. Do this instead */
+>  	drv_data->run = QUEUE_STOPPED;
+> -	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
+> +	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
+>  		spin_unlock_irqrestore(&drv_data->lock, flags);
+>  		msleep(10);
+>  		spin_lock_irqsave(&drv_data->lock, flags);
+> diff --git a/drivers/spi/spi_bfin5xx.c b/drivers/spi/spi_bfin5xx.c
+> index 3f22351..0e14f40 100644
+> --- a/drivers/spi/spi_bfin5xx.c
+> +++ b/drivers/spi/spi_bfin5xx.c
+> @@ -1244,7 +1244,7 @@ static inline int bfin_spi_stop_queue(struct bfin_spi_master_data *drv_data)
+>  	 * friends on every SPI message. Do this instead
+>  	 */
+>  	drv_data->running = false;
+> -	while (!list_empty(&drv_data->queue) && drv_data->busy && limit--) {
+> +	while ((!list_empty(&drv_data->queue) || drv_data->busy) && limit--) {
+>  		spin_unlock_irqrestore(&drv_data->lock, flags);
+>  		msleep(10);
+>  		spin_lock_irqsave(&drv_data->lock, flags);
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
