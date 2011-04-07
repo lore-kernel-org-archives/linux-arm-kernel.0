@@ -1,142 +1,54 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 7 Apr 2011 18:39:45 +0200
-Subject: [patch 2/2] Add GPIO DT support to s3c24xx
-References: <20110407163322.465935232@gmail.com>
-Message-ID: <20110407163945.GC17498@dandreoli.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 7 Apr 2011 09:49:33 -0700
+Subject: [PATCH v3] ARM: Use generic BUG() handler
+In-Reply-To: <4D9D4D23.6000805@codeaurora.org>
+References: <1302131890-20953-1-git-send-email-sjg@chromium.org>
+	<4D9D4D23.6000805@codeaurora.org>
+Message-ID: <BANLkTimaii4zNXVuUPqiWGZabRRdYM8JmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <cavokz@gmail.com>
+On Wed, Apr 6, 2011 at 10:35 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 4/6/2011 4:18 PM, Simon Glass wrote:
+>> v3: Remove old BUG() implementation in favor of this one.
+>> Remove the Backtrace: message (will submit this separately).
+>> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
+>> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
+>> define GENERIC_BUG this might be academic.)
+>
+> Its not entirely academic because CONFIG_BUG=n and CONFIG_SMP_ON_UP=n
+> would allow us to remove the exit text. This could be huge for people
+> who want to cram kernel's onto space constrained devices.
 
-Add DT compat strings to the GPIO chips registerd by s3c24xx SOCs.
+OK I see. On my kernel this is 8KB but every little helps and no point
+it having it in there if it isn't needed.
 
-Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+>> Rebase to linux-2.6.git master.
+>>
+>> Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
+>
+> Don't forget to remove these before submitting to the patch tracker (and
+> sending to the list).
 
----
- arch/arm/plat-s3c24xx/gpiolib.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+OK thanks.
 
-Index: b/arch/arm/plat-s3c24xx/gpiolib.c
-===================================================================
---- a/arch/arm/plat-s3c24xx/gpiolib.c	2011-04-07 18:16:09.000000000 +0200
-+++ b/arch/arm/plat-s3c24xx/gpiolib.c	2011-04-07 18:20:41.000000000 +0200
-@@ -94,6 +94,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOA",
- 			.ngpio			= 24,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-a",
-+#endif
- 			.direction_input	= s3c24xx_gpiolib_banka_input,
- 			.direction_output	= s3c24xx_gpiolib_banka_output,
- 		},
-@@ -106,6 +109,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOB",
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-b",
-+#endif
- 		},
- 	},
- 	[2] = {
-@@ -116,6 +122,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOC",
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-c",
-+#endif
- 		},
- 	},
- 	[3] = {
-@@ -126,6 +135,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOD",
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-d",
-+#endif
- 		},
- 	},
- 	[4] = {
-@@ -136,6 +148,9 @@
- 			.label			= "GPIOE",
- 			.owner			= THIS_MODULE,
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-e",
-+#endif
- 		},
- 	},
- 	[5] = {
-@@ -147,6 +162,9 @@
- 			.label			= "GPIOF",
- 			.ngpio			= 8,
- 			.to_irq			= s3c24xx_gpiolib_bankf_toirq,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-f",
-+#endif
- 		},
- 	},
- 	[6] = {
-@@ -159,6 +177,9 @@
- 			.label			= "GPIOG",
- 			.ngpio			= 16,
- 			.to_irq			= samsung_gpiolib_to_irq,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-g",
-+#endif
- 		},
- 	}, {
- 		.base	= S3C2410_GPHCON,
-@@ -168,6 +189,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOH",
- 			.ngpio			= 11,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2410-gpio-h",
-+#endif
- 		},
- 	},
- 		/* GPIOS for the S3C2443 and later devices. */
-@@ -179,6 +203,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOJ",
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2440-gpio-j",
-+#endif
- 		},
- 	}, {
- 		.base	= S3C2443_GPKCON,
-@@ -188,6 +215,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOK",
- 			.ngpio			= 16,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2443-gpio-k",
-+#endif
- 		},
- 	}, {
- 		.base	= S3C2443_GPLCON,
-@@ -197,6 +227,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOL",
- 			.ngpio			= 15,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2443-gpio-l",
-+#endif
- 		},
- 	}, {
- 		.base	= S3C2443_GPMCON,
-@@ -206,6 +239,9 @@
- 			.owner			= THIS_MODULE,
- 			.label			= "GPIOM",
- 			.ngpio			= 2,
-+#if defined(CONFIG_OF_GPIO)
-+			.dt_compat		= "samsung,s3c2443-gpio-m",
-+#endif
- 		},
- 	},
- };
+>> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+>> index 4d88425..2914724 100644
+>> --- a/arch/arm/include/asm/bug.h
+>> +++ b/arch/arm/include/asm/bug.h
+>> @@ -3,21 +3,58 @@
+>>
+>>
+>> ?#ifdef CONFIG_BUG
+>> -#ifdef CONFIG_DEBUG_BUGVERBOSE
+>> -extern void __bug(const char *file, int line) __attribute__((noreturn));
+>> -
+>> -/* give file/line information */
+>> -#define BUG() ? ? ? ? ? ? ? ?__bug(__FILE__, __LINE__)
+>
+> Does anybody reference __bug() anymore? If not you can remove that too.
+
+No one is using it now, I will do this.
+
+Regards,
+Simon
