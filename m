@@ -1,54 +1,80 @@
-From: jk@ozlabs.org (Jeremy Kerr)
-Date: Thu, 07 Apr 2011 10:00:06 +0800
-Subject: [RFC] filter function for submaintainers
-In-Reply-To: <20110406193416.GB767@pengutronix.de>
-References: <20110404161716.GG13963@pengutronix.de>
-	<20110404170049.GA12200@pengutronix.de>
-	<20110404170515.GF7285@pengutronix.de>
-	<20110406190313.GA767@pengutronix.de>
-	<20110406193416.GB767@pengutronix.de>
-Message-ID: <1302141606.20777.34.camel@pororo>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Thu, 07 Apr 2011 11:05:22 +0900
+Subject: [alsa-devel] [PATCH 3/3] SoC: SAMSUNG: Add WM8580 PCM	Machine
+	driver
+In-Reply-To: <20110407011704.GA21071@sirena.org.uk>
+References: <1302136270-28776-1-git-send-email-sbkim73@samsung.com>
+	<1302136270-28776-4-git-send-email-sbkim73@samsung.com>
+	<20110407011704.GA21071@sirena.org.uk>
+Message-ID: <041801cbf4c8$51ca7390$f55f5ab0$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-> The problem (admittedly only from a quick glance at
-> patchwork.ozlabs.org) I see is that it's not possible to reliably filter
-> patches by directory name. (Or maybe I'm just to stupid to find the
-> right knob, I tried searching for "drivers/net/ehea" in the netdev
-> project, got a few hits, but e.g.
-> http://patchwork.ozlabs.org/patch/89837/ wasn't listed. My guess is that
-> the search only checks subject and commit log?)
-
-At present, the search only covers the patch subject.
-
-> For us I think this is a crucial function, because the imx patches are
-> usually sent to the linux-arm-kernel mailing list where most patches
-> don't touch the files we are responsible for.
-
-It sounds like a separate linux-imx patchwork instance would suit better
-- this would mean you don't have to constantly apply filters to get the
-patches that you're interested in.
-
-I'm very happy to set up a patchwork instance on ozlabs.org for you; but
-(as you've mentioned) we'd need to filter-out the imx patches from the
-rest of the l-a-k content that you're not interested in tracking.
-
-Most projects (eg linux-davinci, linux-omap) do this by using a separate
-mailing list; I assume you'd rather keep your patches on the main ARM
-list, correct?
-
-Since this is a one-off, I think an external program to filter relevant
-patches from l-a-k would be best. This would check the diffstat for
-interesting paths, then conditionally feed the patch to the patchwork
-parser.
-
-Would this suit? Are you OK with including patches that are not
-necessarily imx-specific, but touch imx-related code (eg,
-architecture-wide code cleanups)?
-
-Cheers,
+Hi Mark,
 
 
-Jeremy
+On Thu, Apr 07, 2011 at 10:17:10AM +0900, Mark Brown wrote:
+
+> > +config SND_SOC_SAMSUNG_SMDK_WM8580_PCM
+> > +	tristate
+> > +
+> 
+> What is the purpose of this variable?  Just the config for the machine
+> should be enough.
+Ok, I will remove it and use machine config.
+
+> 
+> > @@ -1,12 +1,12 @@
+> > -# S3c24XX Platform Support
+> > +# SAMSUNG Platform Support
+> >  snd-soc-s3c24xx-objs := dma.o
+> >  snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
+> >  snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
+> >  snd-soc-ac97-objs := ac97.o
+> >  snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
+> >  snd-soc-samsung-spdif-objs := spdif.o
+> > -snd-soc-pcm-objs := pcm.o
+> > -snd-soc-i2s-objs := i2s.o
+> > +snd-soc-samsung-pcm-objs := pcm.o
+> > +snd-soc-samsung-i2s-objs := i2s.o
+> 
+> These changes all look reasonable but they're unrelated to adding the
+> machine driver and should be split out.
+Ok, I will split out.
+
+> 
+> > diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
+> > index 38aac7d..9c7e8b4 100644
+> > --- a/sound/soc/samsung/pcm.c
+> > +++ b/sound/soc/samsung/pcm.c
+> > @@ -350,8 +350,8 @@ static int s3c_pcm_set_fmt(struct snd_soc_dai
+> *cpu_dai,
+> >  	ctl = readl(regs + S3C_PCM_CTL);
+> >
+> >  	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
+> > -	case SND_SOC_DAIFMT_NB_NF:
+> > -		/* Nothing to do, NB_NF by default */
+> > +	case SND_SOC_DAIFMT_IB_NF:
+> > +		/* Nothing to do, IB_NF by default */
+> >  		break;
+> 
+> Similarly here, this is a bug fix so should be merged for 2.6.39.
+I will submit another bug fix patch for this.
+
+> 
+> > +	smdk_snd_device = platform_device_alloc("soc-audio", -1);
+> > +	if (!smdk_snd_device)
+> > +		return -ENOMEM;
+> 
+> Please use snd_soc_register_card() for new machines rather than the
+> soc-audio device.  Otherwise the actual driver itself looks good.
+Ok I will apply it.
+
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+
+
+Thanks and Regards,
+SB Kim
