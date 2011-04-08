@@ -1,55 +1,111 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 08 Apr 2011 00:47:44 +0100
-Subject: [PATCH] arm: Fix .size directive for xscale_dma_a0_map_area
-In-Reply-To: <1299900442.4146.79.camel@localhost>
-References: <1299900442.4146.79.camel@localhost>
-Message-ID: <1302220064.5282.10.camel@localhost>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 7 Apr 2011 17:17:17 -0700
+Subject: [patch 1/2] Add dt_compat field to struct gpio_chip
+In-Reply-To: <BANLkTi=WE_vOUAi8T60ESAH2kua4uB-_HA@mail.gmail.com>
+References: <20110407163322.465935232@gmail.com>
+	<20110407163930.GB17498@dandreoli.com>
+	<20110407171704.GC2455@angua.secretlab.ca>
+	<BANLkTi=WE_vOUAi8T60ESAH2kua4uB-_HA@mail.gmail.com>
+Message-ID: <BANLkTi=r2MESkm-JXwa59pYGDxMDWQF0XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-03-12 at 03:27 +0000, Ben Hutchings wrote:
-> gas used to accept (and ignore?) .size directives which referred to
-> undefined symbols, as this does.  In binutils 2.21 these are treated
-> as fatal errors.
+On Thu, Apr 7, 2011 at 1:41 PM, Domenico Andreoli <cavokz@gmail.com> wrote:
+> On Thu, Apr 7, 2011 at 7:17 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>
+>> On Thu, Apr 07, 2011 at 06:39:30PM +0200, Domenico Andreoli wrote:
+>> > From: Domenico Andreoli <cavokz@gmail.com>
+>> >
+>> > This new field allows easy creation of GPIO chips in base of struct arrays.
+>> >
+>> > Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+>> >
+>> > ---
+>> > ?drivers/of/gpio.c ? ? ? ? ?| ? ?3 +++
+>> > ?include/asm-generic/gpio.h | ? ?1 +
+>> > ?2 files changed, 4 insertions(+)
+>> >
+>> > Index: b/drivers/of/gpio.c
+>> > ===================================================================
+>> > --- a/drivers/of/gpio.c ? ? ? 2011-04-07 18:19:20.000000000 +0200
+>> > +++ b/drivers/of/gpio.c ? ? ? 2011-04-07 18:20:31.000000000 +0200
+>> > @@ -212,6 +212,9 @@
+>> >
+>> > ?void of_gpiochip_add(struct gpio_chip *chip)
+>> > ?{
+>> > + ? ? if ((!chip->of_node) && (chip->dt_compat))
+>> > + ? ? ? ? ? ? chip->of_node = of_find_compatible_node(NULL, NULL, chip->dt_compat);
+>> > +
+>>
+>> Hi Domenico,
+>
+> Hi Grant,
+>
+>> From what I can tell, this patch attempts to adapt to the way that
+>> arch/arm/plat-samsung/gpio.c registers gpios with the kernel. ?Each
+>> platform seems to have its own static table of gpio banks which are
+>> registered without any regard to the Linux device model. ?It works,
+>> but it isn't really the way things should be done.
+>
+> About the independent models of the ARM platforms, I can't say
+> anything. I only wanted to explore the DT concepts and import them on
+> the s3c24xx. While this could look only as the latest individual
+> attempt, the DT interface is not and cannot be of any harm if ARM
+> deploys it a little more.
+>
+>> The design of gpiolib right now is such that the of_node pointer
+>> should be known *before* of_gpiochip_add() gets called. ?This is very
+>> important because the code that registers the gpio is the only place
+>> that can truly know which node is actually associated with the gpio.
+>
+> This explains why a so simple patch has never been proposed before.
+>
+>> To solve your problem, the best solution would be to rework
+>> arch/arm/plat-samsung-gpio.c to properly use the driver model and
+>> register platform_devices which can be attached to dt nodes. ?This
+>> change should probably be done anyway, even ignoring the dt needs, but
+>> I'm not going to force you to make this change to get dt support added
+>> for samsung gpios.
+>
+> Indeed my plan is to not rework it, not in the next future, not before
+> I switched all its users to DT ;)
+>
+> I'd like to follow the path towards a pure dts platform definition so
+> the next step would be to DT-fy something like the s3c
+> sdi/sdhci/whatever, which already uses some GPIO. Then something else
+> like audio or network and so on. I would be very glad to arrive sooner
+> or later to a s3c24xx FDT.
+>
+>> Alternately, what you should do is make sure that the chip->of_node
+>> pointer is correctly populated before calling gpiochip_add(), possibly
+>> in s3c_gpiolib_add().
+>
+> I already restored it to the previous state, with .dt_compat in struct
+> s3c_gpio_chip and the the call of of_find_compatible_node() in
+> s3c_gpiolib_add(), this way it stays out of gpiolib.
+>
+>> Also, be careful about the way that 'compatible' is being used.
+>> Remember that compatible describes the /interface/ to a device, but
+>> not the /instance/. ?Many systems have multiple instances of the same
+>> device, and compatible doesn't provide any help for differentiating
+>> between them.
+>
+> I needed some clarification here, I already suspected that my way to
+> encode banks in the compatible property was somehow fishy. And I
+> needed a working patch to get some attention before digging further..
+> ;)
+>
+>> Typically, when trying to find a specific instance of a
+>> device, it should be resolved with a property in the /aliases node, or
+>> it should be matched up against the resolved base address of the
+>> device.
+>
+> This is what I'll try next. This alone seems to imply the rework you
+> said above, let's see.
 
-Please acknowledge and send this upstream.
+It doesn't actually depend on the rework.  You already have the
+register information in s3c gpio.  You could use the same compatible
+value for all, and then add another comparison against the base
+address to figure out exactly which one is the correct one.
 
-You also haven't responded to my patch fixing .size directives for
-__arm{7,9}tdmi_proc_info.
-
-Ben.
-
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> ---
-> I missed this one previously because my 5-minute script didn't recognise
-> the ENDPROC macro as generating a .size directive.
-> 
-> Ben.
-> 
->  arch/arm/mm/proc-xscale.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> index 5a37c5e..ab00b59 100644
-> --- a/arch/arm/mm/proc-xscale.S
-> +++ b/arch/arm/mm/proc-xscale.S
-> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
->  	teq	r2, #DMA_TO_DEVICE
->  	beq	xscale_dma_clean_range
->  	b	xscale_dma_flush_range
-> -ENDPROC(xscsale_dma_a0_map_area)
-> +ENDPROC(xscale_dma_a0_map_area)
->  
->  /*
->   *	dma_unmap_area(start, size, dir)
-
--- 
-Ben Hutchings
-Once a job is fouled up, anything done to improve it makes it worse.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110408/e0707e03/attachment.sig>
+g.
