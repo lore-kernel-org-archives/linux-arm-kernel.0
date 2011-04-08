@@ -1,38 +1,28 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 07 Apr 2011 17:38:38 -0700
-Subject: [PATCH/RFC 4/6] ARM: move SH-mobile runtime PM to arm/common for
-	sharing with other platforms
-In-Reply-To: <201104080035.26989.rjw@sisk.pl> (Rafael J. Wysocki's message of
-	"Fri, 8 Apr 2011 00:35:26 +0200")
-References: <1302134569-22825-1-git-send-email-khilman@ti.com>
-	<20110407165654.GD8052@linux-sh.org> <8739lu9eg6.fsf@ti.com>
-	<201104080035.26989.rjw@sisk.pl>
-Message-ID: <87vcyp37ch.fsf@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Apr 2011 20:51:06 -0400 (EDT)
+Subject: [PATCH v2 0/4] ARM: kprobes: Fixes for ARM instruction emulation
+	(part 1)
+In-Reply-To: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
+References: <1302085032-30415-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <alpine.LFD.2.00.1104072048460.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
+On Wed, 6 Apr 2011, Tixy wrote:
 
-> On Thursday, April 07, 2011, Kevin Hilman wrote:
->> Paul Mundt <lethal@linux-sh.org> writes:
->> 
->> > On Wed, Apr 06, 2011 at 05:02:47PM -0700, Kevin Hilman wrote:
->> >> There is really nothing SH-mobile specific about this runtime PM
->> >> implementation.  Any platform wanting to implement runtime PM based on
->> >> simple clock gating can use this implementation.
->> >> 
->> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> >
->> > This observation is wholly architecture agnostic, so it's not clear that
->> > keeping it in arch/arm/common is any better. It seems that this would be
->> > better suited for drivers/base/power/ with a generic Kconfig symbol.
->> 
->> Sounds fine to me.
->
-> Well, what platforms is the clock framework available on?
+> When kprobes are inserted into code an ARM instruction is replaced
+> by a breakpoint. When this is hit, the original instruction must be
+> emulated out-of-line. This patchset fixes some bugs in this emulation.
+> 
+> v2  Move definitions of __check_xx functions from the .h to .c file.
+> 
+> [PATCH v2 1/4] ARM: kprobes: Fix probing of conditionally executed instructions
+> [PATCH v2 2/4] ARM: kprobes: Remove redundant condition checks from simulation routines
+> [PATCH v2 3/4] ARM: kprobes: Fix emulation of CMP, CMN, TST and TEQ instructions.
+> [PATCH v2 4/4] ARM: kprobes: Fix emulation of Data-processing (immediate) instructions
 
-Well, the majority of implementations of <linux/clk.h> are certainly in
-ARM, but I know it's also implemented for SH, and a quick grep shows
-implementations in powerpc, mips and m68k also.
+This looks all good.  I've committed them in the kprobes branch of 
+git://git.linaro.org/people/nico/linux.
 
-Kevin
+
+Nicolas
