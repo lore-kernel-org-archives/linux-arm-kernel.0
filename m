@@ -1,193 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Apr 2011 13:58:39 +0100
-Subject: [PATCH] ARM: futex: add SMP futex support when !CPU_USE_DOMAINS
-Message-ID: <1302267519-18156-1-git-send-email-will.deacon@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 8 Apr 2011 09:00:07 -0400 (EDT)
+Subject: [PATCH 2/2] ARM: fix personality flag propagation across an exec
+In-Reply-To: <20110408072931.GB27450@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
+	<20110408072931.GB27450@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104080856000.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the load/store exclusive instructions to add SMP futex
-support for ARM.
+On Fri, 8 Apr 2011, Russell King - ARM Linux wrote:
 
-Since the ARM architecture does not provide instructions for
-unprivileged exclusive memory accesses, we can only provide SMP futexes
-when CPU domain support is disabled.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/futex.h |  137 +++++++++++++++++++++++++++--------------
- 1 files changed, 90 insertions(+), 47 deletions(-)
-
-diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
-index 199a6b6..8c73900 100644
---- a/arch/arm/include/asm/futex.h
-+++ b/arch/arm/include/asm/futex.h
-@@ -3,16 +3,74 @@
- 
- #ifdef __KERNEL__
- 
-+#if defined(CONFIG_CPU_USE_DOMAINS) && defined(CONFIG_SMP)
-+/* ARM doesn't provide unprivileged exclusive memory accessors */
-+#include <asm-generic/futex.h>
-+#else
-+
-+#include <linux/futex.h>
-+#include <linux/uaccess.h>
-+#include <asm/errno.h>
-+
-+#define __futex_atomic_ex_table(err_reg)			\
-+	"3:\n"							\
-+	"	.pushsection __ex_table,\"a\"\n"		\
-+	"	.align	3\n"					\
-+	"	.long	1b, 4f, 2b, 4f\n"			\
-+	"	.popsection\n"					\
-+	"	.pushsection .fixup,\"ax\"\n"			\
-+	"4:	mov	%0, " err_reg "\n"			\
-+	"	b	3b\n"					\
-+	"	.popsection"
-+
- #ifdef CONFIG_SMP
- 
--#include <asm-generic/futex.h>
-+#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
-+	smp_mb();						\
-+	__asm__ __volatile__(					\
-+	"1:	ldrex	%1, [%2]\n"				\
-+	"	" insn "\n"					\
-+	"2:	strex	%1, %0, [%2]\n"				\
-+	"	teq	%1, #0\n"				\
-+	"	bne	1b\n"					\
-+	"	mov	%0, #0\n"				\
-+	__futex_atomic_ex_table("%4")				\
-+	: "=&r" (ret), "=&r" (oldval)				\
-+	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
-+	: "cc", "memory")
-+
-+static inline int
-+futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-+			      u32 oldval, u32 newval)
-+{
-+	int ret;
-+	u32 val;
-+
-+	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-+		return -EFAULT;
-+
-+	smp_mb();
-+	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
-+	"1:	ldrex	%1, [%4]\n"
-+	"	teq	%1, %2\n"
-+	"	ite	eq	@ explicit IT needed for the 2b label\n"
-+	"2:	strexeq	%0, %3, [%4]\n"
-+	"	movne	%0, #0\n"
-+	"	teq	%0, #0\n"
-+	"	bne	1b\n"
-+	__futex_atomic_ex_table("%5")
-+	: "=&r" (ret), "=&r" (val)
-+	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
-+	: "cc", "memory");
-+	smp_mb();
-+
-+	*uval = val;
-+	return ret;
-+}
- 
- #else /* !SMP, we can work around lack of atomic ops by disabling preemption */
- 
--#include <linux/futex.h>
- #include <linux/preempt.h>
--#include <linux/uaccess.h>
--#include <asm/errno.h>
- #include <asm/domain.h>
- 
- #define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
-@@ -21,20 +79,38 @@
- 	"	" insn "\n"					\
- 	"2:	" T(str) "	%0, [%2]\n"			\
- 	"	mov	%0, #0\n"				\
--	"3:\n"							\
--	"	.pushsection __ex_table,\"a\"\n"		\
--	"	.align	3\n"					\
--	"	.long	1b, 4f, 2b, 4f\n"			\
--	"	.popsection\n"					\
--	"	.pushsection .fixup,\"ax\"\n"			\
--	"4:	mov	%0, %4\n"				\
--	"	b	3b\n"					\
--	"	.popsection"					\
-+	__futex_atomic_ex_table("%4")				\
- 	: "=&r" (ret), "=&r" (oldval)				\
- 	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
- 	: "cc", "memory")
- 
- static inline int
-+futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-+			      u32 oldval, u32 newval)
-+{
-+	int ret = 0;
-+	u32 val;
-+
-+	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-+		return -EFAULT;
-+
-+	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
-+	"1:	" T(ldr) "	%1, [%4]\n"
-+	"	teq	%1, %2\n"
-+	"	it	eq	@ explicit IT needed for the 2b label\n"
-+	"2:	" T(streq) "	%3, [%4]\n"
-+	__futex_atomic_ex_table("%5")
-+	: "+r" (ret), "=&r" (val)
-+	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
-+	: "cc", "memory");
-+
-+	*uval = val;
-+	return ret;
-+}
-+
-+#endif /* !SMP */
-+
-+static inline int
- futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
- {
- 	int op = (encoded_op >> 28) & 7;
-@@ -87,39 +163,6 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
- 	return ret;
- }
- 
--static inline int
--futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
--			      u32 oldval, u32 newval)
--{
--	int ret = 0;
--	u32 val;
--
--	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
--		return -EFAULT;
--
--	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
--	"1:	" T(ldr) "	%1, [%4]\n"
--	"	teq	%1, %2\n"
--	"	it	eq	@ explicit IT needed for the 2b label\n"
--	"2:	" T(streq) "	%3, [%4]\n"
--	"3:\n"
--	"	.pushsection __ex_table,\"a\"\n"
--	"	.align	3\n"
--	"	.long	1b, 4f, 2b, 4f\n"
--	"	.popsection\n"
--	"	.pushsection .fixup,\"ax\"\n"
--	"4:	mov	%0, %5\n"
--	"	b	3b\n"
--	"	.popsection"
--	: "+r" (ret), "=&r" (val)
--	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
--	: "cc", "memory");
--
--	*uval = val;
--	return ret;
--}
--
--#endif /* !SMP */
--
-+#endif /* !(CPU_USE_DOMAINS && SMP) */
- #endif /* __KERNEL__ */
- #endif /* _ASM_ARM_FUTEX_H */
--- 
-1.7.0.4
+> On Thu, Apr 07, 2011 at 10:52:53PM -0400, Nicolas Pitre wrote:
+> >  	/*
+> > +	 * Inherit most personality flags from parent, except for those
+> > +	 * we're about to choose.  Beware: PER_LINUX_32BIT carries flag bits
+> > +	 * outside of PER_MASK.
+> > +	 */
+> > +	personality &= ~(PER_MASK | PER_LINUX | PER_LINUX_32BIT);
+> 
+> PER_LINUX and PER_LINUX_32BIT aren't bitflags - the LSB is a numeric
+> personality ID.  So this looks wrong.
