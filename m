@@ -1,48 +1,72 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 08 Apr 2011 05:38:54 +0200
-Subject: [PATCH 0/2] ARM: Unify setup for Marvell SheevaPlugs and	Seagate
-	DockStars
-In-Reply-To: <20110407173912.GA17049@n2100.arm.linux.org.uk>
-References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<4D9CEE24.1080501@erfurth.eu> <4D9D81ED.7090809@ahsoftware.de>
-	<4D9D85E4.2040606@erfurth.eu> <4D9D8762.3080207@ahsoftware.de>
-	<20110407173912.GA17049@n2100.arm.linux.org.uk>
-Message-ID: <4D9E834E.2030705@ahsoftware.de>
+From: eggonlea@gmail.com (Li Li)
+Date: Fri, 8 Apr 2011 11:39:09 +0800
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <20100705135526.GF15951@atomide.com>
+References: <20100623133636.GC7058@shareable.org>
+	<20100629141836.GM2822@atomide.com>
+	<alpine.LFD.2.00.1006291355520.24097@xanadu.home>
+	<20100630110828.GZ2822@atomide.com>
+	<20100630131737.GF2822@atomide.com>
+	<alpine.LFD.2.00.1006301011520.24097@xanadu.home>
+	<20100701092510.GH2822@atomide.com>
+	<20100701174051.GA8786@shareable.org>
+	<alpine.LFD.2.00.1007012226170.26524@xanadu.home>
+	<20100702103744.GJ6632@atomide.com>
+	<20100705135526.GF15951@atomide.com>
+Message-ID: <BANLkTim4TTf3KXGYzjcvQ2n-hNbdSQM1eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.04.2011 19:39, schrieb Russell King - ARM Linux:
+Dears,
 
-> We have an established API and convention in the kernel which you claim
-> is "from outerspace".  It's not "from outerspace" but a designed API to
-> allow platforms to live together in the same kernel image.  So I find
-> your arguments totally unreasonable.
+I cannot understand how TLS EMU ensure it's SMP safe, because get_tls
+helper (at 0xffff0fe0) just read the value from 0xffff0ff0. But all
+SMP cores should have the exact same mapping to the vectors page (at
+0xffff0000). So various threads running on different SMP cores at the
+same time would get the same emulated TLS value (instead of thread
+specific value set via set_tls). Could anybody explain this a little
+bit?
 
-I've claimed that the specific machine ID is from outerspace not the 
-API. This one (ID) got invented just because of a different usage of two 
-GPIOs (and not even by the manufacturerer). And I still think using the 
-(fixed) memory size here is totally reasonable. There is nothing else to 
-differentiate these HWs, it's extremely unlikely that this difference 
-will get proved wrong, and if that would really happen, than one could 
-still add some code to fix this specific problem. _Always_ dealing with 
-"what happens when" is (imho) fruitless and no solution or API can deal 
-with everything.
+Thanks,
+Lea
 
-> I fully support Nicolas in rejecting your patches outright on this point
-> alone.
-
-Which I fully understand. And I wouldn't have started to defend me, if 
-that would have happened in a more civil language.
-
-But because I don't want to get involved in more discussions with people 
-who are missing the needed manners (at least how I learned them) to talk 
-with other people without offending them (not you), I better try to stay 
-away posting patches.
-
-Maybe I'm getting too old and lacking the needed enthusiasm needed to 
-discuss such stuff (and with everyone who thinks he must enter this 
-discussion too, again, not you). ;)
-
-I wish you all a nice day,
-
-Alexander
+On Mon, Jul 5, 2010 at 9:55 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [100702 13:32]:
+>> * Nicolas Pitre <nico@fluxnic.net> [100702 05:31]:
+>> > On Thu, 1 Jul 2010, Jamie Lokier wrote:
+>> >
+>> > > Tony Lindgren wrote:
+>> > > > +static void __init kuser_get_tls_init(unsigned long vectors)
+>> > > > +{
+>> > > > + ? ? ? /*
+>> > > > + ? ? ? ?* vectors + 0xfe0 = __kuser_get_tls
+>> > > > + ? ? ? ?* vectors + 0xfe8 = hardware TLS instruction at 0xffff0fe8
+>> > > > + ? ? ? ?*/
+>> > > > + ? ? ? if (tls_emu || has_tls)
+>> > > > + ? ? ? ? ? ? ? memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfe8, 4);
+>> > > > +}
+>> > >
+>> > > Just a little opinion: Perhaps has_tls_reg would be a clearer name.
+>> > > All variants "have TLS" after all.
+>> >
+>> > Good point.
+>>
+>> I like that too. Updated patch below.
+>
+> I've uploaded this patch into Russell's patch system:
+>
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6207/1
+>
+> Jamie, assuming no more comments, do you care to Ack/Reviewed/Tested-by
+> the patch in the link above?
+>
+> Regards,
+>
+> Tony
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
