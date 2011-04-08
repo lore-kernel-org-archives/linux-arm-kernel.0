@@ -1,19 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Apr 2011 20:12:57 +0100
-Subject: [PATCH 1/5 V2]arch:common:Makefile Remove unused config in the
-	Makefile.
-In-Reply-To: <4D9F2C0C.5090400@gmail.com>
-References: <1302219529-8864-1-git-send-email-justinmattock@gmail.com>
-	<20110408073153.GA18601@pengutronix.de>
-	<4D9F2C0C.5090400@gmail.com>
-Message-ID: <20110408191257.GB5573@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 08 Apr 2011 12:28:01 -0700
+Subject: [RFC][WAS:bcmai][PATCH V2] axi: add AXI bus driver
+In-Reply-To: <1302291900-1902-1-git-send-email-zajec5@gmail.com>
+References: <1302291900-1902-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1302290881.1664.7.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2011 at 08:38:52AM -0700, Justin P. Mattock wrote:
-> alright I read up and sent this to the address listed on that  
-> page(patches at arm.linux.org.uk) if it is incorrect let me know and I will  
-> resend so that I get things correct..
+On Fri, 2011-04-08 at 21:45 +0200, Rafa? Mi?ecki wrote:
+> diff --git a/include/linux/axi/axi.h b/include/linux/axi/axi.h
+[]
+> +#define axi_info	pr_info
+> +#ifdef CONFIG_AXI_DEBUG
+> +#define axi_debug	pr_debug
+> +#else
+> +#define axi_debug	do { } while (0)
+> +#endif
+> +#define axi_err		pr_err
 
-It appears to have arrived properly and looks fine, so... thanks.
-I'll be queuing up some stuff this weekend.
+I think redefining standard functionality like
+this doesn't gain anything and loses some basic
+grep capability.
