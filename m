@@ -1,19 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Apr 2011 08:29:31 +0100
-Subject: [PATCH 2/2] ARM: fix personality flag propagation across an exec
-In-Reply-To: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
-References: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
-Message-ID: <20110408072931.GB27450@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 8 Apr 2011 09:31:10 +0200
+Subject: 2.6.39-rc2 on zaurus: does not build, does not boot
+In-Reply-To: <20110408062646.GA1472@ucw.cz>
+References: <20110408062646.GA1472@ucw.cz>
+Message-ID: <201104080931.11202.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2011 at 10:52:53PM -0400, Nicolas Pitre wrote:
->  	/*
-> +	 * Inherit most personality flags from parent, except for those
-> +	 * we're about to choose.  Beware: PER_LINUX_32BIT carries flag bits
-> +	 * outside of PER_MASK.
-> +	 */
-> +	personality &= ~(PER_MASK | PER_LINUX | PER_LINUX_32BIT);
+On Friday 08 April 2011 08:26:46 Pavel Machek wrote:
+> Hi!
+> 
+> Build fix is below. Maybe it is pending in the trees somewhere
+> already...
 
-PER_LINUX and PER_LINUX_32BIT aren't bitflags - the LSB is a numeric
-personality ID.  So this looks wrong.
+Fix is already there, it was broken by a patch from someone recently. Thanks 
+though
+> 
+> Boot stops just after mounting root filesystem; cursor stops
+> flashing. (Any idea what goes on there?)
+
+No idea, it works for me and doesn't hang ;-)
+
+> 
+> 								Pavel
+> 
+> --- ./drivers/video.ofic/pxafb.c	2011-04-06 15:19:51.000000000 +0200
+> +++ ./drivers/video/pxafb.c	2011-04-07 06:20:20.000000000 +0200
+> @@ -1648,7 +1648,7 @@
+> 
+>  	switch (val) {
+>  	case CPUFREQ_PRECHANGE:
+> -		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
+> +//		if (!fbi->overlay[0].usage && !fbi->overlay[1].usage)
+>  			set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
+>  		break;
