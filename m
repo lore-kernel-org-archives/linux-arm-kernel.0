@@ -1,56 +1,38 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Thu,  7 Apr 2011 17:41:09 -0700
-Subject: [PATCH] msm: platsmp: actually read core count in get_core_count
-Message-ID: <1302223269-32047-1-git-send-email-johlstei@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 07 Apr 2011 17:38:38 -0700
+Subject: [PATCH/RFC 4/6] ARM: move SH-mobile runtime PM to arm/common for
+	sharing with other platforms
+In-Reply-To: <201104080035.26989.rjw@sisk.pl> (Rafael J. Wysocki's message of
+	"Fri, 8 Apr 2011 00:35:26 +0200")
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+	<20110407165654.GD8052@linux-sh.org> <8739lu9eg6.fsf@ti.com>
+	<201104080035.26989.rjw@sisk.pl>
+Message-ID: <87vcyp37ch.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously we just assumed there were CONFIG_NR_CPUS cpus present in
-the system. Instead, figure out the number of cpus from the MIDR
-register.
+"Rafael J. Wysocki" <rjw@sisk.pl> writes:
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
----
- arch/arm/mach-msm/platsmp.c |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
+> On Thursday, April 07, 2011, Kevin Hilman wrote:
+>> Paul Mundt <lethal@linux-sh.org> writes:
+>> 
+>> > On Wed, Apr 06, 2011 at 05:02:47PM -0700, Kevin Hilman wrote:
+>> >> There is really nothing SH-mobile specific about this runtime PM
+>> >> implementation.  Any platform wanting to implement runtime PM based on
+>> >> simple clock gating can use this implementation.
+>> >> 
+>> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> >
+>> > This observation is wholly architecture agnostic, so it's not clear that
+>> > keeping it in arch/arm/common is any better. It seems that this would be
+>> > better suited for drivers/base/power/ with a generic Kconfig symbol.
+>> 
+>> Sounds fine to me.
+>
+> Well, what platforms is the clock framework available on?
 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 0f427bc..58c1d7b 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/hardware/gic.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/mach-types.h>
- 
- #include <mach/msm_iomap.h>
-@@ -40,6 +41,12 @@ volatile int pen_release = -1;
- 
- static DEFINE_SPINLOCK(boot_lock);
- 
-+static inline int get_core_count(void)
-+{
-+	/* 1 + the PART[1:0] field of MIDR */
-+	return ((read_cpuid_id() >> 4) & 3) + 1;
-+}
-+
- void __cpuinit platform_secondary_init(unsigned int cpu)
- {
- 	/* Configure edge-triggered PPIs */
-@@ -147,9 +154,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-  */
- void __init smp_init_cpus(void)
- {
--	unsigned int i;
-+	unsigned int i, ncores = get_core_count();
- 
--	for (i = 0; i < NR_CPUS; i++)
-+	for (i = 0; i < ncores; i++)
- 		set_cpu_possible(i, true);
- }
- 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Well, the majority of implementations of <linux/clk.h> are certainly in
+ARM, but I know it's also implemented for SH, and a quick grep shows
+implementations in powerpc, mips and m68k also.
+
+Kevin
