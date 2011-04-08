@@ -1,43 +1,96 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Fri, 8 Apr 2011 14:19:13 +0200
-Subject: [PATCH] ARM: Allow for kernel command line concatenation
-In-Reply-To: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
-References: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
-Message-ID: <BANLkTi=mV3VdJWk2H0f0UpgaWK=M8qrS=w@mail.gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Fri,  8 Apr 2011 20:15:38 +0800
+Subject: [PATCH 1/7] ARM: pxa: add clk_set_rate()
+In-Reply-To: <2011040801>
+References: <2011040801>
+Message-ID: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 8, 2011 at 11:36 AM,  <oskar.andero@sonyericsson.com> wrote:
-> From: Victor Boivie <victor.boivie@sonyericsson.com>
->
-> This patch allows the provided CONFIG_CMDLINE to be concatenated
-> with the one provided by the boot loader. This is useful to
-> merge the static values defined in CONFIG_CMDLINE with the
-> boot loader's (possibly) more dynamic values, such as startup
-> reasons and more.
->
-> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
-> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
+Since there're mulitple clock rates in some device controllers, enable
+clk_set_rate() for this usage.
 
-All fine from ARM point of view.
-Just to remember there is space for a standardization in the sources
-being that other archs have ended up using different names for the
-same things:
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-mmp/clock.c |   15 +++++++++++++++
+ arch/arm/mach-mmp/clock.h |    1 +
+ arch/arm/mach-pxa/clock.c |   15 +++++++++++++++
+ arch/arm/mach-pxa/clock.h |    1 +
+ 4 files changed, 32 insertions(+), 0 deletions(-)
 
-CONFIG_CMDLINE
-CONFIG_CMDLINE_BOOL
-CONFIG_CMDLINE_OVERRIDE
-CONFIG_CMDLINE_OVERWRITE
-CONFIG_CMDLINE_EXTEND
-
-During our kexecboot works we have battled with CMDLINE passed by
-broken arm bootloaders and we are still fighting with mips kernels...
-
-
-My 2 cents
-
-Andrea
+diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+index 886e056..7c6f95f 100644
+--- a/arch/arm/mach-mmp/clock.c
++++ b/arch/arm/mach-mmp/clock.c
+@@ -88,3 +88,18 @@ unsigned long clk_get_rate(struct clk *clk)
+ 	return rate;
+ }
+ EXPORT_SYMBOL(clk_get_rate);
++
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long flags;
++	int ret = -EINVAL;
++
++	if (clk->ops->setrate) {
++		spin_lock_irqsave(&clocks_lock, flags);
++		ret = clk->ops->setrate(clk, rate);
++		spin_unlock_irqrestore(&clocks_lock, flags);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_rate);
+diff --git a/arch/arm/mach-mmp/clock.h b/arch/arm/mach-mmp/clock.h
+index 9b027d7..3143e99 100644
+--- a/arch/arm/mach-mmp/clock.h
++++ b/arch/arm/mach-mmp/clock.h
+@@ -12,6 +12,7 @@ struct clkops {
+ 	void			(*enable)(struct clk *);
+ 	void			(*disable)(struct clk *);
+ 	unsigned long		(*getrate)(struct clk *);
++	int			(*setrate)(struct clk *, unsigned long);
+ };
+ 
+ struct clk {
+diff --git a/arch/arm/mach-pxa/clock.c b/arch/arm/mach-pxa/clock.c
+index d515222..4d46610 100644
+--- a/arch/arm/mach-pxa/clock.c
++++ b/arch/arm/mach-pxa/clock.c
+@@ -53,6 +53,21 @@ unsigned long clk_get_rate(struct clk *clk)
+ }
+ EXPORT_SYMBOL(clk_get_rate);
+ 
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long flags;
++	int ret = -EINVAL;
++
++	if (clk->ops->setrate) {
++		spin_lock_irqsave(&clocks_lock, flags);
++		ret = clk->ops->setrate(clk, rate);
++		spin_unlock_irqrestore(&clocks_lock, flags);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
+ void clk_dummy_enable(struct clk *clk)
+ {
+ }
+diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
+index f9f349a..7373853 100644
+--- a/arch/arm/mach-pxa/clock.h
++++ b/arch/arm/mach-pxa/clock.h
+@@ -5,6 +5,7 @@ struct clkops {
+ 	void			(*enable)(struct clk *);
+ 	void			(*disable)(struct clk *);
+ 	unsigned long		(*getrate)(struct clk *);
++	int			(*setrate)(struct clk *, unsigned long);
+ };
+ 
+ struct clk {
+-- 
+1.5.6.5
