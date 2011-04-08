@@ -1,55 +1,50 @@
-From: eggonlea@gmail.com (Li Li)
-Date: Fri, 8 Apr 2011 21:35:48 +0800
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <alpine.LFD.2.00.1104080911520.28032@xanadu.home>
-References: <20100623133636.GC7058@shareable.org>
-	<20100629141836.GM2822@atomide.com>
-	<alpine.LFD.2.00.1006291355520.24097@xanadu.home>
-	<20100630110828.GZ2822@atomide.com>
-	<20100630131737.GF2822@atomide.com>
-	<alpine.LFD.2.00.1006301011520.24097@xanadu.home>
-	<20100701092510.GH2822@atomide.com>
-	<20100701174051.GA8786@shareable.org>
-	<alpine.LFD.2.00.1007012226170.26524@xanadu.home>
-	<20100702103744.GJ6632@atomide.com>
-	<20100705135526.GF15951@atomide.com>
-	<BANLkTim4TTf3KXGYzjcvQ2n-hNbdSQM1eg@mail.gmail.com>
-	<alpine.LFD.2.00.1104080911520.28032@xanadu.home>
-Message-ID: <BANLkTinEnn1C8_mKtL6P2YXdPSt1eaUzKA@mail.gmail.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Fri, 8 Apr 2011 15:37:42 +0200
+Subject: [Zaurus-devel] 2.6.39-rc2 on zaurus: does not build, does not boot
+In-Reply-To: <20110408130715.GA1632@ucw.cz>
+References: <20110408062646.GA1472@ucw.cz> <20110408130715.GA1632@ucw.cz>
+Message-ID: <20110408133742.GA21399@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+Hi!
+> > Boot stops just after mounting root filesystem; cursor stops
+> > flashing. (Any idea what goes on there?)
+> 
+> With CF bluetooth unplugged, it gets  up to userland.
+> 
+> Once it hung in eaarly boot, once early in runlevel 2.
 
-Thanks for the explanation. :)
+Hmm, the cf seems to be crippled a little.
 
-I noticed what you mentioned. Actually, Kconfig says TLS EMU might be
-used in some "old" (e.g. pre-armv6) SMP platforms without TLS
-register. In such a case, could we still ensure it's SMP safe by a
-single ldr?
+I've got oops in pccard, but only when cf wifi is compiled in kernel and
+inserted while booting, it stopped when the driver is compiled as module.
 
-Thanks,
-Lea
+Note that zaurus has two cf slots, one for internal hd and one outside, so it
+may be some race in cf/pccardd initalization.
 
-On Fri, Apr 8, 2011 at 9:19 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 8 Apr 2011, Li Li wrote:
->
->> Dears,
->>
->> I cannot understand how TLS EMU ensure it's SMP safe, because get_tls
->> helper (at 0xffff0fe0) just read the value from 0xffff0ff0. But all
->> SMP cores should have the exact same mapping to the vectors page (at
->> 0xffff0000). So various threads running on different SMP cores at the
->> same time would get the same emulated TLS value (instead of thread
->> specific value set via set_tls). Could anybody explain this a little
->> bit?
->
-> On SMP the hardware TLS register is always available, therefore the TLS
-> value is not stored at 0xffff0ff0. ?The code actually installed at
-> 0xffff0fe0 is modified at boot time by kuser_get_tls_init to select
-> either the ldr or the mrc instruction to retrieve the TLS value.
->
->
-> Nicolas
->
+Some parts of the trace:
+
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = c0004000
+[00000000] mpad=00000000
+Internal error: Oops: f5 [#1] PREEMPT
+las sysfs file:
+CPU: 0 Not tainted (2.6.38....)
+PC is at complete+0x30/0x90
+LR is at giveback+0x134/0x150
+pc: [<c0032070>]  lr : [<c019a4278>] psr: a0000093
+sp : c38a4cb0  ip : c38atc70  fp : c38a5cc4
+
+...
+
+Flags: NzCv  IRQs off  FIQs on  Mode SYC_32  ISA ARM segment kernel
+Control: 0000397f  Table a0004000  DAC: 00000017
+Process: pccardd (pid 275, stack limit = 0xc38a4278)
+Stack (0xc38a5cb0 to 0xc38a6000)
+...
+
+Which seems like problem occured in complete() ...
+
+-- 
+metan
