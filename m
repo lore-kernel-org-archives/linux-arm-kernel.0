@@ -1,32 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 08 Apr 2011 08:41:32 +0100
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <201104080535.02769.arnd@arndb.de>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201104080119.11378.arnd@arndb.de>
-	<20110407232959.GA29305@kroah.com>
-	<201104080535.02769.arnd@arndb.de>
-Message-ID: <4D9EBC2C.2050809@linaro.org>
+From: bill_carson@126.com (bill)
+Date: Fri, 8 Apr 2011 16:06:09 +0800 (CST)
+Subject: Query about __unmap_hugepage_range
+Message-ID: <42571f95.177e8.12f342597dc.Coremail.bill_carson@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/11 04:35, Arnd Bergmann wrote:
-> On Friday 08 April 2011, Greg KH wrote:
->> Symlinks are a requirement as multiple cpus can be attached to a single
->> SoC.
->>
->> What about multiple cpus that are attached to multiple SoCs?  Why even
->> try to describe this relationship, what would userspace get out of this
->> information?
-> 
-> The only one I can think of is node affinity. I've worked with a system
-> (IBM QS2x Cell blade) that had two SoCs with multiple CPUs each. There was
-> a significant performance penalty when talking to devices on the remote
-> SoC. In that case, we used the NUMA node information in /sys/ to deal
-> with it, but we might not want to use the NUMA infrastructure on systems
-> that only have RAM on one node.
+Hey, MM developers:)
 
-I'm struggling to see a scenario where we'd have multiple SoCs on a
-single device and only one filesystem. ux500 sub-arch code is yet to
-facilitate SoC counting functionality. If were are to implement per-SoC
-directories would this need to be added?
+I don't know if this posting is proper at here, so sorry for disturbing if it does. 
+
+for normal 4K page: in unmap_page_range 
+1: tlb_start_vma(tlb, vma); <------ call  flush_cache_range to invalidate icache if vma is VM_EXEC
+2: clear pagetable mapping
+3: tlb_end_vma(tlb, vma); <-------- call flush_tlb_range to invalidate unmapped vma tlb entry
+
+for hugepage: in __unmap_hugepage_range
+1: clear pagetable mapping
+ 2: call flush_tlb_range(vma, start, end); to invalidate unmapped vma tlb entry
+
+I really don't understand about two things:
+A: why there is no  flush_cache_range for hugepage when we do the unmapping?
+B: How does kernel take care of such case for both normal 4K page and hugepage:
+    a: mmap a page with PROT_EXEC at location p;
+    b: copy bunch instruction into p ,call cacheflush to make ICACHE see the new instruction; 
+    c: run instruction at location p, then unmap it;
+    d: mmap a new page with MAP_FIXED/PROT_EXEC at location p, and run unexpected instruction at p;
+        there is a great chance we got the same page@step_a;
+        user space should see a clean icache, not a stale one;
+     
+I am really puzzled for a long time.
+I am porting hugepage for ARM ,and one testcase in libhugetlbfs called icache-hygiene failed, test rationale is described  in above B.
+
+Any tips/advice would be truly appreciated.
+Thanks
+
+ 
+
+
+
+
+
+        
