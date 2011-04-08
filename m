@@ -1,116 +1,66 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Fri, 8 Apr 2011 15:20:57 +0100 (BST)
-Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for
- Thumb-2
-In-Reply-To: <BANLkTimocsXKuP54PRyCHTdYNqrhy9QQQA@mail.gmail.com>
-References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
-	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
-	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
-	<20110407222813.GF17049@n2100.arm.linux.org.uk>
-	<BANLkTimocsXKuP54PRyCHTdYNqrhy9QQQA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1104081453540.5463@localhost6.localdomain6>
+From: tixy@yxit.co.uk (Tixy)
+Date: Fri,  8 Apr 2011 15:32:56 +0100
+Subject: [PATCH 4/4] ARM: kprobes: Fix emulation of LDRD and STRD instructions
+In-Reply-To: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
+References: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1302273176-6414-5-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jon Medhurst <tixy@yxit.co.uk>
 
+The decoding of these instructions got the register indexed and
+immediate indexed forms the wrong way around, causing incorrect
+emulation.
 
-On Fri, 8 Apr 2011, Dave Martin wrote:
+Instructions like "LDRD Rx, [Rx]" were corrupting Rx because the base
+register writeback was being performed unconditionally, overwriting the
+value just loaded from memory. The fix is to only writeback the base
+register when that form of the instruction is used. Note, now that we
+reject probing writeback with PC the emulation code doesn't need the
+check rn!=15.
 
-> On Thu, Apr 7, 2011 at 11:28 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Apr 07, 2011 at 11:02:18AM +0100, Dave Martin wrote:
->>> The main reason for that is to code the ->ARM_r8 in C (as in the
->>> existing code). ?I feel safer doing that than hard-coding an offset in
->>> the assembler, though possibly that is overkill since if the layout of
->>> struct pt_regs changes we are probably in trouble for all kinds of
->>> other reasons anyway...
->>
->> It may be worth looking up exactly what's allowed with naked functions.
->> A naked function tells the compiler to omit the function prologue and
->> epologue, which effectively means you can't do very much other than
->> inline asm in them. ?So I think we're pretty safe from register
->> allocation issues.
->>
->> If the compiler was to do register allocation for &regs->ARM_r8, and it
->> landed up in r8, then that would not only break the code, but also break
->> the ABI as the compiler would be unable to save the value of r8.
->>
->>> I could have used register variables with explicit register
->>> assignments.  Alternatively, I could have added r8-r14 to the clobber
->>> list -- but then the compiler would generate unnecessary save and
->>> restore sequences for all those registers.
->>
->> I doubt it would for a naked function.  You're expected to handle
->> that stuff yourself with such things.
->>
->
-> It looks like your instinct is correct -- if I add those extra
-> registers to the clobber list, I get no save/resrote sequences, as you
-> suggest... but...
+Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+---
+ arch/arm/kernel/kprobes-decode.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-Just some observation on inline assembly behaviour ...
-
-If gcc in its wisdom decides it wants a register, it'll take that 
-register, in the sense that a clobber list r0-r12 will make compiles fail 
-even if gcc theoretically were able to restore every item from the stack 
-and/or first principles. But if you leave it a way out, then imagine 
-the compiler deciding to want your R8 reg, and doing code like:
-
- 	mov	r12, r8
- 	... your inline assembly goes here
- 	mov	r8, r12
-
-because you left it a nonclobbered register to store things in ...
-
-I've tried that once, with inline assembly that had a "ldm r0,{r0-r14}" 
-and the whole function operated on nothing else at all but global 
-variables. gcc wanted to keep the global pointer in a reg, and refused to 
-re-load that reg after that ldm, and whinced about the compile when giving 
-it a "full" clobber list".
-
-
-Anyway, re __naked: See <linux/compiler-gcc.h> for the goodie:
-
-/*
-  * it doesn't make sense on ARM (currently the only user of __naked) to trace
-  * naked functions because then mcount is called without stack and frame pointer
-  * being set up and there is no chance to restore the lr register to the value
-  * before mcount was called.
-  */
-#define __naked                         __attribute__((naked)) notrace
-
-who knows what other nice autoextensions beyond -finstrument-functions gcc 
-ultimately will come up with are going to have effects that end up 
-"clothing" naked functions nicely.
-
-
-In the end, fully agree that Dave is right, an assembler sourcefile is the 
-best place.
-
-FrankH.
-
->
-> From the GCC info docs:
-> `naked'
->     Use this attribute on the ARM, AVR, IP2K and SPU ports to indicate
->     that the specified function does not need prologue/epilogue
->     sequences generated by the compiler.  It is up to the programmer
->     to provide these sequences. The only statements that can be safely
->     included in naked functions are `asm' statements that do not have
->     operands.  All other statements, including declarations of local
->     variables, `if' statements, and so forth, should be avoided.
->     Naked functions should be used to implement the body of an
->     assembly function, while allowing the compiler to construct the
->     requisite function declaration for the assembler.
->
-> ... but we don't have an asm statement with no operands and no
-> accompanying declarations in this case.  Logically the code ought to
-> work if the compiler doesn't spill anything to the stack, and explicit
-> register variables ought to avoid this provided we don't have too
-> many.
->
-> But I doubt whether this behaviour is well tested by the compiler guys.
->
-> Cheers
-> ---Dave
->
+diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+index 2e22977..bb239f6 100644
+--- a/arch/arm/kernel/kprobes-decode.c
++++ b/arch/arm/kernel/kprobes-decode.c
+@@ -560,8 +560,8 @@ static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
+ 		  [i_fn] "r" (i_fn)
+ 		: "r0", "r1", "r2", "r3", "lr", "cc"
+ 	);
+-	if (rn != 15)
+-		regs->uregs[rn] = rnv;  /* Save Rn in case of writeback. */
++	if (is_writeback(insn))
++		regs->uregs[rn] = rnv;
+ }
+ 
+ static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
+@@ -580,8 +580,8 @@ static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
+ 	rnv_wb = insnslot_4arg_rflags(rnv, rmv, regs->uregs[rd],
+ 					       regs->uregs[rd+1],
+ 					       regs->ARM_cpsr, i_fn);
+-	if (rn != 15)
+-		regs->uregs[rn] = rnv_wb;  /* Save Rn in case of writeback. */
++	if (is_writeback(insn))
++		regs->uregs[rn] = rnv_wb;
+ }
+ 
+ static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
+@@ -1183,8 +1183,8 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 
+ 			insn &= 0xfff00fff;
+ 			insn |= 0x00002000;	/* Rn = r0, Rd = r2 */
+-			if (insn & (1 << 22)) {
+-				/* I bit */
++			if (!(insn & (1 << 22))) {
++				/* Register index */
+ 				insn &= ~0xf;
+ 				insn |= 1;	/* Rm = r1 */
+ 			}
+-- 
+1.7.2.5
