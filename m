@@ -1,50 +1,116 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Fri, 8 Apr 2011 15:37:42 +0200
-Subject: [Zaurus-devel] 2.6.39-rc2 on zaurus: does not build, does not boot
-In-Reply-To: <20110408130715.GA1632@ucw.cz>
-References: <20110408062646.GA1472@ucw.cz> <20110408130715.GA1632@ucw.cz>
-Message-ID: <20110408133742.GA21399@atrey.karlin.mff.cuni.cz>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 8 Apr 2011 15:20:57 +0100 (BST)
+Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for
+ Thumb-2
+In-Reply-To: <BANLkTimocsXKuP54PRyCHTdYNqrhy9QQQA@mail.gmail.com>
+References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
+	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
+	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
+	<20110407222813.GF17049@n2100.arm.linux.org.uk>
+	<BANLkTimocsXKuP54PRyCHTdYNqrhy9QQQA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1104081453540.5463@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> > Boot stops just after mounting root filesystem; cursor stops
-> > flashing. (Any idea what goes on there?)
-> 
-> With CF bluetooth unplugged, it gets  up to userland.
-> 
-> Once it hung in eaarly boot, once early in runlevel 2.
 
-Hmm, the cf seems to be crippled a little.
 
-I've got oops in pccard, but only when cf wifi is compiled in kernel and
-inserted while booting, it stopped when the driver is compiled as module.
+On Fri, 8 Apr 2011, Dave Martin wrote:
 
-Note that zaurus has two cf slots, one for internal hd and one outside, so it
-may be some race in cf/pccardd initalization.
+> On Thu, Apr 7, 2011 at 11:28 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Thu, Apr 07, 2011 at 11:02:18AM +0100, Dave Martin wrote:
+>>> The main reason for that is to code the ->ARM_r8 in C (as in the
+>>> existing code). ?I feel safer doing that than hard-coding an offset in
+>>> the assembler, though possibly that is overkill since if the layout of
+>>> struct pt_regs changes we are probably in trouble for all kinds of
+>>> other reasons anyway...
+>>
+>> It may be worth looking up exactly what's allowed with naked functions.
+>> A naked function tells the compiler to omit the function prologue and
+>> epologue, which effectively means you can't do very much other than
+>> inline asm in them. ?So I think we're pretty safe from register
+>> allocation issues.
+>>
+>> If the compiler was to do register allocation for &regs->ARM_r8, and it
+>> landed up in r8, then that would not only break the code, but also break
+>> the ABI as the compiler would be unable to save the value of r8.
+>>
+>>> I could have used register variables with explicit register
+>>> assignments.  Alternatively, I could have added r8-r14 to the clobber
+>>> list -- but then the compiler would generate unnecessary save and
+>>> restore sequences for all those registers.
+>>
+>> I doubt it would for a naked function.  You're expected to handle
+>> that stuff yourself with such things.
+>>
+>
+> It looks like your instinct is correct -- if I add those extra
+> registers to the clobber list, I get no save/resrote sequences, as you
+> suggest... but...
 
-Some parts of the trace:
+Just some observation on inline assembly behaviour ...
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0004000
-[00000000] mpad=00000000
-Internal error: Oops: f5 [#1] PREEMPT
-las sysfs file:
-CPU: 0 Not tainted (2.6.38....)
-PC is at complete+0x30/0x90
-LR is at giveback+0x134/0x150
-pc: [<c0032070>]  lr : [<c019a4278>] psr: a0000093
-sp : c38a4cb0  ip : c38atc70  fp : c38a5cc4
+If gcc in its wisdom decides it wants a register, it'll take that 
+register, in the sense that a clobber list r0-r12 will make compiles fail 
+even if gcc theoretically were able to restore every item from the stack 
+and/or first principles. But if you leave it a way out, then imagine 
+the compiler deciding to want your R8 reg, and doing code like:
 
-...
+ 	mov	r12, r8
+ 	... your inline assembly goes here
+ 	mov	r8, r12
 
-Flags: NzCv  IRQs off  FIQs on  Mode SYC_32  ISA ARM segment kernel
-Control: 0000397f  Table a0004000  DAC: 00000017
-Process: pccardd (pid 275, stack limit = 0xc38a4278)
-Stack (0xc38a5cb0 to 0xc38a6000)
-...
+because you left it a nonclobbered register to store things in ...
 
-Which seems like problem occured in complete() ...
+I've tried that once, with inline assembly that had a "ldm r0,{r0-r14}" 
+and the whole function operated on nothing else at all but global 
+variables. gcc wanted to keep the global pointer in a reg, and refused to 
+re-load that reg after that ldm, and whinced about the compile when giving 
+it a "full" clobber list".
 
--- 
-metan
+
+Anyway, re __naked: See <linux/compiler-gcc.h> for the goodie:
+
+/*
+  * it doesn't make sense on ARM (currently the only user of __naked) to trace
+  * naked functions because then mcount is called without stack and frame pointer
+  * being set up and there is no chance to restore the lr register to the value
+  * before mcount was called.
+  */
+#define __naked                         __attribute__((naked)) notrace
+
+who knows what other nice autoextensions beyond -finstrument-functions gcc 
+ultimately will come up with are going to have effects that end up 
+"clothing" naked functions nicely.
+
+
+In the end, fully agree that Dave is right, an assembler sourcefile is the 
+best place.
+
+FrankH.
+
+>
+> From the GCC info docs:
+> `naked'
+>     Use this attribute on the ARM, AVR, IP2K and SPU ports to indicate
+>     that the specified function does not need prologue/epilogue
+>     sequences generated by the compiler.  It is up to the programmer
+>     to provide these sequences. The only statements that can be safely
+>     included in naked functions are `asm' statements that do not have
+>     operands.  All other statements, including declarations of local
+>     variables, `if' statements, and so forth, should be avoided.
+>     Naked functions should be used to implement the body of an
+>     assembly function, while allowing the compiler to construct the
+>     requisite function declaration for the assembler.
+>
+> ... but we don't have an asm statement with no operands and no
+> accompanying declarations in this case.  Logically the code ought to
+> work if the compiler doesn't spill anything to the stack, and explicit
+> register variables ought to avoid this provided we don't have too
+> many.
+>
+> But I doubt whether this behaviour is well tested by the compiler guys.
+>
+> Cheers
+> ---Dave
+>
