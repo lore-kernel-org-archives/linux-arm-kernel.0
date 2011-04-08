@@ -1,34 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 8 Apr 2011 23:11:36 +0200
-Subject: [FAILED] BLD i.MX51 Referenz + linux-next git kernel
-In-Reply-To: <E1Q8IiX-0006uC-GW@himalia.hi.pengutronix.de>
-References: <E1Q8IiX-0006uC-GW@himalia.hi.pengutronix.de>
-Message-ID: <20110408211136.GC18601@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 8 Apr 2011 18:18:10 -0300
+Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
+In-Reply-To: <20110407074050.GF13963@pengutronix.de>
+References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110406163805.GA11820@linux-sh.org>
+	<20110406184022.GI13963@pengutronix.de>
+	<20110407043623.GA3905@jasper.tkos.co.il>
+	<20110407074050.GF13963@pengutronix.de>
+Message-ID: <BANLkTi=LdPOLxUURdc+pOj-t2wpjtezdhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Uwe,
 
-I haven't looked yet (and won't anymore today), but our autobuilder
-failed to build because of something that looks like a arm global
-problem.
+2011/4/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+>> Can you take the following one then? I need this to enable multiple NAND chips
+>> on i.MX25.
+>>
+>> http://article.gmane.org/gmane.linux.ports.arm.kernel/110313
+> I already have that in my tree.
 
-On Fri, Apr 08, 2011 at 10:55:45PM +0200, Pengutronix Sisyphus Druid wrote:
->                               Source URL .... git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
->                     Kernel configuration .... use config: mx51_defconfig
-> [...]
->   CC      arch/arm/kernel/process.o
-> arch/arm/kernel/process.c: In function 'cpu_idle':
-> arch/arm/kernel/process.c:200: error: implicit declaration of function 'cpuidle_call_idle'
-> make[1]: *** [arch/arm/kernel/process.o] Error 1
-> make: *** [arch/arm/kernel] Error 2
-> make: *** Waiting for unfinished jobs....
+Could you please point us to your git tree?
 
-Will look into that on Monday if nobody else cares before.
+Thanks,
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Fabio Estevam
