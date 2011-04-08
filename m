@@ -1,58 +1,43 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 8 Apr 2011 12:46:49 +0200
-Subject: [PATCH V4 0/4] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <4D9E75FF.6090603@freescale.com>
-References: <19869.40520.368078.270732@ipc1.ka-ro>
-	<4D9E75FF.6090603@freescale.com>
-Message-ID: <19870.59289.913018.127715@ipc1.ka-ro>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Fri, 8 Apr 2011 14:19:13 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+In-Reply-To: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
+References: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
+Message-ID: <BANLkTi=mV3VdJWk2H0f0UpgaWK=M8qrS=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 8, 2011 at 11:36 AM,  <oskar.andero@sonyericsson.com> wrote:
+> From: Victor Boivie <victor.boivie@sonyericsson.com>
+>
+> This patch allows the provided CONFIG_CMDLINE to be concatenated
+> with the one provided by the boot loader. This is useful to
+> merge the static values defined in CONFIG_CMDLINE with the
+> boot loader's (possibly) more dynamic values, such as startup
+> reasons and more.
+>
+> Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
 
-Huang Shijie writes:
-> Hi Lothar:
-> > Hi,
-> >
-> > Huang Shijie writes:
-> >> Does some one have any comments about this driver?
-> >>
-> > I'm still not happy with the rom-helper code that IMO does not belong
-> > in this driver.
-> Could you tell me which part of the rom-helper code is not belong the 
-> driver?
-> 
-All of it. I don't see a point in having it, when all that it does can
-be achieved with standard functions already.
+All fine from ARM point of view.
+Just to remember there is space for a standardization in the sources
+being that other archs have ended up using different names for the
+same things:
 
-> > Also, I would integrate the code from the hal-*.c files into the main
-> > file and remove all the function hooks, since the functions are the
-> thanks for your advice.
-> 
-> This driver will serve for many platforms, not only the imx23 and imx28.
-> I am merging the imx508 code to the driver.
-> I feel lucky that i did not merge all the code into the main file, which 
-> will
-> make the code mess.
-> 
-You would probably end up with some more functions that are
-implemented for the different variants. They could be prefixed with
-the SoC name and selected in the probe() function depending on the
-platform id. I don't see why this should get messy.
+CONFIG_CMDLINE
+CONFIG_CMDLINE_BOOL
+CONFIG_CMDLINE_OVERRIDE
+CONFIG_CMDLINE_OVERWRITE
+CONFIG_CMDLINE_EXTEND
 
-If the imx508 driver is so much different from the other variants,
-that merging it gets too messy, it's probably better to not merge it
-with the other variants anyway.
+During our kexecboot works we have battled with CMDLINE passed by
+broken arm bootloaders and we are still fighting with mips kernels...
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+My 2 cents
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Andrea
