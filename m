@@ -1,26 +1,40 @@
-From: pwaechtler@mac.com (Peter =?iso-8859-1?q?W=E4chtler?=)
-Date: Fri, 8 Apr 2011 18:25:46 +0200
-Subject: Fwd: Re: howto set some kernel pages to readonly?
-Message-ID: <201104081825.46632.pwaechtler@mac.com>
+From: nickbane1@gmail.com (Nick Bane)
+Date: Fri, 08 Apr 2011 17:42:12 +0100
+Subject: [PATCH] pxa270 rtc wakeup event fix
+Message-ID: <4D9F3AE4.2040101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 8. April 2011, 00:04:07 schrieben Sie:
+This fixes the failure to register the IRQ_RTCAlrm alarm as a wakeup event.
+It is misinterpreted as a gpio irq not a PWER bitmask.
 
-> We don't map kernel space using pages, but section mappings which have a
-> granularity of 1MB.
+Nick Bane
 
->That makes it difficult to set read-only status on just small areas of
->memory because you'd have to ensure that the .rodata starts at a 1MB
->boundary, and the following data also starts at a 1MB boundary - which
->would be quite wasteful.
+Index: linux-2.6.38/arch/arm/mach-pxa/pxa27x.c
+===================================================================
+--- linux-2.6.38.orig/arch/arm/mach-pxa/pxa27x.c    2011-04-07 
+21:07:54.000000000 +0100
++++ linux-2.6.38/arch/arm/mach-pxa/pxa27x.c    2011-04-07 
+21:08:40.000000000 +0100
+@@ -341,6 +341,11 @@
+  static inline void pxa27x_init_pm(void) {}
+  #endif
 
-OK, then what do I have to do, to set a section of 1MB to readonly?
-It's really meant as a guard - I have to find some memory corruption 
-potentially caused by a driver... 
++static int is_gpio_irq(int irq)
++{
++    return (irq == IRQ_GPIO0) || (irq == IRQ_GPIO1) || (irq >= 
+PXA_GPIO_IRQ_BASE);
++}
++
+  /* PXA27x:  Various gpios can issue wakeup events.  This logic only
+   * handles the simple cases, not the WEMUX2 and WEMUX3 options
+   */
+@@ -349,7 +354,7 @@
+      int gpio = IRQ_TO_GPIO(d->irq);
+      uint32_t mask;
 
-I use the slab cache to allocate - now - a 1 MB section - how to protect this 
-section as readonly?
+-    if (gpio >= 0 && gpio < 128)
++    if (is_gpio_irq(d->irq) && gpio >= 0 && gpio < 128)
+          return gpio_set_wake(gpio, on);
 
---
-   Peter
+      if (d->irq == IRQ_KEYPAD)
