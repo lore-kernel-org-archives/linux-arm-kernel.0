@@ -1,28 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 8 Apr 2011 15:31:13 -0400 (EDT)
-Subject: [PATCH 0/4] ARM: kprobes: Fixes for ARM instruction emulation
-	(part 3)
-In-Reply-To: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
-References: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <alpine.LFD.2.00.1104081529590.28032@xanadu.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 8 Apr 2011 21:36:52 +0200
+Subject: [PATCH] pxa270 rtc wakeup event fix
+In-Reply-To: <4D9F3AE4.2040101@gmail.com>
+References: <4D9F3AE4.2040101@gmail.com>
+Message-ID: <201104082136.52297.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Apr 2011, Tixy wrote:
-
-> (This is a third set of patches)
+On Friday 08 April 2011 18:42:12 Nick Bane wrote:
+> This fixes the failure to register the IRQ_RTCAlrm alarm as a wakeup event.
+> It is misinterpreted as a gpio irq not a PWER bitmask.
 > 
-> When kprobes are inserted into code an ARM instruction is replaced
-> by a breakpoint. When this is hit, the original instruction must be
-> emulated out-of-line. This patchset fixes yet more bugs in the
-> instruction decoding and emulation.
+> Nick Bane
+
+CCing Haojian and Eric.
+
 > 
-> [PATCH 1/4] ARM: kprobes: Reject probing of STREX and LDREX instructions
-> [PATCH 2/4] ARM: kprobes: Fix emulation of LDRH, STRH, LDRSB and LDRSH instructions
-> [PATCH 3/4] ARM: kprobes: Reject probing of LDR/STR instructions which update PC unpredictably
-> [PATCH 4/4] ARM: kprobes: Fix emulation of LDRD and STRD instructions
+> Index: linux-2.6.38/arch/arm/mach-pxa/pxa27x.c
+> ===================================================================
 
-Good catches!  Merged.
+Please use git format-patch
 
+Thanks, cheers
 
-Nicolas
+> --- linux-2.6.38.orig/arch/arm/mach-pxa/pxa27x.c    2011-04-07
+> 21:07:54.000000000 +0100
+> +++ linux-2.6.38/arch/arm/mach-pxa/pxa27x.c    2011-04-07
+> 21:08:40.000000000 +0100
+> @@ -341,6 +341,11 @@
+>   static inline void pxa27x_init_pm(void) {}
+>   #endif
+> 
+> +static int is_gpio_irq(int irq)
+> +{
+> +    return (irq == IRQ_GPIO0) || (irq == IRQ_GPIO1) || (irq >=
+> PXA_GPIO_IRQ_BASE);
+> +}
+> +
+>   /* PXA27x:  Various gpios can issue wakeup events.  This logic only
+>    * handles the simple cases, not the WEMUX2 and WEMUX3 options
+>    */
+> @@ -349,7 +354,7 @@
+>       int gpio = IRQ_TO_GPIO(d->irq);
+>       uint32_t mask;
+> 
+> -    if (gpio >= 0 && gpio < 128)
+> +    if (is_gpio_irq(d->irq) && gpio >= 0 && gpio < 128)
+>           return gpio_set_wake(gpio, on);
+> 
+>       if (d->irq == IRQ_KEYPAD)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
