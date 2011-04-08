@@ -1,111 +1,76 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 7 Apr 2011 17:17:17 -0700
-Subject: [patch 1/2] Add dt_compat field to struct gpio_chip
-In-Reply-To: <BANLkTi=WE_vOUAi8T60ESAH2kua4uB-_HA@mail.gmail.com>
-References: <20110407163322.465935232@gmail.com>
-	<20110407163930.GB17498@dandreoli.com>
-	<20110407171704.GC2455@angua.secretlab.ca>
-	<BANLkTi=WE_vOUAi8T60ESAH2kua4uB-_HA@mail.gmail.com>
-Message-ID: <BANLkTi=r2MESkm-JXwa59pYGDxMDWQF0XQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 07 Apr 2011 17:32:42 -0700
+Subject: [PATCH/RFC 0/6] ARM: runtime PM: consolidate runtime PM
+	implementations
+References: <1302134569-22825-1-git-send-email-khilman@ti.com>
+	<871v1eaz0u.fsf@ti.com> <87hbaa7zhs.fsf@ti.com>
+	<201104080031.23452.rjw@suse.com>
+Message-ID: <874o694m6t.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 7, 2011 at 1:41 PM, Domenico Andreoli <cavokz@gmail.com> wrote:
-> On Thu, Apr 7, 2011 at 7:17 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>
->> On Thu, Apr 07, 2011 at 06:39:30PM +0200, Domenico Andreoli wrote:
->> > From: Domenico Andreoli <cavokz@gmail.com>
->> >
->> > This new field allows easy creation of GPIO chips in base of struct arrays.
->> >
->> > Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
->> >
->> > ---
->> > ?drivers/of/gpio.c ? ? ? ? ?| ? ?3 +++
->> > ?include/asm-generic/gpio.h | ? ?1 +
->> > ?2 files changed, 4 insertions(+)
->> >
->> > Index: b/drivers/of/gpio.c
->> > ===================================================================
->> > --- a/drivers/of/gpio.c ? ? ? 2011-04-07 18:19:20.000000000 +0200
->> > +++ b/drivers/of/gpio.c ? ? ? 2011-04-07 18:20:31.000000000 +0200
->> > @@ -212,6 +212,9 @@
->> >
->> > ?void of_gpiochip_add(struct gpio_chip *chip)
->> > ?{
->> > + ? ? if ((!chip->of_node) && (chip->dt_compat))
->> > + ? ? ? ? ? ? chip->of_node = of_find_compatible_node(NULL, NULL, chip->dt_compat);
->> > +
->>
->> Hi Domenico,
->
-> Hi Grant,
->
->> From what I can tell, this patch attempts to adapt to the way that
->> arch/arm/plat-samsung/gpio.c registers gpios with the kernel. ?Each
->> platform seems to have its own static table of gpio banks which are
->> registered without any regard to the Linux device model. ?It works,
->> but it isn't really the way things should be done.
->
-> About the independent models of the ARM platforms, I can't say
-> anything. I only wanted to explore the DT concepts and import them on
-> the s3c24xx. While this could look only as the latest individual
-> attempt, the DT interface is not and cannot be of any harm if ARM
-> deploys it a little more.
->
->> The design of gpiolib right now is such that the of_node pointer
->> should be known *before* of_gpiochip_add() gets called. ?This is very
->> important because the code that registers the gpio is the only place
->> that can truly know which node is actually associated with the gpio.
->
-> This explains why a so simple patch has never been proposed before.
->
->> To solve your problem, the best solution would be to rework
->> arch/arm/plat-samsung-gpio.c to properly use the driver model and
->> register platform_devices which can be attached to dt nodes. ?This
->> change should probably be done anyway, even ignoring the dt needs, but
->> I'm not going to force you to make this change to get dt support added
->> for samsung gpios.
->
-> Indeed my plan is to not rework it, not in the next future, not before
-> I switched all its users to DT ;)
->
-> I'd like to follow the path towards a pure dts platform definition so
-> the next step would be to DT-fy something like the s3c
-> sdi/sdhci/whatever, which already uses some GPIO. Then something else
-> like audio or network and so on. I would be very glad to arrive sooner
-> or later to a s3c24xx FDT.
->
->> Alternately, what you should do is make sure that the chip->of_node
->> pointer is correctly populated before calling gpiochip_add(), possibly
->> in s3c_gpiolib_add().
->
-> I already restored it to the previous state, with .dt_compat in struct
-> s3c_gpio_chip and the the call of of_find_compatible_node() in
-> s3c_gpiolib_add(), this way it stays out of gpiolib.
->
->> Also, be careful about the way that 'compatible' is being used.
->> Remember that compatible describes the /interface/ to a device, but
->> not the /instance/. ?Many systems have multiple instances of the same
->> device, and compatible doesn't provide any help for differentiating
->> between them.
->
-> I needed some clarification here, I already suspected that my way to
-> encode banks in the compatible property was somehow fishy. And I
-> needed a working patch to get some attention before digging further..
-> ;)
->
->> Typically, when trying to find a specific instance of a
->> device, it should be resolved with a property in the /aliases node, or
->> it should be matched up against the resolved base address of the
->> device.
->
-> This is what I'll try next. This alone seems to imply the rework you
-> said above, let's see.
+"Rafael J. Wysocki" <rjw@suse.com> writes:
 
-It doesn't actually depend on the rework.  You already have the
-register information in s3c gpio.  You could use the same compatible
-value for all, and then add another comparison against the base
-address to figure out exactly which one is the correct one.
+> On Thursday, April 07, 2011, Kevin Hilman wrote:
+>> Kevin Hilman <khilman@ti.com> writes:
+>> 
+>> [...]
+>> 
+>> > Replacing the PM ops for all devices was done on OMAP and SH-mobile
+>> > because that was the only approach we had.  Now that we have device
+>> > power domains (thanks Rafael!), we can be more selective about which
+>> > devices to apply them to.
+>> >
+>> > Note that my RFC patch/series did not do the selective part of deciding
+>> > which devices to override and which ones not to, that part will be
+>> > platform specific.  
+>> 
+>> Actually, thinking about this a little more, my patch actually does
+>> select only relevant devices, and not *all* platform devices.
+>> 
+>> In my patch, the device power domain pointers are only added for devices
+>> where a clk_get() actually succeeds.  In the original version, the
+>> runtime PM hooks are overridden for *all* platform devices, but ones
+>> that have no clock (or where clk_get() failed) have the additional
+>> overhead of still calling the custom PM ops, but the custom ops have
+>> nothing to do.
+>
+> As I wrote in another message to Grant, the problem basically is that
+> the platform bus type behavior is not the desirable one.  Namely, I don't
+> generally want device driver callbacks to be invoked until we know that
+> power will be removed from the devices.  
 
-g.
+Ah, I didn't know that was a goal.  I totally agree there.
+
+> However, the platform bus type executes driver callbacks automatically
+> if they exist.  This currently is unavoidable, because power domain
+> callbacks are executed in addition to and not instead the bus type
+> callbacks.
+>
+> We've discussed that a bit at the LF Collab Summit with Grant and Paul and
+> the conclusion is that to address this particular problem we'll need to change
+> the core so that if there is a power domain for the given device, the
+> power domain callbacks will be executed first and if they return a specific
+> error code, the core will execute the bus type callbacks.  For devices that
+> don't belong to any power domain, the bus type callbacks will be executed
+> (which is the current behavior).
+>
+> I'm going to post a patch along these lines early next week.  Then, we
+> can simply move the management of device clocks, the execution of device
+> driver callbacks and the power removal into power domain callbacks.
+
+Sounds good to me.
+
+> At that point it may be possible to share some code between shmobile and
+> OMAP, but I'm not sure yet how much of the code may be shared and it what
+> way exactly.
+
+I'll have a look again after you post your series, but I'm pretty sure
+any runtime PM implementation based on basic clock gating could be
+shared.  Basically, the idea is in the absence of real power domains, to
+create a default "virtual" powerdomain that contains every device with a
+clock.  This would capture all on-chip devices into a single power domain.
+The device powerdomain callbacks for these would do the basic clock
+gating (as is done in mach-shmobile/pm_runtime.c).
+
+Kevin
