@@ -1,39 +1,91 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Fri,  8 Apr 2011 17:35:53 +0800
-Subject: [PATCH RFC] util-linux: readprofile: don't stop parsing at __init_end
-Message-ID: <1302255353-1622-1-git-send-email-ratbert.chuang@gmail.com>
+From: oskar.andero@sonyericsson.com (oskar.andero at sonyericsson.com)
+Date: Fri, 8 Apr 2011 11:36:23 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+Message-ID: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Po-Yu Chuang <ratbert@faraday-tech.com>
+From: Victor Boivie <victor.boivie@sonyericsson.com>
 
-Some architectures like ARM place __init_end before .text section.
-If any function in .init section is hit while profiling, readprofile
-stops at __init_end.  That means if we enable profiling at boot time,
-the profiler probably hits init functions and readprofile does not
-work well unless we reset profiling buffer with -r option.
+This patch allows the provided CONFIG_CMDLINE to be concatenated
+with the one provided by the boot loader. This is useful to
+merge the static values defined in CONFIG_CMDLINE with the
+boot loader's (possibly) more dynamic values, such as startup
+reasons and more.
 
-Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
+Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- sys-utils/readprofile.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig        |   21 ++++++++++++++++++---
+ arch/arm/kernel/setup.c |   13 +++++++++----
+ 2 files changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/sys-utils/readprofile.c b/sys-utils/readprofile.c
-index 91ff329..174f9aa 100644
---- a/sys-utils/readprofile.c
-+++ b/sys-utils/readprofile.c
-@@ -323,8 +323,10 @@ main(int argc, char **argv) {
- 			done = 1;
- 		else {
- 			/* ignore any LEADING (before a '[tT]' symbol is found)
--			   Absolute symbols */
--			if ((*mode == 'A' || *mode == '?') && total == 0)
-+			   Absolute symbols and __init_end because some
-+			   architectures place it before .text section */
-+			if ((*mode == 'A' || *mode == '?')
-+			    && (total == 0 || !strcmp(next_name, "__init_end")))
- 				continue;
- 			if (*mode != 'T' && *mode != 't' &&
- 			    *mode != 'W' && *mode != 'w')
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5b9f78b..fe34ed7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1743,16 +1743,31 @@ config CMDLINE
+ 	  time by entering them here. As a minimum, you should specify the
+ 	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+ 
++choice
++	prompt "Kernel command line type" if CMDLINE != ""
++	default CMDLINE_FROM_BOOTLOADER
++
++config CMDLINE_FROM_BOOTLOADER
++	bool "Use bootloader kernel arguments if available"
++	help
++	  Uses the command-line options passed by the boot loader. If
++	  the boot loader doesn't provide any, the default kernel command
++	  string provided in CMDLINE will be used.
++
++config CMDLINE_EXTEND
++	bool "Extend bootloader kernel arguments"
++	help
++	  The command-line arguments provided by the boot loader will be
++	  appended to the default kernel command string.
++
+ config CMDLINE_FORCE
+ 	bool "Always use the default kernel command string"
+-	depends on CMDLINE != ""
+ 	help
+ 	  Always use the default kernel command string, even if the boot
+ 	  loader passes other arguments to the kernel.
+ 	  This is useful if you cannot or don't want to change the
+ 	  command-line options your boot loader passes to the kernel.
+-
+-	  If unsure, say N.
++endchoice
+ 
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 006c1e8..6dce209 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -672,11 +672,16 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
+ 
+ static int __init parse_tag_cmdline(const struct tag *tag)
+ {
+-#ifndef CONFIG_CMDLINE_FORCE
+-	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
+-#else
++#if defined(CONFIG_CMDLINE_EXTEND)
++	strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
++	strlcat(default_command_line, tag->u.cmdline.cmdline,
++		COMMAND_LINE_SIZE);
++#elif defined(CONFIG_CMDLINE_FORCE)
+ 	pr_warning("Ignoring tag cmdline (using the default kernel command line)\n");
+-#endif /* CONFIG_CMDLINE_FORCE */
++#else
++	strlcpy(default_command_line, tag->u.cmdline.cmdline,
++		COMMAND_LINE_SIZE);
++#endif
+ 	return 0;
+ }
+ 
 -- 
-1.6.3.3
+1.7.4.2
