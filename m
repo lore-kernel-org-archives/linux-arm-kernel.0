@@ -1,64 +1,58 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Fri, 8 Apr 2011 20:30:17 +1000
-Subject: [PATCH] ARM: imx: fix usb related build failure for mach-vpr200
-In-Reply-To: <1302257029-17397-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1302257029-17397-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <201104082030.17792.marc@cpdesign.com.au>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 8 Apr 2011 12:46:49 +0200
+Subject: [PATCH V4 0/4] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4D9E75FF.6090603@freescale.com>
+References: <19869.40520.368078.270732@ipc1.ka-ro>
+	<4D9E75FF.6090603@freescale.com>
+Message-ID: <19870.59289.913018.127715@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi,
 
-Many thanks...
+Huang Shijie writes:
+> Hi Lothar:
+> > Hi,
+> >
+> > Huang Shijie writes:
+> >> Does some one have any comments about this driver?
+> >>
+> > I'm still not happy with the rom-helper code that IMO does not belong
+> > in this driver.
+> Could you tell me which part of the rom-helper code is not belong the 
+> driver?
+> 
+All of it. I don't see a point in having it, when all that it does can
+be achieved with standard functions already.
 
+> > Also, I would integrate the code from the hal-*.c files into the main
+> > file and remove all the function hooks, since the functions are the
+> thanks for your advice.
 > 
-> by just applying the change to mach-vpr200.c that the other machine files
-> got by 4bd597b.
+> This driver will serve for many platforms, not only the imx23 and imx28.
+> I am merging the imx508 code to the driver.
+> I feel lucky that i did not merge all the code into the main file, which 
+> will
+> make the code mess.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> this is based on a tree that have mach-mx3 moved to mach-imx, so this patch
-> might not apply to your tree. Then you need to patch
-> arch/arm/mach-mx3/mach-vpr200.c.
-> 
+You would probably end up with some more functions that are
+implemented for the different variants. They could be prefixed with
+the SoC name and selected in the probe() function depending on the
+platform id. I don't see why this should get messy.
 
-I haven't had time to absorb and test those changes, but... 
+If the imx508 driver is so much different from the other variants,
+that merging it gets too messy, it's probably better to not merge it
+with the other variants anyway.
 
-> 
->  arch/arm/mach-imx/mach-vpr200.c |   11 ++++++++---
->  1 files changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-vpr200.c
-> b/arch/arm/mach-imx/mach-vpr200.c index 84100c6..d74e347 100644
-> --- a/arch/arm/mach-imx/mach-vpr200.c
-> +++ b/arch/arm/mach-imx/mach-vpr200.c
-> @@ -246,11 +246,16 @@ static const struct fsl_usb2_platform_data
-> otg_device_pdata __initconst = { .workaround	=
-> FLS_USB2_WORKAROUND_ENGCM09152,
->  };
-> 
-> +static int vpr200_usbh_init(struct platform_device *pdev)
-> +{
-> +	return mx35_initialize_usb_hw(pdev->id,
-> +			MXC_EHCI_INTERFACE_SINGLE_UNI | MXC_EHCI_INTERNAL_PHY);
-> +}
-> +
->  /* USB HOST config */
->  static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
-> -	.portsc		= MXC_EHCI_MODE_SERIAL,
-> -	.flags		= MXC_EHCI_INTERFACE_SINGLE_UNI |
-> -			  MXC_EHCI_INTERNAL_PHY,
-> +	.init = vpr200_usbh_init,
-> +	.portsc = MXC_EHCI_MODE_SERIAL,
->  };
-> 
 
-This looks exactly like my fix after I pulled imx-for-2.6.39 the other day, 
-procured also by copying the other board files :)
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Acked-by: Marc Reilly <marc@cpdesign.com.au>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Cheers
-Marc
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
