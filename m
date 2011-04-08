@@ -1,45 +1,45 @@
-From: eggonlea@gmail.com (Li Li)
-Date: Fri, 8 Apr 2011 22:40:12 +0800
-Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
-	check for it on V6
-In-Reply-To: <20110408143541.GU26912@shareable.org>
-References: <20100630131737.GF2822@atomide.com>
-	<alpine.LFD.2.00.1006301011520.24097@xanadu.home>
-	<20100701092510.GH2822@atomide.com>
-	<20100701174051.GA8786@shareable.org>
-	<alpine.LFD.2.00.1007012226170.26524@xanadu.home>
-	<20100702103744.GJ6632@atomide.com>
-	<20100705135526.GF15951@atomide.com>
-	<BANLkTim4TTf3KXGYzjcvQ2n-hNbdSQM1eg@mail.gmail.com>
-	<alpine.LFD.2.00.1104080911520.28032@xanadu.home>
-	<BANLkTinEnn1C8_mKtL6P2YXdPSt1eaUzKA@mail.gmail.com>
-	<20110408143541.GU26912@shareable.org>
-Message-ID: <BANLkTimEzTk2CCVRZMcR_jmWJGkvm1vvdQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Apr 2011 17:02:17 +0200
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <4D9EBC2C.2050809@linaro.org>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201104080535.02769.arnd@arndb.de> <4D9EBC2C.2050809@linaro.org>
+Message-ID: <201104081702.17409.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ah, I see. That's why I saw abnormal behavior when I enabled TLS EMU
-on an ARMv7 SMP SOC. Many thanks! :)
+On Friday 08 April 2011, Lee Jones wrote:
+> On 08/04/11 04:35, Arnd Bergmann wrote:
+> > On Friday 08 April 2011, Greg KH wrote:
+> >> Symlinks are a requirement as multiple cpus can be attached to a single
+> >> SoC.
+> >>
+> >> What about multiple cpus that are attached to multiple SoCs?  Why even
+> >> try to describe this relationship, what would userspace get out of this
+> >> information?
+> > 
+> > The only one I can think of is node affinity. I've worked with a system
+> > (IBM QS2x Cell blade) that had two SoCs with multiple CPUs each. There was
+> > a significant performance penalty when talking to devices on the remote
+> > SoC. In that case, we used the NUMA node information in sys to deal
+> > with it, but we might not want to use the NUMA infrastructure on systems
+> > that only have RAM on one node.
+> 
+> I'm struggling to see a scenario where we'd have multiple SoCs on a
+> single device and only one filesystem. ux500 sub-arch code is yet to
+> facilitate SoC counting functionality. If were are to implement per-SoC
+> directories would this need to be added?
 
-On Fri, Apr 8, 2011 at 10:35 PM, Jamie Lokier <jamie@shareable.org> wrote:
-> Li Li wrote:
->> Nicolas,
->>
->> Thanks for the explanation. :)
->>
->> I noticed what you mentioned. Actually, Kconfig says TLS EMU might be
->> used in some "old" (e.g. pre-armv6) SMP platforms without TLS
->> register. In such a case, could we still ensure it's SMP safe by a
->> single ldr?
->
-> In that case, the hardware TLS 'mcr' is used, which traps and is
-> emulated by the undefined instruction handler. ?It's not fast but
-> presumably those platforms don't really matter.
->
-> See CONFIG_TLS_REG_EMUL in arch/arm/kernel/traps.c, and 'tls_emu'.
->
-> 'tls_emu' is a constant, so if a kernel built for TLS emulation is run
-> on something which has the TLS register, it will not work properly.
->
-> -- JAmie
->
+How can you say we won't need it when I've just given you a specific
+example of a widely shipping machine?
+
+It's not important that the kernel internal code supports multiple SoCs as
+long as there is no in-tree user for this. It can always be added at a later
+point.
+
+What is important is that the user interface accomodates for it. If you
+name the device simply /sys/devices/soc/, any user program looking at
+that will have to be modified when we have more than one. We cannot
+allow that to happen.
+
+	Arnd
