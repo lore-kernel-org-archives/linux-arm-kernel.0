@@ -1,122 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Apr 2011 09:36:25 +0200
-Subject: [PATCH V2 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1300355883-28484-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1300355883-28484-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300355883-28484-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110408073625.GU7285@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 08 Apr 2011 08:41:32 +0100
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <201104080535.02769.arnd@arndb.de>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201104080119.11378.arnd@arndb.de>
+	<20110407232959.GA29305@kroah.com>
+	<201104080535.02769.arnd@arndb.de>
+Message-ID: <4D9EBC2C.2050809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 05:58:03PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx53_loco.c |   88 +++++++++++++++++++++++++++++++++++
->  1 files changed, 88 insertions(+), 0 deletions(-)
+On 08/04/11 04:35, Arnd Bergmann wrote:
+> On Friday 08 April 2011, Greg KH wrote:
+>> Symlinks are a requirement as multiple cpus can be attached to a single
+>> SoC.
+>>
+>> What about multiple cpus that are attached to multiple SoCs?  Why even
+>> try to describe this relationship, what would userspace get out of this
+>> information?
 > 
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 0a18f8d..336273b 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,11 +23,13 @@
->  #include <linux/fec.h>
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
-> +#include <linux/ahci_platform.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/iomux-mx53.h>
-> +#include <mach/ahci_sata.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -38,6 +40,8 @@
->  
->  #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
->  
-> +static struct clk *sata_clk, *sata_ref_clk;
-> +
->  static iomux_v3_cfg_t mx53_loco_pads[] = {
->  	/* FEC */
->  	MX53_PAD_FEC_MDC__FEC_MDC,
-> @@ -203,6 +207,89 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +/* HW Initialization, if return 0, initialization is successful. */
-> +static int sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	int ret = 0;
-> +	u32 tmpdata;
-> +	struct clk *clk;
-> +
-> +	sata_clk = clk_get(dev, NULL);
-> +	if (IS_ERR(sata_clk)) {
-> +		dev_err(dev, "no sata clock.\n");
-> +		return PTR_ERR(sata_clk);
-> +	}
-> +	ret = clk_enable(sata_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata clock.\n");
-> +		clk_put(sata_clk);
-> +		return ret;
-> +	}
-> +
-> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> +	sata_ref_clk = clk_get(NULL, "usb_phy1");
-> +	if (IS_ERR(sata_ref_clk)) {
-> +		dev_err(dev, "no sata ref clock.\n");
-> +		ret = PTR_ERR(sata_ref_clk);
-> +		goto release_sata_clk;
-> +	}
-> +	ret = clk_enable(sata_ref_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata ref clock.\n");
-> +		clk_put(sata_ref_clk);
-> +		goto release_sata_clk;
-> +	}
-> +
-> +	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-> +	clk = clk_get(NULL, "ahb");
-> +	if (IS_ERR(clk)) {
-> +		dev_err(dev, "no ahb clock.\n");
-> +		ret = PTR_ERR(clk);
-> +		goto release_sata_ref_clk;
-> +	}
+> The only one I can think of is node affinity. I've worked with a system
+> (IBM QS2x Cell blade) that had two SoCs with multiple CPUs each. There was
+> a significant performance penalty when talking to devices on the remote
+> SoC. In that case, we used the NUMA node information in /sys/ to deal
+> with it, but we might not want to use the NUMA infrastructure on systems
+> that only have RAM on one node.
 
-When I read code like this I think that a devm_clk_get is overdue.
-
-Also, the ahci driver should handle the regular
-
-> +
-> +	tmpdata = readl(addr + HOST_CAP);
-> +	if (!(tmpdata & HOST_CAP_SSS)) {
-> +		tmpdata |= HOST_CAP_SSS;
-> +		writel(tmpdata, addr + HOST_CAP);
-> +	}
-
-According to the AHCI spec this bit is read only.
-
-> +
-> +	if (!(readl(addr + HOST_PORTS_IMPL) & 0x1))
-> +		writel((readl(addr + HOST_PORTS_IMPL) | 0x1),
-> +			addr + HOST_PORTS_IMPL);
-
-This is also readonly.
-
-> +
-> +	tmpdata = clk_get_rate(clk) / 1000;
-> +	clk_put(clk);
-> +	writel(tmpdata, addr + HOST_TIMER1MS);
-
-This should be in a more generic place as it needs to be done for every
-board. We can put this into some i.MX53 startup function.
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I'm struggling to see a scenario where we'd have multiple SoCs on a
+single device and only one filesystem. ux500 sub-arch code is yet to
+facilitate SoC counting functionality. If were are to implement per-SoC
+directories would this need to be added?
