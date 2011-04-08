@@ -1,80 +1,26 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Apr 2011 18:18:10 +0200
-Subject: [PATCH V2 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <010C9052C42A00499CE76D637FA5EE900D942F@039-SN1MPN1-001.039d.mgd.msft.net>
-References: <1300355883-28484-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1300355883-28484-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<20110408073625.GU7285@pengutronix.de>
-	<010C9052C42A00499CE76D637FA5EE900D942F@039-SN1MPN1-001.039d.mgd.msft.net>
-Message-ID: <20110408161810.GX7285@pengutronix.de>
+From: pwaechtler@mac.com (Peter =?iso-8859-1?q?W=E4chtler?=)
+Date: Fri, 8 Apr 2011 18:25:46 +0200
+Subject: Fwd: Re: howto set some kernel pages to readonly?
+Message-ID: <201104081825.46632.pwaechtler@mac.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2011 at 08:49:28AM +0000, Zhu Richard-R65037 wrote:
-> >
-> > When I read code like this I think that a devm_clk_get is overdue.
-> >
-> > Also, the ahci driver should handle the regular
-> [Richard]Sorry, I can't catch what's the exact means of this comment.
+Am Freitag, 8. April 2011, 00:04:07 schrieben Sie:
 
-devm_* are a set of functions which track the resources a driver
-allocates and frees them automatically when the driver exits. See for
-example the ahci driver. It uses devm_kzalloc and devm_ioremap.
-devm_clk_get would be nice to have also.
+> We don't map kernel space using pages, but section mappings which have a
+> granularity of 1MB.
 
-> 
-> >
-> > > +
-> > > +   tmpdata = readl(addr + HOST_CAP);
-> > > +   if (!(tmpdata & HOST_CAP_SSS)) {
-> > > +           tmpdata |= HOST_CAP_SSS;
-> > > +           writel(tmpdata, addr + HOST_CAP);
-> > > +   }
-> >
-> > According to the AHCI spec this bit is read only.
-> >
-> > > +
-> > > +   if (!(readl(addr + HOST_PORTS_IMPL) & 0x1))
-> > > +           writel((readl(addr + HOST_PORTS_IMPL) | 0x1),
-> > > +                   addr + HOST_PORTS_IMPL);
-> >
-> > This is also readonly.
-> >
-> [Richard]:About the RO marked bits defined in the SPEC, there are used
->  as R/W bits in MX53 AHCI implementation actually.
-> Here are the hack debug log:
-> ----------Log--------------------
-> HOST_CAP: 0x6726ff80
-> HOST_CAP: 0x6f26ff80 <------------ After set the SSS bit.
-> HOST_PT_IMPL: 0x0
-> HOST_PT_IMPL: 0x1    <------------ After set the IMPL bit
-> ahci: SSS flag set, parallel bus scan disabled
-> ahci ahci.0: AHCI 0001.0100 32 slots 1 ports 3 Gbps 0x1 impl platform mode
-> ahci ahci.0: flags: ncq sntf stag pm led clo only pmp pio slum part ccc
-> scsi0 : ahci
-> ata1: SATA max UDMA/133 irq_stat 0x00000040, connection status changed irq 28
-> MXC MTD nand Driver 3.0
-> ----------End--------------------
+>That makes it difficult to set read-only status on just small areas of
+>memory because you'd have to ensure that the .rodata starts at a 1MB
+>boundary, and the following data also starts at a 1MB boundary - which
+>would be quite wasteful.
 
-Sigh. At least they tried to implement a standard...
+OK, then what do I have to do, to set a section of 1MB to readonly?
+It's really meant as a guard - I have to find some memory corruption 
+potentially caused by a driver... 
 
-> > > +
-> > > +   tmpdata = clk_get_rate(clk) / 1000;
-> > > +   clk_put(clk);
-> > > +   writel(tmpdata, addr + HOST_TIMER1MS);
-> >
-> > This should be in a more generic place as it needs to be done for every
-> > board. We can put this into some i.MX53 startup function.
-> >
-> [Richard]How about put these codes into one standalone file in .../arch/arm/plat-mxc/ folder,
->  and export the sata_init and sata_exit out for kinds of MX53 boards?
+I use the slab cache to allocate - now - a 1 MB section - how to protect this 
+section as readonly?
 
-Yes, probably except the special clock usage on the loco board.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--
+   Peter
