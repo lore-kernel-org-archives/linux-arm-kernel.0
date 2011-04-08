@@ -1,43 +1,38 @@
-From: bill_carson@126.com (bill)
-Date: Fri, 8 Apr 2011 16:06:09 +0800 (CST)
-Subject: Query about __unmap_hugepage_range
-Message-ID: <42571f95.177e8.12f342597dc.Coremail.bill_carson@126.com>
+From: martin.jansa@gmail.com (Martin Jansa)
+Date: Fri, 8 Apr 2011 10:28:27 +0200
+Subject: [Zaurus-devel] 2.6.39-rc2 on zaurus: does not build, does not boot
+In-Reply-To: <201104080931.11202.marek.vasut@gmail.com>
+References: <20110408062646.GA1472@ucw.cz>
+	<201104080931.11202.marek.vasut@gmail.com>
+Message-ID: <20110408082827.GD3180@jama.jama.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey, MM developers:)
+On Fri, Apr 08, 2011 at 09:31:10AM +0200, Marek Vasut wrote:
+> On Friday 08 April 2011 08:26:46 Pavel Machek wrote:
+> > Hi!
+> > 
+> > Build fix is below. Maybe it is pending in the trees somewhere
+> > already...
+> 
+> Fix is already there, it was broken by a patch from someone recently. Thanks 
+> though
+> > 
+> > Boot stops just after mounting root filesystem; cursor stops
+> > flashing. (Any idea what goes on there?)
+> 
+> No idea, it works for me and doesn't hang ;-)
 
-I don't know if this posting is proper at here, so sorry for disturbing if it does. 
+it works here too with rev 6221f222c0ebf1acdf7abcf927178f40e1a65e2a
 
-for normal 4K page: in unmap_page_range 
-1: tlb_start_vma(tlb, vma); <------ call  flush_cache_range to invalidate icache if vma is VM_EXEC
-2: clear pagetable mapping
-3: tlb_end_vma(tlb, vma); <-------- call flush_tlb_range to invalidate unmapped vma tlb entry
+Cheers,
 
-for hugepage: in __unmap_hugepage_range
-1: clear pagetable mapping
- 2: call flush_tlb_range(vma, start, end); to invalidate unmapped vma tlb entry
-
-I really don't understand about two things:
-A: why there is no  flush_cache_range for hugepage when we do the unmapping?
-B: How does kernel take care of such case for both normal 4K page and hugepage:
-    a: mmap a page with PROT_EXEC at location p;
-    b: copy bunch instruction into p ,call cacheflush to make ICACHE see the new instruction; 
-    c: run instruction at location p, then unmap it;
-    d: mmap a new page with MAP_FIXED/PROT_EXEC at location p, and run unexpected instruction at p;
-        there is a great chance we got the same page@step_a;
-        user space should see a clean icache, not a stale one;
-     
-I am really puzzled for a long time.
-I am porting hugepage for ARM ,and one testcase in libhugetlbfs called icache-hygiene failed, test rationale is described  in above B.
-
-Any tips/advice would be truly appreciated.
-Thanks
-
- 
-
-
-
-
-
-        
+-- 
+Martin 'JaMa' Jansa     jabber: Martin.Jansa at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110408/90563cf7/attachment.sig>
