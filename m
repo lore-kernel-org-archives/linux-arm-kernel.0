@@ -1,43 +1,59 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 8 Apr 2011 11:03:19 +0100
-Subject: [RFC PATCH] ARM: fiq: Refactor {get,set}_fiq_regs() for Thumb-2
-In-Reply-To: <20110407222813.GF17049@n2100.arm.linux.org.uk>
-References: <mailman.19600.1302086322.1534.linux-arm-kernel@lists.infradead.org>
-	<alpine.DEB.2.00.1104061208310.15572@localhost6.localdomain6>
-	<BANLkTi=q=A=RBh-mQgZ_4S6NkUJ0O7ERig@mail.gmail.com>
-	<20110407222813.GF17049@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimocsXKuP54PRyCHTdYNqrhy9QQQA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  8 Apr 2011 12:03:49 +0200
+Subject: [PATCH] ARM: imx: fix usb related build failure for mach-vpr200
+Message-ID: <1302257029-17397-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 7, 2011 at 11:28 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 07, 2011 at 11:02:18AM +0100, Dave Martin wrote:
->> The main reason for that is to code the ->ARM_r8 in C (as in the
->> existing code). ?I feel safer doing that than hard-coding an offset in
->> the assembler, though possibly that is overkill since if the layout of
->> struct pt_regs changes we are probably in trouble for all kinds of
->> other reasons anyway...
->
-> It may be worth looking up exactly what's allowed with naked functions.
-> A naked function tells the compiler to omit the function prologue and
-> epologue, which effectively means you can't do very much other than
-> inline asm in them. ?So I think we're pretty safe from register
-> allocation issues.
->
-> If the compiler was to do register allocation for &regs->ARM_r8, and it
-> landed up in r8, then that would not only break the code, but also break
-> the ABI as the compiler would be unable to save the value of r8.
->
->> I could have used register variables with explicit register
->> assignments.  Alternatively, I could have added r8-r14 to the clobber
->> list -- but then the compiler would generate unnecessary save and
->> restore sequences for all those registers.
->
-> I doubt it would for a naked function.  You're expected to handle
-> that stuff yourself with such things.
->
+This was broken by
 
-It looks like your instinct is correct -- if I add those extra
-registers to the clobber list, I get no save/resrote sequences, as you
-suggest... but...
+	4bd597b (ARM i.MX ehci: do ehci init in board specific functions)
+
+and fixes:
+
+  CC      arch/arm/mach-mx3/mach-vpr200.o
+arch/arm/mach-mx3/mach-vpr200.c:263: error: unknown field 'flags' specified in initializer
+arch/arm/mach-mx3/mach-vpr200.c:264: warning: initialization makes pointer from integer without a cast
+
+by just applying the change to mach-vpr200.c that the other machine files
+got by 4bd597b.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+this is based on a tree that have mach-mx3 moved to mach-imx, so this patch
+might not apply to your tree. Then you need to patch arch/arm/mach-mx3/mach-vpr200.c.
+
+Thanks
+Uwe
+
+ arch/arm/mach-imx/mach-vpr200.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
+index 84100c6..d74e347 100644
+--- a/arch/arm/mach-imx/mach-vpr200.c
++++ b/arch/arm/mach-imx/mach-vpr200.c
+@@ -246,11 +246,16 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+ 	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
+ };
+ 
++static int vpr200_usbh_init(struct platform_device *pdev)
++{
++	return mx35_initialize_usb_hw(pdev->id,
++			MXC_EHCI_INTERFACE_SINGLE_UNI | MXC_EHCI_INTERNAL_PHY);
++}
++
+ /* USB HOST config */
+ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
+-	.portsc		= MXC_EHCI_MODE_SERIAL,
+-	.flags		= MXC_EHCI_INTERFACE_SINGLE_UNI |
+-			  MXC_EHCI_INTERNAL_PHY,
++	.init = vpr200_usbh_init,
++	.portsc = MXC_EHCI_MODE_SERIAL,
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
+-- 
+1.7.2.3
