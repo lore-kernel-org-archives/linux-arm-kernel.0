@@ -1,87 +1,193 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Apr 2011 20:15:44 +0800
-Subject: [PATCH 7/7] ARM: mmp: enable max7312 gpio expander in dkb
-In-Reply-To: <1302264944-2759-6-git-send-email-haojian.zhuang@marvell.com>
-References: <2011040801>
-	<1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-4-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-5-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-6-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1302264944-2759-7-git-send-email-haojian.zhuang@marvell.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  8 Apr 2011 13:58:39 +0100
+Subject: [PATCH] ARM: futex: add SMP futex support when !CPU_USE_DOMAINS
+Message-ID: <1302267519-18156-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support max7312 gpio expander in TTC DKB.
+This patch uses the load/store exclusive instructions to add SMP futex
+support for ARM.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Since the ARM architecture does not provide instructions for
+unprivileged exclusive memory accesses, we can only provide SMP futexes
+when CPU domain support is disabled.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-mmp/ttc_dkb.c |   31 ++++++++++++++++++++++++++++++-
- 1 files changed, 30 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/futex.h |  137 +++++++++++++++++++++++++++--------------
+ 1 files changed, 90 insertions(+), 47 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index e411039..8ca4a11 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -15,6 +15,8 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
- #include <linux/interrupt.h>
-+#include <linux/gpio.h>
-+#include <linux/i2c/pca953x.h>
+diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
+index 199a6b6..8c73900 100644
+--- a/arch/arm/include/asm/futex.h
++++ b/arch/arm/include/asm/futex.h
+@@ -3,16 +3,74 @@
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -25,7 +27,17 @@
+ #ifdef __KERNEL__
  
- #include "common.h"
- 
--#define TTCDKB_NR_IRQS		(IRQ_BOARD_START + 24)
-+#define TTCDKB_GPIO_EXT0(x)	(NR_BUILTIN_GPIO + ((x < 0) ? 0 :	\
-+				((x < 16) ? x : 15)))
-+#define TTCDKB_GPIO_EXT1(x)	(NR_BUILTIN_GPIO + 16 + ((x < 0) ? 0 :	\
-+				((x < 16) ? x : 15)))
++#if defined(CONFIG_CPU_USE_DOMAINS) && defined(CONFIG_SMP)
++/* ARM doesn't provide unprivileged exclusive memory accessors */
++#include <asm-generic/futex.h>
++#else
 +
-+/*
-+ * 16 board interrupts -- MAX7312 GPIO expander
-+ * 16 board interrupts -- PCA9575 GPIO expander
-+ * 24 board interrupts -- 88PM860x PMIC
-+ */
-+#define TTCDKB_NR_IRQS		(IRQ_BOARD_START + 16 + 16 + 24)
- 
- static unsigned long ttc_dkb_pin_config[] __initdata = {
- 	/* UART2 */
-@@ -113,6 +125,22 @@ static struct platform_device *ttc_dkb_devices[] = {
- 	&ttc_dkb_device_onenand,
- };
- 
-+static struct pca953x_platform_data max7312_data[] = {
-+	{
-+		.gpio_base	= TTCDKB_GPIO_EXT0(0),
-+		.irq_base	= IRQ_BOARD_START,
-+	},
-+};
++#include <linux/futex.h>
++#include <linux/uaccess.h>
++#include <asm/errno.h>
 +
-+static struct i2c_board_info ttc_dkb_i2c_info[] = {
-+	{
-+		.type		= "max7312",
-+		.addr		= 0x23,
-+		.irq		= IRQ_GPIO(80),
-+		.platform_data	= &max7312_data,
-+	},
-+};
++#define __futex_atomic_ex_table(err_reg)			\
++	"3:\n"							\
++	"	.pushsection __ex_table,\"a\"\n"		\
++	"	.align	3\n"					\
++	"	.long	1b, 4f, 2b, 4f\n"			\
++	"	.popsection\n"					\
++	"	.pushsection .fixup,\"ax\"\n"			\
++	"4:	mov	%0, " err_reg "\n"			\
++	"	b	3b\n"					\
++	"	.popsection"
 +
- static void __init ttc_dkb_init(void)
+ #ifdef CONFIG_SMP
+ 
+-#include <asm-generic/futex.h>
++#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
++	smp_mb();						\
++	__asm__ __volatile__(					\
++	"1:	ldrex	%1, [%2]\n"				\
++	"	" insn "\n"					\
++	"2:	strex	%1, %0, [%2]\n"				\
++	"	teq	%1, #0\n"				\
++	"	bne	1b\n"					\
++	"	mov	%0, #0\n"				\
++	__futex_atomic_ex_table("%4")				\
++	: "=&r" (ret), "=&r" (oldval)				\
++	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
++	: "cc", "memory")
++
++static inline int
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++			      u32 oldval, u32 newval)
++{
++	int ret;
++	u32 val;
++
++	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++		return -EFAULT;
++
++	smp_mb();
++	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
++	"1:	ldrex	%1, [%4]\n"
++	"	teq	%1, %2\n"
++	"	ite	eq	@ explicit IT needed for the 2b label\n"
++	"2:	strexeq	%0, %3, [%4]\n"
++	"	movne	%0, #0\n"
++	"	teq	%0, #0\n"
++	"	bne	1b\n"
++	__futex_atomic_ex_table("%5")
++	: "=&r" (ret), "=&r" (val)
++	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
++	: "cc", "memory");
++	smp_mb();
++
++	*uval = val;
++	return ret;
++}
+ 
+ #else /* !SMP, we can work around lack of atomic ops by disabling preemption */
+ 
+-#include <linux/futex.h>
+ #include <linux/preempt.h>
+-#include <linux/uaccess.h>
+-#include <asm/errno.h>
+ #include <asm/domain.h>
+ 
+ #define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
+@@ -21,20 +79,38 @@
+ 	"	" insn "\n"					\
+ 	"2:	" T(str) "	%0, [%2]\n"			\
+ 	"	mov	%0, #0\n"				\
+-	"3:\n"							\
+-	"	.pushsection __ex_table,\"a\"\n"		\
+-	"	.align	3\n"					\
+-	"	.long	1b, 4f, 2b, 4f\n"			\
+-	"	.popsection\n"					\
+-	"	.pushsection .fixup,\"ax\"\n"			\
+-	"4:	mov	%0, %4\n"				\
+-	"	b	3b\n"					\
+-	"	.popsection"					\
++	__futex_atomic_ex_table("%4")				\
+ 	: "=&r" (ret), "=&r" (oldval)				\
+ 	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
+ 	: "cc", "memory")
+ 
+ static inline int
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++			      u32 oldval, u32 newval)
++{
++	int ret = 0;
++	u32 val;
++
++	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++		return -EFAULT;
++
++	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
++	"1:	" T(ldr) "	%1, [%4]\n"
++	"	teq	%1, %2\n"
++	"	it	eq	@ explicit IT needed for the 2b label\n"
++	"2:	" T(streq) "	%3, [%4]\n"
++	__futex_atomic_ex_table("%5")
++	: "+r" (ret), "=&r" (val)
++	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
++	: "cc", "memory");
++
++	*uval = val;
++	return ret;
++}
++
++#endif /* !SMP */
++
++static inline int
+ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
  {
- 	mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
-@@ -121,6 +149,7 @@ static void __init ttc_dkb_init(void)
- 	pxa910_add_uart(1);
- 
- 	/* off-chip devices */
-+	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+ 	int op = (encoded_op >> 28) & 7;
+@@ -87,39 +163,6 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
+ 	return ret;
  }
  
+-static inline int
+-futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
+-			      u32 oldval, u32 newval)
+-{
+-	int ret = 0;
+-	u32 val;
+-
+-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+-		return -EFAULT;
+-
+-	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
+-	"1:	" T(ldr) "	%1, [%4]\n"
+-	"	teq	%1, %2\n"
+-	"	it	eq	@ explicit IT needed for the 2b label\n"
+-	"2:	" T(streq) "	%3, [%4]\n"
+-	"3:\n"
+-	"	.pushsection __ex_table,\"a\"\n"
+-	"	.align	3\n"
+-	"	.long	1b, 4f, 2b, 4f\n"
+-	"	.popsection\n"
+-	"	.pushsection .fixup,\"ax\"\n"
+-	"4:	mov	%0, %5\n"
+-	"	b	3b\n"
+-	"	.popsection"
+-	: "+r" (ret), "=&r" (val)
+-	: "r" (oldval), "r" (newval), "r" (uaddr), "Ir" (-EFAULT)
+-	: "cc", "memory");
+-
+-	*uval = val;
+-	return ret;
+-}
+-
+-#endif /* !SMP */
+-
++#endif /* !(CPU_USE_DOMAINS && SMP) */
+ #endif /* __KERNEL__ */
+ #endif /* _ASM_ARM_FUTEX_H */
 -- 
-1.5.6.5
+1.7.0.4
