@@ -1,54 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 07 Apr 2011 22:52:53 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: fix personality flag propagation across an exec
-Message-ID: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Apr 2011 05:35:02 +0200
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <20110407232959.GA29305@kroah.com>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201104080119.11378.arnd@arndb.de>
+	<20110407232959.GA29305@kroah.com>
+Message-ID: <201104080535.02769.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 08 April 2011, Greg KH wrote:
+> Symlinks are a requirement as multiple cpus can be attached to a single
+> SoC.
+> 
+> What about multiple cpus that are attached to multiple SoCs?  Why even
+> try to describe this relationship, what would userspace get out of this
+> information?
 
-Our SET_PERSONALITY() implementation was overwriting all existing
-personality flags, including ADDR_NO_RANDOMIZE, making them unavailable
-to processes being exec'd after a call to personality() in user space.
-This prevents the gdb test suite from running successfully.
+The only one I can think of is node affinity. I've worked with a system
+(IBM QS2x Cell blade) that had two SoCs with multiple CPUs each. There was
+a significant performance penalty when talking to devices on the remote
+SoC. In that case, we used the NUMA node information in /sys/ to deal
+with it, but we might not want to use the NUMA infrastructure on systems
+that only have RAM on one node.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/kernel/elf.c |   19 +++++++++++++------
- 1 files changed, 13 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d4a0da1..8524d09 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -40,16 +40,23 @@ EXPORT_SYMBOL(elf_check_arch);
- void elf_set_personality(const struct elf32_hdr *x)
- {
- 	unsigned int eflags = x->e_flags;
--	unsigned int personality = PER_LINUX_32BIT;
-+	unsigned int personality = current->personality;
- 
- 	/*
-+	 * Inherit most personality flags from parent, except for those
-+	 * we're about to choose.  Beware: PER_LINUX_32BIT carries flag bits
-+	 * outside of PER_MASK.
-+	 */
-+	personality &= ~(PER_MASK | PER_LINUX | PER_LINUX_32BIT);
-+		
-+	/*
- 	 * APCS-26 is only valid for OABI executables
- 	 */
--	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN) {
--		if (eflags & EF_ARM_APCS_26)
--			personality = PER_LINUX;
--	}
--
-+	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN &&
-+	    (eflags & EF_ARM_APCS_26))
-+		personality |= PER_LINUX;
-+	else
-+		personality |= PER_LINUX_32BIT;
- 	set_personality(personality);
- 
- 	/*
--- 
-1.7.4
+	Arnd
