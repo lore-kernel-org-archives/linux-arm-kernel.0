@@ -1,39 +1,40 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Apr 2011 20:15:39 +0800
-Subject: [PATCH 2/7] ARM: pxa: always clear LPM bits for PXA168 MFPR
-In-Reply-To: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri,  8 Apr 2011 20:15:40 +0800
+Subject: [PATCH 3/7] ARM: mmp: set correct uart according to board
+In-Reply-To: <1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
 References: <2011040801>
 	<1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
+	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bit[9:7] should always be zero in PXA168.
+UART3 is the default console in jasper, brownstone and avengers lite.
 
+Change-Id: Iacfe665cc0e20a47d50e0b2ad8724097f28e7d2c
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/mfp-pxa168.h |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/include/mach/debug-macro.S |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-index 4621067..713be15 100644
---- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-+++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-@@ -8,6 +8,15 @@
- #define MFP_DRIVE_MEDIUM	(0x2 << 13)
- #define MFP_DRIVE_FAST		(0x3 << 13)
+diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
+index 7e2ebd3..b353785 100644
+--- a/arch/arm/mach-mmp/include/mach/debug-macro.S
++++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
+@@ -14,8 +14,14 @@
+ 		.macro	addruart, rp, rv
+ 		ldr	\rp, =APB_PHYS_BASE		@ physical
+ 		ldr	\rv, =APB_VIRT_BASE		@ virtual
++#if defined(CONFIG_MACH_BROWNSTONE) || defined(CONFIG_MACH_MARVELL_JASPER) \
++	|| defined(CONFIG_MACH_AVENGERS_LITE)
++		orr	\rp, \rp, #0x00018000
++		orr	\rv, \rv, #0x00018000
++#else
+ 		orr	\rp, \rp, #0x00017000
+ 		orr	\rv, \rv, #0x00017000
++#endif
+ 		.endm
  
-+#undef MFP_CFG
-+#undef MFP_CFG_DRV
-+
-+#define MFP_CFG(pin, af)		\
-+	(MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_MEDIUM)
-+
-+#define MFP_CFG_DRV(pin, af, drv)	\
-+	(MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_##drv)
-+
- /* GPIO */
- #define GPIO0_GPIO		MFP_CFG(GPIO0, AF5)
- #define GPIO1_GPIO		MFP_CFG(GPIO1, AF5)
+ #define UART_SHIFT	2
 -- 
 1.5.6.5
