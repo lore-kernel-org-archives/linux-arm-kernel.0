@@ -1,54 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 8 Apr 2011 16:44:02 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: fix personality flag propagation across an exec
-In-Reply-To: <20110408201541.GC5573@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
-	<20110408072931.GB27450@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104080856000.28032@xanadu.home>
-	<20110408191035.GA5573@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104081536390.28032@xanadu.home>
-	<20110408201541.GC5573@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1104081642330.28032@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 8 Apr 2011 23:11:36 +0200
+Subject: [FAILED] BLD i.MX51 Referenz + linux-next git kernel
+In-Reply-To: <E1Q8IiX-0006uC-GW@himalia.hi.pengutronix.de>
+References: <E1Q8IiX-0006uC-GW@himalia.hi.pengutronix.de>
+Message-ID: <20110408211136.GC18601@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Apr 2011, Russell King - ARM Linux wrote:
+Hello,
 
-> On Fri, Apr 08, 2011 at 03:50:21PM -0400, Nicolas Pitre wrote:
-> 
-> > Or is the actual personality type not supposed to be inherited?
-> 
-> Many architectures explicitly set a personality type on exec, so that
-> seems to be the thing to do.  We want it set to a PER_LINUX flavour
-> as the ELF executables we run tend to be Linux executables.
-> 
-> Also, the ARM kernel doesn't really support anything but PER_LINUX
-> ELF executables, so it'd be rather meaningless to set it to anything
-> else here.
-> 
-> So:
-> 
-> 	unsigned int personality = current->personality & ~PER_MASK;
-> 
-> 	/*
-> 	 * We only support Linux ELF executables, so always set the
-> 	 * personality to LINUX.
-> 	 */
-> 	personality |= PER_LINUX;
-> 
-> 	/* APCS-26 is only valid for OABI executables */
-> 	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN &&
-> 	    (eflags & EF_ARM_APCS_26))
-> 		personality &= ~ADDR_LIMIT_32BIT;
-> 	else
-> 		personality |= ADDR_LIMIT_32BIT;
-> 
-> 	set_personality(personality);
-> 
-> is probably what we want.
+I haven't looked yet (and won't anymore today), but our autobuilder
+failed to build because of something that looks like a arm global
+problem.
 
-ACK.  Are you committing this directly, or do you still want me to send 
-you a patch?
+On Fri, Apr 08, 2011 at 10:55:45PM +0200, Pengutronix Sisyphus Druid wrote:
+>                               Source URL .... git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
+>                     Kernel configuration .... use config: mx51_defconfig
+> [...]
+>   CC      arch/arm/kernel/process.o
+> arch/arm/kernel/process.c: In function 'cpu_idle':
+> arch/arm/kernel/process.c:200: error: implicit declaration of function 'cpuidle_call_idle'
+> make[1]: *** [arch/arm/kernel/process.o] Error 1
+> make: *** [arch/arm/kernel] Error 2
+> make: *** Waiting for unfinished jobs....
 
+Will look into that on Monday if nobody else cares before.
 
-Nicolas
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
