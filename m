@@ -1,72 +1,39 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Fri,  8 Apr 2011 15:32:55 +0100
-Subject: [PATCH 3/4] ARM: kprobes: Reject probing of LDR/STR instructions
-	which update PC unpredictably
-In-Reply-To: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
-References: <1302273176-6414-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1302273176-6414-4-git-send-email-tixy@yxit.co.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Fri, 8 Apr 2011 15:35:41 +0100
+Subject: [PATCH 1/2] arm: Replace CONFIG_HAS_TLS_REG with HWCAP_TLS and
+	check for it on V6
+In-Reply-To: <BANLkTinEnn1C8_mKtL6P2YXdPSt1eaUzKA@mail.gmail.com>
+References: <20100630131737.GF2822@atomide.com>
+	<alpine.LFD.2.00.1006301011520.24097@xanadu.home>
+	<20100701092510.GH2822@atomide.com>
+	<20100701174051.GA8786@shareable.org>
+	<alpine.LFD.2.00.1007012226170.26524@xanadu.home>
+	<20100702103744.GJ6632@atomide.com>
+	<20100705135526.GF15951@atomide.com>
+	<BANLkTim4TTf3KXGYzjcvQ2n-hNbdSQM1eg@mail.gmail.com>
+	<alpine.LFD.2.00.1104080911520.28032@xanadu.home>
+	<BANLkTinEnn1C8_mKtL6P2YXdPSt1eaUzKA@mail.gmail.com>
+Message-ID: <20110408143541.GU26912@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+Li Li wrote:
+> Nicolas,
+> 
+> Thanks for the explanation. :)
+> 
+> I noticed what you mentioned. Actually, Kconfig says TLS EMU might be
+> used in some "old" (e.g. pre-armv6) SMP platforms without TLS
+> register. In such a case, could we still ensure it's SMP safe by a
+> single ldr?
 
-Using PC as an base register with writeback is UNPREDICTABLE, as is non
-word-sized loads or stores of PC. (We only really care about preventing
-loads to PC but it keeps the code simpler if we also exclude stores.)
+In that case, the hardware TLS 'mcr' is used, which traps and is
+emulated by the undefined instruction handler.  It's not fast but
+presumably those platforms don't really matter.
 
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes-decode.c |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+See CONFIG_TLS_REG_EMUL in arch/arm/kernel/traps.c, and 'tls_emu'.
 
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 9a115b6..2e22977 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -70,6 +70,12 @@
- 
- #define is_r15(insn, bitpos) (((insn) & (0xf << bitpos)) == (0xf << bitpos))
- 
-+/*
-+ * Test if load/store instructions writeback the address register.
-+ * if P (bit 24) == 0 or W (bit 21) == 1
-+ */
-+#define is_writeback(insn) ((insn ^ 0x01000000) & 0x01200000)
-+
- #define PSR_fs	(PSR_f|PSR_s)
- 
- #define KPROBE_RETURN_INSTRUCTION	0xe1a0f00e	/* mov pc, lr */
-@@ -886,6 +892,9 @@ prep_emulate_ldr_str(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	int not_imm = (insn & (1 << 26)) ? (insn & (1 << 25))
- 					 : (~insn & (1 << 22));
- 
-+	if (is_writeback(insn) && is_r15(insn, 16))
-+		return INSN_REJECTED;	/* Writeback to PC */
-+
- 	insn &= 0xfff00fff;
- 	insn |= 0x00001000;	/* Rn = r0, Rd = r1 */
- 	if (not_imm) {
-@@ -1167,6 +1176,11 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 
- 		} else if ((insn & 0x0e1000d0) == 0x00000d0) {
- 			/* STRD/LDRD */
-+			if ((insn & 0x0000e000) == 0x0000e000)
-+				return INSN_REJECTED;	/* Rd is LR or PC */
-+			if (is_writeback(insn) && is_r15(insn, 16))
-+				return INSN_REJECTED;	/* Writeback to PC */
-+
- 			insn &= 0xfff00fff;
- 			insn |= 0x00002000;	/* Rn = r0, Rd = r2 */
- 			if (insn & (1 << 22)) {
-@@ -1180,6 +1194,9 @@ space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 			return INSN_GOOD;
- 		}
- 
-+		/* LDRH/STRH/LDRSB/LDRSH */
-+		if (is_r15(insn, 12))
-+			return INSN_REJECTED;	/* Rd is PC */
- 		return prep_emulate_ldr_str(insn, asi);
- 	}
- 
--- 
-1.7.2.5
+'tls_emu' is a constant, so if a kernel built for TLS emulation is run
+on something which has the TLS register, it will not work properly.
+
+-- JAmie
