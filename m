@@ -1,60 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Apr 2011 21:15:41 +0100
-Subject: [PATCH 2/2] ARM: fix personality flag propagation across an exec
-In-Reply-To: <alpine.LFD.2.00.1104081536390.28032@xanadu.home>
-References: <alpine.LFD.2.00.1104072251390.28032@xanadu.home>
-	<20110408072931.GB27450@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104080856000.28032@xanadu.home>
-	<20110408191035.GA5573@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104081536390.28032@xanadu.home>
-Message-ID: <20110408201541.GC5573@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Apr 2011 22:22:01 +0200
+Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
+In-Reply-To: <4D9F2D3F.5010109@linaro.org>
+References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
+	<201104081702.17409.arnd@arndb.de> <4D9F2D3F.5010109@linaro.org>
+Message-ID: <201104082222.01634.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2011 at 03:50:21PM -0400, Nicolas Pitre wrote:
-> However, if we're only setting the address limit flag here, wouldn't it 
-> be better to leave the current personality type as is and only set/clear 
-> the ADDR_LIMIT_32BIT flag?  Something like:
-> 
-> 	unsigned int personality = current->personality;
->         if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN &&
->             (eflags & EF_ARM_APCS_26))
->                 personality &= ~ADDR_LIMIT_32BIT;
->         else
->                 personality |= ADDR_LIMIT_32BIT;
->         set_personality(personality);
-> 
-> Or is the actual personality type not supposed to be inherited?
-> 
-> I also notice that bad_syscall() is broken if extra flags such as 
-> ADDR_NO_RANDOMIZE are added to the current personality (will send a 
-> patch for that as well).
+On Friday 08 April 2011, Lee Jones wrote:
+> I didn't say we won't need it. I'm just finding it difficult to picture
+> how it would work. I'm more than happy to implement it, but there are
+> more things to take into consideration, such as naming conventions for
+> multiple SoCs. Even if they start at '1' and increase sequentially,
+> there are still questions that need to be answered, such as; How will
+> the SoCs be ordered? First come first served? Priority order? Or we
+> could name them by soc_id?
 
-Many architectures explicitly set a personality type on exec, so that
-seems to be the thing to do.  We want it set to a PER_LINUX flavour
-as the ELF executables we run tend to be Linux executables.
+Any of these would be fine IMHO. In most cases, the order is fixed,
+either through a board file or through the order in the device tree,
+so I would just use a sequential number.
 
-Also, the ARM kernel doesn't really support anything but PER_LINUX
-ELF executables, so it'd be rather meaningless to set it to anything
-else here.
-
-So:
-
-	unsigned int personality = current->personality & ~PER_MASK;
-
-	/*
-	 * We only support Linux ELF executables, so always set the
-	 * personality to LINUX.
-	 */
-	personality |= PER_LINUX;
-
-	/* APCS-26 is only valid for OABI executables */
-	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN &&
-	    (eflags & EF_ARM_APCS_26))
-		personality &= ~ADDR_LIMIT_32BIT;
-	else
-		personality |= ADDR_LIMIT_32BIT;
-
-	set_personality(personality);
-
-is probably what we want.
+	Arnd
