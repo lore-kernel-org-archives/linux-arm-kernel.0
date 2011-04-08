@@ -1,29 +1,45 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Fri, 8 Apr 2011 19:31:56 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <op.vtmqujir3ri7v4@arend-laptop>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTin1yyow595tcYveB5fh8q3x+U_GOw@mail.gmail.com>
-	<op.vtmqm7fw3ri7v4@arend-laptop>
-	<BANLkTimy8LEqBqeJQD5SY=e8ZgEy8pRVHw@mail.gmail.com>
-	<op.vtmqujir3ri7v4@arend-laptop>
-Message-ID: <BANLkTina48Z_BfHopVELJrnWt4bBDfE6PA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Apr 2011 20:10:04 +0200
+Subject: [RFC] Extending ARM perf-events for multiple PMUs
+In-Reply-To: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <BANLkTinAcAudWKvipYVLyijUrLZVFozBWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/8 Arend van Spriel <arend@broadcom.com>:
-> On Fri, 08 Apr 2011 19:27:11 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> OK, thanks. I'm compiling kernel with patch V2 right now. Of course
->> class included.
->>
->
-> Great. I tried to apply you patch on my kernel tree but it did not apply.
-> Which tree are you using. linux-next, wireless-next?
+Hi Will, thanks for this quite informative letter!
 
-I'm using few days old wireless-testing. However, I've not idea how it
-could not apply. That are mostly new files, we do not modify much of
-current kernel code. Where did it fail to apply?
+On Fri, Apr 8, 2011 at 7:15 PM, Will Deacon <will.deacon@arm.com> wrote:
 
--- 
-Rafa?
+> Implementing support for Counting System PMUs can reuse a lot of the
+> functionality in perf_event.c (for example, struct arm_pmu) but the low-level
+> accessors should be separate and a new struct pmu should be used. This means
+> that we will want multiple instances of struct arm_pmu and a method to translate
+> from a struct pmu to a struct arm_pmu. We'll also need to clean up some of the
+> armpmu_* functions to ensure the correction indirection is used when invoking
+> per-pmu functions.
+
+What I start wondering at this point in the description is that there is some
+implicit assumption that counting system PMU:s is an arch/arm/* thing,
+that they should even be named arm_* and I guess as such they are
+some PrimeCell kind of thing.
+
+I can surely accept the per-CPU close-to-CPU counters to live
+in arch/arm/* but..
+
+I am thinking that a SoC vendor like Renesas may be implementing a
+System PMU monitoring a bus shared between an SH and and ARM
+core.
+
+Unless you're ARM Ltd you can also think about vendors doing System
+PMU IP blocks and synthesizing these in both ARM and other-arch
+systems.
+
+So maybe this needs an multiarch-spanning solution? I start
+thinking about decoupling these babies from the arch and abstracting
+them into something like drivers/perf
+
+Am I totally misguided in this?
+
+Yours,
+Linus Walleij
