@@ -1,277 +1,284 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 08 Apr 2011 14:08:50 +0900
-Subject: [PATCH 4/4 RESEND] USB: Add initial S5P EHCI driver
-Message-ID: <1302239330-28669-1-git-send-email-jy0922.shim@samsung.com>
+From: shweta.gulati@ti.com (Shweta Gulati)
+Date: Fri,  8 Apr 2011 11:44:40 +0530
+Subject: [PATCH V2] OMAP2+: SR Layer Cleanup.
+Message-ID: <1302243280-10891-1-git-send-email-shweta.gulati@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds host USB high speed driver for samsung S5P series. This
-is initial driver and we need additional implementation to support some
-functions like power management.
+As a part of Voltage Layer Cleanup Patches,
+submitted by Kevin Hilman, Voltage domain
+Information is removed from hwmod,
+So the patch removes 'vdd_name' info from omap_hwmod
+and adds that info into dev_attr as SR code uses vdd_name
+to get voltagedomain sructure info.
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Tested on OMAP3630 SDP and OMAP4430 SDP Board
+
+Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
 ---
-Add missing Signed-off-by.
+ V2:
+  Rebased on latest 'pm-wip/voltdm_a' branch.
 
- drivers/usb/Kconfig         |    1 +
- drivers/usb/host/Kconfig    |    6 ++
- drivers/usb/host/ehci-hcd.c |    5 +
- drivers/usb/host/ehci-s5p.c |  201 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 213 insertions(+), 0 deletions(-)
- create mode 100644 drivers/usb/host/ehci-s5p.c
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   17 +++++++++++++----
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 ++++++++++++++++---
+ arch/arm/mach-omap2/smartreflex.h            |   10 ++++++++++
+ arch/arm/mach-omap2/sr_device.c              |   11 +++++++----
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 -
+ 5 files changed, 46 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index 41b6e51..e0a9f2a 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -65,6 +65,7 @@ config USB_ARCH_HAS_EHCI
- 	default y if ARCH_CNS3XXX
- 	default y if ARCH_VT8500
- 	default y if PLAT_SPEAR
-+	default y if PLAT_S5P
- 	default y if ARCH_MSM
- 	default PCI
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 3cd91ac..6a704bd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -29,6 +29,7 @@
  
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 9483acd..0fe36a2 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -188,6 +188,12 @@ config USB_EHCI_SH
- 	  Enables support for the on-chip EHCI controller on the SuperH.
- 	  If you use the PCI EHCI controller, this option is not necessary.
+ #include "omap_hwmod_common_data.h"
  
-+config USB_EHCI_S5P
-+       boolean "S5P EHCI support"
-+       depends on USB_EHCI_HCD && PLAT_S5P
-+       help
-+	 Enable support for the S5P SOC's on-chip EHCI controller.
++#include "smartreflex.h"
+ #include "prm-regbits-34xx.h"
+ #include "cm-regbits-34xx.h"
+ #include "wd_timer.h"
+@@ -2904,6 +2905,10 @@ static struct omap_hwmod_class omap36xx_smartreflex_hwmod_class = {
+ };
+ 
+ /* SR1 */
++static struct omap_sr_dev_attr sr1_dev_attr = {
++	.voltdm_name   = "mpu_iva",
++};
 +
- config USB_W90X900_EHCI
- 	bool "W90X900(W90P910) EHCI support"
- 	depends on USB_EHCI_HCD && ARCH_W90X900
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 78561d1..6b20b3b 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1265,6 +1265,11 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		tegra_ehci_driver
- #endif
+ static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
+ 	&omap3_l4_core__sr1,
+ };
+@@ -2912,7 +2917,6 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ 	.name		= "sr1_hwmod",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+-	.vdd_name	= "mpu_iva",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -2924,6 +2928,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ 	},
+ 	.slaves		= omap3_sr1_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
++	.dev_attr       = &sr1_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+ 					CHIP_IS_OMAP3430ES3_0 |
+ 					CHIP_IS_OMAP3430ES3_1),
+@@ -2934,7 +2939,6 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+ 	.name		= "sr1_hwmod",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+-	.vdd_name	= "mpu_iva",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -2946,10 +2950,15 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+ 	},
+ 	.slaves		= omap3_sr1_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
++	.dev_attr       = &sr1_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+ };
  
-+#ifdef CONFIG_USB_EHCI_S5P
-+#include "ehci-s5p.c"
-+#define PLATFORM_DRIVER		s5p_ehci_driver
-+#endif
+ /* SR2 */
++static struct omap_sr_dev_attr sr2_dev_attr = {
++	.voltdm_name    = "core",
++};
 +
- #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
-     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
-     !defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-new file mode 100644
-index 0000000..0c18f28
---- /dev/null
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -0,0 +1,201 @@
-+/*
-+ * SAMSUNG S5P USB HOST EHCI Controller
+ static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
+ 	&omap3_l4_core__sr2,
+ };
+@@ -2958,7 +2967,6 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ 	.name		= "sr2_hwmod",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+-	.vdd_name	= "core",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -2970,6 +2978,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ 	},
+ 	.slaves		= omap3_sr2_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
++	.dev_attr       = &sr2_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+ 					CHIP_IS_OMAP3430ES3_0 |
+ 					CHIP_IS_OMAP3430ES3_1),
+@@ -2980,7 +2989,6 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+ 	.name		= "sr2_hwmod",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+-	.vdd_name	= "core",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -2992,6 +3000,7 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+ 	},
+ 	.slaves		= omap3_sr2_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
++	.dev_attr       = &sr2_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 3e88dd3..1331b39 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -30,6 +30,7 @@
+ 
+ #include "omap_hwmod_common_data.h"
+ 
++#include "smartreflex.h"
+ #include "cm1_44xx.h"
+ #include "cm2_44xx.h"
+ #include "prm44xx.h"
+@@ -3775,6 +3776,10 @@ static struct omap_hwmod_class omap44xx_smartreflex_hwmod_class = {
+ };
+ 
+ /* smartreflex_core */
++static struct omap_sr_dev_attr sr_core_dev_attr = {
++	.voltdm_name   = "core",
++};
++
+ static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
+ static struct omap_hwmod_irq_info omap44xx_smartreflex_core_irqs[] = {
+ 	{ .irq = 19 + OMAP44XX_IRQ_GIC_START },
+@@ -3809,7 +3814,6 @@ static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
+ 	.mpu_irqs	= omap44xx_smartreflex_core_irqs,
+ 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
+ 	.main_clk	= "smartreflex_core_fck",
+-	.vdd_name	= "core",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_reg = OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
+@@ -3817,10 +3821,15 @@ static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
+ 	},
+ 	.slaves		= omap44xx_smartreflex_core_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
++	.dev_attr       = &sr_core_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ };
+ 
+ /* smartreflex_iva */
++static struct omap_sr_dev_attr sr_iva_dev_attr = {
++	.voltdm_name   = "iva",
++};
++
+ static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
+ static struct omap_hwmod_irq_info omap44xx_smartreflex_iva_irqs[] = {
+ 	{ .irq = 102 + OMAP44XX_IRQ_GIC_START },
+@@ -3855,7 +3864,6 @@ static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
+ 	.mpu_irqs	= omap44xx_smartreflex_iva_irqs,
+ 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
+ 	.main_clk	= "smartreflex_iva_fck",
+-	.vdd_name	= "iva",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_reg = OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
+@@ -3863,10 +3871,15 @@ static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
+ 	},
+ 	.slaves		= omap44xx_smartreflex_iva_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
++	.dev_attr       = &sr_iva_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ };
+ 
+ /* smartreflex_mpu */
++static struct omap_sr_dev_attr sr_mpu_dev_attr = {
++	.voltdm_name   = "mpu",
++};
++
+ static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
+ static struct omap_hwmod_irq_info omap44xx_smartreflex_mpu_irqs[] = {
+ 	{ .irq = 18 + OMAP44XX_IRQ_GIC_START },
+@@ -3901,7 +3914,6 @@ static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
+ 	.mpu_irqs	= omap44xx_smartreflex_mpu_irqs,
+ 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
+ 	.main_clk	= "smartreflex_mpu_fck",
+-	.vdd_name	= "mpu",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_reg = OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
+@@ -3909,6 +3921,7 @@ static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
+ 	},
+ 	.slaves		= omap44xx_smartreflex_mpu_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
++	.dev_attr       = &sr_mpu_dev_attr,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ };
+ 
+diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+index 5f35b9e..9a7f770 100644
+--- a/arch/arm/mach-omap2/smartreflex.h
++++ b/arch/arm/mach-omap2/smartreflex.h
+@@ -197,6 +197,16 @@ struct omap_sr_nvalue_table {
+ };
+ 
+ /**
++ * struct omap_sr_dev_attr - Smartreflex Device attribute.
 + *
-+ * Copyright (C) 2011 Samsung Electronics Co.Ltd
-+ * Author: Jingoo Han <jg1.han@samsung.com>
-+ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
++ * @voltdm_name:       Name of voltdomain of SR instance
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/platform_device.h>
-+#include <mach/regs-pmu.h>
-+#include <plat/cpu.h>
-+#include <plat/ehci.h>
-+#include <plat/usb-phy.h>
-+
-+struct s5p_ehci_hcd {
-+	struct device *dev;
-+	struct usb_hcd *hcd;
-+	struct clk *clk;
++struct omap_sr_dev_attr {
++	const char      *voltdm_name;
 +};
 +
-+static const struct hc_driver s5p_ehci_hc_driver = {
-+	.description		= hcd_name,
-+	.product_desc		= "S5P EHCI Host Controller",
-+	.hcd_priv_size		= sizeof(struct ehci_hcd),
-+
-+	.irq			= ehci_irq,
-+	.flags			= HCD_MEMORY | HCD_USB2,
-+
-+	.reset			= ehci_init,
-+	.start			= ehci_run,
-+	.stop			= ehci_stop,
-+	.shutdown		= ehci_shutdown,
-+
-+	.get_frame_number	= ehci_get_frame,
-+
-+	.urb_enqueue		= ehci_urb_enqueue,
-+	.urb_dequeue		= ehci_urb_dequeue,
-+	.endpoint_disable	= ehci_endpoint_disable,
-+	.endpoint_reset		= ehci_endpoint_reset,
-+
-+	.hub_status_data	= ehci_hub_status_data,
-+	.hub_control		= ehci_hub_control,
-+	.bus_suspend		= ehci_bus_suspend,
-+	.bus_resume		= ehci_bus_resume,
-+
-+	.relinquish_port	= ehci_relinquish_port,
-+	.port_handed_over	= ehci_port_handed_over,
-+
-+	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
-+};
-+
-+static int s5p_ehci_probe(struct platform_device *pdev)
-+{
-+	struct s5p_ehci_platdata *pdata;
-+	struct s5p_ehci_hcd *s5p_ehci;
-+	struct usb_hcd *hcd;
-+	struct ehci_hcd *ehci;
-+	struct resource *res;
-+	int irq;
-+	int err;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "No platform data defined\n");
-+		return -EINVAL;
-+	}
-+
-+	s5p_ehci = kzalloc(sizeof(struct s5p_ehci_hcd), GFP_KERNEL);
-+	if (!s5p_ehci)
-+		return -ENOMEM;
-+
-+	s5p_ehci->dev = &pdev->dev;
-+
-+	hcd = usb_create_hcd(&s5p_ehci_hc_driver, &pdev->dev,
-+					dev_name(&pdev->dev));
-+	if (!hcd) {
-+		dev_err(&pdev->dev, "Unable to create HCD\n");
-+		err = -ENOMEM;
-+		goto fail_hcd;
-+	}
-+
-+	s5p_ehci->clk = clk_get(&pdev->dev, "usbhost");
-+
-+	if (IS_ERR(s5p_ehci->clk)) {
-+		dev_err(&pdev->dev, "Failed to get usbhost clock\n");
-+		err = PTR_ERR(s5p_ehci->clk);
-+		goto fail_clk;
-+	}
-+
-+	err = clk_enable(s5p_ehci->clk);
-+	if (err)
-+		goto fail_clken;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get I/O memory\n");
-+		err = -ENXIO;
-+		goto fail_io;
-+	}
-+
-+	hcd->rsrc_start = res->start;
-+	hcd->rsrc_len = resource_size(res);
-+	hcd->regs = ioremap(res->start, resource_size(res));
-+	if (!hcd->regs) {
-+		dev_err(&pdev->dev, "Failed to remap I/O memory\n");
-+		err = -ENOMEM;
-+		goto fail_io;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (!irq) {
-+		dev_err(&pdev->dev, "Failed to get IRQ\n");
-+		err = -ENODEV;
-+		goto fail;
-+	}
-+
-+	if (pdata->phy_init)
-+		pdata->phy_init(pdev, S5P_USB_PHY_HOST);
-+
-+	ehci = hcd_to_ehci(hcd);
-+	ehci->caps = hcd->regs;
-+	ehci->regs = hcd->regs + HC_LENGTH(readl(&ehci->caps->hc_capbase));
-+
-+	dbg_hcs_params(ehci, "reset");
-+	dbg_hcc_params(ehci, "reset");
-+
-+	/* cache this readonly data; minimize chip reads */
-+	ehci->hcs_params = readl(&ehci->caps->hcs_params);
-+
-+	err = usb_add_hcd(hcd, irq, IRQF_DISABLED | IRQF_SHARED);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to add USB HCD\n");
-+		goto fail;
-+	}
-+
-+	platform_set_drvdata(pdev, s5p_ehci);
-+
-+	return 0;
-+
-+fail:
-+	iounmap(hcd->regs);
-+fail_io:
-+	clk_disable(s5p_ehci->clk);
-+fail_clken:
-+	clk_put(s5p_ehci->clk);
-+fail_clk:
-+	usb_put_hcd(hcd);
-+fail_hcd:
-+	kfree(s5p_ehci);
-+	return err;
-+}
-+
-+static int s5p_ehci_remove(struct platform_device *pdev)
-+{
-+	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
-+	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
-+	struct usb_hcd *hcd = s5p_ehci->hcd;
-+
-+	usb_remove_hcd(hcd);
-+
-+	if (pdata && pdata->phy_exit)
-+		pdata->phy_exit(pdev, S5P_USB_PHY_HOST);
-+
-+	iounmap(hcd->regs);
-+
-+	clk_disable(s5p_ehci->clk);
-+	clk_put(s5p_ehci->clk);
-+
-+	usb_put_hcd(hcd);
-+	kfree(s5p_ehci);
-+
-+	return 0;
-+}
-+
-+static void s5p_ehci_shutdown(struct platform_device *pdev)
-+{
-+	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
-+	struct usb_hcd *hcd = s5p_ehci->hcd;
-+
-+	if (hcd->driver->shutdown)
-+		hcd->driver->shutdown(hcd);
-+}
-+
-+static struct platform_driver s5p_ehci_driver = {
-+	.probe		= s5p_ehci_probe,
-+	.remove		= s5p_ehci_remove,
-+	.shutdown	= s5p_ehci_shutdown,
-+	.driver = {
-+		.name	= "s5p-ehci",
-+		.owner	= THIS_MODULE,
-+	}
-+};
-+
-+MODULE_ALIAS("platform:s5p-ehci");
++/**
+  * struct omap_sr_data - Smartreflex platform data.
+  *
+  * @ip_type:		Smartreflex IP type.
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+index 2782d3f..65b2aae 100644
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -82,6 +82,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 	struct omap_sr_data *sr_data;
+ 	struct omap_device *od;
+ 	struct omap_volt_data *volt_data;
++	struct omap_sr_dev_attr *sr_dev_attr;
+ 	char *name = "smartreflex";
+ 	static int i;
+ 
+@@ -92,9 +93,11 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 		return -ENOMEM;
+ 	}
+ 
+-	if (!oh->vdd_name) {
++	sr_dev_attr = (struct omap_sr_dev_attr *)oh->dev_attr;
++	if (!sr_dev_attr->voltdm_name) {
+ 		pr_err("%s: No voltage domain specified for %s."
+-			"Cannot initialize\n", __func__, oh->name);
++				"Cannot initialize\n", __func__,
++					sr_dev_attr->voltdm_name);
+ 		goto exit;
+ 	}
+ 
+@@ -102,10 +105,10 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 	sr_data->senn_mod = 0x1;
+ 	sr_data->senp_mod = 0x1;
+ 
+-	sr_data->voltdm = voltdm_lookup(oh->vdd_name);
++	sr_data->voltdm = voltdm_lookup(sr_dev_attr->voltdm_name);
+ 	if (IS_ERR(sr_data->voltdm)) {
+ 		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+-			__func__, oh->vdd_name);
++			__func__, sr_dev_attr->voltdm_name);
+ 		goto exit;
+ 	}
+ 
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index a5fa7c1..39d809a 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -519,7 +519,6 @@ struct omap_hwmod {
+ 	const char			*main_clk;
+ 	struct clk			*_clk;
+ 	struct omap_hwmod_opt_clk	*opt_clks;
+-	char				*vdd_name;
+ 	struct omap_hwmod_ocp_if	**masters; /* connect to *_IA */
+ 	struct omap_hwmod_ocp_if	**slaves;  /* connect to *_TA */
+ 	void				*dev_attr;
 -- 
 1.7.0.4
