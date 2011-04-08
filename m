@@ -1,41 +1,88 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Fri, 8 Apr 2011 19:14:09 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <BANLkTi=DiGX=yg9HAxYHwKdOvedJdYC_sw@mail.gmail.com>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTin1yyow595tcYveB5fh8q3x+U_GOw@mail.gmail.com>
-	<BANLkTi=DiGX=yg9HAxYHwKdOvedJdYC_sw@mail.gmail.com>
-Message-ID: <BANLkTinCFnFELn_BPFWE+WCHtZB7d0o1gg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 08 Apr 2011 18:15:12 +0100
+Subject: [RFC] Extending ARM perf-events for multiple PMUs
+Message-ID: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/8 Rafa? Mi?ecki <zajec5@gmail.com>:
-> 2011/4/8 Rafa? Mi?ecki <zajec5@gmail.com>:
->> Could you say something more about *class*, please? For my BCM43224 it
->> seems to be 0x0. WIll check BCM4313 in a moment.
->
-> Same for BCM4313.
->
-> BCM43224:
-> axi: Core 0 found: ChipCommon (manuf 0x4BF, id 0x800, rev 0x22, class 0x0)
-> axi: Core 1 found: IEEE 802.11 (manuf 0x4BF, id 0x812, rev 0x17, class 0x0)
-> axi: Core 2 found: PCIe (manuf 0x4BF, id 0x820, rev 0x0F, class 0x0)
->
-> BCM4313
-> axi: Core 0 found: ChipCommon (manuf 0x4BF, id 0x800, rev 0x24, class 0x0)
-> axi: Core 1 found: IEEE 802.11 (manuf 0x4BF, id 0x812, rev 0x18, class 0x0)
-> axi: Core 2 found: PCIe (manuf 0x4BF, id 0x820, rev 0x11, class 0x0)
+Hello,
 
-This is last one, really ;)
+Currently the perf code on ARM only caters for the core CPU PMU. In actual
+fact, this only represents a subset of the performance monitoring hardware
+available in real SoCs and is arguably the simplest to interact with. This
+long-winded email is an attempt to classify the possible event sources that we
+might see so that we can have clean support for them in the future. I think
+that the perf tools might also need tweaking slightly so they can handle PMUs
+which can't service per-cpu or per-task events (instead, you essentially have
+a single system-wide event).
 
-This is MMIO dump (from wl):
-R 4 92.541328 1 0xfaafc000 0x4bf80001 0x0 0
-R 4 92.541351 1 0xfaafc014 0x4bf81201 0x0 0
-R 4 92.541373 1 0xfaafc028 0x4bf82001 0x0 0
+We can split PMUs up into two basic categories (an `action' here is usually an
+interrupt but could be defined as any state recording or signalling operation).
 
-So there is not any mistake in my reading code. This the youngest 0x1
-is SCAN_ER_VALID.
+  (1) CPU-aware PMUs
 
--- 
-Rafa?
+      This type of PMU is typically per-CPU and accessed via co-processor
+      instructions. Actions may be delivered as PPIs. Events scheduled onto
+      a CPU-aware PMU can be grouped, possibly with events scheduled for other
+      per-CPU PMUs on the same CPU. An action delivered by one of these PMUs
+      can *always* be attributed to a specific CPU but not necessarily a
+      specific task. Accessing a CPU-aware PMU is a synchronous operation.
+
+  (2) System PMUs
+
+      System PMUs are typically outside of the CPU domain. Bus monitors, GPU
+      counters and external L2 cache controller monitors are all system PMUs.
+      Actions delivered by these PMUs cannot be attributed to a particular CPU
+      and certainly cannot be associated with a particular piece of code. They
+      are memory-mapped and cannot be grouped with other PMUs of any type.
+      Accesses to a system PMU may be asynchronous.
+
+      System PMUs can be further split up into `counting' and `filtering'
+      PMUs:
+
+      (i) Counting PMUs
+
+          Counting PMUs increment a counter whenever a particular event occurs
+	  and can deliver an action periodically (for example, on overflow or
+	  after a certain amount of time has passed). The event types are
+	  hardwired as particular, discrete events such as `cycles' or
+	  `misses'.
+
+      (ii) Filtering PMUs
+
+          Filtering PMUs respond to a query. For example, `generate an action
+	  whenever you see a bus access which fits the following criteria'. The
+	  action may simply be to increment a counter, in which case this PMU
+	  can act as a highly configurable counting PMU, where the event types
+	  are dynamic.
+
+Now, we currently support the core CPU PMU, which is obviously a CPU-aware PMU
+that generates interrupts as actions. Another example of a CPU-aware PMU is
+the VFP PMU in Qualcomm's Scorpion. The next step (moving outwards from the
+core) is to add support for L2 cache controllers. I expect most of these to be
+Counting System PMUs, although I can envisage them being CPU-aware if built
+into the core with enough extra hardware.
+
+Implementing support for CPU-aware PMUs can be done alongside the current CPU
+PMU code and much of the code can be shared with the core PMU providing that
+the event namespaces are distinct.
+
+Implementing support for Counting System PMUs can reuse a lot of the
+functionality in perf_event.c (for example, struct arm_pmu) but the low-level
+accessors should be separate and a new struct pmu should be used. This means
+that we will want multiple instances of struct arm_pmu and a method to translate
+from a struct pmu to a struct arm_pmu. We'll also need to clean up some of the
+armpmu_* functions to ensure the correction indirection is used when invoking
+per-pmu functions.
+
+Finally, the Filtering System PMUs will probably need their own struct pmu
+instances for each device and can make use of the dynamic sysfs interface via
+perf_pmu_register. I don't see any scope for common code in this space yet.
+
+I appreciate this is especially hand-wavy stuff, but I'd like to check we've
+got all of our bases covered before introducing system PMUs to ARM. The first
+victim is the PL310 L2CC on the Cortex-A9.
+
+Feedback welcome,
+
+Will
