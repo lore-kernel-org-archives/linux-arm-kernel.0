@@ -1,50 +1,49 @@
-From: ricard.wanderlof@axis.com (Ricard Wanderlof)
-Date: Fri, 8 Apr 2011 09:14:04 +0200 (CEST)
-Subject: [RFC 1/6]Fix typo "recieve" in various parts of the kernel.
-In-Reply-To: <4D9E4A59.8010604@gmail.com>
-References: <1302192567-842-1-git-send-email-justinmattock@gmail.com>
-	<20110407200541.GC8569@pengutronix.de> <4D9E4A59.8010604@gmail.com>
-Message-ID: <Pine.LNX.4.64.1104080909040.5186@lnxricardw.se.axis.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Apr 2011 08:24:20 +0100
+Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on the
+	basis of the memory size.
+In-Reply-To: <4D9E42E1.1060902@ahsoftware.de>
+References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
+	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
+	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
+	<4D9CED15.2010806@ahsoftware.de>
+	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
+	<4D9CF5B3.9020007@ahsoftware.de>
+	<toa078-0do.ln1@chipmunk.wormnet.eu>
+	<4D9E2D1C.7070102@ahsoftware.de>
+	<20110407220855.GD17049@n2100.arm.linux.org.uk>
+	<4D9E42E1.1060902@ahsoftware.de>
+Message-ID: <20110408072420.GA27450@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Fri, 8 Apr 2011, Justin P. Mattock wrote:
-
-> On 04/07/2011 01:05 PM, Uwe Kleine-K?nig wrote:
->> On Thu, Apr 07, 2011 at 09:09:22AM -0700, Justin P. Mattock wrote:
->>> The patch below fixes some typos "recieve" in various parts of the kernel.
->>> Note: these below are in actual code rather than comments(excpet for r852.c which
->> s/excpet/except/
->>
->>> has a code fix, and comment).
->>> compile tested as best as I can...
->> I'm not a native speaker, but "as good as" sounds better in my ears.
->>
->> Best regards
->> Uwe
->>
+On Fri, Apr 08, 2011 at 01:04:01AM +0200, Alexander Holler wrote:
+> Am 08.04.2011 00:08, schrieb Russell King - ARM Linux:
 >
-> your right.. gcc and friends are the one's doing all the reall work: "as 
-> good as *"
+>>> Requiring a machine ID and the needed stuff to handle that for a board
+>>> which just is using two GPIOs different than another board is why the
+>>> ARM tree exploded.
+>>
+>> You can not be any more wrong than that.
+>>
+>> The reason the ARM tree exploded is because of the compartmentalized
+>> sub-community structure, where the vast majority of (eg) OMAP development
+>> is done independently of the (eg) Samsung development.
+>>
+>> Consequently, there's no attempt to consolidate code between the SoCs,
+>> even for basic stuff like 32-bit up-counting timers.  We've ended up with
+>> _nine_ implementations of clocksources all doing the same thing in that
+>> respect.
+>>
+>> That's got precisely zilch to do with machine IDs, and your attempt to
+>> blame the bloat on machine IDs just shows how misinformed you are.
+>
+> I had a look at what's going on in the OMAP linux world for more than a  
+> year now and I think I've seen a lot of the stuff you are referring to.
+>
+> And I think one of the reasons that the mess happened is the same I've  
+> got trapped in. Why should anyone try to submit patches if he must fear  
+> to get caught in some senseless endless discussion about one line.
 
-I think Uwe was thinking of grammar rather than who was doing the actual 
-work.
-
-Now that I've gone more or less off topic I may as well voice my opinion 
-the 'as best as I can' sounds like a mixup of two constructs: either 'as 
-best I can' (which is probably slightly unusual these days), or 'as well 
-as I can'. 'I've done it as good as I can' is gramatically wrong (since 
-'good' is an adjective and 'well' is an adverb, and it is referring to 
-'how I did it' (or in the case above, 'how well I tested it'), but fairly 
-common nevertheless, and given the large percentage of non-native speakers 
-in the Linux community I wouldn't worry about it, the meaning is clear 
-anyway.
-
-I'll shut up and go now. :-)
-
-/Ricard
--- 
-Ricard Wolf Wanderl?f                           ricardw(at)axis.com
-Axis Communications AB, Lund, Sweden            www.axis.com
-Phone +46 46 272 2016                           Fax +46 46 13 61 30
+Because matching against the memory size is _technically_ the wrong thing
+to do, as you've already been told.
