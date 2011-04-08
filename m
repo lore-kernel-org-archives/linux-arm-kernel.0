@@ -1,11 +1,11 @@
 From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Fri, 08 Apr 2011 08:07:05 -0700
+Date: Fri, 08 Apr 2011 08:38:52 -0700
 Subject: [PATCH 1/5 V2]arch:common:Makefile Remove unused config in the
 	Makefile.
 In-Reply-To: <20110408073153.GA18601@pengutronix.de>
 References: <1302219529-8864-1-git-send-email-justinmattock@gmail.com>
 	<20110408073153.GA18601@pengutronix.de>
-Message-ID: <4D9F2499.1030803@gmail.com>
+Message-ID: <4D9F2C0C.5090400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,8 +29,8 @@ On 04/08/2011 12:31 AM, Uwe Kleine-K?nig wrote:
 >
 
 
-ahh... alright I will read up on that and resend..
-
-Thanks!
+alright I read up and sent this to the address listed on that 
+page(patches at arm.linux.org.uk) if it is incorrect let me know and I will 
+resend so that I get things correct..
 
 Justin P. Mattock
