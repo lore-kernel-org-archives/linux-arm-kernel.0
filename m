@@ -1,55 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 08 Apr 2011 16:43:59 +0100
-Subject: [RFC PATCHv2 1/2] Export SoC info through sysfs
-In-Reply-To: <201104081702.17409.arnd@arndb.de>
-References: <1299846911-15782-1-git-send-email-maxime.coquelin-nonst@stericsson.com>
-	<201104080535.02769.arnd@arndb.de> <4D9EBC2C.2050809@linaro.org>
-	<201104081702.17409.arnd@arndb.de>
-Message-ID: <4D9F2D3F.5010109@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Apr 2011 18:18:10 +0200
+Subject: [PATCH V2 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
+In-Reply-To: <010C9052C42A00499CE76D637FA5EE900D942F@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1300355883-28484-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1300355883-28484-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110408073625.GU7285@pengutronix.de>
+	<010C9052C42A00499CE76D637FA5EE900D942F@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <20110408161810.GX7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/11 16:02, Arnd Bergmann wrote:
-> On Friday 08 April 2011, Lee Jones wrote:
->> On 08/04/11 04:35, Arnd Bergmann wrote:
->>> On Friday 08 April 2011, Greg KH wrote:
->>>> Symlinks are a requirement as multiple cpus can be attached to a single
->>>> SoC.
->>>>
->>>> What about multiple cpus that are attached to multiple SoCs?  Why even
->>>> try to describe this relationship, what would userspace get out of this
->>>> information?
->>>
->>> The only one I can think of is node affinity. I've worked with a system
->>> (IBM QS2x Cell blade) that had two SoCs with multiple CPUs each. There was
->>> a significant performance penalty when talking to devices on the remote
->>> SoC. In that case, we used the NUMA node information in sys to deal
->>> with it, but we might not want to use the NUMA infrastructure on systems
->>> that only have RAM on one node.
->>
->> I'm struggling to see a scenario where we'd have multiple SoCs on a
->> single device and only one filesystem. ux500 sub-arch code is yet to
->> facilitate SoC counting functionality. If were are to implement per-SoC
->> directories would this need to be added?
+On Fri, Apr 08, 2011 at 08:49:28AM +0000, Zhu Richard-R65037 wrote:
+> >
+> > When I read code like this I think that a devm_clk_get is overdue.
+> >
+> > Also, the ahci driver should handle the regular
+> [Richard]Sorry, I can't catch what's the exact means of this comment.
+
+devm_* are a set of functions which track the resources a driver
+allocates and frees them automatically when the driver exits. See for
+example the ahci driver. It uses devm_kzalloc and devm_ioremap.
+devm_clk_get would be nice to have also.
+
 > 
-> How can you say we won't need it when I've just given you a specific
-> example of a widely shipping machine?
+> >
+> > > +
+> > > +   tmpdata = readl(addr + HOST_CAP);
+> > > +   if (!(tmpdata & HOST_CAP_SSS)) {
+> > > +           tmpdata |= HOST_CAP_SSS;
+> > > +           writel(tmpdata, addr + HOST_CAP);
+> > > +   }
+> >
+> > According to the AHCI spec this bit is read only.
+> >
+> > > +
+> > > +   if (!(readl(addr + HOST_PORTS_IMPL) & 0x1))
+> > > +           writel((readl(addr + HOST_PORTS_IMPL) | 0x1),
+> > > +                   addr + HOST_PORTS_IMPL);
+> >
+> > This is also readonly.
+> >
+> [Richard]:About the RO marked bits defined in the SPEC, there are used
+>  as R/W bits in MX53 AHCI implementation actually.
+> Here are the hack debug log:
+> ----------Log--------------------
+> HOST_CAP: 0x6726ff80
+> HOST_CAP: 0x6f26ff80 <------------ After set the SSS bit.
+> HOST_PT_IMPL: 0x0
+> HOST_PT_IMPL: 0x1    <------------ After set the IMPL bit
+> ahci: SSS flag set, parallel bus scan disabled
+> ahci ahci.0: AHCI 0001.0100 32 slots 1 ports 3 Gbps 0x1 impl platform mode
+> ahci ahci.0: flags: ncq sntf stag pm led clo only pmp pio slum part ccc
+> scsi0 : ahci
+> ata1: SATA max UDMA/133 irq_stat 0x00000040, connection status changed irq 28
+> MXC MTD nand Driver 3.0
+> ----------End--------------------
 
-I didn't say we won't need it. I'm just finding it difficult to picture
-how it would work. I'm more than happy to implement it, but there are
-more things to take into consideration, such as naming conventions for
-multiple SoCs. Even if they start at '1' and increase sequentially,
-there are still questions that need to be answered, such as; How will
-the SoCs be ordered? First come first served? Priority order? Or we
-could name them by soc_id?
+Sigh. At least they tried to implement a standard...
 
-> It's not important that the kernel internal code supports multiple SoCs as
-> long as there is no in-tree user for this. It can always be added at a later
-> point.
-> 
-> What is important is that the user interface accomodates for it. If you
-> name the device simply /sys/devices/soc/, any user program looking at
-> that will have to be modified when we have more than one. We cannot
-> allow that to happen.
+> > > +
+> > > +   tmpdata = clk_get_rate(clk) / 1000;
+> > > +   clk_put(clk);
+> > > +   writel(tmpdata, addr + HOST_TIMER1MS);
+> >
+> > This should be in a more generic place as it needs to be done for every
+> > board. We can put this into some i.MX53 startup function.
+> >
+> [Richard]How about put these codes into one standalone file in .../arch/arm/plat-mxc/ folder,
+>  and export the sata_init and sata_exit out for kinds of MX53 boards?
 
-No problem. I can insure it's complete on first submission.
+Yes, probably except the special clock usage on the loco board.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
