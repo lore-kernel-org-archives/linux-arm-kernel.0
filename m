@@ -1,27 +1,52 @@
 From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 9 Apr 2011 01:46:29 +0200
+Date: Sat, 9 Apr 2011 02:03:03 +0200
 Subject: [RFC][WAS:bcmai][PATCH V2] axi: add AXI bus driver
-In-Reply-To: <20110408220157.GC26019@kroah.com>
+In-Reply-To: <1302292554.1664.12.camel@Joe-Laptop>
 References: <1302291900-1902-1-git-send-email-zajec5@gmail.com>
-	<20110408220157.GC26019@kroah.com>
-Message-ID: <BANLkTin_-hhcexTd67HviTqM4bjXMZxweA@mail.gmail.com>
+	<1302290881.1664.7.camel@Joe-Laptop>
+	<BANLkTi=QwBOxfxy13PxeX+LRuccV_p06zA@mail.gmail.com>
+	<1302292554.1664.12.camel@Joe-Laptop>
+Message-ID: <BANLkTimQBAHgFaH0RVCOYBGSKuHN2Dprmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/9 Greg KH <greg@kroah.com>:
->> +static void axi_release_core_dev(struct device *dev)
->> +{
->> + ? ? kfree(dev);
->> +}
+2011/4/8 Joe Perches <joe@perches.com>:
+> On Fri, 2011-04-08 at 21:46 +0200, Rafa? Mi?ecki wrote:
+>> 2011/4/8 Joe Perches <joe@perches.com>:
+>> > On Fri, 2011-04-08 at 21:45 +0200, Rafa? Mi?ecki wrote:
+>> >> diff --git a/include/linux/axi/axi.h b/include/linux/axi/axi.h
+>> > []
+>> >> +#define axi_info ? ? pr_info
+>> >> +#ifdef CONFIG_AXI_DEBUG
+>> >> +#define axi_debug ? ?pr_debug
+>> >> +#else
+>> >> +#define axi_debug ? ?do { } while (0)
+>> >> +#endif
+>> >> +#define axi_err ? ? ? ? ? ? ?pr_err
+>> >
+>> > I think redefining standard functionality like
+>> > this doesn't gain anything and loses some basic
+>> > grep capability.
+>>
+>> But on the other hand using:
+>> pr_info, pr_err, BUT axi_debug
+>> can easily lead to mistakes.
+>>
+>> Or is this possible to re-define pr_debug locally?
 >
-> This is wrong, unless you are really only creating a 'struct device'.
-> Why are you doing that instead of embedding struct device in your
-> structure?
+> It is, but is that CONFIG_AXI_DEBUG actually
+> worthwhile?
+>
+> If you think so, doesn't adding this to the Makefile
+> give you the same capability?
+>
+> ccflags-$(CONFIG_CONFIG_AXI_DEBUG) := -DDEBUG
 
-Hm, I think Greg found explanation why we can not reload axi driver
-successfully :)
+But pr_debug does not depend on DEBUG define:
+http://lxr.free-electrons.com/source/tools/perf/util/include/linux/kernel.h#L94
 
-I'll take care of your comment after weekend, thank you everybody.
+How do you expect -DDEBUG to affect pr_debug? Could you explain this
+to me, please?
 
 -- 
 Rafa?
