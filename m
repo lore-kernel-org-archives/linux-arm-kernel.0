@@ -1,54 +1,62 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri,  8 Apr 2011 22:16:37 -0600
-Subject: [PATCH] ARM: Tegra: Seaboard: Re-order sdhci device registration
-Message-ID: <1302322597-18469-1-git-send-email-swarren@nvidia.com>
+From: george@znau.edu.ua (George Kashperko)
+Date: Sat, 09 Apr 2011 10:10:26 +0300
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <op.vtmqm7fw3ri7v4@arend-laptop>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop>
+	<BANLkTin1yyow595tcYveB5fh8q3x+U_GOw@mail.gmail.com>
+	<op.vtmqm7fw3ri7v4@arend-laptop>
+Message-ID: <1302333026.18361.8.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure the built-in eMMC is always named mmcblk0.
 
-This is important because:
+> On Fri, 08 Apr 2011 18:56:13 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> 
+> > 2011/4/6 Arend van Spriel <arend@broadcom.com>:
+> >> 3. Device identification
+> >>
+> >> The cores are identified by manufacturer, core id and revision in your
+> >> patch. I would not use the revision because 4 out of 5 times a revision
+> >> change does indicate a hardware change but no change in programming
+> >> interface. The enumeration data does contain a more selective field
+> >> indicating the core class (4 bits following the core identifier). I  
+> >> suggest
+> >> to replace the revision field by this class field.
+> >
+> > Could you say something more about *class*, please? For my BCM43224 it
+> > seems to be 0x0. WIll check BCM4313 in a moment.
+> >
+> 
+> In principal the manufacturer id is unique (defined/assigned by JEDEC  
+> www.jedec.org) and the chip id and chip class are defined by the  
+> manufacturer. So I can only indicate what classes Broadcom uses in  
+> combination with the manufacturer id BRCM, ARM and MIPS.
+> 
+> /* Component Classes */
+> #define	CC_SIM			0
+> #define	CC_EROM			1
+> #define	CC_CORESIGHT		9
+> #define	CC_VERIF		0xb
+> #define	CC_OPTIMO		0xd
+> #define	CC_GEN			0xe
+> #define	CC_PRIMECELL		0xf
+> 
+> Looking at this it seems strange that you see a class value of 0x0. It may  
+> be rarely used or for non-production chips only (for simulation, chip  
+> bringup) which may require additional (debug) functions. So question is  
+> whether you will need it, but it is specified by ARM and it is up to  
+> manufacturers to use it. So I it is better to be safe than sorry and have  
+> this in the device id.
+> 
+> Gr. AvS
+When parsing bcm4716 EROM I have
+cia & CIA_CCL_MASK equal to 0 for all 9 cores
 
-* U-Boot statically assigns MMC device IDs based on controller ID.
-* U-Boot assumes that kernel MMC device ID numbering matches U-Boot numbering.
-* U-Boot provides a kernel cmdline option e.g. root=/dev/mmcblk0p3 based on
-  that numbering.
-* The kernel dynamically assigns MMC device IDs based on enumeration order of
-  the memory behind the host controller, rather than statically based on host
-  controller ID like U-Boot.
-* By registering the SDHCI controller for the built-in eMMC first, the
-  enumeration of the built-in eMMC is performed first, and hence eMMC gets
-  assigned ID 0 just like U-Boot. If the SD slot is filled, it then gets
-  assigned ID 1 just like U-Boot.
-* If the MMC IDs mismatch, and the system boots from SD card not eMMC, the
-  kernel will access the eMMC instead of SD card when attempting to mount
-  /dev/mmcblk1p3 as the root fs. If eMMC is not partitioned/formatted, the
-  kernel will panic since the root fs can't be mounted. If eMMC is partitioned
-  and formatted, the kernel will mount an unexpected filesystem as the root fs.
+You mentioned ARM DMP (Device Management Plugin) several times in
+earlier messages some time ago but I can't find anything relevant about
+that at ARM infocenter. Any chance you can point more precise location
+for any DMP reference?
 
-This change relies on the SDHCI driver performing initial card detection
-synchronously during device registration. This is currently the case.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-seaboard.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
-index a8d7ace..783de17 100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -137,9 +137,9 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
- static struct platform_device *seaboard_devices[] __initdata = {
- 	&debug_uart,
- 	&tegra_pmu_device,
--	&tegra_sdhci_device1,
--	&tegra_sdhci_device3,
- 	&tegra_sdhci_device4,
-+	&tegra_sdhci_device3,
-+	&tegra_sdhci_device1,
- 	&seaboard_gpio_keys_device,
- };
- 
--- 
-1.7.1
+Have nice day,
+George
