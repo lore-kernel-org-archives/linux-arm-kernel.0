@@ -1,77 +1,140 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Sat, 9 Apr 2011 13:01:39 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <1302333026.18361.8.camel@dev.znau.edu.ua>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTin1yyow595tcYveB5fh8q3x+U_GOw@mail.gmail.com>
-	<op.vtmqm7fw3ri7v4@arend-laptop>
-	<1302333026.18361.8.camel@dev.znau.edu.ua>
-Message-ID: <op.vtn3k12g3ri7v4@arend-laptop>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sat, 09 Apr 2011 13:40:35 +0200
+Subject: [RFC] Extending ARM perf-events for multiple PMUs
+In-Reply-To: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <1302349235.9086.1270.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 09 Apr 2011 09:10:26 +0200, George Kashperko <george@znau.edu.ua>  
-wrote:
+On Fri, 2011-04-08 at 18:15 +0100, Will Deacon wrote:
+> Hello,
+> 
+> Currently the perf code on ARM only caters for the core CPU PMU. In actual
+> fact, this only represents a subset of the performance monitoring hardware
+> available in real SoCs and is arguably the simplest to interact with. This
+> long-winded email is an attempt to classify the possible event sources that we
+> might see so that we can have clean support for them in the future. I think
+> that the perf tools might also need tweaking slightly so they can handle PMUs
+> which can't service per-cpu or per-task events (instead, you essentially have
+> a single system-wide event).
+> 
+> We can split PMUs up into two basic categories (an `action' here is usually an
+> interrupt but could be defined as any state recording or signalling operation).
+> 
+>   (1) CPU-aware PMUs
+> 
+>       This type of PMU is typically per-CPU and accessed via co-processor
+>       instructions. Actions may be delivered as PPIs. Events scheduled onto
+>       a CPU-aware PMU can be grouped, possibly with events scheduled for other
+>       per-CPU PMUs on the same CPU. An action delivered by one of these PMUs
+>       can *always* be attributed to a specific CPU but not necessarily a
+>       specific task. Accessing a CPU-aware PMU is a synchronous operation.
+> 
+>   (2) System PMUs
+> 
+>       System PMUs are typically outside of the CPU domain. Bus monitors, GPU
+>       counters and external L2 cache controller monitors are all system PMUs.
+>       Actions delivered by these PMUs cannot be attributed to a particular CPU
+>       and certainly cannot be associated with a particular piece of code. They
+>       are memory-mapped and cannot be grouped with other PMUs of any type.
+>       Accesses to a system PMU may be asynchronous.
+> 
+>       System PMUs can be further split up into `counting' and `filtering'
+>       PMUs:
+> 
+>       (i) Counting PMUs
+> 
+>           Counting PMUs increment a counter whenever a particular event occurs
+> 	  and can deliver an action periodically (for example, on overflow or
+> 	  after a certain amount of time has passed). The event types are
+> 	  hardwired as particular, discrete events such as `cycles' or
+> 	  `misses'.
+> 
+>       (ii) Filtering PMUs
+> 
+>           Filtering PMUs respond to a query. For example, `generate an action
+> 	  whenever you see a bus access which fits the following criteria'. The
+> 	  action may simply be to increment a counter, in which case this PMU
+> 	  can act as a highly configurable counting PMU, where the event types
+> 	  are dynamic.
 
->
->> On Fri, 08 Apr 2011 18:56:13 +0200, Rafa? Mi?ecki <zajec5@gmail.com>  
->> wrote:
->>
->> > 2011/4/6 Arend van Spriel <arend@broadcom.com>:
->> >> 3. Device identification
->> >>
->> >> The cores are identified by manufacturer, core id and revision in  
->> your
->> >> patch. I would not use the revision because 4 out of 5 times a  
->> revision
->> >> change does indicate a hardware change but no change in programming
->> >> interface. The enumeration data does contain a more selective field
->> >> indicating the core class (4 bits following the core identifier). I
->> >> suggest
->> >> to replace the revision field by this class field.
->> >
->> > Could you say something more about *class*, please? For my BCM43224 it
->> > seems to be 0x0. WIll check BCM4313 in a moment.
->> >
->>
->> In principal the manufacturer id is unique (defined/assigned by JEDEC
->> www.jedec.org) and the chip id and chip class are defined by the
->> manufacturer. So I can only indicate what classes Broadcom uses in
->> combination with the manufacturer id BRCM, ARM and MIPS.
->>
->> /* Component Classes */
->> #define	CC_SIM			0
->> #define	CC_EROM			1
->> #define	CC_CORESIGHT		9
->> #define	CC_VERIF		0xb
->> #define	CC_OPTIMO		0xd
->> #define	CC_GEN			0xe
->> #define	CC_PRIMECELL		0xf
->>
->> Looking at this it seems strange that you see a class value of 0x0. It  
->> may
->> be rarely used or for non-production chips only (for simulation, chip
->> bringup) which may require additional (debug) functions. So question is
->> whether you will need it, but it is specified by ARM and it is up to
->> manufacturers to use it. So I it is better to be safe than sorry and  
->> have
->> this in the device id.
->>
->> Gr. AvS
-> When parsing bcm4716 EROM I have
-> cia & CIA_CCL_MASK equal to 0 for all 9 cores
->
-> You mentioned ARM DMP (Device Management Plugin) several times in
-> earlier messages some time ago but I can't find anything relevant about
-> that at ARM infocenter. Any chance you can point more precise location
-> for any DMP reference?
+I don't see this distinction, both will have to count, and telling it
+what to count is a function of perf_event_attr::config* and how the
+hardware implements that is of no interest.
 
-I believe this is part of the CoreLink AMBA Designer tool, which is used  
-to design/configure a SoC. The DMP is ARM system IP and so references are  
-under ARM copyright. You need a special account with ARM to get access to  
-these references.
+> Now, we currently support the core CPU PMU, which is obviously a CPU-aware PMU
+> that generates interrupts as actions. Another example of a CPU-aware PMU is
+> the VFP PMU in Qualcomm's Scorpion. The next step (moving outwards from the
+> core) is to add support for L2 cache controllers. I expect most of these to be
+> Counting System PMUs, although I can envisage them being CPU-aware if built
+> into the core with enough extra hardware.
+> 
+> Implementing support for CPU-aware PMUs can be done alongside the current CPU
+> PMU code and much of the code can be shared with the core PMU providing that
+> the event namespaces are distinct.
+> 
+> Implementing support for Counting System PMUs can reuse a lot of the
+> functionality in perf_event.c (for example, struct arm_pmu) but the low-level
+> accessors should be separate and a new struct pmu should be used. This means
+> that we will want multiple instances of struct arm_pmu and a method to translate
+> from a struct pmu to a struct arm_pmu. We'll also need to clean up some of the
+> armpmu_* functions to ensure the correction indirection is used when invoking
+> per-pmu functions.
+> 
+> Finally, the Filtering System PMUs will probably need their own struct pmu
+> instances for each device and can make use of the dynamic sysfs interface via
+> perf_pmu_register. I don't see any scope for common code in this space yet.
+> 
+> I appreciate this is especially hand-wavy stuff, but I'd like to check we've
+> got all of our bases covered before introducing system PMUs to ARM. The first
+> victim is the PL310 L2CC on the Cortex-A9.
 
-Gr. AvS
--- 
-"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
+Right, so x86 has this too, and we have a fairly complete implementation
+of the Nehalem/Westmere uncore PMU, which is a NODE/memory controller
+PMU. Afaik we're mostly waiting on Intel to clarify some hardware
+details.
+
+So the perf core supports multiple hardware PMUs, but currently only one
+of which can do per-task sampling, if you've got multiple CPU local PMUs
+we need to do a little extra.
+
+See perf_pmu_register(), what say a memory controller PMU would do is
+something like:
+
+  perf_pmu_register(&node_pmu, "node", -1);
+
+that will create a /sys/bus/event_source/devices/node/ directory in
+which will host the PMU details for userspace. This is currently limited
+to a single 'type' file which includes the number to provide
+perf_event_attr::type, but could (and should) be extended to provide
+some important events as well, which will provide the the bits to put in
+perf_event_attr::config.
+
+I just haven't figured out a way to dynamically add files/directories in
+the whole struct device sysfs muck (that also pleases the driver/sysfs
+folks). Nor have we agreed on a sane layout for such events there.
+
+What we do for the events is map the provided CPU number to a memory
+controller (cpu_to_node() does that for our case), and then use the
+first online cpu in that node mask to drive the event.
+
+If you've got system wide things like GPUs, where every cpu maps to the
+same device, simply use the first online cpu and create a pmu instance
+per device.
+
+Now, I've also wanted to make symlinks in the regular sysfs topology to
+these bus/event_source nodes, but again, that's something I've not
+managed to find out how to do yet.
+
+That is, for the currently existing "cpu" node, I'd like to have:
+
+  /sys/devices/system/cpu/cpuN/event_source -> /sys/bus/event_source/devices/cpu
+
+And similar for the node thing:
+
+  /sys/devices/system/node/nodeN/event_source -> /sys/bus/event_source/devices/node
+
+And for a GPU we could have:
+
+  /sys/devices/pci0000:00/0000:00:02.0/drm/card0/event_source -> /sys/bus/event_source/devices/IGC0
