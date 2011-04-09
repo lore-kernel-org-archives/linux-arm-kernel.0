@@ -1,36 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 9 Apr 2011 11:19:39 +0200
-Subject: [PATCH] video: imx-fb: just depend on IMX_HAVE_PLATFORM_IMX_FB
-In-Reply-To: <BANLkTi=LdPOLxUURdc+pOj-t2wpjtezdhw@mail.gmail.com>
-References: <1302100144-17176-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110406163805.GA11820@linux-sh.org>
-	<20110406184022.GI13963@pengutronix.de>
-	<20110407043623.GA3905@jasper.tkos.co.il>
-	<20110407074050.GF13963@pengutronix.de>
-	<BANLkTi=LdPOLxUURdc+pOj-t2wpjtezdhw@mail.gmail.com>
-Message-ID: <20110409091939.GD18601@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 9 Apr 2011 12:49:58 +0300
+Subject: 2.6.39-rc2 on zaurus: does not build, does not boot
+In-Reply-To: <201104080931.11202.marek.vasut@gmail.com>
+References: <20110408062646.GA1472@ucw.cz>
+	<201104080931.11202.marek.vasut@gmail.com>
+Message-ID: <201104091249.59159.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Fri, Apr 08, 2011 at 06:18:10PM -0300, Fabio Estevam wrote:
-> 2011/4/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> ...
-> >> Can you take the following one then? I need this to enable multiple NAND chips
-> >> on i.MX25.
-> >>
-> >> http://article.gmane.org/gmane.linux.ports.arm.kernel/110313
-> > I already have that in my tree.
+On Friday 08 April 2011 10:31:10 Marek Vasut wrote:
+> On Friday 08 April 2011 08:26:46 Pavel Machek wrote:
+> > Hi!
+> > 
+> > Build fix is below. Maybe it is pending in the trees somewhere
+> > already...
 > 
-> Could you please point us to your git tree?
-It's still on a machine that you can only reach if you hack the
-Pengutronix network. I hope to get it finally sorted on Monday that I
-can push it to my public tree (or let Sascha push it to the imx repo).
+> Fix is already there, it was broken by a patch from someone recently.
+> Thanks though
 
-Best regards
-Uwe
+I broke it accidently, sorry :) you can enable CONFIG_FB_PXA_OVERLAY as 
+temporary workaround
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Vasily
