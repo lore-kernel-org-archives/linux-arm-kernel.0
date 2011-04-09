@@ -1,96 +1,99 @@
-From: bernd@petrovitsch.priv.at (Bernd Petrovitsch)
-Date: Sat, 09 Apr 2011 10:29:13 +0200
-Subject: [PATCH 1/2] ARM: Differentiate SheevaPlugs and DockStars on
-	the basis of the memory size.
-In-Reply-To: <4D9E42E1.1060902@ahsoftware.de>
-References: <1302122121-3652-1-git-send-email-holler@ahsoftware.de>
-	<1302122121-3652-2-git-send-email-holler@ahsoftware.de>
-	<alpine.LFD.2.00.1104061739100.28032@xanadu.home>
-	<4D9CED15.2010806@ahsoftware.de>
-	<alpine.LFD.2.00.1104061850410.28032@xanadu.home>
-	<4D9CF5B3.9020007@ahsoftware.de> <toa078-0do.ln1@chipmunk.wormnet.eu>
-	<4D9E2D1C.7070102@ahsoftware.de>
-	<20110407220855.GD17049@n2100.arm.linux.org.uk>
-	<4D9E42E1.1060902@ahsoftware.de>
-Message-ID: <1302337753.30783.24.camel@thorin>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 9 Apr 2011 11:57:57 +0300
+Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
+	device accesses
+In-Reply-To: <BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
+References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
+	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
+	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
+	<BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
+Message-ID: <BANLkTi=37p-BWpzF2KT4J8PO+xEWrRjDfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fre, 2011-04-08 at 01:04 +0200, Alexander Holler wrote:
-[...] 
-> I had a look at what's going on in the OMAP linux world for more than a 
-> year now and I think I've seen a lot of the stuff you are referring to.
+Hi,
 
-Others were far longer in in several of these "Linux worlds" ....
+On 7 April 2011 10:07, Ming Lei <tom.leiming@gmail.com> wrote:
+> 2011/3/29 Catalin Marinas <catalin.marinas@arm.com>:
+>> On Tue, 2011-03-29 at 16:02 +0100, Martin Furmanski wrote:
+>>> Do you have a reference on this?
+>>
+>> Usually the ARM ARM but a document with examples is this:
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
+>
+> After glancing over the above, I find DSB is only applied in the WFE/WFI
+> example in section 6, but all other examples in this section do use DMB.
+>
+> So could you point out which example is the reference for the mandatory DSB
+> wrt. read memory barrier?
 
-> And I think one of the reasons that the mess happened is the same I've 
-> got trapped in. Why should anyone try to submit patches if he must fear 
-> to get caught in some senseless endless discussion about one line.
+Probably the above document isn't comprehensive enough. It mainly
+targets memory ordering between processors. I think another example
+that mentions DSB is the mailbox scenario.
 
-Welcome to the world where software is actually really maintained - and
-not longer in the easy world of "fork it, hack it up to ship it and be
-done with it - except of bugs actually reported by customers who care
-enough to get the bug report that far" like it is not uncommon in the
-embedded world.
+Anyway, my patch is based on the discussions I had with the person
+that wrote the above document (and the ARM ARM).
 
-> E.g. requiring people to use NULL than 0 or that stupid discussion now 
+>>> I have been under the impression that DMB is a barrier for all memory
+>>> accesses. I find no support in ARMv7, for the hypothesis that DSB is
+>>> needed to order between Device and Normal.
+>>
+>> The key point is that DMB only ensures the *observability* of memory
+>> accesses by the processors and not arrival to the device or block of
+>
+> How could you conclude that the memory accesses order is different with
+> the order of memory requests observed on the same type of memory?
 
-You obviously where never forced to bugfix with source where you can
-identify the writer of each be the style.
+I don't fully understand your question. But I'll give an example where
+the DMB fails.
 
-> about the simple patch I've posted. I'm writing whole (readable) C++ 
+Let's assume we have a device that performs the two steps below:
 
-"readable" is quite subjective. And just because it is readable by you
-doesn't imply it is readable for many others. Especially if you actually
-wrote it .....
+1. Writes data to RAM
+2. Updates its status register
 
-> applications (not crap!) in less time than what's is needed to submit 
-> and discuss a small patch for some silly hw.
+A driver running on the CPU has some code as below:
 
-That's precisely the point: Writing the source is the easiest job.
-Maintaining it over years and keeping it clear is hard.
+    LDR [Device]    @ read the device status
+    DMB               @ current barrier that we have in readl
+    TST                 @ check whether the DMA transfer is ready
+    BEQ out
+    LDR [Normal]    @ read the DMA buffer
+    ...
+out:
 
-> So for me it's fully understandable why companies don't try to work with 
-> kernel people at first. They try to develop innovativ products they can 
-> sell, and it doesn't help if their developers would have to fear that 
+With the code above, the CPU may do the following steps:
 
-"Innovative products which actually sell" are neither necessary nor
-sufficient to produce maintainable code.
-IMHO it it quite the opposite - these companies just want to get their
-products built as quickly as possible to minimize the time to market and
-get it sold (as in "second place, first looser") and be done with it
-(except the sales part of course).
-And the vast majority of the software on these products is actually not
-really maintained - they have just bugs fixed if they crop up and some
-user works hard enough to get the bug report actually to someone who
-might fix it.
-Existing software is just patched to implement the "new features" far
-enough to be usable on that one product - ignoring the big picture of
-the upstream with all the features and possibilities.
-For the next release/version/product, the old code is plain simply
-forked and everyone moves on.
+1. Issue read from the device. Note that it does not wait for the read
+to complete.
+2. DMB - ensures that no subsequent memory accesses happen before the
+previous ones.
+3. Issues read from normal memory speculatively. This is allowed
+because the TST/BEQ are only flow control dependency. In case the
+condition fails, the read is discarded.
+4. The read from Normal memory (DMA buffer) completes. This could
+happen before the I/O read at point 1 depending on the bus speeds.
+5. The Device read completes. This can happen after the Normal read
+because of different bus speeds.
+6. TST clears CPSR.Z
+7. BEQ not executed.
+8. Normal read data moved to register.
 
-[...] 
-> It's one thing to say such to someone you know and work with, but it's a 
-> totally different thing to say such to someone you almost know nothing 
-> about. And not everybody who hasn't the name of a big company in his 
-> email address is a moron.
+So, even if the CPU issues the read from Device and Normal memory in
+order (steps 1, 3), they can happen at the device and RAM level out of
+order (steps 4, 5) and the CPU could read data not yet written by the
+device.
 
-You have to read more mails on the LKML and you will see, that the
-domain name in the mail address help in any direction - neither to avoid
-being flamed nor that a patch goes faster in.
-Of course, there *are* people out there where it looks like that a
-well-known domain name helps - but most of them started to hack on the
-kernel and (successfully) submit patches with other domains. Think about
-it ...
+The solution is to use a DSB which ensures the completion of the
+Device read before issuing the Normal memory read.
 
-> Sorry, I'm getting sick having to defend me here against people who like 
-> to call others crap and abonimation writing ones just because they have 
-> maintainer status or whatever.
+Note that if the device would update the ready state in some
+memory-mapped register via the same port as the CPU, a DMB would be
+enough (IOW, ordering ensured only for accesses initiated by bus
+masters).
 
-The main reason was a pure technical one. Think about it ....
+Hope this helps.
 
-Bernd
 -- 
-Bernd Petrovitsch                  Email : bernd at petrovitsch.priv.at
-                     LUGA : http://www.luga.at
+Catalin
