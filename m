@@ -1,65 +1,59 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 08 Apr 2011 17:07:43 -0700
-Subject: [RFC][WAS:bcmai][PATCH V2] axi: add AXI bus driver
-In-Reply-To: <BANLkTimQBAHgFaH0RVCOYBGSKuHN2Dprmw@mail.gmail.com>
-References: <1302291900-1902-1-git-send-email-zajec5@gmail.com>
-	<1302290881.1664.7.camel@Joe-Laptop>
-	<BANLkTi=QwBOxfxy13PxeX+LRuccV_p06zA@mail.gmail.com>
-	<1302292554.1664.12.camel@Joe-Laptop>
-	<BANLkTimQBAHgFaH0RVCOYBGSKuHN2Dprmw@mail.gmail.com>
-Message-ID: <1302307663.1664.19.camel@Joe-Laptop>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 9 Apr 2011 03:33:39 +0200
+Subject: V4L/ARM: videobuf-dma-contig no longer works on my ARM machine (was:
+	[PATCH v3] SoC Camera: add driver for OMAP1 camera interface)
+In-Reply-To: <Pine.LNX.4.64.1103231056360.6836@axis700.grange>
+References: <201009301335.51643.jkrzyszt@tis.icnet.pl>
+	<Pine.LNX.4.64.1103231056360.6836@axis700.grange>
+Message-ID: <201104090333.52312.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-04-09 at 02:03 +0200, Rafa? Mi?ecki wrote:
-> 2011/4/8 Joe Perches <joe@perches.com>:
-> > On Fri, 2011-04-08 at 21:46 +0200, Rafa? Mi?ecki wrote:
-> >> 2011/4/8 Joe Perches <joe@perches.com>:
-> >> > On Fri, 2011-04-08 at 21:45 +0200, Rafa? Mi?ecki wrote:
-> >> >> diff --git a/include/linux/axi/axi.h b/include/linux/axi/axi.h
-> >> > []
-> >> >> +#define axi_info     pr_info
-> >> >> +#ifdef CONFIG_AXI_DEBUG
-> >> >> +#define axi_debug    pr_debug
-> >> >> +#else
-> >> >> +#define axi_debug    do { } while (0)
-> >> >> +#endif
-> >> >> +#define axi_err              pr_err
-> >> > I think redefining standard functionality like
-> >> > this doesn't gain anything and loses some basic
-> >> > grep capability.
-> >> But on the other hand using:
-> >> pr_info, pr_err, BUT axi_debug
-> >> can easily lead to mistakes.
-> >> Or is this possible to re-define pr_debug locally?
-> > It is, but is that CONFIG_AXI_DEBUG actually
-> > worthwhile?
-> > If you think so, doesn't adding this to the Makefile
-> > give you the same capability?
-> > ccflags-$(CONFIG_CONFIG_AXI_DEBUG) := -DDEBUG
+On Wendesday, 23 March 2011, at 11:00:06, Guennadi Liakhovetski wrote:
+> 
+> You might want to retest ams-delta with the camera on the current
+> (next or git://linuxtv.org/media_tree.git staging/for_v2.6.39) kernel
+> ...
 
-Just CONFIG_AXI_DEBUG of course.
+Hi Guennadi,
+With the patch I've just submitted to the linux-media list 
+(http://www.spinics.net/lists/linux-media/msg31255.html), the 2.6.39-rc2 
+OMAP1 camera driver still works for me as before, but only in SG mode. 
+I'm no longer able to use it in CONTIG mode after videobuf-dma-contig.c 
+has been changed with commit 35d9f510b67b10338161aba6229d4f55b4000f5b, 
+"V4L: videobuf, don't use dma addr as physical", supposed to correct 
+potential issues on IOMMU euqipped machines.
 
-> But pr_debug does not depend on DEBUG define:
-> http://lxr.free-electrons.com/source/tools/perf/util/include/linux/kernel.h#L94
-> How do you expect -DDEBUG to affect pr_debug? Could you explain this
-> to me, please?
+Since there were no actual problems reported before, I suppose the old 
+code, which was passing to remap_pfn_range() a physical page number 
+calculated from dma_alloc_coherent() privided dma_handle, worked 
+correctly on all platforms actually using videobud-dma-config. Now, on 
+my ARM machine, a completely different, then completely wrong physical 
+address, calculated as virt_to_phys(dma_alloc_coherent()), is used 
+instead of the dma_handle, which causes the machine to hang.
 
-Sure.  You're not looking at the right place.
+AFAICS, incompatibility of the new code with the ARM architecture has 
+been already pointed out as a potential issue by Lauent Pinchart 
+(http://www.spinics.net/lists/linux-media/msg29544.html), but the patch 
+has been accepted regardless.
 
-Look instead at include/linux/printk.h
+I suspect the problem may affect other ARM subarchitectures, not only 
+OMAP1, but have no way to verify this. Anyone with a suitable hardware, 
+can you please verify and report if your machine is affected or not?
 
-/* If you are writing a driver, please use dev_dbg instead */
-#if defined(DEBUG)
-#define pr_debug(fmt, ...) \
-	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
-#elif defined(CONFIG_DYNAMIC_DEBUG)
-/* dynamic_pr_debug() uses pr_fmt() internally so we don't need it here */
-#define pr_debug(fmt, ...) \
-	dynamic_pr_debug(fmt, ##__VA_ARGS__)
-#else
-#define pr_debug(fmt, ...) \
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
-#endif
+I've tried to resolve the problem by conditionally (#ifdef CONFIG_ARM) 
+replacing remap_pfn_range() with ARM specific dma_mmap_coherent(), but 
+with not much success so far. While this still seems a possibly correct 
+solution to me (see sound/core/pcm_native.c for an example, architecture 
+independent driver code which already implements a similiar method), I 
+found that the dma_mmap_coherent() does its job for me only with the 
+first buffer, failing with the second one because of negative buffer 
+size vs. available vma space comparison. It seems to me that there may 
+be something wrong with vma->vm_pgoff handling, but I'm not sure if in 
+the V4L videobuf, or in the ARM DMA, or in a yet another piece of code.
 
-cheers, Joe
+Not being able to work out a solution myself, other than reverting back 
+to the old code for ARM, I hope someone can come out with a better idea.
+
+Thanks,
+Janusz
