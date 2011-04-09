@@ -1,62 +1,23 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Sat, 09 Apr 2011 10:10:26 +0300
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <op.vtmqm7fw3ri7v4@arend-laptop>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop>
-	<BANLkTin1yyow595tcYveB5fh8q3x+U_GOw@mail.gmail.com>
-	<op.vtmqm7fw3ri7v4@arend-laptop>
-Message-ID: <1302333026.18361.8.camel@dev.znau.edu.ua>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Apr 2011 08:16:24 +0100
+Subject: V4L/ARM: videobuf-dma-contig no longer works on my ARM machine
+	(was: [PATCH v3] SoC Camera: add driver for OMAP1 camera interface)
+In-Reply-To: <201104090333.52312.jkrzyszt@tis.icnet.pl>
+References: <201009301335.51643.jkrzyszt@tis.icnet.pl>
+	<Pine.LNX.4.64.1103231056360.6836@axis700.grange>
+	<201104090333.52312.jkrzyszt@tis.icnet.pl>
+Message-ID: <20110409071624.GE5573@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Apr 09, 2011 at 03:33:39AM +0200, Janusz Krzysztofik wrote:
+> Since there were no actual problems reported before, I suppose the old 
+> code, which was passing to remap_pfn_range() a physical page number 
+> calculated from dma_alloc_coherent() privided dma_handle, worked 
+> correctly on all platforms actually using videobud-dma-config. Now, on 
+> my ARM machine, a completely different, then completely wrong physical 
+> address, calculated as virt_to_phys(dma_alloc_coherent()), is used 
+> instead of the dma_handle, which causes the machine to hang.
 
-> On Fri, 08 Apr 2011 18:56:13 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> 
-> > 2011/4/6 Arend van Spriel <arend@broadcom.com>:
-> >> 3. Device identification
-> >>
-> >> The cores are identified by manufacturer, core id and revision in your
-> >> patch. I would not use the revision because 4 out of 5 times a revision
-> >> change does indicate a hardware change but no change in programming
-> >> interface. The enumeration data does contain a more selective field
-> >> indicating the core class (4 bits following the core identifier). I  
-> >> suggest
-> >> to replace the revision field by this class field.
-> >
-> > Could you say something more about *class*, please? For my BCM43224 it
-> > seems to be 0x0. WIll check BCM4313 in a moment.
-> >
-> 
-> In principal the manufacturer id is unique (defined/assigned by JEDEC  
-> www.jedec.org) and the chip id and chip class are defined by the  
-> manufacturer. So I can only indicate what classes Broadcom uses in  
-> combination with the manufacturer id BRCM, ARM and MIPS.
-> 
-> /* Component Classes */
-> #define	CC_SIM			0
-> #define	CC_EROM			1
-> #define	CC_CORESIGHT		9
-> #define	CC_VERIF		0xb
-> #define	CC_OPTIMO		0xd
-> #define	CC_GEN			0xe
-> #define	CC_PRIMECELL		0xf
-> 
-> Looking at this it seems strange that you see a class value of 0x0. It may  
-> be rarely used or for non-production chips only (for simulation, chip  
-> bringup) which may require additional (debug) functions. So question is  
-> whether you will need it, but it is specified by ARM and it is up to  
-> manufacturers to use it. So I it is better to be safe than sorry and have  
-> this in the device id.
-> 
-> Gr. AvS
-When parsing bcm4716 EROM I have
-cia & CIA_CCL_MASK equal to 0 for all 9 cores
-
-You mentioned ARM DMP (Device Management Plugin) several times in
-earlier messages some time ago but I can't find anything relevant about
-that at ARM infocenter. Any chance you can point more precise location
-for any DMP reference?
-
-Have nice day,
-George
+virt_to_phys(dma_alloc_coherent()) is and always has been invalid, and
+will break on several architectures apart from ARM.
