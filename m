@@ -1,23 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Apr 2011 08:16:24 +0100
-Subject: V4L/ARM: videobuf-dma-contig no longer works on my ARM machine
-	(was: [PATCH v3] SoC Camera: add driver for OMAP1 camera interface)
-In-Reply-To: <201104090333.52312.jkrzyszt@tis.icnet.pl>
-References: <201009301335.51643.jkrzyszt@tis.icnet.pl>
-	<Pine.LNX.4.64.1103231056360.6836@axis700.grange>
-	<201104090333.52312.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110409071624.GE5573@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 9 Apr 2011 10:53:48 +0300
+Subject: [PATCH] ux500: Adding support for u8500 Hsem functionality.
+In-Reply-To: <1302294509-6595-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1302294509-6595-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <BANLkTikMy7vpz8z479sCuROgjV8EK03FUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 09, 2011 at 03:33:39AM +0200, Janusz Krzysztofik wrote:
-> Since there were no actual problems reported before, I suppose the old 
-> code, which was passing to remap_pfn_range() a physical page number 
-> calculated from dma_alloc_coherent() privided dma_handle, worked 
-> correctly on all platforms actually using videobud-dma-config. Now, on 
-> my ARM machine, a completely different, then completely wrong physical 
-> address, calculated as virt_to_phys(dma_alloc_coherent()), is used 
-> instead of the dma_handle, which causes the machine to hang.
+Hi Mathieu,
 
-virt_to_phys(dma_alloc_coherent()) is and always has been invalid, and
-will break on several architectures apart from ARM.
+On Fri, Apr 8, 2011 at 11:28 PM,  <mathieu.poirier@linaro.org> wrote:
+...
+
+> + * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+> + * Heavily borrowed from the work of :
+> + * ? Simon Que <sque@ti.com>
+> + * ? Hddari Kanigeri <h-kanigeri2@ti.com>
+
+s/Hddari/Hari/
+
+> + ? ? ? platform_set_drvdata(pdev, state);
+> +
+> + ? ? ? /* no pm needed for HSem but required to comply
+> + ? ? ? ?* with hwspilock core.
+> + ? ? ? ?*/
+> + ? ? ? pm_runtime_enable(&pdev->dev);
+
+You seem to have removed the calls to pm_runtime_disable() throughout
+the driver, is that on purpose ?
+
+You should see an "Unbalanced pm_runtime_enable!" warning about this
+if you tried rmmod'ing and insmod'ing the driver again.
+
+And just a minor comment if you're submitting a v2: you have a bunch
+of trailing whitespaces; try checkpatch to spot them easily.
+
+Thanks,
+Ohad.
