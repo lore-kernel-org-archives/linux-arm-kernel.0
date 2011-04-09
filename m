@@ -1,112 +1,484 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 10 Apr 2011 01:03:02 +0800
-Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
-	device accesses
-In-Reply-To: <BANLkTi=37p-BWpzF2KT4J8PO+xEWrRjDfA@mail.gmail.com>
-References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
-	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
-	<BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
-	<BANLkTi=37p-BWpzF2KT4J8PO+xEWrRjDfA@mail.gmail.com>
-Message-ID: <BANLkTikcy_eut-HGexziTnoUcXOPLdyVfA@mail.gmail.com>
+From: wanlong.gao@gmail.com (wanlong.gao at gmail.com)
+Date: Sun, 10 Apr 2011 03:04:18 +0800
+Subject: [PATCH] fix build warnings on defconfigs
+Message-ID: <1302375858-11253-1-git-send-email-wanlong.gao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+From: Wanlong Gao <wanlong.gao@gmail.com>
 
-2011/4/9 Catalin Marinas <catalin.marinas@arm.com>:
+Change the BT_L2CAP and BT_SCO defconfigs from 'm' to 'y',
+since BT_L2CAP and BT_SCO had changed to bool configs.
 
-> Probably the above document isn't comprehensive enough. It mainly
-> targets memory ordering between processors. I think another example
-> that mentions DSB is the mailbox scenario.
+Signed-off-by: Wanlong Gao <wanlong.gao@gmail.com>
+---
+ arch/arm/configs/am200epdkit_defconfig     |    4 ++--
+ arch/arm/configs/at572d940hfek_defconfig   |    2 +-
+ arch/arm/configs/at91rm9200_defconfig      |    4 ++--
+ arch/arm/configs/badge4_defconfig          |    2 +-
+ arch/arm/configs/cm_x2xx_defconfig         |    4 ++--
+ arch/arm/configs/cm_x300_defconfig         |    4 ++--
+ arch/arm/configs/colibri_pxa270_defconfig  |    4 ++--
+ arch/arm/configs/corgi_defconfig           |    4 ++--
+ arch/arm/configs/davinci_all_defconfig     |    2 +-
+ arch/arm/configs/em_x270_defconfig         |    4 ++--
+ arch/arm/configs/magician_defconfig        |    4 ++--
+ arch/arm/configs/mini2440_defconfig        |    4 ++--
+ arch/arm/configs/nhk8815_defconfig         |    4 ++--
+ arch/arm/configs/ns9xxx_defconfig          |    2 +-
+ arch/arm/configs/omap2plus_defconfig       |    4 ++--
+ arch/arm/configs/pxa3xx_defconfig          |    2 +-
+ arch/arm/configs/s3c2410_defconfig         |    6 +++---
+ arch/arm/configs/simpad_defconfig          |    4 ++--
+ arch/arm/configs/spitz_defconfig           |    4 ++--
+ arch/arm/configs/trizeps4_defconfig        |    4 ++--
+ arch/arm/configs/viper_defconfig           |    2 +-
+ arch/arm/configs/zeus_defconfig            |    4 ++--
+ arch/avr32/configs/atngw100_mrmt_defconfig |    2 +-
+ arch/mips/configs/lemote2f_defconfig       |    4 ++--
+ arch/mips/configs/mtx1_defconfig           |    4 ++--
+ arch/powerpc/configs/c2k_defconfig         |    4 ++--
+ arch/powerpc/configs/pmac32_defconfig      |    4 ++--
+ arch/powerpc/configs/ppc6xx_defconfig      |    4 ++--
+ arch/powerpc/configs/ps3_defconfig         |    4 ++--
+ 29 files changed, 52 insertions(+), 52 deletions(-)
 
-I also saw this example of 8.1, but I don't think it is related with
-linux read memory barrier, see below:
-
-	- 8.1 requires that the 'STR R5, [R1]' in P1 is completed before
-	'LDR R5, [R1]' in P2;
-
-	- Documentation/memory-barriers.txt said:
-	1), Memory barriers are such interventions.  They impose a
-	perceived partial ordering over the memory operations on either
-	side of the barrier.
-
-	2),There is no guarantee that any of the memory accesses specified
-	before a memory barrier will be _complete_ by the completion of a
-	memory barrier instruction; the barrier can be considered to draw a
-	line in that CPU's access queue that accesses of the appropriate type
-	may not cross.
-
-In fact, IMO, the 'DSB' should be used before 'LDR R5, [R1]' in P2 instead
-of in P1 because of the belows:
-
-	- out of order of the two stores in P1 is allowable
-	- P2 should get message address from the mailbox pointed by R4 first,
-	so how can we make sure the 'STR R1, [R4]' in P1 is completed if
-	R4 doesn't point to a Strongly-Ordered memory.
-
-> Anyway, my patch is based on the discussions I had with the person
-> that wrote the above document (and the ARM ARM).
->
->>>> I have been under the impression that DMB is a barrier for all memory
->>>> accesses. I find no support in ARMv7, for the hypothesis that DSB is
->>>> needed to order between Device and Normal.
->>>
->>> The key point is that DMB only ensures the *observability* of memory
->>> accesses by the processors and not arrival to the device or block of
->>
->> How could you conclude that the memory accesses order is different with
->> the order of memory requests observed on the same type of memory?
->
-> I don't fully understand your question. But I'll give an example where
-> the DMB fails.
->
-> Let's assume we have a device that performs the two steps below:
->
-> 1. Writes data to RAM
-> 2. Updates its status register
->
-> A driver running on the CPU has some code as below:
->
-> ? ?LDR [Device] ? ?@ read the device status
-> ? ?DMB ? ? ? ? ? ? ? @ current barrier that we have in readl
-> ? ?TST ? ? ? ? ? ? ? ? @ check whether the DMA transfer is ready
-> ? ?BEQ out
-> ? ?LDR [Normal] ? ?@ read the DMA buffer
-> ? ?...
-> out:
->
-> With the code above, the CPU may do the following steps:
->
-> 1. Issue read from the device. Note that it does not wait for the read
-> to complete.
-> 2. DMB - ensures that no subsequent memory accesses happen before the
-> previous ones.
-> 3. Issues read from normal memory speculatively. This is allowed
-> because the TST/BEQ are only flow control dependency. In case the
-> condition fails, the read is discarded.
-> 4. The read from Normal memory (DMA buffer) completes. This could
-> happen before the I/O read at point 1 depending on the bus speeds.
-> 5. The Device read completes. This can happen after the Normal read
-> because of different bus speeds.
-> 6. TST clears CPSR.Z
-> 7. BEQ not executed.
-> 8. Normal read data moved to register.
->
-> So, even if the CPU issues the read from Device and Normal memory in
-> order (steps 1, 3), they can happen at the device and RAM level out of
-> order (steps 4, 5) and the CPU could read data not yet written by the
-> device.
->
-> The solution is to use a DSB which ensures the completion of the
-> Device read before issuing the Normal memory read.
-
-I agree a DSB is needed in such case, but I am not sure the patch is
-good. Maybe we should keep rmb not changed and only replace __iormb
-as DSB if this issue only happens between device io memory and normal
-memory, then rmb will not degrade performance a little as does by your
-patch.
-
-thanks,
+diff --git a/arch/arm/configs/am200epdkit_defconfig b/arch/arm/configs/am200epdkit_defconfig
+index f0dea52..0a7d807 100644
+--- a/arch/arm/configs/am200epdkit_defconfig
++++ b/arch/arm/configs/am200epdkit_defconfig
+@@ -34,8 +34,8 @@ CONFIG_INET=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/at572d940hfek_defconfig b/arch/arm/configs/at572d940hfek_defconfig
+index 1b1158a..8409374 100644
+--- a/arch/arm/configs/at572d940hfek_defconfig
++++ b/arch/arm/configs/at572d940hfek_defconfig
+@@ -280,7 +280,7 @@ CONFIG_SDIO_UART=m
+ CONFIG_MMC_AT91=m
+ CONFIG_MMC_SPI=m
+ CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=m
+diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
+index 38cb7c9..b21dd9e 100644
+--- a/arch/arm/configs/at91rm9200_defconfig
++++ b/arch/arm/configs/at91rm9200_defconfig
+@@ -75,8 +75,8 @@ CONFIG_IPV6_TUNNEL=m
+ CONFIG_BRIDGE=m
+ CONFIG_VLAN_8021Q=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/badge4_defconfig b/arch/arm/configs/badge4_defconfig
+index 5b54abb..ddd8eb2 100644
+--- a/arch/arm/configs/badge4_defconfig
++++ b/arch/arm/configs/badge4_defconfig
+@@ -24,7 +24,7 @@ CONFIG_IRCOMM=y
+ CONFIG_IRDA_ULTRA=y
+ CONFIG_SA1100_FIR=y
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
++CONFIG_BT_L2CAP=y
+ CONFIG_BT_HCIUART=m
+ CONFIG_BT_HCIVHCI=m
+ # CONFIG_FW_LOADER is not set
+diff --git a/arch/arm/configs/cm_x2xx_defconfig b/arch/arm/configs/cm_x2xx_defconfig
+index a93ff8d..04bf923 100644
+--- a/arch/arm/configs/cm_x2xx_defconfig
++++ b/arch/arm/configs/cm_x2xx_defconfig
+@@ -43,8 +43,8 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_BNEP=m
+ CONFIG_BT_HIDP=m
+diff --git a/arch/arm/configs/cm_x300_defconfig b/arch/arm/configs/cm_x300_defconfig
+index 921e56a..d7c7d99 100644
+--- a/arch/arm/configs/cm_x300_defconfig
++++ b/arch/arm/configs/cm_x300_defconfig
+@@ -40,8 +40,8 @@ CONFIG_IP_PNP_RARP=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/colibri_pxa270_defconfig b/arch/arm/configs/colibri_pxa270_defconfig
+index 2ef2c5e..a381317 100644
+--- a/arch/arm/configs/colibri_pxa270_defconfig
++++ b/arch/arm/configs/colibri_pxa270_defconfig
+@@ -45,8 +45,8 @@ CONFIG_IRDA_CACHE_LAST_LSAP=y
+ CONFIG_IRDA_FAST_RR=y
+ CONFIG_IRTTY_SIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/corgi_defconfig b/arch/arm/configs/corgi_defconfig
+index e53c475..ee85811 100644
+--- a/arch/arm/configs/corgi_defconfig
++++ b/arch/arm/configs/corgi_defconfig
+@@ -69,8 +69,8 @@ CONFIG_IRNET=m
+ CONFIG_IRCOMM=m
+ CONFIG_PXA_FICP=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 889922a..9739ee2 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -152,7 +152,7 @@ CONFIG_MMC=m
+ # CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_DAVINCI=m
+ CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=m
+diff --git a/arch/arm/configs/em_x270_defconfig b/arch/arm/configs/em_x270_defconfig
+index 60a21e0..9910c68 100644
+--- a/arch/arm/configs/em_x270_defconfig
++++ b/arch/arm/configs/em_x270_defconfig
+@@ -38,8 +38,8 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_BNEP=m
+ CONFIG_BT_HIDP=m
+diff --git a/arch/arm/configs/magician_defconfig b/arch/arm/configs/magician_defconfig
+index a88e64d..eef5440 100644
+--- a/arch/arm/configs/magician_defconfig
++++ b/arch/arm/configs/magician_defconfig
+@@ -48,8 +48,8 @@ CONFIG_IRDA_DEBUG=y
+ CONFIG_IRTTY_SIR=m
+ CONFIG_PXA_FICP=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/mini2440_defconfig b/arch/arm/configs/mini2440_defconfig
+index 2472a95..a0b5413 100644
+--- a/arch/arm/configs/mini2440_defconfig
++++ b/arch/arm/configs/mini2440_defconfig
+@@ -56,8 +56,8 @@ CONFIG_VLAN_8021Q=m
+ CONFIG_VLAN_8021Q_GVRP=y
+ CONFIG_NET_PKTGEN=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
+index 37207d1..5129217 100644
+--- a/arch/arm/configs/nhk8815_defconfig
++++ b/arch/arm/configs/nhk8815_defconfig
+@@ -38,8 +38,8 @@ CONFIG_IP_MROUTE=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/ns9xxx_defconfig b/arch/arm/configs/ns9xxx_defconfig
+index 1f528a0..56c20fc 100644
+--- a/arch/arm/configs/ns9xxx_defconfig
++++ b/arch/arm/configs/ns9xxx_defconfig
+@@ -38,7 +38,7 @@ CONFIG_I2C_GPIO=m
+ # CONFIG_VGA_CONSOLE is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=m
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 076db52..08cc79d 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -89,8 +89,8 @@ CONFIG_IP_PNP_RARP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_NETFILTER=y
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=y
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/pxa3xx_defconfig b/arch/arm/configs/pxa3xx_defconfig
+index 1677a06..573d882 100644
+--- a/arch/arm/configs/pxa3xx_defconfig
++++ b/arch/arm/configs/pxa3xx_defconfig
+@@ -99,7 +99,7 @@ CONFIG_LOGO=y
+ CONFIG_MMC=y
+ CONFIG_MMC_PXA=y
+ CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_DA903X=m
+ CONFIG_LEDS_TRIGGERS=y
+diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+index f9096c1..3a0cd99 100644
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -177,8 +177,8 @@ CONFIG_IP6_NF_TARGET_REJECT=m
+ CONFIG_IP6_NF_MANGLE=m
+ CONFIG_IP6_NF_RAW=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+@@ -387,7 +387,7 @@ CONFIG_MMC_TEST=m
+ CONFIG_MMC_SDHCI=m
+ CONFIG_MMC_SPI=m
+ CONFIG_MMC_S3C=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_S3C24XX=m
+ CONFIG_LEDS_H1940=m
+ CONFIG_LEDS_PCA9532=m
+diff --git a/arch/arm/configs/simpad_defconfig b/arch/arm/configs/simpad_defconfig
+index d335815..8c6f806 100644
+--- a/arch/arm/configs/simpad_defconfig
++++ b/arch/arm/configs/simpad_defconfig
+@@ -33,8 +33,8 @@ CONFIG_IRCOMM=m
+ CONFIG_IRTTY_SIR=m
+ CONFIG_SA1100_FIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/spitz_defconfig b/arch/arm/configs/spitz_defconfig
+index 7015827..f0137dd 100644
+--- a/arch/arm/configs/spitz_defconfig
++++ b/arch/arm/configs/spitz_defconfig
+@@ -66,8 +66,8 @@ CONFIG_IRNET=m
+ CONFIG_IRCOMM=m
+ CONFIG_PXA_FICP=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/trizeps4_defconfig b/arch/arm/configs/trizeps4_defconfig
+index 3162173..3d6ce92 100644
+--- a/arch/arm/configs/trizeps4_defconfig
++++ b/arch/arm/configs/trizeps4_defconfig
+@@ -49,8 +49,8 @@ CONFIG_IRDA_CACHE_LAST_LSAP=y
+ CONFIG_IRDA_FAST_RR=y
+ CONFIG_IRTTY_SIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/viper_defconfig b/arch/arm/configs/viper_defconfig
+index 8b0c717..4fe0c80 100644
+--- a/arch/arm/configs/viper_defconfig
++++ b/arch/arm/configs/viper_defconfig
+@@ -37,7 +37,7 @@ CONFIG_SYN_COOKIES=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
++CONFIG_BT_L2CAP=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/arm/configs/zeus_defconfig b/arch/arm/configs/zeus_defconfig
+index 960f655..f8f9910 100644
+--- a/arch/arm/configs/zeus_defconfig
++++ b/arch/arm/configs/zeus_defconfig
+@@ -32,7 +32,7 @@ CONFIG_SYN_COOKIES=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
++CONFIG_BT_L2CAP=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+@@ -150,7 +150,7 @@ CONFIG_MMC=y
+ # CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_PXA=y
+ CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=m
+diff --git a/arch/avr32/configs/atngw100_mrmt_defconfig b/arch/avr32/configs/atngw100_mrmt_defconfig
+index 19f6cee..6f9ed2e 100644
+--- a/arch/avr32/configs/atngw100_mrmt_defconfig
++++ b/arch/avr32/configs/atngw100_mrmt_defconfig
+@@ -36,7 +36,7 @@ CONFIG_SYN_COOKIES=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
++CONFIG_BT_L2CAP=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_HIDP=m
+diff --git a/arch/mips/configs/lemote2f_defconfig b/arch/mips/configs/lemote2f_defconfig
+index cb2c5ea..b6acd2f 100644
+--- a/arch/mips/configs/lemote2f_defconfig
++++ b/arch/mips/configs/lemote2f_defconfig
+@@ -86,8 +86,8 @@ CONFIG_NET_SCHED=y
+ CONFIG_NET_EMATCH=y
+ CONFIG_NET_CLS_ACT=y
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/mips/configs/mtx1_defconfig b/arch/mips/configs/mtx1_defconfig
+index a97a42c..37862b2 100644
+--- a/arch/mips/configs/mtx1_defconfig
++++ b/arch/mips/configs/mtx1_defconfig
+@@ -225,8 +225,8 @@ CONFIG_TOSHIBA_FIR=m
+ CONFIG_VLSI_FIR=m
+ CONFIG_MCS_FIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/powerpc/configs/c2k_defconfig b/arch/powerpc/configs/c2k_defconfig
+index f9e6a3e..2a84fd7 100644
+--- a/arch/powerpc/configs/c2k_defconfig
++++ b/arch/powerpc/configs/c2k_defconfig
+@@ -132,8 +132,8 @@ CONFIG_NET_CLS_RSVP=m
+ CONFIG_NET_CLS_RSVP6=m
+ CONFIG_NET_CLS_IND=y
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/powerpc/configs/pmac32_defconfig b/arch/powerpc/configs/pmac32_defconfig
+index ac4fc41..f8b394a 100644
+--- a/arch/powerpc/configs/pmac32_defconfig
++++ b/arch/powerpc/configs/pmac32_defconfig
+@@ -112,8 +112,8 @@ CONFIG_IRDA_CACHE_LAST_LSAP=y
+ CONFIG_IRDA_FAST_RR=y
+ CONFIG_IRTTY_SIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/powerpc/configs/ppc6xx_defconfig b/arch/powerpc/configs/ppc6xx_defconfig
+index 0a10fb0..2142089 100644
+--- a/arch/powerpc/configs/ppc6xx_defconfig
++++ b/arch/powerpc/configs/ppc6xx_defconfig
+@@ -351,8 +351,8 @@ CONFIG_VLSI_FIR=m
+ CONFIG_VIA_FIR=m
+ CONFIG_MCS_FIR=m
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
+diff --git a/arch/powerpc/configs/ps3_defconfig b/arch/powerpc/configs/ps3_defconfig
+index caba919..6472322 100644
+--- a/arch/powerpc/configs/ps3_defconfig
++++ b/arch/powerpc/configs/ps3_defconfig
+@@ -52,8 +52,8 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_DIAG is not set
+ CONFIG_IPV6=y
+ CONFIG_BT=m
+-CONFIG_BT_L2CAP=m
+-CONFIG_BT_SCO=m
++CONFIG_BT_L2CAP=y
++CONFIG_BT_SCO=y
+ CONFIG_BT_RFCOMM=m
+ CONFIG_BT_RFCOMM_TTY=y
+ CONFIG_BT_BNEP=m
 -- 
-Ming Lei
+1.7.3
