@@ -1,137 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 10 Apr 2011 13:10:41 +0300
-Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
-	device accesses
-In-Reply-To: <BANLkTikcy_eut-HGexziTnoUcXOPLdyVfA@mail.gmail.com>
-References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
-	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
-	<BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
-	<BANLkTi=37p-BWpzF2KT4J8PO+xEWrRjDfA@mail.gmail.com>
-	<BANLkTikcy_eut-HGexziTnoUcXOPLdyVfA@mail.gmail.com>
-Message-ID: <BANLkTin4rfDMUB-Fa=AsL==SfJgaY0C2Zw@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 10 Apr 2011 13:32:43 +0200
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <op.vtpt6v173ri7v4@arend-laptop>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop> <20110410080159.GB2798@ucw.cz>
+	<BANLkTikL+GvaKN6nT-9WjpPjaJz0dR51KQ@mail.gmail.com>
+	<20110410082420.GA1460@localhost.ucw.cz>
+	<BANLkTim9JTpZGib+_C_vTFFhP5azbGwMjg@mail.gmail.com>
+	<op.vtpt6v173ri7v4@arend-laptop>
+Message-ID: <BANLkTimgJ--19=q-od7S8uj6T6AcXrtg7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2011 20:03, Ming Lei <tom.leiming@gmail.com> wrote:
-> 2011/4/9 Catalin Marinas <catalin.marinas@arm.com>:
->> Probably the above document isn't comprehensive enough. It mainly
->> targets memory ordering between processors. I think another example
->> that mentions DSB is the mailbox scenario.
+W dniu 10 kwietnia 2011 11:33 u?ytkownik Arend van Spriel
+<arend@broadcom.com> napisa?:
+> On Sun, 10 Apr 2011 10:30:53 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
 >
-> I also saw this example of 8.1, but I don't think it is related with
-> linux read memory barrier, see below:
+>> 2011/4/10 Pavel Machek <pavel@ucw.cz>:
+>>>>
+>>>> >> >+config BCMAI_HOST_PCI_POSSIBLE
+>>>> >> >+ ? ? ? bool
+>>>> >> >+ ? ? ? depends on BCMAI && PCI = y
+>>>> >> >+ ? ? ? default y
+>>>> >> >+
+>>>> >> >+config BCMAI_HOST_PCI
+>>>> >> >+ ? ? ? bool "Support for AI on PCI-host bus"
+>>>> >> >+ ? ? ? depends on BCMAI_HOST_PCI_POSSIBLE
+>>>> >> >+
 >
-> ? ? ? ?- 8.1 requires that the 'STR R5, [R1]' in P1 is completed before
-> ? ? ? ?'LDR R5, [R1]' in P2;
-
-Its not related to the read memory barrier but it refers to ordering
-between accesses to Normal memory and Device memory. The mailbox here
-at [R4] can be a device. I'm copying the relevant code here for others
-following this thread:
-
-P1:
-    STR R5, [R1] ; message stored to shared memory location
-    DSB [ST]
-    STR R1, [R4] ; R4 contains the address of a mailbox
-
-P2:
-    ; interrupt service routine
-    LDR R5, [R1]
-
-> ? ? ? ?- Documentation/memory-barriers.txt said:
-> ? ? ? ?1), Memory barriers are such interventions. ?They impose a
-> ? ? ? ?perceived partial ordering over the memory operations on either
-> ? ? ? ?side of the barrier.
+> Hi Rafa?,
 >
-> ? ? ? ?2),There is no guarantee that any of the memory accesses specified
-> ? ? ? ?before a memory barrier will be _complete_ by the completion of a
-> ? ? ? ?memory barrier instruction; the barrier can be considered to draw a
-> ? ? ? ?line in that CPU's access queue that accesses of the appropriate type
-> ? ? ? ?may not cross.
-
-While the above is correct, the Linux document is quite vague in
-relation to the mandatory barriers and it's not clear whether the
-above only refers to the SMP barriers.
-
-> In fact, IMO, the 'DSB' should be used before 'LDR R5, [R1]' in P2 instead
-> of in P1 because of the belows:
-
-A DSB on one CPU does not control the ordering on another CPU. So the
-DSB on P2 is useless. Note that the P2 code is executed in an
-interrupt routine raised as a result of STR R1, [R4]. If P2 had a loop
-polling for [R4] to get a valid address, we would indeed need a DSB
-before LDR R5, [R1].
-
-> ? ? ? ?- out of order of the two stores in P1 is allowable
-
-That's why we have a DSB in there, to ensure that the [R1] location is
-written before we store the R1 to the [R4] device.
-
-> ? ? ? ?- P2 should get message address from the mailbox pointed by R4 first,
-> ? ? ? ?so how can we make sure the 'STR R1, [R4]' in P1 is completed if
-> ? ? ? ?R4 doesn't point to a Strongly-Ordered memory.
-
-Even if the memory is SO, on newer CPUs I don't think it guarantees
-the completion (pretty much acting like Device memory). But here we
-don't care when the store to [R4] completes. When this happen, P2 will
-get an interrupt. P2 does not execute the LDR R5, [R1] in interrupt
-routine speculatively (i.e. before the interrupt was received).
-
->> Let's assume we have a device that performs the two steps below:
->>
->> 1. Writes data to RAM
->> 2. Updates its status register
->>
->> A driver running on the CPU has some code as below:
->>
->> ? ?LDR [Device] ? ?@ read the device status
->> ? ?DMB ? ? ? ? ? ? ? @ current barrier that we have in readl
->> ? ?TST ? ? ? ? ? ? ? ? @ check whether the DMA transfer is ready
->> ? ?BEQ out
->> ? ?LDR [Normal] ? ?@ read the DMA buffer
->> ? ?...
->> out:
->>
->> With the code above, the CPU may do the following steps:
->>
->> 1. Issue read from the device. Note that it does not wait for the read
->> to complete.
->> 2. DMB - ensures that no subsequent memory accesses happen before the
->> previous ones.
->> 3. Issues read from normal memory speculatively. This is allowed
->> because the TST/BEQ are only flow control dependency. In case the
->> condition fails, the read is discarded.
->> 4. The read from Normal memory (DMA buffer) completes. This could
->> happen before the I/O read at point 1 depending on the bus speeds.
->> 5. The Device read completes. This can happen after the Normal read
->> because of different bus speeds.
->> 6. TST clears CPSR.Z
->> 7. BEQ not executed.
->> 8. Normal read data moved to register.
->>
->> So, even if the CPU issues the read from Device and Normal memory in
->> order (steps 1, 3), they can happen at the device and RAM level out of
->> order (steps 4, 5) and the CPU could read data not yet written by the
->> device.
->>
->> The solution is to use a DSB which ensures the completion of the
->> Device read before issuing the Normal memory read.
+> Could use term AMBA AXI instead which gives enough hits on Google to hint
+> interested people to more in depth information.
 >
-> I agree a DSB is needed in such case, but I am not sure the patch is
-> good. Maybe we should keep rmb not changed and only replace __iormb
-> as DSB if this issue only happens between device io memory and normal
-> memory, then rmb will not degrade performance a little as does by your
-> patch.
+> FYI: AXI = Advanced eXtensible Interface
+> ? ? ? ?High-speed interconnect for chip cores ( provides higher
+> bursts/transfers than predecessor AHB = Advanced High-performance Bus
+> (AHB)).
 
-What other use do you see for the mandatory barriers if not in
-relation to I/O? They are not for SMP configurations. We already have
-a DSB in wmb().
-
-The mandatory barriers could be present in device drivers that use the
-relaxed I/O accessors and mandatory barriers explicitly as
-optimisation. This was the approach recommended in past mailing list
-discussions.
+"If you check PATCH V2, we renamed this to (AMBA) AXI"
 
 -- 
-Catalin
+Rafa?
