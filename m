@@ -1,51 +1,30 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Sun, 10 Apr 2011 19:11:57 +0300
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <op.vtpt6v173ri7v4@arend-laptop>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop> <20110410080159.GB2798@ucw.cz>
-	<BANLkTikL+GvaKN6nT-9WjpPjaJz0dR51KQ@mail.gmail.com>
-	<20110410082420.GA1460@localhost.ucw.cz>
-	<BANLkTim9JTpZGib+_C_vTFFhP5azbGwMjg@mail.gmail.com>
-	<op.vtpt6v173ri7v4@arend-laptop>
-Message-ID: <1302451917.14558.13.camel@dev.znau.edu.ua>
+From: greg@kroah.com (Greg KH)
+Date: Sun, 10 Apr 2011 09:20:33 -0700
+Subject: [RFC][WAS:bcmai][PATCH V2] axi: add AXI bus driver
+In-Reply-To: <BANLkTinZbw=GvkThyjMHbeQQ5arRVf2FUg@mail.gmail.com>
+References: <1302291900-1902-1-git-send-email-zajec5@gmail.com>
+	<20110408220157.GC26019@kroah.com>
+	<BANLkTinZbw=GvkThyjMHbeQQ5arRVf2FUg@mail.gmail.com>
+Message-ID: <20110410162033.GA4358@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Apr 10, 2011 at 05:52:27PM +0200, Rafa? Mi?ecki wrote:
+> 2011/4/9 Greg KH <greg@kroah.com>:
+> > On Fri, Apr 08, 2011 at 09:45:00PM +0200, Rafa? Mi?ecki wrote:
+> >> TODO:
+> >> - Interrupts
+> >> - Reloading driver
+> >
+> > Please add to the TODO list:
+> > ? ? ? ?- Documentation/ABI entries for new sysfs files
+> > ? ? ? ?- proper Kconfig entry documentation for the different options
+> 
+> Could you tell me sth more about this? How am I expected to document this stuff?
+> 
+> Should I create Documentation/ABI/testing/sysfs-bus-axi or what?
+> 
+> Of course you can just point me to some place where I can read about
+> proper documenting.
 
-> On Sun, 10 Apr 2011 10:30:53 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> 
-> > 2011/4/10 Pavel Machek <pavel@ucw.cz>:
-> >>> >> >+config BCMAI_HOST_PCI_POSSIBLE
-> >>> >> >+       bool
-> >>> >> >+       depends on BCMAI && PCI = y
-> >>> >> >+       default y
-> >>> >> >+
-> >>> >> >+config BCMAI_HOST_PCI
-> >>> >> >+       bool "Support for AI on PCI-host bus"
-> >>> >> >+       depends on BCMAI_HOST_PCI_POSSIBLE
-> >>> >> >+
-> 
-> Hi Rafa?,
-> 
-> Could use term AMBA AXI instead which gives enough hits on Google to hint  
-> interested people to more in depth information.
-> 
-> FYI: AXI = Advanced eXtensible Interface
-> 	High-speed interconnect for chip cores ( provides higher bursts/transfers  
-> than predecessor AHB = Advanced High-performance Bus (AHB)).
-> 
-> Gr. AvS
-
-Not sure if AXI will be relevant bus name to manage newer Broadcom IP
-cores. Yes, AMBA AXI is underlying interconnect used for communications,
-but those communications are made in regard of communication ports
-(those thingys referenced at Broadcom code as wrappers and which are
-actually master ports intermediately bound to the backplane itself).
-Pretty much sure your original bcmb is much more relevant for managing
-Broadcom hardware extensions over AXI than just axi, especially
-considering that techniques we use to identify, enumerate and control
-AXI slave ports are completely Broadcom-specific.
-
-Have nice day,
-George
+Documentation/ABI/README
