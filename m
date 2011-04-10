@@ -1,37 +1,29 @@
 From: jkosina@suse.cz (Jiri Kosina)
-Date: Sun, 10 Apr 2011 08:04:36 -0700 (PDT)
-Subject: [PATCH][Trivial] ARM: Remove duplicate linux/sched.h include
-	from arch/arm/plat-iop/time.c
-In-Reply-To: <alpine.LNX.2.00.1103150108510.26293@swampdragon.chaosbits.net>
-References: <alpine.LNX.2.00.1103150108510.26293@swampdragon.chaosbits.net>
-Message-ID: <alpine.LNX.2.00.1104081917270.6392@deuxcents.site>
+Date: Sun, 10 Apr 2011 08:07:45 -0700 (PDT)
+Subject: [trivial PATCH 2/2] arm: mach-u300/gpio: Fix mem_region resource
+	size miscalculations
+In-Reply-To: <AANLkTika-y8bqaXFp008C28wd_YzmcBm2mj5ZLfxSSSy@mail.gmail.com>
+References: <cover.1300909445.git.joe@perches.com>
+	<798d0aea7272beadf2ee838f7aa27f86cfe7f9ba.1300909446.git.joe@perches.com>
+	<AANLkTika-y8bqaXFp008C28wd_YzmcBm2mj5ZLfxSSSy@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1104081937100.6392@deuxcents.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Mar 2011, Jesper Juhl wrote:
+On Wed, 23 Mar 2011, Linus Walleij wrote:
 
-> There's no need to include linux/sched.h more than once 
-> in arch/arm/plat-iop/time.c
+> 2011/3/23 Joe Perches <joe@perches.com>:
 > 
-> Signed-off-by: Jesper Juhl <jj@chaosbits.net>
-> ---
->  time.c |    1 -
->  1 file changed, 1 deletion(-)
+> > Convert off-by-1 r->end - r->start to resource_size(r)
+> >
+> > Signed-off-by: Joe Perches <joe@perches.com>
 > 
-> diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-> index 07f23bb..7cdc516 100644
-> --- a/arch/arm/plat-iop/time.c
-> +++ b/arch/arm/plat-iop/time.c
-> @@ -17,7 +17,6 @@
->  #include <linux/interrupt.h>
->  #include <linux/time.h>
->  #include <linux/init.h>
-> -#include <linux/sched.h>
->  #include <linux/timex.h>
->  #include <linux/sched.h>
->  #include <linux/io.h>
+> Oh man, there was one of these lurking in my own beloved mach-u300.
+> How embarrassing. Thanks for catching!
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Seems to be present in linux-next as of today still. Applied.
+As I don't see it in today's linux-next, I have picked it up. Thanks,
 
 -- 
 Jiri Kosina
