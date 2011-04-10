@@ -1,44 +1,36 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 10 Apr 2011 13:32:43 +0200
-Subject: [RFC][PATCH] bcmai: introduce AI driver
-In-Reply-To: <op.vtpt6v173ri7v4@arend-laptop>
-References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
-	<op.vtisojsk3ri7v4@arend-laptop> <20110410080159.GB2798@ucw.cz>
-	<BANLkTikL+GvaKN6nT-9WjpPjaJz0dR51KQ@mail.gmail.com>
-	<20110410082420.GA1460@localhost.ucw.cz>
-	<BANLkTim9JTpZGib+_C_vTFFhP5azbGwMjg@mail.gmail.com>
-	<op.vtpt6v173ri7v4@arend-laptop>
-Message-ID: <BANLkTimgJ--19=q-od7S8uj6T6AcXrtg7w@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sun, 10 Apr 2011 22:04:03 +0800
+Subject: about uclinux for armnommu dma allocate issue
+Message-ID: <BANLkTikkzWZcfeic8qUeLKLr5+ef14eA4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 10 kwietnia 2011 11:33 u?ytkownik Arend van Spriel
-<arend@broadcom.com> napisa?:
-> On Sun, 10 Apr 2011 10:30:53 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->
->> 2011/4/10 Pavel Machek <pavel@ucw.cz>:
->>>>
->>>> >> >+config BCMAI_HOST_PCI_POSSIBLE
->>>> >> >+ ? ? ? bool
->>>> >> >+ ? ? ? depends on BCMAI && PCI = y
->>>> >> >+ ? ? ? default y
->>>> >> >+
->>>> >> >+config BCMAI_HOST_PCI
->>>> >> >+ ? ? ? bool "Support for AI on PCI-host bus"
->>>> >> >+ ? ? ? depends on BCMAI_HOST_PCI_POSSIBLE
->>>> >> >+
->
-> Hi Rafa?,
->
-> Could use term AMBA AXI instead which gives enough hits on Google to hint
-> interested people to more in depth information.
->
-> FYI: AXI = Advanced eXtensible Interface
-> ? ? ? ?High-speed interconnect for chip cores ( provides higher
-> bursts/transfers than predecessor AHB = Advanced High-performance Bus
-> (AHB)).
+Hi Greg,
 
-"If you check PATCH V2, we renamed this to (AMBA) AXI"
+I am programming ohci driver for my arm7 based on 2.6.38.
 
+td_alloc -> dma_pool_alloc -> dma_alloc_coherent().
+
+In previous uclinux version, there is the consistent.c located in
+arch/armnommu/mm to implement
+this dma_alloc_coherent, but now this latest version, I did not see
+this 'dma_alloc_coherent' function
+for armnommu, so I can use this function directly like this arm mmu?
+
+In addtion, the 'kmalloc' is the same to previous uclinux armnommu
+version? I can use it directly?
+
+Wan.
+
+thanks!
 -- 
-Rafa?
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
