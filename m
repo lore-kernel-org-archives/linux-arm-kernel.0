@@ -1,25 +1,48 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 10 Apr 2011 09:58:34 +0200
-Subject: [PATCH 2/3] Use gpio_set_value_cansleep() in corgi_lcd.c
-In-Reply-To: <BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
-References: <1301708597-7413-1-git-send-email-marek.vasut@gmail.com>
-	<1301708597-7413-2-git-send-email-marek.vasut@gmail.com>
-	<BANLkTimtLsF_fQQbfxRQZ6ToBWj5HvGm6A@mail.gmail.com>
-Message-ID: <20110410075834.GA2798@ucw.cz>
+Date: Sun, 10 Apr 2011 10:01:59 +0200
+Subject: [RFC][PATCH] bcmai: introduce AI driver
+In-Reply-To: <op.vtisojsk3ri7v4@arend-laptop>
+References: <1302033463-1846-1-git-send-email-zajec5@gmail.com>
+	<op.vtisojsk3ri7v4@arend-laptop>
+Message-ID: <20110410080159.GB2798@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2011-04-04 18:45:46, Eric Miao wrote:
-> Personally, I don't quite like the idea of an explicit _cansleep() version,
-> which is just confusing. A programmer shouldn't be aware of which
-> version to use.
-> 
-> David, you have any justification?
+Hi!
 
-Whether it is possible to sleep in given context  is not  something
-that  can be detected automatically in general case; so two different
-functions are needed.
-								Pavel
+
+> >@@ -0,0 +1,30 @@
+> >+config BCMAI_POSSIBLE
+> >+       bool
+> >+       depends on HAS_IOMEM && HAS_DMA
+> >+       default y
+> >+
+> >+menu "Broadcom's AI"
+> >+       depends on BCMAI_POSSIBLE
+> >+
+> >+config BCMAI
+> >+       tristate "AI support"
+> >+       depends on BCMAI_POSSIBLE
+> >+
+> >+config BCMAI_HOST_PCI_POSSIBLE
+> >+       bool
+> >+       depends on BCMAI && PCI = y
+> >+       default y
+> >+
+> >+config BCMAI_HOST_PCI
+> >+       bool "Support for AI on PCI-host bus"
+> >+       depends on BCMAI_HOST_PCI_POSSIBLE
+> >+
+> >+config BCMAI_DEBUG
+> >+       bool "BCMAI debugging"
+> >+       depends on BCMAI
+> >+       help
+> >+         This turns on additional debugging messages.
+> >+
+> >+         If unsure, say N
+
+Totally useless  :-(. It should really explain what AI means in this context.
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
