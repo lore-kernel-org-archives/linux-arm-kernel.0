@@ -1,22 +1,66 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 17:00:29 +0100
-Subject: [RFC PATCH 2/5] sa1100: convert to basic-mmio-gpio
-In-Reply-To: <1302522502-24381-3-git-send-email-jamie@jamieiles.com>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<1302522502-24381-3-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110411160029.GE21449@pulham.picochip.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 11 Apr 2011 18:11:42 +0200
+Subject: [PATCH 2.6.39] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <4DA24E65.4060505@infradead.org>
+References: <201104110048.08764.jkrzyszt@tis.icnet.pl>
+	<4DA24E65.4060505@infradead.org>
+Message-ID: <201104111811.42563.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 12:48:19PM +0100, Jamie Iles wrote:
-> The basic-mmio-gpio driver is capable of supporting this controller so
-> convert the platform to use it for basic GPIO support.
-> 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
+On Mon 11 Apr 2011 at 02:42:13 Mauro Carvalho Chehab wrote:
+> Em 10-04-2011 19:47, Janusz Krzysztofik escreveu:
+> > After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
+> > used for obtaining page frame number passed to remap_pfn_range()
+> > (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
+> > videobuf-dma-contig stopped working on my ARM based board. The ARM
+> > architecture maintainer, Russell King, confirmed that using
+> > something like
+> > virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can
+> > be broken on other architectures as well. The author of the
+> > change, Jiri Slaby, also confirmed that his code may not work on
+> > all architectures.
+> > 
+> > The patch takes two different countermeasures against this
+> > regression:
+> > 
+> > 1. On architectures which provide dma_mmap_coherent() function (ARM
+> > for
+> > 
+> >    now), use it instead of just remap_pfn_range(). The code is
+> >    stollen from sound/core/pcm_native.c:snd_pcm_default_mmap().
+> >    Set vma->vm_pgoff to 0 before calling dma_mmap_coherent(), or it
+> >    fails.
+> > 
+> > 2. On other architectures, use
+> > virt_to_phys(bus_to_virt(mem->dma_handle))
+> > 
+> >    instead of problematic virt_to_phys(mem->vaddr). This should
+> >    work even if those translations would occure inaccurate for DMA
+> >    addresses, since possible errors introduced by both
+> >    calculations, performed in opposite directions, should
+> >    compensate.
+> > 
+> > Both solutions tested on ARM OMAP1 based Amstrad Delta board.
+...
+> The code is saying that dma_mmap_coherent should be used only on ARM
+> and PPC architectures, and remap_pfn_range should be used otherwise.
+> Are you sure that this will work on the other architectures? I
+> really prefer to have one standard way for doing it, that would be
+> architecture-independent. Media drivers or core should not have
+> arch-dependent code inside.
 
-So this is the same as plat-mxc in that the gpio initialization is being 
-called from .init_irq and some of the .init_machine calls need to use 
-GPIOs.
+More looking at this and making more tests, I found that the 
+dma_mmap_coherent() method, working correctly on OMAP1 which has no 
+countermeasures against unpredictable dma_alloc_coherent() runtime 
+behaviour implemented, may not be compatible with all those 
+dma_declare_coherent_memory() and alike workarounds, still being used,  
+more or less successfully, on other ARM platforms/machines/boards.
 
-Jamie
+Under such circumstances, I'd opt for choosing the depreciated, but 
+hopefully working, bi-directional translation method, ie. 
+virt_to_phys(bus_to_virt(mem->dma_handle)), as the regression fix.
+
+Thanks,
+Janusz
