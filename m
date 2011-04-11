@@ -1,128 +1,109 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 11 Apr 2011 14:10:36 +0200
-Subject: [PATCH 2.6.39] V4L: videobuf-dma-contig: fix mmap_mapper broken
-	on ARM
-In-Reply-To: <4DA24E65.4060505@infradead.org>
-References: <201104110048.08764.jkrzyszt@tis.icnet.pl>
-	<4DA24E65.4060505@infradead.org>
-Message-ID: <201104111410.37145.jkrzyszt@tis.icnet.pl>
+From: pratyush.anand@st.com (pratyush)
+Date: Mon, 11 Apr 2011 17:56:20 +0530
+Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
+	support.
+In-Reply-To: <201103230928.18445.arnd@arndb.de>
+References: <cover.1298977728.git.viresh.kumar@st.com>
+	<6a4328fcb24af3fa28b2188864875cbecc6f533a.1298977728.git.viresh.kumar@st.com>
+	<201103230928.18445.arnd@arndb.de>
+Message-ID: <4DA2F36C.3010707@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 11 Apr 2011 at 02:42:13 Mauro Carvalho Chehab wrote:
-> Em 10-04-2011 19:47, Janusz Krzysztofik escreveu:
-> > After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
-> > used for obtaining page frame number passed to remap_pfn_range()
-> > (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
-> > videobuf-dma-contig stopped working on my ARM based board. The ARM
-> > architecture maintainer, Russell King, confirmed that using
-> > something like
-> > virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can
-> > be broken on other architectures as well. The author of the
-> > change, Jiri Slaby, also confirmed that his code may not work on
-> > all architectures.
-> > 
-> > The patch takes two different countermeasures against this
-> > regression:
-> > 
-> > 1. On architectures which provide dma_mmap_coherent() function (ARM for
-> >    now), use it instead of just remap_pfn_range(). The code is
-> >    stollen from sound/core/pcm_native.c:snd_pcm_default_mmap().
-> >    Set vma->vm_pgoff to 0 before calling dma_mmap_coherent(), or it
-> >    fails.
-> > 
-> > 2. On other architectures, use virt_to_phys(bus_to_virt(mem-dma_handle))
-> >    instead of problematic virt_to_phys(mem->vaddr). This should
-> >    work even if those translations would occure inaccurate for DMA
-> >    addresses, since possible errors introduced by both
-> >    calculations, performed in opposite directions, should
-> >    compensate.
-...
-> > +#ifndef ARCH_HAS_DMA_MMAP_COHERENT
-> > +/* This should be defined / handled globally! */
-> > +#ifdef CONFIG_ARM
-> > +#define ARCH_HAS_DMA_MMAP_COHERENT
-> > +#endif
-> > +#endif
-> > +
-> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
+Hello Arnd,
+
+Sorry for late response.
+I was out of my office for some days.
+
+On 3/23/2011 1:58 PM, Arnd Bergmann wrote:
+> On Wednesday 23 March 2011, Viresh Kumar wrote:
+>> From: Pratyush Anand <pratyush.anand@st.com>
+>>
+>> SPEAr13xx family contains Synopsys designware PCIe version 3.30a. This
+>> patch adds support for this PCIe module for spear platform.
 > 
-> Hmm... IMHO, this seems too confusing. Why not use just something
-> like:
+> Looks almost good now, but I still have my doubts about the I/O space handling.
+> Most importantly, I cannot even see where the I/O space is getting mapped to.
+> This becomes rather interesting when you have multiple root ports that each
+> have their own physical I/O space windows, and there are multiple ways it can
+> be done.
 > 
-> #if defined(CONFIG_ARM) || defined(ARCH_HAS_DMA_MMAP_COHERENT)
+> The way I would recommend is to reserve a part of the system's virtual
+> address space for all I/O windows, and using iotable_init() to map
+> them contiguously. The first port will then be the only one that
+> can hold ISA ranges (needed for legacy VGA mode, for instance).
 > 
-> Better yet: why should CONFIG_ARM should explicitly be checked here?
-> Is it the only architecture where this would fail?dma_mmap_coherent
+
+Sorry, may be I could not get this point correctly. Do you mean that,
+I should create a static mapping for IN0_MEM_SIZE (200 MB) and 
+IN_IO_SIZE (20 MB) during board initialization itself?
+
+>> Changes since V6:
+>> - Read request size in RC'c PCIE capability is forced to 128 bytes.
+>> - Max payload is forced to the minimum value of max payload of any of the
+>>   device in tree.
+>> - Request_resource for IO Space is from ioport_resource now. Earlier it was from
+>>   iomem_resource.
 > 
-> Hmm...
+> This seems like a mistake. The I/O space window resides inside of
+> iomem_resource, so you have to register it from there.
 > 
-> $ git grep ARCH_HAS_DMA_MMAP_COHERENT arch
-> arch/powerpc/include/asm/dma-mapping.h:#define ARCH_HAS_DMA_MMAP_COHERENT
+> The ioport_resource refers to ports in the range between 0x1000 and 0x2ffff
+> that get mapped into that window, so you cannot register the window inside
+> of itself.
+> 
+> You should probably register both -- add the physical address to iomem_resource,
+> and register the I/O port range for each PCIe port to ioport_resource.
+> 
 
-My fault, I've just missed the fact that PPC also provides 
-dma_mmap_coherent() AND, unlike ARM, defines ARCH_HAS_DMA_MMAP_COHERENT 
-as well. Then, I would drop all above ifdefery except the last '#ifdef 
-ARCH_HAS_DMA_MMAP_COHERENT', and also submit a separate patch against 
-arch/arm/include/asm/dma-mapping.h for it to define 
-ARCH_HAS_DMA_MMAP_COHERENT, OK?
 
-> The code is saying that dma_mmap_coherent should be used only on ARM
-> and PPC architectures, and remap_pfn_range should be used otherwise.
+Now I understood difference between I/O space and I/O port. Yes, I/O space should 
+be allocated from iomem_resource window rather from ioport_resource. I will correct it.
 
-Yes, because only these two architectures provide this function:
+>> diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+>> index fd8c2dc..6169d4f 100644
+>> --- a/arch/arm/mach-spear13xx/include/mach/hardware.h
+>> +++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+>> @@ -28,4 +28,8 @@
+>>  /* typesafe io address */
+>>  #define __io_address(n)		__io(IO_ADDRESS(n))
+> 
+> Please reread my previous comments. You have to redefine __io() in order to make
+> the I/O port accesses work. When you do that, you cannot define
+> __io_address (which is used by non-PCI code) as using __io.
+> 
 
-$ grep -r "EXPORT_SYMBOL.*(dma_mmap_coherent)" arch
-arch/powerpc/kernel/dma.c:EXPORT_SYMBOL_GPL(dma_mmap_coherent);
-arch/arm/mm/dma-mapping.c:EXPORT_SYMBOL(dma_mmap_coherent);
+__io_address is not used by PICe routines. Also, this is not part of 
+this patch. Shiraz will reply for this issue.
 
-Other must keep using remap_pfn_range(), as they used to before.
+>> +#define PCIBIOS_MIN_IO		0
+> 
+> PCIBIOS_MIN_IO should be 0x1000, to make sure that any ISA or PCMCIA
+> devices behind a bridge cannot interfere with regular PCI or PCIe
+> devices.
+> 
 
-> Are you sure that this will work on the other architectures? 
+I will modify this define.
 
-If you mean using virt_to_phys(bus_to_virt(mem->dma_handle)) instead of 
-that problematic virt_to_phys(mem->vaddr) - yes, I think this should 
-work not any worth than before, and shouldn't break anything on any 
-architecture, including those not suffering from the problem.
+>> +/*
+>> + * In current implementation address translation is done using IN0 only. So IN1
+>> + * start address and IN0 end address has been kept same
+>> +*/
+>> +#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
+>> +#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
+>> +#define IN_CFG0_SIZE	(1 * 1024 * 1024 - 1)
+>> +#define IN_CFG1_SIZE	(1 * 1024 * 1024 - 1)
+>> +#define IN_MSG_SIZE	(1 * 1024 * 1024 - 1)
+> 
+> Is IN_IO_SIZE per host, or this shared across all hosts?
 
-What I'm not sure about is if this really helps on all those affected 
-architectures (if still any) which don't provide their 
-dma_mmap_coherent() implementation yet. I can only confirm this helps on 
-my ARM.
+This is per host. So is it not a practical size?
+What should be a reasonable IO size?
 
-I've already asked for testing to get an idea which architectures those 
-could be 
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047701.html),
-but haven't received any response yet.
+Regards
+Pratyush
 
-> I really prefer to have one standard way for doing it, that would 
-> be architecture-independent. Media drivers or core should not have
-> arch-dependent code inside.
-
-Sure, but here we have a choice between the still working but 
-depreciated usage of bus_to_virt() for tranlating a DMA bus address, and 
-a new way of doing things with dma_mmap_coherent(), which is not (yet) 
-widely supported. If you think we should limit our choice to the 
-depreciated way, please tell me, I'll modify the patch the way you like 
-it.
-
-Thanks,
-Janusz
-
-> > +	vma->vm_pgoff = 0;
-> > +	retval = dma_mmap_coherent(q->dev, vma, mem->vaddr, mem->dma_handle, 
-> > +			mem->size);
-> > +#else
-> >  	size = vma->vm_end - vma->vm_start;
-> >  	size = (size < mem->size) ? size : mem->size;
-> >  	
-> >  	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> >  	retval = remap_pfn_range(vma, vma->vm_start,
-> > -				 PFN_DOWN(virt_to_phys(mem->vaddr)),
-> > -				 size, vma->vm_page_prot);
-> > +			PFN_DOWN(virt_to_phys(bus_to_virt(mem->dma_handle))),
-> > +			size, vma->vm_page_prot);
-> > +#endif
-> >  	if (retval) {
-> >  		dev_err(q->dev, "mmap: remap failed with error %d. ", retval);
-> >  		dma_free_coherent(q->dev, mem->size,
+> 
+> 	Arnd
+> .
+> 
