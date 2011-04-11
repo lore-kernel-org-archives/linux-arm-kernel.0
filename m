@@ -1,36 +1,39 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 16:13:21 +0100
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Apr 2011 17:17:53 +0200
 Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
-In-Reply-To: <20110411144928.GL18601@pengutronix.de>
+In-Reply-To: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
 References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<20110411134320.GJ18601@pengutronix.de>
-	<20110411135215.GD2818@pulham.picochip.com>
-	<20110411142307.GK18601@pengutronix.de>
-	<20110411143327.GA21449@pulham.picochip.com>
-	<20110411144928.GL18601@pengutronix.de>
-Message-ID: <20110411151321.GB21449@pulham.picochip.com>
+Message-ID: <BANLkTi=bur3zPkQ45+StkPxLm_YMyw9uaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 04:49:28PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Apr 11, 2011 at 03:33:27PM +0100, Jamie Iles wrote:
-> > Hmm, so this looks like it's because mxc_gpio_init() is being called 
-> > from init_IRQ which is too early for platform devices.  Is there a 
-> > suitable place where this can be called later in the boot process?  
-> > I guess the gpio irq stuff should remain where it is but the 
-> > platform_device registration should be moved to later.
-> I guess this means that using gpios in .init_machine (== arch_initcall
-> time) stops working then? Actually I wanted to test if this is broken
-> already now because the driver is registered too late.
+2011/4/11 Jamie Iles <jamie@jamieiles.com>:
 
-I've just tried this on my platform and no, the GPIO's won't be 
-available for .init_machine().
+> The basic-mmio-gpio driver has been extended in
+> <http://marc.info/?l=linux-kernel&m=130252092900804&w=2> to support a
+> larger wider of controllers and this series converts the ARM platforms
+> that do not implement I/O muxing in the GPIO driver or use the .to_irq
+> method of gpio_chip to use the driver.
+>
+> Jamie Iles (5):
+> ?gemini: convert to basic-mmio-gpio
+> ?sa1100: convert to basic-mmio-gpio
+> ?w90x900: convert to basic-mmio-gpio
+> ?iop: convert to basic-mmio-gpio
+> ?mxc: convert to basic-mmio-gpio
 
-> Actually my build doesn't even have CONFIG_GPIO_BASIC_MMIO=y. I 
-> suggest to let the converted platforms select it.
+For all of these, maybe you can
+  select GPIO_BASIC_GPIO
 
-OK, that sounds like a good plan.
+In their mach-xxx/Kconfig so that the driver gets compiled-in by default?
 
-Jamie
+Further the basic_mmio_gpio.c driver looks a bit dangerous: it only uses
+__raw_* accessors for the GPIO registers, I'd very much like to replace that
+with the non-__raw* versions if this is to have any generic impact.
+
+The raw accessors can get stuck in things like write buffers and the like
+IIRC, they usually won't so you don't notice first, then you start getting
+all kind of real strange bugs.
+
+Yours,
+Linus Walleij
