@@ -1,201 +1,128 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 12:48:22 +0100
-Subject: [RFC PATCH 5/5] mxc: convert to basic-mmio-gpio
-In-Reply-To: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1302522502-24381-6-git-send-email-jamie@jamieiles.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 11 Apr 2011 14:10:36 +0200
+Subject: [PATCH 2.6.39] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <4DA24E65.4060505@infradead.org>
+References: <201104110048.08764.jkrzyszt@tis.icnet.pl>
+	<4DA24E65.4060505@infradead.org>
+Message-ID: <201104111410.37145.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The basic-mmio-gpio driver is capable of supporting this controller so
-convert the platform to use it for basic GPIO support.
+On Mon 11 Apr 2011 at 02:42:13 Mauro Carvalho Chehab wrote:
+> Em 10-04-2011 19:47, Janusz Krzysztofik escreveu:
+> > After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
+> > used for obtaining page frame number passed to remap_pfn_range()
+> > (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
+> > videobuf-dma-contig stopped working on my ARM based board. The ARM
+> > architecture maintainer, Russell King, confirmed that using
+> > something like
+> > virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can
+> > be broken on other architectures as well. The author of the
+> > change, Jiri Slaby, also confirmed that his code may not work on
+> > all architectures.
+> > 
+> > The patch takes two different countermeasures against this
+> > regression:
+> > 
+> > 1. On architectures which provide dma_mmap_coherent() function (ARM for
+> >    now), use it instead of just remap_pfn_range(). The code is
+> >    stollen from sound/core/pcm_native.c:snd_pcm_default_mmap().
+> >    Set vma->vm_pgoff to 0 before calling dma_mmap_coherent(), or it
+> >    fails.
+> > 
+> > 2. On other architectures, use virt_to_phys(bus_to_virt(mem-dma_handle))
+> >    instead of problematic virt_to_phys(mem->vaddr). This should
+> >    work even if those translations would occure inaccurate for DMA
+> >    addresses, since possible errors introduced by both
+> >    calculations, performed in opposite directions, should
+> >    compensate.
+...
+> > +#ifndef ARCH_HAS_DMA_MMAP_COHERENT
+> > +/* This should be defined / handled globally! */
+> > +#ifdef CONFIG_ARM
+> > +#define ARCH_HAS_DMA_MMAP_COHERENT
+> > +#endif
+> > +#endif
+> > +
+> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
+> 
+> Hmm... IMHO, this seems too confusing. Why not use just something
+> like:
+> 
+> #if defined(CONFIG_ARM) || defined(ARCH_HAS_DMA_MMAP_COHERENT)
+> 
+> Better yet: why should CONFIG_ARM should explicitly be checked here?
+> Is it the only architecture where this would fail?dma_mmap_coherent
+> 
+> Hmm...
+> 
+> $ git grep ARCH_HAS_DMA_MMAP_COHERENT arch
+> arch/powerpc/include/asm/dma-mapping.h:#define ARCH_HAS_DMA_MMAP_COHERENT
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/plat-mxc/gpio.c              |   96 +++++++++-----------------------
- arch/arm/plat-mxc/include/mach/gpio.h |    3 +-
- 2 files changed, 29 insertions(+), 70 deletions(-)
+My fault, I've just missed the fact that PPC also provides 
+dma_mmap_coherent() AND, unlike ARM, defines ARCH_HAS_DMA_MMAP_COHERENT 
+as well. Then, I would drop all above ifdefery except the last '#ifdef 
+ARCH_HAS_DMA_MMAP_COHERENT', and also submit a separate patch against 
+arch/arm/include/asm/dma-mapping.h for it to define 
+ARCH_HAS_DMA_MMAP_COHERENT, OK?
 
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 7a10724..9c494b4 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -19,11 +19,14 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
- 
-+#include <linux/basic_mmio_gpio.h>
-+#include <linux/err.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-+#include <linux/platform_device.h>
- #include <mach/hardware.h>
- #include <asm-generic/bug.h>
- 
-@@ -40,6 +43,14 @@ static int gpio_table_size;
- #define GPIO_IMR	(cpu_is_mx1_mx2() ? 0x30 : 0x14)
- #define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
- 
-+#define GPIO_RES(__name, __addr) \
-+	{ \
-+		.start = (__addr), \
-+		.end = (__addr) + 0x3, \
-+		.flags = IORESOURCE_MEM, \
-+		.name = #__name, \
-+	}
-+
- #define GPIO_INT_LOW_LEV	(cpu_is_mx1_mx2() ? 0x3 : 0x0)
- #define GPIO_INT_HIGH_LEV	(cpu_is_mx1_mx2() ? 0x2 : 0x1)
- #define GPIO_INT_RISE_EDGE	(cpu_is_mx1_mx2() ? 0x0 : 0x2)
-@@ -81,8 +92,6 @@ static void gpio_unmask_irq(struct irq_data *d)
- 	_set_gpio_irqenable(&mxc_gpio_ports[gpio / 32], gpio & 0x1f, 1);
- }
- 
--static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset);
--
- static int gpio_set_irq_type(struct irq_data *d, u32 type)
- {
- 	u32 gpio = irq_to_gpio(d->irq);
-@@ -100,7 +109,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
- 		edge = GPIO_INT_FALL_EDGE;
- 		break;
- 	case IRQ_TYPE_EDGE_BOTH:
--		val = mxc_gpio_get(&port->chip, gpio & 31);
-+		val = gpio_get_value(gpio);
- 		if (val) {
- 			edge = GPIO_INT_LOW_LEV;
- 			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
-@@ -241,60 +250,6 @@ static struct irq_chip gpio_irq_chip = {
- 	.irq_set_wake = gpio_set_wake_irq,
- };
- 
--static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
--				int dir)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--	u32 l;
--	unsigned long flags;
--
--	spin_lock_irqsave(&port->lock, flags);
--	l = __raw_readl(port->base + GPIO_GDIR);
--	if (dir)
--		l |= 1 << offset;
--	else
--		l &= ~(1 << offset);
--	__raw_writel(l, port->base + GPIO_GDIR);
--	spin_unlock_irqrestore(&port->lock, flags);
--}
--
--static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--	void __iomem *reg = port->base + GPIO_DR;
--	u32 l;
--	unsigned long flags;
--
--	spin_lock_irqsave(&port->lock, flags);
--	l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
--	__raw_writel(l, reg);
--	spin_unlock_irqrestore(&port->lock, flags);
--}
--
--static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--
--	return (__raw_readl(port->base + GPIO_PSR) >> offset) & 1;
--}
--
--static int mxc_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	_set_gpio_direction(chip, offset, 0);
--	return 0;
--}
--
--static int mxc_gpio_direction_output(struct gpio_chip *chip,
--				     unsigned offset, int value)
--{
--	mxc_gpio_set(chip, offset, value);
--	_set_gpio_direction(chip, offset, 1);
--	return 0;
--}
--
- int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- {
- 	int i, j;
-@@ -306,6 +261,17 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 	printk(KERN_INFO "MXC GPIO hardware\n");
- 
- 	for (i = 0; i < cnt; i++) {
-+		struct resource res[] = {
-+			GPIO_RES(set, port[i].base_phys + GPIO_DR),
-+			GPIO_RES(dat, port[i].base_phys + GPIO_PSR),
-+			GPIO_RES(dirout, port[i].base_phys + GPIO_GDIR),
-+		};
-+		struct bgpio_pdata pdata = {
-+			.base	= i * 32,
-+			.ngpio	= 32,
-+		};
-+		struct platform_device *pdev;
-+
- 		/* disable the interrupt and clear the status */
- 		__raw_writel(0, port[i].base + GPIO_IMR);
- 		__raw_writel(~0, port[i].base + GPIO_ISR);
-@@ -316,18 +282,10 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 			set_irq_flags(j, IRQF_VALID);
- 		}
- 
--		/* register gpio chip */
--		port[i].chip.direction_input = mxc_gpio_direction_input;
--		port[i].chip.direction_output = mxc_gpio_direction_output;
--		port[i].chip.get = mxc_gpio_get;
--		port[i].chip.set = mxc_gpio_set;
--		port[i].chip.base = i * 32;
--		port[i].chip.ngpio = 32;
--
--		spin_lock_init(&port[i].lock);
--
--		/* its a serious configuration bug when it fails */
--		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
-+		pdev = platform_device_register_resndata(NULL,
-+			"basic-mmio-gpio", i, res, ARRAY_SIZE(res), &pdata,
-+			sizeof(pdata));
-+		BUG_ON(IS_ERR(pdev));
- 
- 		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
- 			/* setup one handler for each entry */
-diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-index a2747f1..ba46be9 100644
---- a/arch/arm/plat-mxc/include/mach/gpio.h
-+++ b/arch/arm/plat-mxc/include/mach/gpio.h
-@@ -38,12 +38,12 @@
- 
- struct mxc_gpio_port {
- 	void __iomem *base;
-+	unsigned long base_phys;
- 	int irq;
- 	int irq_high;
- 	int virtual_irq_start;
- 	struct gpio_chip chip;
- 	u32 both_edges;
--	spinlock_t lock;
- };
- 
- #define DEFINE_IMX_GPIO_PORT_IRQ_HIGH(soc, _id, _hwid, _irq, _irq_high)	\
-@@ -53,6 +53,7 @@ struct mxc_gpio_port {
- 		.irq_high = _irq_high,					\
- 		.base = soc ## _IO_ADDRESS(				\
- 				soc ## _GPIO ## _hwid ## _BASE_ADDR),	\
-+		.base_phys = soc ## _GPIO ## _hwid ## _BASE_ADDR,	\
- 		.virtual_irq_start = MXC_GPIO_IRQ_START + (_id) * 32,	\
- 	}
- 
--- 
-1.7.4.2
+> The code is saying that dma_mmap_coherent should be used only on ARM
+> and PPC architectures, and remap_pfn_range should be used otherwise.
+
+Yes, because only these two architectures provide this function:
+
+$ grep -r "EXPORT_SYMBOL.*(dma_mmap_coherent)" arch
+arch/powerpc/kernel/dma.c:EXPORT_SYMBOL_GPL(dma_mmap_coherent);
+arch/arm/mm/dma-mapping.c:EXPORT_SYMBOL(dma_mmap_coherent);
+
+Other must keep using remap_pfn_range(), as they used to before.
+
+> Are you sure that this will work on the other architectures? 
+
+If you mean using virt_to_phys(bus_to_virt(mem->dma_handle)) instead of 
+that problematic virt_to_phys(mem->vaddr) - yes, I think this should 
+work not any worth than before, and shouldn't break anything on any 
+architecture, including those not suffering from the problem.
+
+What I'm not sure about is if this really helps on all those affected 
+architectures (if still any) which don't provide their 
+dma_mmap_coherent() implementation yet. I can only confirm this helps on 
+my ARM.
+
+I've already asked for testing to get an idea which architectures those 
+could be 
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047701.html),
+but haven't received any response yet.
+
+> I really prefer to have one standard way for doing it, that would 
+> be architecture-independent. Media drivers or core should not have
+> arch-dependent code inside.
+
+Sure, but here we have a choice between the still working but 
+depreciated usage of bus_to_virt() for tranlating a DMA bus address, and 
+a new way of doing things with dma_mmap_coherent(), which is not (yet) 
+widely supported. If you think we should limit our choice to the 
+depreciated way, please tell me, I'll modify the patch the way you like 
+it.
+
+Thanks,
+Janusz
+
+> > +	vma->vm_pgoff = 0;
+> > +	retval = dma_mmap_coherent(q->dev, vma, mem->vaddr, mem->dma_handle, 
+> > +			mem->size);
+> > +#else
+> >  	size = vma->vm_end - vma->vm_start;
+> >  	size = (size < mem->size) ? size : mem->size;
+> >  	
+> >  	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> >  	retval = remap_pfn_range(vma, vma->vm_start,
+> > -				 PFN_DOWN(virt_to_phys(mem->vaddr)),
+> > -				 size, vma->vm_page_prot);
+> > +			PFN_DOWN(virt_to_phys(bus_to_virt(mem->dma_handle))),
+> > +			size, vma->vm_page_prot);
+> > +#endif
+> >  	if (retval) {
+> >  		dev_err(q->dev, "mmap: remap failed with error %d. ", retval);
+> >  		dma_free_coherent(q->dev, mem->size,
