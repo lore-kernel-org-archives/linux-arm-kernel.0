@@ -1,92 +1,158 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Sun, 10 Apr 2011 21:42:13 -0300
-Subject: [PATCH 2.6.39] V4L: videobuf-dma-contig: fix mmap_mapper broken
-	on ARM
-In-Reply-To: <201104110048.08764.jkrzyszt@tis.icnet.pl>
-References: <201104110048.08764.jkrzyszt@tis.icnet.pl>
-Message-ID: <4DA24E65.4060505@infradead.org>
+From: jiri.pinkava@vscht.cz (Jiri Pinkava)
+Date: Mon, 11 Apr 2011 03:27:42 +0200
+Subject: [PATCH] nand: Fix S3C NAND clock stop
+Message-ID: <1302485262-8401-1-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 10-04-2011 19:47, Janusz Krzysztofik escreveu:
-> After switching from mem->dma_handle to virt_to_phys(mem->vaddr) used 
-> for obtaining page frame number passed to remap_pfn_range()
-> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b), videobuf-dma-contig 
-> stopped working on my ARM based board. The ARM architecture maintainer, 
-> Russell King, confirmed that using something like 
-> virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can be 
-> broken on other architectures as well. The author of the change, Jiri 
-> Slaby, also confirmed that his code may not work on all architectures.
-> 
-> The patch takes two different countermeasures against this regression:
-> 
-> 1. On architectures which provide dma_mmap_coherent() function (ARM for 
->    now), use it instead of just remap_pfn_range(). The code is stollen 
->    from sound/core/pcm_native.c:snd_pcm_default_mmap().
->    Set vma->vm_pgoff to 0 before calling dma_mmap_coherent(), or it 
->    fails.
-> 
-> 2. On other architectures, use virt_to_phys(bus_to_virt(mem->dma_handle)) 
->    instead of problematic virt_to_phys(mem->vaddr). This should work 
->    even if those translations would occure inaccurate for DMA addresses, 
->    since possible errors introduced by both calculations, performed in 
->    opposite directions, should compensate.
-> 
-> Both solutions tested on ARM OMAP1 based Amstrad Delta board.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> ---
->  drivers/media/video/videobuf-dma-contig.c |   17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> --- linux-2.6.39-rc2/drivers/media/video/videobuf-dma-contig.c.orig	2011-04-09 00:38:45.000000000 +0200
-> +++ linux-2.6.39-rc2/drivers/media/video/videobuf-dma-contig.c	2011-04-10 15:00:23.000000000 +0200
-> @@ -295,13 +295,26 @@ static int __videobuf_mmap_mapper(struct
->  
->  	/* Try to remap memory */
->  
-> +#ifndef ARCH_HAS_DMA_MMAP_COHERENT
-> +/* This should be defined / handled globally! */
-> +#ifdef CONFIG_ARM
-> +#define ARCH_HAS_DMA_MMAP_COHERENT
-> +#endif
-> +#endif
-> +
-> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
+Current implementation of s3c2410_nand_select_chip call
+clk_disable every time when chip = -1 (de-select). This happend
+multiple times even if chip was already de-selected. This causes
+disabling clock even if they are already disabled and due to
+nature of clock subsytem implementation this causes nand clock
+to be disabled and newer enabled again.
 
-Hmm... IMHO, this seems too confusing. Why not use just something like:
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+ drivers/mtd/nand/s3c2410.c |   57 +++++++++++++++++++++++++++++++------------
+ 1 files changed, 41 insertions(+), 16 deletions(-)
 
-#if defined(CONFIG_ARM) || defined(ARCH_HAS_DMA_MMAP_COHERENT)
-
-Better yet: why should CONFIG_ARM should explicitly be checked here? Is it the
-only architecture where this would fail?dma_mmap_coherent
-
-Hmm...
-
-$ git grep ARCH_HAS_DMA_MMAP_COHERENT arch
-arch/powerpc/include/asm/dma-mapping.h:#define ARCH_HAS_DMA_MMAP_COHERENT
-
-The code is saying that dma_mmap_coherent should be used only on ARM and PPC architectures,
-and remap_pfn_range should be used otherwise. Are you sure that this will work on the
-other architectures? I really prefer to have one standard way for doing it, that
-would be architecture-independent. Media drivers or core should not have arch-dependent
-code inside.
-
-
-> +	vma->vm_pgoff = 0;
-> +	retval = dma_mmap_coherent(q->dev, vma, mem->vaddr, mem->dma_handle,
-> +			mem->size);
-> +#else
->  	size = vma->vm_end - vma->vm_start;
->  	size = (size < mem->size) ? size : mem->size;
->  
->  	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
->  	retval = remap_pfn_range(vma, vma->vm_start,
-> -				 PFN_DOWN(virt_to_phys(mem->vaddr)),
-> -				 size, vma->vm_page_prot);
-> +			PFN_DOWN(virt_to_phys(bus_to_virt(mem->dma_handle))),
-> +			size, vma->vm_page_prot);
-> +#endif
->  	if (retval) {
->  		dev_err(q->dev, "mmap: remap failed with error %d. ", retval);
->  		dma_free_coherent(q->dev, mem->size,
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index 33d832d..79e18a3 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -54,8 +54,14 @@ static int hardware_ecc = 1;
+ static int hardware_ecc = 0;
+ #endif
+ 
++#define CLOCK_DISABLE	0
++#define CLOCK_ENABLE	1
++#define CLOCK_SUSPEND	2
++
++static int clock_state = CLOCK_DISABLE;
++
+ #ifdef CONFIG_MTD_NAND_S3C2410_CLKSTOP
+-static int clock_stop = 1;
++static const int clock_stop = 1;
+ #else
+ static const int clock_stop = 0;
+ #endif
+@@ -159,11 +165,33 @@ static struct s3c2410_platform_nand *to_nand_plat(struct platform_device *dev)
+ 	return dev->dev.platform_data;
+ }
+ 
+-static inline int allow_clk_stop(struct s3c2410_nand_info *info)
++static inline int allow_clk_suspend(struct s3c2410_nand_info *info)
+ {
+ 	return clock_stop;
+ }
+ 
++/**
++ * s3c2410_nand_clk_set_state - Enable, disable or suspend NAND clock.
++ * @info: The controller instance.
++ * @state: State to which clock should be set.
++ */
++static void s3c2410_nand_clk_set_state(struct s3c2410_nand_info *info,
++		int new_state)
++{
++	if (!allow_clk_suspend(info) && new_state == CLOCK_SUSPEND)
++		return;
++
++	if (clock_state == CLOCK_ENABLE) {
++		if (new_state != CLOCK_ENABLE)
++			clk_disable(info->clk);
++	} else {
++		if (new_state == CLOCK_ENABLE)
++			clk_enable(info->clk);
++	}
++
++	clock_state = new_state;
++}
++
+ /* timing calculations */
+ 
+ #define NS_IN_KHZ 1000000
+@@ -333,8 +361,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
+ 	nmtd = this->priv;
+ 	info = nmtd->info;
+ 
+-	if (chip != -1 && allow_clk_stop(info))
+-		clk_enable(info->clk);
++	if (chip != -1)
++		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+ 
+ 	cur = readl(info->sel_reg);
+ 
+@@ -356,8 +384,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
+ 
+ 	writel(cur, info->sel_reg);
+ 
+-	if (chip == -1 && allow_clk_stop(info))
+-		clk_disable(info->clk);
++	if (chip == -1)
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+ }
+ 
+ /* s3c2410_nand_hwcontrol
+@@ -694,8 +722,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
+ 	/* free the common resources */
+ 
+ 	if (info->clk != NULL && !IS_ERR(info->clk)) {
+-		if (!allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+ 		clk_put(info->clk);
+ 	}
+ 
+@@ -947,7 +974,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 		goto exit_error;
+ 	}
+ 
+-	clk_enable(info->clk);
++	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+ 
+ 	/* allocate and map the resource */
+ 
+@@ -1026,9 +1053,9 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 		goto exit_error;
+ 	}
+ 
+-	if (allow_clk_stop(info)) {
++	if (allow_clk_suspend(info)) {
+ 		dev_info(&pdev->dev, "clock idle support enabled\n");
+-		clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+ 	}
+ 
+ 	pr_debug("initialised ok\n");
+@@ -1059,8 +1086,7 @@ static int s3c24xx_nand_suspend(struct platform_device *dev, pm_message_t pm)
+ 
+ 		writel(info->save_sel | info->sel_bit, info->sel_reg);
+ 
+-		if (!allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+ 	}
+ 
+ 	return 0;
+@@ -1072,7 +1098,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
+ 	unsigned long sel;
+ 
+ 	if (info) {
+-		clk_enable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+ 		s3c2410_nand_inithw(info);
+ 
+ 		/* Restore the state of the nFCE line. */
+@@ -1082,8 +1108,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
+ 		sel |= info->save_sel & info->sel_bit;
+ 		writel(sel, info->sel_reg);
+ 
+-		if (allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.4.4
