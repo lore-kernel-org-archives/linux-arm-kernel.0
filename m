@@ -1,22 +1,185 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Apr 2011 19:01:10 +0100
-Subject: [PATCH 0/3] Export valuable System-on-Chip information to user-space
-	via sysfs
-Message-ID: <4DA341E6.70700@linaro.org>
+Date: Mon, 11 Apr 2011 19:01:16 +0100
+Subject: [PATCH 1/3] Framework for exporting System-on-Chip information via
+	sysfs
+Message-ID: <4DA341EC.7010101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lee Jones <lee.jones@linaro.org>
 
-This patch-set is based on Maxime Coquelin's <maxime.coquelin-nonst@stericsson.com> previous attempts. All advice has been taken and this is the resultant work. The main points taken into consideration are:
- * Ability to support multiple SoCs on any one device
- * Each SoC is registered as a _real_ device
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/base/Kconfig    |    3 +
+ drivers/base/Makefile   |    1 +
+ drivers/base/soc.c      |   96 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sys_soc.h |   29 ++++++++++++++
+ 4 files changed, 129 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/base/soc.c
+ create mode 100644 include/linux/sys_soc.h
 
-Documentation/ABI/testing/sysfs-devices-soc |   16 +++++
- arch/arm/mach-ux500/Kconfig                 |    1 +
- arch/arm/mach-ux500/id.c                    |   96 +++++++++++++++++++++++++++
- drivers/base/Kconfig                        |    3 +
- drivers/base/Makefile                       |    1 +
- drivers/base/soc.c                          |   96 +++++++++++++++++++++++++++
- include/linux/sys_soc.h                     |   29 ++++++++
- 7 files changed, 242 insertions(+), 0 deletions(-)
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index e9e5238..f381fcc 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -168,6 +168,9 @@ config SYS_HYPERVISOR
+ 	bool
+ 	default n
+ 
++config SYS_SOC
++	bool
++
+ config ARCH_NO_SYSDEV_OPS
+ 	bool
+ 	---help---
+diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+index 4c5701c..a0d246d 100644
+--- a/drivers/base/Makefile
++++ b/drivers/base/Makefile
+@@ -18,6 +18,7 @@ ifeq ($(CONFIG_SYSFS),y)
+ obj-$(CONFIG_MODULES)	+= module.o
+ endif
+ obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
++obj-$(CONFIG_SYS_SOC) += soc.o
+ 
+ ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
+ 
+diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+new file mode 100644
+index 0000000..1a409e2
+--- /dev/null
++++ b/drivers/base/soc.c
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ *
++ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#include <linux/sysfs.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/stat.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
++
++static char *soc_names[] = {"1", "2", "3", "4", "5", "6", "7", "8" };
++static struct device parent_soc = { .init_name = "soc", };
++struct device *soc[MAX_SOCS];
++
++static int soc_device_create_files(struct device *soc,
++                                   struct device_attribute soc_attrs[]);
++
++static void soc_device_remove_files(struct device *soc,
++                                    struct device_attribute soc_attrs[]);
++
++static int __init soc_device_create_files(struct device *soc,
++                                          struct device_attribute soc_attrs[])
++{
++	int ret = 0;
++	int i = 0;
++
++	while (soc_attrs[i].attr.name != NULL) {
++		ret = device_create_file(soc, &soc_attrs[i++]);
++		if (ret)
++			goto out;
++	}
++	return ret;
++
++out:
++	soc_device_remove_files(soc, soc_attrs);
++	return ret;
++}
++
++static void __exit soc_device_remove_files(struct device *soc,
++                                           struct device_attribute soc_attrs[])
++{
++	int i = 0;
++
++	while (soc_attrs[i++].attr.name != NULL)
++		device_remove_file(soc, &soc_attrs[i]);
++}
++
++int __init soc_device_register(struct device_attribute *soc_attrs[],
++                               int soc_count)
++{
++	int ret, i;
++
++	/* Register top-level SoC device '/sys/devices/soc' */
++	ret = device_register(&parent_soc);
++	if (ret)
++		return ret;
++
++	/* Register each SoC and populate sysfs with requested attributes */
++	for (i = 0; i < soc_count - 1; i++) {
++		soc[i] = kmalloc(sizeof(struct device), GFP_KERNEL);
++		if (!soc[i])
++			return -ENOMEM;
++
++		memset(soc[i], 0, sizeof(struct device));
++		soc[i]->init_name = soc_names[i];
++		soc[i]->parent = &parent_soc;
++
++		ret = device_register(soc[i]);
++		if (ret)
++			return ret;
++
++		soc_device_create_files(soc[i], soc_attrs[i]);
++	}
++
++	return ret;
++}
++
++void __exit soc_device_unregister(struct device_attribute *soc_attrs[],
++                                  int soc_count)
++{
++	int i;
++
++	/* Unregister and free all SoC from sysfs */
++	for (i = 0; i < soc_count - 1; i++) {
++		soc_device_remove_files(soc[i], soc_attrs[i]);
++		device_unregister(soc[i]);
++		kfree(soc[i]);
++	}
++
++	/* Unregister top-level SoC device '/sys/devices/soc' */
++	device_unregister(&parent_soc);
++}
+diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+new file mode 100644
+index 0000000..072cd39
+--- /dev/null
++++ b/include/linux/sys_soc.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++#ifndef __SYS_SOC_H
++#define __SYS_SOC_H
++
++#include <linux/kobject.h>
++#include <linux/device.h>
++
++#define MAX_SOCS 8
++
++/**
++ * soc_device_register - register SoC as a device
++ * @soc_attr: Array of sysfs file attributes
++ * @soc: Parent node '/sys/devices/soc'
++ */
++int soc_device_register(struct device_attribute *soc_attrs[],
++                        int num_socs);
++/**
++ *  soc_device_unregister - unregister SoC as a device
++ * @soc_attr: Array of sysfs file attributes
++ * @soc: Parent node '/sys/devices/soc'
++ */
++void soc_device_unregister(struct device_attribute *soc_attrs[],
++                           int num_socs);
++
++#endif /* __SYS_SOC_H */
+-- 
+1.7.4.1
