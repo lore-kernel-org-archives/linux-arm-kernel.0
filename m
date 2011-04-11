@@ -1,62 +1,83 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 11 Apr 2011 15:49:01 -0600
-Subject: [PATCH] ARM: Tegra: Harmony: Fix conflicting GPIO numbering
-Message-ID: <1302558541-19841-1-git-send-email-swarren@nvidia.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 11 Apr 2011 16:50:48 -0500
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
+	i.MX53
+In-Reply-To: <alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+Message-ID: <BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, both the WM8903 and TPS6586x chips attempt to register with
-gpiolib using the same GPIO numbers. This causes the audio driver to
-fail to initialize.
+Well, whoever's responsibility it is to fix this, whereever it needs
+to be fixed, it needs to be fixed, as it is absolutely nuts that you
+cannot run an MX51 and MX53 board off the same kernel.
 
-To solve this, add a define to board-harmony.h for the TPS6586x, and make
-oard-harmony-power.c use this define, instead of directly referencing
-TEGRA_NR_GPIOS.
+If nobody knows or agrees, can anyone can identify exactly what needs
+to be fixed and where, and how much work this would actually be, so
+they or someone else can actually go do it, instead of us just
+debating about how experimental it might be?
 
-This fixes a regression introduced by commit
-6f168f2fa60f87e85e0df25e87e2372f22f5eb7c.
+As far as I see it the only reason it depends on EXPERIMENTAL is
+because it breaks at least one subarch, it breaks XIP kernels and it
+breaks Thumb2 kernels (this last one is not so much a showstopper for
+enabling it by default, unless I am mistaken in my assumption that
+Thumb2 kernels still don't work reliably right now anyway?)
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-harmony-power.c |    4 +++-
- arch/arm/mach-tegra/board-harmony.h       |    3 ++-
- 2 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
-index c84442c..5ad8b2f 100644
---- a/arch/arm/mach-tegra/board-harmony-power.c
-+++ b/arch/arm/mach-tegra/board-harmony-power.c
-@@ -24,6 +24,8 @@
- 
- #include <mach/irqs.h>
- 
-+#include "board-harmony.h"
-+
- #define PMC_CTRL		0x0
- #define PMC_CTRL_INTR_LOW	(1 << 17)
- 
-@@ -98,7 +100,7 @@ static struct tps6586x_platform_data tps_platform = {
- 	.irq_base	= TEGRA_NR_IRQS,
- 	.num_subdevs	= ARRAY_SIZE(tps_devs),
- 	.subdevs	= tps_devs,
--	.gpio_base	= TEGRA_NR_GPIOS,
-+	.gpio_base	= HARMONY_GPIO_TPS6586X(0),
- };
- 
- static struct i2c_board_info __initdata harmony_regulators[] = {
-diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
-index 1e57b07..d85142e 100644
---- a/arch/arm/mach-tegra/board-harmony.h
-+++ b/arch/arm/mach-tegra/board-harmony.h
-@@ -17,7 +17,8 @@
- #ifndef _MACH_TEGRA_BOARD_HARMONY_H
- #define _MACH_TEGRA_BOARD_HARMONY_H
- 
--#define HARMONY_GPIO_WM8903(_x_)	(TEGRA_NR_GPIOS + (_x_))
-+#define HARMONY_GPIO_TPS6586X(_x_)	(TEGRA_NR_GPIOS + (_x_))
-+#define HARMONY_GPIO_WM8903(_x_)	(HARMONY_GPIO_TPS6586X(4) + (_x_))
- 
- #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
- #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
 -- 
-1.7.1
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
+
+
+
+2011/4/11 Nicolas Pitre <nico@fluxnic.net>:
+> On Mon, 11 Apr 2011, Uwe Kleine-K?nig wrote:
+>
+>> On Sun, Apr 10, 2011 at 10:02:03PM -0400, Nicolas Pitre wrote:
+>> > On Sun, 10 Apr 2011, Uwe Kleine-K?nig wrote:
+>> >
+>> > > The two SoCs have different PHYS_OFFSETs so it's not (yet) possible to
+>> > > compile a single (working) kernel for these.
+>> >
+>> > Really?
+>> >
+>> > Have a look at CONFIG_ARM_PATCH_PHYS_VIRT. ?It's in mainline and fully
+>> > functional.
+>> I'm aware of this config item. But still if it's off there must be a
+>> distinction that's provided by this patch.
+>
+> Sure. ?Instead of a compile time expansion of virt_to_phys() and
+> phys_to_virt(), you get a run time patching of the kernel binary
+> according to the runtime deduced PHYS_OFFSET. ?See commit logs for "git
+> log 6fc31d54..b511d75" for the details.
+>
+>> Currently you can build a
+>> kernel for i.MX51 + i.MX53 but IIRC it works on no machine.
+>
+> Maybe it should be fixed?
+>
+>> When considering ARM_PATCH_PHYS_VIRT there are more SoCs that could be
+>> built into a single image and so needs a more complicated logic.
+>
+> The ultimate goal is to structure the code so we can build as many SOCs
+> together as possible.
+>
+>> And I don't want to depend on ARM_PATCH_PHYS_VIRT (yet), e.g. because
+>> it's new and still depends on EXPERIMENTAL.
+>
+> When will it be no experimental anymore if no one starts using it? ?RMK
+> talked about making it enabled by default, and that could allow for the
+> removal of a bunch of arch/arm/*/include/mach/memory.h files.
+>
+>
+> Nicolas
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
