@@ -1,142 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Apr 2011 10:22:10 +0200
-Subject: [PATCH V3 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1302509153-30326-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1302509153-30326-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1302509153-30326-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110411082210.GI18601@pengutronix.de>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Apr 2011 09:31:12 +0100
+Subject: [RFC PATCHv2 09/20] ARM: architected timers: add A15
+	architected timers
+In-Reply-To: <4D9FC8DE.3090701@codeaurora.org>
+References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
+	<1300201983-26124-10-git-send-email-marc.zyngier@arm.com>
+	<4D9FC8DE.3090701@codeaurora.org>
+Message-ID: <1302510672.14918.68.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 04:05:53PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx53_loco.c |   76 +++++++++++++++++++++++++++++++++++
->  1 files changed, 76 insertions(+), 0 deletions(-)
+On Fri, 2011-04-08 at 19:47 -0700, Stephen Boyd wrote:
+
+Hi Stephen,
+
+> On 3/15/2011 8:12 AM, Marc Zyngier wrote:
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index b7e504b..38ee56e 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1407,9 +1407,14 @@ config HOTPLUG_CPU
+> >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
+> >  	  can be controlled through /sys/devices/system/cpu.
+> >  
+> > +config HAVE_ARCH_TIMERS
+> > +	bool
+> > +	depends on CPU_V7
+> > +	select TICK_ONESHOT
 > 
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 0a18f8d..489830a 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,11 +23,13 @@
->  #include <linux/fec.h>
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
-> +#include <linux/ahci_platform.h>
-this shouldn't be needed, as devices-common already #includes it.
+> I don't think you need to select TICK_ONESHOT. The user should be
+> selecting NO_HZ or HIGH_RES_TIMERS instead, right?
 
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/imx-uart.h>
->  #include <mach/iomux-mx53.h>
-> +#include <mach/ahci_sata.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -38,6 +40,8 @@
->  
->  #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
->  
-> +static struct clk *sata_clk, *sata_ref_clk;
-> +
->  static iomux_v3_cfg_t mx53_loco_pads[] = {
->  	/* FEC */
->  	MX53_PAD_FEC_MDC__FEC_MDC,
-> @@ -203,6 +207,77 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +/* HW Initialization, if return 0, initialization is successful. */
-> +static int mx53_loco_sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	int ret = 0;
-> +	struct clk *clk;
-> +
-> +	sata_clk = clk_get(dev, NULL);
-> +	if (IS_ERR(sata_clk)) {
-> +		dev_err(dev, "no sata clock.\n");
-> +		return PTR_ERR(sata_clk);
-> +	}
-> +	ret = clk_enable(sata_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata clock.\n");
-> +		clk_put(sata_clk);
-> +		return ret;
-> +	}
-> +
-> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> +	sata_ref_clk = clk_get(NULL, "usb_phy1");
-> +	if (IS_ERR(sata_ref_clk)) {
-> +		dev_err(dev, "no sata ref clock.\n");
-> +		ret = PTR_ERR(sata_ref_clk);
-> +		goto release_sata_clk;
-> +	}
-> +	ret = clk_enable(sata_ref_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata ref clock.\n");
-> +		clk_put(sata_ref_clk);
-> +		goto release_sata_clk;
-> +	}
-> +
-> +	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-> +	clk = clk_get(NULL, "ahb");
-> +	if (IS_ERR(clk)) {
-> +		dev_err(dev, "no ahb clock.\n");
-> +		ret = PTR_ERR(clk);
-> +		goto release_sata_ref_clk;
-> +	}
-> +
-> +	sata_init(addr, clk);
-> +
-> +	clk = NULL;
-This isn't needed. And ah, there is the clk_get. This looks all strange.
-If sata_ref_clk is needed to have ahci working it should be enabled
-automatically (maybe by making it a secondary clk?) Otherwise it's
-always on. Same for sata_ref_clk -> sata_clk.
+The A15 timer only has the one-shot feature (ie no auto-relead). Not
+having TICK_ONESHOT would render the timer completely unusable if
+neither NO_HZ nor HIGH_RES_TIMERS are selected. For that reason, I
+believe selecting TICK_ONESHOT is necessary.
 
-> +	return ret;
-> +
-> +release_sata_ref_clk:
-> +	clk_disable(sata_ref_clk);
-> +	clk_put(sata_ref_clk);
-> +
-> +release_sata_clk:
-> +	clk_disable(sata_clk);
-> +	clk_put(sata_clk);
-> +
-> +	clk = NULL;
-not needed
+> > +
+> > +static struct clocksource clocksource_counter = {
+> > +	.name	= "arch_sys_counter",
+> > +	.rating	= 400,
+> > +	.read	= arch_counter_read,
+> > +	.mask	= CLOCKSOURCE_MASK(56),
+> > +	.flags	= (CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_VALID_FOR_HRES),
+> 
+> I'm fairly certain that CLOCK_SOURCE_VALID_FOR_HRES is a private flag
+> not to be used by clocksource drivers. At least grepping the kernel for
+> it shows no results outside of kernel/time/
 
-> +	return ret;
-> +}
-> +
-> +static void sata_exit(struct device *dev)
-mx53_loco_sata_exit?
+You're probably right here. Will fix.
 
-> +{
-> +	clk_disable(sata_ref_clk);
-> +	clk_put(sata_ref_clk);
-> +
-> +	clk_disable(sata_clk);
-> +	clk_put(sata_clk);
-> +}
-> +
-> +static struct ahci_platform_data sata_data = {
-> +	.init = mx53_loco_sata_init,
-> +	.exit = sata_exit,
-> +};
-> +
->  static void __init mx53_loco_board_init(void)
->  {
->  	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-> @@ -215,6 +290,7 @@ static void __init mx53_loco_board_init(void)
->  	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
->  	imx53_add_sdhci_esdhc_imx(0, NULL);
->  	imx53_add_sdhci_esdhc_imx(2, NULL);
-> +	imx53_add_ahci_imx(0, &sata_data);
->  }
+Thanks for reviewing.
 
+	M.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Reality is an implementation detail.
