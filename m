@@ -1,46 +1,72 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 16:21:10 +0100
-Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
-In-Reply-To: <BANLkTi=bur3zPkQ45+StkPxLm_YMyw9uaw@mail.gmail.com>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<BANLkTi=bur3zPkQ45+StkPxLm_YMyw9uaw@mail.gmail.com>
-Message-ID: <20110411152110.GC21449@pulham.picochip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Apr 2011 17:22:18 +0200
+Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
+	support.
+In-Reply-To: <4DA2F36C.3010707@st.com>
+References: <cover.1298977728.git.viresh.kumar@st.com>
+	<201103230928.18445.arnd@arndb.de> <4DA2F36C.3010707@st.com>
+Message-ID: <201104111722.18309.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 05:17:53PM +0200, Linus Walleij wrote:
-> 2011/4/11 Jamie Iles <jamie@jamieiles.com>:
+On Monday 11 April 2011, pratyush wrote:
+> On 3/23/2011 1:58 PM, Arnd Bergmann wrote:
+> > On Wednesday 23 March 2011, Viresh Kumar wrote:
+> > 
+> > The way I would recommend is to reserve a part of the system's virtual
+> > address space for all I/O windows, and using iotable_init() to map
+> > them contiguously. The first port will then be the only one that
+> > can hold ISA ranges (needed for legacy VGA mode, for instance).
+> > 
 > 
-> > The basic-mmio-gpio driver has been extended in
-> > <http://marc.info/?l=linux-kernel&m=130252092900804&w=2> to support a
-> > larger wider of controllers and this series converts the ARM platforms
-> > that do not implement I/O muxing in the GPIO driver or use the .to_irq
-> > method of gpio_chip to use the driver.
-> >
-> > Jamie Iles (5):
-> > ?gemini: convert to basic-mmio-gpio
-> > ?sa1100: convert to basic-mmio-gpio
-> > ?w90x900: convert to basic-mmio-gpio
-> > ?iop: convert to basic-mmio-gpio
-> > ?mxc: convert to basic-mmio-gpio
+> Sorry, may be I could not get this point correctly. Do you mean that,
+> I should create a static mapping for IN0_MEM_SIZE (200 MB) and 
+> IN_IO_SIZE (20 MB) during board initialization itself?
+
+Only IN_IO_SIZE. The I/O space is implicitly assumed to be mapped, while
+the memory space is mapped by device drivers individually.
+
+> >> diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> index fd8c2dc..6169d4f 100644
+> >> --- a/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> +++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+> >> @@ -28,4 +28,8 @@
+> >>  /* typesafe io address */
+> >>  #define __io_address(n)		__io(IO_ADDRESS(n))
+> > 
+> > Please reread my previous comments. You have to redefine __io() in order to make
+> > the I/O port accesses work. When you do that, you cannot define
+> > __io_address (which is used by non-PCI code) as using __io.
+> > 
 > 
-> For all of these, maybe you can
->   select GPIO_BASIC_GPIO
+> __io_address is not used by PICe routines. Also, this is not part of 
+> this patch. 
+
+Yes, that was my point.
+
+> >> +/*
+> >> + * In current implementation address translation is done using IN0 only. So IN1
+> >> + * start address and IN0 end address has been kept same
+> >> +*/
+> >> +#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
+> >> +#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
+> >> +#define IN_CFG0_SIZE	(1 * 1024 * 1024 - 1)
+> >> +#define IN_CFG1_SIZE	(1 * 1024 * 1024 - 1)
+> >> +#define IN_MSG_SIZE	(1 * 1024 * 1024 - 1)
+> > 
+> > Is IN_IO_SIZE per host, or this shared across all hosts?
 > 
-> In their mach-xxx/Kconfig so that the driver gets compiled-in by default?
+> This is per host. So is it not a practical size?
+> What should be a reasonable IO size?
 
-OK, Uwe has suggested that already so I'll fix that up for the next 
-attempt.
+64 KB is more than enough per host. That is the maximum that an x86 PC
+can address, so devices usually use very little of this, if anything.
 
-> Further the basic_mmio_gpio.c driver looks a bit dangerous: it only uses
-> __raw_* accessors for the GPIO registers, I'd very much like to replace that
-> with the non-__raw* versions if this is to have any generic impact.
-> 
-> The raw accessors can get stuck in things like write buffers and the like
-> IIRC, they usually won't so you don't notice first, then you start getting
-> all kind of real strange bugs.
+There are some advantages to using 64KB combined for all hosts, but
+the easiest way should probably be to reserve 1 MB for the space
+and use 64 KB for each of them.
 
-Sounds sensible.  I'll create a patch to convert to use the non raw 
-versions then.
+If you have a PCI-ISA bridge chip or a card that has one, it needs to
+be on a host that has its I/O space in the first 64 KB.
 
-Jamie
+	Arnd
