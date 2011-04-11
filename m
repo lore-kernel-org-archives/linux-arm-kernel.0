@@ -1,90 +1,171 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 11 Apr 2011 11:08:41 +0800
-Subject: [PATCH V4 0/4] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <19870.59289.913018.127715@ipc1.ka-ro>
-References: <19869.40520.368078.270732@ipc1.ka-ro>	<4D9E75FF.6090603@freescale.com>
-	<19870.59289.913018.127715@ipc1.ka-ro>
-Message-ID: <4DA270B9.6030700@freescale.com>
+From: Jiri.Pinkava@vscht.cz (=?UTF-8?B?SmnFmcOtIFBpbmthdmE=?=)
+Date: Mon, 11 Apr 2011 05:15:17 +0200
+Subject: [PATCH] nand: Fix S3C NAND clock stop
+In-Reply-To: <4DA261DA.2050404@oracle.com>
+References: <1302485262-8401-1-git-send-email-jiri.pinkava@vscht.cz>
+	<4DA261DA.2050404@oracle.com>
+Message-ID: <4DA27245.6@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar:
+Current implementation of s3c2410_nand_select_chip call
+clk_disable every time when chip = -1 (de-select). This happend
+multiple times even if chip was already de-selected. This causes
+disabling clock even if they are already disabled and due to
+nature of clock subsytem implementation this causes nand clock
+to be disabled and newer enabled again.
 
-> Hi,
->
-> Huang Shijie writes:
->> Hi Lothar:
->>> Hi,
->>>
->>> Huang Shijie writes:
->>>> Does some one have any comments about this driver?
->>>>
->>> I'm still not happy with the rom-helper code that IMO does not belong
->>> in this driver.
->> Could you tell me which part of the rom-helper code is not belong the
->> driver?
->>
-> All of it. I don't see a point in having it, when all that it does can
-> be achieved with standard functions already.
->
-I am afraid most of the rom-help code can not be removed, the  reasons are:
-[1] imx23 does not need the swap-block-mark feature. The swap-block-mark 
-feature is used
-    by the BCH hardware ecc-correction module. But the imx28 does need 
-the swap-block-mark feature.
-    Why? the firmwares in both chips are a little different. The 
-rom-help code is used to distinguish
-    this, and _DO_ some necessary initializations. After the 
-initialization, the NAND_SCAN will works.
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+  drivers/mtd/nand/s3c2410.c |   57 
++++++++++++++++++++++++++++++++------------
+  1 files changed, 41 insertions(+), 16 deletions(-)
 
-[2] In the NAND boot mode, we also need to check the swap-block-mark to 
-do the right ECC read pages.
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index 33d832d..fbc37dc 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -54,8 +54,14 @@ static int hardware_ecc = 1;
+  static int hardware_ecc = 0;
+  #endif
 
++#define CLOCK_DISABLE	0
++#define CLOCK_ENABLE	1
++#define CLOCK_SUSPEND	2
++
++static int clock_state = CLOCK_DISABLE;
++
+  #ifdef CONFIG_MTD_NAND_S3C2410_CLKSTOP
+-static int clock_stop = 1;
++static const int clock_stop = 1;
+  #else
+  static const int clock_stop = 0;
+  #endif
+@@ -159,11 +165,33 @@ static struct s3c2410_platform_nand 
+*to_nand_plat(struct platform_device *dev)
+  	return dev->dev.platform_data;
+  }
 
+-static inline int allow_clk_stop(struct s3c2410_nand_info *info)
++static inline int allow_clk_suspend(struct s3c2410_nand_info *info)
+  {
+  	return clock_stop;
+  }
 
-BUT the default partition layout code really can be removed. It somehow 
-can be regards as not belonged to
-the driver.
++/**
++ * s3c2410_nand_clk_set_state - Enable, disable or suspend NAND clock.
++ * @info: The controller instance.
++ * @new_state: State to which clock should be set.
++ */
++static void s3c2410_nand_clk_set_state(struct s3c2410_nand_info *info,
++		int new_state)
++{
++	if (!allow_clk_suspend(info) && new_state == CLOCK_SUSPEND)
++		return;
++
++	if (clock_state == CLOCK_ENABLE) {
++		if (new_state != CLOCK_ENABLE)
++			clk_disable(info->clk);
++	} else {
++		if (new_state == CLOCK_ENABLE)
++			clk_enable(info->clk);
++	}
++
++	clock_state = new_state;
++}
++
+  /* timing calculations */
 
-thanks.
->>> Also, I would integrate the code from the hal-*.c files into the main
->>> file and remove all the function hooks, since the functions are the
->> thanks for your advice.
->>
->> This driver will serve for many platforms, not only the imx23 and imx28.
->> I am merging the imx508 code to the driver.
->> I feel lucky that i did not merge all the code into the main file, which
->> will
->> make the code mess.
->>
-> You would probably end up with some more functions that are
-> implemented for the different variants. They could be prefixed with
-> the SoC name and selected in the probe() function depending on the
-> platform id. I don't see why this should get messy.
->
-I really do not like to package all the code into one file which makes 
-the file bigger and bigger.
-Frankly speaking, I regard it as a bad idea. I think it's messy.
+  #define NS_IN_KHZ 1000000
+@@ -333,8 +361,8 @@ static void s3c2410_nand_select_chip(struct mtd_info 
+*mtd, int chip)
+  	nmtd = this->priv;
+  	info = nmtd->info;
 
-imx508 will support DDR mode for ONFI NAND and TOGGLE nand which need to 
-do lot of TIMING initialization for both mode.
-It is a long initialization code. Keep the code in separate file is to 
-make the code tidy. Do you think it's a
-grace method to keep it in one file? I do not think so. :)
+-	if (chip != -1 && allow_clk_stop(info))
+-		clk_enable(info->clk);
++	if (chip != -1)
++		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
 
-yes, I can use the PREFIXED name for different variants. But I think 
-that will create more code.
-The current *hal.c only contains the different implementation for variants.
+  	cur = readl(info->sel_reg);
 
+@@ -356,8 +384,8 @@ static void s3c2410_nand_select_chip(struct mtd_info 
+*mtd, int chip)
 
-> If the imx508 driver is so much different from the other variants,
-> that merging it gets too messy, it's probably better to not merge it
-> with the other variants anyway.
->
-It just needs a separate hal-508.c file.
-> Lothar Wa?mann
+  	writel(cur, info->sel_reg);
 
-Thanks a lot.
+-	if (chip == -1 && allow_clk_stop(info))
+-		clk_disable(info->clk);
++	if (chip == -1)
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+  }
 
-Best Regards
-Huang Shijie
+  /* s3c2410_nand_hwcontrol
+@@ -694,8 +722,7 @@ static int s3c24xx_nand_remove(struct 
+platform_device *pdev)
+  	/* free the common resources */
+
+  	if (info->clk != NULL && !IS_ERR(info->clk)) {
+-		if (!allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+  		clk_put(info->clk);
+  	}
+
+@@ -947,7 +974,7 @@ static int s3c24xx_nand_probe(struct platform_device 
+*pdev)
+  		goto exit_error;
+  	}
+
+-	clk_enable(info->clk);
++	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+
+  	/* allocate and map the resource */
+
+@@ -1026,9 +1053,9 @@ static int s3c24xx_nand_probe(struct 
+platform_device *pdev)
+  		goto exit_error;
+  	}
+
+-	if (allow_clk_stop(info)) {
++	if (allow_clk_suspend(info)) {
+  		dev_info(&pdev->dev, "clock idle support enabled\n");
+-		clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+  	}
+
+  	pr_debug("initialised ok\n");
+@@ -1059,8 +1086,7 @@ static int s3c24xx_nand_suspend(struct 
+platform_device *dev, pm_message_t pm)
+
+  		writel(info->save_sel | info->sel_bit, info->sel_reg);
+
+-		if (!allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+  	}
+
+  	return 0;
+@@ -1072,7 +1098,7 @@ static int s3c24xx_nand_resume(struct 
+platform_device *dev)
+  	unsigned long sel;
+
+  	if (info) {
+-		clk_enable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+  		s3c2410_nand_inithw(info);
+
+  		/* Restore the state of the nFCE line. */
+@@ -1082,8 +1108,7 @@ static int s3c24xx_nand_resume(struct 
+platform_device *dev)
+  		sel |= info->save_sel & info->sel_bit;
+  		writel(sel, info->sel_reg);
+
+-		if (allow_clk_stop(info))
+-			clk_disable(info->clk);
++		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+  	}
+
+  	return 0;
+-- 
+1.7.4.4
