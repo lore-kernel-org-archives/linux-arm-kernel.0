@@ -1,107 +1,213 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 12:48:19 +0100
-Subject: [RFC PATCH 2/5] sa1100: convert to basic-mmio-gpio
+Date: Mon, 11 Apr 2011 12:48:20 +0100
+Subject: [RFC PATCH 3/5] w90x900: convert to basic-mmio-gpio
 In-Reply-To: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
 References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1302522502-24381-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <1302522502-24381-4-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The basic-mmio-gpio driver is capable of supporting this controller so
 convert the platform to use it for basic GPIO support.
 
+Cc: Wan ZongShun <mcuos.com@gmail.com>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-sa1100/gpio.c |   69 +++++++++++++++---------------------------
- 1 files changed, 25 insertions(+), 44 deletions(-)
+ arch/arm/mach-w90x900/gpio.c |  162 +++++++++++-------------------------------
+ 1 files changed, 43 insertions(+), 119 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/gpio.c b/arch/arm/mach-sa1100/gpio.c
-index 0d3829a..f7bd975 100644
---- a/arch/arm/mach-sa1100/gpio.c
-+++ b/arch/arm/mach-sa1100/gpio.c
-@@ -8,58 +8,39 @@
+diff --git a/arch/arm/mach-w90x900/gpio.c b/arch/arm/mach-w90x900/gpio.c
+index ba05aec..5dd7efe 100644
+--- a/arch/arm/mach-w90x900/gpio.c
++++ b/arch/arm/mach-w90x900/gpio.c
+@@ -10,145 +10,69 @@
   * published by the Free Software Foundation.
   */
  
+-#include <linux/clk.h>
+-#include <linux/errno.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/debugfs.h>
+-#include <linux/seq_file.h>
 +#include <linux/basic_mmio_gpio.h>
 +#include <linux/err.h>
- #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/list.h>
  #include <linux/module.h>
+-#include <linux/io.h>
+ #include <linux/gpio.h>
 +#include <linux/platform_device.h>
  
- #include <asm/gpio.h>
  #include <mach/hardware.h>
- #include "generic.h"
  
--static int sa1100_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	return GPLR & GPIO_GPIO(offset);
--}
--
--static void sa1100_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	if (value)
--		GPSR = GPIO_GPIO(offset);
--	else
--		GPCR = GPIO_GPIO(offset);
--}
--
--static int sa1100_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	unsigned long flags;
--
--	local_irq_save(flags);
--	GPDR &= ~GPIO_GPIO(offset);
--	local_irq_restore(flags);
--	return 0;
--}
--
--static int sa1100_direction_output(struct gpio_chip *chip, unsigned offset, int value)
--{
--	unsigned long flags;
--
--	local_irq_save(flags);
--	sa1100_gpio_set(chip, offset, value);
--	GPDR |= GPIO_GPIO(offset);
--	local_irq_restore(flags);
--	return 0;
--}
--
--static struct gpio_chip sa1100_gpio_chip = {
--	.label			= "gpio",
--	.direction_input	= sa1100_direction_input,
--	.direction_output	= sa1100_direction_output,
--	.set			= sa1100_gpio_set,
--	.get			= sa1100_gpio_get,
--	.base			= 0,
--	.ngpio			= GPIO_MAX + 1,
--};
+-#define GPIO_BASE 		(W90X900_VA_GPIO)
+ #define GPIO_DIR		(0x04)
+ #define GPIO_OUT		(0x08)
+ #define GPIO_IN			(0x0C)
+ #define GROUPINERV		(0x10)
+-#define GPIO_GPIO(Nb)		(0x00000001 << (Nb))
+-#define to_nuc900_gpio_chip(c) container_of(c, struct nuc900_gpio_chip, chip)
+ 
+-#define NUC900_GPIO_CHIP(name, base_gpio, nr_gpio)			\
+-	{								\
+-		.chip = {						\
+-			.label		  = name,			\
+-			.direction_input  = nuc900_dir_input,		\
+-			.direction_output = nuc900_dir_output,		\
+-			.get		  = nuc900_gpio_get,		\
+-			.set		  = nuc900_gpio_set,		\
+-			.base		  = base_gpio,			\
+-			.ngpio		  = nr_gpio,			\
+-		}							\
 +#define GPIO_RES(__name, __addr) \
 +	{ \
 +		.start = (__addr), \
 +		.end = (__addr) + 0x3, \
 +		.flags = IORESOURCE_MEM, \
 +		.name = #__name, \
+ 	}
+ 
+-struct nuc900_gpio_chip {
+-	struct gpio_chip	chip;
+-	void __iomem		*regbase;	/* Base of group register*/
+-	spinlock_t 		gpio_lock;
+-};
+-
+-static int nuc900_gpio_get(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
+-	void __iomem *pio = nuc900_gpio->regbase + GPIO_IN;
+-	unsigned int regval;
+-
+-	regval = __raw_readl(pio);
+-	regval &= GPIO_GPIO(offset);
+-
+-	return (regval != 0);
+-}
+-
+-static void nuc900_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+-{
+-	struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
+-	void __iomem *pio = nuc900_gpio->regbase + GPIO_OUT;
+-	unsigned int regval;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
+-
+-	regval = __raw_readl(pio);
+-
+-	if (val)
+-		regval |= GPIO_GPIO(offset);
+-	else
+-		regval &= ~GPIO_GPIO(offset);
+-
+-	__raw_writel(regval, pio);
+-
+-	spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
+-}
+-
+-static int nuc900_dir_input(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
+-	void __iomem *pio = nuc900_gpio->regbase + GPIO_DIR;
+-	unsigned int regval;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
+-
+-	regval = __raw_readl(pio);
+-	regval &= ~GPIO_GPIO(offset);
+-	__raw_writel(regval, pio);
+-
+-	spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
+-
+-	return 0;
+-}
+-
+-static int nuc900_dir_output(struct gpio_chip *chip, unsigned offset, int val)
+-{
+-	struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
+-	void __iomem *outreg = nuc900_gpio->regbase + GPIO_OUT;
+-	void __iomem *pio = nuc900_gpio->regbase + GPIO_DIR;
+-	unsigned int regval;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
+-
+-	regval = __raw_readl(pio);
+-	regval |= GPIO_GPIO(offset);
+-	__raw_writel(regval, pio);
+-
+-	regval = __raw_readl(outreg);
+-
+-	if (val)
+-		regval |= GPIO_GPIO(offset);
+-	else
+-		regval &= ~GPIO_GPIO(offset);
+-
+-	__raw_writel(regval, outreg);
+-
+-	spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
+-
+-	return 0;
+-}
++#define NUC900_GPIO_BANK(base_gpio, nr_gpio)			\
++	{							\
++		.ngpio	= (nr_gpio),				\
++		.base	= (base_gpio),				\
 +	}
  
- void __init sa1100_init_gpio(void)
+-static struct nuc900_gpio_chip nuc900_gpio[] = {
+-	NUC900_GPIO_CHIP("GROUPC", 0, 16),
+-	NUC900_GPIO_CHIP("GROUPD", 16, 10),
+-	NUC900_GPIO_CHIP("GROUPE", 26, 14),
+-	NUC900_GPIO_CHIP("GROUPF", 40, 10),
+-	NUC900_GPIO_CHIP("GROUPG", 50, 17),
+-	NUC900_GPIO_CHIP("GROUPH", 67, 8),
+-	NUC900_GPIO_CHIP("GROUPI", 75, 17),
++struct nuc900_gpio_bank {
++	unsigned int		base;
++	unsigned int		ngpio;
+ };
+ 
+ void __init nuc900_init_gpio(int nr_group)
  {
--	gpiochip_add(&sa1100_gpio_chip);
-+	struct resource res[] = {
-+		GPIO_RES(set, 0x90040008),
-+		GPIO_RES(clr, 0x9004000C),
-+		GPIO_RES(dat, 0x90040000),
-+		GPIO_RES(dirout, 0x90040004),
-+	};
-+	struct bgpio_pdata pdata = {
-+		.ngpio = GPIO_MAX + 1,
-+	};
-+	struct platform_device *pdev;
+ 	unsigned	i;
+-	struct nuc900_gpio_chip *gpio_chip;
 +
-+	pdev = platform_device_register_resndata(NULL, "basic-mmio-gpio", 0,
-+						 res, ARRAY_SIZE(res), &pdata,
-+						 sizeof(pdata));
-+	WARN_ON(IS_ERR(pdev));
++	struct nuc900_gpio_bank nuc900_gpio[] = {
++		NUC900_GPIO_BANK(0, 16),
++		NUC900_GPIO_BANK(16, 10),
++		NUC900_GPIO_BANK(26, 14),
++		NUC900_GPIO_BANK(40, 10),
++		NUC900_GPIO_BANK(50, 17),
++		NUC900_GPIO_BANK(67, 8),
++		NUC900_GPIO_BANK(75, 17),
++	};
+ 
+ 	for (i = 0; i < nr_group; i++) {
+-		gpio_chip = &nuc900_gpio[i];
+-		spin_lock_init(&gpio_chip->gpio_lock);
+-		gpio_chip->regbase = GPIO_BASE + i * GROUPINERV;
+-		gpiochip_add(&gpio_chip->chip);
++		unsigned long addr = W90X900_PA_GPIO + i * GROUPINERV;
++		struct resource res[] = {
++			GPIO_RES(dat, addr + GPIO_IN),
++			GPIO_RES(set, addr + GPIO_OUT),
++			GPIO_RES(dirout, addr + GPIO_DIR),
++		};
++		struct bgpio_pdata pdata = {
++			.ngpio	= nuc900_gpio[i].ngpio,
++			.base	= nuc900_gpio[i].base,
++		};
++		struct platform_device *pdev;
++
++		pdev = platform_device_register_resndata(NULL,
++			"basic-mmio-gpio", i, res, ARRAY_SIZE(res), &pdata,
++			sizeof(pdata));
++		WARN_ON(IS_ERR(pdev));
+ 	}
  }
 -- 
 1.7.4.2
