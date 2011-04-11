@@ -1,71 +1,62 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 11 Apr 2011 23:36:39 +0200
-Subject: [RFC][PATCH V3] axi: add AXI bus driver
-In-Reply-To: <20110411212513.GA17809@kroah.com>
-References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
-	<20110411210631.GA28559@kroah.com>
-	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
-	<20110411212513.GA17809@kroah.com>
-Message-ID: <BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 11 Apr 2011 15:49:01 -0600
+Subject: [PATCH] ARM: Tegra: Harmony: Fix conflicting GPIO numbering
+Message-ID: <1302558541-19841-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/11 Greg KH <greg@kroah.com>:
-> On Mon, Apr 11, 2011 at 11:19:13PM +0200, Rafa? Mi?ecki wrote:
->> 2011/4/11 Greg KH <greg@kroah.com>:
->> > On Mon, Apr 11, 2011 at 11:25:14PM +0200, Rafa? Mi?ecki wrote:
->> >> +static void axi_release_core_dev(struct device *dev)
->> >> +{
->> >> + ? ? /* Silent lack-of-release warning */
->> >> +}
->> >
->> > Ok, WTF!!!!
->>
->> Thank you for your kindly words. It's much more enjoyable to work on
->> kernel that way. I definitely made that on purpose.
->
-> I can't tell if you are kidding or not.
+Currently, both the WM8903 and TPS6586x chips attempt to register with
+gpiolib using the same GPIO numbers. This causes the audio driver to
+fail to initialize.
 
-That was 100% irony. I swear I don't enjoy publishing bad code and
-getting such a comment.
+To solve this, add a define to board-harmony.h for the TPS6586x, and make
+oard-harmony-power.c use this define, instead of directly referencing
+TEGRA_NR_GPIOS.
 
+This fixes a regression introduced by commit
+6f168f2fa60f87e85e0df25e87e2372f22f5eb7c.
 
-> Please read the documentation for how to do this properly. ?I find it
-> really hard to believe that you wrote that comment instead of putting in
-> the 2 lines of code required for this function.
->
-> Especially as-it-is, your code does not work properly and leaks memory
-> badly. ?Why would you do that on purpose?
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-harmony-power.c |    4 +++-
+ arch/arm/mach-tegra/board-harmony.h       |    3 ++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-I tried to read some documentation about this.
-
-1) driver-mode/device.txt says only that:
-> Callback to free the device after all references have
-> gone away. This should be set by the allocator of the
-> device (i.e. the bus driver that discovered the device).
-I *really* do not know how my driver should "free" core on AXI bus.
-
-2) LDD3 says:
-> The method is called when the last reference to the device is removed; it is called
-> from the embedded kobject?s release method. All device structures registered with
-> the core must have a release method, or the kernel prints out scary complaints.
-Well, I do not register any structs for AXI core.
-
-3) Example code from LDD3:
-static void ldd_bus_release(struct device *dev)
-{
-printk(KERN_DEBUG "lddbus release\n");
-}
-Yeah, that's what I did...
-
-4) SSB in it's ssb_release_dev just calls kfree on struct that was
-allocated when registering drivers. *I do not* allocate such a struct,
-so I believe I do exactly the same memory leak as SSB does.
-
-
-Can you spend 2 more minues in addition to commenting my ideas and
-help me with writing that 2 lines I missed? Where do I leak memory in
-my driver? Which struct should I kfree?
-
+diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
+index c84442c..5ad8b2f 100644
+--- a/arch/arm/mach-tegra/board-harmony-power.c
++++ b/arch/arm/mach-tegra/board-harmony-power.c
+@@ -24,6 +24,8 @@
+ 
+ #include <mach/irqs.h>
+ 
++#include "board-harmony.h"
++
+ #define PMC_CTRL		0x0
+ #define PMC_CTRL_INTR_LOW	(1 << 17)
+ 
+@@ -98,7 +100,7 @@ static struct tps6586x_platform_data tps_platform = {
+ 	.irq_base	= TEGRA_NR_IRQS,
+ 	.num_subdevs	= ARRAY_SIZE(tps_devs),
+ 	.subdevs	= tps_devs,
+-	.gpio_base	= TEGRA_NR_GPIOS,
++	.gpio_base	= HARMONY_GPIO_TPS6586X(0),
+ };
+ 
+ static struct i2c_board_info __initdata harmony_regulators[] = {
+diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
+index 1e57b07..d85142e 100644
+--- a/arch/arm/mach-tegra/board-harmony.h
++++ b/arch/arm/mach-tegra/board-harmony.h
+@@ -17,7 +17,8 @@
+ #ifndef _MACH_TEGRA_BOARD_HARMONY_H
+ #define _MACH_TEGRA_BOARD_HARMONY_H
+ 
+-#define HARMONY_GPIO_WM8903(_x_)	(TEGRA_NR_GPIOS + (_x_))
++#define HARMONY_GPIO_TPS6586X(_x_)	(TEGRA_NR_GPIOS + (_x_))
++#define HARMONY_GPIO_WM8903(_x_)	(HARMONY_GPIO_TPS6586X(4) + (_x_))
+ 
+ #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
+ #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
 -- 
-Rafa?
+1.7.1
