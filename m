@@ -1,45 +1,64 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 11 Apr 2011 10:53:24 +0200
-Subject: [patch 2/2] Add GPIO DT support to s3c24xx
-In-Reply-To: <20110411064719.GD4439@angua.secretlab.ca>
-References: <20110410152735.338798127@gmail.com>
-	<20110410153316.GC27088@dandreoli.com>
-	<20110411064719.GD4439@angua.secretlab.ca>
-Message-ID: <BANLkTim+CuRa=zFDFS3Qgwov4TW4NDK-Lw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Apr 2011 09:56:03 +0100
+Subject: dmaengine: Can we schedule new transfer from dma callback
+	routine??
+In-Reply-To: <4DA2B3D8.6060707@st.com>
+References: <4DA2B3D8.6060707@st.com>
+Message-ID: <20110411085603.GA13041@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 8:47 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sun, Apr 10, 2011 at 05:33:16PM +0200, Domenico Andreoli wrote:
->>
->> ?arch/arm/plat-s3c24xx/gpiolib.c | ? 45 ++++++++++++++++++++++++++++++++++++++++
->> ?1 file changed, 45 insertions(+)
->>
->> Index: b/arch/arm/plat-s3c24xx/gpiolib.c
->> ===================================================================
->> --- a/arch/arm/plat-s3c24xx/gpiolib.c 2011-04-10 16:24:59.000000000 +0200
->> +++ b/arch/arm/plat-s3c24xx/gpiolib.c 2011-04-10 17:12:32.000000000 +0200
->> @@ -19,6 +19,8 @@
->> ?#include <linux/ioport.h>
->> ?#include <linux/io.h>
->> ?#include <linux/gpio.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->>
->> ?#include <plat/gpio-core.h>
->> ?#include <plat/gpio-cfg.h>
->> @@ -97,6 +99,9 @@
->> ? ? ? ? ? ? ? ? ? ? ? .direction_input ? ? ? ?= s3c24xx_gpiolib_banka_input,
->> ? ? ? ? ? ? ? ? ? ? ? .direction_output ? ? ? = s3c24xx_gpiolib_banka_output,
->> ? ? ? ? ? ? ? },
->> +#ifdef CONFIG_OF_GPIO
->> + ? ? ? ? ? ? .dt_compat = "samsung,s3c2410-gpio-a",
->> +#endif
->
-> The '-a' bit I suspect is wrong. ?Aren't all the gpio banks of the same type?
+On Mon, Apr 11, 2011 at 01:25:04PM +0530, viresh kumar wrote:
+> 
+> Hello,
+> 
+> In dw_dmac.c driver, dwc_descriptor_complete() routine, following is
+> mentioned before calling callback:
+> 
+> 	/*
+> 	 * The API requires that no submissions are done from a
+> 	 * callback, so we don't need to drop the lock here
+> 	 */
+> 	if (callback)
+> 		callback(param);
+> 
+> Does this hold true for dmaengine??
 
-no, the first bank is made of output-only gpio.
+Not for slave devices - see Dan's reply:
 
------[ Domenico Andreoli, aka cavok
-?--[ http://www.dandreoli.com/gpgkey.asc
-?? ---[ 3A0F 2F80 F79C 678A 8936? 4FEE 0677 9033 A20E BC50
+http://lists.arm.linux.org.uk/lurker/message/20101223.005313.a38d7bf0.en.html
+
+As the slave API hasn't been well documented, there's a lot of
+inconsistency of behaviour between DMA engine slave implementations.
+I'd suggest at least fixing slave DMA engine drivers to ensure that:
+
+(a) the callback is always called in tasklet context
+(b) the callback can submit new slave transactions (iow, the spinlock
+    which prep_slave_sg takes must not be held during the callback.)
+
+The way that others solve this is to move the completed txd structures
+to a local 'completed' list, and then walk this list after the spinlocks
+have been dropped.
+
+IOW, something like this:
+
+my_tasklet()
+{
+	INIT_LIST_HEAD(completed);
+
+	spin_lock_irqsave(my_chan->lock);
+	for_each_txd(my_txd, my_chan) {
+		if (has_completed(my_txd))
+			list_add_tail(my_txd->node, &completed);
+	}
+	spin_unlock_irqrestore(my_chan->lock);
+
+	list_for_each_entry_safe(my_txd, next, &completed, node) {
+		void *callback_param = my_txd->txd.callback_param;
+		void (*fn)(void *) = my_txd->txd.callback;
+
+		my_txd_free(my_chan, my_txd);
+
+		fn(callback_param);
+	}	
+}
