@@ -1,41 +1,53 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 11 Apr 2011 14:52:16 +0100
-Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
-In-Reply-To: <20110411134320.GJ18601@pengutronix.de>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<20110411134320.GJ18601@pengutronix.de>
-Message-ID: <20110411135215.GD2818@pulham.picochip.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Apr 2011 10:15:09 -0400 (EDT)
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
+	i.MX53
+In-Reply-To: <20110411074041.GF18601@pengutronix.de>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1104110944290.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Mon, 11 Apr 2011, Uwe Kleine-K?nig wrote:
 
-On Mon, Apr 11, 2011 at 03:43:20PM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, Apr 11, 2011 at 12:48:17PM +0100, Jamie Iles wrote:
-> > The basic-mmio-gpio driver has been extended in
-> > <http://marc.info/?l=linux-kernel&m=130252092900804&w=2> to support a
-> > larger wider of controllers and this series converts the ARM platforms
-> > that do not implement I/O muxing in the GPIO driver or use the .to_irq
-> > method of gpio_chip to use the driver.
-> As these patches are necessary to test at least the mxc patch but they
-> are not present in todays next and I don't want to spend the time to
-> find the patches on marc.info (the "next in thread" link is greyed out)
-> and it's non-trivial to get patches from marc into git (
-> wget -O - 'http://marc.info/?l=linux-kernel&m=130252092900807&q=raw' | git am
-> fails with "Patch does not have a valid e-mail address." because the raw
-> view doesn't provide the From: header (Subject: is missing, too)) can
-> you please point out a repository that has all 12 patches?
+> On Sun, Apr 10, 2011 at 10:02:03PM -0400, Nicolas Pitre wrote:
+> > On Sun, 10 Apr 2011, Uwe Kleine-K?nig wrote:
+> > 
+> > > The two SoCs have different PHYS_OFFSETs so it's not (yet) possible to
+> > > compile a single (working) kernel for these.
+> > 
+> > Really?
+> > 
+> > Have a look at CONFIG_ARM_PATCH_PHYS_VIRT.  It's in mainline and fully 
+> > functional.
+> I'm aware of this config item. But still if it's off there must be a
+> distinction that's provided by this patch.
 
-Sure, they're all in:
+Sure.  Instead of a compile time expansion of virt_to_phys() and 
+phys_to_virt(), you get a run time patching of the kernel binary 
+according to the runtime deduced PHYS_OFFSET.  See commit logs for "git 
+log 6fc31d54..b511d75" for the details.
 
-	git://github.com/jamieiles/linux-2.6-ji.git gpio
+> Currently you can build a
+> kernel for i.MX51 + i.MX53 but IIRC it works on no machine.
 
-There's one extra slightly unrelated fix for gemini in there too.
+Maybe it should be fixed?
 
-> Did you (or someone else) measure the performance difference these
-> patches introduce?
+> When considering ARM_PATCH_PHYS_VIRT there are more SoCs that could be
+> built into a single image and so needs a more complicated logic.
 
-No, I haven't done any performance measurement, though from inspection I 
-don't think that I would expect any real measurable difference.
+The ultimate goal is to structure the code so we can build as many SOCs 
+together as possible.
 
-Jamie
+> And I don't want to depend on ARM_PATCH_PHYS_VIRT (yet), e.g. because
+> it's new and still depends on EXPERIMENTAL.
+
+When will it be no experimental anymore if no one starts using it?  RMK 
+talked about making it enabled by default, and that could allow for the 
+removal of a bunch of arch/arm/*/include/mach/memory.h files.
+
+
+Nicolas
