@@ -1,46 +1,93 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Mon, 11 Apr 2011 11:08:22 +0200
-Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <BANLkTikVeXvfSBS-xLDXVdesKJpKdtUVqg@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<BANLkTikZVDejarZ4O5KgNS7S4fxBLSmANA@mail.gmail.com>
-	<BANLkTikVeXvfSBS-xLDXVdesKJpKdtUVqg@mail.gmail.com>
-Message-ID: <BANLkTikaerLi9NC153L=kJM2hAC_VerBKQ@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 11 Apr 2011 11:33:04 +0200
+Subject: [PATCH v3] Add GPIO DT support to s3c24xx
+In-Reply-To: <20110411064719.GD4439@angua.secretlab.ca>
+References: <20110410152735.338798127@gmail.com>
+	<20110410153316.GC27088@dandreoli.com>
+	<20110411064719.GD4439@angua.secretlab.ca>
+Message-ID: <20110411093304.GA21589@dandreoli.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2011 13:55, Jae hoon Chung <jh80.chung@gmail.com> wrote:
-> Hi Per..
->
-> I'm applied your patch..and sent the patch about dw_mmc.c.
-> I think good this approach..
->
-Do you have any test results from the mmc_tests I added?
-I am interested in the results.
+From: Domenico Andreoli <cavokz@gmail.com>
 
-Regards,
-Per
+Assign proper OF node (= with matching physical base address) to each
+s3c24xx GPIO chip.
 
-> Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
->
-> Regards,
-> Jaehoon Chung
->
-> 2011/4/9 Linus Walleij <linus.walleij@linaro.org>:
->> On Wed, Apr 6, 2011 at 9:07 PM, Per Forlin <per.forlin@linaro.org> wrote:
->>
->>> The intention for introducing none blocking mmc requests is to minimize the
->>> time between a mmc request ends and another mmc request starts.
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org> FWIW, I've looked at the
->> patches so many times I'm already blind for any remaining bugs...
->>
->> Yours,
->> Linus Walleij
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->
+Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+
+---
+
+With this new patch there is no need to add the dt_compat field to
+s3c_gpio_chip, such string is now chosen in base of the s3c gpio chip
+base address.
+
+Respect to v2, s3c24xx_attach_of_node() now uses of_address_to_resource()
+instead of of_get_address()+of_translate_address(). I don't see where
+is the gain.
+
+---
+ arch/arm/plat-s3c24xx/gpiolib.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+Index: b/arch/arm/plat-s3c24xx/gpiolib.c
+===================================================================
+--- a/arch/arm/plat-s3c24xx/gpiolib.c	2011-04-10 23:28:31.000000000 +0200
++++ b/arch/arm/plat-s3c24xx/gpiolib.c	2011-04-11 11:23:36.000000000 +0200
+@@ -19,6 +19,8 @@
+ #include <linux/ioport.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ #include <plat/gpio-core.h>
+ #include <plat/gpio-cfg.h>
+@@ -210,6 +212,39 @@
+ 	},
+ };
+ 
++#ifdef CONFIG_OF_GPIO
++
++static void s3c24xx_attach_of_node(struct s3c_gpio_chip *chip)
++{
++	struct device_node *dn;
++	struct resource res;
++	const char *dt_compat;
++
++	if (chip->base == S3C2410_GPACON)
++		dt_compat = "samsung,s3c2410-gpio-a";
++	else
++		dt_compat = "samsung,s3c2410-gpio";
++
++	for_each_compatible_node(dn, NULL, dt_compat) {
++		if (of_address_to_resource(dn, 0, &res) < 0) {
++			printk(KERN_ERR "%s: unable to translate DT address\n", dn->full_name);
++			continue;
++		}
++
++		if (chip->base == (res.start - S3C24XX_PA_GPIO + S3C24XX_VA_GPIO)) {
++			chip->chip.of_node = dn;
++			break;
++		}
++	}
++}
++
++#else
++
++static void s3c24xx_attach_of_node(struct s3c_gpio_chip *chip)
++{
++}
++
++#endif
+ 
+ static __init int s3c24xx_gpiolib_init(void)
+ {
+@@ -220,6 +255,7 @@
+ 		if (!chip->config)
+ 			chip->config = &s3c24xx_gpiocfg_default;
+ 
++		s3c24xx_attach_of_node(chip);
+ 		s3c_gpiolib_add(chip);
+ 	}
+ 
