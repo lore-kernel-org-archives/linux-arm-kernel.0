@@ -1,83 +1,93 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 11 Apr 2011 16:50:48 -0500
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
-	i.MX53
-In-Reply-To: <alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
-	<20110411074041.GF18601@pengutronix.de>
-	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-Message-ID: <BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 11 Apr 2011 14:56:19 -0700
+Subject: [RFC][PATCH V3] axi: add AXI bus driver
+In-Reply-To: <BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
+References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
+	<20110411210631.GA28559@kroah.com>
+	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
+	<20110411212513.GA17809@kroah.com>
+	<BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
+Message-ID: <20110411215619.GA27943@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, whoever's responsibility it is to fix this, whereever it needs
-to be fixed, it needs to be fixed, as it is absolutely nuts that you
-cannot run an MX51 and MX53 board off the same kernel.
+On Mon, Apr 11, 2011 at 11:36:39PM +0200, Rafa? Mi?ecki wrote:
+> 2011/4/11 Greg KH <greg@kroah.com>:
+> > On Mon, Apr 11, 2011 at 11:19:13PM +0200, Rafa? Mi?ecki wrote:
+> >> 2011/4/11 Greg KH <greg@kroah.com>:
+> >> > On Mon, Apr 11, 2011 at 11:25:14PM +0200, Rafa? Mi?ecki wrote:
+> >> >> +static void axi_release_core_dev(struct device *dev)
+> >> >> +{
+> >> >> + ? ? /* Silent lack-of-release warning */
+> >> >> +}
+> >> >
+> >> > Ok, WTF!!!!
+> >>
+> >> Thank you for your kindly words. It's much more enjoyable to work on
+> >> kernel that way. I definitely made that on purpose.
+> >
+> > I can't tell if you are kidding or not.
+> 
+> That was 100% irony. I swear I don't enjoy publishing bad code and
+> getting such a comment.
 
-If nobody knows or agrees, can anyone can identify exactly what needs
-to be fixed and where, and how much work this would actually be, so
-they or someone else can actually go do it, instead of us just
-debating about how experimental it might be?
+Ok, you forgot the ':)' then...
 
-As far as I see it the only reason it depends on EXPERIMENTAL is
-because it breaks at least one subarch, it breaks XIP kernels and it
-breaks Thumb2 kernels (this last one is not so much a showstopper for
-enabling it by default, unless I am mistaken in my assumption that
-Thumb2 kernels still don't work reliably right now anyway?)
+> > Please read the documentation for how to do this properly. ?I find it
+> > really hard to believe that you wrote that comment instead of putting in
+> > the 2 lines of code required for this function.
+> >
+> > Especially as-it-is, your code does not work properly and leaks memory
+> > badly. ?Why would you do that on purpose?
+> 
+> I tried to read some documentation about this.
+> 
+> 1) driver-mode/device.txt says only that:
+> > Callback to free the device after all references have
+> > gone away. This should be set by the allocator of the
+> > device (i.e. the bus driver that discovered the device).
+> I *really* do not know how my driver should "free" core on AXI bus.
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+The structure that you have created, added to the bus, is now ready to
+have its memory freed.  So free it.
 
+This usually means something like:
+	struct my_obj = to_my_obj(dev);
+	kfree(my_obj);
+in the release function.
 
+> 2) LDD3 says:
+> > The method is called when the last reference to the device is removed; it is called
+> > from the embedded kobject?s release method. All device structures registered with
+> > the core must have a release method, or the kernel prints out scary complaints.
+> Well, I do not register any structs for AXI core.
 
-2011/4/11 Nicolas Pitre <nico@fluxnic.net>:
-> On Mon, 11 Apr 2011, Uwe Kleine-K?nig wrote:
->
->> On Sun, Apr 10, 2011 at 10:02:03PM -0400, Nicolas Pitre wrote:
->> > On Sun, 10 Apr 2011, Uwe Kleine-K?nig wrote:
->> >
->> > > The two SoCs have different PHYS_OFFSETs so it's not (yet) possible to
->> > > compile a single (working) kernel for these.
->> >
->> > Really?
->> >
->> > Have a look at CONFIG_ARM_PATCH_PHYS_VIRT. ?It's in mainline and fully
->> > functional.
->> I'm aware of this config item. But still if it's off there must be a
->> distinction that's provided by this patch.
->
-> Sure. ?Instead of a compile time expansion of virt_to_phys() and
-> phys_to_virt(), you get a run time patching of the kernel binary
-> according to the runtime deduced PHYS_OFFSET. ?See commit logs for "git
-> log 6fc31d54..b511d75" for the details.
->
->> Currently you can build a
->> kernel for i.MX51 + i.MX53 but IIRC it works on no machine.
->
-> Maybe it should be fixed?
->
->> When considering ARM_PATCH_PHYS_VIRT there are more SoCs that could be
->> built into a single image and so needs a more complicated logic.
->
-> The ultimate goal is to structure the code so we can build as many SOCs
-> together as possible.
->
->> And I don't want to depend on ARM_PATCH_PHYS_VIRT (yet), e.g. because
->> it's new and still depends on EXPERIMENTAL.
->
-> When will it be no experimental anymore if no one starts using it? ?RMK
-> talked about making it enabled by default, and that could allow for the
-> removal of a bunch of arch/arm/*/include/mach/memory.h files.
->
->
-> Nicolas
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Yes you did, otherwise you would have never seen that callback warning
+you that you needed a release function.
+
+> 3) Example code from LDD3:
+> static void ldd_bus_release(struct device *dev)
+> {
+> printk(KERN_DEBUG "lddbus release\n");
+> }
+> Yeah, that's what I did...
+
+Wow that's old, sorry.  See the kobject documentation for much more
+detail about what you need here.
+
+> 4) SSB in it's ssb_release_dev just calls kfree on struct that was
+> allocated when registering drivers. *I do not* allocate such a struct,
+> so I believe I do exactly the same memory leak as SSB does.
+
+Well someone allocated it, right?  Who did it?  If it wasn't you, where
+did that structure come from and why are you registering it on your bus?
+
+> Can you spend 2 more minues in addition to commenting my ideas and
+> help me with writing that 2 lines I missed? Where do I leak memory in
+> my driver? Which struct should I kfree?
+
+The structure that you wrap around 'struct device' for your bus.
+
+hope this helps,
+
+greg k-h
