@@ -1,26 +1,23 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 11 Apr 2011 22:02:41 +0300
-Subject: i.MX31 Early Kernel Messages
-In-Reply-To: <352399F8DB39E14FBB4B648897CA32E60825A82A@DE08EV802.global.ds.honeywell.com>
-References: <352399F8DB39E14FBB4B648897CA32E60825A82A@DE08EV802.global.ds.honeywell.com>
-Message-ID: <20110411190241.GB18740@tarshish>
+From: gregkh@suse.de (Greg KH)
+Date: Mon, 11 Apr 2011 12:07:53 -0700
+Subject: [PATCH 1/5] driver core/platform_device_add_data: set
+	platform_data to NULL if !data
+In-Reply-To: <20110411185035.GA7771@pengutronix.de>
+References: <20110301153438.GB15633@suse.de>
+	<1302081865-2962-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110411185035.GA7771@pengutronix.de>
+Message-ID: <20110411190753.GB21355@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Mon, Apr 11, 2011 at 08:50:35PM +0200, Uwe Kleine-K?nig wrote:
+> Hi Greg,
+> 
+> do you care for the Reviewed-by: tag from Viresh or should I resend?
 
-On Mon, Apr 11, 2011 at 02:48:36PM -0400, Russell, Richard S (G&N CoE) wrote:
-> As best I can tell, the TimeSys kernel sets up an early console to
-> display the early kernel messages. Is there an equivalent feature in the
-> latest kernel?  If so, how does one enable it?
+Feel free to resend, I'm still working through my patch backlog for
+being away for a few weeks...
 
-Enable the early printk option in you kernel configuration (Kernel hacking -> 
-Kernel low-level debugging functions -> Early printk), and add 'earlyprintk' 
-to your kernel command line parameters.
+thanks,
 
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+greg k-h
