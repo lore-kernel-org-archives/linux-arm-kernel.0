@@ -1,58 +1,45 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Apr 2011 09:31:12 +0100
-Subject: [RFC PATCHv2 09/20] ARM: architected timers: add A15
-	architected timers
-In-Reply-To: <4D9FC8DE.3090701@codeaurora.org>
-References: <1300201983-26124-1-git-send-email-marc.zyngier@arm.com>
-	<1300201983-26124-10-git-send-email-marc.zyngier@arm.com>
-	<4D9FC8DE.3090701@codeaurora.org>
-Message-ID: <1302510672.14918.68.camel@e102391-lin.cambridge.arm.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 11 Apr 2011 10:53:24 +0200
+Subject: [patch 2/2] Add GPIO DT support to s3c24xx
+In-Reply-To: <20110411064719.GD4439@angua.secretlab.ca>
+References: <20110410152735.338798127@gmail.com>
+	<20110410153316.GC27088@dandreoli.com>
+	<20110411064719.GD4439@angua.secretlab.ca>
+Message-ID: <BANLkTim+CuRa=zFDFS3Qgwov4TW4NDK-Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-08 at 19:47 -0700, Stephen Boyd wrote:
+On Mon, Apr 11, 2011 at 8:47 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sun, Apr 10, 2011 at 05:33:16PM +0200, Domenico Andreoli wrote:
+>>
+>> ?arch/arm/plat-s3c24xx/gpiolib.c | ? 45 ++++++++++++++++++++++++++++++++++++++++
+>> ?1 file changed, 45 insertions(+)
+>>
+>> Index: b/arch/arm/plat-s3c24xx/gpiolib.c
+>> ===================================================================
+>> --- a/arch/arm/plat-s3c24xx/gpiolib.c 2011-04-10 16:24:59.000000000 +0200
+>> +++ b/arch/arm/plat-s3c24xx/gpiolib.c 2011-04-10 17:12:32.000000000 +0200
+>> @@ -19,6 +19,8 @@
+>> ?#include <linux/ioport.h>
+>> ?#include <linux/io.h>
+>> ?#include <linux/gpio.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>>
+>> ?#include <plat/gpio-core.h>
+>> ?#include <plat/gpio-cfg.h>
+>> @@ -97,6 +99,9 @@
+>> ? ? ? ? ? ? ? ? ? ? ? .direction_input ? ? ? ?= s3c24xx_gpiolib_banka_input,
+>> ? ? ? ? ? ? ? ? ? ? ? .direction_output ? ? ? = s3c24xx_gpiolib_banka_output,
+>> ? ? ? ? ? ? ? },
+>> +#ifdef CONFIG_OF_GPIO
+>> + ? ? ? ? ? ? .dt_compat = "samsung,s3c2410-gpio-a",
+>> +#endif
+>
+> The '-a' bit I suspect is wrong. ?Aren't all the gpio banks of the same type?
 
-Hi Stephen,
+no, the first bank is made of output-only gpio.
 
-> On 3/15/2011 8:12 AM, Marc Zyngier wrote:
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index b7e504b..38ee56e 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1407,9 +1407,14 @@ config HOTPLUG_CPU
-> >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
-> >  	  can be controlled through /sys/devices/system/cpu.
-> >  
-> > +config HAVE_ARCH_TIMERS
-> > +	bool
-> > +	depends on CPU_V7
-> > +	select TICK_ONESHOT
-> 
-> I don't think you need to select TICK_ONESHOT. The user should be
-> selecting NO_HZ or HIGH_RES_TIMERS instead, right?
-
-The A15 timer only has the one-shot feature (ie no auto-relead). Not
-having TICK_ONESHOT would render the timer completely unusable if
-neither NO_HZ nor HIGH_RES_TIMERS are selected. For that reason, I
-believe selecting TICK_ONESHOT is necessary.
-
-> > +
-> > +static struct clocksource clocksource_counter = {
-> > +	.name	= "arch_sys_counter",
-> > +	.rating	= 400,
-> > +	.read	= arch_counter_read,
-> > +	.mask	= CLOCKSOURCE_MASK(56),
-> > +	.flags	= (CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_VALID_FOR_HRES),
-> 
-> I'm fairly certain that CLOCK_SOURCE_VALID_FOR_HRES is a private flag
-> not to be used by clocksource drivers. At least grepping the kernel for
-> it shows no results outside of kernel/time/
-
-You're probably right here. Will fix.
-
-Thanks for reviewing.
-
-	M.
--- 
-Reality is an implementation detail.
+-----[ Domenico Andreoli, aka cavok
+?--[ http://www.dandreoli.com/gpgkey.asc
+?? ---[ 3A0F 2F80 F79C 678A 8936? 4FEE 0677 9033 A20E BC50
