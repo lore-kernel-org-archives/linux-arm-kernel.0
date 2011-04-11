@@ -1,73 +1,92 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 11 Apr 2011 01:40:13 +0200
-Subject: [PATCH] PXA: Use dev_pm_ops in z2_battery
-Message-ID: <1302478813-17945-1-git-send-email-marek.vasut@gmail.com>
+From: mchehab@infradead.org (Mauro Carvalho Chehab)
+Date: Sun, 10 Apr 2011 21:42:13 -0300
+Subject: [PATCH 2.6.39] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <201104110048.08764.jkrzyszt@tis.icnet.pl>
+References: <201104110048.08764.jkrzyszt@tis.icnet.pl>
+Message-ID: <4DA24E65.4060505@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
-btw. Anton, do you want to apply it or shall pxa tree pick this up?
+Em 10-04-2011 19:47, Janusz Krzysztofik escreveu:
+> After switching from mem->dma_handle to virt_to_phys(mem->vaddr) used 
+> for obtaining page frame number passed to remap_pfn_range()
+> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b), videobuf-dma-contig 
+> stopped working on my ARM based board. The ARM architecture maintainer, 
+> Russell King, confirmed that using something like 
+> virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can be 
+> broken on other architectures as well. The author of the change, Jiri 
+> Slaby, also confirmed that his code may not work on all architectures.
+> 
+> The patch takes two different countermeasures against this regression:
+> 
+> 1. On architectures which provide dma_mmap_coherent() function (ARM for 
+>    now), use it instead of just remap_pfn_range(). The code is stollen 
+>    from sound/core/pcm_native.c:snd_pcm_default_mmap().
+>    Set vma->vm_pgoff to 0 before calling dma_mmap_coherent(), or it 
+>    fails.
+> 
+> 2. On other architectures, use virt_to_phys(bus_to_virt(mem->dma_handle)) 
+>    instead of problematic virt_to_phys(mem->vaddr). This should work 
+>    even if those translations would occure inaccurate for DMA addresses, 
+>    since possible errors introduced by both calculations, performed in 
+>    opposite directions, should compensate.
+> 
+> Both solutions tested on ARM OMAP1 based Amstrad Delta board.
+> 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> ---
+>  drivers/media/video/videobuf-dma-contig.c |   17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> --- linux-2.6.39-rc2/drivers/media/video/videobuf-dma-contig.c.orig	2011-04-09 00:38:45.000000000 +0200
+> +++ linux-2.6.39-rc2/drivers/media/video/videobuf-dma-contig.c	2011-04-10 15:00:23.000000000 +0200
+> @@ -295,13 +295,26 @@ static int __videobuf_mmap_mapper(struct
+>  
+>  	/* Try to remap memory */
+>  
+> +#ifndef ARCH_HAS_DMA_MMAP_COHERENT
+> +/* This should be defined / handled globally! */
+> +#ifdef CONFIG_ARM
+> +#define ARCH_HAS_DMA_MMAP_COHERENT
+> +#endif
+> +#endif
+> +
+> +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
 
-Cheers :)
+Hmm... IMHO, this seems too confusing. Why not use just something like:
 
- drivers/power/z2_battery.c |   20 ++++++++++++++------
- 1 files changed, 14 insertions(+), 6 deletions(-)
+#if defined(CONFIG_ARM) || defined(ARCH_HAS_DMA_MMAP_COHERENT)
 
-diff --git a/drivers/power/z2_battery.c b/drivers/power/z2_battery.c
-index e5ed52d..82dae53 100644
---- a/drivers/power/z2_battery.c
-+++ b/drivers/power/z2_battery.c
-@@ -269,24 +269,33 @@ static int __devexit z2_batt_remove(struct i2c_client *client)
- }
- 
- #ifdef CONFIG_PM
--static int z2_batt_suspend(struct i2c_client *client, pm_message_t state)
-+static int z2_batt_suspend(struct device *dev)
- {
-+	struct i2c_client *client = to_i2c_client(dev);
- 	struct z2_charger *charger = i2c_get_clientdata(client);
- 
- 	flush_work_sync(&charger->bat_work);
- 	return 0;
- }
- 
--static int z2_batt_resume(struct i2c_client *client)
-+static int z2_batt_resume(struct device *dev)
- {
-+	struct i2c_client *client = to_i2c_client(dev);
- 	struct z2_charger *charger = i2c_get_clientdata(client);
- 
- 	schedule_work(&charger->bat_work);
- 	return 0;
- }
-+
-+static const struct dev_pm_ops z2_battery_pm_ops = {
-+	.suspend	= z2_batt_suspend,
-+	.resume		= z2_batt_resume,
-+};
-+
-+#define	Z2_BATTERY_PM_OPS	(&z2_battery_pm_ops)
-+
- #else
--#define z2_batt_suspend NULL
--#define z2_batt_resume NULL
-+#define	Z2_BATTERY_PM_OPS	(NULL)
- #endif
- 
- static const struct i2c_device_id z2_batt_id[] = {
-@@ -298,11 +307,10 @@ static struct i2c_driver z2_batt_driver = {
- 	.driver	= {
- 		.name	= "z2-battery",
- 		.owner	= THIS_MODULE,
-+		.pm	= Z2_BATTERY_PM_OPS
- 	},
- 	.probe		= z2_batt_probe,
- 	.remove		= z2_batt_remove,
--	.suspend	= z2_batt_suspend,
--	.resume		= z2_batt_resume,
- 	.id_table	= z2_batt_id,
- };
- 
--- 
-1.7.4.1
+Better yet: why should CONFIG_ARM should explicitly be checked here? Is it the
+only architecture where this would fail?dma_mmap_coherent
+
+Hmm...
+
+$ git grep ARCH_HAS_DMA_MMAP_COHERENT arch
+arch/powerpc/include/asm/dma-mapping.h:#define ARCH_HAS_DMA_MMAP_COHERENT
+
+The code is saying that dma_mmap_coherent should be used only on ARM and PPC architectures,
+and remap_pfn_range should be used otherwise. Are you sure that this will work on the
+other architectures? I really prefer to have one standard way for doing it, that
+would be architecture-independent. Media drivers or core should not have arch-dependent
+code inside.
+
+
+> +	vma->vm_pgoff = 0;
+> +	retval = dma_mmap_coherent(q->dev, vma, mem->vaddr, mem->dma_handle,
+> +			mem->size);
+> +#else
+>  	size = vma->vm_end - vma->vm_start;
+>  	size = (size < mem->size) ? size : mem->size;
+>  
+>  	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+>  	retval = remap_pfn_range(vma, vma->vm_start,
+> -				 PFN_DOWN(virt_to_phys(mem->vaddr)),
+> -				 size, vma->vm_page_prot);
+> +			PFN_DOWN(virt_to_phys(bus_to_virt(mem->dma_handle))),
+> +			size, vma->vm_page_prot);
+> +#endif
+>  	if (retval) {
+>  		dev_err(q->dev, "mmap: remap failed with error %d. ", retval);
+>  		dma_free_coherent(q->dev, mem->size,
