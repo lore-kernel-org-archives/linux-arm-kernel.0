@@ -1,29 +1,45 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 11 Apr 2011 14:47:55 +0200
-Subject: [RFC] Extending ARM perf-events for multiple PMUs
-In-Reply-To: <1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
-References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
-	<1302349235.9086.1270.camel@twins>
-	<1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <1302526075.2388.97.camel@twins>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Mon, 11 Apr 2011 18:41:54 +0530
+Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout
+	during bootup
+In-Reply-To: <20110407070310.GA21701@avinash-laptop>
+References: <20110407070310.GA21701@avinash-laptop>
+Message-ID: <20110411131154.GA4498@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-11 at 12:29 +0100, Will Deacon wrote:
-> > If you've got system wide things like GPUs, where every cpu maps to the
-> > same device, simply use the first online cpu and create a pmu instance
-> > per device.
-> 
-> Would this result in userspace attributing all of the data to a
-> particular CPU? We could consider allowing events where the cpu is -1
-> and the task pid is -1 as well. Non system-wide PMUs could reject these
-> and demand multiple events instead. 
+> > > +     oh->_sysc_cache = v;
+> > > +     omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
+> >
+> > Direct SYSCONFIG access isn't right here.   This should go through
+> > omap_hwmod.
+> >
+> > What is probably needed is exposing _ocp_softreset to device code
+> > via something like omap_hwmod_ocp_softreset() and calling that here.
+> >
 
-Not at such, but you need a cpu to receive interrupts on and program the
-hardware from etc. Currently most core code assumes things are either
-restrained to a single cpu or serialized by virtue of a task never
-running on more than 1 cpu at a time.
+Hi Kevin , 
 
-I'm not quite sure how hard these assumptions are, and we might be able
-to get away with making it a little less strict, but that's something
-you'd have to play with.
+Looking more closely, i realised that, the sequence of _ocp_softreset
+doesn't work for I2C. It has a special programming sequence which needs
+to be followed to reset the IP. That was the reason, we created
+omap_i2c_reset.  So i feel we need not expose _ocp_softreset.
+
+Since, the problem here is accessing the SYSCONFIG here, instead, what i
+can do is, something like below.
+
+	omap_hwmod_softreset(struct omap_hwmod *oh)
+	{
+
+		v = oh->_sysc_cache;
+		v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
+
+		oh->_sysc_cache = v;
+		omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
+
+	}
+
+And then call this in omap_i2c_reset. Is this OK ?
+
+
+- Avinash
