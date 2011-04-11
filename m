@@ -1,92 +1,42 @@
 From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Mon, 11 Apr 2011 13:29:21 -0400
+Date: Mon, 11 Apr 2011 13:44:14 -0400
 Subject: [RFC] Extending ARM perf-events for multiple PMUs
-In-Reply-To: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
-References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <4DA33A71.6010804@codeaurora.org>
+In-Reply-To: <1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>	
+	<1302349235.9086.1270.camel@twins>
+	<1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4DA33DEE.9080709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Will,
-Thanks for the starting the discussion here.
 
-On 4/8/2011 1:15 PM, Will Deacon wrote:
+On 4/11/2011 7:29 AM, Will Deacon wrote:
+>> I don't see this distinction, both will have to count, and telling it
+>> what to count is a function of perf_event_attr::config* and how the
+>> hardware implements that is of no interest.
 > 
->   (1) CPU-aware PMUs
+> Sure, fundamentally we're just writing bits rather than interpreting
+> them. The reason I mention the difference is that filtering PMUs will
+> always need their own struct pmu because of the lack of an event
+> namespace. The other problem is only an issue for some userspace tools
+> (like Oprofile) which require lists of events and their hex codes.
 > 
->       This type of PMU is typically per-CPU and accessed via co-processor
->       instructions. Actions may be delivered as PPIs. Events scheduled onto
->       a CPU-aware PMU can be grouped, possibly with events scheduled for other
->       per-CPU PMUs on the same CPU. An action delivered by one of these PMUs
->       can *always* be attributed to a specific CPU but not necessarily a
->       specific task. Accessing a CPU-aware PMU is a synchronous operation.
->
 
-I didn't understand when would an action not be attributed to a task in
-this category ? If we know which CPU "enabled" the event, this should be
-possible ?
+If you mean namespace = perf_event_attr::config, its 64 bits + another 64
+bits of config_base + event_base on ARM ? Not too sure, but it would seem
+like that should be enough to setup such event chaining.
 
 
->   (2) System PMUs
 > 
->       System PMUs are typically outside of the CPU domain. Bus monitors, GPU
->       counters and external L2 cache controller monitors are all system PMUs.
->       Actions delivered by these PMUs cannot be attributed to a particular CPU
->       and certainly cannot be associated with a particular piece of code. They
->       are memory-mapped and cannot be grouped with other PMUs of any type.
->       Accesses to a system PMU may be asynchronous.
-> 
->       System PMUs can be further split up into `counting' and `filtering'
->       PMUs:
-> 
->       (i) Counting PMUs
-> 
->           Counting PMUs increment a counter whenever a particular event occurs
-> 	  and can deliver an action periodically (for example, on overflow or
-> 	  after a certain amount of time has passed). The event types are
-> 	  hardwired as particular, discrete events such as `cycles' or
-> 	  `misses'.
-> 
->       (ii) Filtering PMUs
-> 
->           Filtering PMUs respond to a query. For example, `generate an action
-> 	  whenever you see a bus access which fits the following criteria'. The
-> 	  action may simply be to increment a counter, in which case this PMU
-> 	  can act as a highly configurable counting PMU, where the event types
-> 	  are dynamic.
-> 
-> Now, we currently support the core CPU PMU, which is obviously a CPU-aware PMU
-> that generates interrupts as actions. Another example of a CPU-aware PMU is
-> the VFP PMU in Qualcomm's Scorpion. The next step (moving outwards from the
-> core) is to add support for L2 cache controllers. I expect most of these to be
-> Counting System PMUs, although I can envisage them being CPU-aware if built
-> into the core with enough extra hardware.
+> Would this result in userspace attributing all of the data to a
+> particular CPU? We could consider allowing events where the cpu is -1
+> and the task pid is -1 as well. Non system-wide PMUs could reject these
+> and demand multiple events instead.
 
-For the Qcom L2CC, the PMU can be configured to filter events based on
-specific masters. This fact would make it a CPU-aware PMU, although its
-NOT per-core and triggers SPI's.
+Agreed. perf stat -a on PMU's that are not CPU-aware, would report
+incorrect output. Task counting on such PMU's would be pointless.
 
-In such a case, I found it to be quite ugly trying to reuse the per-cpu
-data structures esp in the interrupt handler, since the interrupt can
-trigger on a CPU where the event wasn't enabled. A cleaner approach was to
-use a separate struct pmu. However, I agree that this approach would lead
-to several pmu's popping up in arch/arm.
-
-So, I think we could add another category for such highly configurable
-PMUs, which are not per-core, but have enough extra h/w to make them
-cpu-aware. These need to be treated differently by arm perf, because they
-can't really use the per-cpu data structures of the cpu-aware pmu's and as
-such can't easily re-use of many of the functions.
-
-In fact, most of Qcomm PMU's (bus, fabric etc.) will fall under this new
-category. At first glance, these would appear to fall under the System PMU
-(counting) category, but they don't because of the extra h/w logic that
-allows origin filtering of events.
-
-Also, having all this origin filtering logic helps us track per-process
-events on these PMU's, for which we need extra functions to decide how to
-allocate and configure counters based on which context (task, cpu) the
-event is enabled in.
 
 Cheers,
 Ashwin
