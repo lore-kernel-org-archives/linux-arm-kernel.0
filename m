@@ -1,56 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 11 Apr 2011 15:39:32 -0400 (EDT)
-Subject: [PATCH] increase the use of CONFIG_VECTORS_BASE
-In-Reply-To: <20110411170047.GA12509@dandreoli.com>
-References: <20110411170047.GA12509@dandreoli.com>
-Message-ID: <alpine.LFD.2.00.1104111509590.28032@xanadu.home>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 11 Apr 2011 15:46:43 +0200
+Subject: [PATCH RFC] ARM: PXA27x: CPUFREQ: Don't use fastbus mode
+In-Reply-To: <4D8EFEC1.7010803@compulab.co.il>
+References: <1301169103-23968-1-git-send-email-anarsoul@gmail.com>
+	<201103270152.45581.marek.vasut@gmail.com>
+	<201103271028.56672.anarsoul@gmail.com>
+	<4D8EFEC1.7010803@compulab.co.il>
+Message-ID: <20110411134642.GA1519@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Apr 2011, Domenico Andreoli wrote:
+Hi!
 
-> From: Domenico Andreoli <cavokz@gmail.com>
+> >>> PXA27x does not like fastbus for some reason, it can hang in
+> >>> random places when it's enabled. So don't use it to make cpufreq
+> >>> stable.
+> >> This is B/S, you're loosing performance!
+> > I'm losing nothing, without this patch cpufreq does not work stable at all on 
+> > Zipit Z2.
 > 
-> If CONFIG_VECTORS_BASE is meant to make vectors base address
-> configurable, it is not consistently used. At least in arch/arm/mm/mmu.c
-> the explicit value 0xffff0000 is still widely used.
-> 
-> This is an attempt to improve the situation.
-> 
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+> Possibly, but Z2 is not the only one using PXA27x.
+> And of course you lose performance, unless you don't care,
+> because if it does not work at all, you don't care about performance,
+> but again it is wrong to force all PXA27x based boards to this.
 
-NAK.
+Well, some other pxa27x machcines  (spitz) are crashing randomly for
+_years_ now... so maybe the problem is more widespread?
 
-Some explanation is in order.
+How easy is to trigger the problem? Do you have script?
 
-On CPU cores with a MMU, there are only two possibilities for the 
-location of the vector page: either address 0, or address 0xffff0000.  
-Some CPUs only supports the low vectors i.e. at 0.  Most others allow 
-for a selection between either of those addresses using the V bit in the 
-control register (see the vectors_high() macro for example).  In those 
-cases replacing 0xffff0000 with CONFIG_VECTORS_BASE is the wrong thing 
-to do.
+Is it possible that this bug triggers with governor==performance.
 
-Now, because the vector table and associated stubs are quite small, we 
-also use the same memory page for other things such as read-only code 
-segments made available to user space.  So to simplify things, the 
-vector page is _always_ mapped at 0xffff0000, regardless if the CPU 
-supports high vectors or not (if it doesn't then another mapping for the 
-same page is installed at 0).  So also in this case it is wrong to 
-substitute 0xffff0000 with CONFIG_VECTORS_BASE.
-
-Finally, on non-MMU processors, the actual vector table is often in ROM 
-and no RAM page can be mapped to the vector address because of course 
-there is no MMU.  In this case, all vectors (except for the reset one) 
-are usually branching to some arbitrary location in RAM to allow the 
-installed software to redirect them.  This is where CONFIG_VECTORS_BASE 
-really makes sense as it should be set to the address of the memory area 
-that the OS can modify to hook its exception handlers.
-
-So using CONFIG_VECTORS_BASE really depends on the context.  For shared 
-code between the MMU and non-MMU cases with access to the vector page, 
-then it makes sense to use CONFIG_VECTORS_BASE, and in the MMU case it 
-shouldn't be set to anything other than 0xffff0000.
-
-
-Nicolas
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
