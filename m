@@ -1,156 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 11 Apr 2011 22:35:57 +0200
-Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <1302097097.22904.41.camel@rex>
-References: <1302097097.22904.41.camel@rex>
-Message-ID: <1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: ashwinc@codeaurora.org (Ashwin Chaugule)
+Date: Mon, 11 Apr 2011 16:46:27 -0400
+Subject: [RFC] Extending ARM perf-events for multiple PMUs
+In-Reply-To: <1302544807.24286.83.camel@e102144-lin.cambridge.arm.com>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>	
+	<4DA33A71.6010804@codeaurora.org>
+	<1302544807.24286.83.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4DA368A3.5080602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function makes a deep copy of the platform data to allow it to live
-in init memory.
-The definition cannot go into leds-gpio.c because it needs to be builtin
-to be usable by platforms.
+Hi Will,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-changes since v2:
- - define gpio_led_register_device in a new file (led-register.c)
- - new parameter id for gpio_led_register_device
- - change drivers/Makefile to unconditionally include
-   drivers/leds/Makefile
-
-On Wed, Apr 06, 2011 at 06:38:17AM -0700, Richard Purdie wrote:
-> It should only be built-in on platforms that both use leds-gpio and want
-> to use this function at boot time. This is not the description of
-> leds-core.c.
+On 4/11/2011 2:00 PM, Will Deacon wrote:
 > 
-> I understand the issue and the desire to move it into common code, I
-> think that is good but I don't think you've found the most appropriate
-> place yet.
+> I don't think that's enough from a profiling perspective because the
+> state of the device will be altered by other tasks. For example, the
+> number of misses in the L2 cache for a given task is going to be
+> affected by the other tasks running in the system, even if we only
+> profile during the period in which the task is running.
+
+I'm probably missing something. If another task affects the cache
+contents, this will manifest as an increase in cache misses/hits for the
+task that is being profiled during this interval. This will also happen
+when interrupts trigger and wipe out cache lines anyway. IOW, a counter
+thats counting events from CPU0, will not increment, if the event it is
+counting gets affected by CPU1.
+
+
+>>
+>> For the Qcom L2CC, the PMU can be configured to filter events based on
+>> specific masters. This fact would make it a CPU-aware PMU, although its
+>> NOT per-core and triggers SPI's.
 > 
-> I'm tempted to suggest making the function a static inline in leds.h (or
-> create an leds-gpio.h and move the struct definition there too).
-I don't like your static inline suggestion but prefer a "select
-SOMETHING" to make the function available. So what about this patch?
+> I have a similar issue with this; filtering based on the master *isn't*
+> the same as having per-master samples, simply because the combined
+> effect of the masters will influence all of the results. That doesn't
+> mean that the filtering feature isn't useful, just that it should be
+> described in the event encoding rather than by pretending to support
+> per-CPU events.
 
-I choosed a generic name led-register.c, maybe in the future some more
-leds want a similar function.
+I'll talk with the h/w guys who designed this, but from the spec it seems
+like each event either has an Origin ID, or is Origin independent. If the
+event has an OID, then the counter should *not* be counting the effect of
+the other masters.
 
-Best regards
-Uwe
+> I expect to see new struct pmus, I'd just like to try and identify
+> common patterns before the code mounts up. I imagine that we'll have a
+> struct pmu for L2 cache controllers, for example, from which people can
+> hang their own specific accessors. Whether or not we can hang other
+> system PMUs off such an implementation is unclear to me at the moment.
 
- drivers/Makefile            |    2 +-
- drivers/leds/Kconfig        |    5 +++++
- drivers/leds/Makefile       |    1 +
- drivers/leds/led-register.c |   33 +++++++++++++++++++++++++++++++++
- include/linux/leds.h        |   12 ++++++++++++
- 5 files changed, 52 insertions(+), 1 deletions(-)
- create mode 100644 drivers/leds/led-register.c
+Agreed. Thanks for initiating the discussion on LKAML.
 
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 3f135b6..4a4f425 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -95,7 +95,7 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle/
- obj-$(CONFIG_DMA_ENGINE)	+= dma/
- obj-$(CONFIG_MMC)		+= mmc/
- obj-$(CONFIG_MEMSTICK)		+= memstick/
--obj-$(CONFIG_NEW_LEDS)		+= leds/
-+obj-y				+= leds/
- obj-$(CONFIG_INFINIBAND)	+= infiniband/
- obj-$(CONFIG_SGI_SN)		+= sn/
- obj-y				+= firmware/
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 9bec869..e8e101e 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -14,6 +14,11 @@ config LEDS_CLASS
- 	  This option enables the led sysfs class in /sys/class/leds.  You'll
- 	  need this to do anything useful with LEDs.  If unsure, say N.
- 
-+config LED_REGISTER_GPIO
-+	bool
-+	help
-+	  This option provides the function gpio_led_register_device.
-+
- if NEW_LEDS
- 
- comment "LED drivers"
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index 39c80fc..ca428bd 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -3,6 +3,7 @@
- obj-$(CONFIG_NEW_LEDS)			+= led-core.o
- obj-$(CONFIG_LEDS_CLASS)		+= led-class.o
- obj-$(CONFIG_LEDS_TRIGGERS)		+= led-triggers.o
-+obj-y					+= led-register.o
- 
- # LED Platform Drivers
- obj-$(CONFIG_LEDS_88PM860X)		+= leds-88pm860x.o
-diff --git a/drivers/leds/led-register.c b/drivers/leds/led-register.c
-new file mode 100644
-index 0000000..d3731ea
---- /dev/null
-+++ b/drivers/leds/led-register.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 2011 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/leds.h>
-+
-+#if defined(CONFIG_LED_REGISTER_GPIO)
-+struct platform_device *__init gpio_led_register_device(
-+		int id, const struct gpio_led_platform_data *pdata)
-+{
-+	struct platform_device *ret;
-+	struct gpio_led_platform_data _pdata = *pdata;
-+
-+	_pdata.leds = kmemdup(pdata->leds,
-+			pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
-+	if (!_pdata.leds)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ret = platform_device_register_resndata(NULL, "leds-gpio", id,
-+			NULL, 0, &_pdata, sizeof(_pdata));
-+	if (IS_ERR(ret))
-+		kfree(_pdata.leds);
-+
-+	return ret;
-+}
-+#endif
-diff --git a/include/linux/leds.h b/include/linux/leds.h
-index 61e0340..b20474d 100644
---- a/include/linux/leds.h
-+++ b/include/linux/leds.h
-@@ -207,5 +207,17 @@ struct gpio_led_platform_data {
- 					unsigned long *delay_off);
- };
- 
-+/**
-+ * gpio_led_register_device - register a gpio-led device
-+ * @pdata: the platform data used for the new device
-+ *
-+ * Use this function instead of platform_device_add()ing a static struct
-+ * platform_device.
-+ *
-+ * Note: as pdata and pdata->leds is copied these usually can and should be
-+ * __initdata.
-+ */
-+struct platform_device *gpio_led_register_device(
-+		int id, const struct gpio_led_platform_data *pdata);
- 
- #endif		/* __LINUX_LEDS_H_INCLUDED */
+> 
+>> So, I think we could add another category for such highly configurable
+>> PMUs, which are not per-core, but have enough extra h/w to make them
+>> cpu-aware. These need to be treated differently by arm perf, because they
+>> can't really use the per-cpu data structures of the cpu-aware pmu's and as
+>> such can't easily re-use of many of the functions.
+>>
+>> In fact, most of Qcomm PMU's (bus, fabric etc.) will fall under this new
+>> category. At first glance, these would appear to fall under the System PMU
+>> (counting) category, but they don't because of the extra h/w logic that
+>> allows origin filtering of events.
+> 
+> I think they do; they just have some event encodings that monitor events
+> specific to particular masters (but may not necessarily be attributable
+> to them).
+
+In our case, I think they are attributable, but I'll reconfirm by talking
+to the h/w designers. Verifying these counter outputs is another challenge
+I'm pursuing.
+
+> 
+>> Also, having all this origin filtering logic helps us track per-process
+>> events on these PMU's, for which we need extra functions to decide how to
+>> allocate and configure counters based on which context (task, cpu) the
+>> event is enabled in.
+> 
+> I don't think we should go down the road of splitting up the counters on
+> a given PMU so that they can be shared between different tasks on
+> different CPUs. There will probably be a single control register, so
+> keeping everything in sync will be impossible.
+
+So, for the L2CC on the 8660 (AFAIK, even the bus/fabric monitors), each
+counter has its own origin filter. So the various counters can count from
+different masters at different profiling intervals.
+
+
+Cheers,
+Ashwin
+
 -- 
-1.7.2.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
