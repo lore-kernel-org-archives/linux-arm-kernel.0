@@ -1,58 +1,64 @@
-From: anish198519851985@gmail.com (anish singh)
-Date: Sun, 10 Apr 2011 09:03:49 +0530
+From: sachinikam@gmail.com (Sachin Nikam)
+Date: Mon, 11 Apr 2011 14:37:32 +0530
 Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
 	latency
-In-Reply-To: <BANLkTikVeXvfSBS-xLDXVdesKJpKdtUVqg@mail.gmail.com>
+In-Reply-To: <BANLkTikoj6UTx08ntZaMM15taKRXjrU_Mg@mail.gmail.com>
 References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
 	<BANLkTikZVDejarZ4O5KgNS7S4fxBLSmANA@mail.gmail.com>
 	<BANLkTikVeXvfSBS-xLDXVdesKJpKdtUVqg@mail.gmail.com>
-Message-ID: <BANLkTikwCveocjPdoMoLEVpNneKkq66s4g@mail.gmail.com>
+	<BANLkTikwCveocjPdoMoLEVpNneKkq66s4g@mail.gmail.com>
+	<BANLkTikoj6UTx08ntZaMM15taKRXjrU_Mg@mail.gmail.com>
+Message-ID: <BANLkTimJdTG+1LD2+hN8SC9-YsbRZ4jBZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 9, 2011 at 5:25 PM, Jae hoon Chung <jh80.chung@gmail.com> wrote:
+Does anybody knows which kernel version will have support for SD4.0 specs
+UHS-2?
 
-> Hi Per..
->
-> I'm applied your patch..and sent the patch about dw_mmc.c.
-> I think good this approach..
->
-Forlin,i too want to test this patch of yours but unfortunately i have
-samsung board+SDHCI host controller so i guess i just need to write pre_req
-and post_req functions and that would enable this(nonblock mmc request) on
-my board.Hope i am right?
 
+On Mon, Apr 11, 2011 at 2:33 PM, Per Forlin <per.forlin@linaro.org> wrote:
+
+> On 10 April 2011 05:33, anish singh <anish198519851985@gmail.com> wrote:
+> >
+> >
+> > On Sat, Apr 9, 2011 at 5:25 PM, Jae hoon Chung <jh80.chung@gmail.com>
+> wrote:
+> >>
+> >> Hi Per..
+> >>
+> >> I'm applied your patch..and sent the patch about dw_mmc.c.
+> >> I think good this approach..
+> >
+> > Forlin,i too want to test this patch of yours but unfortunately i have
+> > samsung board+SDHCI host controller so i guess i just need to write
+> pre_req
+> > and post_req functions and that would enable this(nonblock mmc request)
+> on
+> > my board.Hope i am right?
+> You are right. The  SDHCI driver should work just fine without
+> implementing pre_req and post_req but you wont see any performance
+> increasing for DMA usage.
+> In order to benefit from the patchset you need to implement pre_req
+> and post_req.
 >
-> Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
+> If you run into trouble implementing those hooks or if you have any
+> questions please let me know.
 >
 > Regards,
-> Jaehoon Chung
->
-> 2011/4/9 Linus Walleij <linus.walleij@linaro.org>:
-> > On Wed, Apr 6, 2011 at 9:07 PM, Per Forlin <per.forlin@linaro.org>
-> wrote:
-> >
-> >> The intention for introducing none blocking mmc requests is to minimize
-> the
-> >> time between a mmc request ends and another mmc request starts.
-> >
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org> FWIW, I've looked at
-> the
-> > patches so many times I'm already blind for any remaining bugs...
-> >
-> > Yours,
-> > Linus Walleij
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->  > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
+> Per
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 >
+
+
+
+-- 
+Have a nice time !!!
+
+Cheers,
+Sachin.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110410/713621b5/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110411/0069f08d/attachment-0001.html>
