@@ -1,47 +1,97 @@
-From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Mon, 11 Apr 2011 13:44:14 -0400
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Apr 2011 19:00:07 +0100
 Subject: [RFC] Extending ARM perf-events for multiple PMUs
-In-Reply-To: <1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
-References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>	
-	<1302349235.9086.1270.camel@twins>
-	<1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <4DA33DEE.9080709@codeaurora.org>
+In-Reply-To: <4DA33A71.6010804@codeaurora.org>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+	<4DA33A71.6010804@codeaurora.org>
+Message-ID: <1302544807.24286.83.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, 2011-04-11 at 18:29 +0100, Ashwin Chaugule wrote:
+> Hi Will,
 
-On 4/11/2011 7:29 AM, Will Deacon wrote:
->> I don't see this distinction, both will have to count, and telling it
->> what to count is a function of perf_event_attr::config* and how the
->> hardware implements that is of no interest.
+Hi Ashwin,
+
+> Thanks for the starting the discussion here.
 > 
-> Sure, fundamentally we're just writing bits rather than interpreting
-> them. The reason I mention the difference is that filtering PMUs will
-> always need their own struct pmu because of the lack of an event
-> namespace. The other problem is only an issue for some userspace tools
-> (like Oprofile) which require lists of events and their hex codes.
+> On 4/8/2011 1:15 PM, Will Deacon wrote:
+> >
+> >   (1) CPU-aware PMUs
+> >
+> >       This type of PMU is typically per-CPU and accessed via co-processor
+> >       instructions. Actions may be delivered as PPIs. Events scheduled onto
+> >       a CPU-aware PMU can be grouped, possibly with events scheduled for other
+> >       per-CPU PMUs on the same CPU. An action delivered by one of these PMUs
+> >       can *always* be attributed to a specific CPU but not necessarily a
+> >       specific task. Accessing a CPU-aware PMU is a synchronous operation.
+> >
 > 
+> I didn't understand when would an action not be attributed to a task in
+> this category ? If we know which CPU "enabled" the event, this should be
+> possible ?
 
-If you mean namespace = perf_event_attr::config, its 64 bits + another 64
-bits of config_base + event_base on ARM ? Not too sure, but it would seem
-like that should be enough to setup such event chaining.
+I don't think that's enough from a profiling perspective because the
+state of the device will be altered by other tasks. For example, the
+number of misses in the L2 cache for a given task is going to be
+affected by the other tasks running in the system, even if we only
+profile during the period in which the task is running. I think it's
+better to permit only per-CPU events in the this case, attributing the
+samples to tasks and letting the user work out what's going on.
 
-
+> > Now, we currently support the core CPU PMU, which is obviously a CPU-aware PMU
+> > that generates interrupts as actions. Another example of a CPU-aware PMU is
+> > the VFP PMU in Qualcomm's Scorpion. The next step (moving outwards from the
+> > core) is to add support for L2 cache controllers. I expect most of these to be
+> > Counting System PMUs, although I can envisage them being CPU-aware if built
+> > into the core with enough extra hardware.
 > 
-> Would this result in userspace attributing all of the data to a
-> particular CPU? We could consider allowing events where the cpu is -1
-> and the task pid is -1 as well. Non system-wide PMUs could reject these
-> and demand multiple events instead.
+> For the Qcom L2CC, the PMU can be configured to filter events based on
+> specific masters. This fact would make it a CPU-aware PMU, although its
+> NOT per-core and triggers SPI's.
 
-Agreed. perf stat -a on PMU's that are not CPU-aware, would report
-incorrect output. Task counting on such PMU's would be pointless.
+I have a similar issue with this; filtering based on the master *isn't*
+the same as having per-master samples, simply because the combined
+effect of the masters will influence all of the results. That doesn't
+mean that the filtering feature isn't useful, just that it should be
+described in the event encoding rather than by pretending to support
+per-CPU events.
 
+> In such a case, I found it to be quite ugly trying to reuse the per-cpu
+> data structures esp in the interrupt handler, since the interrupt can
+> trigger on a CPU where the event wasn't enabled. A cleaner approach was to
+> use a separate struct pmu. However, I agree that this approach would lead
+> to several pmu's popping up in arch/arm.
+> 
+I expect to see new struct pmus, I'd just like to try and identify
+common patterns before the code mounts up. I imagine that we'll have a
+struct pmu for L2 cache controllers, for example, from which people can
+hang their own specific accessors. Whether or not we can hang other
+system PMUs off such an implementation is unclear to me at the moment.
 
-Cheers,
-Ashwin
+> So, I think we could add another category for such highly configurable
+> PMUs, which are not per-core, but have enough extra h/w to make them
+> cpu-aware. These need to be treated differently by arm perf, because they
+> can't really use the per-cpu data structures of the cpu-aware pmu's and as
+> such can't easily re-use of many of the functions.
+> 
+> In fact, most of Qcomm PMU's (bus, fabric etc.) will fall under this new
+> category. At first glance, these would appear to fall under the System PMU
+> (counting) category, but they don't because of the extra h/w logic that
+> allows origin filtering of events.
 
+I think they do; they just have some event encodings that monitor events
+specific to particular masters (but may not necessarily be attributable
+to them).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Also, having all this origin filtering logic helps us track per-process
+> events on these PMU's, for which we need extra functions to decide how to
+> allocate and configure counters based on which context (task, cpu) the
+> event is enabled in.
+
+I don't think we should go down the road of splitting up the counters on
+a given PMU so that they can be shared between different tasks on
+different CPUs. There will probably be a single control register, so
+keeping everything in sync will be impossible.
+
+Will
