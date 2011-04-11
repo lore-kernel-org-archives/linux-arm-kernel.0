@@ -1,39 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Apr 2011 19:01:25 +0100
-Subject: [PATCH 3/3] Add documenation for new sysfs devices/soc functionallity
-Message-ID: <4DA341F5.7030607@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 11 Apr 2011 20:42:58 +0200
+Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead of
+	void as it can fail
+In-Reply-To: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
+References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
+Message-ID: <1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
+Before commit
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+	b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
+
+calling dev_set_drvdata with dev=NULL was an unchecked error. After some
+discussion about what to return in this case removing the check (and so
+producing a null pointer exception) seems fine.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- Documentation/ABI/testing/sysfs-devices-soc |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
+Hello,
 
-diff --git a/Documentation/ABI/testing/sysfs-devices-soc b/Documentation/ABI/testing/sysfs-devices-soc
-new file mode 100644
-index 0000000..fcf7f07
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-devices-soc
-@@ -0,0 +1,16 @@
-+What:		/sys/devices/soc
-+Date:		April 2011
-+contact:	Lee Jones <lee.jones@linaro.org>
-+Description:
-+		The /sys/devices/soc directory contains a sub-directory for each
-+		System-on-Chip (SoC) device on a running platform. Information
-+		regarding each SoC can be obtained by reading sysfs files. This
-+		functionallity is only available if implemented by the platform.
-+		This directory contains two kinds of attributes:
-+			- Common attributes:
-+				* machine: the name of the machine (e.g. Ux500).
-+				* family: the family name of the SoC (e.g. DB8500).
-+			- SoC-specific attributes:
-+			  	* SoC vendor declared, such as serial and rev numbers.
-+Users:
-+		Any platform dependent user-space applications or profiling tools.
+@Viresh: as I didn't choose to return -EINVAL I didn't add your Reviewed-by:
+
+Best regards
+Uwe
+ drivers/base/dd.c      |    7 +++----
+ include/linux/device.h |    2 +-
+ 2 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index da57ee9..f9d69d7 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -408,17 +408,16 @@ void *dev_get_drvdata(const struct device *dev)
+ }
+ EXPORT_SYMBOL(dev_get_drvdata);
+ 
+-void dev_set_drvdata(struct device *dev, void *data)
++int dev_set_drvdata(struct device *dev, void *data)
+ {
+ 	int error;
+ 
+-	if (!dev)
+-		return;
+ 	if (!dev->p) {
+ 		error = device_private_init(dev);
+ 		if (error)
+-			return;
++			return error;
+ 	}
+ 	dev->p->driver_data = data;
++	return 0;
+ }
+ EXPORT_SYMBOL(dev_set_drvdata);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index ab8dfc0..e5e07eb 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -557,7 +557,7 @@ extern int device_move(struct device *dev, struct device *new_parent,
+ extern const char *device_get_devnode(struct device *dev,
+ 				      mode_t *mode, const char **tmp);
+ extern void *dev_get_drvdata(const struct device *dev);
+-extern void dev_set_drvdata(struct device *dev, void *data);
++extern int dev_set_drvdata(struct device *dev, void *data);
+ 
+ /*
+  * Root device objects for grouping under /sys/devices
 -- 
-1.7.4.1
+1.7.2.3
