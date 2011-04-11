@@ -1,45 +1,33 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Mon, 11 Apr 2011 18:41:54 +0530
-Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout
-	during bootup
-In-Reply-To: <20110407070310.GA21701@avinash-laptop>
-References: <20110407070310.GA21701@avinash-laptop>
-Message-ID: <20110411131154.GA4498@avinash-laptop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Apr 2011 15:43:20 +0200
+Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
+In-Reply-To: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
+References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110411134320.GJ18601@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +     oh->_sysc_cache = v;
-> > > +     omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
-> >
-> > Direct SYSCONFIG access isn't right here.   This should go through
-> > omap_hwmod.
-> >
-> > What is probably needed is exposing _ocp_softreset to device code
-> > via something like omap_hwmod_ocp_softreset() and calling that here.
-> >
+On Mon, Apr 11, 2011 at 12:48:17PM +0100, Jamie Iles wrote:
+> The basic-mmio-gpio driver has been extended in
+> <http://marc.info/?l=linux-kernel&m=130252092900804&w=2> to support a
+> larger wider of controllers and this series converts the ARM platforms
+> that do not implement I/O muxing in the GPIO driver or use the .to_irq
+> method of gpio_chip to use the driver.
+As these patches are necessary to test at least the mxc patch but they
+are not present in todays next and I don't want to spend the time to
+find the patches on marc.info (the "next in thread" link is greyed out)
+and it's non-trivial to get patches from marc into git (
+wget -O - 'http://marc.info/?l=linux-kernel&m=130252092900807&q=raw' | git am
+fails with "Patch does not have a valid e-mail address." because the raw
+view doesn't provide the From: header (Subject: is missing, too)) can
+you please point out a repository that has all 12 patches?
 
-Hi Kevin , 
+Did you (or someone else) measure the performance difference these
+patches introduce?
 
-Looking more closely, i realised that, the sequence of _ocp_softreset
-doesn't work for I2C. It has a special programming sequence which needs
-to be followed to reset the IP. That was the reason, we created
-omap_i2c_reset.  So i feel we need not expose _ocp_softreset.
+Best regards
+Uwe
 
-Since, the problem here is accessing the SYSCONFIG here, instead, what i
-can do is, something like below.
-
-	omap_hwmod_softreset(struct omap_hwmod *oh)
-	{
-
-		v = oh->_sysc_cache;
-		v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
-
-		oh->_sysc_cache = v;
-		omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
-
-	}
-
-And then call this in omap_i2c_reset. Is this OK ?
-
-
-- Avinash
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
