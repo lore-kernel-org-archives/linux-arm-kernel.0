@@ -1,236 +1,71 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 11 Apr 2011 22:27:56 +0800
-Subject: [RFC PATCH 3/5] w90x900: convert to basic-mmio-gpio
-In-Reply-To: <1302522502-24381-4-git-send-email-jamie@jamieiles.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 11 Apr 2011 15:33:27 +0100
+Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
+In-Reply-To: <20110411142307.GK18601@pengutronix.de>
 References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<1302522502-24381-4-git-send-email-jamie@jamieiles.com>
-Message-ID: <BANLkTincujypx04vpogGyZ8c0SDz9uUUrg@mail.gmail.com>
+	<20110411134320.GJ18601@pengutronix.de>
+	<20110411135215.GD2818@pulham.picochip.com>
+	<20110411142307.GK18601@pengutronix.de>
+Message-ID: <20110411143327.GA21449@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/11 Jamie Iles <jamie@jamieiles.com>:
-> The basic-mmio-gpio driver is capable of supporting this controller so
-> convert the platform to use it for basic GPIO support.
->
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+On Mon, Apr 11, 2011 at 04:23:07PM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Apr 11, 2011 at 02:52:16PM +0100, Jamie Iles wrote:
+> > Hi Uwe,
+> > 
+> > On Mon, Apr 11, 2011 at 03:43:20PM +0200, Uwe Kleine-K?nig wrote:
+> > > On Mon, Apr 11, 2011 at 12:48:17PM +0100, Jamie Iles wrote:
+> > > > The basic-mmio-gpio driver has been extended in
+> > > > <http://marc.info/?l=linux-kernel&m=130252092900804&w=2> to support a
+> > > > larger wider of controllers and this series converts the ARM platforms
+> > > > that do not implement I/O muxing in the GPIO driver or use the .to_irq
+> > > > method of gpio_chip to use the driver.
+> > > As these patches are necessary to test at least the mxc patch but they
+> > > are not present in todays next and I don't want to spend the time to
+> > > find the patches on marc.info (the "next in thread" link is greyed out)
+> > > and it's non-trivial to get patches from marc into git (
+> > > wget -O - 'http://marc.info/?l=linux-kernel&m=130252092900807&q=raw' | git am
+> > > fails with "Patch does not have a valid e-mail address." because the raw
+> > > view doesn't provide the From: header (Subject: is missing, too)) can
+> > > you please point out a repository that has all 12 patches?
+> > 
+> > Sure, they're all in:
+> > 
+> > 	git://github.com/jamieiles/linux-2.6-ji.git gpio
+> > 
+> > There's one extra slightly unrelated fix for gemini in there too.
+> Thanks, compiles fine for a i.MX35 machine here, but fails to boot:
+> 
+> <6>[    0.000000] MXC GPIO hardware
+> <4>[    0.000000] ------------[ cut here ]------------
+> <4>[    0.000000] WARNING: at lib/kref.c:34 kref_get+0x2c/0x48()
+> <4>[    0.000000] Modules linked in:
+> <4>[    0.000000] Backtrace: 
+> <4>[    0.000000] [<c0039f9c>] (dump_backtrace+0x0/0x110) from [<c02bff9c>] (dump_stack+0x1c/0x20)
+> <4>[    0.000000]  r7:00000000 r6:c01c1ed0 r5:c0367fd4 r4:00000022
+> <4>[    0.000000] [<c02bff80>] (dump_stack+0x0/0x20) from [<c004b95c>] (warn_slowpath_common+0x5c/0x74)
+> <4>[    0.000000] [<c004b900>] (warn_slowpath_common+0x0/0x74) from [<c004b99c>] (warn_slowpath_null+0x28/0x30)
+> <4>[    0.000000]  r8:00000000 r7:00000000 r6:00000003 r5:c7803008 r4:c03bce7c
+> <4>[    0.000000] [<c004b974>] (warn_slowpath_null+0x0/0x30) from [<c01c1ed0>] (kref_get+0x2c/0x48)
+> <4>[    0.000000] [<c01c1ea4>] (kref_get+0x0/0x48) from [<c01c0df0>] (kobject_get+0x20/0x28)
+> <4>[    0.000000]  r4:c03bce60
+> <4>[    0.000000] [<c01c0dd0>] (kobject_get+0x0/0x28) from [<c02017e4>] (get_device+0x20/0x28)
+> <4>[    0.000000]  r4:c7803000
+> <4>[    0.000000] [<c02017c4>] (get_device+0x0/0x28) from [<c0202b24>] (device_add+0x80/0x5c8)
+> <4>[    0.000000] [<c0202aa4>] (device_add+0x0/0x5c8) from [<c0206d50>] (platform_device_add+0x110/0x16c)
+> <4>[    0.000000] [<c0206c40>] (platform_device_add+0x0/0x16c) from [<c0207064>] (platform_device_register_resndata+0x90/0xb8)
+> <4>[    0.000000]  r7:00000000 r6:c0395f1c r5:c7803000 r4:00000000
+> <4>[    0.000000] [<c0206fd4>] (platform_device_register_resndata+0x0/0xb8) from [<c000cb34>] (mxc_gpio_init+0x134/0x1f0)
+> <4>[    0.000000]  r8:c039a82c r7:f57cc000 r6:53fcc007 r5:00000000 r4:00000060
+> <4>[    0.000000] [<c000ca00>] (mxc_gpio_init+0x0/0x1f0) from [<c000c3dc>] (mx35_init_irq+0x20/0x2c)
+> <4>[    0.000000] [<c000c3bc>] (mx35_init_irq+0x0/0x2c) from [<c00096bc>] (init_IRQ+0x1c/0x24)
+> <4>[    0.000000] [<c00096a0>] (init_IRQ+0x0/0x24) from [<c0008970>] (start_kernel+0x184/0x2b4)
 
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+Hmm, so this looks like it's because mxc_gpio_init() is being called 
+from init_IRQ which is too early for platform devices.  Is there a 
+suitable place where this can be called later in the boot process?  I 
+guess the gpio irq stuff should remain where it is but the 
+platform_device registration should be moved to later.
 
-Thanks, so you can submit it to Russell for merging.
-
-> ---
-> ?arch/arm/mach-w90x900/gpio.c | ?162 +++++++++++-------------------------------
-> ?1 files changed, 43 insertions(+), 119 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/gpio.c b/arch/arm/mach-w90x900/gpio.c
-> index ba05aec..5dd7efe 100644
-> --- a/arch/arm/mach-w90x900/gpio.c
-> +++ b/arch/arm/mach-w90x900/gpio.c
-> @@ -10,145 +10,69 @@
-> ?* published by the Free Software Foundation.
-> ?*/
->
-> -#include <linux/clk.h>
-> -#include <linux/errno.h>
-> -#include <linux/interrupt.h>
-> -#include <linux/irq.h>
-> -#include <linux/debugfs.h>
-> -#include <linux/seq_file.h>
-> +#include <linux/basic_mmio_gpio.h>
-> +#include <linux/err.h>
-> ?#include <linux/kernel.h>
-> -#include <linux/list.h>
-> ?#include <linux/module.h>
-> -#include <linux/io.h>
-> ?#include <linux/gpio.h>
-> +#include <linux/platform_device.h>
->
-> ?#include <mach/hardware.h>
->
-> -#define GPIO_BASE ? ? ? ? ? ? ?(W90X900_VA_GPIO)
-> ?#define GPIO_DIR ? ? ? ? ? ? ? (0x04)
-> ?#define GPIO_OUT ? ? ? ? ? ? ? (0x08)
-> ?#define GPIO_IN ? ? ? ? ? ? ? ? ? ? ? ?(0x0C)
-> ?#define GROUPINERV ? ? ? ? ? ? (0x10)
-> -#define GPIO_GPIO(Nb) ? ? ? ? ?(0x00000001 << (Nb))
-> -#define to_nuc900_gpio_chip(c) container_of(c, struct nuc900_gpio_chip, chip)
->
-> -#define NUC900_GPIO_CHIP(name, base_gpio, nr_gpio) ? ? ? ? ? ? ? ? ? ? \
-> - ? ? ? { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> - ? ? ? ? ? ? ? .chip = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> - ? ? ? ? ? ? ? ? ? ? ? .label ? ? ? ? ? ?= name, ? ? ? ? ? ? ? ? ? ? ? \
-> - ? ? ? ? ? ? ? ? ? ? ? .direction_input ?= nuc900_dir_input, ? ? ? ? ? \
-> - ? ? ? ? ? ? ? ? ? ? ? .direction_output = nuc900_dir_output, ? ? ? ? ?\
-> - ? ? ? ? ? ? ? ? ? ? ? .get ? ? ? ? ? ? ?= nuc900_gpio_get, ? ? ? ? ? ?\
-> - ? ? ? ? ? ? ? ? ? ? ? .set ? ? ? ? ? ? ?= nuc900_gpio_set, ? ? ? ? ? ?\
-> - ? ? ? ? ? ? ? ? ? ? ? .base ? ? ? ? ? ? = base_gpio, ? ? ? ? ? ? ? ? ?\
-> - ? ? ? ? ? ? ? ? ? ? ? .ngpio ? ? ? ? ? ?= nr_gpio, ? ? ? ? ? ? ? ? ? ?\
-> - ? ? ? ? ? ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> +#define GPIO_RES(__name, __addr) \
-> + ? ? ? { \
-> + ? ? ? ? ? ? ? .start = (__addr), \
-> + ? ? ? ? ? ? ? .end = (__addr) + 0x3, \
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM, \
-> + ? ? ? ? ? ? ? .name = #__name, \
-> ? ? ? ?}
->
-> -struct nuc900_gpio_chip {
-> - ? ? ? struct gpio_chip ? ? ? ?chip;
-> - ? ? ? void __iomem ? ? ? ? ? ?*regbase; ? ? ? /* Base of group register*/
-> - ? ? ? spinlock_t ? ? ? ? ? ? ?gpio_lock;
-> -};
-> -
-> -static int nuc900_gpio_get(struct gpio_chip *chip, unsigned offset)
-> -{
-> - ? ? ? struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
-> - ? ? ? void __iomem *pio = nuc900_gpio->regbase + GPIO_IN;
-> - ? ? ? unsigned int regval;
-> -
-> - ? ? ? regval = __raw_readl(pio);
-> - ? ? ? regval &= GPIO_GPIO(offset);
-> -
-> - ? ? ? return (regval != 0);
-> -}
-> -
-> -static void nuc900_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
-> -{
-> - ? ? ? struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
-> - ? ? ? void __iomem *pio = nuc900_gpio->regbase + GPIO_OUT;
-> - ? ? ? unsigned int regval;
-> - ? ? ? unsigned long flags;
-> -
-> - ? ? ? spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
-> -
-> - ? ? ? regval = __raw_readl(pio);
-> -
-> - ? ? ? if (val)
-> - ? ? ? ? ? ? ? regval |= GPIO_GPIO(offset);
-> - ? ? ? else
-> - ? ? ? ? ? ? ? regval &= ~GPIO_GPIO(offset);
-> -
-> - ? ? ? __raw_writel(regval, pio);
-> -
-> - ? ? ? spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
-> -}
-> -
-> -static int nuc900_dir_input(struct gpio_chip *chip, unsigned offset)
-> -{
-> - ? ? ? struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
-> - ? ? ? void __iomem *pio = nuc900_gpio->regbase + GPIO_DIR;
-> - ? ? ? unsigned int regval;
-> - ? ? ? unsigned long flags;
-> -
-> - ? ? ? spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
-> -
-> - ? ? ? regval = __raw_readl(pio);
-> - ? ? ? regval &= ~GPIO_GPIO(offset);
-> - ? ? ? __raw_writel(regval, pio);
-> -
-> - ? ? ? spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
-> -
-> - ? ? ? return 0;
-> -}
-> -
-> -static int nuc900_dir_output(struct gpio_chip *chip, unsigned offset, int val)
-> -{
-> - ? ? ? struct nuc900_gpio_chip *nuc900_gpio = to_nuc900_gpio_chip(chip);
-> - ? ? ? void __iomem *outreg = nuc900_gpio->regbase + GPIO_OUT;
-> - ? ? ? void __iomem *pio = nuc900_gpio->regbase + GPIO_DIR;
-> - ? ? ? unsigned int regval;
-> - ? ? ? unsigned long flags;
-> -
-> - ? ? ? spin_lock_irqsave(&nuc900_gpio->gpio_lock, flags);
-> -
-> - ? ? ? regval = __raw_readl(pio);
-> - ? ? ? regval |= GPIO_GPIO(offset);
-> - ? ? ? __raw_writel(regval, pio);
-> -
-> - ? ? ? regval = __raw_readl(outreg);
-> -
-> - ? ? ? if (val)
-> - ? ? ? ? ? ? ? regval |= GPIO_GPIO(offset);
-> - ? ? ? else
-> - ? ? ? ? ? ? ? regval &= ~GPIO_GPIO(offset);
-> -
-> - ? ? ? __raw_writel(regval, outreg);
-> -
-> - ? ? ? spin_unlock_irqrestore(&nuc900_gpio->gpio_lock, flags);
-> -
-> - ? ? ? return 0;
-> -}
-> +#define NUC900_GPIO_BANK(base_gpio, nr_gpio) ? ? ? ? ? ? ? ? ? \
-> + ? ? ? { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? .ngpio ?= (nr_gpio), ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? .base ? = (base_gpio), ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? }
->
-> -static struct nuc900_gpio_chip nuc900_gpio[] = {
-> - ? ? ? NUC900_GPIO_CHIP("GROUPC", 0, 16),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPD", 16, 10),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPE", 26, 14),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPF", 40, 10),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPG", 50, 17),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPH", 67, 8),
-> - ? ? ? NUC900_GPIO_CHIP("GROUPI", 75, 17),
-> +struct nuc900_gpio_bank {
-> + ? ? ? unsigned int ? ? ? ? ? ?base;
-> + ? ? ? unsigned int ? ? ? ? ? ?ngpio;
-> ?};
->
-> ?void __init nuc900_init_gpio(int nr_group)
-> ?{
-> ? ? ? ?unsigned ? ? ? ?i;
-> - ? ? ? struct nuc900_gpio_chip *gpio_chip;
-> +
-> + ? ? ? struct nuc900_gpio_bank nuc900_gpio[] = {
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(0, 16),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(16, 10),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(26, 14),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(40, 10),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(50, 17),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(67, 8),
-> + ? ? ? ? ? ? ? NUC900_GPIO_BANK(75, 17),
-> + ? ? ? };
->
-> ? ? ? ?for (i = 0; i < nr_group; i++) {
-> - ? ? ? ? ? ? ? gpio_chip = &nuc900_gpio[i];
-> - ? ? ? ? ? ? ? spin_lock_init(&gpio_chip->gpio_lock);
-> - ? ? ? ? ? ? ? gpio_chip->regbase = GPIO_BASE + i * GROUPINERV;
-> - ? ? ? ? ? ? ? gpiochip_add(&gpio_chip->chip);
-> + ? ? ? ? ? ? ? unsigned long addr = W90X900_PA_GPIO + i * GROUPINERV;
-> + ? ? ? ? ? ? ? struct resource res[] = {
-> + ? ? ? ? ? ? ? ? ? ? ? GPIO_RES(dat, addr + GPIO_IN),
-> + ? ? ? ? ? ? ? ? ? ? ? GPIO_RES(set, addr + GPIO_OUT),
-> + ? ? ? ? ? ? ? ? ? ? ? GPIO_RES(dirout, addr + GPIO_DIR),
-> + ? ? ? ? ? ? ? };
-> + ? ? ? ? ? ? ? struct bgpio_pdata pdata = {
-> + ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= nuc900_gpio[i].ngpio,
-> + ? ? ? ? ? ? ? ? ? ? ? .base ? = nuc900_gpio[i].base,
-> + ? ? ? ? ? ? ? };
-> + ? ? ? ? ? ? ? struct platform_device *pdev;
-> +
-> + ? ? ? ? ? ? ? pdev = platform_device_register_resndata(NULL,
-> + ? ? ? ? ? ? ? ? ? ? ? "basic-mmio-gpio", i, res, ARRAY_SIZE(res), &pdata,
-> + ? ? ? ? ? ? ? ? ? ? ? sizeof(pdata));
-> + ? ? ? ? ? ? ? WARN_ON(IS_ERR(pdev));
-> ? ? ? ?}
-> ?}
-> --
-> 1.7.4.2
->
->
-
-
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Jamie
