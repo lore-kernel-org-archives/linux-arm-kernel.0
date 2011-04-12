@@ -1,53 +1,74 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Wed, 13 Apr 2011 02:03:13 +0530
-Subject: [PATCHv3] omap3: alsa-soc: Remove restrictive checks for cpu type
-Message-ID: <1302640393-21734-1-git-send-email-premi@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Apr 2011 22:37:30 +0200
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <20110412202734.GB7806@n2100.arm.linux.org.uk>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<20110412095446.GB18850@pengutronix.de>
+	<20110412202734.GB7806@n2100.arm.linux.org.uk>
+Message-ID: <20110412203730.GE18850@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current checks for cpu type were too restrictive leading
-to failures for other silicons in same family.
+Hi Russell,
 
-The problem was found while testing audio playback on
-AM37x and AM35x processors. But should exist on OMAP36xx
-as well.
+On Tue, Apr 12, 2011 at 09:27:34PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 12, 2011 at 11:54:46AM +0200, Uwe Kleine-K?nig wrote:
+> > #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+> > # if defined CONFIG_ARCH_MX1
+> > #  define PLAT_PHYS_OFFSET              MX1_PHYS_OFFSET
+> > # endif
+> > # if defined CONFIG_MACH_MX21 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX21_PHYS_OFFSET)
+> > #  define PLAT_PHYS_OFFSET              MX21_PHYS_OFFSET
+> > # endif
+> > # if defined CONFIG_ARCH_MX25 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX25_PHYS_OFFSET)
+> > #  define PLAT_PHYS_OFFSET              MX25_PHYS_OFFSET
+> > # endif
+> 
+> And what's wrong with:
+> 
+> #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+> #ifdef CONFIG_ARCH_MX1
+> #ifdef PLAT_PHYS_OFFSET
+> #error Invalid configuration - PLAT_PHYS_OFFSET already defined
+> #endif
+> #define PLAT_PHYS_OFFSET MX1_PHYS_OFFSET
+> #endif
+> 
+> #ifdef CONFIG_MACH_MX21
+> #ifdef PLAT_PHYS_OFFSET
+> #error Invalid configuration - PLAT_PHYS_OFFSET already defined
+> #endif
+> #define PLAT_PHYS_OFFSET MX21_PHYS_OFFSET
+> #endif
+> ...
+> #endif
+> 
+> ?
+i.MX25 and i.MX31 have the same PHYS_OFFSET, so the error should
+not trigger if these two are enabled. So testing only #ifdef
+PLAT_PHYS_OFFSET is wrong.
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
----
- Changes in v3::
-   None. Reposting[1] after subscribing to alsa-devel list
+> Or this _may_ work:
+> 
+> #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+> #if CONFIG_ARCH_MX1 + CONFIG_MACH_MX21 + ... > 1
+> #error Invalid configuration - unable to handle different phys base addresses
+> #endif
+Same problem (and I guess it yields some cpp warnings about
+CONFIG_ARCH_MX1 not being defined for an i.MX21-only build, but I didn't
+test).
+> ...
+> #endif
+> 
 
- Changes in v2:
-   1) Added one more check to the changes.
-   2) Updated commit message to use plurals.
+Thanks for your try,
+Uwe
 
-
- [1] http://marc.info/?l=linux-omap&m=130026430110592&w=2
-
- sound/soc/omap/omap-mcbsp.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index 2175f09..a88a0bf 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
-@@ -146,7 +146,7 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
- 	 * 2 channels (stereo): size is 128 / 2 = 64 frames (2 * 64 words)
- 	 * 4 channels: size is 128 / 4 = 32 frames (4 * 32 words)
- 	 */
--	if (cpu_is_omap343x() || cpu_is_omap44xx()) {
-+	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
- 		/*
- 		* Rule for the buffer size. We should not allow
- 		* smaller buffer than the FIFO size to avoid underruns
-@@ -258,7 +258,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
- 	default:
- 		return -EINVAL;
- 	}
--	if (cpu_is_omap343x()) {
-+	if (cpu_is_omap34xx()) {
- 		dma_data->set_threshold = omap_mcbsp_set_threshold;
- 		/* TODO: Currently, MODE_ELEMENT == MODE_FRAME */
- 		if (omap_mcbsp_get_dma_op_mode(bus_id) ==
 -- 
-1.7.2.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
