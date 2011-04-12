@@ -1,44 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2011 09:52:37 +0100
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
-	and i.MX53
-In-Reply-To: <BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
-	<20110411074041.GF18601@pengutronix.de>
-	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-	<BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
-Message-ID: <20110412085237.GA30550@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 12 Apr 2011 10:00:22 +0100
+Subject: [PATCH] increase the use of CONFIG_VECTORS_BASE
+In-Reply-To: <alpine.LFD.2.00.1104111509590.28032@xanadu.home>
+References: <20110411170047.GA12509@dandreoli.com>
+	<alpine.LFD.2.00.1104111509590.28032@xanadu.home>
+Message-ID: <BANLkTim4VAiVmiTRHb1cj=VGeyyUk5aZ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do _not_ top post.
+On Mon, Apr 11, 2011 at 8:39 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 11 Apr 2011, Domenico Andreoli wrote:
+>
+>> From: Domenico Andreoli <cavokz@gmail.com>
+>>
+>> If CONFIG_VECTORS_BASE is meant to make vectors base address
+>> configurable, it is not consistently used. At least in arch/arm/mm/mmu.c
+>> the explicit value 0xffff0000 is still widely used.
+>>
+>> This is an attempt to improve the situation.
+>>
+>> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+>
+> NAK.
+>
+> Some explanation is in order.
+>
+> On CPU cores with a MMU, there are only two possibilities for the
+> location of the vector page: either address 0, or address 0xffff0000.
+> Some CPUs only supports the low vectors i.e. at 0. ?Most others allow
+> for a selection between either of those addresses using the V bit in the
+> control register (see the vectors_high() macro for example). ?In those
+> cases replacing 0xffff0000 with CONFIG_VECTORS_BASE is the wrong thing
+> to do.
+>
+> Now, because the vector table and associated stubs are quite small, we
+> also use the same memory page for other things such as read-only code
+> segments made available to user space. ?So to simplify things, the
+> vector page is _always_ mapped at 0xffff0000, regardless if the CPU
+> supports high vectors or not (if it doesn't then another mapping for the
+> same page is installed at 0). ?So also in this case it is wrong to
+> substitute 0xffff0000 with CONFIG_VECTORS_BASE.
+>
+> Finally, on non-MMU processors, the actual vector table is often in ROM
+> and no RAM page can be mapped to the vector address because of course
+> there is no MMU. ?In this case, all vectors (except for the reset one)
+> are usually branching to some arbitrary location in RAM to allow the
+> installed software to redirect them. ?This is where CONFIG_VECTORS_BASE
+> really makes sense as it should be set to the address of the memory area
+> that the OS can modify to hook its exception handlers.
+>
+> So using CONFIG_VECTORS_BASE really depends on the context. ?For shared
+> code between the MMU and non-MMU cases with access to the vector page,
+> then it makes sense to use CONFIG_VECTORS_BASE, and in the MMU case it
+> shouldn't be set to anything other than 0xffff0000.
+>
 
-On Mon, Apr 11, 2011 at 04:50:48PM -0500, Matt Sealey wrote:
-> Well, whoever's responsibility it is to fix this, whereever it needs
-> to be fixed, it needs to be fixed, as it is absolutely nuts that you
-> cannot run an MX51 and MX53 board off the same kernel.
-> 
-> If nobody knows or agrees, can anyone can identify exactly what needs
-> to be fixed and where, and how much work this would actually be, so
-> they or someone else can actually go do it, instead of us just
-> debating about how experimental it might be?
-> 
-> As far as I see it the only reason it depends on EXPERIMENTAL is
-> because it breaks at least one subarch, it breaks XIP kernels and it
-> breaks Thumb2 kernels (this last one is not so much a showstopper for
-> enabling it by default, unless I am mistaken in my assumption that
-> Thumb2 kernels still don't work reliably right now anyway?)
+Since v6Z (i.e., including arm1176 and all v7-A processors), there is
+a cp15 vector base address register for MMU-enabled CPUs, allowing the
+vectors to be placed anywhere (32-byte aligned) in the virtual address
+space.
 
-I can only guess that you're talking about the dynamic patching of the
-virt_to_phys stuff - but that's only a guess because there is _no_
-_context_ because you _top_ _posted_.
+This was introduced as part of the v6 security extensions, since the
+Secure World needs two vector tables for its own use and therefore a
+single default location isn't enough; but as a consequence the Normal
+World can move its vector table too.  The high vectors configuration
+input to the core only determines the default vectors location at boot
+in this case.
 
-It is marked as EXPERIMENTAL because it is a new feature which has just
-gone in, and hasn't had sufficient testing out in the wild to justify
-removal of EXPERIMENTAL.  Therefore, the EXPERIMENTAL tag tells people
-that the feature may not be as stable as it should be.
+Moving the actual vectors could be useful from an address space layout
+randomisation point of view.  But unfortunately, although the vectors
+themselves could be moved, the rest of the contents of the vectors
+page must probably stay where it is -- with no VDSO, userspace code is
+riddled with hard-coded references to 0xffff0000 to call the kuser
+helpers etc.
 
-It can be removed _after_ the next merge window when we have a higher
-confidence that no one has seen any major problems with it.
+Cheers
+---Dave
