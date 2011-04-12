@@ -1,94 +1,73 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 12 Apr 2011 15:28:00 +0400
-Subject: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1302587472-20435-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <4DA43740.9050806@ru.mvista.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 12 Apr 2011 13:40:36 +0200
+Subject: [RFC][PATCH V3] axi: add AXI bus driver
+In-Reply-To: <BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
+References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
+	<20110411210631.GA28559@kroah.com>
+	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
+	<20110411212513.GA17809@kroah.com>
+	<BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
+	<20110411215619.GA27943@kroah.com>
+	<BANLkTimjThXn347+=m98NsBXY84guJjNqA@mail.gmail.com>
+	<20110411223632.GB31833@kroah.com>
+	<BANLkTinpKKRCrBik6-9C5WqcSDGuEt5yCw@mail.gmail.com>
+	<20110411233506.GA13240@kroah.com>
+	<BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
+Message-ID: <BANLkTikR2AwBdORYUdTCcAOPeMkKN7azQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 12-04-2011 9:51, Richard Zhu wrote:
-
-> Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
-> ---
->   arch/arm/mach-mx5/board-mx53_loco.c |   76 +++++++++++++++++++++++++++++++++++
->   1 files changed, 76 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 0a18f8d..644aaa2 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-[...]
-> @@ -203,6 +206,78 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->   	.bitrate = 100000,
->   };
+2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
+> 2011/4/12 Greg KH <greg@kroah.com>:
+>> On Tue, Apr 12, 2011 at 12:45:33AM +0200, Rafa? Mi?ecki wrote:
+>>> 2011/4/12 Greg KH <greg@kroah.com>:
+>>> > Then in your release function, free the struct axi_device. ?It's that
+>>> > simple. ?To try to free it before then would be wrong and cause
+>>> > problems.
+>>>
+>>> This is because it is defined as:
+>>> struct axi_device cores[AXI_MAX_NR_CORES];
+>>
+>> No way, seriously?
+>>
+>> You can't do that, no static struct devices please. ?Make these dynamic
+>> and everything will be fine. ?The -mm tree used to have a huge warning
+>> if you ever tried to register a statically allocated struct, but that
+>> didn't really work out, but would have saved you a lot of time here,
+>> sorry.
+>>
+>> So dynamically allocate the structures and you will be fine.
 >
-> +/* HW Initialization, if return 0, initialization is successful. */
-> +static int mx53_loco_sata_init(struct device *dev, void __iomem *addr)
-> +{
-> +	u32 tmpdata;
-> +	int ret = 0;
-> +	struct clk *clk;
-> +
-> +	sata_clk = clk_get(dev, NULL);
-> +	if (IS_ERR(sata_clk)) {
-> +		dev_err(dev, "no sata clock.\n");
-> +		return PTR_ERR(sata_clk);
-> +	}
-> +	ret = clk_enable(sata_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata clock.\n");
-> +		clk_put(sata_clk);
+> Well, I saw that along kernel, I had no idea there is anything wrong
+> about this. It seems more ppl do not know about this:
+> struct radeon_ib ? ? ? ?ibs[RADEON_IB_POOL_SIZE];
+> struct radeon_pm_clock_info clock_info[8];
+> struct radeon_pm_profile profiles[PM_PROFILE_MAX];
+> struct radeon_surface_reg surface_regs[RADEON_GEM_MAX_SURFACES];
+> struct radeon_i2c_chan *i2c_bus[RADEON_MAX_I2C_BUS];
+>
+> struct b43_key key[B43_NR_GROUP_KEYS * 2 + B43_NR_PAIRWISE_KEYS];
+>
+> struct ssb_device devices[SSB_MAX_NR_CORES];
+> I guess I could fine more examples by simple grepping .h files.
+>
+> Is there some guide around with things like this we should avoid?
+> checkpatch does no catch this, so maybe just some manual? Could you
+> point me to it?
 
-    Why duplicate clk_put() which you already have at the end of function?
-Just define another label there.
+Greg, my:
+struct ssb_device devices[SSB_MAX_NR_CORES];
+is part of "struct axi_bus", which we allocate dynamically anyway:
 
-> +		return ret;
-> +	}
-> +
-> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> +	sata_ref_clk = clk_get(NULL, "usb_phy1");
-> +	if (IS_ERR(sata_ref_clk)) {
-> +		dev_err(dev, "no sata ref clock.\n");
-> +		ret = PTR_ERR(sata_ref_clk);
-> +		goto release_sata_clk;
-> +	}
-> +	ret = clk_enable(sata_ref_clk);
-> +	if (ret) {
-> +		dev_err(dev, "can't enable sata ref clock.\n");
-> +		clk_put(sata_ref_clk);
+struct axi_bus *bus;
+bus = kzalloc(sizeof(*bus), GFP_KERNEL);
+if (!bus)
+	goto out;
 
-    Same question.
+So do we really need to dynamically alloc main structure and
+separately every of it's array of structs? Does it really make sense?
+Please point me to some place where I can read more about this. Some
+tips about coding style for such things, cases.
 
-> +		goto release_sata_clk;
-> +	}
-> +
-> +	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
-> +	clk = clk_get(NULL, "ahb");
-> +	if (IS_ERR(clk)) {
-> +		dev_err(dev, "no ahb clock.\n");
-> +		ret = PTR_ERR(clk);
-> +		goto release_sata_ref_clk;
-> +	}
-> +	tmpdata = clk_get_rate(clk) / 1000;
-> +	clk_put(clk);
-> +
-> +	sata_init(addr, tmpdata);
-> +
-> +	return ret;
-> +
-> +release_sata_ref_clk:
-> +	clk_disable(sata_ref_clk);
-> +	clk_put(sata_ref_clk);
-> +
-> +release_sata_clk:
-> +	clk_disable(sata_clk);
-> +	clk_put(sata_clk);
-> +
-> +	return ret;
-> +}
-
-WBR, Sergei
+-- 
+Rafa?
