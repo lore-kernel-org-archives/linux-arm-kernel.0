@@ -1,34 +1,38 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 12 Apr 2011 16:44:29 +0300
-Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
-In-Reply-To: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <BANLkTin7DEWJt4PrBp85disqXd9ZBG3Z_g@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 12 Apr 2011 21:47:46 +0800
+Subject: [PATCH] pxa270 rtc wakeup event fix
+In-Reply-To: <201104121253.38937.marek.vasut@gmail.com>
+References: <4D9F3AE4.2040101@gmail.com>
+	<201104082136.52297.marek.vasut@gmail.com>
+	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+	<201104121253.38937.marek.vasut@gmail.com>
+Message-ID: <BANLkTi=ZJ2utAwpnADMdLWx5SEnLqwX18g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 6:24 PM, <mathieu.poirier@linaro.org> wrote:
+On Tue, Apr 12, 2011 at 6:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Tuesday 12 April 2011 09:44:17 Eric Miao wrote:
+>> Hi Nick,
+>>
+>> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
+>> doesn't behave as assumed. A better approach would be to return -1
+>> when none-GPIO IRQs are mapped back, let me know if you are OK w/
+>> the patch below:
+>>
+>> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
+>> b/arch/arm/mach-pxa/include/mach/gpio.h
+>> index b024a8b..b9f4ed1 100644
+>> --- a/arch/arm/mach-pxa/include/mach/gpio.h
+>> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
+>> @@ -103,7 +103,20 @@
+>>
+>> ?#define gpio_to_bank(gpio) ? ((gpio) >> 5)
+>> ?#define gpio_to_irq(gpio) ? ?IRQ_GPIO(gpio)
+>> -#define irq_to_gpio(irq) ? ? IRQ_TO_GPIO(irq)
+>> +
+>> +static inline int irq_to_gpio(unsigned int irq)
 >
-> From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
->
-> This is the second spin on STE's Hsem driver that is implemented
-> through the hwspinlock scheme. ?More specifically:
->
-> ?More comments have been added in the code.
-> ?Cleanup of included header files.
-> ?One of the original contributor's name corrected.
-> ?Calls to 'pm_runtime_disable'restored.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
+> Maybe drop the explicit inline?
 
-Looks good, but please revise the commit log (think of a random reader
-who tries to understand what does this patch do, and is less
-interested to hear about its revisions' history).
-
-Otherwise,
-
-Acked-by: Ohad Ben-Cohen <ohad@wizery.com>
-
-(btw I assume the "PATCH 1/2" in the subject is just a typo, and
-there's no missing "PATCH 2/2")
+It's in a header file, and has to be declared as inline to avoid the
+copy being duplicated in every .c files where this header is included.
