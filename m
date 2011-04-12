@@ -1,30 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 12 Apr 2011 20:04:14 +0200
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <20110412155217.GA982@atrey.karlin.mff.cuni.cz>
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<BANLkTikNEJEwq4cfr6cmTcHqcRfyGLM6Ww@mail.gmail.com>
-	<20110412152307.GD20815@atrey.karlin.mff.cuni.cz>
-	<20110412155217.GA982@atrey.karlin.mff.cuni.cz>
-Message-ID: <20110412180414.GA26916@elf.ucw.cz>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 13 Apr 2011 04:02:22 +1000
+Subject: about uclinux for armnommu dma allocate issue
+In-Reply-To: <BANLkTikkzWZcfeic8qUeLKLr5+ef14eA4g@mail.gmail.com>
+References: <BANLkTikkzWZcfeic8qUeLKLr5+ef14eA4g@mail.gmail.com>
+Message-ID: <4DA493AE.3040007@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2011-04-12 17:52:17, Cyril Hrubis wrote:
-> Hi!
-> > > Which model do you have? And check the corresponding board file if
-> > > card detect GPIO handling is doing right.
-> > 
-> > I've got spitz (SL-3200).
-> > 
-> > So I suppose the board file is arch/arm/mach-pxa/spitz.c, I'll have a look.
-> 
-> Hmm, besides cleanup by Marek Vasut there were no changes in the code. And it
-> seems that it was just cleanup in spitz_card_pwr_ctrl().
+Hi Wan,
 
-With vanilla 2.6.38, I observe similar problem. MMC removal is not
-detected; I get "error -110 whilst initalising SD card" on reinsert.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+On 11/04/11 00:04, Wan ZongShun wrote:
+> I am programming ohci driver for my arm7 based on 2.6.38.
+>
+> td_alloc ->  dma_pool_alloc ->  dma_alloc_coherent().
+>
+> In previous uclinux version, there is the consistent.c located in
+> arch/armnommu/mm to implement
+> this dma_alloc_coherent, but now this latest version, I did not see
+> this 'dma_alloc_coherent' function
+> for armnommu, so I can use this function directly like this arm mmu?
+
+Yes. There is no separate one for the nommu case. It just
+uses the standard one in arch/arm/mm/dma-mapping.c.
+
+
+> In addtion, the 'kmalloc' is the same to previous uclinux armnommu
+> version? I can use it directly?
+
+Oh, yes. There is no changes in how that works.
+
+Regards
+Greg
