@@ -1,40 +1,47 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Tue, 12 Apr 2011 22:54:21 +0200
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <m3oc4bxne1.fsf@pullcord.laptop.org>
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<m3aafvz30t.fsf@pullcord.laptop.org>
-	<20110412193944.GC2665@atrey.karlin.mff.cuni.cz>
-	<m3oc4bxne1.fsf@pullcord.laptop.org>
-Message-ID: <20110412205421.GD2665@atrey.karlin.mff.cuni.cz>
+From: george@znau.edu.ua (George Kashperko)
+Date: Tue, 12 Apr 2011 23:57:34 +0300
+Subject: [RFC][PATCH] axi: add AXI bus driver
+In-Reply-To: <BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
+	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
+	<1302634039.14216.10.camel@dev.znau.edu.ua>
+	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
+	<1302635550.14216.21.camel@dev.znau.edu.ua>
+	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
+	<4DA4AC4B.90409@hauke-m.de>
+	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
+	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
+	<1302640546.14216.65.camel@dev.znau.edu.ua>
+	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+Message-ID: <1302641854.14216.77.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> >> Your symptoms match the bug that was fixed by:
-> >> 
-> >> bad3babace2ee4d ("mmc: fix CONFIG_MMC_UNSAFE_RESUME regression")
-> >> 
-> >> but this fix made it into 2.6.38, so if you're using 2.6.38 final then
-> >> you shouldn't be seeing this.  Could you confirm that you have this
-> >> patch?
-> >
-> > It seems that the pxa tree I have is still based on 2.6.38-rc8.
-> >
-> > And yes, turning CONFIG_MMC_UNSAFE_RESUME off seems to fix that problem.
-> >
-> > I'll try to update the kernel tree and try again with CONFIG_MMC_UNSAFE_RESUME
-> > enabled.
+
+> 2011/4/12 George Kashperko <george@znau.edu.ua>:
+> >> 2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
+> >> That way I see really low (or not at all) relation between out
+> >> (not)Broadcom bus and present AMBA bus.
+> >>
+> > Agree.
 > 
-> Okay, great.  It was introduced in 2.6.38-rc1 and fixed in 2.6.38 final.
->
+> Ehh, sounds like one more renaming to functions, defines, prefixes.
+> 
+> Let's wait for Arend comments, he was the one voting for not-bcm-specific name.
+> 
+Sounds like good plan :)
 
-Tried 2.6.39-rc3 both with and without CONFIG_MMC_UNSAFE_RESUME and the
-insert/remove detection works but both with and without unsafe resume, if the
-card is removed for more than second or two it fails to recognize the card
-after insertion failing with:
+Btw, while waiting.... Digging the web clearing different things around
+ssb/axi found few broadcom ssb docs some of you maybe find interesting
+to look through.
+http://read.pudn.com/downloads127/doc/fileformat/537112/mips/bcm5836/5836-5836P-PG01-RDS.pdf
+http://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
 
-mmc0: error -95 whilst initialising SD card
+Also, one more question to Arend:
+could you please ask if there are any plans on lifting UNPUBLISHED
+PROPRIETARY for GMAC core driver sources (etcgmac.c, have this core at
+bcm4716-based ASUS N16, might used at other bcm471X socs as well) or
+possibly Broadcom could publish some doc for the chip?
 
--- 
-metan
+Have nice day,
+George
