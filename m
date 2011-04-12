@@ -1,91 +1,287 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 12 Apr 2011 07:41:18 +0200
-Subject: [RFC][PATCH V3] axi: add AXI bus driver
-In-Reply-To: <20110411233506.GA13240@kroah.com>
-References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
-	<20110411210631.GA28559@kroah.com>
-	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
-	<20110411212513.GA17809@kroah.com>
-	<BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
-	<20110411215619.GA27943@kroah.com>
-	<BANLkTimjThXn347+=m98NsBXY84guJjNqA@mail.gmail.com>
-	<20110411223632.GB31833@kroah.com>
-	<BANLkTinpKKRCrBik6-9C5WqcSDGuEt5yCw@mail.gmail.com>
-	<20110411233506.GA13240@kroah.com>
-Message-ID: <BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Tue, 12 Apr 2011 13:51:11 +0800
+Subject: [PATCH V4 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
+Message-ID: <1302587472-20435-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/12 Greg KH <greg@kroah.com>:
-> On Tue, Apr 12, 2011 at 12:45:33AM +0200, Rafa? Mi?ecki wrote:
->> 2011/4/12 Greg KH <greg@kroah.com>:
->> > On Tue, Apr 12, 2011 at 12:12:47AM +0200, Rafa? Mi?ecki wrote:
->> >> 2011/4/11 Greg KH <greg@kroah.com>:
->> >> > On Mon, Apr 11, 2011 at 11:36:39PM +0200, Rafa? Mi?ecki wrote:
->> >> >> 2011/4/11 Greg KH <greg@kroah.com>:
->> >> >> > Please read the documentation for how to do this properly. ?I find it
->> >> >> > really hard to believe that you wrote that comment instead of putting in
->> >> >> > the 2 lines of code required for this function.
->> >> >> >
->> >> >> > Especially as-it-is, your code does not work properly and leaks memory
->> >> >> > badly. ?Why would you do that on purpose?
->> >> >>
->> >> >> I tried to read some documentation about this.
->> >> >>
->> >> >> 1) driver-mode/device.txt says only that:
->> >> >> > Callback to free the device after all references have
->> >> >> > gone away. This should be set by the allocator of the
->> >> >> > device (i.e. the bus driver that discovered the device).
->> >> >> I *really* do not know how my driver should "free" core on AXI bus.
->> >> >
->> >> > The structure that you have created, added to the bus, is now ready to
->> >> > have its memory freed. ?So free it.
->> >> >
->> >> > This usually means something like:
->> >> > ? ? ? ?struct my_obj = to_my_obj(dev);
->> >> > ? ? ? ?kfree(my_obj);
->> >> > in the release function.
->> >>
->> >> I register core->dev to the bus (I set core->dev.bus and
->> >> core->dev.parent, is that what you mean?). This core->dev is "struct
->> >> dev" embedded in "struct axi_device". By embedded I mean it is *not* a
->> >> pointer, I do not alloc it, it's part of the "struct axi_device".
->> >
->> > That is exactly as it should be.
->> >
->> > Then in your release function, free the struct axi_device. ?It's that
->> > simple. ?To try to free it before then would be wrong and cause
->> > problems.
->>
->> This is because it is defined as:
->> struct axi_device cores[AXI_MAX_NR_CORES];
->
-> No way, seriously?
->
-> You can't do that, no static struct devices please. ?Make these dynamic
-> and everything will be fine. ?The -mm tree used to have a huge warning
-> if you ever tried to register a statically allocated struct, but that
-> didn't really work out, but would have saved you a lot of time here,
-> sorry.
->
-> So dynamically allocate the structures and you will be fine.
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c             |   11 +++++
+ arch/arm/mach-mx5/devices-imx53.h               |    4 ++
+ arch/arm/plat-mxc/Makefile                      |    1 +
+ arch/arm/plat-mxc/ahci_sata.c                   |   43 ++++++++++++++++++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-ahci-imx.c   |   55 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/ahci_sata.h      |   54 ++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 ++++
+ 9 files changed, 183 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/ahci_sata.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
 
-Well, I saw that along kernel, I had no idea there is anything wrong
-about this. It seems more ppl do not know about this:
-struct radeon_ib	ibs[RADEON_IB_POOL_SIZE];
-struct radeon_pm_clock_info clock_info[8];
-struct radeon_pm_profile profiles[PM_PROFILE_MAX];
-struct radeon_surface_reg surface_regs[RADEON_GEM_MAX_SURFACES];
-struct radeon_i2c_chan *i2c_bus[RADEON_MAX_I2C_BUS];
-
-struct b43_key key[B43_NR_GROUP_KEYS * 2 + B43_NR_PAIRWISE_KEYS];
-
-struct ssb_device devices[SSB_MAX_NR_CORES];
-I guess I could fine more examples by simple grepping .h files.
-
-Is there some guide around with things like this we should avoid?
-checkpatch does no catch this, so maybe just some manual? Could you
-point me to it?
-
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 652ace4..8bf2bab 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1380,6 +1380,14 @@ static struct clk esdhc4_mx53_clk = {
+ 	.secondary = &esdhc4_ipg_clk,
+ };
+ 
++static struct clk sata_clk = {
++	.parent = &ipg_clk,
++	.enable = _clk_max_enable,
++	.enable_reg = MXC_CCM_CCGR4,
++	.enable_shift = MXC_CCM_CCGRx_CG1_OFFSET,
++	.disable = _clk_max_disable,
++};
++
+ DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
+ DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
+ DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
+@@ -1468,6 +1476,9 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
++	_REGISTER_CLOCK("ahci.0", NULL, sata_clk)
++	_REGISTER_CLOCK(NULL, "usb_phy1", usb_phy1_clk)
++	_REGISTER_CLOCK(NULL, "ahb", ahb_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index 9251008..390b469 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -33,3 +33,7 @@ extern const struct imx_spi_imx_data imx53_ecspi_data[] __initconst;
+ extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
+ #define imx53_add_imx2_wdt(id, pdata)	\
+ 	imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
++
++extern const struct imx_ahci_data imx53_ahci_data __initconst;
++#define imx53_add_ahci(id, pdata)   \
++	imx_add_ahci(&imx53_ahci_data, pdata)
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index a138787..a9386bc 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
+ obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_AHCI)	+= ahci_sata.o
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
+diff --git a/arch/arm/plat-mxc/ahci_sata.c b/arch/arm/plat-mxc/ahci_sata.c
+new file mode 100644
+index 0000000..1455eaf
+--- /dev/null
++++ b/arch/arm/plat-mxc/ahci_sata.c
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <mach/ahci_sata.h>
++
++/* AHCI module Initialization, if return 0, initialization is successful. */
++int sata_init(void __iomem *addr, unsigned long timer1ms)
++{
++	u32 tmpdata;
++
++	tmpdata = readl(addr + HOST_CAP);
++	if (!(tmpdata & HOST_CAP_SSS)) {
++		tmpdata |= HOST_CAP_SSS;
++		writel(tmpdata, addr + HOST_CAP);
++	}
++
++	if (!(readl(addr + HOST_PORTS_IMPL) & 0x1))
++		writel((readl(addr + HOST_PORTS_IMPL) | 0x1),
++			addr + HOST_PORTS_IMPL);
++
++	writel(timer1ms, addr + HOST_TIMER1MS);
++
++	return 0;
++}
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index b9ab1d5..bbeab2d 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 
+ config IMX_HAVE_PLATFORM_SPI_IMX
+ 	bool
++
++config IMX_HAVE_PLATFORM_AHCI
++	bool
++	default y if ARCH_MX53
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 75cd2ec..a4dcfcd 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_AHCI) +=  platform-ahci-imx.o
+diff --git a/arch/arm/plat-mxc/devices/platform-ahci-imx.c b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
+new file mode 100644
+index 0000000..65a76ce
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <asm/sizes.h>
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx_ahci_data_entry_single(soc)					\
++	{								\
++		.iobase = soc ## _SATA_BASE_ADDR,			\
++		.irq = soc ## _INT_SATA,				\
++	}
++
++#ifdef CONFIG_SOC_IMX53
++const struct imx_ahci_data imx53_ahci_data __initconst =
++	imx_ahci_data_entry_single(MX53);
++#endif
++
++struct platform_device *__init imx_add_ahci(
++		const struct imx_ahci_data *data,
++		const struct ahci_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobase,
++			.end = data->iobase + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irq,
++			.end = data->irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device_dmamask("ahci", 0,
++			res, ARRAY_SIZE(res),
++			pdata, sizeof(*pdata),  DMA_BIT_MASK(32));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/ahci_sata.h b/arch/arm/plat-mxc/include/mach/ahci_sata.h
+new file mode 100644
+index 0000000..dbaaf74
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/ahci_sata.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#ifndef __PLAT_MXC_AHCI_SATA_H__
++#define __PLAT_MXC_AHCI_SATA_H__
++
++enum {
++	HOST_CAP = 0x00,
++	HOST_CAP_SSS = (1 << 27), /* Staggered Spin-up */
++	HOST_PORTS_IMPL	= 0x0c,
++	HOST_TIMER1MS = 0xe0, /* Timer 1-ms */
++	/* Offest used to control the MPLL input clk */
++	PHY_CR_CLOCK_FREQ_OVRD = 0x12,
++	/* Port0 SATA Status */
++	PORT_SATA_SR = 0x128,
++	/* Port0 PHY Control */
++	PORT_PHY_CTL = 0x178,
++	/* PORT_PHY_CTL bits */
++	PORT_PHY_CTL_CAP_ADR_LOC = 0x10000,
++	PORT_PHY_CTL_CAP_DAT_LOC = 0x20000,
++	PORT_PHY_CTL_WRITE_LOC = 0x40000,
++	PORT_PHY_CTL_READ_LOC = 0x80000,
++	/* Port0 PHY Status */
++	PORT_PHY_SR = 0x17c,
++	/* PORT_PHY_SR */
++	PORT_PHY_STAT_DATA_LOC = 0,
++	PORT_PHY_STAT_ACK_LOC = 18,
++	/* SATA PHY Register */
++	SATA_PHY_CR_CLOCK_CRCMP_LT_LIMIT = 0x0001,
++	SATA_PHY_CR_CLOCK_DAC_CTL = 0x0008,
++	SATA_PHY_CR_CLOCK_RTUNE_CTL = 0x0009,
++	SATA_PHY_CR_CLOCK_ADC_OUT = 0x000A,
++	SATA_PHY_CR_CLOCK_MPLL_TST = 0x0017,
++};
++
++extern int sata_init(void __iomem *addr, unsigned long timer1ms);
++#endif /* __PLAT_MXC_AHCI_SATA_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8658c9c..b85469d 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -264,3 +264,13 @@ struct imx_spi_imx_data {
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
++
++#include <linux/ahci_platform.h>
++struct imx_ahci_data {
++	int id;
++	resource_size_t iobase;
++	resource_size_t irq;
++};
++struct platform_device *__init imx_add_ahci(
++		const struct imx_ahci_data *data,
++		const struct ahci_platform_data *pdata);
 -- 
-Rafa?
+1.7.1
