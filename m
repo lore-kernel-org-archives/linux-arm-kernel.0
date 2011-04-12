@@ -1,57 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Apr 2011 19:35:35 +0100
-Subject: [PATCH 1/6] ARM: omap: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1302633340-4795-2-git-send-email-will.deacon@arm.com>
+From: george@znau.edu.ua (George Kashperko)
+Date: Tue, 12 Apr 2011 21:47:19 +0300
+Subject: [RFC][PATCH] axi: add AXI bus driver
+In-Reply-To: <20110412133633.GR15130@legolas.emea.dhcp.ti.com>
+References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
+	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
+Message-ID: <1302634039.14216.10.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the OMAP gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
 
-Cc: Colin Cross <ccross@google.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/plat-omap/gpio.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+> Hi,
+> 
+> On Tue, Apr 12, 2011 at 01:57:07AM +0200, Rafa? Mi?ecki wrote:
+> > Cc: Michael B?sch <mb@bu3sch.de>
+> > Cc: Larry Finger <Larry.Finger@lwfinger.net>
+> > Cc: George Kashperko <george@znau.edu.ua>
+> > Cc: Arend van Spriel <arend@broadcom.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Russell King <rmk@arm.linux.org.uk>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Andy Botting <andy@andybotting.com>
+> > Cc: linuxdriverproject <devel@linuxdriverproject.org>
+> > Cc: linux-kernel at vger.kernel.org <linux-kernel@vger.kernel.org>
+> > Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> > ---
+> > V2: Rename to axi
+> >     Use DEFINE_PCI_DEVICE_TABLE in bridge
+> >     Make use of pr_fmt and pr_*
+> >     Store core class
+> >     Rename bridge to not b43 specific
+> >     Replace magic 0x1000 with BCMAI_CORE_SIZE
+> >     Remove some old "ssb" names and defines
+> >     Move BCMAI_ADDR_BASE def
+> >     Add drvdata field
+> > V3: Fix reloading (kfree issue)
+> >     Add 14e4:0x4331
+> >     Fix non-initialized struct issue
+> >     Drop useless inline functions wrappers for pci core drv
+> >     Proper pr_* usage
+> > V3.1: Include forgotten changes (pr_* and include related)
+> >     Explain why we dare to implement empty release function
+> 
+> I'm not sure we need this. If you have an IP Core which talks AXI and
+> you want to put it on a PCI bus, you will have a PCI Bus wrapper around
+> that IP Core, so you should go and let the kernel know about that. See
+> [1] for a core IP which talks AXI and [2] for a PCI bus glue layer.
+> 
+> Besides, if you introduce this bus layer, it'll be more difficult for
+> other licensees of the same core to re-use the same driver, since it's
+> now talking a PCI emulated on top of AXI. The same can be achieved with
+> the platform_bus which is more widely used, specially on ARM SoCs.
+> 
+> [1] http://gitorious.org/usb/usb/blobs/dwc3/drivers/usb/dwc3/core.c
+> [2] http://gitorious.org/usb/usb/blobs/dwc3/drivers/usb/dwc3/dwc3-haps.c
+> 
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index d2adcdd..a2478eb 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1137,8 +1137,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct gpio_bank *bank;
- 	u32 retrigger = 0;
- 	int unmasked = 0;
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
- 
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
-+	chained_irq_enter(chip, desc);
- 
- 	bank = irq_get_handler_data(irq);
- #ifdef CONFIG_ARCH_OMAP1
-@@ -1195,7 +1196,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		configured, we could unmask GPIO bank interrupt immediately */
- 		if (!level_mask && !unmasked) {
- 			unmasked = 1;
--			desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+			chained_irq_exit(chip, desc);
- 		}
- 
- 		isr |= retrigger;
-@@ -1231,7 +1232,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	interrupt */
- exit:
- 	if (!unmasked)
--		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+		chained_irq_exit(chip, desc);
- }
- 
- static void gpio_irq_shutdown(struct irq_data *d)
--- 
-1.7.0.4
+Already noticed earlier that AXI isnt really good name for
+Broadcom-specific axi bus customization. As of tech docs available from
+arm, corelink AXI cores use own identification registers which feature
+different format and layout comparing to that we use for Broadcom cores.
+
+Maybe there is something "standartized" by the DMP specs? If so I'm
+curious if that DMP is obligatory for every axi bus ?
+
+Naming particular Broadcom's implementation just axi limits other
+licensees in reusing axi bus name/code or will require hacks/workarounds
+from them to fit Broadcom-like core scanning/identificating techniques.
+You use bus named AXI to group and manage Broadcom cores, while never
+even publish device records for native axi cores Broadcom use to talk to
+the interconnect through. Yet again, something like bcmb/bcmai looks
+like better name for this bus.
+
+Also can't figure out how is this implementation supposed to manage
+multicore devices.
+
+Any plans on embeddables' support ?
+
+Have nice day,
+George
