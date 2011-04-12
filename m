@@ -1,60 +1,56 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Tue, 12 Apr 2011 23:23:30 +0300
-Subject: [RFC][PATCH] axi: add AXI bus driver
-In-Reply-To: <4DA4AC4B.90409@hauke-m.de>
-References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
-	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
-	<1302634039.14216.10.camel@dev.znau.edu.ua>
-	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
-	<1302635550.14216.21.camel@dev.znau.edu.ua>
-	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
-	<4DA4AC4B.90409@hauke-m.de>
-Message-ID: <1302639810.14216.57.camel@dev.znau.edu.ua>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 21:27:34 +0100
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <20110412095446.GB18850@pengutronix.de>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<20110412095446.GB18850@pengutronix.de>
+Message-ID: <20110412202734.GB7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 12, 2011 at 11:54:46AM +0200, Uwe Kleine-K?nig wrote:
+> #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+> # if defined CONFIG_ARCH_MX1
+> #  define PLAT_PHYS_OFFSET              MX1_PHYS_OFFSET
+> # endif
+> # if defined CONFIG_MACH_MX21 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX21_PHYS_OFFSET)
+> #  define PLAT_PHYS_OFFSET              MX21_PHYS_OFFSET
+> # endif
+> # if defined CONFIG_ARCH_MX25 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX25_PHYS_OFFSET)
+> #  define PLAT_PHYS_OFFSET              MX25_PHYS_OFFSET
+> # endif
 
-> The specification for the AMBA AXI Interface is available for free
-> download from ARM if you register to their website and accept their license:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.set.amba/index.html
-> I got it from there without any problems and the license does not look
-> too bad for me, by having a quick look at it. I do not know if it will
-> help you in any way or if it is completely unrelated.
-> 
-> Why is the existing support for the amba bus not extended or used in any
-> way for this? It exists for some time in drivers/amba/. There already
-> was a discussion about this in https://lkml.org/lkml/2011/3/30/186 , but
-> with no result as I see.
-Existing AMBA bus might is the proper place to publish axi master port
-cores but Rafal's implementation manage those internally. Rafal
-introduces separate Broadcom-specific bus intended exclusively for
-Broadcom-specific devices management. Those devices share common
-identification/management techniques which are completely different from
-those implemented by other existant kernel buses and amba bus (at least
-at it current state) as well. Might be there are good and proper ways to
-extend amba bus driver to support axi as well but its a field for guys
-and girls confident with closed proprietary arm docs.
-Therefore IMHO the bus introduced by Rafal deserves its own driver and
-name. But I'm sure that the "axi" tag isn't good one for this bus.
+And what's wrong with:
 
-> 
-> >>>> Also can't figure out how is this implementation supposed to manage
-> >>>> multicore devices.
-> >>>
-> >>> We have got ideas, but let's first find (wait for) such a device ;)
-> >> bcm4716 usb host ? Don't really know if there are any other multicores.
-> > 
-> > This is SoC, we do not have any problems supporting multiple cores on
-> > SoCs. All cores are available at the same time, without any sliding
-> > windows.
-> > 
-> 
-> Hauke
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-wireless" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+#if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+#ifdef CONFIG_ARCH_MX1
+#ifdef PLAT_PHYS_OFFSET
+#error Invalid configuration - PLAT_PHYS_OFFSET already defined
+#endif
+#define PLAT_PHYS_OFFSET MX1_PHYS_OFFSET
+#endif
 
-Have nice day,
-George
+#ifdef CONFIG_MACH_MX21
+#ifdef PLAT_PHYS_OFFSET
+#error Invalid configuration - PLAT_PHYS_OFFSET already defined
+#endif
+#define PLAT_PHYS_OFFSET MX21_PHYS_OFFSET
+#endif
+...
+#endif
+
+?
+
+Or this _may_ work:
+
+#if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+#if CONFIG_ARCH_MX1 + CONFIG_MACH_MX21 + ... > 1
+#error Invalid configuration - unable to handle different phys base addresses
+#endif
+...
+#endif
