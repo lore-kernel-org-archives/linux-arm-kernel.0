@@ -1,110 +1,65 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Tue, 12 Apr 2011 17:30:27 +0100 (BST)
-Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
-In-Reply-To: <20110412055958.GA3507@ucw.cz>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-	<20110412055958.GA3507@ucw.cz>
-Message-ID: <alpine.DEB.2.00.1104121636460.29883@localhost6.localdomain6>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 12 Apr 2011 10:43:01 -0600
+Subject: [PATCH v2] ARM: Tegra: Harmony: Fix conflicting GPIO numbering
+Message-ID: <1302626581-14125-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Apr 2011, Pavel Machek wrote:
+Currently, both the WM8903 and TPS6586x chips attempt to register with
+gpiolib using the same GPIO numbers. This causes the audio driver to
+fail to initialize.
 
-> Hi!
->
->> There's one ugly thing in this set - I've changed a generic kernel
->> header, <linux/suspend.h> to #define save/restore_processor_state()
->> on ARM so that it only does preempt_disable/enable(). It's
->> surprising that this isn't the default behaviour; all platforms need
->> swsusp_arch_suspend/resume anyway so why force the existance of
->> _two_ arch-specific hooks ?
->
-> Can you submit separate patch cleaning it up?
+To solve this, add a define to board-harmony.h for the TPS6586x, and make
+oard-harmony-power.c use this define, instead of directly referencing
+TEGRA_NR_GPIOS.
 
-How about the attached ?
+This fixes a regression introduced by commit:
+6f168f2fa60f87e85e0df25e87e2372f22f5eb7c
+ARM: tegra: harmony: initialize the TPS65862 PMIC
 
-It's for discussion, and hence not tested (admittedly, I need an x86 test 
-system ...).
+v2: Added commit description for human readers.
 
-The diff is against RMK's devel-stable tree, as of commit 
-5f183860d5007ec76ea36bfa6c36d66e37f0dbcf
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-harmony-power.c |    4 +++-
+ arch/arm/mach-tegra/board-harmony.h       |    3 ++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-
-There's a few hurdles here:
-
-a) who knows all assembly calling conventions for all architectures
-    supported by linux ?
-
-    This applies to SH and S390; save/restore_processor_state on those
-    are primitive and should be inlined within swsusp_arch_suspend/resume,
-    just like the attached patch does for the powerpc variants.
-
-    I've done a bounce call within S390 but don't know enough about SH3
-    for arch/sh/kernel/cpu/sh3/swsusp.S - i.e. add a call in assembly to
-    init_cpu(current), and then ditch save_processor_state.
-
-b) some architectures do things _beyond_ register/state saving in those
-    two functions, and hence rely on them being called paired.
-
-c) CONFIG_KEXEC_JUMP (ab-)uses them. I don't know that subsystem at all,
-    but this sort of re-use means the symbols can't just be ditched.
-    They become arch-dependent though, no non-arch/ code calls them
-    anymore.
-
-What I've attached might break SH3 swsusp, as save_processor_state 
-is no longer called there (it stores FPU state).
-
-
-
-
-I've also been wondering:
-The comments in kernel/power/hibernate.c mention the need to get preempt 
-counts "right" as major motivator to call save/restore_processor_state.
-effect" of save/restore_processor_state).
-
-But then on all architectures in kernels as far back as 2.6.32 it doesn't 
-look like save/restore_processor state are actually adjusting the preempt 
-count; nowhere do they call preempt_enable/disable.
-
-What is and what is not necessary, really ?
-
-
-Finally, on things like e.g. the floating point context saves: Wouldn't 
-this happen as part of freezing processes (in the early stages of 
-suspend), and/or as part of device quiesce ?
-I wonder why e.g. powerpc does it explicitly; not doing so on ARM doesn't 
-seem to cause problems.
-
-
-
->
->> @@ -195,6 +195,14 @@ config VECTORS_BASE
->>  	help
->>  	  The base address of exception vectors.
->>
->> +config ARCH_HIBERNATION_POSSIBLE
->> +	bool
->> +	help
->> +	  If the machine architecture supports suspend-to-disk
->> +	  it should select this automatically for you.
->> +	  Otherwise, say 'Y' at your own peril.
->> +
->
-> Good for debugging, but not good for mainline.
-
-How would this be done better ?
-
-FrankH.
-
->
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: remove-save_processor_state.patch
-Type: text/x-diff
-Size: 10417 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110412/6de02f2b/attachment.bin>
+diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
+index c84442c..5ad8b2f 100644
+--- a/arch/arm/mach-tegra/board-harmony-power.c
++++ b/arch/arm/mach-tegra/board-harmony-power.c
+@@ -24,6 +24,8 @@
+ 
+ #include <mach/irqs.h>
+ 
++#include "board-harmony.h"
++
+ #define PMC_CTRL		0x0
+ #define PMC_CTRL_INTR_LOW	(1 << 17)
+ 
+@@ -98,7 +100,7 @@ static struct tps6586x_platform_data tps_platform = {
+ 	.irq_base	= TEGRA_NR_IRQS,
+ 	.num_subdevs	= ARRAY_SIZE(tps_devs),
+ 	.subdevs	= tps_devs,
+-	.gpio_base	= TEGRA_NR_GPIOS,
++	.gpio_base	= HARMONY_GPIO_TPS6586X(0),
+ };
+ 
+ static struct i2c_board_info __initdata harmony_regulators[] = {
+diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
+index 1e57b07..d85142e 100644
+--- a/arch/arm/mach-tegra/board-harmony.h
++++ b/arch/arm/mach-tegra/board-harmony.h
+@@ -17,7 +17,8 @@
+ #ifndef _MACH_TEGRA_BOARD_HARMONY_H
+ #define _MACH_TEGRA_BOARD_HARMONY_H
+ 
+-#define HARMONY_GPIO_WM8903(_x_)	(TEGRA_NR_GPIOS + (_x_))
++#define HARMONY_GPIO_TPS6586X(_x_)	(TEGRA_NR_GPIOS + (_x_))
++#define HARMONY_GPIO_WM8903(_x_)	(HARMONY_GPIO_TPS6586X(4) + (_x_))
+ 
+ #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
+ #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
+-- 
+1.7.1
