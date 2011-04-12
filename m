@@ -1,49 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2011 21:47:14 +0100
-Subject: A15 h/w virtulization support
-In-Reply-To: <BANLkTi=cOmWQuPY_aG5T6JoOAYCXshdyPg@mail.gmail.com>
-References: <BANLkTi=cOmWQuPY_aG5T6JoOAYCXshdyPg@mail.gmail.com>
-Message-ID: <20110412204714.GD7806@n2100.arm.linux.org.uk>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 12 Apr 2011 22:51:04 +0200
+Subject: [PATCH] ARM: s3c2440: gta02; Register dfbmcs320 device
+Message-ID: <1302641464-27494-1-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 12:16:10PM +0530, Subash Patel wrote:
-> If I am not wrong, Cortex-A15 is WIP with many SoC vendors. From my
-> understanding, A15 has additional operational mode "hypervisor mode"
-> and SMMU support for GuestOS memory to IPA in VMM, and IPA in VMM into
-> PA. I was curious to know whether ARM v7 changes for Linux
-> is happening for this? This will help to understand the KVM changes
-> that may be required to run Linux directly in ring-0, and support
-> guest OS?
+Register the dfbmcs320 device which provides the PCM DAI for the bluetooth
+module.
 
-Currently, I am planning no work on merging virtualization support.
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s3c2440/mach-gta02.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Linus complained during the last merge window about the size of the
-arch/arm sub-tree, and we - as the *entire* ARM community - really
-need to address this issue right now.
-
-Therefore, I will be taking no patches which aren't bug fixes or
-consolidation patches for code which already lives in the kernel.
-
-I am presently not convinced that many people are taking this issue
-seriously enough, believing that "someone else will sort it out for
-me."  This isn't going to happen.  If that's what many people are
-doing, then I believe that we'll see ARM being removed from mainline
-kernels.
-
-Longer term, folk need to open their minds and look through code
-which is already present to see whether code which one SoC already
-implements can be re-used for their SoC, and actually sort out
-re-using that code rather than submitting their own thing.
-
-I believe that we are far too large in mainline to allow anything new
-in.
-
-If you're wondering "why doesn't X do that work" the answer is that
-there have already been efforts to consolidate things, but because of
-the sheer amount of new ARM specific code flowing into the kernel,
-these consolidations completely disappear into the noise.  We need an
-army of people working on this.
-
-So, at the moment, virtualization support for ARM in mainline kernels
-is completely out of the question.
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index 0db2411..7166620 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -409,6 +409,10 @@ struct platform_device s3c24xx_pwm_device = {
+ 	.num_resources	= 0,
+ };
+ 
++static struct platform_device gta02_dfbmcs320_device = {
++	.name = "dfbmcs320",
++};
++
+ static struct i2c_board_info gta02_i2c_devs[] __initdata = {
+ 	{
+ 		I2C_BOARD_INFO("pcf50633", 0x73),
+@@ -523,6 +527,7 @@ static struct platform_device *gta02_devices[] __initdata = {
+ 	&s3c_device_iis,
+ 	&samsung_asoc_dma,
+ 	&s3c_device_i2c0,
++	&gta02_dfbmcs320_device,
+ 	&gta02_buttons_device,
+ 	&s3c_device_adc,
+ 	&s3c_device_ts,
+-- 
+1.7.2.5
