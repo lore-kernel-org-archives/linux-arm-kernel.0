@@ -1,37 +1,24 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 12 Apr 2011 07:59:58 +0200
-Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
-In-Reply-To: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-Message-ID: <20110412055958.GA3507@ucw.cz>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Tue, 12 Apr 2011 14:18:57 +0800
+Subject: [PATCH RFC 0/1] RAMDISK: doing write barrier will return -EIO 
+Message-ID: <1302589138-20686-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-> There's one ugly thing in this set - I've changed a generic kernel
-> header, <linux/suspend.h> to #define save/restore_processor_state()
-> on ARM so that it only does preempt_disable/enable(). It's
-> surprising that this isn't the default behaviour; all platforms need
-> swsusp_arch_suspend/resume anyway so why force the existance of
-> _two_ arch-specific hooks ?
+---
+ drivers/block/brd.c |    6 ++++--
+   1 files changed, 4 insertions(+), 2 deletions(-)
 
-Can you submit separate patch cleaning it up?
+Encounter one RAMDISK issue when use the RAMDISK as the removable
+device through USB OTG on MX51 BBG board.
+I think it's a general issue in such kind of implementation.
 
-> @@ -195,6 +195,14 @@ config VECTORS_BASE
->  	help
->  	  The base address of exception vectors.
->  
-> +config ARCH_HIBERNATION_POSSIBLE
-> +	bool
-> +	help
-> +	  If the machine architecture supports suspend-to-disk
-> +	  it should select this automatically for you.
-> +	  Otherwise, say 'Y' at your own peril.
-> +
 
-Good for debugging, but not good for mainline.
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Here are the reproduce steps:
+1. enable ramdisk in kernel and make default size to 16M.
+2. connect board to PC through USB otg port.
+3. modprobe g_file_storage file=/dev/ram0 removable=1.
+4. check the removable usb devices on PC and need to be formatted
+then write a file to this disk. found data error when create a new
+file on disk in window explore
