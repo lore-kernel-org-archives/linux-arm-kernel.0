@@ -1,34 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 12 Apr 2011 01:25:17 -0700
-Subject: [FAILED] BLD i.MX51 Referenz + linux-next git kernel
-In-Reply-To: <20110408211136.GC18601@pengutronix.de>
-References: <E1Q8IiX-0006uC-GW@himalia.hi.pengutronix.de>
-	<20110408211136.GC18601@pengutronix.de>
-Message-ID: <4DA40C6D.3070302@codeaurora.org>
+From: nickbane1@googlemail.com (Nick Bane)
+Date: Tue, 12 Apr 2011 09:28:29 +0100
+Subject: [PATCH] pxa270 rtc wakeup event fix
+In-Reply-To: <BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+References: <4D9F3AE4.2040101@gmail.com>
+	<201104082136.52297.marek.vasut@gmail.com>
+	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+Message-ID: <4DA40D2D.40807@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/8/2011 2:11 PM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> I haven't looked yet (and won't anymore today), but our autobuilder
-> failed to build because of something that looks like a arm global
-> problem.
->
-> On Fri, Apr 08, 2011 at 10:55:45PM +0200, Pengutronix Sisyphus Druid wrote:
->>                               Source URL .... git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
->>                     Kernel configuration .... use config: mx51_defconfig
->> [...]
->>   CC      arch/arm/kernel/process.o
->> arch/arm/kernel/process.c: In function 'cpu_idle':
->> arch/arm/kernel/process.c:200: error: implicit declaration of function 'cpuidle_call_idle'
->> make[1]: *** [arch/arm/kernel/process.o] Error 1
->> make: *** [arch/arm/kernel] Error 2
->> make: *** Waiting for unfinished jobs....
-> Will look into that on Monday if nobody else cares before.
 
-https://lkml.org/lkml/2011/4/4/109 should fix it.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Hi Nick,
+>
+> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
+> doesn't behave as assumed. A better approach would be to return -1
+> when none-GPIO IRQs are mapped back, let me know if you are OK w/
+> the patch below:
+>
+Hi Eric
+That looks like the right answer.
+Nick
+> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
+> b/arch/arm/mach-pxa/include/mach/gpio.h
+> index b024a8b..b9f4ed1 100644
+> --- a/arch/arm/mach-pxa/include/mach/gpio.h
+> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
+> @@ -103,7 +103,20 @@
+>
+>   #define gpio_to_bank(gpio)	((gpio)>>  5)
+>   #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
+> -#define irq_to_gpio(irq)	IRQ_TO_GPIO(irq)
+> +
+> +static inline int irq_to_gpio(unsigned int irq)
+> +{
+> +	int gpio;
+> +
+> +	if (irq == IRQ_GPIO0 || irq == IRQ_GPIO1)
+> +		return irq - IRQ_GPIO0;
+> +
+> +	gpio = irq - PXA_GPIO_IRQ_BASE;
+> +	if (gpio>= 2&&  gpio<  NR_BUILTIN_GPIO)
+> +		return gpio;
+> +
+> +	return -1;
+> +}
+>
+>   #ifdef CONFIG_CPU_PXA26x
+>   /* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
+> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
+> b/arch/arm/mach-pxa/include/mach/irqs.h
+> index a4285fc..0384024 100644
+> --- a/arch/arm/mach-pxa/include/mach/irqs.h
+> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
+> @@ -93,9 +93,6 @@
+>   #define GPIO_2_x_TO_IRQ(x)	(PXA_GPIO_IRQ_BASE + (x))
+>   #define IRQ_GPIO(x)	(((x)<  2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
+>
+> -#define IRQ_TO_GPIO_2_x(i)	((i) - PXA_GPIO_IRQ_BASE)
+> -#define IRQ_TO_GPIO(i)	(((i)<  IRQ_GPIO(2)) ? ((i) - IRQ_GPIO0) :
+> IRQ_TO_GPIO_2_x(i))
+> -
+>   /*
+>    * The following interrupts are for board specific purposes. Since
+>    * the kernel can only run on one machine at a time, we can re-use
+> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+> index 6bde595..a4af8c5 100644
+> --- a/arch/arm/mach-pxa/pxa25x.c
+> +++ b/arch/arm/mach-pxa/pxa25x.c
+> @@ -285,7 +285,7 @@ static inline void pxa25x_init_pm(void) {}
+>
+>   static int pxa25x_set_wake(struct irq_data *d, unsigned int on)
+>   {
+> -	int gpio = IRQ_TO_GPIO(d->irq);
+> +	int gpio = irq_to_gpio(d->irq);
+>   	uint32_t mask = 0;
+>
+>   	if (gpio>= 0&&  gpio<  85)
+> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+> index 1cb5d0f..909756e 100644
+> --- a/arch/arm/mach-pxa/pxa27x.c
+> +++ b/arch/arm/mach-pxa/pxa27x.c
+> @@ -345,7 +345,7 @@ static inline void pxa27x_init_pm(void) {}
+>    */
+>   static int pxa27x_set_wake(struct irq_data *d, unsigned int on)
+>   {
+> -	int gpio = IRQ_TO_GPIO(d->irq);
+> +	int gpio = irq_to_gpio(d->irq);
+>   	uint32_t mask;
+>
+>   	if (gpio>= 0&&  gpio<  128)
