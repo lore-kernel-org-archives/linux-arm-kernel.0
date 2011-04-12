@@ -1,25 +1,18 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 12 Apr 2011 12:00:44 -0700
-Subject: [PATCH] ARM: Tegra: Seaboard board updates for audio
-In-Reply-To: <1302629547-2368-1-git-send-email-swarren@nvidia.com>
-References: <1302629547-2368-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0493EB3EA2@HQMAIL01.nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Apr 2011 00:32:58 +0530
+Subject: [Q] GIC : IRQ_TYPE_LEVEL_LOW interrupts
+Message-ID: <4DA4A1E2.9090304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Tuesday, April 12, 2011 11:32 AM:
-> * Initialize clock tree for audio
-> * Add GPIO base definitions
-> * Add audio GPIO definitions
-> * Define platform data for WM8903 and ASoC machine driver
-> * Add special case for Kaen to handle HP_MUTE GPIO
-> * Register platform devices for audio
-> * Update pinmux to cater for new GPIOs used for audio
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Rabin,
 
-I forgot to point out that this patch depends on the series "[PATCH 0/3]
-Rename Tegra ASoC driver" having been merged first.
+As part of the commit 5c0c1f08a (gic: implement set_type)
+change, I see that you are ignoring interrupts which
+are of LOW_LEVEL type. Why is that ?
 
--- 
-nvpublic
+There are interrupts of LOW_LEVEL type on OMAP and this
+change break those.
+
+Regards
+Santosh
