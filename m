@@ -1,29 +1,94 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 12 Apr 2011 15:12:43 +0400
-Subject: [PATCH] ARM: Tegra: Harmony: Fix conflicting GPIO numbering
-In-Reply-To: <1302558541-19841-1-git-send-email-swarren@nvidia.com>
-References: <1302558541-19841-1-git-send-email-swarren@nvidia.com>
-Message-ID: <4DA433AB.4040508@ru.mvista.com>
+Date: Tue, 12 Apr 2011 15:28:00 +0400
+Subject: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
+In-Reply-To: <1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1302587472-20435-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <4DA43740.9050806@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 12-04-2011 1:49, Stephen Warren wrote:
+On 12-04-2011 9:51, Richard Zhu wrote:
 
-> Currently, both the WM8903 and TPS6586x chips attempt to register with
-> gpiolib using the same GPIO numbers. This causes the audio driver to
-> fail to initialize.
+> Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
+> ---
+>   arch/arm/mach-mx5/board-mx53_loco.c |   76 +++++++++++++++++++++++++++++++++++
+>   1 files changed, 76 insertions(+), 0 deletions(-)
 
-> To solve this, add a define to board-harmony.h for the TPS6586x, and make
-> oard-harmony-power.c use this define, instead of directly referencing
-> TEGRA_NR_GPIOS.
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+> index 0a18f8d..644aaa2 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+[...]
+> @@ -203,6 +206,78 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
+>   	.bitrate = 100000,
+>   };
+>
+> +/* HW Initialization, if return 0, initialization is successful. */
+> +static int mx53_loco_sata_init(struct device *dev, void __iomem *addr)
+> +{
+> +	u32 tmpdata;
+> +	int ret = 0;
+> +	struct clk *clk;
+> +
+> +	sata_clk = clk_get(dev, NULL);
+> +	if (IS_ERR(sata_clk)) {
+> +		dev_err(dev, "no sata clock.\n");
+> +		return PTR_ERR(sata_clk);
+> +	}
+> +	ret = clk_enable(sata_clk);
+> +	if (ret) {
+> +		dev_err(dev, "can't enable sata clock.\n");
+> +		clk_put(sata_clk);
 
-> This fixes a regression introduced by commit
-> 6f168f2fa60f87e85e0df25e87e2372f22f5eb7c.
+    Why duplicate clk_put() which you already have at the end of function?
+Just define another label there.
 
-    Please specify the commit's summary in parens -- for the human readers.
+> +		return ret;
+> +	}
+> +
+> +	/* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
+> +	sata_ref_clk = clk_get(NULL, "usb_phy1");
+> +	if (IS_ERR(sata_ref_clk)) {
+> +		dev_err(dev, "no sata ref clock.\n");
+> +		ret = PTR_ERR(sata_ref_clk);
+> +		goto release_sata_clk;
+> +	}
+> +	ret = clk_enable(sata_ref_clk);
+> +	if (ret) {
+> +		dev_err(dev, "can't enable sata ref clock.\n");
+> +		clk_put(sata_ref_clk);
 
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+    Same question.
+
+> +		goto release_sata_clk;
+> +	}
+> +
+> +	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
+> +	clk = clk_get(NULL, "ahb");
+> +	if (IS_ERR(clk)) {
+> +		dev_err(dev, "no ahb clock.\n");
+> +		ret = PTR_ERR(clk);
+> +		goto release_sata_ref_clk;
+> +	}
+> +	tmpdata = clk_get_rate(clk) / 1000;
+> +	clk_put(clk);
+> +
+> +	sata_init(addr, tmpdata);
+> +
+> +	return ret;
+> +
+> +release_sata_ref_clk:
+> +	clk_disable(sata_ref_clk);
+> +	clk_put(sata_ref_clk);
+> +
+> +release_sata_clk:
+> +	clk_disable(sata_clk);
+> +	clk_put(sata_clk);
+> +
+> +	return ret;
+> +}
 
 WBR, Sergei
