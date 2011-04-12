@@ -1,87 +1,48 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 12 Apr 2011 20:32:08 +0200
-Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
-In-Reply-To: <alpine.DEB.2.00.1104121636460.29883@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-	<20110412055958.GA3507@ucw.cz>
-	<alpine.DEB.2.00.1104121636460.29883@localhost6.localdomain6>
-Message-ID: <20110412183208.GC26916@elf.ucw.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Apr 2011 19:35:37 +0100
+Subject: [PATCH 3/6] ARM: s5pv310: update IRQ combiner to use chained
+	entry/exit functions
+In-Reply-To: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1302633340-4795-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patch updates the IRQ combiner chained IRQ handler code to use the
+chained IRQ enter/exit functions in order to function correctly on
+primary controllers with different methods of flow control.
 
-> >>There's one ugly thing in this set - I've changed a generic kernel
-> >>header, <linux/suspend.h> to #define save/restore_processor_state()
-> >>on ARM so that it only does preempt_disable/enable(). It's
-> >>surprising that this isn't the default behaviour; all platforms need
-> >>swsusp_arch_suspend/resume anyway so why force the existance of
-> >>_two_ arch-specific hooks ?
-> >
-> >Can you submit separate patch cleaning it up?
-> 
-> How about the attached ?
-> 
-> It's for discussion, and hence not tested (admittedly, I need an x86
-> test system ...).
-...
+This is required for the GIC to move to fasteoi interrupt handling.
 
-> I've also been wondering:
-> The comments in kernel/power/hibernate.c mention the need to get
-> preempt counts "right" as major motivator to call
-> save/restore_processor_state.
-> effect" of save/restore_processor_state).
-> 
-> But then on all architectures in kernels as far back as 2.6.32 it
-> doesn't look like save/restore_processor state are actually
-> adjusting the preempt count; nowhere do they call
-> preempt_enable/disable.
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-exynos4/irq-combiner.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-You might need to dig a bit more. IIRC it manipulated FPU or something
-long time ago.
-
-> Finally, on things like e.g. the floating point context saves:
-> Wouldn't this happen as part of freezing processes (in the early
-> stages of suspend), and/or as part of device quiesce ?
-
-Are you sure? I thought we have (had?) concept of lazy FPU
-saving... and occassionaly kernel uses FPU too (with some
-precautions).
-
-> >>@@ -195,6 +195,14 @@ config VECTORS_BASE
-> >> 	help
-> >> 	  The base address of exception vectors.
-> >>
-> >>+config ARCH_HIBERNATION_POSSIBLE
-> >>+	bool
-> >>+	help
-> >>+	  If the machine architecture supports suspend-to-disk
-> >>+	  it should select this automatically for you.
-> >>+	  Otherwise, say 'Y' at your own peril.
-> >>+
-> >
-> >Good for debugging, but not good for mainline.
-> 
-> How would this be done better ?
-
-Just set the ARCH_HIBERNATION_POSSIBLE=y in the ARM code now that ARM
-can do it. No need to ask user.
-
-> @@ -412,8 +413,7 @@ static int resume_target_kernel(bool platform_mode)
->  	if (error)
->  		goto Enable_irqs;
->  
-> -	/* We'll ignore saved state, but this gets preempt count (etc) right */
-> -	save_processor_state();
-> +	preempt_disable();
->  	error = restore_highmem();
->  	if (!error) {
->  		error = swsusp_arch_resume();
-
-Yep. save_processor_state() on x86 does kernel_fpu_begin(), and than
-one needs to be balanced IIRC.
-
-									Pavel
+diff --git a/arch/arm/mach-exynos4/irq-combiner.c b/arch/arm/mach-exynos4/irq-combiner.c
+index f488b66..5a2758a 100644
+--- a/arch/arm/mach-exynos4/irq-combiner.c
++++ b/arch/arm/mach-exynos4/irq-combiner.c
+@@ -59,8 +59,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	unsigned int cascade_irq, combiner_irq;
+ 	unsigned long status;
+ 
+-	/* primary controller ack'ing */
+-	chip->irq_ack(&desc->irq_data);
++	chained_irq_enter(chip, desc);
+ 
+ 	spin_lock(&irq_controller_lock);
+ 	status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
+@@ -79,8 +78,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 		generic_handle_irq(cascade_irq);
+ 
+  out:
+-	/* primary controller unmasking */
+-	chip->irq_unmask(&desc->irq_data);
++	chained_irq_exit(chip, desc);
+ }
+ 
+ static struct irq_chip combiner_chip = {
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.0.4
