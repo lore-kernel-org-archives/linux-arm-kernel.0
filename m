@@ -1,37 +1,39 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 12 Apr 2011 19:06:20 +0400
-Subject: [RFC PATCH 0/5] Convert some ARM platforms to basic-mmio-gpio
-In-Reply-To: <20110411144928.GL18601@pengutronix.de>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<20110411134320.GJ18601@pengutronix.de>
-	<20110411135215.GD2818@pulham.picochip.com>
-	<20110411142307.GK18601@pengutronix.de>
-	<20110411143327.GA21449@pulham.picochip.com>
-	<20110411144928.GL18601@pengutronix.de>
-Message-ID: <20110412150620.GB8931@oksana.dev.rtsoft.ru>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 12 Apr 2011 22:46:25 +0800
+Subject: reboot/kexec in 2.6.38
+In-Reply-To: <20110412144330.GB20815@atrey.karlin.mff.cuni.cz>
+References: <20110317064523.GA1995@ucw.cz>
+	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
+	<20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
+	<m1bp0zylgg.fsf@fess.ebiederm.org>
+	<20110412144330.GB20815@atrey.karlin.mff.cuni.cz>
+Message-ID: <BANLkTikZXjfD82DxoahkvUo+26cjvOKZmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2011 at 04:49:28PM +0200, Uwe Kleine-K?nig wrote:
-[...]
-> > Hmm, so this looks like it's because mxc_gpio_init() is being called 
-> > from init_IRQ which is too early for platform devices.  Is there a 
-> > suitable place where this can be called later in the boot process?  I 
-> > guess the gpio irq stuff should remain where it is but the 
-> > platform_device registration should be moved to later.
-> I guess this means that using gpios in .init_machine (== arch_initcall
-> time) stops working then?
+On Tue, Apr 12, 2011 at 10:43 PM, Cyril Hrubis <metan@ucw.cz> wrote:
+> Hi!
+>> >> I think it's config issue. Never heard of this.
+>> >
+>> > I've just compiled and booted 2.6.38. The kernel boots without problems when
+>> > flashed in. But I've had no success with kexec, the last lines I see are:
+>> >
+>> > Starting new kernel
+>>
+>> Enable early_printk to a serial port if you can.
+>>
+>> There is definitely an issue in 2.6.38 where kdump doesn't work, that
+>> right now looks like a memblock issue.
+>
+> Finaly got time to solder serial adapter...
+>
+> And now, after I configured kernel to print to both ttyS0 serial console and
+> tty0 the kexec started to work.
 
-Probably it's a bad sign for a platform if it wants to use it
-that early (i.e. like init_IRQ).
+Cool. Please help check why it didn't work, and see if we have something
+broken.
 
-But as GPIOs is quite essential part of an embedded system, and
-some platform code might actually need it, I guess having the stuff
-available in arch_initcall would be fine though (assuming
-basic_mmio_gpio will be changed to use postcore_initcall).
-
-Thanks,
-
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+>
+> --
+> metan
+>
