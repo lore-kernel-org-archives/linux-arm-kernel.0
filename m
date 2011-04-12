@@ -1,31 +1,49 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 12 Apr 2011 22:44:01 +0200
-Subject: [RFC][PATCH] axi: add AXI bus driver
-In-Reply-To: <1302640546.14216.65.camel@dev.znau.edu.ua>
-References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
-	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
-	<1302634039.14216.10.camel@dev.znau.edu.ua>
-	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
-	<1302635550.14216.21.camel@dev.znau.edu.ua>
-	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
-	<4DA4AC4B.90409@hauke-m.de>
-	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
-	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
-	<1302640546.14216.65.camel@dev.znau.edu.ua>
-Message-ID: <BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 21:47:14 +0100
+Subject: A15 h/w virtulization support
+In-Reply-To: <BANLkTi=cOmWQuPY_aG5T6JoOAYCXshdyPg@mail.gmail.com>
+References: <BANLkTi=cOmWQuPY_aG5T6JoOAYCXshdyPg@mail.gmail.com>
+Message-ID: <20110412204714.GD7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/12 George Kashperko <george@znau.edu.ua>:
->> 2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
->> That way I see really low (or not at all) relation between out
->> (not)Broadcom bus and present AMBA bus.
->>
-> Agree.
+On Tue, Apr 12, 2011 at 12:16:10PM +0530, Subash Patel wrote:
+> If I am not wrong, Cortex-A15 is WIP with many SoC vendors. From my
+> understanding, A15 has additional operational mode "hypervisor mode"
+> and SMMU support for GuestOS memory to IPA in VMM, and IPA in VMM into
+> PA. I was curious to know whether ARM v7 changes for Linux
+> is happening for this? This will help to understand the KVM changes
+> that may be required to run Linux directly in ring-0, and support
+> guest OS?
 
-Ehh, sounds like one more renaming to functions, defines, prefixes.
+Currently, I am planning no work on merging virtualization support.
 
-Let's wait for Arend comments, he was the one voting for not-bcm-specific name.
+Linus complained during the last merge window about the size of the
+arch/arm sub-tree, and we - as the *entire* ARM community - really
+need to address this issue right now.
 
--- 
-Rafa?
+Therefore, I will be taking no patches which aren't bug fixes or
+consolidation patches for code which already lives in the kernel.
+
+I am presently not convinced that many people are taking this issue
+seriously enough, believing that "someone else will sort it out for
+me."  This isn't going to happen.  If that's what many people are
+doing, then I believe that we'll see ARM being removed from mainline
+kernels.
+
+Longer term, folk need to open their minds and look through code
+which is already present to see whether code which one SoC already
+implements can be re-used for their SoC, and actually sort out
+re-using that code rather than submitting their own thing.
+
+I believe that we are far too large in mainline to allow anything new
+in.
+
+If you're wondering "why doesn't X do that work" the answer is that
+there have already been efforts to consolidate things, but because of
+the sheer amount of new ARM specific code flowing into the kernel,
+these consolidations completely disappear into the noise.  We need an
+army of people working on this.
+
+So, at the moment, virtualization support for ARM in mainline kernels
+is completely out of the question.
