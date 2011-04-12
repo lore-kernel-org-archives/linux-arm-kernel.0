@@ -1,46 +1,53 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 12 Apr 2011 23:24:59 +0800
-Subject: [PATCH 2/7] ARM: pxa: always clear LPM bits for PXA168 MFPR
-In-Reply-To: <1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <BANLkTi=Ne4TT3KgizKSoA8TWD-AyuZiczw@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 12 Apr 2011 17:25:39 +0200
+Subject: [RFC][PATCH V3] axi: add AXI bus driver
+In-Reply-To: <20110412151453.GA20978@kroah.com>
+References: <20110411210631.GA28559@kroah.com>
+	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
+	<20110411212513.GA17809@kroah.com>
+	<BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
+	<20110411215619.GA27943@kroah.com>
+	<BANLkTimjThXn347+=m98NsBXY84guJjNqA@mail.gmail.com>
+	<20110411223632.GB31833@kroah.com>
+	<BANLkTinpKKRCrBik6-9C5WqcSDGuEt5yCw@mail.gmail.com>
+	<20110411233506.GA13240@kroah.com>
+	<BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
+	<20110412151453.GA20978@kroah.com>
+Message-ID: <BANLkTi=6tDsBF9jULDXLJ05zaHrD-+EC2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 8, 2011 at 8:15 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> Bit[9:7] should always be zero in PXA168.
+2011/4/12 Greg KH <greg@kroah.com>:
+> On Tue, Apr 12, 2011 at 07:41:18AM +0200, Rafa? Mi?ecki wrote:
+>> > You can't do that, no static struct devices please. ?Make these dynamic
+>> > and everything will be fine. ?The -mm tree used to have a huge warning
+>> > if you ever tried to register a statically allocated struct, but that
+>> > didn't really work out, but would have saved you a lot of time here,
+>> > sorry.
+>> >
+>> > So dynamically allocate the structures and you will be fine.
+>>
+>> Well, I saw that along kernel, I had no idea there is anything wrong
+>> about this. It seems more ppl do not know about this:
+>> struct radeon_ib ? ? ?ibs[RADEON_IB_POOL_SIZE];
+>> struct radeon_pm_clock_info clock_info[8];
+>> struct radeon_pm_profile profiles[PM_PROFILE_MAX];
+>> struct radeon_surface_reg surface_regs[RADEON_GEM_MAX_SURFACES];
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Are you sure these are all containing a 'struct device'?
 
-Applied to 'fix'.
+I didn't catch from you mail that you mean "struct device" only. I
+though it apply to all structs.
 
-> ---
-> ?arch/arm/mach-mmp/include/mach/mfp-pxa168.h | ? ?9 +++++++++
-> ?1 files changed, 9 insertions(+), 0 deletions(-)
+
+>> checkpatch does no catch this, so maybe just some manual? Could you
+>> point me to it?
 >
-> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> index 4621067..713be15 100644
-> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> @@ -8,6 +8,15 @@
-> ?#define MFP_DRIVE_MEDIUM ? ? ? (0x2 << 13)
-> ?#define MFP_DRIVE_FAST ? ? ? ? (0x3 << 13)
->
-> +#undef MFP_CFG
-> +#undef MFP_CFG_DRV
-> +
-> +#define MFP_CFG(pin, af) ? ? ? ? ? ? ? \
-> + ? ? ? (MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_MEDIUM)
-> +
-> +#define MFP_CFG_DRV(pin, af, drv) ? ? ?\
-> + ? ? ? (MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_##drv)
-> +
-> ?/* GPIO */
-> ?#define GPIO0_GPIO ? ? ? ? ? ? MFP_CFG(GPIO0, AF5)
-> ?#define GPIO1_GPIO ? ? ? ? ? ? MFP_CFG(GPIO1, AF5)
-> --
-> 1.5.6.5
->
->
+> It's a structure that has dynamic lifetime rules, you can't statically
+> allocate it safely. ?It's that simple.
+
+Ah, and this is a great explanation, for all the time I tough the
+problem is memory issue. Now it makes sense, thanks.
+
+-- 
+Rafa?
