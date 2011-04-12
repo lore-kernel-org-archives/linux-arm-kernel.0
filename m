@@ -1,33 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2011 22:40:11 +0100
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110412214011.GG7806@n2100.arm.linux.org.uk>
+Date: Tue, 12 Apr 2011 22:46:21 +0100
+Subject: [PATCH] ARM: Kconfig.debug: Remove unused CONFIG_DEBUG_ERRORS
+In-Reply-To: <4DA33720.5020206@codeaurora.org>
+References: <1302300518-7523-1-git-send-email-sboyd@codeaurora.org>
+	<alpine.LNX.2.00.1104101904000.17706@swampdragon.chaosbits.net>
+	<4DA33720.5020206@codeaurora.org>
+Message-ID: <20110412214621.GH7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 11:06:34PM +0200, Janusz Krzysztofik wrote:
-> The patch tries to solve this regression by using 
-> virt_to_phys(bus_to_virt(mem->dma_handle)) instead of problematic 
-> virt_to_phys(mem->vaddr).
+On Mon, Apr 11, 2011 at 10:15:12AM -0700, Stephen Boyd wrote:
+> > But, I see a lot of *_defconfig files in my copy of the tree that 
+> > reference the option :
+> >
+> [snip]
+> > shouldn't those lines be removed as well?
+> >
+> > I can submit a patch, but I thought you'd rather do it yourself..
+> >
+> 
+> I was concerned that it would be more churn in the defconfigs. I can
+> make a patch for that too though. Or we could just wait for the
+> defconfigs to be regenerated and then the symbols would be dropped?
 
-Who says that DMA handles are bus addresses in the strictest sense?
+Two points here:
 
-DMA handles on ARM are the bus address to program 'dev' with in order
-for it to access the memory mapped by dma_alloc_coherent().  On some
-ARM platforms, this bus address is dependent on 'dev' - such as platforms
-with more than one root PCI bus, and so bus_to_virt() just doesn't
-hack it.
+1. if it removes stuff, that's good.
+2. but it has the potential to cause conflicts when other defconfig
+   updates happen.
 
-What is really needed is for this problem - the mapping of DMA coherent
-memory into userspace - to be solved with a proper arch API rather than
-all these horrible hacks which subsystems instead invent.  That's
-something I tried to do with the dma_mmap_coherent() stuff but it was
-shot down by linux-arch as (iirc) PA-RISC objected to it.
-
-Hence why ARM only implements it.
-
-Maybe the video drivers should try to resurect the idea, maybe only
-allowing this support for architectures which provide dma_mmap_coherent().
+I think (2) outweighs (1), and as it's only one line, I agree with the
+idea of just leaving it for when the defconfigs get updated.  We need
+more effort spent on consolidating the bigger fish...
