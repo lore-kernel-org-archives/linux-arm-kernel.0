@@ -1,47 +1,64 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Tue, 12 Apr 2011 23:57:34 +0300
-Subject: [RFC][PATCH] axi: add AXI bus driver
-In-Reply-To: <BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
-References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
-	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
-	<1302634039.14216.10.camel@dev.znau.edu.ua>
-	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
-	<1302635550.14216.21.camel@dev.znau.edu.ua>
-	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
-	<4DA4AC4B.90409@hauke-m.de>
-	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
-	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
-	<1302640546.14216.65.camel@dev.znau.edu.ua>
-	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
-Message-ID: <1302641854.14216.77.camel@dev.znau.edu.ua>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 22:01:47 +0100
+Subject: [PATCH 3/7] ARM: mmp: set correct uart according to board
+In-Reply-To: <1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
+References: <2011040801>
+	<1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
+	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
+	<1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110412210147.GF7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> 2011/4/12 George Kashperko <george@znau.edu.ua>:
-> >> 2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
-> >> That way I see really low (or not at all) relation between out
-> >> (not)Broadcom bus and present AMBA bus.
-> >>
-> > Agree.
+On Fri, Apr 08, 2011 at 08:15:40PM +0800, Haojian Zhuang wrote:
+> UART3 is the default console in jasper, brownstone and avengers lite.
 > 
-> Ehh, sounds like one more renaming to functions, defines, prefixes.
-> 
-> Let's wait for Arend comments, he was the one voting for not-bcm-specific name.
-> 
-Sounds like good plan :)
+> Change-Id: Iacfe665cc0e20a47d50e0b2ad8724097f28e7d2c
 
-Btw, while waiting.... Digging the web clearing different things around
-ssb/axi found few broadcom ssb docs some of you maybe find interesting
-to look through.
-http://read.pudn.com/downloads127/doc/fileformat/537112/mips/bcm5836/5836-5836P-PG01-RDS.pdf
-http://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
+Please don't include Change-Ids in patch submissions.
 
-Also, one more question to Arend:
-could you please ask if there are any plans on lifting UNPUBLISHED
-PROPRIETARY for GMAC core driver sources (etcgmac.c, have this core at
-bcm4716-based ASUS N16, might used at other bcm471X socs as well) or
-possibly Broadcom could publish some doc for the chip?
+> diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
+> index 7e2ebd3..b353785 100644
+> --- a/arch/arm/mach-mmp/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
+> @@ -14,8 +14,14 @@
+>  		.macro	addruart, rp, rv
+>  		ldr	\rp, =APB_PHYS_BASE		@ physical
+>  		ldr	\rv, =APB_VIRT_BASE		@ virtual
+> +#if defined(CONFIG_MACH_BROWNSTONE) || defined(CONFIG_MACH_MARVELL_JASPER) \
+> +	|| defined(CONFIG_MACH_AVENGERS_LITE)
+> +		orr	\rp, \rp, #0x00018000
+> +		orr	\rv, \rv, #0x00018000
+> +#else
+>  		orr	\rp, \rp, #0x00017000
+>  		orr	\rv, \rv, #0x00017000
+> +#endif
 
-Have nice day,
-George
+It probably makes more sense to have this in the configuration scripts:
+
+choice
+	prompt "PXA debug uart"
+	default DEBUG_PXA_UART0
+
+config DEBUG_PXA_UART0
+	bool "UART 0"
+
+config DEBUG_PXA_UART1
+	bool "UART 1"
+	default y if MACH_BROWNSTONE || MACH_MARVELL_JASPER || MACH_AVENGERS_LITE
+
+endchoice
+
+and select the debug uart address using these symbols.  That'd avoid the
+need to couple lots of platform specific stuff into the compiled files.
+
+Alternatively, you could do more in the Kconfig like this:
+
+config DEBUG_PXA_UART
+	hex
+	default 0x17000 if DEBUG_PXA_UART0
+	default 0x18000 if DEBUG_PXA_UART1
+
+and use CONFIG_DEBUG_PXA_UART in the assembly code, eliminating the
+need to change sourcecode for additional uarts.  Or maybe combine the
+two ideas.
