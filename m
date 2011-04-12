@@ -1,20 +1,46 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Tue, 12 Apr 2011 17:23:07 +0200
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <BANLkTikNEJEwq4cfr6cmTcHqcRfyGLM6Ww@mail.gmail.com>
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<BANLkTikNEJEwq4cfr6cmTcHqcRfyGLM6Ww@mail.gmail.com>
-Message-ID: <20110412152307.GD20815@atrey.karlin.mff.cuni.cz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 12 Apr 2011 23:24:59 +0800
+Subject: [PATCH 2/7] ARM: pxa: always clear LPM bits for PXA168 MFPR
+In-Reply-To: <1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
+	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <BANLkTi=Ne4TT3KgizKSoA8TWD-AyuZiczw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> Which model do you have? And check the corresponding board file if
-> card detect GPIO handling is doing right.
+On Fri, Apr 8, 2011 at 8:15 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> Bit[9:7] should always be zero in PXA168.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-I've got spitz (SL-3200).
+Applied to 'fix'.
 
-So I suppose the board file is arch/arm/mach-pxa/spitz.c, I'll have a look.
-
--- 
-metan
+> ---
+> ?arch/arm/mach-mmp/include/mach/mfp-pxa168.h | ? ?9 +++++++++
+> ?1 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> index 4621067..713be15 100644
+> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> @@ -8,6 +8,15 @@
+> ?#define MFP_DRIVE_MEDIUM ? ? ? (0x2 << 13)
+> ?#define MFP_DRIVE_FAST ? ? ? ? (0x3 << 13)
+>
+> +#undef MFP_CFG
+> +#undef MFP_CFG_DRV
+> +
+> +#define MFP_CFG(pin, af) ? ? ? ? ? ? ? \
+> + ? ? ? (MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_MEDIUM)
+> +
+> +#define MFP_CFG_DRV(pin, af, drv) ? ? ?\
+> + ? ? ? (MFP_LPM_INPUT | MFP_PIN(MFP_PIN_##pin) | MFP_##af | MFP_DRIVE_##drv)
+> +
+> ?/* GPIO */
+> ?#define GPIO0_GPIO ? ? ? ? ? ? MFP_CFG(GPIO0, AF5)
+> ?#define GPIO1_GPIO ? ? ? ? ? ? MFP_CFG(GPIO1, AF5)
+> --
+> 1.5.6.5
+>
+>
