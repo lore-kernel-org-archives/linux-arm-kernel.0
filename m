@@ -1,64 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2011 22:01:47 +0100
-Subject: [PATCH 3/7] ARM: mmp: set correct uart according to board
-In-Reply-To: <1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
-References: <2011040801>
-	<1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110412210147.GF7806@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 12 Apr 2011 23:06:34 +0200
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken on
+	ARM
+Message-ID: <201104122306.34909.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2011 at 08:15:40PM +0800, Haojian Zhuang wrote:
-> UART3 is the default console in jasper, brownstone and avengers lite.
-> 
-> Change-Id: Iacfe665cc0e20a47d50e0b2ad8724097f28e7d2c
+After switching from mem->dma_handle to virt_to_phys(mem->vaddr) used 
+for obtaining page frame number passed to remap_pfn_range()
+(commit 35d9f510b67b10338161aba6229d4f55b4000f5b), videobuf-dma-contig 
+stopped working on my ARM based board. The ARM architecture maintainer, 
+Russell King, confirmed that using something like 
+virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can be 
+broken on other architectures as well. The author of the change, Jiri 
+Slaby, also confirmed that his code may not work on all architectures.
 
-Please don't include Change-Ids in patch submissions.
+The patch tries to solve this regression by using 
+virt_to_phys(bus_to_virt(mem->dma_handle)) instead of problematic 
+virt_to_phys(mem->vaddr). I think this should work even if those 
+translations would occure inaccurate for DMA addresses, since possible 
+errors introduced by both translations, performed in opposite 
+directions, should compensate.
 
-> diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
-> index 7e2ebd3..b353785 100644
-> --- a/arch/arm/mach-mmp/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
-> @@ -14,8 +14,14 @@
->  		.macro	addruart, rp, rv
->  		ldr	\rp, =APB_PHYS_BASE		@ physical
->  		ldr	\rv, =APB_VIRT_BASE		@ virtual
-> +#if defined(CONFIG_MACH_BROWNSTONE) || defined(CONFIG_MACH_MARVELL_JASPER) \
-> +	|| defined(CONFIG_MACH_AVENGERS_LITE)
-> +		orr	\rp, \rp, #0x00018000
-> +		orr	\rv, \rv, #0x00018000
-> +#else
->  		orr	\rp, \rp, #0x00017000
->  		orr	\rv, \rv, #0x00017000
-> +#endif
+Tested on ARM OMAP1 based Amstrad Delta board.
 
-It probably makes more sense to have this in the configuration scripts:
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+v1 -> v2 changes:
+- drop dma_mmap_coherent() path, it may not work correctly for device 
+  memory preallocated with dma_declare_coherent_memory().
 
-choice
-	prompt "PXA debug uart"
-	default DEBUG_PXA_UART0
+ drivers/media/video/videobuf-dma-contig.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-config DEBUG_PXA_UART0
-	bool "UART 0"
-
-config DEBUG_PXA_UART1
-	bool "UART 1"
-	default y if MACH_BROWNSTONE || MACH_MARVELL_JASPER || MACH_AVENGERS_LITE
-
-endchoice
-
-and select the debug uart address using these symbols.  That'd avoid the
-need to couple lots of platform specific stuff into the compiled files.
-
-Alternatively, you could do more in the Kconfig like this:
-
-config DEBUG_PXA_UART
-	hex
-	default 0x17000 if DEBUG_PXA_UART0
-	default 0x18000 if DEBUG_PXA_UART1
-
-and use CONFIG_DEBUG_PXA_UART in the assembly code, eliminating the
-need to change sourcecode for additional uarts.  Or maybe combine the
-two ideas.
+--- git/drivers/media/video/videobuf-dma-contig.c.orig	2011-04-09 00:38:45.000000000 +0200
++++ git/drivers/media/video/videobuf-dma-contig.c	2011-04-12 22:36:44.000000000 +0200
+@@ -300,8 +300,8 @@ static int __videobuf_mmap_mapper(struct
+ 
+ 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+ 	retval = remap_pfn_range(vma, vma->vm_start,
+-				 PFN_DOWN(virt_to_phys(mem->vaddr)),
+-				 size, vma->vm_page_prot);
++			PFN_DOWN(virt_to_phys(bus_to_virt(mem->dma_handle))),
++			size, vma->vm_page_prot);
+ 	if (retval) {
+ 		dev_err(q->dev, "mmap: remap failed with error %d. ", retval);
+ 		dma_free_coherent(q->dev, mem->size,
