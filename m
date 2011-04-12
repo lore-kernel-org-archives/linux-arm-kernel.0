@@ -1,29 +1,94 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 12 Apr 2011 12:30:28 +0200
-Subject: [RFC] Extending ARM perf-events for multiple PMUs
-In-Reply-To: <20110412153937.07a2311e@tom-lei>
-References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
-	<1302349235.9086.1270.camel@twins>  <20110412153937.07a2311e@tom-lei>
-Message-ID: <1302604228.2035.2.camel@laptop>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 12 Apr 2011 12:53:38 +0200
+Subject: [PATCH] pxa270 rtc wakeup event fix
+In-Reply-To: <BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+References: <4D9F3AE4.2040101@gmail.com>
+	<201104082136.52297.marek.vasut@gmail.com>
+	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+Message-ID: <201104121253.38937.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-04-12 at 15:39 +0800, Ming Lei wrote:
-> > I just haven't figured out a way to dynamically add files/directories
+On Tuesday 12 April 2011 09:44:17 Eric Miao wrote:
+> Hi Nick,
 > 
-> Seems not very difficult, we have pmu_bus already, so introduce the
-> .match to find driver according device name, then implement a
-> driver for the pmu device to add this needed attributes(files).
-
-It probably isn't very hard, but I'm not sysfs/driver skilled and
-haven't been able to put a lot of time in.
-
-> > in the whole struct device sysfs muck (that also pleases the
-> > driver/sysfs folks). Nor have we agreed on a sane layout for such
-> > events there.
+> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
+> doesn't behave as assumed. A better approach would be to return -1
+> when none-GPIO IRQs are mapped back, let me know if you are OK w/
+> the patch below:
 > 
-> You mean we can find this event names here and pass them to perf -e ? 
+> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
+> b/arch/arm/mach-pxa/include/mach/gpio.h
+> index b024a8b..b9f4ed1 100644
+> --- a/arch/arm/mach-pxa/include/mach/gpio.h
+> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
+> @@ -103,7 +103,20 @@
+> 
+>  #define gpio_to_bank(gpio)	((gpio) >> 5)
+>  #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
+> -#define irq_to_gpio(irq)	IRQ_TO_GPIO(irq)
+> +
+> +static inline int irq_to_gpio(unsigned int irq)
 
-That's the purpose yes. The intermediate problem is how to represent
-these events in the sysfs hierarchy such that not every pmu
-implementation does it differently.
+Maybe drop the explicit inline?
+
+Cheers
+
+
+> +{
+> +	int gpio;
+> +
+> +	if (irq == IRQ_GPIO0 || irq == IRQ_GPIO1)
+> +		return irq - IRQ_GPIO0;
+> +
+> +	gpio = irq - PXA_GPIO_IRQ_BASE;
+> +	if (gpio >= 2 && gpio < NR_BUILTIN_GPIO)
+> +		return gpio;
+> +
+> +	return -1;
+> +}
+> 
+>  #ifdef CONFIG_CPU_PXA26x
+>  /* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
+> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
+> b/arch/arm/mach-pxa/include/mach/irqs.h
+> index a4285fc..0384024 100644
+> --- a/arch/arm/mach-pxa/include/mach/irqs.h
+> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
+> @@ -93,9 +93,6 @@
+>  #define GPIO_2_x_TO_IRQ(x)	(PXA_GPIO_IRQ_BASE + (x))
+>  #define IRQ_GPIO(x)	(((x) < 2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
+> 
+> -#define IRQ_TO_GPIO_2_x(i)	((i) - PXA_GPIO_IRQ_BASE)
+> -#define IRQ_TO_GPIO(i)	(((i) < IRQ_GPIO(2)) ? ((i) - IRQ_GPIO0) :
+> IRQ_TO_GPIO_2_x(i))
+> -
+>  /*
+>   * The following interrupts are for board specific purposes. Since
+>   * the kernel can only run on one machine at a time, we can re-use
+> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+> index 6bde595..a4af8c5 100644
+> --- a/arch/arm/mach-pxa/pxa25x.c
+> +++ b/arch/arm/mach-pxa/pxa25x.c
+> @@ -285,7 +285,7 @@ static inline void pxa25x_init_pm(void) {}
+> 
+>  static int pxa25x_set_wake(struct irq_data *d, unsigned int on)
+>  {
+> -	int gpio = IRQ_TO_GPIO(d->irq);
+> +	int gpio = irq_to_gpio(d->irq);
+>  	uint32_t mask = 0;
+> 
+>  	if (gpio >= 0 && gpio < 85)
+> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+> index 1cb5d0f..909756e 100644
+> --- a/arch/arm/mach-pxa/pxa27x.c
+> +++ b/arch/arm/mach-pxa/pxa27x.c
+> @@ -345,7 +345,7 @@ static inline void pxa27x_init_pm(void) {}
+>   */
+>  static int pxa27x_set_wake(struct irq_data *d, unsigned int on)
+>  {
+> -	int gpio = IRQ_TO_GPIO(d->irq);
+> +	int gpio = irq_to_gpio(d->irq);
+>  	uint32_t mask;
+> 
+>  	if (gpio >= 0 && gpio < 128)
