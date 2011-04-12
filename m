@@ -1,77 +1,52 @@
-From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
-Date: Tue, 12 Apr 2011 14:03:06 +0300
-Subject: [PATCH V4 2/4] MTD : add the common code for GPMI controller
-	driver
-In-Reply-To: <1301722240-15406-3-git-send-email-b32955@freescale.com>
-References: <1301722240-15406-1-git-send-email-b32955@freescale.com>
-	<1301722240-15406-3-git-send-email-b32955@freescale.com>
-Message-ID: <E550E0E66149EE438CE65645D99717D601670B0E@darkblue.bgt.local>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 12 Apr 2011 19:12:18 +0800
+Subject: [RFC] Extending ARM perf-events for multiple PMUs
+In-Reply-To: <1302604228.2035.2.camel@laptop>
+References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
+	<1302349235.9086.1270.camel@twins>
+	<20110412153937.07a2311e@tom-lei> <1302604228.2035.2.camel@laptop>
+Message-ID: <BANLkTikK_YCu-hMH=2hD25WJS7Lu15p+7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-I have one correction to your NAND driver. Please see inlined comments.
+2011/4/12 Peter Zijlstra <peterz@infradead.org>:
+> On Tue, 2011-04-12 at 15:39 +0800, Ming Lei wrote:
+>> > I just haven't figured out a way to dynamically add files/directories
+>>
+>> Seems not very difficult, we have pmu_bus already, so introduce the
+>> .match to find driver according device name, then implement a
+>> driver for the pmu device to add this needed attributes(files).
+>
+> It probably isn't very hard, but I'm not sysfs/driver skilled and
+> haven't been able to put a lot of time in.
+>
+>> > in the whole struct device sysfs muck (that also pleases the
+>> > driver/sysfs folks). Nor have we agreed on a sane layout for such
+>> > events there.
+>>
+>> You mean we can find this event names here and pass them to perf -e ?
+>
+> That's the purpose yes. The intermediate problem is how to represent
+> these events in the sysfs hierarchy such that not every pmu
+> implementation does it differently.
 
-> These files contain the common code for the GPMI driver.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c | 2453
-> +++++++++++++++++++++++++++++
->  drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h      |  551 +++++++
->  2 files changed, 3004 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
->  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
-> 
-> diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
-> b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
-> new file mode 100644
-> index 0000000..7bbc448
-> --- /dev/null
-> +++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
-> @@ -0,0 +1,2453 @@
+How about the below idea?
 
-<snip>
+      - for each pmu device, one attribute group(directory) named as 'events'
+     is created to accommodate all events this pmu can handle, such as:
 
-> +#ifdef CONFIG_PM
-> +static int gpmi_nfc_suspend(struct platform_device *pdev,
-pm_message_t
-> state)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int gpmi_nfc_resume(struct platform_device *pdev)
-> +{
-> +	return 0;
-> +}
-> +#else
-> +#define suspend  NULL
-> +#define resume   NULL
-> +#endif
+                /sys/devices/cpu/events/ for pmu of 'cpu'
 
-If CONFIG_PM is disabled your defines don't match function names.
+     - perf_pmu_register will populate all events that this pmu can handle under
+      the directory of 'events' using information from the defined pmu instance
 
-<snip>
+     - 'perf' utility can get all events for each pmu by walking the
+directory of
+     'events' for all pmu devices, which can be got from
+'/sys/bus/event_source/devices'.
 
-> +/* This structure represents this driver to the platform management
-> system. */
-> +static struct platform_driver gpmi_nfc_driver = {
-> +	.driver = {
-> +		.name = GPMI_NFC_DRIVER_NAME,
-> +	},
-> +	.probe   = gpmi_nfc_probe,
-> +	.remove  = __exit_p(gpmi_nfc_remove),
-> +	.suspend = gpmi_nfc_suspend,
-> +	.resume  = gpmi_nfc_resume,
-> +	.id_table = gpmi_ids,
-> +};
-
-This section fails to compile as gpmi_nfc_suspend and gpmi_nfc_resume
-are undefined. It compiles fine if I add gpmi_nfc_ prefix to defines.
-
---
-Veli-Pekka Peltola
-R&D Engineer
-Bluegiga Technologies 
+thanks,
+-- 
+Ming Lei
