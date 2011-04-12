@@ -1,68 +1,40 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Tue, 12 Apr 2011 17:29:43 +1000
-Subject: [Libhugetlbfs-devel] Query about __unmap_hugepage_range
-In-Reply-To: <42571f95.177e8.12f342597dc.Coremail.bill_carson@126.com>
-References: <42571f95.177e8.12f342597dc.Coremail.bill_carson@126.com>
-Message-ID: <20110412072943.GS3151@yookeroo>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Apr 2011 10:08:51 +0200
+Subject: [PATCH 1/6] ARM: mxc: update defconfigs
+In-Reply-To: <20110412075931.GA24855@S2100-06.ap.freescale.net>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110412075931.GA24855@S2100-06.ap.freescale.net>
+Message-ID: <20110412080851.GG7771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2011 at 04:06:09PM +0800, bill wrote:
-> Hey, MM developers:)
+On Tue, Apr 12, 2011 at 03:59:32PM +0800, Shawn Guo wrote:
+> Hi Uwe,
 > 
-> I don't know if this posting is proper at here, so sorry for disturbing if it does. 
+> On Sun, Apr 10, 2011 at 09:48:58PM +0200, Uwe Kleine-K?nig wrote:
+> > 
+> [...]
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm/configs/mx1_defconfig  |   11 +++-----
+> >  arch/arm/configs/mx21_defconfig |    8 +++---
+> >  arch/arm/configs/mx27_defconfig |   45 ++++++++++++++++++++++++++++----
+> >  arch/arm/configs/mx3_defconfig  |   40 +++++++++++++++++++++--------
+> >  arch/arm/configs/mx51_defconfig |   53 +++++++++++++++++++++++++++++++-------
 > 
-> for normal 4K page: in unmap_page_range 
-> 1: tlb_start_vma(tlb, vma); <------ call  flush_cache_range to invalidate icache if vma is VM_EXEC
-> 2: clear pagetable mapping
-> 3: tlb_end_vma(tlb, vma); <-------- call flush_tlb_range to invalidate unmapped vma tlb entry
-> 
-> for hugepage: in __unmap_hugepage_range
-> 1: clear pagetable mapping
->  2: call flush_tlb_range(vma, start, end); to invalidate unmapped vma tlb entry
-> 
-> I really don't understand about two things:
-> A: why there is no  flush_cache_range for hugepage when we do the unmapping?
-> B: How does kernel take care of such case for both normal 4K page and hugepage:
->     a: mmap a page with PROT_EXEC at location p;
->     b: copy bunch instruction into p ,call cacheflush to make ICACHE see the new instruction; 
->     c: run instruction at location p, then unmap it;
->     d: mmap a new page with MAP_FIXED/PROT_EXEC at location p, and run unexpected instruction at p;
->         there is a great chance we got the same page at step_a;
->         user space should see a clean icache, not a stale one;
->      
-> I am really puzzled for a long time.
+> Would you consider to enable mx5 ESDHC by default?  I guess Linaro
+> will appreciate it, as they are using ext3 rootfs on SD/MMC for their
+> releases.
+I assume this means
 
-> I am porting hugepage for ARM ,and one testcase in libhugetlbfs
-> called icache-hygiene failed, test rationale is described in above
-> B.
+	+CONFIG_MMC_SDHCI_PLTFM=m
+	+CONFIG_MMC_SDHCI_ESDHC_IMX=y
 
-Yes, that testcase is designed to check exactly this.
+seems sensible for mx3, too. I will look after that.
 
-This is a bit of a hack.  On x86 machines, nothing special is required
-here, because the dcache and icache are coherent in hardware.  This is
-also true on many power machines, including all moderm POWER
-hardware.  However, this is not true on old POWER4 hardware, and that
-testcase was designed to detect this bug which we once had on that
-hardware.
-
-For powerpc, the cache flush is handled in the arch specific code:
-flush_dcache_icache_page() is called from set_pte_filter() and
-set_access_flags_filter().  Those I believe are called from set_pte()
-and set_ptep_access_flags().
-
-There is some extra code here to only lazily flush the icache if the
-page is not immediately executed from.  That is, we keep track of
-whether the page is icache clean, and if we receive a read or write
-fault on the page we don't clean it but map it without execute
-permission.  We only perform the icache flush when we get an actual
-execute fault on the page.
-
-You will either need to implement similar hacks in ARM, or move the
-flushing logic into the generic code.
+Thanks
+Uwe
 
 -- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
