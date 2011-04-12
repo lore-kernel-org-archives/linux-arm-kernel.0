@@ -1,81 +1,84 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 11 Apr 2011 16:44:32 -0700
-Subject: [RFC][PATCH V3] axi: add AXI bus driver
-In-Reply-To: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
-References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1302565473.2163.28.camel@Joe-Laptop>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 12 Apr 2011 03:32:59 +0200
+Subject: [PATCH] clkdev: add debugfs support
+Message-ID: <1302571979-11097-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-11 at 23:25 +0200, Rafa? Mi?ecki wrote:
+create a file in /sys/kernel/debug/clkdev
 
->   Proper pr_* usage
+with the list of lookup with the con_id, dev_id and the clock rate
+
+as this
+
+dev_id               con_id               rate
+(null)               clk32k                   32768 Hz
+(null)               main                  16367660 Hz
+(null)               plla                 199919178 Hz
+(null)               mck                   99959589 Hz
+at91_mci.0           mci_clk               99959589 Hz
+at91_mci.1           mci_clk               99959589 Hz
+atmel_spi.0          spi_clk               99959589 Hz
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/clk/clkdev.c |   40 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 0fc0a79..5c3a6fb 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -19,6 +19,8 @@
+ #include <linux/mutex.h>
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
  
-Just trivia...
-
-> diff --git a/drivers/axi/axi_private.h b/drivers/axi/axi_private.h
-> new file mode 100644
-> index 0000000..1c995f5
-> --- /dev/null
-> +++ b/drivers/axi/axi_private.h
-> @@ -0,0 +1,45 @@
-> +#ifndef LINUX_AXI_PRIVATE_H_
-> +#define LINUX_AXI_PRIVATE_H_
-> +
-> +#include <linux/axi/axi.h>
-> +#include <linux/device.h>
-> +#include <linux/list.h>
-> +#include <linux/types.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/pci.h>
-> +#include <linux/mod_devicetable.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/types.h>
-
-Duplicate include of linux/types.h
-
-> +
-> +#ifndef pr_fmt
-> +#define pr_fmt(fmt)		"axi: " fmt
-> +#endif
-
-This needs to be before any include that includes kernel.h
-and I believe
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-is the same output and more normally used style.
-
-Right now, you've got no prefix for any format string.
-Try '$ strings built-in.o | grep "^<.>"' and see.
-
-> +void axi_pmu_workarounds(struct axi_drv_cc *cc)
-> +{
-> +	struct axi_bus *bus = cc->core->bus;
-> +
-> +	switch (bus->chipinfo.id) {
-> +	case 0x4313:
-
-Probably better to use defines.
-
-> +		axi_chipco_chipctl_maskset(cc, 0, ~0, 0x7);
-> +		break;
-> +	case 0x4331:
-> +		axi_err("Enabling Ext PA lines not implemented\n");
-
-You should still remove axi_err/info/debug and
-just use pr_<level>.
-
-
-> +		break;
-> +	case 43224:
-> +		if (bus->chipinfo.rev == 0) {
-> +			axi_err("Workarounds for 43224 rev 0 not fully "
-> +					"implemented\n");
-
-I suggest you don't bother splitting and wrapping
-format strings > 80 chars.  Splitting makes grep
-a bit harder.
-
-			pr_err("Workarounds for 43224 rev 0 not fully implemented\n");
-
-Some hex and some decimal cases?
-Maybe some comments for that?
+ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+@@ -174,3 +176,41 @@ void clkdev_drop(struct clk_lookup *cl)
+ 	kfree(cl);
+ }
+ EXPORT_SYMBOL(clkdev_drop);
++
++#ifdef CONFIG_DEBUG_FS
++static int clkdev_clk_show(struct seq_file *s, void *unused)
++{
++	struct clk_lookup *p;
++
++	seq_printf(s, "%-20s %-20s rate\n", "dev_id", "con_id");
++
++	list_for_each_entry(p, &clocks, node) {
++
++		seq_printf(s, "%-20s %-20s %9ld Hz\n",
++			p->dev_id, p->con_id, clk_get_rate(p->clk));
++	}
++	return 0;
++}
++
++static int clkdev_clk_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, clkdev_clk_show, NULL);
++}
++
++static const struct file_operations clkdev_clk_operations = {
++	.open		= clkdev_clk_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int __init clkdev_clk_debugfs_init(void)
++{
++	/* /sys/kernel/debug/clkdev */
++	(void) debugfs_create_file("clkdev", S_IFREG | S_IRUGO, NULL, NULL,
++				   &clkdev_clk_operations);
++
++	return 0;
++}
++postcore_initcall(clkdev_clk_debugfs_init);
++#endif
+-- 
+1.7.4.1
