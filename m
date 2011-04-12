@@ -1,86 +1,109 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Apr 2011 11:54:46 +0200
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
-	and i.MX53
-In-Reply-To: <alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
-	<20110411074041.GF18601@pengutronix.de>
-	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-Message-ID: <20110412095446.GB18850@pengutronix.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 12 Apr 2011 12:56:29 +0300
+Subject: [PATCH] pxa270 rtc wakeup event fix
+In-Reply-To: <4DA40D2D.40807@googlemail.com>
+References: <4D9F3AE4.2040101@gmail.com>	<201104082136.52297.marek.vasut@gmail.com>	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
+	<4DA40D2D.40807@googlemail.com>
+Message-ID: <4DA421CD.8090103@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Nick,
 
-On Mon, Apr 11, 2011 at 10:15:09AM -0400, Nicolas Pitre wrote:
-> On Mon, 11 Apr 2011, Uwe Kleine-K?nig wrote:
-> > Currently you can build a
-> > kernel for i.MX51 + i.MX53 but IIRC it works on no machine.
-> 
-> Maybe it should be fixed?
-To catch similar errors earlier next time, I'd like the compiler to wail
-if the physoffsets don't match (in the !ARM_PATCH_PHYS_VIRT case).
+On 04/12/11 11:28, Nick Bane wrote:
 
-The best thing I could come up with up to now is:
+>
+>> Hi Nick,
+>>
+>> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
+>> doesn't behave as assumed. A better approach would be to return -1
+>> when none-GPIO IRQs are mapped back, let me know if you are OK w/
+>> the patch below:
+>>
+> Hi Eric
+> That looks like the right answer.
+> Nick
+>> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
+>> b/arch/arm/mach-pxa/include/mach/gpio.h
+>> index b024a8b..b9f4ed1 100644
+>> --- a/arch/arm/mach-pxa/include/mach/gpio.h
+>> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
+>> @@ -103,7 +103,20 @@
+>>
+>>   #define gpio_to_bank(gpio)    ((gpio)>>  5)
+>>   #define gpio_to_irq(gpio)    IRQ_GPIO(gpio)
+>> -#define irq_to_gpio(irq)    IRQ_TO_GPIO(irq)
+>> +
+>> +static inline int irq_to_gpio(unsigned int irq)
+>> +{
+>> +    int gpio;
+>> +
+>> +    if (irq == IRQ_GPIO0 || irq == IRQ_GPIO1)
+>> +        return irq - IRQ_GPIO0;
+>> +
+>> +    gpio = irq - PXA_GPIO_IRQ_BASE;
+>> +    if (gpio>= 2&&  gpio<  NR_BUILTIN_GPIO)
 
-#if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
-# if defined CONFIG_ARCH_MX1
-#  define PLAT_PHYS_OFFSET              MX1_PHYS_OFFSET
-# endif
-# if defined CONFIG_MACH_MX21 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX21_PHYS_OFFSET)
-#  define PLAT_PHYS_OFFSET              MX21_PHYS_OFFSET
-# endif
-# if defined CONFIG_ARCH_MX25 && (!defined(PLAT_PHYS_OFFSET) || PLAT_PHYS_OFFSET != MX25_PHYS_OFFSET)
-#  define PLAT_PHYS_OFFSET              MX25_PHYS_OFFSET
-# endif
-...
+This is a really nice white space game, your mailer plays ;)
+Really funny...
 
-this is really ugly.  And even to make this work I have to do 
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 431077c..957cd7e 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -16,8 +16,6 @@
- #include <linux/compiler.h>
- #include <linux/const.h>
- #include <linux/types.h>
--#include <mach/memory.h>
--#include <asm/sizes.h>
- 
- /*
-  * Allow for constants defined here to be used from assembly code
-@@ -25,6 +23,9 @@
-  */
- #define UL(x) _AC(x, UL)
- 
-+#include <mach/memory.h>
-+#include <asm/sizes.h>
-+
- #ifdef CONFIG_MMU
- 
- /*
-
-because cpp can only compare integers and so needs a definition for UL.
-Even when keeping the definition as it is now (i.e. asserting a single
-definition by using #ifelse) adding something like:
-
-#if defined(PLAT_PHYS_OFFSET)
-# if defined(CONFIG_ARCH_MX1) && (PLAT_PHYS_OFFSET != MX1_PHYS_OFFSET)
-#error something
-# endif
-# ...
-#endif
-
-needs the UL macro.
-
-Does someone has a better idea? If not it's probably not worth the change.
-
-Best regards
-Uwe
+>> +        return gpio;
+>> +
+>> +    return -1;
+>> +}
+>>
+>>   #ifdef CONFIG_CPU_PXA26x
+>>   /* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
+>> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
+>> b/arch/arm/mach-pxa/include/mach/irqs.h
+>> index a4285fc..0384024 100644
+>> --- a/arch/arm/mach-pxa/include/mach/irqs.h
+>> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
+>> @@ -93,9 +93,6 @@
+>>   #define GPIO_2_x_TO_IRQ(x)    (PXA_GPIO_IRQ_BASE + (x))
+>>   #define IRQ_GPIO(x)    (((x)<  2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
+>>
+>> -#define IRQ_TO_GPIO_2_x(i)    ((i) - PXA_GPIO_IRQ_BASE)
+>> -#define IRQ_TO_GPIO(i)    (((i)<  IRQ_GPIO(2)) ? ((i) - IRQ_GPIO0) :
+>> IRQ_TO_GPIO_2_x(i))
+>> -
+>>   /*
+>>    * The following interrupts are for board specific purposes. Since
+>>    * the kernel can only run on one machine at a time, we can re-use
+>> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+>> index 6bde595..a4af8c5 100644
+>> --- a/arch/arm/mach-pxa/pxa25x.c
+>> +++ b/arch/arm/mach-pxa/pxa25x.c
+>> @@ -285,7 +285,7 @@ static inline void pxa25x_init_pm(void) {}
+>>
+>>   static int pxa25x_set_wake(struct irq_data *d, unsigned int on)
+>>   {
+>> -    int gpio = IRQ_TO_GPIO(d->irq);
+>> +    int gpio = irq_to_gpio(d->irq);
+>>       uint32_t mask = 0;
+>>
+>>       if (gpio>= 0&&  gpio<  85)
+>> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+>> index 1cb5d0f..909756e 100644
+>> --- a/arch/arm/mach-pxa/pxa27x.c
+>> +++ b/arch/arm/mach-pxa/pxa27x.c
+>> @@ -345,7 +345,7 @@ static inline void pxa27x_init_pm(void) {}
+>>    */
+>>   static int pxa27x_set_wake(struct irq_data *d, unsigned int on)
+>>   {
+>> -    int gpio = IRQ_TO_GPIO(d->irq);
+>> +    int gpio = irq_to_gpio(d->irq);
+>>       uint32_t mask;
+>>
+>>       if (gpio>= 0&&  gpio<  128)
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Igor.
