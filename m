@@ -1,32 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Apr 2011 18:45:01 +0100
-Subject: [RFC] Extending ARM perf-events for multiple PMUs
-In-Reply-To: <4DA33DEE.9080709@codeaurora.org>
-References: <1302282912.5758.25.camel@e102144-lin.cambridge.arm.com>
-	<1302349235.9086.1270.camel@twins>
-	<1302521393.24286.66.camel@e102144-lin.cambridge.arm.com>
-	<4DA33DEE.9080709@codeaurora.org>
-Message-ID: <1302630301.24286.89.camel@e102144-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Apr 2011 19:46:01 +0200
+Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
+In-Reply-To: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <201104121946.01618.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashwin,
-
-On Mon, 2011-04-11 at 18:44 +0100, Ashwin Chaugule wrote:
-> > Sure, fundamentally we're just writing bits rather than interpreting
-> > them. The reason I mention the difference is that filtering PMUs will
-> > always need their own struct pmu because of the lack of an event
-> > namespace. The other problem is only an issue for some userspace tools
-> > (like Oprofile) which require lists of events and their hex codes.
-> >
+On Monday 11 April 2011, mathieu.poirier at linaro.org wrote:
+> From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
 > 
-> If you mean namespace = perf_event_attr::config, its 64 bits + another 64
-> bits of config_base + event_base on ARM ? Not too sure, but it would seem
-> like that should be enough to setup such event chaining.
+> This is the second spin on STE's Hsem driver that is implemented
+> through the hwspinlock scheme.  More specifically:
+> 
+>  More comments have been added in the code.
+>  Cleanup of included header files.
+>  One of the original contributor's name corrected.
+>  Calls to 'pm_runtime_disable'restored.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-If you have a filtering PMU on a bus with large physical addresses, by
-the time you've specified an address range you've already used up a
-decent proportion of those bits so I don't think we should restrict
-ourselves if we don't have to.
+Looks very nice overall, just a few small details I noticed:
 
-Will
+> +
+> +#define HSEM_REGISTER_OFFSET		0x08
+> +
+> +#define HSEM_CTRL_REG			0x00
+> +#define HSEM_ICRALL			0x90
+> +#define HSEM_PROTOCOL_1			0x01
+> +
+> +#define to_u8500_hsem(lock)	\
+> +	container_of(lock, struct u8500_hsem, lock)
+> +
+> +struct u8500_hsem {
+> +	struct hwspinlock lock;
+> +	void __iomem *addr;
+> +};
+
+It seems inconsistent to name it sem instead of spinlock.
+
+> +struct u8500_hsem_state {
+> +	void __iomem *io_base;		/* Mapped base address */
+> +};
+
+If you make that one data structure, you only need a single allocation:
+
+struct u8500_hsem_state {
+	void __iomem *io_base;
+	struct u8500_hsem hsem[U8500_MAX_SEMAPHORE];
+}
+
+> +
+> +	for (i = 0; i < U8500_MAX_SEMAPHORE; i++) {
+> +		u8500_lock = kzalloc(sizeof(*u8500_lock), GFP_KERNEL);
+> +		if (!u8500_lock) {
+> +			ret = -ENOMEM;
+> +			goto free_locks;
+> +		}
+> +
+> +		u8500_lock->lock.dev = &pdev->dev;
+> +		u8500_lock->lock.owner = THIS_MODULE;
+> +		u8500_lock->lock.id = i;
+> +		u8500_lock->lock.ops = &u8500_hwspinlock_ops;
+> +		u8500_lock->addr = io_base + offset + sizeof(u32) * i;
+> +
+> +		ret = hwspin_lock_register(&u8500_lock->lock);
+> +		if (ret) {
+> +			kfree(u8500_lock);
+> +			goto free_locks;
+> +		}
+> +	}
+
+When you do that, this can be a single allocation.
+
+Thinking about it some more, it may actually be worthwhile to still improve
+the API here: I think the owner field should be part of the operations structure,
+because it is constant. It would also be nice to have a "private" pointer
+in struct hwspinlock, so you don't need to wrap it if you don't want to.
+
+Finally, the hwspin_lock_register could take the specific values as arguments
+instead of requiring you to fill it out first.
+
+	Arnd
