@@ -1,46 +1,35 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 12 Apr 2011 18:53:29 -0400
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <20110412224333.GA22640@atrey.karlin.mff.cuni.cz> (Cyril Hrubis's
-	message of "Wed, 13 Apr 2011 00:43:33 +0200")
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<m3aafvz30t.fsf@pullcord.laptop.org>
-	<20110412193944.GC2665@atrey.karlin.mff.cuni.cz>
-	<m3oc4bxne1.fsf@pullcord.laptop.org>
-	<20110412205421.GD2665@atrey.karlin.mff.cuni.cz>
-	<m3fwpnxj1w.fsf@pullcord.laptop.org>
-	<20110412224333.GA22640@atrey.karlin.mff.cuni.cz>
-Message-ID: <m339lnxes6.fsf@pullcord.laptop.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 12 Apr 2011 18:54:30 -0400 (EDT)
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
+	i.MX53
+In-Reply-To: <20110412212050.GF18850@pengutronix.de>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<20110412095446.GB18850@pengutronix.de>
+	<20110412202734.GB7806@n2100.arm.linux.org.uk>
+	<20110412203730.GE18850@pengutronix.de>
+	<20110412205344.GE7806@n2100.arm.linux.org.uk>
+	<20110412212050.GF18850@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1104121850160.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 12 Apr 2011, Uwe Kleine-K?nig wrote:
 
-On Tue, Apr 12 2011, Cyril Hrubis wrote:
->> > mmc0: error -95 whilst initialising SD card
->> 
->> That's interesting.  Would you mind trying to bisect?  (Knowing whether
->> 2.6.38 final does it, for example, would be very helpful.)
->
-> It may need one or two tries on 2.6.38 but it's there too.
->
->> There aren't many -EOPNOTSUPP returns in the stack.  I see:
->> 
->> card/block.c: mmc_blk_issue_secdiscard_rq and mmc_blk_issue_discard_rq
->> card/core.c: mmc_erase
->> core/sd_ops.c: mmc_app_cmd
->> 
->> Mind doing some instrumentation to figure out which it is?
->
-> Fails in the mmc_app_cmd.
+> Apart from defining PLAT_PHYS_OFFSET these symbols are used in the
+> machine files to define .boot_params. This is better than repeating the
+> bare numbers, isn't it?
 
-Okay.  mmc_app_cmd() hasn't changed for years, so I'm afraid I don't
-have any strong leads for you -- further bisection (you're pretty
-sure this is a regression?) would be very useful.
+Sure.
 
-Thanks,
+> The current arch/arm/plat-mxc/include/mach/memory.h looks ok for me. I 
+> assume you concur?
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Maybe you should replace CONFIG_RUNTIME_PHYS_OFFSET with 
+CONFIG_ARM_PATCH_PHYS_VIRT in that file.
+
+
+Nicolas
