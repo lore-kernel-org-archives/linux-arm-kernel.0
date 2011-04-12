@@ -1,39 +1,62 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 12 Apr 2011 22:46:25 +0800
-Subject: reboot/kexec in 2.6.38
-In-Reply-To: <20110412144330.GB20815@atrey.karlin.mff.cuni.cz>
-References: <20110317064523.GA1995@ucw.cz>
-	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
-	<20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
-	<m1bp0zylgg.fsf@fess.ebiederm.org>
-	<20110412144330.GB20815@atrey.karlin.mff.cuni.cz>
-Message-ID: <BANLkTikZXjfD82DxoahkvUo+26cjvOKZmw@mail.gmail.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Tue, 12 Apr 2011 17:15:48 +0200
+Subject: zaurus: mmcblk0: error -110
+Message-ID: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 10:43 PM, Cyril Hrubis <metan@ucw.cz> wrote:
-> Hi!
->> >> I think it's config issue. Never heard of this.
->> >
->> > I've just compiled and booted 2.6.38. The kernel boots without problems when
->> > flashed in. But I've had no success with kexec, the last lines I see are:
->> >
->> > Starting new kernel
->>
->> Enable early_printk to a serial port if you can.
->>
->> There is definitely an issue in 2.6.38 where kdump doesn't work, that
->> right now looks like a memblock issue.
->
-> Finaly got time to solder serial adapter...
->
-> And now, after I configured kernel to print to both ttyS0 serial console and
-> tty0 the kexec started to work.
+Hi!
+When I insert the mmc card to zaurus, it gets properly detected and prints some
+info into console. Mounting reading/writing files works fine.
 
-Cool. Please help check why it didn't work, and see if we have something
-broken.
+However when the card is removed (doesn't need to be mounted before), the
+removal is most likely not detected, so when I insert it again, no info is
+printed into console and moreover when I try to mount it zaurus goes into
+infinite loop printing:
 
->
-> --
-> metan
->
+Buffer I/O error on device mmcblk0p1, logical block 9
+mmcblk0: error -110 sending status command
+mmcblk0: error -110 sending read/write command, response 0xb00, card status 0xb00
+end_request: I/O error, dev mmcblk0, sector 257
+Buffer I/O error on device mmcblk0p1, logical block 10
+mmcblk0: error -110 sending status command
+mmcblk0: error -110 sending read/write command, response 0xb00, card status 0xb00
+end_request: I/O error, dev mmcblk0, sector 258
+Buffer I/O error on device mmcblk0p1, logical block 11
+mmcblk0: error -110 sending status command
+mmcblk0: error -110 sending read/write command, response 0xb00, card status 0xb00
+end_request: I/O error, dev mmcblk0, sector 259
+Buffer I/O error on device mmcblk0p1, logical block 12
+mmcblk0: error -110 sending status command
+mmcblk0: error -110 sending read/write command, response 0xb00, card status 0xb00
+...
+
+Related part of the .config:
+
+#
+# OTG and related infrastructure
+#
+# CONFIG_USB_GPIO_VBUS is not set
+# CONFIG_USB_ULPI is not set
+# CONFIG_NOP_USB_XCEIV is not set
+CONFIG_MMC=y
+# CONFIG_MMC_DEBUG is not set
+CONFIG_MMC_UNSAFE_RESUME=y
+# CONFIG_MMC_CLKGATE is not set
+
+#
+# MMC/SD/SDIO Card Drivers
+#
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_BLOCK_MINORS=8
+CONFIG_MMC_BLOCK_BOUNCE=y
+# CONFIG_SDIO_UART is not set
+# CONFIG_MMC_TEST is not set
+
+#
+# MMC/SD/SDIO Host Controller Drivers
+#
+CONFIG_MMC_PXA=y
+
+-- 
+metan
