@@ -1,38 +1,52 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 12 Apr 2011 21:47:46 +0800
-Subject: [PATCH] pxa270 rtc wakeup event fix
-In-Reply-To: <201104121253.38937.marek.vasut@gmail.com>
-References: <4D9F3AE4.2040101@gmail.com>
-	<201104082136.52297.marek.vasut@gmail.com>
-	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
-	<201104121253.38937.marek.vasut@gmail.com>
-Message-ID: <BANLkTi=ZJ2utAwpnADMdLWx5SEnLqwX18g@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 12 Apr 2011 18:37:14 +0400
+Subject: [RFC PATCH 1/5] gemini: convert to basic-mmio-gpio
+In-Reply-To: <1302522502-24381-2-git-send-email-jamie@jamieiles.com>
+References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
+	<1302522502-24381-2-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110412143714.GA8931@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 6:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Tuesday 12 April 2011 09:44:17 Eric Miao wrote:
->> Hi Nick,
->>
->> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
->> doesn't behave as assumed. A better approach would be to return -1
->> when none-GPIO IRQs are mapped back, let me know if you are OK w/
->> the patch below:
->>
->> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
->> b/arch/arm/mach-pxa/include/mach/gpio.h
->> index b024a8b..b9f4ed1 100644
->> --- a/arch/arm/mach-pxa/include/mach/gpio.h
->> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
->> @@ -103,7 +103,20 @@
->>
->> ?#define gpio_to_bank(gpio) ? ((gpio) >> 5)
->> ?#define gpio_to_irq(gpio) ? ?IRQ_GPIO(gpio)
->> -#define irq_to_gpio(irq) ? ? IRQ_TO_GPIO(irq)
->> +
->> +static inline int irq_to_gpio(unsigned int irq)
->
-> Maybe drop the explicit inline?
+On Mon, Apr 11, 2011 at 12:48:18PM +0100, Jamie Iles wrote:
+> The basic-mmio-gpio driver is capable of supporting this controller so
+> convert the platform to use it for basic GPIO support.
+> 
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+[...]
+> +#define GPIO_RES(__name, __addr) \
+> +	{ \
+> +		.start = (__addr), \
+> +		.end = (__addr) + 0x3, \
+> +		.flags = IORESOURCE_MEM, \
+> +		.name = #__name, \
+> +	}
 
-It's in a header file, and has to be declared as inline to avoid the
-copy being duplicated in every .c files where this header is included.
+Btw, how about moving this (repetitive) macro into basic_mmio_gpio.h?
+
+Assuming, that there could be IRQ resources later, making
+something like BGPIO_MEM_RES(name, addr, sz)?
+
+Or, even better, some generic shorthand macro in linux/ioport.h?
+
+#define IORES(__type, __name, __addr, __size)	\
+	{					\
+		.start = (__addr), 		\
+		.end = (__addr) + (__size),	\
+		.flags = IORESOURCE_##__type, 	\
+		.name = #__name, 		\
+	}
+
+Would translate to
+
+IORES(MEM, set, GEMINI_GPIO_BASE(i) + GPIO_DATA_SET), 3),
+vs.
+GPIO_RES(set, GEMINI_GPIO_BASE(i) + GPIO_DATA_SET),
+
+Thanks,
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
