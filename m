@@ -1,45 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 12 Apr 2011 16:33:18 +0800
-Subject: [PATCH 1/6] ARM: mxc: update defconfigs
-In-Reply-To: <20110412080851.GG7771@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 09:52:37 +0100
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
 References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110412075931.GA24855@S2100-06.ap.freescale.net>
-	<20110412080851.GG7771@pengutronix.de>
-Message-ID: <20110412083317.GB24855@S2100-06.ap.freescale.net>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<BANLkTim6N8OAY6dwdOfrCmLwPe=EuUGrAg@mail.gmail.com>
+Message-ID: <20110412085237.GA30550@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 10:08:51AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Apr 12, 2011 at 03:59:32PM +0800, Shawn Guo wrote:
-> > Hi Uwe,
-> > 
-> > On Sun, Apr 10, 2011 at 09:48:58PM +0200, Uwe Kleine-K?nig wrote:
-> > > 
-> > [...]
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > >  arch/arm/configs/mx1_defconfig  |   11 +++-----
-> > >  arch/arm/configs/mx21_defconfig |    8 +++---
-> > >  arch/arm/configs/mx27_defconfig |   45 ++++++++++++++++++++++++++++----
-> > >  arch/arm/configs/mx3_defconfig  |   40 +++++++++++++++++++++--------
-> > >  arch/arm/configs/mx51_defconfig |   53 +++++++++++++++++++++++++++++++-------
-> > 
-> > Would you consider to enable mx5 ESDHC by default?  I guess Linaro
-> > will appreciate it, as they are using ext3 rootfs on SD/MMC for their
-> > releases.
-> I assume this means
-> 
-> 	+CONFIG_MMC_SDHCI_PLTFM=m
-> 	+CONFIG_MMC_SDHCI_ESDHC_IMX=y
-> 
-To get the system up with rootfs mounted on SD/MMC, I have to do the
-following.
+Do _not_ top post.
 
-CONFIG_MMC_BLOCK=y
-CONFIG_MMC_SDHCI=y
-CONFIG_MMC_SDHCI_PLTFM=y
-CONFIG_MMC_SDHCI_ESDHC_IMX=y
+On Mon, Apr 11, 2011 at 04:50:48PM -0500, Matt Sealey wrote:
+> Well, whoever's responsibility it is to fix this, whereever it needs
+> to be fixed, it needs to be fixed, as it is absolutely nuts that you
+> cannot run an MX51 and MX53 board off the same kernel.
+> 
+> If nobody knows or agrees, can anyone can identify exactly what needs
+> to be fixed and where, and how much work this would actually be, so
+> they or someone else can actually go do it, instead of us just
+> debating about how experimental it might be?
+> 
+> As far as I see it the only reason it depends on EXPERIMENTAL is
+> because it breaks at least one subarch, it breaks XIP kernels and it
+> breaks Thumb2 kernels (this last one is not so much a showstopper for
+> enabling it by default, unless I am mistaken in my assumption that
+> Thumb2 kernels still don't work reliably right now anyway?)
 
--- 
-Regards,
-Shawn
+I can only guess that you're talking about the dynamic patching of the
+virt_to_phys stuff - but that's only a guess because there is _no_
+_context_ because you _top_ _posted_.
+
+It is marked as EXPERIMENTAL because it is a new feature which has just
+gone in, and hasn't had sufficient testing out in the wild to justify
+removal of EXPERIMENTAL.  Therefore, the EXPERIMENTAL tag tells people
+that the feature may not be as stable as it should be.
+
+It can be removed _after_ the next merge window when we have a higher
+confidence that no one has seen any major problems with it.
