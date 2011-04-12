@@ -1,58 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Apr 2011 19:35:38 +0100
-Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1302633340-4795-5-git-send-email-will.deacon@arm.com>
+Date: Tue, 12 Apr 2011 19:35:34 +0100
+Subject: [PATCH v2 0/6] Use chained handler entry/exit functions in platform
+	code
+Message-ID: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the MSM gpio chained IRQ handler to use the chained
-IRQ enter/exit functions in order to function correctly on primary
-controllers with different methods of flow control.
+Hello,
 
-Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-msm/gpio-v2.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+This is version 2 of the patches originally posted here:
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index 56a964e..cc9c4fd 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -27,6 +27,9 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
-+
-+#include <asm/mach/irq.h>
-+
- #include <mach/msm_iomap.h>
- #include "gpiomux.h"
- 
-@@ -309,8 +312,10 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int flow_type)
-  */
- static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
--	struct irq_data *data = irq_desc_get_irq_data(desc);
- 	unsigned long i;
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+
-+	chained_irq_enter(chip, desc);
- 
- 	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
- 	     i < NR_GPIO_IRQS;
-@@ -319,7 +324,8 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
- 							   i));
- 	}
--	data->chip->irq_ack(data);
-+
-+	chained_irq_exit(chip, desc);
- }
- 
- static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
--- 
-1.7.0.4
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/046905.html
+
+Changes since v1:
+
+	* Updated to irq_desc_get_chip
+	* Fixed missing includes
+	* Updated Tegra IRQ handling
+	* Based on -rc3
+
+Colin - Please can you look at the changes I've made to mach-tegra/irq.c?
+I'd also value some feedback on how you'd like to see this merged. See
+my previous post here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047253.html
+
+Please test/ack/complain wherever possible,
+
+Will
+
+
+Will Deacon (6):
+  ARM: omap: update GPIO chained IRQ handler to use entry/exit
+    functions
+  ARM: tegra: update GPIO chained IRQ handler to use entry/exit
+    functions
+  ARM: s5pv310: update IRQ combiner to use chained entry/exit functions
+  ARM: msm: update GPIO chained IRQ handler to use entry/exit functions
+  ARM: nmk: update GPIO chained IRQ handler to entry/exit functions
+  ARM: gic: use handle_fasteoi_irq for SPIs
+
+ arch/arm/common/gic.c                |   32 ++++++++++++++++----------------
+ arch/arm/mach-exynos4/irq-combiner.c |    6 ++----
+ arch/arm/mach-msm/gpio-v2.c          |   10 ++++++++--
+ arch/arm/mach-tegra/gpio.c           |    9 ++++++---
+ arch/arm/mach-tegra/irq.c            |   12 ++++++------
+ arch/arm/plat-nomadik/gpio.c         |   12 ++++--------
+ arch/arm/plat-omap/gpio.c            |    7 ++++---
+ 7 files changed, 46 insertions(+), 42 deletions(-)
