@@ -1,41 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2011 21:53:44 +0100
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
-	and i.MX53
-In-Reply-To: <20110412203730.GE18850@pengutronix.de>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
-	<20110411074041.GF18601@pengutronix.de>
-	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
-	<20110412095446.GB18850@pengutronix.de>
-	<20110412202734.GB7806@n2100.arm.linux.org.uk>
-	<20110412203730.GE18850@pengutronix.de>
-Message-ID: <20110412205344.GE7806@n2100.arm.linux.org.uk>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Tue, 12 Apr 2011 22:54:21 +0200
+Subject: zaurus: mmcblk0: error -110
+In-Reply-To: <m3oc4bxne1.fsf@pullcord.laptop.org>
+References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
+	<m3aafvz30t.fsf@pullcord.laptop.org>
+	<20110412193944.GC2665@atrey.karlin.mff.cuni.cz>
+	<m3oc4bxne1.fsf@pullcord.laptop.org>
+Message-ID: <20110412205421.GD2665@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 10:37:30PM +0200, Uwe Kleine-K?nig wrote:
-> > #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
-> > #if CONFIG_ARCH_MX1 + CONFIG_MACH_MX21 + ... > 1
-> > #error Invalid configuration - unable to handle different phys base addresses
-> > #endif
-> Same problem (and I guess it yields some cpp warnings about
-> CONFIG_ARCH_MX1 not being defined for an i.MX21-only build, but I didn't
-> test).
+Hi!
+> >> Your symptoms match the bug that was fixed by:
+> >> 
+> >> bad3babace2ee4d ("mmc: fix CONFIG_MMC_UNSAFE_RESUME regression")
+> >> 
+> >> but this fix made it into 2.6.38, so if you're using 2.6.38 final then
+> >> you shouldn't be seeing this.  Could you confirm that you have this
+> >> patch?
+> >
+> > It seems that the pxa tree I have is still based on 2.6.38-rc8.
+> >
+> > And yes, turning CONFIG_MMC_UNSAFE_RESUME off seems to fix that problem.
+> >
+> > I'll try to update the kernel tree and try again with CONFIG_MMC_UNSAFE_RESUME
+> > enabled.
+> 
+> Okay, great.  It was introduced in 2.6.38-rc1 and fixed in 2.6.38 final.
+>
 
-Well then,
+Tried 2.6.39-rc3 both with and without CONFIG_MMC_UNSAFE_RESUME and the
+insert/remove detection works but both with and without unsafe resume, if the
+card is removed for more than second or two it fails to recognize the card
+after insertion failing with:
 
-#if (CONFIG_ARCH_MX1 | CONFIG_MACH_MX21) + (...) + ... > 1
+mmc0: error -95 whilst initialising SD card
 
-where each group of | cover those which share the same phys base.
-
-No idea what those are because each MX SoC hides its phys base behind
-some SoC private definition.  This is definitely a case where more
-preprocessor junk reduces the code readability and makes it harder to
-understand.  Removal of preprocessor indirection sounds like a candidate
-for the consolidation effort to me.
-
-I think we're at the point where "no" to that is not acceptable.  Make
-it happen please.  We must reduce the size of arch/arm by all means
-possible.
+-- 
+metan
