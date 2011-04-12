@@ -1,73 +1,63 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 12 Apr 2011 13:40:36 +0200
-Subject: [RFC][PATCH V3] axi: add AXI bus driver
-In-Reply-To: <BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
-References: <1302557114-7880-1-git-send-email-zajec5@gmail.com>
-	<20110411210631.GA28559@kroah.com>
-	<BANLkTim155YxMUVJ=pmVs-rNhkovGPG6OQ@mail.gmail.com>
-	<20110411212513.GA17809@kroah.com>
-	<BANLkTingqXAWTeOhcL6ER0UJfEdQF5Bo2A@mail.gmail.com>
-	<20110411215619.GA27943@kroah.com>
-	<BANLkTimjThXn347+=m98NsBXY84guJjNqA@mail.gmail.com>
-	<20110411223632.GB31833@kroah.com>
-	<BANLkTinpKKRCrBik6-9C5WqcSDGuEt5yCw@mail.gmail.com>
-	<20110411233506.GA13240@kroah.com>
-	<BANLkTi=cG3U8yXaQ6PusmNaWcr+AWv3e_w@mail.gmail.com>
-Message-ID: <BANLkTikR2AwBdORYUdTCcAOPeMkKN7azQQ@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 12 Apr 2011 15:39:18 +0400
+Subject: [PATCH 4/6] ARM: kprobes: Fix emulation of SXTB16, SXTB, SXTH,
+	UXTB16,	UXTB and UXTH instructions
+In-Reply-To: <1302590726-3484-5-git-send-email-tixy@yxit.co.uk>
+References: <1302590726-3484-1-git-send-email-tixy@yxit.co.uk>
+	<1302590726-3484-5-git-send-email-tixy@yxit.co.uk>
+Message-ID: <4DA439E6.90906@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
-> 2011/4/12 Greg KH <greg@kroah.com>:
->> On Tue, Apr 12, 2011 at 12:45:33AM +0200, Rafa? Mi?ecki wrote:
->>> 2011/4/12 Greg KH <greg@kroah.com>:
->>> > Then in your release function, free the struct axi_device. ?It's that
->>> > simple. ?To try to free it before then would be wrong and cause
->>> > problems.
->>>
->>> This is because it is defined as:
->>> struct axi_device cores[AXI_MAX_NR_CORES];
->>
->> No way, seriously?
->>
->> You can't do that, no static struct devices please. ?Make these dynamic
->> and everything will be fine. ?The -mm tree used to have a huge warning
->> if you ever tried to register a statically allocated struct, but that
->> didn't really work out, but would have saved you a lot of time here,
->> sorry.
->>
->> So dynamically allocate the structures and you will be fine.
->
-> Well, I saw that along kernel, I had no idea there is anything wrong
-> about this. It seems more ppl do not know about this:
-> struct radeon_ib ? ? ? ?ibs[RADEON_IB_POOL_SIZE];
-> struct radeon_pm_clock_info clock_info[8];
-> struct radeon_pm_profile profiles[PM_PROFILE_MAX];
-> struct radeon_surface_reg surface_regs[RADEON_GEM_MAX_SURFACES];
-> struct radeon_i2c_chan *i2c_bus[RADEON_MAX_I2C_BUS];
->
-> struct b43_key key[B43_NR_GROUP_KEYS * 2 + B43_NR_PAIRWISE_KEYS];
->
-> struct ssb_device devices[SSB_MAX_NR_CORES];
-> I guess I could fine more examples by simple grepping .h files.
->
-> Is there some guide around with things like this we should avoid?
-> checkpatch does no catch this, so maybe just some manual? Could you
-> point me to it?
+Hello.
 
-Greg, my:
-struct ssb_device devices[SSB_MAX_NR_CORES];
-is part of "struct axi_bus", which we allocate dynamically anyway:
+On 12-04-2011 10:45, Tixy wrote:
 
-struct axi_bus *bus;
-bus = kzalloc(sizeof(*bus), GFP_KERNEL);
-if (!bus)
-	goto out;
+> From: Jon Medhurst <tixy@yxit.co.uk>
 
-So do we really need to dynamically alloc main structure and
-separately every of it's array of structs? Does it really make sense?
-Please point me to some place where I can read more about this. Some
-tips about coding style for such things, cases.
+> These sign extension instructions are encoded as extend-and-add
+> instructions where the register to add is specified as r15. The decoding
+> routines weren't checking for this and were using the incorrect
+> emulation code, giving incorrect results.
 
--- 
-Rafa?
+> Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
+> ---
+>   arch/arm/kernel/kprobes-decode.c |   14 ++++++++++++--
+>   1 files changed, 12 insertions(+), 2 deletions(-)
+
+> diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+> index a824a79..30ba313 100644
+> --- a/arch/arm/kernel/kprobes-decode.c
+> +++ b/arch/arm/kernel/kprobes-decode.c
+> @@ -1390,18 +1390,28 @@ space_cccc_0110__1(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>   		return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+>
+>   	/* SXTAB16   : cccc 0110 1000 xxxx xxxx xxxx 0111 xxxx :   */
+> -	/* SXTB      : cccc 0110 1010 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* SXTB16    : cccc 0110 1000 1111 xxxx xxxx 0111 xxxx :   */
+>   	/* ???       : cccc 0110 1001 xxxx xxxx xxxx 0111 xxxx :   */
+>   	/* SXTAB     : cccc 0110 1010 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* SXTB      : cccc 0110 1010 1111 xxxx xxxx 0111 xxxx :   */
+>   	/* SXTAH     : cccc 0110 1011 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* SXTH      : cccc 0110 1011 1111 xxxx xxxx 0111 xxxx :   */
+>   	/* UXTAB16   : cccc 0110 1100 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* UXTB16    : cccc 0110 1100 1111 xxxx xxxx 0111 xxxx :   */
+>   	/* ???       : cccc 0110 1101 xxxx xxxx xxxx 0111 xxxx :   */
+>   	/* UXTAB     : cccc 0110 1110 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* UXTB      : cccc 0110 1110 1111 xxxx xxxx 0111 xxxx :   */
+>   	/* UXTAH     : cccc 0110 1111 xxxx xxxx xxxx 0111 xxxx :   */
+> +	/* UXTH      : cccc 0110 1111 1111 xxxx xxxx 0111 xxxx :   */
+>   	if ((insn & 0x0f8000f0) == 0x06800070) {
+>   		if ((insn & 0x00300000) == 0x00100000)
+>   			return INSN_REJECTED;	/* Unallocated space */
+> -		return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+> +
+> +		if ((insn & 0x000f0000) == 0x000f0000) {
+> +			return prep_emulate_rd12rm0(insn, asi);
+> +		} else {
+> +			return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+> +		}
+
+    Why use {} around single statements? checkpatch.pl used to warn about this...
+
+WBR, Sergei
