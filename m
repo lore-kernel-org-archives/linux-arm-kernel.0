@@ -1,38 +1,33 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 12 Apr 2011 17:39:26 -0400
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <m3fwpnxj1w.fsf@pullcord.laptop.org> (Chris Ball's message of
-	"Tue, 12 Apr 2011 17:21:15 -0400")
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<m3aafvz30t.fsf@pullcord.laptop.org>
-	<20110412193944.GC2665@atrey.karlin.mff.cuni.cz>
-	<m3oc4bxne1.fsf@pullcord.laptop.org>
-	<20110412205421.GD2665@atrey.karlin.mff.cuni.cz>
-	<m3fwpnxj1w.fsf@pullcord.laptop.org>
-Message-ID: <m37hazxi7l.fsf@pullcord.laptop.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 22:40:11 +0100
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
+	broken on ARM
+In-Reply-To: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+Message-ID: <20110412214011.GG7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 12, 2011 at 11:06:34PM +0200, Janusz Krzysztofik wrote:
+> The patch tries to solve this regression by using 
+> virt_to_phys(bus_to_virt(mem->dma_handle)) instead of problematic 
+> virt_to_phys(mem->vaddr).
 
-On Tue, Apr 12 2011, Chris Ball wrote:
-> There aren't many -EOPNOTSUPP returns in the stack.  I see:
->
-> card/block.c: mmc_blk_issue_secdiscard_rq and mmc_blk_issue_discard_rq
-> card/core.c: mmc_erase
-> core/sd_ops.c: mmc_app_cmd
->
-> Mind doing some instrumentation to figure out which it is?
+Who says that DMA handles are bus addresses in the strictest sense?
 
-Actually, this probably isn't necessary -- mmc_app_cmd() is the only call
-involved in the setup path, via mmc_sd_init_card() -> mmc_app_send_scr().
+DMA handles on ARM are the bus address to program 'dev' with in order
+for it to access the memory mapped by dma_alloc_coherent().  On some
+ARM platforms, this bus address is dependent on 'dev' - such as platforms
+with more than one root PCI bus, and so bus_to_virt() just doesn't
+hack it.
 
-So, a better question: was mmc_app_send_scr() succeeding on your previous
-kernels?  There hasn't been much change in this area lately.
+What is really needed is for this problem - the mapping of DMA coherent
+memory into userspace - to be solved with a proper arch API rather than
+all these horrible hacks which subsystems instead invent.  That's
+something I tried to do with the dma_mmap_coherent() stuff but it was
+shot down by linux-arch as (iirc) PA-RISC objected to it.
 
-Thanks,
+Hence why ARM only implements it.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Maybe the video drivers should try to resurect the idea, maybe only
+allowing this support for architectures which provide dma_mmap_coherent().
