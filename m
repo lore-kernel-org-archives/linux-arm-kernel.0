@@ -1,94 +1,77 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 12 Apr 2011 12:53:38 +0200
-Subject: [PATCH] pxa270 rtc wakeup event fix
-In-Reply-To: <BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
-References: <4D9F3AE4.2040101@gmail.com>
-	<201104082136.52297.marek.vasut@gmail.com>
-	<BANLkTi=dUVins-kj2H6t6vwQKPKG8-PzQw@mail.gmail.com>
-Message-ID: <201104121253.38937.marek.vasut@gmail.com>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Tue, 12 Apr 2011 14:03:06 +0300
+Subject: [PATCH V4 2/4] MTD : add the common code for GPMI controller
+	driver
+In-Reply-To: <1301722240-15406-3-git-send-email-b32955@freescale.com>
+References: <1301722240-15406-1-git-send-email-b32955@freescale.com>
+	<1301722240-15406-3-git-send-email-b32955@freescale.com>
+Message-ID: <E550E0E66149EE438CE65645D99717D601670B0E@darkblue.bgt.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 April 2011 09:44:17 Eric Miao wrote:
-> Hi Nick,
+Hi,
+
+I have one correction to your NAND driver. Please see inlined comments.
+
+> These files contain the common code for the GPMI driver.
 > 
-> Thanks for spotting this. The problem is really IRQ_TO_GPIO() macro
-> doesn't behave as assumed. A better approach would be to return -1
-> when none-GPIO IRQs are mapped back, let me know if you are OK w/
-> the patch below:
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c | 2453
+> +++++++++++++++++++++++++++++
+>  drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h      |  551 +++++++
+>  2 files changed, 3004 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>  create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
 > 
-> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
-> b/arch/arm/mach-pxa/include/mach/gpio.h
-> index b024a8b..b9f4ed1 100644
-> --- a/arch/arm/mach-pxa/include/mach/gpio.h
-> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
-> @@ -103,7 +103,20 @@
-> 
->  #define gpio_to_bank(gpio)	((gpio) >> 5)
->  #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
-> -#define irq_to_gpio(irq)	IRQ_TO_GPIO(irq)
-> +
-> +static inline int irq_to_gpio(unsigned int irq)
+> diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+> b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+> new file mode 100644
+> index 0000000..7bbc448
+> --- /dev/null
+> +++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+> @@ -0,0 +1,2453 @@
 
-Maybe drop the explicit inline?
+<snip>
 
-Cheers
-
-
+> +#ifdef CONFIG_PM
+> +static int gpmi_nfc_suspend(struct platform_device *pdev,
+pm_message_t
+> state)
 > +{
-> +	int gpio;
-> +
-> +	if (irq == IRQ_GPIO0 || irq == IRQ_GPIO1)
-> +		return irq - IRQ_GPIO0;
-> +
-> +	gpio = irq - PXA_GPIO_IRQ_BASE;
-> +	if (gpio >= 2 && gpio < NR_BUILTIN_GPIO)
-> +		return gpio;
-> +
-> +	return -1;
+> +	return 0;
 > +}
-> 
->  #ifdef CONFIG_CPU_PXA26x
->  /* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
-> b/arch/arm/mach-pxa/include/mach/irqs.h
-> index a4285fc..0384024 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -93,9 +93,6 @@
->  #define GPIO_2_x_TO_IRQ(x)	(PXA_GPIO_IRQ_BASE + (x))
->  #define IRQ_GPIO(x)	(((x) < 2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
-> 
-> -#define IRQ_TO_GPIO_2_x(i)	((i) - PXA_GPIO_IRQ_BASE)
-> -#define IRQ_TO_GPIO(i)	(((i) < IRQ_GPIO(2)) ? ((i) - IRQ_GPIO0) :
-> IRQ_TO_GPIO_2_x(i))
-> -
->  /*
->   * The following interrupts are for board specific purposes. Since
->   * the kernel can only run on one machine at a time, we can re-use
-> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-> index 6bde595..a4af8c5 100644
-> --- a/arch/arm/mach-pxa/pxa25x.c
-> +++ b/arch/arm/mach-pxa/pxa25x.c
-> @@ -285,7 +285,7 @@ static inline void pxa25x_init_pm(void) {}
-> 
->  static int pxa25x_set_wake(struct irq_data *d, unsigned int on)
->  {
-> -	int gpio = IRQ_TO_GPIO(d->irq);
-> +	int gpio = irq_to_gpio(d->irq);
->  	uint32_t mask = 0;
-> 
->  	if (gpio >= 0 && gpio < 85)
-> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index 1cb5d0f..909756e 100644
-> --- a/arch/arm/mach-pxa/pxa27x.c
-> +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -345,7 +345,7 @@ static inline void pxa27x_init_pm(void) {}
->   */
->  static int pxa27x_set_wake(struct irq_data *d, unsigned int on)
->  {
-> -	int gpio = IRQ_TO_GPIO(d->irq);
-> +	int gpio = irq_to_gpio(d->irq);
->  	uint32_t mask;
-> 
->  	if (gpio >= 0 && gpio < 128)
+> +
+> +static int gpmi_nfc_resume(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +#else
+> +#define suspend  NULL
+> +#define resume   NULL
+> +#endif
+
+If CONFIG_PM is disabled your defines don't match function names.
+
+<snip>
+
+> +/* This structure represents this driver to the platform management
+> system. */
+> +static struct platform_driver gpmi_nfc_driver = {
+> +	.driver = {
+> +		.name = GPMI_NFC_DRIVER_NAME,
+> +	},
+> +	.probe   = gpmi_nfc_probe,
+> +	.remove  = __exit_p(gpmi_nfc_remove),
+> +	.suspend = gpmi_nfc_suspend,
+> +	.resume  = gpmi_nfc_resume,
+> +	.id_table = gpmi_ids,
+> +};
+
+This section fails to compile as gpmi_nfc_suspend and gpmi_nfc_resume
+are undefined. It compiles fine if I add gpmi_nfc_ prefix to defines.
+
+--
+Veli-Pekka Peltola
+R&D Engineer
+Bluegiga Technologies 
