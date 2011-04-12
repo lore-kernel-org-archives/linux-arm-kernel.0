@@ -1,42 +1,210 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 12 Apr 2011 10:53:23 -0600
-Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
-In-Reply-To: <BANLkTin7DEWJt4PrBp85disqXd9ZBG3Z_g@mail.gmail.com>
-References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
-	<BANLkTin7DEWJt4PrBp85disqXd9ZBG3Z_g@mail.gmail.com>
-Message-ID: <4DA48383.4000604@linaro.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 12 Apr 2011 11:32:27 -0600
+Subject: [PATCH] ARM: Tegra: Seaboard board updates for audio
+Message-ID: <1302629547-2368-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-04-12 07:44 AM, Ohad Ben-Cohen wrote:
-> On Mon, Apr 11, 2011 at 6:24 PM,<mathieu.poirier@linaro.org>  wrote:
->> From: Mathieu J. Poirier<mathieu.poirier@linaro.org>
->>
->> This is the second spin on STE's Hsem driver that is implemented
->> through the hwspinlock scheme.  More specifically:
->>
->>   More comments have been added in the code.
->>   Cleanup of included header files.
->>   One of the original contributor's name corrected.
->>   Calls to 'pm_runtime_disable'restored.
->>
->> Signed-off-by: Mathieu Poirier<mathieu.poirier@linaro.org>
->> ---
-> Looks good, but please revise the commit log (think of a random reader
-> who tries to understand what does this patch do, and is less
-> interested to hear about its revisions' history).
->
-> Otherwise,
->
-> Acked-by: Ohad Ben-Cohen<ohad@wizery.com>
->
-> (btw I assume the "PATCH 1/2" in the subject is just a typo, and
-> there's no missing "PATCH 2/2")
->
-Ohad,
+* Initialize clock tree for audio
+* Add GPIO base definitions
+* Add audio GPIO definitions
+* Define platform data for WM8903 and ASoC machine driver
+* Add special case for Kaen to handle HP_MUTE GPIO
+* Register platform devices for audio
+* Update pinmux to cater for new GPIOs used for audio
 
-I will revise the commit log and send a V3.  The PATCH 1/2 was generated 
-by send-email even if there was only one patch file...  But you are 
-correct, there was only just one patch.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This patch is for 2.6.40, and for the ARM/Tegra subsystem
 
-Mathieu.
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   21 ++++++++++-
+ arch/arm/mach-tegra/board-seaboard.c        |   52 +++++++++++++++++++++++++++
+ arch/arm/mach-tegra/board-seaboard.h        |   12 ++++--
+ 3 files changed, 79 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+index 0bda495..e693246 100644
+--- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
++++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+@@ -49,7 +49,7 @@ static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
+ 	{TEGRA_PINGROUP_CRTP,  TEGRA_MUX_CRT,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_CSUS,  TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+-	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_DAP4,  TEGRA_MUX_DAP4,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_DDC,   TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+@@ -133,7 +133,7 @@ static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
+ 	{TEGRA_PINGROUP_SPDO,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SPIB,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+-	{TEGRA_PINGROUP_SPIC,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SPIC,  TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_SPID,  TEGRA_MUX_SPI1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SPIE,  TEGRA_MUX_SPI1,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SPIF,  TEGRA_MUX_SPI1,          TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_TRISTATE},
+@@ -171,6 +171,23 @@ static struct tegra_gpio_table gpio_table[] = {
+ 
+ void __init seaboard_pinmux_init(void)
+ {
++	/*
++	 * PINGROUP_SPIC contains two pins:
++	 * + PX2, DISABLE_CHRGR (output)
++	 * + PX3, WM8903 codec IRQ (input)
++	 *
++	 * The pinmux module can only configure TRISTATE vs. NORMAL on a
++	 * per-group rather than per-pin basis. The group must be NORMAL
++	 * since at least one pin is an output. However, we must ensure that
++	 * the WM8903 IRQ is never driven, since the WM8903 itself is driving
++	 * it, and we don't want multiple drivers. To ensure this, configure
++	 * PX3 as a GPIO here, and set is as an input, before the pinmux table
++	 * is written, which is when the pins will be un-tristated.
++	 */
++	tegra_gpio_enable(TEGRA_GPIO_CDC_IRQ);
++	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
++	gpio_direction_input(TEGRA_GPIO_CDC_IRQ);
++
+ 	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
+ 
+ 	tegra_drive_pinmux_config_table(seaboard_drive_pinmux,
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index 783de17..2fdd376 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -26,9 +26,12 @@
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
+ 
++#include <sound/wm8903.h>
++
+ #include <mach/iomap.h>
+ #include <mach/irqs.h>
+ #include <mach/sdhci.h>
++#include <mach/tegra_wm8903_pdata.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -63,6 +66,10 @@ static __initdata struct tegra_clk_init_table seaboard_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+ 	{ "uartb",	"pll_p",	216000000,	true},
+ 	{ "uartd",	"pll_p",	216000000,	true},
++	{ "pll_a",	"pll_p_out1",	56448000,	true },
++	{ "pll_a_out0",	"pll_a",	11289600,	true },
++	{ "cdev1",	NULL,		0,		true },
++	{ "i2s1",	"pll_a_out0",	11289600,	false},
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+@@ -134,6 +141,22 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+ 	.is_8bit	= 1,
+ };
+ 
++static struct tegra_wm8903_platform_data seaboard_audio_pdata = {
++	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
++	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
++	.gpio_hp_mute		= -1,
++	.gpio_int_mic_en	= -1,
++	.gpio_ext_mic_en	= -1,
++};
++
++static struct platform_device seaboard_audio_device = {
++	.name	= "tegra-snd-wm8903",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &seaboard_audio_pdata,
++	},
++};
++
+ static struct platform_device *seaboard_devices[] __initdata = {
+ 	&debug_uart,
+ 	&tegra_pmu_device,
+@@ -141,6 +164,10 @@ static struct platform_device *seaboard_devices[] __initdata = {
+ 	&tegra_sdhci_device3,
+ 	&tegra_sdhci_device1,
+ 	&seaboard_gpio_keys_device,
++	&tegra_i2s_device1,
++	&tegra_das_device,
++	&tegra_pcm_device,
++	&seaboard_audio_device,
+ };
+ 
+ static struct i2c_board_info __initdata isl29018_device = {
+@@ -152,6 +179,26 @@ static struct i2c_board_info __initdata adt7461_device = {
+ 	I2C_BOARD_INFO("adt7461", 0x4c),
+ };
+ 
++static struct wm8903_platform_data wm8903_pdata = {
++	.irq_active_low = 0,
++	.micdet_cfg = 0,
++	.micdet_delay = 100,
++	.gpio_base = SEABOARD_GPIO_WM8903(0),
++	.gpio_cfg = {
++		WM8903_GPIO_NO_CONFIG,
++		WM8903_GPIO_NO_CONFIG,
++		0,
++		WM8903_GPIO_NO_CONFIG,
++		WM8903_GPIO_NO_CONFIG,
++	},
++};
++
++static struct i2c_board_info __initdata wm8903_device = {
++	I2C_BOARD_INFO("wm8903", 0x1a),
++	.platform_data = &wm8903_pdata,
++	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
++};
++
+ static void __init seaboard_i2c_init(void)
+ {
+ 	gpio_request(TEGRA_GPIO_ISL29018_IRQ, "isl29018");
+@@ -161,6 +208,8 @@ static void __init seaboard_i2c_init(void)
+ 
+ 	i2c_register_board_info(4, &adt7461_device, 1);
+ 
++	i2c_register_board_info(0, &wm8903_device, 1);
++
+ 	tegra_i2c_device1.dev.platform_data = &seaboard_i2c1_platform_data;
+ 	tegra_i2c_device2.dev.platform_data = &seaboard_i2c2_platform_data;
+ 	tegra_i2c_device3.dev.platform_data = &seaboard_i2c3_platform_data;
+@@ -204,6 +253,9 @@ static void __init tegra_kaen_init(void)
+ 	debug_uart_platform_data[0].mapbase = TEGRA_UARTB_BASE;
+ 	debug_uart_platform_data[0].irq = INT_UARTB;
+ 
++	seaboard_audio_pdata.gpio_hp_mute = TEGRA_GPIO_KAEN_HP_MUTE;
++	tegra_gpio_enable(TEGRA_GPIO_KAEN_HP_MUTE);
++
+ 	seaboard_common_init();
+ 
+ 	seaboard_i2c_init();
+diff --git a/arch/arm/mach-tegra/board-seaboard.h b/arch/arm/mach-tegra/board-seaboard.h
+index d8415e1..04a1b2e 100644
+--- a/arch/arm/mach-tegra/board-seaboard.h
++++ b/arch/arm/mach-tegra/board-seaboard.h
+@@ -17,6 +17,9 @@
+ #ifndef _MACH_TEGRA_BOARD_SEABOARD_H
+ #define _MACH_TEGRA_BOARD_SEABOARD_H
+ 
++#define SEABOARD_GPIO_TPS6586X(_x_)	(TEGRA_NR_GPIOS + (_x_))
++#define SEABOARD_GPIO_WM8903(_x_)	(SEABOARD_GPIO_TPS6586X(4) + (_x_))
++
+ #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
+ #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
+ #define TEGRA_GPIO_SD2_POWER		TEGRA_GPIO_PI6
+@@ -31,10 +34,11 @@
+ #define TEGRA_GPIO_MAGNETOMETER		TEGRA_GPIO_PN5
+ #define TEGRA_GPIO_ISL29018_IRQ		TEGRA_GPIO_PZ2
+ #define TEGRA_GPIO_AC_ONLINE		TEGRA_GPIO_PV3
+-
+-#define TPS_GPIO_BASE			TEGRA_NR_GPIOS
+-
+-#define TPS_GPIO_WWAN_PWR		(TPS_GPIO_BASE + 2)
++#define TEGRA_GPIO_WWAN_PWR		SEABOARD_GPIO_TPS(2)
++#define TEGRA_GPIO_CDC_IRQ		TEGRA_GPIO_PX3
++#define TEGRA_GPIO_SPKR_EN		SEABOARD_GPIO_WM8903(2)
++#define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PX1
++#define TEGRA_GPIO_KAEN_HP_MUTE		TEGRA_GPIO_PA5
+ 
+ void seaboard_pinmux_init(void);
+ 
+-- 
+1.7.1
