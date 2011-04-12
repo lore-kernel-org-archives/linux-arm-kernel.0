@@ -1,32 +1,52 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Tue, 12 Apr 2011 16:43:30 +0200
-Subject: reboot/kexec in 2.6.38
-In-Reply-To: <m1bp0zylgg.fsf@fess.ebiederm.org>
-References: <20110317064523.GA1995@ucw.cz>
-	<AANLkTik1CdT4k8SJop7b-MjR27RzF7a=i7WuodNKJi+J@mail.gmail.com>
-	<20110322133034.GA15475@atrey.karlin.mff.cuni.cz>
-	<m1bp0zylgg.fsf@fess.ebiederm.org>
-Message-ID: <20110412144330.GB20815@atrey.karlin.mff.cuni.cz>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 12 Apr 2011 16:01:01 +0100
+Subject: [RFC PATCH 1/5] gemini: convert to basic-mmio-gpio
+In-Reply-To: <20110412143714.GA8931@oksana.dev.rtsoft.ru>
+References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
+	<1302522502-24381-2-git-send-email-jamie@jamieiles.com>
+	<20110412143714.GA8931@oksana.dev.rtsoft.ru>
+Message-ID: <20110412150101.GG10225@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> >> I think it's config issue. Never heard of this.
-> >
-> > I've just compiled and booted 2.6.38. The kernel boots without problems when
-> > flashed in. But I've had no success with kexec, the last lines I see are:
-> >
-> > Starting new kernel
+Hi Anton,
+
+On Tue, Apr 12, 2011 at 06:37:14PM +0400, Anton Vorontsov wrote:
+> On Mon, Apr 11, 2011 at 12:48:18PM +0100, Jamie Iles wrote:
+> > The basic-mmio-gpio driver is capable of supporting this controller so
+> > convert the platform to use it for basic GPIO support.
+> > 
+> > Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > ---
+> [...]
+> > +#define GPIO_RES(__name, __addr) \
+> > +	{ \
+> > +		.start = (__addr), \
+> > +		.end = (__addr) + 0x3, \
+> > +		.flags = IORESOURCE_MEM, \
+> > +		.name = #__name, \
+> > +	}
 > 
-> Enable early_printk to a serial port if you can.
+> Btw, how about moving this (repetitive) macro into basic_mmio_gpio.h?
 > 
-> There is definitely an issue in 2.6.38 where kdump doesn't work, that
-> right now looks like a memblock issue.
+> Assuming, that there could be IRQ resources later, making
+> something like BGPIO_MEM_RES(name, addr, sz)?
 
-Finaly got time to solder serial adapter...
+Yes, that sounds reasonable.
 
-And now, after I configured kernel to print to both ttyS0 serial console and
-tty0 the kexec started to work.
+> Or, even better, some generic shorthand macro in linux/ioport.h?
+> 
+> #define IORES(__type, __name, __addr, __size)	\
+> 	{					\
+> 		.start = (__addr), 		\
+> 		.end = (__addr) + (__size),	\
+> 		.flags = IORESOURCE_##__type, 	\
+> 		.name = #__name, 		\
+> 	}
 
--- 
-metan
+I'm not sure about this - it looks multiple flags can be OR'd together 
+and resources nested so singling out this particular case for a macro 
+doesn't feel right to me.
+
+Jamie
