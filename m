@@ -1,42 +1,41 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 12 Apr 2011 22:51:04 +0200
-Subject: [PATCH] ARM: s3c2440: gta02; Register dfbmcs320 device
-Message-ID: <1302641464-27494-1-git-send-email-lars@metafoo.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2011 21:53:44 +0100
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <20110412203730.GE18850@pengutronix.de>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<20110412095446.GB18850@pengutronix.de>
+	<20110412202734.GB7806@n2100.arm.linux.org.uk>
+	<20110412203730.GE18850@pengutronix.de>
+Message-ID: <20110412205344.GE7806@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the dfbmcs320 device which provides the PCM DAI for the bluetooth
-module.
+On Tue, Apr 12, 2011 at 10:37:30PM +0200, Uwe Kleine-K?nig wrote:
+> > #if !defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+> > #if CONFIG_ARCH_MX1 + CONFIG_MACH_MX21 + ... > 1
+> > #error Invalid configuration - unable to handle different phys base addresses
+> > #endif
+> Same problem (and I guess it yields some cpp warnings about
+> CONFIG_ARCH_MX1 not being defined for an i.MX21-only build, but I didn't
+> test).
 
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s3c2440/mach-gta02.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Well then,
 
-diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
-index 0db2411..7166620 100644
---- a/arch/arm/mach-s3c2440/mach-gta02.c
-+++ b/arch/arm/mach-s3c2440/mach-gta02.c
-@@ -409,6 +409,10 @@ struct platform_device s3c24xx_pwm_device = {
- 	.num_resources	= 0,
- };
- 
-+static struct platform_device gta02_dfbmcs320_device = {
-+	.name = "dfbmcs320",
-+};
-+
- static struct i2c_board_info gta02_i2c_devs[] __initdata = {
- 	{
- 		I2C_BOARD_INFO("pcf50633", 0x73),
-@@ -523,6 +527,7 @@ static struct platform_device *gta02_devices[] __initdata = {
- 	&s3c_device_iis,
- 	&samsung_asoc_dma,
- 	&s3c_device_i2c0,
-+	&gta02_dfbmcs320_device,
- 	&gta02_buttons_device,
- 	&s3c_device_adc,
- 	&s3c_device_ts,
--- 
-1.7.2.5
+#if (CONFIG_ARCH_MX1 | CONFIG_MACH_MX21) + (...) + ... > 1
+
+where each group of | cover those which share the same phys base.
+
+No idea what those are because each MX SoC hides its phys base behind
+some SoC private definition.  This is definitely a case where more
+preprocessor junk reduces the code readability and makes it harder to
+understand.  Removal of preprocessor indirection sounds like a candidate
+for the consolidation effort to me.
+
+I think we're at the point where "no" to that is not acceptable.  Make
+it happen please.  We must reduce the size of arch/arm by all means
+possible.
