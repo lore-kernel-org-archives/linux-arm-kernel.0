@@ -1,58 +1,34 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 12 Apr 2011 15:24:34 -0400
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz> (Cyril Hrubis's
-	message of "Tue, 12 Apr 2011 17:15:48 +0200")
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-Message-ID: <m3aafvz30t.fsf@pullcord.laptop.org>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Tue, 12 Apr 2011 14:20:14 -0500
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <201104122052.17453.pwaechtler@mac.com>
+References: <201104122052.17453.pwaechtler@mac.com>
+Message-ID: <BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-(Adding linux-mmc at .)
-
-On Tue, Apr 12 2011, Cyril Hrubis wrote:
-> Hi!
-> When I insert the mmc card to zaurus, it gets properly detected and prints some
-> info into console. Mounting reading/writing files works fine.
+2011/4/12 Peter W?chtler <pwaechtler@mac.com>:
+> Hello Linux ARM developers,
 >
-> However when the card is removed (doesn't need to be mounted before), the
-> removal is most likely not detected, so when I insert it again, no info is
-> printed into console and moreover when I try to mount it zaurus goes into
-> infinite loop printing:
+> did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
+> Or was the memory always mapped in sections?
 >
-> Buffer I/O error on device mmcblk0p1, logical block 9
-> mmcblk0: error -110 sending status command
-> mmcblk0: error -110 sending read/write command, response 0xb00, card status 0xb00
-> end_request: I/O error, dev mmcblk0, sector 257
-> Buffer I/O error on device mmcblk0p1, logical block 10
-> ...
+> I still have to chase a potential memory corruption. The rootfs is located on
+> a SDcard and gets corrupted even when the filesystem test programs write to
+> different partitions.
+> The test scenario includes several dozen or even hundreds of warm and cold
+> boot sequences, file system write tests with sudden soft resets. It's a large
+> embedded project with a lot of drivers and the fact that always the rootfs and
+> often the superblock gets damaged let me think of a memory corruption.
 >
-> Related part of the .config:
->
-> #
-> # OTG and related infrastructure
-> #
-> # CONFIG_USB_GPIO_VBUS is not set
-> # CONFIG_USB_ULPI is not set
-> # CONFIG_NOP_USB_XCEIV is not set
-> CONFIG_MMC=y
-> # CONFIG_MMC_DEBUG is not set
-> CONFIG_MMC_UNSAFE_RESUME=y
 
-Your symptoms match the bug that was fixed by:
+Sorry, I don't want to be obvious, but you mentioned sudden resets
+while writing, which is almost always going to wind
+up as fs corruptions, with the severity depending on the level of
+caching the system is doing to the writes.
+How are you mounting your rootfs and what file system are you using?
+What sort of corruptions to the super block are you seeing?
 
-bad3babace2ee4d ("mmc: fix CONFIG_MMC_UNSAFE_RESUME regression")
-
-but this fix made it into 2.6.38, so if you're using 2.6.38 final then
-you shouldn't be seeing this.  Could you confirm that you have this
-patch?
-
-If so, could you try building a kernel with CONFIG_MMC_UNSAFE_RESUME=n
-and see if you still have the same problem?
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+A
