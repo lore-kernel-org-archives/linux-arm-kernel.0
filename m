@@ -1,35 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 13 Apr 2011 21:36:30 +0400
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
-	on ARM
-In-Reply-To: <201104131511.42171.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<4DA59120.1070402@ru.mvista.com>
-	<201104131511.42171.jkrzyszt@tis.icnet.pl>
-Message-ID: <4DA5DF1E.1040302@ru.mvista.com>
+From: pwaechtler@mac.com (Peter =?iso-8859-1?q?W=E4chtler?=)
+Date: Wed, 13 Apr 2011 20:19:16 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <BANLkTintPVJoJCyRJCX9f2j8KD5BPgrXrA@mail.gmail.com>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTintPVJoJCyRJCX9f2j8KD5BPgrXrA@mail.gmail.com>
+Message-ID: <201104132019.16294.pwaechtler@mac.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Am Dienstag, 12. April 2011, 21:11:59 schrieb Colin Cross:
+> On Tue, Apr 12, 2011 at 11:52 AM, Peter W?chtler <pwaechtler@mac.com> wrote:
+> > Hello Linux ARM developers,
+> > 
+> > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
+> > Or was the memory always mapped in sections?
+> > 
+> > I still have to chase a potential memory corruption. The rootfs is
+> > located on a SDcard and gets corrupted even when the filesystem test
+> > programs write to different partitions.
+> > The test scenario includes several dozen or even hundreds of warm and
+> > cold boot sequences, file system write tests with sudden soft resets.
+> > It's a large embedded project with a lot of drivers and the fact that
+> > always the rootfs and often the superblock gets damaged let me think of
+> > a memory corruption.
+> 
+> Gary King posted some patches a while ago that switched the kernel
+> back to page mappings, so he could modify attributes on some pages to
+> be non-cacheable.  The patches were not accepted, but you can probably
+> dig them up for testing.
 
-Janusz Krzysztofik wrote:
+Thanx for the tip. I already found the patch and applied it. Some probs on 
+config but not tested yet...
 
->>> After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
->>> used for obtaining page frame number passed to remap_pfn_range()
->>> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
->>> videobuf-dma-contig
-
->>     Please specify the commit summary -- for the human readers.
-
-> Hi,
-> OK, I'll try to reword the summary using a more human friendly language 
-> as soon as I have signs that Mauro (who seemed to understand the message 
-> well enough) is willing to accept the code.
-
-    I wasn't asking you to rework your summary but to specify the summary of the 
-commit you've mentioned (in parens).
-
-> Thanks,
-> Janusz
-
-WBR, Sergei
+   Peter
