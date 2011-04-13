@@ -1,82 +1,34 @@
-From: weitway@gmail.com (Jason Chen)
-Date: Wed, 13 Apr 2011 07:43:23 +0800
-Subject: [PATCH] ARM: mx53/loco: add pwm backlight device
-In-Reply-To: <20110404160855.GF13963@pengutronix.de>
-References: <1299207086-11000-1-git-send-email-b02280@freescale.com>
-	<20110404160855.GF13963@pengutronix.de>
-Message-ID: <BANLkTi=+1EzK5ZxaAsRRT-e9HzyR3SRUqw@mail.gmail.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Tue, 12 Apr 2011 17:42:24 -0700
+Subject: MT_HIGH_VECTOR mapping set read-only creating illegal access
+Message-ID: <4DA4F170.4020009@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Uwe,
+Hi,
 
-Thanks for your comments, I will resend this series patches.
+In arch/arm/kernel/traps.c:set_tls() and arch/arm/include/asm/tls.h, 
+some configurations allow for a assignment of address 0xffff0ff0. This 
+address falls within the MT_HIGH_VECTORS mapping setup in 
+devicemaps_init(). That mapping is explicitly made read-only. Thus, the 
+kernel takes a segfault when writing in set_tls().
 
-2011/4/5 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Fri, Mar 04, 2011 at 10:51:26AM +0800, Jason Chen wrote:
->> Signed-off-by: Jason Chen <b02280@freescale.com>
->> ---
->> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_loco.c | ? 11 +++++++++++
->> ?arch/arm/mach-mx5/devices-imx53.h ? | ? ?4 ++++
->> ?3 files changed, 16 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
->> index f065a0d..baf5223 100644
->> --- a/arch/arm/mach-mx5/Kconfig
->> +++ b/arch/arm/mach-mx5/Kconfig
->> @@ -162,6 +162,7 @@ config MACH_MX53_LOCO
->> ? ? ? select IMX_HAVE_PLATFORM_IMX2_WDT
->> ? ? ? select IMX_HAVE_PLATFORM_IMX_I2C
->> ? ? ? select IMX_HAVE_PLATFORM_IMX_UART
->> + ? ? select IMX_HAVE_PLATFORM_MXC_PWM
->> ? ? ? help
->> ? ? ? ? Include support for MX53 LOCO platform. This includes specific
->> ? ? ? ? configurations for the board and its peripherals.
->> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
->> index 160899e..3b0b200 100644
->> --- a/arch/arm/mach-mx5/board-mx53_loco.c
->> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
->> @@ -23,6 +23,7 @@
->> ?#include <linux/fec.h>
->> ?#include <linux/delay.h>
->> ?#include <linux/gpio.h>
->> +#include <linux/pwm_backlight.h>
->>
->> ?#include <mach/common.h>
->> ?#include <mach/hardware.h>
->> @@ -203,6 +204,13 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->> ? ? ? .bitrate = 100000,
->> ?};
->>
->> +static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
->> + ? ? .pwm_id = 1,
->> + ? ? .max_brightness = 255,
->> + ? ? .dft_brightness = 128,
->> + ? ? .pwm_period_ns = 50000,
->> +};
->> +
->> ?static void __init mx53_loco_board_init(void)
->> ?{
->> ? ? ? mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
->> @@ -213,6 +221,9 @@ static void __init mx53_loco_board_init(void)
->> ? ? ? imx53_add_imx2_wdt(0, NULL);
->> ? ? ? imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
->> ? ? ? imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
->> +
->> + ? ? imx53_add_mxc_pwm(1);
-> can you please resend this with the series adding this function when
-> addressing the comments I just gave.
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+It looks like this disparity may have been introduced in this commit:
+
+commit 36bb94ba36f332de767cfaa3af6a5136435a3a9c
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Tue Nov 16 08:40:36 2010 +0000
+
+     ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+
+     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Is there a reason this mapping must be read-only? Perhaps we could apply 
+write access for these special cases only?
+
+Thanks,
+Mike
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
