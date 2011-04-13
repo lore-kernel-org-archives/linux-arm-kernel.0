@@ -1,63 +1,43 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 13 Apr 2011 14:24:41 +0800
-Subject: [PATCH v5 4/4] MTD : add GPMI driver in the config and Makefile
-In-Reply-To: <1302675881-18862-1-git-send-email-b32955@freescale.com>
-References: <1302675881-18862-1-git-send-email-b32955@freescale.com>
-Message-ID: <1302675881-18862-5-git-send-email-b32955@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 Apr 2011 08:20:43 +0200
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <alpine.LFD.2.00.1104121850160.28032@xanadu.home>
+References: <1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
+	<20110411074041.GF18601@pengutronix.de>
+	<alpine.LFD.2.00.1104110944290.28032@xanadu.home>
+	<20110412095446.GB18850@pengutronix.de>
+	<20110412202734.GB7806@n2100.arm.linux.org.uk>
+	<20110412203730.GE18850@pengutronix.de>
+	<20110412205344.GE7806@n2100.arm.linux.org.uk>
+	<20110412212050.GF18850@pengutronix.de>
+	<alpine.LFD.2.00.1104121850160.28032@xanadu.home>
+Message-ID: <20110413062043.GG18850@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the GPMI driver in the relevant Kconfig and Makefile in the MTD.
+Hi Nicolas,
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/Kconfig           |   11 +++++++++++
- drivers/mtd/nand/Makefile          |    1 +
- drivers/mtd/nand/gpmi-nfc/Makefile |    3 +++
- 3 files changed, 15 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/nand/gpmi-nfc/Makefile
+On Tue, Apr 12, 2011 at 06:54:30PM -0400, Nicolas Pitre wrote:
+> On Tue, 12 Apr 2011, Uwe Kleine-K?nig wrote:
+> 
+> > Apart from defining PLAT_PHYS_OFFSET these symbols are used in the
+> > machine files to define .boot_params. This is better than repeating the
+> > bare numbers, isn't it?
+> 
+> Sure.
+> 
+> > The current arch/arm/plat-mxc/include/mach/memory.h looks ok for me. I 
+> > assume you concur?
+> 
+> Maybe you should replace CONFIG_RUNTIME_PHYS_OFFSET with 
+> CONFIG_ARM_PATCH_PHYS_VIRT in that file.
+This is already commited to my private repo.
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 450afc5..25a1493 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -426,6 +426,17 @@ config MTD_NAND_NANDSIM
- 	  The simulator may simulate various NAND flash chips for the
- 	  MTD nand layer.
- 
-+config MTD_NAND_GPMI_NFC
-+        bool "GPMI NAND Flash Controller driver"
-+        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
-+	select MTD_PARTITIONS
-+	select MTD_CMDLINE_PARTS
-+        help
-+	 Enables NAND Flash support for IMX23 or IMX28.
-+	 The GPMI controller is very powerful, with the help of BCH
-+	 module, it can do the hardware ECC. The GPMI supports several
-+	 NAND flashs at the same time.
-+
- config MTD_NAND_PLATFORM
- 	tristate "Support for generic platform NAND driver"
- 	help
-diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-index 8ad6fae..80d1f08 100644
---- a/drivers/mtd/nand/Makefile
-+++ b/drivers/mtd/nand/Makefile
-@@ -48,5 +48,6 @@ obj-$(CONFIG_MTD_NAND_BCM_UMI)		+= bcm_umi_nand.o nand_bcm_umi.o
- obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
- obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
- obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
-+obj-$(CONFIG_MTD_NAND_GPMI_NFC)		+= gpmi-nfc/
- 
- nand-objs := nand_base.o nand_bbt.o
-diff --git a/drivers/mtd/nand/gpmi-nfc/Makefile b/drivers/mtd/nand/gpmi-nfc/Makefile
-new file mode 100644
-index 0000000..7179513
---- /dev/null
-+++ b/drivers/mtd/nand/gpmi-nfc/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_MTD_NAND_GPMI_NFC) += gpmi-nfc.o
-+gpmi-nfc-objs += gpmi-nfc-main.o
-+gpmi-nfc-objs += hal-mxs.o
+Best regards
+Uwe
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
