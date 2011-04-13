@@ -1,41 +1,33 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 13 Apr 2011 23:01:55 +0200
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <4DA5DF1E.1040302@ru.mvista.com>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104131511.42171.jkrzyszt@tis.icnet.pl>
-	<4DA5DF1E.1040302@ru.mvista.com>
-Message-ID: <201104132301.56210.jkrzyszt@tis.icnet.pl>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 13 Apr 2011 14:00:57 -0700
+Subject: [RFC][PATCH V4] axi: add AXI bus driver
+In-Reply-To: <BANLkTimBZK8i3EgihB85HqTJ+wOz89uwTw@mail.gmail.com>
+References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
+	<20110413163113.GA24015@kroah.com>
+	<BANLkTin-4HrJzNrLOxRy_-a98S3ZF4aSQw@mail.gmail.com>
+	<BANLkTimBZK8i3EgihB85HqTJ+wOz89uwTw@mail.gmail.com>
+Message-ID: <20110413210057.GA7523@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia ?roda 13 kwiecie? 2011 o 19:36:30 Sergei Shtylyov napisa?(a):
-> Hello.
+On Wed, Apr 13, 2011 at 10:37:44PM +0200, G?bor Stefanik wrote:
+> On Wed, Apr 13, 2011 at 9:39 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> > Hm, I'm not sure. Using EXPORT_SYMBOL_GPL will forbid closed source
+> > drivers from using our bus driver, right? I'm don't have preferences
+> > on this, if you prefer us to force GPL, I can.
 > 
-> Janusz Krzysztofik wrote:
-> >>> After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
-> >>> used for obtaining page frame number passed to remap_pfn_range()
-> >>> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
-> >>> videobuf-dma-contig
-> >>> 
-> >>     Please specify the commit summary -- for the human readers.
-> > 
-> > Hi,
-> > OK, I'll try to reword the summary using a more human friendly
-> > language as soon as I have signs that Mauro (who seemed to
-> > understand the message well enough) is willing to accept the code.
-> 
->     I wasn't asking you to rework your summary but to specify the
-> summary of the commit you've mentioned (in parens).
+> Isn't EXPORT_SYMBOL_GPL for symbols that are considered to form a
+> tight coupling between the kernel and users of the symbol? Using _GPL
+> just because you are against proprietary drivers in general and want
+> to force GPL on HW vendors is wrong.
 
-Ah, I see. How about just reordered wording:
+It shows _intent_.  Not to say that functions that are not exported in
+this manner do not also require only GPL kernel code to be used as well
+at all.
 
-After commit 35d9f510b67b10338161aba6229d4f55b4000f5b (switching from 
-mem->dma_handle to virt_to_phys(mem->vaddr) used for obtaining page 
-frame number passed to remap_pfn_range()), ....
+See the archives for more details if you are curious about it, it's been
+covered numerous times in the past.
 
-Do you think this would be clear enough?
+thanks,
 
-Thanks,
-Janusz
+greg k-h
