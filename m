@@ -1,14 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 13 Apr 2011 10:37:48 -0700
-Subject: [PATCH] ARM: s3c2440: gta02; Register dfbmcs320 device
-In-Reply-To: <1302641464-27494-1-git-send-email-lars@metafoo.de>
-References: <1302641464-27494-1-git-send-email-lars@metafoo.de>
-Message-ID: <20110413173747.GF18008@opensource.wolfsonmicro.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 13 Apr 2011 21:36:30 +0400
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <201104131511.42171.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<4DA59120.1070402@ru.mvista.com>
+	<201104131511.42171.jkrzyszt@tis.icnet.pl>
+Message-ID: <4DA5DF1E.1040302@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 10:51:04PM +0200, Lars-Peter Clausen wrote:
-> Register the dfbmcs320 device which provides the PCM DAI for the bluetooth
-> module.
+Hello.
 
-Applied, thanks.
+Janusz Krzysztofik wrote:
+
+>>> After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
+>>> used for obtaining page frame number passed to remap_pfn_range()
+>>> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
+>>> videobuf-dma-contig
+
+>>     Please specify the commit summary -- for the human readers.
+
+> Hi,
+> OK, I'll try to reword the summary using a more human friendly language 
+> as soon as I have signs that Mauro (who seemed to understand the message 
+> well enough) is willing to accept the code.
+
+    I wasn't asking you to rework your summary but to specify the summary of the 
+commit you've mentioned (in parens).
+
+> Thanks,
+> Janusz
+
+WBR, Sergei
