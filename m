@@ -1,59 +1,92 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 13 Apr 2011 21:11:14 +0100
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <alpine.LFD.2.00.1104131125380.24613@xanadu.home>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-	<alpine.LFD.2.00.1104131125380.24613@xanadu.home>
-Message-ID: <20110413201114.GB16019@shareable.org>
+From: george@znau.edu.ua (George Kashperko)
+Date: Wed, 13 Apr 2011 23:23:07 +0300
+Subject: [RFC][PATCH] axi: add AXI bus driver
+In-Reply-To: <BANLkTik6JZ-n3sVjCFK_x1yNRH3_o3_6rg@mail.gmail.com>
+References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
+	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
+	<1302634039.14216.10.camel@dev.znau.edu.ua>
+	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
+	<1302635550.14216.21.camel@dev.znau.edu.ua>
+	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
+	<4DA4AC4B.90409@hauke-m.de>
+	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
+	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
+	<1302640546.14216.65.camel@dev.znau.edu.ua>
+	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+	<op.vtvalzu33ri7v4@arend-laptop>
+	<BANLkTik6JZ-n3sVjCFK_x1yNRH3_o3_6rg@mail.gmail.com>
+Message-ID: <1302726187.7911.11.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Tue, 12 Apr 2011, Jamie Lokier wrote:
+
+> 2011/4/13 Arend van Spriel <arend@broadcom.com>:
+> > On Tue, 12 Apr 2011 22:44:01 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> >
+> >> 2011/4/12 George Kashperko <george@znau.edu.ua>:
+> >>>>
+> >>>> 2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
+> >>>> That way I see really low (or not at all) relation between out
+> >>>> (not)Broadcom bus and present AMBA bus.
+> >>>>
+> >>> Agree.
+> >>
+> >> Ehh, sounds like one more renaming to functions, defines, prefixes.
+> >>
+> >> Let's wait for Arend comments, he was the one voting for not-bcm-specific
+> >> name.
+> >>
+> >
+> > Hi Rafa?,
+> >
+> > Still think its better to stick with a generic name even if currently you
+> > only come across this in Broadcom chips right now. I do agree that the term
+> > 'axi' is implying something else than what this bus driver is providing. The
+> > name 'axi-dmp' I gave earlier may be more to the point.
+> >
+> > I also looked at the amba driver after receiving comments on the brcmaxi
+> > library module (this is what Hauke Mehrtens referred to) and came to similar
+> > conclusion as you did. It does however support PM properly so you may want
+> > to get inspiration in that area. I also noticed a reference to AMBA term APB
+> > which is a different bus in the AMBA family. AXI was introduced later as
+> > higher performance bus (in AMBA rev3 if I remember correctly).
 > 
-> > Andrei Warkentin wrote:
-> > > Hi Peter,
-> > > 
-> > > 2011/4/12 Peter W?chtler <pwaechtler@mac.com>:
-> > > > Hello Linux ARM developers,
-> > > >
-> > > > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
-> > > > Or was the memory always mapped in sections?
-> > > >
-> > > > I still have to chase a potential memory corruption. The rootfs is located on
-> > > > a SDcard and gets corrupted even when the filesystem test programs write to
-> > > > different partitions.
-> > > > The test scenario includes several dozen or even hundreds of warm and cold
-> > > > boot sequences, file system write tests with sudden soft resets. It's a large
-> > > > embedded project with a lot of drivers and the fact that always the rootfs and
-> > > > often the superblock gets damaged let me think of a memory corruption.
-> > > >
-> > > 
-> > > Sorry, I don't want to be obvious, but you mentioned sudden resets
-> > > while writing, which is almost always going to wind
-> > > up as fs corruptions, with the severity depending on the level of
-> > > caching the system is doing to the writes.
-> > > How are you mounting your rootfs and what file system are you using?
-> > > What sort of corruptions to the super block are you seeing?
-> > 
-> > If everything is implemented correctly, that depends on the type of
-> > filesystem, block layer and storage.  Some are explicitly designed to
-> > be safe against sudden reboots and power failure - which is an
-> > important feature of systems where removing the power is how they are
-> > turned off at night.
+> I don't focus on PM yet, do not consider it a problem, it just needs some time.
 > 
-> SD was mentioned as being the storage medium in this thread. I really 
-> doubt SD cards are designed to be safe against sudden power outages.
+> Note for not involved: AMBA is family with few buses/interfaces
+> possible: AXI, AHB, ASB, APB, ATB [1].
+> 
+> So what are you saying is that drivers/amba/ is for AMBA APB? OK, I
+> can accept such a explanation and it makes me even more sure we need
+> another AMBA driver (this time: AMBA AXI).
+AMBA is AMBA. axi/apb/ahb etc are all subsets of AMBA and as of current
+all fit to what already is in drivers/amba.
 
-Ah, fair enough, you are sadly almost certainly right.
+> 
+> The left question is: how much of the implemented code is AMBA AXI
+> specific and how much is Broadcom specific?
 
-(Some flash even corrupts itself on power removal during reads too,
-due to internal reorganisation.  I have no idea if SD is in that
-category.  It is quite a problem when searching for something to
-replace an old-fashioned hard disk in an application where removing
-the power is normal daily usage, and traditional journalling
-filesystems used to be effective.)
+Answers to 1. and 2. are there in drivers/amba/bus.c
+Look _probe and _register fn for more details.
+> 1) Does AMBA AXI identify cores by manuf, id, rev and class? Is this
+> really AMBA AXI specific and a evolution from simple "id" in AMBA APB?
+During amba device registration amba bus code read component/peripheral
+id registers from known locations, exactly where
+peripherialid/componentid registers of master port (agent) core are.
+Look brcm80211/inclue/aidmp.h for those.
+> 2) Is this standard for AMBA AXI to keep list of available cores in
+> some specific memory (is this always EPROM like in case of Bcm?)?
+> 3) Does every AMBA AXI device need enabling/disabling/resetting
+> routine we implemented? Is that really Bcm independent?
+Enable/disable abstracted by clocks interface. 
 
--- Jamie
+It would be really great if someone could enligten us on 2).
+
+> This is mostly what I already asked, but didn't get answer. Please,
+> explain to us what is AMBA AXI specific and what is Broadcom specific.
+> 
+> [1] http://en.wikipedia.org/wiki/Advanced_Microcontroller_Bus_Architecture
+> 
+
+Have nice day,
+George
