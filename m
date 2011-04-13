@@ -1,305 +1,238 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 13 Apr 2011 09:31:13 -0700
-Subject: [RFC][PATCH V4] axi: add AXI bus driver
-In-Reply-To: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
-References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20110413163113.GA24015@kroah.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 13 Apr 2011 18:29:01 +0200
+Subject: [PATCH] at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
+Message-ID: <1302712141-6952-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 08:52:55PM +0200, Rafa? Mi?ecki wrote:
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Michael B?sch <mb@bu3sch.de>
-> Cc: Larry Finger <Larry.Finger@lwfinger.net>
-> Cc: George Kashperko <george@znau.edu.ua>
-> Cc: Arend van Spriel <arend@broadcom.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King <rmk@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andy Botting <andy@andybotting.com>
-> Cc: linuxdriverproject <devel@linuxdriverproject.org>
-> Cc: linux-kernel at vger.kernel.org <linux-kernel@vger.kernel.org>
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
-> Greg: is this what you expected from dynamic allocation and documentation?
-> 
-> Did I miss any other comments about something to change?
-> 
-> V2: Rename to axi
->     Use DEFINE_PCI_DEVICE_TABLE in bridge
->     Make use of pr_fmt and pr_*
->     Store core class
->     Rename bridge to not b43 specific
->     Replace magic 0x1000 with BCMAI_CORE_SIZE
->     Remove some old "ssb" names and defines
->     Move BCMAI_ADDR_BASE def
->     Add drvdata field
-> V3: Fix reloading (kfree issue)
->     Add 14e4:0x4331
->     Fix non-initialized struct issue
->     Drop useless inline functions wrappers for pci core drv
->     Proper pr_* usage
-> V3.1: Include forgotten changes (pr_* and include related)
->     Explain why we dare to implement empty release function
-> V4: Add ABI documentation
->     Move struct device to wrapper and alloc it dynamically
->     checkpatch.pl pointed fixes
-> ---
->  Documentation/ABI/testing/sysfs-bus-axi   |   31 +++
->  drivers/Kconfig                           |    2 +
->  drivers/Makefile                          |    1 +
->  drivers/axi/Kconfig                       |   33 +++
->  drivers/axi/Makefile                      |    7 +
->  drivers/axi/TODO                          |    3 +
->  drivers/axi/axi_pci_bridge.c              |   33 +++
->  drivers/axi/axi_private.h                 |   37 +++
->  drivers/axi/core.c                        |   51 ++++
->  drivers/axi/driver_chipcommon.c           |   87 +++++++
->  drivers/axi/driver_chipcommon_pmu.c       |  134 ++++++++++
->  drivers/axi/driver_pci.c                  |  163 ++++++++++++
->  drivers/axi/host_pci.c                    |  178 +++++++++++++
->  drivers/axi/main.c                        |  271 ++++++++++++++++++++
->  drivers/axi/scan.c                        |  392 +++++++++++++++++++++++++++++
->  drivers/axi/scan.h                        |   56 ++++
->  include/linux/axi/axi.h                   |  227 +++++++++++++++++
->  include/linux/axi/axi_driver_chipcommon.h |  308 ++++++++++++++++++++++
->  include/linux/axi/axi_driver_pci.h        |   89 +++++++
->  include/linux/axi/axi_regs.h              |   34 +++
->  include/linux/mod_devicetable.h           |   17 ++
->  scripts/mod/file2alias.c                  |   21 ++
->  22 files changed, 2175 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/sysfs-bus-axi
->  create mode 100644 drivers/axi/Kconfig
->  create mode 100644 drivers/axi/Makefile
->  create mode 100644 drivers/axi/TODO
->  create mode 100644 drivers/axi/axi_pci_bridge.c
->  create mode 100644 drivers/axi/axi_private.h
->  create mode 100644 drivers/axi/core.c
->  create mode 100644 drivers/axi/driver_chipcommon.c
->  create mode 100644 drivers/axi/driver_chipcommon_pmu.c
->  create mode 100644 drivers/axi/driver_pci.c
->  create mode 100644 drivers/axi/host_pci.c
->  create mode 100644 drivers/axi/main.c
->  create mode 100644 drivers/axi/scan.c
->  create mode 100644 drivers/axi/scan.h
->  create mode 100644 include/linux/axi/axi.h
->  create mode 100644 include/linux/axi/axi_driver_chipcommon.h
->  create mode 100644 include/linux/axi/axi_driver_pci.h
->  create mode 100644 include/linux/axi/axi_regs.h
-> 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-axi b/Documentation/ABI/testing/sysfs-bus-axi
-> new file mode 100644
-> index 0000000..6223612
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-bus-axi
-> @@ -0,0 +1,31 @@
-> +What:		/sys/bus/axi/devices/.../class
-> +Date:		April 2011
-> +KernelVersion:	2.6.40
-> +Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
-> +Description:
-> +		Each AXI core is identified by few fields, including class it
-> +		belongs to. See include/linux/axi/axi.h for possible values.
-> +
-> +What:		/sys/bus/axi/devices/.../manuf
-> +Date:		April 2011
-> +KernelVersion:	2.6.40
-> +Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
-> +Description:
-> +		Each AXI core has it's manufacturer id. See
-> +		include/linux/axi/axi.h for possible values.
-> +
-> +What:		/sys/bus/axi/devices/.../rev
-> +Date:		April 2011
-> +KernelVersion:	2.6.40
-> +Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
-> +Description:
-> +		AXI cores of the same type can still slightly differ depending
-> +		on their revision. Use it for detailed programming.
-> +
-> +What:		/sys/bus/axi/devices/.../id
-> +Date:		April 2011
-> +KernelVersion:	2.6.40
-> +Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
-> +Description:
-> +		There are a few types of AXI cores, they can be identified by
-> +		id field.
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index 177c7d1..1244e8c 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -68,6 +68,8 @@ source "drivers/watchdog/Kconfig"
->  
->  source "drivers/ssb/Kconfig"
->  
-> +source "drivers/axi/Kconfig"
-> +
->  source "drivers/mfd/Kconfig"
->  
->  source "drivers/regulator/Kconfig"
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index 3f135b6..6e1979b 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -110,6 +110,7 @@ obj-$(CONFIG_HID)		+= hid/
->  obj-$(CONFIG_PPC_PS3)		+= ps3/
->  obj-$(CONFIG_OF)		+= of/
->  obj-$(CONFIG_SSB)		+= ssb/
-> +obj-$(CONFIG_AXI)		+= axi/
->  obj-$(CONFIG_VHOST_NET)		+= vhost/
->  obj-$(CONFIG_VLYNQ)		+= vlynq/
->  obj-$(CONFIG_STAGING)		+= staging/
-> diff --git a/drivers/axi/Kconfig b/drivers/axi/Kconfig
-> new file mode 100644
-> index 0000000..6221af0
-> --- /dev/null
-> +++ b/drivers/axi/Kconfig
-> @@ -0,0 +1,33 @@
-> +config AXI_POSSIBLE
-> +	bool
-> +	depends on HAS_IOMEM && HAS_DMA
-> +	default y
-> +
-> +menu "AMBA AXI"
-> +	depends on AXI_POSSIBLE
-> +
-> +config AXI
-> +	tristate "AXI support"
-> +	depends on AXI_POSSIBLE
-> +	help
-> +	  Bus driver for one of the Advanced Microcontroller Bus Architecture
-> +	  interfaces: Advanced eXtensible Interface.
-> +
-> +config AXI_HOST_PCI_POSSIBLE
-> +	bool
-> +	depends on AXI && PCI = y
-> +	default y
-> +
-> +config AXI_HOST_PCI
-> +	bool "Support for AXI on PCI-host bus"
-> +	depends on AXI_HOST_PCI_POSSIBLE
-> +
-> +config AXI_DEBUG
-> +	bool "AXI debugging"
-> +	depends on AXI
-> +	help
-> +	  This turns on additional debugging messages.
-> +
-> +	  If unsure, say N
-> +
-> +endmenu
-> diff --git a/drivers/axi/Makefile b/drivers/axi/Makefile
-> new file mode 100644
-> index 0000000..50d6797
-> --- /dev/null
-> +++ b/drivers/axi/Makefile
-> @@ -0,0 +1,7 @@
-> +axi-y					+= main.o scan.o core.o
-> +axi-y					+= driver_chipcommon.o driver_chipcommon_pmu.o
-> +axi-y					+= driver_pci.o
-> +axi-$(CONFIG_AXI_HOST_PCI)		+= host_pci.o axi_pci_bridge.o
-> +obj-$(CONFIG_AXI)			+= axi.o
-> +
-> +ccflags-$(CONFIG_AXI_DEBUG)		:= -DDEBUG
-> diff --git a/drivers/axi/TODO b/drivers/axi/TODO
-> new file mode 100644
-> index 0000000..5190336
-> --- /dev/null
-> +++ b/drivers/axi/TODO
-> @@ -0,0 +1,3 @@
-> +- Interrupts
-> +- Defines for PCI core driver
-> +- Convert axi_bus->cores into linked list
-> diff --git a/drivers/axi/axi_pci_bridge.c b/drivers/axi/axi_pci_bridge.c
-> new file mode 100644
-> index 0000000..17e882c
-> --- /dev/null
-> +++ b/drivers/axi/axi_pci_bridge.c
-> @@ -0,0 +1,33 @@
-> +/*
-> + * AXI PCI bridge module
-> + *
-> + * Licensed under the GNU/GPL. See COPYING for details.
-> + */
-> +
-> +#include "axi_private.h"
-> +
-> +#include <linux/axi/axi.h>
-> +#include <linux/pci.h>
-> +
-> +static DEFINE_PCI_DEVICE_TABLE(axi_pci_bridge_tbl) = {
-> +	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4331) },
-> +	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4353) },
-> +	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4727) },
-> +	{ 0, },
-> +};
-> +MODULE_DEVICE_TABLE(pci, axi_pci_bridge_tbl);
-> +
-> +static struct pci_driver axi_pci_bridge_driver = {
-> +	.name = "axi-pci-bridge",
-> +	.id_table = axi_pci_bridge_tbl,
-> +};
-> +
-> +int __init axi_pci_bridge_init(void)
-> +{
-> +	return axi_host_pci_register(&axi_pci_bridge_driver);
-> +}
-> +
-> +void __exit axi_pci_bridge_exit(void)
-> +{
-> +	axi_host_pci_unregister(&axi_pci_bridge_driver);
-> +}
+no board configure it as 'n' and it's an issue to merge all defconfigs
+in one
 
-You register a pci driver that does nothing?  That's not right, you need
-to then base your axi bus off of that pci device, so it is hooked up
-correctly in the /sys/devices/ tree.  Otherwise you are somewhere up in
-the virtual location for your axi bus, right?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+---
+ arch/arm/mach-at91/Kconfig                |   19 -------------------
+ arch/arm/mach-at91/board-at572d940hf_ek.c |    4 ----
+ arch/arm/mach-at91/board-cap9adk.c        |    4 ----
+ arch/arm/mach-at91/board-sam9260ek.c      |    4 ----
+ arch/arm/mach-at91/board-sam9261ek.c      |    4 ----
+ arch/arm/mach-at91/board-sam9263ek.c      |    4 ----
+ arch/arm/mach-at91/board-sam9g20ek.c      |    4 ----
+ arch/arm/mach-at91/board-sam9m10g45ek.c   |    4 ----
+ 8 files changed, 0 insertions(+), 47 deletions(-)
 
-> +bool axi_core_is_enabled(struct axi_device *core)
-> +{
-> +	if ((axi_aread32(core, AXI_IOCTL) & (AXI_IOCTL_CLK | AXI_IOCTL_FGC))
-> +	    != AXI_IOCTL_CLK)
-> +		return false;
-> +	if (axi_aread32(core, AXI_RESET_CTL) & AXI_RESET_CTL_RESET)
-> +		return false;
-> +	return true;
-> +}
-> +EXPORT_SYMBOL(axi_core_is_enabled);
-
-EXPORT_SYMBOL_GPL()?
-
-What module uses this?  And why would it care?
-
-> +EXPORT_SYMBOL(axi_core_enable);
-
-EXPORT_SYMBOL_GPL()?
-
-Same goes for your other exports, just want you to be sure here.
-
-> +u32 xaxi_chipco_gpio_control(struct axi_drv_cc *cc, u32 mask, u32 value)
-> +{
-> +	return axi_cc_write32_masked(cc, AXI_CC_GPIOCTL, mask, value);
-> +}
-> +EXPORT_SYMBOL(xaxi_chipco_gpio_control);
-
-"xaxi"?  Shouldn't that be consistant with the other exports and start
-with "axi"?
-
-> +static u8 axi_host_pci_read8(struct axi_device *core, u16 offset)
-> +{
-> +	if (unlikely(core->bus->mapped_core != core))
-
-Are you sure about the use of unlikely in this, and other functions?
-The compiler almost always does a better job than we do for these types
-of calls, just let it do it's job.
-
-> +		axi_host_pci_switch_core(core);
-> +	return ioread8(core->bus->mmio + offset);
-
-I think because of that unlikely, you just slowed down all pci devices,
-right?  That's not very nice :)
-
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 1939023..da5d708 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -3,9 +3,6 @@ if ARCH_AT91
+ config HAVE_AT91_DATAFLASH_CARD
+ 	bool
+ 
+-config HAVE_NAND_ATMEL_BUSWIDTH_16
+-	bool
+-
+ config HAVE_AT91_USART3
+ 	bool
+ 
+@@ -208,7 +205,6 @@ comment "AT91SAM9260 / AT91SAM9XE Board Type"
+ config MACH_AT91SAM9260EK
+ 	bool "Atmel AT91SAM9260-EK / AT91SAM9XE Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9260-EK or AT91SAM9XE Evaluation Kit
+ 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=3933>
+@@ -269,7 +265,6 @@ comment "AT91SAM9261 Board Type"
+ config MACH_AT91SAM9261EK
+ 	bool "Atmel AT91SAM9261-EK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9261-EK Evaluation Kit.
+ 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=3820>
+@@ -285,7 +280,6 @@ comment "AT91SAM9G10 Board Type"
+ config MACH_AT91SAM9G10EK
+ 	bool "Atmel AT91SAM9G10-EK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9G10-EK Evaluation Kit.
+ 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4588>
+@@ -301,7 +295,6 @@ comment "AT91SAM9263 Board Type"
+ config MACH_AT91SAM9263EK
+ 	bool "Atmel AT91SAM9263-EK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9263-EK Evaluation Kit.
+ 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4057>
+@@ -342,7 +335,6 @@ comment "AT91SAM9G20 Board Type"
+ config MACH_AT91SAM9G20EK
+ 	bool "Atmel AT91SAM9G20-EK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9G20-EK Evaluation Kit
+ 	  that embeds only one SD/MMC slot.
+@@ -350,7 +342,6 @@ config MACH_AT91SAM9G20EK
+ config MACH_AT91SAM9G20EK_2MMC
+ 	depends on MACH_AT91SAM9G20EK
+ 	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
+ 	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
+@@ -415,7 +406,6 @@ comment "AT91SAM9G45 Board Type"
+ 
+ config MACH_AT91SAM9M10G45EK
+ 	bool "Atmel AT91SAM9M10G45-EK Evaluation Kits"
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9G45-EKES Evaluation Kit.
+ 	  "ES" at the end of the name means that this board is an
+@@ -432,7 +422,6 @@ comment "AT91CAP9 Board Type"
+ config MACH_AT91CAP9ADK
+ 	bool "Atmel AT91CAP9A-DK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT91CAP9A-DK Evaluation Kit.
+ 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4138>
+@@ -449,7 +438,6 @@ config MACH_AT572D940HFEB
+ 	bool "AT572D940HF-EK"
+ 	depends on ARCH_AT572D940HF
+ 	select HAVE_AT91_DATAFLASH_CARD
+-	select HAVE_NAND_ATMEL_BUSWIDTH_16
+ 	help
+ 	  Select this if you are using Atmel's AT572D940HF-EK evaluation kit.
+ 	  <http://www.atmel.com/products/diopsis/default.asp>
+@@ -482,13 +470,6 @@ config MTD_AT91_DATAFLASH_CARD
+ 	help
+ 	  Enable support for the DataFlash card.
+ 
+-config MTD_NAND_ATMEL_BUSWIDTH_16
+-	bool "Enable 16-bit data bus interface to NAND flash"
+-	depends on HAVE_NAND_ATMEL_BUSWIDTH_16
+-	help
+-	  On AT91SAM926x boards both types of NAND flash can be present
+-	  (8 and 16 bit data bus width).
+-
+ # ----------------------------------------------------------
+ 
+ comment "AT91 Feature Selections"
+diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+index 3929f1c..1cd80d6 100644
+--- a/arch/arm/mach-at91/board-at572d940hf_ek.c
++++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+@@ -216,11 +216,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
+ /*	.rdy_pin	= AT91_PIN_PC16, */
+ 	.enable_pin	= AT91_PIN_PA15,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata eb_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
+index e727444..4014a14 100644
+--- a/arch/arm/mach-at91/board-cap9adk.c
++++ b/arch/arm/mach-at91/board-cap9adk.c
+@@ -187,11 +187,7 @@ static struct atmel_nand_data __initdata cap9adk_nand_data = {
+ //	.rdy_pin	= ... not connected
+ 	.enable_pin	= AT91_PIN_PD15,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata cap9adk_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+index de1816e..f1c9aa2 100644
+--- a/arch/arm/mach-at91/board-sam9260ek.c
++++ b/arch/arm/mach-at91/board-sam9260ek.c
+@@ -191,11 +191,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 14acc90..2afbada 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -197,11 +197,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC15,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+index bfe490d..61518b5 100644
+--- a/arch/arm/mach-at91/board-sam9263ek.c
++++ b/arch/arm/mach-at91/board-sam9263ek.c
+@@ -198,11 +198,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PA22,
+ 	.enable_pin	= AT91_PIN_PD15,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index ca8198b..fb0c9b5 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -175,11 +175,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index 6c999db..d202bc0 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -155,11 +155,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC8,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+-#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+ 	.bus_width_16	= 1,
+-#else
+-	.bus_width_16	= 0,
+-#endif
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+-- 
+1.7.4.1
