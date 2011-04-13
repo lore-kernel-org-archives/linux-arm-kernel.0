@@ -1,26 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 13 Apr 2011 13:17:17 +0530
-Subject: [Q] GIC : IRQ_TYPE_LEVEL_LOW interrupts
-In-Reply-To: <4DA4A1E2.9090304@ti.com>
-References: <4DA4A1E2.9090304@ti.com>
-Message-ID: <BANLkTimrxA0-U65Tw208tc1Mqz5ZGa8X9Q@mail.gmail.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Wed, 13 Apr 2011 10:16:37 +0200
+Subject: [RFC][PATCH] axi: add AXI bus driver
+In-Reply-To: <BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
+	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
+	<1302634039.14216.10.camel@dev.znau.edu.ua>
+	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
+	<1302635550.14216.21.camel@dev.znau.edu.ua>
+	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
+	<4DA4AC4B.90409@hauke-m.de>
+	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
+	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
+	<1302640546.14216.65.camel@dev.znau.edu.ua>
+	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+Message-ID: <op.vtvalzu33ri7v4@arend-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 00:32, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> As part of the commit 5c0c1f08a (gic: implement set_type)
-> change, I see that you are ignoring interrupts which
-> are of LOW_LEVEL type. Why is that ?
+On Tue, 12 Apr 2011 22:44:01 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+
+> 2011/4/12 George Kashperko <george@znau.edu.ua>:
+>>> 2011/4/12 Rafa? Mi?ecki <zajec5@gmail.com>:
+>>> That way I see really low (or not at all) relation between out
+>>> (not)Broadcom bus and present AMBA bus.
+>>>
+>> Agree.
 >
-> There are interrupts of LOW_LEVEL type on OMAP and this
-> change break those.
+> Ehh, sounds like one more renaming to functions, defines, prefixes.
+>
+> Let's wait for Arend comments, he was the one voting for  
+> not-bcm-specific name.
+>
 
-Please see the discussion on an earlier, similar patch:
-https://patchwork.kernel.org/patch/75509/.  The discussion did
-not move further at that time and the "rather easy" solution
-mentioned there was implemented.
+Hi Rafa?,
 
-The GIC spec seems to only talk about rising-edge and active
-high:
-http://infocenter.arm.com/help/topic/com.arm.doc.ihi0048a/CACCAGCF.html
+Still think its better to stick with a generic name even if currently you  
+only come across this in Broadcom chips right now. I do agree that the  
+term 'axi' is implying something else than what this bus driver is  
+providing. The name 'axi-dmp' I gave earlier may be more to the point.
+
+I also looked at the amba driver after receiving comments on the brcmaxi  
+library module (this is what Hauke Mehrtens referred to) and came to  
+similar conclusion as you did. It does however support PM properly so you  
+may want to get inspiration in that area. I also noticed a reference to  
+AMBA term APB which is a different bus in the AMBA family. AXI was  
+introduced later as higher performance bus (in AMBA rev3 if I remember  
+correctly).
+
+Gr. AvS
+-- 
+"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
