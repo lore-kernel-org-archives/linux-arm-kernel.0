@@ -1,46 +1,38 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 13 Apr 2011 15:46:49 +0400
-Subject: [RFC PATCH 1/5] gemini: convert to basic-mmio-gpio
-In-Reply-To: <20110412143714.GA8931@oksana.dev.rtsoft.ru>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>	<1302522502-24381-2-git-send-email-jamie@jamieiles.com>
-	<20110412143714.GA8931@oksana.dev.rtsoft.ru>
-Message-ID: <4DA58D29.3010805@ru.mvista.com>
+Date: Wed, 13 Apr 2011 16:03:44 +0400
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on	ARM
+In-Reply-To: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+Message-ID: <4DA59120.1070402@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 12-04-2011 18:37, Anton Vorontsov wrote:
+On 13-04-2011 1:06, Janusz Krzysztofik wrote:
 
->> The basic-mmio-gpio driver is capable of supporting this controller so
->> convert the platform to use it for basic GPIO support.
+> After switching from mem->dma_handle to virt_to_phys(mem->vaddr) used
+> for obtaining page frame number passed to remap_pfn_range()
+> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b), videobuf-dma-contig
 
->> Cc: Hans Ulli Kroll<ulli.kroll@googlemail.com>
->> Signed-off-by: Jamie Iles<jamie@jamieiles.com>
->> ---
-> [...]
->> +#define GPIO_RES(__name, __addr) \
->> +	{ \
->> +		.start = (__addr), \
->> +		.end = (__addr) + 0x3, \
->> +		.flags = IORESOURCE_MEM, \
->> +		.name = #__name, \
->> +	}
+    Please specify the commit summary -- for the human readers.
 
-> Btw, how about moving this (repetitive) macro into basic_mmio_gpio.h?
+> stopped working on my ARM based board. The ARM architecture maintainer,
+> Russell King, confirmed that using something like
+> virt_to_phys(dma_alloc_coherent()) is not supported on ARM, and can be
+> broken on other architectures as well. The author of the change, Jiri
+> Slaby, also confirmed that his code may not work on all architectures.
 
-> Assuming, that there could be IRQ resources later, making
-> something like BGPIO_MEM_RES(name, addr, sz)?
+> The patch tries to solve this regression by using
+> virt_to_phys(bus_to_virt(mem->dma_handle)) instead of problematic
+> virt_to_phys(mem->vaddr). I think this should work even if those
+> translations would occure inaccurate for DMA addresses, since possible
+> errors introduced by both translations, performed in opposite
+> directions, should compensate.
 
-> Or, even better, some generic shorthand macro in linux/ioport.h?
+> Tested on ARM OMAP1 based Amstrad Delta board.
 
-> #define IORES(__type, __name, __addr, __size)	\
-> 	{					\
-> 		.start = (__addr), 		\
-> 		.end = (__addr) + (__size),	\
-
-    You forgot to subtract 1.
-
-> Thanks,
+> Signed-off-by: Janusz Krzysztofik<jkrzyszt@tis.icnet.pl>
 
 WBR, Sergei
