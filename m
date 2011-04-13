@@ -1,28 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 Apr 2011 14:41:49 +0200
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
-	and i.MX53
-In-Reply-To: <20110413122503.GB1897@S2100-06.ap.freescale.net>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110413122503.GB1897@S2100-06.ap.freescale.net>
-Message-ID: <20110413124149.GR18850@pengutronix.de>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 13 Apr 2011 15:11:41 +0200
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
+	broken on ARM
+In-Reply-To: <4DA59120.1070402@ru.mvista.com>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<4DA59120.1070402@ru.mvista.com>
+Message-ID: <201104131511.42171.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Dnia ?roda 13 kwiecie? 2011 o 14:03:44 Sergei Shtylyov napisa?(a):
+> Hello.
+> 
+> On 13-04-2011 1:06, Janusz Krzysztofik wrote:
+> > After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
+> > used for obtaining page frame number passed to remap_pfn_range()
+> > (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
+> > videobuf-dma-contig
+> 
+>     Please specify the commit summary -- for the human readers.
 
-On Wed, Apr 13, 2011 at 08:25:04PM +0800, Shawn Guo wrote:
-> On Sun, Apr 10, 2011 at 09:49:01PM +0200, Uwe Kleine-K?nig wrote:
-> [...]
-> > +	  This enables support for machines using Freescale's i.MX50 and i.MX51
-> s/MX51/MX53/
-yeah, thanks, as you're not the first one to point this out I already
-sent a fixup to Sascha.
+Hi,
+OK, I'll try to reword the summary using a more human friendly language 
+as soon as I have signs that Mauro (who seemed to understand the message 
+well enough) is willing to accept the code.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Janusz
