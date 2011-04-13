@@ -1,46 +1,38 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 13 Apr 2011 21:12:05 +0530
-Subject: [PATCH 6/6] da8xx: enable the use of the ICPFUNC in i2c-davinci
-In-Reply-To: <BANLkTi=j=Dp015ZsU44DH3p1s_XdxvAX8Q@mail.gmail.com>
-References: <cover.1302031487.git.bengardiner@nanometrics.ca>
-	<f1ff3f2888725a1e03541e0be5c0880f0591aea2.1302031487.git.bengardiner@nanometrics.ca>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C8B3C9F@dbde02.ent.ti.com>
-	<BANLkTi=j=Dp015ZsU44DH3p1s_XdxvAX8Q@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C8B3CBD@dbde02.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 13 Apr 2011 11:44:09 -0400 (EDT)
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <201104130851.17676.pwaechtler@mac.com>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<201104130851.17676.pwaechtler@mac.com>
+Message-ID: <alpine.LFD.2.00.1104131128070.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 20:52:05, Ben Gardiner wrote:
+On Wed, 13 Apr 2011, Peter W?chtler wrote:
 
-> >> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> >> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> >> @@ -324,6 +324,12 @@ int __init da8xx_register_i2c(int instance,
-> >> ? ? ? else
-> >> ? ? ? ? ? ? ? return -EINVAL;
-> >>
-> >> + ? ? /*
-> >> + ? ? ?* Both the DA850 and DA830 have an I2C controller which has the
-> >> + ? ? ?* ICPFUNC et. al. registers
-> >> + ? ? ?*/
-> >> + ? ? pdata->has_pfunc = 1;
-> >
-> > The I2C driver implements a default platform data
-> > so it should actually be legal for a DA8x board to
-> > pass NULL platform data. In that case this line
-> > will crash.
+> Am Dienstag, 12. April 2011, 21:20:14 schrieb Andrei Warkentin:
+> > How are you mounting your rootfs and what file system are you using?
+> > What sort of corruptions to the super block are you seeing?
+> > 
 > 
-> Good catch, thanks.
-> 
-> > [...] You should either check for pdata to
-> > be NULL or just let each board choose whether it
-> > needs recovery (I think the better option).
-> 
-> I understand "check for pdata to be NULL."  If you think it is the
-> better option I'd be happy to implement it but I don't understand how
-> to implement "let each board choose whether it needs recovery."
+> It's using ext4 with metadata journalling in ordered mode.
+> I had to check "if it's the FS" - the test programs create lots of directories 
+> and files while a timer is armed to issue a soft reset.
+> The partitions where the "stress tests" run on - survive it happily - just the 
+> rootfs where almost nothing gets written is severly damaged so that fsck.ext4 
+> will not repair it automatically.
 
-This is done by just setting has_pfunc = 1 in the
-davinci_i2c_platform_data defined in the board file.
+SD cards are doing their own wear leveling internally and you have no 
+control over it.  Some blocks of data may be moved around, affecting a 
+separate logical partition, even if you are not actively writing to that 
+partition.  Now if you cut power or reset the card while this is 
+happening you'll certainly end up with data loss.  Those SD cards are 
+made to be both cheap and fast, meaning they're certainly not reliable 
+with regards to unexpected interruptions.
 
-Thanks,
-Sekhar
+Furthermore, you should have a look at this article and referenced 
+material: http://lwn.net/Articles/428584/.
+
+
+Nicolas
