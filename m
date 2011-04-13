@@ -1,114 +1,65 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 13 Apr 2011 18:21:07 +0300
-Subject: [PATCH 2/2] OMAP3: PM: Do not rely on ROM code to restore
-	CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-In-Reply-To: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
-References: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1302708067-8226-3-git-send-email-eduardo.valentin@ti.com>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Wed, 13 Apr 2011 11:22:05 -0400
+Subject: [PATCH 6/6] da8xx: enable the use of the ICPFUNC in i2c-davinci
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C8B3C9F@dbde02.ent.ti.com>
+References: <cover.1302031487.git.bengardiner@nanometrics.ca>
+	<f1ff3f2888725a1e03541e0be5c0880f0591aea2.1302031487.git.bengardiner@nanometrics.ca>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C8B3C9F@dbde02.ent.ti.com>
+Message-ID: <BANLkTi=j=Dp015ZsU44DH3p1s_XdxvAX8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per OMAP3 erratum (i671), ROM code adds extra latencies while
-restoring CM_AUTOIDLE_PLL register, if AUTO_PERIPH_DPLL is equal to 1.
+Hi Sekhar,
 
-This patch stores 0's in scratchpad content area corresponding to
-AUTO_PERIPH_DPLL, to prevent ROM code to try to lock per DPLL, since
-it won't respect proper programing scheme.
+On Wed, Apr 13, 2011 at 11:10 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Ben,
+>
+> On Wed, Apr 06, 2011 at 03:08:09, Ben Gardiner wrote:
+>> Both the da850 and da830 have an I2C controller which has the ICPFUNC
+>> registers. Indicate this for all da830 and da850 boards by setting the
+>> has_pfunc flag true in the da8xx utility setup routine for registering the
+>> I2C controller
+>>
+>> Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>
+>> ---
+>> ?arch/arm/mach-davinci/devices-da8xx.c | ? ?6 ++++++
+>> ?1 files changed, 6 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>> index beda8a4..da01558 100644
+>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>> @@ -324,6 +324,12 @@ int __init da8xx_register_i2c(int instance,
+>> ? ? ? else
+>> ? ? ? ? ? ? ? return -EINVAL;
+>>
+>> + ? ? /*
+>> + ? ? ?* Both the DA850 and DA830 have an I2C controller which has the
+>> + ? ? ?* ICPFUNC et. al. registers
+>> + ? ? ?*/
+>> + ? ? pdata->has_pfunc = 1;
+>
+> The I2C driver implements a default platform data
+> so it should actually be legal for a DA8x board to
+> pass NULL platform data. In that case this line
+> will crash.
 
-This register is then stored in prcm context. The saving and restore
-is now done by kernel side.
+Good catch, thanks.
 
-Here follow the erratum description
+> [...] You should either check for pdata to
+> be NULL or just let each board choose whether it
+> needs recovery (I think the better option).
 
-DESCRIPTION
+I understand "check for pdata to be NULL."  If you think it is the
+better option I'd be happy to implement it but I don't understand how
+to implement "let each board choose whether it needs recovery."
 
-After OFF mode transition, among many restorations, the ROM Code restores the
-CM_AUTOIDLE_PLL register, and after that, it tries to relock the PER DPLL.
+Best Regards,
+Ben Gardiner
 
-In case the restoration data stored in scratchpad memory contains a field
-CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL = 1, then the way the ROM Code restores and
-locks the PER DPLL does not respect the PER DPLL programming scheme.
-
-In that case, the DPLL might not lock. Meanwhile, when trying to lock the PER
-DPLL, the ROM Code does not hang. Only extra latencies are introduced at
-wake-up.
-
-WORKAROUND
-
-When saving the context-restore structure in scratchpad memory, in order to
-respect the PER DPLL programming scheme, it is advised to store 0 in the
-CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL field of the saved structure.
-
-After wake-up, the application should store in CM_AUTOIDLE_PLL register the
-right desired value.
-
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/mach-omap2/cm2xxx_3xxx.c |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c     |    8 +++++++-
- 2 files changed, 24 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.c b/arch/arm/mach-omap2/cm2xxx_3xxx.c
-index 9d0dec8..38830d8 100644
---- a/arch/arm/mach-omap2/cm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx.c
-@@ -247,6 +247,7 @@ struct omap3_cm_regs {
- 	u32 per_cm_clksel;
- 	u32 emu_cm_clksel;
- 	u32 emu_cm_clkstctrl;
-+	u32 pll_cm_autoidle;
- 	u32 pll_cm_autoidle2;
- 	u32 pll_cm_clksel4;
- 	u32 pll_cm_clksel5;
-@@ -319,6 +320,15 @@ void omap3_cm_save_context(void)
- 		omap2_cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
- 	cm_context.emu_cm_clkstctrl =
- 		omap2_cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
-+	/*
-+	 * As per erratum i671, ROM code does not respect the PER DPLL
-+	 * programming scheme if CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL == 1.
-+	 * In this case, even though this register has been saved in
-+	 * scratchpad contents, we need to restore AUTO_PERIPH_DPLL
-+	 * by ourselves. So, we need to save it anyway.
-+	 */
-+	cm_context.pll_cm_autoidle =
-+		omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
- 	cm_context.pll_cm_autoidle2 =
- 		omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
- 	cm_context.pll_cm_clksel4 =
-@@ -441,6 +451,13 @@ void omap3_cm_restore_context(void)
- 			       CM_CLKSEL1);
- 	omap2_cm_write_mod_reg(cm_context.emu_cm_clkstctrl, OMAP3430_EMU_MOD,
- 			       OMAP2_CM_CLKSTCTRL);
-+	/*
-+	 * As per erratum i671, ROM code does not respect the PER DPLL
-+	 * programming scheme if CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL == 1.
-+	 * In this case, we need to restore AUTO_PERIPH_DPLL by ourselves.
-+	 */
-+	omap2_cm_write_mod_reg(cm_context.pll_cm_autoidle, PLL_MOD,
-+			       CM_AUTOIDLE);
- 	omap2_cm_write_mod_reg(cm_context.pll_cm_autoidle2, PLL_MOD,
- 			       CM_AUTOIDLE2);
- 	omap2_cm_write_mod_reg(cm_context.pll_cm_clksel4, PLL_MOD,
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index df0c75c..da53ba3 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -316,8 +316,14 @@ void omap3_save_scratchpad_contents(void)
- 			omap2_cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
- 	prcm_block_contents.cm_clken_pll =
- 			omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+	/*
-+	 * As per erratum i671, ROM code does not respect the PER DPLL
-+	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
-+	 * Then,  in anycase, clear these bits to avoid extra latencies.
-+	 */
- 	prcm_block_contents.cm_autoidle_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
-+			omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
-+			~OMAP3430_AUTO_PERIPH_DPLL_MASK;
- 	prcm_block_contents.cm_clksel1_pll =
- 			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
- 	prcm_block_contents.cm_clksel2_pll =
--- 
-1.7.5-rc1
+Nanometrics Inc.
+http://www.nanometrics.ca
