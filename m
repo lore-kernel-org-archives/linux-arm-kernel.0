@@ -1,70 +1,82 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 13 Apr 2011 09:20:36 +0800
-Subject: [PATCH 3/7] ARM: mmp: set correct uart according to board
-In-Reply-To: <20110412210147.GF7806@n2100.arm.linux.org.uk>
-References: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-2-git-send-email-haojian.zhuang@marvell.com>
-	<1302264944-2759-3-git-send-email-haojian.zhuang@marvell.com>
-	<20110412210147.GF7806@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=V0udLi=z5b2PH2jJ14LQz-xhD8g@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 13 Apr 2011 09:41:50 +0800
+Subject: [PATCH V4 2/4] MTD : add the common code for GPMI controller
+	driver
+In-Reply-To: <E550E0E66149EE438CE65645D99717D601670B0E@darkblue.bgt.local>
+References: <1301722240-15406-1-git-send-email-b32955@freescale.com>
+	<1301722240-15406-3-git-send-email-b32955@freescale.com>
+	<E550E0E66149EE438CE65645D99717D601670B0E@darkblue.bgt.local>
+Message-ID: <4DA4FF5E.2090406@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 5:01 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 08, 2011 at 08:15:40PM +0800, Haojian Zhuang wrote:
->> UART3 is the default console in jasper, brownstone and avengers lite.
+Hi,
+> Hi,
+>
+> I have one correction to your NAND driver. Please see inlined comments.
+>
+>> These files contain the common code for the GPMI driver.
 >>
->> Change-Id: Iacfe665cc0e20a47d50e0b2ad8724097f28e7d2c
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>>   drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c | 2453
+>> +++++++++++++++++++++++++++++
+>>   drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h      |  551 +++++++
+>>   2 files changed, 3004 insertions(+), 0 deletions(-)
+>>   create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>>   create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
+>>
+>> diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>> b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>> new file mode 100644
+>> index 0000000..7bbc448
+>> --- /dev/null
+>> +++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc-main.c
+>> @@ -0,0 +1,2453 @@
+> <snip>
 >
-> Please don't include Change-Ids in patch submissions.
->
->> diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
->> index 7e2ebd3..b353785 100644
->> --- a/arch/arm/mach-mmp/include/mach/debug-macro.S
->> +++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
->> @@ -14,8 +14,14 @@
->> ? ? ? ? ? ? ? .macro ?addruart, rp, rv
->> ? ? ? ? ? ? ? ldr ? ? \rp, =APB_PHYS_BASE ? ? ? ? ? ? @ physical
->> ? ? ? ? ? ? ? ldr ? ? \rv, =APB_VIRT_BASE ? ? ? ? ? ? @ virtual
->> +#if defined(CONFIG_MACH_BROWNSTONE) || defined(CONFIG_MACH_MARVELL_JASPER) \
->> + ? ? || defined(CONFIG_MACH_AVENGERS_LITE)
->> + ? ? ? ? ? ? orr ? ? \rp, \rp, #0x00018000
->> + ? ? ? ? ? ? orr ? ? \rv, \rv, #0x00018000
+>> +#ifdef CONFIG_PM
+>> +static int gpmi_nfc_suspend(struct platform_device *pdev,
+> pm_message_t
+>> state)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>> +static int gpmi_nfc_resume(struct platform_device *pdev)
+>> +{
+>> +	return 0;
+>> +}
 >> +#else
->> ? ? ? ? ? ? ? orr ? ? \rp, \rp, #0x00017000
->> ? ? ? ? ? ? ? orr ? ? \rv, \rv, #0x00017000
+>> +#define suspend  NULL
+>> +#define resume   NULL
 >> +#endif
->
-> It probably makes more sense to have this in the configuration scripts:
->
-> choice
-> ? ? ? ?prompt "PXA debug uart"
-> ? ? ? ?default DEBUG_PXA_UART0
->
-> config DEBUG_PXA_UART0
-> ? ? ? ?bool "UART 0"
->
-> config DEBUG_PXA_UART1
-> ? ? ? ?bool "UART 1"
-> ? ? ? ?default y if MACH_BROWNSTONE || MACH_MARVELL_JASPER || MACH_AVENGERS_LITE
->
-> endchoice
->
-> and select the debug uart address using these symbols. ?That'd avoid the
-> need to couple lots of platform specific stuff into the compiled files.
->
-> Alternatively, you could do more in the Kconfig like this:
->
-> config DEBUG_PXA_UART
-> ? ? ? ?hex
-> ? ? ? ?default 0x17000 if DEBUG_PXA_UART0
-> ? ? ? ?default 0x18000 if DEBUG_PXA_UART1
->
-> and use CONFIG_DEBUG_PXA_UART in the assembly code, eliminating the
-> need to change sourcecode for additional uarts. ?Or maybe combine the
-> two ideas.
->
+> If CONFIG_PM is disabled your defines don't match function names.
 
-This looks much cleaner. I was actually thinking if it's necessary to make
-this run-time determined, when multiple boards are all selected.
+thanks.
+> <snip>
+>
+>> +/* This structure represents this driver to the platform management
+>> system. */
+>> +static struct platform_driver gpmi_nfc_driver = {
+>> +	.driver = {
+>> +		.name = GPMI_NFC_DRIVER_NAME,
+>> +	},
+>> +	.probe   = gpmi_nfc_probe,
+>> +	.remove  = __exit_p(gpmi_nfc_remove),
+>> +	.suspend = gpmi_nfc_suspend,
+>> +	.resume  = gpmi_nfc_resume,
+>> +	.id_table = gpmi_ids,
+>> +};
+> This section fails to compile as gpmi_nfc_suspend and gpmi_nfc_resume
+> are undefined. It compiles fine if I add gpmi_nfc_ prefix to defines.
+thanks. I will fix it in next version.
+
+Best Regards
+Huang Shijie
+> --
+> Veli-Pekka Peltola
+> R&D Engineer
+> Bluegiga Technologies
+>
+>
