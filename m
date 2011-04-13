@@ -1,46 +1,41 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Wed, 13 Apr 2011 11:12:01 +0100
-Subject: [PATCH] arm: cputype.h uses __attribute_const__ which requires
-	including kernel.h
-Message-ID: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 13 Apr 2011 12:20:43 +0200
+Subject: V4L/ARM: videobuf-dma-contig no longer works on my ARM machine
+In-Reply-To: <4DA08C80.5040205@suse.cz>
+References: <201009301335.51643.jkrzyszt@tis.icnet.pl>
+	<201104091711.00191.jkrzyszt@tis.icnet.pl>
+	<4DA08C80.5040205@suse.cz>
+Message-ID: <201104131220.44430.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
----
-Issue manifests as:
+Dnia sobota 09 kwiecie? 2011 o 18:42:40 Jiri Slaby napisa?(a):
+> On 04/09/2011 05:10 PM, Janusz Krzysztofik wrote:
+> > (CC: Jiri Slaby, the author of the problematic change; truncate
+> > subject)
+> > 
+> > On Sat, 09 Apr 2011, at 09:16:24, Russell King - ARM Linux wrote:
+> >> On Sat, Apr 09, 2011 at 03:33:39AM +0200, Janusz Krzysztofik wrote:
+> >>> Since there were no actual problems reported before, I suppose
+> >>> the old code, which was passing to remap_pfn_range() a physical
+> >>> page number calculated from dma_alloc_coherent() privided
+> >>> dma_handle, worked correctly on all platforms actually using
+> >>> videobud-dma-config.
+> 
+> No, it didn't when IOMMU was used. 
 
-a  CC [M]  drivers/staging/iio/gyro/adis16080_core.o
-In file included from arch/arm/mach-pxa/include/mach/hardware.h:62,
-                 from arch/arm/mach-pxa/include/mach/gpio.h:28,
-                 from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
-                 from include/linux/gpio.h:7,
-                 from drivers/staging/iio/gyro/adis16080_core.c:8:
-/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:57: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_id'
-/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:62: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_cachetype'
-/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:67: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_tcmstatus'
-In file included from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
-                 from include/linux/gpio.h:7,
-                 from drivers/staging/iio/gyro/adis16080_core.c:8:
+Taking into account that I'm just trying to fix a regression, and not 
+invent a new, long term solution: are you able to name a board which a) 
+is already supported in 2.6.39, b) is (or can be) equipped with a device 
+supported by a V4L driver which uses videobuf-dma-config susbsystem, c) 
+uses IOMMU? If there is one, than I agree that reverting the patch is 
+not a good option.
 
-With current mainline.  Could trivially work around this by reordering
-headers in the driver, but should probably be fixed at the source of
-the problem as done here.
+> Because remap_pfn_range didn't get
+> a physical page address.
 
- arch/arm/include/asm/cputype.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+If I didn't understand it, I wouldn't try to find a solution other than 
+reverting your patch.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index ed5bc9e..cd4458f 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -2,6 +2,7 @@
- #define __ASM_ARM_CPUTYPE_H
- 
- #include <linux/stringify.h>
-+#include <linux/kernel.h>
- 
- #define CPUID_ID	0
- #define CPUID_CACHETYPE	1
--- 
-1.7.3.4
+Thanks,
+Janusz
