@@ -1,268 +1,59 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 13 Apr 2011 21:47:18 +0200
-Subject: [PATCH] atmel_serial: keep the platform_device unchanged
-Message-ID: <1302724038-26236-1-git-send-email-plagnioj@jcrosoft.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 13 Apr 2011 21:11:14 +0100
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <alpine.LFD.2.00.1104131125380.24613@xanadu.home>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<20110412203303.GA16019@shareable.org>
+	<alpine.LFD.2.00.1104131125380.24613@xanadu.home>
+Message-ID: <20110413201114.GB16019@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-specify the port num via platform_data this will allow to match the clock
-with the plaform_dev staticly
+Nicolas Pitre wrote:
+> On Tue, 12 Apr 2011, Jamie Lokier wrote:
+> 
+> > Andrei Warkentin wrote:
+> > > Hi Peter,
+> > > 
+> > > 2011/4/12 Peter W?chtler <pwaechtler@mac.com>:
+> > > > Hello Linux ARM developers,
+> > > >
+> > > > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
+> > > > Or was the memory always mapped in sections?
+> > > >
+> > > > I still have to chase a potential memory corruption. The rootfs is located on
+> > > > a SDcard and gets corrupted even when the filesystem test programs write to
+> > > > different partitions.
+> > > > The test scenario includes several dozen or even hundreds of warm and cold
+> > > > boot sequences, file system write tests with sudden soft resets. It's a large
+> > > > embedded project with a lot of drivers and the fact that always the rootfs and
+> > > > often the superblock gets damaged let me think of a memory corruption.
+> > > >
+> > > 
+> > > Sorry, I don't want to be obvious, but you mentioned sudden resets
+> > > while writing, which is almost always going to wind
+> > > up as fs corruptions, with the severity depending on the level of
+> > > caching the system is doing to the writes.
+> > > How are you mounting your rootfs and what file system are you using?
+> > > What sort of corruptions to the super block are you seeing?
+> > 
+> > If everything is implemented correctly, that depends on the type of
+> > filesystem, block layer and storage.  Some are explicitly designed to
+> > be safe against sudden reboots and power failure - which is an
+> > important feature of systems where removing the power is how they are
+> > turned off at night.
+> 
+> SD was mentioned as being the storage medium in this thread. I really 
+> doubt SD cards are designed to be safe against sudden power outages.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-Cc: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
----
- arch/arm/mach-at91/at572d940hf_devices.c    |    4 +++-
- arch/arm/mach-at91/at91cap9_devices.c       |    4 +++-
- arch/arm/mach-at91/at91rm9200_devices.c     |    4 +++-
- arch/arm/mach-at91/at91sam9260_devices.c    |    4 +++-
- arch/arm/mach-at91/at91sam9261_devices.c    |    4 +++-
- arch/arm/mach-at91/at91sam9263_devices.c    |    4 +++-
- arch/arm/mach-at91/at91sam9g45_devices.c    |    4 +++-
- arch/arm/mach-at91/at91sam9rl_devices.c     |    4 +++-
- arch/arm/mach-at91/include/mach/board.h     |    1 +
- arch/avr32/mach-at32ap/at32ap700x.c         |    4 +++-
- arch/avr32/mach-at32ap/include/mach/board.h |    1 +
- drivers/tty/serial/atmel_serial.c           |    2 +-
- 12 files changed, 30 insertions(+), 10 deletions(-)
+Ah, fair enough, you are sadly almost certainly right.
 
-diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 6e1b9a3..57ed4b7 100644
---- a/arch/arm/mach-at91/at572d940hf_devices.c
-+++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -822,6 +822,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -847,7 +848,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index e887632..ad41039 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -1199,6 +1199,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1224,7 +1225,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 5f873d5..f65f9d3 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -1109,6 +1109,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1139,7 +1140,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index e172b46..bb74c2a 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -1139,6 +1139,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1179,7 +1180,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 59fc483..8792f9b 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -989,6 +989,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1014,7 +1015,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 416613c..1fc6878 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -1370,6 +1370,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1395,7 +1396,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 0867343..fd031ce 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1527,6 +1527,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1557,7 +1558,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 53aaa94..2d8d519 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -1141,6 +1141,7 @@ struct platform_device *atmel_default_console_device;	/* the serial console devi
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (id) {
- 		case 0:		/* DBGU */
-@@ -1171,7 +1172,8 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
- 		default:
- 			return;
- 	}
--	pdev->id = portnr;		/* update to mapped ID */
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;		/* update to mapped ID */
- 
- 	if (portnr < ATMEL_MAX_UART)
- 		at91_uarts[portnr] = pdev;
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index d970420..ef10f32 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -130,6 +130,7 @@ extern void __init at91_set_serial_console(unsigned portnr);
- extern struct platform_device *atmel_default_console_device;
- 
- struct atmel_uart_data {
-+	int			num;		/* port num */
- 	short			use_dma_tx;	/* use transmit DMA? */
- 	short			use_dma_rx;	/* use receive DMA? */
- 	void __iomem		*regs;		/* virt. base address, if any */
-diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-index bfc9d07..aa677e2 100644
---- a/arch/avr32/mach-at32ap/at32ap700x.c
-+++ b/arch/avr32/mach-at32ap/at32ap700x.c
-@@ -1014,6 +1014,7 @@ static struct platform_device *__initdata at32_usarts[4];
- void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
- {
- 	struct platform_device *pdev;
-+	struct atmel_uart_data *pdata;
- 
- 	switch (hw_id) {
- 	case 0:
-@@ -1042,7 +1043,8 @@ void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
- 		data->regs = (void __iomem *)pdev->resource[0].start;
- 	}
- 
--	pdev->id = line;
-+	pdata = pdev->dev.platform_data;
-+	pdata->num = portnr;
- 	at32_usarts[line] = pdev;
- }
- 
-diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
-index 3d79356..dd61a24 100644
---- a/arch/avr32/mach-at32ap/include/mach/board.h
-+++ b/arch/avr32/mach-at32ap/include/mach/board.h
-@@ -34,6 +34,7 @@ extern struct platform_device *atmel_default_console_device;
- #define	ATMEL_USART_CLK		0x04
- 
- struct atmel_uart_data {
-+	int		num;		/* port num */
- 	short		use_dma_tx;	/* use transmit DMA? */
- 	short		use_dma_rx;	/* use receive DMA? */
- 	void __iomem	*regs;		/* virtual base address, if any */
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 2dc8a66..57e294c 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1423,7 +1423,7 @@ static int __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
- 	port->flags		= UPF_BOOT_AUTOCONF;
- 	port->ops		= &atmel_pops;
- 	port->fifosize		= 1;
--	port->line		= pdev->id;
-+	port->line		= data->num;
- 	port->dev		= &pdev->dev;
- 	port->mapbase	= pdev->resource[0].start;
- 	port->irq	= pdev->resource[1].start;
--- 
-1.7.4.1
+(Some flash even corrupts itself on power removal during reads too,
+due to internal reorganisation.  I have no idea if SD is in that
+category.  It is quite a problem when searching for something to
+replace an old-fashioned hard disk in an application where removing
+the power is normal daily usage, and traditional journalling
+filesystems used to be effective.)
+
+-- Jamie
