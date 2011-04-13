@@ -1,115 +1,51 @@
-From: R65037@freescale.com (Zhu Richard-R65037)
-Date: Wed, 13 Apr 2011 03:06:58 +0000
-Subject: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-In-Reply-To: <4DA43740.9050806@ru.mvista.com>
-References: <1302587472-20435-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<4DA43740.9050806@ru.mvista.com>
-Message-ID: <010C9052C42A00499CE76D637FA5EE900D9E8E@039-SN1MPN1-001.039d.mgd.msft.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 12 Apr 2011 23:31:16 -0400 (EDT)
+Subject: MT_HIGH_VECTOR mapping set read-only creating illegal access
+In-Reply-To: <4DA4F170.4020009@codeaurora.org>
+References: <4DA4F170.4020009@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1104122308400.28032@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei:
-Got that. Thanks for your kindly comments.
-Would change them later.
+On Tue, 12 Apr 2011, Michael Bohan wrote:
 
-Best Regards
-Richard Zhu
+> Hi,
+> 
+> In arch/arm/kernel/traps.c:set_tls() and arch/arm/include/asm/tls.h, some
+> configurations allow for a assignment of address 0xffff0ff0. This address
+> falls within the MT_HIGH_VECTORS mapping setup in devicemaps_init(). That
+> mapping is explicitly made read-only. Thus, the kernel takes a segfault when
+> writing in set_tls().
+
+If set_tls() writes to 0xffff0ff0 in your case, then you must have an 
+ARM core which is prior ARMv6k.
+
+> It looks like this disparity may have been introduced in this commit:
+> 
+> commit 36bb94ba36f332de767cfaa3af6a5136435a3a9c
+> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> Date:   Tue Nov 16 08:40:36 2010 +0000
+> 
+>     ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+> 
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Is there a reason this mapping must be read-only?
+
+It is read-only for user space to prevent user space from messing with 
+the vector table.
+
+In the kernel, it is read-only _only_ when CONFIG_CPU_USE_DOMAINS is not 
+enabled which may happen with ARMv6k and above.  Otherwise, if you are 
+pre ARMv6k, you do use domains, and then the vector page is read-write 
+for the kernel.
+
+> Perhaps we could apply write
+> access for these special cases only?
+
+I'd rather suggest you investigate what changes you did to your kernel 
+tree that would explain the apparent inconsistency in your kernel 
+config.
 
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Tuesday, April 12, 2011 7:28 PM
-> To: Zhu Richard-R65037
-> Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com;
-> kernel at pengutronix.de; linux-ide at vger.kernel.org;
-> avorontsov at ru.mvista.com; eric at eukrea.com; eric.miao at linaro.org
-> Subject: Re: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
->
-> Hello.
->
-> On 12-04-2011 9:51, Richard Zhu wrote:
->
-> > Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
-> > ---
-> >   arch/arm/mach-mx5/board-mx53_loco.c |   76
-> +++++++++++++++++++++++++++++++++++
-> >   1 files changed, 76 insertions(+), 0 deletions(-)
->
-> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c
-> > b/arch/arm/mach-mx5/board-mx53_loco.c
-> > index 0a18f8d..644aaa2 100644
-> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> [...]
-> > @@ -203,6 +206,78 @@ static const struct imxi2c_platform_data
-> mx53_loco_i2c_data __initconst = {
-> >     .bitrate = 100000,
-> >   };
-> >
-> > +/* HW Initialization, if return 0, initialization is successful. */
-> > +static int mx53_loco_sata_init(struct device *dev, void __iomem
-> > +*addr) {
-> > +   u32 tmpdata;
-> > +   int ret = 0;
-> > +   struct clk *clk;
-> > +
-> > +   sata_clk = clk_get(dev, NULL);
-> > +   if (IS_ERR(sata_clk)) {
-> > +           dev_err(dev, "no sata clock.\n");
-> > +           return PTR_ERR(sata_clk);
-> > +   }
-> > +   ret = clk_enable(sata_clk);
-> > +   if (ret) {
-> > +           dev_err(dev, "can't enable sata clock.\n");
-> > +           clk_put(sata_clk);
->
->     Why duplicate clk_put() which you already have at the end of function?
-> Just define another label there.
->
-> > +           return ret;
-> > +   }
-> > +
-> > +   /* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
-> > +   sata_ref_clk = clk_get(NULL, "usb_phy1");
-> > +   if (IS_ERR(sata_ref_clk)) {
-> > +           dev_err(dev, "no sata ref clock.\n");
-> > +           ret = PTR_ERR(sata_ref_clk);
-> > +           goto release_sata_clk;
-> > +   }
-> > +   ret = clk_enable(sata_ref_clk);
-> > +   if (ret) {
-> > +           dev_err(dev, "can't enable sata ref clock.\n");
-> > +           clk_put(sata_ref_clk);
->
->     Same question.
->
-> > +           goto release_sata_clk;
-> > +   }
-> > +
-> > +   /* Get the AHB clock rate, and configure the TIMER1MS reg later */
-> > +   clk = clk_get(NULL, "ahb");
-> > +   if (IS_ERR(clk)) {
-> > +           dev_err(dev, "no ahb clock.\n");
-> > +           ret = PTR_ERR(clk);
-> > +           goto release_sata_ref_clk;
-> > +   }
-> > +   tmpdata = clk_get_rate(clk) / 1000;
-> > +   clk_put(clk);
-> > +
-> > +   sata_init(addr, tmpdata);
-> > +
-> > +   return ret;
-> > +
-> > +release_sata_ref_clk:
-> > +   clk_disable(sata_ref_clk);
-> > +   clk_put(sata_ref_clk);
-> > +
-> > +release_sata_clk:
-> > +   clk_disable(sata_clk);
-> > +   clk_put(sata_clk);
-> > +
-> > +   return ret;
-> > +}
->
-> WBR, Sergei
+Nicolas
