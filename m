@@ -1,193 +1,186 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed, 13 Apr 2011 09:25:26 -0400
-Subject: [PATCH v5 1/4] ARM: add GPMI support for imx23/imx28
-In-Reply-To: <20110413114304.GA1897@S2100-06.ap.freescale.net>
-References: <1302675881-18862-1-git-send-email-b32955@freescale.com>
-	<1302675881-18862-2-git-send-email-b32955@freescale.com>
-	<20110413114304.GA1897@S2100-06.ap.freescale.net>
-Message-ID: <BANLkTi=xHoT_=pwy3y7q0FSXRWNQ3Pe21A@mail.gmail.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Wed, 13 Apr 2011 14:36:58 +0100 (BST)
+Subject: [RFC PATCH] Current status, suspend-to-disk support on ARM
+In-Reply-To: <20110412183208.GC26916@elf.ucw.cz>
+References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
+	<20110412055958.GA3507@ucw.cz>
+	<alpine.DEB.2.00.1104121636460.29883@localhost6.localdomain6>
+	<20110412183208.GC26916@elf.ucw.cz>
+Message-ID: <alpine.DEB.2.00.1104131020080.29883@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/13 Shawn Guo <shawn.guo@freescale.com>:
-> On Wed, Apr 13, 2011 at 02:24:38PM +0800, Huang Shijie wrote:
->> add the clock and iomux initialization for GPMI in the imx23 and imx28.
->> and register the gpmi driver.
+
+
+On Tue, 12 Apr 2011, Pavel Machek wrote:
+
+> Hi!
+[ ... ]
+>> But then on all architectures in kernels as far back as 2.6.32 it
+>> doesn't look like save/restore_processor state are actually
+>> adjusting the preempt count; nowhere do they call
+>> preempt_enable/disable.
+>
+> You might need to dig a bit more. IIRC it manipulated FPU or something
+> long time ago.
+
+Actually, it's the other way round - kernel_fpu_begin/end are users of 
+preempt_disable/enable, quote Documentation/preempt-locking.txt:
+
+ 	Note, some FPU functions are already explicitly preempt safe.  For example,
+ 	kernel_fpu_begin and kernel_fpu_end will disable and enable preemption.
+ 	However, math_state_restore must be called with preemption disabled.
+
+But kernel_fpu_begin/end functions are x86-specific. At best, that makes 
+the comment in hibernate.c (which refers to "needing" preempt_dis/enable) 
+misleading.
+
+x86, in this, is an odd one out, though, in ; On ARM, for example, saving 
+the FP context happens through a PM notifier.
+
+In addition, it seems that the code (at least in hibernate.c, 
+create_image) does anyway:
+
+ 	- go single-cpu (disables all but current)
+ 	- switch interrupts off (local_irq_disable)
+
+before going into save_processor_state - wouldn't that mean all conditions 
+for nonpreemptable (or all conditions for a stable FP state) are already 
+met by that time ?
+
+
+
+>
+>> Finally, on things like e.g. the floating point context saves:
+>> Wouldn't this happen as part of freezing processes (in the early
+>> stages of suspend), and/or as part of device quiesce ?
+>
+> Are you sure? I thought we have (had?) concept of lazy FPU
+> saving... and occassionaly kernel uses FPU too (with some
+> precautions).
+
+speaking in particular for ARM, I'd deflect the answer to:
+
+ 	http://www.spinics.net/lists/linux-pm/msg22839.html
+
+It's lazy but it does happen ... without any specific need to have the 
+"bracketing" that save/restore_processor_state are doing.
+
+
+Food for thought:
+
+I mean, the code in hibernate.c really looks like this (quote):
+
+
+static int create_image(int platform_mode)
+{
+         int error;
+
+         error = arch_prepare_suspend();				<===== platform hook 1
+[ ... ]
+         error = dpm_suspend_noirq(PMSG_FREEZE);			<===== platform hook 2
+[ ... ]
+         error = platform_pre_snapshot(platform_mode);		<===== platform hook 3
+[ ... ]
+         error = disable_nonboot_cpus();				<===== platform hook 4
+[ ... ]
+         error = sysdev_suspend(PMSG_FREEZE);			<===== ...
+         if (!error)
+                 error = syscore_suspend();			<===== ...
+[ ... ]
+         in_suspend = 1;
+         save_processor_state();					<===== platform hook N-1
+         error = swsusp_arch_suspend();				<===== platform hook N
+[ ... ]
+         restore_processor_state();				<===== platform hook N+1
+[ ... ]
+
+And that's _without_ the platform hibernation ops hooks code in 
+hibernate(), which calls this one.
+
+This code is full of places where to plug save/restore code (or any sort 
+of "bracketing" begin/finish hooks) into.
+It's surprising that with all these hooks existing already, "bracketing" 
+of swsusp_arch_suspend() by save/restore_processor state is so sacrosanct.
+
+These are _three_ arch-dependent hooks in three consecutive lines of code.
+
+If a platform requires the bracketing, why can it not do that part in 
+syscore_suspend() ? Or why not simply embed it in swsusp_arch_suspend() ?
+
+As said, wrt. to save/restore_processor_state, x86 is definitely the odd 
+one out (and not a good example) with the monstrosity of code; all other 
+architectures either have trivial or even completely empty code for
+save/restore_processor_state().
+
+Should we really force everyone to provide an (as good as) empty hook just 
+because x86@one point had chosen to have it ?
+
+>
+>>>> @@ -195,6 +195,14 @@ config VECTORS_BASE
+>>>> 	help
+>>>> 	  The base address of exception vectors.
+>>>>
+>>>> +config ARCH_HIBERNATION_POSSIBLE
+>>>> +	bool
+>>>> +	help
+>>>> +	  If the machine architecture supports suspend-to-disk
+>>>> +	  it should select this automatically for you.
+>>>> +	  Otherwise, say 'Y' at your own peril.
+>>>> +
+>>>
+>>> Good for debugging, but not good for mainline.
 >>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
->> ---
->> ?arch/arm/mach-mxs/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
->> ?arch/arm/mach-mxs/clock-mx23.c ? ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-mxs/clock-mx28.c ? ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-mxs/devices-mx23.h ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-mxs/devices-mx28.h ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-mxs/devices/Kconfig ? ? ? ? ? ? ? | ? ?3 +
->> ?arch/arm/mach-mxs/devices/Makefile ? ? ? ? ? ? ?| ? ?1 +
->> ?arch/arm/mach-mxs/devices/platform-gpmi.c ? ? ? | ?134 +++++++++++++++++++++++
->> ?arch/arm/mach-mxs/include/mach/devices-common.h | ? ?4 +
->> ?arch/arm/mach-mxs/include/mach/gpmi-nfc.h ? ? ? | ? 65 +++++++++++
->> ?arch/arm/mach-mxs/mach-mx23evk.c ? ? ? ? ? ? ? ?| ? 37 ++++++
->> ?arch/arm/mach-mxs/mach-mx28evk.c ? ? ? ? ? ? ? ?| ? 37 ++++++
->> ?12 files changed, 295 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
->> ?create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>> How would this be done better ?
+>
+> Just set the ARCH_HIBERNATION_POSSIBLE=y in the ARM code now that ARM
+> can do it. No need to ask user.
+
+I.e. preferrably:
+
+ 	config ARCH_HIBERNATION_POSSIBLE
+ 		def_bool n
+
+plus the "select" within the actual platform config subsection for those 
+that have it.
+
+To stress the point: "ARM can do it" would be an exaggeration even if 
+those changes went in, because only some ARM types will have it.
+
+The situation on ARM is identical to e.g. SuperH, see arch/sh/Kconfig,
+
+config SUPERH32
+         def_bool ARCH = "sh"
+[ ... various ... ]
+         select ARCH_HIBERNATION_POSSIBLE if MMU
+
+config ARCH_HIBERNATION_POSSIBLE
+         def_bool n
+
+
+>
+>> @@ -412,8 +413,7 @@ static int resume_target_kernel(bool platform_mode)
+>>  	if (error)
+>>  		goto Enable_irqs;
 >>
-> [...]
->> diff --git a/arch/arm/mach-mxs/devices/platform-gpmi.c b/arch/arm/mach-mxs/devices/platform-gpmi.c
->> new file mode 100644
->> index 0000000..74ebe22
->> --- /dev/null
->> +++ b/arch/arm/mach-mxs/devices/platform-gpmi.c
->> @@ -0,0 +1,134 @@
->> +/*
->> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program; if not, write to the Free Software Foundation, Inc.,
->> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
->> + */
->> +#include <asm/sizes.h>
->> +#include <mach/mx23.h>
->> +#include <mach/mx28.h>
->> +#include <mach/gpmi-nfc.h>
->> +#include <mach/devices-common.h>
+>> -	/* We'll ignore saved state, but this gets preempt count (etc) right */
+>> -	save_processor_state();
+>> +	preempt_disable();
+>>  	error = restore_highmem();
+>>  	if (!error) {
+>>  		error = swsusp_arch_resume();
 >
-> devices-common.h already includes gpmi-nfc.h
-
-ok. thanks
->
-> [...]
->> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
->> new file mode 100644
->> index 0000000..cf8e8c3
->> --- /dev/null
->> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
->> @@ -0,0 +1,65 @@
->> +/*
->> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program; if not, write to the Free Software Foundation, Inc.,
->> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
->> + */
->> +
->> +#ifndef __INCLUDE_LINUX_DEVICE_H
->> +#define __INCLUDE_LINUX_DEVICE_H
->
-> __INCLUDE_LINUX_DEVICE_H is too generic to protect the inclusion of
-> gpmi-nfc.h
-
-ok, thanks
->
-> [...]
->> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
->> index a66994f..db715f9 100644
->> --- a/arch/arm/mach-mxs/mach-mx23evk.c
->> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
->> @@ -34,6 +34,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
->> ? ? ? MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
->> ? ? ? MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
->>
->> + ? ? /* gpmi */
->> + ? ? MX23_PAD_GPMI_D00__GPMI_D00 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->
-> You can use MXS_PAD_CTRL here.
->
->> + ? ? MX23_PAD_GPMI_D01__GPMI_D01 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D02__GPMI_D02 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D03__GPMI_D03 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D04__GPMI_D04 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D05__GPMI_D05 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D06__GPMI_D06 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_D07__GPMI_D07 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_CLE__GPMI_CLE |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_ALE__GPMI_ALE |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_WPN__GPMI_WPN |
->> + ? ? ? ? ? ? (MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_WRN__GPMI_WRN |
->> + ? ? ? ? ? ? (MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_RDN__GPMI_RDN |
->> + ? ? ? ? ? ? (MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_RDY0__GPMI_RDY0 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_RDY1__GPMI_RDY1 |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_CE0N__GPMI_CE0N |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> + ? ? MX23_PAD_GPMI_CE1N__GPMI_CE1N |
->> + ? ? ? ? ? ? (MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->> +
->
-> mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
->
-> Uwe,
->
-> How do you usually handle such pin conflicts on board?
-In the our imx508 code, we add a initialization  hook in the platform
-data , and calls the
-hook in the driver's probe().
-
-Does this a good solution?
+> Yep. save_processor_state() on x86 does kernel_fpu_begin(), and than
+> one needs to be balanced IIRC.
 
 
->
->> ? ? ? /* auart */
->> ? ? ? MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
->> ? ? ? MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
->> @@ -108,6 +144,7 @@ static void __init mx23evk_init(void)
->> ? ? ? mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
->>
->> ? ? ? mx23_add_duart();
->> + ? ? mx23_add_gpmi();
->> ? ? ? mx23_add_auart0();
->>
-> Can you please add gpmi stuff like this and pad configuration at the
-> end to reflect the order that devices get supported?
-ok.
+The needs of x86 force generic kernel changes ;-)
 
-Best Regards
-Huang Shijie
+FrankH.
 
 >
->> ? ? ? ret = gpio_request_one(MX23EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
->> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
->> index 08002d0..cf8ddcb 100644
->> --- a/arch/arm/mach-mxs/mach-mx28evk.c
->> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> Ditto
->
-> --
-> Regards,
-> Shawn
->
+> 									Pavel
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 >
