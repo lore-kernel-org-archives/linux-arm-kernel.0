@@ -1,148 +1,48 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Wed, 13 Apr 2011 23:45:16 +0300
-Subject: [RFC][PATCH V4] axi: add AXI bus driver
-In-Reply-To: <BANLkTimwZOJ0a5kVfaUzEcsMc39H999u0A@mail.gmail.com>
-References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
-	<20110413163113.GA24015@kroah.com>
-	<BANLkTin-4HrJzNrLOxRy_-a98S3ZF4aSQw@mail.gmail.com>
-	<1302726703.8015.1.camel@dev.znau.edu.ua>
-	<BANLkTimwZOJ0a5kVfaUzEcsMc39H999u0A@mail.gmail.com>
-Message-ID: <1302727516.8015.9.camel@dev.znau.edu.ua>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Wed, 13 Apr 2011 16:49:24 -0400
+Subject: [RFC][PATCH] axi: add AXI bus driver
+In-Reply-To: <BANLkTik6JZ-n3sVjCFK_x1yNRH3_o3_6rg@mail.gmail.com>
+References: <BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
+	<1302635550.14216.21.camel@dev.znau.edu.ua>
+	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
+	<4DA4AC4B.90409@hauke-m.de>
+	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
+	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
+	<1302640546.14216.65.camel@dev.znau.edu.ua>
+	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
+	<op.vtvalzu33ri7v4@arend-laptop>
+	<BANLkTik6JZ-n3sVjCFK_x1yNRH3_o3_6rg@mail.gmail.com>
+Message-ID: <20110413204924.GA1063@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> 2011/4/13 George Kashperko <george@znau.edu.ua>:
-> >
-> > ? ???, 13/04/2011 ? 21:39 +0200, Rafa? Mi?ecki ?????:
-> >> 2011/4/13 Greg KH <greg@kroah.com>:
-> >> >> diff --git a/drivers/axi/axi_pci_bridge.c b/drivers/axi/axi_pci_bridge.c
-> >> >> new file mode 100644
-> >> >> index 0000000..17e882c
-> >> >> --- /dev/null
-> >> >> +++ b/drivers/axi/axi_pci_bridge.c
-> >> >> @@ -0,0 +1,33 @@
-> >> >> +/*
-> >> >> + * AXI PCI bridge module
-> >> >> + *
-> >> >> + * Licensed under the GNU/GPL. See COPYING for details.
-> >> >> + */
-> >> >> +
-> >> >> +#include "axi_private.h"
-> >> >> +
-> >> >> +#include <linux/axi/axi.h>
-> >> >> +#include <linux/pci.h>
-> >> >> +
-> >> >> +static DEFINE_PCI_DEVICE_TABLE(axi_pci_bridge_tbl) = {
-> >> >> +     { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4331) },
-> >> >> +     { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4353) },
-> >> >> +     { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4727) },
-> >> >> +     { 0, },
-> >> >> +};
-> >> >> +MODULE_DEVICE_TABLE(pci, axi_pci_bridge_tbl);
-> >> >> +
-> >> >> +static struct pci_driver axi_pci_bridge_driver = {
-> >> >> +     .name = "axi-pci-bridge",
-> >> >> +     .id_table = axi_pci_bridge_tbl,
-> >> >> +};
-> >> >> +
-> >> >> +int __init axi_pci_bridge_init(void)
-> >> >> +{
-> >> >> +     return axi_host_pci_register(&axi_pci_bridge_driver);
-> >> >> +}
-> >> >> +
-> >> >> +void __exit axi_pci_bridge_exit(void)
-> >> >> +{
-> >> >> +     axi_host_pci_unregister(&axi_pci_bridge_driver);
-> >> >> +}
-> >> >
-> >> > You register a pci driver that does nothing?  That's not right, you need
-> >> > to then base your axi bus off of that pci device, so it is hooked up
-> >> > correctly in the /sys/devices/ tree.  Otherwise you are somewhere up in
-> >> > the virtual location for your axi bus, right?
-> >>
-> >> Please take a look at:
-> >> driver->probe = axi_host_pci_probe;
-> >> driver->remove = axi_host_pci_remove;
-> >> return pci_register_driver(driver);
-> >>
-> >>
-> >> >> +bool axi_core_is_enabled(struct axi_device *core)
-> >> >> +{
-> >> >> +     if ((axi_aread32(core, AXI_IOCTL) & (AXI_IOCTL_CLK | AXI_IOCTL_FGC))
-> >> >> +         != AXI_IOCTL_CLK)
-> >> >> +             return false;
-> >> >> +     if (axi_aread32(core, AXI_RESET_CTL) & AXI_RESET_CTL_RESET)
-> >> >> +             return false;
-> >> >> +     return true;
-> >> >> +}
-> >> >> +EXPORT_SYMBOL(axi_core_is_enabled);
-> >> >
-> >> > EXPORT_SYMBOL_GPL()?
-> >> >
-> >> > What module uses this?  And why would it care?
-> >> >
-> >> >> +EXPORT_SYMBOL(axi_core_enable);
-> >> >
-> >> > EXPORT_SYMBOL_GPL()?
-> >> >
-> >> > Same goes for your other exports, just want you to be sure here.
-> >>
-> >> Hm, I'm not sure. Using EXPORT_SYMBOL_GPL will forbid closed source
-> >> drivers from using our bus driver, right? I'm don't have preferences
-> >> on this, if you prefer us to force GPL, I can.
-> >>
-> >>
-> >> >> +u32 xaxi_chipco_gpio_control(struct axi_drv_cc *cc, u32 mask, u32 value)
-> >> >> +{
-> >> >> +     return axi_cc_write32_masked(cc, AXI_CC_GPIOCTL, mask, value);
-> >> >> +}
-> >> >> +EXPORT_SYMBOL(xaxi_chipco_gpio_control);
-> >> >
-> >> > "xaxi"?  Shouldn't that be consistant with the other exports and start
-> >> > with "axi"?
-> >>
-> >> Left from old tests/rewrites/splitting. Thanks.
-> >>
-> >>
-> >> >> +static u8 axi_host_pci_read8(struct axi_device *core, u16 offset)
-> >> >> +{
-> >> >> +     if (unlikely(core->bus->mapped_core != core))
-> >> >
-> >> > Are you sure about the use of unlikely in this, and other functions?
-> >> > The compiler almost always does a better job than we do for these types
-> >> > of calls, just let it do it's job.
-> >> >
-> >> >> +             axi_host_pci_switch_core(core);
-> >> >> +     return ioread8(core->bus->mmio + offset);
-> >> >
-> >> > I think because of that unlikely, you just slowed down all pci devices,
-> >> > right?  That's not very nice :)
-> >>
-> >> Hm, my logic suggests it is alright, but please consider this once
-> >> more with me ;)
-> >>
-> >> For the most of the time mapped_core (active core) do not change. We
-> >> perform few hundreds of operations on one core in a row. This way
-> >> mapped_core points to passed core for most of the time. Condition
-> >> (mapped_core != core) is unlikely to happen.
-> >>
-> >> Is there anything wrong in my logic?
-> >>
-> > Yes, there is. You don't need that "if" at all.
+On 2011-04-13 21:50 +0200, Rafa? Mi?ecki wrote:
+> Note for not involved: AMBA is family with few buses/interfaces
+> possible: AXI, AHB, ASB, APB, ATB [1].
 > 
-> Damn, WHY do you make me ask why, why, why, all the time?! Can't you
-> just write word of explanation without being asked for?
-> 
-Errm... Sorry, but I've already explained PCIE host behaviour _several_
-times several days ago. Personally I like to ask questions. Have
-absolutely nothing agains anyone else asking good questions. Never try
-to make people ask me questions I know they would ask anyway. Really you
-might missed some my messages earlier or maybe my english is too awful ?
+> So what are you saying is that drivers/amba/ is for AMBA APB? OK, I
+> can accept such a explanation and it makes me even more sure we need
+> another AMBA driver (this time: AMBA AXI).
 
-Yet again, for PCIE cores (not only for them, for some PCI cores as
-well) buscommon, buscore and function core are all available
-simultaneously. You dont need window sliding when access them.
+I believe the drivers/amba code is mainly (only?) for ARM PrimeCell
+cores which all include identification information at the end of their
+memory maps.  There are PrimeCell cores available for most if not all
+AMBA bus interfaces.
 
-Have nice day,
-George
+Non-primecell cores might not have such identification, and therefore
+would not be usable with drivers/amba.  They are generally used with
+the platform bus.
+
+> The left question is: how much of the implemented code is AMBA AXI
+> specific and how much is Broadcom specific?
+> 1) Does AMBA AXI identify cores by manuf, id, rev and class? Is this
+> really AMBA AXI specific and a evolution from simple "id" in AMBA APB?
+> 2) Is this standard for AMBA AXI to keep list of available cores in
+> some specific memory (is this always EPROM like in case of Bcm?)?
+
+I don't believe AXI (the physical bus) nor any other AMBA bus interface
+provides any mechanism whatsoever for device identification or
+enumeration.
+
+-- 
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
