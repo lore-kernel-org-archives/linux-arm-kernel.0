@@ -1,41 +1,40 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 13 Apr 2011 12:20:43 +0200
-Subject: V4L/ARM: videobuf-dma-contig no longer works on my ARM machine
-In-Reply-To: <4DA08C80.5040205@suse.cz>
-References: <201009301335.51643.jkrzyszt@tis.icnet.pl>
-	<201104091711.00191.jkrzyszt@tis.icnet.pl>
-	<4DA08C80.5040205@suse.cz>
-Message-ID: <201104131220.44430.jkrzyszt@tis.icnet.pl>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 13 Apr 2011 18:49:14 +0800
+Subject: [PATCH v5 1/4] ARM: add GPMI support for imx23/imx28
+In-Reply-To: <20110413100353.GP18850@pengutronix.de>
+References: <1302675881-18862-1-git-send-email-b32955@freescale.com>
+	<1302675881-18862-2-git-send-email-b32955@freescale.com>
+	<20110413090304.GM18850@pengutronix.de>
+	<4DA5725A.9000106@freescale.com>
+	<20110413100353.GP18850@pengutronix.de>
+Message-ID: <4DA57FAA.7030309@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia sobota 09 kwiecie? 2011 o 18:42:40 Jiri Slaby napisa?(a):
-> On 04/09/2011 05:10 PM, Janusz Krzysztofik wrote:
-> > (CC: Jiri Slaby, the author of the problematic change; truncate
-> > subject)
-> > 
-> > On Sat, 09 Apr 2011, at 09:16:24, Russell King - ARM Linux wrote:
-> >> On Sat, Apr 09, 2011 at 03:33:39AM +0200, Janusz Krzysztofik wrote:
-> >>> Since there were no actual problems reported before, I suppose
-> >>> the old code, which was passing to remap_pfn_range() a physical
-> >>> page number calculated from dma_alloc_coherent() privided
-> >>> dma_handle, worked correctly on all platforms actually using
-> >>> videobud-dma-config.
-> 
-> No, it didn't when IOMMU was used. 
+hi:
+> Hello,
+>
+>>>> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+>>> IMHO adding the device to machines should be a seperate patch.
+>> Do I have to split the driver into two parts? one for ARM-KERNEL,
+>> and another for MTD?
+>> If I have to do it, I will split the driver.
+> I'm not sure I understood what you mean here. I havn't looked at the mtd
+> part of this series, but I think having:
+>
+>   - ARM: mxs: add GPMI support for imx23/imx28
+>   - ARM: mxs: add gpmi device for mx2[38]evk
+>   - MTD: what
+>   - MTD: ever
+>   - MTD: is
+>   - MTD: needed
+>
+> is OK.
+>
+ok, thanks.
 
-Taking into account that I'm just trying to fix a regression, and not 
-invent a new, long term solution: are you able to name a board which a) 
-is already supported in 2.6.39, b) is (or can be) equipped with a device 
-supported by a V4L driver which uses videobuf-dma-config susbsystem, c) 
-uses IOMMU? If there is one, than I agree that reverting the patch is 
-not a good option.
-
-> Because remap_pfn_range didn't get
-> a physical page address.
-
-If I didn't understand it, I wouldn't try to find a solution other than 
-reverting your patch.
-
-Thanks,
-Janusz
+Best Regards
+Huang Shijie
+> Best regards
+> Uwe
+>
