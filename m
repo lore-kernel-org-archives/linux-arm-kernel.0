@@ -1,54 +1,56 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu, 14 Apr 2011 00:43:39 +0200
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <20110413220008.GA23901@n2100.arm.linux.org.uk>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104132256.40325.jkrzyszt@tis.icnet.pl>
-	<20110413220008.GA23901@n2100.arm.linux.org.uk>
-Message-ID: <201104140043.40244.jkrzyszt@tis.icnet.pl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Apr 2011 07:56:22 +0900
+Subject: [PATCH] ARM: S3C64XX: Initial support for Wolfson/Simtec
+	Cragganmore/Banff
+In-Reply-To: <1302533295-27917-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1302533295-27917-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <01bd01cbfa2e$1afae140$50f0a3c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia czwartek 14 kwiecie? 2011 o 00:00:08 Russell King - ARM Linux 
-napisa?(a):
-> On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
-> > Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux
-> > 
-> > napisa?(a):
-> > > On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik 
-wrote:
-> > > > Taking into account that I'm just trying to fix a regression,
-> > > > and not invent a new, long term solution: are you able to name
-> > > > an ARM based board which a) is already supported in 2.6.39, b)
-> > > > is (or can be) equipped with a device supported by a V4L
-> > > > driver which uses videobuf- dma-config susbsystem, c) has a
-> > > > bus structure with which virt_to_phys(bus_to_virt(dma_handle))
-> > > > is not equal dma_handle?
-> > > 
-> > > I have no idea - and why should whether someone can name
-> > > something that may break be a justification to allow something
-> > > which is technically wrong?
-> > > 
-> > > Surely it should be the other way around - if its technically
-> > > wrong and _may_ break something then it shouldn't be allowed.
-> > 
-> > In theory - of course. In practice - couldn't we now, close to
-> > -rc3, relax the rules a little bit and stop bothering with
-> > something that may break in the future if it doesn't break on any
-> > board supported so far (I hope)?
+Mark Brown wrote:
 > 
-> If we are worried about closeness to -final, then what should happen
-> is that the original commit is reverted; the "fix" for IOMMUs
-> resulted in a regression for existing users which isn't trivial to
-> resolve without risking possible breakage of other users.
+> The Cragganmore carrier card and Banff CPU module are used on Wolfson
+> Microelectronics reference systems.  This initial support covers the
+> core system which is a fairly generic S3C6410 based design, further
+> patches will add support for the key features of the reference system.
 > 
-> Do we even know whether bus_to_virt(iommu_bus_address) works?  I
-> suspect it doesn't, so by doing so you're already re-breaking the
-> IOMMU case.
+> The initial board bringup and therefore much of the key code was done by
+> Ben Dooks for Simtec, with additional work (especially around the
+> integration of the Wolfson devices) being done by myself.
+> 
+> Signed-off-by: Ben Dooks <ben@simtec.co.uk>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/Kconfig             |   24 ++
+>  arch/arm/mach-s3c64xx/Makefile            |    1 +
+>  arch/arm/mach-s3c64xx/include/mach/irqs.h |    4 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c     |  575
+> +++++++++++++++++++++++++++++
+>  4 files changed, 603 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-s3c64xx/mach-crag6410.c
+> 
+(Cc'ing Russell King)
 
-Hard to deny with only me having actually tested this dirty hack on one 
-single board :)
+Hi Mark,
 
-Thanks for your support,
-Janusz
+Looks ok after quickly review.
+
+But I'm not sure this can be sent to upstream during the next merge window.
+Because of Linus' complaint, Russell does not want to add new stuff now,
+maybe you know. Basically my tree was sent to upstream via RMK when merge
+window.
+
+Hmm...for now I will make some branch for new stuff like this and keep it
+until everyone is happy. Of course, if any consolidation work in Linux ARM
+world, I will update.
+
+Or...if any good idea, please let me know :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
