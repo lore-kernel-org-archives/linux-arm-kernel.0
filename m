@@ -1,67 +1,173 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 13 Apr 2011 12:52:31 +0200
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <20110412214011.GG7806@n2100.arm.linux.org.uk>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<20110412214011.GG7806@n2100.arm.linux.org.uk>
-Message-ID: <201104131252.32011.jkrzyszt@tis.icnet.pl>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 13 Apr 2011 19:43:05 +0800
+Subject: [PATCH v5 1/4] ARM: add GPMI support for imx23/imx28
+In-Reply-To: <1302675881-18862-2-git-send-email-b32955@freescale.com>
+References: <1302675881-18862-1-git-send-email-b32955@freescale.com>
+	<1302675881-18862-2-git-send-email-b32955@freescale.com>
+Message-ID: <20110413114304.GA1897@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 12 Apr 2011 at 23:40:11 Russell King - ARM Linux wrote:
-> On Tue, Apr 12, 2011 at 11:06:34PM +0200, Janusz Krzysztofik wrote:
-> > The patch tries to solve this regression by using
-> > virt_to_phys(bus_to_virt(mem->dma_handle)) instead of problematic
-> > virt_to_phys(mem->vaddr).
+On Wed, Apr 13, 2011 at 02:24:38PM +0800, Huang Shijie wrote:
+> add the clock and iomux initialization for GPMI in the imx23 and imx28.
+> and register the gpmi driver.
 > 
-> Who says that DMA handles are bus addresses in the strictest sense?
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/mach-mxs/Kconfig                       |    2 +
+>  arch/arm/mach-mxs/clock-mx23.c                  |    3 +
+>  arch/arm/mach-mxs/clock-mx28.c                  |    3 +
+>  arch/arm/mach-mxs/devices-mx23.h                |    3 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    3 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-gpmi.c       |  134 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    4 +
+>  arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   65 +++++++++++
+>  arch/arm/mach-mxs/mach-mx23evk.c                |   37 ++++++
+>  arch/arm/mach-mxs/mach-mx28evk.c                |   37 ++++++
+>  12 files changed, 295 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi.c
+>  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
 > 
-> DMA handles on ARM are the bus address to program 'dev' with in order
-> for it to access the memory mapped by dma_alloc_coherent().  On some
-> ARM platforms, this bus address is dependent on 'dev' - such as
-> platforms with more than one root PCI bus, and so bus_to_virt() just
-> doesn't hack it.
+[...]
+> diff --git a/arch/arm/mach-mxs/devices/platform-gpmi.c b/arch/arm/mach-mxs/devices/platform-gpmi.c
+> new file mode 100644
+> index 0000000..74ebe22
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/devices/platform-gpmi.c
+> @@ -0,0 +1,134 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +#include <asm/sizes.h>
+> +#include <mach/mx23.h>
+> +#include <mach/mx28.h>
+> +#include <mach/gpmi-nfc.h>
+> +#include <mach/devices-common.h>
 
-Taking into account that I'm just trying to fix a regression, and not 
-invent a new, long term solution: are you able to name an ARM based 
-board which a) is already supported in 2.6.39, b) is (or can be) 
-equipped with a device supported by a V4L driver which uses videobuf-
-dma-config susbsystem, c) has a bus structure with which 
-virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
+devices-common.h already includes gpmi-nfc.h
 
-If there is one, then I agree that my short-term fix is wrong.
+[...]
+> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+> new file mode 100644
+> index 0000000..cf8e8c3
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#ifndef __INCLUDE_LINUX_DEVICE_H
+> +#define __INCLUDE_LINUX_DEVICE_H
 
-> What is really needed is for this problem - the mapping of DMA
-> coherent memory into userspace - to be solved with a proper arch API
-> rather than all these horrible hacks which subsystems instead
-> invent.  That's something I tried to do with the dma_mmap_coherent()
-> stuff but it was shot down by linux-arch as (iirc) PA-RISC objected
-> to it.
-> 
-> Hence why ARM only implements it.
+__INCLUDE_LINUX_DEVICE_H is too generic to protect the inclusion of
+gpmi-nfc.h 
 
-I thought so too, but missed the fact that PowerPC implements it 
-actually, even defining the ARCH_HAS_DMA_MMAP_COHERENT symbol, which ARM 
-doesn't so far.
+[...]
+> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> index a66994f..db715f9 100644
+> --- a/arch/arm/mach-mxs/mach-mx23evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> @@ -34,6 +34,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+>  	MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+>  	MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+>  
+> +	/* gpmi */
+> +	MX23_PAD_GPMI_D00__GPMI_D00 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
 
-> Maybe the video drivers should try to resurect the idea, maybe only
-> allowing this support for architectures which provide
-> dma_mmap_coherent().
+You can use MXS_PAD_CTRL here.
 
-AFAICT, ARM implementation of dma_mmap_coherent() is not compatible with 
-dma_declare_coherent_memory(), is it? If I'm wrong, please correct me, 
-I'll get back to the idea presented in v1 of the fix.
+> +	MX23_PAD_GPMI_D01__GPMI_D01 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D02__GPMI_D02 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D03__GPMI_D03 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D04__GPMI_D04 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D05__GPMI_D05 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D06__GPMI_D06 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_D07__GPMI_D07 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_CLE__GPMI_CLE |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_ALE__GPMI_ALE |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_WPN__GPMI_WPN |
+> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_WRN__GPMI_WRN |
+> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_RDN__GPMI_RDN |
+> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_RDY0__GPMI_RDY0 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_RDY1__GPMI_RDY1 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_CE0N__GPMI_CE0N |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_GPMI_CE1N__GPMI_CE1N |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +
 
-Otherwise, I think that switching to dma_mmap_coherent() is not an 
-option for the videobuf-dma-contig subsystem as long as there is no good 
-solution to the problem of dma_alloc_coherent() not guaranteed to 
-succeed with high-order allocations at any time. Any chance for your 
-already proposed 
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/036463.html, 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/036809.html), 
-or perhaps a new, better solution ever finding its way to the mainline 
-tree?
+mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
 
-Thanks,
-Janusz
+Uwe,
+
+How do you usually handle such pin conflicts on board?
+
+>  	/* auart */
+>  	MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+>  	MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+> @@ -108,6 +144,7 @@ static void __init mx23evk_init(void)
+>  	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+>  
+>  	mx23_add_duart();
+> +	mx23_add_gpmi();
+>  	mx23_add_auart0();
+>  
+Can you please add gpmi stuff like this and pad configuration at the
+end to reflect the order that devices get supported?
+
+>  	ret = gpio_request_one(MX23EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index 08002d0..cf8ddcb 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+Ditto
+
+-- 
+Regards,
+Shawn
