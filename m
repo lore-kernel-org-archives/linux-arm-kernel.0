@@ -1,54 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Apr 2011 23:03:38 +0100
-Subject: [PATCH] arm: cputype.h uses  __attribute_const__ which
-	requires including kernel.h
-In-Reply-To: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
-References: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
-Message-ID: <20110413220338.GB23901@n2100.arm.linux.org.uk>
+From: alan@linux.intel.com (Alan Cox)
+Date: Wed, 13 Apr 2011 22:58:18 +0100
+Subject: [PATCH] atmel_serial: keep the platform_device unchanged
+In-Reply-To: <1302724038-26236-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1302724038-26236-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110413225818.39ce5104@bob.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 11:12:01AM +0100, Jonathan Cameron wrote:
-> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
-> ---
-> Issue manifests as:
-> 
-> a  CC [M]  drivers/staging/iio/gyro/adis16080_core.o
-> In file included from arch/arm/mach-pxa/include/mach/hardware.h:62,
->                  from arch/arm/mach-pxa/include/mach/gpio.h:28,
->                  from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
->                  from include/linux/gpio.h:7,
->                  from drivers/staging/iio/gyro/adis16080_core.c:8:
-> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:57: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_id'
-> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:62: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_cachetype'
-> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:67: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_tcmstatus'
-> In file included from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
->                  from include/linux/gpio.h:7,
->                  from drivers/staging/iio/gyro/adis16080_core.c:8:
-> 
-> With current mainline.  Could trivially work around this by reordering
-> headers in the driver, but should probably be fixed at the source of
-> the problem as done here.
+On Wed, 13 Apr 2011 21:47:18 +0200
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
 
-Missing sign-off, please fix that, and then this can go to the patch system.
-Thanks.
+> specify the port num via platform_data this will allow to match the
+> clock with the plaform_dev staticly
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Cc: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: Greg Kroah-Hartman <gregkh@suse.de>
 
-> 
->  arch/arm/include/asm/cputype.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index ed5bc9e..cd4458f 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -2,6 +2,7 @@
->  #define __ASM_ARM_CPUTYPE_H
->  
->  #include <linux/stringify.h>
-> +#include <linux/kernel.h>
->  
->  #define CPUID_ID	0
->  #define CPUID_CACHETYPE	1
-> -- 
-> 1.7.3.4
-> 
+Ack for the serial side, its really an arch patch though as far as I
+can see..
