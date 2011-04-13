@@ -1,37 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 Apr 2011 12:03:53 +0200
-Subject: [PATCH v5 1/4] ARM: add GPMI support for imx23/imx28
-In-Reply-To: <4DA5725A.9000106@freescale.com>
-References: <1302675881-18862-1-git-send-email-b32955@freescale.com>
-	<1302675881-18862-2-git-send-email-b32955@freescale.com>
-	<20110413090304.GM18850@pengutronix.de>
-	<4DA5725A.9000106@freescale.com>
-Message-ID: <20110413100353.GP18850@pengutronix.de>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Wed, 13 Apr 2011 11:12:01 +0100
+Subject: [PATCH] arm: cputype.h uses __attribute_const__ which requires
+	including kernel.h
+Message-ID: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+---
+Issue manifests as:
 
-> >>diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-> >IMHO adding the device to machines should be a seperate patch.
-> Do I have to split the driver into two parts? one for ARM-KERNEL,
-> and another for MTD?
-> If I have to do it, I will split the driver.
-I'm not sure I understood what you mean here. I havn't looked at the mtd
-part of this series, but I think having:
+a  CC [M]  drivers/staging/iio/gyro/adis16080_core.o
+In file included from arch/arm/mach-pxa/include/mach/hardware.h:62,
+                 from arch/arm/mach-pxa/include/mach/gpio.h:28,
+                 from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
+                 from include/linux/gpio.h:7,
+                 from drivers/staging/iio/gyro/adis16080_core.c:8:
+/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:57: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_id'
+/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:62: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_cachetype'
+/home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:67: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_tcmstatus'
+In file included from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
+                 from include/linux/gpio.h:7,
+                 from drivers/staging/iio/gyro/adis16080_core.c:8:
 
- - ARM: mxs: add GPMI support for imx23/imx28
- - ARM: mxs: add gpmi device for mx2[38]evk
- - MTD: what
- - MTD: ever
- - MTD: is
- - MTD: needed
+With current mainline.  Could trivially work around this by reordering
+headers in the driver, but should probably be fixed at the source of
+the problem as done here.
 
-is OK.
+ arch/arm/include/asm/cputype.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index ed5bc9e..cd4458f 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -2,6 +2,7 @@
+ #define __ASM_ARM_CPUTYPE_H
+ 
+ #include <linux/stringify.h>
++#include <linux/kernel.h>
+ 
+ #define CPUID_ID	0
+ #define CPUID_CACHETYPE	1
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.3.4
