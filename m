@@ -1,73 +1,43 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 13 Apr 2011 23:58:12 +0200
-Subject: [RFC][PATCH] axi: add AXI bus driver
-In-Reply-To: <BANLkTi=8HEysFXhcv5yn=ErWZkzzqPoSug@mail.gmail.com>
-References: <1302566227-23788-1-git-send-email-zajec5@gmail.com>
-	<20110412133633.GR15130@legolas.emea.dhcp.ti.com>
-	<1302634039.14216.10.camel@dev.znau.edu.ua>
-	<BANLkTi=0sM2+nPYyd09G=Uy9rcEvaFErnA@mail.gmail.com>
-	<1302635550.14216.21.camel@dev.znau.edu.ua>
-	<BANLkTi=8mB9ZDTjF4yds6mkx+PmM+B_6Cg@mail.gmail.com>
-	<4DA4AC4B.90409@hauke-m.de>
-	<BANLkTiknRYWaDM1ThAxgXcdGqK8jeFaBPA@mail.gmail.com>
-	<BANLkTikqKtJuDS17mfFvxzMoXuBtJvCgTA@mail.gmail.com>
-	<1302640546.14216.65.camel@dev.znau.edu.ua>
-	<BANLkTim8dmTL-BVK3fcWHNBU9Eyz1k_T+Q@mail.gmail.com>
-	<op.vtvalzu33ri7v4@arend-laptop>
-	<BANLkTik6JZ-n3sVjCFK_x1yNRH3_o3_6rg@mail.gmail.com>
-	<1302726187.7911.11.camel@dev.znau.edu.ua>
-	<BANLkTi=8HEysFXhcv5yn=ErWZkzzqPoSug@mail.gmail.com>
-Message-ID: <BANLkTinXnZzF_1XkdDpuHsL-NWDd03VREw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Apr 2011 23:00:08 +0100
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
+	broken on ARM
+In-Reply-To: <201104132256.40325.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<201104131252.32011.jkrzyszt@tis.icnet.pl>
+	<20110413183231.GA23631@n2100.arm.linux.org.uk>
+	<201104132256.40325.jkrzyszt@tis.icnet.pl>
+Message-ID: <20110413220008.GA23901@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/13 Rafa? Mi?ecki <zajec5@gmail.com>:
-> Will comment on that later.
+On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
+> Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux 
+> napisa?(a):
+> > On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
+> > > Taking into account that I'm just trying to fix a regression, and
+> > > not invent a new, long term solution: are you able to name an ARM
+> > > based board which a) is already supported in 2.6.39, b) is (or can
+> > > be) equipped with a device supported by a V4L driver which uses
+> > > videobuf- dma-config susbsystem, c) has a bus structure with which
+> > > virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
+> > 
+> > I have no idea - and why should whether someone can name something
+> > that may break be a justification to allow something which is
+> > technically wrong?
+> > 
+> > Surely it should be the other way around - if its technically wrong
+> > and _may_ break something then it shouldn't be allowed.
+> 
+> In theory - of course. In practice - couldn't we now, close to -rc3, 
+> relax the rules a little bit and stop bothering with something that may 
+> break in the future if it doesn't break on any board supported so far (I 
+> hope)?
 
-Can we try to decide, how to implement our driver correctly? This
-should be main focus for now. I tried to analyze drivers/amba/, how it
-works, how it relates to our code, Broadcom.
+If we are worried about closeness to -final, then what should happen is
+that the original commit is reverted; the "fix" for IOMMUs resulted in
+a regression for existing users which isn't trivial to resolve without
+risking possible breakage of other users.
 
-AFAICS AMBA so far is mostly (always?) used for embedded devices with
-pre-defined hardware layout. Let's take as example mach-u300 (just
-some random one). One of the amba_devices it registers is uart0_device
-which has two interesting fields:
-.start = U300_UART0_BASE,
-.end   = U300_UART0_BASE + SZ_4K - 1,
-U300_UART0_BASE == (U300_SLOW_PER_PHYS_BASE+0x3000) == 0xc0013000
-So this mach-u300 is well-specified device, every mach-u300 has uart0
-at 0xc0013000.
-
-It looks every AMBA device (like uart0) has some common fields, like:
-u32 peripherialid0, peripherialid1, peripherialid2, peripherialid3;
-u32 componentid0, componentid1, componentid2, componentid3;
-
-I believe Broadcom's *agent* AKA *wrapper* is comparable to standard
-amba device.
-
-Of course agents/wrappers are not the same for every Broadcom AMBA AXI
-card, so we can not use strict .start and .end declarations and the
-same agents/wrappers for every card. Instead, we have to do scanning
-of EPROM to read info about agents/wrappers.
-
-If someone does not know: every core on Broadcom AMBA AXI card has
-it's agent/wrapper. We access agent/wrapper registers to
-enable/disable/reset core.
-
-So we could scan EPROM for agents/wrappers, register them in AMBA
-driver using our *_core_enable as AMBA's clock management.
-
-
-Please verify if my understanding is correct. I tried to explain
-easily whole situation I just analyzed.
-
-If I'm right: is this really the right path to follow? What about real
-core, like PCIe core, or IEEE core? I guess they are not standard AMBA
-cores, so we can not simply register them. Should we look for clever
-way to connect everything we have with drivers/amba? How to connect
-"real" cores (PCIe, IEEE) with agents?
-
-Please, share how do you see this situation now.
-
--- 
-Rafa?
+Do we even know whether bus_to_virt(iommu_bus_address) works?  I suspect
+it doesn't, so by doing so you're already re-breaking the IOMMU case.
