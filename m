@@ -1,273 +1,126 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Wed, 13 Apr 2011 13:22:50 -0600
-Subject: [PATCH] ux500: Adding support for u8500 Hsem functionality V3
-Message-ID: <1302722570-9494-1-git-send-email-mathieu.poirier@linaro.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 13 Apr 2011 21:39:54 +0200
+Subject: [RFC][PATCH V4] axi: add AXI bus driver
+In-Reply-To: <20110413163113.GA24015@kroah.com>
+References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
+	<20110413163113.GA24015@kroah.com>
+Message-ID: <BANLkTin-4HrJzNrLOxRy_-a98S3ZF4aSQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
+2011/4/13 Greg KH <greg@kroah.com>:
+>> diff --git a/drivers/axi/axi_pci_bridge.c b/drivers/axi/axi_pci_bridge.c
+>> new file mode 100644
+>> index 0000000..17e882c
+>> --- /dev/null
+>> +++ b/drivers/axi/axi_pci_bridge.c
+>> @@ -0,0 +1,33 @@
+>> +/*
+>> + * AXI PCI bridge module
+>> + *
+>> + * Licensed under the GNU/GPL. See COPYING for details.
+>> + */
+>> +
+>> +#include "axi_private.h"
+>> +
+>> +#include <linux/axi/axi.h>
+>> +#include <linux/pci.h>
+>> +
+>> +static DEFINE_PCI_DEVICE_TABLE(axi_pci_bridge_tbl) = {
+>> + ? ? { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4331) },
+>> + ? ? { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4353) },
+>> + ? ? { PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4727) },
+>> + ? ? { 0, },
+>> +};
+>> +MODULE_DEVICE_TABLE(pci, axi_pci_bridge_tbl);
+>> +
+>> +static struct pci_driver axi_pci_bridge_driver = {
+>> + ? ? .name = "axi-pci-bridge",
+>> + ? ? .id_table = axi_pci_bridge_tbl,
+>> +};
+>> +
+>> +int __init axi_pci_bridge_init(void)
+>> +{
+>> + ? ? return axi_host_pci_register(&axi_pci_bridge_driver);
+>> +}
+>> +
+>> +void __exit axi_pci_bridge_exit(void)
+>> +{
+>> + ? ? axi_host_pci_unregister(&axi_pci_bridge_driver);
+>> +}
+>
+> You register a pci driver that does nothing? ?That's not right, you need
+> to then base your axi bus off of that pci device, so it is hooked up
+> correctly in the /sys/devices/ tree. ?Otherwise you are somewhere up in
+> the virtual location for your axi bus, right?
 
-This driver provides functionality for STE's Hsem protocol
-1, with no interrupts.  It is folded in the hwspinlock scheme and
-as such meant to provide synchronisation between various processors
-on the SoC rather than processes inside the ARM core.
+Please take a look at:
+driver->probe = axi_host_pci_probe;
+driver->remove = axi_host_pci_remove;
+return pci_register_driver(driver);
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwspinlock/u8500_hsem.c |  245 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 245 insertions(+), 0 deletions(-)
- create mode 100644 drivers/hwspinlock/u8500_hsem.c
 
-diff --git a/drivers/hwspinlock/u8500_hsem.c b/drivers/hwspinlock/u8500_hsem.c
-new file mode 100644
-index 0000000..85c3c07
---- /dev/null
-+++ b/drivers/hwspinlock/u8500_hsem.c
-@@ -0,0 +1,245 @@
-+/*
-+ * u8500 HWSEM driver
-+ *
-+ * Copyright (C) 2010-2011 ST-Ericsson
-+ *
-+ * Implements u8500 semaphore handling for protocol 1, no interrupts.
-+ *
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ * Heavily borrowed from the work of :
-+ *   Simon Que <sque@ti.com>
-+ *   Hari Kanigeri <h-kanigeri2@ti.com>
-+ *   Ohad Ben-Cohen <ohad@wizery.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/hwspinlock.h>
-+#include <linux/platform_device.h>
-+
-+#include "hwspinlock_internal.h"
-+
-+/*
-+ * Implementation of STE's HSem protocol 1 without interrutps.
-+ * The only masterID we allow is '0x01' to force people to use
-+ * HSems for synchronisation between processors rather than processes
-+ * on the ARM core.
-+ */
-+
-+#define U8500_MAX_SEMAPHORE		32	/* a total of 32 semaphore */
-+#define RESET_SEMAPHORE			(0)	/* free */
-+
-+/* CPU ID for master running u8500 kernel.
-+ * Hswpinlocks should only be used to synchonise operations
-+ * between the Cortex A9 core and the other CPUs.  Hence
-+ * forcing the masterID to a preset value.
-+ */
-+#define HSEM_MASTER_ID			0x01
-+
-+#define HSEM_REGISTER_OFFSET		0x08
-+
-+#define HSEM_CTRL_REG			0x00
-+#define HSEM_ICRALL			0x90
-+#define HSEM_PROTOCOL_1			0x01
-+
-+#define to_u8500_hsem(lock)	\
-+	container_of(lock, struct u8500_hsem, lock)
-+
-+struct u8500_hsem {
-+	struct hwspinlock lock;
-+	void __iomem *addr;
-+};
-+
-+struct u8500_hsem_state {
-+	void __iomem *io_base;		/* Mapped base address */
-+};
-+
-+static int u8500_hsem_trylock(struct hwspinlock *lock)
-+{
-+	struct u8500_hsem *u8500_lock = to_u8500_hsem(lock);
-+
-+	writel(HSEM_MASTER_ID, u8500_lock->addr);
-+
-+	/*
-+	 * get only first 4 bit and compare to masterID.
-+	 * if equal, we have the semaphore, otherwise
-+	 * someone else has it.
-+	 */
-+	return (HSEM_MASTER_ID == (0x0F & readl(u8500_lock->addr)));
-+}
-+
-+static void u8500_hsem_unlock(struct hwspinlock *lock)
-+{
-+	struct u8500_hsem *u8500_lock = to_u8500_hsem(lock);
-+
-+	/* release the lock by writing 0 to it */
-+	writel(RESET_SEMAPHORE, u8500_lock->addr);
-+}
-+
-+/*
-+ * u8500: what value is recommended here ?
-+ */
-+static void u8500_hsem_relax(struct hwspinlock *lock)
-+{
-+	ndelay(50);
-+}
-+
-+static const struct hwspinlock_ops u8500_hwspinlock_ops = {
-+	.trylock	= u8500_hsem_trylock,
-+	.unlock		= u8500_hsem_unlock,
-+	.relax		= u8500_hsem_relax,
-+};
-+
-+static int __devinit u8500_hsem_probe(struct platform_device *pdev)
-+{
-+	struct u8500_hsem *u8500_lock;
-+	struct u8500_hsem_state *state;
-+	struct hwspinlock *lock;
-+	struct resource *res;
-+	void __iomem *io_base;
-+	int i, ret;
-+	ulong offset, val;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (!state)
-+		return -ENOMEM;
-+
-+	io_base = ioremap(res->start, resource_size(res));
-+	if (!io_base) {
-+		ret = -ENOMEM;
-+		goto free_state;
-+	}
-+
-+	/* make sure protocol 1 is selected */
-+	val = readl(io_base + HSEM_CTRL_REG);
-+	writel((val & ~HSEM_PROTOCOL_1), io_base + HSEM_CTRL_REG);
-+
-+	/* clear all interrupts */
-+	writel(0xFFFF, io_base + HSEM_ICRALL);
-+
-+	state->io_base = io_base;
-+
-+	platform_set_drvdata(pdev, state);
-+
-+	/*
-+	 * no pm needed for HSem but required to comply
-+	 * with hwspilock core.
-+	 */
-+	pm_runtime_enable(&pdev->dev);
-+
-+	offset = HSEM_REGISTER_OFFSET;
-+
-+	for (i = 0; i < U8500_MAX_SEMAPHORE; i++) {
-+		u8500_lock = kzalloc(sizeof(*u8500_lock), GFP_KERNEL);
-+		if (!u8500_lock) {
-+			ret = -ENOMEM;
-+			goto free_locks;
-+		}
-+
-+		u8500_lock->lock.dev = &pdev->dev;
-+		u8500_lock->lock.owner = THIS_MODULE;
-+		u8500_lock->lock.id = i;
-+		u8500_lock->lock.ops = &u8500_hwspinlock_ops;
-+		u8500_lock->addr = io_base + offset + sizeof(u32) * i;
-+
-+		ret = hwspin_lock_register(&u8500_lock->lock);
-+		if (ret) {
-+			kfree(u8500_lock);
-+			goto free_locks;
-+		}
-+	}
-+
-+	return 0;
-+
-+free_locks:
-+	while (--i >= 0) {
-+		lock = hwspin_lock_unregister(i);
-+		/* this should't happen, but let's give our best effort */
-+		if (!lock) {
-+			dev_err(&pdev->dev, "%s: cleanups failed\n", __func__);
-+			continue;
-+		}
-+		u8500_lock = to_u8500_hsem(lock);
-+		kfree(u8500_lock);
-+	}
-+
-+	pm_runtime_disable(&pdev->dev);
-+	iounmap(io_base);
-+free_state:
-+	kfree(state);
-+	return ret;
-+}
-+
-+static int u8500_hsem_remove(struct platform_device *pdev)
-+{
-+	struct u8500_hsem_state *state = platform_get_drvdata(pdev);
-+	struct hwspinlock *lock;
-+	struct u8500_hsem *u8500_lock;
-+	void __iomem *io_base;
-+	int i;
-+
-+	io_base = state->io_base;
-+
-+	/* clear all interrupts */
-+	writel(0xFFFF, io_base + HSEM_ICRALL);
-+
-+	for (i = 0; i < U8500_MAX_SEMAPHORE; i++) {
-+		lock = hwspin_lock_unregister(i);
-+		/* this shouldn't happen at this point. if it does,@least
-+		 * don't continue with the remove */
-+		if (!lock) {
-+			dev_err(&pdev->dev, "%s: failed on %d\n", __func__, i);
-+			return -EBUSY;
-+		}
-+
-+		u8500_lock = to_u8500_hsem(lock);
-+		kfree(u8500_lock);
-+	}
-+
-+	pm_runtime_disable(&pdev->dev);
-+	iounmap(io_base);
-+	kfree(state);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver u8500_hsem_driver = {
-+	.probe		= u8500_hsem_probe,
-+	.remove		= u8500_hsem_remove,
-+	.driver		= {
-+		.name	= "u8500_hsem",
-+	},
-+};
-+
-+static int __init u8500_hsem_init(void)
-+{
-+	return platform_driver_register(&u8500_hsem_driver);
-+}
-+/* board init code might need to reserve hwspinlocks for predefined purposes */
-+postcore_initcall(u8500_hsem_init);
-+
-+static void __exit u8500_hsem_exit(void)
-+{
-+	platform_driver_unregister(&u8500_hsem_driver);
-+}
-+module_exit(u8500_hsem_exit);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("Hardware Semaphore driver for u8500");
-+MODULE_AUTHOR("Mathieu Poirier <mathieu.poirier@linaro.org");
+>> +bool axi_core_is_enabled(struct axi_device *core)
+>> +{
+>> + ? ? if ((axi_aread32(core, AXI_IOCTL) & (AXI_IOCTL_CLK | AXI_IOCTL_FGC))
+>> + ? ? ? ? != AXI_IOCTL_CLK)
+>> + ? ? ? ? ? ? return false;
+>> + ? ? if (axi_aread32(core, AXI_RESET_CTL) & AXI_RESET_CTL_RESET)
+>> + ? ? ? ? ? ? return false;
+>> + ? ? return true;
+>> +}
+>> +EXPORT_SYMBOL(axi_core_is_enabled);
+>
+> EXPORT_SYMBOL_GPL()?
+>
+> What module uses this? ?And why would it care?
+>
+>> +EXPORT_SYMBOL(axi_core_enable);
+>
+> EXPORT_SYMBOL_GPL()?
+>
+> Same goes for your other exports, just want you to be sure here.
+
+Hm, I'm not sure. Using EXPORT_SYMBOL_GPL will forbid closed source
+drivers from using our bus driver, right? I'm don't have preferences
+on this, if you prefer us to force GPL, I can.
+
+
+>> +u32 xaxi_chipco_gpio_control(struct axi_drv_cc *cc, u32 mask, u32 value)
+>> +{
+>> + ? ? return axi_cc_write32_masked(cc, AXI_CC_GPIOCTL, mask, value);
+>> +}
+>> +EXPORT_SYMBOL(xaxi_chipco_gpio_control);
+>
+> "xaxi"? ?Shouldn't that be consistant with the other exports and start
+> with "axi"?
+
+Left from old tests/rewrites/splitting. Thanks.
+
+
+>> +static u8 axi_host_pci_read8(struct axi_device *core, u16 offset)
+>> +{
+>> + ? ? if (unlikely(core->bus->mapped_core != core))
+>
+> Are you sure about the use of unlikely in this, and other functions?
+> The compiler almost always does a better job than we do for these types
+> of calls, just let it do it's job.
+>
+>> + ? ? ? ? ? ? axi_host_pci_switch_core(core);
+>> + ? ? return ioread8(core->bus->mmio + offset);
+>
+> I think because of that unlikely, you just slowed down all pci devices,
+> right? ?That's not very nice :)
+
+Hm, my logic suggests it is alright, but please consider this once
+more with me ;)
+
+For the most of the time mapped_core (active core) do not change. We
+perform few hundreds of operations on one core in a row. This way
+mapped_core points to passed core for most of the time. Condition
+(mapped_core != core) is unlikely to happen.
+
+Is there anything wrong in my logic?
+
 -- 
-1.7.1
+Rafa?
