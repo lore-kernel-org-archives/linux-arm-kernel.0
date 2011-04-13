@@ -1,74 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Apr 2011 19:32:31 +0100
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <201104131252.32011.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<20110412214011.GG7806@n2100.arm.linux.org.uk>
-	<201104131252.32011.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110413183231.GA23631@n2100.arm.linux.org.uk>
+From: pwaechtler@mac.com (Peter =?iso-8859-15?q?W=E4chtler?=)
+Date: Wed, 13 Apr 2011 20:35:55 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <alpine.LFD.2.00.1104131128070.24613@xanadu.home>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<201104130851.17676.pwaechtler@mac.com>
+	<alpine.LFD.2.00.1104131128070.24613@xanadu.home>
+Message-ID: <201104132035.55362.pwaechtler@mac.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
-> Taking into account that I'm just trying to fix a regression, and not 
-> invent a new, long term solution: are you able to name an ARM based 
-> board which a) is already supported in 2.6.39, b) is (or can be) 
-> equipped with a device supported by a V4L driver which uses videobuf-
-> dma-config susbsystem, c) has a bus structure with which 
-> virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
-
-I have no idea - and why should whether someone can name something that
-may break be a justification to allow something which is technically
-wrong?
-
-Surely it should be the other way around - if its technically wrong and
-_may_ break something then it shouldn't be allowed.
-
-> I thought so too, but missed the fact that PowerPC implements it 
-> actually, even defining the ARCH_HAS_DMA_MMAP_COHERENT symbol, which ARM 
-> doesn't so far.
-
-So, there's no problem adding that symbol to ARM.
-
-> > Maybe the video drivers should try to resurect the idea, maybe only
-> > allowing this support for architectures which provide
-> > dma_mmap_coherent().
+Am Mittwoch, 13. April 2011, 17:44:09 schrieb Nicolas Pitre:
+> On Wed, 13 Apr 2011, Peter W?chtler wrote:
+> > Am Dienstag, 12. April 2011, 21:20:14 schrieb Andrei Warkentin:
+> > > How are you mounting your rootfs and what file system are you using?
+> > > What sort of corruptions to the super block are you seeing?
+> > 
+> > It's using ext4 with metadata journalling in ordered mode.
+> > I had to check "if it's the FS" - the test programs create lots of
+> > directories and files while a timer is armed to issue a soft reset.
+> > The partitions where the "stress tests" run on - survive it happily -
+> > just the rootfs where almost nothing gets written is severly damaged so
+> > that fsck.ext4 will not repair it automatically.
 > 
-> AFAICT, ARM implementation of dma_mmap_coherent() is not compatible with 
-> dma_declare_coherent_memory(), is it? If I'm wrong, please correct me, 
-> I'll get back to the idea presented in v1 of the fix.
+> SD cards are doing their own wear leveling internally and you have no
+> control over it.  Some blocks of data may be moved around, affecting a
+> separate logical partition, even if you are not actively writing to that
+> partition.  Now if you cut power or reset the card while this is
+> happening you'll certainly end up with data loss.  Those SD cards are
+> made to be both cheap and fast, meaning they're certainly not reliable
+> with regards to unexpected interruptions.
+> 
+> Furthermore, you should have a look at this article and referenced
+> material: http://lwn.net/Articles/428584/.
+> 
+> 
 
-1. dma_declare_coherent_memory() doesn't work on ARM for memory which
-already exists (its not permitted to ioremap() the kernel direct-mapped
-memory due to attribute aliasing issues.)
+Yes, I know this article - and I know about wear levelling etc.
 
-2. dma_declare_coherent_memory() totally bypasses the DMA allocator, and
-so dma_mmap_coherent() has no knowledge of how to map the memory.
+Data loss is not the biggest problem. The capacity is huge (>>4GB) - therefore 
+I wouldn't want to miss journalling - but I was not involved on the decision. 
+Ten years ago I carefully ordered the fsync, rename on ext2 on a 64MiB 
+CompactFlash - worked well enough.
 
-If we had a proper way to map DMA memory into userspace, then we wouldn't
-have these issues as the dma_declare_coherent_memory() would already
-support that.
+The vendor knows about the requirements - perhaps learned it with another 
+customer ;)
 
-And actually, talking about dma_declare_coherent_memory(), you've just
-provided a reason why virt_to_phys(bus_to_virt(dma_handle)) won't work -
-dma_declare_coherent_memory() can be used to provide on-device memory
-where the virt/handle may not be mappable with bus_to_virt().
+I tried to "smash" the FS without success in the past - but the rootfs was 
+mounted via NFS ;) And the partitions that get tortured stay intact - of 
+course you can say that the wear levelling switches some blocks - but I don't 
+buy it.
 
-> Otherwise, I think that switching to dma_mmap_coherent() is not an 
-> option for the videobuf-dma-contig subsystem as long as there is no good 
-> solution to the problem of dma_alloc_coherent() not guaranteed to 
-> succeed with high-order allocations at any time.
+Thanks for all the nice work on Linux - Russell included ;)
 
-Let me repeat: there is no official API or way to map DMA memory into
-userspace.  Every way people try is a half-hacked up bodge which may or
-may not work for a limited subset of systems.
-
-Until someone (like you) puts some serious effort into persuading
-*everyone* that this feature is needed, things are just going to
-continue being bodged and fragile.
-
-All that's happening here is that you're changing one broken way which
-works for one subset with another broken way which works for a different
-subset of systems and architectures.  What actually needs to happen is
-a _proper_ fix for this.
+  Peter
