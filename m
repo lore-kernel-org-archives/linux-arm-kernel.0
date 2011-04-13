@@ -1,43 +1,54 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Apr 2011 23:00:08 +0100
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper
-	broken on ARM
-In-Reply-To: <201104132256.40325.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104131252.32011.jkrzyszt@tis.icnet.pl>
-	<20110413183231.GA23631@n2100.arm.linux.org.uk>
-	<201104132256.40325.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110413220008.GA23901@n2100.arm.linux.org.uk>
+Date: Wed, 13 Apr 2011 23:03:38 +0100
+Subject: [PATCH] arm: cputype.h uses  __attribute_const__ which
+	requires including kernel.h
+In-Reply-To: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
+References: <1302689521-10210-1-git-send-email-jic23@cam.ac.uk>
+Message-ID: <20110413220338.GB23901@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
-> Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux 
-> napisa?(a):
-> > On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
-> > > Taking into account that I'm just trying to fix a regression, and
-> > > not invent a new, long term solution: are you able to name an ARM
-> > > based board which a) is already supported in 2.6.39, b) is (or can
-> > > be) equipped with a device supported by a V4L driver which uses
-> > > videobuf- dma-config susbsystem, c) has a bus structure with which
-> > > virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
-> > 
-> > I have no idea - and why should whether someone can name something
-> > that may break be a justification to allow something which is
-> > technically wrong?
-> > 
-> > Surely it should be the other way around - if its technically wrong
-> > and _may_ break something then it shouldn't be allowed.
+On Wed, Apr 13, 2011 at 11:12:01AM +0100, Jonathan Cameron wrote:
+> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+> ---
+> Issue manifests as:
 > 
-> In theory - of course. In practice - couldn't we now, close to -rc3, 
-> relax the rules a little bit and stop bothering with something that may 
-> break in the future if it doesn't break on any board supported so far (I 
-> hope)?
+> a  CC [M]  drivers/staging/iio/gyro/adis16080_core.o
+> In file included from arch/arm/mach-pxa/include/mach/hardware.h:62,
+>                  from arch/arm/mach-pxa/include/mach/gpio.h:28,
+>                  from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
+>                  from include/linux/gpio.h:7,
+>                  from drivers/staging/iio/gyro/adis16080_core.c:8:
+> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:57: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_id'
+> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:62: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_cachetype'
+> /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/cputype.h:67: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'read_cpuid_tcmstatus'
+> In file included from /home/jic23/src/kernel/temp-remove/arch/arm/include/asm/gpio.h:5,
+>                  from include/linux/gpio.h:7,
+>                  from drivers/staging/iio/gyro/adis16080_core.c:8:
+> 
+> With current mainline.  Could trivially work around this by reordering
+> headers in the driver, but should probably be fixed at the source of
+> the problem as done here.
 
-If we are worried about closeness to -final, then what should happen is
-that the original commit is reverted; the "fix" for IOMMUs resulted in
-a regression for existing users which isn't trivial to resolve without
-risking possible breakage of other users.
+Missing sign-off, please fix that, and then this can go to the patch system.
+Thanks.
 
-Do we even know whether bus_to_virt(iommu_bus_address) works?  I suspect
-it doesn't, so by doing so you're already re-breaking the IOMMU case.
+> 
+>  arch/arm/include/asm/cputype.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index ed5bc9e..cd4458f 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -2,6 +2,7 @@
+>  #define __ASM_ARM_CPUTYPE_H
+>  
+>  #include <linux/stringify.h>
+> +#include <linux/kernel.h>
+>  
+>  #define CPUID_ID	0
+>  #define CPUID_CACHETYPE	1
+> -- 
+> 1.7.3.4
+> 
