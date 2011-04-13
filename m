@@ -1,64 +1,115 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 12 Apr 2011 22:28:29 -0400 (EDT)
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
-	i.MX53
-In-Reply-To: <20110412094545.GA18850@pengutronix.de>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.1104102157440.28032@xanadu.home>
-	<20110411074041.GF18601@pengutronix.de>
-	<BANLkTi=uUsxJtWVyuivqb8Sj0JVSS0L_kg@mail.gmail.com>
-	<20110412094545.GA18850@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1104122217590.28032@xanadu.home>
+From: R65037@freescale.com (Zhu Richard-R65037)
+Date: Wed, 13 Apr 2011 03:06:58 +0000
+Subject: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
+In-Reply-To: <4DA43740.9050806@ru.mvista.com>
+References: <1302587472-20435-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1302587472-20435-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<4DA43740.9050806@ru.mvista.com>
+Message-ID: <010C9052C42A00499CE76D637FA5EE900D9E8E@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Apr 2011, Uwe Kleine-K?nig wrote:
+Hi Sergei:
+Got that. Thanks for your kindly comments.
+Would change them later.
 
-> Hello Jason,
-> 
-> On Tue, Apr 12, 2011 at 05:16:44PM +0800, Jason Liu wrote:
-> > 2011/4/11 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > > On Sun, Apr 10, 2011 at 10:02:03PM -0400, Nicolas Pitre wrote:
-> > >> On Sun, 10 Apr 2011, Uwe Kleine-K?nig wrote:
-> > >>
-> > >> > The two SoCs have different PHYS_OFFSETs so it's not (yet) possible to
-> > >> > compile a single (working) kernel for these.
-> > >>
-> > >> Really?
-> > >>
-> > >> Have a look at CONFIG_ARM_PATCH_PHYS_VIRT. ?It's in mainline and fully
-> > >> functional.
-> > > I'm aware of this config item. But still if it's off there must be a
-> > > distinction that's provided by this patch. Currently you can build a
-> > > kernel for i.MX51 + i.MX53 but IIRC it works on no machine.
-> > > When considering ARM_PATCH_PHYS_VIRT there are more SoCs that could be
-> > > built into a single image and so needs a more complicated logic.
-> > > And I don't want to depend on ARM_PATCH_PHYS_VIRT (yet), e.g. because
-> > > it's new and still depends on EXPERIMENTAL.
-> > 
-> > Uwe, did you enable CONFIG_AUTO_ZRELADDR=y? Besides this if use uboot to
-> > load uImage and run, it also need fix uboot since uImage will hard
-> > code the load address.
-> > In other word, uImage will have mx53 PHY_OFFSET for both mx51 and
-> > mx53, which will
-> > make mx51 failed with bootm command.
-> an uboot image (at least the ones created by the kernel build system's
-> make uImage) is more system dependant than the kernel image itself.
-> There is nothing that can be fixed considering that Russell doesn't want
-> more sophisticated support for u-boot images for ARM.
-> So you have to create the uImage yourself.
-
-The U-Boot image format is broken for multi-SOC kernels.  It insists on 
-having an absolute address for the placement of that image in RAM when 
-loaded which prevents you from using a single kernel image on multiple 
-SOCs with different RAM offsets.
-
-The solution is to stop using uImage and simply load a standard kernel 
-zImage at the appropriate place in memory according to the hardware you 
-have.  And if your zImage is built with CONFIG_AUTO_ZRELADDR and 
-CONFIG_ARM_PATCH_PHYS_VIRT then it'll be able to detect and use a 
-different PHYS_OFFSET values with the same kernel binary.
+Best Regards
+Richard Zhu
 
 
-Nicolas
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
+> Sent: Tuesday, April 12, 2011 7:28 PM
+> To: Zhu Richard-R65037
+> Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com;
+> kernel at pengutronix.de; linux-ide at vger.kernel.org;
+> avorontsov at ru.mvista.com; eric at eukrea.com; eric.miao at linaro.org
+> Subject: Re: [PATCH V4 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
+>
+> Hello.
+>
+> On 12-04-2011 9:51, Richard Zhu wrote:
+>
+> > Signed-off-by: Richard Zhu<Hong-Xing.Zhu@freescale.com>
+> > ---
+> >   arch/arm/mach-mx5/board-mx53_loco.c |   76
+> +++++++++++++++++++++++++++++++++++
+> >   1 files changed, 76 insertions(+), 0 deletions(-)
+>
+> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c
+> > b/arch/arm/mach-mx5/board-mx53_loco.c
+> > index 0a18f8d..644aaa2 100644
+> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> [...]
+> > @@ -203,6 +206,78 @@ static const struct imxi2c_platform_data
+> mx53_loco_i2c_data __initconst = {
+> >     .bitrate = 100000,
+> >   };
+> >
+> > +/* HW Initialization, if return 0, initialization is successful. */
+> > +static int mx53_loco_sata_init(struct device *dev, void __iomem
+> > +*addr) {
+> > +   u32 tmpdata;
+> > +   int ret = 0;
+> > +   struct clk *clk;
+> > +
+> > +   sata_clk = clk_get(dev, NULL);
+> > +   if (IS_ERR(sata_clk)) {
+> > +           dev_err(dev, "no sata clock.\n");
+> > +           return PTR_ERR(sata_clk);
+> > +   }
+> > +   ret = clk_enable(sata_clk);
+> > +   if (ret) {
+> > +           dev_err(dev, "can't enable sata clock.\n");
+> > +           clk_put(sata_clk);
+>
+>     Why duplicate clk_put() which you already have at the end of function?
+> Just define another label there.
+>
+> > +           return ret;
+> > +   }
+> > +
+> > +   /* FSL IMX AHCI SATA uses the internal usb phy1 clk on loco */
+> > +   sata_ref_clk = clk_get(NULL, "usb_phy1");
+> > +   if (IS_ERR(sata_ref_clk)) {
+> > +           dev_err(dev, "no sata ref clock.\n");
+> > +           ret = PTR_ERR(sata_ref_clk);
+> > +           goto release_sata_clk;
+> > +   }
+> > +   ret = clk_enable(sata_ref_clk);
+> > +   if (ret) {
+> > +           dev_err(dev, "can't enable sata ref clock.\n");
+> > +           clk_put(sata_ref_clk);
+>
+>     Same question.
+>
+> > +           goto release_sata_clk;
+> > +   }
+> > +
+> > +   /* Get the AHB clock rate, and configure the TIMER1MS reg later */
+> > +   clk = clk_get(NULL, "ahb");
+> > +   if (IS_ERR(clk)) {
+> > +           dev_err(dev, "no ahb clock.\n");
+> > +           ret = PTR_ERR(clk);
+> > +           goto release_sata_ref_clk;
+> > +   }
+> > +   tmpdata = clk_get_rate(clk) / 1000;
+> > +   clk_put(clk);
+> > +
+> > +   sata_init(addr, tmpdata);
+> > +
+> > +   return ret;
+> > +
+> > +release_sata_ref_clk:
+> > +   clk_disable(sata_ref_clk);
+> > +   clk_put(sata_ref_clk);
+> > +
+> > +release_sata_clk:
+> > +   clk_disable(sata_clk);
+> > +   clk_put(sata_clk);
+> > +
+> > +   return ret;
+> > +}
+>
+> WBR, Sergei
