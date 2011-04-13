@@ -1,44 +1,23 @@
-From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Thu, 14 Apr 2011 01:36:27 +0200
-Subject: [RFC][PATCH V4] axi: add AXI bus driver
-In-Reply-To: <BANLkTinLn4Ug=gX4coHJbSzrkxdSMjgGeg@mail.gmail.com>
-References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
-	<20110413163113.GA24015@kroah.com>
-	<BANLkTin-4HrJzNrLOxRy_-a98S3ZF4aSQw@mail.gmail.com>
-	<1302726703.8015.1.camel@dev.znau.edu.ua>
-	<BANLkTimwZOJ0a5kVfaUzEcsMc39H999u0A@mail.gmail.com>
-	<1302727516.8015.9.camel@dev.znau.edu.ua>
-	<BANLkTi=wzzzeF-PmqLt9o8arW7nRaFRRJw@mail.gmail.com>
-	<1302729243.8479.1.camel@dev.znau.edu.ua>
-	<BANLkTinLn4Ug=gX4coHJbSzrkxdSMjgGeg@mail.gmail.com>
-Message-ID: <BANLkTimcy16ggC0C66V-fbuaJwg4Sna4Qw@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 13 Apr 2011 16:54:02 -0700
+Subject: [PATCH 3/4] ARM: EXYNOS4: Add usb ehci device to the NURI board
+In-Reply-To: <1302236532-27636-3-git-send-email-jy0922.shim@samsung.com>
+References: <1302236532-27636-1-git-send-email-jy0922.shim@samsung.com>
+	<1302236532-27636-3-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <20110413235402.GA32159@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2011 23:19, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> 2011/4/13 George Kashperko <george@znau.edu.ua>:
->>> I had no idea what you were referring to. We do not dig into PCIe
->>> functions yet, so I believe for now we need this "if".
->> You are already deep inside. Your host code drives pci function.
->
-> But I don't use multiple PCIe functions, do not focus on that at all.
+On Fri, Apr 08, 2011 at 01:22:11PM +0900, Joonyoung Shim wrote:
+> This patch is to support usb ehci device to the NURI board.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-I think what George meant is the following (please correct me if I
-understood you wrong) and has nothing to do with PCIe functions:
-<http://lxr.free-electrons.com/source/drivers/staging/brcm80211/util/aiutils.c#L522>
+Note, I had to apply this one by hand, I don't know what tree you made
+it against.  Hopefully the merge issues will be simple to handle, as
+they were pretty obvious to me.
 
-The chipcommon and PCIe core registers seem to be always available on
-PCIe and no core switching is necessary for them. So as long as you
-only access the core registers of chipcommon, PCIe + one other core,
-you never need to do any switching (except for the initial switch to
-the other core)
+thanks,
 
-But If you need to access the agent registers you do have to do adapt
-the PCIe windows.
-
-(This seems to apply also to PCI cards with a PCI core revision >= 13,
-but this is probably only relevant for SSB - unless Arend says there
-are/were also PCI cards with AMBA AXI backplanes ;-).
-
-
-Jonas
+greg k-h
