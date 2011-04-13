@@ -1,47 +1,75 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 13 Apr 2011 20:25:04 +0800
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
-	i.MX53
-In-Reply-To: <1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110413122503.GB1897@S2100-06.ap.freescale.net>
+From: pratyush.anand@st.com (pratyush)
+Date: Wed, 13 Apr 2011 17:55:25 +0530
+Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
+	support.
+In-Reply-To: <4DA47085.9090209@gmail.com>
+References: <cover.1298977728.git.viresh.kumar@st.com>
+	<6a4328fcb24af3fa28b2188864875cbecc6f533a.1298977728.git.viresh.kumar@st.com>
+	<4DA47085.9090209@gmail.com>
+Message-ID: <4DA59635.2020705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 10, 2011 at 09:49:01PM +0200, Uwe Kleine-K?nig wrote:
-[...]
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index ce6ed5e..aa4234b 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -4,6 +4,12 @@ source "arch/arm/plat-mxc/devices/Kconfig"
->  
->  menu "Freescale MXC Implementations"
->  
-> +config ARCH_MX50_SUPPORTED
-> +	bool
-> +
-> +config ARCH_MX53_SUPPORTED
-> +	bool
-> +
->  choice
->  	prompt "Set of supported SoCs:"
->  	default ARCH_MX3
-> @@ -36,8 +42,17 @@ config ARCH_MX3
->  	  This enables support for machines using Freescale's i.MX31 and i.MX35
->  	  processors.
->  
-> -config ARCH_MX5
-> -	bool "MX5-based"
-> +config ARCH_MX503
-> +	bool "i.MX50 + i.MX53"
-> +	select ARCH_MX50_SUPPORTED
-> +	select ARCH_MX53_SUPPORTED
-> +	help
-> +	  This enables support for machines using Freescale's i.MX50 and i.MX51
-s/MX51/MX53/
+Hello Rob,
 
--- 
-Regards,
-Shawn
+...
+
+>> SPEAr13xx family contains Synopsys designware PCIe version 3.30a. This
+>> patch adds support for this PCIe module for spear platform.
+>>
+> 
+> Sorry for the late response.
+> 
+> Other vendors are likely to have the same IP, but none of the code here
+> is written to be common. In light of recent discussions this would be a
+> good candidate to avoid future duplication.
+> 
+> It doesn't appear that pcie.c contains much SPEAr specific code. The few
+> defines and structs that are could be passed in. Some comments below.
+> 
+
+Yes, this driver is for an PCIe host which uses Synopsys IP. But 
+SPEAr specific wrapper has been used heavily in the code.
+Synopsis provides some signal which can be interfaced to registers
+for CPU access. This interface can be different for different vendor.
+All the application registers are SPEAr specific representation
+and may not be same for other vendor.
+So all accesses for app_reg in the code may not be similar in other 
+implementation. 
+
+...
+
+
+>> +struct pcie_port {
+> 
+> 3 other structs with the same name and similar fields already exist:
+> 
+> arch/arm/mach-kirkwood/pcie.c:27:struct pcie_port {
+> arch/arm/mach-dove/pcie.c:23:struct pcie_port {
+> arch/arm/mach-mv78xx0/pcie.c:19:struct pcie_port {
+> 
+>> +     u8                      port;
+>> +     u8                      root_bus_nr;
+>> +     void __iomem            *base;
+>> +     void __iomem            *app_base;
+>> +     void __iomem            *va_app_base;
+>> +     void __iomem            *va_dbi_base;
+
+
+like dbi interface. May not be needed in all implementation
+of the same synposis IP.
+
+>> +     void __iomem            *va_cfg0_base;
+>> +     void __iomem            *va_cfg1_base;
+>> +     spinlock_t              conf_lock;
+>> +     char                    mem_space_name[16];
+>> +     char                    io_space_name[16];
+>> +     struct resource         res[2];
+>> +     struct pcie_port_info   config;
+>> +};
+>> +
+
+...
+
+Regards
+Pratyush
