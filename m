@@ -1,27 +1,37 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 13 Apr 2011 18:21:05 +0300
-Subject: [PATCH 0/2] Couple of fixes regarding CM_AUTOIDLE_PLL register
-Message-ID: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
+Date: Wed, 13 Apr 2011 18:21:06 +0300
+Subject: [PATCH 1/2] OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on
+	scratchpad area
+In-Reply-To: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
+References: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1302708067-8226-2-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello guys,
+The saving of CCR.CM_AUTOIDLE_PLL is done in scratchpad area.
 
-This patch set is fixing the saving and restore of CM_AUTOIDLE_PLL register.
-It also includes a patch to save and restore it in kernel side, because
-ROM code adds extra delay when we use it to restore this register.
+However, in current code, the saving is done for CM_AUTOIDLE2_PLL
+(offset 0x34) instead of CM_AUTOIDLE_PLL (offset 0x30).
 
-Cheers,
+This patch changes the code to save the correct register.
 
-Eduardo Valentin (2):
-  OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad
-    area
-  OMAP3: PM: Do not rely on ROM code to restore
-    CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+---
+ arch/arm/mach-omap2/control.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- arch/arm/mach-omap2/cm2xxx_3xxx.c |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c     |    8 +++++++-
- 2 files changed, 24 insertions(+), 1 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 6952794..df0c75c 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -317,7 +317,7 @@ void omap3_save_scratchpad_contents(void)
+ 	prcm_block_contents.cm_clken_pll =
+ 			omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
+ 	prcm_block_contents.cm_autoidle_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_AUTOIDLE_PLL);
++			omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
+ 	prcm_block_contents.cm_clksel1_pll =
+ 			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
+ 	prcm_block_contents.cm_clksel2_pll =
 -- 
 1.7.5-rc1
