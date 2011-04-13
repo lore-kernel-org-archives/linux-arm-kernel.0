@@ -1,56 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 14 Apr 2011 07:56:22 +0900
-Subject: [PATCH] ARM: S3C64XX: Initial support for Wolfson/Simtec
-	Cragganmore/Banff
-In-Reply-To: <1302533295-27917-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1302533295-27917-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <01bd01cbfa2e$1afae140$50f0a3c0$%kim@samsung.com>
+From: michael.williamson@criticallink.com (Mike Williamson)
+Date: Wed, 13 Apr 2011 19:04:34 -0400
+Subject: [PATCH 6/6] da8xx: enable the use of the ICPFUNC in i2c-davinci
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C8B3C9F@dbde02.ent.ti.com>
+References: <cover.1302031487.git.bengardiner@nanometrics.ca>
+	<f1ff3f2888725a1e03541e0be5c0880f0591aea2.1302031487.git.bengardiner@nanometrics.ca>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C8B3C9F@dbde02.ent.ti.com>
+Message-ID: <BANLkTikskhqNk3NihqJ5kZhFqn1YpJEN9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> The Cragganmore carrier card and Banff CPU module are used on Wolfson
-> Microelectronics reference systems.  This initial support covers the
-> core system which is a fairly generic S3C6410 based design, further
-> patches will add support for the key features of the reference system.
-> 
-> The initial board bringup and therefore much of the key code was done by
-> Ben Dooks for Simtec, with additional work (especially around the
-> integration of the Wolfson devices) being done by myself.
-> 
-> Signed-off-by: Ben Dooks <ben@simtec.co.uk>
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/Kconfig             |   24 ++
->  arch/arm/mach-s3c64xx/Makefile            |    1 +
->  arch/arm/mach-s3c64xx/include/mach/irqs.h |    4 +-
->  arch/arm/mach-s3c64xx/mach-crag6410.c     |  575
-> +++++++++++++++++++++++++++++
->  4 files changed, 603 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-s3c64xx/mach-crag6410.c
-> 
-(Cc'ing Russell King)
+On Wed, Apr 13, 2011 at 11:10 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+>
+> Hi Ben,
+>
+> On Wed, Apr 06, 2011 at 03:08:09, Ben Gardiner wrote:
+> > Both the da850 and da830 have an I2C controller which has the ICPFUNC
+> > registers. Indicate this for all da830 and da850 boards by setting the
+> > has_pfunc flag true in the da8xx utility setup routine for registering the
+> > I2C controller
+> >
+> > Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+> > Cc: Sekhar Nori <nsekhar@ti.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> >
+> > ---
+> > ?arch/arm/mach-davinci/devices-da8xx.c | ? ?6 ++++++
+> > ?1 files changed, 6 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> > index beda8a4..da01558 100644
+> > --- a/arch/arm/mach-davinci/devices-da8xx.c
+> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> > @@ -324,6 +324,12 @@ int __init da8xx_register_i2c(int instance,
+> > ? ? ? else
+> > ? ? ? ? ? ? ? return -EINVAL;
+> >
+> > + ? ? /*
+> > + ? ? ?* Both the DA850 and DA830 have an I2C controller which has the
+> > + ? ? ?* ICPFUNC et. al. registers
+> > + ? ? ?*/
+> > + ? ? pdata->has_pfunc = 1;
+>
+> The I2C driver implements a default platform data
+> so it should actually be legal for a DA8x board to
+> pass NULL platform data. In that case this line
+> will crash. You should either check for pdata to
+> be NULL or just let each board choose whether it
+> needs recovery (I think the better option).
+>
 
-Hi Mark,
+I actually had a problem with using NULL for pdata with davinci I2C
+and had submitted a patch here that sort of fell on the floor.  The
+problem was that the i2c_davinci_calc_clk_dividers is using
+platform_data without a check as described above.  So at the moment
+using NULL doesn't really work, best as I can tell...
 
-Looks ok after quickly review.
+https://lkml.org/lkml/2010/9/4/119
 
-But I'm not sure this can be sent to upstream during the next merge window.
-Because of Linus' complaint, Russell does not want to add new stuff now,
-maybe you know. Basically my tree was sent to upstream via RMK when merge
-window.
+FWIW.
 
-Hmm...for now I will make some branch for new stuff like this and keep it
-until everyone is happy. Of course, if any consolidation work in Linux ARM
-world, I will update.
-
-Or...if any good idea, please let me know :)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-Mike
