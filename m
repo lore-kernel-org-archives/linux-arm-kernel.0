@@ -1,39 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Apr 2011 15:49:52 +0100
-Subject: [PATCH 3/3] Add documenation for new sysfs devices/soc functionallity
-In-Reply-To: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
-References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1302792592-17484-4-git-send-email-lee.jones@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Apr 2011 20:32:50 +0530
+Subject: [PATCH linux-omap-pm/pm-wip/cpufreq] OMAP2PLUS: cpufreq: Fix
+	typo when attempting to set mpu_clk for OMAP4
+In-Reply-To: <1302787318-6650-1-git-send-email-jhnikula@gmail.com>
+References: <1302787318-6650-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <4DA70C9A.7080805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/ABI/testing/sysfs-devices-soc |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
+On 4/14/2011 6:51 PM, Jarkko Nikula wrote:
+> Fix this typo as there is no dpll_mpu_ck for OMAP3 and code flow is clearly
+> trying to set mpu_clk for OMAP4 for which this dpll_mpu_ck is available.
+>
+> Signed-off-by: Jarkko Nikula<jhnikula@gmail.com>
+> ---
+>   arch/arm/mach-omap2/omap2plus-cpufreq.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> index 8d472f6..d53ce23 100644
+> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> @@ -161,7 +161,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+>   		mpu_clk = clk_get(NULL, "virt_prcm_set");
+>   	else if (cpu_is_omap34xx())
+>   		mpu_clk = clk_get(NULL, "dpll1_ck");
+> -	else if (cpu_is_omap34xx())
+> +	else if (cpu_is_omap44xx())
+My Bad :(
+Thanks Jarkko for finding this.
 
-diff --git a/Documentation/ABI/testing/sysfs-devices-soc b/Documentation/ABI/testing/sysfs-devices-soc
-new file mode 100644
-index 0000000..fcf7f07
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-devices-soc
-@@ -0,0 +1,16 @@
-+What:		/sys/devices/soc
-+Date:		April 2011
-+contact:	Lee Jones <lee.jones@linaro.org>
-+Description:
-+		The /sys/devices/soc directory contains a sub-directory for each
-+		System-on-Chip (SoC) device on a running platform. Information
-+		regarding each SoC can be obtained by reading sysfs files. This
-+		functionallity is only available if implemented by the platform.
-+		This directory contains two kinds of attributes:
-+			- Common attributes:
-+				* machine: the name of the machine (e.g. Ux500).
-+				* family: the family name of the SoC (e.g. DB8500).
-+			- SoC-specific attributes:
-+			  	* SoC vendor declared, such as serial and rev numbers.
-+Users:
-+		Any platform dependent user-space applications or profiling tools.
--- 
-1.7.4.1
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
