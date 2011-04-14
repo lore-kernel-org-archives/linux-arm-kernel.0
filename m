@@ -1,46 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 14 Apr 2011 13:47:05 -0700
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 14 Apr 2011 17:33:39 -0400 (EDT)
 Subject: [PATCH 1/2] ARM: the ADDR_NO_RANDOMIZE personality flag should
-	be	honored with mmap()
-In-Reply-To: <alpine.LFD.2.00.1104072249260.28032@xanadu.home>
+	be honored with mmap()
+In-Reply-To: <4DA75D49.1050003@codeaurora.org>
 References: <alpine.LFD.2.00.1104072249260.28032@xanadu.home>
-Message-ID: <4DA75D49.1050003@codeaurora.org>
+	<4DA75D49.1050003@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1104141727360.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2011 07:51 PM, Nicolas Pitre wrote:
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
+On Thu, 14 Apr 2011, Stephen Boyd wrote:
 
-Is this a stable candidate?
+> On 04/07/2011 07:51 PM, Nicolas Pitre wrote:
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > ---
+> 
+> Is this a stable candidate?
 
->  arch/arm/mm/mmap.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-> index afe209e..74be05f 100644
-> --- a/arch/arm/mm/mmap.c
-> +++ b/arch/arm/mm/mmap.c
-> @@ -7,6 +7,7 @@
->  #include <linux/shm.h>
->  #include <linux/sched.h>
->  #include <linux/io.h>
-> +#include <linux/personality.h>
->  #include <linux/random.h>
->  #include <asm/cputype.h>
->  #include <asm/system.h>
-> @@ -82,7 +83,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
->  	        mm->cached_hole_size = 0;
->  	}
->  	/* 8 bits of randomness in 20 address space bits */
-> -	if (current->flags & PF_RANDOMIZE)
-> +	if ((current->flags & PF_RANDOMIZE) &&
-> +	    !(current->personality & ADDR_NO_RANDOMIZE))
->  		addr += (get_random_int() % (1 << 8)) << PAGE_SHIFT;
->  
->  full_search:
+Maybe, but OTOH this is not critical.  You also need to have 
+CONFIG_COMPAT_BRK=n before this makes any difference, and that option is 
+enabled by default.
 
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Nicolas
