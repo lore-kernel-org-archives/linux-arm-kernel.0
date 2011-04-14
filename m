@@ -1,47 +1,48 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 14 Apr 2011 15:17:18 +0400
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
-	on ARM
-In-Reply-To: <201104132301.56210.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104131511.42171.jkrzyszt@tis.icnet.pl>
-	<4DA5DF1E.1040302@ru.mvista.com>
-	<201104132301.56210.jkrzyszt@tis.icnet.pl>
-Message-ID: <4DA6D7BE.8070702@ru.mvista.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 14 Apr 2011 13:28:10 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+Message-ID: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello,
 
-On 14-04-2011 1:01, Janusz Krzysztofik wrote:
+We have slightly improved our knowledge of new Broadcom's bus. It
+appears Broadcom took standard AMBA bus and put on it two cores for
+every device:
+1) First core from each pair is real AMBA device, it has CID and PID.
+Broadcom called it wrapper, it is used to control second core
+(enabling second, disabling second, resetting second, setting flags of
+second).
+2) Second core from each pair is Broadcom specific device. It can
+*not* be treated as standard AMBA core - attempting to read it's CID
+on PID leads to machine hang. Instead it is identified by MANUF, ID,
+REV and CLASS. Example can be 80211 core.
 
->>>>> After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
->>>>> used for obtaining page frame number passed to remap_pfn_range()
->>>>> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
->>>>> videobuf-dma-contig
+One of the idea is to integrate with current AMBA driver:
+1) First driver read info about all cores in Broadcom specific way. It
+registers all *wrapper* (AMBA type) cores as amba_device(s).
+2) Second driver registers for cores with PID 0x103BB369 (Broadcom
+specific I believe). It receives wrappers (from AMBA bus) and exposes
+wrapper-related Broadcom specific core in the system.
 
->>>>      Please specify the commit summary -- for the human readers.
+Problem: how to expose Broadcom specific cores in the system? Remember
+we can not use amba_device, because Broadcom specific cores are
+programmed and identified differently.
 
->>> Hi,
->>> OK, I'll try to reword the summary using a more human friendly
->>> language as soon as I have signs that Mauro (who seemed to
->>> understand the message well enough) is willing to accept the code.
+Could we register some virtual bcm_amba bus in the system and register
+Broadcom specific cores with it? Or is there something better for this
+case? In summary everything I need is to make driver (for example b43)
+able to register for Broadcom specific core with Broadcom specific
+identifiers. For example:
+static const struct axi_device_id b43_axi_tbl[] = {
+	AXI_CORE(AXI_MANUF_BCM, AXI_CORE_80211, 0x17, AXI_ANY_CLASS),
+	AXI_CORETABLE_END
+};
+MODULE_DEVICE_TABLE(axi, b43_axi_tbl);
 
->>      I wasn't asking you to rework your summary but to specify the
->> summary of the commit you've mentioned (in parens).
+We have problems deciding architecture, the whole proposed layout is
+not approved as final yet. Right now I try to check possibilities.
 
-> Ah, I see. How about just reordered wording:
-
-> After commit 35d9f510b67b10338161aba6229d4f55b4000f5b (switching from
-> mem->dma_handle to virt_to_phys(mem->vaddr) used for obtaining page
-> frame number passed to remap_pfn_range()), ....
-
-> Do you think this would be clear enough?
-
-    As I can see, the summary of that commit is "[media] V4L: videobuf, don't 
-use dma addr as physical". That's what you should have inserted.
-
-> Thanks,
-> Janusz
-
-WBR, Sergei
+-- 
+Rafa?
