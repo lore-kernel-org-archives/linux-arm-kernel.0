@@ -1,53 +1,31 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Thu, 14 Apr 2011 16:15:00 +0300
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTinu+Q367oqQPiUehPcbMs-SBxbwFg@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<1302781431.21145.6.camel@dev.znau.edu.ua>
-	<BANLkTinvpt5vs+rXd3WN-a2JpGtTV+=Gyg@mail.gmail.com>
-	<4DA6E9BD.3090404@hauke-m.de>
-	<BANLkTinu+Q367oqQPiUehPcbMs-SBxbwFg@mail.gmail.com>
-Message-ID: <1302786900.21965.52.camel@dev.znau.edu.ua>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Thu, 14 Apr 2011 16:21:58 +0300
+Subject: [PATCH linux-omap-pm/pm-wip/cpufreq] OMAP2PLUS: cpufreq: Fix typo
+	when attempting to set mpu_clk for OMAP4
+Message-ID: <1302787318-6650-1-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fix this typo as there is no dpll_mpu_ck for OMAP3 and code flow is clearly
+trying to set mpu_clk for OMAP4 for which this dpll_mpu_ck is available.
 
-> W dniu 14 kwietnia 2011 14:34 u?ytkownik Hauke Mehrtens
-> <hauke@hauke-m.de> napisa?:
-> > On 04/14/2011 02:04 PM, Rafa? Mi?ecki wrote:
-> >> Hauke: you were proposing integrating with drivers/amba. I really
-> >> expect you to comment on this, please tell us how do you see this now,
-> >> when we have better overview. I took your proposal seriously, you can
-> >> see the results above.
-> >
-> > I had no closer look at drivers/amba and this bus driver, I just saw
-> > that there was a discussion about drivers/amba and this implementation
-> > with no result. When the Bradcom cores are not directly connected to
-> > AMBA, but are using some sort of wrapper and there are no benefits in
-> > using drivers/amba, just leave it.
-> >
-> > As the implementation of the Braodcom AIX Bus contains some Broadcom
-> > extensions and there seams to be no normal AMBA device being connected
-> > to some Broadcom devices with this special interface number 3) "Broadcom
-> > specific bus (bcmai)" seams to the the best approach in my opinion.
-> 
-> Thanks for commenting.
-> 
-> Russell: you were asking:
-> > What does this do which the 'amba' bus support doesn't?
-> I believe I explained it well in this thread. Do you still think about
-> using amba/driver? Do you think we should use it?
-> 
-> Arnd: I found you saying:
-> > I believe the one thing we really want from this driver is the bus
-> > scan code, which is not present in the amba bus implementation,
-> I explained how it works, I believe scanning (EPROM in this case) it
-> Broadcom specific, not really AMBA standard. How do you see it?
-> 
-It might not Broadcom specific as EPROM core seems to be CoreLink one
-core and maybe is arm-developed. But it isn't documented publicly and we
-don't know yet if it is obligatory for all amba (or at least axi)
-interconnects or not.
+Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+---
+ arch/arm/mach-omap2/omap2plus-cpufreq.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Have nice day,
-George
+diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+index 8d472f6..d53ce23 100644
+--- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
++++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+@@ -161,7 +161,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 		mpu_clk = clk_get(NULL, "virt_prcm_set");
+ 	else if (cpu_is_omap34xx())
+ 		mpu_clk = clk_get(NULL, "dpll1_ck");
+-	else if (cpu_is_omap34xx())
++	else if (cpu_is_omap44xx())
+ 		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
+ 
+ 	if (IS_ERR(mpu_clk))
+-- 
+1.7.4.1
