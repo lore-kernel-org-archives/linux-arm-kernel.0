@@ -1,27 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 14 Apr 2011 19:32:48 +0100
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110414143127.GB6259@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<20110414110854.GF29938@atomide.com>
-	<20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<20110414142026.GD1452@sirena.org.uk>
-	<20110414143127.GB6259@n2100.arm.linux.org.uk>
-Message-ID: <20110414183248.GA8820@opensource.wolfsonmicro.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 14 Apr 2011 20:36:13 +0200
+Subject: i.MX27 SPI tx fifo underrun
+In-Reply-To: <io73tm$1e5$1@dough.gmane.org>
+References: <io73tm$1e5$1@dough.gmane.org>
+Message-ID: <20110414183613.GH3811@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2011 at 03:31:27PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 14, 2011 at 03:20:26PM +0100, Mark Brown wrote:
+On Thu, Apr 14, 2011 at 05:29:57PM +0200, Jurgen Braam wrote:
+> while trying to write to an at25 eeprom connected via SPI on an
+> i.MX27, I ran into a TX FIFO underrun. In spi_imx_isr() the variable
+> spi_imx->txfifo gets rather large as a result of an unsigned integer
+> underflow, resulting in a feels-like-endless loop.
+> 
+> The following patch fixes the problem in our case:
+> 
+> --- a/drivers/spi/spi_imx.c
+> +++ b/drivers/spi/spi_imx.c
+> @@ -407,7 +407,7 @@ static void __maybe_unused
 
-> > Personally I had formed the impression that this was an understandable
-> > reaction on the part of Russell that he was applying to his own trees
-> > rather than a general policy that was being applied over all of arch/arm.
+Please add your Signed-off-by: when sending patches.
 
-> Given that the non-platform stuff isn't the problem, such a policy has no
-> effect if its restricted to the core code.
-
-Oh, of course - I didn't read it as being about the code at all.  I'd
-registered it as being about you prioritising your time and effort to
-focus on this issue rather than anything else.
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
