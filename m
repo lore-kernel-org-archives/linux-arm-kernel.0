@@ -1,58 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Apr 2011 14:08:54 +0300
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-Message-ID: <20110414110854.GF29938@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 14 Apr 2011 15:17:18 +0400
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <201104132301.56210.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<201104131511.42171.jkrzyszt@tis.icnet.pl>
+	<4DA5DF1E.1040302@ru.mvista.com>
+	<201104132301.56210.jkrzyszt@tis.icnet.pl>
+Message-ID: <4DA6D7BE.8070702@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110414 12:42]:
-> This morning, I looked at linux-next to find out how arch/arm is doing
-> for the next merge window.
-> 
-> $ git diff -C --cumulative v2.6.39-rc1... arch
->   19.7% arch/arm/mach-imx/
->   19.2% arch/arm/mach-mx3/
->    3.4% arch/arm/mach-mxc91231/
->   18.1% arch/arm/mach-ux500/
->   74.1% arch/arm/
->    3.2% arch/m68k/
->    4.0% arch/mips/lantiq/
->    6.9% arch/mips/
->    3.1% arch/x86/kvm/
->    7.6% arch/x86/
->  100.0% arch/
-> $ git diff -C --cumulative v2.6.39-rc1... arch/arm
->    4.7% arch/arm/mach-imx/
->    5.9% arch/arm/mach-msm/
->    6.3% arch/arm/mach-mx3/
->    8.8% arch/arm/mach-mxc91231/
->    7.6% arch/arm/mach-ux500/include/mach/
->   46.1% arch/arm/mach-ux500/
->    3.6% arch/arm/mach-zynq/
->    5.9% arch/arm/plat-mxc/include/mach/
->    7.3% arch/arm/plat-mxc/
->  100.0% arch/arm/
-> $ git diff -C --shortstat v2.6.39-rc1... arch/arm
->  450 files changed, 11973 insertions(+), 5736 deletions(-)
-> 
-> Note that with --cumulative, the %age given includes all child directories
-> (so the 74% for arch/arm includes everything below it).
-> 
-> So, almost 75% of changes in arch are down to arch/arm.  For arch/arm,
-> there's 6k new lines introduced - so there's a significant amount of new
-> work there.
-> 
-> Folk may want to consider that we're three weeks from Linus' rant, and
-> there's little sign of the situation changing.  It looks to me from
-> these statistics that it's business as usual.
-> 
-> Please take a moment to consider how Linus will react to this at the
-> next merge window.
+Hello.
 
-It's going to take some time before the consolidated code starts
-being available.. And until we have something available, we all
-should aim for negative diffstat.
+On 14-04-2011 1:01, Janusz Krzysztofik wrote:
 
-Tony
+>>>>> After switching from mem->dma_handle to virt_to_phys(mem->vaddr)
+>>>>> used for obtaining page frame number passed to remap_pfn_range()
+>>>>> (commit 35d9f510b67b10338161aba6229d4f55b4000f5b),
+>>>>> videobuf-dma-contig
+
+>>>>      Please specify the commit summary -- for the human readers.
+
+>>> Hi,
+>>> OK, I'll try to reword the summary using a more human friendly
+>>> language as soon as I have signs that Mauro (who seemed to
+>>> understand the message well enough) is willing to accept the code.
+
+>>      I wasn't asking you to rework your summary but to specify the
+>> summary of the commit you've mentioned (in parens).
+
+> Ah, I see. How about just reordered wording:
+
+> After commit 35d9f510b67b10338161aba6229d4f55b4000f5b (switching from
+> mem->dma_handle to virt_to_phys(mem->vaddr) used for obtaining page
+> frame number passed to remap_pfn_range()), ....
+
+> Do you think this would be clear enough?
+
+    As I can see, the summary of that commit is "[media] V4L: videobuf, don't 
+use dma addr as physical". That's what you should have inserted.
+
+> Thanks,
+> Janusz
+
+WBR, Sergei
