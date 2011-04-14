@@ -1,49 +1,39 @@
-From: j.braam@homeautomationeurope.com (Jurgen Braam)
-Date: Thu, 14 Apr 2011 17:29:57 +0200
-Subject: i.MX27 SPI tx fifo underrun
-Message-ID: <io73tm$1e5$1@dough.gmane.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 14 Apr 2011 11:35:43 -0400 (EDT)
+Subject: [PATCH v4 3/4] USB: Gadget: Add Samsung S3C24XX USB High-Speed
+	controller driver
+In-Reply-To: <201104141111.33781.heiko@sntech.de>
+Message-ID: <Pine.LNX.4.44L0.1104141134260.2487-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Folks,
+On Thu, 14 Apr 2011, Heiko [iso-8859-1] St?bner wrote:
 
-while trying to write to an at25 eeprom connected via SPI on an i.MX27, 
-I ran into a TX FIFO underrun. In spi_imx_isr() the variable 
-spi_imx->txfifo gets rather large as a result of an unsigned integer 
-underflow, resulting in a feels-like-endless loop.
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> The Samsung's S3C2416, S3C2443 and S3C2450 includes a USB High-Speed
+> device controller module. This driver enables support for USB high-speed
+> gadget functionality for the Samsung S3C24xx SoC's that include this
+> controller.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Alexander Neumann <alexander@bumpern.de>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-The following patch fixes the problem in our case:
+...
 
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -407,7 +407,7 @@ static void __maybe_unused spi_imx0_4_reset(struct 
-spi_imx_data *spi_imx)
-  }
+> +static struct usb_ep_ops s3c_hsudc_ep_ops = {
+> +	.enable = s3c_hsudc_ep_enable,
+> +	.disable = s3c_hsudc_ep_disable,
+> +	.alloc_request = s3c_hsudc_alloc_request,
+> +	.free_request = s3c_hsudc_free_request,
+> +	.queue = s3c_hsudc_queue,
+> +	.dequeue = s3c_hsudc_dequeue,
+> +	.set_halt = s3c_hsudc_set_halt,
+> +};
 
-  #define MX27_INTREG_RR         (1 << 4)
--#define MX27_INTREG_TEEN       (1 << 9)
-+#define MX27_INTREG_TSHFEEN    (1 << 12)
-  #define MX27_INTREG_RREN       (1 << 13)
+There's no .set_wedge method.  Why do people always leave this out?
 
-  #define MX27_CSPICTRL_POL      (1 << 5)
-@@ -424,7 +424,7 @@ static void __maybe_unused mx27_intctrl(struct 
-spi_imx_data *spi_imx, int enable
-         unsigned int val = 0;
-
-         if (enable & MXC_INT_TE)
--               val |= MX27_INTREG_TEEN;
-+               val |= MX27_INTREG_TSHFEEN;
-         if (enable & MXC_INT_RR)
-                 val |= MX27_INTREG_RREN;
-
-
-The i.MX27 manual states you have to wait for a TSHFE interrupt or poll 
-the XCH bit. The i.MX31 manual for instance says to wait for a TC 
-interrupt or poll XCH. The app flow of both docs never mention waiting 
-for the TE interrupt.
-
-Maybe the MX1_INTREG_TEEN and/or MX31_INTREG_TEEN refs need to be 
-changed as well? Anybody know if this is true? Comments?
-
-grtz,
-   Jurgen
+Alan Stern
