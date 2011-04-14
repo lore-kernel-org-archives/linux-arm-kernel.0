@@ -1,28 +1,32 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 14 Apr 2011 13:40:25 +0900
-Subject: [PATCH 3/4] ARM: EXYNOS4: Add usb ehci device to the NURI board
-In-Reply-To: <20110413235402.GA32159@kroah.com>
-References: <1302236532-27636-1-git-send-email-jy0922.shim@samsung.com>
-	<1302236532-27636-3-git-send-email-jy0922.shim@samsung.com>
-	<20110413235402.GA32159@kroah.com>
-Message-ID: <4DA67AB9.2080107@samsung.com>
+From: ccross@google.com (Colin Cross)
+Date: Wed, 13 Apr 2011 22:50:58 -0700
+Subject: ARM Tegra fixes for 2.6.39-rc4
+Message-ID: <BANLkTimtnD3OMWT11Kf4A8dyx=Vp9DOOGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2011-04-14 ?? 8:54, Greg KH wrote:
-> On Fri, Apr 08, 2011 at 01:22:11PM +0900, Joonyoung Shim wrote:
->> This patch is to support usb ehci device to the NURI board.
->>
->> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
->> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->
-> Note, I had to apply this one by hand, I don't know what tree you made
-> it against.  Hopefully the merge issues will be simple to handle, as
-> they were pretty obvious to me.
->
+Hi Linus,
+Please pull minor fixes for Tegra from:
 
-This patch is based from for-next branch of linux-samsung tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git),
-so will occur merge conflict at the your usb tree.
+ git://android.git.kernel.org/kernel/tegra.git for-linus
 
-Sorry for missing about tree.
+Thanks,
+Colin
+
+
+The following changes since commit 0ce790e7d736cedc563e1fb4e998babf5a4dbc3d:
+
+  Linux 2.6.39-rc1 (2011-03-29 12:09:47 -0700)
+
+are available in the git repository at:
+  git://android.git.kernel.org/kernel/tegra.git for-linus
+
+Colin Cross (1):
+      ARM: tegra: gpio: Fix unused variable warnings
+
+Nicolas Kaiser (1):
+      arm: tegra: fix error check in tegra2_clocks.c
+
+ arch/arm/mach-tegra/gpio.c          |    6 ++++--
+ arch/arm/mach-tegra/tegra2_clocks.c |    9 +++++----
+ 2 files changed, 9 insertions(+), 6 deletions(-)
