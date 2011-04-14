@@ -1,400 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 14 Apr 2011 17:45:35 +0200
-Subject: [PATCH v3] at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
-In-Reply-To: <1302784833-25930-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1302784833-25930-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1302795935-11175-1-git-send-email-plagnioj@jcrosoft.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 14 Apr 2011 12:06:40 -0400 (EDT)
+Subject: [PATCH 0/2] Common struct clk implementation, v14
+In-Reply-To: <20110414153813.GC6259@n2100.arm.linux.org.uk>
+References: <1299134429.100626.661279191478.0.gpush@pororo>
+	<1302754859.2767.30.camel@pororo>
+	<20110414100048.GB1611@n2100.arm.linux.org.uk>
+	<1302776705.28876.113.camel@pasglop>
+	<20110414103200.GF1611@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104140751220.24613@xanadu.home>
+	<20110414120904.GH1611@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104140920110.24613@xanadu.home>
+	<20110414153813.GC6259@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104141154390.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-no board configure it as 'n' and it's an issue to merge all defconfigs
-in one
+On Thu, 14 Apr 2011, Russell King - ARM Linux wrote:
 
-On AT91SAM926x boards both types of NAND flash can be present
-(8 and 16 bit data bus width).
+> On Thu, Apr 14, 2011 at 09:39:58AM -0400, Nicolas Pitre wrote:
+> > However we can and must do better in consolidation work in order to make 
+> > the tree more maintainable of course.  _That_ is the real issue and 
+> > _that_ is what the ARM tree sucks at.  The fact that this consolidation 
+> > work might reduce the size of the ARM code is only a side effect, not 
+> > the primary goal.  So let's not get too hung up about LOC but focus on 
+> > improving the infrastructure instead.
+> 
+> Look, this is what is in amongst the 6K lines of new code - these are
+> the top two in the diffstat with the highest number of additional lines:
+> 
+>  arch/arm/mach-ux500/clock-db8500.c                 | 1291 +++++++++++++
+>  arch/arm/mach-ux500/prcmu-db8500.c                 | 2018 ++++++++++++++++++++
+> 
+> These comprise 50% of the 6K of new code.  clock-db8500.c is a mixture
+> of code and data declarations for individual clocks - which is essentially
+> what Linus picked up with his complaint on under OMAP.  That in itself
+> makes me worried.
 
-so will pass it via system_rev
+Sure.  So... let's see what we can do about it.  Having 1300 lines only 
+for clock stuff on only one platform certainly looks silly.  Either we 
+can consolidate some of that stuff with another similar-enough platform, 
+or we're stuck with the ST-E hardware being just too different from, 
+say, the OMAP clock hardware for those to be consolidated.  In the 
+former case we can work towards a solution and that code currently in 
+next won't make it to mainline, or in the later case... well... we'll 
+have to live with it.  If in doubt let's simply ask the opinion of those 
+mainline people who said they're willing to help with advices.  If in 
+the end they have no better solutions than what we have now then it will 
+be harder for them to complain.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
----
-V3:
-	use common 31bit to specify the nand bus width 8/16bit
-V2:
-	update the default logic
-	add support to pass the nand bus size via system_rev
+> Looking at the other file, prcmu-db8500.c seems to contain at least 5 sets
+> of mailbox support code.  Take a look at "Subject: [PATCH 9/9] mach-ux500:
+> add DB5500 PRCMU interface" from Linus Walleij on 31st March on this list
+> for the patch.  Are we sure that this couldn't be consolidated in some
+> way, at least at file level?
+> 
+> So while you can say about not getting hung up about LOC, LOC is a good
+> indication that things are still going wrong in much the same way.
 
-Best Regards,
-J.
- arch/arm/mach-at91/Kconfig                   |   19 ------------------
- arch/arm/mach-at91/board-at572d940hf_ek.c    |    6 +---
- arch/arm/mach-at91/board-cap9adk.c           |    6 +---
- arch/arm/mach-at91/board-sam9260ek.c         |    6 +---
- arch/arm/mach-at91/board-sam9261ek.c         |    6 +---
- arch/arm/mach-at91/board-sam9263ek.c         |    6 +---
- arch/arm/mach-at91/board-sam9g20ek.c         |    6 +---
- arch/arm/mach-at91/board-sam9m10g45ek.c      |    6 +---
- arch/arm/mach-at91/include/mach/system_rev.h |   27 ++++++++++++++++++++++++++
- 9 files changed, 41 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
+Agreed.  My point is, we shouldn't be afraid to add more code if that 
+code is allowing for some consolidation to happen down the road, which 
+should be the case with the initial subject of this thread.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 1939023..da5d708 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -3,9 +3,6 @@ if ARCH_AT91
- config HAVE_AT91_DATAFLASH_CARD
- 	bool
- 
--config HAVE_NAND_ATMEL_BUSWIDTH_16
--	bool
--
- config HAVE_AT91_USART3
- 	bool
- 
-@@ -208,7 +205,6 @@ comment "AT91SAM9260 / AT91SAM9XE Board Type"
- config MACH_AT91SAM9260EK
- 	bool "Atmel AT91SAM9260-EK / AT91SAM9XE Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9260-EK or AT91SAM9XE Evaluation Kit
- 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=3933>
-@@ -269,7 +265,6 @@ comment "AT91SAM9261 Board Type"
- config MACH_AT91SAM9261EK
- 	bool "Atmel AT91SAM9261-EK Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9261-EK Evaluation Kit.
- 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=3820>
-@@ -285,7 +280,6 @@ comment "AT91SAM9G10 Board Type"
- config MACH_AT91SAM9G10EK
- 	bool "Atmel AT91SAM9G10-EK Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9G10-EK Evaluation Kit.
- 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4588>
-@@ -301,7 +295,6 @@ comment "AT91SAM9263 Board Type"
- config MACH_AT91SAM9263EK
- 	bool "Atmel AT91SAM9263-EK Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9263-EK Evaluation Kit.
- 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4057>
-@@ -342,7 +335,6 @@ comment "AT91SAM9G20 Board Type"
- config MACH_AT91SAM9G20EK
- 	bool "Atmel AT91SAM9G20-EK Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9G20-EK Evaluation Kit
- 	  that embeds only one SD/MMC slot.
-@@ -350,7 +342,6 @@ config MACH_AT91SAM9G20EK
- config MACH_AT91SAM9G20EK_2MMC
- 	depends on MACH_AT91SAM9G20EK
- 	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
- 	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
-@@ -415,7 +406,6 @@ comment "AT91SAM9G45 Board Type"
- 
- config MACH_AT91SAM9M10G45EK
- 	bool "Atmel AT91SAM9M10G45-EK Evaluation Kits"
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91SAM9G45-EKES Evaluation Kit.
- 	  "ES" at the end of the name means that this board is an
-@@ -432,7 +422,6 @@ comment "AT91CAP9 Board Type"
- config MACH_AT91CAP9ADK
- 	bool "Atmel AT91CAP9A-DK Evaluation Kit"
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT91CAP9A-DK Evaluation Kit.
- 	  <http://www.atmel.com/dyn/products/tools_card.asp?tool_id=4138>
-@@ -449,7 +438,6 @@ config MACH_AT572D940HFEB
- 	bool "AT572D940HF-EK"
- 	depends on ARCH_AT572D940HF
- 	select HAVE_AT91_DATAFLASH_CARD
--	select HAVE_NAND_ATMEL_BUSWIDTH_16
- 	help
- 	  Select this if you are using Atmel's AT572D940HF-EK evaluation kit.
- 	  <http://www.atmel.com/products/diopsis/default.asp>
-@@ -482,13 +470,6 @@ config MTD_AT91_DATAFLASH_CARD
- 	help
- 	  Enable support for the DataFlash card.
- 
--config MTD_NAND_ATMEL_BUSWIDTH_16
--	bool "Enable 16-bit data bus interface to NAND flash"
--	depends on HAVE_NAND_ATMEL_BUSWIDTH_16
--	help
--	  On AT91SAM926x boards both types of NAND flash can be present
--	  (8 and 16 bit data bus width).
--
- # ----------------------------------------------------------
- 
- comment "AT91 Feature Selections"
-diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-index 3929f1c..d1da1bd 100644
---- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-+++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-@@ -41,6 +41,7 @@
- #include <mach/board.h>
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -216,11 +217,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
- /*	.rdy_pin	= AT91_PIN_PC16, */
- 	.enable_pin	= AT91_PIN_PA15,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata eb_nand_smc_config = {
-@@ -243,6 +240,7 @@ static struct sam9_smc_config __initdata eb_nand_smc_config = {
- 
- static void __init eb_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (eb_nand_data.bus_width_16)
- 		eb_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index e727444..e86f267 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -44,6 +44,7 @@
- #include <mach/gpio.h>
- #include <mach/at91cap9_matrix.h>
- #include <mach/at91sam9_smc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -187,11 +188,7 @@ static struct atmel_nand_data __initdata cap9adk_nand_data = {
- //	.rdy_pin	= ... not connected
- 	.enable_pin	= AT91_PIN_PD15,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata cap9adk_nand_smc_config = {
-@@ -219,6 +216,7 @@ static void __init cap9adk_add_device_nand(void)
- 	csa = at91_sys_read(AT91_MATRIX_EBICSA);
- 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_VDDIOMSEL_3_3V);
- 
-+	cap9adk_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (cap9adk_nand_data.bus_width_16)
- 		cap9adk_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index de1816e..4cc2229 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -44,6 +44,7 @@
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -191,11 +192,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-@@ -218,6 +215,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (ek_nand_data.bus_width_16)
- 		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 14acc90..03b9b86 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -48,6 +48,7 @@
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -197,11 +198,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.rdy_pin	= AT91_PIN_PC15,
- 	.enable_pin	= AT91_PIN_PC14,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-@@ -224,6 +221,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (ek_nand_data.bus_width_16)
- 		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index bfe490d..a3d86df 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -47,6 +47,7 @@
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -198,11 +199,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.rdy_pin	= AT91_PIN_PA22,
- 	.enable_pin	= AT91_PIN_PD15,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-@@ -225,6 +222,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (ek_nand_data.bus_width_16)
- 		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index ca8198b..1eeff39 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -43,6 +43,7 @@
- #include <mach/board.h>
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -175,11 +176,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-@@ -202,6 +199,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (ek_nand_data.bus_width_16)
- 		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 6c999db..81cb834 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -41,6 +41,7 @@
- #include <mach/gpio.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-+#include <mach/system_rev.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -155,11 +156,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.rdy_pin	= AT91_PIN_PC8,
- 	.enable_pin	= AT91_PIN_PC14,
- 	.partition_info	= nand_partitions,
--#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
--	.bus_width_16	= 1,
--#else
- 	.bus_width_16	= 0,
--#endif
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-@@ -182,6 +179,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	ek_nand_data.bus_width_16 = board_have_nand_16bit();
- 	/* setup bus-width (8 or 16) */
- 	if (ek_nand_data.bus_width_16)
- 		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-diff --git a/arch/arm/mach-at91/include/mach/system_rev.h b/arch/arm/mach-at91/include/mach/system_rev.h
-new file mode 100644
-index 0000000..7e1e28e
---- /dev/null
-+++ b/arch/arm/mach-at91/include/mach/system_rev.h
-@@ -0,0 +1,27 @@
-+/*
-+ * arch/arm/mach-at91/include/mach/system_rev.h
-+ *
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Under GPLv2 only
-+ */
-+
-+#ifndef __ARCH_SYSTEM_REV_H__
-+#define __ARCH_SYSTEM_REV_H__
-+
-+/*
-+ * board revision encoding
-+ * mach specific
-+ * the 16-31 bit are reserved for at91 generic information
-+ *
-+ * bit 31:
-+ *	0 => nand 8 bit
-+ *	1 => nand 16 bit
-+ */
-+#define BOARD_HAVE_NAND_16BIT	(1 << 31)
-+static int inline board_have_nand_16bit(void)
-+{
-+	return system_rev & BOARD_HAVE_NAND_16BIT;
-+}
-+
-+#endif /* __ARCH_SYSTEM_REV_H__ */
--- 
-1.7.4.1
+
+Nicolas
