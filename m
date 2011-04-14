@@ -1,34 +1,55 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 14 Apr 2011 14:40:58 +0800
-Subject: [PATCH v5 2/4] MTD : add the common code for GPMI controller
-	driver
-In-Reply-To: <19878.38524.705271.384302@ipc1.ka-ro>
-References: <1302675881-18862-1-git-send-email-b32955@freescale.com>	<1302675881-18862-3-git-send-email-b32955@freescale.com>	<19877.65411.687158.113390@ipc1.ka-ro>	<4DA659D0.9030504@freescale.com>
-	<19878.38524.705271.384302@ipc1.ka-ro>
-Message-ID: <4DA696FA.90804@freescale.com>
+From: J.Kilb@phytec.de (Juergen Kilb)
+Date: Thu, 14 Apr 2011 09:31:43 +0200
+Subject: [PATCH] Fixed gpio polarity of gpio USB-phy reset.
+Message-ID: <1302766303-1157-1-git-send-email-J.Kilb@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi:
-> Hi,
->
-> Huang Shijie writes:
->>>> +	this->swap_block_mark = true;
->>>> +	if (GPMI_IS_MX23(this))
->>>> +		this->swap_block_mark = false;
->>>>
->>> if ... else ...?
->> else is "true" by default.
->>
-> I meant it would be clearer to do:
-> 	if (GPMI_IS_MX23(this))
-> 		this->swap_block_mark = false;
-> 	else
-> 		this->swap_block_mark = true;
->
-:)
+With commit 19403165 a main part of ehci-omap.c moved to
+drivers/mfd/omap-usb-host.c created by commit 17cdd29d.
+Due to this reorganisation the polarity used to reset the
+external USB phy changed and USB host doesn't recognize
+any devices.
 
-thanks.
+Signed-off-by: Juergen Kilb <J.Kilb@phytec.de>
+---
+ drivers/mfd/omap-usb-host.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-Huang Shijie
-> Lothar Wa?mann
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 53450f4..491cac5 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -719,14 +719,14 @@ static int usbhs_enable(struct device *dev)
+ 			gpio_request(pdata->ehci_data->reset_gpio_port[0],
+ 						"USB1 PHY reset");
+ 			gpio_direction_output
+-				(pdata->ehci_data->reset_gpio_port[0], 1);
++				(pdata->ehci_data->reset_gpio_port[0], 0);
+ 		}
+ 
+ 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1])) {
+ 			gpio_request(pdata->ehci_data->reset_gpio_port[1],
+ 						"USB2 PHY reset");
+ 			gpio_direction_output
+-				(pdata->ehci_data->reset_gpio_port[1], 1);
++				(pdata->ehci_data->reset_gpio_port[1], 0);
+ 		}
+ 
+ 		/* Hold the PHY in RESET for enough time till DIR is high */
+@@ -906,11 +906,11 @@ static int usbhs_enable(struct device *dev)
+ 
+ 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+ 			gpio_set_value
+-				(pdata->ehci_data->reset_gpio_port[0], 0);
++				(pdata->ehci_data->reset_gpio_port[0], 1);
+ 
+ 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+ 			gpio_set_value
+-				(pdata->ehci_data->reset_gpio_port[1], 0);
++				(pdata->ehci_data->reset_gpio_port[1], 1);
+ 	}
+ 
+ end_count:
+-- 
+1.7.0.4
