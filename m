@@ -1,28 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Apr 2011 11:00:48 +0100
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <1302754859.2767.30.camel@pororo>
-References: <1299134429.100626.661279191478.0.gpush@pororo>
-	<1302754859.2767.30.camel@pororo>
-Message-ID: <20110414100048.GB1611@n2100.arm.linux.org.uk>
+From: thomas.ab@samsung.com (Thomas Abraham)
+Date: Thu, 14 Apr 2011 15:39:21 +0530
+Subject: [PATCH] ARM: Remove clkdev.o build in arch/arm/common/Makefile
+Message-ID: <1302775761-27139-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2011 at 12:20:59PM +0800, Jeremy Kerr wrote:
-> Any updates on these patches? I've added to your patch-tracker, would
-> you expect these to make the next merge window, or are there changes
-> you'd like made first?
-> 
-> Reason I ask is that I have a few queries from platform maintainers that
-> would like to complete their clock ports to this API, but don't want to
-> commit until the interface has been accepted, in at least an initial
-> form.
+clkdev.c is moved to drivers/clk. So build for clkdev.o can
+be removed from arch/arm/common/Makefile.
 
-I will take it, but at the moment I'm rather unhappy about the response
-from the community to Linus' complaint.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+---
+ arch/arm/common/Makefile |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-If existing platform maintainers can show that moving over to this will
-result in a net reduction of code under arch/arm, then that will be good.
-What I don't want to see at the moment is arch/arm increasing in size as
-a result of any change.  We desperately need to see a reduction for the
-next merge window.
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e7521bc..6ea9b6f 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -16,5 +16,4 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
+ obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+-obj-$(CONFIG_COMMON_CLKDEV)	+= clkdev.o
+ obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+-- 
+1.6.6.rc2
