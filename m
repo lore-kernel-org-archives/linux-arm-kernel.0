@@ -1,57 +1,33 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Thu, 14 Apr 2011 19:43:14 +0530
-Subject: [PATCH 2/2] OMAP3: PM: Do not rely on ROM code to restore
-	CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-In-Reply-To: <1302708067-8226-3-git-send-email-eduardo.valentin@ti.com>
-References: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
-	<1302708067-8226-3-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C9603BD@dbde02.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 14 Apr 2011 15:20:26 +0100
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <20110414123126.GA3336@atomide.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<20110414110854.GF29938@atomide.com>
+	<20110414120209.GG1611@n2100.arm.linux.org.uk>
+	<20110414123126.GA3336@atomide.com>
+Message-ID: <20110414142026.GD1452@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
-> Valentin, Eduardo
-> Sent: Wednesday, April 13, 2011 8:51 PM
-> To: Paul Walmsley; Kevin Hilman
-> Cc: Linux-OMAP; Linux-ARM; Valentin, Eduardo
-> Subject: [PATCH 2/2] OMAP3: PM: Do not rely on ROM code to 
-> restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-> 
-> As per OMAP3 erratum (i671), ROM code adds extra latencies while
-> restoring CM_AUTOIDLE_PLL register, if AUTO_PERIPH_DPLL is equal to 1.
-> 
-> This patch stores 0's in scratchpad content area corresponding to
-> AUTO_PERIPH_DPLL, to prevent ROM code to try to lock per DPLL, since
-> it won't respect proper programing scheme.
-> 
-> This register is then stored in prcm context. The saving and restore
-> is now done by kernel side.
-> 
-> Here follow the erratum description
-> 
-> DESCRIPTION
-> 
-> After OFF mode transition, among many restorations, the ROM 
-> Code restores the
-> CM_AUTOIDLE_PLL register, and after that, it tries to relock 
-> the PER DPLL.
-> 
-> In case the restoration data stored in scratchpad memory 
-> contains a field
-> CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL = 1, then the way the ROM 
-> Code restores and
-> locks the PER DPLL does not respect the PER DPLL programming scheme.
-> 
-> In that case, the DPLL might not lock. Meanwhile, when trying 
-> to lock the PER
-> DPLL, the ROM Code does not hang. Only extra latencies are 
-> introduced at
-> wake-up.
-> 
+On Thu, Apr 14, 2011 at 03:31:27PM +0300, Tony Lindgren wrote:
 
-[sp] You seem to have missed this patch:
-http://marc.info/?l=linux-arm-kernel&m=129735383925285&w=2
+> I think that 6k lines of new code should wait in the platform specific
+> trees and not get merged until we have some real progress on the
+> consolidation of code.
 
-~sanjeev
+> We should make it clear that we're not merging new code except for code
+> consolidation. Looks like some people have missed it despite the
+> massive flaming.
+
+Personally I had formed the impression that this was an understandable
+reaction on the part of Russell that he was applying to his own trees
+rather than a general policy that was being applied over all of arch/arm.
+
+I think we need to give people a tractable route to addressing the
+consolidation issues with the code they're trying to contribute before
+we start rejecting code.  If we can identify something useful that
+people can do that's in some way related to what they're trying to
+accomplish that's constructive and likely to inspire contributions to
+the consolidation efforts but if we're rejecting the code without
+any route to improving it that's much less so.  
