@@ -1,35 +1,98 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Apr 2011 11:12:20 +0200
-Subject: [PATCH 5/7] ARM i.MX53 loco: Add framebuffer support
-In-Reply-To: <33F32152BE7EC740BC2C838D2836AC8710FD9C@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1302710016-3569-1-git-send-email-weitway@gmail.com>
-	<1302710016-3569-5-git-send-email-weitway@gmail.com>
-	<20110414085714.GY7285@pengutronix.de>
-	<33F32152BE7EC740BC2C838D2836AC8710FD9C@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20110414091220.GA7285@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 14 Apr 2011 11:12:49 +0200
+Subject: [PATCH 4/4] ARM: S3C2416: Add support for USB 2.0 High-Speed gadget
+	controller
+In-Reply-To: <201104141106.59565.heiko@sntech.de>
+References: <201103232235.49318.heiko@sntech.de>
+	<20110413232841.GA20142@kroah.com>
+	<201104141106.59565.heiko@sntech.de>
+Message-ID: <201104141112.55917.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please do not top post!
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-On Thu, Apr 14, 2011 at 09:01:37AM +0000, Chen Jie-B02280 wrote:
-> Hi, Sascha,
-> 
-> I tested this patch on wvga lcd panel for loco board.
-> 
-> You can not get vga output if without tve driver support, I am planning upstream tve driver later.
-> 
-> And how do you test HDMI on loco board? Do you get hdmi daughter card?
+Add support for USB 2.0 High-Speed gadget controller driver for Samsung's
+S3C2416 processor.
 
-Yes, I have the hdmi daughter board. I don't have the wvga lcd panel
-though. Shouldn't you register the mode for the wvga panel then?
-Also, Please don't register the second head when it's not actually
-working.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+---
+ arch/arm/mach-s3c2416/mach-smdk2416.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
-Sascha
-
+diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
+index 3f83177..ac27ebb 100644
+--- a/arch/arm/mach-s3c2416/mach-smdk2416.c
++++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
+@@ -23,6 +23,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/gpio.h>
+ #include <linux/fb.h>
++#include <linux/delay.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -35,6 +36,7 @@
+ #include <plat/regs-serial.h>
+ #include <mach/regs-gpio.h>
+ #include <mach/regs-lcd.h>
++#include <mach/regs-s3c2443-clock.h>
+ 
+ #include <mach/idle.h>
+ #include <mach/leds-gpio.h>
+@@ -47,6 +49,7 @@
+ #include <plat/cpu.h>
+ #include <plat/nand.h>
+ #include <plat/sdhci.h>
++#include <plat/udc.h>
+ 
+ #include <plat/regs-fb-v4.h>
+ #include <plat/fb.h>
+@@ -121,6 +124,27 @@ static struct s3c2410_uartcfg smdk2416_uartcfgs[] __initdata = {
+ 	}
+ };
+ 
++void smdk2416_hsudc_gpio_init(void)
++{
++	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_UP);
++	s3c_gpio_setpull(S3C2410_GPF(2), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgpin(S3C2410_GPH(14), S3C_GPIO_SFN(1));
++	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 0);
++}
++
++void smdk2416_hsudc_gpio_uninit(void)
++{
++	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 1);
++	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgpin(S3C2410_GPH(14), S3C_GPIO_SFN(0));
++}
++
++struct s3c24xx_hsudc_platdata smdk2416_hsudc_platdata = {
++	.epnum = 9,
++	.gpio_init = smdk2416_hsudc_gpio_init,
++	.gpio_uninit = smdk2416_hsudc_gpio_uninit,
++};
++
+ struct s3c_fb_pd_win smdk2416_fb_win[] = {
+ 	[0] = {
+ 		/* think this is the same as the smdk6410 */
+@@ -186,6 +210,7 @@ static struct platform_device *smdk2416_devices[] __initdata = {
+ 	&s3c_device_i2c0,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
++	&s3c_device_usb_hsudc,
+ };
+ 
+ static void __init smdk2416_map_io(void)
+@@ -203,6 +228,8 @@ static void __init smdk2416_machine_init(void)
+ 	s3c_sdhci0_set_platdata(&smdk2416_hsmmc0_pdata);
+ 	s3c_sdhci1_set_platdata(&smdk2416_hsmmc1_pdata);
+ 
++	s3c24xx_hsudc_set_platdata(&smdk2416_hsudc_platdata);
++
+ 	gpio_request(S3C2410_GPB(4), "USBHost Power");
+ 	gpio_direction_output(S3C2410_GPB(4), 1);
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
