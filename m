@@ -1,65 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 14 Apr 2011 12:06:40 -0400 (EDT)
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 14 Apr 2011 18:08:48 +0200
 Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <20110414153813.GC6259@n2100.arm.linux.org.uk>
+In-Reply-To: <20110414103200.GF1611@n2100.arm.linux.org.uk>
 References: <1299134429.100626.661279191478.0.gpush@pororo>
 	<1302754859.2767.30.camel@pororo>
 	<20110414100048.GB1611@n2100.arm.linux.org.uk>
 	<1302776705.28876.113.camel@pasglop>
 	<20110414103200.GF1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140751220.24613@xanadu.home>
-	<20110414120904.GH1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140920110.24613@xanadu.home>
-	<20110414153813.GC6259@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1104141154390.24613@xanadu.home>
+Message-ID: <20110414160848.GC31990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Apr 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Apr 14, 2011 at 09:39:58AM -0400, Nicolas Pitre wrote:
-> > However we can and must do better in consolidation work in order to make 
-> > the tree more maintainable of course.  _That_ is the real issue and 
-> > _that_ is what the ARM tree sucks at.  The fact that this consolidation 
-> > work might reduce the size of the ARM code is only a side effect, not 
-> > the primary goal.  So let's not get too hung up about LOC but focus on 
-> > improving the infrastructure instead.
+On Thu, Apr 14, 2011 at 11:32:00AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 14, 2011 at 08:25:05PM +1000, Benjamin Herrenschmidt wrote:
+> > On Thu, 2011-04-14 at 11:00 +0100, Russell King - ARM Linux wrote:
+> > > 
+> > > I will take it, but at the moment I'm rather unhappy about the response
+> > > from the community to Linus' complaint.
+> > > 
+> > > If existing platform maintainers can show that moving over to this will
+> > > result in a net reduction of code under arch/arm, then that will be good.
+> > > What I don't want to see at the moment is arch/arm increasing in size as
+> > > a result of any change.  We desperately need to see a reduction for the
+> > > next merge window.
+> > 
+> > It's a chicken and egg... platform maintainers wait for you to take it
+> > and you wait for them to take it :-)
+> > 
+> > It seems to me that this fits well into the category of "better common
+> > abstractions" that was discussed in the thread initiated by Linus as one
+> > of the ways to improve on the "clutter"...
 > 
-> Look, this is what is in amongst the 6K lines of new code - these are
-> the top two in the diffstat with the highest number of additional lines:
+> That depends - sometimes creating generic stuff results in a net increase
+> in the overall size, and that's something that Linus also complained about.
 > 
->  arch/arm/mach-ux500/clock-db8500.c                 | 1291 +++++++++++++
->  arch/arm/mach-ux500/prcmu-db8500.c                 | 2018 ++++++++++++++++++++
-> 
-> These comprise 50% of the 6K of new code.  clock-db8500.c is a mixture
-> of code and data declarations for individual clocks - which is essentially
-> what Linus picked up with his complaint on under OMAP.  That in itself
-> makes me worried.
+> According to linux-next, where we are at the moment with arch/arm is a
+> net increase of 6000 lines since the close of the last merge window,
+> and arch/arm is responsible for almost 75% of arch/ changes.  It looks
+> very much like the same situation which Linus complained about.
+Well, looking at the output of
 
-Sure.  So... let's see what we can do about it.  Having 1300 lines only 
-for clock stuff on only one platform certainly looks silly.  Either we 
-can consolidate some of that stuff with another similar-enough platform, 
-or we're stuck with the ST-E hardware being just too different from, 
-say, the OMAP clock hardware for those to be consolidated.  In the 
-former case we can work towards a solution and that code currently in 
-next won't make it to mainline, or in the later case... well... we'll 
-have to live with it.  If in doubt let's simply ask the opinion of those 
-mainline people who said they're willing to help with advices.  If in 
-the end they have no better solutions than what we have now then it will 
-be harder for them to complain.
+	git diff --dirstat=3 linus/master...next/master -- arch
 
-> Looking at the other file, prcmu-db8500.c seems to contain at least 5 sets
-> of mailbox support code.  Take a look at "Subject: [PATCH 9/9] mach-ux500:
-> add DB5500 PRCMU interface" from Linus Walleij on 31st March on this list
-> for the patch.  Are we sure that this couldn't be consolidated in some
-> way, at least at file level?
-> 
-> So while you can say about not getting hung up about LOC, LOC is a good
-> indication that things are still going wrong in much the same way.
+(with linus/master == 85f2e689a and next/master == 9e06a6ea7) I think
+the main culprit is 12dc7eff5 that moved arch/arm/mach-mx3 to
+arch/arm/mach-imx. (75 files changed, 9783 insertions(+), 9731
+deletions(-)) That's a part of the effort to consolidate the i.MX
+platforms and allow to compile more SoCs in a single image.
 
-Agreed.  My point is, we shouldn't be afraid to add more code if that 
-code is allowing for some consolidation to happen down the road, which 
-should be the case with the initial subject of this thread.
+That commit accounts for more than the half of the (loc) changes in
+arch/arm.
 
+OK, this doesn't discuss away the 6000 added lines, but at least the
+percentage thingy. And I think when you point out this commit Linus will
+be much quiter when replying to your pull request.
 
-Nicolas
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
