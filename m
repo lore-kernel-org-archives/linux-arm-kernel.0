@@ -1,70 +1,54 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 14 Apr 2011 10:56:24 +0200
-Subject: [PATCH] Fixed gpio polarity of gpio USB-phy reset.
-In-Reply-To: <1302766303-1157-1-git-send-email-J.Kilb@phytec.de>
-References: <1302766303-1157-1-git-send-email-J.Kilb@phytec.de>
-Message-ID: <20110414085623.GA27253@sortiz-mobl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Apr 2011 10:57:15 +0200
+Subject: [PATCH 5/7] ARM i.MX53 loco: Add framebuffer support
+In-Reply-To: <1302710016-3569-5-git-send-email-weitway@gmail.com>
+References: <1302710016-3569-1-git-send-email-weitway@gmail.com>
+	<1302710016-3569-5-git-send-email-weitway@gmail.com>
+Message-ID: <20110414085714.GY7285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
-
-On Thu, Apr 14, 2011 at 09:31:43AM +0200, Juergen Kilb wrote:
-> With commit 19403165 a main part of ehci-omap.c moved to
-> drivers/mfd/omap-usb-host.c created by commit 17cdd29d.
-> Due to this reorganisation the polarity used to reset the
-> external USB phy changed and USB host doesn't recognize
-> any devices.
-If that fix is correct, it looks like it should make its way to 2.6.39.
-Felipe, are you ok with this fix ?
-
-Cheers,
-Samuel.
-
-> Signed-off-by: Juergen Kilb <J.Kilb@phytec.de>
+On Wed, Apr 13, 2011 at 11:53:34PM +0800, weitway at gmail.com wrote:
+> From: Jason Chen <b02280@freescale.com>
+>
+> Signed-off-by: Jason Chen <Jason.Chen@freescale.com>
 > ---
->  drivers/mfd/omap-usb-host.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 53450f4..491cac5 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -719,14 +719,14 @@ static int usbhs_enable(struct device *dev)
->  			gpio_request(pdata->ehci_data->reset_gpio_port[0],
->  						"USB1 PHY reset");
->  			gpio_direction_output
-> -				(pdata->ehci_data->reset_gpio_port[0], 1);
-> +				(pdata->ehci_data->reset_gpio_port[0], 0);
->  		}
+>  arch/arm/mach-mx5/Kconfig           |    1 +
+>  arch/arm/mach-mx5/board-mx53_loco.c |   24 ++++++++++++++++++++++++
+>  arch/arm/mach-mx5/clock-mx51-mx53.c |    3 +++
+>  3 files changed, 28 insertions(+), 0 deletions(-)
+
+
+Does the driver already work on the LOCO board? I just tested it on my
+board and get no picture (neither on VGA nor on HDMI).
+I got a picture on HDMI with another version of this driver and some
+hacking in the clock code, but as of now this only works when a freescale
+kernel is started first and rebooted into my kernel without powercycling.
+There is no picture on the VGA output though and I think there is
+code missing for the TV encoder.
+
+>  }
 >  
->  		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1])) {
->  			gpio_request(pdata->ehci_data->reset_gpio_port[1],
->  						"USB2 PHY reset");
->  			gpio_direction_output
-> -				(pdata->ehci_data->reset_gpio_port[1], 1);
-> +				(pdata->ehci_data->reset_gpio_port[1], 0);
->  		}
->  
->  		/* Hold the PHY in RESET for enough time till DIR is high */
-> @@ -906,11 +906,11 @@ static int usbhs_enable(struct device *dev)
->  
->  		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
->  			gpio_set_value
-> -				(pdata->ehci_data->reset_gpio_port[0], 0);
-> +				(pdata->ehci_data->reset_gpio_port[0], 1);
->  
->  		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
->  			gpio_set_value
-> -				(pdata->ehci_data->reset_gpio_port[1], 0);
-> +				(pdata->ehci_data->reset_gpio_port[1], 1);
->  	}
->  
->  end_count:
-> -- 
-> 1.7.0.4
-> 
+>  static void __init mx53_loco_timer_init(void)
+> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> index 652ace4..213ec33 100644
+> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> @@ -1468,6 +1468,9 @@ static struct clk_lookup mx53_lookups[] = {
+>  	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+>  	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+>  	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
+> +	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
+> +	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+> +	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
+
+This change shouldn't be in this patch of course.
+
+Sascha
+
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
