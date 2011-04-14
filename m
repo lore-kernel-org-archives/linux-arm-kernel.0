@@ -1,69 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Apr 2011 16:38:14 +0100
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <alpine.LFD.2.00.1104140920110.24613@xanadu.home>
-References: <1299134429.100626.661279191478.0.gpush@pororo>
-	<1302754859.2767.30.camel@pororo>
-	<20110414100048.GB1611@n2100.arm.linux.org.uk>
-	<1302776705.28876.113.camel@pasglop>
-	<20110414103200.GF1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140751220.24613@xanadu.home>
-	<20110414120904.GH1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140920110.24613@xanadu.home>
-Message-ID: <20110414153813.GC6259@n2100.arm.linux.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 14 Apr 2011 08:47:48 -0700
+Subject: [PATCH v4 3/4] USB: Gadget: Add Samsung S3C24XX USB High-Speed
+	controller driver
+In-Reply-To: <Pine.LNX.4.44L0.1104141134260.2487-100000@iolanthe.rowland.org>
+References: <201104141111.33781.heiko@sntech.de>
+	<Pine.LNX.4.44L0.1104141134260.2487-100000@iolanthe.rowland.org>
+Message-ID: <20110414154748.GA1366@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2011 at 09:39:58AM -0400, Nicolas Pitre wrote:
-> I might have a look later.  However it is clear that the ARM tree will 
-> _never_ be as small as, say, X86 or even PPC given the indisputable 
-> amount of hardware variations within the ARM landscape that is not to be 
-> seen anywhere else.  Until the ARM ecosystem converge towards a single 
-> whole-system architecture we won't be able to match X86 in terms of code 
-> reduction.  Anyone thinking otherwise is living in a different universe.
+On Thu, Apr 14, 2011 at 11:35:43AM -0400, Alan Stern wrote:
+> On Thu, 14 Apr 2011, Heiko [iso-8859-1] St?bner wrote:
 > 
-> However we can and must do better in consolidation work in order to make 
-> the tree more maintainable of course.  _That_ is the real issue and 
-> _that_ is what the ARM tree sucks at.  The fact that this consolidation 
-> work might reduce the size of the ARM code is only a side effect, not 
-> the primary goal.  So let's not get too hung up about LOC but focus on 
-> improving the infrastructure instead.
+> > From: Thomas Abraham <thomas.ab@samsung.com>
+> > 
+> > The Samsung's S3C2416, S3C2443 and S3C2450 includes a USB High-Speed
+> > device controller module. This driver enables support for USB high-speed
+> > gadget functionality for the Samsung S3C24xx SoC's that include this
+> > controller.
+> > 
+> > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Alexander Neumann <alexander@bumpern.de>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> ...
+> 
+> > +static struct usb_ep_ops s3c_hsudc_ep_ops = {
+> > +	.enable = s3c_hsudc_ep_enable,
+> > +	.disable = s3c_hsudc_ep_disable,
+> > +	.alloc_request = s3c_hsudc_alloc_request,
+> > +	.free_request = s3c_hsudc_free_request,
+> > +	.queue = s3c_hsudc_queue,
+> > +	.dequeue = s3c_hsudc_dequeue,
+> > +	.set_halt = s3c_hsudc_set_halt,
+> > +};
+> 
+> There's no .set_wedge method.  Why do people always leave this out?
 
-Look, this is what is in amongst the 6K lines of new code - these are
-the top two in the diffstat with the highest number of additional lines:
+Does the code spit out a nasty warning if this isn't set?  If not, I
+would suggest adding it so that this doesn't keep happening.
 
- arch/arm/mach-ux500/clock-db8500.c                 | 1291 +++++++++++++
- arch/arm/mach-ux500/prcmu-db8500.c                 | 2018 ++++++++++++++++++++
+Or just refuse to be able to register the structure, that would stop it
+right away :)
 
-These comprise 50% of the 6K of new code.  clock-db8500.c is a mixture
-of code and data declarations for individual clocks - which is essentially
-what Linus picked up with his complaint on under OMAP.  That in itself
-makes me worried.
+thanks,
 
-Looking at the other file, prcmu-db8500.c seems to contain at least 5 sets
-of mailbox support code.  Take a look at "Subject: [PATCH 9/9] mach-ux500:
-add DB5500 PRCMU interface" from Linus Walleij on 31st March on this list
-for the patch.  Are we sure that this couldn't be consolidated in some
-way, at least at file level?
-
-So while you can say about not getting hung up about LOC, LOC is a good
-indication that things are still going wrong in much the same way.
-
-On the positive note, it looks like MX3 is being merged into IMX stuff,
-which is good news, and the mxc91231 has been dropped.  We need to ensure
-that good work like this, which will make Linus happy, doesn't get
-swamped by new stuff.
-
-We must take Linus' complaint about 'churn' seriously - it's not something
-new that he's just started to complain about in the last month.  It's
-something which he's complained about on a number of occasions.  Feel free
-to think what you may about that, but just bear in mind that Linus holds
-the keys to the mainline kernel, and he can put us in a different universe.
-
-Now, the next thing is that Linus hasn't been too happy about driver stuff
-coming via my tree either - it's something which has been the subject of
-concern in private email.  I've _already_ said something about that prior
-to the recent merge window.  So should I take the clk API stuff which
-touches the drivers subtree?  If yes, it needs to be kept entirely separate
-from the rest of the ARM stuff so we don't end up mixing drivers stuff with
-ARM stuff.
+greg k-h
