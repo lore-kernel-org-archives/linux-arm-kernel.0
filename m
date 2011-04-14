@@ -1,49 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Apr 2011 10:44:47 +0100
-Subject: Status of arch/arm in linux-next
-Message-ID: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 14 Apr 2011 11:51:55 +0200
+Subject: [RFC][PATCH V4] axi: add AXI bus driver
+In-Reply-To: <BANLkTimcy16ggC0C66V-fbuaJwg4Sna4Qw@mail.gmail.com>
+References: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
+	<20110413163113.GA24015@kroah.com>
+	<BANLkTin-4HrJzNrLOxRy_-a98S3ZF4aSQw@mail.gmail.com>
+	<1302726703.8015.1.camel@dev.znau.edu.ua>
+	<BANLkTimwZOJ0a5kVfaUzEcsMc39H999u0A@mail.gmail.com>
+	<1302727516.8015.9.camel@dev.znau.edu.ua>
+	<BANLkTi=wzzzeF-PmqLt9o8arW7nRaFRRJw@mail.gmail.com>
+	<1302729243.8479.1.camel@dev.znau.edu.ua>
+	<BANLkTinLn4Ug=gX4coHJbSzrkxdSMjgGeg@mail.gmail.com>
+	<BANLkTimcy16ggC0C66V-fbuaJwg4Sna4Qw@mail.gmail.com>
+Message-ID: <BANLkTika3oprbxqYJTq=Fzms+LMdnxtwYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This morning, I looked at linux-next to find out how arch/arm is doing
-for the next merge window.
+2011/4/14 Jonas Gorski <jonas.gorski@gmail.com>:
+> On 13 April 2011 23:19, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>> 2011/4/13 George Kashperko <george@znau.edu.ua>:
+>>>> I had no idea what you were referring to. We do not dig into PCIe
+>>>> functions yet, so I believe for now we need this "if".
+>>> You are already deep inside. Your host code drives pci function.
+>>
+>> But I don't use multiple PCIe functions, do not focus on that at all.
+>
+> I think what George meant is the following (please correct me if I
+> understood you wrong) and has nothing to do with PCIe functions:
+> <http://lxr.free-electrons.com/source/drivers/staging/brcm80211/util/aiutils.c#L522>
 
-$ git diff -C --cumulative v2.6.39-rc1... arch
-  19.7% arch/arm/mach-imx/
-  19.2% arch/arm/mach-mx3/
-   3.4% arch/arm/mach-mxc91231/
-  18.1% arch/arm/mach-ux500/
-  74.1% arch/arm/
-   3.2% arch/m68k/
-   4.0% arch/mips/lantiq/
-   6.9% arch/mips/
-   3.1% arch/x86/kvm/
-   7.6% arch/x86/
- 100.0% arch/
-$ git diff -C --cumulative v2.6.39-rc1... arch/arm
-   4.7% arch/arm/mach-imx/
-   5.9% arch/arm/mach-msm/
-   6.3% arch/arm/mach-mx3/
-   8.8% arch/arm/mach-mxc91231/
-   7.6% arch/arm/mach-ux500/include/mach/
-  46.1% arch/arm/mach-ux500/
-   3.6% arch/arm/mach-zynq/
-   5.9% arch/arm/plat-mxc/include/mach/
-   7.3% arch/arm/plat-mxc/
- 100.0% arch/arm/
-$ git diff -C --shortstat v2.6.39-rc1... arch/arm
- 450 files changed, 11973 insertions(+), 5736 deletions(-)
+Ahh, thanks, I though PCIe functions are something different, that we
+have to register for pci device differently to access them or sth.
 
-Note that with --cumulative, the %age given includes all child directories
-(so the 74% for arch/arm includes everything below it).
-
-So, almost 75% of changes in arch are down to arch/arm.  For arch/arm,
-there's 6k new lines introduced - so there's a significant amount of new
-work there.
-
-Folk may want to consider that we're three weeks from Linus' rant, and
-there's little sign of the situation changing.  It looks to me from
-these statistics that it's business as usual.
-
-Please take a moment to consider how Linus will react to this at the
-next merge window.
+-- 
+Rafa?
