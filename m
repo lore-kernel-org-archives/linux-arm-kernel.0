@@ -1,216 +1,146 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Apr 2011 15:49:50 +0100
-Subject: [PATCH 1/3] Framework for exporting System-on-Chip information via
-	sysfs
+Date: Thu, 14 Apr 2011 15:49:51 +0100
+Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via sysfs
 In-Reply-To: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
 References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1302792592-17484-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1302792592-17484-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/base/Kconfig    |    3 +
- drivers/base/Makefile   |    1 +
- drivers/base/soc.c      |  127 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/sys_soc.h |   29 +++++++++++
- 4 files changed, 160 insertions(+), 0 deletions(-)
- create mode 100644 drivers/base/soc.c
- create mode 100644 include/linux/sys_soc.h
+ arch/arm/mach-ux500/Kconfig |    1 +
+ arch/arm/mach-ux500/id.c    |   96 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 97 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index e9e5238..f381fcc 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -168,6 +168,9 @@ config SYS_HYPERVISOR
- 	bool
- 	default n
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index c6b2375..ffee422 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -25,6 +25,7 @@ config MACH_U8500
+ 	bool "U8500 Development platform"
+ 	depends on UX500_SOC_DB8500
+ 	select TPS6105X
++	select SYS_SOC
+ 	help
+ 	  Include support for the mop500 development platform.
  
-+config SYS_SOC
-+	bool
-+
- config ARCH_NO_SYSDEV_OPS
- 	bool
- 	---help---
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 4c5701c..a0d246d 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -18,6 +18,7 @@ ifeq ($(CONFIG_SYSFS),y)
- obj-$(CONFIG_MODULES)	+= module.o
- endif
- obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
-+obj-$(CONFIG_SYS_SOC) += soc.o
+diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
+index d35122e..74492ee 100644
+--- a/arch/arm/mach-ux500/id.c
++++ b/arch/arm/mach-ux500/id.c
+@@ -2,12 +2,17 @@
+  * Copyright (C) ST-Ericsson SA 2010
+  *
+  * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
++ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson
+  * License terms: GNU General Public License (GPL) version 2
+  */
  
- ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
- 
-diff --git a/drivers/base/soc.c b/drivers/base/soc.c
-new file mode 100644
-index 0000000..5e4d6ef
---- /dev/null
-+++ b/drivers/base/soc.c
-@@ -0,0 +1,127 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2011
-+ *
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/stat.h>
-+#include <linux/slab.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
 +#include <linux/sys_soc.h>
++#include <linux/slab.h>
++#include <linux/stat.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/tlbflush.h>
+@@ -105,3 +110,94 @@ void __init ux500_map_io(void)
+ 
+ 	ux500_print_soc_info(asicid);
+ }
 +
-+struct device *parent_soc;
-+struct device *soc[MAX_SOCS];
++#ifdef CONFIG_SYS_SOC
++#define U8500_BB_UID_BASE (U8500_BACKUPRAM1_BASE + 0xFC0)
++#define U8500_BB_UID_LENGTH 5
 +
-+static void soc_device_remove_files(struct device *soc,
-+                                    struct device_attribute soc_attrs[])
++static ssize_t ux500_get_family(struct device *dev,
++                                struct device_attribute *attr,
++                                char *buf)
 +{
-+	int i = 0;
-+
-+	while (soc_attrs[i++].attr.name != NULL)
-+		device_remove_file(soc, &soc_attrs[i]);
++	return sprintf(buf, "Ux500\n");
 +}
 +
-+static int __init soc_device_create_files(struct device *soc,
-+                                          struct device_attribute soc_attrs[])
++static ssize_t ux500_get_machine(struct device *dev,
++                                 struct device_attribute *attr,
++                                 char *buf)
 +{
-+	int ret = 0;
-+	int i = 0;
-+
-+	while (soc_attrs[i].attr.name != NULL) {
-+		ret = device_create_file(soc, &soc_attrs[i++]);
-+		if (ret)
-+			goto out;
-+	}
-+	return ret;
-+
-+out:
-+	soc_device_remove_files(soc, soc_attrs);
-+	return ret;
++	return sprintf(buf, "DB%4x\n", dbx500_partnumber());
 +}
 +
-+void soc_device_release(struct device *soc)
++static ssize_t ux500_get_soc_id(struct device *dev,
++                                struct device_attribute *attr,
++                                char *buf)
 +{
-+	kfree(soc);
-+}
-+
-+int __init soc_device_register(struct device_attribute *soc_attrs[],
-+                               int soc_count)
-+{
-+	int ret, i;
-+
-+	if (!soc_attrs || soc_count > MAX_SOCS)
-+		return -EINVAL;
-+
-+	/* Register top-level SoC device '/sys/devices/soc'. */
-+	parent_soc = kzalloc(sizeof(struct device), GFP_KERNEL);
-+	if (!parent_soc)
-+		return -ENOMEM;
-+
-+	ret = dev_set_name(parent_soc, "soc");
-+	if (ret)
-+		goto soc_parent_free;
-+
-+	parent_soc->release = soc_device_release;
-+
-+	ret = device_register(parent_soc);
-+	if (ret)
-+		goto soc_parent_free;
-+
-+	/* Register each SoC and populate sysfs with requested attributes. */
-+	for (i = 0; i < soc_count - 1; i++) {
-+		soc[i] = kzalloc(sizeof(struct device), GFP_KERNEL);
-+		if (!soc[i]) {
-+			ret = -ENOMEM;
-+			goto soc_out_of_memory;
-+		}
-+
-+		ret = dev_set_name(soc[i], "soc%d", i);
-+		if (ret)
-+			goto soc_free_unreg;
-+
-+		soc[i]->parent = parent_soc;
-+		soc[i]->release = soc_device_release;
-+
-+		ret = device_register(soc[i]);
-+		if (ret)
-+			goto soc_free_unreg;
-+
-+		ret = soc_device_create_files(soc[i], soc_attrs[i]);
-+		if (ret)
-+			goto soc_free_unreg;
-+	}
-+	return ret;
-+
-+soc_free_unreg:
-+	kfree(soc[i]);
-+soc_out_of_memory:
-+	/* Unregister only previously registered SoCs. */
-+	soc_device_unregister(soc_attrs, i);
-+	return ret;
-+
-+soc_parent_free:
-+	/* Free unregisterable parent SoC device. */
-+	kfree(parent_soc);
-+	return ret;
-+}
-+
-+void soc_device_unregister(struct device_attribute *soc_attrs[],
-+                           int soc_count)
-+{
++	void __iomem *uid_base;
 +	int i;
++	ssize_t sz = 0;
 +
-+	if (!soc_attrs || soc_count > MAX_SOCS)
-+		return;
-+
-+	/* Unregister and free all SoC from sysfs. */
-+	for (i = 0; i < soc_count - 1; i++) {
-+		soc_device_remove_files(soc[i], soc_attrs[i]);
-+		device_unregister(soc[i]);
++	if (dbx500_partnumber() == 0x8500) {
++		uid_base = __io_address(U8500_BB_UID_BASE);
++		for (i = 0; i < U8500_BB_UID_LENGTH; i++)
++			sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
++		sz += sprintf(buf + sz, "\n");
++	} else {
++		/* Don't know where it is located for U5500 */
++		sz = sprintf(buf, "N/A\n");
 +	}
 +
-+	/* Unregister top-level SoC device '/sys/devices/soc'. */
-+	device_unregister(parent_soc);
++	return sz;
 +}
-diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-new file mode 100644
-index 0000000..988cf6f
---- /dev/null
-+++ b/include/linux/sys_soc.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2011
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+#ifndef __SYS_SOC_H
-+#define __SYS_SOC_H
 +
-+#include <linux/kobject.h>
-+#include <linux/device.h>
++static ssize_t ux500_get_revision(struct device *dev,
++                                  struct device_attribute *attr,
++                                  char *buf)
++{
++	unsigned int rev = dbx500_revision();
 +
-+#define MAX_SOCS 8
++	if (rev == 0x01)
++		return sprintf(buf, "%s\n", "ED");
++	else if (rev >= 0xA0)
++		return sprintf(buf, "%d.%d\n" , (rev >> 4) - 0xA + 1, rev & 0xf);
 +
-+/**
-+ * soc_device_register - register SoC as a device
-+ * @soc_attrs: Multiple arrays of sysfs file attributes
-+ * @num_socs: Amount of SoCs we're attempting to register
-+ */
-+int soc_device_register(struct device_attribute *soc_attrs[],
-+                        int num_socs);
-+/**
-+ * soc_device_unregister - unregister SoC as a device
-+ * @soc_attrs: Multiple arrays of sysfs file attributes
-+ * @num_socs: Amount of SoCs we're attempting to register
-+ */
-+void soc_device_unregister(struct device_attribute *soc_attrs[],
-+                           int num_socs);
++	return sprintf(buf, "%s", "Unknown\n");
++}
 +
-+#endif /* __SYS_SOC_H */
++static ssize_t ux500_get_process(struct device *dev,
++                                 struct device_attribute *attr,
++                                 char *buf)
++{
++	if (dbx500_id.process == 0x00)
++		return sprintf(buf, "Standard\n");
++
++	return sprintf(buf, "%02xnm\n", dbx500_id.process);
++}
++
++struct device_attribute soc_one_attrs[] = {
++	__ATTR(machine,  S_IRUGO, ux500_get_machine,  NULL),
++	__ATTR(family,   S_IRUGO, ux500_get_family,   NULL),
++	__ATTR(soc_id,   S_IRUGO, ux500_get_soc_id,   NULL),
++	__ATTR(revision, S_IRUGO, ux500_get_revision, NULL),
++	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL),
++	__ATTR_NULL,
++};
++
++struct device_attribute *each_soc_attrs[] = {
++	soc_one_attrs,
++	NULL,
++};
++
++static int __init ux500_soc_sysfs_init(void)
++{
++	return soc_device_register(each_soc_attrs, ARRAY_SIZE(each_soc_attrs));
++}
++module_init(ux500_soc_sysfs_init);
++
++static void __exit ux500_soc_sysfs_exit(void)
++{
++	return soc_device_unregister(each_soc_attrs, ARRAY_SIZE(each_soc_attrs));
++}
++module_exit(ux500_soc_sysfs_exit);
++
++#endif
 -- 
 1.7.4.1
