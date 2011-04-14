@@ -1,7 +1,7 @@
-From: weitway@gmail.com (weitway at gmail.com)
-Date: Wed, 13 Apr 2011 23:53:30 +0800
+From: jason.chen@freescale.com (jason.chen at freescale.com)
+Date: Thu, 14 Apr 2011 10:04:56 +0800
 Subject: [PATCH 1/7] Add a mfd IPUv3 driver
-Message-ID: <1302710016-3569-1-git-send-email-weitway@gmail.com>
+Message-ID: <1302746696-2666-1-git-send-email-jason.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
