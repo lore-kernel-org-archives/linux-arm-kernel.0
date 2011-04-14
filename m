@@ -1,88 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Apr 2011 11:08:44 +0200
-Subject: [PATCH 1/7] Add a mfd IPUv3 driver
-In-Reply-To: <1302710016-3569-1-git-send-email-weitway@gmail.com>
-References: <1302710016-3569-1-git-send-email-weitway@gmail.com>
-Message-ID: <20110414090844.GZ7285@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 14 Apr 2011 11:08:56 +0200
+Subject: [PATCH 1/4] ARM: S3C2416: Add USB Phy register definitions
+In-Reply-To: <201104141106.59565.heiko@sntech.de>
+References: <201103232235.49318.heiko@sntech.de>
+	<20110413232841.GA20142@kroah.com>
+	<201104141106.59565.heiko@sntech.de>
+Message-ID: <201104141109.07385.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2011 at 11:53:30PM +0800, weitway at gmail.com wrote:
-> From: Jason Chen <b02280@freescale.com>
-> 
-> +
-> +static irqreturn_t ipu_irq_handler(int irq, void *desc)
-> +{
-> +	struct ipu_soc *ipu = container_of(desc, struct ipu_soc, ipu_dev);
-> +	DECLARE_IPU_IRQ_BITMAP(status);
-> +	struct ipu_irq_handler *handler;
-> +	unsigned long flags;
-> +	int i;
-> +
-> +	spin_lock_irqsave(&ipu->ipu_lock, flags);
-> +
-> +	for (i = 0; i < BITS_TO_LONGS(IPU_IRQ_COUNT); i++) {
-> +		status[i] = ipu_cm_read(ipu, IPU_INT_STAT(i + 1));
-> +		ipu_cm_write(ipu, status[i], IPU_INT_STAT(i + 1));
-> +	}
-> +
-> +	list_for_each_entry(handler, &ipu->ipu_irq_handlers_list, list) {
-> +		DECLARE_IPU_IRQ_BITMAP(tmp);
-> +		if (bitmap_and(tmp, status, handler->ipu_irqs, IPU_IRQ_COUNT))
-> +			handler->handler(tmp, handler->context);
-> +	}
-> +
-> +	spin_unlock_irqrestore(&ipu->ipu_lock, flags);
-> +
-> +	return IRQ_HANDLED;
-> +}
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-Arnd and Thomas have objected to the custom interrupt handling code and
-prefer a standard chained interrupt handler for the IPU interrupts.
+Add register definitions required to configure the USB Phy. The definitions
+for PHYCTRL, PHYPWR, URSTCON and UCLKCON registers and corresponding bit
+field definitions are added.
 
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+---
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |   25 ++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-> +
-> +static int ipu_add_subdevice_pdata(struct platform_device *pdev,
-> +		const char *name, int id, void *pdata, size_t pdata_size)
-> +{
-> +	struct mfd_cell cell = {
-> +		.platform_data = pdata,
-> +		.data_size = pdata_size,
-> +	};
-
-These fields do not exist anymore.
-
-> +static int __devinit ipu_probe(struct platform_device *pdev)
-> +{
-> +	struct ipu_soc *ipu;
-> +	struct imx_ipuv3_platform_data *plat_data = pdev->dev.platform_data;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	ipu = kzalloc(sizeof(struct ipu_soc), GFP_KERNEL);
-> +	if (!ipu)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&ipu->ipu_lock);
-> +	mutex_init(&ipu->ipu_channel_lock);
-> +	INIT_LIST_HEAD(&ipu->ipu_irq_handlers_list);
-> +
-> +	ipu->ipu_dev = &pdev->dev;
-> +
-> +	if (plat_data->init)
-> +		plat_data->init(pdev);
-> +
-> +	ipu->irq1 = platform_get_irq(pdev, 0);
-> +	ipu->irq2 = platform_get_irq(pdev, 1);
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	if (!res || ipu->irq1 < 0 || ipu->irq2 < 0)
-> +		return -ENODEV;
-
-You already allocated memory which you forget to free here.
-
+diff --git a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+index 44494a5..5e06c72 100644
+--- a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
++++ b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
+@@ -37,6 +37,10 @@
+ #define S3C2443_SYSID			S3C2443_CLKREG(0x5C)
+ #define S3C2443_PWRCFG			S3C2443_CLKREG(0x60)
+ #define S3C2443_RSTCON			S3C2443_CLKREG(0x64)
++#define S3C2443_PHYCTRL			S3C2443_CLKREG(0x80)
++#define S3C2443_PHYPWR			S3C2443_CLKREG(0x84)
++#define S3C2443_URSTCON			S3C2443_CLKREG(0x88)
++#define S3C2443_UCLKCON			S3C2443_CLKREG(0x8C)
+ 
+ #define S3C2443_SWRST_RESET		(0x533c2443)
+ 
+@@ -121,6 +125,27 @@
+ 
+ #define S3C2443_PWRCFG_SLEEP		(1<<15)
+ 
++#define S3C2443_PWRCFG_USBPHY		(1 << 4)
++
++#define S3C2443_URSTCON_FUNCRST		(1 << 2)
++#define S3C2443_URSTCON_PHYRST		(1 << 0)
++
++#define S3C2443_PHYCTRL_CLKSEL		(1 << 3)
++#define S3C2443_PHYCTRL_EXTCLK		(1 << 2)
++#define S3C2443_PHYCTRL_PLLSEL		(1 << 1)
++#define S3C2443_PHYCTRL_DSPORT		(1 << 0)
++
++#define S3C2443_PHYPWR_COMMON_ON	(1 << 31)
++#define S3C2443_PHYPWR_ANALOG_PD	(1 << 4)
++#define S3C2443_PHYPWR_PLL_REFCLK	(1 << 3)
++#define S3C2443_PHYPWR_XO_ON		(1 << 2)
++#define S3C2443_PHYPWR_PLL_PWRDN	(1 << 1)
++#define S3C2443_PHYPWR_FSUSPEND		(1 << 0)
++
++#define S3C2443_UCLKCON_DETECT_VBUS	(1 << 31)
++#define S3C2443_UCLKCON_FUNC_CLKEN	(1 << 2)
++#define S3C2443_UCLKCON_TCLKEN		(1 << 0)
++
+ #include <asm/div64.h>
+ 
+ static inline unsigned int
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
