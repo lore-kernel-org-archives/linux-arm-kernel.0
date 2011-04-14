@@ -1,43 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 14 Apr 2011 19:20:17 +0200
-Subject: [PATCH 0/2] Common struct clk implementation, v14
-In-Reply-To: <20110414153813.GC6259@n2100.arm.linux.org.uk>
-References: <1299134429.100626.661279191478.0.gpush@pororo>
-	<1302754859.2767.30.camel@pororo>
-	<20110414100048.GB1611@n2100.arm.linux.org.uk>
-	<1302776705.28876.113.camel@pasglop>
-	<20110414103200.GF1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140751220.24613@xanadu.home>
-	<20110414120904.GH1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104140920110.24613@xanadu.home>
-	<20110414153813.GC6259@n2100.arm.linux.org.uk>
-Message-ID: <20110414172017.GD31990@pengutronix.de>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 14 Apr 2011 20:33:53 +0300
+Subject: [PATCH 2/2] OMAP3: PM: Do not rely on ROM code to restore
+	CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C9603BD@dbde02.ent.ti.com>
+References: <1302708067-8226-1-git-send-email-eduardo.valentin@ti.com>
+	<1302708067-8226-3-git-send-email-eduardo.valentin@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024C9603BD@dbde02.ent.ti.com>
+Message-ID: <20110414173352.GA3311@zarco>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Sanjeev,
 
-On Thu, Apr 14, 2011 at 04:38:14PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 14, 2011 at 09:39:58AM -0400, Nicolas Pitre wrote:
-> Now, the next thing is that Linus hasn't been too happy about driver stuff
-> coming via my tree either - it's something which has been the subject of
-> concern in private email.  I've _already_ said something about that prior
-> to the recent merge window.  So should I take the clk API stuff which
-> touches the drivers subtree?  If yes, it needs to be kept entirely separate
-> from the rest of the ARM stuff so we don't end up mixing drivers stuff with
-> ARM stuff.
-OK, so the solution is to put this in a seperate branch. But then when
-platform maintainers start working with it the resulting changes will
-most probably go to arch/arm. So if Linus doesn't want to pull a tree
-that touches both drivers/clk and arch/arm, then either he has to pull
-the clk branch first or we have to wait for the next merge window until
-we can use it.
 
-I prefer the former.
+On Thu, Apr 14, 2011 at 09:13:14AM -0500, Premi, Sanjeev wrote:
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org 
+> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
+> > Valentin, Eduardo
+> > Sent: Wednesday, April 13, 2011 8:51 PM
+> > To: Paul Walmsley; Kevin Hilman
+> > Cc: Linux-OMAP; Linux-ARM; Valentin, Eduardo
+> > Subject: [PATCH 2/2] OMAP3: PM: Do not rely on ROM code to 
+> > restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
+> > 
+> > As per OMAP3 erratum (i671), ROM code adds extra latencies while
+> > restoring CM_AUTOIDLE_PLL register, if AUTO_PERIPH_DPLL is equal to 1.
+> > 
+> > This patch stores 0's in scratchpad content area corresponding to
+> > AUTO_PERIPH_DPLL, to prevent ROM code to try to lock per DPLL, since
+> > it won't respect proper programing scheme.
+> > 
+> > This register is then stored in prcm context. The saving and restore
+> > is now done by kernel side.
+> > 
+> > Here follow the erratum description
+> > 
+> > DESCRIPTION
+> > 
+> > After OFF mode transition, among many restorations, the ROM 
+> > Code restores the
+> > CM_AUTOIDLE_PLL register, and after that, it tries to relock 
+> > the PER DPLL.
+> > 
+> > In case the restoration data stored in scratchpad memory 
+> > contains a field
+> > CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL = 1, then the way the ROM 
+> > Code restores and
+> > locks the PER DPLL does not respect the PER DPLL programming scheme.
+> > 
+> > In that case, the DPLL might not lock. Meanwhile, when trying 
+> > to lock the PER
+> > DPLL, the ROM Code does not hang. Only extra latencies are 
+> > introduced at
+> > wake-up.
+> > 
+> 
+> [sp] You seem to have missed this patch:
+> http://marc.info/?l=linux-arm-kernel&m=129735383925285&w=2
 
-Best regards
-Uwe
+Right,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+But that one doesn't clear the AUTO_PERIPH_DPLL bits in the scratchpad area
+to avoid rom code extra overhead (check my patch description).
+
+Besides, why do we want to add more code inside omap_sram_idle,
+if we have better places to this S&R?
+
+
+> 
+> ~sanjeev
+> 
+> 
+
+All best,
+
+--
+Eduardo Valentin
