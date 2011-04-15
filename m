@@ -1,50 +1,58 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 15 Apr 2011 09:32:01 -0600
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Apr 2011 16:37:23 +0100
 Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415152643.GC4423@n2100.arm.linux.org.uk>
+In-Reply-To: <4DA85B49.60209@vollmann.ch>
 References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com> <201104151640.01040.arnd@arndb.de>
-	<20110415152643.GC4423@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTinDwH9G1zW784t=QnNR7kZkgfKA8w@mail.gmail.com>
+	<4DA85B49.60209@vollmann.ch>
+Message-ID: <20110415153723.GD4423@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 9:26 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 15, 2011 at 04:40:00PM +0200, Arnd Bergmann wrote:
->> On Friday 15 April 2011 15:39:55 Rob Herring wrote:
->>
->> > On 04/15/2011 08:06 AM, Russell King - ARM Linux wrote:
->> > > This is work in progress.
->> > >
->> > > We have two SoCs using SRAM, both with their own allocation systems,
->> > > and both with their own ways of copying functions into the SRAM.
->> >
->> > It's more than that. Several i.MX chips use plat-mxc/iram_alloc.c.
->>
->> There are also non-ARM systems doing something like that,
->> arch/blackfin/mm/sram-alloc.c comes to mind. On powerpc, the
->> ppc7410 also has this feature in hardware, but I believe it was
->> never supported in mainline Linux.
->
-> Yes, but there's some horrible bits out there. ?PPC is one of them
-> which looks like it doesn't lend itself to consolidating with this
-> kind of implementation.
->
->> How about putting sram-pool.c into the top-level mm/ directory
->> and sram-pool.h into include/linux? They seem to be completely
->> generic to me, aside from the dependency on asm/fncpy.h which
->> should probably remain arch specific.
->
-> I've thought about lib - but first lets see whether other architectures
-> want to use it first. ?I've asked the sh folk off-list about this and
-> waiting for a reply.
->
-> Blackfin and PPC look horrible to sort out though, so they can come at
-> a later date if they so wish.
+On Fri, Apr 15, 2011 at 04:50:49PM +0200, Detlef Vollmann wrote:
+> I'd love to have the mapping inside the create pool, but that might
+> not be possible in general.
 
-Yes, once the infrastructure is in place, powerpc can do its own
-migration to the new code.  I vote for putting it in lib at the
-outset.
+No, think about it.  What if you need to map the RAM area with some
+special attributes - eg, where ioremap() doesn't work.  Eg, OMAP you
+need SRAM mapped as normal memory, except for OMAP34xx where it must
+be mapped normal memory non-cacheable.
 
-g.
+It's best to leave the mapping to the architecture.
+
+>> Another question is whether we should allow multiple SRAM pools or not -
+>> this code does allow multiple pools, but so far we only have one pool
+>> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
+>> it if they want to partition the SRAM, or have peripheral-local SRAMs.
+> Having the option to partition the SRAM is probably useful.
+> What I'm missing is sram_pool_add: on AT91SAM9G20 you have two banks
+> of SRAM, and you might want to combine them into a single pool.
+
+Do you already combine them into a single pool, or is this a wishlist?
+I'm really not interested in sorting out peoples wishlist items in
+the process of consolidation.
+
+Second point is that you'll notice that the code converts to a phys
+address using this: phys = phys_base + (virt - virt_base).  As soon as
+we start allowing multiple regions of SRAM, it becomes impossible to
+provide the phys address without a lot more complexity.
+
+>>   arch/arm/common/sram-pool.c                 |   69 +++++++++++++++++++++++++++
+>>   arch/arm/include/asm/sram-pool.h            |   20 ++++++++
+> Waht is ARM specific about this code?
+> Why not put it into lib/ and include/linux, respectively?
+
+Nothing, but this is the first stage of consolidation of this code.
+I'm not trying to consolidate the universe down to one implementation
+here - that's going to take _far_ too much effort in one go, and from
+my previous experiences interacting with other arch maintainers, that's
+the way to get precisely nothing done.
+
+In my experience, arch maintainers tend to object to each others patches,
+and the net result is no forward progress.  See dma_mmap API as a
+brilliant example of that - the lack of which contines to cause problems
+for drivers many years after I initially tried (and gave up) trying to
+get agreement on that.
+
+So, let's do what we can to consolidate our stuff and if we get some
+agreement from other arch maintainers, look towards moving it out.
+Moving stuff out once its properly modularized is trivial.
