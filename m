@@ -1,41 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 15 Apr 2011 10:10:04 -0600
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110415155642.GO1611@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<20110414110854.GF29938@atomide.com>
-	<20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
-	<20110415155642.GO1611@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Fri, 15 Apr 2011 16:18:23 +0000
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415160339.GF4423@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<4DA84AAB.60601@gmail.com>
+	<20110415160339.GF4423@n2100.arm.linux.org.uk>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 9:56 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 15, 2011 at 09:12:39AM -0600, Grant Likely wrote:
->> For example, John Linn
->> has posted support for the new Xilinx ARM FPGA platform, has been
->> through several rounds of review, but now he fears that it will all be
->> rejected and he'll have to start over in 3 months.
+Hi Russell,
+
+
+>-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-
+>bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+>Sent: Friday, April 15, 2011 11:04 AM
+>To: Rob Herring
+>Cc: Kevin Hilman; davinci-linux-open-source at linux.davincidsp.com; Tony Lindgren; Sekhar Nori; linux-
+>omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [RFC PATCH] Consolidate SRAM support
 >
-> Well, what about my fear that we won't be able to get anything more
-> past Linus if we submit another 60k lines of code during the next
-> merge window?
+>On Fri, Apr 15, 2011 at 08:39:55AM -0500, Rob Herring wrote:
+>> Russell,
+>>
+>> On 04/15/2011 08:06 AM, Russell King - ARM Linux wrote:
+>>> This is work in progress.
+>>>
+>>> We have two SoCs using SRAM, both with their own allocation systems,
+>>> and both with their own ways of copying functions into the SRAM.
+>>
+>> It's more than that. Several i.MX chips use plat-mxc/iram_alloc.c.
+>
+>Hmm, that's nice - except for one issue.  According to my grep of
+>arch/arm/ and drivers/, nothing uses iram_alloc().  So, does anything in
+>the MX stuff use iram_alloc.c, or is it dead code left over from a
+>previous experiment?
 
-Worst he can say is no.  He /knows/ we're trying to fix the problem.
-He also knows that development doesn't stop, even in the midst of
-consolidation work that is going to take a lot of time.
+This function will be used for suspend code in the mx5x series. I just got done submitting a series of patches to Sascha for a simple suspend that does not need running code out of IRAM yet. The next set of suspend patches will be using these iram functions.
 
-To mitigate the risk, how about a
-not-ideal-but-should-be-merged-anyway branch that is sent to Linus
-after all the core code and consolidation changes have been merged?
-We should even describe to Linus why this branch exists and give him
-the option to say no if he wants to.
-
-g.
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+>
+>The commit says:
+>
+>    ARM: imx: Add iram allocator functions
+>
+>    Add IRAM(Internal RAM) allocation functions using GENERIC_ALLOCATOR.
+>    The allocation size is 4KB multiples to guarantee alignment. The
+>    idea for these functions is for i.MX platforms to use them
+>    to dynamically allocate IRAM usage.
+>
+>    Applies on 2.6.36-rc7
+>
+>> lpc32xx and pnx4008 also use iram, but do not have an allocator (only 1
+>> user). Both are doing a copy the suspend code to IRAM and run it which
+>> may also be a good thing to have generic code for. Several i.MX chips
+>> also need to run from IRAM for suspend.
+>
+>We have support for copying functions to other bits of memory and getting
+>the Thumb-ness right - see asm/fncpy.h.  So that's a separate patch to
+>convert them over.
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
