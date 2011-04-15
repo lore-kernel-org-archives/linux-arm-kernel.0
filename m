@@ -1,72 +1,116 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Apr 2011 21:08:07 +0200
-Subject: [PATCH 02/10] clk: Generic support for fixed-rate clocks
+Date: Fri, 15 Apr 2011 21:08:08 +0200
+Subject: [PATCH 03/10] clk: Make NULL a valid clock again
 In-Reply-To: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
 References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1302894495-6879-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1302894495-6879-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jeremy.kerr@canonical.com>
+NULL used to be a valid clock. This patch makes the common struct
+clk stuff work with this. Instead of crashing we return sane default
+values for this dummy clock, that is: can always be prepared, enabled,
+rate unkown and no set rate.
 
-Since most platforms will need a fixed-rate clock, add one. This will
-also serve as a basic example of an implementation of struct clk.
-
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
 ---
- drivers/clk/clk.c   |   14 ++++++++++++++
- include/linux/clk.h |   16 ++++++++++++++++
- 2 files changed, 30 insertions(+), 0 deletions(-)
+ drivers/clk/clk.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0bc9c6f..0da0bb9 100644
+index 0da0bb9..264c809 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -130,3 +130,17 @@ void __clk_put(struct clk *clk)
- 	if (clk->ops->put)
- 		clk->ops->put(clk);
- }
-+
-+/* clk_fixed support */
-+
-+#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
-+
-+static unsigned long clk_fixed_get_rate(struct clk *clk)
-+{
-+	return to_clk_fixed(clk)->rate;
-+}
-+
-+struct clk_ops clk_fixed_ops = {
-+	.get_rate = clk_fixed_get_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_fixed_ops);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 7b406bd..d2f0db0 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -155,6 +155,22 @@ static inline void clk_common_init(struct clk *clk)
- 	mutex_init(&clk->prepare_lock);
- }
+@@ -15,6 +15,9 @@ int clk_prepare(struct clk *clk)
+ {
+ 	int ret = 0;
  
-+/* Simple fixed-rate clock */
-+struct clk_fixed {
-+	struct clk	clk;
-+	unsigned long	rate;
-+};
++	if (!clk)
++		return 0;
 +
-+extern struct clk_ops clk_fixed_ops;
-+
-+#define INIT_CLK_FIXED(name, r) { \
-+	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
-+	.rate = (r) \
-+}
-+
-+#define DEFINE_CLK_FIXED(name, r) \
-+	struct clk_fixed name = INIT_CLK_FIXED(name, r)
-+
- #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+ 	mutex_lock(&clk->prepare_lock);
+ 	if (clk->prepare_count == 0 && clk->ops->prepare)
+ 		ret = clk->ops->prepare(clk);
+@@ -29,6 +32,9 @@ EXPORT_SYMBOL_GPL(clk_prepare);
  
- /*
+ void clk_unprepare(struct clk *clk)
+ {
++	if (!clk)
++		return;
++
+ 	mutex_lock(&clk->prepare_lock);
+ 
+ 	WARN_ON(clk->prepare_count == 0);
+@@ -47,6 +53,9 @@ int clk_enable(struct clk *clk)
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
++	if (!clk)
++		return 0;
++
+ 	WARN_ON(clk->prepare_count == 0);
+ 
+ 	spin_lock_irqsave(&clk->enable_lock, flags);
+@@ -65,6 +74,9 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
++	if (!clk)
++		return;
++
+ 	spin_lock_irqsave(&clk->enable_lock, flags);
+ 
+ 	WARN_ON(clk->enable_count == 0);
+@@ -78,6 +90,9 @@ EXPORT_SYMBOL_GPL(clk_disable);
+ 
+ unsigned long clk_get_rate(struct clk *clk)
+ {
++	if (!clk)
++		return 0;
++
+ 	if (clk->ops->get_rate)
+ 		return clk->ops->get_rate(clk);
+ 	return 0;
+@@ -86,6 +101,9 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
+ 
+ long clk_round_rate(struct clk *clk, unsigned long rate)
+ {
++	if (!clk)
++		return -ENOSYS;
++
+ 	if (clk->ops->round_rate)
+ 		return clk->ops->round_rate(clk, rate);
+ 	return -ENOSYS;
+@@ -94,6 +112,9 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
+ 
+ int clk_set_rate(struct clk *clk, unsigned long rate)
+ {
++	if (!clk)
++		return -ENOSYS;
++
+ 	might_sleep();
+ 
+ 	if (clk->ops->set_rate)
+@@ -104,6 +125,9 @@ EXPORT_SYMBOL_GPL(clk_set_rate);
+ 
+ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
++	if (!clk)
++		return -ENOSYS;
++
+ 	if (clk->ops->set_parent)
+ 		return clk->ops->set_parent(clk, parent);
+ 	return -ENOSYS;
+@@ -112,6 +136,9 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
+ 
+ struct clk *clk_get_parent(struct clk *clk)
+ {
++	if (!clk)
++		return ERR_PTR(-ENOSYS);
++
+ 	if (clk->ops->get_parent)
+ 		return clk->ops->get_parent(clk);
+ 	return ERR_PTR(-ENOSYS);
 -- 
 1.7.4.1
