@@ -1,75 +1,43 @@
-From: mnalajal@codeaurora.org (Murali Nalajala)
-Date: Fri, 15 Apr 2011 20:20:12 +0530
-Subject: [PATCH 2/2] mtd: msm_nand: Add initial msm nand driver support.
-In-Reply-To: <1302861097.3220.12.camel@localhost>
-References: <1298940450-27365-1-git-send-email-mnalajal@codeaurora.org>	
-	<1298940450-27365-2-git-send-email-mnalajal@codeaurora.org>
-	<1302861097.3220.12.camel@localhost>
-Message-ID: <4DA85B24.50807@codeaurora.org>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 15 Apr 2011 16:50:49 +0200
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+Message-ID: <4DA85B49.60209@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/15/2011 3:21 PM, Artem Bityutskiy wrote:
-> On Tue, 2011-03-01 at 06:17 +0530, Murali Nalajala wrote:
->> +#define pr_fmt(fmt) "%s:" fmt, __func__
->> +
->> +#include<linux/kernel.h>
->> +#include<linux/mtd/mtd.h>
->> +#include<linux/mtd/nand.h>
->> +#include<linux/mtd/partitions.h>
->> +#include<linux/platform_device.h>
->> +#include<linux/sched.h>
->> +#include<linux/slab.h>
->> +#include<linux/dma-mapping.h>
->> +#include<asm/mach/flash.h>
->> +#include<mach/dma.h>
->> +
->> +#include "msm_nand.h"
->> +
->> +unsigned long msm_nand_phys;
->
-> No global variables like this please. Here is how you use them:
->
-> +extern unsigned long msm_nand_phys;
+On 04/15/11 15:06, Russell King - ARM Linux wrote:
+> This is work in progress.
+Thanks, very useful.
 
-extern declaration in the 'C' file causing warning. We are in plan to 
-upload the OneNAND changes soon which makes use of the same .h file.
+> This uses the physical address, and unlike Davinci's dma address usage,
+> it always wants to have the physical address, and will always return
+> the corresponding physical address when passed that pointer.
+Good.
 
-> +#define MSM_NAND_REG(off) (msm_nand_phys + (off))
-> +
-> +#define MSM_NAND_FLASH_CMD            MSM_NAND_REG(0x0000)
-> +#define MSM_NAND_ADDR0                MSM_NAND_REG(0x0004)
+> OMAP could probably do with some more work to make the omapfb and other
+> allocations use the sram allocator, rather than hooking in before the
+> sram allocator is initialized - and then further cleanups so that we
+> have an initialization function which just does
 >
-> Could you please make the macros to take the "struct msm_nand_chip
-> *chip" argument instead, and store the pase address there. Do not hide
-> the fact that those macros are actually functions, not constant - this
-> is error prone.
->
-> Besides, I'm do not know your HW, but if you have several controllers
-> with various base addresses - your driver won't work.
+> sram_create(phys, size)
+> 	virt = map sram(phys, size)
+> 	create sram pool(virt, phys, size, min_alloc_order)
+I'd love to have the mapping inside the create pool, but that might
+not be possible in general.
 
-you are correct, we have multiple controllers, which breaks this logic 
-in future.
+> Another question is whether we should allow multiple SRAM pools or not -
+> this code does allow multiple pools, but so far we only have one pool
+> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
+> it if they want to partition the SRAM, or have peripheral-local SRAMs.
+Having the option to partition the SRAM is probably useful.
+What I'm missing is sram_pool_add: on AT91SAM9G20 you have two banks
+of SRAM, and you might want to combine them into a single pool.
 
->
->> +	pr_info("Save cfg0 = %x cfg1 = %x\n", chip->cfg0, chip->cfg1);
->> +	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d "
->> +		"num_addr_cycles=%d\n", (chip->cfg0>>  6)&  7,
->> +		(chip->cfg0>>  9)&  0x3ff, (chip->cfg0>>  19)&  15,
->> +		(chip->cfg0>>  23)&  15, (chip->cfg0>>  27)&  7);
->
-> Please, revise all your pr_info() calls and turn most of them into
-> dev_dbg() or pr_debug. Your driver should be completely silent by
-> default, except of error messages and some information messages when it
-> is initialized.
->
->
-I will revise all the pr_info calls and change the inappropriate calls 
-to pr_debug.
+>   arch/arm/common/sram-pool.c                 |   69 +++++++++++++++++++++++++++
+>   arch/arm/include/asm/sram-pool.h            |   20 ++++++++
+Waht is ARM specific about this code?
+Why not put it into lib/ and include/linux, respectively?
 
-Thanks,
-Murali N
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+   Detlef
