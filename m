@@ -1,34 +1,54 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Fri, 15 Apr 2011 06:26:40 -0500
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <20110414223036.GA7335@n2100.arm.linux.org.uk>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<20110414223036.GA7335@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 15 Apr 2011 16:25:49 +0400
+Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
+	on ARM
+In-Reply-To: <201104132316.01922.jkrzyszt@tis.icnet.pl>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<4DA5DF1E.1040302@ru.mvista.com>
+	<201104132301.56210.jkrzyszt@tis.icnet.pl>
+	<201104132316.01922.jkrzyszt@tis.icnet.pl>
+Message-ID: <4DA8394D.80405@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hello.
 
-On Thu, Apr 14, 2011 at 5:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
->> From: Ramesh Gupta <grgupta@ti.com>
->>
->> This patch is to flush the iommu page table entries from L1 and L2
->> caches using dma_map_single. This also simplifies the implementation
->> by removing the functions ?flush_iopgd_range/flush_iopte_range.
->
-> No. ?This usage is just wrong. ?If you're going to use the DMA API then
-> unmap it, otherwise the DMA API debugging will go awol.
->
+On 14-04-2011 1:16, Janusz Krzysztofik wrote:
 
-Thank you for the comments, this particular memory is always a write
-from the A9 for MMU programming and
-only read from the slave processor, that is the reason for not calling
-the unmap. I can re-look into the changes to call
-unmap in a proper way as this impacts the DMA API.
-Are there any other ways to perform only flush the memory from L1/L2 caches?
+>>> Janusz Krzysztofik wrote:
+>>>>>> After switching from mem->dma_handle to
+>>>>>> virt_to_phys(mem->vaddr) used for obtaining page frame number
+>>>>>> passed to remap_pfn_range() (commit
+>>>>>> 35d9f510b67b10338161aba6229d4f55b4000f5b),
+>>>>>> videobuf-dma-contig
 
- regards
-Ramesh Gupta G
+>>>>>      Please specify the commit summary -- for the human readers.
+
+>>>> Hi,
+>>>> OK, I'll try to reword the summary using a more human friendly
+>>>> language as soon as I have signs that Mauro (who seemed to
+>>>> understand the message well enough) is willing to accept the
+>>>> code.
+
+>>>      I wasn't asking you to rework your summary but to specify the
+
+>>> summary of the commit you've mentioned (in parens).
+
+>> Ah, I see. How about just reordered wording:
+
+>> After commit 35d9f510b67b10338161aba6229d4f55b4000f5b (switching from
+>> mem->dma_handle to virt_to_phys(mem->vaddr) used for obtaining page
+>> frame number passed to remap_pfn_range()), ....
+
+>> Do you think this would be clear enough?
+
+> Oh no, I probably missed your point again.
+
+> You meant just quoting the commit original summary line, didn't you?
+
+    Yes.
+
+> Thanks,
+> Janusz
+
+WBR, Sergei
