@@ -1,31 +1,50 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 15 Apr 2011 23:27:49 +0800
-Subject: About enable L2 cache in Linux kernel
-In-Reply-To: <BANLkTinTB=BmybmAGCRAbS9+nsLbXwBvkg@mail.gmail.com>
-References: <BANLkTinTB=BmybmAGCRAbS9+nsLbXwBvkg@mail.gmail.com>
-Message-ID: <BANLkTi=pTm+tgn88CQ8GGOoEZPAN_o4nzw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 15 Apr 2011 09:32:01 -0600
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415152643.GC4423@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<4DA84AAB.60601@gmail.com> <201104151640.01040.arnd@arndb.de>
+	<20110415152643.GC4423@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTinDwH9G1zW784t=QnNR7kZkgfKA8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell, Nicolas,
-
-2011/4/15 Jason Liu <liu.h.jason@gmail.com>:
-> Hi, Russell,
+On Fri, Apr 15, 2011 at 9:26 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 15, 2011 at 04:40:00PM +0200, Arnd Bergmann wrote:
+>> On Friday 15 April 2011 15:39:55 Rob Herring wrote:
+>>
+>> > On 04/15/2011 08:06 AM, Russell King - ARM Linux wrote:
+>> > > This is work in progress.
+>> > >
+>> > > We have two SoCs using SRAM, both with their own allocation systems,
+>> > > and both with their own ways of copying functions into the SRAM.
+>> >
+>> > It's more than that. Several i.MX chips use plat-mxc/iram_alloc.c.
+>>
+>> There are also non-ARM systems doing something like that,
+>> arch/blackfin/mm/sram-alloc.c comes to mind. On powerpc, the
+>> ppc7410 also has this feature in hardware, but I believe it was
+>> never supported in mainline Linux.
 >
-> I notice that if bootloader does not enable L2, after linux boot up,
-> the L2 cached will keep disabled.
-> Do you know why Linux kernel does not do L2 cache enable operation at
-> start up on cortex_a8?
-> Just due to that L2 is implementation specific? But cortex_a8
-> processor embed L2 cache inside.
-
-Any comments about it?
-
-Jason
-
-A
+> Yes, but there's some horrible bits out there. ?PPC is one of them
+> which looks like it doesn't lend itself to consolidating with this
+> kind of implementation.
 >
+>> How about putting sram-pool.c into the top-level mm/ directory
+>> and sram-pool.h into include/linux? They seem to be completely
+>> generic to me, aside from the dependency on asm/fncpy.h which
+>> should probably remain arch specific.
 >
-> BR,
-> Jason
+> I've thought about lib - but first lets see whether other architectures
+> want to use it first. ?I've asked the sh folk off-list about this and
+> waiting for a reply.
 >
+> Blackfin and PPC look horrible to sort out though, so they can come at
+> a later date if they so wish.
+
+Yes, once the infrastructure is in place, powerpc can do its own
+migration to the new code.  I vote for putting it in lib at the
+outset.
+
+g.
