@@ -1,84 +1,106 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Apr 2011 20:31:52 +0200
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-Message-ID: <20110415183152.GA10539@game.jcrosoft.org>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Fri, 15 Apr 2011 11:42:32 -0700
+Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
+Message-ID: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:06 Fri 15 Apr     , Russell King - ARM Linux wrote:
-> This is work in progress.
-> 
-> We have two SoCs using SRAM, both with their own allocation systems,
-> and both with their own ways of copying functions into the SRAM.
-> 
-> Let's unify this before we have additional SoCs re-implementing this
-> obviously common functionality themselves.
-> 
-> Unfortunately, we end up with code growth through doing this, but that
-> will become a win when we have another SoC using this (which I know
-> there's at least one in the pipeline).
-> 
-> One of the considerations here is that we can easily convert sram-pool.c
-> to hook into device tree stuff, which can tell the sram allocator:
-> 	- physical address of sram
-> 	- size of sram
-> 	- allocation granularity
-> and then we just need to ensure that it is appropriately mapped.
-> 
-> This uses the physical address, and unlike Davinci's dma address usage,
-> it always wants to have the physical address, and will always return
-> the corresponding physical address when passed that pointer.
-> 
-> OMAP could probably do with some more work to make the omapfb and other
-> allocations use the sram allocator, rather than hooking in before the
-> sram allocator is initialized - and then further cleanups so that we
-> have an initialization function which just does
-> 
-> sram_create(phys, size)
-> 	virt = map sram(phys, size)
-> 	create sram pool(virt, phys, size, min_alloc_order)
-> 
-> Another question is whether we should allow multiple SRAM pools or not -
-> this code does allow multiple pools, but so far we only have one pool
-> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
-> it if they want to partition the SRAM, or have peripheral-local SRAMs.
-> 
-> Lastly, uio_pruss should probably take the SRAM pool pointer via
-> platform data so that it doesn't have to include Davinci specific
-> includes.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Hi,
+Some drivers need to know what the status of the interrupt line is.
+This is especially true for drivers that register a handler with
+IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING and in the handler they
+need to know which edge transition it was invoked for.
 
-	I also work on it for at91
+The irq_read_line callback in the chip allows the controller to provide
+the real time status of this line. Controllers that can read the status
+of an interrupt line should implement this by doing necessary
+hardware reads and return the logical state of the line.
 
-	and already have some patch in the mm for this
+Interrupt controllers based on the slow bus architecture should conduct
+the transaction in this callback. The genirq code will call the chip's
+bus lock prior to calling irq_read_line. Obviously since the transaction
+would be completed before returning from irq_read_line it need not do
+any transactions in the bus unlock call.
 
-	[PATCH] genalloc: add support to specify the physical address
+Drivers need to be aware whether the interrupt controller is a slow bus
+and call read_irq_line in proper context.
 
-	so now you can do this
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+---
+ include/linux/interrupt.h |    1 +
+ include/linux/irq.h       |    2 ++
+ kernel/irq/manage.c       |   25 +++++++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 0 deletions(-)
 
-	as I do on at91 will send the patch after
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index 59b72ca..0722576 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -337,6 +337,7 @@ static inline void enable_irq_lockdep_irqrestore(unsigned int irq, unsigned long
+ 
+ /* IRQ wakeup (PM) control: */
+ extern int irq_set_irq_wake(unsigned int irq, unsigned int on);
++extern int irq_read_line(unsigned int irq);
+ 
+ #ifndef CONFIG_GENERIC_HARDIRQS_NO_COMPAT
+ /* Please do not use: Use the replacement functions instead */
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 2a375a7..52198b6 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -298,6 +298,7 @@ static inline void irqd_clr_chained_irq_inprogress(struct irq_data *d)
+  * @irq_retrigger:	resend an IRQ to the CPU
+  * @irq_set_type:	set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
+  * @irq_set_wake:	enable/disable power-management wake-on of an IRQ
++ * @irq_read_line:	return the current value on the irq line
+  * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
+  * @irq_bus_sync_unlock:function to sync and unlock slow bus (i2c) chips
+  * @irq_cpu_online:	configure an interrupt source for a secondary CPU
+@@ -324,6 +325,7 @@ struct irq_chip {
+ 	int		(*irq_retrigger)(struct irq_data *data);
+ 	int		(*irq_set_type)(struct irq_data *data, unsigned int flow_type);
+ 	int		(*irq_set_wake)(struct irq_data *data, unsigned int on);
++	int		(*irq_read_line)(struct irq_data *data);
+ 
+ 	void		(*irq_bus_lock)(struct irq_data *data);
+ 	void		(*irq_bus_sync_unlock)(struct irq_data *data);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 12a80fd..6667052 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -518,6 +518,31 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
+ }
+ EXPORT_SYMBOL(irq_set_irq_wake);
+ 
++/**
++ *	irq_read_line - read the value on an irq line
++ *	@irq: Interrupt number representing a hardware line
++ *
++ *	This function may be called from IRQ context only when
++ *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
++ */
++int irq_read_line(unsigned int irq)
++{
++	struct irq_desc *desc = irq_to_desc(irq);
++	unsigned long flags;
++	int val;
++
++	if (!desc || !desc->irq_data.chip->irq_read_line)
++		return -EINVAL;
++
++	chip_bus_lock(desc);
++	raw_spin_lock_irqsave(&desc->lock, flags);
++	val = desc->irq_data.chip->irq_read_line(&desc->irq_data);
++	raw_spin_unlock_irqrestore(&desc->lock, flags);
++	chip_bus_sync_unlock(desc);
++	return val;
++}
++EXPORT_SYMBOL(irq_read_line);
++
+ /*
+  * Internal function that tells the architecture code whether a
+  * particular irq has been exclusively allocated or is available
+-- 
+1.7.1
 
-static struct map_desc at91sam9g20_sram_desc[] __initdata = {
-	{
-		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G20_SRAM_SIZE,
-		.pfn		= __phys_to_pfn(AT91SAM9G20_SRAM_BASE),
-		.length		= AT91SAM9G20_SRAM_SIZE,
-		.type		= MT_DEVICE,
-	}
-};
-
-	sram_pool = gen_pool_create(2, -1);
-
-	gen_pool_add_virt(sram_pool, io_desc->virtual __pfn_to_phys(io_desc->pfn),
-			io_desc->length, -1)
-
-	and to get the physical address
-
-	phys = gen_pool_virt_to_phys(sram_pool, virt);
-
-Best Resgards,
-J.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
