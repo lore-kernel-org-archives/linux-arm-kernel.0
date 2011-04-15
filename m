@@ -1,29 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Apr 2011 19:21:44 +0100
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <4DA88A77.6050502@vollmann.ch>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA85B49.60209@vollmann.ch>
-	<20110415153723.GD4423@n2100.arm.linux.org.uk>
-	<4DA88A77.6050502@vollmann.ch>
-Message-ID: <20110415182144.GI4423@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 15 Apr 2011 11:27:41 -0700
+Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <1302633340-4795-5-git-send-email-will.deacon@arm.com> (Will
+	Deacon's message of "Tue, 12 Apr 2011 19:35:38 +0100")
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-5-git-send-email-will.deacon@arm.com>
+Message-ID: <8yazknr1iaq.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 08:12:07PM +0200, Detlef Vollmann wrote:
->> Second point is that you'll notice that the code converts to a phys
->> address using this: phys = phys_base + (virt - virt_base).  As soon as
->> we start allowing multiple regions of SRAM, it becomes impossible to
->> provide the phys address without a lot more complexity.
-> Yes, I understand that.  This either requires some intrusive changes
-> to gen_pool code or quite some additional code in sram_pool_alloc.
+On Tue, Apr 12 2011, Will Deacon wrote:
 
-It would require sram_pool to track each individual buffer alongside
-the similar tracking that gen_pool does, and then look up the returned
-address to find out which buffer it corresponds with.
+> This patch updates the MSM gpio chained IRQ handler to use the chained
+> IRQ enter/exit functions in order to function correctly on primary
+> controllers with different methods of flow control.
+>
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-As it looks though, this functionality isn't required on AT91.  So lets
-not complicate the code unless we know we have to.  While the alloc/free
-API is such that it'll be able to cope if we have to add it later - the
-initialization will have to become a little more complex.  And then I
-start to wonder if gen_pool should just be extended for the phys address.
+I'm okay acking this as long as Abhijeet is ok with it.
+
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
