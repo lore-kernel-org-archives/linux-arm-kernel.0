@@ -1,69 +1,56 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Fri, 15 Apr 2011 19:20:12 +0000
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415165857.GH4423@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com>
-	<20110415160339.GF4423@n2100.arm.linux.org.uk>
-	<56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
-	<20110415162045.GG4423@n2100.arm.linux.org.uk>
-	<20110415165857.GH4423@n2100.arm.linux.org.uk>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA1F8D18@039-SN1MPN1-004.039d.mgd.msft.net>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Fri, 15 Apr 2011 21:21:44 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <1302892585.30441.12.camel@dev.znau.edu.ua>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<1302781431.21145.6.camel@dev.znau.edu.ua>
+	<BANLkTinvpt5vs+rXd3WN-a2JpGtTV+=Gyg@mail.gmail.com>
+	<4DA6E9BD.3090404@hauke-m.de>
+	<BANLkTinu+Q367oqQPiUehPcbMs-SBxbwFg@mail.gmail.com>
+	<1302786900.21965.52.camel@dev.znau.edu.ua>
+	<BANLkTimM8=-pX+Ea8Eyp4XyvP1APbUof9w@mail.gmail.com>
+	<1302892585.30441.12.camel@dev.znau.edu.ua>
+Message-ID: <BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->-----Original Message-----
->From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
->Sent: Friday, April 15, 2011 11:59 AM
->To: Nguyen Dinh-R00091
->Cc: Kevin Hilman; davinci-linux-open-source at linux.davincidsp.com; Tony Lindgren; Sekhar Nori; linux-
->omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [RFC PATCH] Consolidate SRAM support
->
->On Fri, Apr 15, 2011 at 05:20:45PM +0100, Russell King - ARM Linux wrote:
->> On Fri, Apr 15, 2011 at 04:18:23PM +0000, Nguyen Dinh-R00091 wrote:
->> > >Hmm, that's nice - except for one issue.  According to my grep of
->> > >arch/arm/ and drivers/, nothing uses iram_alloc().  So, does anything in
->> > >the MX stuff use iram_alloc.c, or is it dead code left over from a
->> > >previous experiment?
->> >
->> > This function will be used for suspend code in the mx5x series. I just
->> > got done submitting a series of patches to Sascha for a simple suspend
->> > that does not need running code out of IRAM yet. The next set of suspend
->> > patches will be using these iram functions.
+W dniu 15 kwietnia 2011 20:36 u?ytkownik George Kashperko
+<george@znau.edu.ua> napisa?:
+>> >> Arnd: I found you saying:
+>> >> > I believe the one thing we really want from this driver is the bus
+>> >> > scan code, which is not present in the amba bus implementation,
+>> >> I explained how it works, I believe scanning (EPROM in this case) it
+>> >> Broadcom specific, not really AMBA standard. How do you see it?
+>> >>
+>> > It might not Broadcom specific as EPROM core seems to be CoreLink one
+>> > core and maybe is arm-developed. But it isn't documented publicly and we
+>> > don't know yet if it is obligatory for all amba (or at least axi)
+>> > interconnects or not.
 >>
->> Okay, so does iram_alloc() need to return a dma_addr_t or a phys_addr_t ?
->> Are you dealing with physical addresses for it or DMA addresses?
+>> Maybe EPROM is not Broadcom specific, but I suspect the content we
+>> deal with in bcmai/axi is Broadcom specific. I didn't see any notes of
+>> manuf/id/rev/class we deal with. So I guess everything *we* (out
+>> driver) read from EPROM is Bcm specific.
+>>
 >
->And another question: why does iram_alloc() return a void __iomem * for
->the virtual address, and the physical address via a pointer argument.
->However, iram_free() take an unsigned long for the address.
+> Played around amba registers on bcm4716. For all amba cores present
+> (under all I mean broadcom ip core agents, oob router core, erom core,
+> and other I-dont-know-what-for cores present at 0x18100000). All those
+> feature AMBA_CID (0xb105f00d) as PrimeCell ID, and slightly different
+> PrimeCell PeripheralIDs:
+> * vendor 0xBB, part_number 0x368 for broadcom cores' agents;
+> * vendor 0xBB, part_number 0x367 for OOB router core (don't ask me wth
+> is this please);
+> * vendor 0xBB, part_number 0x366 for EROM core;
+>
+> ARM vendor id is 0x41. Might 0xBB is Broadcom vendor id but I've found
+> no evidence for that with google.
 
-Yes, should just be a void *iram_alloc().
+Yeah, as I suspected, everything except Broadcom specific cores
+matches AMBA standards quite nicely. Still, I don't see anything in it
+we could use for driver.
 
->
->It seems rather inconsistent that the parameter for free is returned via
->a pointer argument.
->
->If I convert this to sram-pool, can we change this to:
->
->static inline void *iram_alloc(size_t size, phys_addr_t *phys_addr)
->{
->	return sram_pool_alloc(iram_pool, size, phys_addr);
->}
->
->static void iram_free(void *addr, size_t size)
->{
->	sram_pool_free(iram_pool, addr, size);
->}
->
->and:
->
->int __init iram_init(unsigned long base, unsigned long size)
->
->becomes:
->
->int __init iram_init(phys_addr_t base, size_t size)
->
->?
+Let's wait for Russell and Arnd to comment.
+
+-- 
+Rafa?
