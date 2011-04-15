@@ -1,35 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Apr 2011 16:40:00 +0200
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <4DA84AAB.60601@gmail.com>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com>
-Message-ID: <201104151640.01040.arnd@arndb.de>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Fri, 15 Apr 2011 20:20:12 +0530
+Subject: [PATCH 2/2] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <1302861097.3220.12.camel@localhost>
+References: <1298940450-27365-1-git-send-email-mnalajal@codeaurora.org>	
+	<1298940450-27365-2-git-send-email-mnalajal@codeaurora.org>
+	<1302861097.3220.12.camel@localhost>
+Message-ID: <4DA85B24.50807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2011 15:39:55 Rob Herring wrote:
+On 4/15/2011 3:21 PM, Artem Bityutskiy wrote:
+> On Tue, 2011-03-01 at 06:17 +0530, Murali Nalajala wrote:
+>> +#define pr_fmt(fmt) "%s:" fmt, __func__
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/mtd/mtd.h>
+>> +#include<linux/mtd/nand.h>
+>> +#include<linux/mtd/partitions.h>
+>> +#include<linux/platform_device.h>
+>> +#include<linux/sched.h>
+>> +#include<linux/slab.h>
+>> +#include<linux/dma-mapping.h>
+>> +#include<asm/mach/flash.h>
+>> +#include<mach/dma.h>
+>> +
+>> +#include "msm_nand.h"
+>> +
+>> +unsigned long msm_nand_phys;
+>
+> No global variables like this please. Here is how you use them:
+>
+> +extern unsigned long msm_nand_phys;
 
-> On 04/15/2011 08:06 AM, Russell King - ARM Linux wrote:
-> > This is work in progress.
-> >
-> > We have two SoCs using SRAM, both with their own allocation systems,
-> > and both with their own ways of copying functions into the SRAM.
-> 
-> It's more than that. Several i.MX chips use plat-mxc/iram_alloc.c.
+extern declaration in the 'C' file causing warning. We are in plan to 
+upload the OneNAND changes soon which makes use of the same .h file.
 
-There are also non-ARM systems doing something like that,
-arch/blackfin/mm/sram-alloc.c comes to mind. On powerpc, the
-ppc7410 also has this feature in hardware, but I believe it was
-never supported in mainline Linux.
+> +#define MSM_NAND_REG(off) (msm_nand_phys + (off))
+> +
+> +#define MSM_NAND_FLASH_CMD            MSM_NAND_REG(0x0000)
+> +#define MSM_NAND_ADDR0                MSM_NAND_REG(0x0004)
+>
+> Could you please make the macros to take the "struct msm_nand_chip
+> *chip" argument instead, and store the pase address there. Do not hide
+> the fact that those macros are actually functions, not constant - this
+> is error prone.
+>
+> Besides, I'm do not know your HW, but if you have several controllers
+> with various base addresses - your driver won't work.
 
-How about putting sram-pool.c into the top-level mm/ directory
-and sram-pool.h into include/linux? They seem to be completely
-generic to me, aside from the dependency on asm/fncpy.h which
-should probably remain arch specific.
+you are correct, we have multiple controllers, which breaks this logic 
+in future.
 
-As long as CONFIG_ARM_SRAM_POOL (or perhaps just CONFIG_SRAM_POOL)
-is selected only by platforms that support it, the dependency
-should not hurt.
+>
+>> +	pr_info("Save cfg0 = %x cfg1 = %x\n", chip->cfg0, chip->cfg1);
+>> +	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d "
+>> +		"num_addr_cycles=%d\n", (chip->cfg0>>  6)&  7,
+>> +		(chip->cfg0>>  9)&  0x3ff, (chip->cfg0>>  19)&  15,
+>> +		(chip->cfg0>>  23)&  15, (chip->cfg0>>  27)&  7);
+>
+> Please, revise all your pr_info() calls and turn most of them into
+> dev_dbg() or pr_debug. Your driver should be completely silent by
+> default, except of error messages and some information messages when it
+> is initialized.
+>
+>
+I will revise all the pr_info calls and change the inappropriate calls 
+to pr_debug.
 
-	Arnd
+Thanks,
+Murali N
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
