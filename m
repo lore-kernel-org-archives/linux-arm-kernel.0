@@ -1,84 +1,66 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Fri, 15 Apr 2011 15:03:19 -0400
-Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
-In-Reply-To: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-References: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <20110415190319.GA24111@Krystal>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 15 Apr 2011 21:08:05 +0200
+Subject: [RFC] sanitizing crazy clock data files
+Message-ID: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Abhijeet Dharmapurikar (adharmap at codeaurora.org) wrote:
-> Some drivers need to know what the status of the interrupt line is.
-> This is especially true for drivers that register a handler with
-> IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING and in the handler they
-> need to know which edge transition it was invoked for.
-> 
-> The irq_read_line callback in the chip allows the controller to provide
-> the real time status of this line. Controllers that can read the status
-> of an interrupt line should implement this by doing necessary
-> hardware reads and return the logical state of the line.
-> 
-> Interrupt controllers based on the slow bus architecture should conduct
-> the transaction in this callback. The genirq code will call the chip's
-> bus lock prior to calling irq_read_line. Obviously since the transaction
-> would be completed before returning from irq_read_line it need not do
-> any transactions in the bus unlock call.
-> 
-> Drivers need to be aware whether the interrupt controller is a slow bus
-> and call read_irq_line in proper context.
+The following tries to solve the chicken-egg problem we have with the
+common struct clk support and its users. It switches i.MX51 clock support
+to the new API. Included are some generic clock helpers for dividers and
+multiplexer. I first made them i.MX specific but after looking round in
+the other architectures I found them useful enough for other architectures
+aswell. If you could use the helpers but missing some bits please speak up.
 
-Hrm, this strikes me as odd. Is there any way this generic API could
-handle the corner-cases without needed the caller to know this ?
+There is one thing missing in Jeremys series and this series does not fix
+it. Once I add the new (un)prepare calls to drivers they won't compile
+without common struct clk support anymore. Maybe a
 
-[...]
+#ifndef CONFIG_USE_COMMON_STRUCT_CLK
+#define clk_prepare()
+#define clk_unprepare()
+#endif
 
-> +/**
-> + *	irq_read_line - read the value on an irq line
-> + *	@irq: Interrupt number representing a hardware line
-> + *
-> + *	This function may be called from IRQ context only when
-> + *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
+will do.
 
-The comment here seems to imply "be careful when using this extremely
-fragile interface", which does not give me the warm safety feeling I
-would come to expect from a generic kernel API.
+Sascha
 
-Any ideas on how to improve that ?
+The following changes since commit de4a95bc9025f0566ade64dc35e5e3014e640b85:
 
-Thanks,
+  clk: Generic support for fixed-rate clocks (2011-04-15 20:39:48 +0200)
 
-Mathieu
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git clk-common
 
-> + */
-> +int irq_read_line(unsigned int irq)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(irq);
-> +	unsigned long flags;
-> +	int val;
-> +
-> +	if (!desc || !desc->irq_data.chip->irq_read_line)
-> +		return -EINVAL;
-> +
-> +	chip_bus_lock(desc);
-> +	raw_spin_lock_irqsave(&desc->lock, flags);
-> +	val = desc->irq_data.chip->irq_read_line(&desc->irq_data);
-> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
-> +	chip_bus_sync_unlock(desc);
-> +	return val;
-> +}
-> +EXPORT_SYMBOL(irq_read_line);
-> +
->  /*
->   * Internal function that tells the architecture code whether a
->   * particular irq has been exclusively allocated or is available
-> -- 
-> 1.7.1
-> 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Sascha Hauer (8):
+      clk: Make NULL a valid clock again
+      clk: implement parent pass through functions
+      clk: Add support for simple dividers
+      clk: Add support for a generic clock multiplexer
+      ARM i.MX: Support for clock building blocks.
+      ARM i.MX: Add generic support for pllv2
+      ARM i.MX51/53: reimplement clock support
+      ARM i.MX51/53: remove old clock support
 
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+ arch/arm/mach-mx5/Kconfig               |    6 +
+ arch/arm/mach-mx5/Makefile              |    2 +-
+ arch/arm/mach-mx5/clock-imx51-imx53.c   |  420 ++++++++
+ arch/arm/mach-mx5/clock-mx51-mx53.c     | 1579 -------------------------------
+ arch/arm/mach-mx5/crm_regs.h            |  249 +-----
+ arch/arm/plat-mxc/Makefile              |    1 +
+ arch/arm/plat-mxc/clock.c               |  182 ++++
+ arch/arm/plat-mxc/include/mach/clkdev.h |    2 +
+ arch/arm/plat-mxc/include/mach/clock.h  |  153 +++-
+ arch/arm/plat-mxc/pllv2.c               |  228 +++++
+ drivers/clk/Kconfig                     |    6 +
+ drivers/clk/Makefile                    |    2 +
+ drivers/clk/clk-divider.c               |  132 +++
+ drivers/clk/clk-mux.c                   |   92 ++
+ drivers/clk/clk.c                       |  104 ++
+ include/linux/clk.h                     |   68 ++
+ 16 files changed, 1395 insertions(+), 1831 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/clock-imx51-imx53.c
+ delete mode 100644 arch/arm/mach-mx5/clock-mx51-mx53.c
+ create mode 100644 arch/arm/plat-mxc/pllv2.c
+ create mode 100644 drivers/clk/clk-divider.c
+ create mode 100644 drivers/clk/clk-mux.c
