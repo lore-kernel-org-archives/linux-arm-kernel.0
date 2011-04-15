@@ -1,47 +1,69 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 15 Apr 2011 12:17:55 -0700
-Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
-In-Reply-To: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-References: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <4DA899E3.30409@caviumnetworks.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Fri, 15 Apr 2011 19:20:12 +0000
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415165857.GH4423@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<4DA84AAB.60601@gmail.com>
+	<20110415160339.GF4423@n2100.arm.linux.org.uk>
+	<56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
+	<20110415162045.GG4423@n2100.arm.linux.org.uk>
+	<20110415165857.GH4423@n2100.arm.linux.org.uk>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA1F8D18@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2011 11:42 AM, Abhijeet Dharmapurikar wrote:
-[...]
+
+>-----Original Message-----
+>From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+>Sent: Friday, April 15, 2011 11:59 AM
+>To: Nguyen Dinh-R00091
+>Cc: Kevin Hilman; davinci-linux-open-source at linux.davincidsp.com; Tony Lindgren; Sekhar Nori; linux-
+>omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [RFC PATCH] Consolidate SRAM support
 >
-> +/**
-> + *	irq_read_line - read the value on an irq line
-> + *	@irq: Interrupt number representing a hardware line
-> + *
-> + *	This function may be called from IRQ context only when
-> + *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
+>On Fri, Apr 15, 2011 at 05:20:45PM +0100, Russell King - ARM Linux wrote:
+>> On Fri, Apr 15, 2011 at 04:18:23PM +0000, Nguyen Dinh-R00091 wrote:
+>> > >Hmm, that's nice - except for one issue.  According to my grep of
+>> > >arch/arm/ and drivers/, nothing uses iram_alloc().  So, does anything in
+>> > >the MX stuff use iram_alloc.c, or is it dead code left over from a
+>> > >previous experiment?
+>> >
+>> > This function will be used for suspend code in the mx5x series. I just
+>> > got done submitting a series of patches to Sascha for a simple suspend
+>> > that does not need running code out of IRAM yet. The next set of suspend
+>> > patches will be using these iram functions.
+>>
+>> Okay, so does iram_alloc() need to return a dma_addr_t or a phys_addr_t ?
+>> Are you dealing with physical addresses for it or DMA addresses?
+>
+>And another question: why does iram_alloc() return a void __iomem * for
+>the virtual address, and the physical address via a pointer argument.
+>However, iram_free() take an unsigned long for the address.
 
-What does it return?  I can see that -EINVAL is returned if it isn't 
-applicable to this irq.  But what if chip->irq_read_line is implemented?
+Yes, should just be a void *iram_alloc().
 
-
-
-
-> + */
-> +int irq_read_line(unsigned int irq)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(irq);
-> +	unsigned long flags;
-> +	int val;
-> +
-> +	if (!desc || !desc->irq_data.chip->irq_read_line)
-> +		return -EINVAL;
-> +
-> +	chip_bus_lock(desc);
-> +	raw_spin_lock_irqsave(&desc->lock, flags);
-> +	val = desc->irq_data.chip->irq_read_line(&desc->irq_data);
-> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
-> +	chip_bus_sync_unlock(desc);
-> +	return val;
-> +}
-> +EXPORT_SYMBOL(irq_read_line);
-> +
->   /*
->    * Internal function that tells the architecture code whether a
->    * particular irq has been exclusively allocated or is available
+>
+>It seems rather inconsistent that the parameter for free is returned via
+>a pointer argument.
+>
+>If I convert this to sram-pool, can we change this to:
+>
+>static inline void *iram_alloc(size_t size, phys_addr_t *phys_addr)
+>{
+>	return sram_pool_alloc(iram_pool, size, phys_addr);
+>}
+>
+>static void iram_free(void *addr, size_t size)
+>{
+>	sram_pool_free(iram_pool, addr, size);
+>}
+>
+>and:
+>
+>int __init iram_init(unsigned long base, unsigned long size)
+>
+>becomes:
+>
+>int __init iram_init(phys_addr_t base, size_t size)
+>
+>?
