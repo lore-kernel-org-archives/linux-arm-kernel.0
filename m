@@ -1,106 +1,83 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 15 Apr 2011 11:42:32 -0700
-Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
-Message-ID: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 15 Apr 2011 20:38:59 +0200
+Subject: [PATCH 1/2] at91: 9260 and 9g20 add support of join SRAM Memory
+	Mapping
+In-Reply-To: <20110415183152.GA10539@game.jcrosoft.org>
+References: <20110415183152.GA10539@game.jcrosoft.org>
+Message-ID: <1302892740-2010-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers need to know what the status of the interrupt line is.
-This is especially true for drivers that register a handler with
-IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING and in the handler they
-need to know which edge transition it was invoked for.
+on 9269 and 9g20 the sram are mirrored at then of the bank so we can join them
 
-The irq_read_line callback in the chip allows the controller to provide
-the real time status of this line. Controllers that can read the status
-of an interrupt line should implement this by doing necessary
-hardware reads and return the logical state of the line.
-
-Interrupt controllers based on the slow bus architecture should conduct
-the transaction in this callback. The genirq code will call the chip's
-bus lock prior to calling irq_read_line. Obviously since the transaction
-would be completed before returning from irq_read_line it need not do
-any transactions in the bus unlock call.
-
-Drivers need to be aware whether the interrupt controller is a slow bus
-and call read_irq_line in proper context.
-
-Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- include/linux/interrupt.h |    1 +
- include/linux/irq.h       |    2 ++
- kernel/irq/manage.c       |   25 +++++++++++++++++++++++++
- 3 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/at91sam9260.c              |   22 ++++++----------------
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
+ 2 files changed, 10 insertions(+), 16 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 59b72ca..0722576 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -337,6 +337,7 @@ static inline void enable_irq_lockdep_irqrestore(unsigned int irq, unsigned long
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 195208b..32524ef 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -36,28 +36,18 @@ static struct map_desc at91sam9260_io_desc[] __initdata = {
  
- /* IRQ wakeup (PM) control: */
- extern int irq_set_irq_wake(unsigned int irq, unsigned int on);
-+extern int irq_read_line(unsigned int irq);
+ static struct map_desc at91sam9260_sram_desc[] __initdata = {
+ 	{
+-		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9260_SRAM0_SIZE,
+-		.pfn		= __phys_to_pfn(AT91SAM9260_SRAM0_BASE),
+-		.length		= AT91SAM9260_SRAM0_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9260_SRAM0_SIZE - AT91SAM9260_SRAM1_SIZE,
+-		.pfn		= __phys_to_pfn(AT91SAM9260_SRAM1_BASE),
+-		.length		= AT91SAM9260_SRAM1_SIZE,
++		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9260_SRAM_SIZE,
++		.pfn		= __phys_to_pfn(AT91SAM9260_SRAM_BASE),
++		.length		= AT91SAM9260_SRAM_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}
+ };
  
- #ifndef CONFIG_GENERIC_HARDIRQS_NO_COMPAT
- /* Please do not use: Use the replacement functions instead */
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 2a375a7..52198b6 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -298,6 +298,7 @@ static inline void irqd_clr_chained_irq_inprogress(struct irq_data *d)
-  * @irq_retrigger:	resend an IRQ to the CPU
-  * @irq_set_type:	set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
-  * @irq_set_wake:	enable/disable power-management wake-on of an IRQ
-+ * @irq_read_line:	return the current value on the irq line
-  * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
-  * @irq_bus_sync_unlock:function to sync and unlock slow bus (i2c) chips
-  * @irq_cpu_online:	configure an interrupt source for a secondary CPU
-@@ -324,6 +325,7 @@ struct irq_chip {
- 	int		(*irq_retrigger)(struct irq_data *data);
- 	int		(*irq_set_type)(struct irq_data *data, unsigned int flow_type);
- 	int		(*irq_set_wake)(struct irq_data *data, unsigned int on);
-+	int		(*irq_read_line)(struct irq_data *data);
+ static struct map_desc at91sam9g20_sram_desc[] __initdata = {
+ 	{
+-		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G20_SRAM0_SIZE,
+-		.pfn		= __phys_to_pfn(AT91SAM9G20_SRAM0_BASE),
+-		.length		= AT91SAM9G20_SRAM0_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G20_SRAM0_SIZE - AT91SAM9G20_SRAM1_SIZE,
+-		.pfn		= __phys_to_pfn(AT91SAM9G20_SRAM1_BASE),
+-		.length		= AT91SAM9G20_SRAM1_SIZE,
++		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G20_SRAM_SIZE,
++		.pfn		= __phys_to_pfn(AT91SAM9G20_SRAM_BASE),
++		.length		= AT91SAM9G20_SRAM_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}
+ };
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+index 4e79036..6c53b95 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9260.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+@@ -119,6 +119,8 @@
+ #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
+ #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+ #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
++#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
++#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
  
- 	void		(*irq_bus_lock)(struct irq_data *data);
- 	void		(*irq_bus_sync_unlock)(struct irq_data *data);
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 12a80fd..6667052 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -518,6 +518,31 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
- }
- EXPORT_SYMBOL(irq_set_irq_wake);
+ #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
  
-+/**
-+ *	irq_read_line - read the value on an irq line
-+ *	@irq: Interrupt number representing a hardware line
-+ *
-+ *	This function may be called from IRQ context only when
-+ *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
-+ */
-+int irq_read_line(unsigned int irq)
-+{
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	unsigned long flags;
-+	int val;
-+
-+	if (!desc || !desc->irq_data.chip->irq_read_line)
-+		return -EINVAL;
-+
-+	chip_bus_lock(desc);
-+	raw_spin_lock_irqsave(&desc->lock, flags);
-+	val = desc->irq_data.chip->irq_read_line(&desc->irq_data);
-+	raw_spin_unlock_irqrestore(&desc->lock, flags);
-+	chip_bus_sync_unlock(desc);
-+	return val;
-+}
-+EXPORT_SYMBOL(irq_read_line);
-+
- /*
-  * Internal function that tells the architecture code whether a
-  * particular irq has been exclusively allocated or is available
+@@ -132,6 +134,8 @@
+ #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
+ #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+ #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
++#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
++#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
+ 
+ #define AT91SAM9G20_UHP_BASE	0x00500000	/* USB Host controller */
+ 
 -- 
-1.7.1
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.4.1
