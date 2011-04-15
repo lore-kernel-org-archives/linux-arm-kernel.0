@@ -1,47 +1,84 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Fri, 15 Apr 2011 21:36:25 +0300
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTimM8=-pX+Ea8Eyp4XyvP1APbUof9w@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<1302781431.21145.6.camel@dev.znau.edu.ua>
-	<BANLkTinvpt5vs+rXd3WN-a2JpGtTV+=Gyg@mail.gmail.com>
-	<4DA6E9BD.3090404@hauke-m.de>
-	<BANLkTinu+Q367oqQPiUehPcbMs-SBxbwFg@mail.gmail.com>
-	<1302786900.21965.52.camel@dev.znau.edu.ua>
-	<BANLkTimM8=-pX+Ea8Eyp4XyvP1APbUof9w@mail.gmail.com>
-Message-ID: <1302892585.30441.12.camel@dev.znau.edu.ua>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 15 Apr 2011 20:31:52 +0200
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+Message-ID: <20110415183152.GA10539@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Arnd: I found you saying:
-> >> > I believe the one thing we really want from this driver is the bus
-> >> > scan code, which is not present in the amba bus implementation,
-> >> I explained how it works, I believe scanning (EPROM in this case) it
-> >> Broadcom specific, not really AMBA standard. How do you see it?
-> >>
-> > It might not Broadcom specific as EPROM core seems to be CoreLink one
-> > core and maybe is arm-developed. But it isn't documented publicly and we
-> > don't know yet if it is obligatory for all amba (or at least axi)
-> > interconnects or not.
+On 14:06 Fri 15 Apr     , Russell King - ARM Linux wrote:
+> This is work in progress.
 > 
-> Maybe EPROM is not Broadcom specific, but I suspect the content we
-> deal with in bcmai/axi is Broadcom specific. I didn't see any notes of
-> manuf/id/rev/class we deal with. So I guess everything *we* (out
-> driver) read from EPROM is Bcm specific.
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
 > 
+> Let's unify this before we have additional SoCs re-implementing this
+> obviously common functionality themselves.
+> 
+> Unfortunately, we end up with code growth through doing this, but that
+> will become a win when we have another SoC using this (which I know
+> there's at least one in the pipeline).
+> 
+> One of the considerations here is that we can easily convert sram-pool.c
+> to hook into device tree stuff, which can tell the sram allocator:
+> 	- physical address of sram
+> 	- size of sram
+> 	- allocation granularity
+> and then we just need to ensure that it is appropriately mapped.
+> 
+> This uses the physical address, and unlike Davinci's dma address usage,
+> it always wants to have the physical address, and will always return
+> the corresponding physical address when passed that pointer.
+> 
+> OMAP could probably do with some more work to make the omapfb and other
+> allocations use the sram allocator, rather than hooking in before the
+> sram allocator is initialized - and then further cleanups so that we
+> have an initialization function which just does
+> 
+> sram_create(phys, size)
+> 	virt = map sram(phys, size)
+> 	create sram pool(virt, phys, size, min_alloc_order)
+> 
+> Another question is whether we should allow multiple SRAM pools or not -
+> this code does allow multiple pools, but so far we only have one pool
+> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
+> it if they want to partition the SRAM, or have peripheral-local SRAMs.
+> 
+> Lastly, uio_pruss should probably take the SRAM pool pointer via
+> platform data so that it doesn't have to include Davinci specific
+> includes.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi,
 
-Played around amba registers on bcm4716. For all amba cores present
-(under all I mean broadcom ip core agents, oob router core, erom core,
-and other I-dont-know-what-for cores present at 0x18100000). All those
-feature AMBA_CID (0xb105f00d) as PrimeCell ID, and slightly different
-PrimeCell PeripheralIDs:
-* vendor 0xBB, part_number 0x368 for broadcom cores' agents;
-* vendor 0xBB, part_number 0x367 for OOB router core (don't ask me wth
-is this please);
-* vendor 0xBB, part_number 0x366 for EROM core;
+	I also work on it for at91
 
-ARM vendor id is 0x41. Might 0xBB is Broadcom vendor id but I've found
-no evidence for that with google.
+	and already have some patch in the mm for this
 
-Have nice day,
-George
+	[PATCH] genalloc: add support to specify the physical address
+
+	so now you can do this
+
+	as I do on at91 will send the patch after
+
+static struct map_desc at91sam9g20_sram_desc[] __initdata = {
+	{
+		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G20_SRAM_SIZE,
+		.pfn		= __phys_to_pfn(AT91SAM9G20_SRAM_BASE),
+		.length		= AT91SAM9G20_SRAM_SIZE,
+		.type		= MT_DEVICE,
+	}
+};
+
+	sram_pool = gen_pool_create(2, -1);
+
+	gen_pool_add_virt(sram_pool, io_desc->virtual __pfn_to_phys(io_desc->pfn),
+			io_desc->length, -1)
+
+	and to get the physical address
+
+	phys = gen_pool_virt_to_phys(sram_pool, virt);
+
+Best Resgards,
+J.
