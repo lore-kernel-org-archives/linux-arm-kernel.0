@@ -1,39 +1,20 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 15 Apr 2011 16:50:56 +0800
-Subject: [PATCH 1/2] ARM: mxs: add GPMI support for imx23/imx28
-In-Reply-To: <20110415084230.GN31990@pengutronix.de>
-References: <1302854508-13652-1-git-send-email-b32955@freescale.com>
-	<20110415080621.GL31990@pengutronix.de>
-	<4DA7FE37.7030808@freescale.com>
-	<20110415084230.GN31990@pengutronix.de>
-Message-ID: <4DA806F0.6080706@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Apr 2011 10:15:29 +0100
+Subject: dmaengine: Can we schedule new transfer from dma callback
+	routine??
+In-Reply-To: <4DA7E997.3080402@st.com>
+References: <4DA2B3D8.6060707@st.com>
+	<20110411085603.GA13041@n2100.arm.linux.org.uk>
+	<4DA7E997.3080402@st.com>
+Message-ID: <20110415091529.GJ1611@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-> On Fri, Apr 15, 2011 at 04:13:43PM +0800, Huang Shijie wrote:
->>> On Fri, Apr 15, 2011 at 04:01:47PM +0800, Huang Shijie wrote:
->>>> +#define GPMI_NFC_DRIVER_NAME	"gpmi-nfc"
->>>> +#define GPMI_NFC_DRIVER_MX23	"imx23-gpmi-nfc"
->>>> +#define GPMI_NFC_DRIVER_MX28	"imx28-gpmi-nfc"
->>>> +#define GPMI_NFC_DRIVER_MX50	"imx50-gpmi-nfc"
->>> Is it sensible to keep these when they are only used in a single .c
->>> file?
->>>
->> I also use these in gpmi driver for distinguish platform id.
->> Do i have to remove these lines , and use the hardcode?
-> Ah, I missed the usage in the header. *shrug*, I don't care much, but
-> I'd use hardcoding.
->
-ok. I will change it in the next version.
+On Fri, Apr 15, 2011 at 12:15:43PM +0530, viresh kumar wrote:
+> There is one more issue in the current DW_DMAC driver.
+> As most of interrupt processing is done in tasklet, spin_lock_bh() is used
+> in almost every routine.
 
-> BTW, as the driver name is gpmi-nfc this should be used for the various
-> names introduced in this patch set. (i.e. mx28_add_gpmi_nfc,
-> MXS_HAS_PLATFORM_GPMI_NFC etc.)
-thanks.
-
-Best Regards
-Huang Shijie
-> Best regards
-> Uwe
->
+As you can't use spin_lock_bh() from IRQ context (you'll get a lockdep
+warning) these need to be converted to being the irqsave versions.
+That's probably the easiest fix.
