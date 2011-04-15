@@ -1,29 +1,25 @@
-From: sakoman@gmail.com (Steve Sakoman)
-Date: Fri, 15 Apr 2011 06:17:51 -0700
-Subject: [PATCH] Fixed gpio polarity of gpio USB-phy reset.
-In-Reply-To: <20110414103254.GC14319@legolas.emea.dhcp.ti.com>
-References: <1302766303-1157-1-git-send-email-J.Kilb@phytec.de>
-	<20110414103254.GC14319@legolas.emea.dhcp.ti.com>
-Message-ID: <BANLkTinNpMcuk0dpobM1Nu4zeU3yo8QQvw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 15 Apr 2011 08:39:55 -0500
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+Message-ID: <4DA84AAB.60601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2011 at 3:32 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, Apr 14, 2011 at 09:31:43AM +0200, Juergen Kilb wrote:
->> With commit 19403165 a main part of ehci-omap.c moved to
->> drivers/mfd/omap-usb-host.c created by commit 17cdd29d.
->> Due to this reorganisation the polarity used to reset the
->> external USB phy changed and USB host doesn't recognize
->> any devices.
->>
->> Signed-off-by: Juergen Kilb <J.Kilb@phytec.de>
+Russell,
+
+On 04/15/2011 08:06 AM, Russell King - ARM Linux wrote:
+> This is work in progress.
 >
-> Judging by how ehci-omap.c was before moving the code:
->
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
 
-This fixes the issue on Overo:
+It's more than that. Several i.MX chips use plat-mxc/iram_alloc.c.
 
-Tested-by: Steve Sakoman <steve@sakoman.com>
+lpc32xx and pnx4008 also use iram, but do not have an allocator (only 1 
+user). Both are doing a copy the suspend code to IRAM and run it which 
+may also be a good thing to have generic code for. Several i.MX chips 
+also need to run from IRAM for suspend.
 
-Steve
+Rob
