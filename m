@@ -1,56 +1,57 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 15 Apr 2011 17:01:11 +0300
-Subject: [PATCH 1/2] MTD: s3c2410_nand: Add option to disable hw ECC at
-	runtime
-In-Reply-To: <4DA7094D.9070002@metafoo.de>
-References: <1302637672-25339-1-git-send-email-lars@metafoo.de>
-	<1302782911.2796.21.camel@localhost>  <4DA7094D.9070002@metafoo.de>
-Message-ID: <1302876071.3220.60.camel@localhost>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Fri, 15 Apr 2011 16:30:50 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikr-J0HSW74dPvGfuJe6GdCBs151w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-04-14 at 16:48 +0200, Lars-Peter Clausen wrote:
-> On 04/14/2011 02:08 PM, Artem Bityutskiy wrote:
-> > On Tue, 2011-04-12 at 21:47 +0200, Lars-Peter Clausen wrote:
-> >> From: Holger Freyther <zecke@openmoko.org>
-> >>
-> >> This patch adds a flag to the s3c2410_nand platform data, which configures
-> >> whether hardware ECC is used.
-> >>
-> >> Currently it is only possible to decide whether hw ECC should be used or not at
-> >> compile time through a config option. But if you want to build a kernel which
-> >> runs on multiple devices you might have a configuration where some devices
-> >> require hw ECC and some devices which want software ECC.
-> >>
-> >> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> > 
-> > Extending platform data is kind of vetoed in arm tree, I do not think
-> > the MTD tree can take these changes.
-> > 
-> That is not my understanding of the situation. But what do you suggest as an
-> alternative for fixing this issue?
+On 14 April 2011 11:44, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> This morning, I looked at linux-next to find out how arch/arm is doing
+> for the next merge window.
+>
+> $ git diff -C --cumulative v2.6.39-rc1... arch
+> ?19.7% arch/arm/mach-imx/
+> ?19.2% arch/arm/mach-mx3/
+> ? 3.4% arch/arm/mach-mxc91231/
+> ?18.1% arch/arm/mach-ux500/
+> ?74.1% arch/arm/
+> ? 3.2% arch/m68k/
+> ? 4.0% arch/mips/lantiq/
+> ? 6.9% arch/mips/
+> ? 3.1% arch/x86/kvm/
+> ? 7.6% arch/x86/
+> ?100.0% arch/
 
-Well, I got this understanding by talking to the OMAP maintainer and by
-chatting with rmk. But I might be wrong. So the understanding is that
-board data extending is banned, at least for a while. And the arm world
-has to consolidate and probably switch to the DT tree approach. This
-would be painful, this would make some vendors to return to behind the
-curtains, so this would be a step back in the short run.
+One reason for high ARM activity is that the arm port has far more
+different supported computers and drivers for more different hardware
+than any other processor, so more activity in the arm tree than any
+other is unlikely to go away unless we stop developing for ARM
+platforms.
 
-But in a couple of years this would be resolved, may be under Linaro's
-aegis, and then the arm world would make 2 steps forward, so that
-previous step back would be compensated in the longer run.
+Another is that most of this is recently-produced hardware, so there
+are a lot new drivers to develop.
 
-But! I'm just an small MTD guy, so I might be mistaken. Of course if you
-make your board file changes be merged via the corresponding arm
-sub-tree - go ahead send your MTD driver updates! This is I guess the
-answer to your "what do you suggest" question.
+Lastly, ARM platforms are common and tend to be cheap, so they are the
+boards that young, enthusiastic developers are likely to have in front
+of them and, since it covers many many machines, they are more likely
+to find places where suoport is lacking or can be improved.
 
-CCing the arm lists so that people could correct me.
+Counting the arch-specific C files:
+for a in arch/* ; do echo -n "$a    "; find $a -name '*.[ch]' | wc -l;
+done | sort -nrk 2
+arch/arm	3040
+arch/mips	1206
+arch/powerpc	1018
+arch/x86	762
+arch/sh	591
+arch/sparc	454
+...
 
-Here is the beginning of the thread:
-http://lists.infradead.org/pipermail/linux-mtd/2011-April/034866.html
+That's a total of 30% of the files out of the 10000 files under 25 architecture.
+I don't think this "problem" is likely to go away.  At best, we can
+try to limit the number of "remove trailing spaces from lines" type of
+patches.
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+   M
