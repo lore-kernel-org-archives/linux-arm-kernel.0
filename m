@@ -1,48 +1,40 @@
 From: metan@ucw.cz (Cyril Hrubis)
-Date: Fri, 15 Apr 2011 23:33:15 +0200
-Subject: zaurus: mmcblk0: error -110
-In-Reply-To: <m339lnxes6.fsf@pullcord.laptop.org>
-References: <20110412151547.GC20815@atrey.karlin.mff.cuni.cz>
-	<m3aafvz30t.fsf@pullcord.laptop.org>
-	<20110412193944.GC2665@atrey.karlin.mff.cuni.cz>
-	<m3oc4bxne1.fsf@pullcord.laptop.org>
-	<20110412205421.GD2665@atrey.karlin.mff.cuni.cz>
-	<m3fwpnxj1w.fsf@pullcord.laptop.org>
-	<20110412224333.GA22640@atrey.karlin.mff.cuni.cz>
-	<m339lnxes6.fsf@pullcord.laptop.org>
-Message-ID: <20110415213315.GA4420@atrey.karlin.mff.cuni.cz>
+Date: Fri, 15 Apr 2011 23:38:17 +0200
+Subject: Zaurus CF tests -- ok
+In-Reply-To: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
+References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
+Message-ID: <20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
-> >> > mmc0: error -95 whilst initialising SD card
-> >> 
-> >> That's interesting.  Would you mind trying to bisect?  (Knowing whether
-> >> 2.6.38 final does it, for example, would be very helpful.)
-> >
-> > It may need one or two tries on 2.6.38 but it's there too.
-> >
-> >> There aren't many -EOPNOTSUPP returns in the stack.  I see:
-> >> 
-> >> card/block.c: mmc_blk_issue_secdiscard_rq and mmc_blk_issue_discard_rq
-> >> card/core.c: mmc_erase
-> >> core/sd_ops.c: mmc_app_cmd
-> >> 
-> >> Mind doing some instrumentation to figure out which it is?
-> >
-> > Fails in the mmc_app_cmd.
+> After getting _good_ power supply, I was able to untar and rm ltp tree
+> 100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
+> ext3 problems).
+
+Hmm, I'm using original adapter, but who knows if it's okay to use...
+
+> Another strange thing is... I see lots of duplicated keystrokes --
+> like type "pavel" but machine understands "paavel". But it only seems
+> to happen when I'm _not_ trying to debug it?!
+
+That seems to be side effect of machine under load (it has gpio keyboard).
+
+> (
+> So... just because something needs 5V does not mean you should charge
+> it from USB.
 > 
-> Okay.  mmc_app_cmd() hasn't changed for years, so I'm afraid I don't
-> have any strong leads for you -- further bisection (you're pretty
-> sure this is a regression?) would be very useful.
+> Yes, I'm talking about zaurus. I noticed that it crashed rather
+> quickly when connected to USB power. (For example in tar/rm test).
+> So I took multimeter, and there was 4.15..4.5V on USB :-(.
+> 
+> With power from USB extension cable, it crashes in <5 minutes. It
+> seems to toggle charger a lot, as voltage on the cable is only
+> 4.2..4.5V. I guess it is software problem in the charging code.
+> )
 
-Well, I was using some old kernel there and updated to the 2.6.38 recently so
-only clue I do have is that it was working on like 2 years old kernel.
-
-And bisection is quite complicated, as number of kernel images simply doesn't
-boot there. :(
-
-I will look on this next week (hopefully) thanks anyway for your help so far.
+The zaurus actually is AFAIK unable to run from battery when connected to the
+external power, so weak power line may explain some of the strange behaviour.
 
 -- 
 metan
