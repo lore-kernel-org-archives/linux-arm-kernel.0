@@ -1,9 +1,8 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Fri, 15 Apr 2011 22:50:10 +0300
+From: peter@stuge.se (Peter Stuge)
+Date: Fri, 15 Apr 2011 21:56:42 +0200
 Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<1302781431.21145.6.camel@dev.znau.edu.ua>
+In-Reply-To: <BANLkTinPVaYC14Y=m5iu7GYodkRb6uTuPw@mail.gmail.com>
+References: <1302781431.21145.6.camel@dev.znau.edu.ua>
 	<BANLkTinvpt5vs+rXd3WN-a2JpGtTV+=Gyg@mail.gmail.com>
 	<4DA6E9BD.3090404@hauke-m.de>
 	<BANLkTinu+Q367oqQPiUehPcbMs-SBxbwFg@mail.gmail.com>
@@ -11,55 +10,22 @@ References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
 	<BANLkTimM8=-pX+Ea8Eyp4XyvP1APbUof9w@mail.gmail.com>
 	<1302892585.30441.12.camel@dev.znau.edu.ua>
 	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
-Message-ID: <1302897010.30441.42.camel@dev.znau.edu.ua>
+	<1302896541.30441.33.camel@dev.znau.edu.ua>
+	<BANLkTinPVaYC14Y=m5iu7GYodkRb6uTuPw@mail.gmail.com>
+Message-ID: <20110415195642.22440.qmail@stuge.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> W dniu 15 kwietnia 2011 20:36 u?ytkownik George Kashperko
-> <george@znau.edu.ua> napisa?:
-> >> >> Arnd: I found you saying:
-> >> >> > I believe the one thing we really want from this driver is the bus
-> >> >> > scan code, which is not present in the amba bus implementation,
-> >> >> I explained how it works, I believe scanning (EPROM in this case) it
-> >> >> Broadcom specific, not really AMBA standard. How do you see it?
-> >> >>
-> >> > It might not Broadcom specific as EPROM core seems to be CoreLink one
-> >> > core and maybe is arm-developed. But it isn't documented publicly and we
-> >> > don't know yet if it is obligatory for all amba (or at least axi)
-> >> > interconnects or not.
-> >>
-> >> Maybe EPROM is not Broadcom specific, but I suspect the content we
-> >> deal with in bcmai/axi is Broadcom specific. I didn't see any notes of
-> >> manuf/id/rev/class we deal with. So I guess everything *we* (out
-> >> driver) read from EPROM is Bcm specific.
-> >>
-> >
-> > Played around amba registers on bcm4716. For all amba cores present
-> > (under all I mean broadcom ip core agents, oob router core, erom core,
-> > and other I-dont-know-what-for cores present at 0x18100000). All those
-> > feature AMBA_CID (0xb105f00d) as PrimeCell ID, and slightly different
-> > PrimeCell PeripheralIDs:
-> > * vendor 0xBB, part_number 0x368 for broadcom cores' agents;
-> > * vendor 0xBB, part_number 0x367 for OOB router core (don't ask me wth
-> > is this please);
-> > * vendor 0xBB, part_number 0x366 for EROM core;
-> >
-> > ARM vendor id is 0x41. Might 0xBB is Broadcom vendor id but I've found
-> > no evidence for that with google.
+Rafa? Mi?ecki wrote:
+> > On other hand just broadcom-specific bus looks like good alternative
+> > too but here I just fail to decide on relevant naming.
 > 
-> Yeah, as I suspected, everything except Broadcom specific cores
-> matches AMBA standards quite nicely. Still, I don't see anything in it
-> we could use for driver.
-> 
-> Let's wait for Russell and Arnd to comment.
-> 
+> Just bcmamba / bcmaxi?
 
-Btw, googling for PL366, PL367, PL368 gives nothing relevant except one
-reference to "NIC-301 Interconnect Device Management (PL368)" which is
-restricted to arm partners. Think it have something to do with that
-magic "DMP - Device Management Plugin" Broadcom guys mentioned earlier.
-Might those 0xBB/0x368 cores are produced with that "plugin".
+Do bcm make any other (different) busses that would warrant a more
+specific name, hinting somehow at the wireless cards specifically?
 
-Have nice day,
-George
+Or is it just cool to have a short name? Me I always like short names.
+
+
+//Peter
