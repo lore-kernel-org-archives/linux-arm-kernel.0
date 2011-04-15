@@ -1,119 +1,166 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri, 15 Apr 2011 18:05:25 +0800
-Subject: [PATCH 1/3] ARM: pxa: enable pxa95x interrupt handler
-In-Reply-To: <2011041501>
+Date: Fri, 15 Apr 2011 18:05:27 +0800
+Subject: [PATCH 3/3] ARM: pxa: enable 1wire controller
+In-Reply-To: <1302861927-6845-2-git-send-email-haojian.zhuang@marvell.com>
 References: <2011041501>
-Message-ID: <1302861927-6845-1-git-send-email-haojian.zhuang@marvell.com>
+	<1302861927-6845-1-git-send-email-haojian.zhuang@marvell.com>
+	<1302861927-6845-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1302861927-6845-3-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA27x/PXA3xx silicons need to access CP15 co-processor to get interrupt
-information. PXA95x needs to access interrupt controller register.
-
-So make PXA95x support multiple handler interrupt.
+Support 1wire controller in both PXA3xx and PXA95x. Enable it in saarb
+platform.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-pxa/Kconfig             |    1 +
- arch/arm/mach-pxa/Makefile            |    2 +-
- arch/arm/mach-pxa/entry-pxa95x-intc.S |   38 +++++++++++++++++++++++++++++++++
- arch/arm/mach-pxa/generic.h           |    1 +
- arch/arm/mach-pxa/saarb.c             |    1 +
- 5 files changed, 42 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-pxa/entry-pxa95x-intc.S
+ arch/arm/mach-pxa/devices.c                 |   12 ++++++++++++
+ arch/arm/mach-pxa/devices.h                 |    1 +
+ arch/arm/mach-pxa/include/mach/mfp-pxa930.h |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                  |    2 ++
+ arch/arm/mach-pxa/pxa95x.c                  |    2 ++
+ arch/arm/mach-pxa/saarb.c                   |   20 ++++++++++++++++++++
+ 6 files changed, 38 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 2fc9f94..9811f0e 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -660,6 +660,7 @@ config CPU_PXA935
- config PXA95x
- 	bool
- 	select CPU_PJ4
-+	select MULTI_IRQ_HANDLER
- 	help
- 	  Select code specific to PXA95x variants
- 
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index cc39d17..ed80260 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -19,7 +19,7 @@ endif
- obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o pxa25x.o
- obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o pxa27x.o
- obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
--obj-$(CONFIG_PXA95x)		+= mfp-pxa3xx.o clock-pxa3xx.o pxa95x.o smemc.o
-+obj-$(CONFIG_PXA95x)		+= mfp-pxa3xx.o clock-pxa3xx.o pxa95x.o smemc.o entry-pxa95x-intc.o
- obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
- obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
- obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
-diff --git a/arch/arm/mach-pxa/entry-pxa95x-intc.S b/arch/arm/mach-pxa/entry-pxa95x-intc.S
-new file mode 100644
-index 0000000..4a62486
---- /dev/null
-+++ b/arch/arm/mach-pxa/entry-pxa95x-intc.S
-@@ -0,0 +1,38 @@
-+/*
-+ *  arch/arm/mach-pxa/entry-pxa95x-intc.S
-+ *
-+ *  Low-level IRQ helper macros for PXA95x-based platforms
-+ *
-+ *  Copyright (C) 2011 Marvell International Ltd.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+#include <asm/entry-macro-multi.S>
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 2e04254..451caa0 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -1067,3 +1067,15 @@ void __init pxa2xx_set_spi_info(unsigned id, struct pxa2xx_spi_master *info)
+ 	pd->dev.platform_data = info;
+ 	platform_device_add(pd);
+ }
 +
-+		.macro	get_pxa95x_irqnr_and_base, irqnr, irqstat, base, tmp
-+		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
-+		add	\base, \base, #0x00d00000
-+		ldr	\irqstat, [\base, #0x18]	@ ICHP offset
-+		tst	\irqstat, #0x80000000
-+		beq	2001f
-+		bic	\irqstat, \irqstat, #0x80000000
-+		mov	\irqnr, \irqstat, lsr #16
-+		add	\irqnr, \irqnr, #(PXA_IRQ(0))
-+2001:
-+		.endm
++static struct resource pxa3xx_resource_w1[] = {
++	{0x41b00000,	0x41b00013,	"ds1wm-mem", IORESOURCE_MEM,},
++	{IRQ_1WIRE,	IRQ_1WIRE,	"ds1wm-irq", IORESOURCE_IRQ,},
++};
 +
-+		.align	5
-+		.global pxa95x_handle_irq_intc
-+pxa95x_handle_irq_intc:
-+		mov	r4, lr
-+1:		get_pxa95x_irqnr_and_base r0, r6, r5, lr
-+		movne	r1, sp
-+
-+		@ routine called with r0 = irq number, r1 = struct pt_regs *
-+		adrne	lr, BSYM(1b)
-+		bne	asm_do_IRQ
-+		mov	pc, r4
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index a079d8b..e47f863 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -30,6 +30,7 @@ extern void __init pxa27x_map_io(void);
- extern void __init pxa3xx_map_io(void);
++struct platform_device pxa3xx_device_w1 = {
++	.name		= "pxa3xx-w1",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(pxa3xx_resource_w1),
++	.resource	= pxa3xx_resource_w1,
++};
+diff --git a/arch/arm/mach-pxa/devices.h b/arch/arm/mach-pxa/devices.h
+index 2fd5a8b..3625e62 100644
+--- a/arch/arm/mach-pxa/devices.h
++++ b/arch/arm/mach-pxa/devices.h
+@@ -36,6 +36,7 @@ extern struct platform_device pxa27x_device_pwm1;
  
- extern unsigned int get_clk_frequency_khz(int info);
-+extern void pxa95x_handle_irq_intc(struct pt_regs *);
+ extern struct platform_device pxa3xx_device_nand;
+ extern struct platform_device pxa3xx_device_i2c_power;
++extern struct platform_device pxa3xx_device_w1;
  
- #define SET_BANK(__nr,__start,__size) \
- 	mi->bank[__nr].start = (__start), \
+ extern struct platform_device pxa3xx_device_gcu;
+ 
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa930.h b/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
+index 04f7c97..18bcb5d 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa930.h
+@@ -493,6 +493,7 @@
+ #define DF_ADDR2_CLK13MOUTDMD	MFP_CFG(DF_ADDR2, AF3)
+ 
+ /* 1 wire */
++#define GPIO16_OW_DQ_IN		MFP_CFG(GPIO16, AF3)
+ #define GPIO95_OW_DQ_IN		MFP_CFG(GPIO95, AF5)
+ 
+ #endif /* __ASM_ARCH_MFP_PXA9xx_H */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 8dd1073..6f87659 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -57,6 +57,7 @@ static DEFINE_PXA3_CKEN(pxa3xx_pwm0, PWM0, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_pwm1, PWM1, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_mmc1, MMC1, 19500000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_mmc2, MMC2, 19500000, 0);
++static DEFINE_PXA3_CKEN(pxa3xx_w1, 1WIRE, 13000000, 0);
+ 
+ static DEFINE_CK(pxa3xx_lcd, LCD, &clk_pxa3xx_hsio_ops);
+ static DEFINE_CK(pxa3xx_smemc, SMC, &clk_pxa3xx_smemc_ops);
+@@ -89,6 +90,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa3xx_mmc1, "pxa2xx-mci.0", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_mmc2, "pxa2xx-mci.1", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_smemc, "pxa2xx-pcmcia", NULL),
++	INIT_CLKREG(&clk_pxa3xx_w1, "pxa3xx-w1", NULL),
+ };
+ 
+ #ifdef CONFIG_PM
+diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
+index 23b229b..1477eef 100644
+--- a/arch/arm/mach-pxa/pxa95x.c
++++ b/arch/arm/mach-pxa/pxa95x.c
+@@ -214,6 +214,7 @@ static DEFINE_PXA3_CKEN(pxa95x_ssp3, SSP3, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa95x_ssp4, SSP4, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa95x_pwm0, PWM0, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa95x_pwm1, PWM1, 13000000, 0);
++static DEFINE_PXA3_CKEN(pxa95x_w1, 1WIRE, 13000000, 0);
+ 
+ static struct clk_lookup pxa95x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa95x_pout, NULL, "CLK_POUT"),
+@@ -232,6 +233,7 @@ static struct clk_lookup pxa95x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa95x_ssp4, "pxa27x-ssp.3", NULL),
+ 	INIT_CLKREG(&clk_pxa95x_pwm0, "pxa27x-pwm.0", NULL),
+ 	INIT_CLKREG(&clk_pxa95x_pwm1, "pxa27x-pwm.1", NULL),
++	INIT_CLKREG(&clk_pxa95x_w1, "pxa3xx-w1", NULL),
+ };
+ 
+ void __init pxa95x_init_irq(void)
 diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
-index 9322fe5..f98ff38 100644
+index f98ff38..e9b252d 100644
 --- a/arch/arm/mach-pxa/saarb.c
 +++ b/arch/arm/mach-pxa/saarb.c
-@@ -107,6 +107,7 @@ MACHINE_START(SAARB, "PXA955 Handheld Platform (aka SAARB)")
- 	.map_io         = pxa_map_io,
- 	.nr_irqs	= SAARB_NR_IRQS,
- 	.init_irq       = pxa95x_init_irq,
-+	.handle_irq	= pxa95x_handle_irq_intc,
- 	.timer          = &pxa_timer,
- 	.init_machine   = saarb_init,
- MACHINE_END
+@@ -12,9 +12,11 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/mfd/88pm860x.h>
++#include <linux/mfd/ds1wm.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -26,9 +28,14 @@
+ #include <mach/gpio.h>
+ 
+ #include "generic.h"
++#include "devices.h"
+ 
+ #define SAARB_NR_IRQS	(IRQ_BOARD_START + 40)
+ 
++static mfp_cfg_t saarb_pin_config[] __initdata = {
++	GPIO16_OW_DQ_IN,
++};
++
+ static struct pm860x_touch_pdata saarb_touch = {
+ 	.gpadc_prebias	= 1,
+ 	.slot_cycle	= 1,
+@@ -95,11 +102,24 @@ static struct i2c_board_info saarb_i2c_info[] = {
+ 	},
+ };
+ 
++static struct ds1wm_driver_data saarb_1wire_data = {
++	.active_high	= 1,
++};
++
++static struct platform_device *saarb_devices[] __initdata = {
++	&pxa3xx_device_w1,
++};
++
+ static void __init saarb_init(void)
+ {
++	pxa3xx_mfp_config(ARRAY_AND_SIZE(saarb_pin_config));
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_i2c_info(NULL);
+ 	i2c_register_board_info(0, ARRAY_AND_SIZE(saarb_i2c_info));
++
++	platform_device_add_data(&pxa3xx_device_w1, &saarb_1wire_data,
++				 sizeof(struct ds1wm_driver_data));
++	platform_add_devices(ARRAY_AND_SIZE(saarb_devices));
+ }
+ 
+ MACHINE_START(SAARB, "PXA955 Handheld Platform (aka SAARB)")
 -- 
 1.5.6.5
