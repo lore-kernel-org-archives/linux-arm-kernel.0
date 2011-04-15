@@ -1,22 +1,56 @@
-From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
-Date: Fri, 15 Apr 2011 16:02:31 +0200
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <4DA84AAB.60601@gmail.com>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com>
-Message-ID: <1302876151.2036.14.camel@team-embedded-2>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 15 Apr 2011 17:01:11 +0300
+Subject: [PATCH 1/2] MTD: s3c2410_nand: Add option to disable hw ECC at
+	runtime
+In-Reply-To: <4DA7094D.9070002@metafoo.de>
+References: <1302637672-25339-1-git-send-email-lars@metafoo.de>
+	<1302782911.2796.21.camel@localhost>  <4DA7094D.9070002@metafoo.de>
+Message-ID: <1302876071.3220.60.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-15 at 08:39 -0500, Rob Herring wrote:
-> lpc32xx and pnx4008 also use iram, but do not have an allocator (only
-> 1 user). Both are doing a copy the suspend code to IRAM and run it
-> which may also be a good thing to have generic code for. Several i.MX
-> chips also need to run from IRAM for suspend.
+On Thu, 2011-04-14 at 16:48 +0200, Lars-Peter Clausen wrote:
+> On 04/14/2011 02:08 PM, Artem Bityutskiy wrote:
+> > On Tue, 2011-04-12 at 21:47 +0200, Lars-Peter Clausen wrote:
+> >> From: Holger Freyther <zecke@openmoko.org>
+> >>
+> >> This patch adds a flag to the s3c2410_nand platform data, which configures
+> >> whether hardware ECC is used.
+> >>
+> >> Currently it is only possible to decide whether hw ECC should be used or not at
+> >> compile time through a config option. But if you want to build a kernel which
+> >> runs on multiple devices you might have a configuration where some devices
+> >> require hw ECC and some devices which want software ECC.
+> >>
+> >> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> > 
+> > Extending platform data is kind of vetoed in arm tree, I do not think
+> > the MTD tree can take these changes.
+> > 
+> That is not my understanding of the situation. But what do you suggest as an
+> alternative for fixing this issue?
 
-There will be similar patches for my lpc2k architecture once it gets
-accepted, a common interface would be _very_ beneficial IMHO.
+Well, I got this understanding by talking to the OMAP maintainer and by
+chatting with rmk. But I might be wrong. So the understanding is that
+board data extending is banned, at least for a while. And the arm world
+has to consolidate and probably switch to the DT tree approach. This
+would be painful, this would make some vendors to return to behind the
+curtains, so this would be a step back in the short run.
 
-Regards,
+But in a couple of years this would be resolved, may be under Linaro's
+aegis, and then the arm world would make 2 steps forward, so that
+previous step back would be compensated in the longer run.
 
-Ithamar.
+But! I'm just an small MTD guy, so I might be mistaken. Of course if you
+make your board file changes be merged via the corresponding arm
+sub-tree - go ahead send your MTD driver updates! This is I guess the
+answer to your "what do you suggest" question.
+
+CCing the arm lists so that people could correct me.
+
+Here is the beginning of the thread:
+http://lists.infradead.org/pipermail/linux-mtd/2011-April/034866.html
+
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
