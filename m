@@ -1,57 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Apr 2011 22:49:49 +0200
-Subject: [RFC] sanitizing crazy clock data files
-In-Reply-To: <20110415202858.GR1611@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<20110415193654.GP1611@n2100.arm.linux.org.uk>
-	<20110415201232.GC14770@pengutronix.de>
-	<20110415202535.GQ1611@n2100.arm.linux.org.uk>
-	<20110415202858.GR1611@n2100.arm.linux.org.uk>
-Message-ID: <20110415204949.GR31990@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Apr 2011 23:18:22 +0200
+Subject: Zaurus CF tests -- ok
+Message-ID: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 09:28:58PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 09:25:35PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Apr 15, 2011 at 10:12:32PM +0200, Sascha Hauer wrote:
-> > > The other regular i.MXs should fit into this fine, they have the same
-> > > patterns. mxs is different though, instead of enable bits they have
-> > > disable bits and dividers are one based instead of zero. We can probably
-> > > extend the patterns to handle some additional flags, but I haven't
-> > > looked deeply into it.
-> > 
-> > A suggestion from work tglx is currently doing - name the two functions
-> > which manipulate the mask bits 'set' and 'clear' rather than 'enable'
-> > and 'disable'.
-> > 
-> > Then, the clk ops can do this:
-> > 
-> > 	.clk_enable	= clk_gate_mask_set,
-> > 	.clk_disable	= clk_gate_mask_clear,
-> > 
-> > for ones with positive logic, and:
-> > 
-> > 	.clk_enable	= clk_gate_mask_clear,
-> > 	.clk_disable	= clk_gate_mask_set,
-> > 
-> > for negative logic.  No additional code required, just a variance in data
-> > structure.
-> 
-> Bah.  Except they may need to reference the parent... which kills that
-> idea.
-Then the actuall en/disabling needs to be a seperate callback.
+Hi!
 
-clk_gate_enable(clk) then does
+After getting _good_ power supply, I was able to untar and rm ltp tree
+100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
+ext3 problems).
 
-	clk_enable(clk->parent)
-	clk->sensiblename_enable(clk)
+Another strange thing is... I see lots of duplicated keystrokes --
+like type "pavel" but machine understands "paavel". But it only seems
+to happen when I'm _not_ trying to debug it?!
 
-with sensiblename_enable pointing to clk_gate_mask_set or
-clk_gate_mask_clear.
+(
+So... just because something needs 5V does not mean you should charge
+it from USB.
 
-Just my 2 cents before going to bed,
-Uwe
+Yes, I'm talking about zaurus. I noticed that it crashed rather
+quickly when connected to USB power. (For example in tar/rm test).
+So I took multimeter, and there was 4.15..4.5V on USB :-(.
 
+With power from USB extension cable, it crashes in <5 minutes. It
+seems to toggle charger a lot, as voltage on the cable is only
+4.2..4.5V. I guess it is software problem in the charging code.
+)
+									Pavel 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
