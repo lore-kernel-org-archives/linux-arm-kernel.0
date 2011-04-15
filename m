@@ -1,60 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Apr 2011 03:16:16 +0200
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikVfdVQuR_nJZnra7Bo=CQgOfS5Zg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 Apr 2011 19:10:28 -0700
+Subject: [PATCH v4] ARM: Use generic BUG() handler
+In-Reply-To: <1302822031-6752-1-git-send-email-sjg@chromium.org>
+References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
+Message-ID: <4DA7A914.5020804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
-> This morning, I looked at linux-next to find out how arch/arm is doing
-> for the next merge window.
+On 04/14/2011 04:00 PM, Simon Glass wrote:
+> From: Simon Glass <sjg@google.com>
 >
-> $ git diff -C --cumulative v2.6.39-rc1... arch/arm
-> (...)
-> ? 7.6% arch/arm/mach-ux500/include/mach/
-> ?46.1% arch/arm/mach-ux500/
-> (...)
-> Please take a moment to consider how Linus will react to this at the
-> next merge window.
+> ARM uses its own BUG() handler which makes its output slightly different
+> from other archtectures.
+>
+> One of the problems is that the ARM implementation doesn't report the function
+> with the BUG() in it, but always reports the PC being in __bug(). The generic
+> implementation doesn't have this problem.
+>
+> Currently we get something like:
+>
+> kernel BUG at fs/proc/breakme.c:35!
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> ...
+> PC is at __bug+0x20/0x2c
+>
+> With this patch it displays:
+>
+> kernel BUG at fs/proc/breakme.c:35!
+> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+> ...
+> PC is at write_breakme+0xd0/0x1b4
+>
+> This implementation uses an undefined instruction to implement BUG, and sets up
+> a bug table containing the relevant information. Many versions of gcc do not
+> support %c properly for ARM (inserting a # when they shouldn't) so we work
+> around this using distasteful macro magic.
+>
+> v1: Initial version to replace existing ARM BUG() implementation with something
+> more similar to other architectures.
+>
+> v2: Add Thumb support, remove backtrace whitespace output changes. Change to
+> use macros instead of requiring the asm %d flag to work (thanks to
+> Dave Martin <dave.martin@linaro.org>)
+>
+> v3: Remove old BUG() implementation in favor of this one.
+> Remove the Backtrace: message (will submit this separately).
+> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
+> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
+> define GENERIC_BUG this might be academic.)
+> Rebase to linux-2.6.git master.
+>
+> v4: Allow BUGS in modules (these were not reported correctly in v3)
+> (thanks to Stephen Boyd <sboyd@codeaurora.org> for suggesting that.)
+> Remove __bug() as this is no longer needed.
+>
+> Signed-off-by: Simon Glass <sjg@chromium.org>
 
-This instance of Linus feels guilty for that...
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Since ~50% of it is ux500 that I usually merge through your tree,
-I suspect you're simply not going to pull it so then half of the problem
-is gone already :-D
-
-Anyway, the bulk of that is a PRCMU driver, similar to the stuff
-in arch/arm/mach-omap2/prcm*. So let's think about what we can
-do about it.
-
-Since this is a one-off kind of thing, a singleton driver that controls
-power, reset and some GPIO on the chip. I contemplate moving the
-stuff to either:
-
-drivers/misc/ux500/*
-include/linux/misc/ux500/*
-
-or:
-
-drivers/platform/arm/ux500/*
-include/linux/platform/arm/ux500/*
-
-Are any of these generally speaking good ideas?
-
-Either place outside arch/arm/* is fine with me, creating something like
-drivers/prcmu/* would be a bit thick since the hardware basically does
-not look like anything else.
-
-The basic problem it's reflecting is that ARM does not have something
-like ACPI, that's basically what the driver is doing, and since every
-vendor does their own HW thingy it's not like it's easily consolidated.
-
-In the meantime I'm working on migrating GPIO drivers from mach-u300
-and plat-nomadik into drivers/gpio so I will hopefully provide some negative
-stats.
-
-Yours,
-Linus Walleij
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
