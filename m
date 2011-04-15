@@ -1,40 +1,55 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Fri, 15 Apr 2011 23:38:17 +0200
-Subject: Zaurus CF tests -- ok
-In-Reply-To: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
-References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
-Message-ID: <20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Fri, 15 Apr 2011 15:02:26 -0700
+Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
+In-Reply-To: <20110415190319.GA24111@Krystal>
+References: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
+	<20110415190319.GA24111@Krystal>
+Message-ID: <4DA8C072.3030705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> After getting _good_ power supply, I was able to untar and rm ltp tree
-> 100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
-> ext3 problems).
-
-Hmm, I'm using original adapter, but who knows if it's okay to use...
-
-> Another strange thing is... I see lots of duplicated keystrokes --
-> like type "pavel" but machine understands "paavel". But it only seems
-> to happen when I'm _not_ trying to debug it?!
-
-That seems to be side effect of machine under load (it has gpio keyboard).
-
-> (
-> So... just because something needs 5V does not mean you should charge
-> it from USB.
+Mathieu Desnoyers wrote:
+> * Abhijeet Dharmapurikar (adharmap at codeaurora.org) wrote:
+>> Drivers need to be aware whether the interrupt controller is a slow bus
+>> and call read_irq_line in proper context.
 > 
-> Yes, I'm talking about zaurus. I noticed that it crashed rather
-> quickly when connected to USB power. (For example in tar/rm test).
-> So I took multimeter, and there was 4.15..4.5V on USB :-(.
+> Hrm, this strikes me as odd. Is there any way this generic API could
+> handle the corner-cases without needed the caller to know this ?
+
+Usually, a slow bus irq controller marks its irq as nested and has its 
+irq handler running in thread context. In that case it will be safe to 
+call irq_read_line from thread context. For the usual (non slow bus) irq 
+controller we can always call irq_read_line within irq context.
+
+
+This function is intended to be called from within the handler, to know 
+if a rising edge or a falling edge caused the interrupt. It can be used 
+in other places too, but then the driver needs to be careful about the 
+interrupt controller slowbus nature.
+
+The problem happens when this function is called from interrupt context 
+when irq controller is slowbus. For example one has taken a spin_lock 
+with interrupts disabled and now it wants to know the real time status 
+on a pin that is controlled by a slow bus controller. The slowbus 
+controller could end up sleeping and things go bad.
+
+I should explain this more in the commit text. Will do so in the next 
+revision of this patch.
+
+>> + *	This function may be called from IRQ context only when
+>> + *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
 > 
-> With power from USB extension cable, it crashes in <5 minutes. It
-> seems to toggle charger a lot, as voltage on the cable is only
-> 4.2..4.5V. I guess it is software problem in the charging code.
-> )
+> The comment here seems to imply "be careful when using this extremely
+> fragile interface", which does not give me the warm safety feeling I
+> would come to expect from a generic kernel API.
+> 
+> Any ideas on how to improve that ?
 
-The zaurus actually is AFAIK unable to run from battery when connected to the
-external power, so weak power line may explain some of the strange behaviour.
+Well, even the enable_irq() and disable_irq_nosync() have the same 
+calling restrictions. I picked this line from the comment block in 
+enable_irq() function. You think I should explain it more in the 
+upcoming patch?
 
--- 
-metan
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
