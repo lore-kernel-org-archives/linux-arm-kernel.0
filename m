@@ -1,32 +1,22 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Fri, 15 Apr 2011 16:52:38 +0300
+From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
+Date: Fri, 15 Apr 2011 16:02:31 +0200
 Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+In-Reply-To: <4DA84AAB.60601@gmail.com>
 References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-Message-ID: <20110415135237.GA9513@zarco>
+	<4DA84AAB.60601@gmail.com>
+Message-ID: <1302876151.2036.14.camel@team-embedded-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+On Fri, 2011-04-15 at 08:39 -0500, Rob Herring wrote:
+> lpc32xx and pnx4008 also use iram, but do not have an allocator (only
+> 1 user). Both are doing a copy the suspend code to IRAM and run it
+> which may also be a good thing to have generic code for. Several i.MX
+> chips also need to run from IRAM for suspend.
 
-Just small comment,
+There will be similar patches for my lpc2k architecture once it gets
+accepted, a common interface would be _very_ beneficial IMHO.
 
-On Fri, Apr 15, 2011 at 08:06:07AM -0500, Russell King wrote:
+Regards,
 
-> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> index a3f50b3..3588749 100644
-> --- a/arch/arm/plat-omap/sram.c
-> +++ b/arch/arm/plat-omap/sram.c
-> @@ -75,7 +75,6 @@
->  static unsigned long omap_sram_start;
->  static unsigned long omap_sram_base;
->  static unsigned long omap_sram_size;
-> -static unsigned long omap_sram_ceil;
-
-I think you missed one occurrence of omap_sram_ceil at omap3_sram_restore_context.
-Probably you have compile-tested w/o CONFIG_PM?
-
-All best,
-
--- 
-Eduardo Valentin
+Ithamar.
