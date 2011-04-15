@@ -1,22 +1,36 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 15 Apr 2011 14:39:27 +0000
-Subject: [PATCH] pxa/hx4700: bq24022 regulator needs to be enabled
-Message-ID: <E1QAkBF-0003bF-A0@outmx04.plus.net>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 15 Apr 2011 20:09:23 +0530
+Subject: [PATCH] ARM: Davinci: Fix I2C build errors
+In-Reply-To: <20110415123924.GL1611@n2100.arm.linux.org.uk>
+References: <20110415123240.GK1611@n2100.arm.linux.org.uk>
+	<20110415123924.GL1611@n2100.arm.linux.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C9608F8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add REGULATOR_CHANGE_STATUS flag to hx4700 bq24022 regulator. Without this flag the bq24022 cannot be enabled and the battery will not charge.
+Hi Russell,
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
---- clean-2.6.38/arch/arm/mach-pxa/hx4700.c	2011-03-15 01:20:32.000000000 +0000
-+++ linux-2.6.38/arch/arm/mach-pxa/hx4700.c	2011-04-15 04:39:04.869989025 +0100
-@@ -711,7 +711,7 @@ static struct regulator_consumer_supply 
- static struct regulator_init_data bq24022_init_data = {
- 	.constraints = {
- 		.max_uA         = 500000,
--		.valid_ops_mask = REGULATOR_CHANGE_CURRENT,
-+		.valid_ops_mask = REGULATOR_CHANGE_CURRENT|REGULATOR_CHANGE_STATUS,
- 	},
- 	.num_consumer_supplies  = ARRAY_SIZE(bq24022_consumers),
- 	.consumer_supplies      = bq24022_consumers,
+On Fri, Apr 15, 2011 at 18:09:24, Russell King - ARM Linux wrote:
+> On Fri, Apr 15, 2011 at 01:32:40PM +0100, Russell King - ARM Linux wrote:
+> > Several Davinci platforms select the I2C EEPROM support, but don't
+> > select I2C support.  This causes I2C EEPROM support to be built into
+> > the kernel, but I2C support may not be configured to be built in.
+> > This leads to linker errors due to missing I2C symbols.
+> > 
+> > Arrange for I2C to be selected whenever EEPROM_AT24 is selected.
+> 
+> Although this fixes I2C build errors, it leaves these errors:
+> 
+> arch/arm/mach-davinci/built-in.o: In function `phy_read':
+> include/linux/phy.h:454: undefined reference to `mdiobus_read'
+> arch/arm/mach-davinci/built-in.o: In function `phy_write':
+> include/linux/phy.h:469: undefined reference to `mdiobus_write'
+> arch/arm/mach-davinci/built-in.o: In function `davinci_evm_init':
+> arch/arm/mach-davinci/board-dm644x-evm.c:708: undefined reference to `phy_register_fixup_for_uid'
+> 
+> which also look like a configuration problem.
+
+Will send out a fix for this.
+
+Thanks,
+Sekhar
