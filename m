@@ -1,54 +1,71 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 15 Apr 2011 16:25:49 +0400
-Subject: [PATCH 2.6.39 v2] V4L: videobuf-dma-contig: fix mmap_mapper broken
-	on ARM
-In-Reply-To: <201104132316.01922.jkrzyszt@tis.icnet.pl>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<4DA5DF1E.1040302@ru.mvista.com>
-	<201104132301.56210.jkrzyszt@tis.icnet.pl>
-	<201104132316.01922.jkrzyszt@tis.icnet.pl>
-Message-ID: <4DA8394D.80405@ru.mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Apr 2011 13:32:40 +0100
+Subject: [PATCH] ARM: Davinci: Fix I2C build errors
+Message-ID: <20110415123240.GK1611@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Several Davinci platforms select the I2C EEPROM support, but don't
+select I2C support.  This causes I2C EEPROM support to be built into
+the kernel, but I2C support may not be configured to be built in.
+This leads to linker errors due to missing I2C symbols.
 
-On 14-04-2011 1:16, Janusz Krzysztofik wrote:
+Arrange for I2C to be selected whenever EEPROM_AT24 is selected.
 
->>> Janusz Krzysztofik wrote:
->>>>>> After switching from mem->dma_handle to
->>>>>> virt_to_phys(mem->vaddr) used for obtaining page frame number
->>>>>> passed to remap_pfn_range() (commit
->>>>>> 35d9f510b67b10338161aba6229d4f55b4000f5b),
->>>>>> videobuf-dma-contig
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-davinci/Kconfig |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
->>>>>      Please specify the commit summary -- for the human readers.
-
->>>> Hi,
->>>> OK, I'll try to reword the summary using a more human friendly
->>>> language as soon as I have signs that Mauro (who seemed to
->>>> understand the message well enough) is willing to accept the
->>>> code.
-
->>>      I wasn't asking you to rework your summary but to specify the
-
->>> summary of the commit you've mentioned (in parens).
-
->> Ah, I see. How about just reordered wording:
-
->> After commit 35d9f510b67b10338161aba6229d4f55b4000f5b (switching from
->> mem->dma_handle to virt_to_phys(mem->vaddr) used for obtaining page
->> frame number passed to remap_pfn_range()), ....
-
->> Do you think this would be clear enough?
-
-> Oh no, I probably missed your point again.
-
-> You meant just quoting the commit original summary line, didn't you?
-
-    Yes.
-
-> Thanks,
-> Janusz
-
-WBR, Sergei
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 32f1479..c0deaca 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -63,6 +63,7 @@ config MACH_DAVINCI_EVM
+ 	depends on ARCH_DAVINCI_DM644x
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Configure this option to specify the whether the board used
+ 	  for development is a DM644x EVM
+@@ -72,6 +73,7 @@ config MACH_SFFSDR
+ 	depends on ARCH_DAVINCI_DM644x
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Say Y here to select the Lyrtech Small Form Factor
+ 	  Software Defined Radio (SFFSDR) board.
+@@ -105,6 +107,7 @@ config MACH_DAVINCI_DM6467_EVM
+ 	select MACH_DAVINCI_DM6467TEVM
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Configure this option to specify the whether the board used
+ 	  for development is a DM6467 EVM
+@@ -118,6 +121,7 @@ config MACH_DAVINCI_DM365_EVM
+ 	depends on ARCH_DAVINCI_DM365
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Configure this option to specify whether the board used
+ 	  for development is a DM365 EVM
+@@ -129,6 +133,7 @@ config MACH_DAVINCI_DA830_EVM
+ 	select GPIO_PCF857X
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Say Y here to select the TI DA830/OMAP-L137/AM17x Evaluation Module.
+ 
+@@ -205,6 +210,7 @@ config MACH_MITYOMAPL138
+ 	depends on ARCH_DAVINCI_DA850
+ 	select MISC_DEVICES
+ 	select EEPROM_AT24
++	select I2C
+ 	help
+ 	  Say Y here to select the Critical Link MityDSP-L138/MityARM-1808
+ 	  System on Module.  Information on this SoM may be found at
