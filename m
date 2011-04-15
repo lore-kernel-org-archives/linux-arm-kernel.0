@@ -1,74 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Apr 2011 09:26:43 +0300
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <BANLkTikVfdVQuR_nJZnra7Bo=CQgOfS5Zg@mail.gmail.com>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<BANLkTikVfdVQuR_nJZnra7Bo=CQgOfS5Zg@mail.gmail.com>
-Message-ID: <20110415062643.GB12272@atomide.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 15 Apr 2011 12:15:43 +0530
+Subject: dmaengine: Can we schedule new transfer from dma
+	callback	routine??
+In-Reply-To: <20110411085603.GA13041@n2100.arm.linux.org.uk>
+References: <4DA2B3D8.6060707@st.com>
+	<20110411085603.GA13041@n2100.arm.linux.org.uk>
+Message-ID: <4DA7E997.3080402@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [110415 04:14]:
-> 2011/4/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On 04/11/2011 02:26 PM, Russell King - ARM Linux wrote:
+> On Mon, Apr 11, 2011 at 01:25:04PM +0530, viresh kumar wrote:
+>>
+>> Hello,
+>>
+>> In dw_dmac.c driver, dwc_descriptor_complete() routine, following is
+>> mentioned before calling callback:
+>>
+>> 	/*
+>> 	 * The API requires that no submissions are done from a
+>> 	 * callback, so we don't need to drop the lock here
+>> 	 */
+>> 	if (callback)
+>> 		callback(param);
+>>
+>> Does this hold true for dmaengine??
 > 
-> > This morning, I looked at linux-next to find out how arch/arm is doing
-> > for the next merge window.
-> >
-> > $ git diff -C --cumulative v2.6.39-rc1... arch/arm
-> > (...)
-> > ? 7.6% arch/arm/mach-ux500/include/mach/
-> > ?46.1% arch/arm/mach-ux500/
-> > (...)
-> > Please take a moment to consider how Linus will react to this at the
-> > next merge window.
+> Not for slave devices - see Dan's reply:
 > 
-> This instance of Linus feels guilty for that...
+> http://lists.arm.linux.org.uk/lurker/message/20101223.005313.a38d7bf0.en.html
 > 
-> Since ~50% of it is ux500 that I usually merge through your tree,
-> I suspect you're simply not going to pull it so then half of the problem
-> is gone already :-D
+> As the slave API hasn't been well documented, there's a lot of
+> inconsistency of behaviour between DMA engine slave implementations.
+> I'd suggest at least fixing slave DMA engine drivers to ensure that:
 > 
-> Anyway, the bulk of that is a PRCMU driver, similar to the stuff
-> in arch/arm/mach-omap2/prcm*. So let's think about what we can
-> do about it.
+> (a) the callback is always called in tasklet context
+> (b) the callback can submit new slave transactions (iow, the spinlock
+>     which prep_slave_sg takes must not be held during the callback.)
+> 
+> The way that others solve this is to move the completed txd structures
+> to a local 'completed' list, and then walk this list after the spinlocks
+> have been dropped.
+> 
 
-Yeah OK.
- 
-> Since this is a one-off kind of thing, a singleton driver that controls
-> power, reset and some GPIO on the chip. I contemplate moving the
-> stuff to either:
-> 
-> drivers/misc/ux500/*
-> include/linux/misc/ux500/*
-> 
-> or:
-> 
-> drivers/platform/arm/ux500/*
-> include/linux/platform/arm/ux500/*
-> 
-> Are any of these generally speaking good ideas?
+Hello,
 
-Or maybe drivers/arm?
+There is one more issue in the current DW_DMAC driver.
+As most of interrupt processing is done in tasklet, spin_lock_bh() is used in almost
+every routine.
 
-Anyways, whatever can be done as loadable modules should be done
-that way. That makes the life for distros much easier ;)
- 
-> Either place outside arch/arm/* is fine with me, creating something like
-> drivers/prcmu/* would be a bit thick since the hardware basically does
-> not look like anything else.
-> 
-> The basic problem it's reflecting is that ARM does not have something
-> like ACPI, that's basically what the driver is doing, and since every
-> vendor does their own HW thingy it's not like it's easily consolidated.
+Now, if some driver is calling these routines from interrupt context or with interrupt
+disabled, we get KERN_WARN() messages due to following in kernel/softirq.c:
 
-Yeah and that's going to take time.
- 
-> In the meantime I'm working on migrating GPIO drivers from mach-u300
-> and plat-nomadik into drivers/gpio so I will hopefully provide some negative
-> stats.
+static inline void _local_bh_enable_ip(unsigned long ip)
+{
+	WARN_ON_ONCE(in_irq() || irqs_disabled());
+	...
+}
 
-We too can move the omap gpio code there too..
+Should i minimize processing in tasklets, so that spin_lock_bh is not required anymore,
+as in drivers/dma/amba-pl08x.c (tasklet for every channel) or is there some other way of
+doing it.
 
-Regards,
+Currently, drivers/tty/serial/amba-pl011.c is calling from interrupt context or with
+interrupt disabled.
 
-Tony
+-- 
+viresh
