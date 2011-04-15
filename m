@@ -1,56 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Apr 2011 17:58:58 +0100
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 15 Apr 2011 20:12:07 +0200
 Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415162045.GG4423@n2100.arm.linux.org.uk>
+In-Reply-To: <20110415153723.GD4423@n2100.arm.linux.org.uk>
 References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com>
-	<20110415160339.GF4423@n2100.arm.linux.org.uk>
-	<56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
-	<20110415162045.GG4423@n2100.arm.linux.org.uk>
-Message-ID: <20110415165857.GH4423@n2100.arm.linux.org.uk>
+	<4DA85B49.60209@vollmann.ch>
+	<20110415153723.GD4423@n2100.arm.linux.org.uk>
+Message-ID: <4DA88A77.6050502@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 05:20:45PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 04:18:23PM +0000, Nguyen Dinh-R00091 wrote:
-> > >Hmm, that's nice - except for one issue.  According to my grep of
-> > >arch/arm/ and drivers/, nothing uses iram_alloc().  So, does anything in
-> > >the MX stuff use iram_alloc.c, or is it dead code left over from a
-> > >previous experiment?
-> > 
-> > This function will be used for suspend code in the mx5x series. I just
-> > got done submitting a series of patches to Sascha for a simple suspend
-> > that does not need running code out of IRAM yet. The next set of suspend
-> > patches will be using these iram functions.
-> 
-> Okay, so does iram_alloc() need to return a dma_addr_t or a phys_addr_t ?
-> Are you dealing with physical addresses for it or DMA addresses?
+On 04/15/11 17:37, Russell King - ARM Linux wrote:
+> On Fri, Apr 15, 2011 at 04:50:49PM +0200, Detlef Vollmann wrote:
+>> I'd love to have the mapping inside the create pool, but that might
+>> not be possible in general.
+>
+> No, think about it.  What if you need to map the RAM area with some
+> special attributes - eg, where ioremap() doesn't work.  Eg, OMAP you
+> need SRAM mapped as normal memory, except for OMAP34xx where it must
+> be mapped normal memory non-cacheable.
+>
+> It's best to leave the mapping to the architecture.
+Ok, I agree.
 
-And another question: why does iram_alloc() return a void __iomem * for
-the virtual address, and the physical address via a pointer argument.
-However, iram_free() take an unsigned long for the address.
+>>> Another question is whether we should allow multiple SRAM pools or not -
+>>> this code does allow multiple pools, but so far we only have one pool
+>>> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
+>>> it if they want to partition the SRAM, or have peripheral-local SRAMs.
+>> Having the option to partition the SRAM is probably useful.
+>> What I'm missing is sram_pool_add: on AT91SAM9G20 you have two banks
+>> of SRAM, and you might want to combine them into a single pool.
+>
+> Do you already combine them into a single pool, or is this a wishlist?
+Well, I have it on my list for next week to write a driver that needs
+that.  So your proposal came just in time :-)
 
-It seems rather inconsistent that the parameter for free is returned via
-a pointer argument.
+> I'm really not interested in sorting out peoples wishlist items in
+> the process of consolidation.
+If your code doesn't support it, then I have three options:
+  - implementing my own pool (this actually might make sense, as
+    my requirement adds quite some overhead that others don't
+    want to pay),
+  - providing a patch on top of your implementation (as long as
+    struct sram_pool is an opaque type, this doesn't change the API), or
+  - forget dynamic allocation and assign buffers statically in the
+    board setup.
 
-If I convert this to sram-pool, can we change this to:
+Of course, if the mirroring mentioned by Nicolas I don't need any
+of this...
 
-static inline void *iram_alloc(size_t size, phys_addr_t *phys_addr)
-{
-	return sram_pool_alloc(iram_pool, size, phys_addr);
-}
+> Second point is that you'll notice that the code converts to a phys
+> address using this: phys = phys_base + (virt - virt_base).  As soon as
+> we start allowing multiple regions of SRAM, it becomes impossible to
+> provide the phys address without a lot more complexity.
+Yes, I understand that.  This either requires some intrusive changes
+to gen_pool code or quite some additional code in sram_pool_alloc.
 
-static void iram_free(void *addr, size_t size)
-{
-	sram_pool_free(iram_pool, addr, size);
-}
 
-and:
+And just one minor point: you might consider to rename sram_* to
+pram_* (or similar), as there's nothing specific to SRAM in your
+pool, the specific thing that sram_pool adds on top of gen_pool
+is the physical address.  And a lot of systems have external SRAM
+that will normally not be used with your sram_pool.
 
-int __init iram_init(unsigned long base, unsigned long size)
-
-becomes:
-
-int __init iram_init(phys_addr_t base, size_t size)
-
-?
+   Detlef
