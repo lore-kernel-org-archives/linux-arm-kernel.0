@@ -1,25 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Apr 2011 17:20:45 +0100
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<4DA84AAB.60601@gmail.com>
-	<20110415160339.GF4423@n2100.arm.linux.org.uk>
-	<56132A77AB93C141BF06E6B96CA6CFEA1F88D9@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <20110415162045.GG4423@n2100.arm.linux.org.uk>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Sat, 16 Apr 2011 00:21:51 +0800
+Subject: [PATCH] ARM: fix badly implementation of wmb
+Message-ID: <1302884511-14152-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 04:18:23PM +0000, Nguyen Dinh-R00091 wrote:
-> >Hmm, that's nice - except for one issue.  According to my grep of
-> >arch/arm/ and drivers/, nothing uses iram_alloc().  So, does anything in
-> >the MX stuff use iram_alloc.c, or is it dead code left over from a
-> >previous experiment?
-> 
-> This function will be used for suspend code in the mx5x series. I just
-> got done submitting a series of patches to Sascha for a simple suspend
-> that does not need running code out of IRAM yet. The next set of suspend
-> patches will be using these iram functions.
+From: Ming Lei <tom.leiming@gmail.com>
 
-Okay, so does iram_alloc() need to return a dma_addr_t or a phys_addr_t ?
-Are you dealing with physical addresses for it or DMA addresses?
+Commit e7c5650f6067f65f8e961394f376d4862808d0d2
+
+	ARM: 5996/1: ARM: Change the mandatory barriers implementation (4/4)
+
+implements wmb as dsb plus outer_sync, which will make wmb
+much more strict than required. In fact, it is enough for dmb to
+keep the partial order of two stores, so restore wmb as dmb to
+fix possible performance degrade caused by the commit e7c5650f.
+
+Also the patch defines __iowmb as mb to fix the issue which the
+commit e7c5650f addressed.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ arch/arm/include/asm/io.h     |    2 +-
+ arch/arm/include/asm/system.h |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index d66605d..b2cd9f2 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -98,7 +98,7 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ /* IO barriers */
+ #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+ #define __iormb()		rmb()
+-#define __iowmb()		wmb()
++#define __iowmb()		mb()
+ #else
+ #define __iormb()		do { } while (0)
+ #define __iowmb()		do { } while (0)
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 885be09..1ec2c25 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -160,7 +160,7 @@ extern unsigned int user_debug;
+ #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+ #define mb()		do { dsb(); outer_sync(); } while (0)
+ #define rmb()		dmb()
+-#define wmb()		mb()
++#define wmb()		dmb()
+ #else
+ #include <asm/memory.h>
+ #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+-- 
+1.7.3
