@@ -1,527 +1,458 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Apr 2011 21:08:14 +0200
-Subject: [PATCH 09/10] ARM i.MX51/53: reimplement clock support
+Date: Fri, 15 Apr 2011 21:08:06 +0200
+Subject: [PATCH 01/10] Add a common struct clk
 In-Reply-To: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
 References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1302894495-6879-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reimplement i.MX51/53 clock support. This is tested with a babbage
-board and a loco board up to the point that UARTs, FEC and USB work.
-There are surely bugs left in the code, but I found several in the
-old code while reimplementing it, so who cares...
-The implementation is mostly based on the datasheet and not the old
+From: Jeremy Kerr <jeremy.kerr@canonical.com>
+
+We currently have ~21 definitions of struct clk in the ARM architecture,
+each defined on a per-platform basis. This makes it difficult to define
+platform- (or architecture-) independent clock sources without making
+assumptions about struct clk, and impossible to compile two
+platforms with different struct clks into a single image.
+
+This change is an effort to unify struct clk where possible, by defining
+a common struct clk, containing a set of clock operations. Different
+clock implementations can set their own operations, and have a standard
+interface for generic code. The callback interface is exposed to the
+kernel proper, while the clock implementations only need to be seen by
+the platform internals.
+
+This allows us to share clock code among platforms, and makes it
+possible to dynamically create clock devices in platform-independent
 code.
 
-The old code is left in the tree and removed in the next patch.
+Platforms can enable the generic struct clock through
+CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+consists of a common struct clk:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+struct clk {
+	const struct clk_ops	*ops;
+	unsigned int		enable_count;
+	unsigned int		prepare_count;
+	spinlock_t		enable_lock;
+	struct mutex		prepare_lock;
+};
+
+And a set of clock operations (defined per type of clock):
+
+struct clk_ops {
+	int             (*enable)(struct clk *);
+	void            (*disable)(struct clk *);
+	unsigned long   (*get_rate)(struct clk *);
+	[...]
+};
+
+To define a hardware-specific clock, machine code can "subclass" the
+struct clock into a new struct (adding any device-specific data), and
+provide a set of operations:
+
+struct clk_foo {
+	struct clk	clk;
+	void __iomem	*some_register;
+};
+
+struct clk_ops clk_foo_ops = {
+	.get_rate = clk_foo_get_rate,
+};
+
+The common clock definitions are based on a development patch from Ben
+Herrenschmidt <benh@kernel.crashing.org>.
+
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx5/Kconfig               |    6 +
- arch/arm/mach-mx5/Makefile              |    2 +-
- arch/arm/mach-mx5/clock-imx51-imx53.c   |  420 +++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/clkdev.h |    2 +
- arch/arm/plat-mxc/include/mach/clock.h  |    3 +
- 5 files changed, 432 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/clock-imx51-imx53.c
+ drivers/clk/Kconfig  |    3 +
+ drivers/clk/Makefile |    1 +
+ drivers/clk/clk.c    |  132 ++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/clkdev.c |    7 ++
+ include/linux/clk.h  |  164 +++++++++++++++++++++++++++++++++++++++++++++++---
+ 5 files changed, 298 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/clk/clk.c
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 159340d..c39cf42 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -26,12 +26,18 @@ config	SOC_IMX51
- 	select ARCH_MXC_AUDMUX_V2
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_MX51
-+	select USE_COMMON_STRUCT_CLK
-+	select USE_COMMON_CLK_DIVIDER
-+	select USE_COMMON_CLK_MUX
- 
- config	SOC_IMX53
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 4168c88..6e3ae54 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -2,3 +2,6 @@
+ config CLKDEV_LOOKUP
  	bool
- 	select MXC_TZIC
- 	select ARCH_MXC_IOMUX_V3
- 	select ARCH_MX53
-+	select USE_COMMON_STRUCT_CLK
-+	select USE_COMMON_CLK_DIVIDER
-+        select USE_COMMON_CLK_MUX
+ 	select HAVE_CLK
++
++config USE_COMMON_STRUCT_CLK
++	bool
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 07613fa..a1a06d3 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,2 +1,3 @@
  
- comment "MX5 platforms:"
- 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 0b9338c..164d300 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Object file lists.
--obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
-+obj-y   := cpu.o mm.o clock-imx51-imx53.o devices.o ehci.o system.o
- obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
- 
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
-diff --git a/arch/arm/mach-mx5/clock-imx51-imx53.c b/arch/arm/mach-mx5/clock-imx51-imx53.c
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
++obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
 new file mode 100644
-index 0000000..27b6c63
+index 0000000..0bc9c6f
 --- /dev/null
-+++ b/arch/arm/mach-mx5/clock-imx51-imx53.c
-@@ -0,0 +1,420 @@
++++ b/drivers/clk/clk.c
+@@ -0,0 +1,132 @@
 +/*
-+ * Copyright 2010 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * Standard functionality for the common clock API.
 + */
-+#include <linux/mm.h>
-+#include <linux/delay.h>
++
 +#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/clkdev.h>
++#include <linux/module.h>
 +
-+#include <asm/div64.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include <mach/clock.h>
-+
-+#include "crm_regs.h"
-+
-+static DEFINE_CLK_FIXED(ckil, 0);
-+static DEFINE_CLK_FIXED(osc, 0);
-+static DEFINE_CLK_FIXED(ckih1, 0);
-+static DEFINE_CLK_FIXED(ckih2, 0);
-+
-+static DEFINE_CLK_PLLV2(pll1_sw, &osc.clk, MX51_DPLL1_BASE);
-+static DEFINE_CLK_PLLV2(pll2_sw, &osc.clk, MX51_DPLL2_BASE);
-+static DEFINE_CLK_PLLV2(pll3_sw, &osc.clk, MX51_DPLL3_BASE);
-+static DEFINE_CLK_PLLV2(pll4_sw, &osc.clk, MX53_DPLL4_BASE);
-+
-+static DEFINE_CLK_FIXED(dummy, 0);
-+
-+/* Low-power Audio Playback Mode clock */
-+static struct clk *lp_apm_sel[] = {
-+	&osc.clk,
-+	NULL,
-+};
-+static DEFINE_CLK_MUX(lp_apm, MXC_CCM_CCSR, 9, 1, lp_apm_sel);
-+
-+/* This is used multiple times */
-+static struct clk *standard_pll_sel_clks[] = {
-+	&pll1_sw.clk,
-+	&pll2_sw.clk,
-+	&pll3_sw.clk,
-+	&lp_apm.clk,
-+};
-+
-+static struct clk *periph_apm_sel[] = {
-+	&pll1_sw.clk,
-+	&pll3_sw.clk,
-+	&lp_apm.clk,
-+	NULL,
-+};
-+static DEFINE_CLK_MUX(periph_apm, MXC_CCM_CBCMR, 12, 2, periph_apm_sel);
-+
-+static struct clk *main_bus_sel[] = {
-+	&pll2_sw.clk,
-+	&periph_apm.clk,
-+};
-+static DEFINE_CLK_MUX(main_bus, MXC_CCM_CBCDR, 25, 1, main_bus_sel);
-+
-+static DEFINE_CLK_DIVIDER(ahb_root, &main_bus.clk, MXC_CCM_CBCDR, 10, 3);
-+static DEFINE_CLK_DIVIDER(ipg, &ahb_root.clk, MXC_CCM_CBCDR, 8, 2);
-+
-+static DEFINE_CLK_MUX(uart_sel, MXC_CCM_CSCMR1, 24, 2, standard_pll_sel_clks);
-+static DEFINE_CLK_DIVIDER(uart_pred, &uart_sel.clk, MXC_CCM_CSCDR1, 3, 3);
-+static DEFINE_CLK_DIVIDER(uart_root, &uart_pred.clk, MXC_CCM_CSCDR1, 0, 3);
-+
-+static DEFINE_CLK_MUX(esdhc1_sel, MXC_CCM_CSCMR1, 20, 2, standard_pll_sel_clks);
-+static DEFINE_CLK_DIVIDER(esdhc1_pred, &esdhc1_sel.clk, MXC_CCM_CSCDR1, 16, 3);
-+static DEFINE_CLK_DIVIDER(esdhc1_podf, &esdhc1_pred.clk, MXC_CCM_CSCDR1, 11, 3);
-+
-+/* This is routed to esdhc3 in the i.MX53 datasheet */
-+static DEFINE_CLK_MUX(esdhc2_sel, MXC_CCM_CSCMR1, 16, 2, standard_pll_sel_clks);
-+static DEFINE_CLK_DIVIDER(esdhc2_pred, &esdhc2_sel.clk, MXC_CCM_CSCDR1, 22, 3);
-+static DEFINE_CLK_DIVIDER(esdhc2_podf, &esdhc2_pred.clk, MXC_CCM_CSCDR1, 19, 3);
-+
-+static struct clk *esdhc3_sel_clks[] = {
-+	&esdhc1_podf.clk,
-+	&esdhc2_podf.clk,
-+};
-+static DEFINE_CLK_MUX(esdhc3_sel, MXC_CCM_CSCMR1, 19, 1, esdhc3_sel_clks);
-+
-+static struct clk *esdhc4_sel_clks[] = {
-+	&esdhc1_podf.clk,
-+	&esdhc2_podf.clk,
-+};
-+static DEFINE_CLK_MUX(esdhc4_sel, MXC_CCM_CSCMR1, 18, 1, esdhc4_sel_clks);
-+
-+static struct clk *emi_slow_sel_clks[] = {
-+	&main_bus.clk,
-+	&ahb_root.clk,
-+};
-+static DEFINE_CLK_MUX(emi_sel, MXC_CCM_CBCDR, 26, 1, emi_slow_sel_clks);
-+static DEFINE_CLK_DIVIDER(emi_slow_podf, &emi_sel.clk, MXC_CCM_CBCDR, 22, 3);
-+static DEFINE_CLK_DIVIDER(nfc_podf, &emi_slow_podf.clk, MXC_CCM_CBCDR, 13, 3);
-+
-+static DEFINE_CLK_MUX(ecspi_sel, MXC_CCM_CSCMR1, 4, 2, standard_pll_sel_clks);
-+static DEFINE_CLK_DIVIDER(ecspi_pred, &ecspi_sel.clk, MXC_CCM_CSCDR2, 25, 3);
-+static DEFINE_CLK_DIVIDER(ecspi_podf, &ecspi_pred.clk, MXC_CCM_CSCDR2, 19, 6);
-+
-+static DEFINE_CLK_MUX(usboh3_sel, MXC_CCM_CSCMR1, 22, 2, standard_pll_sel_clks);
-+static DEFINE_CLK_DIVIDER(usboh3_pred, &usboh3_sel.clk, MXC_CCM_CSCDR1, 8, 3);
-+static DEFINE_CLK_DIVIDER(usboh3_podf, &usboh3_pred.clk, MXC_CCM_CSCDR1, 6, 2);
-+
-+static DEFINE_CLK_DIVIDER(usb_phy_pred, &pll3_sw.clk, MXC_CCM_CDCDR, 3, 3);
-+static DEFINE_CLK_DIVIDER(usb_phy_podf, &usb_phy_pred.clk, MXC_CCM_CDCDR, 0, 3);
-+static struct clk *usb_phy_sel_clks[] = {
-+	&osc.clk,
-+	&usb_phy_podf.clk,
-+};
-+static DEFINE_CLK_MUX(usb_phy_sel, MXC_CCM_CSCMR1, 26, 1, usb_phy_sel_clks);
-+
-+static DEFINE_CLK_DIVIDER(cpu_podf, &pll1_sw.clk, MXC_CCM_CACRR, 0, 3);
-+
-+static struct clk *ipu_di0_sel_clks[] = {
-+	&pll3_sw.clk,
-+	&osc.clk,
-+	&ckih1.clk,
-+	NULL, /* &tve_di.clk */
-+	NULL, /* ipp di0 (iomux) */
-+	NULL, /* ldp di0 */
-+};
-+static DEFINE_CLK_MUX(ipu_di0_sel, MXC_CCM_CSCMR2, 26, 3, ipu_di0_sel_clks);
-+
-+static struct clk *ipu_di1_sel_clks[] = {
-+	&pll3_sw.clk,
-+	&osc.clk,
-+	&ckih1.clk,
-+	NULL, /* &tve_di.clk */
-+	NULL, /* ipp di1 (iomux) */
-+	NULL, /* ldp di1 */
-+};
-+static DEFINE_CLK_MUX(ipu_di1_sel, MXC_CCM_CSCMR2, 29, 3, ipu_di1_sel_clks);
-+
-+static struct clk *tve_ext_sel_clks[] = {
-+	&osc.clk,
-+	&ckih1.clk,
-+};
-+static DEFINE_CLK_MUX(tve_ext_sel, MXC_CCM_CSCMR1, 6, 1, tve_ext_sel_clks);
-+
-+static DEFINE_CLK_DIVIDER(tve_pred, &pll3_sw.clk, MXC_CCM_CDCDR, 28, 3);
-+
-+static struct clk *tve_sel_clks[] = {
-+	&tve_pred.clk,
-+	&tve_ext_sel.clk,
-+};
-+static DEFINE_CLK_MUX(tve_sel, MXC_CCM_CSCMR1, 7, 1, tve_sel_clks);
-+
-+static DEFINE_CLK_GATE_2(iim_gate, &ipg.clk, MXC_CCM_CCGR0, 30);
-+
-+static DEFINE_CLK_GATE_2(uart1_ipg_gate, &ipg.clk, MXC_CCM_CCGR1, 6);
-+static DEFINE_CLK_GATE_2(uart1_per_gate, &uart_root.clk, MXC_CCM_CCGR1, 8);
-+static DEFINE_CLK_GATE_2(uart2_ipg_gate, &ipg.clk, MXC_CCM_CCGR1, 10);
-+static DEFINE_CLK_GATE_2(uart2_per_gate, &uart_root.clk, MXC_CCM_CCGR1, 12);
-+static DEFINE_CLK_GATE_2(uart3_ipg_gate, &ipg.clk, MXC_CCM_CCGR1, 14);
-+static DEFINE_CLK_GATE_2(uart3_per_gate, &uart_root.clk, MXC_CCM_CCGR1, 16);
-+static DEFINE_CLK_GATE_2(i2c1_gate, &ipg.clk, MXC_CCM_CCGR1, 18);
-+static DEFINE_CLK_GATE_2(i2c2_gate, &ipg.clk, MXC_CCM_CCGR1, 20);
-+static DEFINE_CLK_GATE_2(hsi2c_gate, &ipg.clk, MXC_CCM_CCGR1, 22);
-+
-+static DEFINE_CLK_GATE_2(mx51_usb_phy_gate, &usb_phy_sel.clk, MXC_CCM_CCGR2, 0);
-+static DEFINE_CLK_GATE_2(gpt_ipg_gate, &ipg.clk, MXC_CCM_CCGR2, 20);
-+static DEFINE_CLK_GATE_2(pwm1_ipg_gate, &ipg.clk, MXC_CCM_CCGR2, 10);
-+static DEFINE_CLK_GATE_2(pwm1_hf_gate, &ipg.clk, MXC_CCM_CCGR2, 12);
-+static DEFINE_CLK_GATE_2(pwm2_ipg_gate, &ipg.clk, MXC_CCM_CCGR2, 14);
-+static DEFINE_CLK_GATE_2(pwm2_hf_gate, &ipg.clk, MXC_CCM_CCGR2, 16);
-+static DEFINE_CLK_GATE_2(gpt_gate, &ipg.clk, MXC_CCM_CCGR2, 18);
-+static DEFINE_CLK_GATE_2(fec_gate, &ipg.clk, MXC_CCM_CCGR2, 24);
-+static DEFINE_CLK_GATE_2(usboh3_ahb_gate, &ipg.clk, MXC_CCM_CCGR2, 26);
-+static DEFINE_CLK_GATE_2(usboh3_gate, &usboh3_podf.clk, MXC_CCM_CCGR2, 28);
-+static DEFINE_CLK_GATE_2(tve_gate, &tve_sel.clk, MXC_CCM_CCGR2, 30);
-+
-+static DEFINE_CLK_GATE_2(esdhc1_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 0);
-+static DEFINE_CLK_GATE_2(esdhc1_per_gate, &esdhc1_podf.clk, MXC_CCM_CCGR3, 2);
-+static DEFINE_CLK_GATE_2(esdhc2_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 4);
-+static DEFINE_CLK_GATE_2(esdhc2_per_gate, &esdhc2_podf.clk, MXC_CCM_CCGR3, 6);
-+static DEFINE_CLK_GATE_2(esdhc3_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 8);
-+static DEFINE_CLK_GATE_2(esdhc3_per_gate, &esdhc3_sel.clk, MXC_CCM_CCGR3, 10);
-+static DEFINE_CLK_GATE_2(esdhc4_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 12);
-+static DEFINE_CLK_GATE_2(esdhc4_per_gate, &esdhc4_sel.clk, MXC_CCM_CCGR3, 14);
-+static DEFINE_CLK_GATE_2(ssi1_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 16);
-+static DEFINE_CLK_GATE_2(ssi2_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 18);
-+static DEFINE_CLK_GATE_2(ssi3_ipg_gate, &ipg.clk, MXC_CCM_CCGR3, 20);
-+
-+static DEFINE_CLK_GATE_2(mx51_mipi_hsc1_gate, &ipg.clk, MXC_CCM_CCGR4, 6);
-+static DEFINE_CLK_GATE_2(mx51_mipi_hsc2_gate, &ipg.clk, MXC_CCM_CCGR4, 8);
-+static DEFINE_CLK_GATE_2(mx51_mipi_esc_gate, &ipg.clk, MXC_CCM_CCGR4, 10);
-+static DEFINE_CLK_GATE_2(mx51_mipi_hsp_gate, &ipg.clk, MXC_CCM_CCGR4, 12);
-+
-+static DEFINE_CLK_GATE_2(mx53_usb_phy1_gate, &usb_phy_sel.clk, MXC_CCM_CCGR4, 10);
-+static DEFINE_CLK_GATE_2(mx53_usb_phy2_gate, &usb_phy_sel.clk, MXC_CCM_CCGR4, 12);
-+static DEFINE_CLK_GATE_2(ecspi1_ipg_gate, &ipg.clk, MXC_CCM_CCGR4, 18);
-+static DEFINE_CLK_GATE_2(ecspi1_per_gate, &ecspi_podf.clk, MXC_CCM_CCGR4, 20);
-+static DEFINE_CLK_GATE_2(ecspi2_ipg_gate, &ipg.clk, MXC_CCM_CCGR4, 22);
-+static DEFINE_CLK_GATE_2(ecspi2_per_gate, &ecspi_podf.clk, MXC_CCM_CCGR4, 24);
-+static DEFINE_CLK_GATE_2(cspi_ipg_gate, &ipg.clk, MXC_CCM_CCGR4, 26);
-+static DEFINE_CLK_GATE_2(sdma_gate, &ipg.clk, MXC_CCM_CCGR4, 30);
-+
-+static DEFINE_CLK_GATE_2(ipu_gate, &ahb_root.clk, MXC_CCM_CCGR5, 10);
-+static DEFINE_CLK_GATE_2(emi_fast_gate, &dummy.clk, MXC_CCM_CCGR5, 16);
-+static DEFINE_CLK_GATE_2(emi_slow_gate, &emi_slow_podf.clk, MXC_CCM_CCGR5, 16);
-+static DEFINE_CLK_GATE_2(nfc_gate, &nfc_podf.clk, MXC_CCM_CCGR5, 20);
-+
-+static DEFINE_CLK_GATE_2(ipu_di0_gate, &ipu_di0_sel.clk, MXC_CCM_CCGR6, 10);
-+static DEFINE_CLK_GATE_2(ipu_di1_gate, &ipu_di1_sel.clk, MXC_CCM_CCGR6, 12);
-+
-+static struct clk *uart1_group[] = {
-+	&uart1_per_gate.clk,
-+	&uart1_ipg_gate.clk
-+};
-+static DEFINE_CLK_GROUP(uart1, uart1_group);
-+
-+static struct clk *uart2_group[] = {
-+	&uart2_per_gate.clk,
-+	&uart2_ipg_gate.clk
-+};
-+static DEFINE_CLK_GROUP(uart2, uart2_group);
-+
-+static struct clk *uart3_group[] = {
-+	&uart3_per_gate.clk,
-+	&uart3_ipg_gate.clk
-+};
-+static DEFINE_CLK_GROUP(uart3, uart3_group);
-+
-+static struct clk *gpt_group[] = {
-+	&gpt_gate.clk,
-+	&gpt_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(gpt, gpt_group);
-+
-+static struct clk *esdhc1_group[] = {
-+	&esdhc1_per_gate.clk,
-+	&esdhc1_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(esdhc1, esdhc1_group);
-+
-+static struct clk *esdhc2_group[] = {
-+	&esdhc2_per_gate.clk,
-+	&esdhc2_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(esdhc2, esdhc2_group);
-+
-+static struct clk *esdhc3_group[] = {
-+	&esdhc3_per_gate.clk,
-+	&esdhc3_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(esdhc3, esdhc3_group);
-+
-+static struct clk *esdhc4_group[] = {
-+	&esdhc4_per_gate.clk,
-+	&esdhc4_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(esdhc4, esdhc4_group);
-+
-+static struct clk *ecspi1_group[] = {
-+	&ecspi1_per_gate.clk,
-+	&ecspi1_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(ecspi1, ecspi1_group);
-+
-+static struct clk *ecspi2_group[] = {
-+	&ecspi2_per_gate.clk,
-+	&ecspi2_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(ecspi2, ecspi2_group);
-+
-+static struct clk *cspi_group[] = {
-+	&ecspi1_per_gate.clk,
-+	&cspi_ipg_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(cspi, cspi_group);
-+
-+static struct clk *mx51_mipi_group[] = {
-+	&mx51_mipi_hsp_gate.clk,
-+	&mx51_mipi_hsc1_gate.clk,
-+	&mx51_mipi_hsc2_gate.clk,
-+	&mx51_mipi_esc_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(mx51_mipi, mx51_mipi_group);
-+
-+static struct clk *ipu_group_clks[] = {
-+	&ipu_gate.clk,
-+	&emi_fast_gate.clk,
-+};
-+static DEFINE_CLK_GROUP(ipu, ipu_group_clks);
-+
-+#define _REGISTER_CLOCK(d, n, c) \
-+       { \
-+		.dev_id = d, \
-+		.con_id = n, \
-+		.clk = c,   \
-+       },
-+
-+static struct clk_lookup mx5_lookups[] = {
-+	_REGISTER_CLOCK("imx-uart.0", NULL, &uart1.clk)
-+	_REGISTER_CLOCK("imx-uart.1", NULL, &uart2.clk)
-+	_REGISTER_CLOCK("imx-uart.2", NULL, &uart3.clk)
-+	_REGISTER_CLOCK("fec.0", NULL, &fec_gate.clk)
-+	_REGISTER_CLOCK("mxc_pwm.0", "pwm", &pwm1_ipg_gate.clk)
-+	_REGISTER_CLOCK("mxc_pwm.1", "pwm", &pwm2_ipg_gate.clk)
-+	_REGISTER_CLOCK("imx-i2c.0", NULL, &i2c1_gate.clk)
-+	_REGISTER_CLOCK("imx-i2c.1", NULL, &i2c2_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.0", "usb", &usboh3_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", &usboh3_ahb_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", &mx53_usb_phy1_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.1", "usb", &usboh3_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", &usboh3_ahb_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.2", "usb", &usboh3_gate.clk)
-+	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", &usboh3_ahb_gate.clk)
-+	_REGISTER_CLOCK("fsl-usb2-udc", "usb", &usboh3_gate.clk)
-+	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", &usboh3_ahb_gate.clk)
-+	_REGISTER_CLOCK("mxc_nand", NULL, &nfc_gate.clk)
-+	_REGISTER_CLOCK("imx-ssi.0", NULL, &ssi1_ipg_gate.clk)
-+	_REGISTER_CLOCK("imx-ssi.1", NULL, &ssi1_ipg_gate.clk)
-+	_REGISTER_CLOCK("imx-ssi.2", NULL, &ssi1_ipg_gate.clk)
-+	_REGISTER_CLOCK("imx-sdma", NULL, &sdma_gate.clk)
-+	_REGISTER_CLOCK("imx51-ecspi.0", NULL, &ecspi1.clk)
-+	_REGISTER_CLOCK("imx51-ecspi.1", NULL, &ecspi2.clk)
-+	_REGISTER_CLOCK("imx51-cspi.0", NULL, &cspi.clk)
-+	_REGISTER_CLOCK(NULL, "cpu", &cpu_podf.clk)
-+	_REGISTER_CLOCK(NULL, "iim", &iim_gate.clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, &esdhc1.clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, &esdhc2.clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, &esdhc3.clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, &esdhc4.clk)
-+	_REGISTER_CLOCK("imx-ipuv3", NULL, &ipu.clk)
-+	_REGISTER_CLOCK("imx-ipuv3", "di0", &ipu_di0_gate.clk)
-+	_REGISTER_CLOCK("imx-ipuv3", "di1", &ipu_di1_gate.clk)
-+	_REGISTER_CLOCK("imx2-wdt.0", NULL, &dummy.clk)
-+	_REGISTER_CLOCK("imx2-wdt.1", NULL, &dummy.clk)
-+	_REGISTER_CLOCK("imx-keypad", NULL, &dummy.clk)
-+};
-+
-+static struct clk_lookup mx51_lookups[] = {
-+	_REGISTER_CLOCK("imx-i2c.2", NULL, &hsi2c_gate.clk)
-+	_REGISTER_CLOCK(NULL, "mipi_hsp", &mx51_mipi.clk)
-+};
-+
-+static void clkdev_add_array(struct clk_lookup *lookup, int num)
++int clk_prepare(struct clk *clk)
 +{
-+	int i;
++	int ret = 0;
 +
-+	for (i = 0; i < num; i++)
-+		clkdev_add(&lookup[i]);
++	mutex_lock(&clk->prepare_lock);
++	if (clk->prepare_count == 0 && clk->ops->prepare)
++		ret = clk->ops->prepare(clk);
++
++	if (!ret)
++		clk->prepare_count++;
++	mutex_unlock(&clk->prepare_lock);
++
++	return ret;
 +}
++EXPORT_SYMBOL_GPL(clk_prepare);
 +
-+static void mx5_clocks_common_init(unsigned long rate_ckil, unsigned long rate_osc,
-+			unsigned long rate_ckih1, unsigned long rate_ckih2)
++void clk_unprepare(struct clk *clk)
 +{
-+	ckil.rate = rate_ckil;
-+	osc.rate = rate_osc;
-+	ckih1.rate = rate_ckih1;
-+	ckih2.rate = rate_ckih2;
++	mutex_lock(&clk->prepare_lock);
 +
-+	clkdev_add_array(mx5_lookups, ARRAY_SIZE(mx5_lookups));
++	WARN_ON(clk->prepare_count == 0);
 +
-+	/* Set SDHC parents to be PLL2 */
-+	clk_set_parent(&esdhc1_sel.clk, &pll2_sw.clk);
-+	clk_set_parent(&esdhc2_sel.clk, &pll2_sw.clk);
++	if (--clk->prepare_count == 0 && clk->ops->unprepare) {
++		WARN_ON(clk->enable_count != 0);
++		clk->ops->unprepare(clk);
++	}
++
++	mutex_unlock(&clk->prepare_lock);
 +}
++EXPORT_SYMBOL_GPL(clk_unprepare);
 +
-+int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
-+			unsigned long rate_ckih1, unsigned long rate_ckih2)
++int clk_enable(struct clk *clk)
 +{
-+	/* Clock tree has i.MX51 layout. i.MX53 needs some fixups */
-+	pll1_sw.base = MX53_DPLL1_BASE;
-+	pll2_sw.base = MX53_DPLL2_BASE;
-+	pll3_sw.base = MX53_DPLL3_BASE;
-+	esdhc3_per_gate.parent = &esdhc2_podf.clk;
-+	esdhc2_per_gate.parent = &esdhc3_sel.clk;
-+	tve_gate.parent = &tve_pred.clk;
-+	tve_pred.parent = &tve_ext_sel.clk;
-+	tve_ext_sel_clks[0] = &pll4_sw.clk;
-+	tve_ext_sel_clks[1] = &ckih1.clk;
++	unsigned long flags;
++	int ret = 0;
 +
-+	mx5_clocks_common_init(rate_ckil, rate_osc, rate_ckih1, rate_ckih2);
++	WARN_ON(clk->prepare_count == 0);
 +
-+	/* set SDHC root clock to 200MHZ*/
-+	clk_set_rate(&esdhc1_podf.clk, 200000000);
-+	clk_set_rate(&esdhc2_podf.clk, 200000000);
++	spin_lock_irqsave(&clk->enable_lock, flags);
++	if (clk->enable_count == 0 && clk->ops->enable)
++		ret = clk->ops->enable(clk);
 +
-+	/* System timer */
-+	mxc_timer_init(&gpt.clk, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
-+		MX53_INT_GPT);
++	if (!ret)
++		clk->enable_count++;
++	spin_unlock_irqrestore(&clk->enable_lock, flags);
 +
-+	clk_prepare(&iim_gate.clk);
-+	clk_enable(&iim_gate.clk);
-+	mx53_revision();
-+	clk_disable(&iim_gate.clk);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(clk_enable);
 +
++void clk_disable(struct clk *clk)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&clk->enable_lock, flags);
++
++	WARN_ON(clk->enable_count == 0);
++
++	if (!--clk->enable_count == 0 && clk->ops->disable)
++		clk->ops->disable(clk);
++
++	spin_unlock_irqrestore(&clk->enable_lock, flags);
++}
++EXPORT_SYMBOL_GPL(clk_disable);
++
++unsigned long clk_get_rate(struct clk *clk)
++{
++	if (clk->ops->get_rate)
++		return clk->ops->get_rate(clk);
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(clk_get_rate);
 +
-+int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
-+			unsigned long rate_ckih1, unsigned long rate_ckih2)
++long clk_round_rate(struct clk *clk, unsigned long rate)
 +{
-+	mx5_clocks_common_init(rate_ckil, rate_osc, rate_ckih1, rate_ckih2);
-+	clkdev_add_array(mx51_lookups, ARRAY_SIZE(mx51_lookups));
-+
-+	/* set SDHC root clock to 166.25MHZ*/
-+	clk_set_rate(&esdhc1_podf.clk, 166250000);
-+	clk_set_rate(&esdhc2_podf.clk, 166250000);
-+
-+	/* System timer */
-+	mxc_timer_init(&gpt.clk, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
-+		MX51_MXC_INT_GPT);
-+
-+	clk_prepare(&iim_gate.clk);
-+	clk_enable(&iim_gate.clk);
-+	mx51_revision();
-+	clk_disable(&iim_gate.clk);
-+	mx51_display_revision();
-+
-+	return 0;
++	if (clk->ops->round_rate)
++		return clk->ops->round_rate(clk, rate);
++	return -ENOSYS;
 +}
-diff --git a/arch/arm/plat-mxc/include/mach/clkdev.h b/arch/arm/plat-mxc/include/mach/clkdev.h
-index 04b37a8..ad1e227 100644
---- a/arch/arm/plat-mxc/include/mach/clkdev.h
-+++ b/arch/arm/plat-mxc/include/mach/clkdev.h
-@@ -1,7 +1,9 @@
- #ifndef __ASM_MACH_CLKDEV_H
- #define __ASM_MACH_CLKDEV_H
++EXPORT_SYMBOL_GPL(clk_round_rate);
++
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	might_sleep();
++
++	if (clk->ops->set_rate)
++		return clk->ops->set_rate(clk, rate);
++	return -ENOSYS;
++}
++EXPORT_SYMBOL_GPL(clk_set_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	if (clk->ops->set_parent)
++		return clk->ops->set_parent(clk, parent);
++	return -ENOSYS;
++}
++EXPORT_SYMBOL_GPL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	if (clk->ops->get_parent)
++		return clk->ops->get_parent(clk);
++	return ERR_PTR(-ENOSYS);
++}
++EXPORT_SYMBOL_GPL(clk_get_parent);
++
++int __clk_get(struct clk *clk)
++{
++	if (clk->ops->get)
++		return clk->ops->get(clk);
++	return 1;
++}
++
++void __clk_put(struct clk *clk)
++{
++	if (clk->ops->put)
++		clk->ops->put(clk);
++}
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 0fc0a79..a7999d2 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -23,6 +23,13 @@
+ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
  
-+#ifndef CONFIG_USE_COMMON_STRUCT_CLK
- #define __clk_get(clk) ({ 1; })
- #define __clk_put(clk) do { } while (0)
-+#endif
- 
- #endif
-diff --git a/arch/arm/plat-mxc/include/mach/clock.h b/arch/arm/plat-mxc/include/mach/clock.h
-index 4943ab0..cc11577 100644
---- a/arch/arm/plat-mxc/include/mach/clock.h
-+++ b/arch/arm/plat-mxc/include/mach/clock.h
-@@ -25,6 +25,8 @@
- 
- struct module;
- 
++/* For USE_COMMON_STRUCT_CLK, these are provided in clk.c, but not exported
++ * through other headers; we don't want them used anywhere but here. */
 +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
-+#else
- struct clk {
- 	int id;
- 	/* Source clock this clk depends on */
-@@ -56,6 +58,7 @@ struct clk {
- 	/* Function ptr to set the parent clock of the clock. */
- 	int (*set_parent) (struct clk *, struct clk *);
- };
++extern int __clk_get(struct clk *clk);
++extern void __clk_put(struct clk *clk);
 +#endif
++
+ /*
+  * Find the correct struct clk for the device and connection ID.
+  * We do slightly fuzzy matching here:
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 1d37f42..7b406bd 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -3,6 +3,7 @@
+  *
+  *  Copyright (C) 2004 ARM Limited.
+  *  Written by Deep Blue Solutions Limited.
++ *  Copyright (c) 2010-2011 Jeremy Kerr <jeremy.kerr@canonical.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -11,18 +12,168 @@
+ #ifndef __LINUX_CLK_H
+ #define __LINUX_CLK_H
  
- unsigned long mxc_decode_pll(unsigned int pll, u32 f_ref);
++#include <linux/err.h>
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
++
+ struct device;
  
+-/*
+- * The base API.
++#ifdef CONFIG_USE_COMMON_STRUCT_CLK
++
++/* If we're using the common struct clk, we define the base clk object here */
++
++/**
++ * struct clk - hardware independent clock structure
++ * @ops:		implementation-specific ops for this clock
++ * @enable_count:	count of clk_enable() calls active on this clock
++ * @enable_lock:	lock for atomic enable
++ * @prepare_count:	count of clk_prepare() calls active on this clock
++ * @prepare_lock:	lock for sleepable prepare
++ *
++ * The base clock object, used by drivers for hardware-independent manipulation
++ * of clock lines. This will be 'subclassed' by device-specific implementations,
++ * which add device-specific data to struct clk. For example:
++ *
++ *  struct clk_foo {
++ *      struct clk;
++ *      [device specific fields]
++ *  };
++ *
++ * The clock driver code will manage the device-specific data, and pass
++ * clk_foo.clk to the common clock code. The clock driver will be called
++ * through the @ops callbacks.
++ *
++ * The @enable_lock and @prepare_lock members are used to serialise accesses
++ * to the ops->enable and ops->prepare functions (and the corresponding
++ * ops->disable and ops->unprepare functions).
+  */
++struct clk {
++	const struct clk_ops	*ops;
++	unsigned int		enable_count;
++	unsigned int		prepare_count;
++	spinlock_t		enable_lock;
++	struct mutex		prepare_lock;
++};
+ 
++/* static initialiser for clocks. */
++#define INIT_CLK(name, o) {						\
++	.ops		= &o,						\
++	.enable_lock	= __SPIN_LOCK_UNLOCKED(name.enable_lock),	\
++	.prepare_lock	= __MUTEX_INITIALIZER(name.prepare_lock),	\
++}
++
++/**
++ * struct clk_ops -  Callback operations for clocks; these are to be provided
++ * by the clock implementation, and will be called by drivers through the clk_*
++ * API.
++ *
++ * @prepare:	Prepare the clock for enabling. This must not return until
++ *		the clock is fully prepared, and it's safe to call clk_enable.
++ *		This callback is intended to allow clock implementations to
++ *		do any initialisation that may sleep. Called with
++ *		clk->prepare_lock held.
++ *
++ * @unprepare:	Release the clock from its prepared state. This will typically
++ *		undo any work done in the @prepare callback. Called with
++ *		clk->prepare_lock held.
++ *
++ * @enable:	Enable the clock atomically. This must not return until the
++ *		clock is generating a valid clock signal, usable by consumer
++ *		devices. Called with clk->enable_lock held. This function
++ *		must not sleep.
++ *
++ * @disable:	Disable the clock atomically. Called with clk->enable_lock held.
++ *		This function must not sleep.
++ *
++ * @get:	Called by the core clock code when a device driver acquires a
++ *		clock via clk_get(). Optional.
++ *
++ * @put:	Called by the core clock code when a devices driver releases a
++ *		clock via clk_put(). Optional.
++ *
++ * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
++ * implementations to split any work between atomic (enable) and sleepable
++ * (prepare) contexts.  If a clock requires sleeping code to be turned on, this
++ * should be done in clk_prepare. Switching that will not sleep should be done
++ * in clk_enable.
++ *
++ * Typically, drivers will call clk_prepare when a clock may be needed later
++ * (eg. when a device is opened), and clk_enable when the clock is actually
++ * required (eg. from an interrupt). Note that clk_prepare *must* have been
++ * called before clk_enable.
++ *
++ * For other callbacks, see the corresponding clk_* functions. Parameters and
++ * return values are passed directly from/to these API functions, or
++ * -ENOSYS (or zero, in the case of clk_get_rate) is returned if the callback
++ * is NULL, see drivers/clk/clk.c for implementation details. All are optional.
++ */
++struct clk_ops {
++	int		(*prepare)(struct clk *);
++	void		(*unprepare)(struct clk *);
++	int		(*enable)(struct clk *);
++	void		(*disable)(struct clk *);
++	int		(*get)(struct clk *);
++	void		(*put)(struct clk *);
++	unsigned long	(*get_rate)(struct clk *);
++	long		(*round_rate)(struct clk *, unsigned long);
++	int		(*set_rate)(struct clk *, unsigned long);
++	int		(*set_parent)(struct clk *, struct clk *);
++	struct clk *	(*get_parent)(struct clk *);
++};
++
++/**
++ * clk_prepare - prepare clock for atomic enabling.
++ *
++ * @clk: The clock to prepare
++ *
++ * Do any possibly sleeping initialisation on @clk, allowing the clock to be
++ * later enabled atomically (via clk_enable). This function may sleep.
++ */
++int clk_prepare(struct clk *clk);
++
++/**
++ * clk_unprepare - release clock from prepared state
++ *
++ * @clk: The clock to release
++ *
++ * Do any (possibly sleeping) cleanup on clk. This function may sleep.
++ */
++void clk_unprepare(struct clk *clk);
++
++/**
++ * clk_common_init - initialise a clock for driver usage
++ *
++ * @clk: The clock to initialise
++ *
++ * Used for runtime intialization of clocks; you don't need to call this
++ * if your clock has been (statically) initialized with INIT_CLK.
++ */
++static inline void clk_common_init(struct clk *clk)
++{
++	clk->enable_count = clk->prepare_count = 0;
++	spin_lock_init(&clk->enable_lock);
++	mutex_init(&clk->prepare_lock);
++}
++
++#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+ 
+ /*
+- * struct clk - an machine class defined object / cookie.
++ * Global clock object, actual structure is declared per-machine
+  */
+ struct clk;
+ 
++static inline void clk_common_init(struct clk *clk) { }
++
++/*
++ * For !CONFIG_USE_COMMON_STRUCT_CLK, we don't enforce any atomicity
++ * requirements for clk_enable/clk_disable, so the prepare and unprepare
++ * functions are no-ops
++ */
++static inline int clk_prepare(struct clk *clk) { return 0; }
++static inline void clk_unprepare(struct clk *clk) { }
++
++#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
++
+ /**
+  * clk_get - lookup and obtain a reference to a clock producer.
+  * @dev: device for clock "consumer"
+@@ -67,6 +218,7 @@ void clk_disable(struct clk *clk);
+ /**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
++ *		  Returns zero if the clock rate is unknown.
+  * @clk: clock source
+  */
+ unsigned long clk_get_rate(struct clk *clk);
+@@ -83,12 +235,6 @@ unsigned long clk_get_rate(struct clk *clk);
+  */
+ void clk_put(struct clk *clk);
+ 
+-
+-/*
+- * The remaining APIs are optional for machine class support.
+- */
+-
+-
+ /**
+  * clk_round_rate - adjust a rate to the exact rate a clock can provide
+  * @clk: clock source
 -- 
 1.7.4.1
