@@ -1,54 +1,55 @@
 From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 15 Apr 2011 15:02:26 -0700
+Date: Fri, 15 Apr 2011 15:08:34 -0700
 Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
-In-Reply-To: <20110415190319.GA24111@Krystal>
+In-Reply-To: <alpine.LFD.2.00.1104152058050.2744@localhost6.localdomain6>
 References: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-	<20110415190319.GA24111@Krystal>
-Message-ID: <4DA8C072.3030705@codeaurora.org>
+	<alpine.LFD.2.00.1104152058050.2744@localhost6.localdomain6>
+Message-ID: <4DA8C1E2.3020205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Desnoyers wrote:
-> * Abhijeet Dharmapurikar (adharmap at codeaurora.org) wrote:
->> Drivers need to be aware whether the interrupt controller is a slow bus
->> and call read_irq_line in proper context.
+Thomas Gleixner wrote:
+> On Fri, 15 Apr 2011, Abhijeet Dharmapurikar wrote:
 > 
-> Hrm, this strikes me as odd. Is there any way this generic API could
-> handle the corner-cases without needed the caller to know this ?
-
-Usually, a slow bus irq controller marks its irq as nested and has its 
-irq handler running in thread context. In that case it will be safe to 
-call irq_read_line from thread context. For the usual (non slow bus) irq 
-controller we can always call irq_read_line within irq context.
-
-
-This function is intended to be called from within the handler, to know 
-if a rising edge or a falling edge caused the interrupt. It can be used 
-in other places too, but then the driver needs to be careful about the 
-interrupt controller slowbus nature.
-
-The problem happens when this function is called from interrupt context 
-when irq controller is slowbus. For example one has taken a spin_lock 
-with interrupts disabled and now it wants to know the real time status 
-on a pin that is controlled by a slow bus controller. The slowbus 
-controller could end up sleeping and things go bad.
-
-I should explain this more in the commit text. Will do so in the next 
-revision of this patch.
-
->> + *	This function may be called from IRQ context only when
->> + *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
+>> Some drivers need to know what the status of the interrupt line is.
+>> This is especially true for drivers that register a handler with
+>> IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING and in the handler they
+>> need to know which edge transition it was invoked for.
 > 
-> The comment here seems to imply "be careful when using this extremely
-> fragile interface", which does not give me the warm safety feeling I
-> would come to expect from a generic kernel API.
-> 
-> Any ideas on how to improve that ?
+> What's the purpose of this? How is that going to be used?
 
-Well, even the enable_irq() and disable_irq_nosync() have the same 
-calling restrictions. I picked this line from the comment block in 
-enable_irq() function. You think I should explain it more in the 
-upcoming patch?
+The main purpose is to know in the handler if it was invoked becuase of 
+a rising edge or the falling edge.
+
+Now one could say that the driver should maintain some state and toggle 
+it upon each invocation of this handler. That scheme quickly goes out of 
+sync because we might ignore interrupts while suspended.
+
+> 
+>>  
+>>  #ifndef CONFIG_GENERIC_HARDIRQS_NO_COMPAT
+> 
+> That hunk does not apply.
+
+Will rebase and resend it again, my bad.
+
+>> +int irq_read_line(unsigned int irq)
+>> +{
+>> +	struct irq_desc *desc = irq_to_desc(irq);
+>> +	unsigned long flags;
+>> +	int val;
+> 
+> Please use irq_get_desc_buslock()
+
+yes will fix this in the next revision of this patch.
+
+
+>> +EXPORT_SYMBOL(irq_read_line);
+> 
+> EXPORT_SYMBOL_GPL() please.
+
+yes will do
+
 
 --
 Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
