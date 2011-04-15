@@ -1,69 +1,112 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 15 Apr 2011 12:15:43 +0530
-Subject: dmaengine: Can we schedule new transfer from dma
-	callback	routine??
-In-Reply-To: <20110411085603.GA13041@n2100.arm.linux.org.uk>
-References: <4DA2B3D8.6060707@st.com>
-	<20110411085603.GA13041@n2100.arm.linux.org.uk>
-Message-ID: <4DA7E997.3080402@st.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 15 Apr 2011 16:01:47 +0800
+Subject: [PATCH 1/2] ARM: mxs: add GPMI support for imx23/imx28
+Message-ID: <1302854508-13652-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2011 02:26 PM, Russell King - ARM Linux wrote:
-> On Mon, Apr 11, 2011 at 01:25:04PM +0530, viresh kumar wrote:
->>
->> Hello,
->>
->> In dw_dmac.c driver, dwc_descriptor_complete() routine, following is
->> mentioned before calling callback:
->>
->> 	/*
->> 	 * The API requires that no submissions are done from a
->> 	 * callback, so we don't need to drop the lock here
->> 	 */
->> 	if (callback)
->> 		callback(param);
->>
->> Does this hold true for dmaengine??
-> 
-> Not for slave devices - see Dan's reply:
-> 
-> http://lists.arm.linux.org.uk/lurker/message/20101223.005313.a38d7bf0.en.html
-> 
-> As the slave API hasn't been well documented, there's a lot of
-> inconsistency of behaviour between DMA engine slave implementations.
-> I'd suggest at least fixing slave DMA engine drivers to ensure that:
-> 
-> (a) the callback is always called in tasklet context
-> (b) the callback can submit new slave transactions (iow, the spinlock
->     which prep_slave_sg takes must not be held during the callback.)
-> 
-> The way that others solve this is to move the completed txd structures
-> to a local 'completed' list, and then walk this list after the spinlocks
-> have been dropped.
-> 
+add gpmi support for imx23 and imx28.
 
-Hello,
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/mach-mxs/Kconfig                 |    2 +
+ arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   68 +++++++++++++++++++++++++++++
+ 2 files changed, 70 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
 
-There is one more issue in the current DW_DMAC driver.
-As most of interrupt processing is done in tasklet, spin_lock_bh() is used in almost
-every routine.
-
-Now, if some driver is calling these routines from interrupt context or with interrupt
-disabled, we get KERN_WARN() messages due to following in kernel/softirq.c:
-
-static inline void _local_bh_enable_ip(unsigned long ip)
-{
-	WARN_ON_ONCE(in_irq() || irqs_disabled());
-	...
-}
-
-Should i minimize processing in tasklets, so that spin_lock_bh is not required anymore,
-as in drivers/dma/amba-pl08x.c (tasklet for every channel) or is there some other way of
-doing it.
-
-Currently, drivers/tty/serial/amba-pl011.c is calling from interrupt context or with
-interrupt disabled.
-
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 4f6f174..e034666 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -22,6 +22,7 @@ config MACH_MX23EVK
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
++	select MXS_HAVE_PLATFORM_GPMI
+ 	select MXS_HAVE_PLATFORM_MXSFB
+ 	default y
+ 	help
+@@ -35,6 +36,7 @@ config MACH_MX28EVK
+ 	select MXS_HAVE_PLATFORM_AUART
+ 	select MXS_HAVE_PLATFORM_FEC
+ 	select MXS_HAVE_PLATFORM_FLEXCAN
++	select MXS_HAVE_PLATFORM_GPMI
+ 	select MXS_HAVE_PLATFORM_MXSFB
+ 	select MXS_OCOTP
+ 	default y
+diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+new file mode 100644
+index 0000000..32c8ad9
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#ifndef __INCLUDE_GPMI_DEVICE_H
++#define __INCLUDE_GPMI_DEVICE_H
++
++#define GPMI_NFC_DRIVER_NAME	"gpmi-nfc"
++#define GPMI_NFC_DRIVER_MX23	"imx23-gpmi-nfc"
++#define GPMI_NFC_DRIVER_MX28	"imx28-gpmi-nfc"
++#define GPMI_NFC_DRIVER_MX50	"imx50-gpmi-nfc"
++
++/* The size of the resource is fixed. */
++#define RES_SIZE	6
++
++/* Resource names for the GPMI NFC driver. */
++#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
++#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
++#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
++#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
++#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
++#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
++
++/**
++ * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
++ *
++ * This structure communicates platform-specific information to the GPMI NFC
++ * driver that can't be expressed as resources.
++ *
++ * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
++ *                           from the NAND Flash device, in nanoseconds.
++ * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
++ *                           from the NAND Flash device, in nanoseconds.
++ * @max_chip_count:          The maximum number of chips for which the driver
++ *                           should configure the hardware. This value most
++ *                           likely reflects the number of pins that are
++ *                           connected to a NAND Flash device. If this is
++ *                           greater than the SoC hardware can support, the
++ *                           driver will print a message and fail to initialize.
++ * @partitions:              An optional pointer to an array of partition
++ *                           descriptions.
++ * @partition_count:         The number of elements in the partitions array.
++ */
++struct gpmi_nfc_platform_data {
++	/* NAND Flash information. */
++	unsigned int          min_prop_delay_in_ns;
++	unsigned int          max_prop_delay_in_ns;
++	unsigned int          max_chip_count;
++
++	/* soc */
++	struct mtd_partition  *partitions;
++	unsigned              partition_count;
++};
++#endif
 -- 
-viresh
+1.7.0.4
