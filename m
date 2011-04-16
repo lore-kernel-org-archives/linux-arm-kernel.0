@@ -1,63 +1,45 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sat, 16 Apr 2011 11:20:29 +0300
-Subject: [PATCH 2/2] mtd: msm_nand: Add initial msm nand driver support.
-In-Reply-To: <4DA85B24.50807@codeaurora.org>
-References: <1298940450-27365-1-git-send-email-mnalajal@codeaurora.org>
-	<1298940450-27365-2-git-send-email-mnalajal@codeaurora.org>
-	<1302861097.3220.12.camel@localhost>  <4DA85B24.50807@codeaurora.org>
-Message-ID: <1302942029.2308.1.camel@koala>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 16 Apr 2011 09:28:02 +0100
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<20110414110854.GF29938@atomide.com>
+	<20110414120209.GG1611@n2100.arm.linux.org.uk>
+	<20110414123126.GA3336@atomide.com>
+	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
+	<20110415155642.GO1611@n2100.arm.linux.org.uk>
+	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
+Message-ID: <20110416082802.GS1611@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-15 at 20:20 +0530, Murali Nalajala wrote:
-> On 4/15/2011 3:21 PM, Artem Bityutskiy wrote:
-> > On Tue, 2011-03-01 at 06:17 +0530, Murali Nalajala wrote:
-> >> +#define pr_fmt(fmt) "%s:" fmt, __func__
-> >> +
-> >> +#include<linux/kernel.h>
-> >> +#include<linux/mtd/mtd.h>
-> >> +#include<linux/mtd/nand.h>
-> >> +#include<linux/mtd/partitions.h>
-> >> +#include<linux/platform_device.h>
-> >> +#include<linux/sched.h>
-> >> +#include<linux/slab.h>
-> >> +#include<linux/dma-mapping.h>
-> >> +#include<asm/mach/flash.h>
-> >> +#include<mach/dma.h>
-> >> +
-> >> +#include "msm_nand.h"
-> >> +
-> >> +unsigned long msm_nand_phys;
+On Fri, Apr 15, 2011 at 10:10:04AM -0600, Grant Likely wrote:
+> On Fri, Apr 15, 2011 at 9:56 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Apr 15, 2011 at 09:12:39AM -0600, Grant Likely wrote:
+> >> For example, John Linn
+> >> has posted support for the new Xilinx ARM FPGA platform, has been
+> >> through several rounds of review, but now he fears that it will all be
+> >> rejected and he'll have to start over in 3 months.
 > >
-> > No global variables like this please. Here is how you use them:
-> >
-> > +extern unsigned long msm_nand_phys;
+> > Well, what about my fear that we won't be able to get anything more
+> > past Linus if we submit another 60k lines of code during the next
+> > merge window?
 > 
-> extern declaration in the 'C' file causing warning. We are in plan to 
-> upload the OneNAND changes soon which makes use of the same .h file.
+> Worst he can say is no.  He /knows/ we're trying to fix the problem.
+> He also knows that development doesn't stop, even in the midst of
+> consolidation work that is going to take a lot of time.
 
-So you say that OneNAND (an independent driver) is going to use this
-variable? Are you also going to export it?
+I find that I can't agree with your point of view on this - I asked
+Linus for his view on the message which started this thread.
 
-> > +#define MSM_NAND_REG(off) (msm_nand_phys + (off))
-> > +
-> > +#define MSM_NAND_FLASH_CMD            MSM_NAND_REG(0x0000)
-> > +#define MSM_NAND_ADDR0                MSM_NAND_REG(0x0004)
-> >
-> > Could you please make the macros to take the "struct msm_nand_chip
-> > *chip" argument instead, and store the pase address there. Do not hide
-> > the fact that those macros are actually functions, not constant - this
-> > is error prone.
-> >
-> > Besides, I'm do not know your HW, but if you have several controllers
-> > with various base addresses - your driver won't work.
-> 
-> you are correct, we have multiple controllers, which breaks this logic 
-> in future.
+Linus' big concern is the platform stuff, and he is close to refusing
+to pull various git trees if he thinks people haven't taken his concern
+on board.
 
-So then make your macros to accept the base address as an argument
-instead please.
+As a result of that, I'm going to modify my position to be: bug fixes,
+regression fixes, consolidation, and core code features.
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+Towards the end of the cycle, we may be able to consider some platforms,
+but _only_ if they make use of the consolidated features and therefore
+have _minimal_ additional code.
