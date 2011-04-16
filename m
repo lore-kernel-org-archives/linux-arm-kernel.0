@@ -1,45 +1,77 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 16 Apr 2011 09:41:34 +0200
-Subject: Zaurus CF tests -- ok
-In-Reply-To: <20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
-References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
-	<20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
-Message-ID: <20110416074134.GA26440@ucw.cz>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Sat, 16 Apr 2011 15:29:44 +0530
+Subject: [PATCH 2/2] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <1302942029.2308.1.camel@koala>
+References: <1298940450-27365-1-git-send-email-mnalajal@codeaurora.org>	
+	<1298940450-27365-2-git-send-email-mnalajal@codeaurora.org>	
+	<1302861097.3220.12.camel@localhost>
+	<4DA85B24.50807@codeaurora.org> <1302942029.2308.1.camel@koala>
+Message-ID: <4DA96890.2070207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 4/16/2011 1:50 PM, Artem Bityutskiy wrote:
+> On Fri, 2011-04-15 at 20:20 +0530, Murali Nalajala wrote:
+>> On 4/15/2011 3:21 PM, Artem Bityutskiy wrote:
+>>> On Tue, 2011-03-01 at 06:17 +0530, Murali Nalajala wrote:
+>>>> +#define pr_fmt(fmt) "%s:" fmt, __func__
+>>>> +
+>>>> +#include<linux/kernel.h>
+>>>> +#include<linux/mtd/mtd.h>
+>>>> +#include<linux/mtd/nand.h>
+>>>> +#include<linux/mtd/partitions.h>
+>>>> +#include<linux/platform_device.h>
+>>>> +#include<linux/sched.h>
+>>>> +#include<linux/slab.h>
+>>>> +#include<linux/dma-mapping.h>
+>>>> +#include<asm/mach/flash.h>
+>>>> +#include<mach/dma.h>
+>>>> +
+>>>> +#include "msm_nand.h"
+>>>> +
+>>>> +unsigned long msm_nand_phys;
+>>>
+>>> No global variables like this please. Here is how you use them:
+>>>
+>>> +extern unsigned long msm_nand_phys;
+>>
+>> extern declaration in the 'C' file causing warning. We are in plan to
+>> upload the OneNAND changes soon which makes use of the same .h file.
+>
+> So you say that OneNAND (an independent driver) is going to use this
+> variable? Are you also going to export it?
 
-> > After getting _good_ power supply, I was able to untar and rm ltp tree
-> > 100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
-> > ext3 problems).
-> 
-> Hmm, I'm using original adapter, but who knows if it's okay to use...
+I haven't decided yet when oneNAND driver come in still it is under 
+discussion. There is a chance that if OneNAND comes as an individual 
+driver then i have to export this variable.
 
-It probably is...
+Can i export this variable now? What is your suggestion?
 
-> > Another strange thing is... I see lots of duplicated keystrokes --
-> > like type "pavel" but machine understands "paavel". But it only seems
-> > to happen when I'm _not_ trying to debug it?!
-> 
-> That seems to be side effect of machine under load (it has gpio keyboard).
+>
+>>> +#define MSM_NAND_REG(off) (msm_nand_phys + (off))
+>>> +
+>>> +#define MSM_NAND_FLASH_CMD            MSM_NAND_REG(0x0000)
+>>> +#define MSM_NAND_ADDR0                MSM_NAND_REG(0x0004)
+>>>
+>>> Could you please make the macros to take the "struct msm_nand_chip
+>>> *chip" argument instead, and store the pase address there. Do not hide
+>>> the fact that those macros are actually functions, not constant - this
+>>> is error prone.
+>>>
+>>> Besides, I'm do not know your HW, but if you have several controllers
+>>> with various base addresses - your driver won't work.
+>>
+>> you are correct, we have multiple controllers, which breaks this logic
+>> in future.
+>
+> So then make your macros to accept the base address as an argument
+> instead please.
+>
 
-ouch. original corgi_kbd driver used timers, new one uses threads --
-more affected by scheduling. I'm not even sure if the worker thread it
-uses runs at elevated priority...
 
-> > With power from USB extension cable, it crashes in <5 minutes. It
-> > seems to toggle charger a lot, as voltage on the cable is only
-> > 4.2..4.5V. I guess it is software problem in the charging code.
-> > )
-> 
-> The zaurus actually is AFAIK unable to run from battery when connected to the
-> external power, so weak power line may explain some of the strange behaviour.
-
-?? IIRC Stanislav told me that hardware will always run off whatever
-is available...?
-							Pavel
+Thanks,
+Murali N
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
