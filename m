@@ -1,69 +1,57 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 16 Apr 2011 07:58:30 -0700
-Subject: [PATCH v4 3/4] USB: Gadget: Add Samsung S3C24XX USB High-Speed
-	controller driver
-In-Reply-To: <201104161200.32042.heiko@sntech.de>
-References: <Pine.LNX.4.44L0.1104141313210.2487-100000@iolanthe.rowland.org>
-	<201104161200.32042.heiko@sntech.de>
-Message-ID: <20110416145830.GA8811@kroah.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 16 Apr 2011 23:48:41 +0800
+Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <20110416154841.GA17935@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 16, 2011 at 12:00:31PM +0200, Heiko St?bner wrote:
-> Am Donnerstag 14 April 2011, 19:15:23 schrieb Alan Stern:
-> > On Thu, 14 Apr 2011, Greg KH wrote:
-> > > On Thu, Apr 14, 2011 at 11:35:43AM -0400, Alan Stern wrote:
-> > > > On Thu, 14 Apr 2011, Heiko [iso-8859-1] St?bner wrote:
-> > > > > From: Thomas Abraham <thomas.ab@samsung.com>
-> > > > > 
-> > > > > The Samsung's S3C2416, S3C2443 and S3C2450 includes a USB High-Speed
-> > > > > device controller module. This driver enables support for USB
-> > > > > high-speed gadget functionality for the Samsung S3C24xx SoC's that
-> > > > > include this controller.
-> > > > > 
-> > > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> > > > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> > > > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > > > > Signed-off-by: Alexander Neumann <alexander@bumpern.de>
-> > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > 
-> > > > ...
-> > > > 
-> > > > > +static struct usb_ep_ops s3c_hsudc_ep_ops = {
-> > > > > +	.enable = s3c_hsudc_ep_enable,
-> > > > > +	.disable = s3c_hsudc_ep_disable,
-> > > > > +	.alloc_request = s3c_hsudc_alloc_request,
-> > > > > +	.free_request = s3c_hsudc_free_request,
-> > > > > +	.queue = s3c_hsudc_queue,
-> > > > > +	.dequeue = s3c_hsudc_dequeue,
-> > > > > +	.set_halt = s3c_hsudc_set_halt,
-> > > > > +};
-> > > > 
-> > > > There's no .set_wedge method.  Why do people always leave this out?
-> > > 
-> > > Does the code spit out a nasty warning if this isn't set?  If not, I
-> > > would suggest adding it so that this doesn't keep happening.
-> > > 
-> > > Or just refuse to be able to register the structure, that would stop it
-> > > right away :)
-> > 
-> > In fact, set_wedge is optional.  But it's so easy to implement, there's
-> > no good reason for leaving it out.
+Hi Per,
+
+On Wed, Apr 06, 2011 at 09:07:01PM +0200, Per Forlin wrote:
+[...]
 > 
-> It seems Thomas [original author of the driver] will be able to implement said 
-> set_wedge function for it.
-> As he will need a bit of time for this, two possible ways for going forward 
-> come to mind:
-> (1) use current driver [as set_wedge is optional] and add it later via patch
-> (2) resubmit whole driver again when set_wedge is added to it
+> Per Forlin (12):
+>   mmc: add none blocking mmc request function
+>   mmc: mmc_test: add debugfs file to list all tests
+>   mmc: mmc_test: add test for none blocking transfers
+>   mmc: add member in mmc queue struct to hold request data
+>   mmc: add a block request prepare function
+>   mmc: move error code in mmc_block_issue_rw_rq to a separate function.
+>   mmc: add a second mmc queue request member
+>   mmc: add handling for two parallel block requests in issue_rw_rq
+>   mmc: test: add random fault injection in core.c
+>   omap_hsmmc: use original sg_len for dma_unmap_sg
+>   omap_hsmmc: add support for pre_req and post_req
+>   mmci: implement pre_req() and post_req()
 > 
-> Obviously I would prefer option 1 :-), but in the end it's your decision.
+>  drivers/mmc/card/block.c      |  493 +++++++++++++++++++++++++++--------------
+>  drivers/mmc/card/mmc_test.c   |  342 ++++++++++++++++++++++++++++-
+>  drivers/mmc/card/queue.c      |  171 +++++++++------
+>  drivers/mmc/card/queue.h      |   31 ++-
+>  drivers/mmc/core/core.c       |  132 ++++++++++-
+>  drivers/mmc/core/debugfs.c    |    5 +
+>  drivers/mmc/host/mmci.c       |  146 +++++++++++-
+>  drivers/mmc/host/mmci.h       |    8 +
+>  drivers/mmc/host/omap_hsmmc.c |   90 +++++++-
+>  include/linux/mmc/core.h      |    9 +-
+>  include/linux/mmc/host.h      |   13 +-
+>  lib/Kconfig.debug             |   11 +
+>  12 files changed, 1172 insertions(+), 279 deletions(-)
+> 
+I'm playing the patch set and seeing the following warnings.
 
-It shouldn't take that much time to do this, what is the delay?
+  CC      drivers/mmc/card/block.o
+drivers/mmc/card/block.c: In function ?mmc_blk_issue_rq?:
+drivers/mmc/card/block.c:429:6: warning: ?status? may be used uninitialized in this function
 
-I'd prefer to get the correct version implemented and would not like to
-accept a patch that everyone knows is wrong.
+  CC      drivers/mmc/core/core.o
+drivers/mmc/core/core.c: In function ?mmc_request_done?:
+drivers/mmc/core/core.c:163:3: warning: passing argument 2 of ?mmc_should_fail_request? from incompatible pointer type
+drivers/mmc/core/core.c:129:20: note: expected ?struct mmc_data *? but argument is of type ?struct mmc_request *?
 
-thanks,
-
-greg k-h
+-- 
+Regards,
+Shawn
