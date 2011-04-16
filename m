@@ -1,49 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 16 Apr 2011 06:04:42 +0200
-Subject: Zaurus CF tests -- ok
-In-Reply-To: <20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
-References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
-	<20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
-Message-ID: <201104160604.42482.marek.vasut@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Sat, 16 Apr 2011 13:11:56 +0900
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415154113.GE4423@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<4DA84AAB.60601@gmail.com> <201104151640.01040.arnd@arndb.de>
+	<20110415152643.GC4423@n2100.arm.linux.org.uk>
+	<BANLkTinDwH9G1zW784t=QnNR7kZkgfKA8w@mail.gmail.com>
+	<20110415154113.GE4423@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTim_HWU28idaCFKgJLfxMuBwwb+Nig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 15, 2011 11:38:17 PM Cyril Hrubis wrote:
-> Hi!
-> 
-> > After getting _good_ power supply, I was able to untar and rm ltp tree
-> > 100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
-> > ext3 problems).
-> 
-> Hmm, I'm using original adapter, but who knows if it's okay to use...
+Hi Russell,
 
-I can lend you Eric's, but promise you won't break it or do anything weird to it 
-;-)
-> 
-> > Another strange thing is... I see lots of duplicated keystrokes --
-> > like type "pavel" but machine understands "paavel". But it only seems
-> > to happen when I'm _not_ trying to debug it?!
-> 
-> That seems to be side effect of machine under load (it has gpio keyboard).
+[CC Paul Mundt]
 
-Yea ... it's that polled para-keyboard I guess.
-> 
-> > (
-> > So... just because something needs 5V does not mean you should charge
-> > it from USB.
-> > 
-> > Yes, I'm talking about zaurus. I noticed that it crashed rather
-> > quickly when connected to USB power. (For example in tar/rm test).
-> > So I took multimeter, and there was 4.15..4.5V on USB :-(.
-> > 
-> > With power from USB extension cable, it crashes in <5 minutes. It
-> > seems to toggle charger a lot, as voltage on the cable is only
-> > 4.2..4.5V. I guess it is software problem in the charging code.
-> > )
-> 
-> The zaurus actually is AFAIK unable to run from battery when connected to
-> the external power, so weak power line may explain some of the strange
-> behaviour.
+On Sat, Apr 16, 2011 at 12:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 15, 2011 at 09:32:01AM -0600, Grant Likely wrote:
+>> Yes, once the infrastructure is in place, powerpc can do its own
+>> migration to the new code. ?I vote for putting it in lib at the
+>> outset.
+>
+> I don't agree with stuffing non-arch directories with code which people
+> haven't already agreed should be shared. ?As I've already said, in my
+> experience it's hard to get agreement in the first place and even when
+> you can the API generally needs to be changed from what you first think
+> would be reasonable.
+>
+> So, lets wait to see whether the SH folk reply.
 
-As for the charging code, do we even have anything even remotely resembling that 
-?
+The SH arch is using NUMA for on-chip SRAM on some CPUs, but for
+SH-Mobile ARM we have no software support at this point.
+
+The SH/ARM hardware has a bunch of different on-chip memories in
+place, and they all have individual power management support through
+both clock gating and power domains. I assume other vendors have
+similar setups.
+
+I'd like to have some refcounting in place for the SRAM code if
+possible, which would trickle down to runtime pm get/put which in turn
+would allow us to control the power dynamically. Not sure how easy
+that would be to accomplish though.
+
+Paul may have some ideas on how to share the code between ARM and SH.
+
+Thanks,
+
+/ magnus
