@@ -1,52 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Sat, 16 Apr 2011 09:42:23 -0700
-Subject: [PATCH 1/2 v2] OMAP2/3: hwmod: fix the i2c-reset timeout
-	during bootup
-In-Reply-To: <20110411131154.GA4498@avinash-laptop>
-References: <20110407070310.GA21701@avinash-laptop>
-	<20110411131154.GA4498@avinash-laptop>
-Message-ID: <1302972143.2719.22.camel@vence>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Sat, 16 Apr 2011 18:06:00 -0500
+Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
+In-Reply-To: <1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-11 at 18:41 +0530, Avinash.H.M. wrote:
-> > > > +     oh->_sysc_cache = v;
-> > > > +     omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
-> > >
-> > > Direct SYSCONFIG access isn't right here.   This should go through
-> > > omap_hwmod.
-> > >
-> > > What is probably needed is exposing _ocp_softreset to device code
-> > > via something like omap_hwmod_ocp_softreset() and calling that here.
-> > >
-> 
-> Hi Kevin , 
-> 
-> Looking more closely, i realised that, the sequence of _ocp_softreset
-> doesn't work for I2C. It has a special programming sequence which needs
-> to be followed to reset the IP. That was the reason, we created
-> omap_i2c_reset.  So i feel we need not expose _ocp_softreset.
-> 
-> Since, the problem here is accessing the SYSCONFIG here, instead, what i
-> can do is, something like below.
-> 
-> 	omap_hwmod_softreset(struct omap_hwmod *oh)
-> 	{
-> 
-> 		v = oh->_sysc_cache;
-> 		v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
-> 
-> 		oh->_sysc_cache = v;
-> 		omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
-> 
-> 	}
-> 
-> And then call this in omap_i2c_reset. Is this OK ?
+Hi Shawn,
 
-Yes, sounds reasonable.
+On Sat, Apr 16, 2011 at 11:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
+> If not calling pre_req() before sdhci_request(), request()
+> will prepare the cache just like it did it before.
+> It is optional to use pre_req() and post_req().
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> I worked out the patch by referring to Per's patch below.
+>
+> ?omap_hsmmc: add support for pre_req and post_req
+>
+> It adds pre_req and post_req support for sdhci based host drivers to
+> work with Per's non-blocking optimization. ?But I only have imx esdhc
+> based hardware to test. ?Unfortunately, I can not measure the
+> performance gain using mmc_test, because the current esdhc driver on
+> mainline fails on the test. ?So I just did a quick test using 'dd',
+> but sadly, I did not see noticeable performance gain here. ?The
+> followings are possible reasons I can think of right away.
+>
+> * The patch did not add pre_req and post_req correctly. ?Please help
+> ?review to catch the mistakes if any.
+> * The imx esdhc driver uses SDHCI_SDMA (max_segs is 1) than SDHCI_ADAM
+> ?(max_segs is 128), due to the broken ADMA support on imx esdhc. ?So
+> ?can people holding other sdhci based hardware give a try on the
+> ?patch?
+>
+> Hopefully, I can find some time to have a close look at the mmc_test
+> failure and the broken ADMA with imx esdhc.
+>
 
-Please be sure to describe the reasoning above in the changelog as well.
+I'll try it out...
 
-Thanks,
-
-Kevin
+A
