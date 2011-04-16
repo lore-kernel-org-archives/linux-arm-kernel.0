@@ -1,34 +1,49 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 15 Apr 2011 20:27:25 -0700
-Subject: [PATCH] Fix infinite loop in ARM user perf_event backtrace code
-Message-ID: <1302924445-18557-1-git-send-email-sonnyrao@chromium.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 16 Apr 2011 06:04:42 +0200
+Subject: Zaurus CF tests -- ok
+In-Reply-To: <20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
+References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
+	<20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
+Message-ID: <201104160604.42482.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM user backtrace code can get into an infinite loop if it
-runs into an invalid stack frame which points back to itself.
-This situation has been observed in practice.  Fix it by capping
-the number of entries in the backtrace.  This is also what other
-architectures do in their backtrace code.
+On Friday, April 15, 2011 11:38:17 PM Cyril Hrubis wrote:
+> Hi!
+> 
+> > After getting _good_ power supply, I was able to untar and rm ltp tree
+> > 100 times so far. 2.6.38, ext3. (So metan no, I do not see any weird
+> > ext3 problems).
+> 
+> Hmm, I'm using original adapter, but who knows if it's okay to use...
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
- arch/arm/kernel/perf_event.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+I can lend you Eric's, but promise you won't break it or do anything weird to it 
+;-)
+> 
+> > Another strange thing is... I see lots of duplicated keystrokes --
+> > like type "pavel" but machine understands "paavel". But it only seems
+> > to happen when I'm _not_ trying to debug it?!
+> 
+> That seems to be side effect of machine under load (it has gpio keyboard).
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 69cfee0..1e61d60 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -746,7 +746,8 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
- 
- 	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
- 
--	while (tail && !((unsigned long)tail & 0x3))
-+	while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
-+	       tail && !((unsigned long)tail & 0x3))
- 		tail = user_backtrace(tail, entry);
- }
- 
--- 
-1.7.3.1
+Yea ... it's that polled para-keyboard I guess.
+> 
+> > (
+> > So... just because something needs 5V does not mean you should charge
+> > it from USB.
+> > 
+> > Yes, I'm talking about zaurus. I noticed that it crashed rather
+> > quickly when connected to USB power. (For example in tar/rm test).
+> > So I took multimeter, and there was 4.15..4.5V on USB :-(.
+> > 
+> > With power from USB extension cable, it crashes in <5 minutes. It
+> > seems to toggle charger a lot, as voltage on the cable is only
+> > 4.2..4.5V. I guess it is software problem in the charging code.
+> > )
+> 
+> The zaurus actually is AFAIK unable to run from battery when connected to
+> the external power, so weak power line may explain some of the strange
+> behaviour.
+
+As for the charging code, do we even have anything even remotely resembling that 
+?
