@@ -1,47 +1,71 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 16 Apr 2011 17:57:26 +0100
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110416082802.GS1611@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<20110414110854.GF29938@atomide.com>
-	<20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
-	<20110415155642.GO1611@n2100.arm.linux.org.uk>
-	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
-	<20110416082802.GS1611@n2100.arm.linux.org.uk>
-Message-ID: <20110416165725.GA25811@opensource.wolfsonmicro.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 16 Apr 2011 20:47:50 +0200
+Subject: [PATCH v4 3/4] USB: Gadget: Add Samsung S3C24XX USB High-Speed
+	controller driver
+In-Reply-To: <20110416145830.GA8811@kroah.com>
+References: <Pine.LNX.4.44L0.1104141313210.2487-100000@iolanthe.rowland.org>
+	<201104161200.32042.heiko@sntech.de>
+	<20110416145830.GA8811@kroah.com>
+Message-ID: <201104162047.50861.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 16, 2011 at 09:28:02AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 10:10:04AM -0600, Grant Likely wrote:
+Am Samstag 16 April 2011, 16:58:30 schrieb Greg KH:
+> On Sat, Apr 16, 2011 at 12:00:31PM +0200, Heiko St?bner wrote:
+> > Am Donnerstag 14 April 2011, 19:15:23 schrieb Alan Stern:
+> > > On Thu, 14 Apr 2011, Greg KH wrote:
+> > > > On Thu, Apr 14, 2011 at 11:35:43AM -0400, Alan Stern wrote:
+> > > > > On Thu, 14 Apr 2011, Heiko [iso-8859-1] St?bner wrote:
+> > > > > > From: Thomas Abraham <thomas.ab@samsung.com>
+> > > > > > 
+> > > > > > The Samsung's S3C2416, S3C2443 and S3C2450 includes a USB
+> > > > > > High-Speed device controller module. This driver enables support
+> > > > > > for USB high-speed gadget functionality for the Samsung S3C24xx
+> > > > > > SoC's that include this controller.
+> > > > > > 
+> > > > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > > > > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > > > > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > > > > Signed-off-by: Alexander Neumann <alexander@bumpern.de>
+> > > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > > > 
+> > > > > ...
+> > > > > 
+> > > > > > +static struct usb_ep_ops s3c_hsudc_ep_ops = {
+> > > > > > +	.enable = s3c_hsudc_ep_enable,
+> > > > > > +	.disable = s3c_hsudc_ep_disable,
+> > > > > > +	.alloc_request = s3c_hsudc_alloc_request,
+> > > > > > +	.free_request = s3c_hsudc_free_request,
+> > > > > > +	.queue = s3c_hsudc_queue,
+> > > > > > +	.dequeue = s3c_hsudc_dequeue,
+> > > > > > +	.set_halt = s3c_hsudc_set_halt,
+> > > > > > +};
+> > > > > 
+> > > > > There's no .set_wedge method.  Why do people always leave this out?
+> > > > 
+> > > > Does the code spit out a nasty warning if this isn't set?  If not, I
+> > > > would suggest adding it so that this doesn't keep happening.
+> > > > 
+> > > > Or just refuse to be able to register the structure, that would stop
+> > > > it right away :)
+> > > 
+> > > In fact, set_wedge is optional.  But it's so easy to implement, there's
+> > > no good reason for leaving it out.
+> > 
+> > It seems Thomas [original author of the driver] will be able to implement
+> > said set_wedge function for it.
+> > As he will need a bit of time for this, two possible ways for going
+> > forward come to mind:
+> > (1) use current driver [as set_wedge is optional] and add it later via
+> > patch (2) resubmit whole driver again when set_wedge is added to it
+> > 
+> > Obviously I would prefer option 1 :-), but in the end it's your decision.
+>
+> It shouldn't take that much time to do this, what is the delay?
+from what I gathered, simply finding the necessary time slot for this.
 
-> > Worst he can say is no.  He /knows/ we're trying to fix the problem.
-> > He also knows that development doesn't stop, even in the midst of
-> > consolidation work that is going to take a lot of time.
+> I'd prefer to get the correct version implemented and would not like to
+> accept a patch that everyone knows is wrong.
+ok, I will resubmit the driver when set_wedge is included
 
-> I find that I can't agree with your point of view on this - I asked
-> Linus for his view on the message which started this thread.
-
-It'd be interesting to read what he wrote there.
-
-> Linus' big concern is the platform stuff, and he is close to refusing
-> to pull various git trees if he thinks people haven't taken his concern
-> on board.
-
-Right, and the discussion here is essentially about if that can be done
-without also blocking development.  But ignoring that for the moment...
-
-> Towards the end of the cycle, we may be able to consider some platforms,
-> but _only_ if they make use of the consolidated features and therefore
-> have _minimal_ additional code.
-
-...this is the negative side of the message - what we're not willing to
-accept.  What's the positive side of the message, what can people do to
-help?  What is the level of consolidation work that's needed before we
-can develop again, and what's needed to make progress there?
-
-For example, with support for new machines are we saying that for
-example we're going to refuse to accept anything that isn't device tree
-based?  If so then what needs doing?
+Heiko
