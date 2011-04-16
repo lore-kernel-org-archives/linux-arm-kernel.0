@@ -1,77 +1,66 @@
 From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 15 Apr 2011 16:06:39 -0700
-Subject: [RFC PATCH] genirq: implement read_irq_line for interrupt lines
-In-Reply-To: <alpine.LFD.2.00.1104160030480.2744@localhost6.localdomain6>
-References: <1302892952-7090-1-git-send-email-adharmap@codeaurora.org>
-	<alpine.LFD.2.00.1104152058050.2744@localhost6.localdomain6>
-	<4DA8C1E2.3020205@codeaurora.org>
-	<alpine.LFD.2.00.1104160030480.2744@localhost6.localdomain6>
-Message-ID: <4DA8CF7F.7020904@codeaurora.org>
+Date: Fri, 15 Apr 2011 18:51:48 -0700
+Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <1302633340-4795-5-git-send-email-will.deacon@arm.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-5-git-send-email-will.deacon@arm.com>
+Message-ID: <4DA8F634.9080803@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner wrote:
-> On Fri, 15 Apr 2011, Abhijeet Dharmapurikar wrote:
+Will Deacon wrote:
+> This patch updates the MSM gpio chained IRQ handler to use the chained
+> IRQ enter/exit functions in order to function correctly on primary
+> controllers with different methods of flow control.
 > 
->> Thomas Gleixner wrote:
->>> On Fri, 15 Apr 2011, Abhijeet Dharmapurikar wrote:
->>>
->>>> Some drivers need to know what the status of the interrupt line is.
->>>> This is especially true for drivers that register a handler with
->>>> IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING and in the handler they
->>>> need to know which edge transition it was invoked for.
->>> What's the purpose of this? How is that going to be used?
->> The main purpose is to know in the handler if it was invoked becuase of a
->> rising edge or the falling edge.
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-msm/gpio-v2.c |   10 ++++++++--
+>  1 files changed, 8 insertions(+), 2 deletions(-)
 > 
-> Come on. That's not an explanation. I know that already and it does
-> not answer my question how this is going to be used. IOW: What does
-> the driver do aside of knowing that it was a rising falling edge?
+> diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+> index 56a964e..cc9c4fd 100644
+> --- a/arch/arm/mach-msm/gpio-v2.c
+> +++ b/arch/arm/mach-msm/gpio-v2.c
+> @@ -27,6 +27,9 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+> +
+> +#include <asm/mach/irq.h>
+> +
+>  #include <mach/msm_iomap.h>
+>  #include "gpiomux.h"
 >  
->> Now one could say that the driver should maintain some state and toggle it
->> upon each invocation of this handler. That scheme quickly goes out of sync
->> because we might ignore interrupts while suspended.
-> 
-> Suspend is a totaly different issue. I have the impression that you
-> are trying to solve some basic issue at the driver level again - just
-> this time you add some core helper to get it solved.
-> 
-> Can you please show _AND_ explain the code which is going to use this?
+> @@ -309,8 +312,10 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int flow_type)
+>   */
+>  static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  {
+> -	struct irq_data *data = irq_desc_get_irq_data(desc);
+>  	unsigned long i;
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +
+> +	chained_irq_enter(chip, desc);
+>  
+>  	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
+>  	     i < NR_GPIO_IRQS;
+> @@ -319,7 +324,8 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+>  							   i));
+>  	}
+> -	data->chip->irq_ack(data);
+> +
+> +	chained_irq_exit(chip, desc);
+>  }
+>  
+>  static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
 
-Sorry, misunderstood your question. Dont have code ready yet but here 
-are few examples which I need to address in the near future
+Reviewed-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Tested-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-The USB_ID pin is an interrupt to the pmic. This pin is used to detect 
-if a peripheral or a host is connected. If a peripheral is connected the 
-  ID pin is driven low (for the host case it remains floating) and when 
-it is removed a pull up draws it high. We want to detect in the handler 
-whether it was invoked when the cable was plugged in or when cable was 
-plugged out. That helps the handler decide to turn on/off a regulator 
-which provides power to the peripheral.
-
-A similar scheme applies to VBUS line of the USB too. If it goes high 
-that means a USB cable from host (or charger) is plugged in, if it goes 
-low USB cable was removed out. Enumeration/charging begins or stops 
-depending on the value read from the interrupt pin.
-
-The battery temperature too is an edge interrupt. If it goes high it 
-means battery temp is either too hot or cold, charging needs to stop. 
-Charging can be resumed when this interrupt goes low.
-
-There are many more such interrupts including battery insertion/removal, 
-sdcard insertion/removal, few keys on the phone etc which can benefit 
-from this api.
-
-Note that these are not gpio lines configured as interrupts. If it were 
-gpio lines I can easily derive the gpio number (irq_to_gpio()) and read 
-the line.
-
-I hope this clarifies my problem a bit more.
-
-I can provide an api in my irq controller driver - lets call it 
-pm8xxx_read_irq_line(int irq) and ask the drivers to call it but thought 
-doing it via irq_chip could benefit other irq_controllers.
-
+-- 
 --
 Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
 Innovation Center, Inc. is a member of the Code Aurora Forum.
