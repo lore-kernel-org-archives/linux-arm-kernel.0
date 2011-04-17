@@ -1,16 +1,16 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 17 Apr 2011 23:13:45 +0200
-Subject: [PATCH 12/14] PM / UNICORE32: Use struct syscore_ops instead of
-	sysdevs for PM
+Date: Sun, 17 Apr 2011 23:11:58 +0200
+Subject: [PATCH 9/14] PM / Blackfin: Use struct syscore_ops instead of sysdevs
+	for PM
 In-Reply-To: <201104172301.54115.rjw@sisk.pl>
 References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
-Message-ID: <201104172313.45854.rjw@sisk.pl>
+Message-ID: <201104172311.59289.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafael J. Wysocki <rjw@sisk.pl>
 
-Make some UNICORE32 architecture's code use struct syscore_ops
+Convert some Blackfin architecture's code to using struct syscore_ops
 objects for power management instead of sysdev classes and sysdevs.
 
 This simplifies the code and reduces the kernel's memory footprint.
@@ -19,70 +19,71 @@ the future.
 
 Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/unicore32/kernel/irq.c |   23 ++++++++---------------
- 1 file changed, 8 insertions(+), 15 deletions(-)
+ arch/blackfin/kernel/nmi.c |   30 +++++++++---------------------
+ 1 file changed, 9 insertions(+), 21 deletions(-)
 
-Index: linux-2.6/arch/unicore32/kernel/irq.c
+Index: linux-2.6/arch/blackfin/kernel/nmi.c
 ===================================================================
---- linux-2.6.orig/arch/unicore32/kernel/irq.c
-+++ linux-2.6/arch/unicore32/kernel/irq.c
-@@ -23,7 +23,7 @@
- #include <linux/list.h>
- #include <linux/kallsyms.h>
- #include <linux/proc_fs.h>
+--- linux-2.6.orig/arch/blackfin/kernel/nmi.c
++++ linux-2.6/arch/blackfin/kernel/nmi.c
+@@ -12,7 +12,7 @@
+ 
+ #include <linux/bitops.h>
+ #include <linux/hardirq.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
- #include <linux/gpio.h>
+ #include <linux/pm.h>
+ #include <linux/nmi.h>
+ #include <linux/smp.h>
+@@ -196,43 +196,31 @@ void touch_nmi_watchdog(void)
  
- #include <asm/system.h>
-@@ -237,7 +237,7 @@ static struct puv3_irq_state {
- 	unsigned int	iccr;
- } puv3_irq_state;
- 
--static int puv3_irq_suspend(struct sys_device *dev, pm_message_t state)
-+static int puv3_irq_suspend(void)
+ /* Suspend/resume support */
+ #ifdef CONFIG_PM
+-static int nmi_wdt_suspend(struct sys_device *dev, pm_message_t state)
++static int nmi_wdt_suspend(void)
  {
- 	struct puv3_irq_state *st = &puv3_irq_state;
- 
-@@ -265,7 +265,7 @@ static int puv3_irq_suspend(struct sys_d
+ 	nmi_wdt_stop();
  	return 0;
  }
  
--static int puv3_irq_resume(struct sys_device *dev)
-+static void puv3_irq_resume(void)
+-static int nmi_wdt_resume(struct sys_device *dev)
++static void nmi_wdt_resume(void)
  {
- 	struct puv3_irq_state *st = &puv3_irq_state;
- 
-@@ -278,27 +278,20 @@ static int puv3_irq_resume(struct sys_de
- 
- 		writel(st->icmr, INTC_ICMR);
- 	}
+ 	if (nmi_active)
+ 		nmi_wdt_start();
 -	return 0;
  }
  
--static struct sysdev_class puv3_irq_sysclass = {
--	.name		= "pkunity-irq",
-+static struct syscore_ops puv3_irq_syscore_ops = {
- 	.suspend	= puv3_irq_suspend,
- 	.resume		= puv3_irq_resume,
+-static struct sysdev_class nmi_sysclass = {
+-	.name		= DRV_NAME,
++static struct syscore_ops nmi_syscore_ops = {
+ 	.resume		= nmi_wdt_resume,
+ 	.suspend	= nmi_wdt_suspend,
  };
  
--static struct sys_device puv3_irq_device = {
--	.id		= 0,
--	.cls		= &puv3_irq_sysclass,
+-static struct sys_device device_nmi_wdt = {
+-	.id	= 0,
+-	.cls	= &nmi_sysclass,
 -};
 -
--static int __init puv3_irq_init_devicefs(void)
-+static int __init puv3_irq_init_syscore(void)
+-static int __init init_nmi_wdt_sysfs(void)
++static int __init init_nmi_wdt_syscore(void)
  {
--	sysdev_class_register(&puv3_irq_sysclass);
--	return sysdev_register(&puv3_irq_device);
-+	register_syscore_ops(&puv3_irq_syscore_ops);
+-	int error;
+-
+-	if (!nmi_active)
+-		return 0;
++	if (nmi_active)
++		register_syscore_ops(&nmi_syscore_ops);
+ 
+-	error = sysdev_class_register(&nmi_sysclass);
+-	if (!error)
+-		error = sysdev_register(&device_nmi_wdt);
+-	return error;
 +	return 0;
  }
+-late_initcall(init_nmi_wdt_sysfs);
++late_initcall(init_nmi_wdt_syscore);
  
--device_initcall(puv3_irq_init_devicefs);
-+device_initcall(puv3_irq_init_syscore);
+ #endif	/* CONFIG_PM */
  
- void __init init_IRQ(void)
- {
