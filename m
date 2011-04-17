@@ -1,38 +1,55 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 17 Apr 2011 15:40:21 +0800
-Subject: [PATCH] ARM: fix badly implementation of wmb
-In-Reply-To: <BANLkTikByisrp7wDnRK+hFcD-Vcy8eYYvA@mail.gmail.com>
-References: <1302884511-14152-1-git-send-email-tom.leiming@gmail.com>
-	<BANLkTikByisrp7wDnRK+hFcD-Vcy8eYYvA@mail.gmail.com>
-Message-ID: <BANLkTimD=H=K5pmR9guWzfABSpqBE=63Qg@mail.gmail.com>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Sun, 17 Apr 2011 23:01:16 +0900
+Subject: [PATCH] ARM: etm: wait for Progbit to go to 1 before programing ETM
+Message-ID: <1303048876-28540-1-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+According to "Embedded Trace Macrocell Architecture Specification",
+3.4.3. Use of the Programming bit, you must wait for Progbit of the ETM
+Status Register to go to 1 before you start to program the ETM registers.
+The current code somehow reads programing bit in ETM Control Register
+instead.
 
-2011/4/17 Catalin Marinas <catalin.marinas@arm.com>:
-> 3. Because Normal non-cacheable memory acceses are buffered at the L2
-> cache level, we need to drain its buffer in the mb()/wmb() case, hence
-> the outer_sync() call.
+Likewise, you must wait for Progbit to go to 0 after programing ETM.
 
-If you confirmed dsb plus outer_sync are needed for this case, the patch
-is surely pointless. In fact, I thought dmb is enough for this case,
-so introduce
-the patch.  Now you have clarified it, please drop it.
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Cc: Alexander Shishkin <virtuoso@slind.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/etm.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
->
-> If you find alternatives to the points above I may agree with your patch.
->
-> Please note that there have been several discussions on LKML around
-> barriers for I/O vs Normal memory and the consensus was *not* to
-> introduce additional barrier types since device drivers don't use them
-> anyway.
->
-> Can you show many situations where you would need mandatory barriers
-> but not in relation to I/O?
-
-No, thank you for the explanation, sorry for the noise.
-
-thanks,
+diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
+index 1bec8b5..7229840 100644
+--- a/arch/arm/kernel/etm.c
++++ b/arch/arm/kernel/etm.c
+@@ -106,7 +106,7 @@ static int trace_start(struct tracectx *t)
+ 
+ 	etm_writel(t, v, ETMR_CTRL);
+ 
+-	while (!(etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM) && --timeout)
++	while (!etm_progbit(t) && --timeout)
+ 		;
+ 	if (!timeout) {
+ 		dev_dbg(t->dev, "Waiting for progbit to assert timed out\n");
+@@ -126,7 +126,7 @@ static int trace_start(struct tracectx *t)
+ 	etm_writel(t, v, ETMR_CTRL);
+ 
+ 	timeout = TRACER_TIMEOUT;
+-	while (etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM && --timeout)
++	while (etm_progbit(t) && --timeout)
+ 		;
+ 	if (!timeout) {
+ 		dev_dbg(t->dev, "Waiting for progbit to deassert timed out\n");
+@@ -148,7 +148,7 @@ static int trace_stop(struct tracectx *t)
+ 	etm_unlock(t);
+ 
+ 	etm_writel(t, 0x440, ETMR_CTRL);
+-	while (!(etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM) && --timeout)
++	while (!etm_progbit(t) && --timeout)
+ 		;
+ 	if (!timeout) {
+ 		dev_dbg(t->dev, "Waiting for progbit to assert timed out\n");
 -- 
-Ming Lei
+1.7.4.2
