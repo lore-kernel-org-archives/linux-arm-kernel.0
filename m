@@ -1,22 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2011 20:41:18 +0200
-Subject: [PATCH 3/3] Add documenation for new sysfs devices/soc
-	functionallity
-In-Reply-To: <1302792592-17484-4-git-send-email-lee.jones@linaro.org>
-References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
-	<1302792592-17484-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <201104172041.18313.arnd@arndb.de>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Sun, 17 Apr 2011 21:39:34 +0200
+Subject: [PATCH v3] at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
+In-Reply-To: <1302795935-11175-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1302784833-25930-1-git-send-email-plagnioj@jcrosoft.com>
+	<1302795935-11175-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <BANLkTimmvDZRzFX4Z6m7Y2jEZx9a89uwVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 April 2011, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/ABI/testing/sysfs-devices-soc |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
+hi,
 
-Looks good, but the patch is missing a changelog. I wouldn't bother splitting it out,
-just merge this patch with the first one in the series.
+> no board configure it as 'n' and it's an issue to merge all defconfigs
+> in one
+>
+> On AT91SAM926x boards both types of NAND flash can be present
+> (8 and 16 bit data bus width).
+>
+> so will pass it via system_rev
 
-	Arnd
+If nobody is using the configuration option and therefore 8-bit flash,
+why not just remove the whole configuration option?
+If there is some non-merged board with 8-bit flash, then they should
+have their own board-file anyway and can just set
+"ek_nand_data.bus_width_16" as required.
+
+Lets not add complex run-time configuration where it's not needed.
+
+Regards,
+ Andrew Victor
