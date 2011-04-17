@@ -1,33 +1,99 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2011 19:47:37 +0200
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415154113.GE4423@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<BANLkTinDwH9G1zW784t=QnNR7kZkgfKA8w@mail.gmail.com>
-	<20110415154113.GE4423@n2100.arm.linux.org.uk>
-Message-ID: <201104171947.38048.arnd@arndb.de>
+Date: Sun, 17 Apr 2011 20:36:44 +0200
+Subject: [PATCH 1/3] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <1302792592-17484-2-git-send-email-lee.jones@linaro.org>
+References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
+	<1302792592-17484-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <201104172036.45052.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2011, Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 09:32:01AM -0600, Grant Likely wrote:
-> > Yes, once the infrastructure is in place, powerpc can do its own
-> > migration to the new code.  I vote for putting it in lib at the
-> > outset.
-> 
-> I don't agree with stuffing non-arch directories with code which people
-> haven't already agreed should be shared.  As I've already said, in my
-> experience it's hard to get agreement in the first place and even when
-> you can the API generally needs to be changed from what you first think
-> would be reasonable.
+Hi Lee,
 
-I believe we should be much more aggressive about putting code into generic
-locations, especially when there is nothing hardware specific to it.
+On Thursday 14 April 2011, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
 
-As we can see from all the mess regarding interrupt controllers, PCI busses
-or dma mapping, most of the smaller architectures get it wrong when they
-have to deal with these things, so when we have a common implementation,
-it's much easier to make sure we only have the bugs once and don't get
-incompatible interfaces.
+This definitely needs a changelog, explaining what the code is there for,
+and why you chose this interface and not the alternatives we discussed
+earlier.
+
+> diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+> new file mode 100644
+> index 0000000..5e4d6ef
+> --- /dev/null
+> +++ b/drivers/base/soc.c
+> @@ -0,0 +1,127 @@
+> +/*
+> + * Copyright (C) ST-Ericsson SA 2011
+> + *
+> + * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+
+(I believe this would be Copyright Linaro Ltd, not ST-Ericsson SA,
+but better ask internally in ST-Ericsson about what your rules are)
+
+> +struct device *parent_soc;
+> +struct device *soc[MAX_SOCS];
+
+The array should not be needed here, you can simply iterate all soc
+devices using device_for_each_child() if required.
+
+Global variables should really not have such generic names. Better
+make all variables static and make sure that the code using them
+can at there properly.
+
+> +int __init soc_device_register(struct device_attribute *soc_attrs[],
+> +                               int soc_count)
+
+This needs to return the soc device, otherwise there is nothing that
+a platform can do with the device.
+
+Passing the soc_count the way you do won't work when you have different
+SoCs, so better require the user to call the register function repeatedly.
+
+
+I think a nicer interface would be to pass a data structure into it
+with the data you always want to export, and then have the soc
+core create the necessary attributes, instead of requiring every
+user to duplicate that code.
+
+A possible interface might be
+
+struct soc_device {
+	const char *machine;
+	const char *family;
+	/* ... */
+	struct device dev;
+};
+
+struct soc_device *soc_device_register(const char *machine, const char *family);
+
+For the nonstandard attributes, I would recommend having the individual
+drivers call device_create_file, in order to discourage the use of 
+device specific attribute names.
+
+> diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+> new file mode 100644
+> index 0000000..988cf6f
+> --- /dev/null
+> +++ b/include/linux/sys_soc.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (C) ST-Ericsson SA 2011
+> + * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +#ifndef __SYS_SOC_H
+> +#define __SYS_SOC_H
+> +
+> +#include <linux/kobject.h>
+> +#include <linux/device.h>
+> +
+> +#define MAX_SOCS 8
+
+No need to hardcode the maximum.
 
 	Arnd
