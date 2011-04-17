@@ -1,16 +1,16 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 17 Apr 2011 23:13:09 +0200
-Subject: [PATCH 11/14] PM / AVR32: Use struct syscore_ops instead of sysdevs
-	for PM
+Date: Sun, 17 Apr 2011 23:13:45 +0200
+Subject: [PATCH 12/14] PM / UNICORE32: Use struct syscore_ops instead of
+	sysdevs for PM
 In-Reply-To: <201104172301.54115.rjw@sisk.pl>
 References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
-Message-ID: <201104172313.09712.rjw@sisk.pl>
+Message-ID: <201104172313.45854.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafael J. Wysocki <rjw@sisk.pl>
 
-Convert some AVR32 architecture's code to using struct syscore_ops
+Make some UNICORE32 architecture's code use struct syscore_ops
 objects for power management instead of sysdev classes and sysdevs.
 
 This simplifies the code and reduces the kernel's memory footprint.
@@ -19,105 +19,70 @@ the future.
 
 Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/avr32/mach-at32ap/intc.c |   38 ++++++++++++--------------------------
- 1 file changed, 12 insertions(+), 26 deletions(-)
+ arch/unicore32/kernel/irq.c |   23 ++++++++---------------
+ 1 file changed, 8 insertions(+), 15 deletions(-)
 
-Index: linux-2.6/arch/avr32/mach-at32ap/intc.c
+Index: linux-2.6/arch/unicore32/kernel/irq.c
 ===================================================================
---- linux-2.6.orig/arch/avr32/mach-at32ap/intc.c
-+++ linux-2.6/arch/avr32/mach-at32ap/intc.c
-@@ -12,7 +12,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/platform_device.h>
+--- linux-2.6.orig/arch/unicore32/kernel/irq.c
++++ linux-2.6/arch/unicore32/kernel/irq.c
+@@ -23,7 +23,7 @@
+ #include <linux/list.h>
+ #include <linux/kallsyms.h>
+ #include <linux/proc_fs.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
+ #include <linux/gpio.h>
  
- #include <asm/io.h>
+ #include <asm/system.h>
+@@ -237,7 +237,7 @@ static struct puv3_irq_state {
+ 	unsigned int	iccr;
+ } puv3_irq_state;
  
-@@ -21,7 +21,6 @@
- struct intc {
- 	void __iomem		*regs;
- 	struct irq_chip		chip;
--	struct sys_device	sysdev;
- #ifdef CONFIG_PM
- 	unsigned long		suspend_ipr;
- 	unsigned long		saved_ipr[64];
-@@ -146,9 +145,8 @@ void intc_set_suspend_handler(unsigned l
- 	intc0.suspend_ipr = offset;
- }
- 
--static int intc_suspend(struct sys_device *sdev, pm_message_t state)
-+static int intc_suspend(void)
+-static int puv3_irq_suspend(struct sys_device *dev, pm_message_t state)
++static int puv3_irq_suspend(void)
  {
--	struct intc *intc = container_of(sdev, struct intc, sysdev);
- 	int i;
+ 	struct puv3_irq_state *st = &puv3_irq_state;
  
- 	if (unlikely(!irqs_disabled())) {
-@@ -156,28 +154,25 @@ static int intc_suspend(struct sys_devic
- 		return -EINVAL;
- 	}
- 
--	if (unlikely(!intc->suspend_ipr)) {
-+	if (unlikely(!intc0.suspend_ipr)) {
- 		pr_err("intc_suspend: suspend_ipr not initialized\n");
- 		return -EINVAL;
- 	}
- 
- 	for (i = 0; i < 64; i++) {
--		intc->saved_ipr[i] = intc_readl(intc, INTPR0 + 4 * i);
--		intc_writel(intc, INTPR0 + 4 * i, intc->suspend_ipr);
-+		intc0.saved_ipr[i] = intc_readl(&intc0, INTPR0 + 4 * i);
-+		intc_writel(&intc0, INTPR0 + 4 * i, intc0.suspend_ipr);
- 	}
- 
+@@ -265,7 +265,7 @@ static int puv3_irq_suspend(struct sys_d
  	return 0;
  }
  
--static int intc_resume(struct sys_device *sdev)
-+static int intc_resume(void)
+-static int puv3_irq_resume(struct sys_device *dev)
++static void puv3_irq_resume(void)
  {
--	struct intc *intc = container_of(sdev, struct intc, sysdev);
- 	int i;
+ 	struct puv3_irq_state *st = &puv3_irq_state;
  
--	WARN_ON(!irqs_disabled());
--
- 	for (i = 0; i < 64; i++)
--		intc_writel(intc, INTPR0 + 4 * i, intc->saved_ipr[i]);
-+		intc_writel(&intc0, INTPR0 + 4 * i, intc0.saved_ipr[i]);
+@@ -278,27 +278,20 @@ static int puv3_irq_resume(struct sys_de
  
- 	return 0;
+ 		writel(st->icmr, INTC_ICMR);
+ 	}
+-	return 0;
  }
-@@ -186,27 +181,18 @@ static int intc_resume(struct sys_device
- #define intc_resume	NULL
- #endif
  
--static struct sysdev_class intc_class = {
--	.name		= "intc",
-+static struct syscore_ops intc_syscore_ops = {
- 	.suspend	= intc_suspend,
- 	.resume		= intc_resume,
+-static struct sysdev_class puv3_irq_sysclass = {
+-	.name		= "pkunity-irq",
++static struct syscore_ops puv3_irq_syscore_ops = {
+ 	.suspend	= puv3_irq_suspend,
+ 	.resume		= puv3_irq_resume,
  };
  
--static int __init intc_init_sysdev(void)
-+static int __init intc_init_syscore(void)
+-static struct sys_device puv3_irq_device = {
+-	.id		= 0,
+-	.cls		= &puv3_irq_sysclass,
+-};
+-
+-static int __init puv3_irq_init_devicefs(void)
++static int __init puv3_irq_init_syscore(void)
  {
--	int ret;
--
--	ret = sysdev_class_register(&intc_class);
--	if (ret)
--		return ret;
-+	register_syscore_ops(&intc_syscore_ops);
- 
--	intc0.sysdev.id = 0;
--	intc0.sysdev.cls = &intc_class;
--	ret = sysdev_register(&intc0.sysdev);
--
--	return ret;
+-	sysdev_class_register(&puv3_irq_sysclass);
+-	return sysdev_register(&puv3_irq_device);
++	register_syscore_ops(&puv3_irq_syscore_ops);
 +	return 0;
  }
--device_initcall(intc_init_sysdev);
-+device_initcall(intc_init_syscore);
  
- unsigned long intc_get_pending(unsigned int group)
+-device_initcall(puv3_irq_init_devicefs);
++device_initcall(puv3_irq_init_syscore);
+ 
+ void __init init_IRQ(void)
  {
