@@ -1,29 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2011 22:39:57 +0200
-Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
-In-Reply-To: <4DA4A44D.5020208@linaro.org>
-References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
-	<201104121946.01618.arnd@arndb.de> <4DA4A44D.5020208@linaro.org>
-Message-ID: <201104172239.57362.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 17 Apr 2011 23:01:53 +0200
+Subject: [PATCH 0/14] Remove sysdev suspend/resume and shutdown operations
+In-Reply-To: <201103280125.11750.rjw@sisk.pl>
+References: <201103280125.11750.rjw@sisk.pl>
+Message-ID: <201104172301.54115.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 April 2011, Mathieu Poirier wrote:
-> > struct u8500_hsem_state {
-> >       void __iomem *io_base;
-> >       struct u8500_hsem hsem[U8500_MAX_SEMAPHORE];
-> > }
-> I don't see the real advantage in doing a single allocation - the 
-> dynamic allocation method is also used in 'omap_hwspinlock.c'.  Is 
-> modification mandatory to get the driver accepted ?
+Hi,
 
-Not strictly required, but somewhat cleaner IMHO. If you have a good
-reason for splitting the allocations, just document that clearly.
+The following series of patches fixes bugs related to the introduction
+of struct syscore_ops later in this cycle, replaces sysdev suspend/resume
+operations in all of the architectures still using them with struct
+syscore_ops-based PM callbacks and finally removes the suspend/resume
+and shutdown operations from struct sysdev_class and struct sysdev_driver.
 
-One more thing I just noticed: the hwspinlock_internal.h file defines
-the hwspinlock->id field as "a global, unique, system-wide, index of
-the lock", but the u8500 hsem just sets it to an integer starting
-at zero. If there are multiple devices providing hwspinlocks in the
-same system, that cannot work.
+Patches [1/14] and [2/14] are important bug fixes targeted at 2.6.39.
+The remaining patches are regareded as 2.6.40 material, but I'd like to
+put them into linux-next shortly, if there are no objections, to catch
+problems that they may introduce before they hit the mainline.  Again,
+if there are no objections I'd like to merge these patches through the
+suspend-2.6 tree.
 
-	Arnd
+[1/14] - Fix error code paths executed after failing syscore_suspend()
+[2/14] - Add missing syscore_suspend() and syscore_resume() calls to
+         subsystems that should use them in addition to sysdev calls.
+
+[3/14] - Use struct syscore_ops for core PM (instead of sysdevs) in the
+         common ARM code.
+[4/14] - Use struct syscore_ops for core PM (instead of sysdevs) in ARM OMAP
+         code.
+[5/14] - Use struct syscore_ops for core PM (instead of sysdevs) in ARM
+         Integrator code.
+[6/14] - Use struct syscore_ops for core PM (instead of sysdevs) in ARM SA1100
+         code.
+[7/14] - Use struct syscore_ops for core PM (instead of sysdevs) in ARM PXA
+         code.
+[8/14] - Use struct syscore_ops for core PM (instead of sysdevs) in ARM Samsung
+         code.
+[9/14] - Use struct syscore_ops for core PM (instead of sysdevs) in Blackfin
+         arch code.
+[10/14] - Use struct syscore_ops for core PM (instead of sysdevs) in MIPS
+         arch code.
+[11/14] - Use struct syscore_ops for core PM (instead of sysdevs) in AVR32
+         arch code.
+[12/14] - Use struct syscore_ops for core PM (instead of sysdevs) in Unicore32
+         arch code.
+[13/14] - Use struct syscore_ops for core PM (instead of sysdevs) in PowerPC
+         arch code.
+[14/14] - Remove sysdev suspend/resume and shutdown operations.
+
+Thanks,
+Rafael
