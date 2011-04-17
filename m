@@ -1,42 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2011 22:19:01 +0200
-Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
-	support.
-In-Reply-To: <4DA59635.2020705@st.com>
-References: <cover.1298977728.git.viresh.kumar@st.com>
-	<4DA47085.9090209@gmail.com> <4DA59635.2020705@st.com>
-Message-ID: <201104172219.01493.arnd@arndb.de>
+Date: Sun, 17 Apr 2011 22:39:57 +0200
+Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
+In-Reply-To: <4DA4A44D.5020208@linaro.org>
+References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
+	<201104121946.01618.arnd@arndb.de> <4DA4A44D.5020208@linaro.org>
+Message-ID: <201104172239.57362.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2011, pratyush wrote:
-> > Other vendors are likely to have the same IP, but none of the code here
-> > is written to be common. In light of recent discussions this would be a
-> > good candidate to avoid future duplication.
-> > 
-> > It doesn't appear that pcie.c contains much SPEAr specific code. The few
-> > defines and structs that are could be passed in. Some comments below.
-> > 
-> 
-> Yes, this driver is for an PCIe host which uses Synopsys IP. But 
-> SPEAr specific wrapper has been used heavily in the code.
-> Synopsis provides some signal which can be interfaced to registers
-> for CPU access. This interface can be different for different vendor.
-> All the application registers are SPEAr specific representation
-> and may not be same for other vendor.
-> So all accesses for app_reg in the code may not be similar in other 
-> implementation. 
-> 
-> ...
+On Tuesday 12 April 2011, Mathieu Poirier wrote:
+> > struct u8500_hsem_state {
+> >       void __iomem *io_base;
+> >       struct u8500_hsem hsem[U8500_MAX_SEMAPHORE];
+> > }
+> I don't see the real advantage in doing a single allocation - the 
+> dynamic allocation method is also used in 'omap_hwspinlock.c'.  Is 
+> modification mandatory to get the driver accepted ?
 
-But they could also be the same in another implementation, right?
+Not strictly required, but somewhat cleaner IMHO. If you have a good
+reason for splitting the allocations, just document that clearly.
 
-I would suggest in general to make the code as generic as easily possible
-and put it into an appropriate location for sharing, but not spending
-too much effort on making it more generic than needed.
-
-The next port that needs a variant of the code can then modify the
-driver accordingly to add the necessary differences and ways to
-detect them.
+One more thing I just noticed: the hwspinlock_internal.h file defines
+the hwspinlock->id field as "a global, unique, system-wide, index of
+the lock", but the u8500 hsem just sets it to an integer starting
+at zero. If there are multiple devices providing hwspinlocks in the
+same system, that cannot work.
 
 	Arnd
