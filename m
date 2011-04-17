@@ -1,16 +1,16 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 17 Apr 2011 23:11:58 +0200
-Subject: [PATCH 9/14] PM / Blackfin: Use struct syscore_ops instead of sysdevs
+Date: Sun, 17 Apr 2011 23:14:26 +0200
+Subject: [PATCH 13/14] PM / PowerPC: Use struct syscore_ops instead of sysdevs
 	for PM
 In-Reply-To: <201104172301.54115.rjw@sisk.pl>
 References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
-Message-ID: <201104172311.59289.rjw@sisk.pl>
+Message-ID: <201104172314.27023.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafael J. Wysocki <rjw@sisk.pl>
 
-Convert some Blackfin architecture's code to using struct syscore_ops
+Make some PowerPC architecture's code use struct syscore_ops
 objects for power management instead of sysdev classes and sysdevs.
 
 This simplifies the code and reduces the kernel's memory footprint.
@@ -19,71 +19,349 @@ the future.
 
 Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/blackfin/kernel/nmi.c |   30 +++++++++---------------------
- 1 file changed, 9 insertions(+), 21 deletions(-)
+ arch/powerpc/include/asm/mpic.h        |    3 --
+ arch/powerpc/platforms/cell/spu_base.c |   28 ++++++++++++-------
+ arch/powerpc/platforms/powermac/pic.c  |   42 +++++++---------------------
+ arch/powerpc/sysdev/ipic.c             |   36 ++++++------------------
+ arch/powerpc/sysdev/mpic.c             |   48 +++++++++++++++++----------------
+ 5 files changed, 64 insertions(+), 93 deletions(-)
 
-Index: linux-2.6/arch/blackfin/kernel/nmi.c
+Index: linux-2.6/arch/powerpc/platforms/powermac/pic.c
 ===================================================================
---- linux-2.6.orig/arch/blackfin/kernel/nmi.c
-+++ linux-2.6/arch/blackfin/kernel/nmi.c
-@@ -12,7 +12,7 @@
- 
- #include <linux/bitops.h>
- #include <linux/hardirq.h>
+--- linux-2.6.orig/arch/powerpc/platforms/powermac/pic.c
++++ linux-2.6/arch/powerpc/platforms/powermac/pic.c
+@@ -21,7 +21,7 @@
+ #include <linux/signal.h>
+ #include <linux/pci.h>
+ #include <linux/interrupt.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
- #include <linux/pm.h>
- #include <linux/nmi.h>
- #include <linux/smp.h>
-@@ -196,43 +196,31 @@ void touch_nmi_watchdog(void)
- 
- /* Suspend/resume support */
- #ifdef CONFIG_PM
--static int nmi_wdt_suspend(struct sys_device *dev, pm_message_t state)
-+static int nmi_wdt_suspend(void)
- {
- 	nmi_wdt_stop();
- 	return 0;
+ #include <linux/adb.h>
+ #include <linux/pmu.h>
+ #include <linux/module.h>
+@@ -677,7 +677,7 @@ not_found:
+ 	return viaint;
  }
  
--static int nmi_wdt_resume(struct sys_device *dev)
-+static void nmi_wdt_resume(void)
+-static int pmacpic_suspend(struct sys_device *sysdev, pm_message_t state)
++static int pmacpic_suspend(void)
  {
- 	if (nmi_active)
- 		nmi_wdt_start();
+ 	int viaint = pmacpic_find_viaint();
+ 
+@@ -698,7 +698,7 @@ static int pmacpic_suspend(struct sys_de
+         return 0;
+ }
+ 
+-static int pmacpic_resume(struct sys_device *sysdev)
++static void pmacpic_resume(void)
+ {
+ 	int i;
+ 
+@@ -709,39 +709,19 @@ static int pmacpic_resume(struct sys_dev
+ 	for (i = 0; i < max_real_irqs; ++i)
+ 		if (test_bit(i, sleep_save_mask))
+ 			pmac_unmask_irq(irq_get_irq_data(i));
+-
 -	return 0;
  }
  
--static struct sysdev_class nmi_sysclass = {
--	.name		= DRV_NAME,
-+static struct syscore_ops nmi_syscore_ops = {
- 	.resume		= nmi_wdt_resume,
- 	.suspend	= nmi_wdt_suspend,
+-#endif /* CONFIG_PM && CONFIG_PPC32 */
+-
+-static struct sysdev_class pmacpic_sysclass = {
+-	.name = "pmac_pic",
++static struct syscore_ops pmacpic_syscore_ops = {
++	.suspend	= pmacpic_suspend,
++	.resume		= pmacpic_resume,
  };
  
--static struct sys_device device_nmi_wdt = {
--	.id	= 0,
--	.cls	= &nmi_sysclass,
+-static struct sys_device device_pmacpic = {
+-	.id		= 0,
+-	.cls		= &pmacpic_sysclass,
 -};
 -
--static int __init init_nmi_wdt_sysfs(void)
-+static int __init init_nmi_wdt_syscore(void)
- {
--	int error;
+-static struct sysdev_driver driver_pmacpic = {
+-#if defined(CONFIG_PM) && defined(CONFIG_PPC32)
+-	.suspend	= &pmacpic_suspend,
+-	.resume		= &pmacpic_resume,
+-#endif /* CONFIG_PM && CONFIG_PPC32 */
+-};
 -
--	if (!nmi_active)
--		return 0;
-+	if (nmi_active)
-+		register_syscore_ops(&nmi_syscore_ops);
+-static int __init init_pmacpic_sysfs(void)
++static int __init init_pmacpic_syscore(void)
+ {
+-#ifdef CONFIG_PPC32
+-	if (max_irqs == 0)
+-		return -ENODEV;
+-#endif
+-	printk(KERN_DEBUG "Registering pmac pic with sysfs...\n");
+-	sysdev_class_register(&pmacpic_sysclass);
+-	sysdev_register(&device_pmacpic);
+-	sysdev_driver_register(&pmacpic_sysclass, &driver_pmacpic);
++	register_syscore_ops(&pmacpic_syscore_ops);
+ 	return 0;
+ }
+-machine_subsys_initcall(powermac, init_pmacpic_sysfs);
  
--	error = sysdev_class_register(&nmi_sysclass);
--	if (!error)
--		error = sysdev_register(&device_nmi_wdt);
++machine_subsys_initcall(powermac, init_pmacpic_syscore);
++
++#endif /* CONFIG_PM && CONFIG_PPC32 */
+Index: linux-2.6/arch/powerpc/platforms/cell/spu_base.c
+===================================================================
+--- linux-2.6.orig/arch/powerpc/platforms/cell/spu_base.c
++++ linux-2.6/arch/powerpc/platforms/cell/spu_base.c
+@@ -32,6 +32,7 @@
+ #include <linux/io.h>
+ #include <linux/mutex.h>
+ #include <linux/linux_logo.h>
++#include <linux/syscore_ops.h>
+ #include <asm/spu.h>
+ #include <asm/spu_priv1.h>
+ #include <asm/spu_csa.h>
+@@ -521,18 +522,8 @@ void spu_init_channels(struct spu *spu)
+ }
+ EXPORT_SYMBOL_GPL(spu_init_channels);
+ 
+-static int spu_shutdown(struct sys_device *sysdev)
+-{
+-	struct spu *spu = container_of(sysdev, struct spu, sysdev);
+-
+-	spu_free_irqs(spu);
+-	spu_destroy_spu(spu);
+-	return 0;
+-}
+-
+ static struct sysdev_class spu_sysdev_class = {
+ 	.name = "spu",
+-	.shutdown = spu_shutdown,
+ };
+ 
+ int spu_add_sysdev_attr(struct sysdev_attribute *attr)
+@@ -797,6 +788,22 @@ static inline void crash_register_spus(s
+ }
+ #endif
+ 
++static void spu_shutdown(void)
++{
++	struct spu *spu;
++
++	mutex_lock(&spu_full_list_mutex);
++	list_for_each_entry(spu, &spu_full_list, full_list) {
++		spu_free_irqs(spu);
++		spu_destroy_spu(spu);
++	}
++	mutex_unlock(&spu_full_list_mutex);
++}
++
++static struct syscore_ops spu_syscore_ops = {
++	.shutdown = spu_shutdown,
++};
++
+ static int __init init_spu_base(void)
+ {
+ 	int i, ret = 0;
+@@ -830,6 +837,7 @@ static int __init init_spu_base(void)
+ 	crash_register_spus(&spu_full_list);
+ 	mutex_unlock(&spu_full_list_mutex);
+ 	spu_add_sysdev_attr(&attr_stat);
++	register_syscore_ops(&spu_syscore_ops);
+ 
+ 	spu_init_affinity();
+ 
+Index: linux-2.6/arch/powerpc/sysdev/ipic.c
+===================================================================
+--- linux-2.6.orig/arch/powerpc/sysdev/ipic.c
++++ linux-2.6/arch/powerpc/sysdev/ipic.c
+@@ -18,7 +18,7 @@
+ #include <linux/stddef.h>
+ #include <linux/sched.h>
+ #include <linux/signal.h>
+-#include <linux/sysdev.h>
++#include <linux/syscore_ops.h>
+ #include <linux/device.h>
+ #include <linux/bootmem.h>
+ #include <linux/spinlock.h>
+@@ -902,7 +902,7 @@ static struct {
+ 	u32 sercr;
+ } ipic_saved_state;
+ 
+-static int ipic_suspend(struct sys_device *sdev, pm_message_t state)
++static int ipic_suspend(void)
+ {
+ 	struct ipic *ipic = primary_ipic;
+ 
+@@ -933,7 +933,7 @@ static int ipic_suspend(struct sys_devic
+ 	return 0;
+ }
+ 
+-static int ipic_resume(struct sys_device *sdev)
++static void ipic_resume(void)
+ {
+ 	struct ipic *ipic = primary_ipic;
+ 
+@@ -949,44 +949,26 @@ static int ipic_resume(struct sys_device
+ 	ipic_write(ipic->regs, IPIC_SECNR, ipic_saved_state.secnr);
+ 	ipic_write(ipic->regs, IPIC_SERMR, ipic_saved_state.sermr);
+ 	ipic_write(ipic->regs, IPIC_SERCR, ipic_saved_state.sercr);
+-
+-	return 0;
+ }
+ #else
+ #define ipic_suspend NULL
+ #define ipic_resume NULL
+ #endif
+ 
+-static struct sysdev_class ipic_sysclass = {
+-	.name = "ipic",
++static struct syscore_ops ipic_syscore_ops = {
+ 	.suspend = ipic_suspend,
+ 	.resume = ipic_resume,
+ };
+ 
+-static struct sys_device device_ipic = {
+-	.id		= 0,
+-	.cls		= &ipic_sysclass,
+-};
+-
+-static int __init init_ipic_sysfs(void)
++static int __init init_ipic_syscore(void)
+ {
+-	int rc;
+-
+ 	if (!primary_ipic || !primary_ipic->regs)
+ 		return -ENODEV;
+-	printk(KERN_DEBUG "Registering ipic with sysfs...\n");
+ 
+-	rc = sysdev_class_register(&ipic_sysclass);
+-	if (rc) {
+-		printk(KERN_ERR "Failed registering ipic sys class\n");
+-		return -ENODEV;
+-	}
+-	rc = sysdev_register(&device_ipic);
+-	if (rc) {
+-		printk(KERN_ERR "Failed registering ipic sys device\n");
+-		return -ENODEV;
+-	}
++	printk(KERN_DEBUG "Registering ipic system core operations\n");
++	register_syscore_ops(&ipic_syscore_ops);
++
+ 	return 0;
+ }
+ 
+-subsys_initcall(init_ipic_sysfs);
++subsys_initcall(init_ipic_syscore);
+Index: linux-2.6/arch/powerpc/sysdev/mpic.c
+===================================================================
+--- linux-2.6.orig/arch/powerpc/sysdev/mpic.c
++++ linux-2.6/arch/powerpc/sysdev/mpic.c
+@@ -27,6 +27,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/pci.h>
+ #include <linux/slab.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <asm/ptrace.h>
+ #include <asm/signal.h>
+@@ -1702,9 +1703,8 @@ void mpic_reset_core(int cpu)
+ #endif /* CONFIG_SMP */
+ 
+ #ifdef CONFIG_PM
+-static int mpic_suspend(struct sys_device *dev, pm_message_t state)
++static void mpic_suspend_one(struct mpic *mpic)
+ {
+-	struct mpic *mpic = container_of(dev, struct mpic, sysdev);
+ 	int i;
+ 
+ 	for (i = 0; i < mpic->num_sources; i++) {
+@@ -1713,13 +1713,22 @@ static int mpic_suspend(struct sys_devic
+ 		mpic->save_data[i].dest =
+ 			mpic_irq_read(i, MPIC_INFO(IRQ_DESTINATION));
+ 	}
++}
++
++static int mpic_suspend(void)
++{
++	struct mpic *mpic = mpics;
++
++	while (mpic) {
++		mpic_suspend_one(mpic);
++		mpic = mpic->next;
++	}
+ 
+ 	return 0;
+ }
+ 
+-static int mpic_resume(struct sys_device *dev)
++static void mpic_resume_one(struct mpic *mpic)
+ {
+-	struct mpic *mpic = container_of(dev, struct mpic, sysdev);
+ 	int i;
+ 
+ 	for (i = 0; i < mpic->num_sources; i++) {
+@@ -1746,33 +1755,28 @@ static int mpic_resume(struct sys_device
+ 	}
+ #endif
+ 	} /* end for loop */
++}
+ 
+-	return 0;
++static void mpic_resume(void)
++{
++	struct mpic *mpic = mpics;
++
++	while (mpic) {
++		mpic_resume_one(mpic);
++		mpic = mpic->next;
++	}
+ }
+-#endif
+ 
+-static struct sysdev_class mpic_sysclass = {
+-#ifdef CONFIG_PM
++static struct syscore_ops mpic_syscore_ops = {
+ 	.resume = mpic_resume,
+ 	.suspend = mpic_suspend,
+-#endif
+-	.name = "mpic",
+ };
+ 
+ static int mpic_init_sys(void)
+ {
+-	struct mpic *mpic = mpics;
+-	int error, id = 0;
+-
+-	error = sysdev_class_register(&mpic_sysclass);
+-
+-	while (mpic && !error) {
+-		mpic->sysdev.cls = &mpic_sysclass;
+-		mpic->sysdev.id = id++;
+-		error = sysdev_register(&mpic->sysdev);
+-		mpic = mpic->next;
+-	}
 -	return error;
++	register_syscore_ops(&mpic_syscore_ops);
 +	return 0;
  }
--late_initcall(init_nmi_wdt_sysfs);
-+late_initcall(init_nmi_wdt_syscore);
  
- #endif	/* CONFIG_PM */
+ device_initcall(mpic_init_sys);
++#endif
+Index: linux-2.6/arch/powerpc/include/asm/mpic.h
+===================================================================
+--- linux-2.6.orig/arch/powerpc/include/asm/mpic.h
++++ linux-2.6/arch/powerpc/include/asm/mpic.h
+@@ -3,7 +3,6 @@
+ #ifdef __KERNEL__
  
+ #include <linux/irq.h>
+-#include <linux/sysdev.h>
+ #include <asm/dcr.h>
+ #include <asm/msi_bitmap.h>
+ 
+@@ -320,8 +319,6 @@ struct mpic
+ 	/* link */
+ 	struct mpic		*next;
+ 
+-	struct sys_device	sysdev;
+-
+ #ifdef CONFIG_PM
+ 	struct mpic_irq_save	*save_data;
+ #endif
