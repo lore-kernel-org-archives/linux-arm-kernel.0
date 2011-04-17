@@ -1,16 +1,16 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 17 Apr 2011 23:14:26 +0200
-Subject: [PATCH 13/14] PM / PowerPC: Use struct syscore_ops instead of sysdevs
+Date: Sun, 17 Apr 2011 23:12:34 +0200
+Subject: [PATCH 10/14] PM / MIPS: Use struct syscore_ops instead of sysdevs
 	for PM
 In-Reply-To: <201104172301.54115.rjw@sisk.pl>
 References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
-Message-ID: <201104172314.27023.rjw@sisk.pl>
+Message-ID: <201104172312.35060.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafael J. Wysocki <rjw@sisk.pl>
 
-Make some PowerPC architecture's code use struct syscore_ops
+Convert some MIPS architecture's code to using struct syscore_ops
 objects for power management instead of sysdev classes and sysdevs.
 
 This simplifies the code and reduces the kernel's memory footprint.
@@ -19,349 +19,453 @@ the future.
 
 Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/powerpc/include/asm/mpic.h        |    3 --
- arch/powerpc/platforms/cell/spu_base.c |   28 ++++++++++++-------
- arch/powerpc/platforms/powermac/pic.c  |   42 +++++++---------------------
- arch/powerpc/sysdev/ipic.c             |   36 ++++++------------------
- arch/powerpc/sysdev/mpic.c             |   48 +++++++++++++++++----------------
- 5 files changed, 64 insertions(+), 93 deletions(-)
+ arch/mips/alchemy/common/dbdma.c |   92 +++++++++++----------------------------
+ arch/mips/alchemy/common/irq.c   |   62 +++++++++-----------------
+ arch/mips/jz4740/gpio.c          |   52 +++++++++-------------
+ arch/mips/kernel/i8259.c         |   26 +++--------
+ 4 files changed, 80 insertions(+), 152 deletions(-)
 
-Index: linux-2.6/arch/powerpc/platforms/powermac/pic.c
+Index: linux-2.6/arch/mips/alchemy/common/irq.c
 ===================================================================
---- linux-2.6.orig/arch/powerpc/platforms/powermac/pic.c
-+++ linux-2.6/arch/powerpc/platforms/powermac/pic.c
-@@ -21,7 +21,7 @@
- #include <linux/signal.h>
- #include <linux/pci.h>
+--- linux-2.6.orig/arch/mips/alchemy/common/irq.c
++++ linux-2.6/arch/mips/alchemy/common/irq.c
+@@ -30,7 +30,7 @@
  #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/slab.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
- #include <linux/adb.h>
- #include <linux/pmu.h>
- #include <linux/module.h>
-@@ -677,7 +677,7 @@ not_found:
- 	return viaint;
+ 
+ #include <asm/irq_cpu.h>
+ #include <asm/mipsregs.h>
+@@ -556,17 +556,15 @@ void __init arch_init_irq(void)
+ 	}
  }
  
--static int pmacpic_suspend(struct sys_device *sysdev, pm_message_t state)
-+static int pmacpic_suspend(void)
- {
- 	int viaint = pmacpic_find_viaint();
- 
-@@ -698,7 +698,7 @@ static int pmacpic_suspend(struct sys_de
-         return 0;
- }
- 
--static int pmacpic_resume(struct sys_device *sysdev)
-+static void pmacpic_resume(void)
- {
- 	int i;
- 
-@@ -709,39 +709,19 @@ static int pmacpic_resume(struct sys_dev
- 	for (i = 0; i < max_real_irqs; ++i)
- 		if (test_bit(i, sleep_save_mask))
- 			pmac_unmask_irq(irq_get_irq_data(i));
--
--	return 0;
- }
- 
--#endif /* CONFIG_PM && CONFIG_PPC32 */
--
--static struct sysdev_class pmacpic_sysclass = {
--	.name = "pmac_pic",
-+static struct syscore_ops pmacpic_syscore_ops = {
-+	.suspend	= pmacpic_suspend,
-+	.resume		= pmacpic_resume,
+-struct alchemy_ic_sysdev {
+-	struct sys_device sysdev;
++struct alchemy_ic {
+ 	void __iomem *base;
+ 	unsigned long pmdata[7];
  };
  
--static struct sys_device device_pmacpic = {
--	.id		= 0,
--	.cls		= &pmacpic_sysclass,
--};
--
--static struct sysdev_driver driver_pmacpic = {
--#if defined(CONFIG_PM) && defined(CONFIG_PPC32)
--	.suspend	= &pmacpic_suspend,
--	.resume		= &pmacpic_resume,
--#endif /* CONFIG_PM && CONFIG_PPC32 */
--};
--
--static int __init init_pmacpic_sysfs(void)
-+static int __init init_pmacpic_syscore(void)
- {
--#ifdef CONFIG_PPC32
--	if (max_irqs == 0)
--		return -ENODEV;
--#endif
--	printk(KERN_DEBUG "Registering pmac pic with sysfs...\n");
--	sysdev_class_register(&pmacpic_sysclass);
--	sysdev_register(&device_pmacpic);
--	sysdev_driver_register(&pmacpic_sysclass, &driver_pmacpic);
-+	register_syscore_ops(&pmacpic_syscore_ops);
+-static int alchemy_ic_suspend(struct sys_device *dev, pm_message_t state)
+-{
+-	struct alchemy_ic_sysdev *icdev =
+-			container_of(dev, struct alchemy_ic_sysdev, sysdev);
++static struct alchemy_ic alchemy_ic_data[2];
+ 
++static void alchemy_suspend_one_ic(struct alchemy_ic *icdev)
++{
+ 	icdev->pmdata[0] = __raw_readl(icdev->base + IC_CFG0RD);
+ 	icdev->pmdata[1] = __raw_readl(icdev->base + IC_CFG1RD);
+ 	icdev->pmdata[2] = __raw_readl(icdev->base + IC_CFG2RD);
+@@ -574,15 +572,17 @@ static int alchemy_ic_suspend(struct sys
+ 	icdev->pmdata[4] = __raw_readl(icdev->base + IC_ASSIGNRD);
+ 	icdev->pmdata[5] = __raw_readl(icdev->base + IC_WAKERD);
+ 	icdev->pmdata[6] = __raw_readl(icdev->base + IC_MASKRD);
++}
+ 
++static int alchemy_ic_suspend(void)
++{
++	alchemy_suspend_one_ic(alchemy_ic_data);
++	alchemy_suspend_one_ic(alchemy_ic_data + 1);
  	return 0;
  }
--machine_subsys_initcall(powermac, init_pmacpic_sysfs);
  
-+machine_subsys_initcall(powermac, init_pmacpic_syscore);
-+
-+#endif /* CONFIG_PM && CONFIG_PPC32 */
-Index: linux-2.6/arch/powerpc/platforms/cell/spu_base.c
-===================================================================
---- linux-2.6.orig/arch/powerpc/platforms/cell/spu_base.c
-+++ linux-2.6/arch/powerpc/platforms/cell/spu_base.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/mutex.h>
- #include <linux/linux_logo.h>
-+#include <linux/syscore_ops.h>
- #include <asm/spu.h>
- #include <asm/spu_priv1.h>
- #include <asm/spu_csa.h>
-@@ -521,18 +522,8 @@ void spu_init_channels(struct spu *spu)
- }
- EXPORT_SYMBOL_GPL(spu_init_channels);
- 
--static int spu_shutdown(struct sys_device *sysdev)
--{
--	struct spu *spu = container_of(sysdev, struct spu, sysdev);
+-static int alchemy_ic_resume(struct sys_device *dev)
++static void alchemy_resume_one_ic(struct alchemy_ic *icdev)
+ {
+-	struct alchemy_ic_sysdev *icdev =
+-			container_of(dev, struct alchemy_ic_sysdev, sysdev);
 -
--	spu_free_irqs(spu);
--	spu_destroy_spu(spu);
+ 	__raw_writel(0xffffffff, icdev->base + IC_MASKCLR);
+ 	__raw_writel(0xffffffff, icdev->base + IC_CFG0CLR);
+ 	__raw_writel(0xffffffff, icdev->base + IC_CFG1CLR);
+@@ -604,42 +604,26 @@ static int alchemy_ic_resume(struct sys_
+ 
+ 	__raw_writel(icdev->pmdata[6], icdev->base + IC_MASKSET);
+ 	wmb();
++}
+ 
 -	return 0;
++static void alchemy_ic_resume(void)
++{
++	alchemy_resume_one_ic(alchemy_ic_data + 1);
++	alchemy_resume_one_ic(alchemy_ic_data);
+ }
+ 
+-static struct sysdev_class alchemy_ic_sysdev_class = {
+-	.name		= "ic",
++static struct syscore_ops alchemy_ic_syscore_ops = {
+ 	.suspend	= alchemy_ic_suspend,
+ 	.resume		= alchemy_ic_resume,
+ };
+ 
+-static int __init alchemy_ic_sysdev_init(void)
++static int __init alchemy_ic_syscore_init(void)
+ {
+-	struct alchemy_ic_sysdev *icdev;
+-	unsigned long icbase[2] = { IC0_PHYS_ADDR, IC1_PHYS_ADDR };
+-	int err, i;
+-
+-	err = sysdev_class_register(&alchemy_ic_sysdev_class);
+-	if (err)
+-		return err;
+-
+-	for (i = 0; i < 2; i++) {
+-		icdev = kzalloc(sizeof(struct alchemy_ic_sysdev), GFP_KERNEL);
+-		if (!icdev)
+-			return -ENOMEM;
+-
+-		icdev->base = ioremap(icbase[i], 0x1000);
+-
+-		icdev->sysdev.id = i;
+-		icdev->sysdev.cls = &alchemy_ic_sysdev_class;
+-		err = sysdev_register(&icdev->sysdev);
+-		if (err) {
+-			kfree(icdev);
+-			return err;
+-		}
+-	}
++	alchemy_ic_data[0].base = ioremap(icbase[IC0_PHYS_ADDR], 0x1000);
++	alchemy_ic_data[1].base = ioremap(icbase[IC1_PHYS_ADDR], 0x1000);
++
++	register_syscore_ops(&alchemy_ic_syscore_ops);
+ 
+ 	return 0;
+ }
+-device_initcall(alchemy_ic_sysdev_init);
++device_initcall(alchemy_ic_syscore_init);
+Index: linux-2.6/arch/mips/alchemy/common/dbdma.c
+===================================================================
+--- linux-2.6.orig/arch/mips/alchemy/common/dbdma.c
++++ linux-2.6/arch/mips/alchemy/common/dbdma.c
+@@ -36,7 +36,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+-#include <linux/sysdev.h>
++#include <linux/syscore_ops.h>
+ #include <asm/mach-au1x00/au1000.h>
+ #include <asm/mach-au1x00/au1xxx_dbdma.h>
+ 
+@@ -957,37 +957,30 @@ u32 au1xxx_dbdma_put_dscr(u32 chanid, au
+ 	return nbytes;
+ }
+ 
++static u32 alchemy_dbdma_pm_regs[NUM_DBDMA_CHANS + 1][6];
+ 
+-struct alchemy_dbdma_sysdev {
+-	struct sys_device sysdev;
+-	u32 pm_regs[NUM_DBDMA_CHANS + 1][6];
+-};
+-
+-static int alchemy_dbdma_suspend(struct sys_device *dev,
+-				 pm_message_t state)
++static int alchemy_dbdma_suspend(void)
+ {
+-	struct alchemy_dbdma_sysdev *sdev =
+-		container_of(dev, struct alchemy_dbdma_sysdev, sysdev);
+ 	int i;
+ 	u32 addr;
+ 
+ 	addr = DDMA_GLOBAL_BASE;
+-	sdev->pm_regs[0][0] = au_readl(addr + 0x00);
+-	sdev->pm_regs[0][1] = au_readl(addr + 0x04);
+-	sdev->pm_regs[0][2] = au_readl(addr + 0x08);
+-	sdev->pm_regs[0][3] = au_readl(addr + 0x0c);
++	alchemy_dbdma_pm_regs[0][0] = au_readl(addr + 0x00);
++	alchemy_dbdma_pm_regs[0][1] = au_readl(addr + 0x04);
++	alchemy_dbdma_pm_regs[0][2] = au_readl(addr + 0x08);
++	alchemy_dbdma_pm_regs[0][3] = au_readl(addr + 0x0c);
+ 
+ 	/* save channel configurations */
+ 	for (i = 1, addr = DDMA_CHANNEL_BASE; i <= NUM_DBDMA_CHANS; i++) {
+-		sdev->pm_regs[i][0] = au_readl(addr + 0x00);
+-		sdev->pm_regs[i][1] = au_readl(addr + 0x04);
+-		sdev->pm_regs[i][2] = au_readl(addr + 0x08);
+-		sdev->pm_regs[i][3] = au_readl(addr + 0x0c);
+-		sdev->pm_regs[i][4] = au_readl(addr + 0x10);
+-		sdev->pm_regs[i][5] = au_readl(addr + 0x14);
++		alchemy_dbdma_pm_regs[i][0] = au_readl(addr + 0x00);
++		alchemy_dbdma_pm_regs[i][1] = au_readl(addr + 0x04);
++		alchemy_dbdma_pm_regs[i][2] = au_readl(addr + 0x08);
++		alchemy_dbdma_pm_regs[i][3] = au_readl(addr + 0x0c);
++		alchemy_dbdma_pm_regs[i][4] = au_readl(addr + 0x10);
++		alchemy_dbdma_pm_regs[i][5] = au_readl(addr + 0x14);
+ 
+ 		/* halt channel */
+-		au_writel(sdev->pm_regs[i][0] & ~1, addr + 0x00);
++		au_writel(alchemy_dbdma_pm_regs[i][0] & ~1, addr + 0x00);
+ 		au_sync();
+ 		while (!(au_readl(addr + 0x14) & 1))
+ 			au_sync();
+@@ -1001,62 +994,35 @@ static int alchemy_dbdma_suspend(struct
+ 	return 0;
+ }
+ 
+-static int alchemy_dbdma_resume(struct sys_device *dev)
++static void alchemy_dbdma_resume(void)
+ {
+-	struct alchemy_dbdma_sysdev *sdev =
+-		container_of(dev, struct alchemy_dbdma_sysdev, sysdev);
+ 	int i;
+ 	u32 addr;
+ 
+ 	addr = DDMA_GLOBAL_BASE;
+-	au_writel(sdev->pm_regs[0][0], addr + 0x00);
+-	au_writel(sdev->pm_regs[0][1], addr + 0x04);
+-	au_writel(sdev->pm_regs[0][2], addr + 0x08);
+-	au_writel(sdev->pm_regs[0][3], addr + 0x0c);
++	au_writel(alchemy_dbdma_pm_regs[0][0], addr + 0x00);
++	au_writel(alchemy_dbdma_pm_regs[0][1], addr + 0x04);
++	au_writel(alchemy_dbdma_pm_regs[0][2], addr + 0x08);
++	au_writel(alchemy_dbdma_pm_regs[0][3], addr + 0x0c);
+ 
+ 	/* restore channel configurations */
+ 	for (i = 1, addr = DDMA_CHANNEL_BASE; i <= NUM_DBDMA_CHANS; i++) {
+-		au_writel(sdev->pm_regs[i][0], addr + 0x00);
+-		au_writel(sdev->pm_regs[i][1], addr + 0x04);
+-		au_writel(sdev->pm_regs[i][2], addr + 0x08);
+-		au_writel(sdev->pm_regs[i][3], addr + 0x0c);
+-		au_writel(sdev->pm_regs[i][4], addr + 0x10);
+-		au_writel(sdev->pm_regs[i][5], addr + 0x14);
++		au_writel(alchemy_dbdma_pm_regs[i][0], addr + 0x00);
++		au_writel(alchemy_dbdma_pm_regs[i][1], addr + 0x04);
++		au_writel(alchemy_dbdma_pm_regs[i][2], addr + 0x08);
++		au_writel(alchemy_dbdma_pm_regs[i][3], addr + 0x0c);
++		au_writel(alchemy_dbdma_pm_regs[i][4], addr + 0x10);
++		au_writel(alchemy_dbdma_pm_regs[i][5], addr + 0x14);
+ 		au_sync();
+ 		addr += 0x100;	/* next channel base */
+ 	}
+-
+-	return 0;
+ }
+ 
+-static struct sysdev_class alchemy_dbdma_sysdev_class = {
+-	.name		= "dbdma",
++static struct syscore_ops alchemy_dbdma_syscore_ops = {
+ 	.suspend	= alchemy_dbdma_suspend,
+ 	.resume		= alchemy_dbdma_resume,
+ };
+ 
+-static int __init alchemy_dbdma_sysdev_init(void)
+-{
+-	struct alchemy_dbdma_sysdev *sdev;
+-	int ret;
+-
+-	ret = sysdev_class_register(&alchemy_dbdma_sysdev_class);
+-	if (ret)
+-		return ret;
+-
+-	sdev = kzalloc(sizeof(struct alchemy_dbdma_sysdev), GFP_KERNEL);
+-	if (!sdev)
+-		return -ENOMEM;
+-
+-	sdev->sysdev.id = -1;
+-	sdev->sysdev.cls = &alchemy_dbdma_sysdev_class;
+-	ret = sysdev_register(&sdev->sysdev);
+-	if (ret)
+-		kfree(sdev);
+-
+-	return ret;
 -}
 -
- static struct sysdev_class spu_sysdev_class = {
- 	.name = "spu",
--	.shutdown = spu_shutdown,
- };
- 
- int spu_add_sysdev_attr(struct sysdev_attribute *attr)
-@@ -797,6 +788,22 @@ static inline void crash_register_spus(s
- }
- #endif
- 
-+static void spu_shutdown(void)
-+{
-+	struct spu *spu;
-+
-+	mutex_lock(&spu_full_list_mutex);
-+	list_for_each_entry(spu, &spu_full_list, full_list) {
-+		spu_free_irqs(spu);
-+		spu_destroy_spu(spu);
-+	}
-+	mutex_unlock(&spu_full_list_mutex);
-+}
-+
-+static struct syscore_ops spu_syscore_ops = {
-+	.shutdown = spu_shutdown,
-+};
-+
- static int __init init_spu_base(void)
+ static int __init au1xxx_dbdma_init(void)
  {
- 	int i, ret = 0;
-@@ -830,6 +837,7 @@ static int __init init_spu_base(void)
- 	crash_register_spus(&spu_full_list);
- 	mutex_unlock(&spu_full_list_mutex);
- 	spu_add_sysdev_attr(&attr_stat);
-+	register_syscore_ops(&spu_syscore_ops);
+ 	int irq_nr, ret;
+@@ -1084,11 +1050,7 @@ static int __init au1xxx_dbdma_init(void
+ 	else {
+ 		dbdma_initialized = 1;
+ 		printk(KERN_INFO "Alchemy DBDMA initialized\n");
+-		ret = alchemy_dbdma_sysdev_init();
+-		if (ret) {
+-			printk(KERN_ERR "DBDMA PM init failed\n");
+-			ret = 0;
+-		}
++		register_syscore_ops(&alchemy_dbdma_syscore_ops);
+ 	}
  
- 	spu_init_affinity();
- 
-Index: linux-2.6/arch/powerpc/sysdev/ipic.c
+ 	return ret;
+Index: linux-2.6/arch/mips/jz4740/gpio.c
 ===================================================================
---- linux-2.6.orig/arch/powerpc/sysdev/ipic.c
-+++ linux-2.6/arch/powerpc/sysdev/ipic.c
+--- linux-2.6.orig/arch/mips/jz4740/gpio.c
++++ linux-2.6/arch/mips/jz4740/gpio.c
 @@ -18,7 +18,7 @@
- #include <linux/stddef.h>
- #include <linux/sched.h>
- #include <linux/signal.h>
+ #include <linux/init.h>
+ 
+ #include <linux/spinlock.h>
 -#include <linux/sysdev.h>
 +#include <linux/syscore_ops.h>
- #include <linux/device.h>
- #include <linux/bootmem.h>
- #include <linux/spinlock.h>
-@@ -902,7 +902,7 @@ static struct {
- 	u32 sercr;
- } ipic_saved_state;
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+@@ -86,7 +86,6 @@ struct jz_gpio_chip {
+ 	spinlock_t lock;
  
--static int ipic_suspend(struct sys_device *sdev, pm_message_t state)
-+static int ipic_suspend(void)
+ 	struct gpio_chip gpio_chip;
+-	struct sys_device sysdev;
+ };
+ 
+ static struct jz_gpio_chip jz4740_gpio_chips[];
+@@ -459,49 +458,47 @@ static struct jz_gpio_chip jz4740_gpio_c
+ 	JZ4740_GPIO_CHIP(D),
+ };
+ 
+-static inline struct jz_gpio_chip *sysdev_to_chip(struct sys_device *dev)
++static void jz4740_gpio_suspend_chip(struct jz_gpio_chip *chip)
  {
- 	struct ipic *ipic = primary_ipic;
+-	return container_of(dev, struct jz_gpio_chip, sysdev);
++	chip->suspend_mask = readl(chip->base + JZ_REG_GPIO_MASK);
++	writel(~(chip->wakeup), chip->base + JZ_REG_GPIO_MASK_SET);
++	writel(chip->wakeup, chip->base + JZ_REG_GPIO_MASK_CLEAR);
+ }
  
-@@ -933,7 +933,7 @@ static int ipic_suspend(struct sys_devic
+-static int jz4740_gpio_suspend(struct sys_device *dev, pm_message_t state)
++static int jz4740_gpio_suspend(void)
+ {
+-	struct jz_gpio_chip *chip = sysdev_to_chip(dev);
++	int i;
+ 
+-	chip->suspend_mask = readl(chip->base + JZ_REG_GPIO_MASK);
+-	writel(~(chip->wakeup), chip->base + JZ_REG_GPIO_MASK_SET);
+-	writel(chip->wakeup, chip->base + JZ_REG_GPIO_MASK_CLEAR);
++	for (i = 0; i < ARRAY_SIZE(jz4740_gpio_chips); i++)
++		jz4740_gpio_suspend_chip(&jz4740_gpio_chips[i]);
+ 
  	return 0;
  }
  
--static int ipic_resume(struct sys_device *sdev)
-+static void ipic_resume(void)
+-static int jz4740_gpio_resume(struct sys_device *dev)
++static void jz4740_gpio_resume_chip(struct jz_gpio_chip *chip)
  {
- 	struct ipic *ipic = primary_ipic;
+-	struct jz_gpio_chip *chip = sysdev_to_chip(dev);
+ 	uint32_t mask = chip->suspend_mask;
  
-@@ -949,44 +949,26 @@ static int ipic_resume(struct sys_device
- 	ipic_write(ipic->regs, IPIC_SECNR, ipic_saved_state.secnr);
- 	ipic_write(ipic->regs, IPIC_SERMR, ipic_saved_state.sermr);
- 	ipic_write(ipic->regs, IPIC_SERCR, ipic_saved_state.sercr);
+ 	writel(~mask, chip->base + JZ_REG_GPIO_MASK_CLEAR);
+ 	writel(mask, chip->base + JZ_REG_GPIO_MASK_SET);
++}
+ 
+-	return 0;
++static void jz4740_gpio_resume(void)
++{
++	int i;
++
++	for (i = ARRAY_SIZE(jz4740_gpio_chips) - 1; i >= 0 ; i--)
++		jz4740_gpio_resume_chip(&jz4740_gpio_chips[i]);
+ }
+ 
+-static struct sysdev_class jz4740_gpio_sysdev_class = {
+-	.name = "gpio",
++static struct syscore_ops jz4740_gpio_syscore_ops = {
+ 	.suspend = jz4740_gpio_suspend,
+ 	.resume = jz4740_gpio_resume,
+ };
+ 
+-static int jz4740_gpio_chip_init(struct jz_gpio_chip *chip, unsigned int id)
++static void jz4740_gpio_chip_init(struct jz_gpio_chip *chip, unsigned int id)
+ {
+-	int ret, irq;
+-
+-	chip->sysdev.id = id;
+-	chip->sysdev.cls = &jz4740_gpio_sysdev_class;
+-	ret = sysdev_register(&chip->sysdev);
+-
+-	if (ret)
+-		return ret;
++	int irq;
+ 
+ 	spin_lock_init(&chip->lock);
+ 
+@@ -519,22 +516,17 @@ static int jz4740_gpio_chip_init(struct
+ 		irq_set_chip_and_handler(irq, &jz_gpio_irq_chip,
+ 					 handle_level_irq);
+ 	}
 -
 -	return 0;
  }
- #else
- #define ipic_suspend NULL
- #define ipic_resume NULL
- #endif
  
--static struct sysdev_class ipic_sysclass = {
--	.name = "ipic",
-+static struct syscore_ops ipic_syscore_ops = {
- 	.suspend = ipic_suspend,
- 	.resume = ipic_resume,
+ static int __init jz4740_gpio_init(void)
+ {
+ 	unsigned int i;
+-	int ret;
+-
+-	ret = sysdev_class_register(&jz4740_gpio_sysdev_class);
+-	if (ret)
+-		return ret;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(jz4740_gpio_chips); ++i)
+ 		jz4740_gpio_chip_init(&jz4740_gpio_chips[i], i);
+ 
++	register_syscore_ops(&jz4740_gpio_syscore_ops);
++
+ 	printk(KERN_INFO "JZ4740 GPIO initialized\n");
+ 
+ 	return 0;
+Index: linux-2.6/arch/mips/kernel/i8259.c
+===================================================================
+--- linux-2.6.orig/arch/mips/kernel/i8259.c
++++ linux-2.6/arch/mips/kernel/i8259.c
+@@ -14,7 +14,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
+-#include <linux/sysdev.h>
++#include <linux/syscore_ops.h>
+ #include <linux/irq.h>
+ 
+ #include <asm/i8259.h>
+@@ -215,14 +215,13 @@ spurious_8259A_irq:
+ 	}
+ }
+ 
+-static int i8259A_resume(struct sys_device *dev)
++static void i8259A_resume(void)
+ {
+ 	if (i8259A_auto_eoi >= 0)
+ 		init_8259A(i8259A_auto_eoi);
+-	return 0;
+ }
+ 
+-static int i8259A_shutdown(struct sys_device *dev)
++static void i8259A_shutdown(void)
+ {
+ 	/* Put the i8259A into a quiescent state that
+ 	 * the kernel initialization code can get it
+@@ -232,29 +231,20 @@ static int i8259A_shutdown(struct sys_de
+ 		outb(0xff, PIC_MASTER_IMR);	/* mask all of 8259A-1 */
+ 		outb(0xff, PIC_SLAVE_IMR);	/* mask all of 8259A-1 */
+ 	}
+-	return 0;
+ }
+ 
+-static struct sysdev_class i8259_sysdev_class = {
+-	.name = "i8259",
++static struct syscore_ops i8259_syscore_ops = {
+ 	.resume = i8259A_resume,
+ 	.shutdown = i8259A_shutdown,
  };
  
--static struct sys_device device_ipic = {
--	.id		= 0,
--	.cls		= &ipic_sysclass,
+-static struct sys_device device_i8259A = {
+-	.id	= 0,
+-	.cls	= &i8259_sysdev_class,
 -};
 -
--static int __init init_ipic_sysfs(void)
-+static int __init init_ipic_syscore(void)
+-static int __init i8259A_init_sysfs(void)
++static int __init i8259A_init_syscore(void)
  {
--	int rc;
--
- 	if (!primary_ipic || !primary_ipic->regs)
- 		return -ENODEV;
--	printk(KERN_DEBUG "Registering ipic with sysfs...\n");
- 
--	rc = sysdev_class_register(&ipic_sysclass);
--	if (rc) {
--		printk(KERN_ERR "Failed registering ipic sys class\n");
--		return -ENODEV;
--	}
--	rc = sysdev_register(&device_ipic);
--	if (rc) {
--		printk(KERN_ERR "Failed registering ipic sys device\n");
--		return -ENODEV;
--	}
-+	printk(KERN_DEBUG "Registering ipic system core operations\n");
-+	register_syscore_ops(&ipic_syscore_ops);
-+
- 	return 0;
- }
- 
--subsys_initcall(init_ipic_sysfs);
-+subsys_initcall(init_ipic_syscore);
-Index: linux-2.6/arch/powerpc/sysdev/mpic.c
-===================================================================
---- linux-2.6.orig/arch/powerpc/sysdev/mpic.c
-+++ linux-2.6/arch/powerpc/sysdev/mpic.c
-@@ -27,6 +27,7 @@
- #include <linux/spinlock.h>
- #include <linux/pci.h>
- #include <linux/slab.h>
-+#include <linux/syscore_ops.h>
- 
- #include <asm/ptrace.h>
- #include <asm/signal.h>
-@@ -1702,9 +1703,8 @@ void mpic_reset_core(int cpu)
- #endif /* CONFIG_SMP */
- 
- #ifdef CONFIG_PM
--static int mpic_suspend(struct sys_device *dev, pm_message_t state)
-+static void mpic_suspend_one(struct mpic *mpic)
- {
--	struct mpic *mpic = container_of(dev, struct mpic, sysdev);
- 	int i;
- 
- 	for (i = 0; i < mpic->num_sources; i++) {
-@@ -1713,13 +1713,22 @@ static int mpic_suspend(struct sys_devic
- 		mpic->save_data[i].dest =
- 			mpic_irq_read(i, MPIC_INFO(IRQ_DESTINATION));
- 	}
-+}
-+
-+static int mpic_suspend(void)
-+{
-+	struct mpic *mpic = mpics;
-+
-+	while (mpic) {
-+		mpic_suspend_one(mpic);
-+		mpic = mpic->next;
-+	}
- 
- 	return 0;
- }
- 
--static int mpic_resume(struct sys_device *dev)
-+static void mpic_resume_one(struct mpic *mpic)
- {
--	struct mpic *mpic = container_of(dev, struct mpic, sysdev);
- 	int i;
- 
- 	for (i = 0; i < mpic->num_sources; i++) {
-@@ -1746,33 +1755,28 @@ static int mpic_resume(struct sys_device
- 	}
- #endif
- 	} /* end for loop */
-+}
- 
--	return 0;
-+static void mpic_resume(void)
-+{
-+	struct mpic *mpic = mpics;
-+
-+	while (mpic) {
-+		mpic_resume_one(mpic);
-+		mpic = mpic->next;
-+	}
- }
--#endif
- 
--static struct sysdev_class mpic_sysclass = {
--#ifdef CONFIG_PM
-+static struct syscore_ops mpic_syscore_ops = {
- 	.resume = mpic_resume,
- 	.suspend = mpic_suspend,
--#endif
--	.name = "mpic",
- };
- 
- static int mpic_init_sys(void)
- {
--	struct mpic *mpic = mpics;
--	int error, id = 0;
--
--	error = sysdev_class_register(&mpic_sysclass);
--
--	while (mpic && !error) {
--		mpic->sysdev.cls = &mpic_sysclass;
--		mpic->sysdev.id = id++;
--		error = sysdev_register(&mpic->sysdev);
--		mpic = mpic->next;
--	}
+-	int error = sysdev_class_register(&i8259_sysdev_class);
+-	if (!error)
+-		error = sysdev_register(&device_i8259A);
 -	return error;
-+	register_syscore_ops(&mpic_syscore_ops);
++	register_syscore_ops(&i8259_syscore_ops);
 +	return 0;
  }
  
- device_initcall(mpic_init_sys);
-+#endif
-Index: linux-2.6/arch/powerpc/include/asm/mpic.h
-===================================================================
---- linux-2.6.orig/arch/powerpc/include/asm/mpic.h
-+++ linux-2.6/arch/powerpc/include/asm/mpic.h
-@@ -3,7 +3,6 @@
- #ifdef __KERNEL__
+-device_initcall(i8259A_init_sysfs);
++device_initcall(i8259A_init_syscore);
  
- #include <linux/irq.h>
--#include <linux/sysdev.h>
- #include <asm/dcr.h>
- #include <asm/msi_bitmap.h>
- 
-@@ -320,8 +319,6 @@ struct mpic
- 	/* link */
- 	struct mpic		*next;
- 
--	struct sys_device	sysdev;
--
- #ifdef CONFIG_PM
- 	struct mpic_irq_save	*save_data;
- #endif
+ static void init_8259A(int auto_eoi)
+ {
