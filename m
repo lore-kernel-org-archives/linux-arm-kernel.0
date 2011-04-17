@@ -1,30 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Apr 2011 06:53:53 +0900
-Subject: samsung: Convert irq_uart to generic irq chip
-In-Reply-To: <20110416211307.886832862@linutronix.de>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.886832862@linutronix.de>
-Message-ID: <008b01cbfd49$f53a26e0$dfae74a0$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 17 Apr 2011 23:58:16 +0200
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <20110417224816.38ddffee@lxorguk.ukuu.org.uk>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<20110417224816.38ddffee@lxorguk.ukuu.org.uk>
+Message-ID: <BANLkTimwbsmQw0Dawz_+LpVf+wU60AbB0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner wrote:
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+2011/4/17 Alan Cox <alan@lxorguk.ukuu.org.uk>:
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>> + * enum gpio_drive - drive modes for GPIOs (output)
+>> + * @GPIO_DRIVE_PUSH_PULL: the GPIO will be driven actively high and low, this
+>> + * ? is the most typical case and is typically achieved with two active
+>> + * ? transistors on the output
+>> + * @GPIO_DRIVE_OPEN_DRAIN: the GPIO will be driven with open drain (open
+>> + * ? collector) which means it is usually wired with other output ports
+>> + * ? which are then pulled up with an external resistor
+>> + * @GPIO_DRIVE_OPEN_SOURCE: the GPIO will be driven with open drain
+>> + * ? (open emitter) which is the same as open drain mutatis mutandis but
+>> + * ? pulled to ground
+>
+> How about "off". As I've pointed out at various times some devices have
+> GPIO pins that may or may not be connected depending upon what other chip
+> logic is doing.
 
-> ---
->  arch/arm/plat-samsung/irq-uart.c |   82
-+++++-------------------------------
-> ---
->  1 file changed, 11 insertions(+), 71 deletions(-)
-> 
+Sure, why not.
 
-Thanks.
+> As I've also noted with various other previous suggestions for API
+> additions you also need an "unknown" state so that a device can implement
+> the methods but indicate for some pins the value is unknown due to
+> hardware or firmware limitations.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+OK do you want an unknown biasing mode too, or is "floating" enough
+of a default to cover that?
+
+Yours,
+Linus Walleij
