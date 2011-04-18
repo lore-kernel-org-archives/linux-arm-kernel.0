@@ -1,25 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 18 Apr 2011 12:59:03 +0100
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-	<20110418091902.13345132@lxorguk.ukuu.org.uk>
-	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-Message-ID: <20110418115903.GB9462@sirena.org.uk>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 18 Apr 2011 14:19:38 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <201104171938.12834.arnd@arndb.de>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<1302892585.30441.12.camel@dev.znau.edu.ua>
+	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de>
+Message-ID: <BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 06:50:12PM +1000, Ben Nizette wrote:
-
-Please fix your MUA to word wrap within paragraphs; I've reflowed your
-text for legibility.
-
-> Still my question stands, where is the driver ever better placed to
-> make these calls than the board code?
-
-Even if it ends up being the board code using these APIs it seems
-sensible to have a standard API that GPIO drivers can use to expose the
-functionality.  This will help with getting control into code Linux owns
-(since people don't have to implement custom APIs) and will mean we can
-do things like add control of this for device tree based boards.
+W dniu 17 kwietnia 2011 19:38 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
+> On Friday 15 April 2011, Rafa? Mi?ecki wrote:
+>> W dniu 15 kwietnia 2011 20:36 u?ytkownik George Kashperko
+>> <george@znau.edu.ua> napisa?:
+>> >> >> Arnd: I found you saying:
+>> >> >> > I believe the one thing we really want from this driver is the bus
+>> >> >> > scan code, which is not present in the amba bus implementation,
+>> >> >> I explained how it works, I believe scanning (EPROM in this case) it
+>> >> >> Broadcom specific, not really AMBA standard. How do you see it?
+>> >>
+>> >> Maybe EPROM is not Broadcom specific, but I suspect the content we
+>> >> deal with in bcmai/axi is Broadcom specific. I didn't see any notes of
+>> >> manuf/id/rev/class we deal with. So I guess everything we (out
+>> >> driver) read from EPROM is Bcm specific.
+>> >>
+>> >
+>> > Played around amba registers on bcm4716. For all amba cores present
+>> > (under all I mean broadcom ip core agents, oob router core, erom core,
+>> > and other I-dont-know-what-for cores present at 0x18100000). All those
+>> > feature AMBA_CID (0xb105f00d) as PrimeCell ID, and slightly different
+>> > PrimeCell PeripheralIDs:
+>> > * vendor 0xBB, part_number 0x368 for broadcom cores' agents;
+>> > * vendor 0xBB, part_number 0x367 for OOB router core (don't ask me wth
+>> > is this please);
+>> > * vendor 0xBB, part_number 0x366 for EROM core;
+>> >
+>> > ARM vendor id is 0x41. Might 0xBB is Broadcom vendor id but I've found
+>> > no evidence for that with google.
+>>
+>> Yeah, as I suspected, everything except Broadcom specific cores
+>> matches AMBA standards quite nicely. Still, I don't see anything in it
+>> we could use for driver.
+>>
+>> Let's wait for Russell and Arnd to comment.
+>
+> In general, the bus_type directly relates to how a device gets probed.
+> If broadcom uses the same basic register layout as regular AMBA devices,
+> it should use the amba bus type.
