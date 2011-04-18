@@ -1,28 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 18 Apr 2011 15:40:18 -0700
-Subject: [GIT PULL for 39-rc4] msm: minor fixes
-Message-ID: <8ya8vv7xjxp.fsf@huya.qualcomm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Apr 2011 01:46:53 +0200
+Subject: [PATCH 5/6] ARM: nmk: update GPIO chained IRQ handler to
+	entry/exit functions
+In-Reply-To: <1303153488.23764.9.camel@e102144-lin.cambridge.arm.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-6-git-send-email-will.deacon@arm.com>
+	<BANLkTikNANiZm+K3-9SdDb9MOWGxgpEGNg@mail.gmail.com>
+	<1303153488.23764.9.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <BANLkTim9dUBbcDGpDOwuWF9dVdS_4TCr_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are some minor fixes to ARM's MSM.  I would have sent them
-earlier, but was on vacation.
+2011/4/18 Will Deacon <will.deacon@arm.com>:
 
-The following changes since commit 0ce790e7d736cedc563e1fb4e998babf5a4dbc3d:
+>> BUT I want it to go through Grants gpio tree. The reason is that
+>> I plan to consolidate this driver into drivers/gpio/* and I don't want
+>> collisions in merges.
+>
+> Ok. Will Grant just pick it up when he's happy with it?
 
-  Linux 2.6.39-rc1 (2011-03-29 12:09:47 -0700)
+If not picked up, I'll queue it on the top of my patch series when moving it
+to drivers/gpio...
 
-are available in the git repository at:
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git for-39-rc4
-
-David Brown (2):
-      msm: Remove extraneous ffa device check
-      msm: timer: fix missing return value
-
- arch/arm/mach-msm/board-qsd8x50.c |    5 +----
- arch/arm/mach-msm/timer.c         |    2 +-
- 2 files changed, 2 insertions(+), 5 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Linus Walleij
