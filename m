@@ -1,34 +1,197 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 18 Apr 2011 17:49:11 +0100
-Subject: [PATCHv2 2.6.40 2/3] ARM:simpad: Cleanup CS3 accessors.
-In-Reply-To: <4DAC4C2E.3050604@scram.de>
-References: <1303131636-19442-1-git-send-email-jochen@scram.de>
-	<1303131636-19442-3-git-send-email-jochen@scram.de>
-	<20110418134712.GD2820@pulham.picochip.com>
-	<4DAC4C2E.3050604@scram.de>
-Message-ID: <20110418164911.GF2820@pulham.picochip.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Mon, 18 Apr 2011 11:39:41 -0500
+Subject: [PATCH v2 2/3] OMAP3/4: l3: fix omap3_l3_probe error path
+In-Reply-To: <1303144782-5591-1-git-send-email-omar.ramirez@ti.com>
+References: <1303144782-5591-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1303144782-5591-3-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 04:35:26PM +0200, Jochen Friedrich wrote:
-> Hi Jamie,
-> 
-> >>- register CS3 as GPIO controller with 24 pins
-> >>   (16 output only and 8 input only).
-> >
-> >I think the basic-mmio-gpio driver (drivers/gpio/basic_mmio_gpio.c)
-> >should cover the GPIO controller portion of this (including the
-> >shadowing etc).
-> 
-> I'll have a look at this. Last time I checked, a single virtual address
-> for a wite-only/read-only register pair was not supported, but this
-> might have changed.
+l3_smx:
+- Add missing free_irq and remove an empty goto label.
 
-You should just be able to specify a single resource named "dat" and 
-you'll be good to go.  The current driver in mainline detects the number 
-of GPIO's based on the register width (so it would detect 32 GPIO's in 
-your case), but I have some patches posted on lkml that allow this to be 
-overridden.  These patches also add support for direction registers 
-which it looks like you may need.
+l3_noc:
+- If kzalloc fails driver shouldn't continue with a NULL pointer.
+- Add missing free_irq and remove empty goto labels.
+- Safe to assume that if we reached the end point of execution
+  without errors, then return value is 0, so replacing instead
+  another goto.
 
-Jamie
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/omap_l3_noc.c |   34 ++++++++++++++++------------------
+ arch/arm/mach-omap2/omap_l3_smx.c |   23 ++++++++++-------------
+ 2 files changed, 26 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_l3_noc.c b/arch/arm/mach-omap2/omap_l3_noc.c
+index 82632c2..def3de8 100644
+--- a/arch/arm/mach-omap2/omap_l3_noc.c
++++ b/arch/arm/mach-omap2/omap_l3_noc.c
+@@ -132,49 +132,49 @@ static int __init omap4_l3_probe(struct platform_device *pdev)
+ 
+ 	l3 = kzalloc(sizeof(*l3), GFP_KERNEL);
+ 	if (!l3)
+-		ret = -ENOMEM;
++		return -ENOMEM;
+ 
+ 	platform_set_drvdata(pdev, l3);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "couldn't find resource 0\n");
+ 		ret = -ENODEV;
+-		goto err1;
++		goto err0;
+ 	}
+ 
+ 	l3->l3_base[0] = ioremap(res->start, resource_size(res));
+ 	if (!(l3->l3_base[0])) {
+ 		dev_err(&pdev->dev, "ioremap failed\n");
+ 		ret = -ENOMEM;
+-		goto err2;
++		goto err0;
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "couldn't find resource 1\n");
+ 		ret = -ENODEV;
+-		goto err3;
++		goto err1;
+ 	}
+ 
+ 	l3->l3_base[1] = ioremap(res->start, resource_size(res));
+ 	if (!(l3->l3_base[1])) {
+ 		dev_err(&pdev->dev, "ioremap failed\n");
+ 		ret = -ENOMEM;
+-		goto err4;
++		goto err1;
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "couldn't find resource 2\n");
+ 		ret = -ENODEV;
+-		goto err5;
++		goto err2;
+ 	}
+ 
+ 	l3->l3_base[2] = ioremap(res->start, resource_size(res));
+ 	if (!(l3->l3_base[2])) {
+ 		dev_err(&pdev->dev, "ioremap failed\n");
+ 		ret = -ENOMEM;
+-		goto err6;
++		goto err2;
+ 	}
+ 
+ 	/*
+@@ -187,7 +187,7 @@ static int __init omap4_l3_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		pr_crit("L3: request_irq failed to register for 0x%x\n",
+ 					 OMAP44XX_IRQ_L3_DBG);
+-		goto err7;
++		goto err3;
+ 	}
+ 	l3->debug_irq = irq;
+ 
+@@ -198,24 +198,22 @@ static int __init omap4_l3_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		pr_crit("L3: request_irq failed to register for 0x%x\n",
+ 					 OMAP44XX_IRQ_L3_APP);
+-		goto err8;
++		goto err4;
+ 	}
+ 	l3->app_irq = irq;
+ 
+-	goto err0;
+-err8:
+-err7:
+-	iounmap(l3->l3_base[2]);
+-err6:
+-err5:
+-	iounmap(l3->l3_base[1]);
++	return 0;
++
+ err4:
++	free_irq(l3->debug_irq, l3);
+ err3:
+-	iounmap(l3->l3_base[0]);
++	iounmap(l3->l3_base[2]);
+ err2:
++	iounmap(l3->l3_base[1]);
+ err1:
+-	kfree(l3);
++	iounmap(l3->l3_base[0]);
+ err0:
++	kfree(l3);
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/omap_l3_smx.c b/arch/arm/mach-omap2/omap_l3_smx.c
+index 4321e79..32961b1 100644
+--- a/arch/arm/mach-omap2/omap_l3_smx.c
++++ b/arch/arm/mach-omap2/omap_l3_smx.c
+@@ -228,10 +228,8 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
+ 	int                     ret;
+ 
+ 	l3 = kzalloc(sizeof(*l3), GFP_KERNEL);
+-	if (!l3) {
+-		ret = -ENOMEM;
+-		goto err0;
+-	}
++	if (!l3)
++		return -ENOMEM;
+ 
+ 	platform_set_drvdata(pdev, l3);
+ 
+@@ -239,13 +237,13 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "couldn't find resource\n");
+ 		ret = -ENODEV;
+-		goto err1;
++		goto err0;
+ 	}
+ 	l3->rt = ioremap(res->start, resource_size(res));
+ 	if (!(l3->rt)) {
+ 		dev_err(&pdev->dev, "ioremap failed\n");
+ 		ret = -ENOMEM;
+-		goto err2;
++		goto err0;
+ 	}
+ 
+ 	l3->debug_irq = platform_get_irq(pdev, 0);
+@@ -254,7 +252,7 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
+ 		"l3-debug-irq", l3);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "couldn't request debug irq\n");
+-		goto err3;
++		goto err1;
+ 	}
+ 
+ 	l3->app_irq = platform_get_irq(pdev, 1);
+@@ -264,18 +262,17 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
+ 
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "couldn't request app irq\n");
+-		goto err4;
++		goto err2;
+ 	}
+ 
+-	goto err0;
++	return 0;
+ 
+-err4:
+-err3:
+-	iounmap(l3->rt);
+ err2:
++	free_irq(l3->debug_irq, l3);
+ err1:
+-	kfree(l3);
++	iounmap(l3->rt);
+ err0:
++	kfree(l3);
+ 	return ret;
+ }
+ 
+-- 
+1.7.1
