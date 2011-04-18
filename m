@@ -1,81 +1,57 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Mon, 18 Apr 2011 20:36:50 +0530
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <no>
-References: <no>
-Message-ID: <1303139217-10285-1-git-send-email-charu@ti.com>
+From: pwaechtler@mac.com (Peter Waechtler)
+Date: Mon, 18 Apr 2011 19:21:04 +0000 (GMT)
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <20110418135243.GB1479@ucw.cz>
+Message-ID: <07919bf9-f05f-ca1c-c084-c4ee18a9dc58@me.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+Hmh,
 
-Use PM runtime framework in OMAP GPIO driver.
+I'm not 100% sure, but a lot of people made good experience with JFFS2.
 
-Patch series is based on mainline rc3 following commit
-commit a1b49cb7e2a7961ec3aa8b64860bf480d4ec9077
-Merge branch 'i2c-for-linus' of
-	git://git.kernel.org/pub/scm/linux/kernel/git/jdelvare/staging
+Is it that hard to get a log structured file system power fail safe?
+Either the end or "commit" block was written or not?
 
-Changes in v2:
-* Use a per-bank flag 'looses_context' (using pwrdm_can_ever_lose_context())
-       instead of using the powerdomain name
-* Make use of omap_device_get_context_loss_count() to decide on if restore
-       context needs to be done.
-* Do not remove #ifdef CONFIG_ARCH_OMAP2PLUS
-* Do not use pm_runtime_suspended() before calling pm_runtime_get_sync/put_sync
-* use IS_ERR_VALUE() instead of '< 0' in "if" conditions
-(Thanks to Kevin and Paul for the above suggestions)
+??Peter
+?
 
-Previous version of this patch series is available at:
-http://ns.spinics.net/lists/linux-omap/msg48167.html
-http://ns.spinics.net/lists/linux-omap/msg47989.html
-http://ns.spinics.net/lists/linux-omap/msg47827.html
-http://ns.spinics.net/lists/linux-omap/msg47830.html
-
-Compile tested for:
- - omap1_defconfig
- - omap2plus_defconfig
-
-Boot test (success on the following boards):
- - OMAP1710-H3
- - OMAP2420-H4
- - OMAP3430-SDP
- - OMAP3430-Zoom2
- - OMAP3630-Zoom3
- - OMAP4430-SDP
-
-GPIO module functionality testing (success on the following boards):
- - OMAP2420-H4
- - OMAP3430-SDP
- - OMAP3430-Zoom2
- - OMAP3630-Zoom3
- - OMAP4430-SDP
-
-PM Testing (success as given below):
-OMAP3430-SDP: retention, off_mode, system_wide suspend, gpio wakeup
-OMAP3630-Zoom3: retention, system_wide suspend
-using the following:
-	     echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-	     echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-	     echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
-	     echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
-	     echo '5' > /debug/pm_debug/wakeup_timer_seconds
-	     echo 1 > /debug/pm_debug/sleep_while_idle
-	     echo 1 > /debug/pm_debug/enable_off_mode
-	     echo mem > /sys/power/state
+On 18 Apr, 2011,at 03:52 PM, Pavel Machek <pavel@ucw.cz> wrote:
 
 
-Charulatha V (7):
-  OMAP: GPIO: Make gpio_context part of gpio_bank structure
-  OMAP: GPIO: Use flag to identify wkup dmn GPIO
-  OMAP4: GPIO: Save/restore context
-  OMAP: GPIO: handle save/restore ctx in GPIO driver
-  OMAP2+: GPIO: make workaround_enabled bank specific
-  OMAP: GPIO: Cleanup prepare_for_idle/resume
-  OMAP: GPIO: use PM runtime framework
+Hi!
 
- arch/arm/mach-omap2/gpio.c             |    6 +
- arch/arm/mach-omap2/pm34xx.c           |   22 +-
- arch/arm/plat-omap/gpio.c              |  766 ++++++++++++++++++--------------
- arch/arm/plat-omap/include/plat/gpio.h |    3 +-
- 4 files changed, 439 insertions(+), 358 deletions(-)
+> > > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
+> > > Or was the memory always mapped in sections?
+> > >
+> > > I still have to chase a potential memory corruption. The rootfs is located on
+> > > a SDcard and gets corrupted even when the filesystem test programs write to
+> > > different partitions.
+> > > The test scenario includes several dozen or even hundreds of warm and cold
+> > > boot sequences, file system write tests with sudden soft resets It's a large
+> > > embedded project with a lot of drivers and the fact that always the rootfs and
+> > > often the superblock gets damaged let me think of a memory corruption.
+> > >
+> > 
+> > Sorry, I don't want to be obvious, but you mentioned sudden resets
+> > while writing, which is almost always going to wind
+> > up as fs corruptions, with the severity depending on the level of
+> > caching the system is doing to the writes.
+> > How are you mounting your rootfs and what file system are you using?
+> > What sort of corruptions to the super block are you seeing?
+> 
+> If everything is implemented correctly, that depends on the type of
+> filesystem, block layer and storage. Some are explicitly designed to
+> be safe against sudden reboots and power failure - which is an
+> important feature of systems where removing the power is how they are
+> turned off at night.
+
+...but note that no existing filesystem is safe on media such
+as usb sticks, SD and CF cards...
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mffcuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110418/bff5d2f9/attachment.html>
