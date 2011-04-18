@@ -1,42 +1,7 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 18 Apr 2011 21:43:31 +0200 (CEST)
-Subject: genirq: Implement a generic interrupt chip
-In-Reply-To: <alpine.LFD.2.00.1104182130470.2744@localhost6.localdomain6>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.117340150@linutronix.de>
-	<0D753D10438DA54287A00B027084269764D221CC64@AUSP01VMBX24.collaborationhost.net>
-	<alpine.LFD.2.00.1104182130470.2744@localhost6.localdomain6>
-Message-ID: <alpine.LFD.2.00.1104182142560.2744@localhost6.localdomain6>
+From: prakity@marvell.com (Philip Rakity)
+Date: Mon, 18 Apr 2011 12:59:34 -0700
+Subject: [PATCH] rtc: max8925 crash since driver data not set before interrupt
+Message-ID: <49989E8F-D7CA-409B-ABB2-519E3EB9067C@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 18 Apr 2011, Thomas Gleixner wrote:
-
-> On Mon, 18 Apr 2011, H Hartley Sweeten wrote:
-> > On Saturday, April 16, 2011 2:14 PM, Thomas Gleixner wrote:
-> > > +void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
-> > > +			    unsigned int clr, unsigned int set)
-> > > +{
-> > > +	struct irq_chip_type *ct = gc->chip_types;
-> > > +	unsigned int i;
-> > > +
-> > > +	/* Init mask cache */
-> > > +	if (ct->irq_mask == irq_gc_mask_clr_bit ||
-> > > +	    ct->irq_mask == irq_gc_mask_set_bit)
-> > 
-> > struct irq_chip_type does not have a member named 'irq_mask'
-> 
-> Found that already. Needs to be ct->chip_types->irq_mask of course.
-
-Gah, my brain is seriously damaged from staring into that
-code. ct->chip.irq_mask of course.
- 
-> Someday I hope that the patch to quilt which forces a refresh of the
-> queue _BEFORE_ generating mail will surface :)
-> 
-> Thanks,
-> 
-> 	tglx
-> 
