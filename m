@@ -1,228 +1,246 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 18 Apr 2011 09:09:28 +0900
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <BANLkTinnscZeaHkuMme1h-mxGrpJhmZ_Xg@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 18 Apr 2011 04:30:34 +0200
+Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
+Message-ID: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+I tried a smaller scaled cleanup before, but now that there are talks about ARM
+consolidation everywhere, I'll be more brave :)
 
-It's really required feature for ARM architectures.
-In case of samsung SoCs. it needs more things you described.
-In case of setting the drive, we can set the drive strength, 1x, 2x, 3x, and 4x.
-So can it add the more like this? or separate enumeration?
+What we have here is consolidation of two platforms. The older one, plat-stmp,
+has never seen much love after the initial commit and has poor design as stated
+in the patch descriptions. The recently added mach-mxs can be used for a
+(friendly) takeover. Adding 130 lines there could save 9500+ lines in arch/arm!
 
-> +enum gpio_drive {
-> + ? ? ? GPIO_DRIVE_PUSH_PULL,
-> + ? ? ? GPIO_DRIVE_OPEN_DRAIN,
-> + ? ? ? GPIO_DRIVE_OPEN_SOURCE,
-            GPIO_DRIVE_STRENGTH_1X,
-            GPIO_DRIVE_STRENGTH_2X,
-            GPIO_DRIVE_STRENGTH_3X,
-            GPIO_DRIVE_STRENGTH_4X,
-> +};
+The drawback sofar is getting an ack from the old submitters of the code. I
+tried contacting Dmitry and a generic address at EmbeddedAlley and they were
+all bounced. However, while EmbeddedAlley was bought by Mentor, also Sigmatel
+was bought by Freescale. I guess Freescale does have more interest in the code
+than Mentor, so I'll try adding Shawn Guo to CC and hope for his ack.
 
-or
+Looking forward for comments. I'd really love seeing this go in, in one form or
+another. Yet, this is an RFC for now as I want to see if people like the idea.
 
-enum gpio_drive_strength {
-            GPIO_DRIVE_STRENGTH_1X,
-            GPIO_DRIVE_STRENGTH_2X,
-            GPIO_DRIVE_STRENGTH_3X,
-            GPIO_DRIVE_STRENGTH_4X,
-};
+Regards,
 
-Thank you,
-Kyungmin Park
+   Wolfram
 
-On Mon, Apr 18, 2011 at 6:37 AM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> This adds two functions for struct gpio_chip chips to provide pin
-> bias and drive mode settings for individual pins. Implementers does
-> this a bit differently and usually there are a few possible modes you
-> can select, I'm providing a few common modes for biasing and driving
-> pins.
->
-> Since we have no previous hacked-up arch-specific drivers for this
-> we can avoid any __override_functions and we just allow this to be
-> properly implemented using gpiolib. Further the function is made
-> non-mandatory, if it is not defined for the chip it will be silently
-> ignored.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ?drivers/gpio/gpiolib.c ? ? | ? 43 ++++++++++++++++++++++++++++++++++++++
-> ?include/asm-generic/gpio.h | ? 12 ++++++++++
-> ?include/linux/gpio.h ? ? ? | ? 49 ++++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 104 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index 36a2974..f79f4a3 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1573,6 +1573,49 @@ void __gpio_set_value(unsigned gpio, int value)
-> ?EXPORT_SYMBOL_GPL(__gpio_set_value);
->
-> ?/**
-> + * gpio_set_bias() - set a gpio's bias
-> + * @gpio: gpio whose bias will be set
-> + * @bias: bias mode to set
-> + * Context: process
-> + *
-> + * This is used to directly or indirectly to implement gpio_set_bias().
-> + * It invokes the associated gpio_chip.set_bias() method. Usually this
-> + * applies to input pins.
-> + */
-> +void gpio_set_bias(unsigned gpio, enum gpio_bias bias)
-> +{
-> + ? ? ? struct gpio_chip ? ? ? ?*chip;
-> +
-> + ? ? ? chip = gpio_to_chip(gpio);
-> + ? ? ? /* Implementing this is not mandatory */
-> + ? ? ? if (chip->set_bias)
-> + ? ? ? ? ? ? ? chip->set_bias(chip, gpio - chip->base, bias);
-> +}
-> +EXPORT_SYMBOL_GPL(gpio_set_bias);
-> +
-> +/**
-> + * gpio_set_drive() - set a gpio's drive mode
-> + * @gpio: gpio whose drive mode will be set
-> + * @drive: drive mode to set
-> + * Context: process
-> + *
-> + * This is used to directly or indirectly to implement gpio_set_drive().
-> + * It invokes the associated gpio_chip.set_drive() method. Call this
-> + * before the __gpio_set_output() function to enable special drive modes.
-> + */
-> +void gpio_set_drive(unsigned gpio, enum gpio_drive drive)
-> +{
-> + ? ? ? struct gpio_chip ? ? ? ?*chip;
-> +
-> + ? ? ? chip = gpio_to_chip(gpio);
-> + ? ? ? /* Implementing this is not mandatory */
-> + ? ? ? if (chip->set_drive)
-> + ? ? ? ? ? ? ? chip->set_drive(chip, gpio - chip->base, drive);
-> +}
-> +EXPORT_SYMBOL_GPL(gpio_set_drive);
-> +
-> +
-> +/**
-> ?* __gpio_cansleep() - report whether gpio value access will sleep
-> ?* @gpio: gpio in question
-> ?* Context: any
-> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-> index ff5c660..b4971b1 100644
-> --- a/include/asm-generic/gpio.h
-> +++ b/include/asm-generic/gpio.h
-> @@ -59,6 +59,8 @@ struct device_node;
-> ?* ? ? returns either the value actually sensed, or zero
-> ?* @direction_output: configures signal "offset" as output, or returns error
-> ?* @set: assigns output value for signal "offset"
-> + * @set_bias: set a certain bias for the GPIO
-> + * @set_drive: set a certain drive mode for the GPIO
-> ?* @to_irq: optional hook supporting non-static gpio_to_irq() mappings;
-> ?* ? ? implementation may not sleep
-> ?* @dbg_show: optional routine to show contents in debugfs; default code
-> @@ -109,6 +111,14 @@ struct gpio_chip {
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*set)(struct gpio_chip *chip,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned offset, int value);
->
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*set_bias)(struct gpio_chip *chip,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned offset,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum gpio_bias bias);
-> +
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*set_drive)(struct gpio_chip *chip,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned offset,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum gpio_drive drive);
-> +
-> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? (*to_irq)(struct gpio_chip *chip,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned offset);
->
-> @@ -158,6 +168,8 @@ extern int gpio_set_debounce(unsigned gpio, unsigned debounce);
-> ?extern int gpio_get_value_cansleep(unsigned gpio);
-> ?extern void gpio_set_value_cansleep(unsigned gpio, int value);
->
-> +extern void gpio_set_bias(unsigned gpio, enum gpio_bias bias);
-> +extern void gpio_set_drive(unsigned gpio, enum gpio_drive drive);
->
-> ?/* A platform's <asm/gpio.h> code may want to inline the I/O calls when
-> ?* the GPIO is constant and refers to some always-present controller,
-> diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-> index 32720ba..6b48c15 100644
-> --- a/include/linux/gpio.h
-> +++ b/include/linux/gpio.h
-> @@ -3,6 +3,43 @@
->
-> ?/* see Documentation/gpio.txt */
->
-> +/**
-> + * enum gpio_bias - bias modes for GPIOs
-> + * @GPIO_BIAS_FLOAT: no specific bias, the GPIO will float or state is no
-> + * ? ? controlled by software
-> + * @GPIO_BIAS_PULL_UP: the GPIO will be pulled up (usually with high impedance
-> + * ? ? to VDD)
-> + * @GPIO_BIAS_PULL_DOWN: the GPIO will be pulled down (usually with high
-> + * ? ? impedance to GROUND)
-> + * @GPIO_BIAS_HIGH: the GPIO will be wired high, connected to VDD
-> + * @GPIO_BIAS_GROUND: the GPIO will be grounded, connected to GROUND
-> + */
-> +enum gpio_bias {
-> + ? ? ? GPIO_BIAS_FLOAT,
-> + ? ? ? GPIO_BIAS_PULL_UP,
-> + ? ? ? GPIO_BIAS_PULL_DOWN,
-> + ? ? ? GPIO_BIAS_HIGH,
-> + ? ? ? GPIO_BIAS_GROUND,
-> +};
-> +
-> +/**
-> + * enum gpio_drive - drive modes for GPIOs (output)
-> + * @GPIO_DRIVE_PUSH_PULL: the GPIO will be driven actively high and low, this
-> + * ? ? is the most typical case and is typically achieved with two active
-> + * ? ? transistors on the output
-> + * @GPIO_DRIVE_OPEN_DRAIN: the GPIO will be driven with open drain (open
-> + * ? ? collector) which means it is usually wired with other output ports
-> + * ? ? which are then pulled up with an external resistor
-> + * @GPIO_DRIVE_OPEN_SOURCE: the GPIO will be driven with open drain
-> + * ? ? (open emitter) which is the same as open drain mutatis mutandis but
-> + * ? ? pulled to ground
-> + */
-> +enum gpio_drive {
-> + ? ? ? GPIO_DRIVE_PUSH_PULL,
-> + ? ? ? GPIO_DRIVE_OPEN_DRAIN,
-> + ? ? ? GPIO_DRIVE_OPEN_SOURCE,
-> +};
-> +
-> ?#ifdef CONFIG_GENERIC_GPIO
-> ?#include <asm/gpio.h>
->
-> @@ -90,6 +127,18 @@ static inline void gpio_set_value(unsigned gpio, int value)
-> ? ? ? ?WARN_ON(1);
-> ?}
->
-> +static inline void gpio_set_bias(unsigned gpio, enum gpio_bias bias)
-> +{
-> + ? ? ? /* GPIO can never have been requested */
-> + ? ? ? WARN_ON(1);
-> +}
-> +
-> +static inline void gpio_set_drive(unsigned gpio, enum gpio_drive drive)
-> +{
-> + ? ? ? /* GPIO can never have been requested */
-> + ? ? ? WARN_ON(1);
-> +}
-> +
-> ?static inline int gpio_cansleep(unsigned gpio)
-> ?{
-> ? ? ? ?/* GPIO can never have been requested or set as {in,out}put */
-> --
-> 1.7.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+Wolfram Sang (4):
+  arm: mach-mxs: add stmp378x-devb
+  arm: mach-stmp37xx: remove mach
+  arm: mach-stmp378x: remove mach
+  arm: plat-stmp: remove plat
+
+ arch/arm/Kconfig                                   |   12 -
+ arch/arm/Makefile                                  |    3 -
+ arch/arm/mach-mxs/Kconfig                          |   10 +
+ arch/arm/mach-mxs/Makefile                         |    1 +
+ arch/arm/mach-mxs/mach-stmp378x_devb.c             |  120 ++
+ arch/arm/mach-stmp378x/Makefile                    |    2 -
+ arch/arm/mach-stmp378x/Makefile.boot               |    3 -
+ arch/arm/mach-stmp378x/include/mach/entry-macro.S  |   35 -
+ arch/arm/mach-stmp378x/include/mach/irqs.h         |   95 --
+ arch/arm/mach-stmp378x/include/mach/pins.h         |  151 ---
+ arch/arm/mach-stmp378x/include/mach/regs-apbh.h    |  101 --
+ arch/arm/mach-stmp378x/include/mach/regs-apbx.h    |  119 --
+ arch/arm/mach-stmp378x/include/mach/regs-audioin.h |   63 --
+ .../arm/mach-stmp378x/include/mach/regs-audioout.h |  104 --
+ arch/arm/mach-stmp378x/include/mach/regs-bch.h     |   56 -
+ arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h |   88 --
+ arch/arm/mach-stmp378x/include/mach/regs-dcp.h     |   87 --
+ arch/arm/mach-stmp378x/include/mach/regs-digctl.h  |   38 -
+ arch/arm/mach-stmp378x/include/mach/regs-dram.h    |   27 -
+ arch/arm/mach-stmp378x/include/mach/regs-dri.h     |   45 -
+ arch/arm/mach-stmp378x/include/mach/regs-ecc8.h    |   39 -
+ arch/arm/mach-stmp378x/include/mach/regs-emi.h     |   25 -
+ arch/arm/mach-stmp378x/include/mach/regs-gpmi.h    |   78 --
+ arch/arm/mach-stmp378x/include/mach/regs-i2c.h     |   55 -
+ arch/arm/mach-stmp378x/include/mach/regs-icoll.h   |   45 -
+ arch/arm/mach-stmp378x/include/mach/regs-ir.h      |   23 -
+ arch/arm/mach-stmp378x/include/mach/regs-lcdif.h   |  195 ----
+ arch/arm/mach-stmp378x/include/mach/regs-lradc.h   |   99 --
+ arch/arm/mach-stmp378x/include/mach/regs-ocotp.h   |   40 -
+ arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h |   90 --
+ arch/arm/mach-stmp378x/include/mach/regs-power.h   |   63 --
+ arch/arm/mach-stmp378x/include/mach/regs-pwm.h     |   53 -
+ arch/arm/mach-stmp378x/include/mach/regs-pxp.h     |  140 ---
+ arch/arm/mach-stmp378x/include/mach/regs-rtc.h     |   59 -
+ arch/arm/mach-stmp378x/include/mach/regs-saif.h    |   21 -
+ arch/arm/mach-stmp378x/include/mach/regs-spdif.h   |   49 -
+ arch/arm/mach-stmp378x/include/mach/regs-ssp.h     |  102 --
+ arch/arm/mach-stmp378x/include/mach/regs-sydma.h   |   23 -
+ arch/arm/mach-stmp378x/include/mach/regs-timrot.h  |   68 --
+ arch/arm/mach-stmp378x/include/mach/regs-tvenc.h   |   67 --
+ arch/arm/mach-stmp378x/include/mach/regs-uartapp.h |   87 --
+ arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h |  268 -----
+ arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h |   40 -
+ arch/arm/mach-stmp378x/include/mach/regs-usbphy.h  |   37 -
+ arch/arm/mach-stmp378x/stmp378x.c                  |  299 -----
+ arch/arm/mach-stmp378x/stmp378x.h                  |   25 -
+ arch/arm/mach-stmp378x/stmp378x_devb.c             |  332 ------
+ arch/arm/mach-stmp37xx/Makefile                    |    2 -
+ arch/arm/mach-stmp37xx/Makefile.boot               |    3 -
+ arch/arm/mach-stmp37xx/include/mach/entry-macro.S  |   37 -
+ arch/arm/mach-stmp37xx/include/mach/irqs.h         |   99 --
+ arch/arm/mach-stmp37xx/include/mach/pins.h         |  147 ---
+ arch/arm/mach-stmp37xx/include/mach/regs-apbh.h    |   97 --
+ arch/arm/mach-stmp37xx/include/mach/regs-apbx.h    |  113 --
+ arch/arm/mach-stmp37xx/include/mach/regs-audioin.h |   61 --
+ .../arm/mach-stmp37xx/include/mach/regs-audioout.h |  111 --
+ arch/arm/mach-stmp37xx/include/mach/regs-clkctrl.h |   72 --
+ arch/arm/mach-stmp37xx/include/mach/regs-digctl.h  |   24 -
+ arch/arm/mach-stmp37xx/include/mach/regs-ecc8.h    |   37 -
+ arch/arm/mach-stmp37xx/include/mach/regs-gpmi.h    |   63 --
+ arch/arm/mach-stmp37xx/include/mach/regs-i2c.h     |   55 -
+ arch/arm/mach-stmp37xx/include/mach/regs-icoll.h   |   43 -
+ arch/arm/mach-stmp37xx/include/mach/regs-lcdif.h   |   89 --
+ arch/arm/mach-stmp37xx/include/mach/regs-lradc.h   |   97 --
+ arch/arm/mach-stmp37xx/include/mach/regs-pinctrl.h |   88 --
+ arch/arm/mach-stmp37xx/include/mach/regs-power.h   |   56 -
+ arch/arm/mach-stmp37xx/include/mach/regs-pwm.h     |   51 -
+ arch/arm/mach-stmp37xx/include/mach/regs-rtc.h     |   57 -
+ arch/arm/mach-stmp37xx/include/mach/regs-ssp.h     |  101 --
+ arch/arm/mach-stmp37xx/include/mach/regs-timrot.h  |   49 -
+ arch/arm/mach-stmp37xx/include/mach/regs-uartapp.h |   85 --
+ arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h |  268 -----
+ arch/arm/mach-stmp37xx/include/mach/regs-usbctl.h  |   22 -
+ arch/arm/mach-stmp37xx/include/mach/regs-usbctrl.h |   22 -
+ arch/arm/mach-stmp37xx/include/mach/regs-usbphy.h  |   37 -
+ arch/arm/mach-stmp37xx/stmp37xx.c                  |  219 ----
+ arch/arm/mach-stmp37xx/stmp37xx.h                  |   24 -
+ arch/arm/mach-stmp37xx/stmp37xx_devb.c             |   99 --
+ arch/arm/plat-stmp3xxx/Kconfig                     |   37 -
+ arch/arm/plat-stmp3xxx/Makefile                    |    5 -
+ arch/arm/plat-stmp3xxx/clock.c                     | 1134 --------------------
+ arch/arm/plat-stmp3xxx/clock.h                     |   61 --
+ arch/arm/plat-stmp3xxx/core.c                      |  128 ---
+ arch/arm/plat-stmp3xxx/devices.c                   |  389 -------
+ arch/arm/plat-stmp3xxx/dma.c                       |  464 --------
+ arch/arm/plat-stmp3xxx/include/mach/clkdev.h       |   18 -
+ arch/arm/plat-stmp3xxx/include/mach/cputype.h      |   33 -
+ arch/arm/plat-stmp3xxx/include/mach/debug-macro.S  |   39 -
+ arch/arm/plat-stmp3xxx/include/mach/dma.h          |  153 ---
+ arch/arm/plat-stmp3xxx/include/mach/gpio.h         |   28 -
+ arch/arm/plat-stmp3xxx/include/mach/gpmi.h         |   12 -
+ arch/arm/plat-stmp3xxx/include/mach/hardware.h     |   32 -
+ arch/arm/plat-stmp3xxx/include/mach/io.h           |   25 -
+ arch/arm/plat-stmp3xxx/include/mach/memory.h       |   22 -
+ arch/arm/plat-stmp3xxx/include/mach/mmc.h          |   14 -
+ arch/arm/plat-stmp3xxx/include/mach/pinmux.h       |  157 ---
+ arch/arm/plat-stmp3xxx/include/mach/pins.h         |   30 -
+ arch/arm/plat-stmp3xxx/include/mach/platform.h     |   68 --
+ arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h     |   54 -
+ arch/arm/plat-stmp3xxx/include/mach/system.h       |   49 -
+ arch/arm/plat-stmp3xxx/include/mach/timex.h        |   20 -
+ arch/arm/plat-stmp3xxx/include/mach/uncompress.h   |   53 -
+ arch/arm/plat-stmp3xxx/include/mach/vmalloc.h      |   12 -
+ arch/arm/plat-stmp3xxx/irq.c                       |   50 -
+ arch/arm/plat-stmp3xxx/pinmux.c                    |  550 ----------
+ arch/arm/plat-stmp3xxx/timer.c                     |  186 ----
+ 106 files changed, 131 insertions(+), 9602 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-stmp378x_devb.c
+ delete mode 100644 arch/arm/mach-stmp378x/Makefile
+ delete mode 100644 arch/arm/mach-stmp378x/Makefile.boot
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/pins.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-apbh.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-apbx.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-audioin.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-audioout.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-bch.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dcp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-digctl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dram.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dri.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ecc8.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-emi.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-gpmi.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-i2c.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-icoll.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ir.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-lcdif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-lradc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ocotp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-power.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pwm.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pxp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-rtc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-saif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-spdif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ssp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-sydma.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-timrot.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-tvenc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-uartapp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-usbphy.h
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x.c
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x.h
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x_devb.c
+ delete mode 100644 arch/arm/mach-stmp37xx/Makefile
+ delete mode 100644 arch/arm/mach-stmp37xx/Makefile.boot
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/pins.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-apbh.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-apbx.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-audioin.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-audioout.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-clkctrl.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-digctl.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-ecc8.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-gpmi.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-i2c.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-icoll.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-lcdif.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-lradc.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-pinctrl.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-power.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-pwm.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-rtc.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-ssp.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-timrot.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-uartapp.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-usbctl.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-usbctrl.h
+ delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-usbphy.h
+ delete mode 100644 arch/arm/mach-stmp37xx/stmp37xx.c
+ delete mode 100644 arch/arm/mach-stmp37xx/stmp37xx.h
+ delete mode 100644 arch/arm/mach-stmp37xx/stmp37xx_devb.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/Kconfig
+ delete mode 100644 arch/arm/plat-stmp3xxx/Makefile
+ delete mode 100644 arch/arm/plat-stmp3xxx/clock.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/clock.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/core.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/devices.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/dma.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/clkdev.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/cputype.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/dma.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpmi.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/hardware.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/io.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/memory.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/mmc.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pinmux.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pins.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/platform.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/system.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/timex.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/irq.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/pinmux.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/timer.c
+
+-- 
+1.7.2.5
