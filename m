@@ -1,44 +1,89 @@
-From: Oskar.Andero@sonyericsson.com (=?iso-8859-1?Q?=22Ander=F6=2C_Oskar=22?=)
-Date: Mon, 18 Apr 2011 17:51:29 +0200
-Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
-In-Reply-To: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
-References: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
-Message-ID: <00D61D20F3A8774CBC77798B3FBC427082058F986D@seldmbx02.corpusers.net>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 18 Apr 2011 17:53:00 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <1303140940.31595.45.camel@dev.znau.edu.ua>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de>
+	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
+	<201104181619.35115.arnd@arndb.de>
+	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+	<1303140940.31595.45.camel@dev.znau.edu.ua>
+Message-ID: <BANLkTikBau8GYiO=Ez=m2t-72QJq3=vUrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ some extra CC's)
+W dniu 18 kwietnia 2011 17:35 u?ytkownik George Kashperko
+<george@znau.edu.ua> napisa?:
+> Unfortunately still have just one axi-based box to play with. Will be
+> much appreciated if you could share EROM dumps from your boards to get
+> better understanding of agents/wrappers coupling and relations.
 
-> Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
-> 
-> This fixes broken build when using gcc 4.5.
-> 
-> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
-> ---
->  arch/arm/mach-omap2/Makefile |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
-> omap2/Makefile
-> index a45cd64..512b152 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -68,7 +68,7 @@ obj-$(CONFIG_OMAP_SMARTREFLEX)          +=
-> sr_device.o smartreflex.o
->  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
-> 
->  AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
-> -AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
-> +AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-
-> a$(plus_sec)
-> 
->  ifeq ($(CONFIG_PM_VERBOSE),y)
->  CFLAGS_pm_bus.o				+= -DDEBUG
-> --
-> 1.7.3.4
-Ping!
+You're welcome.
 
-Anyone else that gets bitten by the following when compiling omap2plus_defconfig with gcc 4.5:
-arch/arm/mach-omap2/sleep34xx.S:150: Error: selected processor does not support ARM mode `smc #1'
+It's just my standard card, not SoC.
 
--Oskar
+-- 
+Rafa?
+-------------- next part --------------
+0x4BF80001	TAG==CI		CID==0x800
+0x22004211	TAG==CI		PORTS==1+1	WRAPPERS==1+0
+0x00000003	TAG==MST_PORT
+0x18000005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+0x181000C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+
+0x4BF81201	TAG==CI		CID==0x812
+0x17004211	TAG==CI		PORTS==1+1	WRAPPERS==1+0
+0x00000103	TAG==MST_PORT
+0x18001005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+0x181010C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+
+0x4BF82001	TAG==CI		CID==0x820
+0x0F084411	TAG==CI		PORTS==1+2	WRAPPERS==1+1
+0x00000203	TAG==MST_PORT
+0x18002005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+0x08000135	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==1		AD_AG32==0	AD_SZ_MASK==0x30==SZD
+0x08000000					SIZEL==...			SD_SG32==0
+0x0000013D	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==1		AD_AG32==8	AD_SZ_MASK==0x30==SZD
+0x80000000					ADDRH==...
+0x00000008					SIZEL==...			SD_SG32==8
+0x80000000					SIZEH==...
+0x181020C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+0x18103185	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==1		AD_AG32==0	AD_SZ_MASK==0
+
+0x43B13501	TAG==CI		CID==0x135
+0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
+0x18000065	TAG==ADDR	ST==BRIDGE	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0x60
+0x18104085	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+
+0x43B13501	TAG==CI		CID==0x135
+0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
+0x18100075	TAG==ADDR	ST==BRIDGE	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0x30==SZD
+0x00009000					SIZEL=...
+0x18105085	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+
+0x43B36701	TAG==CI		CID==0x367 (note: OOB_ROUTER, we do not care about lack of wrappers)
+0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
+0x18106005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+
+0x43B36601	TAG==CI		CID==0x366
+0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
+0x18107005	(...) ? NO WRAPPERS
+
+0x43B30101	TAG==CI		CID==0x301
+0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
+0x18003005	(...) ? NO WRAPPERS
+
+0x43BFFF01	TAG==CI		CID==0xFFF
+0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
+0x00000035	(...) ? MANUF_ARM && DEF_AI_COMP
+0x08000000	(...) ? MANUF_ARM && DEF_AI_COMP
+0x10000035	(...) ? MANUF_ARM && DEF_AI_COMP
+0x08000000	(...) ? MANUF_ARM && DEF_AI_COMP
+0x18004035	(...) ? MANUF_ARM && DEF_AI_COMP
+0x000FC000	(...) ? MANUF_ARM && DEF_AI_COMP
+0x18109035	(...) ? MANUF_ARM && DEF_AI_COMP
+0xE7EF7008	(...) ? MANUF_ARM && DEF_AI_COMP
+0x7FFFFFFF	(...) ? MANUF_ARM && DEF_AI_COMP
+0x18108085	(...) ? MANUF_ARM && DEF_AI_COMP
+
+0x0000000F	TAG==END
