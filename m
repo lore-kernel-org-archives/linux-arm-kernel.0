@@ -1,47 +1,54 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 18 Apr 2011 15:32:55 -0500
-Subject: genirq: Implement a generic interrupt chip
-In-Reply-To: <alpine.LFD.2.00.1104182142560.2744@localhost6.localdomain6>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.117340150@linutronix.de>
-	<0D753D10438DA54287A00B027084269764D221CC64@AUSP01VMBX24.collaborationhost.net>
-	<alpine.LFD.2.00.1104182130470.2744@localhost6.localdomain6>
-	<alpine.LFD.2.00.1104182142560.2744@localhost6.localdomain6>
-Message-ID: <0D753D10438DA54287A00B027084269764D22A5CBF@AUSP01VMBX24.collaborationhost.net>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Mon, 18 Apr 2011 21:53:06 +0100
+Subject: [PATCH V14 3/4] ptp: Added a clock driver for the IXP46x.
+In-Reply-To: <dbee2487a57fd7f41e4efbbd2ddfb1313b8d71bc.1303107532.git.richard.cochran@omicron.at>
+References: <cover.1303107532.git.richard.cochran@omicron.at>
+	<dbee2487a57fd7f41e4efbbd2ddfb1313b8d71bc.1303107532.git.richard.cochran@omicron.at>
+Message-ID: <1303159986.2857.56.camel@bwh-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 18, 2011 12:44 PM, Thomas Gleixner wrote:
-> On Mon, 18 Apr 2011, Thomas Gleixner wrote:
->
->> On Mon, 18 Apr 2011, H Hartley Sweeten wrote:
->>> On Saturday, April 16, 2011 2:14 PM, Thomas Gleixner wrote:
->>>> +void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
->>>> +			    unsigned int clr, unsigned int set)
->>>> +{
->>>> +	struct irq_chip_type *ct = gc->chip_types;
->>>> +	unsigned int i;
->>>> +
->>>> +	/* Init mask cache */
->>>> +	if (ct->irq_mask == irq_gc_mask_clr_bit ||
->>>> +	    ct->irq_mask == irq_gc_mask_set_bit)
->>> 
->>> struct irq_chip_type does not have a member named 'irq_mask'
->>
->> Found that already. Needs to be ct->chip_types->irq_mask of course.
->
-> Gah, my brain is seriously damaged from staring into that
-> code. ct->chip.irq_mask of course.
+On Mon, 2011-04-18 at 08:29 +0200, Richard Cochran wrote:
+> This patch adds a driver for the hardware time stamping unit found on the
+> IXP465. The basic clock operations and an external trigger are implemented.
+[...]
+> --- a/drivers/net/arm/ixp4xx_eth.c
+> +++ b/drivers/net/arm/ixp4xx_eth.c
+[...]
+> @@ -246,6 +255,169 @@ static int ports_open;
+>  static struct port *npe_port_tab[MAX_NPES];
+>  static struct dma_pool *dma_pool;
+>  
+> +static struct sock_filter ptp_filter[] = {
+> +	PTP_FILTER
+> +};
+> +
+> +static int ixp_ptp_match(struct sk_buff *skb, u16 uid_hi, u32 uid_lo, u16 seq)
+> +{
+> +	unsigned int type;
+> +	u16 *hi, *id;
+> +	u8 *lo, *data = skb->data;
+> +
+> +	type = sk_run_filter(skb, ptp_filter);
+> +
+> +	if (PTP_CLASS_V1_IPV4 == type) {
+> +
+> +		id = (u16 *)(data + 42 + 30);
+> +		hi = (u16 *)(data + 42 + 22);
+> +		lo = data + 42 + 24;
+[...]
 
-OK. With that fix, I compiled and boot tested these patches on an 
-ep93xx based board:
+PTP_FILTER does not verify that the packet length is sufficient to hold
+a complete PTP header, nor does it require that the IPv4 header length
+is 5 (i.e. 20 bytes).  So you have to check those here rather than using
+magic numbers.
 
-genirq: Implement a generic interrupt chip
-vic: Use generic interrupt chip
+I think you also need to use be16_to_cpup() to read 'id' and 'hi', since
+the host byte order may vary.
 
-I do not have CONFIG_PM enabled so I'm not sure about the vic_id++
-issue I pointed out earlier in vic: Use generic interrupt chip.
+Ben.
 
-Other than that, for these two patches you can add (if you wish):
-
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+-- 
+Ben Hutchings, Senior Software Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
