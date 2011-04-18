@@ -1,30 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2011 09:29:33 +0200
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <20110414223036.GA7335@n2100.arm.linux.org.uk>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<20110414223036.GA7335@n2100.arm.linux.org.uk>
-Message-ID: <201104180929.33569.arnd@arndb.de>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Mon, 18 Apr 2011 09:32:14 +0200
+Subject: [PATCH V2 2/2] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <1302938249-4601-1-git-send-email-mnalajal@codeaurora.org>
+References: <1302938249-4601-1-git-send-email-mnalajal@codeaurora.org>
+Message-ID: <4DABE8FE.5040300@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2011, Russell King - ARM Linux wrote:
-> On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
-> > From: Ramesh Gupta <grgupta@ti.com>
-> > 
-> > This patch is to flush the iommu page table entries from L1 and L2
-> > caches using dma_map_single. This also simplifies the implementation
-> > by removing the functions  flush_iopgd_range/flush_iopte_range.
+Hi,
+
+Murali Nalajala a ?crit :
+> Add initial msm nand driver support for Qualcomm MSM platforms.
+> This driver is capable of handling both 2k and 4k page support
+> nand devices.
 > 
-> No.  This usage is just wrong.  If you're going to use the DMA API then
-> unmap it, otherwise the DMA API debugging will go awol.
+> This driver was originally developed by Arve Hj?nnev?g at google.
+> Its source is available at
+> http://android.git.kernel.org/?p=kernel/msm.git under
+> android-msm-2.6.35 branch.
+> 
+> CC: Dima Zavin <dima@android.com>
+> CC: Brian Swetland <swetland@google.com>
+> CC: Arve Hj?nnev?g <arve@android.com>
+> Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+> ---
+> Changes in V2
+> * Turn most of the pr_info() calls into pr_debug().
+> 
+>  drivers/mtd/devices/Kconfig    |   11 +
+>  drivers/mtd/devices/Makefile   |    1 +
+>  drivers/mtd/devices/msm_nand.c | 1597 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/mtd/devices/msm_nand.h |   77 ++
+>  4 files changed, 1686 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mtd/devices/msm_nand.c
+>  create mode 100644 drivers/mtd/devices/msm_nand.h
+> 
 
+For the record, I am not sure it is a great idea to make nand drivers
+independent of the nand layer.
+By doing that you could change the expected behavior, and introduce bug
+difficult to debug.
 
-It's also completely upside-down: The iommu support should provide interfaces
-using the dma-mapping API, not use that API to provide a machine specific
-version of the generic interface.
+Why do you need that ? Nand drivers can override callbacks of nand framework.
 
-As far as I can tell, nothing actually uses these drivers, maybe we should just
-remove them before we get any code in the mainline kernel that depends on it.
+Maybe because the nand layer call the driver page per page, and  you want to
+work with more than one page. But in this case you can extend nand layer.
 
-	Arnd
+Or does your controller don't allow sending raw command ?
+And in that case all the nand logic is in the nand controller ?
+
+Matthieu
