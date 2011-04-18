@@ -1,37 +1,81 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Apr 2011 11:46:57 -0700
-Subject: [PATCH 06/10] clk: Add support for a generic clock multiplexer
-In-Reply-To: <20110418184138.GE25671@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>
-	<20110418131527.GF31131@pengutronix.de>
-	<20110418133353.GL14770@pengutronix.de>
-	<4DAC7AE9.9030106@codeaurora.org>
-	<20110418183421.GD25671@n2100.arm.linux.org.uk>
-	<20110418184138.GE25671@n2100.arm.linux.org.uk>
-Message-ID: <4DAC8721.7090106@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Apr 2011 20:04:48 +0100
+Subject: [PATCH 5/6] ARM: nmk: update GPIO chained IRQ handler to
+	entry/exit functions
+In-Reply-To: <BANLkTikNANiZm+K3-9SdDb9MOWGxgpEGNg@mail.gmail.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-6-git-send-email-will.deacon@arm.com>
+	<BANLkTikNANiZm+K3-9SdDb9MOWGxgpEGNg@mail.gmail.com>
+Message-ID: <1303153488.23764.9.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2011 11:41 AM, Russell King - ARM Linux wrote:
-> On Mon, Apr 18, 2011 at 07:34:21PM +0100, Russell King - ARM Linux wrote:
->> Oops, clk_get_sys() and clk_find() really should be fixed for this.  I'll
->> sort a patch for it.
-> And here it is:
->
-> 8<----
-> Subject: [PATCH] Fix clkdev return value for NULL clk case
->
-> clkdev may incorrectly cause a clkdev entry with a NULL clk to return
-> -ENOENT.  This is not the intention of this code; -ENOENT should only
-> be returned if the clock entry can not be found in the table.  Fix this.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Linus,
 
-Thanks. Feel free to include a:
+On Mon, 2011-04-18 at 19:26 +0100, Linus Walleij wrote:
+> 2011/4/12 Will Deacon <will.deacon@arm.com>:
+> 
+> > This patch updates the Nomadik gpio chained IRQ handler to use the
+> > chained IRQ enter/exit functions in order to function correctly on
+> > primary controllers with different methods of flow control.
+> >
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Thanks for the Ack.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> BUT I want it to go through Grants gpio tree. The reason is that
+> I plan to consolidate this driver into drivers/gpio/* and I don't want
+> collisions in merges.
+
+Ok. Will Grant just pick it up when he's happy with it?
+
+> And wait:
+> 
+> > +#include <asm/mach/irq.h>
+> 
+> > -       if (host_chip->irq_mask_ack)
+> > -               host_chip->irq_mask_ack(&desc->irq_data);
+> > -       else {
+> > -               host_chip->irq_mask(&desc->irq_data);
+> > -               if (host_chip->irq_ack)
+> > -                       host_chip->irq_ack(&desc->irq_data);
+> > -       }
+> > +       chained_irq_enter(host_chip, desc);
+> 
+> (...)
+> 
+> > -       host_chip->irq_unmask(&desc->irq_data);
+> > +       chained_irq_exit(host_chip, desc);
+> 
+> This looks an awful lot like this from drivers/gpio/pl061.c:
+> 
+> desc->irq_data.chip->irq_ack(&desc->irq_data);
+> (...)
+> desc->irq_data.chip->irq_unmask(&desc->irq_data);
+
+The chained_{enter,exit} functions are there so that chained handlers
+written for multiple parent IRQ chips can cope when the chips differ in
+their method of flow control. I'd argue that we shouldn't be promoting
+chained handlers like this (there should probably be a separate handler
+for each primary chip implementation with which it's designed to work).
+
+The *only* reason I abstracting this pattern is so that platforms can
+survive the GIC migration from ACK => FastEOI without being broken in
+mainline while the GIC code is in a state of flux.
+
+> It gets me wondering what the proper way is to do this.
+> Isn't the proper place for chained_irq_[enter|exit]* in
+> include/linux/irq.h rather? It does not really look machine
+> or arch specific, is it, really?
+
+There are only a handful of machines under arch/arm/ that suffer from
+this problem and need to be able to handle two flow types
+simultaneously. If there's a demand for making this stuff more visible,
+then fine, but I don't think there is.
+
+Cheers,
+
+Will
