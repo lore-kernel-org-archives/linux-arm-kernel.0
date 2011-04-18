@@ -1,68 +1,43 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 18 Apr 2011 17:43:00 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.39-rc4
-In-Reply-To: <008701cbfd45$94dd8f70$be98ae50$%kim@samsung.com>
-References: <008701cbfd45$94dd8f70$be98ae50$%kim@samsung.com>
-Message-ID: <BANLkTik=-YbSD3D+9twqDm3uKR3tm+V+=g@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Apr 2011 10:45:20 +0200
+Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead of
+	VIDEOBUF_DMA_CONTIG
+In-Reply-To: <20110418082049.GJ3811@pengutronix.de>
+References: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110418080637.GA31131@pengutronix.de>
+	<Pine.LNX.4.64.1104181013250.27247@axis700.grange>
+	<20110418082049.GJ3811@pengutronix.de>
+Message-ID: <20110418084520.GB31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robert,
 
-Can you check this patch also?
-http://lists.arm.linux.org.uk/lurker/message/20110329.064902.fb2f620c.en.html
+On Mon, Apr 18, 2011 at 10:20:49AM +0200, Robert Schwebel wrote:
+> On Mon, Apr 18, 2011 at 10:14:56AM +0200, Guennadi Liakhovetski wrote:
+> > It's been pushed upstream almost 2 weeks ago:
+> >
+> > http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/31352
+> 
+> As our autobuilder does still trigger, I assume that the configs have to
+> be refreshed and it may be an issue on our side. Can you take care of
+> that?
+The problem is not our config, but that the change didn't hit next
+(next-20110418) yet.
 
-Fix cpuinit section mismatch(es).
+git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-2.6 (master)
+(which I guess is the tree targeted by Guennadi's pull request)
+is currently at
 
-WARNING: modpost: Found 2 section mismatch(es).
-To see full details build your kernel with:
-'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+	78fca1b9 (Merge branch 'release' of git://git.kernel.org/pub/scm/linux/kernel/git/aegl/linux-2.6)
 
-Thank you,
-Kyungmin Park
+which doesn't contain Guennadi's pull request. Also the other branches
+in Mauro's repo don't contain it, in fact the repository is fully merged
+into Linus tree.
 
-On Mon, Apr 18, 2011 at 6:22 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Linus,
->
-> Please pull Samsung fixes from:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> s5p-fixes-for-linus
->
-> These things are small fixes for 2.6.39-rc4.
-> If any problems, please let me know.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> The following changes since commit a6360dd37e1a144ed11e6548371bade559a1e4df:
->
-> ?Linux 2.6.39-rc3 (2011-04-11 17:21:51 -0700)
->
-> are available in the git repository at:
-> ? git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> s5p-fixes-for-linus
->
-> Abhilash Kesavan (2):
-> ? ? ?ARM: S5P: Remove unused s3c_pm_check_resume_pin
-> ? ? ?ARM: SAMSUNG: Fix build failure in PM CRC check code
->
-> Maurus Cuelenaere (1):
-> ? ? ?ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs' defined but not
-> used
->
-> ?arch/arm/plat-s5p/pm.c ? ? ? ? ? | ? 11 -----------
-> ?arch/arm/plat-samsung/pm-check.c | ? ?6 ------
-> ?arch/arm/plat-samsung/pm.c ? ? ? | ? ?5 +++--
-> ?3 files changed, 3 insertions(+), 19 deletions(-)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
