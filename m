@@ -1,89 +1,101 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 18 Apr 2011 17:53:00 +0200
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <1303140940.31595.45.camel@dev.znau.edu.ua>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de>
-	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
-	<201104181619.35115.arnd@arndb.de>
-	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
-	<1303140940.31595.45.camel@dev.znau.edu.ua>
-Message-ID: <BANLkTikBau8GYiO=Ez=m2t-72QJq3=vUrg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 18 Apr 2011 16:58:50 +0100
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <20110418143808.GP12272@atomide.com>
+References: <20110414120209.GG1611@n2100.arm.linux.org.uk>
+	<20110414123126.GA3336@atomide.com>
+	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
+	<20110415155642.GO1611@n2100.arm.linux.org.uk>
+	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
+	<20110416082802.GS1611@n2100.arm.linux.org.uk>
+	<20110416165725.GA25811@opensource.wolfsonmicro.com>
+	<20110418081050.GG12272@atomide.com>
+	<20110418135704.GB1765@opensource.wolfsonmicro.com>
+	<20110418143808.GP12272@atomide.com>
+Message-ID: <20110418155849.GE1765@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 18 kwietnia 2011 17:35 u?ytkownik George Kashperko
-<george@znau.edu.ua> napisa?:
-> Unfortunately still have just one axi-based box to play with. Will be
-> much appreciated if you could share EROM dumps from your boards to get
-> better understanding of agents/wrappers coupling and relations.
+On Mon, Apr 18, 2011 at 05:41:14PM +0300, Tony Lindgren wrote:
+> * Mark Brown <broonie@opensource.wolfsonmicro.com> [110418 16:54]:
 
-You're welcome.
+> > I do think that a flat lines of code criterion isn't terribly helpful as
+> > it isn't *really* what we're trying to optimise and will needlessly
+> > peanalise newer architectures which have good reasons for active
 
-It's just my standard card, not SoC.
+> Sure. But for an existing platform it can tell something indirectly.
 
--- 
-Rafa?
--------------- next part --------------
-0x4BF80001	TAG==CI		CID==0x800
-0x22004211	TAG==CI		PORTS==1+1	WRAPPERS==1+0
-0x00000003	TAG==MST_PORT
-0x18000005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
-0x181000C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+Right, but my point is that it's being treated as gospel not an
+indicator.
 
-0x4BF81201	TAG==CI		CID==0x812
-0x17004211	TAG==CI		PORTS==1+1	WRAPPERS==1+0
-0x00000103	TAG==MST_PORT
-0x18001005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
-0x181010C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+> > I think we need the append support for all platforms - the idea of
+> > having the description of the CPU in each board device tree just doesn't
+> > seem sensible to me.
 
-0x4BF82001	TAG==CI		CID==0x820
-0x0F084411	TAG==CI		PORTS==1+2	WRAPPERS==1+1
-0x00000203	TAG==MST_PORT
-0x18002005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
-0x08000135	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==1		AD_AG32==0	AD_SZ_MASK==0x30==SZD
-0x08000000					SIZEL==...			SD_SG32==0
-0x0000013D	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==1		AD_AG32==8	AD_SZ_MASK==0x30==SZD
-0x80000000					ADDRH==...
-0x00000008					SIZEL==...			SD_SG32==8
-0x80000000					SIZEH==...
-0x181020C5	TAG==ADDR	ST==MST_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
-0x18103185	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==1		AD_AG32==0	AD_SZ_MASK==0
+> I think the CPU or SoC can be just included into the board description
+> file. Or do you have something else in mind for that?
 
-0x43B13501	TAG==CI		CID==0x135
-0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
-0x18000065	TAG==ADDR	ST==BRIDGE	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0x60
-0x18104085	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+There's the device tree bits that represent the internals of the CPU
+(there was a push to use device tree there too) - that needs to be
+merged with the off-chip definitions from the board.
 
-0x43B13501	TAG==CI		CID==0x135
-0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
-0x18100075	TAG==ADDR	ST==BRIDGE	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0x30==SZD
-0x00009000					SIZEL=...
-0x18105085	TAG==ADDR	ST==SLV_WRAP	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+> > You can easily be pushing at something in four digits by the time you
+> > map out a large board, it's certainly not a trivial amount of code to go
+> > trying to save especially when that's not really directly relevant to
+> > improving the reuse for board drivers and you get into diminishing
+> > returns fairly rapidly.
 
-0x43B36701	TAG==CI		CID==0x367 (note: OOB_ROUTER, we do not care about lack of wrappers)
-0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
-0x18106005	TAG==ADDR	ST==SLV_PORT	ADDRL==...	PORT==0		AD_AG32==0	AD_SZ_MASK==0
+> I guess I'd rather stick to only minimal board additions for now.
+> At least for me merging anything larger means that later on I may
+> have deal with sorting it out which is not nice..
 
-0x43B36601	TAG==CI		CID==0x366
-0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
-0x18107005	(...) ? NO WRAPPERS
+Like I say right now we're just flat out refusing to accept boards at
+all so it's all rather moot.
 
-0x43B30101	TAG==CI		CID==0x301
-0x00000201	TAG==CI		PORTS==0+1	WRAPPERS==0+0
-0x18003005	(...) ? NO WRAPPERS
+> BTW, this issue can be already avoided for most part by creating
+> generic platform init code, like what we have for gpmc-*.c for
+> any devices connected to the GPMC bus on omaps. And that's something
+> that can be done already for various platforms.
 
-0x43BFFF01	TAG==CI		CID==0xFFF
-0x00080201	TAG==CI		PORTS==0+1	WRAPPERS==0+1
-0x00000035	(...) ? MANUF_ARM && DEF_AI_COMP
-0x08000000	(...) ? MANUF_ARM && DEF_AI_COMP
-0x10000035	(...) ? MANUF_ARM && DEF_AI_COMP
-0x08000000	(...) ? MANUF_ARM && DEF_AI_COMP
-0x18004035	(...) ? MANUF_ARM && DEF_AI_COMP
-0x000FC000	(...) ? MANUF_ARM && DEF_AI_COMP
-0x18109035	(...) ? MANUF_ARM && DEF_AI_COMP
-0xE7EF7008	(...) ? MANUF_ARM && DEF_AI_COMP
-0x7FFFFFFF	(...) ? MANUF_ARM && DEF_AI_COMP
-0x18108085	(...) ? MANUF_ARM && DEF_AI_COMP
+That doesn't really achieve a huge amount for platforms where it really
+is just providing resources for the device rather than doing any bus
+configuration like gpmc does - on some platforms you just spec the
+memory regions and IRQ ranges and you're done.  TBH for those systems it
+doesn't seem like a valuable use of time to implement this when device
+tree is (probably) just round the corner as for these systems it's only
+factoring out data, not actual code.
 
-0x0000000F	TAG==END
+> > This does also come back to the whole thing about pointing at relevant
+> > work that people can do - we're not telling people the code they're
+> > submitting is problematic and they need to address things with it, we're
+> > saying that we're not even willing to look at the code or talk about
+> > things that would make it OK.  That's a really negative response that's
+> > essentially impossible to work with.
+
+> I don't think that's the intention.. But I agree with you, we
+> need to coordinate things on the mailing lists so everybody knows
+> what can be done.
+
+And also so that when people can see what they're aiming for.
+
+> Maybe let's try to come up with some checklist on what people
+> can already help with? How about:
+
+> - Is there already generic code posted for review that could
+>   be used insted?
+
+> - Can the platform specific code and defconfigs be combined
+>   within the platform?
+
+> - Is the platform specific data separate from code so that
+>   the data can be eventually be passed from bootloader using
+>   device tree?
+
+> - Can the new code be made generic?
+
+> - Can the new code be made into a loadable module under
+>   drivers directory?
+
+That looks pretty sensible to me - I'd probably merge the "can it be
+generic" with the first point but other than that it looks OK and mostly
+also covers drivers as well.
