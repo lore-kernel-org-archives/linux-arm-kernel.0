@@ -1,60 +1,43 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Mon, 18 Apr 2011 13:00:19 -0700
-Subject: [PATCH] rtc: max8925 crash since driver data not set before
-	interrupt
-In-Reply-To: <49989E8F-D7CA-409B-ABB2-519E3EB9067C@marvell.com>
-References: <49989E8F-D7CA-409B-ABB2-519E3EB9067C@marvell.com>
-Message-ID: <57F86070-9D2B-4000-907E-2078F5EE4CA8@marvell.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 18 Apr 2011 22:03:15 +0200
+Subject: [PATCH 10/14] PM / MIPS: Use struct syscore_ops instead of
+	sysdevs for PM
+In-Reply-To: <20110418101218.GA25325@linux-mips.org>
+References: <201103280125.11750.rjw@sisk.pl> <201104172312.35060.rjw@sisk.pl>
+	<20110418101218.GA25325@linux-mips.org>
+Message-ID: <201104182203.16171.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Eric,
-
-happens on mmp2 / brownstone
-
-Philip
-
-On Apr 18, 2011, at 12:59 PM, Philip Rakity wrote:
-
-> From 449d78d5145f25d95c3bcf8fbcbbf5554299ec0f Mon Sep 17 00:00:00 2001
-> From: Philip Rakity <prakity@marvell.com>
-> Date: Mon, 18 Apr 2011 12:56:17 -0700
-> Subject: [PATCH] rtc: max8925 crash since driver data not set before interrupt
+On Monday, April 18, 2011, Ralf Baechle wrote:
+> This patch breaks the Alchemy kernel compile; below patch on top of it fixes
+> that again.
 > 
-> in probe set the platform data before setting up interrupts
-> avoids crash at start-up time.
-> 
-> Signed-off-by: Philip Rakity <prakity@marvell.com>
+> Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
+
+Thanks!  If you don't mind, I'd like to fold your patch into [10/14].
+
+Rafael
+
+
 > ---
-> drivers/rtc/rtc-max8925.c |    6 +++---
-> 1 files changed, 3 insertions(+), 3 deletions(-)
+>  arch/mips/alchemy/common/irq.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/rtc/rtc-max8925.c b/drivers/rtc/rtc-max8925.c
-> index 174036d..24a326a 100644
-> --- a/drivers/rtc/rtc-max8925.c
-> +++ b/drivers/rtc/rtc-max8925.c
-> @@ -249,6 +249,9 @@ static int __devinit max8925_rtc_probe(struct platform_device *pdev)
-> 	info->dev = &pdev->dev;
-> 	irq = chip->irq_base + MAX8925_IRQ_RTC_ALARM0;
-> 
-> +	dev_set_drvdata(&pdev->dev, info);
-> +	platform_set_drvdata(pdev, info);
-> +
-> 	ret = request_threaded_irq(irq, NULL, rtc_update_handler,
-> 				   IRQF_ONESHOT, "rtc-alarm0", info);
-> 	if (ret < 0) {
-> @@ -265,9 +268,6 @@ static int __devinit max8925_rtc_probe(struct platform_device *pdev)
-> 		goto out_rtc;
-> 	}
-> 
-> -	dev_set_drvdata(&pdev->dev, info);
-> -	platform_set_drvdata(pdev, info);
-> -
-> 	return 0;
-> out_rtc:
-> 	free_irq(chip->irq_base + MAX8925_IRQ_RTC_ALARM0, info);
-> -- 
-> 1.7.0.4
+> Index: linux-mips/arch/mips/alchemy/common/irq.c
+> ===================================================================
+> --- linux-mips.orig/arch/mips/alchemy/common/irq.c
+> +++ linux-mips/arch/mips/alchemy/common/irq.c
+> @@ -619,8 +619,8 @@ static struct syscore_ops alchemy_ic_sys
+>  
+>  static int __init alchemy_ic_syscore_init(void)
+>  {
+> -	alchemy_ic_data[0].base = ioremap(icbase[IC0_PHYS_ADDR], 0x1000);
+> -	alchemy_ic_data[1].base = ioremap(icbase[IC1_PHYS_ADDR], 0x1000);
+> +	alchemy_ic_data[0].base = ioremap(IC0_PHYS_ADDR, 0x1000);
+> +	alchemy_ic_data[1].base = ioremap(IC1_PHYS_ADDR, 0x1000);
+>  
+>  	register_syscore_ops(&alchemy_ic_syscore_ops);
+>  
 > 
 > 
