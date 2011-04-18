@@ -1,45 +1,35 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 18 Apr 2011 15:52:44 +0200
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <20110412203303.GA16019@shareable.org>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-Message-ID: <20110418135243.GB1479@ucw.cz>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Apr 2011 15:54:35 +0200
+Subject: [PATCH 06/10] clk: Add support for a generic clock multiplexer
+In-Reply-To: <20110418133353.GL14770@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>
+	<20110418131527.GF31131@pengutronix.de>
+	<20110418133353.GL14770@pengutronix.de>
+Message-ID: <20110418135435.GI31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi!
-
-> > > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
-> > > Or was the memory always mapped in sections?
-> > >
-> > > I still have to chase a potential memory corruption. The rootfs is located on
-> > > a SDcard and gets corrupted even when the filesystem test programs write to
-> > > different partitions.
-> > > The test scenario includes several dozen or even hundreds of warm and cold
-> > > boot sequences, file system write tests with sudden soft resets. It's a large
-> > > embedded project with a lot of drivers and the fact that always the rootfs and
-> > > often the superblock gets damaged let me think of a memory corruption.
-> > >
-> > 
-> > Sorry, I don't want to be obvious, but you mentioned sudden resets
-> > while writing, which is almost always going to wind
-> > up as fs corruptions, with the severity depending on the level of
-> > caching the system is doing to the writes.
-> > How are you mounting your rootfs and what file system are you using?
-> > What sort of corruptions to the super block are you seeing?
+On Mon, Apr 18, 2011 at 03:33:53PM +0200, Sascha Hauer wrote:
+> On Mon, Apr 18, 2011 at 03:15:27PM +0200, Uwe Kleine-K?nig wrote:
+> > On Fri, Apr 15, 2011 at 09:08:11PM +0200, Sascha Hauer wrote:
+> > > +
+> > > +static int clk_mux_set_parent(struct clk *clk, struct clk *parent)
+> > > +{
+> > > +	struct clk_mux *mux = to_clk_mux(clk);
+> > > +	u32 val;
+> > > +	int i;
+> > > +	unsigned long flags = 0;
+> > = 0 isn't needed. (Or does gcc wail without it?)
 > 
-> If everything is implemented correctly, that depends on the type of
-> filesystem, block layer and storage.  Some are explicitly designed to
-> be safe against sudden reboots and power failure - which is an
-> important feature of systems where removing the power is how they are
-> turned off at night.
+> At least my gcc is not smart engough for this. flags may be used unitialized.
+Then please use
 
-...but note that no existing  filesystem is safe on media such
-as usb sticks, SD and CF cards...
+	unsigned long uninitialized_var(flags);
+
+Best regards
+Uwe
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
