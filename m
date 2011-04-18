@@ -1,51 +1,36 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 18 Apr 2011 16:31:02 +0200
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <201104181619.35115.arnd@arndb.de>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de>
-	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
-	<201104181619.35115.arnd@arndb.de>
-Message-ID: <BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Mon, 18 Apr 2011 16:35:26 +0200
+Subject: [PATCHv2 2.6.40 2/3] ARM:simpad: Cleanup CS3 accessors.
+In-Reply-To: <20110418134712.GD2820@pulham.picochip.com>
+References: <1303131636-19442-1-git-send-email-jochen@scram.de>
+	<1303131636-19442-3-git-send-email-jochen@scram.de>
+	<20110418134712.GD2820@pulham.picochip.com>
+Message-ID: <4DAC4C2E.3050604@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 18 kwietnia 2011 16:19 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
-> On Monday 18 April 2011, Rafa? Mi?ecki wrote:
->> W dniu 17 kwietnia 2011 19:38 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
->>
->> > In general, the bus_type directly relates to how a device gets probed.
->> > If broadcom uses the same basic register layout as regular AMBA devices,
->> > it should use the amba bus type.
->>
->> From Broadcom side we *could* use some registers that are AMBA
->> specific, they are present... but there is totally no point in doing
->> that. Everything we use is Broadcom specific.
->>
->>
->> > I think it would be fine to extend the AMBA bus slightly if there are
->> > just minor differences.
->>
->> As I said, Broadcom specific driver use nothing from AMBA common
->> things. Plus we implement routines that are Broadcom specific and no
->> other platform will use them.
+Hi Jamie,
+
+>> - register CS3 as GPIO controller with 24 pins
+>>    (16 output only and 8 input only).
 >
-> You mean the hardware has two sets of registers containing the same
-> information, one of them the standard registers, and one with broadcom
-> specific ones?
->
-> Why don't you just use the standard ones then?
+> I think the basic-mmio-gpio driver (drivers/gpio/basic_mmio_gpio.c)
+> should cover the GPIO controller portion of this (including the
+> shadowing etc).
 
-No. Did you read my first mail in this thread?
+I'll have a look at this. Last time I checked, a single virtual address
+for a wite-only/read-only register pair was not supported, but this
+might have changed.
 
-There is pair of cores for every device. First is AMBA-specific called
-agent/wrapper and second one is Broadcom-specific.
+ > This may need a few other bits (simpad_uart_pm(),
+> simpad_map_io() etc) converting over to use the GPIO API though.
 
-AMBA specific core called agent/wrapper has AMBA specific registers:
-CID and PID. However we do not ever read that in Broadcom driver,
-because that are useless for us. On AMBA specific core we use only
-some Broadcom specific registers to manage (enable/disable) *second*
-(Broadcom-specific) core.
+Yes. In particular the UART and PCMCIA stuff needs to be converted.
+OTOH, this would make some board specific stuff obsolete and would
+help to reduce the arch/arm/* mess some more ;-).
 
--- 
-Rafa?
+Unfortunately, my Simpad doesn't have a PCMCIA slot, so it's hard
+for me to test this.
+
+Thanks,
+Jochen
