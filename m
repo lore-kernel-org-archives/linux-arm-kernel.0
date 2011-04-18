@@ -1,65 +1,50 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Mon, 18 Apr 2011 08:53:57 +0100
-Subject: [PATCH 4/5] ARM: kprobes: Fix emulation of PLD instructions
-In-Reply-To: <1303113238-23920-1-git-send-email-tixy@yxit.co.uk>
-References: <1303113238-23920-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1303113238-23920-5-git-send-email-tixy@yxit.co.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 18 Apr 2011 10:56:06 +0300
+Subject: [PATCH V2 2/2] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <4DABE8FE.5040300@parrot.com>
+References: <1302938249-4601-1-git-send-email-mnalajal@codeaurora.org>
+	<4DABE8FE.5040300@parrot.com>
+Message-ID: <1303113366.2815.31.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+On Mon, 2011-04-18 at 09:32 +0200, Matthieu CASTET wrote:
+> Hi,
+> 
+> Murali Nalajala a ?crit :
+> > Add initial msm nand driver support for Qualcomm MSM platforms.
+> > This driver is capable of handling both 2k and 4k page support
+> > nand devices.
+> > 
+> > This driver was originally developed by Arve Hj?nnev?g at google.
+> > Its source is available at
+> > http://android.git.kernel.org/?p=kernel/msm.git under
+> > android-msm-2.6.35 branch.
+> > 
+> > CC: Dima Zavin <dima@android.com>
+> > CC: Brian Swetland <swetland@google.com>
+> > CC: Arve Hj?nnev?g <arve@android.com>
+> > Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+> > ---
+> > Changes in V2
+> > * Turn most of the pr_info() calls into pr_debug().
+> > 
+> >  drivers/mtd/devices/Kconfig    |   11 +
+> >  drivers/mtd/devices/Makefile   |    1 +
+> >  drivers/mtd/devices/msm_nand.c | 1597 ++++++++++++++++++++++++++++++++++++++++
+> >  drivers/mtd/devices/msm_nand.h |   77 ++
+> >  4 files changed, 1686 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/mtd/devices/msm_nand.c
+> >  create mode 100644 drivers/mtd/devices/msm_nand.h
+> > 
+> 
+> For the record, I am not sure it is a great idea to make nand drivers
+> independent of the nand layer.
 
-The PLD instructions wasn't being decoded correctly and the emulation
-code wasn't adjusting PC correctly.
+This is not acceptable. Nand drivers should use the nand_base framework.
+If the framework is limiting, buggy, slow, etc for your case (which is
+quite possible) - the framework should be improved.
 
-As the PLD instruction is only a performance hint we emulate it as a
-simple nop, and we can broaden the instruction decoding to take into
-account newer PLI and PLDW instructions.
-
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes-decode.c |   21 ++++++++-------------
- 1 files changed, 8 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index c68b26d..f36dba2 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -657,14 +657,8 @@ static void __kprobes emulate_none(struct kprobe *p, struct pt_regs *regs)
- 	insnslot_0arg_rflags(regs->ARM_cpsr, i_fn);
- }
- 
--static void __kprobes emulate_rn16(struct kprobe *p, struct pt_regs *regs)
-+static void __kprobes emulate_nop(struct kprobe *p, struct pt_regs *regs)
- {
--	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
--	kprobe_opcode_t insn = p->opcode;
--	int rn = (insn >> 16) & 0xf;
--	long rnv = regs->uregs[rn];
--
--	insnslot_1arg_rflags(rnv, regs->ARM_cpsr, i_fn);
- }
- 
- static void __kprobes emulate_rd12rm0(struct kprobe *p, struct pt_regs *regs)
-@@ -941,12 +935,13 @@ space_1111(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	    (insn & 0xfe5f0f00) == 0xf84d0500)
- 		return INSN_REJECTED;
- 
--	/* PLD : 1111 01x1 x101 xxxx xxxx xxxx xxxx xxxx : */
--	if ((insn & 0xfd700000) == 0xf4500000) {
--		insn &= 0xfff0ffff;	/* Rn = r0 */
--		asi->insn[0] = insn;
--		asi->insn_handler = emulate_rn16;
--		return INSN_GOOD;
-+	/* memory hint : 1111 0100 x001 xxxx xxxx xxxx xxxx xxxx : */
-+	/* PLDI        : 1111 0100 x101 xxxx xxxx xxxx xxxx xxxx : */
-+	/* PLDW        : 1111 0101 x001 xxxx xxxx xxxx xxxx xxxx : */
-+	/* PLD         : 1111 0101 x101 xxxx xxxx xxxx xxxx xxxx : */
-+	if ((insn & 0xfe300000) == 0xf4100000) {
-+		asi->insn_handler = emulate_nop;
-+		return INSN_GOOD_NO_SLOT;
- 	}
- 
- 	/* BLX(1) : 1111 101x xxxx xxxx xxxx xxxx xxxx xxxx : */
 -- 
-1.7.2.5
+Best Regards,
+Artem Bityutskiy (????? ????????)
