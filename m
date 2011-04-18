@@ -1,40 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 18 Apr 2011 21:23:02 +0100
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110418171857.GC25671@n2100.arm.linux.org.uk>
-References: <20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
-	<20110415155642.GO1611@n2100.arm.linux.org.uk>
-	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
-	<20110416082802.GS1611@n2100.arm.linux.org.uk>
-	<20110416165725.GA25811@opensource.wolfsonmicro.com>
-	<20110418081050.GG12272@atomide.com>
-	<20110418135704.GB1765@opensource.wolfsonmicro.com>
-	<20110418171857.GC25671@n2100.arm.linux.org.uk>
-Message-ID: <20110418202301.GA13808@opensource.wolfsonmicro.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 18 Apr 2011 15:32:55 -0500
+Subject: genirq: Implement a generic interrupt chip
+In-Reply-To: <alpine.LFD.2.00.1104182142560.2744@localhost6.localdomain6>
+References: <20110416211221.853079766@linutronix.de>
+	<20110416211307.117340150@linutronix.de>
+	<0D753D10438DA54287A00B027084269764D221CC64@AUSP01VMBX24.collaborationhost.net>
+	<alpine.LFD.2.00.1104182130470.2744@localhost6.localdomain6>
+	<alpine.LFD.2.00.1104182142560.2744@localhost6.localdomain6>
+Message-ID: <0D753D10438DA54287A00B027084269764D22A5CBF@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 06:18:57PM +0100, Russell King - ARM Linux wrote:
+On Monday, April 18, 2011 12:44 PM, Thomas Gleixner wrote:
+> On Mon, 18 Apr 2011, Thomas Gleixner wrote:
+>
+>> On Mon, 18 Apr 2011, H Hartley Sweeten wrote:
+>>> On Saturday, April 16, 2011 2:14 PM, Thomas Gleixner wrote:
+>>>> +void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+>>>> +			    unsigned int clr, unsigned int set)
+>>>> +{
+>>>> +	struct irq_chip_type *ct = gc->chip_types;
+>>>> +	unsigned int i;
+>>>> +
+>>>> +	/* Init mask cache */
+>>>> +	if (ct->irq_mask == irq_gc_mask_clr_bit ||
+>>>> +	    ct->irq_mask == irq_gc_mask_set_bit)
+>>> 
+>>> struct irq_chip_type does not have a member named 'irq_mask'
+>>
+>> Found that already. Needs to be ct->chip_types->irq_mask of course.
+>
+> Gah, my brain is seriously damaged from staring into that
+> code. ct->chip.irq_mask of course.
 
-> Linus has replied in this thread with his view, which is not much
-> different from the view which I've been stating all along.
+OK. With that fix, I compiled and boot tested these patches on an 
+ep93xx based board:
 
-Yeah, I saw that.  Quite frankly it's astonishing - I must apologise, I
-had thought you were most likely misinterpreting what he was saying.
+genirq: Implement a generic interrupt chip
+vic: Use generic interrupt chip
 
-> Will we ever be able to put John's code in the kernel?  Honestly, I have
-> no idea.  What I do know is that unless we start doing something to solve
-> the problem we have today with the quantity of code under arch/arm _and_
-> the constant churn of that code, we will _never_ be able to add new
-> platform support in any shape or form to the kernel.
+I do not have CONFIG_PM enabled so I'm not sure about the vic_id++
+issue I pointed out earlier in vic: Use generic interrupt chip.
 
-Given where we're at right now I'm guessing we're going to see ARM
-development halted until at least the merge window after next which is
-5-6 months or so.  We're not talking about trivial bits of
-infrastructure here and obviously any substantial reworks here are going
-to involve churn anyway.
+Other than that, for these two patches you can add (if you wish):
 
-To make matters worse unless people just give up the longer we keep the
-tree shut down the larger the merge will be when it does reopen.
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
