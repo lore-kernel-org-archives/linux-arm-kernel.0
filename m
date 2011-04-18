@@ -1,145 +1,151 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 18 Apr 2011 11:25:04 +0200
-Subject: [PATCH 04/10] clk: implement parent pass through functions
-In-Reply-To: <1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110418092504.GD31131@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 18 Apr 2011 11:26:37 +0200
+Subject: [RFC/PATCH v3 0/7] Samsung IOMMU videobuf2 allocator and s5p-fimc
+	update
+Message-ID: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2011 at 09:08:09PM +0200, Sascha Hauer wrote:
-> A common case for clocks is that certain operations are not implemented
-> and shall be passed through to the parent. Add convenience functions
-> for this purpose
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> ---
->  drivers/clk/clk.c   |   77 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk.h |    9 ++++++
->  2 files changed, 86 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 264c809..7e2c182 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -171,3 +171,80 @@ struct clk_ops clk_fixed_ops = {
->  	.get_rate = clk_fixed_get_rate,
->  };
->  EXPORT_SYMBOL_GPL(clk_fixed_ops);
-> +
-> +int clk_parent_prepare(struct clk *clk)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return -ENOSYS;
-> +
-> +	return clk_prepare(parent);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_prepare);
-> +
-> +void clk_parent_unprepare(struct clk *clk)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return;
-> +
-> +	clk_unprepare(parent);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_unprepare);
-> +
-> +int clk_parent_enable(struct clk *clk)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return 0;
-Do you really want to return 0 here? IMHO something is fishy if a clock
-has .enable = clk_parent_enable but has no parent.
+Hello,
 
-> +
-> +	return clk_enable(parent);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_enable);
-> +
-> +void clk_parent_disable(struct clk *clk)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return;
-> +
-> +	clk_disable(parent);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_disable);
-> +
-> +unsigned long clk_parent_get_rate(struct clk *clk)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return 0;
-> +
-> +	return clk_get_rate(parent);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_get_rate);
-> +
-> +long clk_parent_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return -ENOSYS;
-> +
-> +	return clk_round_rate(parent, rate);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_round_rate);
-> +
-> +int clk_parent_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	struct clk *parent = clk_get_parent(clk);
-> +
-> +	if (IS_ERR(parent))
-> +		return -ENOSYS;
-> +
-> +	return clk_set_rate(parent, rate);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_parent_set_rate);
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index d2f0db0..d014341 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -171,6 +171,15 @@ extern struct clk_ops clk_fixed_ops;
->  #define DEFINE_CLK_FIXED(name, r) \
->  	struct clk_fixed name = INIT_CLK_FIXED(name, r)
->  
-> +/* generic pass-through-to-parent functions */
-> +int clk_parent_prepare(struct clk *clk);
-> +void clk_parent_unprepare(struct clk *clk);
-> +int clk_parent_enable(struct clk *clk);
-> +void clk_parent_disable(struct clk *clk);
-> +unsigned long clk_parent_get_rate(struct clk *clk);
-> +long clk_parent_round_rate(struct clk *clk, unsigned long rate);
-> +int clk_parent_set_rate(struct clk *clk, unsigned long rate);
-> +
-Technically they don't need to depend on USE_COMMON_STRUCT_CLK.
+This is a third version of the Samsung IOMMU driver (see patch #2) and
+videobuf2 allocator for IOMMU mapped memory (see patch #4) as well as
+FIMC driver update. This update brings some minor bugfixes to Samsung
+IOMMU (SYSMMU) driver and support for pages larger than 4KiB in
+videobuf2-dma-iommu allocator.
 
->  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
->  
->  /*
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The main change from the first version of the Samsung IOMMU patches is a
+complete rewrite of the IOMMU driver API. As suggested by Arnd Bergmann
+we decided to drop the custom interface and use the kernel wide, common
+iommu API defined in linux/include/iommu.h. This way the videobuf2 iommu
+allocator become much more generic framework and it is no longer tied to
+any particular iommu implementation.
+
+This patch series introduces new type of videbuf2 memory allocator -
+vb2-dma-iommu. This allocator can be used on the platforms that support
+linux/include/iommu.h style IOMMU driver. An IOMMU driver for Samsung
+EXYNOS4 (called SYSMMU) platform is also included. The allocator and
+IOMMU driver is then used by s5p-fimc driver. To make it possible some
+additional changes are required. Mainly the platform support for s5p-fimc
+for EXYNOS4 machines need to be defined. The proposed solution has been
+tested on Universal C210 board (Samsung S5PC210/EXYNOS4 based).
+This IOMMU allocator has no dependences on any external subsystems.
+
+We also ported s5p-mfc and s5p-tv drivers to this allocator, they will
+be posted in separate patch series. This will enable to get them working
+on mainline Linux kernel for EXYNOS4 platform. Support for
+S5PV210/S5PC110 platform still depends on CMA allocator that needs more
+discussion on memory management mailing list and further development.
+The patches with updated s5p-mfc and s5p-tv drivers will follow.
+
+To get FIMC module working on EXYNOS4 platform on UniversalC210 board we
+also added support for power domains and power gating.
+
+This patch series contains a collection of patches for various platform
+subsystems. Here is a detailed list:
+
+[PATCH 1/7] ARM: EXYNOS4: power domains: fixes and code cleanup
+- adds support for block gating in Samsung power domain driver and
+  performs some cleanup
+
+[PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU) driver
+- a complete rewrite of sysmmu driver for Samsung platform, now uses
+  linux/include/iommu.h api (key patch in this series)
+
+[PATCH 3/7] v4l: videobuf2: dma-sg: move some generic functions to memops
+- a little cleanup and preparations for the dma-iommu allocator
+
+[PATCH 4/7] v4l: videobuf2: add IOMMU based DMA memory allocator
+- introduces new memory allocator for videobuf2 for drivers that support
+  iommu dma memory mappings (key patch in this series)
+
+[PATCH 5/7] v4l: s5p-fimc: add pm_runtime support
+- adds support for pm_runtime in s5p-fimc driver
+
+[PATCH 6/7] v4l: s5p-fimc: Add support for vb2-dma-iommu allocator
+- adds support for the newly introduces videbuf2-s5p-iommu allocator
+  on EXYNOS4 platform
+
+[PATCH 7/7] ARM: EXYNOS4: enable FIMC on Universal_C210
+- adds all required machine definitions to get FIMC modules working
+  on Universal C210 boards
+
+
+Changelog:
+
+V3:
+ - minor bugfixes in SYSMMU driver
+ - added complete support for 64KiB and 1MiB pages to videobuf2-dma-iommu
+   allocator
+
+V2: http://68.183.106.108/lists/arm-kernel/msg120636.html
+ - custom SYSMMU interface has been dropped in favour of linux/include/iommu.h
+   and rewritten SYSMMU driver again
+ - added support to SYSMMU for mapping pages larger than 4Kb
+ - dropped ARM shared mode
+ - videobuf2-s5p-iommu allocator has been renamed to videobuf2-dma-iommu,
+   because it has no dependenco on any Samsung platform specific API,
+   the allocator still uses only 4Kb pages, but this will be changed in the
+   next version
+ - dropped FIMC platform patch that have been merged mainline
+ - rebased all patches onto Linux kernel v2.6.39-rc1
+
+V1: http://www.spinics.net/lists/linux-media/msg29751.html
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+
+Complete patch summary:
+
+Andrzej Pietrasiewicz (3):
+  ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU) driver
+  v4l: videobuf2: dma-sg: move some generic functions to memops
+  v4l: videobuf2: add IOMMU based DMA memory allocator
+
+Marek Szyprowski (3):
+  v4l: s5p-fimc: add pm_runtime support
+  v4l: s5p-fimc: Add support for vb2-dma-iommu allocator
+  ARM: EXYNOS4: enable FIMC on Universal_C210
+
+Tomasz Stanislawski (1):
+  ARM: EXYNOS4: power domains: fixes and code cleanup
+
+ arch/arm/mach-exynos4/Kconfig                   |    6 +
+ arch/arm/mach-exynos4/clock.c                   |   68 +-
+ arch/arm/mach-exynos4/dev-pd.c                  |   93 ++-
+ arch/arm/mach-exynos4/dev-sysmmu.c              |  615 ++++++++-----
+ arch/arm/mach-exynos4/include/mach/irqs.h       |   35 +-
+ arch/arm/mach-exynos4/include/mach/regs-clock.h |    7 +
+ arch/arm/mach-exynos4/include/mach/sysmmu.h     |   46 -
+ arch/arm/mach-exynos4/mach-universal_c210.c     |   22 +
+ arch/arm/plat-s5p/Kconfig                       |   20 +-
+ arch/arm/plat-s5p/include/plat/sysmmu.h         |  241 +++--
+ arch/arm/plat-s5p/sysmmu.c                      | 1191 +++++++++++++++++------
+ arch/arm/plat-samsung/include/plat/devs.h       |    2 +-
+ arch/arm/plat-samsung/include/plat/pd.h         |    1 +
+ drivers/media/video/Kconfig                     |   11 +-
+ drivers/media/video/Makefile                    |    1 +
+ drivers/media/video/s5p-fimc/fimc-capture.c     |    9 +-
+ drivers/media/video/s5p-fimc/fimc-core.c        |   38 +-
+ drivers/media/video/s5p-fimc/fimc-core.h        |    1 +
+ drivers/media/video/s5p-fimc/fimc-mem.h         |  104 ++
+ drivers/media/video/videobuf2-dma-iommu.c       |  762 +++++++++++++++
+ drivers/media/video/videobuf2-dma-sg.c          |   37 +-
+ drivers/media/video/videobuf2-memops.c          |   76 ++
+ include/media/videobuf2-dma-iommu.h             |   48 +
+ include/media/videobuf2-memops.h                |    5 +
+ 24 files changed, 2638 insertions(+), 801 deletions(-)
+ rewrite arch/arm/mach-exynos4/dev-sysmmu.c (88%)
+ delete mode 100644 arch/arm/mach-exynos4/include/mach/sysmmu.h
+ rewrite arch/arm/plat-s5p/include/plat/sysmmu.h (83%)
+ rewrite arch/arm/plat-s5p/sysmmu.c (87%)
+ create mode 100644 drivers/media/video/s5p-fimc/fimc-mem.h
+ create mode 100644 drivers/media/video/videobuf2-dma-iommu.c
+ create mode 100644 include/media/videobuf2-dma-iommu.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1.569.g6f426
