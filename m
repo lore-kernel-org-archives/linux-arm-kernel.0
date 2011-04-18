@@ -1,23 +1,29 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 18 Apr 2011 09:19:02 +0100
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-Message-ID: <20110418091902.13345132@lxorguk.ukuu.org.uk>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 18 Apr 2011 10:20:49 +0200
+Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead
+	of VIDEOBUF_DMA_CONTIG
+In-Reply-To: <Pine.LNX.4.64.1104181013250.27247@axis700.grange>
+References: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110418080637.GA31131@pengutronix.de>
+	<Pine.LNX.4.64.1104181013250.27247@axis700.grange>
+Message-ID: <20110418082049.GJ3811@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> gpiolib handles input and output, high and low because that's all that could reasonably be expected to a) always work and b) be changed at run time in the driver.
+Uwe,
 
-Imagine if file systems only handled 8.3 filenames because that's all
-that could reasonably be expected to a) always work !
+On Mon, Apr 18, 2011 at 10:14:56AM +0200, Guennadi Liakhovetski wrote:
+> It's been pushed upstream almost 2 weeks ago:
+>
+> http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/31352
 
-> So in short - what's the use case?  Which driver requires this?
-> 
+As our autobuilder does still trigger, I assume that the configs have to
+be refreshed and it may be an issue on our side. Can you take care of
+that?
 
-Also your comment re simply in or out on or off is incorrect. Pins may
-also be in use by firmware and the like and in a 'neither' state.
-Something certain gpio people seem to be in denial over.
-
-Alan
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
