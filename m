@@ -1,35 +1,28 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 18 Apr 2011 07:33:10 +0200
-Subject: [PATCH v3] at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
-In-Reply-To: <BANLkTimmvDZRzFX4Z6m7Y2jEZx9a89uwVQ@mail.gmail.com>
-References: <1302784833-25930-1-git-send-email-plagnioj@jcrosoft.com>
-	<1302795935-11175-1-git-send-email-plagnioj@jcrosoft.com>
-	<BANLkTimmvDZRzFX4Z6m7Y2jEZx9a89uwVQ@mail.gmail.com>
-Message-ID: <20110418053310.GA4267@game.jcrosoft.org>
+From: gregkh@suse.de (Greg KH)
+Date: Sun, 17 Apr 2011 23:02:18 -0700
+Subject: [PATCH 0/14] Remove sysdev suspend/resume and shutdown operations
+In-Reply-To: <201104172301.54115.rjw@sisk.pl>
+References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
+Message-ID: <20110418060218.GB22168@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:39 Sun 17 Apr     , Andrew Victor wrote:
-> hi,
+On Sun, Apr 17, 2011 at 11:01:53PM +0200, Rafael J. Wysocki wrote:
+> Hi,
 > 
-> > no board configure it as 'n' and it's an issue to merge all defconfigs
-> > in one
-> >
-> > On AT91SAM926x boards both types of NAND flash can be present
-> > (8 and 16 bit data bus width).
-> >
-> > so will pass it via system_rev
+> The following series of patches fixes bugs related to the introduction
+> of struct syscore_ops later in this cycle, replaces sysdev suspend/resume
+> operations in all of the architectures still using them with struct
+> syscore_ops-based PM callbacks and finally removes the suspend/resume
+> and shutdown operations from struct sysdev_class and struct sysdev_driver.
 > 
-> If nobody is using the configuration option and therefore 8-bit flash,
-> why not just remove the whole configuration option?
-> If there is some non-merged board with 8-bit flash, then they should
-> have their own board-file anyway and can just set
-> "ek_nand_data.bus_width_16" as required.
-> 
-> Lets not add complex run-time configuration where it's not needed.
-Except the board can have a 16bit or 8bit nand flash on the pcb
+> Patches [1/14] and [2/14] are important bug fixes targeted at 2.6.39.
+> The remaining patches are regareded as 2.6.40 material, but I'd like to
+> put them into linux-next shortly, if there are no objections, to catch
+> problems that they may introduce before they hit the mainline.  Again,
+> if there are no objections I'd like to merge these patches through the
+> suspend-2.6 tree.
 
-So people can change it.
+No objection from me at all, thanks for doing this they look great.
 
-Best Regards,
-J.
+Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
