@@ -1,33 +1,92 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 18 Apr 2011 20:02:05 +0200
-Subject: [PATCHv2 2.6.40 2/3] ARM:simpad: Cleanup CS3 accessors.
-In-Reply-To: <20110418164911.GF2820@pulham.picochip.com>
-References: <1303131636-19442-1-git-send-email-jochen@scram.de>	<1303131636-19442-3-git-send-email-jochen@scram.de>	<20110418134712.GD2820@pulham.picochip.com>	<4DAC4C2E.3050604@scram.de>
-	<20110418164911.GF2820@pulham.picochip.com>
-Message-ID: <4DAC7C9D.7020304@scram.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Apr 2011 20:26:02 +0200
+Subject: [PATCH 5/6] ARM: nmk: update GPIO chained IRQ handler to
+	entry/exit functions
+In-Reply-To: <1302633340-4795-6-git-send-email-will.deacon@arm.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-6-git-send-email-will.deacon@arm.com>
+Message-ID: <BANLkTikNANiZm+K3-9SdDb9MOWGxgpEGNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+2011/4/12 Will Deacon <will.deacon@arm.com>:
 
->> I'll have a look at this. Last time I checked, a single virtual address
->> for a wite-only/read-only register pair was not supported, but this
->> might have changed.
+> This patch updates the Nomadik gpio chained IRQ handler to use the
+> chained IRQ enter/exit functions in order to function correctly on
+> primary controllers with different methods of flow control.
 >
-> You should just be able to specify a single resource named "dat" and
-> you'll be good to go.
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Not really. The "CS3" register on the simpad device is a 16bit register
-which hat 16 write-only pins and 8 independent read-only pins (no 
-direction register, at all). It is implemented using 3 TTL logic chips.
-More information about this strange stuff can be found at:
-http://opensimpad.org/index.php/Wiring#CS3_latch
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I'm not sure if handling such a corner-case in the generic driver makes
-sense. However, i'm convinced that moving away from the simpad specific
-API to the GPIO API and removing all the platform specific UART and
-PCMCIA glue code by a generic GPIO one does make sense, in particular
-as the FDT has a nice way to assign GPIO functions to other subsystems.
+BUT I want it to go through Grants gpio tree. The reason is that
+I plan to consolidate this driver into drivers/gpio/* and I don't want
+collisions in merges.
 
-Thanks,
-Jochen
+And wait:
+
+> +#include <asm/mach/irq.h>
+
+> - ? ? ? if (host_chip->irq_mask_ack)
+> - ? ? ? ? ? ? ? host_chip->irq_mask_ack(&desc->irq_data);
+> - ? ? ? else {
+> - ? ? ? ? ? ? ? host_chip->irq_mask(&desc->irq_data);
+> - ? ? ? ? ? ? ? if (host_chip->irq_ack)
+> - ? ? ? ? ? ? ? ? ? ? ? host_chip->irq_ack(&desc->irq_data);
+> - ? ? ? }
+> + ? ? ? chained_irq_enter(host_chip, desc);
+
+(...)
+
+> - ? ? ? host_chip->irq_unmask(&desc->irq_data);
+> + ? ? ? chained_irq_exit(host_chip, desc);
+
+This looks an awful lot like this from drivers/gpio/pl061.c:
+
+desc->irq_data.chip->irq_ack(&desc->irq_data);
+(...)
+desc->irq_data.chip->irq_unmask(&desc->irq_data);
+
+It gets me wondering what the proper way is to do this.
+Isn't the proper place for chained_irq_[enter|exit]* in
+include/linux/irq.h rather? It does not really look machine
+or arch specific, is it, really?
+
+I.e. this:
+
+#ifndef __ASSEMBLY__
+/*
+ * Entry/exit functions for chained handlers where the primary IRQ chip
+ * may implement either fasteoi or level-trigger flow control.
+ */
+static inline void chained_irq_enter(struct irq_chip *chip,
+                                     struct irq_desc *desc)
+{
+        /* FastEOI controllers require no action on entry. */
+        if (chip->irq_eoi)
+                return;
+
+        if (chip->irq_mask_ack) {
+                chip->irq_mask_ack(&desc->irq_data);
+        } else {
+                chip->irq_mask(&desc->irq_data);
+                if (chip->irq_ack)
+                        chip->irq_ack(&desc->irq_data);
+        }
+}
+
+static inline void chained_irq_exit(struct irq_chip *chip,
+                                    struct irq_desc *desc)
+{
+        if (chip->irq_eoi)
+                chip->irq_eoi(&desc->irq_data);
+        else
+                chip->irq_unmask(&desc->irq_data);
+}
+#endif
+
+Excuse me if this was discussed before...
+
+Yours,
+Linus Walleij
