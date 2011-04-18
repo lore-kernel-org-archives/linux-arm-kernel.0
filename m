@@ -1,31 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2011 16:13:43 +0200
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <BANLkTimc20N0nh9O0FaSXizW+bYOMx9Ddw@mail.gmail.com>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<201104181358.53521.arnd@arndb.de>
-	<BANLkTimc20N0nh9O0FaSXizW+bYOMx9Ddw@mail.gmail.com>
-Message-ID: <201104181613.43572.arnd@arndb.de>
+Date: Mon, 18 Apr 2011 16:15:48 +0200
+Subject: [PATCH 4/7] v4l: videobuf2: add IOMMU based DMA memory allocator
+In-Reply-To: <1303118804-5575-5-git-send-email-m.szyprowski@samsung.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<1303118804-5575-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201104181615.49009.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2011, Kyungmin Park wrote:
-> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > One missing piece is still a way for a platform to provide both
-> > the iommu and the dma-mapping API in a unified driver. Right now,
-> > you have to export both interface for a generic solution.
+On Monday 18 April 2011, Marek Szyprowski wrote:
+> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
 > 
-> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
-> implementation into mm, but MM did't accept it.
+> This patch adds new videobuf2 memory allocator dedicated to devices that
+> supports IOMMU DMA mappings. A device with IOMMU module and a driver
+> with include/iommu.h compatible interface is required. This allocator
+> aquires memory with standard alloc_page() call and doesn't suffer from
+> memory fragmentation issues. The allocator support following page sizes:
+> 4KiB, 64KiB, 1MiB and 16MiB to reduce iommu translation overhead.
 
-I'm confused. What do you mean with MM?
-
-> So now it's implemented at each SoCs. I think it's good chance to make
-> a generic IOMMU feature for ARM consolidation.
->
-> Before this idea, can you review our implementation at above URL?
-
-I've commented on the main implementation for the IOMMU now.
+My feeling is that this is not the right abstraction. Why can't you
+just implement the regular dma-mapping.h interfaces for your IOMMU
+so that the videobuf code can use the existing allocators?
 
 	Arnd
