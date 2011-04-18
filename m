@@ -1,44 +1,45 @@
-From: dv@vollmann.ch (Detlef Vollmann)
-Date: Mon, 18 Apr 2011 15:50:20 +0200
-Subject: [RFC PATCH v2] Consolidate SRAM support
-In-Reply-To: <20110418085259.GA26044@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<20110418085259.GA26044@n2100.arm.linux.org.uk>
-Message-ID: <4DAC419C.6000801@vollmann.ch>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 18 Apr 2011 15:52:44 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <20110412203303.GA16019@shareable.org>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<20110412203303.GA16019@shareable.org>
+Message-ID: <20110418135243.GB1479@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/11 10:52, Russell King - ARM Linux wrote:
-> This is the second revision of this patch.
-Thanks, looks good :-)
 
-Just to minor issues:
+Hi!
 
-> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-> index ea5ee4d..ddbd20b 100644
-> --- a/arch/arm/common/Kconfig
-> +++ b/arch/arm/common/Kconfig
-> @@ -39,3 +39,7 @@ config SHARP_PARAM
->
->   config SHARP_SCOOP
->   	bool
-> +
-> +config PV_POOL
-> +	bool
-Could you add a prompt here, so that this gets selectable on machs
-that don't automatically select it?
+> > > did the ARM Linux 2.6 kernel map the kernel memory in pages in the past?
+> > > Or was the memory always mapped in sections?
+> > >
+> > > I still have to chase a potential memory corruption. The rootfs is located on
+> > > a SDcard and gets corrupted even when the filesystem test programs write to
+> > > different partitions.
+> > > The test scenario includes several dozen or even hundreds of warm and cold
+> > > boot sequences, file system write tests with sudden soft resets. It's a large
+> > > embedded project with a lot of drivers and the fact that always the rootfs and
+> > > often the superblock gets damaged let me think of a memory corruption.
+> > >
+> > 
+> > Sorry, I don't want to be obvious, but you mentioned sudden resets
+> > while writing, which is almost always going to wind
+> > up as fs corruptions, with the severity depending on the level of
+> > caching the system is doing to the writes.
+> > How are you mounting your rootfs and what file system are you using?
+> > What sort of corruptions to the super block are you seeing?
+> 
+> If everything is implemented correctly, that depends on the type of
+> filesystem, block layer and storage.  Some are explicitly designed to
+> be safe against sudden reboots and power failure - which is an
+> important feature of systems where removing the power is how they are
+> turned off at night.
 
-> diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-> index db0f778..ebd4d67 100644
-> --- a/arch/arm/mach-davinci/sram.c
-> +++ b/arch/arm/mach-davinci/sram.c
-> @@ -10,40 +10,13 @@
-> +struct pv_pool *davinci_pv_pool;
-> +EXPORT_SYMBOL_GPL(davinci_pv_pool);
->
->   /*
->    * REVISIT This supports CPU and DMA access to/from SRAM, but it
-This comment here doesn't look correct anymore.
-Maybe it should be removed completely.
+...but note that no existing  filesystem is safe on media such
+as usb sticks, SD and CF cards...
 
-   Detlef
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
