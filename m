@@ -1,53 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Apr 2011 18:18:57 +0100
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110418135704.GB1765@opensource.wolfsonmicro.com>
-References: <20110414110854.GF29938@atomide.com>
-	<20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
-	<20110415155642.GO1611@n2100.arm.linux.org.uk>
-	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
-	<20110416082802.GS1611@n2100.arm.linux.org.uk>
-	<20110416165725.GA25811@opensource.wolfsonmicro.com>
-	<20110418081050.GG12272@atomide.com>
-	<20110418135704.GB1765@opensource.wolfsonmicro.com>
-Message-ID: <20110418171857.GC25671@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 18 Apr 2011 12:20:24 -0500
+Subject: genirq: Implement a generic interrupt chip
+In-Reply-To: <20110416211307.117340150@linutronix.de>
+References: <20110416211221.853079766@linutronix.de>
+	<20110416211307.117340150@linutronix.de>
+Message-ID: <0D753D10438DA54287A00B027084269764D221CC64@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 02:57:04PM +0100, Mark Brown wrote:
-> This does also come back to the whole thing about pointing at relevant
-> work that people can do - we're not telling people the code they're
-> submitting is problematic and they need to address things with it, we're
-> saying that we're not even willing to look at the code or talk about
-> things that would make it OK.  That's a really negative response that's
-> essentially impossible to work with.
+On Saturday, April 16, 2011 2:14 PM, Thomas Gleixner wrote:
+>
+> Implement a generic interrupt chip, which is configurable and is able
+> to handle the most common irq chip implementations.
+>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  include/linux/irq.h       |  123 ++++++++++++++++++++++
+>  kernel/irq/Makefile       |    1 
+>  kernel/irq/generic-chip.c |  251 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 375 insertions(+)
+> 
+> Index: linux-2.6/include/linux/irq.h
+> ===================================================================
+> --- linux-2.6.orig/include/linux/irq.h
+> +++ linux-2.6/include/linux/irq.h
 
-Linus has replied in this thread with his view, which is not much
-different from the view which I've been stating all along.
+[snip]
 
-I'll let you read Linus' message and see whether you can translate it
-into a positive response for platform maintainers.
+> +/**
+> + * struct irq_chip_type - Generic interrupt chip instance for a flow type
+> + * @chip:		The real interrupt chip which provides the callbacks
+> + * @regs:		Register offsets for this chip
+> + * @handler:		Flow handler associated with this chip
+> + * @type:		Chip can handle these flow types
+> + *
+> + * A irq_generic_chip can have several instances of irq_chip_type when
+> + * it requires different functions and register offsets for different
+> + * flow types.
+> + */
+> +struct irq_chip_type {
+> +	struct irq_chip		chip;
+> +	struct irq_chip_regs	regs;
+> +	irq_flow_handler_t	handler;
+> +	u32			type;
+> +};
+> +
 
-I had given up discussing it, as people haven't really been listening.
-So, this will probably be my last message in this thread and on this
-subject, and I've said what I'm going to do, and that's exactly what
-I'm going to do.
+[snip]
 
-I'm very sorry for people with new platforms outstanding like John Linn
-who are on the sharp end of this (who have platform code ready to go)
-but I see no solution at the moment.  It really is the case that either
-I can say no to it, or I can put it in my tree and Linus will say no to
-it.  So putting it in my tree *doesn't* help.
+> Index: linux-2.6/kernel/irq/generic-chip.c
+> ===================================================================
+> --- /dev/null
+> +++ linux-2.6/kernel/irq/generic-chip.c
 
-Will we ever be able to put John's code in the kernel?  Honestly, I have
-no idea.  What I do know is that unless we start doing something to solve
-the problem we have today with the quantity of code under arch/arm _and_
-the constant churn of that code, we will _never_ be able to add new
-platform support in any shape or form to the kernel.
+[snip]
 
-If this means that people like Xilinx decide to drop their Linux kernel
-effort, or decide not to bother submitting to mainline, then that's
-unfortunate, but is not something I have any control over given the
-situation we find ourselves in.
+> +/**
+> + * irq_setup_generic_chip - Setup a range of interrupts with a generic chip
+> + * @gc:		Generic irq chip holding all data
+> + * @msk:	Bitmask holding the irqs to initialize relative to gc->irq_base
+> + * @clr:	IRQ_* bits to clear
+> + * @set:	IRQ_* bits to set
+> + *
+> + * Set up max. 32 interrupts starting from gc->irq_base. Note, this
+> + * initializes all interrupts to the primary irq_chip_type and its
+> + * associated handler.
+> + */
+> +void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+> +			    unsigned int clr, unsigned int set)
+> +{
+> +	struct irq_chip_type *ct = gc->chip_types;
+> +	unsigned int i;
+> +
+> +	/* Init mask cache */
+> +	if (ct->irq_mask == irq_gc_mask_clr_bit ||
+> +	    ct->irq_mask == irq_gc_mask_set_bit)
+
+struct irq_chip_type does not have a member named 'irq_mask'
+
+Regards,
+Hartley
