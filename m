@@ -1,46 +1,51 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 18 Apr 2011 09:23:51 -0700
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
-Message-ID: <BANLkTi=B9izP5N5iPnZDLdaQzBQ+egyo=A@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 18 Apr 2011 18:25:33 +0200
+Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
+In-Reply-To: <BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
+References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
+	<BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
+Message-ID: <20110418162533.GF23814@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 8:17 AM, Alexey Zaytsev
-<alexey.zaytsev@gmail.com> wrote:
->
-> Could you please just apologize for the pointless diffstat complain,
-> so we could go on?
+Hi Vitaly,
 
-Ehh. They aren't pointless, and I'm _this_ close to just stopping
-pulling from some people unless things improve.
+> On Mon, Apr 18, 2011 at 4:30 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> > I tried a smaller scaled cleanup before, but now that there are talks about ARM
+> > consolidation everywhere, I'll be more brave :)
+> >
+> > What we have here is consolidation of two platforms. The older one, plat-stmp,
+> > has never seen much love after the initial commit and has poor design as stated
+> > in the patch descriptions. The recently added mach-mxs can be used for a
+> > (friendly) takeover. Adding 130 lines there could save 9500+ lines in arch/arm!
+> 
+> may we FIRST see how you are going to fit it into mach-mxc? NAK from
+> me before I see that.
 
-> Dear Russel.
->
-> Please don't take the offense. Linus might be a dickhead at times, and
-> sometimes he's wrong, but I'm sure he did not mean to hurt you.
+mach-mxs, not mach-mxc :) As said to Arnd, you can check the patches here
 
-Umm. The "some people" who need to get their shit together was never
-Russell (and we've been emailing in private about it). We may not
-agree about every detail, but on the whole we're not at all butting
-heads.
+  http://git.pengutronix.de/?p=wsa/linux-2.6.git;a=shortlog;h=refs/heads/remove_stmp
 
-Why do you think he posted that email with those arm statistics?
+until they are moderated (or pull the branch). Looking forward to input from
+you and you even seem to have boards.
 
-It's the _machine/platform_ guys who are trouble.
+> unstable and painful to work with lower end i.MXs, and is also being
+> killed virtually -- by you guys.
 
-Hint for anybody on the arm list: look at the dirstat that rmk posted,
-and if your "arch/arm/{mach,plat}-xyzzy" shows up a lot, it's quite
-possible that I won't be pulling your tree unless the reason it shows
-up a lot is because it has a lot of code removed.
+STMP378x is not killed. STMP37xx is, but I have doubts the mainline linux
+support ever worked. See my patch descriptions.
 
-People need to realize that the endless amounts of new pointless
-platform code is a problem, and since my only recourse is to say "if
-you don't seem to try to make an effort to fix it, I won't pull from
-you", that is what I'll eventually be doing.
+Regards,
 
-Exactly when I reach that point, I don't know.
+   Wolfram
 
-                      Linus
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110418/c551fc7e/attachment.sig>
