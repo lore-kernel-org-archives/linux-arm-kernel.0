@@ -1,64 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2011 13:58:53 +0200
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <20110418110502.GI12272@atomide.com>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<201104180929.33569.arnd@arndb.de>
-	<20110418110502.GI12272@atomide.com>
-Message-ID: <201104181358.53521.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 18 Apr 2011 12:59:03 +0100
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+Message-ID: <20110418115903.GB9462@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2011, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [110418 10:26]:
-> > On Friday 15 April 2011, Russell King - ARM Linux wrote:
-> > > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
-> > > > From: Ramesh Gupta <grgupta@ti.com>
-> > > > 
-> > > > This patch is to flush the iommu page table entries from L1 and L2
-> > > > caches using dma_map_single. This also simplifies the implementation
-> > > > by removing the functions  flush_iopgd_range/flush_iopte_range.
-> > > 
-> > > No.  This usage is just wrong.  If you're going to use the DMA API then
-> > > unmap it, otherwise the DMA API debugging will go awol.
-> > 
-> > 
-> > It's also completely upside-down: The iommu support should provide interfaces
-> > using the dma-mapping API, not use that API to provide a machine specific
-> > version of the generic interface.
-> > 
-> > As far as I can tell, nothing actually uses these drivers, maybe we should just
-> > remove them before we get any code in the mainline kernel that depends on it.
-> 
-> There is drivers/media/video/omap3isp/isp.c.
+On Mon, Apr 18, 2011 at 06:50:12PM +1000, Ben Nizette wrote:
 
-Ah, I didn't see that, was looking at an older version.
+Please fix your MUA to word wrap within paragraphs; I've reflowed your
+text for legibility.
 
-> But if we now have a generic replacement for this code we should start
-> using it.
+> Still my question stands, where is the driver ever better placed to
+> make these calls than the board code?
 
-To give some background:
-
-Historically, the dma-mapping API has been used for all IOMMUs on
-architectures that need it. This interface is rather flexible,
-but ARM currently only uses it for managing static mappings.
-One thing that it cannot do is mapping memory to an arbitrary
-(driver-chosen) bus address. The generic iommu API was added in order
-to do that, and is mostly used for virtual machines with KVM.
-
-The MSM platform in ARM also added support for the generic iommu
-API, and now the exynos4 is gaining support for it as well.
-
-One missing piece is still a way for a platform to provide both
-the iommu and the dma-mapping API in a unified driver. Right now,
-you have to export both interface for a generic solution.
-
-On ARM, we don't yet use include/asm-generic/dma-mapping-common.h,
-which allows overriding the dma-mapping API per device. This would
-have to change if you want to export the IOMMU functionality using
-the dma-mapping API, but that would also allow abstracting the
-various ways we currently have (dmabounce, swiotlb, linear map,
-custom __arch_page_to_dma, iommu, coherent or noncoherent DMA)
-in a nicer way per device.
-
-	Arnd
+Even if it ends up being the board code using these APIs it seems
+sensible to have a standard API that GPIO drivers can use to expose the
+functionality.  This will help with getting control into code Linux owns
+(since people don't have to implement custom APIs) and will mean we can
+do things like add control of this for device tree based boards.
