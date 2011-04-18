@@ -1,57 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Apr 2011 09:48:38 +0300
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110416130929.GL4423@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<BANLkTikJwFRenjwnws+4J2ep9G0Nv-9aXw@mail.gmail.com>
-	<20110416130929.GL4423@n2100.arm.linux.org.uk>
-Message-ID: <20110418064838.GE12272@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2011 08:54:35 +0200
+Subject: [PATCH V14 1/4] ptp: Added a brand new class driver for ptp
+	clocks.
+In-Reply-To: <7cabcc0bbd14733fa979fe08deccab8939204f24.1303107532.git.richard.cochran@omicron.at>
+References: <cover.1303107532.git.richard.cochran@omicron.at>
+	<7cabcc0bbd14733fa979fe08deccab8939204f24.1303107532.git.richard.cochran@omicron.at>
+Message-ID: <201104180854.35552.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110416 16:06]:
-> On Sat, Apr 16, 2011 at 09:01:26PM +0800, Haojian Zhuang wrote:
-> > On Fri, Apr 15, 2011 at 9:06 PM, Russell King - ARM Linux
-> > >
-> > > This uses the physical address, and unlike Davinci's dma address usage,
-> > > it always wants to have the physical address, and will always return
-> > > the corresponding physical address when passed that pointer.
-> > >
-> > > OMAP could probably do with some more work to make the omapfb and other
-> > > allocations use the sram allocator, rather than hooking in before the
-> > > sram allocator is initialized - and then further cleanups so that we
-> > > have an initialization function which just does
-
-I think we can just remove the omapfb SRAM support for now as it should
-be optional. That will then leave out that dependency and can be added
-back once we have a common framework in place.
-
-Tomi do you see any problems with that?
-
-> > TCM driver can allocate code into SRAM section in link stage. It needs to
-> > update link file and virtual memory layout. Is it worth to make SRAM driver
-> > support this behavior? The case of using SRAM as memory for instruction
-> > is switching frequency or entering/exiting low power mode in PXA silicons.
+On Monday 18 April 2011, Richard Cochran wrote:
+> This patch adds an infrastructure for hardware clocks that implement
+> IEEE 1588, the Precision Time Protocol (PTP). A class driver offers a
+> registration method to particular hardware clock drivers. Each clock is
+> presented as a standard POSIX clock.
 > 
-> This is more or less the same scenario which OMAP is using its SRAM
-> for, although that's explicitly SRAM and not TCM.
+> The ancillary clock features are exposed in two different ways, via
+> the sysfs and by a character device.
 > 
-> I don't think we need position dependent code requiring fixup for
-> these applications as such things tend to be fairly easily coded in a
-> position independent way.
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
 
-There should not be any need code requiring fixup in most cases using
-parameters passed to the functions should be enough. Usually it's
-just register addresses that are different.
- 
-> Also note that C functions can't be copied because C produces position
-> dependent code, and we have no way of extracting the relocation
-> dependencies from such code.
-
-C functions should not be needed. The SRAM size is small and typical
-usage is a loop waiting for some register to lock. For any larger SRAM
-areas NUMA can be used instead.
-
-Regards,
-
-Tony
+Acked-by: Arnd Bergmann <arnd@arndb.de>
