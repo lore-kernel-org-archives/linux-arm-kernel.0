@@ -1,73 +1,44 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Mon, 18 Apr 2011 18:35:40 +0300
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de>
-	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
-	<201104181619.35115.arnd@arndb.de>
-	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
-Message-ID: <1303140940.31595.45.camel@dev.znau.edu.ua>
+From: Oskar.Andero@sonyericsson.com (=?iso-8859-1?Q?=22Ander=F6=2C_Oskar=22?=)
+Date: Mon, 18 Apr 2011 17:51:29 +0200
+Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
+In-Reply-To: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
+References: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
+Message-ID: <00D61D20F3A8774CBC77798B3FBC427082058F986D@seldmbx02.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(+ some extra CC's)
 
-> >
-> > You mean the hardware has two sets of registers containing the same
-> > information, one of them the standard registers, and one with broadcom
-> > specific ones?
-> >
-> > Why don't you just use the standard ones then?
+> Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
 > 
-> No. Did you read my first mail in this thread?
+> This fixes broken build when using gcc 4.5.
 > 
-> There is pair of cores for every device. First is AMBA-specific called
-> agent/wrapper and second one is Broadcom-specific.
+> Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+> ---
+>  arch/arm/mach-omap2/Makefile |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> AMBA specific core called agent/wrapper has AMBA specific registers:
-> CID and PID. However we do not ever read that in Broadcom driver,
-> because that are useless for us. On AMBA specific core we use only
-> some Broadcom specific registers to manage (enable/disable) *second*
-> (Broadcom-specific) core.
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
+> omap2/Makefile
+> index a45cd64..512b152 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -68,7 +68,7 @@ obj-$(CONFIG_OMAP_SMARTREFLEX)          +=
+> sr_device.o smartreflex.o
+>  obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
 > 
-Actually there could be two wrappers per agent (wrappers and agents
-ain't the same, wrapper could be part of agent or core, for broadcom
-ssb/axi buses seems we have wrappers in agents only).
+>  AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+> -AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
+> +AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-
+> a$(plus_sec)
+> 
+>  ifeq ($(CONFIG_PM_VERBOSE),y)
+>  CFLAGS_pm_bus.o				+= -DDEBUG
+> --
+> 1.7.3.4
+Ping!
 
-Earlier at ssb-times we had wrappers built into agent, separate agent
-per core connection for each broadcom core. Connections are implied with
-bus usage by core - core can act as bus initiator (starting transfers to
-bus regions, those SBTMxxx registers used for control/state), bus target
-(accepting transfers from external bus regions, those SBIMxxx registers)
-or both.
-Currently for broadcom on axi bus we have the same (might implied by
-cores circuitry designed to be OCP-compliant) - cores being able to act
-both as initiators and targets have two wrappers built into agent, all
-other have either slave or master wrapper.
+Anyone else that gets bitten by the following when compiling omap2plus_defconfig with gcc 4.5:
+arch/arm/mach-omap2/sleep34xx.S:150: Error: selected processor does not support ARM mode `smc #1'
 
-Unlike ssb, where we used wrappers differently, for axi we use them just
-for reset and control/state queries and we never reset/query chipcommon
-therefore can silently ignore its agent wrappers. For pcie in device
-mode we might need to reset both wrappers for clean initialization (at
-least I see both master and slave wrappers' reset during 4716 pci device
-mode startup in number of GPL'ed sourcecodes) but here I dont know for
-sure. For all other single-role cores we have either target or initiator
-wrapper for agent control and as those seems to feature same dmp
-register's layout therefore we see no difference in wether we reset
-agent master or slave.
-
-Unfortunately still have just one axi-based box to play with. Will be
-much appreciated if you could share EROM dumps from your boards to get
-better understanding of agents/wrappers coupling and relations.
-
-As for amba bus usage I think we could get back to this idea later at
-some point if/when broadcom implement some different agents and/or erom
-core with other layout or if we spot broadcom-on-axi bus with some
-useful native axi peripherals without DMP wrappers (they are actually
-already there on the bus but we have no clue how to control them and
-actualy have no need to do that anyways) which won't fit into our
-coure->agent model but for now I think there is no benefit in doing
-that.
-
-Have nice day,
-George
+-Oskar
