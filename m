@@ -1,51 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Apr 2011 10:54:49 -0700
-Subject: [PATCH 06/10] clk: Add support for a generic clock multiplexer
-In-Reply-To: <20110418133353.GL14770@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	<1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>	<20110418131527.GF31131@pengutronix.de>
-	<20110418133353.GL14770@pengutronix.de>
-Message-ID: <4DAC7AE9.9030106@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Apr 2011 18:56:46 +0100
+Subject: [PATCH 4/6] ARM: msm: update GPIO chained IRQ handler to use
+	entry/exit functions
+In-Reply-To: <4DA8F634.9080803@codeaurora.org>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-5-git-send-email-will.deacon@arm.com>
+	<4DA8F634.9080803@codeaurora.org>
+Message-ID: <1303149406.13157.16.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2011 06:33 AM, Sascha Hauer wrote:
->>>  
->>> +/**
->>> + * clock multiplexer
->>> + *
->>> + * @clk		clock source
->>> + * @reg		the register this multiplexer can be configured with
->>> + * @shift	the shift to the start bit of this multiplexer
->>> + * @width	the width in bits of this multiplexer
->>> + * @num_clks	number of parent clocks
->>> + * @lock	register lock
->>> + * @clks	array of possible parents for this multiplexer. Can contain
->>> + *		holes with NULL in it for invalid register settings
->> NULL is a valid clk, isn't it?
-> You're right. I think for invalid mux settings we should ERR_PTR(-EINVAL)
-> or similar to the array.
+Abhijeet,
 
-Note that if you're using clkdev you can't actually return a NULL clock
-to the caller of clk_get() due to:
+On Sat, 2011-04-16 at 02:51 +0100, Abhijeet Dharmapurikar wrote:
+> Will Deacon wrote:
+> > This patch updates the MSM gpio chained IRQ handler to use the chained
+> > IRQ enter/exit functions in order to function correctly on primary
+> > controllers with different methods of flow control.
+> >
+> > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/mach-msm/gpio-v2.c |   10 ++++++++--
+> >  1 files changed, 8 insertions(+), 2 deletions(-)
 
-struct clk *clk_get_sys(const char *dev_id, const char *con_id)
-{
-        struct clk *clk;
+[...]
 
-        mutex_lock(&clocks_mutex);
-        clk = clk_find(dev_id, con_id);
-        if (clk && !__clk_get(clk))
-                clk = NULL;
-        mutex_unlock(&clocks_mutex);
+> Reviewed-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Tested-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-        return clk ? clk : ERR_PTR(-ENOENT);
-}
+Thanks for getting round to looking at this. I don't have any Qualcomm
+hardware myself (feel free to send me some :) so I'm uneasy without the
+Tested-by tags.
 
+I'll add your tags for this patch and the final one in the series.
 
-So all this talk about NULL being a valid clock returned to drivers is
-kinda pointless unless the mach has a custom clk_get() implementation.
-Perhaps we should force clkdev on users of the generic struct clk framework?
+Cheers,
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Will
