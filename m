@@ -1,39 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Apr 2011 17:18:17 +0100
-Subject: [RFC PATCH v2] Consolidate SRAM support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CA31B27@dbde02.ent.ti.com>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<20110418085259.GA26044@n2100.arm.linux.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CA31B27@dbde02.ent.ti.com>
-Message-ID: <20110418161817.GB26044@n2100.arm.linux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 18 Apr 2011 09:23:51 -0700
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
+Message-ID: <BANLkTi=B9izP5N5iPnZDLdaQzBQ+egyo=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 09:42:10PM +0530, Nori, Sekhar wrote:
-> I was able to test this on DaVinci (DA850 suspend-to-RAM) with
-> the following additional changes:
-> 
-> There was a sram_free call remaining in pm.c file.
+On Mon, Apr 18, 2011 at 8:17 AM, Alexey Zaytsev
+<alexey.zaytsev@gmail.com> wrote:
+>
+> Could you please just apologize for the pointless diffstat complain,
+> so we could go on?
 
-Hmm, wonder why my build for DaVinci didn't pick that up.  Thanks for
-that and I'll merge it in.
+Ehh. They aren't pointless, and I'm _this_ close to just stopping
+pulling from some people unless things improve.
 
-> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
-> index fb5e72b..dcb8e9d 100644
-> --- a/arch/arm/mach-davinci/sleep.S
-> +++ b/arch/arm/mach-davinci/sleep.S
-> @@ -50,6 +50,8 @@
->   * 	r4: contains virtual address of the DEEPSLEEP register
->   */
->  ENTRY(davinci_cpu_suspend)
-> +	.align 3
-> +
+> Dear Russel.
+>
+> Please don't take the offense. Linus might be a dickhead at times, and
+> sometimes he's wrong, but I'm sure he did not mean to hurt you.
 
-I think you want the .align 3 on the line before ENTRY().
+Umm. The "some people" who need to get their shit together was never
+Russell (and we've been emailing in private about it). We may not
+agree about every detail, but on the whole we're not at all butting
+heads.
 
-> The davinci audio driver in sound/soc/davinci/davinci-pcm.c uses
-> the sram allocator too and would need to be converted to the
-> new API.
+Why do you think he posted that email with those arm statistics?
 
-Ah, right - I'll sort that too.  Slightly annoying that sound stuff
-is outside the drivers/ subdir.
+It's the _machine/platform_ guys who are trouble.
+
+Hint for anybody on the arm list: look at the dirstat that rmk posted,
+and if your "arch/arm/{mach,plat}-xyzzy" shows up a lot, it's quite
+possible that I won't be pulling your tree unless the reason it shows
+up a lot is because it has a lot of code removed.
+
+People need to realize that the endless amounts of new pointless
+platform code is a problem, and since my only recourse is to say "if
+you don't seem to try to make an effort to fix it, I won't pull from
+you", that is what I'll eventually be doing.
+
+Exactly when I reach that point, I don't know.
+
+                      Linus
