@@ -1,37 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 18 Apr 2011 13:20:41 +0800
-Subject: [PATCH] ARM: pxa: enable AUTO_ZRELADDR and remove now useless
-	Makefile.boot
-Message-ID: <1303104041-4995-1-git-send-email-eric.y.miao@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 18 Apr 2011 07:33:10 +0200
+Subject: [PATCH v3] at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
+In-Reply-To: <BANLkTimmvDZRzFX4Z6m7Y2jEZx9a89uwVQ@mail.gmail.com>
+References: <1302784833-25930-1-git-send-email-plagnioj@jcrosoft.com>
+	<1302795935-11175-1-git-send-email-plagnioj@jcrosoft.com>
+	<BANLkTimmvDZRzFX4Z6m7Y2jEZx9a89uwVQ@mail.gmail.com>
+Message-ID: <20110418053310.GA4267@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/Kconfig                |    1 +
- arch/arm/mach-pxa/Makefile.boot |    2 --
- 2 files changed, 1 insertions(+), 2 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/Makefile.boot
+On 21:39 Sun 17 Apr     , Andrew Victor wrote:
+> hi,
+> 
+> > no board configure it as 'n' and it's an issue to merge all defconfigs
+> > in one
+> >
+> > On AT91SAM926x boards both types of NAND flash can be present
+> > (8 and 16 bit data bus width).
+> >
+> > so will pass it via system_rev
+> 
+> If nobody is using the configuration option and therefore 8-bit flash,
+> why not just remove the whole configuration option?
+> If there is some non-merged board with 8-bit flash, then they should
+> have their own board-file anyway and can just set
+> "ek_nand_data.bus_width_16" as required.
+> 
+> Lets not add complex run-time configuration where it's not needed.
+Except the board can have a 16bit or 8bit nand flash on the pcb
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fdc9d4d..d37b52b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -623,6 +623,7 @@ config ARCH_PXA
- 	select TICK_ONESHOT
- 	select PLAT_PXA
- 	select SPARSE_IRQ
-+	select AUTO_ZRELADDR
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
-diff --git a/arch/arm/mach-pxa/Makefile.boot b/arch/arm/mach-pxa/Makefile.boot
-deleted file mode 100644
-index 1ead671..0000000
---- a/arch/arm/mach-pxa/Makefile.boot
-+++ /dev/null
-@@ -1,2 +0,0 @@
--   zreladdr-y	:= 0xa0008000
--
--- 
-1.7.1
+So people can change it.
+
+Best Regards,
+J.
