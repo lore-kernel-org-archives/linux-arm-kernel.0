@@ -1,27 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2011 07:01:30 +0200
-Subject: [PATCH 2/2] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <1303076969-13039-1-git-send-email-linus.walleij@stericsson.com>
-References: <1303076969-13039-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201104180701.30384.arnd@arndb.de>
+Date: Mon, 18 Apr 2011 07:07:03 +0200
+Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
+In-Reply-To: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
+References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <201104180707.04176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 April 2011, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This rewrites the U300 GPIO driver using gpiolib and the irq_chip
-> abstractions, makes it runtime-configured rather than compile-time,
-> and moves it to the drivers/gpio subsystem where it belongs,
-> depopulating the ARM tree of one more driver.
-> 
-> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Monday 18 April 2011, Wolfram Sang wrote:
+> I tried a smaller scaled cleanup before, but now that there are talks about ARM
+> consolidation everywhere, I'll be more brave :)
 
-The new driver looks good, but it would be nice to see the actual changes you did.
-You can do that by either passing the -M flag to git-format-patch, or by splitting
-up the patch into separate move and rewrite bits, in either order.
+Great stuff!
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Wolfram Sang (4):
+>   arm: mach-mxs: add stmp378x-devb
+>   arm: mach-stmp37xx: remove mach
+>   arm: mach-stmp378x: remove mach
+>   arm: plat-stmp: remove plat
+
+It seems that the patches did not make it to the mailing list, possibly because of the
+size.
+
+Could you repost the first patch in the series? I suppose the other three are entirely
+uncontroversial.
 
 	Arnd
