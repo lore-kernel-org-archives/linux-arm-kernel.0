@@ -1,51 +1,34 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 18 Apr 2011 18:25:33 +0200
-Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
-In-Reply-To: <BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
-References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
-	<BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
-Message-ID: <20110418162533.GF23814@pengutronix.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 18 Apr 2011 17:49:11 +0100
+Subject: [PATCHv2 2.6.40 2/3] ARM:simpad: Cleanup CS3 accessors.
+In-Reply-To: <4DAC4C2E.3050604@scram.de>
+References: <1303131636-19442-1-git-send-email-jochen@scram.de>
+	<1303131636-19442-3-git-send-email-jochen@scram.de>
+	<20110418134712.GD2820@pulham.picochip.com>
+	<4DAC4C2E.3050604@scram.de>
+Message-ID: <20110418164911.GF2820@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
-
-> On Mon, Apr 18, 2011 at 4:30 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> > I tried a smaller scaled cleanup before, but now that there are talks about ARM
-> > consolidation everywhere, I'll be more brave :)
-> >
-> > What we have here is consolidation of two platforms. The older one, plat-stmp,
-> > has never seen much love after the initial commit and has poor design as stated
-> > in the patch descriptions. The recently added mach-mxs can be used for a
-> > (friendly) takeover. Adding 130 lines there could save 9500+ lines in arch/arm!
+On Mon, Apr 18, 2011 at 04:35:26PM +0200, Jochen Friedrich wrote:
+> Hi Jamie,
 > 
-> may we FIRST see how you are going to fit it into mach-mxc? NAK from
-> me before I see that.
+> >>- register CS3 as GPIO controller with 24 pins
+> >>   (16 output only and 8 input only).
+> >
+> >I think the basic-mmio-gpio driver (drivers/gpio/basic_mmio_gpio.c)
+> >should cover the GPIO controller portion of this (including the
+> >shadowing etc).
+> 
+> I'll have a look at this. Last time I checked, a single virtual address
+> for a wite-only/read-only register pair was not supported, but this
+> might have changed.
 
-mach-mxs, not mach-mxc :) As said to Arnd, you can check the patches here
+You should just be able to specify a single resource named "dat" and 
+you'll be good to go.  The current driver in mainline detects the number 
+of GPIO's based on the register width (so it would detect 32 GPIO's in 
+your case), but I have some patches posted on lkml that allow this to be 
+overridden.  These patches also add support for direction registers 
+which it looks like you may need.
 
-  http://git.pengutronix.de/?p=wsa/linux-2.6.git;a=shortlog;h=refs/heads/remove_stmp
-
-until they are moderated (or pull the branch). Looking forward to input from
-you and you even seem to have boards.
-
-> unstable and painful to work with lower end i.MXs, and is also being
-> killed virtually -- by you guys.
-
-STMP378x is not killed. STMP37xx is, but I have doubts the mainline linux
-support ever worked. See my patch descriptions.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110418/c551fc7e/attachment.sig>
+Jamie
