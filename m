@@ -1,48 +1,87 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 18 Apr 2011 13:26:29 +0100
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-	<20110418091902.13345132@lxorguk.ukuu.org.uk>
-	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-Message-ID: <20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 18 Apr 2011 21:55:56 +0900
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <201104181358.53521.arnd@arndb.de>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<201104180929.33569.arnd@arndb.de>
+	<20110418110502.GI12272@atomide.com>
+	<201104181358.53521.arnd@arndb.de>
+Message-ID: <BANLkTimc20N0nh9O0FaSXizW+bYOMx9Ddw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Fair call, but bringing this back to the particular case in hand what in that enum is worth 'hinting' in a might-have-an-effect manner rather than just letting the board take care of it?
-> 
-> Still my question stands, where is the driver ever better placed to make these calls than the board code?
+On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 18 April 2011, Tony Lindgren wrote:
+>> * Arnd Bergmann <arnd@arndb.de> [110418 10:26]:
+>> > On Friday 15 April 2011, Russell King - ARM Linux wrote:
+>> > > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
+>> > > > From: Ramesh Gupta <grgupta@ti.com>
+>> > > >
+>> > > > This patch is to flush the iommu page table entries from L1 and L2
+>> > > > caches using dma_map_single. This also simplifies the implementation
+>> > > > by removing the functions ?flush_iopgd_range/flush_iopte_range.
+>> > >
+>> > > No. ?This usage is just wrong. ?If you're going to use the DMA API then
+>> > > unmap it, otherwise the DMA API debugging will go awol.
+>> >
+>> >
+>> > It's also completely upside-down: The iommu support should provide interfaces
+>> > using the dma-mapping API, not use that API to provide a machine specific
+>> > version of the generic interface.
+>> >
+>> > As far as I can tell, nothing actually uses these drivers, maybe we should just
+>> > remove them before we get any code in the mainline kernel that depends on it.
+>>
+>> There is drivers/media/video/omap3isp/isp.c.
+>
+> Ah, I didn't see that, was looking at an older version.
+>
+>> But if we now have a generic replacement for this code we should start
+>> using it.
+>
+> To give some background:
+>
+> Historically, the dma-mapping API has been used for all IOMMUs on
+> architectures that need it. This interface is rather flexible,
+> but ARM currently only uses it for managing static mappings.
+> One thing that it cannot do is mapping memory to an arbitrary
+> (driver-chosen) bus address. The generic iommu API was added in order
+> to do that, and is mostly used for virtual machines with KVM.
+>
+> The MSM platform in ARM also added support for the generic iommu
+> API, and now the exynos4 is gaining support for it as well.
 
-The logical extension to that is to delete the gpio layer because the
-board code can do it ?
+You can find a exynos4 patches.
+http://comments.gmane.org/gmane.linux.drivers.video-input-infrastructure/31613
 
-> > Also your comment re simply in or out on or off is incorrect. Pins may
-> > also be in use by firmware and the like and in a 'neither' state.
-> > Something certain gpio people seem to be in denial over.
-> 
-> Quite right, but should a pin ever be in a neither state and simultaneously controlled by a gpiolib driver?  If so, how should it behave and if not, is it anything that stricter enforcement of gpio_request() semantics can't get around?
+>
+> One missing piece is still a way for a platform to provide both
+> the iommu and the dma-mapping API in a unified driver. Right now,
+> you have to export both interface for a generic solution.
 
-That won't fix sysfs.
+Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
+implementation into mm, but MM did't accept it.
+So now it's implemented at each SoCs. I think it's good chance to make
+a generic IOMMU feature for ARM consolidation.
 
-It also doesn't solve the real problem which is that you've got to
-implement platform specific parallel gpio extensions all over the place
-when you really want it all using the same 'handle' and request logic.
+>
+> On ARM, we don't yet use include/asm-generic/dma-mapping-common.h,
+> which allows overriding the dma-mapping API per device. This would
+> have to change if you want to export the IOMMU functionality using
+> the dma-mapping API, but that would also allow abstracting the
+> various ways we currently have (dmabounce, swiotlb, linear map,
+> custom __arch_page_to_dma, iommu, coherent or noncoherent DMA)
+> in a nicer way per device.
 
-The gpio layer doesn't seem to know what it is doing. It's a fine resource
-allocator and call distributor but it can't make up its mind whether it
-wants to just do that job, or to be a proper extensible gpio layer.
-Instead it sits there being almost useful but incomplete and unwilling to
-either do the job needed or get out of the way.
+Before this idea, can you review our implementation at above URL?
 
-One possible way to tackle a lot of it would be to actually let the
-drivers make the choices instead of imposing arbitarily wrong sematics
-in the upper layers.
-
-And for a lot of this stuff that the gpio layer really doesn't want
-internal knowledge of other chunks of the kernel have used models like
-'get_property/set_property' (eg battery, video4linux etc) so that the mid
-layer can plumb in a conversation between the handle owner and the driver
-without getting involved in the conversation.
-
-Alan
+Thank you,
+Kyungmin Park
+>
+> ? ? ? ?Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
