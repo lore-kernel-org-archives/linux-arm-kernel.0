@@ -1,25 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2011 16:15:48 +0200
-Subject: [PATCH 4/7] v4l: videobuf2: add IOMMU based DMA memory allocator
-In-Reply-To: <1303118804-5575-5-git-send-email-m.szyprowski@samsung.com>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<1303118804-5575-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201104181615.49009.arnd@arndb.de>
+Date: Mon, 18 Apr 2011 16:19:34 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de>
+	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
+Message-ID: <201104181619.35115.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2011, Marek Szyprowski wrote:
-> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+On Monday 18 April 2011, Rafa? Mi?ecki wrote:
+> W dniu 17 kwietnia 2011 19:38 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
+>
+> > In general, the bus_type directly relates to how a device gets probed.
+> > If broadcom uses the same basic register layout as regular AMBA devices,
+> > it should use the amba bus type.
 > 
-> This patch adds new videobuf2 memory allocator dedicated to devices that
-> supports IOMMU DMA mappings. A device with IOMMU module and a driver
-> with include/iommu.h compatible interface is required. This allocator
-> aquires memory with standard alloc_page() call and doesn't suffer from
-> memory fragmentation issues. The allocator support following page sizes:
-> 4KiB, 64KiB, 1MiB and 16MiB to reduce iommu translation overhead.
+> From Broadcom side we *could* use some registers that are AMBA
+> specific, they are present... but there is totally no point in doing
+> that. Everything we use is Broadcom specific.
+> 
+> 
+> > I think it would be fine to extend the AMBA bus slightly if there are
+> > just minor differences.
+> 
+> As I said, Broadcom specific driver use nothing from AMBA common
+> things. Plus we implement routines that are Broadcom specific and no
+> other platform will use them.
 
-My feeling is that this is not the right abstraction. Why can't you
-just implement the regular dma-mapping.h interfaces for your IOMMU
-so that the videobuf code can use the existing allocators?
+You mean the hardware has two sets of registers containing the same
+information, one of them the standard registers, and one with broadcom
+specific ones?
+
+Why don't you just use the standard ones then?
 
 	Arnd
