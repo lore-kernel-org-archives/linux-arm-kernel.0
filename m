@@ -1,63 +1,67 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 18 Apr 2011 12:34:00 -0500
-Subject: vic: Use generic interrupt chip
-In-Reply-To: <20110416211307.310117421@linutronix.de>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.310117421@linutronix.de>
-Message-ID: <0D753D10438DA54287A00B027084269764D221CCCE@AUSP01VMBX24.collaborationhost.net>
+Date: Mon, 18 Apr 2011 12:37:43 -0500
+Subject: [patch 27/29] arm: Cleanup the irq namespace
+In-Reply-To: <20110328170653.348149801@linutronix.de>
+References: <20110328170219.059141076@linutronix.de>
+	<20110328170653.348149801@linutronix.de>
+Message-ID: <0D753D10438DA54287A00B027084269764D221CCE5@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, April 16, 2011 2:14 PM, Thomas Gleixner wrote:
->
-> The VIC chips can be handled by the generic implementation. The
-> implementation uses always uses handle_level_irq. We can replace the
-> ack and mask functions by a combined mask_ack function which also gets
-> rid of the double write to VIC_INT_ENABLE_CLEAR.
+On Monday, March 28, 2011 10:13 AM, Thomas Gleixner wrote:
 > 
+> Convert to the new function names. Automated with coccinelle.
+>
 > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  arch/arm/common/vic.c |  152 ++++++++++++--------------------------------------
->  1 file changed, 39 insertions(+), 113 deletions(-)
-> 
-> Index: linux-2.6/arch/arm/common/vic.c
+>  arch/arm/mach-ep93xx/gpio.c                    |   31 +++++++++++------
+>
+> Index: linux-2.6-tip/arch/arm/mach-ep93xx/gpio.c
 > ===================================================================
-> --- linux-2.6.orig/arch/arm/common/vic.c
-> +++ linux-2.6/arch/arm/common/vic.c
-
-[snip]
-
-> @@ -178,15 +172,13 @@ late_initcall(vic_pm_init);
+> --- linux-2.6-tip.orig/arch/arm/mach-ep93xx/gpio.c
+> +++ linux-2.6-tip/arch/arm/mach-ep93xx/gpio.c
+> @@ -231,20 +231,29 @@ void __init ep93xx_gpio_init_irq(void)
 >  
->  /**
->   * vic_pm_register - Register a VIC for later power management control
-> - * @base: The base address of the VIC.
-> - * @irq: The base IRQ for the VIC.
-> - * @resume_sources: bitmask of interrupts allowed for resume sources.
-> + * @gc: The generic interrupt chip for the VIC
->   *
->   * Register the VIC with the system device tree so that it can be notified
->   * of suspend and resume requests and ensure that the correct actions are
->   * taken to re-instate the settings on resume.
->   */
-> -static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 resume_sources)
-> +static void __init vic_pm_register(struct irq_chip_generic *gc)
->  {
->  	struct vic_device *v;
->  
-> @@ -194,85 +186,13 @@ static void __init vic_pm_register(void 
->  		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
->  	else {
->  		v = &vic_devices[vic_id];
-> -		v->base = base;
-> -		v->resume_sources = resume_sources;
-> -		v->irq = irq;
-> -		vic_id++;
-> +		v->gc = gc;
+>  	for (gpio_irq = gpio_to_irq(0);
+>  	     gpio_irq <= gpio_to_irq(EP93XX_GPIO_LINE_MAX_IRQ); ++gpio_irq) {
+> -		set_irq_chip(gpio_irq, &ep93xx_gpio_irq_chip);
+> -		set_irq_handler(gpio_irq, handle_level_irq);
+> +		irq_set_chip(gpio_irq, &ep93xx_gpio_irq_chip);
+> +		irq_set_handler(gpio_irq, handle_level_irq);
+>  		set_irq_flags(gpio_irq, IRQF_VALID);
 >  	}
+>  
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO_AB, ep93xx_gpio_ab_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO0MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO1MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO2MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO3MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO4MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO5MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO6MUX, ep93xx_gpio_f_irq_handler);
+> -	set_irq_chained_handler(IRQ_EP93XX_GPIO7MUX, ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO_AB,
+> +				ep93xx_gpio_ab_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO0MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO1MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO2MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO3MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO4MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO5MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO6MUX,
+> +				ep93xx_gpio_f_irq_handler);
+> +	irq_set_chained_handler(IRQ_EP93XX_GPIO7MUX,
+> +				ep93xx_gpio_f_irq_handler);
 >  }
 
-I think the vic_id++ is still needed here in order to handle multiple VIC devices.
+I would suggest keeping these as one line each just for readability.
 
-Regards,
-Hartley
+Other than that:
+
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
