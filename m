@@ -1,27 +1,50 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Apr 2011 10:44:13 -0700
-Subject: [PATCH] ARM: allow hotplug on msm
-In-Reply-To: <1301078861-1991-1-git-send-email-johlstei@codeaurora.org>
-References: <1301078861-1991-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <4DAC786D.4020809@codeaurora.org>
+Date: Mon, 18 Apr 2011 10:54:49 -0700
+Subject: [PATCH 06/10] clk: Add support for a generic clock multiplexer
+In-Reply-To: <20110418133353.GL14770@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	<1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>	<20110418131527.GF31131@pengutronix.de>
+	<20110418133353.GL14770@pengutronix.de>
+Message-ID: <4DAC7AE9.9030106@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 04/18/2011 06:33 AM, Sascha Hauer wrote:
+>>>  
+>>> +/**
+>>> + * clock multiplexer
+>>> + *
+>>> + * @clk		clock source
+>>> + * @reg		the register this multiplexer can be configured with
+>>> + * @shift	the shift to the start bit of this multiplexer
+>>> + * @width	the width in bits of this multiplexer
+>>> + * @num_clks	number of parent clocks
+>>> + * @lock	register lock
+>>> + * @clks	array of possible parents for this multiplexer. Can contain
+>>> + *		holes with NULL in it for invalid register settings
+>> NULL is a valid clk, isn't it?
+> You're right. I think for invalid mux settings we should ERR_PTR(-EINVAL)
+> or similar to the array.
 
-On 3/25/2011 11:47 AM, Jeff Ohlstein wrote:
-> Hotplug support was added in 9f1890a (msm: hotplug: support cpu hotplug
-> on msm, 2010-12-02)
->
-> Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+Note that if you're using clkdev you can't actually return a NULL clock
+to the caller of clk_get() due to:
 
-This fixes a Kconfig warning on MSM:
+struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+{
+        struct clk *clk;
 
-warning: (PM_SLEEP_SMP) selects HOTPLUG_CPU which has unmet direct
-dependencies (SMP && HOTPLUG && EXPERIMENTAL && !ARCH_MSM)
+        mutex_lock(&clocks_mutex);
+        clk = clk_find(dev_id, con_id);
+        if (clk && !__clk_get(clk))
+                clk = NULL;
+        mutex_unlock(&clocks_mutex);
 
-Is there any way we can get this merged for .39 final? It's 6863/1 in
-the patch tracker.
+        return clk ? clk : ERR_PTR(-ENOENT);
+}
+
+
+So all this talk about NULL being a valid clock returned to drivers is
+kinda pointless unless the mach has a custom clk_get() implementation.
+Perhaps we should force clkdev on users of the generic struct clk framework?
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
