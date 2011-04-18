@@ -1,37 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Apr 2011 09:27:59 +0100
-Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead
-	of VIDEOBUF_DMA_CONTIG
-In-Reply-To: <20110418082049.GJ3811@pengutronix.de>
-References: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110418080637.GA31131@pengutronix.de>
-	<Pine.LNX.4.64.1104181013250.27247@axis700.grange>
-	<20110418082049.GJ3811@pengutronix.de>
-Message-ID: <20110418082759.GA25671@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 18 Apr 2011 16:42:28 +0800
+Subject: [PATCH 7/7] gpio-vbus: ask for vbus_draw regulator before
+	registering xceiv
+In-Reply-To: <1301666188-11822-7-git-send-email-dbaryshkov@gmail.com>
+References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
+	<1301666188-11822-7-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <BANLkTimhus3KjV=RXbpLmn6hy2xY9ZZM+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 10:20:49AM +0200, Robert Schwebel wrote:
-> Uwe,
-> 
-> On Mon, Apr 18, 2011 at 10:14:56AM +0200, Guennadi Liakhovetski wrote:
-> > It's been pushed upstream almost 2 weeks ago:
-> >
-> > http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/31352
-> 
-> As our autobuilder does still trigger, I assume that the configs have to
-> be refreshed and it may be an issue on our side. Can you take care of
-> that?
+On Fri, Apr 1, 2011 at 9:56 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> Ask for vbus_draw regulator before registering tranceiver to disallow possible
+> race between registration and set_power/etc.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-Just take a look at what's in mainline:
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
-config VIDEO_MX3
-        tristate "i.MX3x Camera Sensor Interface driver"
-        depends on VIDEO_DEV && MX3_IPU && SOC_CAMERA
-        select VIDEOBUF_DMA_CONTIG
-        select MX3_VIDEO
-        ---help---
-          This is a v4l2 driver for the i.MX3x Camera Sensor Interface
+Greg, can you help take this patch. This looks like a good fix.
 
-and you'll see that it hasn't made it there yet.  If I search for
-'linuxtv.org' in the history post 2.6.39-rc2, there's no sign of it.
+> ---
+> ?drivers/usb/otg/gpio_vbus.c | ? 14 +++++++-------
+> ?1 files changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+> index 221c444..52733d9 100644
+> --- a/drivers/usb/otg/gpio_vbus.c
+> +++ b/drivers/usb/otg/gpio_vbus.c
+> @@ -279,6 +279,13 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
+> ? ? ? ?}
+> ? ? ? ?INIT_WORK(&gpio_vbus->work, gpio_vbus_work);
+>
+> + ? ? ? gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
+> + ? ? ? if (IS_ERR(gpio_vbus->vbus_draw)) {
+> + ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
+> + ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(gpio_vbus->vbus_draw));
+> + ? ? ? ? ? ? ? gpio_vbus->vbus_draw = NULL;
+> + ? ? ? }
+> +
+> ? ? ? ?/* only active when a gadget is registered */
+> ? ? ? ?err = otg_set_transceiver(&gpio_vbus->otg);
+> ? ? ? ?if (err) {
+> @@ -287,13 +294,6 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?goto err_otg;
+> ? ? ? ?}
+>
+> - ? ? ? gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
+> - ? ? ? if (IS_ERR(gpio_vbus->vbus_draw)) {
+> - ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
+> - ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(gpio_vbus->vbus_draw));
+> - ? ? ? ? ? ? ? gpio_vbus->vbus_draw = NULL;
+> - ? ? ? }
+> -
+> ? ? ? ?return 0;
+> ?err_otg:
+> ? ? ? ?free_irq(irq, &pdev->dev);
+> --
+> 1.7.4.1
+>
+>
