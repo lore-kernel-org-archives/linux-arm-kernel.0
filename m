@@ -1,31 +1,46 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 18 Apr 2011 10:06:07 +0200
-Subject: [PATCH V14 3/4] ptp: Added a clock driver for the IXP46x.
-In-Reply-To: <201104180856.04186.arnd@arndb.de>
-References: <cover.1303107532.git.richard.cochran@omicron.at>
-	<dbee2487a57fd7f41e4efbbd2ddfb1313b8d71bc.1303107532.git.richard.cochran@omicron.at>
-	<201104180856.04186.arnd@arndb.de>
-Message-ID: <20110418080606.GA3809@riccoc20.at.omicron.at>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Apr 2011 10:06:37 +0200
+Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead of
+	VIDEOBUF_DMA_CONTIG
+In-Reply-To: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110418080637.GA31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 08:56:03AM +0200, Arnd Bergmann wrote:
-> On Monday 18 April 2011, Richard Cochran wrote:
-> > +
-> > +       lo = __raw_readl(&regs->channel[ch].src_uuid_lo);
-> > +       hi = __raw_readl(&regs->channel[ch].src_uuid_hi);
-> > +
+Hi Guennadi,
+
+On Thu, Apr 07, 2011 at 10:50:43AM +0200, Uwe Kleine-K?nig wrote:
+> Since commit
 > 
-> I guess you should use readl(), not __raw_readl() here. The __raw_* functions
-> are not meant for device drivers.
+> 	379fa5d ([media] V4L: mx3_camera: convert to videobuf2)
+> 
+> mx3_camera uses videobuf2, but that commit didn't upgrade the select
+> resulting in the following build failure:
+> 
+> 	drivers/built-in.o: In function `mx3_camera_init_videobuf':
+> 	clkdev.c:(.text+0x86580): undefined reference to `vb2_dma_contig_memops'
+> 	drivers/built-in.o: In function `mx3_camera_probe':
+> 	clkdev.c:(.devinit.text+0x3548): undefined reference to `vb2_dma_contig_init_ctx'
+> 	clkdev.c:(.devinit.text+0x3578): undefined reference to `vb2_dma_contig_cleanup_ctx'
+> 	drivers/built-in.o: In function `mx3_camera_remove':
+> 	clkdev.c:(.devexit.text+0x674): undefined reference to `vb2_dma_contig_cleanup_ctx'
+> 	make[2]: *** [.tmp_vmlinux1] Error 1
+> 	make[1]: *** [sub-make] Error 2
+> 	make: *** [all] Error 2
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+I guess the only problem with this is -ENOTIME on your side?
 
-Krzysztof had a different opinion about this.
+> does someone has a hint how to fix gcc not to believe the undefined
+> references to be in clkdev.c?
+I got a hint that might be related to ccache. Didn't look into it yet,
+though.
 
-    https://lkml.org/lkml/2011/1/8/67
+Best regards
+Uwe
 
-Anyway, it is his driver, and I just followed what he does elsewhere
-in the driver. It make sense to me to keep the driver consistent.
-Maybe we should make the change throughout?
-
-Thanks,
-Richard
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
