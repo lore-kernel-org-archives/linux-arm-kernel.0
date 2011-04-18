@@ -1,30 +1,27 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 18 Apr 2011 06:38:36 +0200
-Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
-In-Reply-To: <20110418041806.GB18623@S2100-06.ap.freescale.net>
-References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
-	<20110418041806.GB18623@S2100-06.ap.freescale.net>
-Message-ID: <20110418043836.GB11578@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2011 07:01:30 +0200
+Subject: [PATCH 2/2] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <1303076969-13039-1-git-send-email-linus.walleij@stericsson.com>
+References: <1303076969-13039-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201104180701.30384.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 12:18:07PM +0800, Shawn Guo wrote:
-
-> You are doing something that I have been intending to do for some
-> while.  I think you are doing the right thing at the right time ;)
-> Let me know if you need any help.
+On Sunday 17 April 2011, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> This rewrites the U300 GPIO driver using gpiolib and the irq_chip
+> abstractions, makes it runtime-configured rather than compile-time,
+> and moves it to the drivers/gpio subsystem where it belongs,
+> depopulating the ARM tree of one more driver.
+> 
+> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-\o/ Thanks a ton!
+The new driver looks good, but it would be nice to see the actual changes you did.
+You can do that by either passing the -M flag to git-format-patch, or by splitting
+up the patch into separate move and rewrite bits, in either order.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110418/2659078c/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+	Arnd
