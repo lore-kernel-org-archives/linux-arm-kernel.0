@@ -1,41 +1,90 @@
 From: bn@niasdigital.com (Ben Nizette)
-Date: Tue, 19 Apr 2011 08:16:12 +1000
+Date: Tue, 19 Apr 2011 08:26:49 +1000
 Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <20110418115903.GB9462@sirena.org.uk>
+In-Reply-To: <20110418132629.12d9a106@lxorguk.ukuu.org.uk>
 References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
 	<20110418091902.13345132@lxorguk.ukuu.org.uk>
 	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-	<20110418115903.GB9462@sirena.org.uk>
-Message-ID: <34EB51B7-AF3B-4DCE-A402-953B2DBC0474@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+Message-ID: <6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 18/04/2011, at 9:59 PM, Mark Brown wrote:
+On 18/04/2011, at 10:26 PM, Alan Cox wrote:
 
-> On Mon, Apr 18, 2011 at 06:50:12PM +1000, Ben Nizette wrote:
+>> Fair call, but bringing this back to the particular case in hand what in that enum is worth 'hinting' in a might-have-an-effect manner rather than just letting the board take care of it?
+>> 
+>> Still my question stands, where is the driver ever better placed to make these calls than the board code?
 > 
-> Please fix your MUA to word wrap within paragraphs; I've reflowed your
-> text for legibility.
+> The logical extension to that is to delete the gpio layer because the
+> board code can do it ?
 
-Sorry, I apologised in advance in my first email, I've made the mistake
-of travelling without a sane MUA :)
+Well anything that is done once at startup, yes, I think the board
+code probably can and should.  The only functionality gpiolib currently
+supplies is stuff that only the driver knows when to do, i.e. has to be
+done during device operation not once-off at boot.
+
+With that said if anyone can demonstrate why a driver would need to
+change drive modes or bias strengths during operation then I'll my
+argument is more or less gone and I'm happy enough to see this kind of
+functionality end up in gpiolib one way or another.
 
 > 
->> Still my question stands, where is the driver ever better placed to
->> make these calls than the board code?
+>>> Also your comment re simply in or out on or off is incorrect. Pins may
+>>> also be in use by firmware and the like and in a 'neither' state.
+>>> Something certain gpio people seem to be in denial over.
+>> 
+>> Quite right, but should a pin ever be in a neither state and simultaneously controlled by a gpiolib driver?  If so, how should it behave and if not, is it anything that stricter enforcement of gpio_request() semantics can't get around?
 > 
-> Even if it ends up being the board code using these APIs it seems
-> sensible to have a standard API that GPIO drivers can use to expose the
-> functionality.  This will help with getting control into code Linux owns
-> (since people don't have to implement custom APIs) and will mean we can
-> do things like add control of this for device tree based boards.
+> That won't fix sysfs.
+> 
+> It also doesn't solve the real problem which is that you've got to
+> implement platform specific parallel gpio extensions all over the place
+> when you really want it all using the same 'handle' and request logic.
 
-Oh I'm all for platform-specific libraries abstracting this away from the
-board code if that helps, that's certainly the way that, eg, AVR32 does it.
-It just doesn't make sense to me to bounce from the board code in to
-'generic' gpio code then back to platform-specific implementations when
-you could cut out the middle man.
+Fair enough.  Forgive me if you've stated this in a previous conversation
+then but what do you see as being the best way forward here?  Should
+gpiolib enforce itself as the One True Allocator and require all firmware
+drivers call back in to it to get access to the pins rather than gpiolib
+calling back to the platform upon gpio_request()?
+
+> 
+> The gpio layer doesn't seem to know what it is doing. It's a fine resource
+> allocator and call distributor but it can't make up its mind whether it
+> wants to just do that job, or to be a proper extensible gpio layer.
+> Instead it sits there being almost useful but incomplete and unwilling to
+> either do the job needed or get out of the way.
+
+I absolutely agree here and I suppose my responses to this patch are more
+or less aimed at keeping gpiolib in the former role which was more or less
+the creator's original vision.  If we want it to become anything more than
+this then I certainly think that has merit but I don't want to go adding it
+piece-wise to the existing style of gpiolib interfaces, I'd like people to
+step back and have a think about what we want this thing to actually /do/
+moving forward.
+
+> 
+> One possible way to tackle a lot of it would be to actually let the
+> drivers make the choices instead of imposing arbitarily wrong sematics
+> in the upper layers.
+> 
+> And for a lot of this stuff that the gpio layer really doesn't want
+> internal knowledge of other chunks of the kernel have used models like
+> 'get_property/set_property' (eg battery, video4linux etc) so that the mid
+> layer can plumb in a conversation between the handle owner and the driver
+> without getting involved in the conversation.
+
+Yeah that sounds like a more reasonable way to expose this functionality if
+the driver does indeed need it.
 
 	--Ben.
+
+> 
+> Alan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
