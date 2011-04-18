@@ -1,259 +1,214 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 18 Apr 2011 15:00:36 +0200
-Subject: [PATCHv2 2.6.40 3/3] ARM:simpad: add GPIO based device definitions.
-In-Reply-To: <1303131636-19442-1-git-send-email-jochen@scram.de>
-References: <1303131636-19442-1-git-send-email-jochen@scram.de>
-Message-ID: <1303131636-19442-4-git-send-email-jochen@scram.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Apr 2011 15:15:27 +0200
+Subject: [PATCH 06/10] clk: Add support for a generic clock multiplexer
+In-Reply-To: <1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110418131527.GF31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register LED, keyboard, polled keyboard and I2C platform
-devices based on GPIOs.
+On Fri, Apr 15, 2011 at 09:08:11PM +0200, Sascha Hauer wrote:
+> This patch adds support for a common type of clock multiplexer.
+> The multiplexer is described with register, shift and width and
+> an array of clocks which correspond to the bit value.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> ---
+>  drivers/clk/Kconfig       |    3 +
+>  drivers/clk/Makefile      |    1 +
+>  drivers/clk/clk-divider.c |    2 +-
+>  drivers/clk/clk-mux.c     |   92 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk.h       |   28 ++++++++++++++
+>  5 files changed, 125 insertions(+), 1 deletions(-)
+>  create mode 100644 drivers/clk/clk-mux.c
+> 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 76bb4c9..710d73d 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -8,3 +8,6 @@ config USE_COMMON_STRUCT_CLK
+>  
+>  config USE_COMMON_CLK_DIVIDER
+>  	bool
+> +
+> +config USE_COMMON_CLK_MUX
+> +	bool
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 723d884..195a434 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -2,3 +2,4 @@
+>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>  obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
+>  obj-$(CONFIG_USE_COMMON_CLK_DIVIDER) += clk-divider.o
+> +obj-$(CONFIG_USE_COMMON_CLK_MUX) += clk-mux.o
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 2de94df..e3f5b7a 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (C) 2011 Sascha Hauer <s.hauer@pengutronix.de>
+> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+This should go into an earlier patch.
 
-V2: Remove the legacy ARM LED code for simpad devices.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> new file mode 100644
+> index 0000000..d33b15f
+> --- /dev/null
+> +++ b/drivers/clk/clk-mux.c
+> @@ -0,0 +1,92 @@
+> +/*
+> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Standard functionality for the common clock API.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +
+> +#define to_clk_mux(clk) (container_of(clk, struct clk_mux, clk))
+> +
+> +static struct clk *clk_mux_get_parent(struct clk *clk)
+> +{
+> +	struct clk_mux *mux = to_clk_mux(clk);
+> +	u32 val;
+> +
+> +	val = readl(mux->reg) >> mux->shift;
+> +	val &= (1 << mux->width) - 1;
+> +
+> +	if (val >= mux->num_clks)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	return mux->clks[val];
+> +}
+> +
+> +static int clk_mux_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	struct clk_mux *mux = to_clk_mux(clk);
+> +	u32 val;
+> +	int i;
+> +	unsigned long flags = 0;
+= 0 isn't needed. (Or does gcc wail without it?)
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/Makefile      |    1 -
- arch/arm/mach-sa1100/leds-simpad.c |   97 ------------------------------------
- arch/arm/mach-sa1100/simpad.c      |   95 ++++++++++++++++++++++++++++++++++-
- 3 files changed, 94 insertions(+), 99 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/leds-simpad.c
+> +
+> +	for (i = 0; i < mux->num_clks; i++)
+> +		if (mux->clks[i] == parent)
+> +			break;
+> +
+> +	if (i == mux->num_clks)
+> +		return -EINVAL;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+> +	val = readl(mux->reg);
+> +	val &= ~(((1 << mux->width) - 1) << mux->shift);
+> +	val |= i << mux->shift;
+> +	writel(val, mux->reg);
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static long clk_mux_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return PTR_ERR(parent);
+> +
+> +	return clk_get_rate(parent);
+> +}
+> +
+> +static int clk_mux_set_rate(struct clk *clk, unsigned long desired)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return PTR_ERR(parent);
+> +
+> +	if (desired != clk_get_rate(parent))
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+Isn't not implementing set_rate good enough? Ditto for .round_rate.
 
-diff --git a/arch/arm/mach-sa1100/Makefile b/arch/arm/mach-sa1100/Makefile
-index 41252d2..0063178 100644
---- a/arch/arm/mach-sa1100/Makefile
-+++ b/arch/arm/mach-sa1100/Makefile
-@@ -45,7 +45,6 @@ obj-$(CONFIG_SA1100_PLEB)		+= pleb.o
- obj-$(CONFIG_SA1100_SHANNON)		+= shannon.o
- 
- obj-$(CONFIG_SA1100_SIMPAD)		+= simpad.o
--led-$(CONFIG_SA1100_SIMPAD)		+= leds-simpad.o
- 
- # LEDs support
- obj-$(CONFIG_LEDS) += $(led-y)
-diff --git a/arch/arm/mach-sa1100/leds-simpad.c b/arch/arm/mach-sa1100/leds-simpad.c
-deleted file mode 100644
-index d25784c..0000000
---- a/arch/arm/mach-sa1100/leds-simpad.c
-+++ /dev/null
-@@ -1,97 +0,0 @@
--/*
-- * linux/arch/arm/mach-sa1100/leds-simpad.c
-- *
-- * Author: Juergen Messerer <juergen.messerer@siemens.ch>
-- */
--#include <linux/init.h>
--
--#include <mach/hardware.h>
--#include <asm/leds.h>
--#include <asm/system.h>
--#include <mach/simpad.h>
--
--#include "leds.h"
--
--
--#define LED_STATE_ENABLED	1
--#define LED_STATE_CLAIMED	2
--
--static unsigned int led_state;
--static unsigned int hw_led_state;
--
--#define	LED_GREEN	(1)
--#define	LED_MASK	(1)
--
--void simpad_leds_event(led_event_t evt)
--{
--	switch (evt)
--	{
--	case led_start:
--	        hw_led_state = LED_GREEN;
--		led_state = LED_STATE_ENABLED;
--		break;
--
--	case led_stop:
--		led_state &= ~LED_STATE_ENABLED;
--		break;
--
--	case led_claim:
--		led_state |= LED_STATE_CLAIMED;
--		hw_led_state = LED_GREEN;
--		break;
--
--	case led_release:
--		led_state &= ~LED_STATE_CLAIMED;
--		hw_led_state = LED_GREEN;
--		break;
--
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:
--		if (!(led_state & LED_STATE_CLAIMED))
--			hw_led_state ^= LED_GREEN;
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:
--		break;
--
--	case led_idle_end:
--		break;
--#endif
--
--	case led_halted:
--		break;
--
--	case led_green_on:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state |= LED_GREEN;
--		break;
--
--	case led_green_off:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state &= ~LED_GREEN;
--		break;
--
--	case led_amber_on:
--		break;
--
--	case led_amber_off:
--		break;
--
--	case led_red_on:
--		break;
--
--	case led_red_off:
--		break;
--
--	default:
--		break;
--	}
--
--	if  (led_state & LED_STATE_ENABLED)
--		simpad_set_cs3_bit(LED2_ON);
--	else 
--		simpad_clear_cs3_bit(LED2_ON);
--}
--
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index ec6e381..cf3a68a 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -29,6 +29,10 @@
- 
- #include <linux/serial_core.h>
- #include <linux/ioport.h>
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/leds.h>
-+#include <linux/i2c-gpio.h>
- 
- #include "generic.h"
- 
-@@ -249,6 +253,91 @@ static void simpad_power_off(void)
- 
- }
- 
-+/*
-+ * gpio_keys
-+*/
-+
-+static struct gpio_keys_button simpad_button_table[] = {
-+	{ KEY_POWER, IRQ_GPIO_POWER_BUTTON, 1, "power button" },
-+};
-+
-+static struct gpio_keys_platform_data simpad_keys_data = {
-+	.buttons = simpad_button_table,
-+	.nbuttons = ARRAY_SIZE(simpad_button_table),
-+};
-+
-+static struct platform_device simpad_keys = {
-+	.name = "gpio-keys",
-+	.dev = {
-+		.platform_data = &simpad_keys_data,
-+	},
-+};
-+
-+static struct gpio_keys_button simpad_polled_button_table[] = {
-+	{ KEY_PROG1, SIMPAD_UCB1X00_GPIO_PROG1, 1, "prog1 button" },
-+	{ KEY_PROG2, SIMPAD_UCB1X00_GPIO_PROG2, 1, "prog2 button" },
-+	{ KEY_UP,    SIMPAD_UCB1X00_GPIO_UP,    1, "up button" },
-+	{ KEY_DOWN,  SIMPAD_UCB1X00_GPIO_DOWN,  1, "down button" },
-+	{ KEY_LEFT,  SIMPAD_UCB1X00_GPIO_LEFT,  1, "left button" },
-+	{ KEY_RIGHT, SIMPAD_UCB1X00_GPIO_RIGHT, 1, "right button" },
-+};
-+
-+static struct gpio_keys_platform_data simpad_polled_keys_data = {
-+	.buttons = simpad_polled_button_table,
-+	.nbuttons = ARRAY_SIZE(simpad_polled_button_table),
-+	.poll_interval = 50,
-+};
-+
-+static struct platform_device simpad_polled_keys = {
-+	.name = "gpio-keys-polled",
-+	.dev = {
-+		.platform_data = &simpad_polled_keys_data,
-+	},
-+};
-+
-+/*
-+ * GPIO LEDs
-+ */
-+
-+static struct gpio_led simpad_leds[] = {
-+	{
-+		.name = "power",
-+		.gpio = SIMPAD_CS3_LED2_ON,
-+		.active_low = 0,
-+		.default_trigger = "default-on",
-+	},
-+};
-+
-+static struct gpio_led_platform_data simpad_led_data = {
-+	.num_leds = 1,
-+	.leds = simpad_leds,
-+};
-+
-+static struct platform_device simpad_gpio_leds = {
-+	.name = "leds-gpio",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &simpad_led_data,
-+	},
-+};
-+
-+/*
-+ * i2c
-+ */
-+static struct i2c_gpio_platform_data simpad_i2c_data = {
-+	.sda_pin = GPIO_GPIO21,
-+	.scl_pin = GPIO_GPIO25,
-+	.udelay = 10,
-+	.timeout = HZ,
-+};
-+
-+static struct platform_device simpad_i2c = {
-+	.name = "i2c-gpio",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &simpad_i2c_data,
-+	},
-+};
- 
- /*
-  * MediaQ Video Device
-@@ -259,7 +348,11 @@ static struct platform_device simpad_mq200fb = {
- };
- 
- static struct platform_device *devices[] __initdata = {
--	&simpad_mq200fb
-+	&simpad_keys,
-+	&simpad_polled_keys,
-+	&simpad_mq200fb,
-+	&simpad_gpio_leds,
-+	&simpad_i2c,
- };
- 
- 
+> +struct clk_ops clk_mux_ops = {
+> +	.prepare = clk_parent_prepare,
+> +	.unprepare = clk_parent_unprepare,
+> +	.enable = clk_parent_enable,
+> +	.disable = clk_parent_disable,
+> +	.get_rate = clk_parent_get_rate,
+> +	.round_rate = clk_mux_round_rate,
+> +	.set_rate = clk_mux_set_rate,
+> +	.get_parent = clk_mux_get_parent,
+> +	.set_parent = clk_mux_set_parent,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_mux_ops);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 6f9771b..fb2c2f5 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -211,6 +211,34 @@ struct clk_divider {
+>  
+>  extern struct clk_ops clk_divider_ops;
+>  
+> +/**
+> + * clock multiplexer
+> + *
+> + * @clk		clock source
+> + * @reg		the register this multiplexer can be configured with
+> + * @shift	the shift to the start bit of this multiplexer
+> + * @width	the width in bits of this multiplexer
+> + * @num_clks	number of parent clocks
+> + * @lock	register lock
+> + * @clks	array of possible parents for this multiplexer. Can contain
+> + *		holes with NULL in it for invalid register settings
+NULL is a valid clk, isn't it?
+
+> + *
+> + * This clock implements get_parent/set_parent. prepare/unprepare,
+> + * enable/disable and get_rate operations are passed through to the parent,
+> + * the rate is not adjustable.
+> + */
+> +struct clk_mux {
+> +	struct clk	clk;
+> +	void __iomem	*reg;
+> +	unsigned char	shift;
+> +	unsigned char	width;
+> +	unsigned char	num_clks;
+> +	spinlock_t	*lock;
+> +	struct clk	**clks;
+> +};
+> +
+> +extern struct clk_ops clk_mux_ops;
+> +
+>  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+>  
+>  /*
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
