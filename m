@@ -1,28 +1,32 @@
-From: gregkh@suse.de (Greg KH)
-Date: Sun, 17 Apr 2011 23:02:18 -0700
-Subject: [PATCH 0/14] Remove sysdev suspend/resume and shutdown operations
-In-Reply-To: <201104172301.54115.rjw@sisk.pl>
-References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
-Message-ID: <20110418060218.GB22168@suse.de>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Mon, 18 Apr 2011 08:23:37 +0200
+Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
+In-Reply-To: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
+References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 17, 2011 at 11:01:53PM +0200, Rafael J. Wysocki wrote:
-> Hi,
-> 
-> The following series of patches fixes bugs related to the introduction
-> of struct syscore_ops later in this cycle, replaces sysdev suspend/resume
-> operations in all of the architectures still using them with struct
-> syscore_ops-based PM callbacks and finally removes the suspend/resume
-> and shutdown operations from struct sysdev_class and struct sysdev_driver.
-> 
-> Patches [1/14] and [2/14] are important bug fixes targeted at 2.6.39.
-> The remaining patches are regareded as 2.6.40 material, but I'd like to
-> put them into linux-next shortly, if there are no objections, to catch
-> problems that they may introduce before they hit the mainline.  Again,
-> if there are no objections I'd like to merge these patches through the
-> suspend-2.6 tree.
+Hi Wolfram,
 
-No objection from me at all, thanks for doing this they look great.
+On Mon, Apr 18, 2011 at 4:30 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> I tried a smaller scaled cleanup before, but now that there are talks about ARM
+> consolidation everywhere, I'll be more brave :)
+>
+> What we have here is consolidation of two platforms. The older one, plat-stmp,
+> has never seen much love after the initial commit and has poor design as stated
+> in the patch descriptions. The recently added mach-mxs can be used for a
+> (friendly) takeover. Adding 130 lines there could save 9500+ lines in arch/arm!
 
-Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
+may we FIRST see how you are going to fit it into mach-mxc? NAK from
+me before I see that.
+
+BTW, I understand that you are taking steps in the right direction but
+having worked with stmp3xxx and multiple i.MXs, I see it as a great
+pity that a low-end but stable and convenient platform has been
+effectively killed by a semiconductor giant to avoid competition with
+unstable and painful to work with lower end i.MXs, and is also being
+killed virtually -- by you guys.
+
+Thanks,
+   Vitaly
