@@ -1,62 +1,68 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 18 Apr 2011 16:42:28 +0800
-Subject: [PATCH 7/7] gpio-vbus: ask for vbus_draw regulator before
-	registering xceiv
-In-Reply-To: <1301666188-11822-7-git-send-email-dbaryshkov@gmail.com>
-References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
-	<1301666188-11822-7-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <BANLkTimhus3KjV=RXbpLmn6hy2xY9ZZM+Q@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 18 Apr 2011 17:43:00 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.39-rc4
+In-Reply-To: <008701cbfd45$94dd8f70$be98ae50$%kim@samsung.com>
+References: <008701cbfd45$94dd8f70$be98ae50$%kim@samsung.com>
+Message-ID: <BANLkTik=-YbSD3D+9twqDm3uKR3tm+V+=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 1, 2011 at 9:56 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> Ask for vbus_draw regulator before registering tranceiver to disallow possible
-> race between registration and set_power/etc.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Hi,
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Can you check this patch also?
+http://lists.arm.linux.org.uk/lurker/message/20110329.064902.fb2f620c.en.html
 
-Greg, can you help take this patch. This looks like a good fix.
+Fix cpuinit section mismatch(es).
 
-> ---
-> ?drivers/usb/otg/gpio_vbus.c | ? 14 +++++++-------
-> ?1 files changed, 7 insertions(+), 7 deletions(-)
+WARNING: modpost: Found 2 section mismatch(es).
+To see full details build your kernel with:
+'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+
+Thank you,
+Kyungmin Park
+
+On Mon, Apr 18, 2011 at 6:22 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Linus,
 >
-> diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
-> index 221c444..52733d9 100644
-> --- a/drivers/usb/otg/gpio_vbus.c
-> +++ b/drivers/usb/otg/gpio_vbus.c
-> @@ -279,6 +279,13 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
-> ? ? ? ?}
-> ? ? ? ?INIT_WORK(&gpio_vbus->work, gpio_vbus_work);
+> Please pull Samsung fixes from:
 >
-> + ? ? ? gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
-> + ? ? ? if (IS_ERR(gpio_vbus->vbus_draw)) {
-> + ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
-> + ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(gpio_vbus->vbus_draw));
-> + ? ? ? ? ? ? ? gpio_vbus->vbus_draw = NULL;
-> + ? ? ? }
-> +
-> ? ? ? ?/* only active when a gadget is registered */
-> ? ? ? ?err = otg_set_transceiver(&gpio_vbus->otg);
-> ? ? ? ?if (err) {
-> @@ -287,13 +294,6 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?goto err_otg;
-> ? ? ? ?}
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> s5p-fixes-for-linus
 >
-> - ? ? ? gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
-> - ? ? ? if (IS_ERR(gpio_vbus->vbus_draw)) {
-> - ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
-> - ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(gpio_vbus->vbus_draw));
-> - ? ? ? ? ? ? ? gpio_vbus->vbus_draw = NULL;
-> - ? ? ? }
-> -
-> ? ? ? ?return 0;
-> ?err_otg:
-> ? ? ? ?free_irq(irq, &pdev->dev);
+> These things are small fixes for 2.6.39-rc4.
+> If any problems, please let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
 > --
-> 1.7.4.1
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
 >
+> The following changes since commit a6360dd37e1a144ed11e6548371bade559a1e4df:
+>
+> ?Linux 2.6.39-rc3 (2011-04-11 17:21:51 -0700)
+>
+> are available in the git repository at:
+> ? git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> s5p-fixes-for-linus
+>
+> Abhilash Kesavan (2):
+> ? ? ?ARM: S5P: Remove unused s3c_pm_check_resume_pin
+> ? ? ?ARM: SAMSUNG: Fix build failure in PM CRC check code
+>
+> Maurus Cuelenaere (1):
+> ? ? ?ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs' defined but not
+> used
+>
+> ?arch/arm/plat-s5p/pm.c ? ? ? ? ? | ? 11 -----------
+> ?arch/arm/plat-samsung/pm-check.c | ? ?6 ------
+> ?arch/arm/plat-samsung/pm.c ? ? ? | ? ?5 +++--
+> ?3 files changed, 3 insertions(+), 19 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
