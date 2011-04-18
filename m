@@ -1,27 +1,145 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 18 Apr 2011 11:23:32 +0200
-Subject: The cleanest way to power off a board inside the kernel.
-Message-ID: <BANLkTinwsEmyCRVbRBm+grhth9Dx8N+Bfg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Apr 2011 11:25:04 +0200
+Subject: [PATCH 04/10] clk: implement parent pass through functions
+In-Reply-To: <1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110418092504.GD31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some boards out there, including Beagleboard xM, which are
-provided with a PMIC that is able to enable or disable power supply
-for the system. The interfaces used for that purpose usually include
-gpios or I2C.
-What is the cleanest way, provided there are some, to tell those
-circuits at the end of the power down process to cut off the power
-supply of the system?
+On Fri, Apr 15, 2011 at 09:08:09PM +0200, Sascha Hauer wrote:
+> A common case for clocks is that certain operations are not implemented
+> and shall be passed through to the parent. Add convenience functions
+> for this purpose
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> ---
+>  drivers/clk/clk.c   |   77 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk.h |    9 ++++++
+>  2 files changed, 86 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 264c809..7e2c182 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -171,3 +171,80 @@ struct clk_ops clk_fixed_ops = {
+>  	.get_rate = clk_fixed_get_rate,
+>  };
+>  EXPORT_SYMBOL_GPL(clk_fixed_ops);
+> +
+> +int clk_parent_prepare(struct clk *clk)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return -ENOSYS;
+> +
+> +	return clk_prepare(parent);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_prepare);
+> +
+> +void clk_parent_unprepare(struct clk *clk)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return;
+> +
+> +	clk_unprepare(parent);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_unprepare);
+> +
+> +int clk_parent_enable(struct clk *clk)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return 0;
+Do you really want to return 0 here? IMHO something is fishy if a clock
+has .enable = clk_parent_enable but has no parent.
 
-At first glance I thought there could be a board specific hook for
-that purpose but I couldn't find any, just an endless loop "while
-(1);" instead.
+> +
+> +	return clk_enable(parent);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_enable);
+> +
+> +void clk_parent_disable(struct clk *clk)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return;
+> +
+> +	clk_disable(parent);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_disable);
+> +
+> +unsigned long clk_parent_get_rate(struct clk *clk)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return 0;
+> +
+> +	return clk_get_rate(parent);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_get_rate);
+> +
+> +long clk_parent_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return -ENOSYS;
+> +
+> +	return clk_round_rate(parent, rate);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_round_rate);
+> +
+> +int clk_parent_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	struct clk *parent = clk_get_parent(clk);
+> +
+> +	if (IS_ERR(parent))
+> +		return -ENOSYS;
+> +
+> +	return clk_set_rate(parent, rate);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_parent_set_rate);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index d2f0db0..d014341 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -171,6 +171,15 @@ extern struct clk_ops clk_fixed_ops;
+>  #define DEFINE_CLK_FIXED(name, r) \
+>  	struct clk_fixed name = INIT_CLK_FIXED(name, r)
+>  
+> +/* generic pass-through-to-parent functions */
+> +int clk_parent_prepare(struct clk *clk);
+> +void clk_parent_unprepare(struct clk *clk);
+> +int clk_parent_enable(struct clk *clk);
+> +void clk_parent_disable(struct clk *clk);
+> +unsigned long clk_parent_get_rate(struct clk *clk);
+> +long clk_parent_round_rate(struct clk *clk, unsigned long rate);
+> +int clk_parent_set_rate(struct clk *clk, unsigned long rate);
+> +
+Technically they don't need to depend on USE_COMMON_STRUCT_CLK.
+
+>  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+>  
+>  /*
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
