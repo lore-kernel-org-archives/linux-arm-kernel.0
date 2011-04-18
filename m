@@ -1,38 +1,39 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 18 Apr 2011 23:43:41 +0200
-Subject: [PATCH 9/14] PM / Blackfin: Use struct syscore_ops instead of
-	sysdevs for PM
-In-Reply-To: <BANLkTi=BRXtsG0wK6SbK-6L-xzwMccR3eQ@mail.gmail.com>
-References: <201103280125.11750.rjw@sisk.pl> <201104172311.59289.rjw@sisk.pl>
-	<BANLkTi=BRXtsG0wK6SbK-6L-xzwMccR3eQ@mail.gmail.com>
-Message-ID: <201104182343.41702.rjw@sisk.pl>
+From: alexey.zaytsev@gmail.com (Alexey Zaytsev)
+Date: Tue, 19 Apr 2011 01:54:34 +0400
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <BANLkTi=B9izP5N5iPnZDLdaQzBQ+egyo=A@mail.gmail.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
+	<BANLkTi=B9izP5N5iPnZDLdaQzBQ+egyo=A@mail.gmail.com>
+Message-ID: <BANLkTikLdmxXS-Ka8jpnnK5DD=0hH8K3rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 18, 2011, Mike Frysinger wrote:
-> On Sun, Apr 17, 2011 at 17:11, Rafael J. Wysocki wrote:
-> > Convert some Blackfin architecture's code to using struct syscore_ops
-> > objects for power management instead of sysdev classes and sysdevs.
-> >
-> > This simplifies the code and reduces the kernel's memory footprint.
-> > It also is necessary for removing sysdevs from the kernel entirely in
-> > the future.
-> 
-> looks straight forward enough ...
-> Acked-by: Mike Frysinger <vapier@gentoo.org>
-> 
-> > +static struct syscore_ops nmi_syscore_ops = {
-> >        .resume         = nmi_wdt_resume,
-> >        .suspend        = nmi_wdt_suspend,
-> >  };
-> 
-> a bit sad this couldnt be made const
+On Mon, Apr 18, 2011 at 20:23, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Mon, Apr 18, 2011 at 8:17 AM, Alexey Zaytsev
+> <alexey.zaytsev@gmail.com> wrote:
+>>
+>> Could you please just apologize for the pointless diffstat complain,
+>> so we could go on?
+>
+> Ehh. They aren't pointless, and I'm _this_ close to just stopping
+> pulling from some people unless things improve.
+>
+>> Dear Russel.
+>>
+>> Please don't take the offense. Linus might be a dickhead at times, and
+>> sometimes he's wrong, but I'm sure he did not mean to hurt you.
+>
+> Umm. The "some people" who need to get their shit together was never
+> Russell (and we've been emailing in private about it). We may not
+> agree about every detail, but on the whole we're not at all butting
+> heads.
+>
 
-Well, that would trigger a compiler warning from register_syscore_ops().
+Ok, I fail at trolling this time.
 
-However, I'm going to make that change change everywhere at once when all of
-the conversions have been made, since it looks like we're only going to have
-static syscore_ops.
-
-Thanks,
-Rafael
+But being serious now, what's the plan for the new code?
+I might get basic support for the Conexant/Ikanos SolosW SOC by the
+2.6.41 merge window. Should I just send it in, or is there some
+moratorium in place, before the current code gets sorted out?
