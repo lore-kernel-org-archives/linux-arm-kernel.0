@@ -1,61 +1,81 @@
-From: matt@0xlab.org (Matt Hsu)
-Date: Mon, 18 Apr 2011 13:48:34 +0800
-Subject: [TuxOnIce-devel] [RFC PATCH] Current status, suspend-to-disk
-	support on ARM
-In-Reply-To: <alpine.DEB.2.00.1104141747310.9967@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-	<20110412183208.GC26916@elf.ucw.cz>
-	<alpine.DEB.2.00.1104131020080.29883@localhost6.localdomain6>
-	<201104132338.03003.rjw@sisk.pl>
-	<alpine.DEB.2.00.1104141747310.9967@localhost6.localdomain6>
-Message-ID: <BANLkTinroLCypX-iG0xGpnyxBk=P5TVtJQ@mail.gmail.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Mon, 18 Apr 2011 20:36:50 +0530
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <no>
+References: <no>
+Message-ID: <1303139217-10285-1-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->
-> The last thing here in my setup that's obviously not correctly suspending /
-> resuming is the OMAP display driver; I'm not the only one with that problem,
-> Matt's previous report:
->
-> http://blog.gmane.org/gmane.linux.swsusp.devel/month=20101201
->
-> has the same thing, "omapdss DISPC error: SYNC_LOST, disabling LCD".
->
->
->     Hi FrankH,
+From: Charulatha V <charu@ti.com>
 
-    Above issue could be resolved by:
+Use PM runtime framework in OMAP GPIO driver.
 
-   - CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE=y
-   - the following patch
+Patch series is based on mainline rc3 following commit
+commit a1b49cb7e2a7961ec3aa8b64860bf480d4ec9077
+Merge branch 'i2c-for-linus' of
+	git://git.kernel.org/pub/scm/linux/kernel/git/jdelvare/staging
 
-diff --git a/drivers/video/omap2/dss/dispc.c
-b/drivers/video/omap2/dss/dispc.c
-index 8b3ac80..a188732 100644
---- a/drivers/video/omap2/dss/dispc.c
-+++ b/drivers/video/omap2/dss/dispc.c
-@@ -2784,7 +2784,6 @@ static void dispc_error_worker(struct work_struct
-*work)
-                bool enable = false;
+Changes in v2:
+* Use a per-bank flag 'looses_context' (using pwrdm_can_ever_lose_context())
+       instead of using the powerdomain name
+* Make use of omap_device_get_context_loss_count() to decide on if restore
+       context needs to be done.
+* Do not remove #ifdef CONFIG_ARCH_OMAP2PLUS
+* Do not use pm_runtime_suspended() before calling pm_runtime_get_sync/put_sync
+* use IS_ERR_VALUE() instead of '< 0' in "if" conditions
+(Thanks to Kevin and Paul for the above suggestions)
 
-                DSSERR("SYNC_LOST, disabling LCD\n");
+Previous version of this patch series is available at:
+http://ns.spinics.net/lists/linux-omap/msg48167.html
+http://ns.spinics.net/lists/linux-omap/msg47989.html
+http://ns.spinics.net/lists/linux-omap/msg47827.html
+http://ns.spinics.net/lists/linux-omap/msg47830.html
 
-                for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
-                        struct omap_overlay_manager *mgr;
-                        mgr = omap_dss_get_overlay_manager(i);
-@@ -2815,6 +2814,9 @@ static void dispc_error_worker(struct work_struct
-*work)
-                        if (enable)
-                                manager->device->enable(manager->device);
-                }
-+
-+               dispc_enable_lcd_out(false);
-+               dispc_enable_lcd_out(true);
+Compile tested for:
+ - omap1_defconfig
+ - omap2plus_defconfig
 
-     Although this patch is somehow nasty, but it work anyway.
+Boot test (success on the following boards):
+ - OMAP1710-H3
+ - OMAP2420-H4
+ - OMAP3430-SDP
+ - OMAP3430-Zoom2
+ - OMAP3630-Zoom3
+ - OMAP4430-SDP
 
-- Matt
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110418/b205e44d/attachment.html>
+GPIO module functionality testing (success on the following boards):
+ - OMAP2420-H4
+ - OMAP3430-SDP
+ - OMAP3430-Zoom2
+ - OMAP3630-Zoom3
+ - OMAP4430-SDP
+
+PM Testing (success as given below):
+OMAP3430-SDP: retention, off_mode, system_wide suspend, gpio wakeup
+OMAP3630-Zoom3: retention, system_wide suspend
+using the following:
+	     echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
+	     echo '5' > /debug/pm_debug/wakeup_timer_seconds
+	     echo 1 > /debug/pm_debug/sleep_while_idle
+	     echo 1 > /debug/pm_debug/enable_off_mode
+	     echo mem > /sys/power/state
+
+
+Charulatha V (7):
+  OMAP: GPIO: Make gpio_context part of gpio_bank structure
+  OMAP: GPIO: Use flag to identify wkup dmn GPIO
+  OMAP4: GPIO: Save/restore context
+  OMAP: GPIO: handle save/restore ctx in GPIO driver
+  OMAP2+: GPIO: make workaround_enabled bank specific
+  OMAP: GPIO: Cleanup prepare_for_idle/resume
+  OMAP: GPIO: use PM runtime framework
+
+ arch/arm/mach-omap2/gpio.c             |    6 +
+ arch/arm/mach-omap2/pm34xx.c           |   22 +-
+ arch/arm/plat-omap/gpio.c              |  766 ++++++++++++++++++--------------
+ arch/arm/plat-omap/include/plat/gpio.h |    3 +-
+ 4 files changed, 439 insertions(+), 358 deletions(-)
