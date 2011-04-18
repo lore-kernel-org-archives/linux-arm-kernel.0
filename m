@@ -1,62 +1,38 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 18 Apr 2011 23:40:15 +0200 (CEST)
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110418202301.GA13808@opensource.wolfsonmicro.com>
-References: <20110414120209.GG1611@n2100.arm.linux.org.uk>
-	<20110414123126.GA3336@atomide.com>
-	<BANLkTi=3+yQU_URj0Tao_MP7v=O7cO_ftg@mail.gmail.com>
-	<20110415155642.GO1611@n2100.arm.linux.org.uk>
-	<BANLkTi=iqcwq+kEaDEWGrCAutZUAPPXFyw@mail.gmail.com>
-	<20110416082802.GS1611@n2100.arm.linux.org.uk>
-	<20110416165725.GA25811@opensource.wolfsonmicro.com>
-	<20110418081050.GG12272@atomide.com>
-	<20110418135704.GB1765@opensource.wolfsonmicro.com>
-	<20110418171857.GC25671@n2100.arm.linux.org.uk>
-	<20110418202301.GA13808@opensource.wolfsonmicro.com>
-Message-ID: <alpine.LFD.2.00.1104182315180.2744@localhost6.localdomain6>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 18 Apr 2011 23:43:41 +0200
+Subject: [PATCH 9/14] PM / Blackfin: Use struct syscore_ops instead of
+	sysdevs for PM
+In-Reply-To: <BANLkTi=BRXtsG0wK6SbK-6L-xzwMccR3eQ@mail.gmail.com>
+References: <201103280125.11750.rjw@sisk.pl> <201104172311.59289.rjw@sisk.pl>
+	<BANLkTi=BRXtsG0wK6SbK-6L-xzwMccR3eQ@mail.gmail.com>
+Message-ID: <201104182343.41702.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Apr 2011, Mark Brown wrote:
-> On Mon, Apr 18, 2011 at 06:18:57PM +0100, Russell King - ARM Linux wrote:
+On Monday, April 18, 2011, Mike Frysinger wrote:
+> On Sun, Apr 17, 2011 at 17:11, Rafael J. Wysocki wrote:
+> > Convert some Blackfin architecture's code to using struct syscore_ops
+> > objects for power management instead of sysdev classes and sysdevs.
+> >
+> > This simplifies the code and reduces the kernel's memory footprint.
+> > It also is necessary for removing sysdevs from the kernel entirely in
+> > the future.
 > 
-> > Linus has replied in this thread with his view, which is not much
-> > different from the view which I've been stating all along.
+> looks straight forward enough ...
+> Acked-by: Mike Frysinger <vapier@gentoo.org>
 > 
-> Yeah, I saw that.  Quite frankly it's astonishing - I must apologise, I
-> had thought you were most likely misinterpreting what he was saying.
-
-Sigh.
- 
-> > Will we ever be able to put John's code in the kernel?  Honestly, I have
-> > no idea.  What I do know is that unless we start doing something to solve
-> > the problem we have today with the quantity of code under arch/arm _and_
-> > the constant churn of that code, we will _never_ be able to add new
-> > platform support in any shape or form to the kernel.
+> > +static struct syscore_ops nmi_syscore_ops = {
+> >        .resume         = nmi_wdt_resume,
+> >        .suspend        = nmi_wdt_suspend,
+> >  };
 > 
-> Given where we're at right now I'm guessing we're going to see ARM
-> development halted until at least the merge window after next which is
-> 5-6 months or so.  We're not talking about trivial bits of
-> infrastructure here and obviously any substantial reworks here are going
-> to involve churn anyway.
-> 
-> To make matters worse unless people just give up the longer we keep the
-> tree shut down the larger the merge will be when it does reopen.
+> a bit sad this couldnt be made const
 
-I tend to disagree. It's not rocket science to cleanup stuff just
-along the way. I did the (not yet perfect) conversion of about 20 irq
-chips on saturday just to see how far I get with that abstract
-chip. And it simply got rid of >1200 LOC with some more potential
-reduction already detected.
+Well, that would trigger a compiler warning from register_syscore_ops().
 
-So when we come up with such generic abstractions then it's not
-a too big burden for a maintainer to care about his 1 or 2 irq chips
-and some other small cleanups here and there.
-
-Linus does not expect that ARM code shrinks 80% in the next cycle, but
-he wants to see that people take him seriously and actually cut down
-code in a diffstat visible way.
+However, I'm going to make that change change everywhere at once when all of
+the conversions have been made, since it looks like we're only going to have
+static syscore_ops.
 
 Thanks,
-
-	tglx
+Rafael
