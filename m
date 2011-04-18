@@ -1,21 +1,21 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 18 Apr 2011 12:37:43 -0500
-Subject: [patch 27/29] arm: Cleanup the irq namespace
-In-Reply-To: <20110328170653.348149801@linutronix.de>
-References: <20110328170219.059141076@linutronix.de>
-	<20110328170653.348149801@linutronix.de>
-Message-ID: <0D753D10438DA54287A00B027084269764D221CCE5@AUSP01VMBX24.collaborationhost.net>
+Date: Mon, 18 Apr 2011 12:43:08 -0500
+Subject: [patch 21/23] arm: Cleanup the irq namespace
+In-Reply-To: <20110325132049.382413026@linutronix.de>
+References: <20110325131617.258789658@linutronix.de>
+	<20110325132049.382413026@linutronix.de>
+Message-ID: <0D753D10438DA54287A00B027084269764D221CD07@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 28, 2011 10:13 AM, Thomas Gleixner wrote:
+On Friday, March 25, 2011 6:22 AM, Thomas Gleixner wrote:
 > 
 > Convert to the new function names. Automated with coccinelle.
->
+> 
 > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  arch/arm/mach-ep93xx/gpio.c                    |   31 +++++++++++------
->
+ arch/arm/mach-ep93xx/gpio.c                    |   31 +++++++++++------
+
 > Index: linux-2.6-tip/arch/arm/mach-ep93xx/gpio.c
 > ===================================================================
 > --- linux-2.6-tip.orig/arch/arm/mach-ep93xx/gpio.c
@@ -60,8 +60,7 @@ On Monday, March 28, 2011 10:13 AM, Thomas Gleixner wrote:
 > +				ep93xx_gpio_f_irq_handler);
 >  }
 
-I would suggest keeping these as one line each just for readability.
+This appears to be the same patch as [27/29] arm: Cleanup the irq namespace
 
-Other than that:
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Regards,
+Hartley
