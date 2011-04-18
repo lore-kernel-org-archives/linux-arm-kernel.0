@@ -1,43 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 18 Apr 2011 10:45:20 +0200
-Subject: [PATCH] V4L: mx3_camera: select VIDEOBUF2_DMA_CONTIG instead of
-	VIDEOBUF_DMA_CONTIG
-In-Reply-To: <20110418082049.GJ3811@pengutronix.de>
-References: <1302166243-650-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110418080637.GA31131@pengutronix.de>
-	<Pine.LNX.4.64.1104181013250.27247@axis700.grange>
-	<20110418082049.GJ3811@pengutronix.de>
-Message-ID: <20110418084520.GB31131@pengutronix.de>
+From: bn@niasdigital.com (Ben Nizette)
+Date: Mon, 18 Apr 2011 18:50:12 +1000
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <20110418091902.13345132@lxorguk.ukuu.org.uk>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+Message-ID: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
 
-On Mon, Apr 18, 2011 at 10:20:49AM +0200, Robert Schwebel wrote:
-> On Mon, Apr 18, 2011 at 10:14:56AM +0200, Guennadi Liakhovetski wrote:
-> > It's been pushed upstream almost 2 weeks ago:
-> >
-> > http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/31352
+On 18/04/2011, at 6:19 PM, Alan Cox wrote:
+
+>> gpiolib handles input and output, high and low because that's all that could reasonably be expected to a) always work and b) be changed at run time in the driver.
 > 
-> As our autobuilder does still trigger, I assume that the configs have to
-> be refreshed and it may be an issue on our side. Can you take care of
-> that?
-The problem is not our config, but that the change didn't hit next
-(next-20110418) yet.
+> Imagine if file systems only handled 8.3 filenames because that's all
+> that could reasonably be expected to a) always work !
 
-git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-2.6 (master)
-(which I guess is the tree targeted by Guennadi's pull request)
-is currently at
+Fair call, but bringing this back to the particular case in hand what in that enum is worth 'hinting' in a might-have-an-effect manner rather than just letting the board take care of it?
 
-	78fca1b9 (Merge branch 'release' of git://git.kernel.org/pub/scm/linux/kernel/git/aegl/linux-2.6)
+Still my question stands, where is the driver ever better placed to make these calls than the board code?
 
-which doesn't contain Guennadi's pull request. Also the other branches
-in Mauro's repo don't contain it, in fact the repository is fully merged
-into Linus tree.
+> 
+>> So in short - what's the use case?  Which driver requires this?
+>> 
+> 
+> Also your comment re simply in or out on or off is incorrect. Pins may
+> also be in use by firmware and the like and in a 'neither' state.
+> Something certain gpio people seem to be in denial over.
 
-Best regards
-Uwe
+Quite right, but should a pin ever be in a neither state and simultaneously controlled by a gpiolib driver?  If so, how should it behave and if not, is it anything that stricter enforcement of gpio_request() semantics can't get around?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	--Ben.
+
+> 
+> Alan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
