@@ -1,71 +1,73 @@
-From: alexey.zaytsev@gmail.com (Alexey Zaytsev)
-Date: Mon, 18 Apr 2011 19:17:35 +0400
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTindYL9RHsc0MtY76RSr05qD0AU5Vg@mail.gmail.com>
+From: george@znau.edu.ua (George Kashperko)
+Date: Mon, 18 Apr 2011 18:35:40 +0300
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de>
+	<BANLkTim6iCAsViJQS4XrY-XObs8pp-BiQQ@mail.gmail.com>
+	<201104181619.35115.arnd@arndb.de>
+	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+Message-ID: <1303140940.31595.45.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, Lunus.
 
-Could you please just apologize for the pointless diffstat complain,
-so we could go on?
+> >
+> > You mean the hardware has two sets of registers containing the same
+> > information, one of them the standard registers, and one with broadcom
+> > specific ones?
+> >
+> > Why don't you just use the standard ones then?
+> 
+> No. Did you read my first mail in this thread?
+> 
+> There is pair of cores for every device. First is AMBA-specific called
+> agent/wrapper and second one is Broadcom-specific.
+> 
+> AMBA specific core called agent/wrapper has AMBA specific registers:
+> CID and PID. However we do not ever read that in Broadcom driver,
+> because that are useless for us. On AMBA specific core we use only
+> some Broadcom specific registers to manage (enable/disable) *second*
+> (Broadcom-specific) core.
+> 
+Actually there could be two wrappers per agent (wrappers and agents
+ain't the same, wrapper could be part of agent or core, for broadcom
+ssb/axi buses seems we have wrappers in agents only).
 
-Dear Russel.
+Earlier at ssb-times we had wrappers built into agent, separate agent
+per core connection for each broadcom core. Connections are implied with
+bus usage by core - core can act as bus initiator (starting transfers to
+bus regions, those SBTMxxx registers used for control/state), bus target
+(accepting transfers from external bus regions, those SBIMxxx registers)
+or both.
+Currently for broadcom on axi bus we have the same (might implied by
+cores circuitry designed to be OCP-compliant) - cores being able to act
+both as initiators and targets have two wrappers built into agent, all
+other have either slave or master wrapper.
 
-Please don't take the offense. Linus might be a dickhead at times, and
-sometimes he's wrong, but I'm sure he did not mean to hurt you.
+Unlike ssb, where we used wrappers differently, for axi we use them just
+for reset and control/state queries and we never reset/query chipcommon
+therefore can silently ignore its agent wrappers. For pcie in device
+mode we might need to reset both wrappers for clean initialization (at
+least I see both master and slave wrappers' reset during 4716 pci device
+mode startup in number of GPL'ed sourcecodes) but here I dont know for
+sure. For all other single-role cores we have either target or initiator
+wrapper for agent control and as those seems to feature same dmp
+register's layout therefore we see no difference in wether we reset
+agent master or slave.
 
-(And who the fuck is this guy? No one.)
+Unfortunately still have just one axi-based box to play with. Will be
+much appreciated if you could share EROM dumps from your boards to get
+better understanding of agents/wrappers coupling and relations.
 
-On Thu, Apr 14, 2011 at 13:44, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> This morning, I looked at linux-next to find out how arch/arm is doing
-> for the next merge window.
->
-> $ git diff -C --cumulative v2.6.39-rc1... arch
-> ?19.7% arch/arm/mach-imx/
-> ?19.2% arch/arm/mach-mx3/
-> ? 3.4% arch/arm/mach-mxc91231/
-> ?18.1% arch/arm/mach-ux500/
-> ?74.1% arch/arm/
-> ? 3.2% arch/m68k/
-> ? 4.0% arch/mips/lantiq/
-> ? 6.9% arch/mips/
-> ? 3.1% arch/x86/kvm/
-> ? 7.6% arch/x86/
-> ?100.0% arch/
-> $ git diff -C --cumulative v2.6.39-rc1... arch/arm
-> ? 4.7% arch/arm/mach-imx/
-> ? 5.9% arch/arm/mach-msm/
-> ? 6.3% arch/arm/mach-mx3/
-> ? 8.8% arch/arm/mach-mxc91231/
-> ? 7.6% arch/arm/mach-ux500/include/mach/
-> ?46.1% arch/arm/mach-ux500/
-> ? 3.6% arch/arm/mach-zynq/
-> ? 5.9% arch/arm/plat-mxc/include/mach/
-> ? 7.3% arch/arm/plat-mxc/
-> ?100.0% arch/arm/
-> $ git diff -C --shortstat v2.6.39-rc1... arch/arm
-> ?450 files changed, 11973 insertions(+), 5736 deletions(-)
->
-> Note that with --cumulative, the %age given includes all child directories
-> (so the 74% for arch/arm includes everything below it).
->
-> So, almost 75% of changes in arch are down to arch/arm. ?For arch/arm,
-> there's 6k new lines introduced - so there's a significant amount of new
-> work there.
->
-> Folk may want to consider that we're three weeks from Linus' rant, and
-> there's little sign of the situation changing. ?It looks to me from
-> these statistics that it's business as usual.
->
-> Please take a moment to consider how Linus will react to this at the
-> next merge window.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+As for amba bus usage I think we could get back to this idea later at
+some point if/when broadcom implement some different agents and/or erom
+core with other layout or if we spot broadcom-on-axi bus with some
+useful native axi peripherals without DMP wrappers (they are actually
+already there on the bus but we have no clue how to control them and
+actualy have no need to do that anyways) which won't fit into our
+coure->agent model but for now I think there is no benefit in doing
+that.
+
+Have nice day,
+George
