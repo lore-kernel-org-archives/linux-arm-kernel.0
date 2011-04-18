@@ -1,50 +1,31 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 18 Apr 2011 10:56:06 +0300
-Subject: [PATCH V2 2/2] mtd: msm_nand: Add initial msm nand driver support.
-In-Reply-To: <4DABE8FE.5040300@parrot.com>
-References: <1302938249-4601-1-git-send-email-mnalajal@codeaurora.org>
-	<4DABE8FE.5040300@parrot.com>
-Message-ID: <1303113366.2815.31.camel@localhost>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 18 Apr 2011 10:06:07 +0200
+Subject: [PATCH V14 3/4] ptp: Added a clock driver for the IXP46x.
+In-Reply-To: <201104180856.04186.arnd@arndb.de>
+References: <cover.1303107532.git.richard.cochran@omicron.at>
+	<dbee2487a57fd7f41e4efbbd2ddfb1313b8d71bc.1303107532.git.richard.cochran@omicron.at>
+	<201104180856.04186.arnd@arndb.de>
+Message-ID: <20110418080606.GA3809@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-04-18 at 09:32 +0200, Matthieu CASTET wrote:
-> Hi,
+On Mon, Apr 18, 2011 at 08:56:03AM +0200, Arnd Bergmann wrote:
+> On Monday 18 April 2011, Richard Cochran wrote:
+> > +
+> > +       lo = __raw_readl(&regs->channel[ch].src_uuid_lo);
+> > +       hi = __raw_readl(&regs->channel[ch].src_uuid_hi);
+> > +
 > 
-> Murali Nalajala a ?crit :
-> > Add initial msm nand driver support for Qualcomm MSM platforms.
-> > This driver is capable of handling both 2k and 4k page support
-> > nand devices.
-> > 
-> > This driver was originally developed by Arve Hj?nnev?g at google.
-> > Its source is available at
-> > http://android.git.kernel.org/?p=kernel/msm.git under
-> > android-msm-2.6.35 branch.
-> > 
-> > CC: Dima Zavin <dima@android.com>
-> > CC: Brian Swetland <swetland@google.com>
-> > CC: Arve Hj?nnev?g <arve@android.com>
-> > Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
-> > ---
-> > Changes in V2
-> > * Turn most of the pr_info() calls into pr_debug().
-> > 
-> >  drivers/mtd/devices/Kconfig    |   11 +
-> >  drivers/mtd/devices/Makefile   |    1 +
-> >  drivers/mtd/devices/msm_nand.c | 1597 ++++++++++++++++++++++++++++++++++++++++
-> >  drivers/mtd/devices/msm_nand.h |   77 ++
-> >  4 files changed, 1686 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/mtd/devices/msm_nand.c
-> >  create mode 100644 drivers/mtd/devices/msm_nand.h
-> > 
-> 
-> For the record, I am not sure it is a great idea to make nand drivers
-> independent of the nand layer.
+> I guess you should use readl(), not __raw_readl() here. The __raw_* functions
+> are not meant for device drivers.
 
-This is not acceptable. Nand drivers should use the nand_base framework.
-If the framework is limiting, buggy, slow, etc for your case (which is
-quite possible) - the framework should be improved.
+Krzysztof had a different opinion about this.
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+    https://lkml.org/lkml/2011/1/8/67
+
+Anyway, it is his driver, and I just followed what he does elsewhere
+in the driver. It make sense to me to keep the driver consistent.
+Maybe we should make the change throughout?
+
+Thanks,
+Richard
