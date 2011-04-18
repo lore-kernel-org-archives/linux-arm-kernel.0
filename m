@@ -1,39 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Apr 2011 14:05:08 +0300
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <201104180929.33569.arnd@arndb.de>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<20110414223036.GA7335@n2100.arm.linux.org.uk>
-	<201104180929.33569.arnd@arndb.de>
-Message-ID: <20110418110502.GI12272@atomide.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 18 Apr 2011 16:52:00 +0530
+Subject: [PATCH] tty/serial/pl011: don't print error msg if dmaengine_pause is
+	not supported
+Message-ID: <98422bc7c3ebb4bf6a4ab26179b3f3b7d1a5b5ca.1303125086.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110418 10:26]:
-> On Friday 15 April 2011, Russell King - ARM Linux wrote:
-> > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
-> > > From: Ramesh Gupta <grgupta@ti.com>
-> > > 
-> > > This patch is to flush the iommu page table entries from L1 and L2
-> > > caches using dma_map_single. This also simplifies the implementation
-> > > by removing the functions  flush_iopgd_range/flush_iopte_range.
-> > 
-> > No.  This usage is just wrong.  If you're going to use the DMA API then
-> > unmap it, otherwise the DMA API debugging will go awol.
-> 
-> 
-> It's also completely upside-down: The iommu support should provide interfaces
-> using the dma-mapping API, not use that API to provide a machine specific
-> version of the generic interface.
-> 
-> As far as I can tell, nothing actually uses these drivers, maybe we should just
-> remove them before we get any code in the mainline kernel that depends on it.
+Few dma controller doesn't support dmaengine_pause() and return -ENXIO if
+dmaengine_pause() is called for them. Error messages such as "unable to pause
+DMA transfer" shouldn't be printed for them.
 
-There is drivers/media/video/omap3isp/isp.c. But if we now
-have a generic replacement for this code we should start using it.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/tty/serial/amba-pl011.c |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
 
-Hiroshi, any comments on that?
-
-Regards,
-
-Tony
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 6deee4e..c0e1a42 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -755,18 +755,21 @@ static void pl011_dma_rx_irq(struct uart_amba_port *uap)
+ 	size_t pending;
+ 	struct dma_tx_state state;
+ 	enum dma_status dmastat;
++	int ret;
+ 
+ 	/*
+ 	 * Pause the transfer so we can trust the current counter,
+ 	 * do this before we pause the PL011 block, else we may
+ 	 * overflow the FIFO.
+ 	 */
+-	if (dmaengine_pause(rxchan))
+-		dev_err(uap->port.dev, "unable to pause DMA transfer\n");
++	ret = dmaengine_pause(rxchan);
++	if (ret && ret != -ENXIO)
++		dev_err(uap->port.dev, "unable to pause DMA transfer");
++
+ 	dmastat = rxchan->device->device_tx_status(rxchan,
+-						   dmarx->cookie, &state);
+-	if (dmastat != DMA_PAUSED)
+-		dev_err(uap->port.dev, "unable to pause DMA transfer\n");
++			dmarx->cookie, &state);
++	if (ret != -ENXIO && dmastat != DMA_PAUSED)
++		dev_err(uap->port.dev, "unable to pause DMA transfer");
+ 
+ 	/* Disable RX DMA - incoming data will wait in the FIFO */
+ 	uap->dmacr &= ~UART011_RXDMAE;
+-- 
+1.7.2.2
