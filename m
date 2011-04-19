@@ -1,43 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Apr 2011 00:24:20 +0100
-Subject: [PATCH] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <20110419161913.a1c18599.akpm@linux-foundation.org>
-References: <20110405073030.GI13963@pengutronix.de>
-	<1301992655-8514-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110405163338.GA11832@n2100.arm.linux.org.uk>
-	<20110419161913.a1c18599.akpm@linux-foundation.org>
-Message-ID: <20110419232420.GA3673@n2100.arm.linux.org.uk>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Tue, 19 Apr 2011 16:33:36 -0700
+Subject: how can I cleanly exclude memory from the kernel memory allocator?
+In-Reply-To: <20110325202755.GA13574@n2100.arm.linux.org.uk>
+References: <20110324221854.GA29359@labbmf-linux.qualcomm.com>
+	<alpine.LFD.2.00.1103241912390.11889@xanadu.home>
+	<20110325173928.GD29359@labbmf-linux.qualcomm.com>
+	<20110325202755.GA13574@n2100.arm.linux.org.uk>
+Message-ID: <20110419233336.GF29359@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 04:19:13PM -0700, Andrew Morton wrote:
-> On Tue, 5 Apr 2011 17:33:39 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 25 Mar 11 20:27, Russell King - ARM Linux wrote:
+> On Fri, Mar 25, 2011 at 10:39:28AM -0700, Larry Bassel wrote:
+> > OK, please ignore my previous mail, I see that .fixup can be
+> > used to adjust tags. It appears to me, however, that using a
+> > .reserve function calling memblock_reserve will be an
+> > easier way of doing what I need.
 > 
-> > On Tue, Apr 05, 2011 at 10:37:35AM +0200, Uwe Kleine-K__nig wrote:
-> > > +struct platform_device *__init gpio_led_register_device(
-> > > +		const struct gpio_led_platform_data *pdata);
-> > 
-> > Please don't add __init annotations to declarations.
+> Absolutely.
+
+Hopefully I'm just missing something obvious, but
+when I call memblock_reserve (in .38) to reserve a block
+of memory away from the general kernel memory pool,
+I find that an ioremap of memory within the reserved block
+still fails because pte_valid() is apparently true.
+
+Is this intended behavior? If so, what would the
+correct way of separating memory from the system be
+so that there is no longer a 1-to-1 1M mapping for
+this memory and ioremap (creating the *only* mapping
+for this memory) is allowed?
+
+Thanks.
+
+Larry
+
 > 
-> Reasons?
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-It's noise.
-
-> A year or so ago we had to *add* an __init to a declaration, because
-> one architecture was generating a short-mode-addressing relative branch
-> to the callee, assuming the target was in the same section as the call
-> site.  When the linker went to resolve the branch, it discovered that
-> the target was in fact in a different section and was too far away to
-> be able to use the short-mode addressing.  IIRC, that architecture was
-> arm.
-
-I'm not aware of ARM ever requiring that.  If it was, we'd have to add
-a heck of a lot of those annotations.  And those annotations don't tell
-the compiler that it might be far away.
-
-We _do_ have a problem if someone decides to include a big ramdisk or
-initramfs image in the discarded section, which is something I have a
-patch kicking around to completely change the vmlinux layout to resolve.
-That's taking something of a low priority at the moment though as we've
-been turned upside down by Linus...
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
