@@ -1,47 +1,39 @@
-From: mbohan@codeaurora.org (Michael Bohan)
-Date: Tue, 19 Apr 2011 15:34:47 -0700
-Subject: MT_HIGH_VECTOR mapping set read-only creating illegal access
-In-Reply-To: <alpine.LFD.2.00.1104122308400.28032@xanadu.home>
-References: <4DA4F170.4020009@codeaurora.org>
-	<alpine.LFD.2.00.1104122308400.28032@xanadu.home>
-Message-ID: <4DAE0E07.9030806@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 19 Apr 2011 15:50:46 -0700
+Subject: [PATCH linux-omap-pm/pm-wip/cpufreq] OMAP2PLUS: cpufreq: Fix typo
+	when attempting to set mpu_clk for OMAP4
+In-Reply-To: <1302787318-6650-1-git-send-email-jhnikula@gmail.com> (Jarkko
+	Nikula's message of "Thu, 14 Apr 2011 16:21:58 +0300")
+References: <1302787318-6650-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <87aaflam9l.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2011 8:31 PM, Nicolas Pitre wrote:
-> On Tue, 12 Apr 2011, Michael Bohan wrote:
-> If set_tls() writes to 0xffff0ff0 in your case, then you must have an
-> ARM core which is prior ARMv6k.
+Jarkko Nikula <jhnikula@gmail.com> writes:
 
-Actually, no, but for historical reasons we were not using the hwreg TLS 
-support for all configurations. Our libc expected the data at this address.
-
->> Is there a reason this mapping must be read-only?
+> Fix this typo as there is no dpll_mpu_ck for OMAP3 and code flow is clearly
+> trying to set mpu_clk for OMAP4 for which this dpll_mpu_ck is available.
 >
-> It is read-only for user space to prevent user space from messing with
-> the vector table.
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+
+Thanks, applied to pm-wip/cpufreq branch.
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/omap2plus-cpufreq.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> In the kernel, it is read-only _only_ when CONFIG_CPU_USE_DOMAINS is not
-> enabled which may happen with ARMv6k and above.  Otherwise, if you are
-> pre ARMv6k, you do use domains, and then the vector page is read-write
-> for the kernel.
-
-Yes, this seems to be the the key. In previous versions the kernel was 
-given this privilege unconditionally in arch/arm/mm/proc-macros.S.
-
->> Perhaps we could apply write
->> access for these special cases only?
->
-> I'd rather suggest you investigate what changes you did to your kernel
-> tree that would explain the apparent inconsistency in your kernel
-> config.
-
-Yes, the inconsistency was on our end. We will revert all hacks and 
-mandate that our libc do things correctly.
-
-Thanks,
-Mike
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> index 8d472f6..d53ce23 100644
+> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> @@ -161,7 +161,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+>  		mpu_clk = clk_get(NULL, "virt_prcm_set");
+>  	else if (cpu_is_omap34xx())
+>  		mpu_clk = clk_get(NULL, "dpll1_ck");
+> -	else if (cpu_is_omap34xx())
+> +	else if (cpu_is_omap44xx())
+>  		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
+>  
+>  	if (IS_ERR(mpu_clk))
