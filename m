@@ -1,53 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 19:12:47 +0200
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110419162742.GB24372@redhat.com>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<201104191801.19348.arnd@arndb.de>
-	<20110419162742.GB24372@redhat.com>
-Message-ID: <201104191912.48003.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 Apr 2011 10:20:28 -0700
+Subject: [PATCH 04/10] clk: implement parent pass through functions
+In-Reply-To: <1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4DADC45C.1020202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2011 18:27:42 Dave Jones wrote:
-> On Tue, Apr 19, 2011 at 06:01:19PM +0200, Arnd Bergmann wrote:
->  > > Thinking of it, is it OK to put chip CPUfreq drivers into
->  > > drivers/cpufreq/* instead of into the arch/arm/* platform
->  > > code as everyone does right now? We could probably
->  > > fix that and bring down the diffstat considerably.
->  > 
->  > That's something to discuss with Dave Jones and other people
->  > interested in cpufre. Right now, all cpufreq drivers, including
->  > those for other architectures are in arch/.
->  > 
->  > I think it would be good to have the out of the individual
->  > platforms, in particular in order to get better reviews of
->  > new cpufreq drivers by people that are interested in them.
-> 
-> The platform drivers are by their nature architecture specific,
-> so arch/ seems apropos.  drivers/platform/arm/ maybe ?
-> 
-> Though, having arm do something different to every other arch seems
-> a bit awkward too. Everyone else has their cpufreq platform driver
-> somewhere under arch/whatever/../cpufreq/..  so changing that
-> violates the principle of least surprise.
-> 
-> I'm also not convinced that moving them would increase review of changes.
-> 
-> What problem is this solving again ?
+On 04/15/2011 12:08 PM, Sascha Hauer wrote:
+> A common case for clocks is that certain operations are not implemented
+> and shall be passed through to the parent. Add convenience functions
+> for this purpose
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+>
 
-Right now, every subarchitecture in arm implements a number of 
-drivers (irq, clocksource, gpio, pci, iommu, cpufreq, ...).
-These drivers are frequently copies of other existing ones with
-slight modifications or (worse) actually are written independently
-for the same IP blocks. In some cases, they are copies of drivers
-for stuff that is present in other architectures.
+I was hoping we could just build the parent handling into the core
+instead of having every clk_ops->enable call the parent ops.
 
-We are discussing on a number of fronts to turn the source code
-layout from subarchitecture-centric to subsystem-centric, e.g.
-put all gpio drivers into one directory instead of each one
-into the directory for its (sub)architecture, in order to improve
-the abstractions and code reuse we have between the different
-implementations.
+Something like: if the clk_ops doesn't have a get_parent,
+clk_get_parent() would return NULL, and if the clk_ops doesn't have a
+set_parent, clk_set_parent() would do nothing.
 
-	Arnd
+Then clk_enable()/clk_disable() would call clk_get_parent() and then
+clk_enable() on that (whatever it is) before calling down into the
+ops->enable() function. Of course this means NULL is now the "no parent"
+value as opposed to ERR_PTR(-ENOSYS) but I'm willing to live with that
+since it makes things a bit simpler when you only have to check for NULL
+in the clk_enable()/clk_disable() path as opposed to NULL and IS_ERR.
+
+I'm afraid this patch means every time the clk_ops wants to enable its
+parent (which is almost always the case), it has to do so explicitly
+when we really just want to concentrate on what enabling means for that
+clock (namely setting some bits in some registers). Thoughts?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
