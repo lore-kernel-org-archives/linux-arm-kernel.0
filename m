@@ -1,43 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Apr 2011 08:25:43 +0200
-Subject: [PATCH 03/10] clk: Make NULL a valid clock again
-In-Reply-To: <1303174420.2801.18.camel@pororo>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-4-git-send-email-s.hauer@pengutronix.de>
-	<1303174420.2801.18.camel@pororo>
-Message-ID: <20110419062543.GQ14770@pengutronix.de>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 19 Apr 2011 11:55:45 +0530
+Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with irqsave
+	variants
+In-Reply-To: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+Message-ID: <4DAD2AE9.7060106@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
-
-On Tue, Apr 19, 2011 at 08:53:40AM +0800, Jeremy Kerr wrote:
-> Hi Sascha,
+On 04/18/2011 04:19 PM, Viresh KUMAR wrote:
+> dmaengine routines can be called from interrupt context and with interrupts
+> disabled.  Whereas spin_unlock_bh can't be called from such contexts. So this
+> patch converts all spin_*_bh routines to irqsave variants.
 > 
-> > NULL used to be a valid clock. This patch makes the common struct
-> > clk stuff work with this. Instead of crashing we return sane default
-> > values for this dummy clock, that is: can always be prepared, enabled,
-> > rate unkown and no set rate.
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/dma/dw_dmac.c      |   56 +++++++++++++++++++++++++------------------
+>  drivers/dma/dw_dmac_regs.h |    1 +
+>  2 files changed, 33 insertions(+), 24 deletions(-)
 > 
-> Although I'm not totally averse to this change, I've been trying to
-> avoid allowing NULL clocks - it seems to be a little 'messy' to allows
-> clocks that don't have any possible operations on them, and could hide
-> error cases where clock pointers have not been correctly initialised.
 > 
-> However, I understand that this may be required for flexibility between
-> machines, and in that case would make sense. Is that what you're
-> intending this for?
+> diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
+> index 720f821..c89fd83 100644
+> --- a/drivers/dma/dw_dmac_regs.h
+> +++ b/drivers/dma/dw_dmac_regs.h
+> @@ -173,6 +173,7 @@ struct dw_dma {
+>  	void __iomem		*regs;
+>  	struct tasklet_struct	tasklet;
+>  	struct clk		*clk;
+> +	unsigned long		flags; /* for spin_lock_irqsave */
 
-I intended to use NULL clocks but didn't do it then. The patch was
-already created, so I posted it. I think We could equally well create a
-dummy clock which can be used by all architectures. People (including
-me) never really got used to NULL clocks and it's been a source of
-confusion since they have been introduced.
-
-Sascha
+Oops!!!
+This must have been added in dw_dma_chan instead :(
+Will resend it.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+viresh
