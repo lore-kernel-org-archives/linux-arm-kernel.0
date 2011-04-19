@@ -1,58 +1,66 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 19 Apr 2011 16:58:51 +0300
-Subject: [PATCH] OMAP: Remove reserve_sram calls to omapfb
-Message-ID: <mailman.204.1303222626.1530.linux-arm-kernel@lists.infradead.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 19 Apr 2011 16:20:17 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <op.vt6ufu1n3ri7v4@arend-laptop>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<1302892585.30441.12.camel@dev.znau.edu.ua>
+	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
+Message-ID: <BANLkTimcR9Z54kgHDK63=jL1U-yvWspjRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes calls from arch/arm/plat-omap/sram.c to
-omapfb_reserve_sram() and omap_vram_reserve_sram(), effectively
-disabling SRAM support for the old and new display drivers.
+W dniu 19 kwietnia 2011 15:58 u?ytkownik Arend van Spriel
+<arend@broadcom.com> napisa?:
+> On Sun, 17 Apr 2011 19:38:12 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> Hi Rafa?,
+>
+> As you probably expected I tried to integrate and use your bcmai/bcmaxi/?
+> driver with our brcm80211 driver (making progress). In the mean time I tried
+> to follow the discussions going on, but I am still catching up.
+>
+>> Compare this to the PCI bus type, which essentially deals with devices
+>> that have a PCI configuration space that contains generic (irq, memory,
+>> vendor/device ID, ...) registers along with device specific registers.
+>
+> How much alike is the (BCM)AXI bus type? My assumption was that each
+> registered PCI device is handled by a single driver module. In the
+> current(?) bcmai implementation each device driver is called with the
+> appropriate device structure reference, but it will also have the bus
+> structure reference and through that can also access other cores on the
+> (bcm)axi bus. This seems to me a potential issue when there are no
+> synchronization mechanisms in place (whether in a SoC configuration or
+> PCI-hosted). Does the PCI bus type allow driver for device A access
+> device B?
 
-SRAM code in the display drivers will be removed in separate patches.
+There are bus-specific infos that have to be available for drivers,
+like board id, sprom, CC access. So bcmai(?) drivers have to have
+access to bus struct.
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/plat-omap/sram.c |   13 -------------
- 1 files changed, 0 insertions(+), 13 deletions(-)
+One core driver should never touch other core, like 80211 touching ETH
+or USB or anything. Exception is CC and maybe PCI(e).
 
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index a3f50b3..e10eeed 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -19,7 +19,6 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
--#include <linux/omapfb.h>
- 
- #include <asm/tlb.h>
- #include <asm/cacheflush.h>
-@@ -32,7 +31,6 @@
- #include <plat/vram.h>
- 
- #include "sram.h"
--#include "fb.h"
- 
- /* XXX These "sideways" includes are a sign that something is wrong */
- #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
-@@ -170,17 +168,6 @@ static void __init omap_detect_sram(void)
- 			omap_sram_size = 0x4000;
- 		}
- 	}
--	reserved = omapfb_reserve_sram(omap_sram_start, omap_sram_base,
--				       omap_sram_size,
--				       omap_sram_start + SRAM_BOOTLOADER_SZ,
--				       omap_sram_size - SRAM_BOOTLOADER_SZ);
--	omap_sram_size -= reserved;
--
--	reserved = omap_vram_reserve_sram(omap_sram_start, omap_sram_base,
--			omap_sram_size,
--			omap_sram_start + SRAM_BOOTLOADER_SZ,
--			omap_sram_size - SRAM_BOOTLOADER_SZ);
--	omap_sram_size -= reserved;
- 
- 	omap_sram_ceil = omap_sram_base + omap_sram_size;
- }
+I still have to make use of all windows to improve cores access.
+
+
+>> A new bus_type really only makes sense if you expect a lot of devices
+>> to use this and you want to have the probing in the bus. If you only
+>> want to have a way to enumerate devices that get created by the
+>> parent driver, you can also use platform devices.
+>
+> The main assumption of the (bcm)axi driver seems to be that each core can
+> be considered as a device. Correct me if I am wrong, but I consider a
+> device to be an entity providing a particular system function. So an
+> ethernet device provides ethernet connectivity function, a mixer device
+> provides sound mixing function, and so on. The cores within a chip are not
+> always self-contained like this. To clarify let's say a system function is
+> realized by programming core A, core B, and finally trigger core A to set
+> the function in motion. This implies the need of coordination between the
+> programming steps on those cores.
+
+What cores may need to access each other? AFAIK so far we didn't meet
+such a cores.
+
 -- 
-1.7.1
+Rafa?
