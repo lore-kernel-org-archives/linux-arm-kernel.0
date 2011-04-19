@@ -1,63 +1,51 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 19 Apr 2011 09:55:15 +0100
-Subject: [PATCH V2 7/7] dmaengine/dw_dmac: implement pause and resume in
-	dwc_control
-In-Reply-To: <a1168e413888e35badd9fab6b1626fcfe355dc9b.1303194836.git.viresh.kumar@st.com>
-References: <cover.1303194835.git.viresh.kumar@st.com>
-	<a1168e413888e35badd9fab6b1626fcfe355dc9b.1303194836.git.viresh.kumar@st.com>
-Message-ID: <20110419085514.GG2820@pulham.picochip.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 19 Apr 2011 01:55:17 -0700 (PDT)
+Subject: [PATCH 05/10] clk: Add support for simple dividers
+In-Reply-To: <20110419073249.GK31131@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
+	<20110418094909.GE31131@pengutronix.de>
+	<20110418100716.GJ14770@pengutronix.de>
+	<4DACF761.3050503@codeaurora.org>
+	<20110419073249.GK31131@pengutronix.de>
+Message-ID: <0943efffac47bface3dff8ca4d700361.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 02:02:12PM +0530, Viresh Kumar wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Some peripherals like amba-pl011 needs pause to be implemented in DMA controller
-> drivers. This also returns correct status from dwc_tx_status() in case chan is
-> paused.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/dw_dmac.c      |   25 +++++++++++++++++++++++--
->  drivers/dma/dw_dmac_regs.h |    1 +
->  2 files changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index c30f0ba..48d2d7e 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -832,8 +832,7 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	struct dw_desc		*desc, *_desc;
->  	LIST_HEAD(list);
->  
-> -	/* Only supports DMA_TERMINATE_ALL */
-> -	if (cmd != DMA_TERMINATE_ALL)
-> +	if (cmd != DMA_TERMINATE_ALL && cmd != DMA_PAUSE && cmd != DMA_RESUME)
->  		return -ENXIO;
->  
->  	/*
-> @@ -844,11 +843,30 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	 */
->  	spin_lock_irqsave(&dwc->lock, dwc->lflags);
->  
-> +	if (cmd == DMA_RESUME) {
-> +		if (dwc->paused) {
-> +			channel_set_bit(dw, CH_EN, dwc->mask);
-> +			while (!(dma_readl(dw, CH_EN) & dwc->mask))
-> +				cpu_relax();
-> +		}
-> +		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
-> +		return 0;
-> +	}
-> +
->  	channel_clear_bit(dw, CH_EN, dwc->mask);
->  
->  	while (dma_readl(dw, CH_EN) & dwc->mask)
->  		cpu_relax();
->  
-> +	if (cmd == DMA_PAUSE) {
-> +		dwc->paused = true;
-> +		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
-> +		return 0;
-> +	}
+On Tue, April 19, 2011 12:32 am, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Mon, Apr 18, 2011 at 07:45:53PM -0700, Saravana Kannan wrote:
+>> On 04/18/2011 03:07 AM, Sascha Hauer wrote:
+>> >On Mon, Apr 18, 2011 at 11:49:09AM +0200, Uwe Kleine-K?nig wrote:
+>> >>On Fri, Apr 15, 2011 at 09:08:10PM +0200, Sascha Hauer wrote:
+>> >AFAIK there are two different implementation types in the tree. Some
+>> >implementations only allow to set to the exact rate round_rate returns
+>> >while others round down in set_rate.
+>> >
+>> >Has this been specified what behaviour is expected?
+>> >
+>>
+>> This is something I have nagged Russell once or twice about and then
+>> sent out an email to the list for which there was very limited
+>> response. I think clk_round_rate() is too generic and not very
+>> useful.
+>>
+>> We should really have something like:
+>> clk_set_rate_range(min, ideal, max)
+> (Note this is orthogonal to the question if set_rate may barf on values
+> other than the return values of round_rate.)
+>
+> clk_set_rate_range can even be implemented with clk_round_rate that is
+> just required to fulfill:
+
+I think it's more important that we try to find a new API that's better
+than clk_round_rate(). We can worry about the specifics of the
+implementation later.
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
