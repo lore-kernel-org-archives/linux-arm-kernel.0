@@ -1,85 +1,38 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 19 Apr 2011 09:38:55 +0100
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-	<20110418091902.13345132@lxorguk.ukuu.org.uk>
-	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
-	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
-Message-ID: <20110419093855.36910400@lxorguk.ukuu.org.uk>
+From: thomas.ab@samsung.com (Thomas Abraham)
+Date: Tue, 19 Apr 2011 14:10:00 +0530
+Subject: Cleanup Samsung stuff
+In-Reply-To: <20110419080307.GA26650@sirena.org.uk>
+References: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
+	<20110419080307.GA26650@sirena.org.uk>
+Message-ID: <BANLkTim2VJBoO-otakfVQaYsXLTyM91jsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > It also doesn't solve the real problem which is that you've got to
-> > implement platform specific parallel gpio extensions all over the place
-> > when you really want it all using the same 'handle' and request logic.
-> 
-> Fair enough.  Forgive me if you've stated this in a previous conversation
-> then but what do you see as being the best way forward here?  Should
-> gpiolib enforce itself as the One True Allocator and require all firmware
-> drivers call back in to it to get access to the pins rather than gpiolib
-> calling back to the platform upon gpio_request()?
+On Tue, Apr 19, 2011 at 1:33 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Apr 19, 2011 at 10:46:47AM +0900, Kukjin Kim wrote:
+>
+>> - Device tree (with Linaro)
+>
+> What is going on with device tree? ?I've asked a couple of times about
+> this in the other thread but I'm still not clear where the code is or
+> what could usefully be done with it.
 
-We need something to allocate gpios and manage them. gpiolib seems to be
-very good at this. We also need gpiolib to route other requests because
-gpiolib is the one thing which knows how to turn "gpio 43" a struct and
-function calls.
+The initial work on Samsung's s5pv310 is available at
+http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-February/004350.html
 
-> > And for a lot of this stuff that the gpio layer really doesn't want
-> > internal knowledge of other chunks of the kernel have used models like
-> > 'get_property/set_property' (eg battery, video4linux etc) so that the mid
-> > layer can plumb in a conversation between the handle owner and the driver
-> > without getting involved in the conversation.
-> 
-> Yeah that sounds like a more reasonable way to expose this functionality if
-> the driver does indeed need it.
+It is based on Grant's tree.
+git://git.secretlab.ca/git/linux-2.6 devicetree/test
 
-Leaving aside the current input/output and on/off bits I would go for
-being able to do
+Currently I am working on supporting clkdev and Jeremy's common clock
+for all of Samsung's platforms and then continue with the device tree
+support for s5pv310.
 
-	gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
-	gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
+Regards,
+Thomas.
 
-and having gpiolib perform nothing more on these than
-
-	is the gpio allocated 
-	does ->get_property() exist
-		no -EOPNOTSUPP
-		yes return ->get_proprty(gpio struct, op, val)
-	
-For dynamically configurable features that avoids the 
-
-	gpio_request(35);
-	magic_platform_hack(&foo[3], blah); /* foo3 will be gpio35 */
-
-type stuff that becomes unmaintainable.
-
-It would be entirely optional for a driver to support any of this stuff,
-but it would both allow drivers to do so and also mean that where there
-are multiple devices with a common feature *and* a driver wants to use it
-that it will be properly abstracted in the driver itself.
-
-
-Alan
-
-
-
-> 
-> 	--Ben.
-> 
-> > 
-> > Alan
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> 
-
-
--- 
---
-	"Alan, I'm getting a bit worried about you."
-				-- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
