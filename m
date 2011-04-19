@@ -1,74 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 16:29:49 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104191449.50824.arnd@arndb.de>
-	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
-Message-ID: <201104191629.49676.arnd@arndb.de>
+From: jh80.chung@gmail.com (Jae hoon Chung)
+Date: Tue, 19 Apr 2011 23:30:41 +0900
+Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <BANLkTikaerLi9NC153L=kJM2hAC_VerBKQ@mail.gmail.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<BANLkTikZVDejarZ4O5KgNS7S4fxBLSmANA@mail.gmail.com>
+	<BANLkTikVeXvfSBS-xLDXVdesKJpKdtUVqg@mail.gmail.com>
+	<BANLkTikaerLi9NC153L=kJM2hAC_VerBKQ@mail.gmail.com>
+Message-ID: <BANLkTim7QdTvffsMdCfG-GBs-TkfB4nY4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2011, Marek Szyprowski wrote:
+Hi Per..
 
-> > 
-> > 1. change the runtime_pm subsystem to allow it to ignore some devices
-> > in an easy way.
-> > 
-> > 2. change the device layout if the sysmmu. If the iommu device is
-> > a child of the device that it is responsible for, I guess you don't
-> > have this problem.
-> > 
-> > 3. Not represent the iommu as a device at all, just as a property
-> > of another device.
-> 
-> Ok, we will handle this issue somehow. I consider this a minor issue and I
-> would like to focus on the IOMMU/dma-mapping APIs first.
+2011/4/11 Per Forlin <per.forlin@linaro.org>:
+> On 9 April 2011 13:55, Jae hoon Chung <jh80.chung@gmail.com> wrote:
+>> Hi Per..
+>>
+>> I'm applied your patch..and sent the patch about dw_mmc.c.
+>> I think good this approach..
+>>
+> Do you have any test results from the mmc_tests I added?
+> I am interested in the results.
 
-Yes, agreed.
+I didn't test with mmc_tests..but i tested with IOzone..
+I'll test with mmc_test..then i'll share the results..
 
-> > That is a limitation of the current implementation. We might want to
-> > change that anyway, e.g. to handle the mali IOMMU along with yours.
-> > I believe the reason for allowing only one IOMMU type so far has been
-> > that nobody required more than one. As I mentioned, the IOMMU API is
-> > rather new and has not been ported to much variety of hardware, unlike
-> > the dma-mapping API, which does support multiple different IOMMUs
-> > in a single system.
-> 
-> Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
-> dma-mapping API is something much more complex that creates the actual
-> mapping for various sets of the devices. IMHO the right direction will
-> be to create dma-mapping implementation that will be just a client of
-> the IOMMU API. What's your opinion?
- 
-Sounds good. I think we should put it into a new drivers/iommu, along
-with your specific iommu implementation, and then we can convert the
-existing ones over to use that.
-
-Note that this also requires using dma-mapping-common.h, which we currently
-don't on ARM.
-
-> > The domain really reflects the user, not the device here, which makes more
-> > sense if you think of virtual machines than of multimedia devices.
-> >
-> > I would suggest that you just use a single iommu_domain globally for
-> > all in-kernel users.
-> 
-> There are cases where having a separate mapping for each device makes sense.
-> It definitely increases the security and helps to find some bugs in
-> the drivers.
-> 
-> Getting back to our video codec - it has 2 IOMMU controllers. The codec
-> hardware is able to address only 256MiB of space. Do you have an idea how
-> this can be handled with dma-mapping API? The only idea that comes to my
-> mind is to provide a second, fake 'struct device' and use it for allocations
-> for the second IOMMU controller.
-
-Good question. 
-
-How do you even decide which controller to use from the driver?
-I would need to understand better what you are trying to do to
-give a good recommendation.
-
-	Arnd
+Regards,
+Jaehoon Chung
