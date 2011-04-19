@@ -1,68 +1,122 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 19 Apr 2011 12:10:20 +0200
-Subject: [RFC patch 00/20] Interrupt chip consolidation
-In-Reply-To: <alpine.LFD.2.00.1104191130050.2744@localhost6.localdomain6>
-References: <20110416211221.853079766@linutronix.de>
-	<4DAD462D.5070008@metafoo.de>
-	<alpine.LFD.2.00.1104191130050.2744@localhost6.localdomain6>
-Message-ID: <4DAD5F8C.1060101@metafoo.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 19 Apr 2011 15:42:32 +0530
+Subject: [PATCH V2 7/7 resend] dmaengine/dw_dmac: implement pause and resume
+	in dwc_control
+In-Reply-To: <cover.1303194835.git.viresh.kumar@st.com>
+References: <cover.1303194835.git.viresh.kumar@st.com>
+Message-ID: <8028d0d16e2376154c60c05c1afad04b61d65d0d.1303194836.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2011 11:41 AM, Thomas Gleixner wrote:
-> On Tue, 19 Apr 2011, Lars-Peter Clausen wrote:
->> On 04/16/2011 11:14 PM, Thomas Gleixner wrote:
->>> [...]
->  
->> I've also noticed that all my chained demuxer handlers follow a similar scheme
->> and a quick grep for generic_handle_irq revealed that quite a few other
->> implementations also follow a similar scheme as well.
->>
->> Something along the lines of ...
->>
->> void irq_gc_chained_demux_handler(unsigned int irq, struct irq_desc *desc)
->> {
->> 	struct irq_chip_generic *gc = irq_desc_get_handler_data(desc);
->> 	struct irq_chip_type *ct = gc = irq_chip_generic_current_chip_type(gc);
->> 	unsigned long pending = irq_reg_readl(ct->regs.pending);
->>
->> 	pending = irq_reg_readl(ct->regs.pending) & gc->mask_cache;
->>
->> 	for_each_set_bit (irq, &pending, gc->irq_cnt)
->> 		generic_handle_irq(gc->irq_base + irq);
->> }
->>
->> ... could be used to replace those custom handlers in an irq_chip_generic based
->> implementation.
->>
->> With this the diffstat for JZ4740 looks even better:
->>  4 files changed, 91 insertions(+), 232 deletions(-)
->>
->> Unfortunately it doesn't completely fit into the current irq_chip_generic
->> implementation. For one there is no irq_chip_generic_current_chip_type, but I
->> guess that could be implementing by adding a field to irq_chip_generic pointing
->> to the current chip type. On the other hand I'm not sure if it is necessary to
-> 
-> No, you can get the current chip from irq_data.chip which always has a
-> pointer to the current active one. container_of will give you the
-> generic chip.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Yes, but the chained demux handler is of course installed on the parent irq chip.
-I guess we could do something like cur_regs(irq_get_irq_data(gc->irq_base))
-though, but that is a lot of indirection.
+Some peripherals like amba-pl011 needs pause to be implemented in DMA controller
+drivers. This also returns correct status from dwc_tx_status() in case chan is
+paused.
 
-> 
->> have different pending registers for different chip types of the same
->> irq_chip_generic.
->>
->> Another issue is that while the gpio unit on the JZ4740 supports different
->> trigger modes it only supports either rising or falling edge at one time. So
->> since it doesn't makes sense to implement switching between those two in a
->> driver triggering in both edges is emulated by the irq chip.
-> 
-> That's what about 5 dozen other irq chips do as well.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/dw_dmac.c      |   59 +++++++++++++++++++++++++++++---------------
+ drivers/dma/dw_dmac_regs.h |    1 +
+ 2 files changed, 40 insertions(+), 20 deletions(-)
 
-Yes, I've noticed as well. That is why I was asking if you see the possibility
-to handle this in the core somehow.
-
-- Lars
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index c30f0ba..971d4df 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -830,34 +830,50 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
+ 	struct dw_dma		*dw = to_dw_dma(chan->device);
+ 	struct dw_desc		*desc, *_desc;
++	u32			cfglo;
+ 	LIST_HEAD(list);
+ 
+-	/* Only supports DMA_TERMINATE_ALL */
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
++	if (cmd == DMA_PAUSE) {
++		spin_lock_irqsave(&dwc->lock, dwc->lflags);
+ 
+-	/*
+-	 * This is only called when something went wrong elsewhere, so
+-	 * we don't really care about the data. Just disable the
+-	 * channel. We still have to poll the channel enable bit due
+-	 * to AHB/HSB limitations.
+-	 */
+-	spin_lock_irqsave(&dwc->lock, dwc->lflags);
++		cfglo = channel_readl(dwc, CFG_LO);
++		channel_writel(dwc, CFG_LO, cfglo | DWC_CFGL_CH_SUSP);
++		while (!(channel_readl(dwc, CFG_LO) & DWC_CFGL_FIFO_EMPTY))
++			cpu_relax();
+ 
+-	channel_clear_bit(dw, CH_EN, dwc->mask);
++		dwc->paused = true;
++		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
++	} else if (cmd == DMA_RESUME) {
++		if (!dwc->paused)
++			return 0;
+ 
+-	while (dma_readl(dw, CH_EN) & dwc->mask)
+-		cpu_relax();
++		spin_lock_irqsave(&dwc->lock, dwc->lflags);
+ 
+-	/* active_list entries will end up before queued entries */
+-	list_splice_init(&dwc->queue, &list);
+-	list_splice_init(&dwc->active_list, &list);
++		cfglo = channel_readl(dwc, CFG_LO);
++		channel_writel(dwc, CFG_LO, cfglo & ~DWC_CFGL_CH_SUSP);
++		dwc->paused = false;
+ 
+-	/* Flush all pending and queued descriptors */
+-	list_for_each_entry_safe(desc, _desc, &list, desc_node)
+-		dwc_descriptor_complete(dwc, desc, 0);
++		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
++	} else if (cmd == DMA_TERMINATE_ALL) {
++		spin_lock_irqsave(&dwc->lock, dwc->lflags);
+ 
+-	spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
++		channel_clear_bit(dw, CH_EN, dwc->mask);
++		while (dma_readl(dw, CH_EN) & dwc->mask)
++			cpu_relax();
++
++		dwc->paused = false;
++
++		/* active_list entries will end up before queued entries */
++		list_splice_init(&dwc->queue, &list);
++		list_splice_init(&dwc->active_list, &list);
++
++		/* Flush all pending and queued descriptors */
++		list_for_each_entry_safe(desc, _desc, &list, desc_node)
++			dwc_descriptor_complete(dwc, desc, 0);
++
++		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
++	} else
++		return -ENXIO;
+ 
+ 	return 0;
+ }
+@@ -893,6 +909,9 @@ dwc_tx_status(struct dma_chan *chan,
+ 	else
+ 		dma_set_tx_state(txstate, last_complete, last_used, 0);
+ 
++	if (dwc->paused)
++		return DMA_PAUSED;
++
+ 	return ret;
+ }
+ 
+diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
+index 5915743..47138b1 100644
+--- a/drivers/dma/dw_dmac_regs.h
++++ b/drivers/dma/dw_dmac_regs.h
+@@ -138,6 +138,7 @@ struct dw_dma_chan {
+ 	void __iomem		*ch_regs;
+ 	u8			mask;
+ 	u8			priority;
++	bool			paused;
+ 
+ 	spinlock_t		lock;
+ 	unsigned long		lflags;
+-- 
+1.7.2.2
