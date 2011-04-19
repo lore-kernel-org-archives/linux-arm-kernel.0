@@ -1,73 +1,69 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 19 Apr 2011 12:26:00 +0200 (CEST)
-Subject: [RFC patch 00/20] Interrupt chip consolidation
-In-Reply-To: <4DAD5F8C.1060101@metafoo.de>
-References: <20110416211221.853079766@linutronix.de>
-	<4DAD462D.5070008@metafoo.de>
-	<alpine.LFD.2.00.1104191130050.2744@localhost6.localdomain6>
-	<4DAD5F8C.1060101@metafoo.de>
-Message-ID: <alpine.LFD.2.00.1104191224460.2744@localhost6.localdomain6>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 19 Apr 2011 11:28:52 +0100
+Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
+In-Reply-To: <00D61D20F3A8774CBC77798B3FBC427082058F9871@seldmbx02.corpusers.net>
+References: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
+	<00D61D20F3A8774CBC77798B3FBC427082058F986D@seldmbx02.corpusers.net>
+	<loom.20110419T100624-335@post.gmane.org>
+	<20110419092014.GA2267@arm.com>
+	<00D61D20F3A8774CBC77798B3FBC427082058F9871@seldmbx02.corpusers.net>
+Message-ID: <20110419102852.GA30588@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Apr 2011, Lars-Peter Clausen wrote:
-> On 04/19/2011 11:41 AM, Thomas Gleixner wrote:
-> > On Tue, 19 Apr 2011, Lars-Peter Clausen wrote:
-> >> On 04/16/2011 11:14 PM, Thomas Gleixner wrote:
-> >>> [...]
-> >  
-> >> I've also noticed that all my chained demuxer handlers follow a similar scheme
-> >> and a quick grep for generic_handle_irq revealed that quite a few other
-> >> implementations also follow a similar scheme as well.
-> >>
-> >> Something along the lines of ...
-> >>
-> >> void irq_gc_chained_demux_handler(unsigned int irq, struct irq_desc *desc)
-> >> {
-> >> 	struct irq_chip_generic *gc = irq_desc_get_handler_data(desc);
-> >> 	struct irq_chip_type *ct = gc = irq_chip_generic_current_chip_type(gc);
-> >> 	unsigned long pending = irq_reg_readl(ct->regs.pending);
-> >>
-> >> 	pending = irq_reg_readl(ct->regs.pending) & gc->mask_cache;
-> >>
-> >> 	for_each_set_bit (irq, &pending, gc->irq_cnt)
-> >> 		generic_handle_irq(gc->irq_base + irq);
-> >> }
-> >>
-> >> ... could be used to replace those custom handlers in an irq_chip_generic based
-> >> implementation.
-> >>
-> >> With this the diffstat for JZ4740 looks even better:
-> >>  4 files changed, 91 insertions(+), 232 deletions(-)
-> >>
-> >> Unfortunately it doesn't completely fit into the current irq_chip_generic
-> >> implementation. For one there is no irq_chip_generic_current_chip_type, but I
-> >> guess that could be implementing by adding a field to irq_chip_generic pointing
-> >> to the current chip type. On the other hand I'm not sure if it is necessary to
+On Tue, Apr 19, 2011 at 12:13:26PM +0200, "Ander?, Oskar" wrote:
+> > > > Ping!
+> > > >
+> > > > Anyone else that gets bitten by the following when compiling
+> > > omap2plus_defconfig with gcc 4.5:
+> > > > arch/arm/mach-omap2/sleep34xx.S:150: Error: selected processor does
+> > not
+> > > support ARM mode `smc #1'
+> > > >
+> > > > -Oskar
+> > > >
+> > >
+> > > I can report that I get the exact same compile error as this.
+> > > OP patch worked beautifully.
+> > >
+> > > -Alex
 > > 
-> > No, you can get the current chip from irq_data.chip which always has a
-> > pointer to the current active one. container_of will give you the
-> > generic chip.
-> 
-> Yes, but the chained demux handler is of course installed on the parent irq chip.
-> I guess we could do something like cur_regs(irq_get_irq_data(gc->irq_base))
-> though, but that is a lot of indirection.
-
-Nah. I whip up a inline helper which lets you retrieve that info from
-*desc.
- 
-> >> Another issue is that while the gpio unit on the JZ4740 supports different
-> >> trigger modes it only supports either rising or falling edge at one time. So
-> >> since it doesn't makes sense to implement switching between those two in a
-> >> driver triggering in both edges is emulated by the irq chip.
+> > Can you check what options are being passed to the compiler
+> > and the assembler, and check for .arch / .arch_extension directives
+> > in the assembler input?
 > > 
-> > That's what about 5 dozen other irq chips do as well.
+> > i.e.,
+> > 
+> > make V=1 CFLAGS_KERNEL='-v -save-temps' arch/arm/mach-omap2/sleep34xx.o
+> > 
+> > ...and look at the output and the generated sleep34xx.s
+> > 
+> > Maybe the options being passed to the compiler/assembler are wrong
+> > somewhere along the line.
+> Yes, the "+sec" extension of armv7-a (i.e. -march=armv7-a+sec) is missing and hence the smc instruction can't be used. This is what my patch fixes. I guess earlier versions of binutils silently ignored this.
 > 
-> Yes, I've noticed as well. That is why I was asking if you see the possibility
-> to handle this in the core somehow.
+> It's not visible in my patch, but plus_sec is declared as:
+> plus_sec := $(call as-instr,.arch_extension sec,+sec)
 
-If the patterns are similar enough then we definitely should do that.
+Ah right, I was slightly confused by the context.
 
-Thanks,
+You're right -- sleep34xx.S also needs this change in the Makefile,
+as per your patch.  This isn't new; the original patch focused on
+omap4, so I guess this file was just missed.
 
-	tglx
+Cheers
+---Dave
+
+> 
+> The following patch added the same extension for some of the other files, but I guess sleep34xx.S was missed or maybe added later:
+> commit fe297dde5ae8f8bf67d3a87759289a99b48ecb2c
+> Author: John Rigby <john.rigby@linaro.org>
+> Date:   Wed Dec 1 05:57:51 2010 +0000
+> 
+>     OMAP4: enable smc instruction in new assembler versions
+>     
+>     New assemblers need -march=armv7-a+sec on command line or
+>     .arch_extension sec inline to enable use of the smc instruction.
+> <snip>
+> 
+> -Oskar
