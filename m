@@ -1,101 +1,56 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 19 Apr 2011 15:50:03 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU
-	(IOMMU) driver
-In-Reply-To: <201104191449.50824.arnd@arndb.de>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104181612.35833.arnd@arndb.de>
-	<005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
-	<201104191449.50824.arnd@arndb.de>
-Message-ID: <20110419135003.GR2192@amd.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 19 Apr 2011 15:58:32 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom
+ bus?
+In-Reply-To: <201104171938.12834.arnd@arndb.de>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<1302892585.30441.12.camel@dev.znau.edu.ua>
+	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de>
+Message-ID: <op.vt6ufu1n3ri7v4@arend-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 08:49:50AM -0400, Arnd Bergmann wrote:
-> (adding Joerg to Cc)
-> 
-> On Tuesday 19 April 2011, Marek Szyprowski wrote:
-> 
-> > > * This extends the generic IOMMU API in platform specific ways, don't
-> > >   do that.
+On Sun, 17 Apr 2011 19:38:12 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
 
-This is certainly not a good idea. Please Cc me on IOMMU-API changes in
-the future to that I can have a look at it. This is also a good way to
-prevent misunderstandings (which I found some in this mail).
+Hi Rafa?,
 
-> > Ok, it looks I don't fully get how this iommu.h should be used. It looks
-> > that there can be only one instance of iommu ops registered in the system,
-> > so only one iommu driver can be activated. You are right that the iommu
-> > driver has to be registered on first probe().
-> 
-> That is a limitation of the current implementation. We might want to
-> change that anyway, e.g. to handle the mali IOMMU along with yours.
-> I believe the reason for allowing only one IOMMU type so far has been
-> that nobody required more than one. As I mentioned, the IOMMU API is
-> rather new and has not been ported to much variety of hardware, unlike
-> the dma-mapping API, which does support multiple different IOMMUs
-> in a single system.
+As you probably expected I tried to integrate and use your bcmai/bcmaxi/?
+driver with our brcm80211 driver (making progress). In the mean time I  
+tried to follow the discussions going on, but I am still catching up.
 
-The current IOMMU-API interface is very simple. It delegates the
-selection of the particular IOMMU device to the IOMMU driver. Handle
-this selection above the IOMMU driver is a complex thing to do. We will
-need some kind of generic IOMMU support in the device-core and
-attach IOMMUs to device sub-trees.
+> Compare this to the PCI bus type, which essentially deals with devices
+> that have a PCI configuration space that contains generic (irq, memory,
+> vendor/device ID, ...) registers along with device specific registers.
 
-A simpler and less intrusive solution is to implement some wrapper code
-which dispatches the IOMMU-API calls to the IOMMU driver implementation
-required for that device.
+How much alike is the (BCM)AXI bus type? My assumption was that each
+registered PCI device is handled by a single driver module. In the
+current(?) bcmai implementation each device driver is called with the
+appropriate device structure reference, but it will also have the bus
+structure reference and through that can also access other cores on the
+(bcm)axi bus. This seems to me a potential issue when there are no
+synchronization mechanisms in place (whether in a SoC configuration or
+PCI-hosted). Does the PCI bus type allow driver for device A access
+device B?
 
-> > I think it might be beneficial to describe a bit more our hardware 
-> > (Exynos4 platform). There are a number of multimedia blocks. Each has it's
-> > own IOMMU controller. Each IOMMU controller has his own set of hardware
-> > registers and irq. There is also a GPU unit (Mali) which has it's own
-> > IOMMU hardware, incompatible with the SYSMMU, so right now it is ignored.
-> > 
-> > The multimedia blocks are modeled as platform devices and are independent
-> > of platform type (same multimedia blocks can be found on other Samsung
-> > machines, like for example s5pv210/s5pc110), see arch/arm/plat-s5p/dev-*.c
-> > and arch/arm/plat-samsung/dev-*.c.
+> A new bus_type really only makes sense if you expect a lot of devices
+> to use this and you want to have the probing in the bus. If you only
+> want to have a way to enumerate devices that get created by the
+> parent driver, you can also use platform devices.
 
-Question: Does every platform device has a different type of IOMMU? Or
-are the IOMMUs on all of these platform devices similar enough to be
-handled by a single driver?
+The main assumption of the (bcm)axi driver seems to be that each core can
+be considered as a device. Correct me if I am wrong, but I consider a
+device to be an entity providing a particular system function. So an
+ethernet device provides ethernet connectivity function, a mixer device
+provides sound mixing function, and so on. The cores within a chip are not
+always self-contained like this. To clarify let's say a system function is
+realized by programming core A, core B, and finally trigger core A to set
+the function in motion. This implies the need of coordination between the
+programming steps on those cores.
 
-> > The domain defined in iommu api are quite straightforward. Each domain 
-> > is just a set of mappings between physical addresses (phys) and io addresses
-> > (iova).
+Is my view on what is a device wrong? Does a platform device differ in
+this respect from a regular device?
 
-Each domain represents an address space. In the AMD IOMMU this is
-basically a page-table.
-
-> > For the drivers the most important are the following functions:
-> > iommu_{attach,detach}_device(struct iommu_domain *domain, struct device *dev);
-
-Right, and each driver can allocate its own domains.
-
-> > We assumed that they just assign the domain (mapping) to particular instance
-> > of iommu. However the driver need to get somehow the pointer to the iommu 
-> > instance. That's why we added the s5p_sysmmu_{get,put} functions.
-
-The functions attach a specific device to an IOMMU domain (== address
-space). These devices might be behind different IOMMUs and it is the
-responsibility of the IOMMU driver to setup everything correctly.
-
-> It's not quite how the domains are meant to be used. In the AMD IOMMU
-> that the API is based on, any number of devices can share one domain,
-> and devices might be able to have mappings in multiple domains.
-
-Yes, any number of devices can be assigned to one domain, but each
-device only belongs to one domain at each point in time. But it is
-possible to detach a device from one domain and attach it to another.
-
-Regards,
-
-	Joerg
-
+Gr. AvS
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
