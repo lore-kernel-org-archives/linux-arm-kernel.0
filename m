@@ -1,22 +1,30 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 19 Apr 2011 17:33:01 +0200
-Subject: [PATCH] ARM: at91: AT91CAP9 has a macb device
-In-Reply-To: <1303201280-25413-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1303201280-25413-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <BANLkTi=jp+acvBUR3PxkkZ4ZM613Xrg9uw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 17:37:30 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <20110419150018.GV2192@amd.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+	<20110419150018.GV2192@amd.com>
+Message-ID: <201104191737.30916.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Tuesday 19 April 2011, Roedel, Joerg wrote:
+> > Getting back to our video codec - it has 2 IOMMU controllers. The codec
+> > hardware is able to address only 256MiB of space. Do you have an idea how
+> > this can be handled with dma-mapping API? The only idea that comes to my
+> > mind is to provide a second, fake 'struct device' and use it for allocations
+> > for the second IOMMU controller.
+> 
+> The GPU IOMMUs can probably be handled in the GPU driver if they are
+> that different. Recent PCIe GPUs on x86 have their own IOMMUs too which
+> are very device specific and are handled in the device driver.
 
-> commit
->
-> ? ? ? ?ee621dd (net: atmel_macb Kconfig: remove long dependency line)
->
-> replaced a list of several explicit machines in the dependencies of MACB by
-> a single symbol that is selected by the respective machines. ee621dd missed
-> to let ARCH_AT91CAP9 select HAVE_NET_MACB though which is fixed here.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+I tend to disagree with this one, and would suggest that the GPUs should
+actually provide their own iommu_ops, even if they are the only users
+of these.
 
-Acked-by: Andrew Victor <linux@maxim.org.za>
+However, this is a minor point that we don't need to worry about today.
+
+	Arnd
