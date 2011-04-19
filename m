@@ -1,28 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 16:55:12 +0200
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110419145009.GH9462@sirena.org.uk>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<201104191616.01647.arnd@arndb.de>
-	<20110419145009.GH9462@sirena.org.uk>
-Message-ID: <201104191655.13133.arnd@arndb.de>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Tue, 19 Apr 2011 17:00:18 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU
+	(IOMMU) driver
+In-Reply-To: <000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104181612.35833.arnd@arndb.de>
+	<005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
+	<201104191449.50824.arnd@arndb.de>
+	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+Message-ID: <20110419150018.GV2192@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2011, Mark Brown wrote:
-> On Tue, Apr 19, 2011 at 04:16:01PM +0200, Arnd Bergmann wrote:
-> 
-> > That sounds like a good idea. Same for the regulator drivers that are
-> > currently in arch/arm instead of drivers/regulator.
-> 
-> We don't have any regulator drivers in arch/arm I think (unless the ST
-> one got merged, but that's actually a dual regulator/system management
-> driver rather than a proper regulator - when I reviewed it I didn't flag
-> the location due to the second interface on the side).
+On Tue, Apr 19, 2011 at 10:03:27AM -0400, Marek Szyprowski wrote:
 
-I was thinking of arch/arm/mach-ux500/regulator-db8500.c in linux-next.
+> Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
+> dma-mapping API is something much more complex that creates the actual
+> mapping for various sets of the devices. IMHO the right direction will
+> be to create dma-mapping implementation that will be just a client of
+> the IOMMU API. What's your opinion?
 
-I can only see regulator contents in there, what do you mean by
-system management?
+Definitly agreed. I plan this since some time but never found the
+time to implement it. In the end we can have a generic dma-ops
+implementation that works for all iommu-api implementations.
 
-	Arnd
+> Getting back to our video codec - it has 2 IOMMU controllers. The codec
+> hardware is able to address only 256MiB of space. Do you have an idea how
+> this can be handled with dma-mapping API? The only idea that comes to my
+> mind is to provide a second, fake 'struct device' and use it for allocations
+> for the second IOMMU controller.
+
+The GPU IOMMUs can probably be handled in the GPU driver if they are
+that different. Recent PCIe GPUs on x86 have their own IOMMUs too which
+are very device specific and are handled in the device driver.
+
+Regards,
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
