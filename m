@@ -1,50 +1,40 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 19 Apr 2011 14:02:07 +0530
-Subject: [PATCH V2 2/7] dmaengine/dw_dmac: Enable resubmission from callback
-	routine.
+Date: Tue, 19 Apr 2011 14:02:08 +0530
+Subject: [PATCH V2 3/7] dmaengine/dw_dmac: call dwc_descriptor_complete from
+	dwc_control with lock held
 In-Reply-To: <cover.1303194835.git.viresh.kumar@st.com>
 References: <cover.1303194835.git.viresh.kumar@st.com>
-Message-ID: <1643d6236b00c03b39186c8789be7d75839c8d91.1303194835.git.viresh.kumar@st.com>
+Message-ID: <c19b6c33e8a04b652e78252fa96021bcd39047e4.1303194835.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resubmission of new transfer must be allowed from callbacks. For this release
-lock before calling callback routine and enable them again.
+dwc_descriptor_complete must always be called with channel lock held. This patch
+moves unlock code, in dwc_control(), untill after dwc_descriptor_complete is
+called.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/dw_dmac.c |   10 ++++------
- 1 files changed, 4 insertions(+), 6 deletions(-)
+ drivers/dma/dw_dmac.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index c4040dd..66d7f1b 100644
+index 66d7f1b..c211460 100644
 --- a/drivers/dma/dw_dmac.c
 +++ b/drivers/dma/dw_dmac.c
-@@ -197,8 +197,8 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
- static void
- dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- {
--	dma_async_tx_callback		callback;
--	void				*param;
-+	dma_async_tx_callback		callback = NULL;
-+	void				*param = NULL;
- 	struct dma_async_tx_descriptor	*txd = &desc->txd;
- 	struct dw_desc			*child;
+@@ -825,12 +825,12 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	list_splice_init(&dwc->queue, &list);
+ 	list_splice_init(&dwc->active_list, &list);
  
-@@ -238,12 +238,10 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- 		}
- 	}
+-	spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
+-
+ 	/* Flush all pending and queued descriptors */
+ 	list_for_each_entry_safe(desc, _desc, &list, desc_node)
+ 		dwc_descriptor_complete(dwc, desc);
  
--	/*
--	 * The API requires that no submissions are done from a
--	 * callback, so we don't need to drop the lock here
--	 */
-+	spin_unlock_irqrestore(&dwc->lock, dw->flags);
- 	if (callback)
- 		callback(param);
-+	spin_lock_irqsave(&dwc->lock, dw->flags);
++	spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
++
+ 	return 0;
  }
  
- static void dwc_complete_all(struct dw_dma *dw, struct dw_dma_chan *dwc)
 -- 
 1.7.2.2
