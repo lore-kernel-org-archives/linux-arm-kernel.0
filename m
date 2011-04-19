@@ -1,16 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 19 Apr 2011 09:03:07 +0100
-Subject: Cleanup Samsung stuff
-In-Reply-To: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
-References: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
-Message-ID: <20110419080307.GA26650@sirena.org.uk>
+From: gxt@mprc.pku.edu.cn (Guan Xuetao)
+Date: Tue, 19 Apr 2011 16:02:55 +0800
+Subject: [PATCH 12/14] PM / UNICORE32: Use struct syscore_ops instead of
+	sysdevs for PM
+In-Reply-To: <201104172313.45854.rjw@sisk.pl>
+References: <201103280125.11750.rjw@sisk.pl> <201104172301.54115.rjw@sisk.pl>
+	<201104172313.45854.rjw@sisk.pl>
+Message-ID: <006201cbfe68$3ad01380$b0703a80$@mprc.pku.edu.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 10:46:47AM +0900, Kukjin Kim wrote:
 
-> - Device tree (with Linaro)
 
-What is going on with device tree?  I've asked a couple of times about
-this in the other thread but I'm still not clear where the code is or
-what could usefully be done with it.
+> -----Original Message-----
+> From: Rafael J. Wysocki [mailto:rjw at sisk.pl]
+> Sent: Monday, April 18, 2011 5:14 AM
+> To: LKML
+> Cc: Greg KH; Kay Sievers; Linux PM mailing list; Russell King; linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
+> kernel at lists.infradead.org; Ben Dooks; Mike Frysinger; Ralf Baechle; Hans-Christian Egtvedt; Guan Xuetao; Benjamin Herrenschmidt;
+> linuxppc-dev at lists.ozlabs.org; Jiri Kosina; Konrad Rzeszutek Wilk; Jeremy Fitzhardinge
+> Subject: [PATCH 12/14] PM / UNICORE32: Use struct syscore_ops instead of sysdevs for PM
+> 
+> From: Rafael J. Wysocki <rjw@sisk.pl>
+> 
+> Make some UNICORE32 architecture's code use struct syscore_ops
+> objects for power management instead of sysdev classes and sysdevs.
+> 
+> This simplifies the code and reduces the kernel's memory footprint.
+> It also is necessary for removing sysdevs from the kernel entirely in
+> the future.
+> 
+> Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+
+Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
