@@ -1,118 +1,126 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 19 Apr 2011 14:49:15 +0800
-Subject: [PATCH V2 1/3] ARM: mxs: add GPMI support for imx23/imx28
-In-Reply-To: <1303123428-12266-1-git-send-email-b32955@freescale.com>
-References: <1303123428-12266-1-git-send-email-b32955@freescale.com>
-Message-ID: <4DAD306B.1080209@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Apr 2011 09:32:50 +0200
+Subject: [PATCH 05/10] clk: Add support for simple dividers
+In-Reply-To: <4DACF761.3050503@codeaurora.org>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
+	<20110418094909.GE31131@pengutronix.de>
+	<20110418100716.GJ14770@pengutronix.de>
+	<4DACF761.3050503@codeaurora.org>
+Message-ID: <20110419073249.GK31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe:
+Hello,
 
+On Mon, Apr 18, 2011 at 07:45:53PM -0700, Saravana Kannan wrote:
+> On 04/18/2011 03:07 AM, Sascha Hauer wrote:
+> >On Mon, Apr 18, 2011 at 11:49:09AM +0200, Uwe Kleine-K?nig wrote:
+> >>On Fri, Apr 15, 2011 at 09:08:10PM +0200, Sascha Hauer wrote:
+> >AFAIK there are two different implementation types in the tree. Some
+> >implementations only allow to set to the exact rate round_rate returns
+> >while others round down in set_rate.
+> >
+> >Has this been specified what behaviour is expected?
+> >
+> 
+> This is something I have nagged Russell once or twice about and then
+> sent out an email to the list for which there was very limited
+> response. I think clk_round_rate() is too generic and not very
+> useful.
+> 
+> We should really have something like:
+> clk_set_rate_range(min, ideal, max)
+(Note this is orthogonal to the question if set_rate may barf on values
+other than the return values of round_rate.)
 
-Are these three patches ok? Do i need to do some change about them?
+clk_set_rate_range can even be implemented with clk_round_rate that is
+just required to fulfill:
 
-thanks
+	clk_round_rate(clk, X) > 0 =>
+	clk_set_rate(clk, clk_round_rate(clk, X)) == clk_round_rate(clk, X)
+		and
+	clk_round_rate(clk, clk_round_rate(clk, X)) == clk_round_rate(clk, X)
 
-Huang Shijie
+and
 
+	X >= Y =>
+	clk_round_rate(clk, X) >= clk_round_rate(clk, Y)
 
+which every implementation should assert provided that X and Y are the
+domain of clk_round_rate(clk, .)
 
-> add gpmi support for imx23 and imx28.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  arch/arm/mach-mxs/Kconfig                 |    2 +
->  arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   63 +++++++++++++++++++++++++++++
->  2 files changed, 65 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
->
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4f6f174..8132f1a 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -22,6 +22,7 @@ config MACH_MX23EVK
->  	select SOC_IMX23
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	default y
->  	help
-> @@ -35,6 +36,7 @@ config MACH_MX28EVK
->  	select MXS_HAVE_PLATFORM_AUART
->  	select MXS_HAVE_PLATFORM_FEC
->  	select MXS_HAVE_PLATFORM_FLEXCAN
-> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	select MXS_OCOTP
->  	default y
-> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-> new file mode 100644
-> index 0000000..5b736f5
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-> @@ -0,0 +1,63 @@
-> +/*
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __INCLUDE_GPMI_DEVICE_H
-> +#define __INCLUDE_GPMI_DEVICE_H
-> +
-> +/* The size of the resource is fixed. */
-> +#define RES_SIZE	6
-> +
-> +/* Resource names for the GPMI NFC driver. */
-> +#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
-> +#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
-> +#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
-> +#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
-> +#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
-> +#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
-> +
-> +/**
-> + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
-> + *
-> + * This structure communicates platform-specific information to the GPMI NFC
-> + * driver that can't be expressed as resources.
-> + *
-> + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
-> + *                           from the NAND Flash device, in nanoseconds.
-> + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
-> + *                           from the NAND Flash device, in nanoseconds.
-> + * @max_chip_count:          The maximum number of chips for which the driver
-> + *                           should configure the hardware. This value most
-> + *                           likely reflects the number of pins that are
-> + *                           connected to a NAND Flash device. If this is
-> + *                           greater than the SoC hardware can support, the
-> + *                           driver will print a message and fail to initialize.
-> + * @partitions:              An optional pointer to an array of partition
-> + *                           descriptions.
-> + * @partition_count:         The number of elements in the partitions array.
-> + */
-> +struct gpmi_nfc_platform_data {
-> +	/* NAND Flash information. */
-> +	unsigned int          min_prop_delay_in_ns;
-> +	unsigned int          max_prop_delay_in_ns;
-> +	unsigned int          max_chip_count;
-> +
-> +	/* soc */
-> +	struct mtd_partition  *partitions;
-> +	unsigned              partition_count;
-> +};
-> +#endif
+Something like:
+
+	long clk_round_rate_range(struct clk *clk, unsigned long minrate,
+		unsigned long optrate, unsigned long maxrate)
+	{
+		unsigned long bot = minrate, best, cur, top = maxrate;
+		unsigned long delta;
+		long tmp;
+
+		if (minrate > optrate || optrate > maxrate)
+			return -EINVAL;
+
+		if (maxrate > LONG_MAX)
+			/* can anything be done here? */
+			return -EINVAL;
+
+		best = cur = clk_round_rate(clk, optrate);
+		if (cur == optrate)
+			return optrate;
+
+		delta = optrate > best ? optrate - best : best - optrate;
+
+		while (1) {
+			if (cur > optrate) {
+				if (delta > cur - optrate)
+					best = cur;
+				top = cur;
+				cur = (bot + cur) / 2;
+			} else if (cur < optrate) {
+				if (delta > optrate - cur)
+					best = cur;
+				bot = cur;
+				cur = (cur + top + 1) / 2;
+			} else {
+				WARN(1, "Your clk_round_rate implementation is broken (clk = %pS, [%lu, %lu, %lu]\n.",
+					clk, minrate, optrate, maxrate);
+				return -EINVAL;
+			}
+
+			tmp = clk_round_rate(clk, cur);
+			if (tmp < 0)
+				return tmp;
+			cur = tmp;
+
+			if (bot == top)
+				break;
+		}
+
+		if (best < minrate || best > maxrate)
+			return -EINVAL;
+
+		return best;
+	}
+
+	int clk_set_rate_range(struct clk *clk, unsigned long minrate,
+		unsigned long optrate, unsigned long maxrate)
+	{
+		long rate = clk_round_rate_range(clk, minrate,
+				optrate, maxrate);
+
+		if (rate < 0)
+			return rate;
+
+		clk_set_rate(clk, rate);
+	}
+
+Completely untestet so probably broken.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
