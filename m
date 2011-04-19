@@ -1,23 +1,73 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 19 Apr 2011 18:25:35 +0800
-Subject: [PATCH] pxa/hx4700: bq24022 regulator needs to be enabled
-In-Reply-To: <20110419084032.GA30743@rainbow>
-References: <E1QAkBF-0003bF-A0@outmx04.plus.net>
-	<20110419084032.GA30743@rainbow>
-Message-ID: <BANLkTikLNbYdTKHiu+gn7wpAS86KPZWN1A@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 19 Apr 2011 12:26:00 +0200 (CEST)
+Subject: [RFC patch 00/20] Interrupt chip consolidation
+In-Reply-To: <4DAD5F8C.1060101@metafoo.de>
+References: <20110416211221.853079766@linutronix.de>
+	<4DAD462D.5070008@metafoo.de>
+	<alpine.LFD.2.00.1104191130050.2744@localhost6.localdomain6>
+	<4DAD5F8C.1060101@metafoo.de>
+Message-ID: <alpine.LFD.2.00.1104191224460.2744@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 4:40 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> On 14:39 Fri 15 Apr ? ? , Paul Parsons wrote:
->> Add REGULATOR_CHANGE_STATUS flag to hx4700 bq24022 regulator. Without this flag the bq24022 cannot be enabled and the battery will not charge.
->>
-> Ah, so that's why my hx4700 doesn't charges under linux! I noticed
-> that some time ago, but never found the time to investigate this.
-> Thanks for finding this out. Will test.
->
-> BTW, this should probably go through Eric Miao's PXA tree, so adding him
-> to CC list.
->
+On Tue, 19 Apr 2011, Lars-Peter Clausen wrote:
+> On 04/19/2011 11:41 AM, Thomas Gleixner wrote:
+> > On Tue, 19 Apr 2011, Lars-Peter Clausen wrote:
+> >> On 04/16/2011 11:14 PM, Thomas Gleixner wrote:
+> >>> [...]
+> >  
+> >> I've also noticed that all my chained demuxer handlers follow a similar scheme
+> >> and a quick grep for generic_handle_irq revealed that quite a few other
+> >> implementations also follow a similar scheme as well.
+> >>
+> >> Something along the lines of ...
+> >>
+> >> void irq_gc_chained_demux_handler(unsigned int irq, struct irq_desc *desc)
+> >> {
+> >> 	struct irq_chip_generic *gc = irq_desc_get_handler_data(desc);
+> >> 	struct irq_chip_type *ct = gc = irq_chip_generic_current_chip_type(gc);
+> >> 	unsigned long pending = irq_reg_readl(ct->regs.pending);
+> >>
+> >> 	pending = irq_reg_readl(ct->regs.pending) & gc->mask_cache;
+> >>
+> >> 	for_each_set_bit (irq, &pending, gc->irq_cnt)
+> >> 		generic_handle_irq(gc->irq_base + irq);
+> >> }
+> >>
+> >> ... could be used to replace those custom handlers in an irq_chip_generic based
+> >> implementation.
+> >>
+> >> With this the diffstat for JZ4740 looks even better:
+> >>  4 files changed, 91 insertions(+), 232 deletions(-)
+> >>
+> >> Unfortunately it doesn't completely fit into the current irq_chip_generic
+> >> implementation. For one there is no irq_chip_generic_current_chip_type, but I
+> >> guess that could be implementing by adding a field to irq_chip_generic pointing
+> >> to the current chip type. On the other hand I'm not sure if it is necessary to
+> > 
+> > No, you can get the current chip from irq_data.chip which always has a
+> > pointer to the current active one. container_of will give you the
+> > generic chip.
+> 
+> Yes, but the chained demux handler is of course installed on the parent irq chip.
+> I guess we could do something like cur_regs(irq_get_irq_data(gc->irq_base))
+> though, but that is a lot of indirection.
 
-Applied to 'fix'.
+Nah. I whip up a inline helper which lets you retrieve that info from
+*desc.
+ 
+> >> Another issue is that while the gpio unit on the JZ4740 supports different
+> >> trigger modes it only supports either rising or falling edge at one time. So
+> >> since it doesn't makes sense to implement switching between those two in a
+> >> driver triggering in both edges is emulated by the irq chip.
+> > 
+> > That's what about 5 dozen other irq chips do as well.
+> 
+> Yes, I've noticed as well. That is why I was asking if you see the possibility
+> to handle this in the core somehow.
+
+If the patterns are similar enough then we definitely should do that.
+
+Thanks,
+
+	tglx
