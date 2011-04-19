@@ -1,27 +1,67 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Tue, 19 Apr 2011 15:04:13 +0300
-Subject: [PATCH 0/2] OMAP: convert boards that use SMSC911x to use
-	gpmc-smsc911x
-Message-ID: <cover.1302992702.git.mike@compulab.co.il>
+Date: Tue, 19 Apr 2011 15:04:14 +0300
+Subject: [PATCH 1/2] OMAP: gpmc-smsc911x: always set irq flags to
+	IORESOURCE_IRQ_LOWLEVEL
+In-Reply-To: <cover.1302992702.git.mike@compulab.co.il>
+References: <cover.1302992702.git.mike@compulab.co.il>
+Message-ID: <7cf1c52880f0f32922c8973cb90aadcd2e728be1.1302992702.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are several OMAP boards that use SMSC911x Ethernet controller. Convert them all to use gpmc-smsc911x for device registration.
+SMSC911x devices attached to OMAP GPMC always use low level irqs.
+Setting the appropriate flag in the irq resourse strucure allows using
+.flags field in the omap_smsc911x_platform_data for driver specific
+flags
 
-Mike Rapoport (2):
-  OMAP: gpmc-smsc911x: always set irq flags to IORESOURCE_IRQ_LOWLEVEL
-  OMAP: convert boards that use SMSC911x to use gpmc-smsc911x
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-omap2/board-omap3logic.c |    1 -
+ arch/arm/mach-omap2/gpmc-smsc911x.c    |    7 ++++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
- arch/arm/mach-omap2/board-cm-t35.c          |   84 +++------------------
- arch/arm/mach-omap2/board-igep0020.c        |   53 ++-----------
- arch/arm/mach-omap2/board-ldp.c             |   65 ++--------------
- arch/arm/mach-omap2/board-omap3evm.c        |   71 +++---------------
- arch/arm/mach-omap2/board-omap3logic.c      |    1 -
- arch/arm/mach-omap2/board-omap3stalker.c    |   48 ++----------
- arch/arm/mach-omap2/board-overo.c           |  108 ++++-----------------------
- arch/arm/mach-omap2/board-zoom-debugboard.c |   56 ++------------
- arch/arm/mach-omap2/gpmc-smsc911x.c         |    7 +-
- 9 files changed, 70 insertions(+), 423 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index b726943..a49e6cf 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -147,7 +147,6 @@ static struct omap_smsc911x_platform_data __initdata board_smsc911x_data = {
+ 	.cs             = OMAP3LOGIC_SMSC911X_CS,
+ 	.gpio_irq       = -EINVAL,
+ 	.gpio_reset     = -EINVAL,
+-	.flags          = IORESOURCE_IRQ_LOWLEVEL,
+ };
+ 
+ /* TODO/FIXME (comment by Peter Barada, LogicPD):
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index 703f150..b331f3c 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -30,7 +30,7 @@ static struct resource gpmc_smsc911x_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.flags		= IORESOURCE_IRQ,
++		.flags		= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+ 	},
+ };
+ 
+@@ -79,8 +79,6 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+ 
+ 	gpio_direction_input(gpmc_cfg->gpio_irq);
+ 	gpmc_smsc911x_resources[1].start = gpio_to_irq(gpmc_cfg->gpio_irq);
+-	gpmc_smsc911x_resources[1].flags |=
+-					(gpmc_cfg->flags & IRQF_TRIGGER_MASK);
+ 
+ 	if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
+ 		ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
+@@ -96,6 +94,9 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+ 		gpio_set_value(gpmc_cfg->gpio_reset, 1);
+ 	}
+ 
++	if (gpmc_cfg->flags)
++		gpmc_smsc911x_config.flags = gpmc_cfg->flags;
++
+ 	if (platform_device_register(&gpmc_smsc911x_device) < 0) {
+ 		printk(KERN_ERR "Unable to register smsc911x device\n");
+ 		gpio_free(gpmc_cfg->gpio_reset);
 -- 
 1.7.3.1
