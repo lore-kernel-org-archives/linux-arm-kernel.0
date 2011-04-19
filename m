@@ -1,48 +1,46 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue, 19 Apr 2011 08:20:09 -0400
-Subject: [PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC
-In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE093FB40998@Cloud.RL.local>
-References: <BANLkTi=7DbMrbo0nQU+268LC_2258q-_DA@mail.gmail.com>
-	<70E876B0EA86DD4BAF101844BC814DFE093FB40998@Cloud.RL.local>
-Message-ID: <BANLkTinTMi76GmgO6HJ0+ifCXsHE3Mjsvg@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 19 Apr 2011 21:35:56 +0900
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <201104191401.34818.arnd@arndb.de>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<201104181613.43572.arnd@arndb.de>
+	<BANLkTi=dpqMFjW_B5-YsmoCJf62b8djj5g@mail.gmail.com>
+	<201104191401.34818.arnd@arndb.de>
+Message-ID: <BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Mon, Apr 18, 2011 at 9:47 PM, Jon Povey <Jon.Povey@racelogic.co.uk> wrote:
-> Ben Gardiner wrote:
+On Tue, Apr 19, 2011 at 9:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 19 April 2011, Kyungmin Park wrote:
+>> On Mon, Apr 18, 2011 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Monday 18 April 2011, Kyungmin Park wrote:
+>> >> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> >
+>> >> > One missing piece is still a way for a platform to provide both
+>> >> > the iommu and the dma-mapping API in a unified driver. Right now,
+>> >> > you have to export both interface for a generic solution.
+>> >>
+>> >> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
+>> >> implementation into mm, but MM did't accept it.
+>> >
+>> > I'm confused. What do you mean with MM?
+>> linux/mm, Memory Management.
 >
->>>> When creating this series I noticed that there are obvious
->>>> similarities between the existing recovery routine implemented by
->>>> Philby John and John Povey
+> I'm still confused. What were you suggesting to merge in there?
+> Do you have a link to a mailing list discussion?
+
+First, Zach Pfeffer <zpfeffer@codeaurora.org> sent the patch
+https://patchwork.kernel.org/patch/108736/
+
+Second, Michal tried it.
+http://lkml.org/lkml/2010/9/6/41
+
+http://lwn.net/Articles/403643/
+https://patchwork.kernel.org/patch/157451/
+
+Thank you,
+Kyungmin Park
+
 >
->> I'm not sure how the 20us in the existing method was derived -- I
->> wonder if Philby John or John Povey could comment?
+> ? ? ? ?Arnd
 >
-> I've been a little bemused about why I am getting credited for I2C
-> bus recovery work. I don't remember doing any work on that.
-
-My mistake -- sorry. Also sorry for getting your name wrong repeatedly.
-
-> I did a couple of patches to fix a race when setting up a TX, but
-> those are, afaik, unrelated.
-
-In "i2c-davinci: Fix race when setting up for TX" and "i2c-davinci:
-Fix TX setup for more SoCs" you mention testing on DM355 -- is there
-any you have hardware on which the recovery procedure is executed on
-occasion and that you would be available to test modifications to the
-current implementation?
-
-> All I know about the bus recovery stuff is looking at it a while back
-> and thinking hmm, that seems to wiggle gpio without changing the
-> pinmuxing, so it can't possibly work.
-
-:) Probably not then.
-
-Best Regards,
-Ben Gardiner
-
----
-Nanometrics Inc.
-http://www.nanometrics.ca
