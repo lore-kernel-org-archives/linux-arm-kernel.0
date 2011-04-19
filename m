@@ -1,40 +1,74 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Tue, 19 Apr 2011 17:52:10 +0400
-Subject: [PATCHv2 2.6.40 3/3] ARM:simpad: add GPIO based device
-	definitions.
-In-Reply-To: <1303131636-19442-4-git-send-email-jochen@scram.de>
-References: <1303131636-19442-1-git-send-email-jochen@scram.de>
-	<1303131636-19442-4-git-send-email-jochen@scram.de>
-Message-ID: <20110419135210.GA2182@rainbow>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 16:29:49 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104191449.50824.arnd@arndb.de>
+	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+Message-ID: <201104191629.49676.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:00 Mon 18 Apr     , Jochen Friedrich wrote:
-> Register LED, keyboard, polled keyboard and I2C platform
-> devices based on GPIOs.
+On Tuesday 19 April 2011, Marek Szyprowski wrote:
+
+> > 
+> > 1. change the runtime_pm subsystem to allow it to ignore some devices
+> > in an easy way.
+> > 
+> > 2. change the device layout if the sysmmu. If the iommu device is
+> > a child of the device that it is responsible for, I guess you don't
+> > have this problem.
+> > 
+> > 3. Not represent the iommu as a device at all, just as a property
+> > of another device.
 > 
-> V2: Remove the legacy ARM LED code for simpad devices.
+> Ok, we will handle this issue somehow. I consider this a minor issue and I
+> would like to focus on the IOMMU/dma-mapping APIs first.
 
-Yeah, that looks like a good move! IMO, legacy ARM leds code should go
-away, as we have now proper generic LED subsystem, and the sooner we
-convert all legacy users to leds-class drivers, the better.
+Yes, agreed.
 
-> Signed-off-by: Jochen Friedrich <jochen@scram.de>
-> ---
->  arch/arm/mach-sa1100/Makefile      |    1 -
->  arch/arm/mach-sa1100/leds-simpad.c |   97 ------------------------------------
->  arch/arm/mach-sa1100/simpad.c      |   95 ++++++++++++++++++++++++++++++++++-
->  3 files changed, 94 insertions(+), 99 deletions(-)
->  delete mode 100644 arch/arm/mach-sa1100/leds-simpad.c
+> > That is a limitation of the current implementation. We might want to
+> > change that anyway, e.g. to handle the mali IOMMU along with yours.
+> > I believe the reason for allowing only one IOMMU type so far has been
+> > that nobody required more than one. As I mentioned, the IOMMU API is
+> > rather new and has not been ported to much variety of hardware, unlike
+> > the dma-mapping API, which does support multiple different IOMMUs
+> > in a single system.
+> 
+> Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
+> dma-mapping API is something much more complex that creates the actual
+> mapping for various sets of the devices. IMHO the right direction will
+> be to create dma-mapping implementation that will be just a client of
+> the IOMMU API. What's your opinion?
+ 
+Sounds good. I think we should put it into a new drivers/iommu, along
+with your specific iommu implementation, and then we can convert the
+existing ones over to use that.
 
-But, while removing leds-simpad.c, it seems you forgot to update both
-Makefile and corresponding entries in leds.[ch], so I suspect it will
-break build with CONFIG_LEDS=y.
+Note that this also requires using dma-mapping-common.h, which we currently
+don't on ARM.
 
-And, while you're at it, it's probably a good idea to move all these LED
-changes into separate patch, and not to mix them with gpio-keys/i2c/etc
-devices registration.
+> > The domain really reflects the user, not the device here, which makes more
+> > sense if you think of virtual machines than of multimedia devices.
+> >
+> > I would suggest that you just use a single iommu_domain globally for
+> > all in-kernel users.
+> 
+> There are cases where having a separate mapping for each device makes sense.
+> It definitely increases the security and helps to find some bugs in
+> the drivers.
+> 
+> Getting back to our video codec - it has 2 IOMMU controllers. The codec
+> hardware is able to address only 256MiB of space. Do you have an idea how
+> this can be handled with dma-mapping API? The only idea that comes to my
+> mind is to provide a second, fake 'struct device' and use it for allocations
+> for the second IOMMU controller.
 
--- 
-Best regards,
-Dmitry "MAD" Artamonow
+Good question. 
+
+How do you even decide which controller to use from the driver?
+I would need to understand better what you are trying to do to
+give a good recommendation.
+
+	Arnd
