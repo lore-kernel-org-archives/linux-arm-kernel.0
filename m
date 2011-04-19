@@ -1,23 +1,43 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 19 Apr 2011 14:40:07 +0530
-Subject: [PATCH V2 7/7] dmaengine/dw_dmac: implement pause and resume
-	in dwc_control
-In-Reply-To: <20110419085514.GG2820@pulham.picochip.com>
-References: <cover.1303194835.git.viresh.kumar@st.com>
-	<a1168e413888e35badd9fab6b1626fcfe355dc9b.1303194836.git.viresh.kumar@st.com>
-	<20110419085514.GG2820@pulham.picochip.com>
-Message-ID: <4DAD516F.50901@st.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 19 Apr 2011 18:11:00 +0900
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <201104181613.43572.arnd@arndb.de>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<201104181358.53521.arnd@arndb.de>
+	<BANLkTimc20N0nh9O0FaSXizW+bYOMx9Ddw@mail.gmail.com>
+	<201104181613.43572.arnd@arndb.de>
+Message-ID: <BANLkTi=dpqMFjW_B5-YsmoCJf62b8djj5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2011 02:25 PM, Jamie Iles wrote:
->From the Synopsys datasheet it looks to me like pausing by clearing the 
-> channel enable bit could cause data to be lost.  I think you need to set 
-> the CH_SUSP bit and wait for the FIFO_EMPTY flag to go high then disable 
-> the channel.
+On Mon, Apr 18, 2011 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 18 April 2011, Kyungmin Park wrote:
+>> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > One missing piece is still a way for a platform to provide both
+>> > the iommu and the dma-mapping API in a unified driver. Right now,
+>> > you have to export both interface for a generic solution.
+>>
+>> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
+>> implementation into mm, but MM did't accept it.
+>
+> I'm confused. What do you mean with MM?
+linux/mm, Memory Management.
 
-Yes, Previously i looked at some other doc of dwc and couldn't find this info.
-But now found it in datasheet. Will correct and resend it.
-
--- 
-viresh
+Thank you,
+Kyungmin Park
+>
+>> So now it's implemented at each SoCs. I think it's good chance to make
+>> a generic IOMMU feature for ARM consolidation.
+>>
+>> Before this idea, can you review our implementation at above URL?
+>
+> I've commented on the main implementation for the IOMMU now.
+>
+> ? ? ? ?Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
