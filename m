@@ -1,40 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Apr 2011 14:00:17 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <20110419092049.GC22799@n2100.arm.linux.org.uk>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 14:00:29 +0200
+Subject: [PATCH 4/7] v4l: videobuf2: add IOMMU based DMA memory allocator
+In-Reply-To: <20110419092135.GD22799@n2100.arm.linux.org.uk>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<00ea01cbfe70$860ca900$9225fb00$%szyprowski@samsung.com>
+	<20110419092135.GD22799@n2100.arm.linux.org.uk>
+Message-ID: <201104191400.30167.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 11:20 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 19, 2011 at 11:02:34AM +0200, Linus Walleij wrote:
->> From: Ulf Hansson <ulf.hansson@stericsson.com>
->>
->> The end of a dma job must be synced with a DATAEND irq. This will
->> prevent the mmci driver from ending the mmc request before the
->> dma driver is completely done. By using DMA_PREP_INTERRUPT we
->> register a callback function which will is called when from the
->> dma driver when the dma transfer is completed.
->
-> Why is what we currently do not sufficient?
+On Tuesday 19 April 2011, Russell King - ARM Linux wrote:
+> On Tue, Apr 19, 2011 at 11:02:34AM +0200, Marek Szyprowski wrote:
+> > On Monday, April 18, 2011 4:16 PM Arnd Bergmann wrote:
+> > > My feeling is that this is not the right abstraction. Why can't you
+> > > just implement the regular dma-mapping.h interfaces for your IOMMU
+> > > so that the videobuf code can use the existing allocators?
+> > 
+> > I'm not really sure which existing videobuf2 allocators might transparently
+> > support IOMMU interface yet
+> > 
+> > Do you think that all iommu operations can be hidden behind dma_map_single 
+> > and dma_unmap_single?
+> 
+> That is one of the intentions of the DMA API.
 
-On a high-speeded ux500 the DATAEND IRQ will assert before the
-DMA data is actually finished, thus if we start hammering in the next
-request we break an ongoing transfer. :-(
+Exactly.
 
-> This will break the detection of dead DMA controllers like on the ARM
-> reference platforms, as I've said before.
+All architectures that support IOMMUs today do that, see:
 
-Yeah ... I'm trying to think of something clever, can we put a
-bool sync_dma_job in the vendor data and only activate this
-for ux500 and U300 ST variants where we know DMA always
-works then?
+arch/alpha/kernel/pci_iommu.c
+arch/ia64/hp/common/sba_iommu.c
+arch/powerpc/kernel/dma-iommu.c
+arch/sparc/kernel/iommu.c
+arch/x86/kernel/amd_iommu.c
 
-The only thing I worry about is if the plain vanilla PL180 would
-exhibit the same behaviour when used with high-speed DMA, then
-we're effectively deactivating a bugfix for it.
+ARM would be the first one to combine an IOMMU with potentially
+noncoherent DMA, but there is no fundamental reason why we shouldn't
+be able to transparently support an IOMMU.
 
-Linus
+Ideally, I think we should first find an architecture-independent
+way to define an IOMMU in one place instead of having to do both
+the iommu.h and dma-mapping.h interfaces, but I wouldn't require
+Samsung to do that in order to support their IOMMU. Doing support for
+the dma-mapping.h interface should be sufficient there.
+
+	Arnd
