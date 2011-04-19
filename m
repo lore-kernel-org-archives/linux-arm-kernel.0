@@ -1,54 +1,76 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 15:11:39 +0200
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<201104191401.34818.arnd@arndb.de>
-	<BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
-Message-ID: <201104191511.39370.arnd@arndb.de>
+Date: Tue, 19 Apr 2011 15:46:49 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
+In-Reply-To: <BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<201104181619.35115.arnd@arndb.de>
+	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
+Message-ID: <201104191546.49632.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2011, Kyungmin Park wrote:
-> On Tue, Apr 19, 2011 at 9:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 19 April 2011, Kyungmin Park wrote:
-> >> On Mon, Apr 18, 2011 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Monday 18 April 2011, Kyungmin Park wrote:
-> >> >> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >> >
-> >> >> > One missing piece is still a way for a platform to provide both
-> >> >> > the iommu and the dma-mapping API in a unified driver. Right now,
-> >> >> > you have to export both interface for a generic solution.
-> >> >>
-> >> >> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
-> >> >> implementation into mm, but MM did't accept it.
-> >> >
-> >> > I'm confused. What do you mean with MM?
-> >> linux/mm, Memory Management.
+On Monday 18 April 2011, Rafa? Mi?ecki wrote:
+> W dniu 18 kwietnia 2011 16:19 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
+> > You mean the hardware has two sets of registers containing the same
+> > information, one of them the standard registers, and one with broadcom
+> > specific ones?
 > >
-> > I'm still confused. What were you suggesting to merge in there?
-> > Do you have a link to a mailing list discussion?
+> > Why don't you just use the standard ones then?
 > 
-> First, Zach Pfeffer <zpfeffer@codeaurora.org> sent the patch
-> https://patchwork.kernel.org/patch/108736/
+> No. Did you read my first mail in this thread?
+
+I'm sorry, but I found the information in this thread and the related ones
+highly confusing and sometimes contradictory. Thanks for clarifying it
+once more.
+
+> There is pair of cores for every device. First is AMBA-specific called
+> agent/wrapper and second one is Broadcom-specific.
 > 
-> Second, Michal tried it.
-> http://lkml.org/lkml/2010/9/6/41
-> 
-> http://lwn.net/Articles/403643/
-> https://patchwork.kernel.org/patch/157451/
+> AMBA specific core called agent/wrapper has AMBA specific registers:
+> CID and PID. However we do not ever read that in Broadcom driver,
+> because that are useless for us. On AMBA specific core we use only
+> some Broadcom specific registers to manage (enable/disable) second
+> (Broadcom-specific) core.
 
-Ah, I did not realize you were talking about VCMM. I believe the main
-reason what that patch was not received well is that it tried to add
-yet another abstraction for IOMMUs when we already have too many of them.
+Ideally, we should model the devices along the IP blocks and how they
+fit together. If I understand correctly what you are saying, your hardware
+looks like
 
-It is essentially doing the opposite of what I was referring to above:
-If we had added VCMM, each platform that has IOMMUs would now have to 
-implement three interfaces: dma-mapping.h (struct dma_map_ops),
-iommu.h (struct iommu_ops) and and vcm_driver.h (struct vcm_driver).
+pci_dev
+  |
+  +---------+-----------+ ...
+  |         |           |
+ amba_dev   amba_dev   amba_dev
+   |           |           |
+ bcm_dev     bcm_dev     bcm_dev
 
-What I really meant was to unify the two we already have, so that
-a platform only needs to implement e.g. iommu_ops and get the dma_mapping.h
-interfaces for free.
+In that case, you would need three bus types (pci_bus, amba_bus and
+your own bcm_bus) and at least seven devices to represent all of it
+using the device model. This is possible, but it seems you are also
+saying that you don't need the complexity of this, e.g. because you
+don't care about the amba device at all.
+
+The easiest shortcut would be to not represent the AMBA devices
+at all, and I guess that is fine. Introducing your own bus_type
+for the broadcom devices sounds like a correct way to use the
+linux driver model, especially if the devices on that bus are
+totally independent from one another. I think you should do that
+if you have e.g. a PCI card containing a single PCI function with
+multiple IP blocks that do completely unrelated things (wifi,
+bluetooth, ethernet, ...).
+
+You could also just use platform_devices if you don't want to
+introduce your own bus, and there is not much commonality between
+the devices in terms of probing them.
+
+However, I would not use the device model if the IP blocks in your
+device are just responsible for different aspects of one logical
+device, e.g. PHY, power management and DMA within a single network
+adapter. If that is what you have, don't use a Linux device for
+each of those blocks at all, but instead do a "library" module
+for each block: export some interfaces from the module that can
+be used by multiple drivers, and create the data structure from
+the main driver, filled out with the data describing the IP
+block (memory ranges, interrupts, etc).
 
 	Arnd
