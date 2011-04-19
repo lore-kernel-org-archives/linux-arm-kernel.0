@@ -1,101 +1,85 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 19 Apr 2011 14:02:09 +0530
-Subject: [PATCH V2 4/7] dmaengine/dw_dmac: don't call callback routine in case
-	dmaengine_terminate_all() is called
-In-Reply-To: <cover.1303194835.git.viresh.kumar@st.com>
-References: <cover.1303194835.git.viresh.kumar@st.com>
-Message-ID: <14106a88c7c86261732080be3e08b1dd5a826362.1303194836.git.viresh.kumar@st.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 19 Apr 2011 09:38:55 +0100
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+Message-ID: <20110419093855.36910400@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dmaengine_terminate_all() is called for dma channel, then it doesn't make
-much sense to call registered callback routine. While in case of success or
-failure it must be called.
+> > It also doesn't solve the real problem which is that you've got to
+> > implement platform specific parallel gpio extensions all over the place
+> > when you really want it all using the same 'handle' and request logic.
+> 
+> Fair enough.  Forgive me if you've stated this in a previous conversation
+> then but what do you see as being the best way forward here?  Should
+> gpiolib enforce itself as the One True Allocator and require all firmware
+> drivers call back in to it to get access to the pins rather than gpiolib
+> calling back to the platform upon gpio_request()?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/dma/dw_dmac.c |   27 ++++++++++++++++-----------
- 1 files changed, 16 insertions(+), 11 deletions(-)
+We need something to allocate gpios and manage them. gpiolib seems to be
+very good at this. We also need gpiolib to route other requests because
+gpiolib is the one thing which knows how to turn "gpio 43" a struct and
+function calls.
 
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index c211460..d8aad28 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -195,7 +195,8 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
- /*----------------------------------------------------------------------*/
- 
- static void
--dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
-+dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
-+		bool callback_required)
- {
- 	dma_async_tx_callback		callback = NULL;
- 	void				*param = NULL;
-@@ -205,8 +206,10 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- 	dev_vdbg(chan2dev(&dwc->chan), "descriptor %u complete\n", txd->cookie);
- 
- 	dwc->completed = txd->cookie;
--	callback = txd->callback;
--	param = txd->callback_param;
-+	if (callback_required) {
-+		callback = txd->callback;
-+		param = txd->callback_param;
-+	}
- 
- 	dwc_sync_desc_for_cpu(dwc, desc);
- 
-@@ -238,10 +241,12 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
- 		}
- 	}
- 
--	spin_unlock_irqrestore(&dwc->lock, dw->flags);
--	if (callback)
--		callback(param);
--	spin_lock_irqsave(&dwc->lock, dw->flags);
-+	if (callback_required) {
-+		spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
-+		if (callback)
-+			callback(param);
-+		spin_lock_irqsave(&dwc->lock, dwc->lflags);
-+	}
- }
- 
- static void dwc_complete_all(struct dw_dma *dw, struct dw_dma_chan *dwc)
-@@ -270,7 +275,7 @@ static void dwc_complete_all(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 	}
- 
- 	list_for_each_entry_safe(desc, _desc, &list, desc_node)
--		dwc_descriptor_complete(dwc, desc);
-+		dwc_descriptor_complete(dwc, desc, 1);
- }
- 
- static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
-@@ -320,7 +325,7 @@ static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 		 * No descriptors so far seem to be in progress, i.e.
- 		 * this one must be done.
- 		 */
--		dwc_descriptor_complete(dwc, desc);
-+		dwc_descriptor_complete(dwc, desc, 1);
- 	}
- 
- 	dev_dbg(chan2dev(&dwc->chan),
-@@ -382,7 +387,7 @@ static void dwc_handle_error(struct dw_dma *dw, struct dw_dma_chan *dwc)
- 		dwc_dump_lli(dwc, &child->lli);
- 
- 	/* Pretend the descriptor completed successfully */
--	dwc_descriptor_complete(dwc, bad_desc);
-+	dwc_descriptor_complete(dwc, bad_desc, 1);
- }
- 
- /* --------------------- Cyclic DMA API extensions -------------------- */
-@@ -827,7 +832,7 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 
- 	/* Flush all pending and queued descriptors */
- 	list_for_each_entry_safe(desc, _desc, &list, desc_node)
--		dwc_descriptor_complete(dwc, desc);
-+		dwc_descriptor_complete(dwc, desc, 0);
- 
- 	spin_unlock_irqrestore(&dwc->lock, dwc->lflags);
- 
+> > And for a lot of this stuff that the gpio layer really doesn't want
+> > internal knowledge of other chunks of the kernel have used models like
+> > 'get_property/set_property' (eg battery, video4linux etc) so that the mid
+> > layer can plumb in a conversation between the handle owner and the driver
+> > without getting involved in the conversation.
+> 
+> Yeah that sounds like a more reasonable way to expose this functionality if
+> the driver does indeed need it.
+
+Leaving aside the current input/output and on/off bits I would go for
+being able to do
+
+	gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
+	gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
+
+and having gpiolib perform nothing more on these than
+
+	is the gpio allocated 
+	does ->get_property() exist
+		no -EOPNOTSUPP
+		yes return ->get_proprty(gpio struct, op, val)
+	
+For dynamically configurable features that avoids the 
+
+	gpio_request(35);
+	magic_platform_hack(&foo[3], blah); /* foo3 will be gpio35 */
+
+type stuff that becomes unmaintainable.
+
+It would be entirely optional for a driver to support any of this stuff,
+but it would both allow drivers to do so and also mean that where there
+are multiple devices with a common feature *and* a driver wants to use it
+that it will be properly abstracted in the driver itself.
+
+
+Alan
+
+
+
+> 
+> 	--Ben.
+> 
+> > 
+> > Alan
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+
 -- 
-1.7.2.2
+--
+	"Alan, I'm getting a bit worried about you."
+				-- Linus Torvalds
