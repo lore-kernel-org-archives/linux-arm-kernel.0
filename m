@@ -1,46 +1,68 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 19 Apr 2011 21:35:56 +0900
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <201104191401.34818.arnd@arndb.de>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<201104181613.43572.arnd@arndb.de>
-	<BANLkTi=dpqMFjW_B5-YsmoCJf62b8djj5g@mail.gmail.com>
-	<201104191401.34818.arnd@arndb.de>
-Message-ID: <BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
+From: mchehab@infradead.org (Mauro Carvalho Chehab)
+Date: Tue, 19 Apr 2011 09:37:48 -0300
+Subject: [REVERT] Re: V4L: videobuf-dma-contig: fix mmap_mapper	broken
+	on ARM
+In-Reply-To: <4DAD26D9.6060906@suse.cz>
+References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
+	<201104131252.32011.jkrzyszt@tis.icnet.pl>
+	<20110413183231.GA23631@n2100.arm.linux.org.uk>
+	<201104132256.40325.jkrzyszt@tis.icnet.pl>
+	<20110413220008.GA23901@n2100.arm.linux.org.uk>
+	<4DAD26D9.6060906@suse.cz>
+Message-ID: <4DAD821C.7080101@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 9:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 19 April 2011, Kyungmin Park wrote:
->> On Mon, Apr 18, 2011 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 18 April 2011, Kyungmin Park wrote:
->> >> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> >
->> >> > One missing piece is still a way for a platform to provide both
->> >> > the iommu and the dma-mapping API in a unified driver. Right now,
->> >> > you have to export both interface for a generic solution.
->> >>
->> >> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
->> >> implementation into mm, but MM did't accept it.
->> >
->> > I'm confused. What do you mean with MM?
->> linux/mm, Memory Management.
->
-> I'm still confused. What were you suggesting to merge in there?
-> Do you have a link to a mailing list discussion?
+Em 19-04-2011 03:08, Jiri Slaby escreveu:
+> On 04/14/2011 12:00 AM, Russell King - ARM Linux wrote:
+>> On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
+>>> Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux 
+>>> napisa?(a):
+>>>> On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
+>>>>> Taking into account that I'm just trying to fix a regression, and
+>>>>> not invent a new, long term solution: are you able to name an ARM
+>>>>> based board which a) is already supported in 2.6.39, b) is (or can
+>>>>> be) equipped with a device supported by a V4L driver which uses
+>>>>> videobuf- dma-config susbsystem, c) has a bus structure with which
+>>>>> virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
+>>>>
+>>>> I have no idea - and why should whether someone can name something
+>>>> that may break be a justification to allow something which is
+>>>> technically wrong?
+>>>>
+>>>> Surely it should be the other way around - if its technically wrong
+>>>> and _may_ break something then it shouldn't be allowed.
+>>>
+>>> In theory - of course. In practice - couldn't we now, close to -rc3, 
+>>> relax the rules a little bit and stop bothering with something that may 
+>>> break in the future if it doesn't break on any board supported so far (I 
+>>> hope)?
+>>
+>> If we are worried about closeness to -final, then what should happen is
+>> that the original commit is reverted; the "fix" for IOMMUs resulted in
+>> a regression for existing users which isn't trivial to resolve without
+>> risking possible breakage of other users.
+> 
+> Hi, as -rc4 is out, I think it's time to revert that commit and rethink
+> the mmap behaviour for some of next -rc1s.
+> 
+> Linus, please revert
+> commit 35d9f510b67b10338161aba6229d4f55b4000f5b
+> Author: Jiri Slaby <jslaby@suse.cz>
+> Date:   Mon Feb 28 06:37:02 2011 -0300
 
-First, Zach Pfeffer <zpfeffer@codeaurora.org> sent the patch
-https://patchwork.kernel.org/patch/108736/
+It seems the better option for now.
 
-Second, Michal tried it.
-http://lkml.org/lkml/2010/9/6/41
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-http://lwn.net/Articles/403643/
-https://patchwork.kernel.org/patch/157451/
-
-Thank you,
-Kyungmin Park
-
->
-> ? ? ? ?Arnd
->
+> 
+>     [media] V4L: videobuf, don't use dma addr as physical
+> ===
+> 
+> It fixes mmap when IOMMU is used on x86 only, but breaks architectures
+> like ARM or PPC where virt_to_phys(dma_alloc_coherent) doesn't work. We
+> need there dma_mmap_coherent or similar (the trickery what
+> snd_pcm_default_mmap does but in some saner way). But this cannot be
+> done at this phase.
+> 
+> thanks,
