@@ -1,37 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 Apr 2011 03:23:11 +0200
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikSfdUXmME8ao4GYtwgZNuZX9RLZg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 19 Apr 2011 10:46:47 +0900
+Subject: Cleanup Samsung stuff
+Message-ID: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+Hi all,
 
-> We have two SoCs using SRAM, both with their own allocation systems,
-> and both with their own ways of copying functions into the SRAM.
->
-> Let's unify this before we have additional SoCs re-implementing this
-> obviously common functionality themselves.
+I think, you know about current situation of Linux ARM world.
 
-Great initiative!
+So...
 
-I'm thinking about how to unify this with the bits I have in kernel/tcm.c.
+As Russell suggested, I also will focus on consolidations and bug fixes for
+Samsung stuff for a while so don't complain about missing new stuff. In my
+opinion, we can keep going it later...
 
-For TCM memory (cacheless, inside CPU core, controlled by CP15
-registers to recap) we can compile plain C into that memory too, which
-seems like a lot of these SRAM drivers actually want to do, but fail at
-and instead write some assembler and copy it there.
+As a note, I'm doing(or preparing) following at the moment.
 
-The remainder of the TCM memory is put into an allocation pool
-of uneven size, maybe that should reuse this mechanism instead
-of rolling its own atleast.
+- Removing some "mach-s5pxxxx"s
+- Removing useless header files in include/{mach,plat} of Samsung
+- Samsung GPIO stuff cleanup/consolidation
+- Samsung DMA stuff consolidation?
+- Device tree (with Linaro)
+- and so on...
 
-On the odd PB11MPCore the TCM memories are NUMA, so one
-on each CPU not reachable from other cores (like Magnus Damm
-mentioned for SH-ARM) and I have no idea on how to handle that,
-neither for an allocator nor for compiling code directly into it.
-Suggestions welcome.
+If required anything else, please let me know.
 
-Linus Walleij
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
