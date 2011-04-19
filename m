@@ -1,35 +1,34 @@
-From: Jon.Povey@racelogic.co.uk (Jon Povey)
-Date: Tue, 19 Apr 2011 02:47:53 +0100
-Subject: [PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC
-In-Reply-To: <BANLkTi=7DbMrbo0nQU+268LC_2258q-_DA@mail.gmail.com>
-Message-ID: <70E876B0EA86DD4BAF101844BC814DFE093FB40998@Cloud.RL.local>
+From: chaos.youn@samsung.com (Changhwan Youn)
+Date: Tue, 19 Apr 2011 10:45:23 +0900
+Subject: [PATCH 0/3] ARM: SAMSUNG: add entry and exit functions for interrupt
+	chained handler
+Message-ID: <1303177526-11744-1-git-send-email-chaos.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Gardiner wrote:
+Hello,
 
->>> When creating this series I noticed that there are obvious
->>> similarities between the existing recovery routine implemented by
->>> Philby John and John Povey
+This is for interrupt chained handlers to properly handle the primary controller
+using chained_irq_enter and chained_irq_exit functions.
+Without this, chained interrupts connected to GIC would not work properly.
 
-> I'm not sure how the 20us in the existing method was derived -- I
-> wonder if Philby John or John Povey could comment?
+This patch series contains:
 
-I've been a little bemused about why I am getting credited for I2C
-bus recovery work. I don't remember doing any work on that.
+[PATCH 1/3] ARM: SAMSUNG: add entry and exit functions for uart interrupt chained handler
+[PATCH 2/3] ARM: SAMSUNG: add entry and exit functions for pwm interrupt chained handler
+[PATCH 3/3] ARM: EXYNOS4: add entry and exit functions for external interrupt chained handler
 
-I did a couple of patches to fix a race when setting up a TX, but
-those are, afaik, unrelated.
+Best regards,
+Changhwan Youn
 
-All I know about the bus recovery stuff is looking at it a while back
-and thinking hmm, that seems to wiggle gpio without changing the
-pinmuxing, so it can't possibly work.
+Patch summary:
 
---
-Jon Povey
-jon.povey at racelogic.co.uk
+Changhwan Youn (3):
+	ARM: SAMSUGN: add entry and exit functions for uart interrupt chained handler
+	ARM: SAMSUNG: add entry and exit functions for pwm interrupt chained handler
+	ARM: EXYNOS4: add entry and exit functions for external interrupt chained handler
 
-Racelogic is a limited company registered in England. Registered number 2743719 .
-Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
-
-The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+	arch/arm/mach-exynos4/irq-eint.c      |   14 +++++++-------
+	arch/arm/plat-samsung/irq-uart.c      |    6 ++++++
+	arch/arm/plat-samsung/irq-vic-timer.c |    5 +++++
+	3 files changed, 18 insertions(+), 7 deletions(-)
