@@ -1,39 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 19 Apr 2011 15:50:46 -0700
-Subject: [PATCH linux-omap-pm/pm-wip/cpufreq] OMAP2PLUS: cpufreq: Fix typo
-	when attempting to set mpu_clk for OMAP4
-In-Reply-To: <1302787318-6650-1-git-send-email-jhnikula@gmail.com> (Jarkko
-	Nikula's message of "Thu, 14 Apr 2011 16:21:58 +0300")
-References: <1302787318-6650-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <87aaflam9l.fsf@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 19 Apr 2011 16:19:13 -0700
+Subject: [PATCH] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <20110405163338.GA11832@n2100.arm.linux.org.uk>
+References: <20110405073030.GI13963@pengutronix.de>
+	<1301992655-8514-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110405163338.GA11832@n2100.arm.linux.org.uk>
+Message-ID: <20110419161913.a1c18599.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jarkko Nikula <jhnikula@gmail.com> writes:
+On Tue, 5 Apr 2011 17:33:39 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> Fix this typo as there is no dpll_mpu_ck for OMAP3 and code flow is clearly
-> trying to set mpu_clk for OMAP4 for which this dpll_mpu_ck is available.
->
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> On Tue, Apr 05, 2011 at 10:37:35AM +0200, Uwe Kleine-K__nig wrote:
+> > +struct platform_device *__init gpio_led_register_device(
+> > +		const struct gpio_led_platform_data *pdata);
+> 
+> Please don't add __init annotations to declarations.
 
-Thanks, applied to pm-wip/cpufreq branch.
+Reasons?
 
-Kevin
-
-> ---
->  arch/arm/mach-omap2/omap2plus-cpufreq.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> index 8d472f6..d53ce23 100644
-> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> @@ -161,7 +161,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
->  		mpu_clk = clk_get(NULL, "virt_prcm_set");
->  	else if (cpu_is_omap34xx())
->  		mpu_clk = clk_get(NULL, "dpll1_ck");
-> -	else if (cpu_is_omap34xx())
-> +	else if (cpu_is_omap44xx())
->  		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
->  
->  	if (IS_ERR(mpu_clk))
+A year or so ago we had to *add* an __init to a declaration, because
+one architecture was generating a short-mode-addressing relative branch
+to the callee, assuming the target was in the same section as the call
+site.  When the linker went to resolve the branch, it discovered that
+the target was in fact in a different section and was too far away to
+be able to use the short-mode addressing.  IIRC, that architecture was
+arm.
