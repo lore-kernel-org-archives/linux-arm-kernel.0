@@ -1,61 +1,186 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 19 Apr 2011 07:02:57 -0700
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <op.vt6ufu1n3ri7v4@arend-laptop>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<1302892585.30441.12.camel@dev.znau.edu.ua>
-	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
-Message-ID: <20110419140257.GA20456@kroah.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 19 Apr 2011 16:03:27 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201104191449.50824.arnd@arndb.de>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104181612.35833.arnd@arndb.de>
+	<005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
+	<201104191449.50824.arnd@arndb.de>
+Message-ID: <000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 03:58:32PM +0200, Arend van Spriel wrote:
-> On Sun, 17 Apr 2011 19:38:12 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> Hi Rafa?,
-> 
-> As you probably expected I tried to integrate and use your bcmai/bcmaxi/?
-> driver with our brcm80211 driver (making progress). In the mean time
-> I tried to follow the discussions going on, but I am still catching
-> up.
-> 
-> >Compare this to the PCI bus type, which essentially deals with devices
-> >that have a PCI configuration space that contains generic (irq, memory,
-> >vendor/device ID, ...) registers along with device specific registers.
-> 
-> How much alike is the (BCM)AXI bus type? My assumption was that each
-> registered PCI device is handled by a single driver module. In the
-> current(?) bcmai implementation each device driver is called with the
-> appropriate device structure reference, but it will also have the bus
-> structure reference and through that can also access other cores on the
-> (bcm)axi bus. This seems to me a potential issue when there are no
-> synchronization mechanisms in place (whether in a SoC configuration or
-> PCI-hosted). Does the PCI bus type allow driver for device A access
-> device B?
-> 
-> >A new bus_type really only makes sense if you expect a lot of devices
-> >to use this and you want to have the probing in the bus. If you only
-> >want to have a way to enumerate devices that get created by the
-> >parent driver, you can also use platform devices.
-> 
-> The main assumption of the (bcm)axi driver seems to be that each core can
-> be considered as a device. Correct me if I am wrong, but I consider a
-> device to be an entity providing a particular system function. So an
-> ethernet device provides ethernet connectivity function, a mixer device
-> provides sound mixing function, and so on. The cores within a chip are not
-> always self-contained like this. To clarify let's say a system function is
-> realized by programming core A, core B, and finally trigger core A to set
-> the function in motion. This implies the need of coordination between the
-> programming steps on those cores.
-> 
-> Is my view on what is a device wrong? Does a platform device differ in
-> this respect from a regular device?
+Hello,
 
-Please don't use a platform device, unless there is no other way for
-your device to work.  For this device, you are connected to the PCI bus,
-so a platform device does not make sense at all.
+On Tuesday, April 19, 2011 2:50 PM Arnd Bergmann wrote:
 
-thanks,
+> On Tuesday 19 April 2011, Marek Szyprowski wrote:
+> 
+> > > These look wrong for a number of reasons:
+> > >
+> > > * try_module_get(THIS_MODULE) makes no sense at all, the idea of the
+> > >   try_module_get is to pin down another module that was calling down,
+> > >   which I suppose is not needed here.
+> > >
+> > > * This extends the generic IOMMU API in platform specific ways, don't
+> > >   do that.
+> > >
+> > > * I think you can do without these functions by including a pointer
+> > >   to the iommu structure in dev_archdata, see
+> > >   arch/powerpc/include/asm/device.h for an example.
+> >
+> > We heavily based our solution on the iommu implementation found in
+> > arch/arm/mach-msm/{devices-iommu,iommu,iommu_dev}.c
+> >
+> > The s5p_sysmmu_get/put functions are equivalent for
+> msm_iommu_{get,put}_ctx.
+> >
+> > (snipped)
+> 
+> Yes, I'm sorry about this. I commented on the early versions of the MSM
+> driver, but then did not do another review of the version that actually
+> got merged. That should also be fixed, ideally we can come up with a
+> way that works for both drivers.
 
-greg k-h
+OK, so it looks that we misunderstood the IOMMU API basing on the 
+particular implementation.
+
+> > > Why even provide these when they don't do anything?
+> >
+> > Because they are required by pm_runtime. If no runtime_{suspend,resume}
+> > methods are provided, the pm_runtime core will not call proper methods
+> > on parent device for pmruntime_{get,put}_sync(). The parent device for
+> > each sysmmu platform device is the power domain the sysmmu belongs to.
+> >
+> > I know this is crazy, but this is the only way it can be handled now
+> > with runtime_pm.
+> 
+> Please don't try to work around kernel features when they don't fit
+> what you are doing. The intent of the way that runtime_pm works is
+> to make life easier for driver writers, not harder ;-)
+> 
+> I can see three ways that would be better solutions:
+> 
+> 1. change the runtime_pm subsystem to allow it to ignore some devices
+> in an easy way.
+> 
+> 2. change the device layout if the sysmmu. If the iommu device is
+> a child of the device that it is responsible for, I guess you don't
+> have this problem.
+> 
+> 3. Not represent the iommu as a device at all, just as a property
+> of another device.
+
+Ok, we will handle this issue somehow. I consider this a minor issue and I
+would like to focus on the IOMMU/dma-mapping APIs first.
+ 
+> > > When you register the iommu unconditionally, it becomes impossible for
+> > > this driver to coexist with other iommu drivers in the same kernel,
+> > > which does against the concept of having a platform driver for this.
+> >
+> > > It might be better to call the s5p_sysmmu_register function from
+> > > the board files and have no platform devices at all if each IOMMU
+> > > is always bound to a specific device anyway.
+> >
+> > Ok, it looks I don't fully get how this iommu.h should be used. It looks
+> > that there can be only one instance of iommu ops registered in the system,
+> > so only one iommu driver can be activated. You are right that the iommu
+> > driver has to be registered on first probe().
+> 
+> That is a limitation of the current implementation. We might want to
+> change that anyway, e.g. to handle the mali IOMMU along with yours.
+> I believe the reason for allowing only one IOMMU type so far has been
+> that nobody required more than one. As I mentioned, the IOMMU API is
+> rather new and has not been ported to much variety of hardware, unlike
+> the dma-mapping API, which does support multiple different IOMMUs
+> in a single system.
+
+Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
+dma-mapping API is something much more complex that creates the actual
+mapping for various sets of the devices. IMHO the right direction will
+be to create dma-mapping implementation that will be just a client of
+the IOMMU API. What's your opinion?
+
+(snipped)
+
+> > The domain defined in iommu api are quite straightforward. Each domain
+> > is just a set of mappings between physical addresses (phys) and io
+> addresses
+> > (iova).
+> >
+> > For the drivers the most important are the following functions:
+> > iommu_{attach,detach}_device(struct iommu_domain *domain, struct device
+> *dev);
+> >
+> > We assumed that they just assign the domain (mapping) to particular
+> instance
+> > of iommu. However the driver need to get somehow the pointer to the iommu
+> > instance. That's why we added the s5p_sysmmu_{get,put} functions.
+> >
+> > Now I see that you want to make the clients (drivers) to provide their
+> own
+> > struct device pointer to the iommu_{attach,detach}_device() function
+> instead of
+> > giving there a pointer to iommu device. Am I right? We will need some
+> kind of
+> > mapping between multimedia devices and particular instanced of sysmmu
+> > controllers.
+> >
+> > There will be also some problems with such approach. Mainly we have a
+> > multimedia codec module, which have 2 memory controllers (for faster
+> transfers)
+> > and 2 iommu controllers. How can we handle such case?
+> 
+> It's not quite how the domains are meant to be used. In the AMD IOMMU
+> that the API is based on, any number of devices can share one domain,
+> and devices might be able to have mappings in multiple domains.
+> 
+> The domain really reflects the user, not the device here, which makes more
+> sense if you think of virtual machines than of multimedia devices.
+>
+> I would suggest that you just use a single iommu_domain globally for
+> all in-kernel users.
+
+There are cases where having a separate mapping for each device makes sense.
+It definitely increases the security and helps to find some bugs in
+the drivers.
+
+Getting back to our video codec - it has 2 IOMMU controllers. The codec
+hardware is able to address only 256MiB of space. Do you have an idea how
+this can be handled with dma-mapping API? The only idea that comes to my
+mind is to provide a second, fake 'struct device' and use it for allocations
+for the second IOMMU controller.
+
+> > > > diff --git a/arch/arm/plat-samsung/include/plat/devs.h
+> b/arch/arm/plat-
+> > > samsung/include/plat/devs.h
+> > > > index f0da6b7..0ae5dd0 100644
+> > > > --- a/arch/arm/plat-samsung/include/plat/devs.h
+> > > > +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> > > > @@ -142,7 +142,7 @@ extern struct platform_device s5p_device_fimc3;
+> > > >  extern struct platform_device s5p_device_mipi_csis0;
+> > > >  extern struct platform_device s5p_device_mipi_csis1;
+> > > >
+> > > > -extern struct platform_device exynos4_device_sysmmu;
+> > > > +extern struct platform_device exynos4_device_sysmmu[];
+> > >
+> > > Why is this a global variable? I would expect this to be private to the
+> > > implementation.
+> >
+> > To allow each board to register only particular instances of sysmmu
+> controllers.
+> 
+> That sounds like an unnecessarily complicated way of doing it. This would
+> be another reason to not make each one a device, but have something else
+> in struct device take care of it.
+
+Well, having each iommu instantiated as a separate device has some advantages,
+but I agree that having it automatically registered together with the
+corresponding multimedia (client) device will simplify a lot of things. Same
+rules should imho apply to power domain drivers.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
