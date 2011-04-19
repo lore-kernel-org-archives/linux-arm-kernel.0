@@ -1,29 +1,29 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 19 Apr 2011 16:19:13 -0700
-Subject: [PATCH] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <20110405163338.GA11832@n2100.arm.linux.org.uk>
-References: <20110405073030.GI13963@pengutronix.de>
-	<1301992655-8514-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110405163338.GA11832@n2100.arm.linux.org.uk>
-Message-ID: <20110419161913.a1c18599.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Apr 2011 00:20:38 +0100
+Subject: [RFC PATCH v2] Consolidate SRAM support
+In-Reply-To: <20110419190557.GB4204@game.jcrosoft.org>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<20110418085259.GA26044@n2100.arm.linux.org.uk>
+	<20110419160135.GA4204@game.jcrosoft.org>
+	<20110419161846.GB24972@n2100.arm.linux.org.uk>
+	<20110419190557.GB4204@game.jcrosoft.org>
+Message-ID: <20110419232038.GC24972@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Apr 2011 17:33:39 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Tue, Apr 19, 2011 at 09:05:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:18 Tue 19 Apr     , Russell King - ARM Linux wrote:
+> > On Tue, Apr 19, 2011 at 06:01:35PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > Hi,
+> > > 
+> > > 	I do post a patch to add the support to specify a virt and phys
+> > > 	address to the generic allocator so the pv-pool.c is not needed
+> > > 	we can just use the generic fucntion
+> > 
+> > You've talked about this before in the thread, but the patch never appeared.
+> I forget to re-send it sorry
+> it's the mm tree
 
-> On Tue, Apr 05, 2011 at 10:37:35AM +0200, Uwe Kleine-K__nig wrote:
-> > +struct platform_device *__init gpio_led_register_device(
-> > +		const struct gpio_led_platform_data *pdata);
-> 
-> Please don't add __init annotations to declarations.
-
-Reasons?
-
-A year or so ago we had to *add* an __init to a declaration, because
-one architecture was generating a short-mode-addressing relative branch
-to the callee, assuming the target was in the same section as the call
-site.  When the linker went to resolve the branch, it discovered that
-the target was in fact in a different section and was too far away to
-be able to use the short-mode addressing.  IIRC, that architecture was
-arm.
+One obvious issue here is that you're using 'unsigned long' for phys
+addresses.  With LPAE we could start seeing SRAM outside of the 4GB
+PA range, and so would need this to be phys_addr_t.
