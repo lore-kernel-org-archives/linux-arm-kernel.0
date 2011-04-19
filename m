@@ -1,38 +1,37 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 19 Apr 2011 11:55:45 +0530
-Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with irqsave
-	variants
-In-Reply-To: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
-References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
-Message-ID: <4DAD2AE9.7060106@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Apr 2011 09:26:33 +0300
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <1303139217-10285-1-git-send-email-charu@ti.com>
+References: <no>
+ <1303139217-10285-1-git-send-email-charu@ti.com>
+Message-ID: <20110419062633.GA15620@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2011 04:19 PM, Viresh KUMAR wrote:
-> dmaengine routines can be called from interrupt context and with interrupts
-> disabled.  Whereas spin_unlock_bh can't be called from such contexts. So this
-> patch converts all spin_*_bh routines to irqsave variants.
+* Varadarajan, Charulatha <charu@ti.com> [110418 18:00]:
+> From: Charulatha V <charu@ti.com>
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/dw_dmac.c      |   56 +++++++++++++++++++++++++------------------
->  drivers/dma/dw_dmac_regs.h |    1 +
->  2 files changed, 33 insertions(+), 24 deletions(-)
-> 
-> 
-> diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-> index 720f821..c89fd83 100644
-> --- a/drivers/dma/dw_dmac_regs.h
-> +++ b/drivers/dma/dw_dmac_regs.h
-> @@ -173,6 +173,7 @@ struct dw_dma {
->  	void __iomem		*regs;
->  	struct tasklet_struct	tasklet;
->  	struct clk		*clk;
-> +	unsigned long		flags; /* for spin_lock_irqsave */
+> Use PM runtime framework in OMAP GPIO driver.
+...
+ 
+>  arch/arm/mach-omap2/gpio.c             |    6 +
+>  arch/arm/mach-omap2/pm34xx.c           |   22 +-
+>  arch/arm/plat-omap/gpio.c              |  766 ++++++++++++++++++--------------
+>  arch/arm/plat-omap/include/plat/gpio.h |    3 +-
+>  4 files changed, 439 insertions(+), 358 deletions(-)
 
-Oops!!!
-This must have been added in dw_dma_chan instead :(
-Will resend it.
+Before this series gets merged we first need to do the following:
 
--- 
-viresh
+- Pass some registers in platform_data so we can have common
+  functions in gpio.c instead of having to test for the bank->method
+  in each function. This allows getting rid of the ifdefs as
+  discussed in the ARM Linux consolidation thread.
+
+- Move it to drivers/gpio
+
+- Further consolidate with whatever common GPIO code might
+  be coming up.
+
+Regards,
+
+Tony
