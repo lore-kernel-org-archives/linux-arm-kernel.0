@@ -1,36 +1,54 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 19 Apr 2011 21:03:38 +0800
-Subject: [PATCH] pxa/hx4700: bq24022 regulator needs to be enabled
-In-Reply-To: <20110419113201.GA32248@rainbow>
-References: <E1QAkBF-0003bF-A0@outmx04.plus.net>
-	<20110419084032.GA30743@rainbow> <20110419113201.GA32248@rainbow>
-Message-ID: <BANLkTim_=pwuOvkRfMz_ZQe=NtJfGijajA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 15:11:39 +0200
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<201104191401.34818.arnd@arndb.de>
+	<BANLkTim_30SbVhPLFOaq-KYwz5N6NGCe6A@mail.gmail.com>
+Message-ID: <201104191511.39370.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 7:32 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> On 12:40 Tue 19 Apr ? ? , Dmitry Artamonow wrote:
->> On 14:39 Fri 15 Apr ? ? , Paul Parsons wrote:
->> > Add REGULATOR_CHANGE_STATUS flag to hx4700 bq24022 regulator. Without this flag the bq24022 cannot be enabled and the battery will not charge.
->> >
->> Ah, so that's why my hx4700 doesn't charges under linux! I noticed
->> that some time ago, but never found the time to investigate this.
->> Thanks for finding this out. Will test.
->
-> Yes, looks like it really works! After about an hour in linux-2.6.38 with
-> this patch applied, battery charged from about a half-empty to almost
-> full (I verified by rebooting into WinMobile). Good! And in dmesg there were
-> also "enabling charger" messages every time I plugged charger cable into
-> device.
->
-> So, get my
-> Tested-by: Dmitry Artamonow <mad_soft@inbox.ru>
+On Tuesday 19 April 2011, Kyungmin Park wrote:
+> On Tue, Apr 19, 2011 at 9:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 19 April 2011, Kyungmin Park wrote:
+> >> On Mon, Apr 18, 2011 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Monday 18 April 2011, Kyungmin Park wrote:
+> >> >> On Mon, Apr 18, 2011 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> >
+> >> >> > One missing piece is still a way for a platform to provide both
+> >> >> > the iommu and the dma-mapping API in a unified driver. Right now,
+> >> >> > you have to export both interface for a generic solution.
+> >> >>
+> >> >> Actually MSM and we (Michal, Marek) tried to merge the generic IOMMU
+> >> >> implementation into mm, but MM did't accept it.
+> >> >
+> >> > I'm confused. What do you mean with MM?
+> >> linux/mm, Memory Management.
+> >
+> > I'm still confused. What were you suggesting to merge in there?
+> > Do you have a link to a mailing list discussion?
+> 
+> First, Zach Pfeffer <zpfeffer@codeaurora.org> sent the patch
+> https://patchwork.kernel.org/patch/108736/
+> 
+> Second, Michal tried it.
+> http://lkml.org/lkml/2010/9/6/41
+> 
+> http://lwn.net/Articles/403643/
+> https://patchwork.kernel.org/patch/157451/
 
-Thanks. Updated and pushed. Will send out git-pull soon.
+Ah, I did not realize you were talking about VCMM. I believe the main
+reason what that patch was not received well is that it tried to add
+yet another abstraction for IOMMUs when we already have too many of them.
 
->
-> --
-> Best regards,
-> Dmitry "MAD" Artamonow
->
->
+It is essentially doing the opposite of what I was referring to above:
+If we had added VCMM, each platform that has IOMMUs would now have to 
+implement three interfaces: dma-mapping.h (struct dma_map_ops),
+iommu.h (struct iommu_ops) and and vcm_driver.h (struct vcm_driver).
+
+What I really meant was to unify the two we already have, so that
+a platform only needs to implement e.g. iommu_ops and get the dma_mapping.h
+interfaces for free.
+
+	Arnd
