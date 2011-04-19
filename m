@@ -1,78 +1,67 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 19 Apr 2011 23:54:21 +0200 (CEST)
-Subject: [PATCH 04/10] clk: implement parent pass through functions
-In-Reply-To: <20110419190910.GQ31131@pengutronix.de>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 19 Apr 2011 15:28:50 -0700
+Subject: [PATCH 05/10] clk: Add support for simple dividers
+In-Reply-To: <20110419093126.GA14770@pengutronix.de>
 References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
-	<4DADC45C.1020202@codeaurora.org>
-	<20110419175318.GB15233@pengutronix.de>
-	<20110419190910.GQ31131@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
+	<20110418094909.GE31131@pengutronix.de>
+	<20110418100716.GJ14770@pengutronix.de>
+	<4DACF761.3050503@codeaurora.org>
+	<20110419073249.GK31131@pengutronix.de>
+	<0943efffac47bface3dff8ca4d700361.squirrel@www.codeaurora.org>
+	<20110419093126.GA14770@pengutronix.de>
+Message-ID: <2b16ee39-08ba-4482-a9fc-6d1393ac1229@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Apr 2011, Uwe Kleine-K?nig wrote:
-> > +1 for letting the core enable/disable and prepare/unprepare the parent
-> > clocks. I scanned the different arm clock implementations and they all
-> > do it, except the ones which do not implement parents at all.
-> Then the question is if all do handle parents in the same way. (i.e.
-> in enable do parent first, in disable do child first?)
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-That's not a question at all. Anything which does it the other way
-round is broken. Period.
- 
-> If one layer of indirection is acceptable this can easily be
-> accomplished (unless I oversee something):
-> 
-> 	struct clk_with_parent {
-> 		struct clk clk;
-> 		const struct clk_ops *ops;
-> 		struct clk *parent;
-> 	}
-> 
-> Then the callbacks in clk_with_parent.clk would handle the parent and
-> then call the respective callbacks in clk_with_parent.ops.
+>On Tue, Apr 19, 2011 at 01:55:17AM -0700, Saravana Kannan wrote:
+>> On Tue, April 19, 2011 12:32 am, Uwe Kleine-K?nig wrote:
+>> > Hello,
+>> >
+>> > On Mon, Apr 18, 2011 at 07:45:53PM -0700, Saravana Kannan wrote:
+>> >> On 04/18/2011 03:07 AM, Sascha Hauer wrote:
+>> >> >On Mon, Apr 18, 2011 at 11:49:09AM +0200, Uwe Kleine-K?nig wrote:
+>> >> >>On Fri, Apr 15, 2011 at 09:08:10PM +0200, Sascha Hauer wrote:
+>> >> >AFAIK there are two different implementation types in the tree.
+>Some
+>> >> >implementations only allow to set to the exact rate round_rate
+>returns
+>> >> >while others round down in set_rate.
+>> >> >
+>> >> >Has this been specified what behaviour is expected?
+>> >> >
+>> >>
+>> >> This is something I have nagged Russell once or twice about and
+>then
+>> >> sent out an email to the list for which there was very limited
+>> >> response. I think clk_round_rate() is too generic and not very
+>> >> useful.
+>> >>
+>> >> We should really have something like:
+>> >> clk_set_rate_range(min, ideal, max)
+>> > (Note this is orthogonal to the question if set_rate may barf on
+>values
+>> > other than the return values of round_rate.)
+>> >
+>> > clk_set_rate_range can even be implemented with clk_round_rate that
+>is
+>> > just required to fulfill:
+>> 
+>> I think it's more important that we try to find a new API that's
+>better
+>> than clk_round_rate(). We can worry about the specifics of the
+>> implementation later.
+>
+>You found it and Uwe found a way to implement this ontop of the old
+>API,
+>that's a comfortable situation, isn't it?
 
-Why the heck do you want to do that? That's a complete and utter
-failure. You invent indirections for no value at all which just
-violate any sense of abstraction and layering.
+Well, do we all agree to this new API? I have no problem with Uwe's helper fn or his suggestion, if we all agree on the final API. I just didn't want him wasting his time when the API is not finalized.
 
-clk_en/disable should just do (simplified):
+-Saravana
 
-clk_enable(clk)
-{
-	if (!clk)
-	   return 0;
-
-	ret = clk_enable(clk->parent);
-	if (ret)
-	   return ret;
-
-	clk_refcnt++;
-
-	if (!clk->enable) 
-	   return 0;
-
-   	ret = clk->enable();
-	if (!ret)
-	   return 0;
-
-	clk_refcnt--;
-	clk_disable(clk->parent);
-
-	return ret;	
-}
-
-Now go figure how clk_disable should look like.
-
-No clk should care about the parent at all, except for handing down
-the pointer. And it should not even check for the pointer being NULL
-or not. It does not matter at all, as long as clk_enable/disable
-return sensible error codes.
-
-Anything else is just overengineered clusterfuck for no value at all,
-which makes error handling way more complex than it needs to be.
-
-Thanks,
-
-	tglx
+-- 
+Sent by an employee of the Qualcomm Innovation Center,  Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
