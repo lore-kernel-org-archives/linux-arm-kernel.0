@@ -1,46 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 16:35:40 +0200
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <op.vt6ufu1n3ri7v4@arend-laptop>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
-Message-ID: <201104191635.40351.arnd@arndb.de>
+From: Oskar.Andero@sonyericsson.com (=?iso-8859-1?Q?=22Ander=F6=2C_Oskar=22?=)
+Date: Tue, 19 Apr 2011 16:41:07 +0200
+Subject: [PATCH] arm: omap2: enable smc instruction for sleep34xx
+In-Reply-To: <20110419102852.GA30588@arm.com>
+References: <1301581164-26538-1-git-send-email-oskar.andero@sonyericsson.com>
+	<00D61D20F3A8774CBC77798B3FBC427082058F986D@seldmbx02.corpusers.net>
+	<loom.20110419T100624-335@post.gmane.org>
+	<20110419092014.GA2267@arm.com>
+	<00D61D20F3A8774CBC77798B3FBC427082058F9871@seldmbx02.corpusers.net>
+	<20110419102852.GA30588@arm.com>
+Message-ID: <00D61D20F3A8774CBC77798B3FBC427082058F9872@seldmbx02.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2011, Arend van Spriel wrote:
-
-> > A new bus_type really only makes sense if you expect a lot of devices
-> > to use this and you want to have the probing in the bus. If you only
-> > want to have a way to enumerate devices that get created by the
-> > parent driver, you can also use platform devices.
+> On Tue, Apr 19, 2011 at 12:13:26PM +0200, "Ander?, Oskar" wrote:
+> > > > > Ping!
+> > > > >
+> > > > > Anyone else that gets bitten by the following when compiling
+> > > > omap2plus_defconfig with gcc 4.5:
+> > > > > arch/arm/mach-omap2/sleep34xx.S:150: Error: selected processor
+> does
+> > > not
+> > > > support ARM mode `smc #1'
+> > > > >
+> > > > > -Oskar
+> > > > >
+> > > >
+> > > > I can report that I get the exact same compile error as this.
+> > > > OP patch worked beautifully.
+> > > >
+> > > > -Alex
+> > >
+> > > Can you check what options are being passed to the compiler
+> > > and the assembler, and check for .arch / .arch_extension directives
+> > > in the assembler input?
+> > >
+> > > i.e.,
+> > >
+> > > make V=1 CFLAGS_KERNEL='-v -save-temps' arch/arm/mach-
+> omap2/sleep34xx.o
+> > >
+> > > ...and look at the output and the generated sleep34xx.s
+> > >
+> > > Maybe the options being passed to the compiler/assembler are wrong
+> > > somewhere along the line.
+> > Yes, the "+sec" extension of armv7-a (i.e. -march=armv7-a+sec) is
+> missing and hence the smc instruction can't be used. This is what my
+> patch fixes. I guess earlier versions of binutils silently ignored this.
+> >
+> > It's not visible in my patch, but plus_sec is declared as:
+> > plus_sec := $(call as-instr,.arch_extension sec,+sec)
 > 
-> The main assumption of the (bcm)axi driver seems to be that each core can
-> be considered as a device. Correct me if I am wrong, but I consider a
-> device to be an entity providing a particular system function. So an
-> ethernet device provides ethernet connectivity function, a mixer device
-> provides sound mixing function, and so on. The cores within a chip are not
-> always self-contained like this. To clarify let's say a system function is
-> realized by programming core A, core B, and finally trigger core A to set
-> the function in motion. This implies the need of coordination between the
-> programming steps on those cores.
+> Ah right, I was slightly confused by the context.
 > 
-> Is my view on what is a device wrong? Does a platform device differ in
-> this respect from a regular device?
+> You're right -- sleep34xx.S also needs this change in the Makefile,
+> as per your patch.  This isn't new; the original patch focused on
+> omap4, so I guess this file was just missed.
+I will soon resubmit the patch (v2) with a slightly more correct git comment. Please, feel free to review it or ack it. ;)
 
-A platform device means something that cannot be probed, in every other
-respect it is the same as other devices. From your explanation above,
-it seems that you don't actually need to represent the cores on your
-particular chips as struct device in Linux at all.
-
-If you wanted to use platform_device, the right way would probably
-be an MFD device that creates multiple child devices (which end
-up as platform_device, though you don't need to worry about that)
-from the PCI driver. Then you could use the child devices completely
-independent from one another.
-
-Since you say that the cores in this case are tightly coupled and
-don't provide independent functionality to the system, there is
-no need to represent them as devices.
-
-	Arnd
+-Oskar
