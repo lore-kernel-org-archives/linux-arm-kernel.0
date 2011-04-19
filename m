@@ -1,31 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Apr 2011 22:41:59 -0700
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <1303173160.2801.13.camel@pororo>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>	
-	<4DACBDC6.2000500@codeaurora.org> <1303173160.2801.13.camel@pororo>
-Message-ID: <4DAD20A7.6040609@codeaurora.org>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 19 Apr 2011 11:34:23 +0530
+Subject: [PATCH] dmaengine: implement pause and resume for dw_dmac
+In-Reply-To: <4DAD1DA5.7010801@st.com>
+References: <1303173092-21785-1-git-send-email-linus.walleij@linaro.org>
+	<4DAD1DA5.7010801@st.com>
+Message-ID: <4DAD25E7.4030602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/18/2011 5:32 PM, Jeremy Kerr wrote:
-> Hi Stephen,
->
->>> +#define to_clk_divider(clk) (container_of(clk, struct clk_divider, clk))
->> Can you make this a static inline function with actual types? We get
->> slightly more type safety that way.
-> Do we? The container_of macro requires that that it's first argument is
-> the same type as type->member, and returns a (type), so I don't see how
-> we're going to miss typing errors here.
+On 04/19/2011 10:59 AM, viresh kumar wrote:
+> On 04/19/2011 06:01 AM, Linus Walleij wrote:
+>> > It seems that the SPEAr needs this.
+>> > 
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Thanks for sending this.
+> Actually i wasn't sure that disabling channel will simply pause it, and not
+> finish the transfer. So, didn't went for this change.
+> 
+>> > ---
+>> >  drivers/dma/dw_dmac.c      |   22 ++++++++++++++++++++--
+>> >  drivers/dma/dw_dmac_regs.h |    1 +
+>> >  2 files changed, 21 insertions(+), 2 deletions(-)
 
-Ah yes you're right. Should have looked further. I still like static
-inline functions for these things but I don't see any reason why one is
-better over the other.
+Moreover, dwc_tx_status() must be updated to add following code:
 
-Thanks,
-Stephen
+	if (dwc->paused)
+		return DMA_PAUSED;
+
+Will do that while sending it in my patchset.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+viresh
