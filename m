@@ -1,76 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2011 15:46:49 +0200
-Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104181619.35115.arnd@arndb.de>
-	<BANLkTinB-9h=bZg9zg219i2wi3zUCA6mcw@mail.gmail.com>
-Message-ID: <201104191546.49632.arnd@arndb.de>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Tue, 19 Apr 2011 15:50:03 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU
+	(IOMMU) driver
+In-Reply-To: <201104191449.50824.arnd@arndb.de>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104181612.35833.arnd@arndb.de>
+	<005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
+	<201104191449.50824.arnd@arndb.de>
+Message-ID: <20110419135003.GR2192@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2011, Rafa? Mi?ecki wrote:
-> W dniu 18 kwietnia 2011 16:19 u?ytkownik Arnd Bergmann <arnd@arndb.de> napisa?:
-> > You mean the hardware has two sets of registers containing the same
-> > information, one of them the standard registers, and one with broadcom
-> > specific ones?
-> >
-> > Why don't you just use the standard ones then?
+On Tue, Apr 19, 2011 at 08:49:50AM -0400, Arnd Bergmann wrote:
+> (adding Joerg to Cc)
 > 
-> No. Did you read my first mail in this thread?
-
-I'm sorry, but I found the information in this thread and the related ones
-highly confusing and sometimes contradictory. Thanks for clarifying it
-once more.
-
-> There is pair of cores for every device. First is AMBA-specific called
-> agent/wrapper and second one is Broadcom-specific.
+> On Tuesday 19 April 2011, Marek Szyprowski wrote:
 > 
-> AMBA specific core called agent/wrapper has AMBA specific registers:
-> CID and PID. However we do not ever read that in Broadcom driver,
-> because that are useless for us. On AMBA specific core we use only
-> some Broadcom specific registers to manage (enable/disable) second
-> (Broadcom-specific) core.
+> > > * This extends the generic IOMMU API in platform specific ways, don't
+> > >   do that.
 
-Ideally, we should model the devices along the IP blocks and how they
-fit together. If I understand correctly what you are saying, your hardware
-looks like
+This is certainly not a good idea. Please Cc me on IOMMU-API changes in
+the future to that I can have a look at it. This is also a good way to
+prevent misunderstandings (which I found some in this mail).
 
-pci_dev
-  |
-  +---------+-----------+ ...
-  |         |           |
- amba_dev   amba_dev   amba_dev
-   |           |           |
- bcm_dev     bcm_dev     bcm_dev
+> > Ok, it looks I don't fully get how this iommu.h should be used. It looks
+> > that there can be only one instance of iommu ops registered in the system,
+> > so only one iommu driver can be activated. You are right that the iommu
+> > driver has to be registered on first probe().
+> 
+> That is a limitation of the current implementation. We might want to
+> change that anyway, e.g. to handle the mali IOMMU along with yours.
+> I believe the reason for allowing only one IOMMU type so far has been
+> that nobody required more than one. As I mentioned, the IOMMU API is
+> rather new and has not been ported to much variety of hardware, unlike
+> the dma-mapping API, which does support multiple different IOMMUs
+> in a single system.
 
-In that case, you would need three bus types (pci_bus, amba_bus and
-your own bcm_bus) and at least seven devices to represent all of it
-using the device model. This is possible, but it seems you are also
-saying that you don't need the complexity of this, e.g. because you
-don't care about the amba device at all.
+The current IOMMU-API interface is very simple. It delegates the
+selection of the particular IOMMU device to the IOMMU driver. Handle
+this selection above the IOMMU driver is a complex thing to do. We will
+need some kind of generic IOMMU support in the device-core and
+attach IOMMUs to device sub-trees.
 
-The easiest shortcut would be to not represent the AMBA devices
-at all, and I guess that is fine. Introducing your own bus_type
-for the broadcom devices sounds like a correct way to use the
-linux driver model, especially if the devices on that bus are
-totally independent from one another. I think you should do that
-if you have e.g. a PCI card containing a single PCI function with
-multiple IP blocks that do completely unrelated things (wifi,
-bluetooth, ethernet, ...).
+A simpler and less intrusive solution is to implement some wrapper code
+which dispatches the IOMMU-API calls to the IOMMU driver implementation
+required for that device.
 
-You could also just use platform_devices if you don't want to
-introduce your own bus, and there is not much commonality between
-the devices in terms of probing them.
+> > I think it might be beneficial to describe a bit more our hardware 
+> > (Exynos4 platform). There are a number of multimedia blocks. Each has it's
+> > own IOMMU controller. Each IOMMU controller has his own set of hardware
+> > registers and irq. There is also a GPU unit (Mali) which has it's own
+> > IOMMU hardware, incompatible with the SYSMMU, so right now it is ignored.
+> > 
+> > The multimedia blocks are modeled as platform devices and are independent
+> > of platform type (same multimedia blocks can be found on other Samsung
+> > machines, like for example s5pv210/s5pc110), see arch/arm/plat-s5p/dev-*.c
+> > and arch/arm/plat-samsung/dev-*.c.
 
-However, I would not use the device model if the IP blocks in your
-device are just responsible for different aspects of one logical
-device, e.g. PHY, power management and DMA within a single network
-adapter. If that is what you have, don't use a Linux device for
-each of those blocks at all, but instead do a "library" module
-for each block: export some interfaces from the module that can
-be used by multiple drivers, and create the data structure from
-the main driver, filled out with the data describing the IP
-block (memory ranges, interrupts, etc).
+Question: Does every platform device has a different type of IOMMU? Or
+are the IOMMUs on all of these platform devices similar enough to be
+handled by a single driver?
 
-	Arnd
+> > The domain defined in iommu api are quite straightforward. Each domain 
+> > is just a set of mappings between physical addresses (phys) and io addresses
+> > (iova).
+
+Each domain represents an address space. In the AMD IOMMU this is
+basically a page-table.
+
+> > For the drivers the most important are the following functions:
+> > iommu_{attach,detach}_device(struct iommu_domain *domain, struct device *dev);
+
+Right, and each driver can allocate its own domains.
+
+> > We assumed that they just assign the domain (mapping) to particular instance
+> > of iommu. However the driver need to get somehow the pointer to the iommu 
+> > instance. That's why we added the s5p_sysmmu_{get,put} functions.
+
+The functions attach a specific device to an IOMMU domain (== address
+space). These devices might be behind different IOMMUs and it is the
+responsibility of the IOMMU driver to setup everything correctly.
+
+> It's not quite how the domains are meant to be used. In the AMD IOMMU
+> that the API is based on, any number of devices can share one domain,
+> and devices might be able to have mappings in multiple domains.
+
+Yes, any number of devices can be assigned to one domain, but each
+device only belongs to one domain at each point in time. But it is
+possible to detach a device from one domain and attach it to another.
+
+Regards,
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
