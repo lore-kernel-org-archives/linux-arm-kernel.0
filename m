@@ -1,47 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Apr 2011 13:03:44 +0100
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-Message-ID: <20110419120344.GG22799@n2100.arm.linux.org.uk>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Tue, 19 Apr 2011 08:20:09 -0400
+Subject: [PATCH 0/6] i2c-davinci gpio pulsed SCL recovery with ICPFUNC
+In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE093FB40998@Cloud.RL.local>
+References: <BANLkTi=7DbMrbo0nQU+268LC_2258q-_DA@mail.gmail.com>
+	<70E876B0EA86DD4BAF101844BC814DFE093FB40998@Cloud.RL.local>
+Message-ID: <BANLkTinTMi76GmgO6HJ0+ifCXsHE3Mjsvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 02:00:17PM +0200, Linus Walleij wrote:
-> On Tue, Apr 19, 2011 at 11:20 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Apr 19, 2011 at 11:02:34AM +0200, Linus Walleij wrote:
-> >> From: Ulf Hansson <ulf.hansson@stericsson.com>
-> >>
-> >> The end of a dma job must be synced with a DATAEND irq. This will
-> >> prevent the mmci driver from ending the mmc request before the
-> >> dma driver is completely done. By using DMA_PREP_INTERRUPT we
-> >> register a callback function which will is called when from the
-> >> dma driver when the dma transfer is completed.
-> >
-> > Why is what we currently do not sufficient?
-> 
-> On a high-speeded ux500 the DATAEND IRQ will assert before the
-> DMA data is actually finished, thus if we start hammering in the next
-> request we break an ongoing transfer. :-(
+Hi Jon,
 
-Yes, you've already said that in the past.  And this is partly why we
-have this code in the dma unmap:
+On Mon, Apr 18, 2011 at 9:47 PM, Jon Povey <Jon.Povey@racelogic.co.uk> wrote:
+> Ben Gardiner wrote:
+>
+>>>> When creating this series I noticed that there are obvious
+>>>> similarities between the existing recovery routine implemented by
+>>>> Philby John and John Povey
+>
+>> I'm not sure how the 20us in the existing method was derived -- I
+>> wonder if Philby John or John Povey could comment?
+>
+> I've been a little bemused about why I am getting credited for I2C
+> bus recovery work. I don't remember doing any work on that.
 
-        /* Wait up to 1ms for the DMA to complete */
-        for (i = 0; ; i++) {
-                status = readl(host->base + MMCISTATUS);
-                if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
-                        break;
-                udelay(10);
-        }
+My mistake -- sorry. Also sorry for getting your name wrong repeatedly.
 
-So, we wait until the DMA has drained the FIFO before we fire off the
-next request - or even unmap the DMA buffer.  Should the DMA fail to
-drain the FIFO in a reasonable time, we timeout and disable DMA.
+> I did a couple of patches to fix a race when setting up a TX, but
+> those are, afaik, unrelated.
 
-Again, I ask, why is this not sufficient to cover the case where the
-data end IRQ occurs before the DMA engine has completed the transfer -
-which is likely to take a very short time indeed.
+In "i2c-davinci: Fix race when setting up for TX" and "i2c-davinci:
+Fix TX setup for more SoCs" you mention testing on DM355 -- is there
+any you have hardware on which the recovery procedure is executed on
+occasion and that you would be available to test modifications to the
+current implementation?
+
+> All I know about the bus recovery stuff is looking at it a while back
+> and thinking hmm, that seems to wiggle gpio without changing the
+> pinmuxing, so it can't possibly work.
+
+:) Probably not then.
+
+Best Regards,
+Ben Gardiner
+
+---
+Nanometrics Inc.
+http://www.nanometrics.ca
