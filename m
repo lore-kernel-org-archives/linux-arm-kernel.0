@@ -1,63 +1,23 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Tue, 19 Apr 2011 08:08:25 +0200
-Subject: [REVERT] Re: V4L: videobuf-dma-contig: fix mmap_mapper	broken on ARM
-In-Reply-To: <20110413220008.GA23901@n2100.arm.linux.org.uk>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104131252.32011.jkrzyszt@tis.icnet.pl>
-	<20110413183231.GA23631@n2100.arm.linux.org.uk>
-	<201104132256.40325.jkrzyszt@tis.icnet.pl>
-	<20110413220008.GA23901@n2100.arm.linux.org.uk>
-Message-ID: <4DAD26D9.6060906@suse.cz>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 19 Apr 2011 11:42:24 +0530
+Subject: [PATCH 2/6] dmaengine/dw_dmac: Enable resubmission from
+	callback routine.
+In-Reply-To: <cf350c267897bd4eaf5a027c659771eee117ac74.1303123511.git.viresh.kumar@st.com>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+	<cf350c267897bd4eaf5a027c659771eee117ac74.1303123511.git.viresh.kumar@st.com>
+Message-ID: <438BB0150E931F4B9CE701519A44630108519E1BE6@bgsmsx502.gar.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2011 12:00 AM, Russell King - ARM Linux wrote:
-> On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
->> Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux 
->> napisa?(a):
->>> On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
->>>> Taking into account that I'm just trying to fix a regression, and
->>>> not invent a new, long term solution: are you able to name an ARM
->>>> based board which a) is already supported in 2.6.39, b) is (or can
->>>> be) equipped with a device supported by a V4L driver which uses
->>>> videobuf- dma-config susbsystem, c) has a bus structure with which
->>>> virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
->>>
->>> I have no idea - and why should whether someone can name something
->>> that may break be a justification to allow something which is
->>> technically wrong?
->>>
->>> Surely it should be the other way around - if its technically wrong
->>> and _may_ break something then it shouldn't be allowed.
->>
->> In theory - of course. In practice - couldn't we now, close to -rc3, 
->> relax the rules a little bit and stop bothering with something that may 
->> break in the future if it doesn't break on any board supported so far (I 
->> hope)?
+On 04/18/2011 04:20 PM, viresh kumar wrote:
 > 
-> If we are worried about closeness to -final, then what should happen is
-> that the original commit is reverted; the "fix" for IOMMUs resulted in
-> a regression for existing users which isn't trivial to resolve without
-> risking possible breakage of other users.
+> Resubmission of new transfer must be allowed from callbacks. For this release
+> lock before calling callback routine and enable them again.
+Why would you like to do that?
 
-Hi, as -rc4 is out, I think it's time to revert that commit and rethink
-the mmap behaviour for some of next -rc1s.
+IMO it's not a good thing as you are essentially doing it in your tasklet...
+Make sure the submit() is done by client before this and you use it to start
+next transaction in you tasklet and let client know in callback txn is
+finished.
 
-Linus, please revert
-commit 35d9f510b67b10338161aba6229d4f55b4000f5b
-Author: Jiri Slaby <jslaby@suse.cz>
-Date:   Mon Feb 28 06:37:02 2011 -0300
-
-    [media] V4L: videobuf, don't use dma addr as physical
-===
-
-It fixes mmap when IOMMU is used on x86 only, but breaks architectures
-like ARM or PPC where virt_to_phys(dma_alloc_coherent) doesn't work. We
-need there dma_mmap_coherent or similar (the trickery what
-snd_pcm_default_mmap does but in some saner way). But this cannot be
-done at this phase.
-
-thanks,
--- 
-js
-suse labs
+~Vinod
