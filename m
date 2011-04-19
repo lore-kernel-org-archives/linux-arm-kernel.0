@@ -1,63 +1,21 @@
-From: x0132446@ti.com (David Anders)
-Date: Tue, 19 Apr 2011 09:49:29 -0500
-Subject: Cleanup Samsung stuff
-In-Reply-To: <BANLkTimTuQ1YE8Xu04NyMZxF42KGDr_XBQ@mail.gmail.com>
-References: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
-	<BANLkTimTuQ1YE8Xu04NyMZxF42KGDr_XBQ@mail.gmail.com>
-Message-ID: <4DADA0F9.7010104@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 19 Apr 2011 15:50:10 +0100
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <201104191616.01647.arnd@arndb.de>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<BANLkTikVfdVQuR_nJZnra7Bo=CQgOfS5Zg@mail.gmail.com>
+	<20110415062643.GB12272@atomide.com>
+	<201104191616.01647.arnd@arndb.de>
+Message-ID: <20110419145009.GH9462@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings All,
+On Tue, Apr 19, 2011 at 04:16:01PM +0200, Arnd Bergmann wrote:
 
+> That sounds like a good idea. Same for the regulator drivers that are
+> currently in arch/arm instead of drivers/regulator.
 
-i've been looking at a number of machine files for boards that are no
-longer in production(mainly the ones i maintain), thoughts on removing them?
-
-
-Dave
-
-On 04/18/2011 09:23 PM, Kyungmin Park wrote:
-> On Tue, Apr 19, 2011 at 10:46 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->   
->> Hi all,
->>
->> I think, you know about current situation of Linux ARM world.
->>
->> So...
->>
->> As Russell suggested, I also will focus on consolidations and bug fixes for
->> Samsung stuff for a while so don't complain about missing new stuff. In my
->> opinion, we can keep going it later...
->>
->> As a note, I'm doing(or preparing) following at the moment.
->>
->> - Removing some "mach-s5pxxxx"s
->>     
-> Why not mach-s3c series? don't you think too much plat-{s3c, s5p,
-> samsung}? how about to use the plat-samsung only?
->   
->> - Removing useless header files in include/{mach,plat} of Samsung
->> - Samsung GPIO stuff cleanup/consolidation
->> - Samsung DMA stuff consolidation?
->>     
->    -> Move to dmaengine and use it.
->   
->> - Device tree (with Linaro)
->> - and so on...
->>     
->    - Strange Samsung Clock and names consolidation.
->    - IRQ stuff (some parts are done by tglx but need to use the
-> generic IRQ base instead of odd +32 magic)
->    - generic IOMMU consolidation.
->
-> BTW, who works on this at LSI?
->
-> Thank you,
-> Kyungmin Park
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->   
+We don't have any regulator drivers in arch/arm I think (unless the ST
+one got merged, but that's actually a dual regulator/system management
+driver rather than a proper regulator - when I reviewed it I didn't flag
+the location due to the second interface on the side).
