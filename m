@@ -1,30 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Apr 2011 11:49:50 +0200
-Subject: [patch 27/29] arm: Cleanup the irq namespace
-In-Reply-To: <20110328170653.348149801@linutronix.de>
-References: <20110328170219.059141076@linutronix.de>
-	<20110328170653.348149801@linutronix.de>
-Message-ID: <20110419094950.GN31131@pengutronix.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Tue, 19 Apr 2011 10:52:15 +0100
+Subject: [PATCH 0/5] ARM: kprobes: Fixes and additions for ARM instruction
+	emulation (part 6)
+Message-ID: <1303206740-10101-1-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2011 at 05:12:36PM -0000, Thomas Gleixner wrote:
-> Convert to the new function names. Automated with coccinelle.
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
-> [...]
->  arch/arm/plat-mxc/3ds_debugboard.c             |    8 ++--
->  arch/arm/plat-mxc/avic.c                       |    4 +-
->  arch/arm/plat-mxc/gpio.c                       |   24 +++++++------
->  arch/arm/plat-mxc/irq-common.c                 |    4 +-
->  arch/arm/plat-mxc/tzic.c                       |    4 +-
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-for your changes to arch/arm/plat-mxc.
+(This is a sixth and final set of patches)
 
-Thanks
-Uwe
+When kprobes are inserted into code an ARM instruction is replaced
+by a breakpoint. When this is hit, the original instruction must be
+emulated out-of-line. This patchset fixes some bugs in the instruction
+decoding and adds emulation for some newer ARMv7 instructions.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+[PATCH 1/5] ARM: kprobes: Reject probing of undefined data processing instructions
+[PATCH 2/5] ARM: kprobes: Add emulation of MOVW and MOVT instructions
+[PATCH 3/5] ARM: kprobes: Add emulation of SBFX, UBFX, BFI and BFC instructions
+[PATCH 4/5] ARM: kprobes: Add emulation of hint instructions like NOP and WFI
+[PATCH 5/5] ARM: kprobes: Tidy-up kprobes-decode.c
