@@ -1,68 +1,183 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Tue, 19 Apr 2011 09:37:48 -0300
-Subject: [REVERT] Re: V4L: videobuf-dma-contig: fix mmap_mapper	broken
-	on ARM
-In-Reply-To: <4DAD26D9.6060906@suse.cz>
-References: <201104122306.34909.jkrzyszt@tis.icnet.pl>
-	<201104131252.32011.jkrzyszt@tis.icnet.pl>
-	<20110413183231.GA23631@n2100.arm.linux.org.uk>
-	<201104132256.40325.jkrzyszt@tis.icnet.pl>
-	<20110413220008.GA23901@n2100.arm.linux.org.uk>
-	<4DAD26D9.6060906@suse.cz>
-Message-ID: <4DAD821C.7080101@infradead.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 14:49:50 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104181612.35833.arnd@arndb.de>
+	<005f01cbfe6b$148a8810$3d9f9830$%szyprowski@samsung.com>
+Message-ID: <201104191449.50824.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 19-04-2011 03:08, Jiri Slaby escreveu:
-> On 04/14/2011 12:00 AM, Russell King - ARM Linux wrote:
->> On Wed, Apr 13, 2011 at 10:56:39PM +0200, Janusz Krzysztofik wrote:
->>> Dnia ?roda 13 kwiecie? 2011 o 20:32:31 Russell King - ARM Linux 
->>> napisa?(a):
->>>> On Wed, Apr 13, 2011 at 12:52:31PM +0200, Janusz Krzysztofik wrote:
->>>>> Taking into account that I'm just trying to fix a regression, and
->>>>> not invent a new, long term solution: are you able to name an ARM
->>>>> based board which a) is already supported in 2.6.39, b) is (or can
->>>>> be) equipped with a device supported by a V4L driver which uses
->>>>> videobuf- dma-config susbsystem, c) has a bus structure with which
->>>>> virt_to_phys(bus_to_virt(dma_handle)) is not equal dma_handle?
->>>>
->>>> I have no idea - and why should whether someone can name something
->>>> that may break be a justification to allow something which is
->>>> technically wrong?
->>>>
->>>> Surely it should be the other way around - if its technically wrong
->>>> and _may_ break something then it shouldn't be allowed.
->>>
->>> In theory - of course. In practice - couldn't we now, close to -rc3, 
->>> relax the rules a little bit and stop bothering with something that may 
->>> break in the future if it doesn't break on any board supported so far (I 
->>> hope)?
->>
->> If we are worried about closeness to -final, then what should happen is
->> that the original commit is reverted; the "fix" for IOMMUs resulted in
->> a regression for existing users which isn't trivial to resolve without
->> risking possible breakage of other users.
-> 
-> Hi, as -rc4 is out, I think it's time to revert that commit and rethink
-> the mmap behaviour for some of next -rc1s.
-> 
-> Linus, please revert
-> commit 35d9f510b67b10338161aba6229d4f55b4000f5b
-> Author: Jiri Slaby <jslaby@suse.cz>
-> Date:   Mon Feb 28 06:37:02 2011 -0300
+(adding Joerg to Cc)
 
-It seems the better option for now.
+On Tuesday 19 April 2011, Marek Szyprowski wrote:
 
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> > These look wrong for a number of reasons:
+> > 
+> > * try_module_get(THIS_MODULE) makes no sense at all, the idea of the
+> >   try_module_get is to pin down another module that was calling down,
+> >   which I suppose is not needed here.
+> > 
+> > * This extends the generic IOMMU API in platform specific ways, don't
+> >   do that.
+> > 
+> > * I think you can do without these functions by including a pointer
+> >   to the iommu structure in dev_archdata, see
+> >   arch/powerpc/include/asm/device.h for an example.
+> 
+> We heavily based our solution on the iommu implementation found in 
+> arch/arm/mach-msm/{devices-iommu,iommu,iommu_dev}.c
+> 
+> The s5p_sysmmu_get/put functions are equivalent for msm_iommu_{get,put}_ctx.
+> 
+> (snipped)
 
+Yes, I'm sorry about this. I commented on the early versions of the MSM
+driver, but then did not do another review of the version that actually
+got merged. That should also be fixed, ideally we can come up with a
+way that works for both drivers.
+
+> > Why even provide these when they don't do anything?
 > 
->     [media] V4L: videobuf, don't use dma addr as physical
-> ===
+> Because they are required by pm_runtime. If no runtime_{suspend,resume}
+> methods are provided, the pm_runtime core will not call proper methods
+> on parent device for pmruntime_{get,put}_sync(). The parent device for
+> each sysmmu platform device is the power domain the sysmmu belongs to.
 > 
-> It fixes mmap when IOMMU is used on x86 only, but breaks architectures
-> like ARM or PPC where virt_to_phys(dma_alloc_coherent) doesn't work. We
-> need there dma_mmap_coherent or similar (the trickery what
-> snd_pcm_default_mmap does but in some saner way). But this cannot be
-> done at this phase.
+> I know this is crazy, but this is the only way it can be handled now
+> with runtime_pm.
+
+Please don't try to work around kernel features when they don't fit
+what you are doing. The intent of the way that runtime_pm works is
+to make life easier for driver writers, not harder ;-)
+
+I can see three ways that would be better solutions:
+
+1. change the runtime_pm subsystem to allow it to ignore some devices
+in an easy way.
+
+2. change the device layout if the sysmmu. If the iommu device is
+a child of the device that it is responsible for, I guess you don't
+have this problem.
+
+3. Not represent the iommu as a device at all, just as a property
+of another device.
+
+> > When you register the iommu unconditionally, it becomes impossible for
+> > this driver to coexist with other iommu drivers in the same kernel,
+> > which does against the concept of having a platform driver for this.
 > 
-> thanks,
+> > It might be better to call the s5p_sysmmu_register function from
+> > the board files and have no platform devices at all if each IOMMU
+> > is always bound to a specific device anyway.
+> 
+> Ok, it looks I don't fully get how this iommu.h should be used. It looks
+> that there can be only one instance of iommu ops registered in the system,
+> so only one iommu driver can be activated. You are right that the iommu
+> driver has to be registered on first probe().
+
+That is a limitation of the current implementation. We might want to
+change that anyway, e.g. to handle the mali IOMMU along with yours.
+I believe the reason for allowing only one IOMMU type so far has been
+that nobody required more than one. As I mentioned, the IOMMU API is
+rather new and has not been ported to much variety of hardware, unlike
+the dma-mapping API, which does support multiple different IOMMUs
+in a single system.
+
+> I think it might be beneficial to describe a bit more our hardware 
+> (Exynos4 platform). There are a number of multimedia blocks. Each has it's
+> own IOMMU controller. Each IOMMU controller has his own set of hardware
+> registers and irq. There is also a GPU unit (Mali) which has it's own
+> IOMMU hardware, incompatible with the SYSMMU, so right now it is ignored.
+> 
+> The multimedia blocks are modeled as platform devices and are independent
+> of platform type (same multimedia blocks can be found on other Samsung
+> machines, like for example s5pv210/s5pc110), see arch/arm/plat-s5p/dev-*.c
+> and arch/arm/plat-samsung/dev-*.c.
+> 
+> Platform driver data defined in the above files are registered by each
+> board startup code, usually by platform_add_devices(), for more details
+> please check arch/arm/mach-s5pv210/mach-goni.c. There is
+> struct platform_device *goni_devices[] array which get registered in the
+> last line in goni_machine_init() function.
+> 
+> For IOMMU controllers on Exynos4 we created an array of platform devices:
+> extern struct platform_device exynos4_device_sysmmu[];
+> 
+> Now the board startup code registers only these sysmmu controllers
+> (instances) that are required on the particular board. See "[PATCH 7/7]
+> ARM: EXYNOS4: enable FIMC on Universal_C210":
+> @@ -613,6 +616,15 @@ static struct platform_device *universal_devices[]
+> __initdata = {
+>         &s3c_device_hsmmc2,
+>         &s3c_device_hsmmc3,
+>         &s3c_device_i2c5,
+> +       &s5p_device_fimc0,
+> +       &s5p_device_fimc1,
+> +       &s5p_device_fimc2,
+> +       &s5p_device_fimc3,
+> +       &exynos4_device_pd[PD_CAM],
+> +       &exynos4_device_sysmmu[S5P_SYSMMU_FIMC0],
+> +       &exynos4_device_sysmmu[S5P_SYSMMU_FIMC1],
+> +       &exynos4_device_sysmmu[S5P_SYSMMU_FIMC2],
+> +       &exynos4_device_sysmmu[S5P_SYSMMU_FIMC3],
+> 
+> We need to map the above structure into linux/iommu.h api.
+
+Thanks for the background information.
+
+> The domain defined in iommu api are quite straightforward. Each domain 
+> is just a set of mappings between physical addresses (phys) and io addresses
+> (iova).
+> 
+> For the drivers the most important are the following functions:
+> iommu_{attach,detach}_device(struct iommu_domain *domain, struct device *dev);
+> 
+> We assumed that they just assign the domain (mapping) to particular instance
+> of iommu. However the driver need to get somehow the pointer to the iommu 
+> instance. That's why we added the s5p_sysmmu_{get,put} functions. 
+> 
+> Now I see that you want to make the clients (drivers) to provide their own
+> struct device pointer to the iommu_{attach,detach}_device() function instead of
+> giving there a pointer to iommu device. Am I right? We will need some kind of
+> mapping between multimedia devices and particular instanced of sysmmu
+> controllers.
+> 
+> There will be also some problems with such approach. Mainly we have a
+> multimedia codec module, which have 2 memory controllers (for faster transfers)
+> and 2 iommu controllers. How can we handle such case?
+
+It's not quite how the domains are meant to be used. In the AMD IOMMU
+that the API is based on, any number of devices can share one domain,
+and devices might be able to have mappings in multiple domains.
+
+The domain really reflects the user, not the device here, which makes more
+sense if you think of virtual machines than of multimedia devices.
+
+I would suggest that you just use a single iommu_domain globally for
+all in-kernel users.
+
+> > > diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+> > samsung/include/plat/devs.h
+> > > index f0da6b7..0ae5dd0 100644
+> > > --- a/arch/arm/plat-samsung/include/plat/devs.h
+> > > +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> > > @@ -142,7 +142,7 @@ extern struct platform_device s5p_device_fimc3;
+> > >  extern struct platform_device s5p_device_mipi_csis0;
+> > >  extern struct platform_device s5p_device_mipi_csis1;
+> > >
+> > > -extern struct platform_device exynos4_device_sysmmu;
+> > > +extern struct platform_device exynos4_device_sysmmu[];
+> > 
+> > Why is this a global variable? I would expect this to be private to the
+> > implementation.
+> 
+> To allow each board to register only particular instances of sysmmu controllers.
+
+That sounds like an unnecessarily complicated way of doing it. This would
+be another reason to not make each one a device, but have something else
+in struct device take care of it.
+
+	Arnd
