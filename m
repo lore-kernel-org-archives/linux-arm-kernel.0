@@ -1,89 +1,57 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 19 Apr 2011 10:52:18 +0100
-Subject: [PATCH 3/5] ARM: kprobes: Add emulation of SBFX, UBFX,
-	BFI and BFC instructions
+Date: Tue, 19 Apr 2011 10:52:19 +0100
+Subject: [PATCH 4/5] ARM: kprobes: Add emulation of hint instructions like NOP
+	and WFI
 In-Reply-To: <1303206740-10101-1-git-send-email-tixy@yxit.co.uk>
 References: <1303206740-10101-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1303206740-10101-4-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1303206740-10101-5-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-These bit field manipulation instructions occur several thousand
-times in an ARMv7 kernel.
+Being able to probe NOP instructions is useful for hard-coding probeable
+locations and is used by the kprobes test code.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-decode.c |   42 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-decode.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 51e6957..25d4a04 100644
+index 25d4a04..c573b85 100644
 --- a/arch/arm/kernel/kprobes-decode.c
 +++ b/arch/arm/kernel/kprobes-decode.c
-@@ -672,6 +672,19 @@ emulate_rd12_modify(struct kprobe *p, struct pt_regs *regs)
- 	regs->uregs[rd] = insnslot_1arg_rflags(rdv, regs->ARM_cpsr, i_fn);
- }
+@@ -1225,6 +1225,30 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 	if ((insn & 0x0fb00000) == 0x03000000)
+ 		return prep_emulate_rd12_modify(insn, asi);
  
-+static void __kprobes
-+emulate_rd12rn0_modify(struct kprobe *p, struct pt_regs *regs)
-+{
-+	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
-+	kprobe_opcode_t insn = p->opcode;
-+	int rd = (insn >> 12) & 0xf;
-+	int rn = insn & 0xf;
-+	long rdv = regs->uregs[rd];
-+	long rnv = regs->uregs[rn];
-+
-+	regs->uregs[rd] = insnslot_2arg_rflags(rdv, rnv, regs->ARM_cpsr, i_fn);
-+}
-+
- static void __kprobes emulate_rd12rm0(struct kprobe *p, struct pt_regs *regs)
- {
- 	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
-@@ -870,6 +883,20 @@ prep_emulate_rd12_modify(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- }
- 
- static enum kprobe_insn __kprobes
-+prep_emulate_rd12rn0_modify(kprobe_opcode_t insn,
-+			    struct arch_specific_insn *asi)
-+{
-+	if (is_r15(insn, 12))
-+		return INSN_REJECTED;	/* Rd is PC */
-+
-+	insn &= 0xffff0ff0;	/* Rd = r0 */
-+	insn |= 0x00000001;	/* Rn = r1 */
-+	asi->insn[0] = insn;
-+	asi->insn_handler = emulate_rd12rn0_modify;
-+	return INSN_GOOD;
-+}
-+
-+static enum kprobe_insn __kprobes
- prep_emulate_rd12rm0(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
- 	if (is_r15(insn, 12))
-@@ -1396,6 +1423,21 @@ space_cccc_0111__1(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	if ((insn & 0x0ff000d0) == 0x075000d0)
- 		return prep_emulate_rd16rn12rs8rm0_wflags(insn, asi);
- 
-+	/* SBFX   : cccc 0111 101x xxxx xxxx xxxx x101 xxxx :  */
-+	/* UBFX   : cccc 0111 111x xxxx xxxx xxxx x101 xxxx :  */
-+	if ((insn & 0x0fa00070) == 0x07a00050)
-+		return prep_emulate_rd12rm0(insn, asi);
-+
-+	/* BFI    : cccc 0111 110x xxxx xxxx xxxx x001 xxxx :  */
-+	/* BFC    : cccc 0111 110x xxxx xxxx xxxx x001 1111 :  */
-+	if ((insn & 0x0fe00070) == 0x07c00010) {
-+
-+		if ((insn & 0x0000000f) == 0x0000000f)
-+			return prep_emulate_rd12_modify(insn, asi);
-+		else
-+			return prep_emulate_rd12rn0_modify(insn, asi);
++	/* hints : cccc 0011 0010 0000 xxxx xxxx xxxx xxxx */
++	if ((insn & 0x0fff0000) == 0x03200000) {
++		unsigned op2 = insn & 0x000000ff;
++		if (op2 == 0x01 || op2 == 0x04) {
++			/* YIELD : cccc 0011 0010 0000 xxxx xxxx 0000 0001 */
++			/* SEV   : cccc 0011 0010 0000 xxxx xxxx 0000 0100 */
++			asi->insn[0] = insn;
++			asi->insn_handler = emulate_none;
++			return INSN_GOOD;
++		} else if (op2 <= 0x03) {
++			/* NOP   : cccc 0011 0010 0000 xxxx xxxx 0000 0000 */
++			/* WFE   : cccc 0011 0010 0000 xxxx xxxx 0000 0010 */
++			/* WFI   : cccc 0011 0010 0000 xxxx xxxx 0000 0011 */
++			/*
++			 * We make WFE and WFI true NOPs to avoid stalls due
++			 * to missing events whilst processing the probe.
++			 */
++			asi->insn_handler = emulate_nop;
++			return INSN_GOOD_NO_SLOT;
++		}
++		/* For DBG and unallocated hints it's safest to reject them */
++		return INSN_REJECTED;
 +	}
 +
- 	return INSN_REJECTED;
- }
- 
+ 	/*
+ 	 * MSR   : cccc 0011 0x10 xxxx xxxx xxxx xxxx xxxx
+ 	 * ALU op with S bit and Rd == 15 :
 -- 
 1.7.2.5
