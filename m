@@ -1,35 +1,43 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 19 Apr 2011 11:53:29 +0530
-Subject: [PATCH 2/6] dmaengine/dw_dmac: Enable resubmission from callback
-	routine.
-In-Reply-To: <438BB0150E931F4B9CE701519A44630108519E1BE6@bgsmsx502.gar.corp.intel.com>
-References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
-	<cf350c267897bd4eaf5a027c659771eee117ac74.1303123511.git.viresh.kumar@st.com>
-	<438BB0150E931F4B9CE701519A44630108519E1BE6@bgsmsx502.gar.corp.intel.com>
-Message-ID: <4DAD2A61.4020406@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 Apr 2011 08:25:43 +0200
+Subject: [PATCH 03/10] clk: Make NULL a valid clock again
+In-Reply-To: <1303174420.2801.18.camel@pororo>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-4-git-send-email-s.hauer@pengutronix.de>
+	<1303174420.2801.18.camel@pororo>
+Message-ID: <20110419062543.GQ14770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2011 11:42 AM, Koul, Vinod wrote:
-> On 04/18/2011 04:20 PM, viresh kumar wrote:
->>
->> Resubmission of new transfer must be allowed from callbacks. For this release
->> lock before calling callback routine and enable them again.
-> Why would you like to do that?
+Hi Jeremy,
+
+On Tue, Apr 19, 2011 at 08:53:40AM +0800, Jeremy Kerr wrote:
+> Hi Sascha,
 > 
-> IMO it's not a good thing as you are essentially doing it in your tasklet...
-> Make sure the submit() is done by client before this and you use it to start
-> next transaction in you tasklet and let client know in callback txn is
-> finished.
+> > NULL used to be a valid clock. This patch makes the common struct
+> > clk stuff work with this. Instead of crashing we return sane default
+> > values for this dummy clock, that is: can always be prepared, enabled,
+> > rate unkown and no set rate.
 > 
+> Although I'm not totally averse to this change, I've been trying to
+> avoid allowing NULL clocks - it seems to be a little 'messy' to allows
+> clocks that don't have any possible operations on them, and could hide
+> error cases where clock pointers have not been correctly initialised.
+> 
+> However, I understand that this may be required for flexibility between
+> machines, and in that case would make sense. Is that what you're
+> intending this for?
 
-Vinod,
+I intended to use NULL clocks but didn't do it then. The patch was
+already created, so I posted it. I think We could equally well create a
+dummy clock which can be used by all architectures. People (including
+me) never really got used to NULL clocks and it's been a source of
+confusion since they have been introduced.
 
-I initiated this discussion few days back on a separate thread:
-
-http://www.spinics.net/lists/arm-kernel/msg121139.html
-
-And so implemented this.
+Sascha
 
 -- 
-viresh
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
