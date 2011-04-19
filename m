@@ -1,30 +1,37 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 19 Apr 2011 08:53:40 +0800
-Subject: [PATCH 03/10] clk: Make NULL a valid clock again
-In-Reply-To: <1302894495-6879-4-git-send-email-s.hauer@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1303174420.2801.18.camel@pororo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Apr 2011 03:23:11 +0200
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikSfdUXmME8ao4GYtwgZNuZX9RLZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+2011/4/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-> NULL used to be a valid clock. This patch makes the common struct
-> clk stuff work with this. Instead of crashing we return sane default
-> values for this dummy clock, that is: can always be prepared, enabled,
-> rate unkown and no set rate.
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
+>
+> Let's unify this before we have additional SoCs re-implementing this
+> obviously common functionality themselves.
 
-Although I'm not totally averse to this change, I've been trying to
-avoid allowing NULL clocks - it seems to be a little 'messy' to allows
-clocks that don't have any possible operations on them, and could hide
-error cases where clock pointers have not been correctly initialised.
+Great initiative!
 
-However, I understand that this may be required for flexibility between
-machines, and in that case would make sense. Is that what you're
-intending this for?
+I'm thinking about how to unify this with the bits I have in kernel/tcm.c.
 
-Cheers,
+For TCM memory (cacheless, inside CPU core, controlled by CP15
+registers to recap) we can compile plain C into that memory too, which
+seems like a lot of these SRAM drivers actually want to do, but fail at
+and instead write some assembler and copy it there.
 
+The remainder of the TCM memory is put into an allocation pool
+of uneven size, maybe that should reuse this mechanism instead
+of rolling its own atleast.
 
-Jeremy
+On the odd PB11MPCore the TCM memories are NUMA, so one
+on each CPU not reachable from other cores (like Magnus Damm
+mentioned for SH-ARM) and I have no idea on how to handle that,
+neither for an allocator nor for compiling code directly into it.
+Suggestions welcome.
+
+Linus Walleij
