@@ -1,23 +1,45 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 19 Apr 2011 17:49:41 +0200
-Subject: [PATCH] ARM: at91: AT91CAP9 has a macb device
-In-Reply-To: <1303201280-25413-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1303201280-25413-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110419154941.GC19199@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Apr 2011 18:01:19 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<201104191655.13133.arnd@arndb.de>
+	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+Message-ID: <201104191801.19348.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:21 Tue 19 Apr     , Uwe Kleine-K?nig wrote:
-> commit
+On Tuesday 19 April 2011, Linus Walleij wrote:
+> I will surely put that into drivers/regulator, Mark already requested that
+> as part of his review.
 > 
-> 	ee621dd (net: atmel_macb Kconfig: remove long dependency line)
+> The problem is that it is dependent on the PRCMU driver which
+> provides the communication mechanism to actually control these
+> regulators.
 > 
-> replaced a list of several explicit machines in the dependencies of MACB by
-> a single symbol that is selected by the respective machines. ee621dd missed
-> to let ARCH_AT91CAP9 select HAVE_NET_MACB though which is fixed here.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> The PRCMU is the Power Reset and Control Management Unit,
+> it is a register pages where you send commands to a firmware
+> running on its own CPU on the other side, partly using mailboxes.
+> The firmware handles things like voltage and power domains
+> (modeled as regulators), frequency changes (using CPUfreq),
+> idle states (CPUidle and sleep, idling), as well as resetting
+> particular memory blocks AND an I2C channel to the AB8500
+> chip (driven from drivers/ab8500-core.c indeed) and some
+> GPIO configuration.
 
-Best Regards,
-J.
+Ok, thanks for the explanation.
+
+> Thinking of it, is it OK to put chip CPUfreq drivers into
+> drivers/cpufreq/* instead of into the arch/arm/* platform
+> code as everyone does right now? We could probably
+> fix that and bring down the diffstat considerably.
+
+That's something to discuss with Dave Jones and other people
+interested in cpufre. Right now, all cpufreq drivers, including
+those for other architectures are in arch/.
+
+I think it would be good to have the out of the individual
+platforms, in particular in order to get better reviews of
+new cpufreq drivers by people that are interested in them.
+
+	Arnd
