@@ -1,26 +1,35 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 18 Apr 2011 19:24:28 +0200
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <07919bf9-f05f-ca1c-c084-c4ee18a9dc58@me.com>
-References: <20110418135243.GB1479@ucw.cz>
-	<07919bf9-f05f-ca1c-c084-c4ee18a9dc58@me.com>
-Message-ID: <20110418172427.GA7246@ucw.cz>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 19 Apr 2011 11:53:29 +0530
+Subject: [PATCH 2/6] dmaengine/dw_dmac: Enable resubmission from callback
+	routine.
+In-Reply-To: <438BB0150E931F4B9CE701519A44630108519E1BE6@bgsmsx502.gar.corp.intel.com>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+	<cf350c267897bd4eaf5a027c659771eee117ac74.1303123511.git.viresh.kumar@st.com>
+	<438BB0150E931F4B9CE701519A44630108519E1BE6@bgsmsx502.gar.corp.intel.com>
+Message-ID: <4DAD2A61.4020406@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 04/19/2011 11:42 AM, Koul, Vinod wrote:
+> On 04/18/2011 04:20 PM, viresh kumar wrote:
+>>
+>> Resubmission of new transfer must be allowed from callbacks. For this release
+>> lock before calling callback routine and enable them again.
+> Why would you like to do that?
+> 
+> IMO it's not a good thing as you are essentially doing it in your tasklet...
+> Make sure the submit() is done by client before this and you use it to start
+> next transaction in you tasklet and let client know in callback txn is
+> finished.
+> 
 
-(don't top post)
+Vinod,
 
-> I'm not 100% sure, but a lot of people made good experience with JFFS2.
+I initiated this discussion few days back on a separate thread:
 
-jffs2 needs raw flash. CF & SD look like block devices.
- 
-> Is it that hard to get a log structured file system power fail safe?
+http://www.spinics.net/lists/arm-kernel/msg121139.html
 
-Not that bad if you can access raw flash. Very bad if there's layer
-that hides flash from you and corrupts data in between...
+And so implemented this.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+viresh
