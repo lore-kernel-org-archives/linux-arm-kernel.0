@@ -1,5 +1,5 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Apr 2011 22:58:00 +0200
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 19 Apr 2011 23:54:21 +0200 (CEST)
 Subject: [PATCH 04/10] clk: implement parent pass through functions
 In-Reply-To: <20110419190910.GQ31131@pengutronix.de>
 References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
@@ -7,23 +7,20 @@ References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
 	<4DADC45C.1020202@codeaurora.org>
 	<20110419175318.GB15233@pengutronix.de>
 	<20110419190910.GQ31131@pengutronix.de>
-Message-ID: <20110419205800.GC15233@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 09:09:10PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> > 
+On Tue, 19 Apr 2011, Uwe Kleine-K?nig wrote:
 > > +1 for letting the core enable/disable and prepare/unprepare the parent
 > > clocks. I scanned the different arm clock implementations and they all
 > > do it, except the ones which do not implement parents at all.
 > Then the question is if all do handle parents in the same way. (i.e.
 > in enable do parent first, in disable do child first?)
 
-Yes, they do.
-
-> 
+That's not a question at all. Anything which does it the other way
+round is broken. Period.
+ 
 > If one layer of indirection is acceptable this can easily be
 > accomplished (unless I oversee something):
 > 
@@ -36,18 +33,46 @@ Yes, they do.
 > Then the callbacks in clk_with_parent.clk would handle the parent and
 > then call the respective callbacks in clk_with_parent.ops.
 
-I fail to see what you are trying to archieve. struct clk already has a ops
-pointer, what's the purpose of the additional *ops here?
-Other than that I prefer not to hardcode parent pointers. Often enough I
-have looked at clock trees and wondered if the clock tree is in sync
-with the hardware. When we read the mux values back from the hardware in
-clk_get_parent the trees are in sync by definition (modulo refcounting
-when you play with the registers somewhere else).
+Why the heck do you want to do that? That's a complete and utter
+failure. You invent indirections for no value at all which just
+violate any sense of abstraction and layering.
 
-Sascha
+clk_en/disable should just do (simplified):
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+clk_enable(clk)
+{
+	if (!clk)
+	   return 0;
+
+	ret = clk_enable(clk->parent);
+	if (ret)
+	   return ret;
+
+	clk_refcnt++;
+
+	if (!clk->enable) 
+	   return 0;
+
+   	ret = clk->enable();
+	if (!ret)
+	   return 0;
+
+	clk_refcnt--;
+	clk_disable(clk->parent);
+
+	return ret;	
+}
+
+Now go figure how clk_disable should look like.
+
+No clk should care about the parent at all, except for handing down
+the pointer. And it should not even check for the pointer being NULL
+or not. It does not matter at all, as long as clk_enable/disable
+return sensible error codes.
+
+Anything else is just overengineered clusterfuck for no value at all,
+which makes error handling way more complex than it needs to be.
+
+Thanks,
+
+	tglx
