@@ -1,984 +1,1121 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 20 Apr 2011 13:10:05 +1200
-Subject: [RFC PATCH 02/23] at91: Make Ethernet device common
+Date: Wed, 20 Apr 2011 13:10:06 +1200
+Subject: [RFC PATCH 03/23] at91: Make USB OHCI/EHCI devices common
 In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
 References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303261827-27730-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303261827-27730-4-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual Ethernet device code for each at91 variant with
-a single implementation in devices.
+Replace the individual USB OHCI and EHCI (AT91SAM9G45 only) device code for
+each at91 variant with a single implementation in devices.c. Rename
+at91_add_device_usbh to at91_add_device_usbh_ohci (as it is on AT91SAM9G45)
+to make the API consistent for all variants.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at572d940hf.c         |    4 +
- arch/arm/mach-at91/at572d940hf_devices.c |   83 +++++++----------------
- arch/arm/mach-at91/at91cap9.c            |    4 +
- arch/arm/mach-at91/at91cap9_devices.c    |  103 ++++++++++------------------
- arch/arm/mach-at91/at91rm9200.c          |    4 +
- arch/arm/mach-at91/at91rm9200_devices.c  |  103 ++++++++++------------------
- arch/arm/mach-at91/at91sam9260.c         |    4 +
- arch/arm/mach-at91/at91sam9260_devices.c |  104 +++++++++++------------------
- arch/arm/mach-at91/at91sam9261_devices.c |    1 -
- arch/arm/mach-at91/at91sam9263.c         |    4 +
- arch/arm/mach-at91/at91sam9263_devices.c |  102 ++++++++++------------------
- arch/arm/mach-at91/at91sam9g45.c         |    4 +
- arch/arm/mach-at91/at91sam9g45_devices.c |  108 +++++++++++-------------------
- arch/arm/mach-at91/devices.c             |   61 +++++++++++++++++
- arch/arm/mach-at91/devices.h             |   10 +++
- 15 files changed, 309 insertions(+), 390 deletions(-)
+ arch/arm/mach-at91/at572d940hf_devices.c  |   45 +----------
+ arch/arm/mach-at91/at91cap9_devices.c     |   54 ++------------
+ arch/arm/mach-at91/at91rm9200_devices.c   |   44 +----------
+ arch/arm/mach-at91/at91sam9260_devices.c  |   44 +----------
+ arch/arm/mach-at91/at91sam9261.c          |    4 +
+ arch/arm/mach-at91/at91sam9261_devices.c  |   54 +++----------
+ arch/arm/mach-at91/at91sam9263_devices.c  |   52 +------------
+ arch/arm/mach-at91/at91sam9g45_devices.c  |  105 ++------------------------
+ arch/arm/mach-at91/board-1arm.c           |    2 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c    |    2 +-
+ arch/arm/mach-at91/board-at572d940hf_ek.c |    2 +-
+ arch/arm/mach-at91/board-cam60.c          |    2 +-
+ arch/arm/mach-at91/board-cap9adk.c        |    2 +-
+ arch/arm/mach-at91/board-carmeva.c        |    2 +-
+ arch/arm/mach-at91/board-cpu9krea.c       |    2 +-
+ arch/arm/mach-at91/board-cpuat91.c        |    2 +-
+ arch/arm/mach-at91/board-csb337.c         |    2 +-
+ arch/arm/mach-at91/board-csb637.c         |    2 +-
+ arch/arm/mach-at91/board-eb9200.c         |    2 +-
+ arch/arm/mach-at91/board-ecbat91.c        |    2 +-
+ arch/arm/mach-at91/board-eco920.c         |    2 +-
+ arch/arm/mach-at91/board-flexibity.c      |    2 +-
+ arch/arm/mach-at91/board-foxg20.c         |    2 +-
+ arch/arm/mach-at91/board-gsia18s.c        |    2 +-
+ arch/arm/mach-at91/board-kafa.c           |    2 +-
+ arch/arm/mach-at91/board-kb9202.c         |    2 +-
+ arch/arm/mach-at91/board-neocore926.c     |    2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c   |    2 +-
+ arch/arm/mach-at91/board-picotux200.c     |    2 +-
+ arch/arm/mach-at91/board-qil-a9260.c      |    2 +-
+ arch/arm/mach-at91/board-rm9200dk.c       |    2 +-
+ arch/arm/mach-at91/board-rm9200ek.c       |    2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c     |    2 +-
+ arch/arm/mach-at91/board-sam9260ek.c      |    2 +-
+ arch/arm/mach-at91/board-sam9261ek.c      |    2 +-
+ arch/arm/mach-at91/board-sam9263ek.c      |    2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c      |    2 +-
+ arch/arm/mach-at91/board-snapper9260.c    |    2 +-
+ arch/arm/mach-at91/board-stamp9g20.c      |    4 +-
+ arch/arm/mach-at91/board-usb-a9260.c      |    2 +-
+ arch/arm/mach-at91/board-usb-a9263.c      |    2 +-
+ arch/arm/mach-at91/board-yl-9200.c        |    2 +-
+ arch/arm/mach-at91/devices.c              |  117 +++++++++++++++++++++++++++++
+ arch/arm/mach-at91/devices.h              |   13 +++
+ arch/arm/mach-at91/include/mach/board.h   |    1 -
+ 45 files changed, 213 insertions(+), 390 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-index a6b9c68..48c1ec2 100644
---- a/arch/arm/mach-at91/at572d940hf.c
-+++ b/arch/arm/mach-at91/at572d940hf.c
-@@ -34,6 +34,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at572d940hf_init_devices(void);
-+
- static struct map_desc at572d940hf_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -307,6 +309,8 @@ void __init at572d940hf_initialize(unsigned long main_clock)
- 	/* Map peripherals */
- 	iotable_init(at572d940hf_io_desc, ARRAY_SIZE(at572d940hf_io_desc));
- 
-+	at572d940hf_init_devices();
-+
- 	at91_arch_reset = at572d940hf_reset;
- 	at91_extern_irq = (1 << AT572D940HF_ID_IRQ0) | (1 << AT572D940HF_ID_IRQ1)
- 			| (1 << AT572D940HF_ID_IRQ2);
 diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 0fc20a2..12af1d5 100644
+index 12af1d5..169e5c4 100644
 --- a/arch/arm/mach-at91/at572d940hf_devices.c
 +++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -35,6 +35,7 @@
- 
- #include "generic.h"
- #include "sam9_smc.h"
-+#include "devices.h"
- 
- 
- /* --------------------------------------------------------------------
-@@ -138,68 +139,26 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
-  *  Ethernet
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
--
--static struct resource eth_resources[] = {
--	[0] = {
--		.start	= AT572D940HF_BASE_EMAC,
--		.end	= AT572D940HF_BASE_EMAC + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT572D940HF_ID_EMAC,
--		.end	= AT572D940HF_ID_EMAC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
-+	{AT91_PIN_PA17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PA18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PA19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PA20, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PA23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PA21, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PA22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
- };
- 
--static struct platform_device at572d940hf_eth_device = {
--	.name		= "macb",
--	.id		= -1,
--	.dev		= {
--			.dma_mask		= &eth_dmamask,
--			.coherent_dma_mask	= DMA_BIT_MASK(32),
--			.platform_data		= &eth_data,
--	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91SAM9260_BASE_EMAC,
-+	.irq		= AT91SAM9260_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
- };
- 
--void __init at91_add_device_eth(struct at91_eth_data *data)
--{
--	if (!data)
--		return;
--
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
--
--	/* Only RMII is supported */
--	data->is_rmii = 1;
--
--	/* Pins used for RMII */
--	at91_set_A_periph(AT91_PIN_PA16, 0);	/* ETXCK_EREFCK */
--	at91_set_A_periph(AT91_PIN_PA17, 0);	/* ERXDV */
--	at91_set_A_periph(AT91_PIN_PA18, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PA19, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PA20, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PA23, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PA21, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PA22, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PA13, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PA14, 0);	/* EMDC */
--
--	eth_data = *data;
--	platform_device_register(&at572d940hf_eth_device);
--}
--#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
--#endif
--
--
- /* --------------------------------------------------------------------
-  *  MMC / SD
-  * -------------------------------------------------------------------- */
-@@ -952,6 +911,14 @@ void __init at91_add_device_mAgic(void)
- void __init at91_add_device_mAgic(void) {}
- #endif
- 
-+static struct at91_device_table __initdata at572d940hf_device_table = {
-+	.ethernet	= &device_eth,
-+};
-+
-+void __init at572d940hf_init_devices(void)
-+{
-+	at91_init_devices(&at572d940hf_device_table);
-+}
- 
- /* -------------------------------------------------------------------- */
- 
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index 7337617..6413530 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -28,6 +28,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91cap9_init_devices(void);
-+
- static struct map_desc at91cap9_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -308,6 +310,8 @@ void __init at91cap9_initialize(unsigned long main_clock)
- 	/* Map peripherals */
- 	iotable_init(at91cap9_io_desc, ARRAY_SIZE(at91cap9_io_desc));
- 
-+	at91cap9_init_devices();
-+
- 	at91_arch_reset = at91cap9_reset;
- 	pm_power_off = at91cap9_poweroff;
- 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 9ffbf3a..183f320 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -29,7 +29,7 @@
- #include <mach/at91sam9_smc.h>
- 
- #include "generic.h"
--
-+#include "devices.h"
- 
- /* --------------------------------------------------------------------
+@@ -42,49 +42,11 @@
   *  USB Host
-@@ -196,75 +196,38 @@ void __init at91_add_device_usba(struct usba_platform_data *data) {}
-  *  Ethernet
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
 -
--static struct resource eth_resources[] = {
+-static struct resource usbh_resources[] = {
 -	[0] = {
--		.start	= AT91CAP9_BASE_EMAC,
--		.end	= AT91CAP9_BASE_EMAC + SZ_16K - 1,
+-		.start	= AT572D940HF_UHP_BASE,
+-		.end	= AT572D940HF_UHP_BASE + SZ_1M - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91CAP9_ID_EMAC,
--		.end	= AT91CAP9_ID_EMAC,
+-		.start	= AT572D940HF_ID_UHP,
+-		.end	= AT572D940HF_ID_UHP,
 -		.flags	= IORESOURCE_IRQ,
 -	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PB21, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
-+	{AT91_PIN_PB22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PB25, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PB26, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PB27, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PB28, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PB23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PB24, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PB30, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PB29, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT572D940HF_UHP_BASE,
++	.irq		= AT572D940HF_ID_UHP,
  };
  
--static struct platform_device at91cap9_eth_device = {
--	.name		= "macb",
+-static struct platform_device at572d940hf_usbh_device = {
+-	.name		= "at91_ohci",
 -	.id		= -1,
 -	.dev		= {
--				.dma_mask		= &eth_dmamask,
+-				.dma_mask		= &ohci_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &eth_data,
+-				.platform_data		= &usbh_data,
 -	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
-+static struct __initdata at91_pin_config eth_mii_pins[] = {
-+	{AT91_PIN_PC25, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECRS */
-+	{AT91_PIN_PC26, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECOL */
-+	{AT91_PIN_PC22, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX2 */
-+	{AT91_PIN_PC23, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX3 */
-+	{AT91_PIN_PC27, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXCK */
-+	{AT91_PIN_PC20, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX2 */
-+	{AT91_PIN_PC21, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX3 */
-+	{AT91_PIN_PC24, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETXER */
- };
- 
--void __init at91_add_device_eth(struct at91_eth_data *data)
--{
--	if (!data)
--		return;
--
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
--
--	/* Pins used for MII and RMII */
--	at91_set_A_periph(AT91_PIN_PB21, 0);	/* ETXCK_EREFCK */
--	at91_set_A_periph(AT91_PIN_PB22, 0);	/* ERXDV */
--	at91_set_A_periph(AT91_PIN_PB25, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PB26, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PB27, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PB28, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PB23, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PB24, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PB30, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PB29, 0);	/* EMDC */
--
--	if (!data->is_rmii) {
--		at91_set_B_periph(AT91_PIN_PC25, 0);	/* ECRS */
--		at91_set_B_periph(AT91_PIN_PC26, 0);	/* ECOL */
--		at91_set_B_periph(AT91_PIN_PC22, 0);	/* ERX2 */
--		at91_set_B_periph(AT91_PIN_PC23, 0);	/* ERX3 */
--		at91_set_B_periph(AT91_PIN_PC27, 0);	/* ERXCK */
--		at91_set_B_periph(AT91_PIN_PC20, 0);	/* ETX2 */
--		at91_set_B_periph(AT91_PIN_PC21, 0);	/* ETX3 */
--		at91_set_B_periph(AT91_PIN_PC24, 0);	/* ETXER */
--	}
--
--	eth_data = *data;
--	platform_device_register(&at91cap9_eth_device);
--}
--#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
--#endif
--
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91CAP9_BASE_EMAC,
-+	.irq		= AT91CAP9_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
-+	.mii_pins	= eth_mii_pins,
-+	.nr_mii_pins	= ARRAY_SIZE(eth_mii_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  MMC / SD
-@@ -1254,6 +1217,14 @@ void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
- #endif
- 
-+static struct at91_device_table __initdata at91cap9_device_table = {
-+	.ethernet	= &device_eth,
-+};
-+
-+void __init at91cap9_init_devices(void)
-+{
-+	at91_init_devices(&at91cap9_device_table);
-+}
- 
- /* -------------------------------------------------------------------- */
- /*
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 2e9ecad..dea90df 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -22,6 +22,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91rm9200_init_devices(void);
-+
- static struct map_desc at91rm9200_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -275,6 +277,8 @@ void __init at91rm9200_initialize(unsigned long main_clock, unsigned short banks
- 	/* Map peripherals */
- 	iotable_init(at91rm9200_io_desc, ARRAY_SIZE(at91rm9200_io_desc));
- 
-+	at91rm9200_init_devices();
-+
- 	at91_arch_reset = at91rm9200_reset;
- 	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
- 			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 7b53922..1b93312 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -23,7 +23,7 @@
- #include <mach/at91rm9200_mc.h>
- 
- #include "generic.h"
--
-+#include "devices.h"
- 
- /* --------------------------------------------------------------------
-  *  USB Host
-@@ -125,75 +125,38 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
-  *  Ethernet
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_ARM_AT91_ETHER) || defined(CONFIG_ARM_AT91_ETHER_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
--
--static struct resource eth_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_EMAC,
--		.end	= AT91_VA_BASE_EMAC + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91RM9200_ID_EMAC,
--		.end	= AT91RM9200_ID_EMAC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PA15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
-+	{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PA12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PA11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ECRS_ECRSDV */
-+	{AT91_PIN_PA10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PA9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PA8,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PA7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
- };
- 
--static struct platform_device at91rm9200_eth_device = {
--	.name		= "at91_ether",
--	.id		= -1,
--	.dev		= {
--				.dma_mask		= &eth_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &eth_data,
--	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
-+static struct __initdata at91_pin_config eth_mii_pins[] = {
-+	{AT91_PIN_PB19, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXCK */
-+	{AT91_PIN_PB18, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECOL */
-+	{AT91_PIN_PB17, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PB16, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX3 */
-+	{AT91_PIN_PB15, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX2 */
-+	{AT91_PIN_PB14, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETXER */
-+	{AT91_PIN_PB13, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX3 */
-+	{AT91_PIN_PB12, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX2 */
- };
- 
--void __init at91_add_device_eth(struct at91_eth_data *data)
--{
--	if (!data)
--		return;
--
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
--
--	/* Pins used for MII and RMII */
--	at91_set_A_periph(AT91_PIN_PA16, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PA15, 0);	/* EMDC */
--	at91_set_A_periph(AT91_PIN_PA14, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PA13, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PA12, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PA11, 0);	/* ECRS_ECRSDV */
--	at91_set_A_periph(AT91_PIN_PA10, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PA9, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PA8, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PA7, 0);	/* ETXCK_EREFCK */
--
--	if (!data->is_rmii) {
--		at91_set_B_periph(AT91_PIN_PB19, 0);	/* ERXCK */
--		at91_set_B_periph(AT91_PIN_PB18, 0);	/* ECOL */
--		at91_set_B_periph(AT91_PIN_PB17, 0);	/* ERXDV */
--		at91_set_B_periph(AT91_PIN_PB16, 0);	/* ERX3 */
--		at91_set_B_periph(AT91_PIN_PB15, 0);	/* ERX2 */
--		at91_set_B_periph(AT91_PIN_PB14, 0);	/* ETXER */
--		at91_set_B_periph(AT91_PIN_PB13, 0);	/* ETX3 */
--		at91_set_B_periph(AT91_PIN_PB12, 0);	/* ETX2 */
--	}
--
--	eth_data = *data;
--	platform_device_register(&at91rm9200_eth_device);
--}
--#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
--#endif
--
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91_VA_BASE_EMAC,
-+	.irq		= AT91RM9200_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
-+	.mii_pins	= eth_mii_pins,
-+	.nr_mii_pins	= ARRAY_SIZE(eth_mii_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  Compact Flash / PCMCIA
-@@ -1170,6 +1133,14 @@ void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
- #endif
- 
-+static struct at91_device_table __initdata at91rm9200_device_table = {
-+	.ethernet	= &device_eth,
-+};
-+
-+void __init at91rm9200_init_devices(void)
-+{
-+	at91_init_devices(&at91rm9200_device_table);
-+}
- 
- /* -------------------------------------------------------------------- */
- 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 195208b..7445f48 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -25,6 +25,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9260_init_devices(void);
-+
- static struct map_desc at91sam9260_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -315,6 +317,8 @@ void __init at91sam9260_initialize(unsigned long main_clock)
- 	/* Map peripherals */
- 	iotable_init(at91sam9260_io_desc, ARRAY_SIZE(at91sam9260_io_desc));
- 
-+	at91sam9260_init_devices();
-+
- 	if (cpu_is_at91sam9xe())
- 		at91sam9xe_initialize();
- 	else if (cpu_is_at91sam9g20())
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 07eb7b0..b4f00ea 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -24,7 +24,7 @@
- #include <mach/at91sam9_smc.h>
- 
- #include "generic.h"
--
-+#include "devices.h"
- 
- /* --------------------------------------------------------------------
-  *  USB Host
-@@ -126,75 +126,38 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
-  *  Ethernet
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
--
--static struct resource eth_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_EMAC,
--		.end	= AT91SAM9260_BASE_EMAC + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9260_ID_EMAC,
--		.end	= AT91SAM9260_ID_EMAC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PA19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
-+	{AT91_PIN_PA17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PA15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PA18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PA12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PA21, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PA20, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
- };
- 
--static struct platform_device at91sam9260_eth_device = {
--	.name		= "macb",
--	.id		= -1,
--	.dev		= {
--				.dma_mask		= &eth_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &eth_data,
--	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
-+static struct __initdata at91_pin_config eth_mii_pins[] = {
-+	{AT91_PIN_PA28, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECRS */
-+	{AT91_PIN_PA29, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECOL */
-+	{AT91_PIN_PA25, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX2 */
-+	{AT91_PIN_PA26, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX3 */
-+	{AT91_PIN_PA27, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXCK */
-+	{AT91_PIN_PA23, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX2 */
-+	{AT91_PIN_PA24, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX3 */
-+	{AT91_PIN_PA22, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETXER */
- };
- 
--void __init at91_add_device_eth(struct at91_eth_data *data)
--{
--	if (!data)
--		return;
--
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
--
--	/* Pins used for MII and RMII */
--	at91_set_A_periph(AT91_PIN_PA19, 0);	/* ETXCK_EREFCK */
--	at91_set_A_periph(AT91_PIN_PA17, 0);	/* ERXDV */
--	at91_set_A_periph(AT91_PIN_PA14, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PA15, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PA18, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PA16, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PA12, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PA13, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PA21, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PA20, 0);	/* EMDC */
--
--	if (!data->is_rmii) {
--		at91_set_B_periph(AT91_PIN_PA28, 0);	/* ECRS */
--		at91_set_B_periph(AT91_PIN_PA29, 0);	/* ECOL */
--		at91_set_B_periph(AT91_PIN_PA25, 0);	/* ERX2 */
--		at91_set_B_periph(AT91_PIN_PA26, 0);	/* ERX3 */
--		at91_set_B_periph(AT91_PIN_PA27, 0);	/* ERXCK */
--		at91_set_B_periph(AT91_PIN_PA23, 0);	/* ETX2 */
--		at91_set_B_periph(AT91_PIN_PA24, 0);	/* ETX3 */
--		at91_set_B_periph(AT91_PIN_PA22, 0);	/* ETXER */
--	}
--
--	eth_data = *data;
--	platform_device_register(&at91sam9260_eth_device);
--}
--#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
--#endif
--
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91SAM9260_BASE_EMAC,
-+	.irq		= AT91SAM9260_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
-+	.mii_pins	= eth_mii_pins,
-+	.nr_mii_pins	= ARRAY_SIZE(eth_mii_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  MMC / SD
-@@ -1326,6 +1289,15 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- void __init at91_add_device_cf(struct at91_cf_data * data) {}
- #endif
- 
-+static struct at91_device_table __initdata at91sam9260_device_table = {
-+	.ethernet	= &device_eth,
-+};
-+
-+void __init at91sam9260_init_devices(void)
-+{
-+	at91_init_devices(&at91sam9260_device_table);
-+}
-+
- /* -------------------------------------------------------------------- */
- /*
-  * These devices are always present and don't need any board-specific
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 59fc483..3c0959f 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -1044,7 +1044,6 @@ void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
- #endif
- 
--
- /* -------------------------------------------------------------------- */
- 
- /*
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 249f900..739fc1f 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -24,6 +24,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9263_init_devices(void);
-+
- static struct map_desc at91sam9263_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -284,6 +286,8 @@ void __init at91sam9263_initialize(unsigned long main_clock)
- 	/* Map peripherals */
- 	iotable_init(at91sam9263_io_desc, ARRAY_SIZE(at91sam9263_io_desc));
- 
-+	at91sam9263_init_devices();
-+
- 	at91_arch_reset = at91sam9_alt_reset;
- 	pm_power_off = at91sam9263_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index fb5c23a..9ff2573 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -26,6 +26,7 @@
- #include <mach/at91sam9_smc.h>
- 
- #include "generic.h"
-+#include "devices.h"
- 
- 
- /* --------------------------------------------------------------------
-@@ -136,75 +137,38 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
-  *  Ethernet
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
--
--static struct resource eth_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_EMAC,
--		.end	= AT91SAM9263_BASE_EMAC + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_EMAC,
--		.end	= AT91SAM9263_ID_EMAC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PE21, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
-+	{AT91_PIN_PC25, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PE25, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PE26, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PE27, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PE28, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PE23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PE24, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PE30, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PE29, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
- };
- 
--static struct platform_device at91sam9263_eth_device = {
--	.name		= "macb",
--	.id		= -1,
--	.dev		= {
--				.dma_mask		= &eth_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &eth_data,
--	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
-+static struct __initdata at91_pin_config eth_mii_pins[] = {
-+	{AT91_PIN_PE22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ECRS */
-+	{AT91_PIN_PC26, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECOL */
-+	{AT91_PIN_PC22, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX2 */
-+	{AT91_PIN_PC23, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX3 */
-+	{AT91_PIN_PC27, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXCK */
-+	{AT91_PIN_PC20, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX2 */
-+	{AT91_PIN_PC21, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX3 */
-+	{AT91_PIN_PC24, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETXER */
- };
- 
--void __init at91_add_device_eth(struct at91_eth_data *data)
--{
--	if (!data)
--		return;
--
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
--
--	/* Pins used for MII and RMII */
--	at91_set_A_periph(AT91_PIN_PE21, 0);	/* ETXCK_EREFCK */
--	at91_set_B_periph(AT91_PIN_PC25, 0);	/* ERXDV */
--	at91_set_A_periph(AT91_PIN_PE25, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PE26, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PE27, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PE28, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PE23, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PE24, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PE30, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PE29, 0);	/* EMDC */
--
--	if (!data->is_rmii) {
--		at91_set_A_periph(AT91_PIN_PE22, 0);	/* ECRS */
--		at91_set_B_periph(AT91_PIN_PC26, 0);	/* ECOL */
--		at91_set_B_periph(AT91_PIN_PC22, 0);	/* ERX2 */
--		at91_set_B_periph(AT91_PIN_PC23, 0);	/* ERX3 */
--		at91_set_B_periph(AT91_PIN_PC27, 0);	/* ERXCK */
--		at91_set_B_periph(AT91_PIN_PC20, 0);	/* ETX2 */
--		at91_set_B_periph(AT91_PIN_PC21, 0);	/* ETX3 */
--		at91_set_B_periph(AT91_PIN_PC24, 0);	/* ETXER */
--	}
--
--	eth_data = *data;
--	platform_device_register(&at91sam9263_eth_device);
--}
--#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
--#endif
--
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91SAM9263_BASE_EMAC,
-+	.irq		= AT91SAM9263_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
-+	.mii_pins	= eth_mii_pins,
-+	.nr_mii_pins	= ARRAY_SIZE(eth_mii_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  MMC / SD
-@@ -1425,6 +1389,14 @@ void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
- #endif
- 
-+static struct at91_device_table __initdata at91sam9263_device_table = {
-+	.ethernet	= &device_eth,
-+};
-+
-+void __init at91sam9263_init_devices(void)
-+{
-+	at91_init_devices(&at91sam9263_device_table);
-+}
- 
- /* -------------------------------------------------------------------- */
- /*
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index c67b47f..357e5d7 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -25,6 +25,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9g45_init_devices(void);
-+
- static struct map_desc at91sam9g45_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -311,6 +313,8 @@ void __init at91sam9g45_initialize(unsigned long main_clock)
- 	/* Map peripherals */
- 	iotable_init(at91sam9g45_io_desc, ARRAY_SIZE(at91sam9g45_io_desc));
- 
-+	at91sam9g45_init_devices();
-+
- 	at91_arch_reset = at91sam9g45_reset;
- 	pm_power_off = at91sam9g45_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 1e8f275..76e95f8 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -29,6 +29,7 @@
- #include <mach/atmel-mci.h>
- 
- #include "generic.h"
-+#include "devices.h"
- 
- 
- /* --------------------------------------------------------------------
-@@ -281,76 +282,39 @@ void __init at91_add_device_usba(struct usba_platform_data *data) {}
-  *  Ethernet
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
--static u64 eth_dmamask = DMA_BIT_MASK(32);
--static struct at91_eth_data eth_data;
--
--static struct resource eth_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_BASE_EMAC,
--		.end	= AT91SAM9G45_BASE_EMAC + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_ID_EMAC,
--		.end	= AT91SAM9G45_ID_EMAC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config eth_rmii_pins[] = {
-+	{AT91_PIN_PA17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXCK_EREFCK */
-+	{AT91_PIN_PA15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXDV */
-+	{AT91_PIN_PA12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX0 */
-+	{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERX1 */
-+	{AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ERXER */
-+	{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETXEN */
-+	{AT91_PIN_PA10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX0 */
-+	{AT91_PIN_PA11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* ETX1 */
-+	{AT91_PIN_PA19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDIO */
-+	{AT91_PIN_PA18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* EMDC */
-+};
-+
-+static struct __initdata at91_pin_config eth_mii_pins[] = {
-+	{AT91_PIN_PA29, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECRS */
-+	{AT91_PIN_PA30, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ECOL */
-+	{AT91_PIN_PA8,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX2 */
-+	{AT91_PIN_PA9,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERX3 */
-+	{AT91_PIN_PA28, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ERXCK */
-+	{AT91_PIN_PA6,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX2 */
-+	{AT91_PIN_PA7,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETX3 */
-+	{AT91_PIN_PA27, AT91_PIN_PERIPH_B, 0, 0, 0},	/* ETXER */
-+};
-+
-+static struct __initdata at91_dev_table_ethernet device_eth = {
-+	.mmio_base	= AT91SAM9G45_BASE_EMAC,
-+	.irq		= AT91SAM9G45_ID_EMAC,
-+	.rmii_pins	= eth_rmii_pins,
-+	.nr_rmii_pins	= ARRAY_SIZE(eth_rmii_pins),
-+	.mii_pins	= eth_mii_pins,
-+	.nr_mii_pins	= ARRAY_SIZE(eth_mii_pins),
- };
- 
--static struct platform_device at91sam9g45_eth_device = {
--	.name		= "macb",
--	.id		= -1,
--	.dev		= {
--				.dma_mask		= &eth_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &eth_data,
--	},
--	.resource	= eth_resources,
--	.num_resources	= ARRAY_SIZE(eth_resources),
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
 -};
 -
--void __init at91_add_device_eth(struct at91_eth_data *data)
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
 -{
 -	if (!data)
 -		return;
 -
--	if (data->phy_irq_pin) {
--		at91_set_gpio_input(data->phy_irq_pin, 0);
--		at91_set_deglitch(data->phy_irq_pin, 1);
--	}
+-	usbh_data = *data;
+-	platform_device_register(&at572d940hf_usbh_device);
 -
--	/* Pins used for MII and RMII */
--	at91_set_A_periph(AT91_PIN_PA17, 0);	/* ETXCK_EREFCK */
--	at91_set_A_periph(AT91_PIN_PA15, 0);	/* ERXDV */
--	at91_set_A_periph(AT91_PIN_PA12, 0);	/* ERX0 */
--	at91_set_A_periph(AT91_PIN_PA13, 0);	/* ERX1 */
--	at91_set_A_periph(AT91_PIN_PA16, 0);	/* ERXER */
--	at91_set_A_periph(AT91_PIN_PA14, 0);	/* ETXEN */
--	at91_set_A_periph(AT91_PIN_PA10, 0);	/* ETX0 */
--	at91_set_A_periph(AT91_PIN_PA11, 0);	/* ETX1 */
--	at91_set_A_periph(AT91_PIN_PA19, 0);	/* EMDIO */
--	at91_set_A_periph(AT91_PIN_PA18, 0);	/* EMDC */
--
--	if (!data->is_rmii) {
--		at91_set_B_periph(AT91_PIN_PA29, 0);	/* ECRS */
--		at91_set_B_periph(AT91_PIN_PA30, 0);	/* ECOL */
--		at91_set_B_periph(AT91_PIN_PA8,  0);	/* ERX2 */
--		at91_set_B_periph(AT91_PIN_PA9,  0);	/* ERX3 */
--		at91_set_B_periph(AT91_PIN_PA28, 0);	/* ERXCK */
--		at91_set_B_periph(AT91_PIN_PA6,  0);	/* ETX2 */
--		at91_set_B_periph(AT91_PIN_PA7,  0);	/* ETX3 */
--		at91_set_B_periph(AT91_PIN_PA27, 0);	/* ETXER */
--	}
--
--	eth_data = *data;
--	platform_device_register(&at91sam9g45_eth_device);
 -}
 -#else
--void __init at91_add_device_eth(struct at91_eth_data *data) {}
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  MMC / SD
+  *  USB Device (Gadget)
   * -------------------------------------------------------------------- */
-@@ -1587,6 +1551,14 @@ void __init at91_set_serial_console(unsigned portnr) {}
+@@ -913,6 +875,7 @@ void __init at91_add_device_mAgic(void) {}
+ 
+ static struct at91_device_table __initdata at572d940hf_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usbh_ohci,
+ };
+ 
+ void __init at572d940hf_init_devices(void)
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index 183f320..c88633c 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -35,58 +35,17 @@
+  *  USB Host
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
+-
+-static struct resource usbh_resources[] = {
+-	[0] = {
+-		.start	= AT91CAP9_UHP_BASE,
+-		.end	= AT91CAP9_UHP_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91CAP9_ID_UHP,
+-		.end	= AT91CAP9_ID_UHP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91_usbh_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_data,
+-	},
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
+-};
+-
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
++static void __init at91cap9_usb_ohci_init(void)
+ {
+-	int i;
+-
+-	if (!data)
+-		return;
+-
+ 	if (cpu_is_at91cap9_revB())
+ 		irq_set_irq_type(AT91CAP9_ID_UHP, IRQ_TYPE_LEVEL_HIGH);
+-
+-	/* Enable VBus control for UHP ports */
+-	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
+-			at91_set_gpio_output(data->vbus_pin[i], 0);
+-	}
+-
+-	usbh_data = *data;
+-	platform_device_register(&at91_usbh_device);
+ }
+-#else
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+-#endif
+ 
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT91CAP9_UHP_BASE,
++	.irq		= AT91CAP9_ID_UHP,
++	.device_init	= at91cap9_usb_ohci_init,
++};
+ 
+ /* --------------------------------------------------------------------
+  *  USB HS Device (Gadget)
+@@ -1219,6 +1178,7 @@ void __init at91_add_device_serial(void) {}
+ 
+ static struct at91_device_table __initdata at91cap9_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usbh_ohci,
+ };
+ 
+ void __init at91cap9_init_devices(void)
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 1b93312..428b9da 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -29,48 +29,11 @@
+  *  USB Host
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
+-
+-static struct resource usbh_resources[] = {
+-	[0] = {
+-		.start	= AT91RM9200_UHP_BASE,
+-		.end	= AT91RM9200_UHP_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91RM9200_ID_UHP,
+-		.end	= AT91RM9200_ID_UHP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91rm9200_usbh_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_data,
+-	},
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT91RM9200_UHP_BASE,
++	.irq		= AT91RM9200_ID_UHP,
+ };
+ 
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
+-{
+-	if (!data)
+-		return;
+-
+-	usbh_data = *data;
+-	platform_device_register(&at91rm9200_usbh_device);
+-}
+-#else
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+@@ -1135,6 +1098,7 @@ void __init at91_add_device_serial(void) {}
+ 
+ static struct at91_device_table __initdata at91rm9200_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usbh_ohci,
+ };
+ 
+ void __init at91rm9200_init_devices(void)
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index b4f00ea..b71e6b0 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -30,48 +30,11 @@
+  *  USB Host
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
+-
+-static struct resource usbh_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9260_UHP_BASE,
+-		.end	= AT91SAM9260_UHP_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9260_ID_UHP,
+-		.end	= AT91SAM9260_ID_UHP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91_usbh_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_data,
+-	},
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT91SAM9260_UHP_BASE,
++	.irq		= AT91SAM9260_ID_UHP,
+ };
+ 
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
+-{
+-	if (!data)
+-		return;
+-
+-	usbh_data = *data;
+-	platform_device_register(&at91_usbh_device);
+-}
+-#else
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+@@ -1291,6 +1254,7 @@ void __init at91_add_device_cf(struct at91_cf_data * data) {}
+ 
+ static struct at91_device_table __initdata at91sam9260_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usbh_ohci,
+ };
+ 
+ void __init at91sam9260_init_devices(void)
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index fcad886..dd0a96d 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -25,6 +25,8 @@
+ #include "generic.h"
+ #include "clock.h"
+ 
++extern void at91sam9261_init_devices(void);
++
+ static struct map_desc at91sam9261_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= AT91_VA_BASE_SYS,
+@@ -272,6 +274,8 @@ void __init at91sam9261_initialize(unsigned long main_clock)
+ 	/* Map peripherals */
+ 	iotable_init(at91sam9261_io_desc, ARRAY_SIZE(at91sam9261_io_desc));
+ 
++	at91sam9261_init_devices();
++
+ 	if (cpu_is_at91sam9g10())
+ 		iotable_init(at91sam9g10_sram_desc, ARRAY_SIZE(at91sam9g10_sram_desc));
+ 	else
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 3c0959f..16d5b91 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -27,54 +27,17 @@
+ #include <mach/at91sam9_smc.h>
+ 
+ #include "generic.h"
+-
++#include "devices.h"
+ 
+ /* --------------------------------------------------------------------
+  *  USB Host
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
+-
+-static struct resource usbh_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9261_UHP_BASE,
+-		.end	= AT91SAM9261_UHP_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9261_ID_UHP,
+-		.end	= AT91SAM9261_ID_UHP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91sam9261_usbh_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_data,
+-	},
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT91SAM9261_UHP_BASE,
++	.irq		= AT91SAM9261_ID_UHP,
+ };
+ 
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
+-{
+-	if (!data)
+-		return;
+-
+-	usbh_data = *data;
+-	platform_device_register(&at91sam9261_usbh_device);
+-}
+-#else
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+@@ -1044,6 +1007,15 @@ void __init at91_set_serial_console(unsigned portnr) {}
  void __init at91_add_device_serial(void) {}
  #endif
  
-+static struct at91_device_table __initdata at91sam9g45_device_table = {
-+	.ethernet	= &device_eth,
++static struct at91_device_table __initdata at91sam9261_device_table = {
++	.usbh_ohci	= &device_usbh_ohci,
 +};
 +
-+void __init at91sam9g45_init_devices(void)
++void __init at91sam9261_init_devices(void)
 +{
-+	at91_init_devices(&at91sam9g45_device_table);
++	at91_init_devices(&at91sam9261_device_table);
 +}
- 
++
  /* -------------------------------------------------------------------- */
+ 
  /*
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 9ff2573..1f851f6 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -33,56 +33,11 @@
+  *  USB Host
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_data;
+-
+-static struct resource usbh_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9263_UHP_BASE,
+-		.end	= AT91SAM9263_UHP_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9263_ID_UHP,
+-		.end	= AT91SAM9263_ID_UHP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91_usbh_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_data,
+-	},
+-	.resource	= usbh_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_resources),
++static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
++	.mmio_base	= AT91SAM9263_UHP_BASE,
++	.irq		= AT91SAM9263_ID_UHP,
+ };
+ 
+-void __init at91_add_device_usbh(struct at91_usbh_data *data)
+-{
+-	int i;
+-
+-	if (!data)
+-		return;
+-
+-	/* Enable VBus control for UHP ports */
+-	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
+-			at91_set_gpio_output(data->vbus_pin[i], 0);
+-	}
+-
+-	usbh_data = *data;
+-	platform_device_register(&at91_usbh_device);
+-}
+-#else
+-void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+@@ -1391,6 +1346,7 @@ void __init at91_add_device_serial(void) {}
+ 
+ static struct at91_device_table __initdata at91sam9263_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usbh_ohci,
+ };
+ 
+ void __init at91sam9263_init_devices(void)
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 76e95f8..2961249 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -83,112 +83,21 @@ void __init at91_add_device_hdmac(void) {}
+  *  USB Host (OHCI)
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+-static u64 ohci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_ohci_data;
+-
+-static struct resource usbh_ohci_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9G45_OHCI_BASE,
+-		.end	= AT91SAM9G45_OHCI_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9G45_ID_UHPHS,
+-		.end	= AT91SAM9G45_ID_UHPHS,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91_usbh_ohci_device = {
+-	.name		= "at91_ohci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ohci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_ohci_data,
+-	},
+-	.resource	= usbh_ohci_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_ohci_resources),
++static struct __initdata at91_dev_table_usb_ohci device_usb_ohci = {
++	.mmio_base	= AT91SAM9G45_OHCI_BASE,
++	.irq		= AT91SAM9G45_ID_UHPHS,
+ };
+ 
+-void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
+-{
+-	int i;
+-
+-	if (!data)
+-		return;
+-
+-	/* Enable VBus control for UHP ports */
+-	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
+-			at91_set_gpio_output(data->vbus_pin[i], 0);
+-	}
+-
+-	usbh_ohci_data = *data;
+-	platform_device_register(&at91_usbh_ohci_device);
+-}
+-#else
+-void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB Host HS (EHCI)
+  *  Needs an OHCI host for low and full speed management
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
+-static u64 ehci_dmamask = DMA_BIT_MASK(32);
+-static struct at91_usbh_data usbh_ehci_data;
+-
+-static struct resource usbh_ehci_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9G45_EHCI_BASE,
+-		.end	= AT91SAM9G45_EHCI_BASE + SZ_1M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9G45_ID_UHPHS,
+-		.end	= AT91SAM9G45_ID_UHPHS,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91_usbh_ehci_device = {
+-	.name		= "atmel-ehci",
+-	.id		= -1,
+-	.dev		= {
+-				.dma_mask		= &ehci_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &usbh_ehci_data,
+-	},
+-	.resource	= usbh_ehci_resources,
+-	.num_resources	= ARRAY_SIZE(usbh_ehci_resources),
++static struct __initdata at91_dev_table_basic_device device_usb_ehci = {
++	.mmio_base	= AT91SAM9G45_EHCI_BASE,
++	.irq		= AT91SAM9G45_ID_UHPHS,
+ };
+ 
+-void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data)
+-{
+-	int i;
+-
+-	if (!data)
+-		return;
+-
+-	/* Enable VBus control for UHP ports */
+-	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
+-			at91_set_gpio_output(data->vbus_pin[i], 0);
+-	}
+-
+-	usbh_ehci_data = *data;
+-	at91_clock_associate("uhphs_clk", &at91_usbh_ehci_device.dev, "ehci_clk");
+-	platform_device_register(&at91_usbh_ehci_device);
+-}
+-#else
+-void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data) {}
+-#endif
+-
+-
+ /* --------------------------------------------------------------------
+  *  USB HS Device (Gadget)
+  * -------------------------------------------------------------------- */
+@@ -1553,6 +1462,8 @@ void __init at91_add_device_serial(void) {}
+ 
+ static struct at91_device_table __initdata at91sam9g45_device_table = {
+ 	.ethernet	= &device_eth,
++	.usbh_ohci	= &device_usb_ohci,
++	.usbh_ehci	= &device_usb_ehci,
+ };
+ 
+ void __init at91sam9g45_init_devices(void)
+diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
+index 8a3fc84..244e8bb 100644
+--- a/arch/arm/mach-at91/board-1arm.c
++++ b/arch/arm/mach-at91/board-1arm.c
+@@ -85,7 +85,7 @@ static void __init onearm_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&onearm_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&onearm_usbh_data);
++	at91_add_device_usbh_ohci(&onearm_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&onearm_udc_data);
+ }
+diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
+index cba7f77..88d08ae 100644
+--- a/arch/arm/mach-at91/board-afeb-9260v1.c
++++ b/arch/arm/mach-at91/board-afeb-9260v1.c
+@@ -189,7 +189,7 @@ static void __init afeb9260_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&afeb9260_usbh_data);
++	at91_add_device_usbh_ohci(&afeb9260_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&afeb9260_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+index 3929f1c..c9ab05d 100644
+--- a/arch/arm/mach-at91/board-at572d940hf_ek.c
++++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+@@ -297,7 +297,7 @@ static void __init eb_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&eb_usbh_data);
++	at91_add_device_usbh_ohci(&eb_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&eb_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index b54e3e6..014271d 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -191,7 +191,7 @@ static void __init cam60_board_init(void)
+ 	/* USB Host */
+ 	/* enable USB power supply circuit */
+ 	at91_set_gpio_output(AT91_PIN_PB18, 1);
+-	at91_add_device_usbh(&cam60_usbh_data);
++	at91_add_device_usbh_ohci(&cam60_usbh_data);
+ 	/* NAND */
+ 	cam60_add_device_nand();
+ }
+diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
+index e727444..0d60378 100644
+--- a/arch/arm/mach-at91/board-cap9adk.c
++++ b/arch/arm/mach-at91/board-cap9adk.c
+@@ -374,7 +374,7 @@ static void __init cap9adk_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&cap9adk_usbh_data);
++	at91_add_device_usbh_ohci(&cap9adk_usbh_data);
+ 	/* USB HS */
+ 	at91_add_device_usba(&cap9adk_usba_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
+index 2e74a19..9d007a8 100644
+--- a/arch/arm/mach-at91/board-carmeva.c
++++ b/arch/arm/mach-at91/board-carmeva.c
+@@ -145,7 +145,7 @@ static void __init carmeva_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&carmeva_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&carmeva_usbh_data);
++	at91_add_device_usbh_ohci(&carmeva_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&carmeva_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
+index 3838594..65c6513 100644
+--- a/arch/arm/mach-at91/board-cpu9krea.c
++++ b/arch/arm/mach-at91/board-cpu9krea.c
+@@ -351,7 +351,7 @@ static void __init cpu9krea_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&cpu9krea_usbh_data);
++	at91_add_device_usbh_ohci(&cpu9krea_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&cpu9krea_udc_data);
+ 	/* NAND */
+diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
+index 2f4dd8c..ce3525d 100644
+--- a/arch/arm/mach-at91/board-cpuat91.c
++++ b/arch/arm/mach-at91/board-cpuat91.c
+@@ -162,7 +162,7 @@ static void __init cpuat91_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&cpuat91_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&cpuat91_usbh_data);
++	at91_add_device_usbh_ohci(&cpuat91_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&cpuat91_udc_data);
+ 	/* MMC */
+diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
+index 464839d..ff7b8c0 100644
+--- a/arch/arm/mach-at91/board-csb337.c
++++ b/arch/arm/mach-at91/board-csb337.c
+@@ -235,7 +235,7 @@ static void __init csb337_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&csb337_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&csb337_usbh_data);
++	at91_add_device_usbh_ohci(&csb337_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&csb337_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
+index 431688c..74d5b7e 100644
+--- a/arch/arm/mach-at91/board-csb637.c
++++ b/arch/arm/mach-at91/board-csb637.c
+@@ -125,7 +125,7 @@ static void __init csb637_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&csb637_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&csb637_usbh_data);
++	at91_add_device_usbh_ohci(&csb637_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&csb637_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
+index 6cf6566..3705082 100644
+--- a/arch/arm/mach-at91/board-eb9200.c
++++ b/arch/arm/mach-at91/board-eb9200.c
+@@ -105,7 +105,7 @@ static void __init eb9200_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&eb9200_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&eb9200_usbh_data);
++	at91_add_device_usbh_ohci(&eb9200_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&eb9200_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
+index de2fd04..df4a07f 100644
+--- a/arch/arm/mach-at91/board-ecbat91.c
++++ b/arch/arm/mach-at91/board-ecbat91.c
+@@ -154,7 +154,7 @@ static void __init ecb_at91board_init(void)
+ 	at91_add_device_eth(&ecb_at91eth_data);
+ 
+ 	/* USB Host */
+-	at91_add_device_usbh(&ecb_at91usbh_data);
++	at91_add_device_usbh_ohci(&ecb_at91usbh_data);
+ 
+ 	/* I2C */
+ 	at91_add_device_i2c(NULL, 0);
+diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
+index a158a0c..7988b58 100644
+--- a/arch/arm/mach-at91/board-eco920.c
++++ b/arch/arm/mach-at91/board-eco920.c
+@@ -114,7 +114,7 @@ static void __init eco920_board_init(void)
+ {
+ 	at91_add_device_serial();
+ 	at91_add_device_eth(&eco920_eth_data);
+-	at91_add_device_usbh(&eco920_usbh_data);
++	at91_add_device_usbh_ohci(&eco920_usbh_data);
+ 	at91_add_device_udc(&eco920_udc_data);
+ 
+ 	at91_add_device_mmc(0, &eco920_mmc_data);
+diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
+index c8a62dc..096d5d2 100644
+--- a/arch/arm/mach-at91/board-flexibity.c
++++ b/arch/arm/mach-at91/board-flexibity.c
+@@ -140,7 +140,7 @@ static void __init flexibity_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&flexibity_usbh_data);
++	at91_add_device_usbh_ohci(&flexibity_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&flexibity_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
+index dfc7dfe..6688ec2 100644
+--- a/arch/arm/mach-at91/board-foxg20.c
++++ b/arch/arm/mach-at91/board-foxg20.c
+@@ -244,7 +244,7 @@ static void __init foxg20_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&foxg20_usbh_data);
++	at91_add_device_usbh_ohci(&foxg20_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&foxg20_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
+index bc28136..8b1d498 100644
+--- a/arch/arm/mach-at91/board-gsia18s.c
++++ b/arch/arm/mach-at91/board-gsia18s.c
+@@ -561,7 +561,7 @@ static int __init gsia18s_power_off_init(void)
+ static void __init gsia18s_board_init(void)
+ {
+ 	stamp9g20_board_init();
+-	at91_add_device_usbh(&usbh_data);
++	at91_add_device_usbh_ohci(&usbh_data);
+ 	at91_add_device_udc(&udc_data);
+ 	at91_add_device_eth(&macb_data);
+ 	gsia18s_leds_init();
+diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
+index d2e1f4e..a0cac24 100644
+--- a/arch/arm/mach-at91/board-kafa.c
++++ b/arch/arm/mach-at91/board-kafa.c
+@@ -83,7 +83,7 @@ static void __init kafa_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&kafa_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&kafa_usbh_data);
++	at91_add_device_usbh_ohci(&kafa_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&kafa_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
+index a13d206..59eafa2 100644
+--- a/arch/arm/mach-at91/board-kb9202.c
++++ b/arch/arm/mach-at91/board-kb9202.c
+@@ -121,7 +121,7 @@ static void __init kb9202_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&kb9202_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&kb9202_usbh_data);
++	at91_add_device_usbh_ohci(&kb9202_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&kb9202_udc_data);
+ 	/* MMC */
+diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
+index fe5f1d4..bffbbdf 100644
+--- a/arch/arm/mach-at91/board-neocore926.c
++++ b/arch/arm/mach-at91/board-neocore926.c
+@@ -351,7 +351,7 @@ static void __init neocore926_board_init(void)
+ 	at91_add_device_serial();
+ 
+ 	/* USB Host */
+-	at91_add_device_usbh(&neocore926_usbh_data);
++	at91_add_device_usbh_ohci(&neocore926_usbh_data);
+ 
+ 	/* USB Device */
+ 	at91_add_device_udc(&neocore926_udc_data);
+diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
+index feb6578..4c5848d 100644
+--- a/arch/arm/mach-at91/board-pcontrol-g20.c
++++ b/arch/arm/mach-at91/board-pcontrol-g20.c
+@@ -205,7 +205,7 @@ static struct spi_board_info pcontrol_g20_spi_devices[] = {
+ static void __init pcontrol_g20_board_init(void)
+ {
+ 	stamp9g20_board_init();
+-	at91_add_device_usbh(&usbh_data);
++	at91_add_device_usbh_ohci(&usbh_data);
+ 	at91_add_device_eth(&macb_data);
+ 	at91_add_device_i2c(pcontrol_g20_i2c_devices,
+ 		ARRAY_SIZE(pcontrol_g20_i2c_devices));
+diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
+index 55dad3a..419456d 100644
+--- a/arch/arm/mach-at91/board-picotux200.c
++++ b/arch/arm/mach-at91/board-picotux200.c
+@@ -111,7 +111,7 @@ static void __init picotux200_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&picotux200_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&picotux200_usbh_data);
++	at91_add_device_usbh_ohci(&picotux200_usbh_data);
+ 	/* I2C */
+ 	at91_add_device_i2c(NULL, 0);
+ 	/* MMC */
+diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
+index 69d15a8..255a984 100644
+--- a/arch/arm/mach-at91/board-qil-a9260.c
++++ b/arch/arm/mach-at91/board-qil-a9260.c
+@@ -244,7 +244,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
+index 4c1047c..3d54963 100644
+--- a/arch/arm/mach-at91/board-rm9200dk.c
++++ b/arch/arm/mach-at91/board-rm9200dk.c
+@@ -197,7 +197,7 @@ static void __init dk_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&dk_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&dk_usbh_data);
++	at91_add_device_usbh_ohci(&dk_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&dk_udc_data);
+ 	at91_set_multi_drive(dk_udc_data.pullup_pin, 1);	/* pullup_pin is connected to reset */
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index 9df1be8..25fe19f 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -167,7 +167,7 @@ static void __init ek_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&ek_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	at91_set_multi_drive(ek_udc_data.pullup_pin, 1);	/* pullup_pin is connected to reset */
+diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
+index 25a26be..589e2f4 100644
+--- a/arch/arm/mach-at91/board-sam9-l9260.c
++++ b/arch/arm/mach-at91/board-sam9-l9260.c
+@@ -195,7 +195,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+index de1816e..b98e766 100644
+--- a/arch/arm/mach-at91/board-sam9260ek.c
++++ b/arch/arm/mach-at91/board-sam9260ek.c
+@@ -332,7 +332,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 14acc90..e631172 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -586,7 +586,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* I2C */
+diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+index bfe490d..fae6ebf 100644
+--- a/arch/arm/mach-at91/board-sam9263ek.c
++++ b/arch/arm/mach-at91/board-sam9263ek.c
+@@ -423,7 +423,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index ca8198b..c25e44c 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -379,7 +379,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+index 17f7d9b..ca14290 100644
+--- a/arch/arm/mach-at91/board-snapper9260.c
++++ b/arch/arm/mach-at91/board-snapper9260.c
+@@ -169,7 +169,7 @@ static void __init snapper9260_board_init(void)
+ 	at91_add_device_i2c(snapper9260_i2c_devices,
+ 			    ARRAY_SIZE(snapper9260_i2c_devices));
+ 	at91_add_device_serial();
+-	at91_add_device_usbh(&snapper9260_usbh_data);
++	at91_add_device_usbh_ohci(&snapper9260_usbh_data);
+ 	at91_add_device_udc(&snapper9260_udc_data);
+ 	at91_add_device_eth(&snapper9260_macb_data);
+ 	at91_add_device_ssc(AT91SAM9260_ID_SSC, (ATMEL_SSC_TF | ATMEL_SSC_TK |
+diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+index f8902b1..1e7a73a 100644
+--- a/arch/arm/mach-at91/board-stamp9g20.c
++++ b/arch/arm/mach-at91/board-stamp9g20.c
+@@ -268,7 +268,7 @@ static void __init portuxg20_board_init(void)
+ {
+ 	stamp9g20_board_init();
+ 	/* USB Host */
+-	at91_add_device_usbh(&usbh_data);
++	at91_add_device_usbh_ohci(&usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&portuxg20_udc_data);
+ 	/* Ethernet */
+@@ -285,7 +285,7 @@ static void __init stamp9g20evb_board_init(void)
+ {
+ 	stamp9g20_board_init();
+ 	/* USB Host */
+-	at91_add_device_usbh(&usbh_data);
++	at91_add_device_usbh_ohci(&usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&stamp9g20evb_udc_data);
+ 	/* Ethernet */
+diff --git a/arch/arm/mach-at91/board-usb-a9260.c b/arch/arm/mach-at91/board-usb-a9260.c
+index 07784ba..9b5cbf5 100644
+--- a/arch/arm/mach-at91/board-usb-a9260.c
++++ b/arch/arm/mach-at91/board-usb-a9260.c
+@@ -208,7 +208,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* NAND */
+diff --git a/arch/arm/mach-at91/board-usb-a9263.c b/arch/arm/mach-at91/board-usb-a9263.c
+index b614508..535af00 100644
+--- a/arch/arm/mach-at91/board-usb-a9263.c
++++ b/arch/arm/mach-at91/board-usb-a9263.c
+@@ -222,7 +222,7 @@ static void __init ek_board_init(void)
+ 	/* Serial */
+ 	at91_add_device_serial();
+ 	/* USB Host */
+-	at91_add_device_usbh(&ek_usbh_data);
++	at91_add_device_usbh_ohci(&ek_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&ek_udc_data);
+ 	/* SPI */
+diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
+index e0f0080..bd5ebfd 100644
+--- a/arch/arm/mach-at91/board-yl-9200.c
++++ b/arch/arm/mach-at91/board-yl-9200.c
+@@ -567,7 +567,7 @@ static void __init yl9200_board_init(void)
+ 	/* Ethernet */
+ 	at91_add_device_eth(&yl9200_eth_data);
+ 	/* USB Host */
+-	at91_add_device_usbh(&yl9200_usbh_data);
++	at91_add_device_usbh_ohci(&yl9200_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&yl9200_udc_data);
+ 	/* I2C */
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 653e0a9..07fefc8 100644
+index 07fefc8..7d1f680 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -14,8 +14,11 @@
-  */
+@@ -15,8 +15,10 @@
  
  #include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
+ #include <linux/dma-mapping.h>
++#include <linux/interrupt.h>
  #include <linux/gpio.h>
  
-+#include <mach/board.h>
-+
- #include "devices.h"
++#include <mach/cpu.h>
+ #include <mach/board.h>
  
- static __initdata struct at91_device_table *devices;
-@@ -64,6 +67,64 @@ static inline void __init init_resource_irq(struct resource *res, int irq)
- 	}
+ #include "devices.h"
+@@ -68,6 +70,121 @@ static inline void __init init_resource_irq(struct resource *res, int irq)
  }
  
-+/* --------------------------------------------------------------------
-+ *  Ethernet
+ /* --------------------------------------------------------------------
++ *  USB Host
 + * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
-+static u64 eth_dmamask = DMA_BIT_MASK(32);
-+static struct at91_eth_data eth_data;
++#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
++static u64 ohci_dmamask = DMA_BIT_MASK(32);
++static struct at91_usbh_data usbh_data;
 +
-+static struct resource eth_resources[] = {
++static struct resource usbh_resources[] = {
 +	[0] = {
-+		.end	= SZ_16K,
++		.end	= SZ_1M,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
@@ -986,70 +1123,151 @@ index 653e0a9..07fefc8 100644
 +	},
 +};
 +
-+static struct platform_device at91_eth_device = {
-+	.name		= "macb",
++static struct platform_device at91_usbh_device = {
++	.name		= "at91_ohci",
 +	.id		= -1,
 +	.dev		= {
-+				.dma_mask		= &eth_dmamask,
++				.dma_mask		= &ohci_dmamask,
 +				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &eth_data,
++				.platform_data		= &usbh_data,
 +	},
-+	.resource	= eth_resources,
-+	.num_resources	= ARRAY_SIZE(eth_resources),
++	.resource	= usbh_resources,
++	.num_resources	= ARRAY_SIZE(usbh_resources),
 +};
 +
-+void __init at91_add_device_eth(struct at91_eth_data *data)
++void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
 +{
-+	struct at91_dev_table_ethernet *info = devices->ethernet;
++	struct at91_dev_table_usb_ohci *info = devices->usbh_ohci;
++	int i;
 +
 +	BUG_ON(!info);
-+	init_resource_mem(&eth_resources[0], info->mmio_base);
-+	init_resource_irq(&eth_resources[1], info->irq);
++	init_resource_mem(&usbh_resources[0], info->mmio_base);
++	init_resource_irq(&usbh_resources[1], info->irq);
 +
 +	if (!data)
 +		return;
 +
-+	if (data->phy_irq_pin) {
-+		at91_set_gpio_input(data->phy_irq_pin, 0);
-+		at91_set_deglitch(data->phy_irq_pin, 1);
++	if (info->device_init)
++		info->device_init();
++
++	/* Enable VBus control for UHP ports */
++	for (i = 0; i < data->ports; i++) {
++		if (data->vbus_pin[i])
++			at91_set_gpio_output(data->vbus_pin[i], 0);
 +	}
 +
-+	/* Pins used for MII and RMII */
-+	at91_config_pins(info->rmii_pins, info->nr_rmii_pins);
-+	if (!data->is_rmii && info->mii_pins)
-+		at91_config_pins(info->mii_pins, info->nr_mii_pins);
-+
-+	eth_data = *data;
-+	platform_device_register(&at91_eth_device);
++	usbh_data = *data;
++	platform_device_register(&at91_usbh_device);
 +}
 +#else
-+void __init at91_add_device_eth(struct at91_eth_data *data) {}
++void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data) {}
 +#endif
 +
- void __init at91_init_devices(struct at91_device_table *device_table)
- {
- 	devices = device_table;
++/* --------------------------------------------------------------------
++ *  USB Host HS (EHCI)
++ *  Needs an OHCI host for low and full speed management
++ * -------------------------------------------------------------------- */
++
++#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
++static u64 ehci_dmamask = DMA_BIT_MASK(32);
++static struct at91_usbh_data usbh_ehci_data;
++
++static struct resource usbh_ehci_resources[] = {
++	[0] = {
++		.end	= SZ_1M,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device at91_usbh_ehci_device = {
++	.name		= "atmel-ehci",
++	.id		= -1,
++	.dev		= {
++				.dma_mask		= &ehci_dmamask,
++				.coherent_dma_mask	= DMA_BIT_MASK(32),
++				.platform_data		= &usbh_ehci_data,
++	},
++	.resource	= usbh_ehci_resources,
++	.num_resources	= ARRAY_SIZE(usbh_ehci_resources),
++};
++
++void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data)
++{
++	struct at91_dev_table_basic_device *info = devices->usb_ehci;
++	int i;
++
++	BUG_ON(!info);
++	init_resource_mem(&usb_ehci_resources[0], info->mmio_base);
++	init_resource_irq(&usb_ehci_resources[1], info->irq);
++
++	if (!data)
++		return;
++
++	/* Enable VBus control for UHP ports */
++	for (i = 0; i < data->ports; i++) {
++		if (data->vbus_pin[i])
++			at91_set_gpio_output(data->vbus_pin[i], 0);
++	}
++
++	usbh_ehci_data = *data;
++	at91_clock_associate("uhphs_clk", &at91_usbh_ehci_device.dev, "ehci_clk");
++	platform_device_register(&at91_usbh_ehci_device);
++}
++#else
++void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data) {}
++#endif
++
++/* --------------------------------------------------------------------
+  *  Ethernet
+  * -------------------------------------------------------------------- */
+ 
 diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index 738f736..7bed3e7 100644
+index 7bed3e7..eb4de05 100644
 --- a/arch/arm/mach-at91/devices.h
 +++ b/arch/arm/mach-at91/devices.h
-@@ -28,7 +28,17 @@ struct at91_pin_config {
+@@ -28,6 +28,11 @@ struct at91_pin_config {
  	int value;
  };
  
-+struct at91_dev_table_ethernet {
++struct at91_dev_table_basic_device {
 +	unsigned 		mmio_base;
 +	int 			irq;
-+	struct at91_pin_config	*rmii_pins;
-+	int 			nr_rmii_pins;
-+	struct at91_pin_config	*mii_pins;
-+	int 			nr_mii_pins;
++};
++
+ struct at91_dev_table_ethernet {
+ 	unsigned 		mmio_base;
+ 	int 			irq;
+@@ -37,8 +42,16 @@ struct at91_dev_table_ethernet {
+ 	int 			nr_mii_pins;
+ };
+ 
++struct at91_dev_table_usb_ohci {
++	unsigned 		mmio_base;
++	int 			irq;
++	void			(*device_init)(void);
 +};
 +
  struct at91_device_table {
-+	struct at91_dev_table_ethernet		*ethernet;
+ 	struct at91_dev_table_ethernet		*ethernet;
++	struct at91_dev_table_usb_ohci		*usbh_ohci;
++	struct at91_dev_table_basic_device	*usbh_ehci;
  };
  
  extern void __init at91_init_devices(struct at91_device_table *device_table);
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 2b499eb..dd0855d 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -99,7 +99,6 @@ struct at91_usbh_data {
+ 	u8		ports;		/* number of ports on root hub */
+ 	u8		vbus_pin[2];	/* port power-control pin */
+ };
+-extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
+ extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+ extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
+ 
 -- 
 1.7.0.4
