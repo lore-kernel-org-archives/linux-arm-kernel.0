@@ -1,63 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Apr 2011 10:42:34 +0200
-Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries for
-	some global variables
-In-Reply-To: <1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20110420084234.GV31131@pengutronix.de>
+From: Artem.Bityutskiy@nokia.com (Artem Bityutskiy)
+Date: Wed, 20 Apr 2011 12:00:11 +0300
+Subject: [PATCH v3] ARM: omap2: mtd split nand_scan in ident and tail
+In-Reply-To: <1303222534-10143-1-git-send-email-j.weitzel@phytec.de>
+References: <BANLkTimxgyStkfYXyHJUzQBKTR0pYsF7Qw@mail.gmail.com>
+	<1303222534-10143-1-git-send-email-j.weitzel@phytec.de>
+Message-ID: <1303290011.2700.12.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 12:15:04AM -0400, Nicolas Pitre wrote:
-> Many architecture specific versions of uncompress.h make use of global
-> variables marked static.  In such case the GOT is bypassed and the
-> code in head.S can't relocate them.
+On Tue, 2011-04-19 at 16:15 +0200, Jan Weitzel wrote:
+> nand_scan calls nand_scan_tail and here we got a ecc.layout and calculate
+> oobavail for this layout. After calling nand_scan, we change the layout pointer
+> if OMAP_ECC_HAMMING_CODE_HW_ROMCODE is set. This results in not calcluated
+> oobavail. Mountig as jffs2 is not possible.
 > 
-> Instead of removing the static keyword from all those files and hope that
-> it won't come back, let's simply
-> define it out.
+> To fix that nand_scan has to split up in nand_scan_ident and nand_scan_tail
+> setting ecc.layout between these calls. So nand_scan_tail calculates oobvail
+> for the used layout. This is also done in serveral other platforms.
 > 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
-> 
-> This should fix remaining issues some people have with the DT append patch.
-> 
->  arch/arm/boot/compressed/misc.c |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-> index a565853..0125dae 100644
-> --- a/arch/arm/boot/compressed/misc.c
-> +++ b/arch/arm/boot/compressed/misc.c
-> @@ -30,7 +30,20 @@ unsigned int __machine_arch_type;
->  static void putstr(const char *ptr);
->  extern void error(char *x);
->  
-> +/*
-> + * Many instances of mach/uncompress.h are including global variables.
-> + * Contrary to standard usage, we should _not_ mark those variables
-> + * static otherwise they get accessed via GOTOFF references which cannot
-> + * be modified at run time.  The entry code in head.S relies on the ability
-> + * to move writable sections around, and for that to work, we must have all
-> + * references going through the GOT which works only with non static
-> + * variables.  So, instead of asking for a non intuitive requirement
-> + * making many files non standard according to accepted coding practices
-> + * we fix the issue here by simply defining the static keyword to nothing.
-> + */
-> +#define static /* non-static */
->  #include <mach/uncompress.h>
-> +#undef static
-This has a strange side effect, i.e. 
+> Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
+> Reviewed-by: Vimal Singh <vimal.newwork@gmail.com>
 
-	static something *ptr;
+Jan,
 
-isn't initialised to NULL anymore IIRC. So the maintainers of
-the various mach/uncompress.h still need to be aware of the issue.
-
-Best regards
-Uwe
+thanks for the patch, pushed to l2-mtd-2.6.git. And apologies that I
+missed.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best Regards,
+Artem Bityutskiy (????? ????????)
