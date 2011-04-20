@@ -1,53 +1,88 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Apr 2011 10:34:04 +0200 (CEST)
-Subject: [PATCH 04/10] clk: implement parent pass through functions
-In-Reply-To: <20110420071641.GR31131@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
-	<4DADC45C.1020202@codeaurora.org>
-	<20110419175318.GB15233@pengutronix.de>
-	<20110419190910.GQ31131@pengutronix.de>
-	<alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<20110420071641.GR31131@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1104201009181.2744@localhost6.localdomain6>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 20 Apr 2011 10:34:25 +0200
+Subject: Lockdep question.
+In-Reply-To: <BANLkTi=PF6zx0yc1UOUDEgAyN2XV8+eG=A@mail.gmail.com>
+References: <BANLkTi=PF6zx0yc1UOUDEgAyN2XV8+eG=A@mail.gmail.com>
+Message-ID: <1303288465.8345.46.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+On Wed, 2011-04-20 at 03:15 -0500, Andrei Warkentin wrote:
+> Hi Peter, Hi Ingo, (and LAKML)
+> 
+> I was playing around with a 2.6.36 kernel on an ARM board, and decided
+> to turn on lockdep.
 
-> On Tue, Apr 19, 2011 at 11:54:21PM +0200, Thomas Gleixner wrote:
-> > On Tue, 19 Apr 2011, Uwe Kleine-K?nig wrote:
-> > > > +1 for letting the core enable/disable and prepare/unprepare the parent
-> > > > clocks. I scanned the different arm clock implementations and they all
-> > > > do it, except the ones which do not implement parents at all.
-> > > Then the question is if all do handle parents in the same way. (i.e.
-> > > in enable do parent first, in disable do child first?)
-> > 
-> > That's not a question at all. Anything which does it the other way
-> > round is broken. Period.
-> I havn't checked, but I remember Jeremy not wanting to handle parents in
-> the generic part because he saw some differences.
+Well, that's a truly ancient kernel you got there ;-)
 
-It does not matter whether you checked or not. And it does not matter
-whether Jeremy found code which does it the other way round.
+> Am I interpreting this correctly?
+> 
+> The global interrupt controller code arch/arm/common/gic.c, uses spin_lock and
+> spin_unlock (not spin_lock_irqsave and spin_unlock_irqrestore). I
+> suppose this is because the interrupts are guaranteed to be off anyway
+> - either
 
-The only safe way is parent first on enable and child first on
-disable. That's a matter of hardware and not a question of random Joe
-hacker got it wrong and it happens to work.
+1)
 
-Sure it works on a simple divider which is connected to the parent
-clock, but think "child is a PLL".
+> because the routines are used on an actual interrupt, where the GIC
+> ensures no more interrupts would be delivered, or
 
-So having a strict ordering enforced is the only sane way, unless you
-can prove that a particular piece of hardware requires it the other
-way round. And I doubt that you can find one.
+2)
 
-So the framework should be coded for the sane case in the first
-place. If the unlikely case of reverse ordering surfaces one day, then
-it's not rocket science to deal with that with a flag in struct clk
-which tells clk_enable/disable or prepare/unprepare to do it the other
-way round.
+> because of an actual spin_lock_irqsave
+> done in kernel/irq/manage.c:disable_irq_nosync:disable_irq_nosync().
+> 
+> Is this failure because lockdep thinks the GIC irq_controller_lock
+> could be taken in both interrupt and non-interrupt context (since it
+> isn't aware of the guarantee enforced by the GIC interrupt path)?
 
-Thanks,
+What its saying is that it was used from within IRQ context through that
+GIC interrupt path (so that works) but also used outside of IRQ context
+with IRQs enabled, invalidating your claim 2 above, see the backtrace:
 
-	tglx
+> 
+> =================================
+> [ INFO: inconsistent lock state ]
+> 2.6.36.3-g0a066c9-dirty #17
+> ---------------------------------
+> inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
+> swapper/1 [HC0[0]:SC0[0]:HE1:SE1] takes:
+>  (irq_controller_lock){?.....}, at: [<c019f2f4>] gic_mask_irq+0x1c/0x78
+> {IN-HARDIRQ-W} state was registered at:
+>   [<c01fe1d8>] __lock_acquire+0x6ec/0x9ec
+>   [<c01fe538>] lock_acquire+0x60/0x74
+>   [<c0576c4c>] _raw_spin_lock+0x50/0x88
+>   [<c019f2f4>] gic_mask_irq+0x1c/0x78
+>   [<c01a1a50>] tegra_mask+0xc/0x18
+>   [<c0215618>] handle_level_irq+0x40/0x144
+>   [<c019408c>] asm_do_IRQ+0x8c/0xcc
+>   [<c0194bf0>] __irq_svc+0x50/0xec
+>   [<c01d037c>] vprintk+0x41c/0x4a8
+>   [<c0573748>] printk+0x1c/0x28
+>   [<c0012d50>] lockdep_info+0x24/0xa4
+>   [<c0008c20>] start_kernel+0x208/0x308
+>   [<00008080>] 0x8080
+> irq event stamp: 196724
+> hardirqs last  enabled at (196724): [<c0577908>] _raw_spin_unlock_irqrestore+0x3c/0x6c
+> hardirqs last disabled at (196723): [<c0576dcc>] _raw_spin_lock_irqsave+0x1c/0x9c
+> softirqs last  enabled at (195681): [<c01d55b0>] irq_exit+0x58/0xbc
+> softirqs last disabled at (195668): [<c01d55b0>] irq_exit+0x58/0xbc
+> 
+> other info that might help us debug this:
+> no locks held by swapper/1.
+> 
+> stack backtrace:
+> [<c019a79c>] (unwind_backtrace+0x0/0xf0) from [<c01fab8c>] (mark_lock+0x5a4/0x7d8)
+> [<c01fab8c>] (mark_lock+0x5a4/0x7d8) from [<c01fe264>] (__lock_acquire+0x778/0x9ec)
+> [<c01fe264>] (__lock_acquire+0x778/0x9ec) from [<c01fe538>] (lock_acquire+0x60/0x74)
+> [<c01fe538>] (lock_acquire+0x60/0x74) from [<c0576c4c>] (_raw_spin_lock+0x50/0x88)
+> [<c0576c4c>] (_raw_spin_lock+0x50/0x88) from [<c019f2f4>] (gic_mask_irq+0x1c/0x78)
+> [<c019f2f4>] (gic_mask_irq+0x1c/0x78) from [<c01a1a50>] (tegra_mask+0xc/0x18)
+> [<c01a1a50>] (tegra_mask+0xc/0x18) from [<c000ebd4>] (tegra_cpuidle_init+0xac/0x300)
+> [<c000ebd4>] (tegra_cpuidle_init+0xac/0x300) from [<c01945c4>] (do_one_initcall+0xd0/0x1a8)
+> [<c01945c4>] (do_one_initcall+0xd0/0x1a8) from [<c0008708>] (kernel_init+0x14c/0x210)
+> [<c0008708>] (kernel_init+0x14c/0x210) from [<c0195c88>] (kernel_thread_exit+0x0/0x8)
+
+Now, no 2.6.36 tree near me includes tegra_cpuidle_init, so I bet you've
+got funky patches on top. Anyway see if that code path also includes the
+whole irqsave desc->lock stuff.
