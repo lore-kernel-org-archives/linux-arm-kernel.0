@@ -1,25 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 20 Apr 2011 19:16:24 +0800
-Subject: [PATCH 0/3] fix some issues with the kernel decompressor
-In-Reply-To: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20110420111623.GD1965@S2100-06.ap.freescale.net>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 20 Apr 2011 13:32:18 +0200
+Subject: [PATCH v2 08/12] mmc: add handling for two parallel block
+	requests in issue_rw_rq
+In-Reply-To: <1302116833-24540-9-git-send-email-per.forlin@linaro.org>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302116833-24540-9-git-send-email-per.forlin@linaro.org>
+Message-ID: <BANLkTikf_yJiXnprkAC2s=q1Oyqs0cGWZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 12:15:01AM -0400, Nicolas Pitre wrote:
-> Here some patches to fix some issues with the zImage code.  The LZMA
-> decompressor now works for me, and the DT append patch should work
-> on all platforms now too.
-> 
-> [PATCH 1/3] ARM: zImage: no need to get the decompressed size from the filesystem
-> [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
-> [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries for some global variables
-> 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+On 6 April 2011 21:07, Per Forlin <per.forlin@linaro.org> wrote:
+> Change mmc_blk_issue_rw_rq() to become asynchronous.
+> The execution flow looks like this:
+> The mmc-queue calls issue_rw_rq(), which sends the request
+> to the host and returns back to the mmc-queue. The mmc-queue calls
+> isuue_rw_rq() again with a new request. This new request is prepared,
+> in isuue_rw_rq(), then it waits for the active request to complete before
+> pushing it to the host. When to mmc-queue is empty it will call
+> isuue_rw_rq() with req=NULL to finish off the active request
+> without starting a new request.
+>
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> ---
+> ?drivers/mmc/card/block.c | ?157 +++++++++++++++++++++++++++++++++++++++-------
+> ?drivers/mmc/card/queue.c | ? ?2 +-
+> ?2 files changed, 134 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
+> index eef3510..2b14d1c 100644
+> --- a/drivers/mmc/card/queue.c
+> +++ b/drivers/mmc/card/queue.c
+> @@ -59,6 +59,7 @@ static int mmc_queue_thread(void *d)
+> ? ? ? ? ? ? ? ?mq->mqrq_cur->req = req;
+> ? ? ? ? ? ? ? ?spin_unlock_irq(q->queue_lock);
+>
+Call set_current_state(TASK_RUNNING) before issue_fn() otherwise
+issue_fn will execute as TASK_INTERRUPTIBLE.
+Will be added in the version 3 of this patchset.
 
-On mx51 babbage, tested both LZMA decompressor and DTB append patch.
-
--- 
-Regards,
-Shawn
+> +               mq->issue_fn(mq, req);
+> ? ? ? ? ? ? ? ?if (!req) {
+> ? ? ? ? ? ? ? ? ? ? ? ?if (kthread_should_stop()) {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?set_current_state(TASK_RUNNING);
+> @@ -71,7 +72,6 @@ static int mmc_queue_thread(void *d)
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?set_current_state(TASK_RUNNING);
+>
+> - ? ? ? ? ? ? ? mq->issue_fn(mq, req);
+> ? ? ? ?} while (1);
+> ? ? ? ?up(&mq->thread_sem);
+>
+> --
+> 1.7.4.1
+>
+>
