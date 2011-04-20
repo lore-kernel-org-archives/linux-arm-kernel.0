@@ -1,31 +1,37 @@
-From: Artem.Bityutskiy@nokia.com (Artem Bityutskiy)
-Date: Wed, 20 Apr 2011 12:00:11 +0300
-Subject: [PATCH v3] ARM: omap2: mtd split nand_scan in ident and tail
-In-Reply-To: <1303222534-10143-1-git-send-email-j.weitzel@phytec.de>
-References: <BANLkTimxgyStkfYXyHJUzQBKTR0pYsF7Qw@mail.gmail.com>
-	<1303222534-10143-1-git-send-email-j.weitzel@phytec.de>
-Message-ID: <1303290011.2700.12.camel@localhost>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Wed, 20 Apr 2011 11:09:56 +0200
+Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead of
+	void as it can fail
+In-Reply-To: <20110419235812.GA4619@kroah.com>
+References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
+	<1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110419235812.GA4619@kroah.com>
+Message-ID: <BANLkTi=q8jfEaLByZVZPHHYp_5PTK-36cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-04-19 at 16:15 +0200, Jan Weitzel wrote:
-> nand_scan calls nand_scan_tail and here we got a ecc.layout and calculate
-> oobavail for this layout. After calling nand_scan, we change the layout pointer
-> if OMAP_ECC_HAMMING_CODE_HW_ROMCODE is set. This results in not calcluated
-> oobavail. Mountig as jffs2 is not possible.
-> 
-> To fix that nand_scan has to split up in nand_scan_ident and nand_scan_tail
-> setting ecc.layout between these calls. So nand_scan_tail calculates oobvail
-> for the used layout. This is also done in serveral other platforms.
-> 
-> Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
-> Reviewed-by: Vimal Singh <vimal.newwork@gmail.com>
+2011/4/20 Greg KH <greg@kroah.com>:
+> On Mon, Apr 11, 2011 at 08:42:58PM +0200, Uwe Kleine-K?nig wrote:
+>> Before commit
+>>
+>> ? ? ? b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
+>>
+>> calling dev_set_drvdata with dev=NULL was an unchecked error. After some
+>> discussion about what to return in this case removing the check (and so
+>> producing a null pointer exception) seems fine.
+> I'm confused by this thread, care to resend all of these in a series
+> against the latest linux-next tree?
 
-Jan,
+I'd argue that dev_set_drvdata() should never fail. All current
+drivers depend on this, and if dev_set_drvdata() fails, user will get
+an OOPS a short while after the device finishes initializing (or maybe
+even before that if callbacks are involved).
+Allowing dev_set_drvdata() to fail will need putting a lot of
+boilerplate code into drivers for no real gain.
 
-thanks for the patch, pushed to l2-mtd-2.6.git. And apologies that I
-missed.
+Please consider reverting commit
+b4028437876866aba4747a655ede00f892089e14 instead of "fixing" issues it
+generates.
 
--- 
 Best Regards,
-Artem Bityutskiy (????? ????????)
+Micha? Miros?aw
