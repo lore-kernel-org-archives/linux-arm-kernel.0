@@ -1,48 +1,103 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 20 Apr 2011 15:55:16 +0100
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTi=M3FxU6vv_aq1rLTmXQCGps=hC=w@mail.gmail.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-	<20110418091902.13345132@lxorguk.ukuu.org.uk>
-	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
-	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
-	<20110419093855.36910400@lxorguk.ukuu.org.uk>
-	<D3BCC8A3-7570-49F2-838C-A2B1899B0519@niasdigital.com>
-	<BANLkTi=M3FxU6vv_aq1rLTmXQCGps=hC=w@mail.gmail.com>
-Message-ID: <20110420155516.57d8d850@lxorguk.ukuu.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 20 Apr 2011 16:55:09 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201104191629.49676.arnd@arndb.de>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104191449.50824.arnd@arndb.de>
+	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
+	<201104191629.49676.arnd@arndb.de>
+Message-ID: <007301cbff6a$f17a4710$d46ed530$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011 14:38:01 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+Hello,
 
-> 2011/4/20 Ben Nizette <bn@niasdigital.com>:
-> > On 19/04/2011, at 6:38 PM, Alan Cox wrote:
-> >> Leaving aside the current input/output and on/off bits I would go for
-> >> being able to do
-> >>
-> >> ? ? ? gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
-> >> ? ? ? gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
+On Tuesday, April 19, 2011 4:30 PM Arnd Bergmann wrote:
+
+> > > That is a limitation of the current implementation. We might want to
+> > > change that anyway, e.g. to handle the mali IOMMU along with yours.
+> > > I believe the reason for allowing only one IOMMU type so far has been
+> > > that nobody required more than one. As I mentioned, the IOMMU API is
+> > > rather new and has not been ported to much variety of hardware, unlike
+> > > the dma-mapping API, which does support multiple different IOMMUs
+> > > in a single system.
 > >
-> > Yeah I'm all for that so long as the capability constants are defined by the gpio
-> > provider, eg <linux/gpio/mygpioexpander.h>. ?There's no way gpiolib should be
-> > keeping a big ole list of every possible config option for every gpio provider.
+> > Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
+> > dma-mapping API is something much more complex that creates the actual
+> > mapping for various sets of the devices. IMHO the right direction will
+> > be to create dma-mapping implementation that will be just a client of
+> > the IOMMU API. What's your opinion?
 > 
-> OK I buy that. I will refactor this solution to some opaque call instead
-> and start from there.
+> Sounds good. I think we should put it into a new drivers/iommu, along
+> with your specific iommu implementation, and then we can convert the
+> existing ones over to use that.
+
+I see, this sounds quite reasonable. I think I finally got how this should
+be implemented. 
+
+The only question is how a device can allocate a buffer that will be most
+convenient for IOMMU mapping (i.e. will require least entries to map)?
+
+IOMMU can create a contiguous mapping for ANY set of pages, but it performs
+much better if the pages are grouped into 64KiB or 1MiB areas.
+
+Can device allocate a buffer without mapping it into kernel space?
+
+The problem that still left to be resolved is the fact the
+dma_coherent_alloc() should also be able to use IOMMU. This would however
+trigger the problem of double mappings with different cache attributes: 
+dma api might require to create coherent (==non-cached mappings), while 
+all low-memory is still mapped with (super)sections as cached, what is 
+against ARM CPU specification and might cause unpredicted behavior
+especially on CPUs that do speculative prefetch. Right now this problem
+has been ignored in dma-mappings implementation, but there have been some
+patches posted to resolve this by reserving some area exclusively for dma
+coherent mappings: 
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/100822/focus=100913
+
+Right now I would like to postpone resolving this issue because the Samsung
+iommu task already became really big.
+
+> Note that this also requires using dma-mapping-common.h, which we currently
+> don't on ARM.
+
+Yes, I noticed this, shouldn't be much problem, imho.
+
+> > > The domain really reflects the user, not the device here, which makes
+> more
+> > > sense if you think of virtual machines than of multimedia devices.
+> > >
+> > > I would suggest that you just use a single iommu_domain globally for
+> > > all in-kernel users.
+> >
+> > There are cases where having a separate mapping for each device makes
+> sense.
+> > It definitely increases the security and helps to find some bugs in
+> > the drivers.
+> >
+> > Getting back to our video codec - it has 2 IOMMU controllers. The codec
+> > hardware is able to address only 256MiB of space. Do you have an idea how
+> > this can be handled with dma-mapping API? The only idea that comes to my
+> > mind is to provide a second, fake 'struct device' and use it for
+> allocations
+> > for the second IOMMU controller.
 > 
-> >?Well, maybe gpiolib can know about the options (eg GPIO_BIAS) so long
-> > as it doesn't have to enumerate every possible value.
+> Good question.
 > 
-> I will drop that even, one parameter is better than two if one of them
-> is custom nevertheless. What difference does it make..
+> How do you even decide which controller to use from the driver?
+> I would need to understand better what you are trying to do to
+> give a good recommendation.
 
-One parameter means its completely useless and we'll have to go change
-the API.
+Both controllers are used by the hardware depending on the buffer type.
+For example, buffers with chroma video data are accessed by first (called
+'left') memory channel, the others (with luma video data) - by the second
+channel (called 'right'). Each memory channel is limited to 256MiB address
+space and best performance is achieved when buffers are allocated in 
+separate physical memory banks (the boards usually have 2 or more memory banks,
+memory is not interleaved).
 
-Without the 'operation' being a parameter of its own no driver knows how
-to answer the question 'is this shared operation A'
-
-Alan
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
