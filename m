@@ -1,61 +1,44 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Wed, 20 Apr 2011 19:23:17 +0530
-Subject: [PATCH v18 08/13] davinci: eliminate use of IO_ADDRESS() on sysmod
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C75E97E@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF72C@dbde02.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 20 Apr 2011 22:01:21 +0800
+Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
+In-Reply-To: <BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
+	<20110417164830.GE17935@S2100-06.ap.freescale.net>
+	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
+Message-ID: <20110420140120.GF1965@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2011 at 16:28:33, Nori, Sekhar wrote:
-> Hi Manju,
+On Wed, Apr 20, 2011 at 10:01:22AM +0200, Per Forlin wrote:
+> On 17 April 2011 18:48, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Mon, Apr 18, 2011 at 12:33:30AM +0800, Shawn Guo wrote:
+> >> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
+> >> If not calling pre_req() before mxs_mmc_request(), request()
+> >> will prepare the cache just like it did it before.
+> >> It is optional to use pre_req() and post_req().
+> >>
+> >> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> >> ---
+> >> ?drivers/mmc/host/mxs-mmc.c | ? 75 ++++++++++++++++++++++++++++++++++++++++++--
+> >> ?1 files changed, 72 insertions(+), 3 deletions(-)
+> >>
+> >
+> > Here is the result of mmc_test case 37 ~ 40, which are designed to see
+> > the performance improvement introduced by non-blocking changes.
+> >
+> > Honestly, the improvement is not so impressive. ?Not sure if the patch
+> > for mxs-mmc pre_req and post_req support was correctly produced. ?So
+> > please help review ...
+> My guess is that dma_unmap is not run in parallel with transfer.
+> Please look at my patch reply.
 > 
-> On Sat, Apr 02, 2011 at 15:13:17, Hadli, Manjunath wrote:
-> > Current devices.c file has a number of instances where
-> > IO_ADDRESS() is used for system module register access. Eliminate this 
-> > in favor of a ioremap() based access.
-> > 
-> > Consequent to this, a new global pointer davinci_sysmodbase has been 
-> > introduced which gets initialized during the initialization of each 
-> > relevant SoC
-> > 
-> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> > Acked-by: Sekhar Nori <nsekhar@ti.com>
-> > ---
-> 
-> > diff --git a/arch/arm/mach-davinci/include/mach/hardware.h 
-> > b/arch/arm/mach-davinci/include/mach/hardware.h
-> > index 414e0b9..2a6b560 100644
-> > --- a/arch/arm/mach-davinci/include/mach/hardware.h
-> > +++ b/arch/arm/mach-davinci/include/mach/hardware.h
-> > @@ -21,6 +21,12 @@
-> >   */
-> >  #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
-> >  
-> > +#ifndef __ASSEMBLER__
-> > +extern void __iomem *davinci_sysmodbase;
-> > +#define DAVINCI_SYSMODULE_VIRT(x)	(davinci_sysmodbase + (x))
-> > +void davinci_map_sysmod(void);
-> > +#endif
-> 
-> Russell has posted[1] that the hardware.h file should not be polluted with platform private stuff like this.
-> 
-> Your patch 7/13 actually helped towards that goal, but this one takes us back. This patch cannot be used in the current form.
-> 
-> Currently there are separate header files for dm644x, dm355, dm646x and dm365. I would like to start by removing unnecessary code from these files and trying to consolidate them into a single file.
-Done. I have consolidated all the headers for DM6446, Dm6467, DM365 and DM355 into a single header as per your suggestion.
-> 
-> Example, the EMAC base address definitions in dm365.h should be moved into dm365.c. Similarly, there is a lot of VPIF specific stuff in dm646x.h which is not really specific to dm646x.h and so should probably be moved to include/media/ or arch/arm/mach-davinci/include/mach/vpif.h
-Done.
-> 
-> Once consolidated into a single file, davinci_sysmodbase can be moved into that file.
-Done.
-> 
-> Also, Russell has said[2] that at least for this merge window only consolidation and bug fixes will go through his tree. This means that as far as mach-davinci is concerned, the clean-up part of this series can go to 2.6.40 - but not the stuff which adds new support.
-> 
-> Thanks,
-> Sekhar
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg120410.html
-> [2] http://www.spinics.net/lists/arm-kernel/msg120606.html
-> 
-> 
+Got it fixed in v2 posted just now.  Please take another look.
+Unfortunately, I do not see noticeable difference than v1 in terms
+of mmc_test result.
+
+Do you have omap_hsmmc and mmci mmc_test result data to share?
+
+-- 
+Regards,
+Shawn
