@@ -1,41 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Apr 2011 13:19:13 -0400 (EDT)
-Subject: [PATCH 0/3] fix some issues with the kernel decompressor
-In-Reply-To: <20110420165514.GE10402@atomide.com>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-Message-ID: <alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+From: gregkh@suse.de (Greg KH)
+Date: Wed, 20 Apr 2011 09:15:13 -0700
+Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead
+	of void as it can fail
+In-Reply-To: <BANLkTi=q8jfEaLByZVZPHHYp_5PTK-36cw@mail.gmail.com>
+References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
+	<1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110419235812.GA4619@kroah.com>
+	<BANLkTi=q8jfEaLByZVZPHHYp_5PTK-36cw@mail.gmail.com>
+Message-ID: <20110420161513.GA25396@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Tony Lindgren wrote:
-
-> * Nicolas Pitre <nicolas.pitre@linaro.org> [110420 05:57]:
-> > On Wed, 20 Apr 2011, Tony Lindgren wrote:
-> > 
-> > > * Nicolas Pitre <nicolas.pitre@linaro.org> [110419 21:12]:
-> > > > Here some patches to fix some issues with the zImage code.  The LZMA
-> > > > decompressor now works for me, and the DT append patch should work
-> > > > on all platforms now too.
-> > > 
-> > > Weird still no luck here booting n900 zImage.. LZMA image prints
-> > > corrupt error, and only works if the image is relocated further
-> > > by 1MB or so. With the following hack n900 boots, so some size
-> > > calculations still are wrong. No luck with DT append patch either.
-> > > 
-> > > Any ideas why the following helps on n900?
-> > 
-> > No idea.  This could indicate that the lzma code is crapping into memory 
-> > outside of its output buffer.  The fact that my patch #2/3 makes lzma 
-> > decompression suddenly work for me with no apparent explanation is not 
-> > reassuring either.
+On Wed, Apr 20, 2011 at 11:09:56AM +0200, Micha? Miros?aw wrote:
+> 2011/4/20 Greg KH <greg@kroah.com>:
+> > On Mon, Apr 11, 2011 at 08:42:58PM +0200, Uwe Kleine-K?nig wrote:
+> >> Before commit
+> >>
+> >> ? ? ? b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
+> >>
+> >> calling dev_set_drvdata with dev=NULL was an unchecked error. After some
+> >> discussion about what to return in this case removing the check (and so
+> >> producing a null pointer exception) seems fine.
+> > I'm confused by this thread, care to resend all of these in a series
+> > against the latest linux-next tree?
 > 
-> With gzip kernel looks like I need to move the kernel further by 8MB
-> instead of 1MB for some reason..
+> I'd argue that dev_set_drvdata() should never fail. All current
+> drivers depend on this, and if dev_set_drvdata() fails, user will get
+> an OOPS a short while after the device finishes initializing (or maybe
+> even before that if callbacks are involved).
+> Allowing dev_set_drvdata() to fail will need putting a lot of
+> boilerplate code into drivers for no real gain.
+> 
+> Please consider reverting commit
+> b4028437876866aba4747a655ede00f892089e14 instead of "fixing" issues it
+> generates.
 
-What kernel config are you using?
+That patch was from 2009, surely if there were real issues with that
+change, it would have shown up in the past 2 years, right?
 
+And no, I don't want to revert that, we need that for future work in
+this area.
 
-Nicolas
+I have no problem migrating the error code for that function on down,
+very few drivers call this function directly, it should be wrapped by
+bus-specific functions instead, right?  They can handle the error
+handling on their own and not force the individual drivers to handle it
+if needed.
+
+Have you ever seen this function fail?
+
+thanks,
+
+greg k-h
