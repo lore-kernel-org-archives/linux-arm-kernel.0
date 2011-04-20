@@ -1,14 +1,15 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 20 Apr 2011 13:10:08 +1200
-Subject: [PATCH 05/23] at91: Make MMC device (at91_mci) common
+Date: Wed, 20 Apr 2011 13:10:09 +1200
+Subject: [RFC PATCH 05/23] at91: Make MMC device common
 In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
 References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303261827-27730-6-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303261827-27730-7-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Replace the individual MMC code for each at91 variant with a single
-implementation in devices.c
+implementation in devices.c. Both the AT91 MMC and Atmel MCI drivers
+are converted here to use the common data in both instances.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
