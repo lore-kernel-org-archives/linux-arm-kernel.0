@@ -1,59 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2011 18:29:40 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <20110419120344.GG22799@n2100.arm.linux.org.uk>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-	<20110419120344.GG22799@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Apr 2011 18:41:04 +0200 (CEST)
+Subject: [PATCH 0/2] Common struct clk implementation, v14
+In-Reply-To: <20110420142816.GZ31131@pengutronix.de>
+References: <1299134429.100626.661279191478.0.gpush@pororo>
+	<1302754859.2767.30.camel@pororo>
+	<20110414100048.GB1611@n2100.arm.linux.org.uk>
+	<1302776705.28876.113.camel@pasglop>
+	<20110414103200.GF1611@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104140751220.24613@xanadu.home>
+	<20110414120904.GH1611@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104140920110.24613@xanadu.home>
+	<20110414153813.GC6259@n2100.arm.linux.org.uk>
+	<20110418105442.GB27864@linux-sh.org>
+	<20110420142816.GZ31131@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1104201830500.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 2:03 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 19, 2011 at 02:00:17PM +0200, Linus Walleij wrote:
->>
->> On a high-speeded ux500 the DATAEND IRQ will assert before the
->> DMA data is actually finished, thus if we start hammering in the next
->> request we break an ongoing transfer. :-(
->
-> Yes, you've already said that in the past. ?And this is partly why we
-> have this code in the dma unmap:
->
-> ? ? ? ?/* Wait up to 1ms for the DMA to complete */
-> ? ? ? ?for (i = 0; ; i++) {
-> ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
-> ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?udelay(10);
-> ? ? ? ?}
->
-> So, we wait until the DMA has drained the FIFO before we fire off the
-> next request - or even unmap the DMA buffer. ?Should the DMA fail to
-> drain the FIFO in a reasonable time, we timeout and disable DMA.
->
-> Again, I ask, why is this not sufficient to cover the case where the
-> data end IRQ occurs before the DMA engine has completed the transfer -
-> which is likely to take a very short time indeed.
+On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+> I declare this to be stable, so assuming people are OK with it, you can
+> use that as a base to convert your platforms.
 
-It doesn't help, we have really tested this and at high speed transfers
-(especially if we use Per Fridens speed-up patches) apparently
-the flag RXDATAAVLBL goes to zero before the block is really
-finished.
+You declare that stable? Interesting.
+ 
+> There is a 2nd branch on that repository that also contains my RFC patch
+> just sent to this list in case you want to test it.
 
-My rough guess (after looking at the VHDL code) is that
-RXDATAVLBL flag goes low when the FIFO is empty, but that
-doesn't mean that the DMA handshake logic is out of its send/recieve
-state and thus we screw it up if we hammer in another transfer before
-it has had time to deassert the single/burst request signals and go to
-idle state. This can only be seen by the side effect of the DMA
-transfer actually terminating, and the DMA engine calling its
-callback.
+Which is utter crap as I pointed out a few minutes ago.
 
-Our version is not that far away from the pure ARM versions
-so I think this problem is actually present in an unmodified
-PL180 as well.
+Also that clk thing is neither stable nor complete. It's just designed
+wrong. 
 
-Yours,
-Linus Walleij
+As long as it does not handle nested clocks proper and by default w/o
+your tasteless add ons, it's just moving the status quo of ARM into a
+common infrastructure file.
+
+Yes, that's probably better than not having common infrastructure at
+all, but trying to build up conversions on that lot would be a
+complete waste of time and resources. Simply because you need to
+convert the already converted stuff another time.
+
+Thanks,
+
+	tglx
