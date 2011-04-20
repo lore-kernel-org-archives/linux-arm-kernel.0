@@ -1,154 +1,177 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 20 Apr 2011 16:07:37 +0200
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-Message-ID: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Apr 2011 16:05:14 +0200
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+Message-ID: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+early platform device may do not have a device name as the slab is not yet
+available. So to search a clock base on the dev_id we need to search first the
+device base name and then the id
+
+we need this on AT91 to use the early device for the GPIO drivers and serial
+at least, SH Mobile and SH could also use it for serial and other drivers
+
+for this purpose this patch introduce two new API
+
+clk_get_sys_id(dev_base_name, id, con_id)
+and clk_get_pdev(pdev, con_id)
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 ---
-Hello,
+ drivers/clk/clkdev.c |   43 +++++++++++++++++++++++++++++++++++++------
+ include/linux/clk.h  |   41 ++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 77 insertions(+), 7 deletions(-)
 
-only compile tested so far.
-
-Best regards
-Uwe
-
- drivers/clk/clk.c   |   43 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk.h |    8 ++++++++
- 2 files changed, 51 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 264c809..7627815 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -14,10 +14,23 @@
- int clk_prepare(struct clk *clk)
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index b9b949c2..8b50509 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -11,7 +11,7 @@
+  */
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+-#include <linux/device.h>
++#include <linux/platform_device.h>
+ #include <linux/list.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -33,8 +33,11 @@ static DEFINE_MUTEX(clocks_mutex);
+  *  If an entry has a connection ID, it must match
+  * Then we take the most specific entry - with the following
+  * order of precedence: dev+con > dev only > con only.
++ *
++ * if id > 0 the dev_id will just contain the base name of the device
++ * it's need to search dev_id before slab is available
+  */
+-static struct clk *clk_find(const char *dev_id, const char *con_id)
++static struct clk *clk_find(const char *dev_id, int id, const char *con_id)
  {
- 	int ret = 0;
-+	struct clk *parent = ERR_PTR(-ENOSYS);
- 
- 	if (!clk)
- 		return 0;
- 
-+	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
-+		parent = clk_get_parent(clk);
+ 	struct clk_lookup *p;
+ 	struct clk *clk = NULL;
+@@ -43,8 +46,19 @@ static struct clk *clk_find(const char *dev_id, const char *con_id)
+ 	list_for_each_entry(p, &clocks, node) {
+ 		match = 0;
+ 		if (p->dev_id) {
+-			if (!dev_id || strcmp(p->dev_id, dev_id))
++			if (!dev_id) {
++				continue;
++			} else if (id < 0 && strcmp(p->dev_id, dev_id)) {
+ 				continue;
++			} else {
++				int len = strlen(dev_id);
 +
-+		if (!IS_ERR(parent)) {
-+			ret = clk_prepare(parent);
-+			if (ret)
-+				return ret;
-+		} else if (PTR_ERR(parent) != -ENOSYS)
-+			/* -ENOSYS means no parent and is OK */
-+			return PTR_ERR(parent);
-+	}
++				if (strncmp(p->dev_id, dev_id, len))
++					continue;
 +
- 	mutex_lock(&clk->prepare_lock);
- 	if (clk->prepare_count == 0 && clk->ops->prepare)
- 		ret = clk->ops->prepare(clk);
-@@ -26,6 +39,9 @@ int clk_prepare(struct clk *clk)
- 		clk->prepare_count++;
- 	mutex_unlock(&clk->prepare_lock);
- 
-+	if (ret && !IS_ERR(parent))
-+		clk_unprepare(parent);
-+
- 	return ret;
++				if (simple_strtoul(p->dev_id + len + 1, NULL, 10) != id)
++					continue;
++			}
+ 			match += 2;
+ 		}
+ 		if (p->con_id) {
+@@ -64,19 +78,36 @@ static struct clk *clk_find(const char *dev_id, const char *con_id)
+ 	return clk;
  }
- EXPORT_SYMBOL_GPL(clk_prepare);
-@@ -45,6 +61,12 @@ void clk_unprepare(struct clk *clk)
- 	}
  
- 	mutex_unlock(&clk->prepare_lock);
-+
-+	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
-+		struct clk *parent = clk_get_parent(clk);
-+		if (!IS_ERR(parent))
-+			clk_unprepare(parent);
-+	}
- }
- EXPORT_SYMBOL_GPL(clk_unprepare);
- 
-@@ -52,10 +74,22 @@ int clk_enable(struct clk *clk)
+-struct clk *clk_get_sys(const char *dev_id, const char *con_id)
++struct clk *clk_get_sys_id(const char *dev_id, int id, const char *con_id)
  {
- 	unsigned long flags;
- 	int ret = 0;
-+	struct clk *parent = ERR_PTR(-ENOSYS);
+ 	struct clk *clk;
  
- 	if (!clk)
- 		return 0;
+ 	mutex_lock(&clocks_mutex);
+-	clk = clk_find(dev_id, con_id);
++	clk = clk_find(dev_id, id, con_id);
+ 	if (clk && !__clk_get(clk))
+ 		clk = NULL;
+ 	mutex_unlock(&clocks_mutex);
  
-+	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
-+		parent = clk_get_parent(clk);
-+		if (!IS_ERR(parent)) {
-+			ret = clk_enable(parent);
-+			if (ret)
-+				return ret;
-+		} else if (PTR_ERR(parent) != -ENOSYS)
-+			/* -ENOSYS means no parent and is OK */
-+			return PTR_ERR(parent);
-+	}
-+
- 	WARN_ON(clk->prepare_count == 0);
- 
- 	spin_lock_irqsave(&clk->enable_lock, flags);
-@@ -66,6 +100,9 @@ int clk_enable(struct clk *clk)
- 		clk->enable_count++;
- 	spin_unlock_irqrestore(&clk->enable_lock, flags);
- 
-+	if (ret && !IS_ERR(parent))
-+		clk_disable(parent);
-+
- 	return ret;
+ 	return clk ? clk : ERR_PTR(-ENOENT);
  }
- EXPORT_SYMBOL_GPL(clk_enable);
-@@ -85,6 +122,12 @@ void clk_disable(struct clk *clk)
- 		clk->ops->disable(clk);
- 
- 	spin_unlock_irqrestore(&clk->enable_lock, flags);
+-EXPORT_SYMBOL(clk_get_sys);
++EXPORT_SYMBOL(clk_get_sys_id);
 +
-+	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
-+		struct clk *parent = clk_get_parent(clk);
-+		if (!IS_ERR(parent))
-+			clk_disable(parent);
-+	}
- }
- EXPORT_SYMBOL_GPL(clk_disable);
++struct clk *clk_get_pdev(struct platform_device *pdev, const char *con_id)
++{
++	const char *dev_id;
++
++	if (!pdev)
++		return clk_get_sys(NULL, con_id);
++
++	dev_id = dev_name(&pdev->dev);
++
++	/* if the slub is not available dev_id is NULL */
++	if (is_early_platform_device(pdev) && !dev_id)
++		return clk_get_sys_id(pdev->name, pdev->id, NULL);
++
++	return clk_get_sys(dev_id, con_id);
++}
++EXPORT_SYMBOL(clk_get_pdev);
  
+ struct clk *clk_get(struct device *dev, const char *con_id)
+ {
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index d2f0db0..125e525 100644
+index 1d37f42..31d1341 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -62,6 +62,11 @@ struct clk {
- 	.prepare_lock	= __MUTEX_INITIALIZER(name.prepare_lock),	\
- }
+@@ -127,6 +127,42 @@ struct clk *clk_get_parent(struct clk *clk);
  
-+/* bit definitions for struct clk_ops.flags */
-+#define CLK_OPS_GENERIC_PARENT	1	/* automatically handle parent in
-+					   enable, disable, prepare and
-+					   unprepare functions */
-+
  /**
-  * struct clk_ops -  Callback operations for clocks; these are to be provided
-  * by the clock implementation, and will be called by drivers through the clk_*
-@@ -91,6 +96,8 @@ struct clk {
-  * @put:	Called by the core clock code when a devices driver releases a
-  *		clock via clk_put(). Optional.
-  *
-+ * @flags:	see above for possible values.
+  * clk_get_sys - get a clock based upon the device name
++ * @dev_id: device base name
++ * @id:     device id
++ * @con_id: connection ID
 + *
-  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-  * implementations to split any work between atomic (enable) and sleepable
-  * (prepare) contexts.  If a clock requires sleeping code to be turned on, this
-@@ -119,6 +126,7 @@ struct clk_ops {
- 	int		(*set_rate)(struct clk *, unsigned long);
- 	int		(*set_parent)(struct clk *, struct clk *);
- 	struct clk *	(*get_parent)(struct clk *);
-+	unsigned int	flags;
- };
++ * Returns a struct clk corresponding to the clock producer, or
++ * valid IS_ERR() condition containing errno.  The implementation
++ * uses @dev_id and @con_id to determine the clock consumer, and
++ * thereby the clock producer. In contrast to clk_get() this function
++ * takes the device name instead of the device itself for identification.
++ *
++ * Drivers must assume that the clock source is not enabled.
++ *
++ * clk_get_sys should not be called from within interrupt context.
++ */
++struct clk *clk_get_sys_id(const char *dev_id, int id, const char *con_id);
++
++/**
++ * clk_get_pdev - lookup and obtain a reference to a clock producer.
++ * @pdev: platform device for clock "consumer"
++ * @id: clock comsumer ID
++ *
++ * Returns a struct clk corresponding to the clock producer, or
++ * valid IS_ERR() condition containing errno.  The implementation
++ * uses @dev and @id to determine the clock consumer, and thereby
++ * the clock producer.  (IOW, @id may be identical strings, but
++ * clk_get may return different clock producers depending on @dev.)
++ *
++ * Drivers must assume that the clock source is not enabled.
++ *
++ * clk_get_pdev should not be called from within interrupt context.
++ */
++struct platform_device;
++struct clk *clk_get_pdev(struct platform_device *pdev, const char *con_id);
++
++/**
++ * clk_get_sys - get a clock based upon the device name
+  * @dev_id: device name
+  * @con_id: connection ID
+  *
+@@ -140,7 +176,10 @@ struct clk *clk_get_parent(struct clk *clk);
+  *
+  * clk_get_sys should not be called from within interrupt context.
+  */
+-struct clk *clk_get_sys(const char *dev_id, const char *con_id);
++static inline  struct clk *clk_get_sys(const char *dev_id, const char *con_id)
++{
++	return clk_get_sys_id(dev_id, -1, con_id);
++}
  
  /**
+  * clk_add_alias - add a new clock alias
 -- 
 1.7.4.1
