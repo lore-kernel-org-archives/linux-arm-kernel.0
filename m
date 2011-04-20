@@ -1,106 +1,94 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Wed, 20 Apr 2011 21:55:15 +0200
-Subject: [PATCH] pxa/hx4700: use gpio arrays for global gpio initialization
-Message-ID: <1303329317.21545.5.camel@flow>
+Date: Wed, 20 Apr 2011 21:55:22 +0200
+Subject: [PATCH] pxa/magician: use gpio arrays for backlight and lcd power init
+Message-ID: <1303329323.21545.6.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_request_arrays() is a functional replacement for hx4700_gpio_request(),
-which is now obsolete.
+Use gpio_request_array() / gpio_free_array() in backlight init and exit
+functions and lcd power initialization.
 
 Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
 ---
- arch/arm/mach-pxa/hx4700.c |   66 ++++++++++----------------------------------
- 1 files changed, 15 insertions(+), 51 deletions(-)
+ arch/arm/mach-pxa/magician.c |   43 ++++++++++++++++-------------------------
+ 1 files changed, 17 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 9cdcca5..f8a3a6e 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -135,42 +135,6 @@ static unsigned long hx4700_pin_config[] __initdata = {
- 	GPIO66_GPIO,	/* nSDIO_IRQ */
- };
- 
--#define HX4700_GPIO_IN(num, _desc) \
--	{ .gpio = (num), .dir = 0, .desc = (_desc) }
--#define HX4700_GPIO_OUT(num, _init, _desc) \
--	{ .gpio = (num), .dir = 1, .init = (_init), .desc = (_desc) }
--struct gpio_ress {
--	unsigned gpio : 8;
--	unsigned dir : 1;
--	unsigned init : 1;
--	char *desc;
--};
--
--static int hx4700_gpio_request(struct gpio_ress *gpios, int size)
--{
--	int i, rc = 0;
--	int gpio;
--	int dir;
--
--	for (i = 0; (!rc) && (i < size); i++) {
--		gpio = gpios[i].gpio;
--		dir = gpios[i].dir;
--		rc = gpio_request(gpio, gpios[i].desc);
--		if (rc) {
--			pr_err("Error requesting GPIO %d(%s) : %d\n",
--			       gpio, gpios[i].desc, rc);
--			continue;
--		}
--		if (dir)
--			gpio_direction_output(gpio, gpios[i].init);
--		else
--			gpio_direction_input(gpio);
--	}
--	while ((rc) && (--i >= 0))
--		gpio_free(gpios[i].gpio);
--	return rc;
--}
--
- /*
-  * IRDA
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 9984ef7..22da1e9 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -344,22 +344,14 @@ static struct pxafb_mach_info samsung_info = {
+  * Backlight
   */
-@@ -829,26 +793,26 @@ static struct platform_device *devices[] __initdata = {
- 	&pcmcia,
- };
  
--static struct gpio_ress global_gpios[] = {
--	HX4700_GPIO_IN(GPIO12_HX4700_ASIC3_IRQ, "ASIC3_IRQ"),
--	HX4700_GPIO_IN(GPIO13_HX4700_W3220_IRQ, "W3220_IRQ"),
--	HX4700_GPIO_IN(GPIO14_HX4700_nWLAN_IRQ, "WLAN_IRQ"),
--	HX4700_GPIO_OUT(GPIO59_HX4700_LCD_PC1,          1, "LCD_PC1"),
--	HX4700_GPIO_OUT(GPIO62_HX4700_LCD_nRESET,       1, "LCD_RESET"),
--	HX4700_GPIO_OUT(GPIO70_HX4700_LCD_SLIN1,        1, "LCD_SLIN1"),
--	HX4700_GPIO_OUT(GPIO84_HX4700_LCD_SQN,          1, "LCD_SQN"),
--	HX4700_GPIO_OUT(GPIO110_HX4700_LCD_LVDD_3V3_ON, 1, "LCD_LVDD"),
--	HX4700_GPIO_OUT(GPIO111_HX4700_LCD_AVDD_3V3_ON, 1, "LCD_AVDD"),
--	HX4700_GPIO_OUT(GPIO32_HX4700_RS232_ON,         1, "RS232_ON"),
--	HX4700_GPIO_OUT(GPIO71_HX4700_ASIC3_nRESET,     1, "ASIC3_nRESET"),
--	HX4700_GPIO_OUT(GPIO82_HX4700_EUART_RESET,      1, "EUART_RESET"),
--	HX4700_GPIO_OUT(GPIO105_HX4700_nIR_ON,          1, "nIR_EN"),
-+static struct gpio global_gpios[] = {
-+	{ GPIO12_HX4700_ASIC3_IRQ, GPIOF_IN, "ASIC3_IRQ" },
-+	{ GPIO13_HX4700_W3220_IRQ, GPIOF_IN, "W3220_IRQ" },
-+	{ GPIO14_HX4700_nWLAN_IRQ, GPIOF_IN, "WLAN_IRQ" },
-+	{ GPIO59_HX4700_LCD_PC1,          GPIOF_OUT_INIT_HIGH, "LCD_PC1" },
-+	{ GPIO62_HX4700_LCD_nRESET,       GPIOF_OUT_INIT_HIGH, "LCD_RESET" },
-+	{ GPIO70_HX4700_LCD_SLIN1,        GPIOF_OUT_INIT_HIGH, "LCD_SLIN1" },
-+	{ GPIO84_HX4700_LCD_SQN,          GPIOF_OUT_INIT_HIGH, "LCD_SQN" },
-+	{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
-+	{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
-+	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
-+	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
-+	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
-+	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
- };
- 
- static void __init hx4700_init(void)
++static struct gpio magician_bl_gpios[] = {
++        { EGPIO_MAGICIAN_BL_POWER,  GPIOF_DIR_OUT, "Backlight power" },
++        { EGPIO_MAGICIAN_BL_POWER2, GPIOF_DIR_OUT, "Backlight power 2" },
++};
++
+ static int magician_backlight_init(struct device *dev)
  {
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
--	hx4700_gpio_request(ARRAY_AND_SIZE(global_gpios));
-+	gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+-	int ret;
+-
+-	ret = gpio_request(EGPIO_MAGICIAN_BL_POWER, "BL_POWER");
+-	if (ret)
+-		goto err;
+-	ret = gpio_request(EGPIO_MAGICIAN_BL_POWER2, "BL_POWER2");
+-	if (ret)
+-		goto err2;
+-	return 0;
+-
+-err2:
+-	gpio_free(EGPIO_MAGICIAN_BL_POWER);
+-err:
+-	return ret;
++	return gpio_request_array(ARRAY_AND_SIZE(magician_bl_gpios));
+ }
  
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
+ static int magician_backlight_notify(struct device *dev, int brightness)
+@@ -376,8 +368,7 @@ static int magician_backlight_notify(struct device *dev, int brightness)
+ 
+ static void magician_backlight_exit(struct device *dev)
+ {
+-	gpio_free(EGPIO_MAGICIAN_BL_POWER);
+-	gpio_free(EGPIO_MAGICIAN_BL_POWER2);
++	gpio_free_array(ARRAY_AND_SIZE(magician_bl_gpios));
+ }
+ 
+ static struct platform_pwm_backlight_data backlight_data = {
+@@ -712,6 +703,12 @@ static struct platform_device *devices[] __initdata = {
+ 	&leds_gpio,
+ };
+ 
++static struct gpio magician_lcd_gpios[] = {
++	{ GPIO104_MAGICIAN_LCD_POWER_1, GPIOF_OUT_INIT_LOW, "LCD power 1" },
++	{ GPIO105_MAGICIAN_LCD_POWER_2, GPIOF_OUT_INIT_LOW, "LCD power 2" },
++	{ GPIO106_MAGICIAN_LCD_POWER_3, GPIOF_OUT_INIT_LOW, "LCD power 3" }
++};
++
+ static void __init magician_init(void)
+ {
+ 	void __iomem *cpld;
+@@ -747,16 +744,10 @@ static void __init magician_init(void)
+ 		system_rev = board_id & 0x7;
+ 		lcd_select = board_id & 0x8;
+ 		pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
+-		if (lcd_select && (system_rev < 3)) {
+-			gpio_request(GPIO75_MAGICIAN_SAMSUNG_POWER, "SAMSUNG_POWER");
+-			gpio_direction_output(GPIO75_MAGICIAN_SAMSUNG_POWER, 0);
+-		}
+-		gpio_request(GPIO104_MAGICIAN_LCD_POWER_1, "LCD_POWER_1");
+-		gpio_request(GPIO105_MAGICIAN_LCD_POWER_2, "LCD_POWER_2");
+-		gpio_request(GPIO106_MAGICIAN_LCD_POWER_3, "LCD_POWER_3");
+-		gpio_direction_output(GPIO104_MAGICIAN_LCD_POWER_1, 0);
+-		gpio_direction_output(GPIO105_MAGICIAN_LCD_POWER_2, 0);
+-		gpio_direction_output(GPIO106_MAGICIAN_LCD_POWER_3, 0);
++		if (lcd_select && (system_rev < 3))
++			gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
++				         GPIOF_OUT_INIT_LOW, "SAMSUNG_POWER");
++		gpio_request_array(ARRAY_AND_SIZE(magician_lcd_gpios));
+ 		pxa_set_fb_info(NULL, lcd_select ? &samsung_info : &toppoly_info);
+ 	} else
+ 		pr_err("LCD detection: CPLD mapping failed\n");
 -- 
 1.7.4.4
