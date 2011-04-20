@@ -1,44 +1,154 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 20 Apr 2011 22:01:21 +0800
-Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
-	<20110417164830.GE17935@S2100-06.ap.freescale.net>
-	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
-Message-ID: <20110420140120.GF1965@S2100-06.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 20 Apr 2011 16:07:37 +0200
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+Message-ID: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 10:01:22AM +0200, Per Forlin wrote:
-> On 17 April 2011 18:48, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Mon, Apr 18, 2011 at 12:33:30AM +0800, Shawn Guo wrote:
-> >> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
-> >> If not calling pre_req() before mxs_mmc_request(), request()
-> >> will prepare the cache just like it did it before.
-> >> It is optional to use pre_req() and post_req().
-> >>
-> >> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> >> ---
-> >> ?drivers/mmc/host/mxs-mmc.c | ? 75 ++++++++++++++++++++++++++++++++++++++++++--
-> >> ?1 files changed, 72 insertions(+), 3 deletions(-)
-> >>
-> >
-> > Here is the result of mmc_test case 37 ~ 40, which are designed to see
-> > the performance improvement introduced by non-blocking changes.
-> >
-> > Honestly, the improvement is not so impressive. ?Not sure if the patch
-> > for mxs-mmc pre_req and post_req support was correctly produced. ?So
-> > please help review ...
-> My guess is that dma_unmap is not run in parallel with transfer.
-> Please look at my patch reply.
-> 
-Got it fixed in v2 posted just now.  Please take another look.
-Unfortunately, I do not see noticeable difference than v1 in terms
-of mmc_test result.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-Do you have omap_hsmmc and mmci mmc_test result data to share?
+only compile tested so far.
 
+Best regards
+Uwe
+
+ drivers/clk/clk.c   |   43 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk.h |    8 ++++++++
+ 2 files changed, 51 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 264c809..7627815 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -14,10 +14,23 @@
+ int clk_prepare(struct clk *clk)
+ {
+ 	int ret = 0;
++	struct clk *parent = ERR_PTR(-ENOSYS);
+ 
+ 	if (!clk)
+ 		return 0;
+ 
++	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
++		parent = clk_get_parent(clk);
++
++		if (!IS_ERR(parent)) {
++			ret = clk_prepare(parent);
++			if (ret)
++				return ret;
++		} else if (PTR_ERR(parent) != -ENOSYS)
++			/* -ENOSYS means no parent and is OK */
++			return PTR_ERR(parent);
++	}
++
+ 	mutex_lock(&clk->prepare_lock);
+ 	if (clk->prepare_count == 0 && clk->ops->prepare)
+ 		ret = clk->ops->prepare(clk);
+@@ -26,6 +39,9 @@ int clk_prepare(struct clk *clk)
+ 		clk->prepare_count++;
+ 	mutex_unlock(&clk->prepare_lock);
+ 
++	if (ret && !IS_ERR(parent))
++		clk_unprepare(parent);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(clk_prepare);
+@@ -45,6 +61,12 @@ void clk_unprepare(struct clk *clk)
+ 	}
+ 
+ 	mutex_unlock(&clk->prepare_lock);
++
++	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
++		struct clk *parent = clk_get_parent(clk);
++		if (!IS_ERR(parent))
++			clk_unprepare(parent);
++	}
+ }
+ EXPORT_SYMBOL_GPL(clk_unprepare);
+ 
+@@ -52,10 +74,22 @@ int clk_enable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 	int ret = 0;
++	struct clk *parent = ERR_PTR(-ENOSYS);
+ 
+ 	if (!clk)
+ 		return 0;
+ 
++	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
++		parent = clk_get_parent(clk);
++		if (!IS_ERR(parent)) {
++			ret = clk_enable(parent);
++			if (ret)
++				return ret;
++		} else if (PTR_ERR(parent) != -ENOSYS)
++			/* -ENOSYS means no parent and is OK */
++			return PTR_ERR(parent);
++	}
++
+ 	WARN_ON(clk->prepare_count == 0);
+ 
+ 	spin_lock_irqsave(&clk->enable_lock, flags);
+@@ -66,6 +100,9 @@ int clk_enable(struct clk *clk)
+ 		clk->enable_count++;
+ 	spin_unlock_irqrestore(&clk->enable_lock, flags);
+ 
++	if (ret && !IS_ERR(parent))
++		clk_disable(parent);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(clk_enable);
+@@ -85,6 +122,12 @@ void clk_disable(struct clk *clk)
+ 		clk->ops->disable(clk);
+ 
+ 	spin_unlock_irqrestore(&clk->enable_lock, flags);
++
++	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
++		struct clk *parent = clk_get_parent(clk);
++		if (!IS_ERR(parent))
++			clk_disable(parent);
++	}
+ }
+ EXPORT_SYMBOL_GPL(clk_disable);
+ 
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index d2f0db0..125e525 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -62,6 +62,11 @@ struct clk {
+ 	.prepare_lock	= __MUTEX_INITIALIZER(name.prepare_lock),	\
+ }
+ 
++/* bit definitions for struct clk_ops.flags */
++#define CLK_OPS_GENERIC_PARENT	1	/* automatically handle parent in
++					   enable, disable, prepare and
++					   unprepare functions */
++
+ /**
+  * struct clk_ops -  Callback operations for clocks; these are to be provided
+  * by the clock implementation, and will be called by drivers through the clk_*
+@@ -91,6 +96,8 @@ struct clk {
+  * @put:	Called by the core clock code when a devices driver releases a
+  *		clock via clk_put(). Optional.
+  *
++ * @flags:	see above for possible values.
++ *
+  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+  * implementations to split any work between atomic (enable) and sleepable
+  * (prepare) contexts.  If a clock requires sleeping code to be turned on, this
+@@ -119,6 +126,7 @@ struct clk_ops {
+ 	int		(*set_rate)(struct clk *, unsigned long);
+ 	int		(*set_parent)(struct clk *, struct clk *);
+ 	struct clk *	(*get_parent)(struct clk *);
++	unsigned int	flags;
+ };
+ 
+ /**
 -- 
-Regards,
-Shawn
+1.7.4.1
