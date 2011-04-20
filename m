@@ -1,7 +1,7 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 20 Apr 2011 23:04:35 +0800
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 20 Apr 2011 17:13:41 +0200
 Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+In-Reply-To: <BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
 References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
 	<20110418091902.13345132@lxorguk.ukuu.org.uk>
@@ -11,49 +11,38 @@ References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<20110419093855.36910400@lxorguk.ukuu.org.uk>
 	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
 	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
-	<BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
-Message-ID: <BANLkTi=Oc+y+31KugbEy66Mp96=bf_G8Mg@mail.gmail.com>
+Message-ID: <BANLkTinaOk4Qq+uwdZQtapncwjpdTg9wmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 10:40 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Wed, Apr 20, 2011 at 11:26 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Tue, Apr 19, 2011 at 4:51 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->>>>
->>>> Leaving aside the current input/output and on/off bits I would go for
->>>> being able to do
->>>>
->>>> ? ? ? ?gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
->>>> ? ? ? ?gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
->>>
->>> One more consideration, not mentioned previous time, is that pin
->>> configuration for power down mode.
->>> Samsung SoCs has retention GPIO configurations at sleep (suspend)
->>> mode. and restore it at resume time.
->>> it's need to reduce power and proper operation after suspend.
->>>
->> I have a little confusion. In ARM SoC, a lot of pins are used as
->> multi-functions.
->>
->> Before suspend, it may be configured as some function that isn't GPIO.
->> Is it a goal
->> that avoid declaring gpio_request() for suspend and updating the setting of pin?
->
-> E.g., When WiFi is turn on and system goes the sleep, wifi should be
-> turn on. For this it should be configure the power down gpio
-> configuration properly. Its' different that call the gpio_set_value
-> function.
->
-> One more, even though some pins are used for other purpose instead of
-> GPIO. It needs to be configure as input or output at power down mode
-> registers.
->
-> Thank you,
-> Kyungmin Park
->
-I have an another question on board initialization. The configuration on pins
-are including drive strength, pull and multiple function.
+2011/4/20 Haojian Zhuang <haojian.zhuang@gmail.com>:
 
-Since this patch can configure drive strength, pull. Will it be preferred to use
-in board initialization?
+> Before suspend, it may be configured as some function that isn't GPIO.
+> Is it a goal
+> that avoid declaring gpio_request() for suspend and updating the setting of pin?
+
+I refer to that as a totally different use case "pinmux or padmux"
+which I think we are better off treating as totally orthogonal to GPIO.
+
+I have loose ideas to break pin/pad muxing into a separate driver
+directory under drivers/pinpadmux or something.
+
+Some people inevitably think that GPIO and pin/padmux are
+intertwined, but as far as I have seen they are not. However there
+may be a cross dependency so that a GPIO driver may need to
+export an additional pin/padmux interface or so, e.g we have
+a separate chip in I2C which can mux pins...
+
+However this is a separate issue altogether, I think we can assume
+pin/padmuxing is in the board code until we have a suitable
+solution for a framework for that. (Don't know if I'll be able to write
+one though.)
+
+> Are these two patches are post in mailing list? I can't find your
+> second patch in this
+> patch series?
+
+I can see it here ... ?
+
+Yours,
+Linus Walleij
