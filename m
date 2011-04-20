@@ -1,7 +1,7 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2011 17:39:28 +0200
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Wed, 20 Apr 2011 16:43:15 +0100
 Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <20110420162958.09286aa7@lxorguk.ukuu.org.uk>
+In-Reply-To: <BANLkTi=QGoaNvJNM6SNsEduVa958bcLC1A@mail.gmail.com>
 References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
 	<20110418091902.13345132@lxorguk.ukuu.org.uk>
@@ -13,79 +13,15 @@ References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
 	<BANLkTinaOk4Qq+uwdZQtapncwjpdTg9wmQ@mail.gmail.com>
 	<20110420162958.09286aa7@lxorguk.ukuu.org.uk>
-Message-ID: <BANLkTi=QGoaNvJNM6SNsEduVa958bcLC1A@mail.gmail.com>
+	<BANLkTi=QGoaNvJNM6SNsEduVa958bcLC1A@mail.gmail.com>
+Message-ID: <20110420164315.6cdbcbf0@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/20 Alan Cox <alan@lxorguk.ukuu.org.uk>:
+> Then of course the GPIO driver can in turn call the padmux
+> subsystem to request its pins or fail/bail out if they are taken.
 
-> Would it not make sense to assume that given a situation where you have a
-> GPIO that can be routed four ways that you actually implement it like the
-> rest of the kernel - ie
->
-> ? ? ? ?r = gpio_request(n); ? ?/* n, n+1, n+2, n+3 are the four ways
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
->
-> ? ? ? ?if (r < 0) ? ? ?/* EBUSY - someone else is using one of the
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?four */
-> ? ? ? ? ? ? ? ?return -EBUSY;
-> ? ? ? ?/* Succeeded - will also have set the mux for us */
->
-> At that point drivers don't need to know if a GPIO is muxed it'll just be
-> busy if someone else is using it.
+Yes that makes a lot more sense. It preserves the abstraction in the
+simple cases but handles the complex stuff right.
 
-Yes indeed. I'd achive that by have the GPIO driver call the
-padmux subsystem to see if it can mux in that specific pin or whether it's
-taken by some other user/mux setting.
-
-> It seems to me that if the goal of the gpio layer is to provide an
-> abstraction then it can abstract muxes just fine and without needing
-> drivers to know.
-
-It's hard to use for all mux cases because it's pin-oriented rather
-than mux-setting oriented I'd say.
-
-For example: pins 0-7 can be used for an SDIO interface, or
-you can use pins 0-3 and 4-7 as two SPI interfaces (just making
-this up) then what you want is to control different mux alternatives
-than mapping specific pins.
-
-So my idea is you abstract muxes separately, we've done so
-in the past, see c.f. this crude but working example:
-arch/arm/mach-u300/padmux.[c|h]:
-
-enum pmx_settings {
-        U300_APP_PMX_MMC_SETTING,
-        U300_APP_PMX_SPI_SETTING
-};
-
-struct pmx *pmx_get(struct device *dev, enum pmx_settings setting);
-int pmx_put(struct device *dev, struct pmx *pmx);
-int pmx_activate(struct device *dev, struct pmx *pmx);
-int pmx_deactivate(struct device *dev, struct pmx *pmx);
-
-(then snip mmc.c):
-
-        /*
-         * Setup padmuxing for MMC. Since this must always be
-         * compiled into the kernel, pmx is never released.
-         */
-        pmx = pmx_get(mmcsd_device, U300_APP_PMX_MMC_SETTING);
-
-        if (IS_ERR(pmx))
-                pr_warning("Could not get padmux handle\n");
-        else {
-                ret = pmx_activate(mmcsd_device, pmx);
-                if (IS_ERR_VALUE(ret))
-                        pr_warning("Could not activate padmuxing\n");
-        }
-
-So while this enum cannot cut it for the generic case, the idea
-is that you enumerate your padmux settings one way or another
-and this is orthogonal to GPIO or other such stuff.
-
-Then of course the GPIO driver can in turn call the padmux
-subsystem to request its pins or fail/bail out if they are taken.
-
-Yours,
-Linus Walleij
+Alan
