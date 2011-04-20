@@ -1,41 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 Apr 2011 14:06:50 -0600 (MDT)
-Subject: [GIT PULL] OMAP hwmod/PRCM/clock: patches for 2.6.39-rc
-Message-ID: <alpine.DEB.2.00.1104201404540.15496@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2011 22:11:30 +0200
+Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
+In-Reply-To: <BANLkTi=u95J5vMrSGQN45=eiQEWGNffv_g@mail.gmail.com>
+References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
+	<20110419092049.GC22799@n2100.arm.linux.org.uk>
+	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
+	<20110419120344.GG22799@n2100.arm.linux.org.uk>
+	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
+	<BANLkTikr5B5YH+is18gYceCM1thjHgT-yQ@mail.gmail.com>
+	<BANLkTik05ERLa83Lah5Fx2HO+91bb9Q7Xg@mail.gmail.com>
+	<BANLkTi=u95J5vMrSGQN45=eiQEWGNffv_g@mail.gmail.com>
+Message-ID: <BANLkTi=4V8DuDyuWeHGPXy_h+aH7YUdXMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 20, 2011 at 7:58 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
 
-Hi Tony
+> Okay, but can't we have something like this then in the unmap function:
+>
+> ? ? ? for (i = 0; i < 100; i++) {
+> ? ? ? ? ? ? ? status = readl(host->base + MMCISTATUS);
+> ? ? ? ? ? ? ? if (host->unreliable_rxflags) {
+> ? ? ? ? ? ? ? ? ? ? ? if (host->dataend)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? } else if (!(status & MCI_RXDATAAVLBLMASK))
+> ? ? ? ? ? ? ? ? ? ? ? break;
+> ? ? ? ? ? ? ? udelay(10);
+> ? ? ? }
+>
+> to minimize the changes and apparently address Russell's concern as well?
 
-The following changes since commit f0e615c3cb72b42191b558c130409335812621d8:
+Yes that was exactly my suggestion in my first reply to Russell,
+sorry if that wasn't clear. I called it bool sync_dma_job
 
-  Linux 2.6.39-rc4 (2011-04-18 21:26:00 -0700)
+The problem is that this HW bug is very likely present also in
+unmodified ARM IP blocks, the only reason noone is seing it
+is that they don't clock them very high and DMA is not really
+working on them for other reasons anyway.
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 for_tony_a_2.6.39rc
+I.e. all versions of MMCI are likely as unreliable...
 
-Avinash.H.M (1):
-      OMAP2/3: hwmod: fix gpio-reset timeouts seen during bootup.
-
-Benoit Cousson (1):
-      OMAP2+: hwmod data: Fix wrong dma_system end address
-
-Eduardo Valentin (2):
-      OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad area
-      OMAP3: PM: Do not rely on ROM code to restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-
-Tomi Valkeinen (1):
-      OMAP4: clock data: Change DSS clock aliases
-
- arch/arm/mach-omap2/clock44xx_data.c       |    9 ++-------
- arch/arm/mach-omap2/cm2xxx_3xxx.c          |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c              |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    6 +++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- 7 files changed, 45 insertions(+), 12 deletions(-)
-
-
-- Paul
+Yours,
+Linus Walleij
