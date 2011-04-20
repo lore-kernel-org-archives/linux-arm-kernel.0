@@ -1,29 +1,104 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Apr 2011 11:48:45 +0200
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-	<20110420083258.GB1517@S2100-06.ap.freescale.net>
-	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-Message-ID: <20110420094845.GW31131@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 20 Apr 2011 18:32:52 +0800
+Subject: [PATCH 1/7] ARM: pxa: add clk_set_rate()
+In-Reply-To: <1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
+References: <2011040801>
+	<1302264944-2759-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <BANLkTin+mkMfmpdi1KrkibGLVJKSHitMqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Apr 8, 2011 at 8:15 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> Since there're mulitple clock rates in some device controllers, enable
+> clk_set_rate() for this usage.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
-On Wed, Apr 20, 2011 at 05:27:06PM +0800, Eric Miao wrote:
-> On Wed, Apr 20, 2011 at 4:32 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> >> -include $(srctree)/$(MACHINE)/Makefile.boot
-> >> +-include $(srctree)/$(MACHINE)/Makefile.boot
-> > ? ^ Makefile grammar?
-> 
-> Yes. GNU make will only include the file if it _exists_.
-To be more exact it will still try to "make" the include files if they
-don't exist.
+Applied.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+> ?arch/arm/mach-mmp/clock.c | ? 15 +++++++++++++++
+> ?arch/arm/mach-mmp/clock.h | ? ?1 +
+> ?arch/arm/mach-pxa/clock.c | ? 15 +++++++++++++++
+> ?arch/arm/mach-pxa/clock.h | ? ?1 +
+> ?4 files changed, 32 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+> index 886e056..7c6f95f 100644
+> --- a/arch/arm/mach-mmp/clock.c
+> +++ b/arch/arm/mach-mmp/clock.c
+> @@ -88,3 +88,18 @@ unsigned long clk_get_rate(struct clk *clk)
+> ? ? ? ?return rate;
+> ?}
+> ?EXPORT_SYMBOL(clk_get_rate);
+> +
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> + ? ? ? unsigned long flags;
+> + ? ? ? int ret = -EINVAL;
+> +
+> + ? ? ? if (clk->ops->setrate) {
+> + ? ? ? ? ? ? ? spin_lock_irqsave(&clocks_lock, flags);
+> + ? ? ? ? ? ? ? ret = clk->ops->setrate(clk, rate);
+> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&clocks_lock, flags);
+> + ? ? ? }
+> +
+> + ? ? ? return ret;
+> +}
+> +EXPORT_SYMBOL(clk_set_rate);
+> diff --git a/arch/arm/mach-mmp/clock.h b/arch/arm/mach-mmp/clock.h
+> index 9b027d7..3143e99 100644
+> --- a/arch/arm/mach-mmp/clock.h
+> +++ b/arch/arm/mach-mmp/clock.h
+> @@ -12,6 +12,7 @@ struct clkops {
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*enable)(struct clk *);
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*disable)(struct clk *);
+> ? ? ? ?unsigned long ? ? ? ? ? (*getrate)(struct clk *);
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? (*setrate)(struct clk *, unsigned long);
+> ?};
+>
+> ?struct clk {
+> diff --git a/arch/arm/mach-pxa/clock.c b/arch/arm/mach-pxa/clock.c
+> index d515222..4d46610 100644
+> --- a/arch/arm/mach-pxa/clock.c
+> +++ b/arch/arm/mach-pxa/clock.c
+> @@ -53,6 +53,21 @@ unsigned long clk_get_rate(struct clk *clk)
+> ?}
+> ?EXPORT_SYMBOL(clk_get_rate);
+>
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> + ? ? ? unsigned long flags;
+> + ? ? ? int ret = -EINVAL;
+> +
+> + ? ? ? if (clk->ops->setrate) {
+> + ? ? ? ? ? ? ? spin_lock_irqsave(&clocks_lock, flags);
+> + ? ? ? ? ? ? ? ret = clk->ops->setrate(clk, rate);
+> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&clocks_lock, flags);
+> + ? ? ? }
+> +
+> + ? ? ? return ret;
+> +}
+> +EXPORT_SYMBOL(clk_set_rate);
+> +
+> ?void clk_dummy_enable(struct clk *clk)
+> ?{
+> ?}
+> diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
+> index f9f349a..7373853 100644
+> --- a/arch/arm/mach-pxa/clock.h
+> +++ b/arch/arm/mach-pxa/clock.h
+> @@ -5,6 +5,7 @@ struct clkops {
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*enable)(struct clk *);
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*disable)(struct clk *);
+> ? ? ? ?unsigned long ? ? ? ? ? (*getrate)(struct clk *);
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? (*setrate)(struct clk *, unsigned long);
+> ?};
+>
+> ?struct clk {
+> --
+> 1.5.6.5
+>
+>
