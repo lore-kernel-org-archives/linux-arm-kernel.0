@@ -1,31 +1,76 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Apr 2011 09:00:15 -0400 (EDT)
-Subject: [PATCH 0/3] fix some issues with the kernel decompressor
-In-Reply-To: <20110420072156.GA28679@atomide.com>
+Date: Wed, 20 Apr 2011 09:03:41 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries
+	for some global variables
+In-Reply-To: <20110420125222.GE1965@S2100-06.ap.freescale.net>
 References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-Message-ID: <alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
+	<20110420084234.GV31131@pengutronix.de>
+	<alpine.LFD.2.00.1104200826550.24613@xanadu.home>
+	<20110420125222.GE1965@S2100-06.ap.freescale.net>
+Message-ID: <alpine.LFD.2.00.1104200901300.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Tony Lindgren wrote:
+On Wed, 20 Apr 2011, Shawn Guo wrote:
 
-> * Nicolas Pitre <nicolas.pitre@linaro.org> [110419 21:12]:
-> > Here some patches to fix some issues with the zImage code.  The LZMA
-> > decompressor now works for me, and the DT append patch should work
-> > on all platforms now too.
-> 
-> Weird still no luck here booting n900 zImage.. LZMA image prints
-> corrupt error, and only works if the image is relocated further
-> by 1MB or so. With the following hack n900 boots, so some size
-> calculations still are wrong. No luck with DT append patch either.
-> 
-> Any ideas why the following helps on n900?
+> On Wed, Apr 20, 2011 at 08:28:20AM -0400, Nicolas Pitre wrote:
+> > On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+> > 
+> > > On Wed, Apr 20, 2011 at 12:15:04AM -0400, Nicolas Pitre wrote:
+> > > > Many architecture specific versions of uncompress.h make use of global
+> > > > variables marked static.  In such case the GOT is bypassed and the
+> > > > code in head.S can't relocate them.
+> > > > 
+> > > > Instead of removing the static keyword from all those files and hope that
+> > > > it won't come back, let's simply
+> > > > define it out.
+> > > > 
+> > > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > > ---
+> > > > 
+> > > > This should fix remaining issues some people have with the DT append patch.
+> > > > 
+> > > >  arch/arm/boot/compressed/misc.c |   13 +++++++++++++
+> > > >  1 files changed, 13 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> > > > index a565853..0125dae 100644
+> > > > --- a/arch/arm/boot/compressed/misc.c
+> > > > +++ b/arch/arm/boot/compressed/misc.c
+> > > > @@ -30,7 +30,20 @@ unsigned int __machine_arch_type;
+> > > >  static void putstr(const char *ptr);
+> > > >  extern void error(char *x);
+> > > >  
+> > > > +/*
+> > > > + * Many instances of mach/uncompress.h are including global variables.
+> > > > + * Contrary to standard usage, we should _not_ mark those variables
+> > > > + * static otherwise they get accessed via GOTOFF references which cannot
+> > > > + * be modified at run time.  The entry code in head.S relies on the ability
+> > > > + * to move writable sections around, and for that to work, we must have all
+> > > > + * references going through the GOT which works only with non static
+> > > > + * variables.  So, instead of asking for a non intuitive requirement
+> > > > + * making many files non standard according to accepted coding practices
+> > > > + * we fix the issue here by simply defining the static keyword to nothing.
+> > > > + */
+> > > > +#define static /* non-static */
+> > > >  #include <mach/uncompress.h>
+> > > > +#undef static
+> > > This has a strange side effect, i.e. 
+> > > 
+> > > 	static something *ptr;
+> > > 
+> > > isn't initialised to NULL anymore IIRC. So the maintainers of
+> > > the various mach/uncompress.h still need to be aware of the issue.
+> > 
+> > Please tell me more about your setup.  This should still be initialized 
+> > to NULL.  If not then something else is still wrong.
+> > 
+> Though I'm unsure if it realistically exists, what if it's a static
+> variable inside a function?  It's actually changing something, right?
 
-No idea.  This could indicate that the lzma code is crapping into memory 
-outside of its output buffer.  The fact that my patch #2/3 makes lzma 
-decompression suddenly work for me with no apparent explanation is not 
-reassuring either.
+Right.  In that case the variable is allocated to the .data section, but 
+we explicitly discard .data at link time to prevent a successful build.
 
 
 Nicolas
