@@ -1,56 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 30 Apr 2011 20:30:35 +0200
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <20110429110115.GI5126@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-	<20110429100927.GC5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291223250.3005@ionos>
-	<20110429110115.GI5126@n2100.arm.linux.org.uk>
-Message-ID: <20110430183034.GA3108@ucw.cz>
+From: anish198519851985@gmail.com (anish singh)
+Date: Wed, 20 Apr 2011 04:43:41 -0000
+Subject: [PATCH v4] ARM: Use generic BUG() handler
+In-Reply-To: <BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
+References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
+	<4DA7A914.5020804@codeaurora.org>
+	<BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
+Message-ID: <BANLkTin_TpzdQS96SPKUNye6vb2b55Qc4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2011-04-29 12:01:15, Russell King - ARM Linux wrote:
-> On Fri, Apr 29, 2011 at 12:45:00PM +0200, Thomas Gleixner wrote:
-> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
-> > > > On Fri, 15 Apr 2011, Sascha Hauer wrote:
-> > > > > From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > > > > + * @get:	Called by the core clock code when a device driver acquires a
-> > > > > + *		clock via clk_get(). Optional.
-> > > > > + *
-> > > > > + * @put:	Called by the core clock code when a devices driver releases a
-> > > > > + *		clock via clk_put(). Optional.
-> > > > 
-> > > > These callbacks are completely pointless. There are only two non empty
-> > > > implementations in tree:
-> > > > 
-> > > > One does a try_module_get(clk->owner), which should be done in generic
-> > > > code. The other does special clock enabling magic which wants to go to
-> > > > clk->prepare().
-> > > 
-> > > I disagree.  Most clocks don't live in a module - there's only one
-> > > platform which does at present.  To force every clock to have an owner
-> > > field is rediculous.  We already know that the OMAP tree represents a
-> > 
-> > So we trade an owner field (which can be NULL) versus two function
-> > pointers in the clk_ops struct, which are of course subject to be
-> > abused for all kind of crap which does not belong there at all.
-> 
-> And the current __clk_get/__clk_put stuff has been abused to hell and
-> back hasn't it with just three implementations.  While I agree with your
-> sentiment, lets agree to address that _if_ it becomes a problem.  At
-> the moment, we have _enough_ problems to deal with, we don't need to
-> invent new ones which really don't matter at this stage.
+On Wed, Apr 20, 2011 at 8:10 AM, Simon Glass <sjg@chromium.org> wrote:
 
-So lets.. add the pointer and see if 4K lost is a problem for
-someone...?
+> On Thu, Apr 14, 2011 at 7:10 PM, Stephen Boyd <sboyd@codeaurora.org>
+> wrote:
+> > On 04/14/2011 04:00 PM, Simon Glass wrote:
+> >> From: Simon Glass <sjg@google.com>
+> >>
+> >> ARM uses its own BUG() handler which makes its output slightly different
+> >> from other archtectures.
+>
+>
+> >> Signed-off-by: Simon Glass <sjg@chromium.org>
+> >
+> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+> Thanks Stephen. Since there were no other comments I have submitted
+> this to RMK's patch tracking system.
+>
 
-It should be 'nice abstractions first, optimalizations later'...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Will this be part of linux kernel as i am not aware of patch tracking
+system? I want to back port this feature on my
+board which has Linux 2.6.35.7 kernel version(android gingerbread).
+
+>
+> Regards,
+> Simon
+>
+> >
+> > --
+> > Sent by an employee of the Qualcomm Innovation Center, Inc.
+> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+> Forum.
+> >
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110420/aef1f9ca/attachment-0001.html>
