@@ -1,23 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Apr 2011 11:34:39 +0200 (CEST)
-Subject: genirq: Implement a generic interrupt chip
-In-Reply-To: <4DAE9764.2090609@codeaurora.org>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.117340150@linutronix.de>
-	<4DAE9764.2090609@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1104201133570.3111@ionos>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 20 Apr 2011 17:41:30 +0800
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+Message-ID: <20110420094129.GB1965@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Abhijeet Dharmapurikar wrote:
-> On 04/16/2011 02:14 PM, Thomas Gleixner wrote:
-> > +#else
-> > +static inline void irq_gc_lock(struct irq_chip_generic *gc) { }
-> > +static inline void irq_gc_unlock(struct irq_chip_generic *gc) { }
-> > +#endif
-> > +
+On Wed, Apr 20, 2011 at 05:27:06PM +0800, Eric Miao wrote:
+> On Wed, Apr 20, 2011 at 4:32 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > Hi Eric,
+> >
+> > On Mon, Apr 18, 2011 at 01:19:36PM +0800, Eric Miao wrote:
+> >> If AUTO_ZRELADDR is selected and target is not uImage, the existence
+> >> of Makefile.boot could be optional.
+> >>
+> >> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> >> ---
+> >> ?arch/arm/boot/Makefile | ? ?2 +-
+> >> ?1 files changed, 1 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> >> index 9128fdd..277368f 100644
+> >> --- a/arch/arm/boot/Makefile
+> >> +++ b/arch/arm/boot/Makefile
+> >> @@ -14,7 +14,7 @@
+> >> ?MKIMAGE ? ? ? ? := $(srctree)/scripts/mkuboot.sh
+> >>
+> >> ?ifneq ($(MACHINE),)
+> >> -include $(srctree)/$(MACHINE)/Makefile.boot
+> >> +-include $(srctree)/$(MACHINE)/Makefile.boot
+> > ? ^ Makefile grammar?
 > 
-> Shall we create a new header file for this, lets say geneirc_irq_chip.h? The
-> generic irq chip api is different from what  irq.h provides, I think
+> Yes. GNU make will only include the file if it _exists_.
+> 
+Ok, something learnt ...
 
-And that header includes irq.h then. Where is the point ?
+> >> ?endif
+> >>
+> > I do not understand the patch. ?But looking at the patch below, the
+> > dtb rule uses Makefile.boot too.
+> >
+> 
+> Since originally there are only definitions like zreladdr defined in
+> Makefile.boot,
+> and with AUTO_ZRELADDR, some platforms do not need this definition any
+> more, which makes Makefile.boot useless on these platforms. Yet it does now
+> look like Makefile.boot is so far the best place for these DTB rules.
+> 
+... so your patch still stands, as DTB is also optional.
+
+-- 
+Regards,
+Shawn
