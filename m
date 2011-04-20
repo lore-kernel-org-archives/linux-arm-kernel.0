@@ -1,43 +1,61 @@
-From: shweta.gulati@ti.com (Shweta Gulati)
-Date: Wed, 20 Apr 2011 14:55:09 +0530
-Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
-Message-ID: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 20 Apr 2011 17:27:06 +0800
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <20110420083258.GB1517@S2100-06.ap.freescale.net>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gulati, Shweta <shweta.gulati@ti.com>
+On Wed, Apr 20, 2011 at 4:32 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> Hi Eric,
+>
+> On Mon, Apr 18, 2011 at 01:19:36PM +0800, Eric Miao wrote:
+>> If AUTO_ZRELADDR is selected and target is not uImage, the existence
+>> of Makefile.boot could be optional.
+>>
+>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>> ?arch/arm/boot/Makefile | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+>> index 9128fdd..277368f 100644
+>> --- a/arch/arm/boot/Makefile
+>> +++ b/arch/arm/boot/Makefile
+>> @@ -14,7 +14,7 @@
+>> ?MKIMAGE ? ? ? ? := $(srctree)/scripts/mkuboot.sh
+>>
+>> ?ifneq ($(MACHINE),)
+>> -include $(srctree)/$(MACHINE)/Makefile.boot
+>> +-include $(srctree)/$(MACHINE)/Makefile.boot
+> ? ^ Makefile grammar?
 
-Core Clk Tree shows incorrect Clk rates at OPP50, as
-in commit e07f469d284ca3d1f5dcf5438c22982be98bc071
-calling of 'recalc' in API clk_set_rate is unintentionally
-removed, because of which clock's tree rates get goofed
-up when DVFS happens. This Patch adds recalc API back.
+Yes. GNU make will only include the file if it _exists_.
 
-Tested on OMAP3630 SDP Board.
+>> ?endif
+>>
+> I do not understand the patch. ?But looking at the patch below, the
+> dtb rule uses Makefile.boot too.
+>
 
-Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Wamsley <paul@pwsan.com>
----
- arch/arm/plat-omap/clock.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+Since originally there are only definitions like zreladdr defined in
+Makefile.boot,
+and with AUTO_ZRELADDR, some platforms do not need this definition any
+more, which makes Makefile.boot useless on these platforms. Yet it does now
+look like Makefile.boot is so far the best place for these DTB rules.
 
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index c9122dd..5a0d06b 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -130,8 +130,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 
- 	spin_lock_irqsave(&clockfw_lock, flags);
- 	ret = arch_clock->clk_set_rate(clk, rate);
--	if (ret == 0)
-+	if (ret == 0) {
-+		if (clk->recalc)
-+			clk->rate = clk->recalc(clk);
- 		propagate_rate(clk);
-+	}
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- 
- 	return ret;
--- 
-1.7.0.4
+> [PATCH v2] arm/dt: Add a make rule to build dtb for enabled boards
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047129.html
+>
+> --
+> Regards,
+> Shawn
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
