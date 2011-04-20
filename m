@@ -1,37 +1,41 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Wed, 20 Apr 2011 11:09:56 +0200
-Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead of
-	void as it can fail
-In-Reply-To: <20110419235812.GA4619@kroah.com>
-References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
-	<1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110419235812.GA4619@kroah.com>
-Message-ID: <BANLkTi=q8jfEaLByZVZPHHYp_5PTK-36cw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 20 Apr 2011 17:19:27 +0800
+Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries for
+	some global variables
+In-Reply-To: <20110420084234.GV31131@pengutronix.de>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
+	<20110420084234.GV31131@pengutronix.de>
+Message-ID: <20110420091926.GA1965@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/20 Greg KH <greg@kroah.com>:
-> On Mon, Apr 11, 2011 at 08:42:58PM +0200, Uwe Kleine-K?nig wrote:
->> Before commit
->>
->> ? ? ? b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
->>
->> calling dev_set_drvdata with dev=NULL was an unchecked error. After some
->> discussion about what to return in this case removing the check (and so
->> producing a null pointer exception) seems fine.
-> I'm confused by this thread, care to resend all of these in a series
-> against the latest linux-next tree?
+On Wed, Apr 20, 2011 at 10:42:34AM +0200, Uwe Kleine-K?nig wrote:
+[...]
+> > +/*
+> > + * Many instances of mach/uncompress.h are including global variables.
+> > + * Contrary to standard usage, we should _not_ mark those variables
+> > + * static otherwise they get accessed via GOTOFF references which cannot
+> > + * be modified at run time.  The entry code in head.S relies on the ability
+> > + * to move writable sections around, and for that to work, we must have all
+> > + * references going through the GOT which works only with non static
+> > + * variables.  So, instead of asking for a non intuitive requirement
+> > + * making many files non standard according to accepted coding practices
+> > + * we fix the issue here by simply defining the static keyword to nothing.
+> > + */
+> > +#define static /* non-static */
+> >  #include <mach/uncompress.h>
+> > +#undef static
+> This has a strange side effect, i.e. 
+> 
+> 	static something *ptr;
+> 
+> isn't initialised to NULL anymore IIRC. So the maintainers of
+> the various mach/uncompress.h still need to be aware of the issue.
+> 
+Also, the static attribute of functions gets lost, though it may not
+matter.
 
-I'd argue that dev_set_drvdata() should never fail. All current
-drivers depend on this, and if dev_set_drvdata() fails, user will get
-an OOPS a short while after the device finishes initializing (or maybe
-even before that if callbacks are involved).
-Allowing dev_set_drvdata() to fail will need putting a lot of
-boilerplate code into drivers for no real gain.
-
-Please consider reverting commit
-b4028437876866aba4747a655ede00f892089e14 instead of "fixing" issues it
-generates.
-
-Best Regards,
-Micha? Miros?aw
+-- 
+Regards,
+Shawn
