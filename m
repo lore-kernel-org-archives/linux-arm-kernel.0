@@ -1,39 +1,46 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 20 Apr 2011 10:07:03 +0530
-Subject: Query about vexpress_ct_ca9x4 watchdog issue ?
-In-Reply-To: <1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
-References: <1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
-Message-ID: <4DAE62EF.7050508@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Apr 2011 08:27:21 +0300
+Subject: [RFC PATCH] Consolidate SRAM support
+In-Reply-To: <1303222615.32281.91.camel@deskari>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<BANLkTikJwFRenjwnws+4J2ep9G0Nv-9aXw@mail.gmail.com>
+	<20110416130929.GL4423@n2100.arm.linux.org.uk>
+	<20110418064838.GE12272@atomide.com>
+	<1303110011.2062.7.camel@deskari>
+	<20110418081743.GH12272@atomide.com>
+	<1303222615.32281.91.camel@deskari>
+Message-ID: <20110420052718.GA5918@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2011 07:37 AM, bill wrote:
-> Hi viresh and arm guys:)
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [110419 17:13]:
+> Hi Tony and Russell,
 > 
-> I am testing sp805 watchdog at vexpress board.
+> On Mon, 2011-04-18 at 11:17 +0300, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [110418 09:57]:
 > 
-> After open /dev/watchdog , I use WDIOC_GETTIMELEFT ioctl to get the time left for rebooting in a loop;
-> while the timeleft is not decrementing, but stay as a constant 59s.
+> > > So, I can make a patch that removes the SRAM support from omapfb, and
+> > > queue it up for the next merge window.
+> > 
+> > OK. That patch should probably go into Russell's tree along with
+> > other SRAM related patches to avoid conflicts.
 > 
-> I read the WdogValue/WdogControl register as specified in SP805TRM, it does not change any way, 
+> Here's a simple patch to remove SRAM support from omapfb. Or more
+> precisely, this just disables it.
 > 
-> WdogValue     --> 0xf0918000
-> WdogControl   -->0x3
-> 
-> 
-> It seems the value is correct, but watchdog is not triggered.
-> I am really puzzled about this, can you give me some clue to find the root cause?
-> 
+> I started to remove the SRAM support from the drivers, but the patches
+> got quite big and will probably cause conflicts if they reside in
+> somebody else's tree than mine. So I believe it's easiest to divide SRAM
+> FB removal into this patch, handled by Russell (?), and then the rest,
+> handled by me.
 
-Hi Bill,
+OK sounds like a plan.
+ 
+> Is there something else related to OMAP FB than the code removed in this
+> patch that is hindering the SRAM work?
 
-It looks that you are also not getting WDT reset after specified timeout? Is it so?
-So, probably driver is fine as it is tested on SPEAr.
+I think we can now also remove sram_ceil and omap_sram_push_address?
 
-Probably the issue might be with clock rate and clock enable. What is the clock rate
-for wdt in your platform?
-Driver calls clk_enable() and clk_get_rate(). Can you please verify that this is
-working correctly.
+Regards,
 
--- 
-viresh
+Tony
