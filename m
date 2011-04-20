@@ -1,83 +1,81 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Apr 2011 00:15:02 -0400
-Subject: [PATCH 1/3] ARM: zImage: no need to get the decompressed size from the
-	filesystem
+Date: Wed, 20 Apr 2011 00:15:03 -0400
+Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
 In-Reply-To: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1303272904-31392-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit d239b1dc093d the hardcoded 4x estimate for the decompressed
-kernel size was replaced by the exact Image file size and passed to
-the linker as a symbol value.  Turns out that this is unneeded as the
-size is already included at the end of the compressed piggy data.
-For those compressed formats that don't include this data, the build
-system already takes care of appending it using size_append in
-scripts/Makefile.lib.  So let's use that instead.
+The return value for decompress_kernel() is no longer used.  Furthermore,
+this was obtained and stored in a variable called output_ptr which is
+a complete misnomer for what is actually the size of the decompressed
+kernel image.  Let's get rid of it.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/boot/compressed/Makefile |    2 --
- arch/arm/boot/compressed/head.S   |   18 ++++++++++++++++--
- 2 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 8ebbb51..58ac434 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -98,8 +98,6 @@ endif
- ccflags-y := -fpic -fno-builtin
- asflags-y := -Wa,-march=all
+BTW, I've yet to understand why, but this patch makes CONFIG_KERNEL_LZMA
+work for me.
  
--# Provide size of uncompressed kernel to the decompressor via a linker symbol.
--LDFLAGS_vmlinux = --defsym _image_size=$(shell stat -c "%s" $(obj)/../Image)
- # Supply ZRELADDR to the decompressor via a linker symbol.
- ifneq ($(CONFIG_AUTO_ZRELADDR),y)
- LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index adf583c..c74f048 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -179,7 +179,7 @@ not_angel:
- 		bl	cache_on
+ arch/arm/boot/compressed/misc.c |   13 ++-----------
+ 1 files changed, 2 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 2df3826..a565853 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -26,8 +26,6 @@ unsigned int __machine_arch_type;
+ #include <linux/linkage.h>
+ #include <asm/string.h>
  
- restart:	adr	r0, LC0
--		ldmia	r0, {r1, r2, r3, r5, r6, r9, r11, r12}
-+		ldmia	r0, {r1, r2, r3, r5, r6, r10, r11, r12}
- 		ldr	sp, [r0, #32]
+-#include <asm/unaligned.h>
+-
  
- 		/*
-@@ -189,7 +189,21 @@ restart:	adr	r0, LC0
- 		sub	r0, r0, r1		@ calculate the delta offset
- 		add	r5, r5, r0		@ _start
- 		add	r6, r6, r0		@ _edata
-+		add	r10, r10, r0		@ inflated kernel size location
+ static void putstr(const char *ptr);
+ extern void error(char *x);
+@@ -139,13 +137,12 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
+ }
  
-+		/*
-+		 * The kernel build system appends the size of the
-+		 * decompressed kernel at the end of the compressed data
-+		 * in little-endian form.
-+		 */
-+		ldrb	r9, [r10, #0]
-+		ldrb	lr, [r10, #1]
-+		orr	r9, r9, lr, lsl #8
-+		ldrb	lr, [r10, #2]
-+		ldrb	r10, [r10, #3]
-+		orr	r9, r9, lr, lsl #16
-+		orr	r9, r9, r10, lsl #24
-+		
- #ifndef CONFIG_ZBOOT_ROM
- 		/* malloc space is above the relocated stack (64k max) */
- 		add	sp, sp, r0
-@@ -335,7 +349,7 @@ LC0:		.word	LC0			@ r1
- 		.word	_end			@ r3
- 		.word	_start			@ r5
- 		.word	_edata			@ r6
--		.word	_image_size		@ r9
-+		.word	input_data_end - 4	@ r9 (inflated size location)
- 		.word	_got_start		@ r11
- 		.word	_got_end		@ ip
- 		.word	user_stack_end		@ sp
+ /*
+- * gzip delarations
++ * gzip declarations
+  */
+ extern char input_data[];
+ extern char input_data_end[];
+ 
+ unsigned char *output_data;
+-unsigned long output_ptr;
+ 
+ unsigned long free_mem_ptr;
+ unsigned long free_mem_end_ptr;
+@@ -173,13 +170,11 @@ asmlinkage void __div0(void)
+ extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
+ 
+ 
+-unsigned long
++void
+ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ 		unsigned long free_mem_ptr_end_p,
+ 		int arch_id)
+ {
+-	unsigned char *tmp;
+-
+ 	output_data		= (unsigned char *)output_start;
+ 	free_mem_ptr		= free_mem_ptr_p;
+ 	free_mem_end_ptr	= free_mem_ptr_end_p;
+@@ -187,12 +182,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ 
+ 	arch_decomp_setup();
+ 
+-	tmp = (unsigned char *) (((unsigned long)input_data_end) - 4);
+-	output_ptr = get_unaligned_le32(tmp);
+-
+ 	putstr("Uncompressing Linux...");
+ 	do_decompress(input_data, input_data_end - input_data,
+ 			output_data, error);
+ 	putstr(" done, booting the kernel.\n");
+-	return output_ptr;
+ }
 -- 
 1.7.4
