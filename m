@@ -1,170 +1,70 @@
-From: plyatov@gmail.com (Igor Plyatov)
-Date: Wed, 20 Apr 2011 15:54:31 +0400
-Subject: [PATCH v2] ide: at91_ide.c bugfix for high master clock
-In-Reply-To: <20101216235153.GA3793@r2bh72.net.upc.cz>
-References: <1292100326-637-1-git-send-email-plyatov@gmail.com>
-	<20101213213549.GA2077@r2bh72.net.upc.cz>
-	<20101216235153.GA3793@r2bh72.net.upc.cz>
-Message-ID: <4DAEC977.4020504@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2011 14:04:47 +0200
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+Message-ID: <BANLkTim-wSoL1anfNsu0PQZJFj5q3ZMSEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stanislaw!
-> On Mon, Dec 13, 2010 at 10:35:49PM +0100, Stanislaw Gruszka wrote:
->> On Sat, Dec 11, 2010 at 11:45:26PM +0300, Igor Plyatov wrote:
->>> The AT91SAM9 microcontrollers with master clock higher then 105 MHz
->>> and PIO0, have overflow of the NCS_RD_PULSE value in the MSB. This
->>> lead to "NCS_RD_PULSE" pulse longer then "NRD_CYCLE" pulse and driver
->>> does not detect IDE device.
->> The overflow happens because MSB (bit 6) is multiplied by 256.
->> NCS pulse length = 256*NCS_RD_PULSE[6] + NCS_RD_PULSE[5:0] clock
->> cycles. So NCS_RD_PULSE 0x41 gives 257 clock cycles not 65 as we
->> expected before. Static memory controller behaviour is undefined
->> when pulse length is bigger than cycle length, so things not work.
+2011/4/18 Ben Nizette <bn@niasdigital.com>:
+>
+> On 18/04/2011, at 7:37 AM, Linus Walleij wrote:
+>
+>> From: Linus Walleij <linus.walleij@linaro.org>
 >>
->>> +	u16 ncs_rd_pulse;
->>>   	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
->>>   			     AT91_SMC_BAT_SELECT;
->>>
->>> @@ -81,19 +84,29 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
->>>   	if (data_float)
->>>   		mode |= AT91_SMC_TDF_(data_float);
->>>
->>> +	ncs_rd_pulse = cycle;
->>> +	if (ncs_rd_pulse>  NCS_RD_PULSE_LIMIT) {
->>> +		ncs_rd_pulse = NCS_RD_PULSE_LIMIT;
->>> +		pr_warn(DRV_NAME ": ncs_rd_pulse limited to maximal value %d\n",
->>> +			ncs_rd_pulse);
->>> +	}
->> I'm fine with that fix. We can possibly still have problems with higher
->> frequencies, but I'm not sure if someone will use that hardware with
->> faster clocks.
-> I looked at patch again and change mind, I'm not ok with it. EBI NCS in
-> this case controls compact flash CS0, CS1 signals, so NCS pulse define
-> a cycle on IDE bus. IDE cycle length can not be smaller than t0 (from
-> PIO Mode Timing Diagram), otherwise we do not conform spec.
+>> This adds two functions for struct gpio_chip chips to provide pin
+>> bias and drive mode settings for individual pins. Implementers does
+>> this a bit differently and usually there are a few possible modes you
+>> can select, I'm providing a few common modes for biasing and driving
+>> pins.
+>>
+>> Since we have no previous hacked-up arch-specific drivers for this
+>> we can avoid any __override_functions and we just allow this to be
+>> properly implemented using gpiolib. Further the function is made
+>> non-mandatory, if it is not defined for the chip it will be silently
+>> ignored.
 >
-> IMHO what should be done in case of overflow is increase NCS pulse time
-> (IDE cycle) and in consequence overall SMC cycle time. Below draw patch
-> how this could be done. I do not even tried to compile it (give up with
-> that since I do not have hardware to test anyway), just idea how things
-> could be possibly done.
->
-> diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-> index 000a78e..277224c 100644
-> --- a/drivers/ide/at91_ide.c
-> +++ b/drivers/ide/at91_ide.c
-> @@ -66,9 +66,8 @@
->
->   #define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
->
-> -static void set_smc_timings(const u8 chipselect, const u16 cycle,
-> -			    const u16 setup, const u16 pulse,
-> -			    const u16 data_float, int use_iordy)
-> +static void set_smc_timings(const u8 chipselect, u16 cycle, u16 cs_cycle,
-> +			    u16 setup, u16 pulse, u16 data_float, int use_iordy)
->   {
->   	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
->   			     AT91_SMC_BAT_SELECT;
-> @@ -89,9 +88,9 @@ static void set_smc_timings(const u8 chipselect, const u16 cycle,
->   						   AT91_SMC_NRDSETUP_(setup) |
->   						   AT91_SMC_NCS_RDSETUP_(0));
->   	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
-> -						   AT91_SMC_NCS_WRPULSE_(cycle) |
-> +						   AT91_SMC_NCS_WRPULSE_(cs_cycle) |
->   						   AT91_SMC_NRDPULSE_(pulse) |
-> -						   AT91_SMC_NCS_RDPULSE_(cycle));
-> +						   AT91_SMC_NCS_RDPULSE_(cs_cycle));
->   	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
->   						   AT91_SMC_NRDCYCLE_(cycle));
->   }
-> @@ -106,11 +105,44 @@ static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
->   	return (unsigned int) tmp;
->   }
->
-> +/*
-> + * In SMC registers values are coded in form:
-> + *
-> + * mul * ((val&  (limit + 1)) ? 1 : 0) + (val&  limit)
-> + *
-> + * where limit can be 0x1f, 0x3f or 0x7f, and  mul can be 128 or 256
-> + */
-> +static int code_smc_values(int *val, const int limit, const int mul)
-> +{
-> +	int tmp;
-> +
-> +	if (*val<= limit)
-> +		return 0;
-> +
-> +	/* limit<  val<  mul */
-> +	tmp = mul - *val;
-> +	if (tmp>  0) {
-> +		*val = limit + 1;
-> +		return tmp;
-> +	}
-> +
-> +	/* mul + limit<  val */
-> +	if (WARN_ON(*val - mul>  limit)) {
-> +		/* it's not possible to code that value - set max */
-> +		*val = (limit + 1) | limit;
-> +		return 0;
-> +	}
-> +
-> +	/* mul<= val<= mul + limit */
-> +	*val = (limit + 1) | (*val - mul);
-> +	return 0;
-> +}
-> +
->   static void apply_timings(const u8 chipselect, const u8 pio,
->   			  const struct ide_timing *timing, int use_iordy)
->   {
->   	unsigned int t0, t1, t2, t6z;
-> -	unsigned int cycle, setup, pulse, data_float;
-> +	unsigned int cycle, cs_cycle, setup, pulse, data_float;
->   	unsigned int mck_hz;
->   	struct clk *mck;
->
-> @@ -133,11 +165,29 @@ static void apply_timings(const u8 chipselect, const u8 pio,
->   	setup = calc_mck_cycles(t1, mck_hz);
->   	pulse = calc_mck_cycles(t2, mck_hz);
->   	data_float = calc_mck_cycles(t6z, mck_hz);
-> -
-> -	pdbg("cycle=%u setup=%u pulse=%u data_float=%u\n",
-> -	     cycle, setup, pulse, data_float);
-> -
-> -	set_smc_timings(chipselect, cycle, setup, pulse, data_float, use_iordy);
-> +	cs_cycle = cycle;
-> +
-> +	pdbg("cycle=%u cs_cycle=%u setup=%u pulse=%u data_float=%u\n",
-> +	     cycle, cs_cycle, setup, pulse, data_float);
-> +
-> +	/* SMC use special coding scheme, see "Coding and Range of Timing
-> +	 * Parameters" table from AT91SAM926x datasheets.
-> +	 *
-> +	 *		SETUP = 128*setup[5] + setup[4:0]
-> +	 *		PULSE = 256*pulse[6] + pulse[5:0]
-> +	 *		CYCLE = 256*cycle[8:7] + cycle[6:0]
-> +	 */
-> +	cycle += code_smc_values(&setup, 31, 128);
-> +	cycle += code_smc_values(&pulse, 63, 256);
-> +	/* cs_cycle is a full pulse wave, setup and hold times are 0 */
-> +	cycle += code_smc_values(&cs_cycle, 63, 256);
-> +	code_cmc_values(&cycle, 127, 256);
-> +
-> +	pdbg("cycle=0x%x cs_cycle=0x%x setup=0x%x pulse=0x%x data_float=0x%x\n",
-> +	     cycle, cs_cycle, setup, pulse, data_float);
-> +
-> +	set_smc_timings(chipselect, cycle, cs_cycle, setup, pulse, data_float,
-> +			use_iordy);
->   }
->
->   static void at91_ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd,
-Unfortunately, yours patch can't work correctly because it does not 
-consider all details, but I understand yours idea and fix pata_at91.c 
-driver.
-You can look to email with "[PATCH] ATA: pata_at91.c bugfixes" subject 
-for details.
+> I don't like this much. ?Why does the driver ever need to do this? ?When
+> should a driver even try this this given you can't guarantee any results
+> and as such it's only ever a hint?
 
-Best regards!
---
-Igor Plyatov
+I don't get it. Who says the interface should be used by drivers?
+It could just as well (and much more likely) be the board code.
+
+> As far as I can see it would be
+> much much better if you just replaced
+
+>
+> platform_device_register(...)
+>
+> with
+>
+> set_up_pins(...)
+> platform_device_register(...)
+>
+> in board code (or add a device tree, erm, leaf or whatever).
+
+Yes that is one of the use cases for this patch set.
+We seem to be in 100% agreement :-)
+
+> So in short - what's the use case? ?Which driver requires this?
+
+You just gave the use case yourself.
+
+The intent of the patch set it to generalize the GPIO drivers
+so they can be pushed down into drivers/gpio/* where they
+belong.
+
+Since only the individual GPIO driver knows for example where
+to find the memory-mapped I/O region it has to reside with
+the GPIO driver(s).
+
+Even if these pin-specific calls are only called from board
+code the mechanism is still needed in order to move,
+consolidate and abstract the GPIO code into the gpio
+subsystem.
+
+Yours,
+Linus Walleij
