@@ -1,45 +1,39 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 20 Apr 2011 09:41:32 +0200
-Subject: [PATCH v2 03/12] mmc: mmc_test: add test for none blocking
-	transfers
-In-Reply-To: <20110417154622.GC17935@S2100-06.ap.freescale.net>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1302116833-24540-4-git-send-email-per.forlin@linaro.org>
-	<20110417154622.GC17935@S2100-06.ap.freescale.net>
-Message-ID: <BANLkTikhaCqW=4BD_h05QebBftVGjGQ3+w@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Apr 2011 09:42:48 +0200
+Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead
+	of void as it can fail
+In-Reply-To: <20110419235812.GA4619@kroah.com>
+References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
+	<1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110419235812.GA4619@kroah.com>
+Message-ID: <20110420074248.GS31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2011 17:46, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Wed, Apr 06, 2011 at 09:07:04PM +0200, Per Forlin wrote:
-> [...]
->> +static int mmc_test_rw_multiple(struct mmc_test_card *test,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_test_multiple_rw *tdata,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int reqsize, unsigned int size)
->> +{
->> + ? ? unsigned int dev_addr;
->> + ? ? struct mmc_test_area *t = &test->area;
->> + ? ? int ret = 0;
->> + ? ? int max_reqsize = max(t->mem->size_min_cmn *
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? min(t->max_segs, t->mem->cnt), t->max_tfr);
->> +
-> The 'max(..., t->max_tfr)' probably should be 'min(..., t->max_tfr)'.
-> Otherwise, I see mmc_test failure on my mxs-mmc setup.
->
-> mmc0: Test case 37. Write performance with blocking req 4k to 4MB...
-> mmc0: Transfer of 64 x 2048 sectors (64 x 1024 KiB) took 5.412563314 seconds (12
-> 398 kB/s, 12108 KiB/s, 11.82 IOPS)
-> mmc0: Failed to map sg list
-> [mmc_test_rw_multiple] error
-> mmc0: Result: ERROR (-22)
-Thanks for letting me know. I think I should simplify it and use
-t->max_tfr only.
-I tried to optimize for one of my case when max_tfr is only 1MiB but
-mmc request size is 32MiB.
+On Tue, Apr 19, 2011 at 04:58:12PM -0700, Greg KH wrote:
+> On Mon, Apr 11, 2011 at 08:42:58PM +0200, Uwe Kleine-K?nig wrote:
+> > Before commit
+> > 
+> > 	b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
+> > 
+> > calling dev_set_drvdata with dev=NULL was an unchecked error. After some
+> > discussion about what to return in this case removing the check (and so
+> > producing a null pointer exception) seems fine.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Hello,
+> > 
+> > @Viresh: as I didn't choose to return -EINVAL I didn't add your Reviewed-by:
+> 
+> I'm confused by this thread, care to resend all of these in a series
+> against the latest linux-next tree?
+No problem, here it comes. This are patches 1 to 4 of the original
+series + v2 of patch 5 (that didn't have 5/5 in the subject).
 
->
-> --
-> Regards,
-> Shawn
-Regards,
-Per
+Best regards,
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
