@@ -1,67 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Apr 2011 18:16:39 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1104201704350.3323@ionos>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2011 18:29:40 +0200
+Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
+In-Reply-To: <20110419120344.GG22799@n2100.arm.linux.org.uk>
+References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
+	<20110419092049.GC22799@n2100.arm.linux.org.uk>
+	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
+	<20110419120344.GG22799@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+On Tue, Apr 19, 2011 at 2:03 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 19, 2011 at 02:00:17PM +0200, Linus Walleij wrote:
+>>
+>> On a high-speeded ux500 the DATAEND IRQ will assert before the
+>> DMA data is actually finished, thus if we start hammering in the next
+>> request we break an ongoing transfer. :-(
+>
+> Yes, you've already said that in the past. ?And this is partly why we
+> have this code in the dma unmap:
+>
+> ? ? ? ?/* Wait up to 1ms for the DMA to complete */
+> ? ? ? ?for (i = 0; ; i++) {
+> ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
+> ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ?udelay(10);
+> ? ? ? ?}
+>
+> So, we wait until the DMA has drained the FIFO before we fire off the
+> next request - or even unmap the DMA buffer. ?Should the DMA fail to
+> drain the FIFO in a reasonable time, we timeout and disable DMA.
+>
+> Again, I ask, why is this not sufficient to cover the case where the
+> data end IRQ occurs before the DMA engine has completed the transfer -
+> which is likely to take a very short time indeed.
 
-Very useful changelog.
+It doesn't help, we have really tested this and at high speed transfers
+(especially if we use Per Fridens speed-up patches) apparently
+the flag RXDATAAVLBL goes to zero before the block is really
+finished.
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> only compile tested so far.
+My rough guess (after looking at the VHDL code) is that
+RXDATAVLBL flag goes low when the FIFO is empty, but that
+doesn't mean that the DMA handshake logic is out of its send/recieve
+state and thus we screw it up if we hammer in another transfer before
+it has had time to deassert the single/burst request signals and go to
+idle state. This can only be seen by the side effect of the DMA
+transfer actually terminating, and the DMA engine calling its
+callback.
 
-You are not listening at all, right?
- 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 264c809..7627815 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -14,10 +14,23 @@
->  int clk_prepare(struct clk *clk)
->  {
->  	int ret = 0;
-> +	struct clk *parent = ERR_PTR(-ENOSYS);
->  
->  	if (!clk)
->  		return 0;
->  
-> +	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
+Our version is not that far away from the pure ARM versions
+so I think this problem is actually present in an unmodified
+PL180 as well.
 
-Why the hell is this conditional? I told you that a proper abstraction
-is for the sane cases which are the majority of the hardware and we
-don't code for the buggy HW case unless we have evidence that it
-exists. Once we have that evidence we can decide what to do - add a
-flag or a separate function.
-
-> +		parent = clk_get_parent(clk);
-> +
-> +		if (!IS_ERR(parent)) {
-> +			ret = clk_prepare(parent);
-> +			if (ret)
-> +				return ret;
-> +		} else if (PTR_ERR(parent) != -ENOSYS)
-> +			/* -ENOSYS means no parent and is OK */
-> +			return PTR_ERR(parent);
-> +	}
-
-And this whole mess should be written:
-
-    ret = clk_prepare(clk->parent);
-    if (ret)
-		return ret;
-
-Which returns 0 when there is no parent and it also returns 0 when
-there is no prepare callback for the parent. Why the hell do we need
-all this ERRPTR checking mess and all this conditional crap ?
-
-Thanks,
-
-	tglx
+Yours,
+Linus Walleij
