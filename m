@@ -1,47 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Apr 2011 00:33:13 -0700
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <201104191616.01647.arnd@arndb.de>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<BANLkTikVfdVQuR_nJZnra7Bo=CQgOfS5Zg@mail.gmail.com>
-	<20110415062643.GB12272@atomide.com>
-	<201104191616.01647.arnd@arndb.de>
-Message-ID: <20110420073313.GB28679@atomide.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 20 Apr 2011 09:41:32 +0200
+Subject: [PATCH v2 03/12] mmc: mmc_test: add test for none blocking
+	transfers
+In-Reply-To: <20110417154622.GC17935@S2100-06.ap.freescale.net>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302116833-24540-4-git-send-email-per.forlin@linaro.org>
+	<20110417154622.GC17935@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTikhaCqW=4BD_h05QebBftVGjGQ3+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110419 07:13]:
-> On Friday 15 April 2011, Tony Lindgren wrote:
-> > > drivers/platform/arm/ux500/*
-> > > include/linux/platform/arm/ux500/*
-> > > 
-> > > Are any of these generally speaking good ideas?
-> > 
-> > Or maybe drivers/arm?
-> > 
-> > Anyways, whatever can be done as loadable modules should be done
-> > that way. That makes the life for distros much easier ;)
-> 
-> drivers/arm would just become the next pile of crap if we start that,
-> like drivers/misc is starting to look now.
-> 
-> There are more things that I think should become subsystems
-> for themselves, with a proper maintainer, rather than bits
-> that simply get copied across all platforms.
+On 17 April 2011 17:46, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Wed, Apr 06, 2011 at 09:07:04PM +0200, Per Forlin wrote:
+> [...]
+>> +static int mmc_test_rw_multiple(struct mmc_test_card *test,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_test_multiple_rw *tdata,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int reqsize, unsigned int size)
+>> +{
+>> + ? ? unsigned int dev_addr;
+>> + ? ? struct mmc_test_area *t = &test->area;
+>> + ? ? int ret = 0;
+>> + ? ? int max_reqsize = max(t->mem->size_min_cmn *
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? min(t->max_segs, t->mem->cnt), t->max_tfr);
+>> +
+> The 'max(..., t->max_tfr)' probably should be 'min(..., t->max_tfr)'.
+> Otherwise, I see mmc_test failure on my mxs-mmc setup.
+>
+> mmc0: Test case 37. Write performance with blocking req 4k to 4MB...
+> mmc0: Transfer of 64 x 2048 sectors (64 x 1024 KiB) took 5.412563314 seconds (12
+> 398 kB/s, 12108 KiB/s, 11.82 IOPS)
+> mmc0: Failed to map sg list
+> [mmc_test_rw_multiple] error
+> mmc0: Result: ERROR (-22)
+Thanks for letting me know. I think I should simplify it and use
+t->max_tfr only.
+I tried to optimize for one of my case when max_tfr is only 1MiB but
+mmc request size is 32MiB.
 
-Sure that sounds good to me.
- 
-> ACPI does a lot of things (unfortunately), and I did not get the impression
-> that prcmu does the one part we really need, which is complete enumeration
-> of all devices. If it did that, it should become a bus_type and replace
-> the hardcoded sets of platform devices.
-
-Right, for most SoCs there is no such thing as enumeration of devices.
-But passing that information in device tree format from the bootloader 
-should sort that issue.
-
-For omaps we have the hwmod bus abstraction for platform bus that could
-be made generic potentially. Needs to be converted to use DT data first
-though..
-
-Tony
+>
+> --
+> Regards,
+> Shawn
+Regards,
+Per
