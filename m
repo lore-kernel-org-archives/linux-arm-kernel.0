@@ -1,137 +1,106 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Apr 2011 21:52:15 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110420185922.GD31131@pengutronix.de>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1104202113250.3323@ionos>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Wed, 20 Apr 2011 21:55:15 +0200
+Subject: [PATCH] pxa/hx4700: use gpio arrays for global gpio initialization
+Message-ID: <1303329317.21545.5.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
-> On Wed, Apr 20, 2011 at 06:16:39PM +0200, Thomas Gleixner wrote:
-> > On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
-> > 
-> > Very useful changelog.
-> IMHO OK for a RFC patch.
+gpio_request_arrays() is a functional replacement for hx4700_gpio_request(),
+which is now obsolete.
 
-Not at all.
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/mach-pxa/hx4700.c |   66 ++++++++++----------------------------------
+ 1 files changed, 15 insertions(+), 51 deletions(-)
 
-> > 
-> > And this whole mess should be written:
-> > 
-> >     ret = clk_prepare(clk->parent);
-> >     if (ret)
-> > 		return ret;
-> > 
-> > Which returns 0 when there is no parent and it also returns 0 when
-> > there is no prepare callback for the parent. Why the hell do we need
-> > all this ERRPTR checking mess and all this conditional crap ?
->
-> struct clk has no parent member, there is only clk_get_parent(). If
-
-Which is a complete failure to begin with. Why the heck do you need a
-callback to figure that out?
-
-Because someone claimed, that you need a callback to make it safe from
-changing? Or what's the reason for this?
-
-> there is no parent it returns ERR_PTR(-ENOSYS) and if you pass that
-> to clk_prepare it tries to dereference it. So either it must not be
-> called with an error pointer or clk_prepare et al. need adaption to
-> handle
-
-The whole clk struct is an utter failure.
-
-It's simply the least common denominator of all clk madness in the
-tree. Which results in a half documented data structure and a handful
-helper functions of which most of them are exported, though the
-functionality in them is less than the overhead of the EXPORT_SYMBOL.
-
-That's not an abstraction and neither it's a framework. It's a half
-arsed conglomorate of primitives w/o the minimal documentation how
-those primitives should be used and why they are there in the first
-place.
-
-This is new code and it should be aimed to cleanup things not to
-shuffle things around in a frenzy.
-
-So what's wrong with that code:
-
-1) struct clk is just a collection of function pointers and two locks
-
-   It lacks:
-   
-   - a flag field for properties
-   - a field for the parent
-   - a field for the current clock rate
-   - a field for the base register
-   - a struct for the offsets of the most common registers relative to
-     base
-
-   optionally a set of common register accessor functions like I did
-   for the generic irq chip.
-
-2) The "framework" API is just a set of low level primitive helper
-   functions
-
-   It lacks:
-
-   - proper refcounting. clk_get() / clk_put() should do that at the
-     framework level.
-
-   - the ability to propagate enable/disable/prepare/unprepare down
-     through the parent tree
-
-   - proper mechanisms to sanity check clk_set_parent(),
-     clk_set_rate() et. al.
-
-     This is not a implementation detail inside a specific clock. It's
-     a problem which is common at least on the tree level:
-
-                    rootclk
-                 /          \
-              clk1          clk2   
-             /   \
-           clk3  clk4
-	   /
-         clk5
-
-    So now you want to change the rate of clk1. Can you do that?
-    
-    No, but where is the sanity check which prevents that ?
-    
-        In the clk1->set_rate() callback ?
-
-	Great, that's the wrong place.
-
-    So now you want to switch the parent of clk3 from clk1 to
-    clk2. Can you do that?
-
-    No, but where is the sanity check which prevents that ?
-
-    	In the clk3->set_parent() callback ?
-
-	Again, the wrong place.
-
-    And these are not problems of a particular clk implementation,
-    these are general problems and those want to be addressed in a
-    real framework.
-
-    It's debatable, whether you want to be able to change clocks which
-    have active childs or not. If not the decision function is pretty
-    simple. If yes, you need a list of child clks which you want to
-    consult first before committing the change.
-
-So unless you fix this stuff you should not even think about
-converting anything to this "framework". That's just waste of time and
-effort. Aside of declaring it stable and useful ....
-
-The least thing which we need now are half baken "abstractions" which
-just shuffle code around for no value.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 9cdcca5..f8a3a6e 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -135,42 +135,6 @@ static unsigned long hx4700_pin_config[] __initdata = {
+ 	GPIO66_GPIO,	/* nSDIO_IRQ */
+ };
+ 
+-#define HX4700_GPIO_IN(num, _desc) \
+-	{ .gpio = (num), .dir = 0, .desc = (_desc) }
+-#define HX4700_GPIO_OUT(num, _init, _desc) \
+-	{ .gpio = (num), .dir = 1, .init = (_init), .desc = (_desc) }
+-struct gpio_ress {
+-	unsigned gpio : 8;
+-	unsigned dir : 1;
+-	unsigned init : 1;
+-	char *desc;
+-};
+-
+-static int hx4700_gpio_request(struct gpio_ress *gpios, int size)
+-{
+-	int i, rc = 0;
+-	int gpio;
+-	int dir;
+-
+-	for (i = 0; (!rc) && (i < size); i++) {
+-		gpio = gpios[i].gpio;
+-		dir = gpios[i].dir;
+-		rc = gpio_request(gpio, gpios[i].desc);
+-		if (rc) {
+-			pr_err("Error requesting GPIO %d(%s) : %d\n",
+-			       gpio, gpios[i].desc, rc);
+-			continue;
+-		}
+-		if (dir)
+-			gpio_direction_output(gpio, gpios[i].init);
+-		else
+-			gpio_direction_input(gpio);
+-	}
+-	while ((rc) && (--i >= 0))
+-		gpio_free(gpios[i].gpio);
+-	return rc;
+-}
+-
+ /*
+  * IRDA
+  */
+@@ -829,26 +793,26 @@ static struct platform_device *devices[] __initdata = {
+ 	&pcmcia,
+ };
+ 
+-static struct gpio_ress global_gpios[] = {
+-	HX4700_GPIO_IN(GPIO12_HX4700_ASIC3_IRQ, "ASIC3_IRQ"),
+-	HX4700_GPIO_IN(GPIO13_HX4700_W3220_IRQ, "W3220_IRQ"),
+-	HX4700_GPIO_IN(GPIO14_HX4700_nWLAN_IRQ, "WLAN_IRQ"),
+-	HX4700_GPIO_OUT(GPIO59_HX4700_LCD_PC1,          1, "LCD_PC1"),
+-	HX4700_GPIO_OUT(GPIO62_HX4700_LCD_nRESET,       1, "LCD_RESET"),
+-	HX4700_GPIO_OUT(GPIO70_HX4700_LCD_SLIN1,        1, "LCD_SLIN1"),
+-	HX4700_GPIO_OUT(GPIO84_HX4700_LCD_SQN,          1, "LCD_SQN"),
+-	HX4700_GPIO_OUT(GPIO110_HX4700_LCD_LVDD_3V3_ON, 1, "LCD_LVDD"),
+-	HX4700_GPIO_OUT(GPIO111_HX4700_LCD_AVDD_3V3_ON, 1, "LCD_AVDD"),
+-	HX4700_GPIO_OUT(GPIO32_HX4700_RS232_ON,         1, "RS232_ON"),
+-	HX4700_GPIO_OUT(GPIO71_HX4700_ASIC3_nRESET,     1, "ASIC3_nRESET"),
+-	HX4700_GPIO_OUT(GPIO82_HX4700_EUART_RESET,      1, "EUART_RESET"),
+-	HX4700_GPIO_OUT(GPIO105_HX4700_nIR_ON,          1, "nIR_EN"),
++static struct gpio global_gpios[] = {
++	{ GPIO12_HX4700_ASIC3_IRQ, GPIOF_IN, "ASIC3_IRQ" },
++	{ GPIO13_HX4700_W3220_IRQ, GPIOF_IN, "W3220_IRQ" },
++	{ GPIO14_HX4700_nWLAN_IRQ, GPIOF_IN, "WLAN_IRQ" },
++	{ GPIO59_HX4700_LCD_PC1,          GPIOF_OUT_INIT_HIGH, "LCD_PC1" },
++	{ GPIO62_HX4700_LCD_nRESET,       GPIOF_OUT_INIT_HIGH, "LCD_RESET" },
++	{ GPIO70_HX4700_LCD_SLIN1,        GPIOF_OUT_INIT_HIGH, "LCD_SLIN1" },
++	{ GPIO84_HX4700_LCD_SQN,          GPIOF_OUT_INIT_HIGH, "LCD_SQN" },
++	{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
++	{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
++	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
++	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
++	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
++	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
+ };
+ 
+ static void __init hx4700_init(void)
+ {
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
+-	hx4700_gpio_request(ARRAY_AND_SIZE(global_gpios));
++	gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+ 
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
+-- 
+1.7.4.4
