@@ -1,68 +1,47 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 20 Apr 2011 10:19:17 +0200
-Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <20110416154841.GA17935@S2100-06.ap.freescale.net>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<20110416154841.GA17935@S2100-06.ap.freescale.net>
-Message-ID: <BANLkTi=c6Fh24W6u-ikRfnfV922OuJnJ9A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Apr 2011 10:19:24 +0200
+Subject: [GIT PULL] i.MX for -rc
+Message-ID: <20110420081924.GB14770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2011 17:48, Shawn Guo <shawn.guo@freescale.com> wrote:
-> Hi Per,
->
-> On Wed, Apr 06, 2011 at 09:07:01PM +0200, Per Forlin wrote:
-> [...]
->>
->> Per Forlin (12):
->> ? mmc: add none blocking mmc request function
->> ? mmc: mmc_test: add debugfs file to list all tests
->> ? mmc: mmc_test: add test for none blocking transfers
->> ? mmc: add member in mmc queue struct to hold request data
->> ? mmc: add a block request prepare function
->> ? mmc: move error code in mmc_block_issue_rw_rq to a separate function.
->> ? mmc: add a second mmc queue request member
->> ? mmc: add handling for two parallel block requests in issue_rw_rq
->> ? mmc: test: add random fault injection in core.c
->> ? omap_hsmmc: use original sg_len for dma_unmap_sg
->> ? omap_hsmmc: add support for pre_req and post_req
->> ? mmci: implement pre_req() and post_req()
->>
->> ?drivers/mmc/card/block.c ? ? ?| ?493 +++++++++++++++++++++++++++--------------
->> ?drivers/mmc/card/mmc_test.c ? | ?342 ++++++++++++++++++++++++++++-
->> ?drivers/mmc/card/queue.c ? ? ?| ?171 +++++++++------
->> ?drivers/mmc/card/queue.h ? ? ?| ? 31 ++-
->> ?drivers/mmc/core/core.c ? ? ? | ?132 ++++++++++-
->> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
->> ?drivers/mmc/host/mmci.c ? ? ? | ?146 +++++++++++-
->> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
->> ?drivers/mmc/host/omap_hsmmc.c | ? 90 +++++++-
->> ?include/linux/mmc/core.h ? ? ?| ? ?9 +-
->> ?include/linux/mmc/host.h ? ? ?| ? 13 +-
->> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
->> ?12 files changed, 1172 insertions(+), 279 deletions(-)
->>
-> I'm playing the patch set and seeing the following warnings.
->
-> ?CC ? ? ?drivers/mmc/card/block.o
-> drivers/mmc/card/block.c: In function ?mmc_blk_issue_rq?:
-> drivers/mmc/card/block.c:429:6: warning: ?status? may be used uninitialized in this function
->
-My bad, it should be:
-+ int status = 0;
 
-> ?CC ? ? ?drivers/mmc/core/core.o
-> drivers/mmc/core/core.c: In function ?mmc_request_done?:
-> drivers/mmc/core/core.c:163:3: warning: passing argument 2 of ?mmc_should_fail_request? from incompatible pointer type
-> drivers/mmc/core/core.c:129:20: note: expected ?struct mmc_data *? but argument is of type ?struct mmc_request *?
-The function within #ifdef CONFIG_FAIL_MMC_REQUEST is the correct one.
-I will update this in the next version.
+Russell,
 
+Please pull the following for -rc. It contains some i.MX specific build
+and runtime fixes.
 
->
-> --
-> Regards,
-> Shawn
-Thanks,
-Per
+Sascha
+
+The following changes since commit 6221f222c0ebf1acdf7abcf927178f40e1a65e2a:
+
+  Linux 2.6.39-rc2 (2011-04-05 18:30:43 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+
+Dave Martin (1):
+      ARM: mxc: Correct data alignment in headsmp.S for CONFIG_THUMB2_KERNEL
+
+Fabio Estevam (1):
+      ARM: mx5/mx53_loco: Fix build warning related to gpio_keys_button structure
+
+Thomas Gleixner (1):
+      ARM: mxc: Add missing lockdep annotation
+
+Uwe Kleine-K?nig (2):
+      ARM: imx: fix usb related build failure for mach-vpr200
+      ARM: mxs/clock-mx28: fix up name##_set_rate
+
+ arch/arm/mach-mx3/mach-vpr200.c     |   11 ++++++++---
+ arch/arm/mach-mx5/board-mx53_loco.c |    2 +-
+ arch/arm/mach-mxs/clock-mx28.c      |    7 ++++++-
+ arch/arm/plat-mxc/gpio.c            |    7 +++++++
+ arch/arm/plat-mxc/ssi-fiq.S         |    2 ++
+ 5 files changed, 24 insertions(+), 5 deletions(-)
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
