@@ -1,49 +1,58 @@
-From: bn@niasdigital.com (Ben Nizette)
-Date: Thu, 21 Apr 2011 09:32:26 +1000
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTi=W7jaVtW1FThvG_ca57q+yDz1kzQ@mail.gmail.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
-	<20110418091902.13345132@lxorguk.ukuu.org.uk>
-	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
-	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
-	<BANLkTi=W7jaVtW1FThvG_ca57q+yDz1kzQ@mail.gmail.com>
-Message-ID: <E0A55C1E-9DA0-4FFE-90EE-575BB1E649CB@niasdigital.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 20 Apr 2011 16:59:16 -0700
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <20110419062633.GA15620@atomide.com> (Tony Lindgren's message of
+	"Tue, 19 Apr 2011 09:26:33 +0300")
+References: <1303139217-10285-1-git-send-email-charu@ti.com>
+	<20110419062633.GA15620@atomide.com>
+Message-ID: <87r58w4gq3.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-On 20/04/2011, at 10:21 PM, Linus Walleij wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> 2011/4/19 Ben Nizette <bn@niasdigital.com>:
->> On 18/04/2011, at 10:26 PM, Alan Cox wrote:
+> * Varadarajan, Charulatha <charu@ti.com> [110418 18:00]:
+>> From: Charulatha V <charu@ti.com>
 >> 
->>> The logical extension to that is to delete the gpio layer because the
->>> board code can do it ?
->> 
->> Well anything that is done once at startup, yes,
-> 
-> This patch is about biasing and drive modes. We need to alter
-> these at runtime (from board code, indeed) due to the fact that
-> when you go to sleep e.g. floating a pin yeilds better power
-> characteristics.
+>> Use PM runtime framework in OMAP GPIO driver.
+> ...
+>  
+>>  arch/arm/mach-omap2/gpio.c             |    6 +
+>>  arch/arm/mach-omap2/pm34xx.c           |   22 +-
+>>  arch/arm/plat-omap/gpio.c              |  766 ++++++++++++++++++--------------
+>>  arch/arm/plat-omap/include/plat/gpio.h |    3 +-
+>>  4 files changed, 439 insertions(+), 358 deletions(-)
+>
+> Before this series gets merged we first need to do the following:
+> - Pass some registers in platform_data so we can have common
+>   functions in gpio.c instead of having to test for the bank->method
+>   in each function. This allows getting rid of the ifdefs as
+>   discussed in the ARM Linux consolidation thread.
 
-This is actually an interesting case because floating pins yeild
-/worse/ power characteristics (each transistor of the push-pull
-is on a little bit and you get a path straight through) [1].  To
-get good power performance you want to pull an input pin high or
-low but which of those two directions depends on external
-constraints, i.e. the board.  This is a case where the driver
-should /not/ go playing with things it can't fully understand.
+I have a series that starts this process, will post it shortly.
 
-Perhaps one of the properties that a board can set in a gpio chip
-driver is the suspend state and have suspend/resume hooks in the
-gpio chip take care of setting things up on each side.
+> - Move it to drivers/gpio
+>
+> - Further consolidate with whatever common GPIO code might
+>   be coming up.
 
-	--Ben.
+Is the above order required?
 
-[1] http://processors.wiki.ti.com/index.php/Optimizing_IO_Power_Consumption
+IMO, before we move it to drivers/gpio, this code needs to be runtime PM
+converted (using this series from Charu.)  The runtime PM conversion
+removes a bunch of platform-specific hacks that should be moved into
+drivers/*.
 
-> 
-> Linus Walleij
+Personally, I think we should go in this order
+
+- runtime PM conversion
+- #ifdef cleanup
+- move to drivers/gpio
+- look at consolidation with other drivers
+
+I'm willing to queue the GPIO work in my tree while it's under way if
+you like as well.
+
+Kevin
