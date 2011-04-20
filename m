@@ -1,31 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 20 Apr 2011 19:42:21 +0400
-Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
-In-Reply-To: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
-References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <4DAEFEDD.1040106@ru.mvista.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2011 17:45:40 +0200
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <20110420163238.5f0e5ea6@lxorguk.ukuu.org.uk>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+	<20110419093855.36910400@lxorguk.ukuu.org.uk>
+	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
+	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
+	<BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+	<BANLkTi=Oc+y+31KugbEy66Mp96=bf_G8Mg@mail.gmail.com>
+	<BANLkTinv_-6dJJXAWc=NFTceXGA9sabanA@mail.gmail.com>
+	<20110420163238.5f0e5ea6@lxorguk.ukuu.org.uk>
+Message-ID: <BANLkTikWrJBDSRL-iJnqFObheeXUwJ7j_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+2011/4/20 Alan Cox <alan@lxorguk.ukuu.org.uk>:
 
-On 20-04-2011 13:25, Shweta Gulati wrote:
+>> Even if some people are only muxing pins that can also be used as GPIO,
+>> this is not always the case. We can shunt out the same pins to be used as
+>> I2C or SPI for example, that means this cannot be handled in a GPIO
+>> driver since it has nothing to do with GPIO pins at all.
+>
+> It sounds very much to me like it belongs in the GPIO driver. That is the
+> one piece of code which knows what it is doing for all this configuration.
 
-> From: Gulati, Shweta<shweta.gulati@ti.com>
+Yeah whether it goes into drivers/pinpadmux and include/linux/pinpadmux.h
+or drivers/gpio and include/linux/gpio.h does not matter to me if that is it's
+more natural habitat to most people :-)
 
-> Core Clk Tree shows incorrect Clk rates at OPP50, as
-> in commit e07f469d284ca3d1f5dcf5438c22982be98bc071
+Now I need to post v2 of this patchset...
 
-    Please also specify that commit's summary -- for human readers.
-
-> calling of 'recalc' in API clk_set_rate is unintentionally
-> removed, because of which clock's tree rates get goofed
-> up when DVFS happens. This Patch adds recalc API back.
-
-> Tested on OMAP3630 SDP Board.
-
-> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
-> Cc: Rajendra Nayak<rnayak@ti.com>
-> Cc: Paul Wamsley<paul@pwsan.com>
-
-WBR, Sergei
+Linus Walleij
