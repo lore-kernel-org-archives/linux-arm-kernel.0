@@ -1,103 +1,59 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 20 Apr 2011 16:55:09 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <201104191629.49676.arnd@arndb.de>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104191449.50824.arnd@arndb.de>
-	<000001cbfe9a$8e64cae0$ab2e60a0$%szyprowski@samsung.com>
-	<201104191629.49676.arnd@arndb.de>
-Message-ID: <007301cbff6a$f17a4710$d46ed530$%szyprowski@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 20 Apr 2011 23:04:35 +0800
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+	<20110419093855.36910400@lxorguk.ukuu.org.uk>
+	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
+	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
+	<BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+Message-ID: <BANLkTi=Oc+y+31KugbEy66Mp96=bf_G8Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Apr 20, 2011 at 10:40 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Wed, Apr 20, 2011 at 11:26 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Tue, Apr 19, 2011 at 4:51 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+>>>>
+>>>> Leaving aside the current input/output and on/off bits I would go for
+>>>> being able to do
+>>>>
+>>>> ? ? ? ?gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
+>>>> ? ? ? ?gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
+>>>
+>>> One more consideration, not mentioned previous time, is that pin
+>>> configuration for power down mode.
+>>> Samsung SoCs has retention GPIO configurations at sleep (suspend)
+>>> mode. and restore it at resume time.
+>>> it's need to reduce power and proper operation after suspend.
+>>>
+>> I have a little confusion. In ARM SoC, a lot of pins are used as
+>> multi-functions.
+>>
+>> Before suspend, it may be configured as some function that isn't GPIO.
+>> Is it a goal
+>> that avoid declaring gpio_request() for suspend and updating the setting of pin?
+>
+> E.g., When WiFi is turn on and system goes the sleep, wifi should be
+> turn on. For this it should be configure the power down gpio
+> configuration properly. Its' different that call the gpio_set_value
+> function.
+>
+> One more, even though some pins are used for other purpose instead of
+> GPIO. It needs to be configure as input or output at power down mode
+> registers.
+>
+> Thank you,
+> Kyungmin Park
+>
+I have an another question on board initialization. The configuration on pins
+are including drive strength, pull and multiple function.
 
-On Tuesday, April 19, 2011 4:30 PM Arnd Bergmann wrote:
-
-> > > That is a limitation of the current implementation. We might want to
-> > > change that anyway, e.g. to handle the mali IOMMU along with yours.
-> > > I believe the reason for allowing only one IOMMU type so far has been
-> > > that nobody required more than one. As I mentioned, the IOMMU API is
-> > > rather new and has not been ported to much variety of hardware, unlike
-> > > the dma-mapping API, which does support multiple different IOMMUs
-> > > in a single system.
-> >
-> > Ok. I understand. IOMMU API is quite nice abstraction of the IOMMU chip.
-> > dma-mapping API is something much more complex that creates the actual
-> > mapping for various sets of the devices. IMHO the right direction will
-> > be to create dma-mapping implementation that will be just a client of
-> > the IOMMU API. What's your opinion?
-> 
-> Sounds good. I think we should put it into a new drivers/iommu, along
-> with your specific iommu implementation, and then we can convert the
-> existing ones over to use that.
-
-I see, this sounds quite reasonable. I think I finally got how this should
-be implemented. 
-
-The only question is how a device can allocate a buffer that will be most
-convenient for IOMMU mapping (i.e. will require least entries to map)?
-
-IOMMU can create a contiguous mapping for ANY set of pages, but it performs
-much better if the pages are grouped into 64KiB or 1MiB areas.
-
-Can device allocate a buffer without mapping it into kernel space?
-
-The problem that still left to be resolved is the fact the
-dma_coherent_alloc() should also be able to use IOMMU. This would however
-trigger the problem of double mappings with different cache attributes: 
-dma api might require to create coherent (==non-cached mappings), while 
-all low-memory is still mapped with (super)sections as cached, what is 
-against ARM CPU specification and might cause unpredicted behavior
-especially on CPUs that do speculative prefetch. Right now this problem
-has been ignored in dma-mappings implementation, but there have been some
-patches posted to resolve this by reserving some area exclusively for dma
-coherent mappings: 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/100822/focus=100913
-
-Right now I would like to postpone resolving this issue because the Samsung
-iommu task already became really big.
-
-> Note that this also requires using dma-mapping-common.h, which we currently
-> don't on ARM.
-
-Yes, I noticed this, shouldn't be much problem, imho.
-
-> > > The domain really reflects the user, not the device here, which makes
-> more
-> > > sense if you think of virtual machines than of multimedia devices.
-> > >
-> > > I would suggest that you just use a single iommu_domain globally for
-> > > all in-kernel users.
-> >
-> > There are cases where having a separate mapping for each device makes
-> sense.
-> > It definitely increases the security and helps to find some bugs in
-> > the drivers.
-> >
-> > Getting back to our video codec - it has 2 IOMMU controllers. The codec
-> > hardware is able to address only 256MiB of space. Do you have an idea how
-> > this can be handled with dma-mapping API? The only idea that comes to my
-> > mind is to provide a second, fake 'struct device' and use it for
-> allocations
-> > for the second IOMMU controller.
-> 
-> Good question.
-> 
-> How do you even decide which controller to use from the driver?
-> I would need to understand better what you are trying to do to
-> give a good recommendation.
-
-Both controllers are used by the hardware depending on the buffer type.
-For example, buffers with chroma video data are accessed by first (called
-'left') memory channel, the others (with luma video data) - by the second
-channel (called 'right'). Each memory channel is limited to 256MiB address
-space and best performance is achieved when buffers are allocated in 
-separate physical memory banks (the boards usually have 2 or more memory banks,
-memory is not interleaved).
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Since this patch can configure drive strength, pull. Will it be preferred to use
+in board initialization?
