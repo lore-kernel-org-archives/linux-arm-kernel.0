@@ -1,194 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Apr 2011 20:08:11 +0100
-Subject: [RFC PATCH 02/12] ARM: smp_twd: add support for remapped PPI
-	interrupts
+Date: Wed, 20 Apr 2011 20:08:18 +0100
+Subject: [RFC PATCH 09/12] ARM: exynos4: use remapped PPI interrupts for local
+	timer
 In-Reply-To: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
 References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1303326501-15664-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1303326501-15664-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_GIC_VPPI is enabled, let smp_twd request interrupts
-the normal way (ie using request_irq()).
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
-This involves letting PPIs go via the same code path as SPIs and
-having normal interrupt handler for the local timer code.
+Tested on a SMDK-S5PV310 board.
 
-The previous ad-hoc code is still supported when CONFIG_ARM_GIC_VPPI
-is not defined.
-
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/entry-macro-multi.S        |    2 +-
- arch/arm/include/asm/hardware/entry-macro-gic.S |   19 ++++++++++++-------
- arch/arm/include/asm/localtimer.h               |    6 ++++++
- arch/arm/kernel/smp.c                           |   10 ++++++++++
- arch/arm/kernel/smp_twd.c                       |   16 +++++++++++++++-
- 5 files changed, 44 insertions(+), 9 deletions(-)
+ arch/arm/mach-exynos4/include/mach/entry-macro.S |   12 +-----------
+ arch/arm/mach-exynos4/localtimer.c               |    3 ++-
+ arch/arm/plat-s5p/Kconfig                        |    1 +
+ 3 files changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
-index ec0bbf7..c599795 100644
---- a/arch/arm/include/asm/entry-macro-multi.S
-+++ b/arch/arm/include/asm/entry-macro-multi.S
-@@ -24,7 +24,7 @@
- 	adrne	lr, BSYM(1b)
- 	bne	do_IPI
+diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+index d8f38c2..f007168 100644
+--- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
++++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+@@ -50,7 +50,7 @@
  
--#ifdef CONFIG_LOCAL_TIMERS
-+#if defined(CONFIG_LOCAL_TIMERS) && !defined(CONFIG_ARM_GIC_VPPI)
- 	test_for_ltirq r0, r6, r5, lr
- 	movne	r0, sp
- 	adrne	lr, BSYM(1b)
-diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
-index c115b82..14a3363 100644
---- a/arch/arm/include/asm/hardware/entry-macro-gic.S
-+++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
-@@ -17,23 +17,26 @@
- 	.endm
- #endif
+ 		bic     \irqnr, \irqstat, #0x1c00
  
-+#ifdef CONFIG_ARM_GIC_VPPI
-+#define DO_IRQ_BASE	16
-+#else
-+#define DO_IRQ_BASE	30
-+#endif
-+
- /*
-  * The interrupt numbering scheme is defined in the
-  * interrupt controller spec.  To wit:
-  *
-  * Interrupts 0-15 are IPI
-- * 16-28 are reserved
-- * 29-31 are local.  We allow 30 to be used for the watchdog.
-+ * 16-31 are local.  We allow 30 to be used for the watchdog.
-  * 32-1020 are global
-  * 1021-1022 are reserved
-  * 1023 is "spurious" (no interrupt)
-  *
-- * For now, we ignore all local interrupts so only return an interrupt if it's
-- * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
-- *
-  * A simple read from the controller will tell us the number of the highest
-  * priority enabled interrupt.  We then just need to check whether it is in the
-- * valid range for an IRQ (30-1020 inclusive).
-+ * valid range for an IRQ (30-1020 inclusive). If CONFIG_ARM_GIC_VPPI is
-+ * enabled, local interrupts are handled the same way as global ones.
-  */
+-		cmp     \irqnr, #29
++		cmp     \irqnr, #15
+ 		cmpcc	\irqnr, \irqnr
+ 		cmpne	\irqnr, \tmp
+ 		cmpcs	\irqnr, \irqnr
+@@ -72,13 +72,3 @@
+ 		cmpcs	\irqnr, \irqnr
+ 		.endm
  
- 	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-@@ -43,7 +46,7 @@
+-		/* As above, this assumes that irqstat and base are preserved.. */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov	\tmp, #0
+-		cmp	\irqnr, #29
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+diff --git a/arch/arm/mach-exynos4/localtimer.c b/arch/arm/mach-exynos4/localtimer.c
+index 6bf3d0a..315de6f 100644
+--- a/arch/arm/mach-exynos4/localtimer.c
++++ b/arch/arm/mach-exynos4/localtimer.c
+@@ -14,13 +14,14 @@
  
- 	ldr	\tmp, =1021
- 	bic     \irqnr, \irqstat, #0x1c00
--	cmp     \irqnr, #29
-+	cmp     \irqnr, #(DO_IRQ_BASE - 1)
- 	cmpcc	\irqnr, \irqnr
- 	cmpne	\irqnr, \tmp
- 	cmpcs	\irqnr, \irqnr
-@@ -63,6 +66,7 @@
- 	cmpcs	\irqnr, \irqnr
- 	.endm
- 
-+#ifndef CONFIG_ARM_GIC_VPPI
- /* As above, this assumes that irqstat and base are preserved.. */
- 
- 	.macro test_for_ltirq, irqnr, irqstat, base, tmp
-@@ -73,3 +77,4 @@
- 	streq	\irqstat, [\base, #GIC_CPU_EOI]
- 	cmp	\tmp, #0
- 	.endm
-+#endif
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 080d74f..bef44b3 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -10,6 +10,8 @@
- #ifndef __ASM_ARM_LOCALTIMER_H
- #define __ASM_ARM_LOCALTIMER_H
- 
-+#include <linux/interrupt.h>
-+
- struct clock_event_device;
+ #include <asm/irq.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
  
  /*
-@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
+  * Setup the local clock events for a CPU.
   */
- asmlinkage void do_local_timer(struct pt_regs *);
- 
-+/*
-+ * Per-cpu timer IRQ handler
-+ */
-+irqreturn_t percpu_timer_handler(int irq, void *dev_id);
- 
- #ifdef CONFIG_LOCAL_TIMERS
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 8fe05ad..64b9d81 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -452,6 +452,16 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
- 	set_irq_regs(old_regs);
- }
- 
-+irqreturn_t percpu_timer_handler(int irq, void *dev_id)
-+{
-+	if (local_timer_ack()) {
-+		ipi_timer();
-+		return IRQ_HANDLED;
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
- void show_local_irqs(struct seq_file *p, int prec)
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
  {
- 	unsigned int cpu;
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 60636f4..bbb0f4d 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -15,10 +15,11 @@
- #include <linux/smp.h>
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
--#include <linux/irq.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- 
- #include <asm/smp_twd.h>
-+#include <asm/localtimer.h>
- #include <asm/hardware/gic.h>
- 
- /* set up by the platform code */
-@@ -124,6 +125,8 @@ static void __cpuinit twd_calibrate_rate(void)
-  */
- void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
-+	int err;
-+
- 	twd_calibrate_rate();
- 
- 	clk->name = "local_timer";
-@@ -137,8 +140,19 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
-+#ifdef CONFIG_ARM_GIC_VPPI
-+	err = request_irq(clk->irq, percpu_timer_handler,
-+			  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_TIMER,
-+			  clk->name, clk);
-+	if (err) {
-+		pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
-+		       clk->name, clk->irq, smp_processor_id(), err);
-+		return;
-+	}
-+#else
- 	/* Make sure our local interrupt controller has this enabled */
- 	gic_enable_ppi(clk->irq);
-+#endif
- 
- 	clockevents_register_device(clk);
+-	evt->irq = IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
  }
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index 8492297..1ee4a1a 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -11,6 +11,7 @@ config PLAT_S5P
+ 	default y
+ 	select ARM_VIC if !ARCH_EXYNOS4
+ 	select ARM_GIC if ARCH_EXYNOS4
++	select ARM_GIC_VPPI if ARCH_EXYNOS4
+ 	select NO_IOPORT
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select S3C_GPIO_TRACK
 -- 
 1.7.0.4
