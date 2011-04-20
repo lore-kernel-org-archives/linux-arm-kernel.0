@@ -1,48 +1,81 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 Apr 2011 13:28:37 -0600
-Subject: [PATCH 0/5] OMAP hwmod/PRCM/clock: patches for 2.6.39-rc
-Message-ID: <20110420192601.16986.56558.stgit@twilight.localdomain>
+Date: Wed, 20 Apr 2011 13:28:39 -0600
+Subject: [PATCH 1/5] OMAP2+: hwmod data: Fix wrong dma_system end address
+In-Reply-To: <20110420192601.16986.56558.stgit@twilight.localdomain>
+References: <20110420192601.16986.56558.stgit@twilight.localdomain>
+Message-ID: <20110420192837.16986.70873.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Benoit Cousson <b-cousson@ti.com>
 
-This series contains OMAP hwmod/PRCM/clock fixes for the 2.6.39-rc merge
-period.  Of particular note is the DSS clock alias patch, without which
-OMAP4 will crash on boot.
+OMAP2420, 2430 and 3xxx were using the OMAP4 end address
+that unfortunately is not located at the same base address.
+Moreover the OMAP4 size was set to 256 instead of 4096.
 
-Boot-tested on N800, OMAP35xx Beagle, OMAP37xx Beagle, and OMAP4430
-ES2 Panda.
+Change all .pa_end to set them to .pa_start + 0xfff
 
-
-- Paul
-
+Cc: "G, Manjunath Kondaiah" <manjugk@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Reported-by: Michael Fillinger <m-fillinger@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
-
-for_tony_a_2.6.39rc
-   text	   data	    bss	    dec	    hex	filename
-5793259	 542448	5594272	11929979	 b6097b	vmlinux.omap2plus_defconfig.orig
-5793339	 542448	5594272	11930059	 b609cb	vmlinux.omap2plus_defconfig
-
-Avinash.H.M (1):
-      OMAP2/3: hwmod: fix gpio-reset timeouts seen during bootup.
-
-Benoit Cousson (1):
-      OMAP2+: hwmod data: Fix wrong dma_system end address
-
-Eduardo Valentin (2):
-      OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad area
-      OMAP3: PM: Do not rely on ROM code to restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-
-Tomi Valkeinen (1):
-      OMAP4: clock data: Change DSS clock aliases
-
-
- arch/arm/mach-omap2/clock44xx_data.c       |    9 ++-------
- arch/arm/mach-omap2/cm2xxx_3xxx.c          |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c              |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    6 +++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- 7 files changed, 45 insertions(+), 12 deletions(-)
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index 8eb3ce1..f50e56a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1782,7 +1782,7 @@ static struct omap_hwmod_irq_info omap2420_dma_system_irqs[] = {
+ static struct omap_hwmod_addr_space omap2420_dma_system_addrs[] = {
+ 	{
+ 		.pa_start	= 0x48056000,
+-		.pa_end		= 0x4a0560ff,
++		.pa_end		= 0x48056fff,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
+ };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index e6e3810..96753f7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -1915,7 +1915,7 @@ static struct omap_hwmod_irq_info omap2430_dma_system_irqs[] = {
+ static struct omap_hwmod_addr_space omap2430_dma_system_addrs[] = {
+ 	{
+ 		.pa_start	= 0x48056000,
+-		.pa_end		= 0x4a0560ff,
++		.pa_end		= 0x48056fff,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
+ };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index b98e2df..9bee155 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -2386,7 +2386,7 @@ static struct omap_hwmod_irq_info omap3xxx_dma_system_irqs[] = {
+ static struct omap_hwmod_addr_space omap3xxx_dma_system_addrs[] = {
+ 	{
+ 		.pa_start	= 0x48056000,
+-		.pa_end		= 0x4a0560ff,
++		.pa_end		= 0x48056fff,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
+ };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 3e88dd3..abc548a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -885,7 +885,7 @@ static struct omap_hwmod_ocp_if *omap44xx_dma_system_masters[] = {
+ static struct omap_hwmod_addr_space omap44xx_dma_system_addrs[] = {
+ 	{
+ 		.pa_start	= 0x4a056000,
+-		.pa_end		= 0x4a0560ff,
++		.pa_end		= 0x4a056fff,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
+ };
