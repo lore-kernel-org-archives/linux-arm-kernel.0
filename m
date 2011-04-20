@@ -1,51 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Apr 2011 09:50:10 +0530
-Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <1303226160.749.1.camel@e102144-lin.cambridge.arm.com>
-References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>	<1302633340-4795-7-git-send-email-will.deacon@arm.com>	<4DAD6FE4.2050504@ti.com>
-	<1303226160.749.1.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <4DAE5EFA.7030901@ti.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 20 Apr 2011 10:07:03 +0530
+Subject: Query about vexpress_ct_ca9x4 watchdog issue ?
+In-Reply-To: <1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
+References: <1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
+Message-ID: <4DAE62EF.7050508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/2011 8:46 PM, Will Deacon wrote:
-> Hi Santosh,
->
-> On Tue, 2011-04-19 at 12:20 +0100, Santosh Shilimkar wrote:
->> On 4/13/2011 12:05 AM, Will Deacon wrote:
->>> Currently, the gic uses handle_level_irq for handling SPIs (Shared
->>> Peripheral Interrupts), requiring active interrupts to be masked at
->>> the distributor level during IRQ handling.
->>>
->>> On a virtualised system, only the CPU interfaces are virtualised in
->>> hardware. Accesses to the distributor must be trapped by the
->>> hypervisor, adding latency to the critical interrupt path in Linux.
->>>
->>> This patch modifies the GIC code to use handle_fasteoi_irq for handling
->>> interrupts, which only requires us to signal EOI to the CPU interface
->>> when handling is complete. Cascaded IRQ handling is also updated to use
->>> the chained IRQ enter/exit functions to honour the flow control of the
->>> parent chip.
->>>
->>> Note that commit 846afbd1 ("GIC: Dont disable INT in ack callback")
->>> broke cascading interrupts by forgetting to add IRQ masking. This is
->>> no longer an issue because the unmask call is now unnecessary.
->>>
->>> Tested on Versatile Express and Realview EB (1176 w/ cascaded GICs).
->>>
->>> Cc: Abhijeet Dharmapurikar<adharmap@codeaurora.org>
->>> Cc: Russell King - ARM Linux<linux@arm.linux.org.uk>
->>> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
->>> Signed-off-by: Will Deacon<will.deacon@arm.com>
->>> ---
->> Tested with OMAP4.
->> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Tested-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->
-> Cheers for this. I'll add this and the tags for the OMAP-specific patch
-> (for some reason you dropped the list when you replied with your Ack).
->
-Sure. By mistake I did reply instead of reply all :(
+On 04/20/2011 07:37 AM, bill wrote:
+> Hi viresh and arm guys:)
+> 
+> I am testing sp805 watchdog at vexpress board.
+> 
+> After open /dev/watchdog , I use WDIOC_GETTIMELEFT ioctl to get the time left for rebooting in a loop;
+> while the timeleft is not decrementing, but stay as a constant 59s.
+> 
+> I read the WdogValue/WdogControl register as specified in SP805TRM, it does not change any way, 
+> 
+> WdogValue     --> 0xf0918000
+> WdogControl   -->0x3
+> 
+> 
+> It seems the value is correct, but watchdog is not triggered.
+> I am really puzzled about this, can you give me some clue to find the root cause?
+> 
 
-Regards
-Santosh
+Hi Bill,
+
+It looks that you are also not getting WDT reset after specified timeout? Is it so?
+So, probably driver is fine as it is tested on SPEAr.
+
+Probably the issue might be with clock rate and clock enable. What is the clock rate
+for wdt in your platform?
+Driver calls clk_enable() and clk_get_rate(). Can you please verify that this is
+working correctly.
+
+-- 
+viresh
