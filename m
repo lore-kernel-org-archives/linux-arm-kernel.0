@@ -1,7 +1,7 @@
 From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 20 Apr 2011 15:54:07 +0100
+Date: Wed, 20 Apr 2011 15:55:16 +0100
 Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTimfkpjQ9DoYKRTVwyvtPRccO+RwpA@mail.gmail.com>
+In-Reply-To: <BANLkTi=M3FxU6vv_aq1rLTmXQCGps=hC=w@mail.gmail.com>
 References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
 	<20110418091902.13345132@lxorguk.ukuu.org.uk>
@@ -9,33 +9,40 @@ References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
 	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
 	<20110419093855.36910400@lxorguk.ukuu.org.uk>
-	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
-	<BANLkTimfkpjQ9DoYKRTVwyvtPRccO+RwpA@mail.gmail.com>
-Message-ID: <20110420155407.1aa60f20@lxorguk.ukuu.org.uk>
+	<D3BCC8A3-7570-49F2-838C-A2B1899B0519@niasdigital.com>
+	<BANLkTi=M3FxU6vv_aq1rLTmXQCGps=hC=w@mail.gmail.com>
+Message-ID: <20110420155516.57d8d850@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011 14:32:35 +0200
+On Wed, 20 Apr 2011 14:38:01 +0200
 Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> 2011/4/19 Kyungmin Park <kmpark@infradead.org>:
+> 2011/4/20 Ben Nizette <bn@niasdigital.com>:
+> > On 19/04/2011, at 6:38 PM, Alan Cox wrote:
+> >> Leaving aside the current input/output and on/off bits I would go for
+> >> being able to do
+> >>
+> >> ? ? ? gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
+> >> ? ? ? gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
+> >
+> > Yeah I'm all for that so long as the capability constants are defined by the gpio
+> > provider, eg <linux/gpio/mygpioexpander.h>. ?There's no way gpiolib should be
+> > keeping a big ole list of every possible config option for every gpio provider.
 > 
-> > One more consideration, not mentioned previous time, is that pin
-> > configuration for power down mode.
-> > Samsung SoCs has retention GPIO configurations at sleep (suspend)
-> > mode. and restore it at resume time.
-> > it's need to reduce power and proper operation after suspend.
+> OK I buy that. I will refactor this solution to some opaque call instead
+> and start from there.
 > 
-> Isn't this supposed to be handled by runtime_pm hooks inside
-> your GPIO driver rather than by someone else talking to
-> the GPIO driver trying to spool/unspool the state from the
-> outside in some other place?
+> >?Well, maybe gpiolib can know about the options (eg GPIO_BIAS) so long
+> > as it doesn't have to enumerate every possible value.
 > 
-> Or am I getting things backwards now...?
+> I will drop that even, one parameter is better than two if one of them
+> is custom nevertheless. What difference does it make..
 
-IMHO that rather depends upon what knows the right things to do. The
-platform may know the right way to manage GPIO pins but it may also be
-that only the driver knows because the correct suspended pin states
-depend on the driver or on the current runtime configuration - eg if a
-specific GPIO must be left enabled for wakeup to work then it depends
-whether that device is active not on the platform level properties.
+One parameter means its completely useless and we'll have to go change
+the API.
+
+Without the 'operation' being a parameter of its own no driver knows how
+to answer the question 'is this shared operation A'
+
+Alan
