@@ -1,39 +1,34 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 20 Apr 2011 10:01:22 +0200
-Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
-In-Reply-To: <20110417164830.GE17935@S2100-06.ap.freescale.net>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
-	<20110417164830.GE17935@S2100-06.ap.freescale.net>
-Message-ID: <BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 20 Apr 2011 13:39:26 +0530
+Subject: Query about vexpress_ct_ca9x4 watchdog issue ?
+In-Reply-To: <fa59500.14272.12f71cec204.Coremail.bill_carson@126.com>
+References: <4DAE885F.3060308@st.com> <4DAE62EF.7050508@st.com>
+	<1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
+	<4b3cc9c7.13699.12f71a8b503.Coremail.bill_carson@126.com>
+	<fa59500.14272.12f71cec204.Coremail.bill_carson@126.com>
+Message-ID: <4DAE94B6.9060309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2011 18:48, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Mon, Apr 18, 2011 at 12:33:30AM +0800, Shawn Guo wrote:
->> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
->> If not calling pre_req() before mxs_mmc_request(), request()
->> will prepare the cache just like it did it before.
->> It is optional to use pre_req() and post_req().
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> ?drivers/mmc/host/mxs-mmc.c | ? 75 ++++++++++++++++++++++++++++++++++++++++++--
->> ?1 files changed, 72 insertions(+), 3 deletions(-)
->>
->
-> Here is the result of mmc_test case 37 ~ 40, which are designed to see
-> the performance improvement introduced by non-blocking changes.
->
-> Honestly, the improvement is not so impressive. ?Not sure if the patch
-> for mxs-mmc pre_req and post_req support was correctly produced. ?So
-> please help review ...
-My guess is that dma_unmap is not run in parallel with transfer.
-Please look at my patch reply.
+On 04/20/2011 12:57 PM, bill wrote:
+>> Sorry i got confused here. Which driver did you test coh901327_wdt.c or SP805.
+>> >1310 doesn't have 805, neither have coh901327_wdt. It has cortex watchdog, for which
+>> >support is not added for spear.
+>> >
+>> >coh901327_wdt.c is for ST Ericsson's U300 soc.
+>> >
+>> >
+> I miss type the file name, it's cortexa9_wdt.c that I used test on SPEAr1310.
+> this file was rename with sp805_wdt.c in new kernel version.
+> 
 
->
-> --
-> Regards,
-> Shawn
-Regards,
-Per
+No. This is wrong.
+There is no driver in kernel with name cortexa9_wdt.c. I sent patch for it once
+but it never made through, and so we aren't supporting wdt for 1310 in mainline at all.
+
+sp805 was present in spear3xx & 6xx.
+
+What do you want to test sp805 or cortexa9_wdt???
+
+-- 
+viresh
