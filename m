@@ -1,41 +1,61 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 20 Apr 2011 21:48:19 +0800
-Subject: [PATCH] pxa/magician: bq24022 regulator needs to be enabled
-In-Reply-To: <1303306891.2703.3.camel@flow>
-References: <E1QAkBF-0003bF-A0@outmx04.plus.net>
-	<20110419084032.GA30743@rainbow> <20110419113201.GA32248@rainbow>
-	<BANLkTim_=pwuOvkRfMz_ZQe=NtJfGijajA@mail.gmail.com>
-	<1303306891.2703.3.camel@flow>
-Message-ID: <BANLkTim33CVj7YRatMSYC5dbzPr+QQgvCA@mail.gmail.com>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Wed, 20 Apr 2011 19:23:17 +0530
+Subject: [PATCH v18 08/13] davinci: eliminate use of IO_ADDRESS() on sysmod
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C75E97E@dbde02.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF72C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 9:41 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Add REGULATOR_CHANGE_STATUS flag to magician bq24022 regulator to enable charging.
->
-> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-
-Applied to 'fix'. Thanks.
-
-> ---
-> ?arch/arm/mach-pxa/magician.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-> index a72993d..9984ef7 100644
-> --- a/arch/arm/mach-pxa/magician.c
-> +++ b/arch/arm/mach-pxa/magician.c
-> @@ -599,7 +599,7 @@ static struct regulator_consumer_supply bq24022_consumers[] = {
-> ?static struct regulator_init_data bq24022_init_data = {
-> ? ? ? ?.constraints = {
-> ? ? ? ? ? ? ? ?.max_uA ? ? ? ? = 500000,
-> - ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_CURRENT,
-> + ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_CURRENT | REGULATOR_CHANGE_STATUS,
-> ? ? ? ?},
-> ? ? ? ?.num_consumer_supplies ?= ARRAY_SIZE(bq24022_consumers),
-> ? ? ? ?.consumer_supplies ? ? ?= bq24022_consumers,
-> --
-> 1.7.4.4
->
->
->
+On Tue, Apr 05, 2011 at 16:28:33, Nori, Sekhar wrote:
+> Hi Manju,
+> 
+> On Sat, Apr 02, 2011 at 15:13:17, Hadli, Manjunath wrote:
+> > Current devices.c file has a number of instances where
+> > IO_ADDRESS() is used for system module register access. Eliminate this 
+> > in favor of a ioremap() based access.
+> > 
+> > Consequent to this, a new global pointer davinci_sysmodbase has been 
+> > introduced which gets initialized during the initialization of each 
+> > relevant SoC
+> > 
+> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> > Acked-by: Sekhar Nori <nsekhar@ti.com>
+> > ---
+> 
+> > diff --git a/arch/arm/mach-davinci/include/mach/hardware.h 
+> > b/arch/arm/mach-davinci/include/mach/hardware.h
+> > index 414e0b9..2a6b560 100644
+> > --- a/arch/arm/mach-davinci/include/mach/hardware.h
+> > +++ b/arch/arm/mach-davinci/include/mach/hardware.h
+> > @@ -21,6 +21,12 @@
+> >   */
+> >  #define DAVINCI_SYSTEM_MODULE_BASE        0x01C40000
+> >  
+> > +#ifndef __ASSEMBLER__
+> > +extern void __iomem *davinci_sysmodbase;
+> > +#define DAVINCI_SYSMODULE_VIRT(x)	(davinci_sysmodbase + (x))
+> > +void davinci_map_sysmod(void);
+> > +#endif
+> 
+> Russell has posted[1] that the hardware.h file should not be polluted with platform private stuff like this.
+> 
+> Your patch 7/13 actually helped towards that goal, but this one takes us back. This patch cannot be used in the current form.
+> 
+> Currently there are separate header files for dm644x, dm355, dm646x and dm365. I would like to start by removing unnecessary code from these files and trying to consolidate them into a single file.
+Done. I have consolidated all the headers for DM6446, Dm6467, DM365 and DM355 into a single header as per your suggestion.
+> 
+> Example, the EMAC base address definitions in dm365.h should be moved into dm365.c. Similarly, there is a lot of VPIF specific stuff in dm646x.h which is not really specific to dm646x.h and so should probably be moved to include/media/ or arch/arm/mach-davinci/include/mach/vpif.h
+Done.
+> 
+> Once consolidated into a single file, davinci_sysmodbase can be moved into that file.
+Done.
+> 
+> Also, Russell has said[2] that at least for this merge window only consolidation and bug fixes will go through his tree. This means that as far as mach-davinci is concerned, the clean-up part of this series can go to 2.6.40 - but not the stuff which adds new support.
+> 
+> Thanks,
+> Sekhar
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg120410.html
+> [2] http://www.spinics.net/lists/arm-kernel/msg120606.html
+> 
+> 
