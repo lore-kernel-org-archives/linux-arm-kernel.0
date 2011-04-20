@@ -1,48 +1,53 @@
-From: bill_carson@126.com (bill)
-Date: Wed, 20 Apr 2011 16:33:54 +0800 (CST)
-Subject: Query about vexpress_ct_ca9x4 watchdog issue ?
-In-Reply-To: <4DAE990C.50302@st.com>
-References: <4DAE990C.50302@st.com> <4DAE94B6.9060309@st.com>
-	<4DAE885F.3060308@st.com> <4DAE62EF.7050508@st.com>
-	<1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
-	<4b3cc9c7.13699.12f71a8b503.Coremail.bill_carson@126.com>
-	<fa59500.14272.12f71cec204.Coremail.bill_carson@126.com>
-	<632b2879.153ae.12f72012291.Coremail.bill_carson@126.com>
-Message-ID: <68a5d54f.186c8.12f720b4f3a.Coremail.bill_carson@126.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Apr 2011 10:34:04 +0200 (CEST)
+Subject: [PATCH 04/10] clk: implement parent pass through functions
+In-Reply-To: <20110420071641.GR31131@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+	<4DADC45C.1020202@codeaurora.org>
+	<20110419175318.GB15233@pengutronix.de>
+	<20110419190910.GQ31131@pengutronix.de>
+	<alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<20110420071641.GR31131@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1104201009181.2744@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
 
-At 2011-04-20 16:27:56?"viresh kumar" <viresh.kumar@st.com> wrote:
+> On Tue, Apr 19, 2011 at 11:54:21PM +0200, Thomas Gleixner wrote:
+> > On Tue, 19 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > > +1 for letting the core enable/disable and prepare/unprepare the parent
+> > > > clocks. I scanned the different arm clock implementations and they all
+> > > > do it, except the ones which do not implement parents at all.
+> > > Then the question is if all do handle parents in the same way. (i.e.
+> > > in enable do parent first, in disable do child first?)
+> > 
+> > That's not a question at all. Anything which does it the other way
+> > round is broken. Period.
+> I havn't checked, but I remember Jeremy not wanting to handle parents in
+> the generic part because he saw some differences.
 
->On 04/20/2011 01:52 PM, bill wrote:
->>> >What do you want to test sp805 or cortexa9_wdt???
->> Oh, sorry for that.
->> 
->> I want to test sp805 on mach-vexpress.
->> 
->
->Ok. So, this is what i said earlier.
->sp805 driver is working fine on spear3xx & 6xx.
->It looks that you are also not getting WDT reset after specified timeout? Is it so?
->
+It does not matter whether you checked or not. And it does not matter
+whether Jeremy found code which does it the other way round.
 
-yes, WDT does not trigger any interrupt/reset signal after specified timeout.
+The only safe way is parent first on enable and child first on
+disable. That's a matter of hardware and not a question of random Joe
+hacker got it wrong and it happens to work.
 
+Sure it works on a simple divider which is connected to the parent
+clock, but think "child is a PLL".
 
->The only thing i can think of now is clock.
->Can you simply program wdt using some debugger instead of driver and see if reset is
->happening??
->
+So having a strict ordering enforced is the only sane way, unless you
+can prove that a particular piece of hardware requires it the other
+way round. And I doubt that you can find one.
 
-yes ,I can try it using some usefull command in Uboot.
+So the framework should be coded for the sane case in the first
+place. If the unlikely case of reverse ordering surfaces one day, then
+it's not rocket science to deal with that with a flag in struct clk
+which tells clk_enable/disable or prepare/unprepare to do it the other
+way round.
 
+Thanks,
 
-
->--
->viresh
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	tglx
