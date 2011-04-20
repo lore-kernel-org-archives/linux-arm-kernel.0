@@ -1,7 +1,7 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 20 Apr 2011 23:40:18 +0900
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Wed, 20 Apr 2011 15:54:07 +0100
 Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
+In-Reply-To: <BANLkTimfkpjQ9DoYKRTVwyvtPRccO+RwpA@mail.gmail.com>
 References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
 	<20110418091902.13345132@lxorguk.ukuu.org.uk>
@@ -10,49 +10,32 @@ References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
 	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
 	<20110419093855.36910400@lxorguk.ukuu.org.uk>
 	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
-	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
-Message-ID: <BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+	<BANLkTimfkpjQ9DoYKRTVwyvtPRccO+RwpA@mail.gmail.com>
+Message-ID: <20110420155407.1aa60f20@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 11:26 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Tue, Apr 19, 2011 at 4:51 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->>>
->>> Leaving aside the current input/output and on/off bits I would go for
->>> being able to do
->>>
->>> ? ? ? ?gpio_get_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER);
->>> ? ? ? ?gpio_set_property(gpio, GPIO_BIAS, GPIO_BIAS_WHATEVER_ELSE);
->>
->> One more consideration, not mentioned previous time, is that pin
->> configuration for power down mode.
->> Samsung SoCs has retention GPIO configurations at sleep (suspend)
->> mode. and restore it at resume time.
->> it's need to reduce power and proper operation after suspend.
->>
-> I have a little confusion. In ARM SoC, a lot of pins are used as
-> multi-functions.
->
-> Before suspend, it may be configured as some function that isn't GPIO.
-> Is it a goal
-> that avoid declaring gpio_request() for suspend and updating the setting of pin?
+On Wed, 20 Apr 2011 14:32:35 +0200
+Linus Walleij <linus.walleij@linaro.org> wrote:
 
-E.g., When WiFi is turn on and system goes the sleep, wifi should be
-turn on. For this it should be configure the power down gpio
-configuration properly. Its' different that call the gpio_set_value
-function.
+> 2011/4/19 Kyungmin Park <kmpark@infradead.org>:
+> 
+> > One more consideration, not mentioned previous time, is that pin
+> > configuration for power down mode.
+> > Samsung SoCs has retention GPIO configurations at sleep (suspend)
+> > mode. and restore it at resume time.
+> > it's need to reduce power and proper operation after suspend.
+> 
+> Isn't this supposed to be handled by runtime_pm hooks inside
+> your GPIO driver rather than by someone else talking to
+> the GPIO driver trying to spool/unspool the state from the
+> outside in some other place?
+> 
+> Or am I getting things backwards now...?
 
-One more, even though some pins are used for other purpose instead of
-GPIO. It needs to be configure as input or output at power down mode
-registers.
-
-Thank you,
-Kyungmin Park
-
->
-> Linus,
-> Are these two patches are post in mailing list? I can't find your
-> second patch in this
-> patch series?
->
+IMHO that rather depends upon what knows the right things to do. The
+platform may know the right way to manage GPIO pins but it may also be
+that only the driver knows because the correct suspended pin states
+depend on the driver or on the current runtime configuration - eg if a
+specific GPIO must be left enabled for wakeup to work then it depends
+whether that device is active not on the platform level properties.
