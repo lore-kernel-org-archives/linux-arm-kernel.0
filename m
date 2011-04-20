@@ -1,150 +1,33 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 20 Apr 2011 08:54:15 +0200
-Subject: [PATCH V2] genalloc: add support to specify the physical address
-Message-ID: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Apr 2011 09:16:41 +0200
+Subject: [PATCH 04/10] clk: implement parent pass through functions
+In-Reply-To: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+	<4DADC45C.1020202@codeaurora.org>
+	<20110419175318.GB15233@pengutronix.de>
+	<20110419190910.GQ31131@pengutronix.de>
+	<alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+Message-ID: <20110420071641.GR31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-so we specify the virtual address as base of the pool chunk and then
-get the physical address for hardware IP
+On Tue, Apr 19, 2011 at 11:54:21PM +0200, Thomas Gleixner wrote:
+> On Tue, 19 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > +1 for letting the core enable/disable and prepare/unprepare the parent
+> > > clocks. I scanned the different arm clock implementations and they all
+> > > do it, except the ones which do not implement parents at all.
+> > Then the question is if all do handle parents in the same way. (i.e.
+> > in enable do parent first, in disable do child first?)
+> 
+> That's not a question at all. Anything which does it the other way
+> round is broken. Period.
+I havn't checked, but I remember Jeremy not wanting to handle parents in
+the generic part because he saw some differences.
 
-as example on at91 we will use on spi, uart or macb
+Best regards
+Uwe
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
----
-Hi Andrew,
-	I integrate the documentation fix
-	could replace the previous one with this one
-
-V2:
-	update documentation
-	use phys_addr_t for physical addr
-Best Regards,
-J.
- include/linux/genalloc.h |   22 +++++++++++++++++++++-
- lib/genalloc.c           |   45 +++++++++++++++++++++++++++++++++++++--------
- 2 files changed, 58 insertions(+), 9 deletions(-)
-
-diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
-index b1c70f1..5bbebda 100644
---- a/include/linux/genalloc.h
-+++ b/include/linux/genalloc.h
-@@ -26,13 +26,33 @@ struct gen_pool {
- struct gen_pool_chunk {
- 	spinlock_t lock;
- 	struct list_head next_chunk;	/* next chunk in pool */
-+	phys_addr_t phys_addr;		/* physical starting address of memory chunk */
- 	unsigned long start_addr;	/* starting address of memory chunk */
- 	unsigned long end_addr;		/* ending address of memory chunk */
- 	unsigned long bits[0];		/* bitmap for allocating memory chunk */
- };
- 
- extern struct gen_pool *gen_pool_create(int, int);
--extern int gen_pool_add(struct gen_pool *, unsigned long, size_t, int);
-+extern phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long);
-+extern int gen_pool_add_virt(struct gen_pool *, unsigned long, phys_addr_t,
-+			     size_t, int);
-+/**
-+ * gen_pool_add - add a new chunk of special memory to the pool
-+ * @pool: pool to add new memory chunk to
-+ * @addr: starting address of memory chunk to add to pool
-+ * @size: size in bytes of the memory chunk to add to pool
-+ * @nid: node id of the node the chunk structure and bitmap should be
-+ *       allocated on, or -1
-+ *
-+ * Add a new chunk of special memory to the specified pool.
-+ *
-+ * Returns 0 on success or a -ve errno on failure.
-+ */
-+static inline int gen_pool_add(struct gen_pool *pool, unsigned long addr,
-+			       size_t size, int nid)
-+{
-+	return gen_pool_add_virt(pool, addr, -1, size, nid);
-+}
- extern void gen_pool_destroy(struct gen_pool *);
- extern unsigned long gen_pool_alloc(struct gen_pool *, size_t);
- extern void gen_pool_free(struct gen_pool *, unsigned long, size_t);
-diff --git a/lib/genalloc.c b/lib/genalloc.c
-index 1923f14..577ddf8 100644
---- a/lib/genalloc.c
-+++ b/lib/genalloc.c
-@@ -39,17 +39,20 @@ struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
- EXPORT_SYMBOL(gen_pool_create);
- 
- /**
-- * gen_pool_add - add a new chunk of special memory to the pool
-+ * gen_pool_add_virt - add a new chunk of special memory to the pool
-  * @pool: pool to add new memory chunk to
-- * @addr: starting address of memory chunk to add to pool
-+ * @virt: virtual starting address of memory chunk to add to pool
-+ * @phys: physical starting address of memory chunk to add to pool
-  * @size: size in bytes of the memory chunk to add to pool
-  * @nid: node id of the node the chunk structure and bitmap should be
-  *       allocated on, or -1
-  *
-  * Add a new chunk of special memory to the specified pool.
-+ *
-+ * Returns 0 on success or a -ve errno on failure.
-  */
--int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
--		 int nid)
-+int gen_pool_add_virt(struct gen_pool *pool, unsigned long virt, phys_addr_t phys,
-+		 size_t size, int nid)
- {
- 	struct gen_pool_chunk *chunk;
- 	int nbits = size >> pool->min_alloc_order;
-@@ -58,11 +61,12 @@ int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
- 
- 	chunk = kmalloc_node(nbytes, GFP_KERNEL | __GFP_ZERO, nid);
- 	if (unlikely(chunk == NULL))
--		return -1;
-+		return -ENOMEM;
- 
- 	spin_lock_init(&chunk->lock);
--	chunk->start_addr = addr;
--	chunk->end_addr = addr + size;
-+	chunk->phys_addr = phys;
-+	chunk->start_addr = virt;
-+	chunk->end_addr = virt + size;
- 
- 	write_lock(&pool->lock);
- 	list_add(&chunk->next_chunk, &pool->chunks);
-@@ -70,7 +74,32 @@ int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(gen_pool_add);
-+EXPORT_SYMBOL(gen_pool_add_virt);
-+
-+/**
-+ * gen_pool_virt_to_phys - return the physical address of memory
-+ * @pool: pool to allocate from
-+ * @addr: starting address of memory
-+ *
-+ * Returns the physical address on success, or -1 on error.
-+ */
-+phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long addr)
-+{
-+	struct list_head *_chunk;
-+	struct gen_pool_chunk *chunk;
-+
-+	read_lock(&pool->lock);
-+	list_for_each(_chunk, &pool->chunks) {
-+		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
-+
-+		if (addr >= chunk->start_addr && addr < chunk->end_addr)
-+			return chunk->phys_addr + addr - chunk->start_addr;
-+	}
-+	read_unlock(&pool->lock);
-+
-+	return -1;
-+}
-+EXPORT_SYMBOL(gen_pool_virt_to_phys);
- 
- /**
-  * gen_pool_destroy - destroy a special memory pool
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
