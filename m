@@ -1,81 +1,53 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Apr 2011 00:15:03 -0400
-Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
+Date: Wed, 20 Apr 2011 00:15:04 -0400
+Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries for some
+	global variables
 In-Reply-To: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return value for decompress_kernel() is no longer used.  Furthermore,
-this was obtained and stored in a variable called output_ptr which is
-a complete misnomer for what is actually the size of the decompressed
-kernel image.  Let's get rid of it.
+Many architecture specific versions of uncompress.h make use of global
+variables marked static.  In such case the GOT is bypassed and the
+code in head.S can't relocate them.
+
+Instead of removing the static keyword from all those files and hope that
+it won't come back, let's simply
+define it out.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
 
-BTW, I've yet to understand why, but this patch makes CONFIG_KERNEL_LZMA
-work for me.
- 
- arch/arm/boot/compressed/misc.c |   13 ++-----------
- 1 files changed, 2 insertions(+), 11 deletions(-)
+This should fix remaining issues some people have with the DT append patch.
+
+ arch/arm/boot/compressed/misc.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 2df3826..a565853 100644
+index a565853..0125dae 100644
 --- a/arch/arm/boot/compressed/misc.c
 +++ b/arch/arm/boot/compressed/misc.c
-@@ -26,8 +26,6 @@ unsigned int __machine_arch_type;
- #include <linux/linkage.h>
- #include <asm/string.h>
- 
--#include <asm/unaligned.h>
--
- 
+@@ -30,7 +30,20 @@ unsigned int __machine_arch_type;
  static void putstr(const char *ptr);
  extern void error(char *x);
-@@ -139,13 +137,12 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
- }
  
- /*
-- * gzip delarations
-+ * gzip declarations
-  */
- extern char input_data[];
- extern char input_data_end[];
++/*
++ * Many instances of mach/uncompress.h are including global variables.
++ * Contrary to standard usage, we should _not_ mark those variables
++ * static otherwise they get accessed via GOTOFF references which cannot
++ * be modified at run time.  The entry code in head.S relies on the ability
++ * to move writable sections around, and for that to work, we must have all
++ * references going through the GOT which works only with non static
++ * variables.  So, instead of asking for a non intuitive requirement
++ * making many files non standard according to accepted coding practices
++ * we fix the issue here by simply defining the static keyword to nothing.
++ */
++#define static /* non-static */
+ #include <mach/uncompress.h>
++#undef static
  
- unsigned char *output_data;
--unsigned long output_ptr;
+ #ifdef CONFIG_DEBUG_ICEDCC
  
- unsigned long free_mem_ptr;
- unsigned long free_mem_end_ptr;
-@@ -173,13 +170,11 @@ asmlinkage void __div0(void)
- extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
- 
- 
--unsigned long
-+void
- decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 		unsigned long free_mem_ptr_end_p,
- 		int arch_id)
- {
--	unsigned char *tmp;
--
- 	output_data		= (unsigned char *)output_start;
- 	free_mem_ptr		= free_mem_ptr_p;
- 	free_mem_end_ptr	= free_mem_ptr_end_p;
-@@ -187,12 +182,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 
- 	arch_decomp_setup();
- 
--	tmp = (unsigned char *) (((unsigned long)input_data_end) - 4);
--	output_ptr = get_unaligned_le32(tmp);
--
- 	putstr("Uncompressing Linux...");
- 	do_decompress(input_data, input_data_end - input_data,
- 			output_data, error);
- 	putstr(" done, booting the kernel.\n");
--	return output_ptr;
- }
 -- 
 1.7.4
