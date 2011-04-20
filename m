@@ -1,57 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Apr 2011 08:36:43 +0200
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <2b16ee39-08ba-4482-a9fc-6d1393ac1229@email.android.com>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
-	<20110418094909.GE31131@pengutronix.de>
-	<20110418100716.GJ14770@pengutronix.de>
-	<4DACF761.3050503@codeaurora.org>
-	<20110419073249.GK31131@pengutronix.de>
-	<0943efffac47bface3dff8ca4d700361.squirrel@www.codeaurora.org>
-	<20110419093126.GA14770@pengutronix.de>
-	<2b16ee39-08ba-4482-a9fc-6d1393ac1229@email.android.com>
-Message-ID: <20110420063643.GD15233@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Apr 2011 08:36:55 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <20110419162742.GB24372@redhat.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<201104191655.13133.arnd@arndb.de>
+	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+	<201104191801.19348.arnd@arndb.de>
+	<20110419162742.GB24372@redhat.com>
+Message-ID: <BANLkTikYMFjjO+igBLN+FoXtWC_uroVUPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 03:28:50PM -0700, Saravana Kannan wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> >> >>
-> >> >> We should really have something like:
-> >> >> clk_set_rate_range(min, ideal, max)
-> >> > (Note this is orthogonal to the question if set_rate may barf on
-> >values
-> >> > other than the return values of round_rate.)
-> >> >
-> >> > clk_set_rate_range can even be implemented with clk_round_rate that
-> >is
-> >> > just required to fulfill:
-> >> 
-> >> I think it's more important that we try to find a new API that's
-> >better
-> >> than clk_round_rate(). We can worry about the specifics of the
-> >> implementation later.
-> >
-> >You found it and Uwe found a way to implement this ontop of the old
-> >API,
-> >that's a comfortable situation, isn't it?
-> 
-> Well, do we all agree to this new API? I have no problem with Uwe's
-> helper fn or his suggestion, if we all agree on the final API. I just
-> didn't want him wasting his time when the API is not finalized.
+2011/4/19 Dave Jones <davej@redhat.com>:
 
-As Uwes suggestion does not change the internal clock API it's
-relatively simple to try out. With this we moved to the
-add-a-helper-function class of patches and are not in the
-change-internal-and-external-API-with-hundreds-of-users
-class anymore.
+> The platform drivers are by their nature architecture specific,
+> so arch/ seems apropos. ?drivers/platform/arm/ maybe ?
 
-Sascha
+I opted for putting stuff in there, it was not popular, it will probably
+just cause overpopulation there instead, like drivers/misc is doing
+right now :-(
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Though, having arm do something different to every other arch seems
+> a bit awkward too. Everyone else has their cpufreq platform driver
+> somewhere under arch/whatever/../cpufreq/.. ?so changing that
+> violates the principle of least surprise.
+>
+> I'm also not convinced that moving them would increase review of changes.
+>
+> What problem is this solving again ?
+
+Recent complaints from Linus (the other one) about overpopulation
+bad code reuse and patch collision churn in the arch/arm/* tree.
+
+If all cpufreq drivers (including the x86 ones!) were under
+drivers/cpufreq/* it would mean better review and more
+opportunity for consolidation I guess? We could begin the move
+with a few ARM architectures. Do you agree?
+
+Yours,
+Linus Walleij
