@@ -1,161 +1,137 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 Apr 2011 13:28:47 -0600
-Subject: [PATCH 5/5] OMAP2/3: hwmod: fix gpio-reset timeouts seen during
-	bootup.
-In-Reply-To: <20110420192601.16986.56558.stgit@twilight.localdomain>
-References: <20110420192601.16986.56558.stgit@twilight.localdomain>
-Message-ID: <20110420192846.16986.65752.stgit@twilight.localdomain>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Apr 2011 21:52:15 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110420185922.GD31131@pengutronix.de>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1104202113250.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Avinash.H.M <avinashhm@ti.com>
+On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+> On Wed, Apr 20, 2011 at 06:16:39PM +0200, Thomas Gleixner wrote:
+> > On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
+> > 
+> > Very useful changelog.
+> IMHO OK for a RFC patch.
 
-GPIO module expects the debounce clocks to be enabled during reset. It doesn't
-reset properly and timeouts are seen, if this clock isn't enabled during
-reset. Add the HWMOD_CONTROL_OPT_CLKS_IN_RESET flags to the GPIO HWMODs, with
-which the debounce clocks are enabled during reset.
+Not at all.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Avinash.H.M <avinashhm@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    4 ++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    5 +++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    6 ++++++
- 3 files changed, 15 insertions(+), 0 deletions(-)
+> > 
+> > And this whole mess should be written:
+> > 
+> >     ret = clk_prepare(clk->parent);
+> >     if (ret)
+> > 		return ret;
+> > 
+> > Which returns 0 when there is no parent and it also returns 0 when
+> > there is no prepare callback for the parent. Why the hell do we need
+> > all this ERRPTR checking mess and all this conditional crap ?
+>
+> struct clk has no parent member, there is only clk_get_parent(). If
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index f50e56a..c4d0ae8 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1639,6 +1639,7 @@ static struct omap_hwmod_ocp_if *omap2420_gpio1_slaves[] = {
- 
- static struct omap_hwmod omap2420_gpio1_hwmod = {
- 	.name		= "gpio1",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap242x_gpio1_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap242x_gpio1_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1669,6 +1670,7 @@ static struct omap_hwmod_ocp_if *omap2420_gpio2_slaves[] = {
- 
- static struct omap_hwmod omap2420_gpio2_hwmod = {
- 	.name		= "gpio2",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap242x_gpio2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap242x_gpio2_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1699,6 +1701,7 @@ static struct omap_hwmod_ocp_if *omap2420_gpio3_slaves[] = {
- 
- static struct omap_hwmod omap2420_gpio3_hwmod = {
- 	.name		= "gpio3",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap242x_gpio3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap242x_gpio3_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1729,6 +1732,7 @@ static struct omap_hwmod_ocp_if *omap2420_gpio4_slaves[] = {
- 
- static struct omap_hwmod omap2420_gpio4_hwmod = {
- 	.name		= "gpio4",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap242x_gpio4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap242x_gpio4_irqs),
- 	.main_clk	= "gpios_fck",
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 96753f7..9682dd5 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1742,6 +1742,7 @@ static struct omap_hwmod_ocp_if *omap2430_gpio1_slaves[] = {
- 
- static struct omap_hwmod omap2430_gpio1_hwmod = {
- 	.name		= "gpio1",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap243x_gpio1_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap243x_gpio1_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1772,6 +1773,7 @@ static struct omap_hwmod_ocp_if *omap2430_gpio2_slaves[] = {
- 
- static struct omap_hwmod omap2430_gpio2_hwmod = {
- 	.name		= "gpio2",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap243x_gpio2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap243x_gpio2_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1802,6 +1804,7 @@ static struct omap_hwmod_ocp_if *omap2430_gpio3_slaves[] = {
- 
- static struct omap_hwmod omap2430_gpio3_hwmod = {
- 	.name		= "gpio3",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap243x_gpio3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap243x_gpio3_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1832,6 +1835,7 @@ static struct omap_hwmod_ocp_if *omap2430_gpio4_slaves[] = {
- 
- static struct omap_hwmod omap2430_gpio4_hwmod = {
- 	.name		= "gpio4",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap243x_gpio4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap243x_gpio4_irqs),
- 	.main_clk	= "gpios_fck",
-@@ -1862,6 +1866,7 @@ static struct omap_hwmod_ocp_if *omap2430_gpio5_slaves[] = {
- 
- static struct omap_hwmod omap2430_gpio5_hwmod = {
- 	.name		= "gpio5",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap243x_gpio5_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap243x_gpio5_irqs),
- 	.main_clk	= "gpio5_fck",
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 9bee155..909a84d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -2141,6 +2141,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio1_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio1_hwmod = {
- 	.name		= "gpio1",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio1_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio1_irqs),
- 	.main_clk	= "gpio1_ick",
-@@ -2177,6 +2178,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio2_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio2_hwmod = {
- 	.name		= "gpio2",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio2_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio2_irqs),
- 	.main_clk	= "gpio2_ick",
-@@ -2213,6 +2215,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio3_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio3_hwmod = {
- 	.name		= "gpio3",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio3_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio3_irqs),
- 	.main_clk	= "gpio3_ick",
-@@ -2249,6 +2252,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio4_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio4_hwmod = {
- 	.name		= "gpio4",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio4_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio4_irqs),
- 	.main_clk	= "gpio4_ick",
-@@ -2285,6 +2289,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio5_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio5_hwmod = {
- 	.name		= "gpio5",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio5_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio5_irqs),
- 	.main_clk	= "gpio5_ick",
-@@ -2321,6 +2326,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio6_slaves[] = {
- 
- static struct omap_hwmod omap3xxx_gpio6_hwmod = {
- 	.name		= "gpio6",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.mpu_irqs	= omap3xxx_gpio6_irqs,
- 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio6_irqs),
- 	.main_clk	= "gpio6_ick",
+Which is a complete failure to begin with. Why the heck do you need a
+callback to figure that out?
+
+Because someone claimed, that you need a callback to make it safe from
+changing? Or what's the reason for this?
+
+> there is no parent it returns ERR_PTR(-ENOSYS) and if you pass that
+> to clk_prepare it tries to dereference it. So either it must not be
+> called with an error pointer or clk_prepare et al. need adaption to
+> handle
+
+The whole clk struct is an utter failure.
+
+It's simply the least common denominator of all clk madness in the
+tree. Which results in a half documented data structure and a handful
+helper functions of which most of them are exported, though the
+functionality in them is less than the overhead of the EXPORT_SYMBOL.
+
+That's not an abstraction and neither it's a framework. It's a half
+arsed conglomorate of primitives w/o the minimal documentation how
+those primitives should be used and why they are there in the first
+place.
+
+This is new code and it should be aimed to cleanup things not to
+shuffle things around in a frenzy.
+
+So what's wrong with that code:
+
+1) struct clk is just a collection of function pointers and two locks
+
+   It lacks:
+   
+   - a flag field for properties
+   - a field for the parent
+   - a field for the current clock rate
+   - a field for the base register
+   - a struct for the offsets of the most common registers relative to
+     base
+
+   optionally a set of common register accessor functions like I did
+   for the generic irq chip.
+
+2) The "framework" API is just a set of low level primitive helper
+   functions
+
+   It lacks:
+
+   - proper refcounting. clk_get() / clk_put() should do that at the
+     framework level.
+
+   - the ability to propagate enable/disable/prepare/unprepare down
+     through the parent tree
+
+   - proper mechanisms to sanity check clk_set_parent(),
+     clk_set_rate() et. al.
+
+     This is not a implementation detail inside a specific clock. It's
+     a problem which is common at least on the tree level:
+
+                    rootclk
+                 /          \
+              clk1          clk2   
+             /   \
+           clk3  clk4
+	   /
+         clk5
+
+    So now you want to change the rate of clk1. Can you do that?
+    
+    No, but where is the sanity check which prevents that ?
+    
+        In the clk1->set_rate() callback ?
+
+	Great, that's the wrong place.
+
+    So now you want to switch the parent of clk3 from clk1 to
+    clk2. Can you do that?
+
+    No, but where is the sanity check which prevents that ?
+
+    	In the clk3->set_parent() callback ?
+
+	Again, the wrong place.
+
+    And these are not problems of a particular clk implementation,
+    these are general problems and those want to be addressed in a
+    real framework.
+
+    It's debatable, whether you want to be able to change clocks which
+    have active childs or not. If not the decision function is pretty
+    simple. If yes, you need a list of child clks which you want to
+    consult first before committing the change.
+
+So unless you fix this stuff you should not even think about
+converting anything to this "framework". That's just waste of time and
+effort. Aside of declaring it stable and useful ....
+
+The least thing which we need now are half baken "abstractions" which
+just shuffle code around for no value.
+
+Thanks,
+
+	tglx
