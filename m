@@ -1,39 +1,55 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 20 Apr 2011 09:17:33 -0700
-Subject: [PATCH v2] driver core: let dev_set_drvdata return int instead
-	of void as it can fail
-In-Reply-To: <20110420074248.GS31131@pengutronix.de>
-References: <BANLkTi=MjDqawZx=+fKjaAs5SPfGQDEgVQ@mail.gmail.com>
-	<1302547378-14639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110419235812.GA4619@kroah.com>
-	<20110420074248.GS31131@pengutronix.de>
-Message-ID: <20110420161733.GB25396@suse.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 20 Apr 2011 10:27:15 -0700
+Subject: [linux-pm] [RFC PATCH V3 1/4] cpuidle: Move dev->last_residency
+	update to driver	enter routine; remove dev->last_state
+In-Reply-To: <20110420065523.332.58678.stgit@tringupt.in.ibm.com> (Trinabh
+	Gupta's message of "Wed, 20 Apr 2011 12:25:34 +0530")
+References: <20110420065445.332.13688.stgit@tringupt.in.ibm.com>
+	<20110420065523.332.58678.stgit@tringupt.in.ibm.com>
+Message-ID: <87pqog6dfw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 09:42:48AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Apr 19, 2011 at 04:58:12PM -0700, Greg KH wrote:
-> > On Mon, Apr 11, 2011 at 08:42:58PM +0200, Uwe Kleine-K?nig wrote:
-> > > Before commit
-> > > 
-> > > 	b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
-> > > 
-> > > calling dev_set_drvdata with dev=NULL was an unchecked error. After some
-> > > discussion about what to return in this case removing the check (and so
-> > > producing a null pointer exception) seems fine.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Hello,
-> > > 
-> > > @Viresh: as I didn't choose to return -EINVAL I didn't add your Reviewed-by:
-> > 
-> > I'm confused by this thread, care to resend all of these in a series
-> > against the latest linux-next tree?
-> No problem, here it comes. This are patches 1 to 4 of the original
-> series + v2 of patch 5 (that didn't have 5/5 in the subject).
+Trinabh Gupta <trinabh@linux.vnet.ibm.com> writes:
+
+> Cpuidle subsystem only suggests the state to enter and does not
+> guarantee if the suggested state is entered. The actual entered state
+> may be different because of software or hardware demotion. Software
+> demotion is done by the back-end cpuidle driver and can be accounted
+> correctly. Current cpuidle code uses last_state field to capture the
+> actual state entered and based on that updates the statistics for the
+> state entered.
+>
+> Ideally the driver enter routine should update the counters,
+> and it should return the state actually entered rather than the time
+> spent there. 
+
+OK, the return type was changed to return the state index instead of the
+time, but since the governors are still relying on dev->last_residency,
+drivers are required to update it.
+
+Because of that, why not keep the update of the  time/usage counters
+in common code rather than duplicating it (9 times in this patch) into 
+all the drivers?
+
+Something like the patch below should suffice.
+
+Kevin
 
 
-Thanks, I'll queue these up soon.
-
-greg k-h
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 845d3ef..875d241 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -91,6 +91,11 @@ static void cpuidle_idle_call(void)
+ 
+ 	entered_state = target_state->enter(dev, drv, next_state);
+ 
++	/* Update cpuidle counters */
++	dev->states_usage[entered_state].time += 
++		(unsigned long long)dev->last_residency;
++	dev->states_usage[entered_state].usage++;
++
+ 	trace_power_end(dev->cpu);
+ 	trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
+ 
