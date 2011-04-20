@@ -1,40 +1,69 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Apr 2011 09:17:04 -0400 (EDT)
-Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries
-	for some global variables
-In-Reply-To: <alpine.LFD.2.00.1104200901300.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
-	<20110420084234.GV31131@pengutronix.de>
-	<alpine.LFD.2.00.1104200826550.24613@xanadu.home>
-	<20110420125222.GE1965@S2100-06.ap.freescale.net>
-	<alpine.LFD.2.00.1104200901300.24613@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1104200911070.24613@xanadu.home>
+From: mayur@ti.com (Janorkar, Mayuresh)
+Date: Wed, 20 Apr 2011 19:05:11 +0530
+Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+In-Reply-To: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB033D7EB768@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Apr 2011, Nicolas Pitre wrote:
 
-> On Wed, 20 Apr 2011, Shawn Guo wrote:
+
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Gulati, Shweta
+> Sent: Wednesday, April 20, 2011 2:55 PM
+> To: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; Gulati, Shweta; Nayak, Rajendra;
+> Paul Wamsley
+> Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
 > 
-> > Though I'm unsure if it realistically exists, what if it's a static
-> > variable inside a function?  It's actually changing something, right?
+> From: Gulati, Shweta <shweta.gulati@ti.com>
 > 
-> Right.  In that case the variable is allocated to the .data section, but 
-> we explicitly discard .data at link time to prevent a successful build.
+> Core Clk Tree shows incorrect Clk rates at OPP50, as
+> in commit e07f469d284ca3d1f5dcf5438c22982be98bc071
+> calling of 'recalc' in API clk_set_rate is unintentionally
+> removed, because of which clock's tree rates get goofed
+> up when DVFS happens. This Patch adds recalc API back.
 
-Sorry, more clarification is needed here.
+I see that the patch is not adding API back.
+It is adding a call to the API.
 
-The patch changing all occurrences of "static" into nothing would break 
-code using static variables within functions.  I just hope that no one 
-is using local static variables in their uncompress.h file.
+> 
+> Tested on OMAP3630 SDP Board.
+> 
+> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Wamsley <paul@pwsan.com>
+> ---
+>  arch/arm/plat-omap/clock.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+> index c9122dd..5a0d06b 100644
+> --- a/arch/arm/plat-omap/clock.c
+> +++ b/arch/arm/plat-omap/clock.c
+> @@ -130,8 +130,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+> 
+>  	spin_lock_irqsave(&clockfw_lock, flags);
+>  	ret = arch_clock->clk_set_rate(clk, rate);
+> -	if (ret == 0)
+> +	if (ret == 0) {
 
-And local static variables are always using GOTOFF relocations which is 
-what we want to avoid in the first place.
+checking if (!ret) is an intelligent way.
+But it is an individual's choice.
 
-The conclusion is that no one should be using local static variables in 
-code linked by the kernel decompressor, unless those variables are also 
-marked const.
-
-
-Nicolas
+> +		if (clk->recalc)
+> +			clk->rate = clk->recalc(clk);
+>  		propagate_rate(clk);
+> +	}
+>  	spin_unlock_irqrestore(&clockfw_lock, flags);
+> 
+>  	return ret;
+> --
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
