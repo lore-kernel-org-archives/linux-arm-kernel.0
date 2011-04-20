@@ -1,94 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Apr 2011 10:16:24 +0200
-Subject: [PATCH] at91: switch to CLKDEV_LOOKUP
-In-Reply-To: <1303271969-9794-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1303271969-9794-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110420081624.GT31131@pengutronix.de>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 20 Apr 2011 10:19:17 +0200
+Subject: [PATCH v2 00/12] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <20110416154841.GA17935@S2100-06.ap.freescale.net>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<20110416154841.GA17935@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTi=c6Fh24W6u-ikRfnfV922OuJnJ9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jean-Christophe,
-
-On Wed, Apr 20, 2011 at 05:59:29AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
->  /*
->   * The five programmable clocks.
->   * You must configure pin multiplexing to bring these signals out.
-> @@ -234,6 +265,13 @@ static struct clk pck3 = {
->  	.id		= 3,
->  };
->  
-> +static struct clk_lookup program_clocks_lookups[] = {
-> +	CLKDEV_CON_ID("pck0", &pck0),
-> +	CLKDEV_CON_ID("pck1", &pck1),
-> +	CLKDEV_CON_ID("pck2", &pck2),
-> +	CLKDEV_CON_ID("pck3", &pck3),
-> +};
-> +
->  static struct clk mAgicV_mem_clk = {
->  	.name		= "mAgicV_mem_clk",
->  	.pmc_mask	= AT91_PMC_PCK4,
-> @@ -241,6 +279,9 @@ static struct clk mAgicV_mem_clk = {
->  	.id		= 4,
->  };
->  
-> +static struct clk_lookup mAgicV_mem_clk_lookup =
-> +	CLKDEV_CON_ID("mAgicV_mem_clk", &mAgicV_mem_clk);
-> +
->  /* HClocks */
->  static struct clk hck0 = {
->  	.name		= "hck0",
-> @@ -255,6 +296,11 @@ static struct clk hck1 = {
->  	.id		= 1,
->  };
->  
-> +static struct clk_lookup hc_clocks_lookups[] = {
-> +	CLKDEV_CON_ID("hck0", &hck0),
-> +	CLKDEV_CON_ID("hck1", &hck1),
-> +};
-> +
->  static void __init at572d940hf_register_clocks(void)
->  {
->  	int i;
-> @@ -262,14 +308,32 @@ static void __init at572d940hf_register_clocks(void)
->  	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
->  		clk_register(periph_clocks[i]);
->  
-> +	clkdev_add_table(periph_clocks_lookups,
-> +			 ARRAY_SIZE(periph_clocks_lookups));
-> +
-Does it make sense to add a (maybe global) helper function ? la:
-
-	void __init clkdev_register_and_add_table(struct clk_lookup *cl, size_t num)
-	{
-		while (num--) {
-			clk_register(&cl->clk);
-			clkdev_add(cl);
-			++cl;
-		}
-	}
-
-? (The locking isn't optimal here, but I think you get the point.)
-
-
-> +static struct clk_lookup usart_clocks_lookups[] = {
-> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
-> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
-> +};
+On 16 April 2011 17:48, Shawn Guo <shawn.guo@freescale.com> wrote:
+> Hi Per,
+>
+> On Wed, Apr 06, 2011 at 09:07:01PM +0200, Per Forlin wrote:
 > [...]
-> +struct clk* __init at91sam9rl_get_uart_clock(int id)
-> +{
-> +	if (id >= ARRAY_SIZE(usart_clocks_lookups))
-> +		return NULL;
-> +	return usart_clocks_lookups[id].clk;
-Who is using this function? If the caller has access to the
-atmel_usart.<id> device, just using clk_get looks better.
+>>
+>> Per Forlin (12):
+>> ? mmc: add none blocking mmc request function
+>> ? mmc: mmc_test: add debugfs file to list all tests
+>> ? mmc: mmc_test: add test for none blocking transfers
+>> ? mmc: add member in mmc queue struct to hold request data
+>> ? mmc: add a block request prepare function
+>> ? mmc: move error code in mmc_block_issue_rw_rq to a separate function.
+>> ? mmc: add a second mmc queue request member
+>> ? mmc: add handling for two parallel block requests in issue_rw_rq
+>> ? mmc: test: add random fault injection in core.c
+>> ? omap_hsmmc: use original sg_len for dma_unmap_sg
+>> ? omap_hsmmc: add support for pre_req and post_req
+>> ? mmci: implement pre_req() and post_req()
+>>
+>> ?drivers/mmc/card/block.c ? ? ?| ?493 +++++++++++++++++++++++++++--------------
+>> ?drivers/mmc/card/mmc_test.c ? | ?342 ++++++++++++++++++++++++++++-
+>> ?drivers/mmc/card/queue.c ? ? ?| ?171 +++++++++------
+>> ?drivers/mmc/card/queue.h ? ? ?| ? 31 ++-
+>> ?drivers/mmc/core/core.c ? ? ? | ?132 ++++++++++-
+>> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
+>> ?drivers/mmc/host/mmci.c ? ? ? | ?146 +++++++++++-
+>> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
+>> ?drivers/mmc/host/omap_hsmmc.c | ? 90 +++++++-
+>> ?include/linux/mmc/core.h ? ? ?| ? ?9 +-
+>> ?include/linux/mmc/host.h ? ? ?| ? 13 +-
+>> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
+>> ?12 files changed, 1172 insertions(+), 279 deletions(-)
+>>
+> I'm playing the patch set and seeing the following warnings.
+>
+> ?CC ? ? ?drivers/mmc/card/block.o
+> drivers/mmc/card/block.c: In function ?mmc_blk_issue_rq?:
+> drivers/mmc/card/block.c:429:6: warning: ?status? may be used uninitialized in this function
+>
+My bad, it should be:
++ int status = 0;
 
-Best regards
-Uwe
+> ?CC ? ? ?drivers/mmc/core/core.o
+> drivers/mmc/core/core.c: In function ?mmc_request_done?:
+> drivers/mmc/core/core.c:163:3: warning: passing argument 2 of ?mmc_should_fail_request? from incompatible pointer type
+> drivers/mmc/core/core.c:129:20: note: expected ?struct mmc_data *? but argument is of type ?struct mmc_request *?
+The function within #ifdef CONFIG_FAIL_MMC_REQUEST is the correct one.
+I will update this in the next version.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+>
+> --
+> Regards,
+> Shawn
+Thanks,
+Per
