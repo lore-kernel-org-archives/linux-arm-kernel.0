@@ -1,49 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2011 19:17:27 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <BANLkTikr5B5YH+is18gYceCM1thjHgT-yQ@mail.gmail.com>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-	<20110419120344.GG22799@n2100.arm.linux.org.uk>
-	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
-	<BANLkTikr5B5YH+is18gYceCM1thjHgT-yQ@mail.gmail.com>
-Message-ID: <BANLkTik05ERLa83Lah5Fx2HO+91bb9Q7Xg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 20 Apr 2011 13:19:13 -0400 (EDT)
+Subject: [PATCH 0/3] fix some issues with the kernel decompressor
+In-Reply-To: <20110420165514.GE10402@atomide.com>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110420072156.GA28679@atomide.com>
+	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+Message-ID: <alpine.LFD.2.00.1104201318040.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 6:46 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
->>
->> My rough guess (after looking at the VHDL code) is that
->> RXDATAVLBL flag goes low when the FIFO is empty, but that
->> doesn't mean that the DMA handshake logic is out of its send/recieve
->> state and thus we screw it up if we hammer in another transfer before
->> it has had time to deassert the single/burst request signals and go to
->> idle state. This can only be seen by the side effect of the DMA
->> transfer actually terminating, and the DMA engine calling its
->> callback.
->
-> From what you are saying, RXDATAAVLBL seems to be equal to
-> !RXFIFOEMPTY in your case.
+On Wed, 20 Apr 2011, Tony Lindgren wrote:
 
-Yes that is exactly what the VHDL says:
+> * Nicolas Pitre <nicolas.pitre@linaro.org> [110420 05:57]:
+> > On Wed, 20 Apr 2011, Tony Lindgren wrote:
+> > 
+> > > * Nicolas Pitre <nicolas.pitre@linaro.org> [110419 21:12]:
+> > > > Here some patches to fix some issues with the zImage code.  The LZMA
+> > > > decompressor now works for me, and the DT append patch should work
+> > > > on all platforms now too.
+> > > 
+> > > Weird still no luck here booting n900 zImage.. LZMA image prints
+> > > corrupt error, and only works if the image is relocated further
+> > > by 1MB or so. With the following hack n900 boots, so some size
+> > > calculations still are wrong. No luck with DT append patch either.
+> > > 
+> > > Any ideas why the following helps on n900?
+> > 
+> > No idea.  This could indicate that the lzma code is crapping into memory 
+> > outside of its output buffer.  The fact that my patch #2/3 makes lzma 
+> > decompression suddenly work for me with no apparent explanation is not 
+> > reassuring either.
+> 
+> With gzip kernel looks like I need to move the kernel further by 8MB
+> instead of 1MB for some reason..
 
-RXDATAAVL <= not(FifoEmpty) [roughly]
+What kernel config are you using?
 
-> Did you try to change the former to the
-> latter to see how it works?
 
-It's equivalent, neither FIFO watermark is connected to the
-state of the DMA request signals...
-
-What we need is a DMAXFERCOMPLETE flag so we know that
-the DMA state machine is really finished. Sadly the hardware lacks
-such a status flag, so there is no way to know that the DMA state
-machine is finished by looking at any status registers in the
-MMCI block.
-
-We are thus reliant on the other end of the bitpipe telling us
-it's finished.
-
-Yours,
-Linus Walleij
+Nicolas
