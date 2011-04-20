@@ -1,42 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 20 Apr 2011 16:32:59 +0800
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <20110420083258.GB1517@S2100-06.ap.freescale.net>
+From: bill_carson@126.com (bill)
+Date: Wed, 20 Apr 2011 16:33:54 +0800 (CST)
+Subject: Query about vexpress_ct_ca9x4 watchdog issue ?
+In-Reply-To: <4DAE990C.50302@st.com>
+References: <4DAE990C.50302@st.com> <4DAE94B6.9060309@st.com>
+	<4DAE885F.3060308@st.com> <4DAE62EF.7050508@st.com>
+	<1b4f89d.afd2.12f70a9e2b0.Coremail.bill_carson@126.com>
+	<4b3cc9c7.13699.12f71a8b503.Coremail.bill_carson@126.com>
+	<fa59500.14272.12f71cec204.Coremail.bill_carson@126.com>
+	<632b2879.153ae.12f72012291.Coremail.bill_carson@126.com>
+Message-ID: <68a5d54f.186c8.12f720b4f3a.Coremail.bill_carson@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On Mon, Apr 18, 2011 at 01:19:36PM +0800, Eric Miao wrote:
-> If AUTO_ZRELADDR is selected and target is not uImage, the existence
-> of Makefile.boot could be optional.
-> 
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> ---
->  arch/arm/boot/Makefile |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index 9128fdd..277368f 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -14,7 +14,7 @@
->  MKIMAGE         := $(srctree)/scripts/mkuboot.sh
->  
->  ifneq ($(MACHINE),)
-> -include $(srctree)/$(MACHINE)/Makefile.boot
-> +-include $(srctree)/$(MACHINE)/Makefile.boot
-   ^ Makefile grammar?
->  endif
->  
-I do not understand the patch.  But looking at the patch below, the
-dtb rule uses Makefile.boot too.
+At 2011-04-20 16:27:56?"viresh kumar" <viresh.kumar@st.com> wrote:
 
-[PATCH v2] arm/dt: Add a make rule to build dtb for enabled boards
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/047129.html
+>On 04/20/2011 01:52 PM, bill wrote:
+>>> >What do you want to test sp805 or cortexa9_wdt???
+>> Oh, sorry for that.
+>> 
+>> I want to test sp805 on mach-vexpress.
+>> 
+>
+>Ok. So, this is what i said earlier.
+>sp805 driver is working fine on spear3xx & 6xx.
+>It looks that you are also not getting WDT reset after specified timeout? Is it so?
+>
 
--- 
-Regards,
-Shawn
+yes, WDT does not trigger any interrupt/reset signal after specified timeout.
+
+
+>The only thing i can think of now is clock.
+>Can you simply program wdt using some debugger instead of driver and see if reset is
+>happening??
+>
+
+yes ,I can try it using some usefull command in Uboot.
+
+
+
+>--
+>viresh
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
