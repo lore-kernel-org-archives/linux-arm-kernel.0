@@ -1,529 +1,151 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 20 Apr 2011 13:10:24 +1200
-Subject: [RFC PATCH 20/23] at91: Make high speed USB gadget device common
+Date: Wed, 20 Apr 2011 13:10:26 +1200
+Subject: [RFC PATCH 22/23] at91: Move at91sam9263 CAN device to common devices
 In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
 References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303261827-27730-22-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303261827-27730-24-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual high-speed UDC code for each at91 variant with
-a single implementation in devices.c
+The CAN device is only used on the AT91SAM9263. Move it to the common
+devices.c file to be consistent with other devices.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91cap9_devices.c    |  114 ++++++------------------------
- arch/arm/mach-at91/at91sam9g45_devices.c |   94 ++++---------------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |  100 ++++----------------------
- arch/arm/mach-at91/devices.c             |   79 +++++++++++++++++++++
- arch/arm/mach-at91/devices.h             |   20 +++++
- 5 files changed, 150 insertions(+), 257 deletions(-)
+ arch/arm/mach-at91/at91sam9263_devices.c |   37 +++++-----------------------
+ arch/arm/mach-at91/devices.c             |   38 ++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/devices.h             |    7 +++++
+ 3 files changed, 52 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 6724011..551f067 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -51,105 +51,36 @@ static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
-  *  USB HS Device (Gadget)
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 7f2e99f..5212480 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -263,39 +263,15 @@ static struct __initdata at91_dev_table_ac97 device_ac97 = {
+  *  CAN Controller
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
--
--static struct resource usba_udc_resources[] = {
+-#if defined(CONFIG_CAN_AT91) || defined(CONFIG_CAN_AT91_MODULE)
+-static struct resource can_resources[] = {
 -	[0] = {
--		.start	= AT91CAP9_UDPHS_FIFO,
--		.end	= AT91CAP9_UDPHS_FIFO + SZ_512K - 1,
+-		.start	= AT91SAM9263_BASE_CAN,
+-		.end	= AT91SAM9263_BASE_CAN + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91CAP9_BASE_UDPHS,
--		.end	= AT91CAP9_BASE_UDPHS + SZ_1K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= AT91CAP9_ID_UDPHS,
--		.end	= AT91CAP9_ID_UDPHS,
+-		.start	= AT91SAM9263_ID_CAN,
+-		.end	= AT91SAM9263_ID_CAN,
 -		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
--	[idx] = {						\
--		.name		= nam,				\
--		.index		= idx,				\
--		.fifo_size	= maxpkt,			\
--		.nr_banks	= maxbk,			\
--		.can_dma	= dma,				\
--		.can_isoc	= isoc,				\
--	}
--
--static struct usba_ep_data usba_udc_ep[] = {
--	EP("ep0", 0,   64, 1, 0, 0),
--	EP("ep1", 1, 1024, 3, 1, 1),
--	EP("ep2", 2, 1024, 3, 1, 1),
--	EP("ep3", 3, 1024, 2, 1, 1),
--	EP("ep4", 4, 1024, 2, 1, 1),
--	EP("ep5", 5, 1024, 2, 1, 0),
--	EP("ep6", 6, 1024, 2, 1, 0),
--	EP("ep7", 7, 1024, 2, 0, 0),
--};
--
--#undef EP
--
--/*
-- * pdata doesn't have room for any endpoints, so we need to
-- * append room for the ones we need right after it.
-- */
--static struct {
--	struct usba_platform_data pdata;
--	struct usba_ep_data ep[8];
--} usba_udc_data;
--
--static struct platform_device at91_usba_udc_device = {
--	.name		= "atmel_usba_udc",
++static struct __initdata at91_dev_table_can device_can = {
++	.mmio_base	= AT91SAM9263_BASE_CAN,
++	.irq		= AT91SAM9263_ID_CAN,
++	.pins		= {
++		{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* CANTX */
++		{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* CANRX */
+ 	},
+ };
+ 
+-static struct platform_device at91sam9263_can_device = {
+-	.name		= "at91_can",
 -	.id		= -1,
--	.dev		= {
--				.platform_data	= &usba_udc_data.pdata,
--	},
--	.resource	= usba_udc_resources,
--	.num_resources	= ARRAY_SIZE(usba_udc_resources),
+-	.resource	= can_resources,
+-	.num_resources	= ARRAY_SIZE(can_resources),
 -};
 -
--void __init at91_add_device_usba(struct usba_platform_data *data)
-+static void at91cap9_usba_init(void)
- {
- 	if (cpu_is_at91cap9_revB()) {
- 		irq_set_irq_type(AT91CAP9_ID_UDPHS, IRQ_TYPE_LEVEL_HIGH);
- 		at91_sys_write(AT91_MATRIX_UDPHS, AT91_MATRIX_SELECT_UDPHS |
--						  AT91_MATRIX_UDPHS_BYPASS_LOCK);
--	}
--	else
-+			       AT91_MATRIX_UDPHS_BYPASS_LOCK);
-+	} else {
- 		at91_sys_write(AT91_MATRIX_UDPHS, AT91_MATRIX_SELECT_UDPHS);
+-void __init at91_add_device_can(struct at91_can_data *data)
+-{
+-	at91_set_A_periph(AT91_PIN_PA13, 0);	/* CANTX */
+-	at91_set_A_periph(AT91_PIN_PA14, 0);	/* CANRX */
+-	at91sam9263_can_device.dev.platform_data = data;
 -
--	/*
--	 * Invalid pins are 0 on AT91, but the usba driver is shared
--	 * with AVR32, which use negative values instead. Once/if
--	 * gpio_is_valid() is ported to AT91, revisit this code.
--	 */
--	usba_udc_data.pdata.vbus_pin = -EINVAL;
--	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
--
--	if (data && data->vbus_pin > 0) {
--		at91_set_gpio_input(data->vbus_pin, 0);
--		at91_set_deglitch(data->vbus_pin, 1);
--		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
- 	}
--
--	/* Pullup pin is handled internally by USB device peripheral */
--
--	/* Clocks */
--	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
--	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
--
--	platform_device_register(&at91_usba_udc_device);
- }
+-	platform_device_register(&at91sam9263_can_device);
+-}
 -#else
--void __init at91_add_device_usba(struct usba_platform_data *data) {}
+-void __init at91_add_device_can(struct at91_can_data *data) {}
 -#endif
- 
-+static struct usba_ep_data usba_udc_ep[] = {
-+	AT91_UDC_HS_EP("ep0", 0,   64, 1, 0, 0),
-+	AT91_UDC_HS_EP("ep1", 1, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep2", 2, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep3", 3, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep4", 4, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep5", 5, 1024, 2, 1, 0),
-+	AT91_UDC_HS_EP("ep6", 6, 1024, 2, 1, 0),
-+	AT91_UDC_HS_EP("ep7", 7, 1024, 2, 0, 0),
-+};
-+
-+static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
-+	.fifo_base	= AT91CAP9_UDPHS_FIFO,
-+	.mmio_base	= AT91CAP9_BASE_UDPHS,
-+	.irq		= AT91CAP9_ID_UDPHS,
-+	.device_init	= at91cap9_usba_init,
-+	.endpoints	= usba_udc_ep,
-+	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
-+};
- 
+-
  /* --------------------------------------------------------------------
-  *  Ethernet
-@@ -480,6 +411,7 @@ static struct at91_device_table __initdata at91cap9_device_table = {
- 	.ssc[1]		= &device_ssc1,
+  *  LCD Controller
+  * -------------------------------------------------------------------- */
+@@ -536,6 +512,7 @@ static struct at91_device_table __initdata at91sam9263_device_table = {
  	.ac97		= &device_ac97,
  	.lcdc		= &device_lcdc,
-+	.udc_hs		= &device_udc_hs,
+ 	.cf		= &device_cf,
++	.can		= &device_can,
  };
  
- void __init at91cap9_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 3c05a6f..4f6c8e9 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -66,91 +66,24 @@ static struct __initdata at91_dev_table_basic_device device_usb_ehci = {
-  *  USB HS Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
--static struct resource usba_udc_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_UDPHS_FIFO,
--		.end	= AT91SAM9G45_UDPHS_FIFO + SZ_512K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_BASE_UDPHS,
--		.end	= AT91SAM9G45_BASE_UDPHS + SZ_1K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= AT91SAM9G45_ID_UDPHS,
--		.end	= AT91SAM9G45_ID_UDPHS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
--	[idx] = {						\
--		.name		= nam,				\
--		.index		= idx,				\
--		.fifo_size	= maxpkt,			\
--		.nr_banks	= maxbk,			\
--		.can_dma	= dma,				\
--		.can_isoc	= isoc,				\
--	}
--
- static struct usba_ep_data usba_udc_ep[] __initdata = {
--	EP("ep0", 0, 64, 1, 0, 0),
--	EP("ep1", 1, 1024, 2, 1, 1),
--	EP("ep2", 2, 1024, 2, 1, 1),
--	EP("ep3", 3, 1024, 3, 1, 0),
--	EP("ep4", 4, 1024, 3, 1, 0),
--	EP("ep5", 5, 1024, 3, 1, 1),
--	EP("ep6", 6, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep0", 0, 64, 1, 0, 0),
-+	AT91_UDC_HS_EP("ep1", 1, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep2", 2, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep3", 3, 1024, 3, 1, 0),
-+	AT91_UDC_HS_EP("ep4", 4, 1024, 3, 1, 0),
-+	AT91_UDC_HS_EP("ep5", 5, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep6", 6, 1024, 3, 1, 1),
- };
- 
--#undef EP
--
--/*
-- * pdata doesn't have room for any endpoints, so we need to
-- * append room for the ones we need right after it.
-- */
--static struct {
--	struct usba_platform_data pdata;
--	struct usba_ep_data ep[7];
--} usba_udc_data;
--
--static struct platform_device at91_usba_udc_device = {
--	.name		= "atmel_usba_udc",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &usba_udc_data.pdata,
--	},
--	.resource	= usba_udc_resources,
--	.num_resources	= ARRAY_SIZE(usba_udc_resources),
-+static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
-+	.fifo_base	= AT91SAM9G45_UDPHS_FIFO,
-+	.mmio_base	= AT91SAM9G45_BASE_UDPHS,
-+	.irq		= AT91SAM9G45_ID_UDPHS,
-+	.endpoints	= usba_udc_ep,
-+	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
- };
- 
--void __init at91_add_device_usba(struct usba_platform_data *data)
--{
--	usba_udc_data.pdata.vbus_pin = -EINVAL;
--	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
--
--	if (data && data->vbus_pin > 0) {
--		at91_set_gpio_input(data->vbus_pin, 0);
--		at91_set_deglitch(data->vbus_pin, 1);
--		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
--	}
--
--	/* Pullup pin is handled internally by USB device peripheral */
--
--	/* Clocks */
--	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
--	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
--
--	platform_device_register(&at91_usba_udc_device);
--}
--#else
--void __init at91_add_device_usba(struct usba_platform_data *data) {}
--#endif
--
--
- /* --------------------------------------------------------------------
-  *  Ethernet
-  * -------------------------------------------------------------------- */
-@@ -543,6 +476,7 @@ static struct at91_device_table __initdata at91sam9g45_device_table = {
- 	.lcdc		= &device_lcdc,
- 	.tsadcc		= &device_tsadcc,
- 	.hdmac		= &device_hdmac,
-+	.udc_hs		= &device_udc_hs,
- };
- 
- void __init at91sam9g45_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index fe73270..7518958 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -40,97 +40,24 @@ static struct __initdata at91_dev_table_hdmac device_hdmac = {
-  *  USB HS Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
--
--static struct resource usba_udc_resources[] = {
--	[0] = {
--		.start	= AT91SAM9RL_UDPHS_FIFO,
--		.end	= AT91SAM9RL_UDPHS_FIFO + SZ_512K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9RL_BASE_UDPHS,
--		.end	= AT91SAM9RL_BASE_UDPHS + SZ_1K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= AT91SAM9RL_ID_UDPHS,
--		.end	= AT91SAM9RL_ID_UDPHS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
--	[idx] = {						\
--		.name		= nam,				\
--		.index		= idx,				\
--		.fifo_size	= maxpkt,			\
--		.nr_banks	= maxbk,			\
--		.can_dma	= dma,				\
--		.can_isoc	= isoc,				\
--	}
--
- static struct usba_ep_data usba_udc_ep[] __initdata = {
--	EP("ep0", 0, 64, 1, 0, 0),
--	EP("ep1", 1, 1024, 2, 1, 1),
--	EP("ep2", 2, 1024, 2, 1, 1),
--	EP("ep3", 3, 1024, 3, 1, 0),
--	EP("ep4", 4, 1024, 3, 1, 0),
--	EP("ep5", 5, 1024, 3, 1, 1),
--	EP("ep6", 6, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep0", 0, 64, 1, 0, 0),
-+	AT91_UDC_HS_EP("ep1", 1, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep2", 2, 1024, 2, 1, 1),
-+	AT91_UDC_HS_EP("ep3", 3, 1024, 3, 1, 0),
-+	AT91_UDC_HS_EP("ep4", 4, 1024, 3, 1, 0),
-+	AT91_UDC_HS_EP("ep5", 5, 1024, 3, 1, 1),
-+	AT91_UDC_HS_EP("ep6", 6, 1024, 3, 1, 1),
- };
- 
--#undef EP
--
--/*
-- * pdata doesn't have room for any endpoints, so we need to
-- * append room for the ones we need right after it.
-- */
--static struct {
--	struct usba_platform_data pdata;
--	struct usba_ep_data ep[7];
--} usba_udc_data;
--
--static struct platform_device at91_usba_udc_device = {
--	.name		= "atmel_usba_udc",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &usba_udc_data.pdata,
--	},
--	.resource	= usba_udc_resources,
--	.num_resources	= ARRAY_SIZE(usba_udc_resources),
-+static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
-+	.fifo_base	= AT91SAM9RL_UDPHS_FIFO,
-+	.mmio_base	= AT91SAM9RL_BASE_UDPHS,
-+	.irq		= AT91SAM9RL_ID_UDPHS,
-+	.endpoints	= usba_udc_ep,
-+	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
- };
- 
--void __init at91_add_device_usba(struct usba_platform_data *data)
--{
--	/*
--	 * Invalid pins are 0 on AT91, but the usba driver is shared
--	 * with AVR32, which use negative values instead. Once/if
--	 * gpio_is_valid() is ported to AT91, revisit this code.
--	 */
--	usba_udc_data.pdata.vbus_pin = -EINVAL;
--	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
--
--	if (data && data->vbus_pin > 0) {
--		at91_set_gpio_input(data->vbus_pin, 0);
--		at91_set_deglitch(data->vbus_pin, 1);
--		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
--	}
--
--	/* Pullup pin is handled internally by USB device peripheral */
--
--	/* Clocks */
--	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
--	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
--
--	platform_device_register(&at91_usba_udc_device);
--}
--#else
--void __init at91_add_device_usba(struct usba_platform_data *data) {}
--#endif
--
--
- /* --------------------------------------------------------------------
-  *  MMC / SD
-  * -------------------------------------------------------------------- */
-@@ -419,6 +346,7 @@ static struct at91_device_table __initdata at91sam9rl_device_table = {
- 	.lcdc		= &device_lcdc,
- 	.tsadcc		= &device_tsadcc,
- 	.hdmac		= &device_hdmac,
-+	.udc_hs		= &device_udc_hs,
- };
- 
- void __init at91sam9rl_init_devices(void)
+ void __init at91sam9263_init_devices(void)
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 40c305d..30e676d 100644
+index 054b64d..fe16fd2 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -1767,6 +1767,85 @@ static void __init at91_add_device_rtc(void)
- static void __init at91_add_device_rtc(void) {}
+@@ -1951,6 +1951,44 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+ void __init at91_add_device_cf(struct at91_cf_data *data) {}
  #endif
  
 +/* --------------------------------------------------------------------
-+ *  USB HS Device (Gadget)
++ *  CAN Controller
 + * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-+static struct resource usba_udc_resources[] = {
++#if defined(CONFIG_CAN_AT91) || defined(CONFIG_CAN_AT91_MODULE)
++static struct resource can_resources[] = {
 +	[0] = {
-+		.end	= SZ_512K,
++		.end	= SZ_16K,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.end	= SZ_1K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[2] = {
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+/*
-+ * pdata doesn't have room for any endpoints, so we need to
-+ * append room for the ones we need right after it.
-+ */
-+static struct {
-+	struct usba_platform_data pdata;
-+	struct usba_ep_data ep[8];
-+} usba_udc_data;
-+
-+static struct platform_device at91_usba_udc_device = {
-+	.name		= "atmel_usba_udc",
++static struct platform_device at91_can_device = {
++	.name		= "at91_can",
 +	.id		= -1,
-+	.dev		= {
-+				.platform_data	= &usba_udc_data.pdata,
-+	},
-+	.resource	= usba_udc_resources,
-+	.num_resources	= ARRAY_SIZE(usba_udc_resources),
++	.resource	= can_resources,
++	.num_resources	= ARRAY_SIZE(can_resources),
 +};
 +
-+void __init at91_add_device_usba(struct usba_platform_data *data)
++void __init at91_add_device_can(struct at91_can_data *data)
 +{
-+	struct at91_dev_table_udc_hs *info = devices->udc_hs;
++	struct at91_dev_table_can *info = devices->can;
 +
 +	BUG_ON(!info);
-+	init_resource_mem(&usba_udc_resources[0], info->fifo_base);
-+	init_resource_mem(&usba_udc_resources[1], info->mmio_base);
-+	init_resource_irq(&usba_udc_resources[2], info->irq);
++	init_resource_mem(&can_resources[0], info->mmio_base);
++	init_resource_irq(&can_resources[1], info->irq);
 +
-+	/* Custom platform initialisation */
-+	if (info->device_init)
-+		info->device_init();
-+
-+	/*
-+	 * Invalid pins are 0 on AT91, but the usba driver is shared
-+	 * with AVR32, which use negative values instead. Once/if
-+	 * gpio_is_valid() is ported to AT91, revisit this code.
-+	 */
-+	usba_udc_data.pdata.vbus_pin = -EINVAL;
-+	usba_udc_data.pdata.num_ep = info->nr_endpoints;
-+	memcpy(usba_udc_data.ep, info->endpoints,
-+	       info->nr_endpoints * sizeof(struct usba_ep_data));
-+
-+	if (data && data->vbus_pin > 0) {
-+		at91_set_gpio_input(data->vbus_pin, 0);
-+		at91_set_deglitch(data->vbus_pin, 1);
-+		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
-+	}
-+
-+	/* Pullup pin is handled internally by USB device peripheral */
-+
-+	/* Clocks */
-+	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
-+	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
-+
-+	platform_device_register(&at91_usba_udc_device);
++	at91_config_pins(info->pins, ARRAY_SIZE(info->pins));
++	at91_can_device.dev.platform_data = data;
++	platform_device_register(&at91sam9263_can_device);
 +}
 +#else
-+void __init at91_add_device_usba(struct usba_platform_data *data) {}
++void __init at91_add_device_can(struct at91_can_data *data) {}
 +#endif
 +
  static int __init at91_add_standard_devices(void)
  {
  	at91_add_device_tc();
 diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index 417c959..a1374fa 100644
+index 74f1b9a..846f36f 100644
 --- a/arch/arm/mach-at91/devices.h
 +++ b/arch/arm/mach-at91/devices.h
-@@ -170,6 +170,25 @@ struct at91_dev_table_hdmac {
- 	int			have_slave;
+@@ -202,6 +202,12 @@ struct at91_dev_table_cf {
+ 	int			nr_pins;
  };
  
-+#define AT91_UDC_HS_EP(nam, idx, maxpkt, maxbk, dma, isoc)	\
-+	[idx] = {						\
-+		.name		= nam,				\
-+		.index		= idx,				\
-+		.fifo_size	= maxpkt,			\
-+		.nr_banks	= maxbk,			\
-+		.can_dma	= dma,				\
-+		.can_isoc	= isoc,				\
-+	}
-+
-+struct at91_dev_table_udc_hs {
-+	unsigned		fifo_base;
++struct at91_dev_table_can {
 +	unsigned		mmio_base;
 +	int			irq;
-+	void			(*device_init)(void);
-+	struct usba_ep_data	*endpoints;
-+	int			nr_endpoints;
++	struct at91_pin_config	pins[2];	/* TX, RX */
 +};
 +
  struct at91_device_table {
  	struct at91_dev_table_ethernet		*ethernet;
  	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -189,6 +208,7 @@ struct at91_device_table {
- 	struct at91_dev_table_lcdc		*lcdc;
- 	struct at91_dev_table_tsadcc		*tsadcc;
+@@ -223,6 +229,7 @@ struct at91_device_table {
  	struct at91_dev_table_hdmac		*hdmac;
-+	struct at91_dev_table_udc_hs		*udc_hs;
+ 	struct at91_dev_table_udc_hs		*udc_hs;
+ 	struct at91_dev_table_cf		*cf;
++	struct at91_dev_table_can		*can;
  };
  
  extern void __init at91_init_devices(struct at91_device_table *device_table);
