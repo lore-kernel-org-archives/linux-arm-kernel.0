@@ -1,46 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Apr 2011 08:27:21 +0300
-Subject: [RFC PATCH] Consolidate SRAM support
-In-Reply-To: <1303222615.32281.91.camel@deskari>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<BANLkTikJwFRenjwnws+4J2ep9G0Nv-9aXw@mail.gmail.com>
-	<20110416130929.GL4423@n2100.arm.linux.org.uk>
-	<20110418064838.GE12272@atomide.com>
-	<1303110011.2062.7.camel@deskari>
-	<20110418081743.GH12272@atomide.com>
-	<1303222615.32281.91.camel@deskari>
-Message-ID: <20110420052718.GA5918@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 20 Apr 2011 13:47:47 +0800
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to
+	be appended to zImage
+In-Reply-To: <20110413140030.GE12665@atomide.com>
+References: <20110324231830.2586.7150.stgit@riker>
+	<20110328091259.GA18721@S2100-06.ap.freescale.net>
+	<20110413140030.GE12665@atomide.com>
+Message-ID: <20110420054746.GA31127@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [110419 17:13]:
-> Hi Tony and Russell,
-> 
-> On Mon, 2011-04-18 at 11:17 +0300, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [110418 09:57]:
-> 
-> > > So, I can make a patch that removes the SRAM support from omapfb, and
-> > > queue it up for the next merge window.
+Hi Tony,
+
+On Wed, Apr 13, 2011 at 05:00:30PM +0300, Tony Lindgren wrote:
+> * Shawn Guo <shawn.guo@freescale.com> [110328 12:10]:
+> > On Thu, Mar 24, 2011 at 04:18:41PM -0700, John Bonesio wrote:
+> > > This patch provides the ability to boot using a device tree that is appended
+> > > to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+> > > 
+> > > Signed-off-by: John Bonesio <bones@secretlab.ca>
+> > > ---
+> > > 
+> > Tested on mx51 babbage.  The non-dt kernel works fine, but dt kernel
+> > does not.
 > > 
-> > OK. That patch should probably go into Russell's tree along with
-> > other SRAM related patches to avoid conflicts.
+> > I tracked it down a little bit and found, before calling kernel from
+> > arch/arm/boot/compressed/head.S, the dtb magic number (at address
+> > pointed by r8) was interpolated to 0x73fbc000 which happens to be the
+> > value of 'uart_base' assigned in plat-mxc/include/mach/uncompress.h.
 > 
-> Here's a simple patch to remove SRAM support from omapfb. Or more
-> precisely, this just disables it.
+I got it working by remove the 'static' from uart_base definition.
+
+> Gave this a try on an omap3 based board, looks like decompress_kernel
+> will trash the first 16 bytes of the device tree data somehow.
 > 
-> I started to remove the SRAM support from the drivers, but the patches
-> got quite big and will probably cause conflicts if they reside in
-> somebody else's tree than mine. So I believe it's easiest to divide SRAM
-> FB removal into this patch, handled by Russell (?), and then the rest,
-> handled by me.
+16 bytes corruption is a little beyond my guess.  I expect only 8
+bytes corruption on omap3.  Can you please remove the 'static' in
+uncompress.h to see if it helps?
 
-OK sounds like a plan.
- 
-> Is there something else related to OMAP FB than the code removed in this
-> patch that is hindering the SRAM work?
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -27,8 +27,8 @@
 
-I think we can now also remove sram_ceil and omap_sram_push_address?
+ #define MDR1_MODE_MASK                 0x07
 
+-static volatile u8 *uart_base;
+-static int uart_shift;
++volatile u8 *uart_base;
++int uart_shift;
+---
+
+Here is how I tracked it down with help from Dave Martin and Nicolas
+Pitre.
+
+http://lists.linaro.org/pipermail/linaro-kernel/2011-April/000259.html
+
+With the comments given by Nicolas below, this seems a global issue in
+platform uncompress.h.
+
+--- quote begins ---
+You must not use static variable in the decompressor.  For one thing, 
+that breaks the ability to XIP the decompressor code and move writable 
+data elsewhere.
+
+So the fix is indeed to _not_ declare any global variable as static in 
+this case.
+--- quote ends ---
+
+I would like to confirm it fixes your setup before I send fixing
+patch to remove 'static' from global variables in all platform
+uncompress.h.
+
+-- 
 Regards,
-
-Tony
+Shawn
