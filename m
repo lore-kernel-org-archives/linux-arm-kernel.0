@@ -1,41 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Apr 2011 08:36:55 +0200
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <20110419162742.GB24372@redhat.com>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<201104191655.13133.arnd@arndb.de>
-	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
-	<201104191801.19348.arnd@arndb.de>
-	<20110419162742.GB24372@redhat.com>
-Message-ID: <BANLkTikYMFjjO+igBLN+FoXtWC_uroVUPQ@mail.gmail.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Wed, 20 Apr 2011 08:39:59 +0200
+Subject: Could I (ab)use bus (struct bus_type) for virtual Broadcom
+ bus?
+In-Reply-To: <20110419140257.GA20456@kroah.com>
+References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
+	<1302892585.30441.12.camel@dev.znau.edu.ua>
+	<BANLkTi=16i+D8frz3X2f+JDtp4hbJKLL3A@mail.gmail.com>
+	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
+	<20110419140257.GA20456@kroah.com>
+Message-ID: <op.vt74sxvp3ri7v4@arend-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/19 Dave Jones <davej@redhat.com>:
+On Tue, 19 Apr 2011 16:02:57 +0200, Greg KH <greg@kroah.com> wrote:
 
-> The platform drivers are by their nature architecture specific,
-> so arch/ seems apropos. ?drivers/platform/arm/ maybe ?
+> Please don't use a platform device, unless there is no other way for
+> your device to work.  For this device, you are connected to the PCI bus,
+> so a platform device does not make sense at all.
 
-I opted for putting stuff in there, it was not popular, it will probably
-just cause overpopulation there instead, like drivers/misc is doing
-right now :-(
+Hi Greg,
 
-> Though, having arm do something different to every other arch seems
-> a bit awkward too. Everyone else has their cpufreq platform driver
-> somewhere under arch/whatever/../cpufreq/.. ?so changing that
-> violates the principle of least surprise.
->
-> I'm also not convinced that moving them would increase review of changes.
->
-> What problem is this solving again ?
+This is only true for a particular usage model. There are two models as  
+shown below:
 
-Recent complaints from Linus (the other one) about overpopulation
-bad code reuse and patch collision churn in the arch/arm/* tree.
+1) PCI(e) card
+                       ...........
++----------+          :   x y z :     x, y, and z are cores.
+|    uC    |__________:___|_|_| :
+|          |  PCI-bus : axi-bus :
++----------+          :.........:
+                       bcm chipset
 
-If all cpufreq drivers (including the x86 ones!) were under
-drivers/cpufreq/* it would mean better review and more
-opportunity for consolidation I guess? We could begin the move
-with a few ARM architectures. Do you agree?
+2) SoC
+           ...............
+           : uC    x y z :
+           :  |____|_|_| :
+           :    axi-bus  :
+           :.............:
+             bcm chipset
 
-Yours,
-Linus Walleij
+Your statement is true for 1) but in usage model 2) there is no PCI bus.  
+Also you refer to the chipset when you say 'device'. In the axi bus type  
+each individual core is registered as a device in the linux device tree.
+
+Gr. AvS
+-- 
+"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
