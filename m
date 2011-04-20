@@ -1,58 +1,124 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 19 Apr 2011 20:26:27 -0700
-Subject: MT_HIGH_VECTOR mapping set read-only creating illegal access
-In-Reply-To: <alpine.LFD.2.00.1104192249440.24613@xanadu.home>
-References: <4DA4F170.4020009@codeaurora.org>
-	<alpine.LFD.2.00.1104122308400.28032@xanadu.home>
-	<4DAE0E07.9030806@codeaurora.org>
-	<alpine.LFD.2.00.1104191956290.24613@xanadu.home>
-	<4DAE3A8E.1000903@codeaurora.org>
-	<alpine.LFD.2.00.1104192249440.24613@xanadu.home>
-Message-ID: <BANLkTinyqs392n1v4M7ZKqPhkJU3Nzs5MA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Apr 2011 05:47:08 +0200
+Subject: [RFC PATCH 00/23] at91: Replace duplicate device
+	initialisation code with common code
+In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
+References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <20110420034708.GD4204@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 8:01 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Tue, 19 Apr 2011, Michael Bohan wrote:
->
->> On 4/19/2011 5:21 PM, Nicolas Pitre wrote:
->> > Are you saying that your user space libc was reading at 0xffff0ff0
->> > directly? ?I hope not, because if you did so, you clearly abused the
->> > interface and the contract between user space and the kernel. ?Here's
->> > what I wrote in the comment right above the related code:
->> >
->> > ? * These are segment of kernel provided user code reachable from user space
->> > ? * at a fixed address in kernel memory. ?This is used to provide user space
->> > ? * with some operations which require kernel help because of unimplemented
->> > ? * native feature and/or instructions in many ARM CPUs. The idea is for
->> > ? * this code to be executed directly in user mode for best efficiency but
->> > ? * which is too intimate with the kernel counter part to be left to user
->> > ? * libraries. ?In fact this code might even differ from one CPU to another
->> > ? * depending on the available ?instruction set and restrictions like on
->> > ? * SMP systems. ?In other words, the kernel reserves the right to change
->> > ? * this code as needed without warning. Only the entry points and their
->> > ? * results are guaranteed to be stable.
->> >
->> > This has been there since April 29th 2005 i.e. 6 years ago.
->>
->> Yes, unfortunately Android appears to do this as an 'optimization' in the case
->> of dynamically linked execs. That is, it skips the helper code all together.
->
-> You should find the persons responsible for this aberration and flame
-> them with extreme prejudice! ?As if this could make any measurable
-> difference on any benchmark...
->
-> Either you have the hw reg for TLS and may use it directly, or you use
-> the provided helper dammit! ?I think I'll just move the implementation
-> private 0xffff0ff0 location around just to make sure it breaks any user
-> code that wrongly started to abuse this interface.
->
+Hi,
 
-I believe the original implementation used the helper, and then it was
-modified to skip the helper due to a measured performance impact.
-Something to do with cache pressure and a specific vendor GL library
-that heavily used get_tls(), I think, but it was before my time.  It
-is already fixed on the Android userspace side by defining
-ARCH_ARM_HAVE_TLS_REGISTER, which will prevent libc from ever
-accessing the private location, and we have dropped the hacks from our
-recent kernel trees.
+	I work olso on the same ideayou send first good
+
+	will take a look on it this week-end and test it
+Best Regards,
+J.
+On 13:10 Wed 20 Apr     , Ryan Mallon wrote:
+> Each AT91 variant (AT91RM9200, AT91SAM9260, etc) currently has its own
+> devices file, which includes the MMIO address, interrupt
+> configuration, GPIO setup, etc for each device. This results in a large
+> amount of duplicated code.
+> 
+> This patch set introduces a framework for adding shared devices for the
+> AT91 platform and replaces the multiple device setup implementations for
+> each device with single implementations in the new framework. This has
+> a net reduction of nearly 5000 lines of code.
+> 
+> Each of the arch/arm/mach-at91/*_devices.c files becomes a collection of
+> structures (with some initialisation callbacks where necessary) with a
+> table of devices which are present on the particular AT91 variant. All
+> structures/functions are marked as __init/__initdata so there is little
+> additional memory overhead. This also means that the #ifdefs around each
+> device can be removed from the *_devices.c files (but remain in the new
+> common devices.c file) without overhead.
+> 
+> I have build tested the patch series for all of the  AT91 variants 
+> and devices, and have boot tested it on the AT91SAM9260 (Snapper 9260
+> board) and tested basic device functionality.
+> 
+> Ryan Mallon (23):
+>   at91: Add common devices framework
+>   at91: Make Ethernet device common
+>   at91: Make USB OHCI/EHCI devices common
+>   at91: Make UDC device common
+>   at91: Make MMC device common
+>   at91: Make NAND device common
+>   at91: Make TWI device common
+>   at91: Make SPI device common
+>   at91: Make TCB device common
+>   at91: Make RTT device common
+>   at91: Make watchdog device common
+>   at91: Make UART devices common
+>   at91: Make PWM device common
+>   at91: Make SSC device common
+>   at91: Make AC97 device common
+>   at91: Make LCD controller device common
+>   at91: Make touchscreen device common
+>   at91: Make HDMAC device common
+>   at91: Make RTC device common
+>   at91: Make high speed USB gadget device common
+>   at91: Make compact flash device common
+>   at91: Move at91sam9263 CAN device to common devices
+>   at91: Remove mAgic and ISI device code
+> 
+>  arch/arm/mach-at91/Makefile               |    2 +-
+>  arch/arm/mach-at91/at572d940hf.c          |    4 +
+>  arch/arm/mach-at91/at572d940hf_devices.c  | 1022 +++-------------
+>  arch/arm/mach-at91/at91cap9.c             |    4 +
+>  arch/arm/mach-at91/at91cap9_devices.c     | 1411 ++++----------------
+>  arch/arm/mach-at91/at91rm9200.c           |    4 +
+>  arch/arm/mach-at91/at91rm9200_devices.c   | 1321 ++++---------------
+>  arch/arm/mach-at91/at91sam9260.c          |    4 +
+>  arch/arm/mach-at91/at91sam9260_devices.c  | 1471 ++++-----------------
+>  arch/arm/mach-at91/at91sam9261.c          |    4 +
+>  arch/arm/mach-at91/at91sam9261_devices.c  | 1172 ++++--------------
+>  arch/arm/mach-at91/at91sam9263.c          |    4 +
+>  arch/arm/mach-at91/at91sam9263_devices.c  | 1589 +++++------------------
+>  arch/arm/mach-at91/at91sam9g45.c          |    4 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c  | 1779 +++++---------------------
+>  arch/arm/mach-at91/at91sam9rl.c           |    4 +
+>  arch/arm/mach-at91/at91sam9rl_devices.c   | 1332 ++++----------------
+>  arch/arm/mach-at91/board-1arm.c           |    6 +-
+>  arch/arm/mach-at91/board-afeb-9260v1.c    |   10 +-
+>  arch/arm/mach-at91/board-at572d940hf_ek.c |   12 +-
+>  arch/arm/mach-at91/board-cam60.c          |    2 +-
+>  arch/arm/mach-at91/board-cap9adk.c        |    4 +-
+>  arch/arm/mach-at91/board-carmeva.c        |    6 +-
+>  arch/arm/mach-at91/board-cpu9krea.c       |   16 +-
+>  arch/arm/mach-at91/board-cpuat91.c        |   12 +-
+>  arch/arm/mach-at91/board-csb337.c         |    4 +-
+>  arch/arm/mach-at91/board-csb637.c         |    4 +-
+>  arch/arm/mach-at91/board-eb9200.c         |    8 +-
+>  arch/arm/mach-at91/board-ecbat91.c        |    6 +-
+>  arch/arm/mach-at91/board-eco920.c         |    2 +-
+>  arch/arm/mach-at91/board-flexibity.c      |    2 +-
+>  arch/arm/mach-at91/board-foxg20.c         |   16 +-
+>  arch/arm/mach-at91/board-gsia18s.c        |   14 +-
+>  arch/arm/mach-at91/board-kafa.c           |    6 +-
+>  arch/arm/mach-at91/board-kb9202.c         |   10 +-
+>  arch/arm/mach-at91/board-neocore926.c     |    6 +-
+>  arch/arm/mach-at91/board-pcontrol-g20.c   |   10 +-
+>  arch/arm/mach-at91/board-picotux200.c     |    6 +-
+>  arch/arm/mach-at91/board-qil-a9260.c      |   10 +-
+>  arch/arm/mach-at91/board-rm9200dk.c       |    6 +-
+>  arch/arm/mach-at91/board-rm9200ek.c       |    6 +-
+>  arch/arm/mach-at91/board-sam9-l9260.c     |    8 +-
+>  arch/arm/mach-at91/board-sam9260ek.c      |   10 +-
+>  arch/arm/mach-at91/board-sam9261ek.c      |    6 +-
+>  arch/arm/mach-at91/board-sam9263ek.c      |    6 +-
+>  arch/arm/mach-at91/board-sam9g20ek.c      |   10 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c   |    2 +-
+>  arch/arm/mach-at91/board-sam9rlek.c       |    4 +-
+>  arch/arm/mach-at91/board-snapper9260.c    |   14 +-
+>  arch/arm/mach-at91/board-stamp9g20.c      |   20 +-
+>  arch/arm/mach-at91/board-usb-a9260.c      |    4 +-
+>  arch/arm/mach-at91/board-usb-a9263.c      |    4 +-
+>  arch/arm/mach-at91/board-yl-9200.c        |   10 +-
+>  arch/arm/mach-at91/devices.c              | 2002 +++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/devices.h              |  237 ++++
+>  arch/arm/mach-at91/include/mach/board.h   |   21 +-
+>  56 files changed, 4483 insertions(+), 9190 deletions(-)
+>  create mode 100644 arch/arm/mach-at91/devices.c
+>  create mode 100644 arch/arm/mach-at91/devices.h
