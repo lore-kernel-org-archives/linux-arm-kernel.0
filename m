@@ -1,35 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Apr 2011 09:55:14 -0700
-Subject: [PATCH 0/3] fix some issues with the kernel decompressor
-In-Reply-To: <alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-Message-ID: <20110420165514.GE10402@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 20 Apr 2011 12:10:34 -0500
+Subject: [RFC PATCH 11/23] at91: Make watchdog device common
+In-Reply-To: <1303261827-27730-13-git-send-email-ryan@bluewatersys.com>
+References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
+	<1303261827-27730-13-git-send-email-ryan@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D23AB86B@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110420 05:57]:
-> On Wed, 20 Apr 2011, Tony Lindgren wrote:
-> 
-> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110419 21:12]:
-> > > Here some patches to fix some issues with the zImage code.  The LZMA
-> > > decompressor now works for me, and the DT append patch should work
-> > > on all platforms now too.
-> > 
-> > Weird still no luck here booting n900 zImage.. LZMA image prints
-> > corrupt error, and only works if the image is relocated further
-> > by 1MB or so. With the following hack n900 boots, so some size
-> > calculations still are wrong. No luck with DT append patch either.
-> > 
-> > Any ideas why the following helps on n900?
-> 
-> No idea.  This could indicate that the lzma code is crapping into memory 
-> outside of its output buffer.  The fact that my patch #2/3 makes lzma 
-> decompression suddenly work for me with no apparent explanation is not 
-> reassuring either.
+On Tuesday, April 19, 2011 6:10 PM, Ryan Mallon wrote:
+>
+> The code for the watchdog device for each of the at91 variants is
+> identical. Remove it from each variant and replace them with a single
+> version in devices.c
+>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+> ---
 
-With gzip kernel looks like I need to move the kernel further by 8MB
-instead of 1MB for some reason..
+[snip]
 
-Tony
+> diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
+> index 2828e7e..20fe358 100644
+> --- a/arch/arm/mach-at91/at572d940hf_devices.c
+> +++ b/arch/arm/mach-at91/at572d940hf_devices.c
+
+[snip]
+ 
+> @@ -538,17 +518,3 @@ void __init at572d940hf_init_devices(void)
+>  {
+>  	at91_init_devices(&at572d940hf_device_table);
+>  }
+> -
+> -/* -------------------------------------------------------------------- */
+> -
+> -/*
+> - * These devices are always present and don't need any board-specific
+> - * setup.
+> - */
+> -static int __init at91_add_standard_devices(void)
+> -{
+> -	at91_add_device_watchdog();
+> -	return 0;
+> -}
+> -
+> -arch_initcall(at91_add_standard_devices);
+
+Ryan,
+
+I would suggest leaving the various at91_add_standard_devices functions in until
+all the other patches are applied.  Add one more patch to the series to finally
+rip them out after all the conversions are complete.
+
+Regards,
+Hartley
