@@ -1,85 +1,94 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Wed, 20 Apr 2011 03:15:16 -0500
-Subject: Lockdep question.
-Message-ID: <BANLkTi=PF6zx0yc1UOUDEgAyN2XV8+eG=A@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Apr 2011 10:16:24 +0200
+Subject: [PATCH] at91: switch to CLKDEV_LOOKUP
+In-Reply-To: <1303271969-9794-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1303271969-9794-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110420081624.GT31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Hi Ingo, (and LAKML)
+Hello Jean-Christophe,
 
-I was playing around with a 2.6.36 kernel on an ARM board, and decided
-to turn on lockdep.
-Am I interpreting this correctly?
+On Wed, Apr 20, 2011 at 05:59:29AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>  /*
+>   * The five programmable clocks.
+>   * You must configure pin multiplexing to bring these signals out.
+> @@ -234,6 +265,13 @@ static struct clk pck3 = {
+>  	.id		= 3,
+>  };
+>  
+> +static struct clk_lookup program_clocks_lookups[] = {
+> +	CLKDEV_CON_ID("pck0", &pck0),
+> +	CLKDEV_CON_ID("pck1", &pck1),
+> +	CLKDEV_CON_ID("pck2", &pck2),
+> +	CLKDEV_CON_ID("pck3", &pck3),
+> +};
+> +
+>  static struct clk mAgicV_mem_clk = {
+>  	.name		= "mAgicV_mem_clk",
+>  	.pmc_mask	= AT91_PMC_PCK4,
+> @@ -241,6 +279,9 @@ static struct clk mAgicV_mem_clk = {
+>  	.id		= 4,
+>  };
+>  
+> +static struct clk_lookup mAgicV_mem_clk_lookup =
+> +	CLKDEV_CON_ID("mAgicV_mem_clk", &mAgicV_mem_clk);
+> +
+>  /* HClocks */
+>  static struct clk hck0 = {
+>  	.name		= "hck0",
+> @@ -255,6 +296,11 @@ static struct clk hck1 = {
+>  	.id		= 1,
+>  };
+>  
+> +static struct clk_lookup hc_clocks_lookups[] = {
+> +	CLKDEV_CON_ID("hck0", &hck0),
+> +	CLKDEV_CON_ID("hck1", &hck1),
+> +};
+> +
+>  static void __init at572d940hf_register_clocks(void)
+>  {
+>  	int i;
+> @@ -262,14 +308,32 @@ static void __init at572d940hf_register_clocks(void)
+>  	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+>  		clk_register(periph_clocks[i]);
+>  
+> +	clkdev_add_table(periph_clocks_lookups,
+> +			 ARRAY_SIZE(periph_clocks_lookups));
+> +
+Does it make sense to add a (maybe global) helper function ? la:
 
-The global interrupt controller code arch/arm/common/gic.c, uses spin_lock and
-spin_unlock (not spin_lock_irqsave and spin_unlock_irqrestore). I
-suppose this is because the interrupts are guaranteed to be off anyway
-- either
-because the routines are used on an actual interrupt, where the GIC
-ensures no more interrupts would be delivered, or because of an actual
-spin_lock_irqsave
-done in kernel/irq/manage.c:disable_irq_nosync:disable_irq_nosync().
+	void __init clkdev_register_and_add_table(struct clk_lookup *cl, size_t num)
+	{
+		while (num--) {
+			clk_register(&cl->clk);
+			clkdev_add(cl);
+			++cl;
+		}
+	}
 
-Is this failure because lockdep thinks the GIC irq_controller_lock
-could be taken in both interrupt and non-interrupt context (since it
-isn't aware of the guarantee enforced by the GIC interrupt path)?
+? (The locking isn't optimal here, but I think you get the point.)
 
-Similar code in x64/ia-32 io-apic (which, grantedly, I guess has to
-deal with multiple IO-APICs) uses spin_lock_irqsave and
-spin_unlock_irqrestore.
 
-Thanks ahead of time,
-A
+> +static struct clk_lookup usart_clocks_lookups[] = {
+> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
+> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
+> +};
+> [...]
+> +struct clk* __init at91sam9rl_get_uart_clock(int id)
+> +{
+> +	if (id >= ARRAY_SIZE(usart_clocks_lookups))
+> +		return NULL;
+> +	return usart_clocks_lookups[id].clk;
+Who is using this function? If the caller has access to the
+atmel_usart.<id> device, just using clk_get looks better.
 
-=================================
-[ INFO: inconsistent lock state ]
-2.6.36.3-g0a066c9-dirty #17
----------------------------------
-inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
-swapper/1 [HC0[0]:SC0[0]:HE1:SE1] takes:
- (irq_controller_lock){?.....}, at: [<c019f2f4>] gic_mask_irq+0x1c/0x78
-{IN-HARDIRQ-W} state was registered at:
-  [<c01fe1d8>] __lock_acquire+0x6ec/0x9ec
-  [<c01fe538>] lock_acquire+0x60/0x74
-  [<c0576c4c>] _raw_spin_lock+0x50/0x88
-  [<c019f2f4>] gic_mask_irq+0x1c/0x78
-  [<c01a1a50>] tegra_mask+0xc/0x18
-  [<c0215618>] handle_level_irq+0x40/0x144
-  [<c019408c>] asm_do_IRQ+0x8c/0xcc
-  [<c0194bf0>] __irq_svc+0x50/0xec
-  [<c01d037c>] vprintk+0x41c/0x4a8
-  [<c0573748>] printk+0x1c/0x28
-  [<c0012d50>] lockdep_info+0x24/0xa4
-  [<c0008c20>] start_kernel+0x208/0x308
-  [<00008080>] 0x8080
-irq event stamp: 196724
-hardirqs last  enabled at (196724): [<c0577908>]
-_raw_spin_unlock_irqrestore+0x3c/0x6c
-hardirqs last disabled at (196723): [<c0576dcc>]
-_raw_spin_lock_irqsave+0x1c/0x9c
-softirqs last  enabled at (195681): [<c01d55b0>] irq_exit+0x58/0xbc
-softirqs last disabled at (195668): [<c01d55b0>] irq_exit+0x58/0xbc
+Best regards
+Uwe
 
-other info that might help us debug this:
-no locks held by swapper/1.
-
-stack backtrace:
-[<c019a79c>] (unwind_backtrace+0x0/0xf0) from [<c01fab8c>]
-(mark_lock+0x5a4/0x7d8)
-[<c01fab8c>] (mark_lock+0x5a4/0x7d8) from [<c01fe264>]
-(__lock_acquire+0x778/0x9ec)
-[<c01fe264>] (__lock_acquire+0x778/0x9ec) from [<c01fe538>]
-(lock_acquire+0x60/0x74)
-[<c01fe538>] (lock_acquire+0x60/0x74) from [<c0576c4c>]
-(_raw_spin_lock+0x50/0x88)
-[<c0576c4c>] (_raw_spin_lock+0x50/0x88) from [<c019f2f4>]
-(gic_mask_irq+0x1c/0x78)
-[<c019f2f4>] (gic_mask_irq+0x1c/0x78) from [<c01a1a50>] (tegra_mask+0xc/0x18)
-[<c01a1a50>] (tegra_mask+0xc/0x18) from [<c000ebd4>]
-(tegra_cpuidle_init+0xac/0x300)
-[<c000ebd4>] (tegra_cpuidle_init+0xac/0x300) from [<c01945c4>]
-(do_one_initcall+0xd0/0x1a8)
-[<c01945c4>] (do_one_initcall+0xd0/0x1a8) from [<c0008708>]
-(kernel_init+0x14c/0x210)
-[<c0008708>] (kernel_init+0x14c/0x210) from [<c0195c88>]
-(kernel_thread_exit+0x0/0x8)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
