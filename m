@@ -1,769 +1,529 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 20 Apr 2011 13:10:20 +1200
-Subject: [RFC PATCH 16/23] at91: Make LCD controller device common
+Date: Wed, 20 Apr 2011 13:10:24 +1200
+Subject: [RFC PATCH 20/23] at91: Make high speed USB gadget device common
 In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
 References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303261827-27730-18-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303261827-27730-22-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual LCD controller device code for each at91 variant with a
-single implementation in devices.c
+Replace the individual high-speed UDC code for each at91 variant with
+a single implementation in devices.c
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91cap9_devices.c    |   96 ++++++++--------------
- arch/arm/mach-at91/at91sam9261_devices.c |  133 ++++++++++--------------------
- arch/arm/mach-at91/at91sam9263_devices.c |   94 +++++++--------------
- arch/arm/mach-at91/at91sam9g45_devices.c |  111 +++++++++----------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   89 ++++++--------------
- arch/arm/mach-at91/devices.c             |   75 +++++++++++++++++
- arch/arm/mach-at91/devices.h             |   11 +++
- 7 files changed, 261 insertions(+), 348 deletions(-)
+ arch/arm/mach-at91/at91cap9_devices.c    |  114 ++++++------------------------
+ arch/arm/mach-at91/at91sam9g45_devices.c |   94 ++++---------------------
+ arch/arm/mach-at91/at91sam9rl_devices.c  |  100 ++++----------------------
+ arch/arm/mach-at91/devices.c             |   79 +++++++++++++++++++++
+ arch/arm/mach-at91/devices.h             |   20 +++++
+ 5 files changed, 150 insertions(+), 257 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index ae8e118..6724011 100644
+index 6724011..551f067 100644
 --- a/arch/arm/mach-at91/at91cap9_devices.c
 +++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -332,73 +332,44 @@ static struct __initdata at91_dev_table_ac97 device_ac97 = {
-  *  LCD Controller
+@@ -51,105 +51,36 @@ static struct at91_dev_table_usb_ohci __initdata device_usbh_ohci = {
+  *  USB HS Device (Gadget)
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
--static u64 lcdc_dmamask = DMA_BIT_MASK(32);
--static struct atmel_lcdfb_info lcdc_data;
+-#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
 -
--static struct resource lcdc_resources[] = {
+-static struct resource usba_udc_resources[] = {
 -	[0] = {
--		.start	= AT91CAP9_LCDC_BASE,
--		.end	= AT91CAP9_LCDC_BASE + SZ_4K - 1,
+-		.start	= AT91CAP9_UDPHS_FIFO,
+-		.end	= AT91CAP9_UDPHS_FIFO + SZ_512K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91CAP9_ID_LCDC,
--		.end	= AT91CAP9_ID_LCDC,
+-		.start	= AT91CAP9_BASE_UDPHS,
+-		.end	= AT91CAP9_BASE_UDPHS + SZ_1K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[2] = {
+-		.start	= AT91CAP9_ID_UDPHS,
+-		.end	= AT91CAP9_ID_UDPHS,
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device at91_lcdc_device = {
--	.name		= "atmel_lcdfb",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &lcdc_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &lcdc_data,
--	},
--	.resource	= lcdc_resources,
--	.num_resources	= ARRAY_SIZE(lcdc_resources),
+-#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
+-	[idx] = {						\
+-		.name		= nam,				\
+-		.index		= idx,				\
+-		.fifo_size	= maxpkt,			\
+-		.nr_banks	= maxbk,			\
+-		.can_dma	= dma,				\
+-		.can_isoc	= isoc,				\
+-	}
+-
+-static struct usba_ep_data usba_udc_ep[] = {
+-	EP("ep0", 0,   64, 1, 0, 0),
+-	EP("ep1", 1, 1024, 3, 1, 1),
+-	EP("ep2", 2, 1024, 3, 1, 1),
+-	EP("ep3", 3, 1024, 2, 1, 1),
+-	EP("ep4", 4, 1024, 2, 1, 1),
+-	EP("ep5", 5, 1024, 2, 1, 0),
+-	EP("ep6", 6, 1024, 2, 1, 0),
+-	EP("ep7", 7, 1024, 2, 0, 0),
 -};
 -
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
-+static void __init at91cap9_lcdc_init(void)
+-#undef EP
+-
+-/*
+- * pdata doesn't have room for any endpoints, so we need to
+- * append room for the ones we need right after it.
+- */
+-static struct {
+-	struct usba_platform_data pdata;
+-	struct usba_ep_data ep[8];
+-} usba_udc_data;
+-
+-static struct platform_device at91_usba_udc_device = {
+-	.name		= "atmel_usba_udc",
+-	.id		= -1,
+-	.dev		= {
+-				.platform_data	= &usba_udc_data.pdata,
+-	},
+-	.resource	= usba_udc_resources,
+-	.num_resources	= ARRAY_SIZE(usba_udc_resources),
+-};
+-
+-void __init at91_add_device_usba(struct usba_platform_data *data)
++static void at91cap9_usba_init(void)
  {
--	if (!data)
--		return;
+ 	if (cpu_is_at91cap9_revB()) {
+ 		irq_set_irq_type(AT91CAP9_ID_UDPHS, IRQ_TYPE_LEVEL_HIGH);
+ 		at91_sys_write(AT91_MATRIX_UDPHS, AT91_MATRIX_SELECT_UDPHS |
+-						  AT91_MATRIX_UDPHS_BYPASS_LOCK);
+-	}
+-	else
++			       AT91_MATRIX_UDPHS_BYPASS_LOCK);
++	} else {
+ 		at91_sys_write(AT91_MATRIX_UDPHS, AT91_MATRIX_SELECT_UDPHS);
 -
- 	if (cpu_is_at91cap9_revB())
- 		irq_set_irq_type(AT91CAP9_ID_LCDC, IRQ_TYPE_LEVEL_HIGH);
+-	/*
+-	 * Invalid pins are 0 on AT91, but the usba driver is shared
+-	 * with AVR32, which use negative values instead. Once/if
+-	 * gpio_is_valid() is ported to AT91, revisit this code.
+-	 */
+-	usba_udc_data.pdata.vbus_pin = -EINVAL;
+-	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
 -
--	at91_set_A_periph(AT91_PIN_PC1, 0);	/* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PC2, 0);	/* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PC3, 0);	/* LCDDEN */
--	at91_set_B_periph(AT91_PIN_PB9, 0);	/* LCDCC */
--	at91_set_A_periph(AT91_PIN_PC6, 0);	/* LCDD2 */
--	at91_set_A_periph(AT91_PIN_PC7, 0);	/* LCDD3 */
--	at91_set_A_periph(AT91_PIN_PC8, 0);	/* LCDD4 */
--	at91_set_A_periph(AT91_PIN_PC9, 0);	/* LCDD5 */
--	at91_set_A_periph(AT91_PIN_PC10, 0);	/* LCDD6 */
--	at91_set_A_periph(AT91_PIN_PC11, 0);	/* LCDD7 */
--	at91_set_A_periph(AT91_PIN_PC14, 0);	/* LCDD10 */
--	at91_set_A_periph(AT91_PIN_PC15, 0);	/* LCDD11 */
--	at91_set_A_periph(AT91_PIN_PC16, 0);	/* LCDD12 */
--	at91_set_A_periph(AT91_PIN_PC17, 0);	/* LCDD13 */
--	at91_set_A_periph(AT91_PIN_PC18, 0);	/* LCDD14 */
--	at91_set_A_periph(AT91_PIN_PC19, 0);	/* LCDD15 */
--	at91_set_A_periph(AT91_PIN_PC22, 0);	/* LCDD18 */
--	at91_set_A_periph(AT91_PIN_PC23, 0);	/* LCDD19 */
--	at91_set_A_periph(AT91_PIN_PC24, 0);	/* LCDD20 */
--	at91_set_A_periph(AT91_PIN_PC25, 0);	/* LCDD21 */
--	at91_set_A_periph(AT91_PIN_PC26, 0);	/* LCDD22 */
--	at91_set_A_periph(AT91_PIN_PC27, 0);	/* LCDD23 */
+-	if (data && data->vbus_pin > 0) {
+-		at91_set_gpio_input(data->vbus_pin, 0);
+-		at91_set_deglitch(data->vbus_pin, 1);
+-		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+ 	}
 -
--	lcdc_data = *data;
--	platform_device_register(&at91_lcdc_device);
+-	/* Pullup pin is handled internally by USB device peripheral */
+-
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+-	platform_device_register(&at91_usba_udc_device);
  }
 -#else
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
+-void __init at91_add_device_usba(struct usba_platform_data *data) {}
 -#endif
  
-+static struct __initdata at91_pin_config lcdc_pins[] = {
-+	{AT91_PIN_PC1,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDHSYNC */
-+	{AT91_PIN_PC2,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDOTCK */
-+	{AT91_PIN_PC3,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDEN */
-+	{AT91_PIN_PB9,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDCC */
-+	{AT91_PIN_PC6,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD2 */
-+	{AT91_PIN_PC7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD3 */
-+	{AT91_PIN_PC8,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD4 */
-+	{AT91_PIN_PC9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD5 */
-+	{AT91_PIN_PC10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD6 */
-+	{AT91_PIN_PC11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD7 */
-+	{AT91_PIN_PC14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD10 */
-+	{AT91_PIN_PC15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD11 */
-+	{AT91_PIN_PC16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD12 */
-+	{AT91_PIN_PC17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD13 */
-+	{AT91_PIN_PC18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD14 */
-+	{AT91_PIN_PC19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD15 */
-+	{AT91_PIN_PC22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD18 */
-+	{AT91_PIN_PC23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD19 */
-+	{AT91_PIN_PC24, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD20 */
-+	{AT91_PIN_PC25, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD21 */
-+	{AT91_PIN_PC26, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD22 */
-+	{AT91_PIN_PC27, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD23 */
++static struct usba_ep_data usba_udc_ep[] = {
++	AT91_UDC_HS_EP("ep0", 0,   64, 1, 0, 0),
++	AT91_UDC_HS_EP("ep1", 1, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep2", 2, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep3", 3, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep4", 4, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep5", 5, 1024, 2, 1, 0),
++	AT91_UDC_HS_EP("ep6", 6, 1024, 2, 1, 0),
++	AT91_UDC_HS_EP("ep7", 7, 1024, 2, 0, 0),
 +};
 +
-+static struct at91_dev_table_lcdc __initdata device_lcdc = {
-+	.mmio_base	= AT91CAP9_LCDC_BASE,
-+	.irq		= AT91CAP9_ID_LCDC,
-+	.device_init	= at91cap9_lcdc_init,
-+	.pins		= lcdc_pins,
-+	.nr_pins	= ARRAY_SIZE(lcdc_pins),
++static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
++	.fifo_base	= AT91CAP9_UDPHS_FIFO,
++	.mmio_base	= AT91CAP9_BASE_UDPHS,
++	.irq		= AT91CAP9_ID_UDPHS,
++	.device_init	= at91cap9_usba_init,
++	.endpoints	= usba_udc_ep,
++	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
 +};
  
  /* --------------------------------------------------------------------
-  *  SSC -- Synchronous Serial Controller
-@@ -508,6 +479,7 @@ static struct at91_device_table __initdata at91cap9_device_table = {
- 	.ssc[0]		= &device_ssc0,
+  *  Ethernet
+@@ -480,6 +411,7 @@ static struct at91_device_table __initdata at91cap9_device_table = {
  	.ssc[1]		= &device_ssc1,
  	.ac97		= &device_ac97,
-+	.lcdc		= &device_lcdc,
+ 	.lcdc		= &device_lcdc,
++	.udc_hs		= &device_udc_hs,
  };
  
  void __init at91cap9_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 6efa1e8..97fb389 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -127,101 +127,53 @@ static struct __initdata at91_dev_table_spi device_spi1 = {
-  *  LCD Controller
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
--static u64 lcdc_dmamask = DMA_BIT_MASK(32);
--static struct atmel_lcdfb_info lcdc_data;
--
--static struct resource lcdc_resources[] = {
--	[0] = {
--		.start	= AT91SAM9261_LCDC_BASE,
--		.end	= AT91SAM9261_LCDC_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9261_ID_LCDC,
--		.end	= AT91SAM9261_ID_LCDC,
--		.flags	= IORESOURCE_IRQ,
--	},
--#if defined(CONFIG_FB_INTSRAM)
--	[2] = {
--		.start	= AT91SAM9261_SRAM_BASE,
--		.end	= AT91SAM9261_SRAM_BASE + AT91SAM9261_SRAM_SIZE - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--#endif
--};
--
--static struct platform_device at91_lcdc_device = {
--	.name		= "atmel_lcdfb",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &lcdc_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &lcdc_data,
--	},
--	.resource	= lcdc_resources,
--	.num_resources	= ARRAY_SIZE(lcdc_resources),
--};
--
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
--{
--	if (!data) {
--		return;
--	}
--
-+static struct __initdata at91_pin_config lcdc_pins[] = {
- #if defined(CONFIG_FB_ATMEL_STN)
--	at91_set_A_periph(AT91_PIN_PB0, 0);     /* LCDVSYNC */
--	at91_set_A_periph(AT91_PIN_PB1, 0);     /* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PB2, 0);     /* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PB3, 0);     /* LCDDEN */
--	at91_set_A_periph(AT91_PIN_PB4, 0);     /* LCDCC */
--	at91_set_A_periph(AT91_PIN_PB5, 0);     /* LCDD0 */
--	at91_set_A_periph(AT91_PIN_PB6, 0);     /* LCDD1 */
--	at91_set_A_periph(AT91_PIN_PB7, 0);     /* LCDD2 */
--	at91_set_A_periph(AT91_PIN_PB8, 0);     /* LCDD3 */
-+	{AT91_PIN_PB0,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDVSYNC */
-+	{AT91_PIN_PB1,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDHSYNC */
-+	{AT91_PIN_PB2,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDDOTCK */
-+	{AT91_PIN_PB3,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDDEN */
-+	{AT91_PIN_PB4,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDCC */
-+	{AT91_PIN_PB5,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDD0 */
-+	{AT91_PIN_PB6,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDD1 */
-+	{AT91_PIN_PB7,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDD2 */
-+	{AT91_PIN_PB8,  AT91_PIN_PERIPH_A, 0, 0, 0},     /* LCDD3 */
- #else
--	at91_set_A_periph(AT91_PIN_PB1, 0);	/* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PB2, 0);	/* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PB3, 0);	/* LCDDEN */
--	at91_set_A_periph(AT91_PIN_PB4, 0);	/* LCDCC */
--	at91_set_A_periph(AT91_PIN_PB7, 0);	/* LCDD2 */
--	at91_set_A_periph(AT91_PIN_PB8, 0);	/* LCDD3 */
--	at91_set_A_periph(AT91_PIN_PB9, 0);	/* LCDD4 */
--	at91_set_A_periph(AT91_PIN_PB10, 0);	/* LCDD5 */
--	at91_set_A_periph(AT91_PIN_PB11, 0);	/* LCDD6 */
--	at91_set_A_periph(AT91_PIN_PB12, 0);	/* LCDD7 */
--	at91_set_A_periph(AT91_PIN_PB15, 0);	/* LCDD10 */
--	at91_set_A_periph(AT91_PIN_PB16, 0);	/* LCDD11 */
--	at91_set_A_periph(AT91_PIN_PB17, 0);	/* LCDD12 */
--	at91_set_A_periph(AT91_PIN_PB18, 0);	/* LCDD13 */
--	at91_set_A_periph(AT91_PIN_PB19, 0);	/* LCDD14 */
--	at91_set_A_periph(AT91_PIN_PB20, 0);	/* LCDD15 */
--	at91_set_B_periph(AT91_PIN_PB23, 0);	/* LCDD18 */
--	at91_set_B_periph(AT91_PIN_PB24, 0);	/* LCDD19 */
--	at91_set_B_periph(AT91_PIN_PB25, 0);	/* LCDD20 */
--	at91_set_B_periph(AT91_PIN_PB26, 0);	/* LCDD21 */
--	at91_set_B_periph(AT91_PIN_PB27, 0);	/* LCDD22 */
--	at91_set_B_periph(AT91_PIN_PB28, 0);	/* LCDD23 */
-+	{AT91_PIN_PB1,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDHSYNC */
-+	{AT91_PIN_PB2,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDOTCK */
-+	{AT91_PIN_PB3,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDEN */
-+	{AT91_PIN_PB4,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDCC */
-+	{AT91_PIN_PB7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD2 */
-+	{AT91_PIN_PB8,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD3 */
-+	{AT91_PIN_PB9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD4 */
-+	{AT91_PIN_PB10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD5 */
-+	{AT91_PIN_PB11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD6 */
-+	{AT91_PIN_PB12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD7 */
-+	{AT91_PIN_PB15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD10 */
-+	{AT91_PIN_PB16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD11 */
-+	{AT91_PIN_PB17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD12 */
-+	{AT91_PIN_PB18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD13 */
-+	{AT91_PIN_PB19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD14 */
-+	{AT91_PIN_PB20, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD15 */
-+	{AT91_PIN_PB23, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD18 */
-+	{AT91_PIN_PB24, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD19 */
-+	{AT91_PIN_PB25, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD20 */
-+	{AT91_PIN_PB26, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD21 */
-+	{AT91_PIN_PB27, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD22 */
-+	{AT91_PIN_PB28, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD23 */
- #endif
-+};
- 
--	if (ARRAY_SIZE(lcdc_resources) > 2) {
--		void __iomem *fb;
--		struct resource *fb_res = &lcdc_resources[2];
--		size_t fb_len = fb_res->end - fb_res->start + 1;
--
--		fb = ioremap(fb_res->start, fb_len);
--		if (fb) {
--			memset(fb, 0, fb_len);
--			iounmap(fb);
--		}
--	}
--	lcdc_data = *data;
--	platform_device_register(&at91_lcdc_device);
--}
--#else
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
-+static struct __initdata at91_dev_table_lcdc device_lcdc = {
-+	.mmio_base	= AT91SAM9261_LCDC_BASE,
-+	.irq		= AT91SAM9261_ID_LCDC,
-+#if defined(CONFIG_FB_INTSRAM)
-+	.sram_base	= AT91SAM9261_SRAM_BASE,
-+	.sram_size	= AT91SAM9261_SRAM_SIZE,
- #endif
--
-+	.pins		= lcdc_pins,
-+	.nr_pins	= ARRAY_SIZE(lcdc_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  Timer/Counter block
-@@ -367,6 +319,7 @@ static struct at91_device_table __initdata at91sam9261_device_table = {
- 	.ssc[0]		= &device_ssc0,
- 	.ssc[1]		= &device_ssc1,
- 	.ssc[2]		= &device_ssc2,
-+	.lcdc		= &device_lcdc,
- };
- 
- void __init at91sam9261_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 6155a9f..f8c6f9c 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -351,71 +351,38 @@ void __init at91_add_device_can(struct at91_can_data *data) {}
-  *  LCD Controller
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
--static u64 lcdc_dmamask = DMA_BIT_MASK(32);
--static struct atmel_lcdfb_info lcdc_data;
--
--static struct resource lcdc_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_LCDC_BASE,
--		.end	= AT91SAM9263_LCDC_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_LCDC,
--		.end	= AT91SAM9263_ID_LCDC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+static struct __initdata at91_pin_config lcdc_pins[] = {
-+	{AT91_PIN_PC1,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDHSYNC */
-+	{AT91_PIN_PC2,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDOTCK */
-+	{AT91_PIN_PC3,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDEN */
-+	{AT91_PIN_PB9,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDCC */
-+	{AT91_PIN_PC6,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD2 */
-+	{AT91_PIN_PC7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD3 */
-+	{AT91_PIN_PC8,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD4 */
-+	{AT91_PIN_PC9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD5 */
-+	{AT91_PIN_PC10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD6 */
-+	{AT91_PIN_PC11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD7 */
-+	{AT91_PIN_PC14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD10 */
-+	{AT91_PIN_PC15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD11 */
-+	{AT91_PIN_PC16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD12 */
-+	{AT91_PIN_PC12, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD13 */
-+	{AT91_PIN_PC18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD14 */
-+	{AT91_PIN_PC19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD15 */
-+	{AT91_PIN_PC22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD18 */
-+	{AT91_PIN_PC23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD19 */
-+	{AT91_PIN_PC24, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD20 */
-+	{AT91_PIN_PC17, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD21 */
-+	{AT91_PIN_PC26, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD22 */
-+	{AT91_PIN_PC27, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD23 */
-+};
-+
-+static struct __initdata at91_dev_table_lcdc device_lcdc = {
-+	.mmio_base	= AT91SAM9263_LCDC_BASE,
-+	.irq		= AT91SAM9263_ID_LCDC,
-+	.pins		= lcdc_pins,
-+	.nr_pins	= ARRAY_SIZE(lcdc_pins),
- };
- 
--static struct platform_device at91_lcdc_device = {
--	.name		= "atmel_lcdfb",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &lcdc_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &lcdc_data,
--	},
--	.resource	= lcdc_resources,
--	.num_resources	= ARRAY_SIZE(lcdc_resources),
--};
--
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
--{
--	if (!data)
--		return;
--
--	at91_set_A_periph(AT91_PIN_PC1, 0);	/* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PC2, 0);	/* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PC3, 0);	/* LCDDEN */
--	at91_set_B_periph(AT91_PIN_PB9, 0);	/* LCDCC */
--	at91_set_A_periph(AT91_PIN_PC6, 0);	/* LCDD2 */
--	at91_set_A_periph(AT91_PIN_PC7, 0);	/* LCDD3 */
--	at91_set_A_periph(AT91_PIN_PC8, 0);	/* LCDD4 */
--	at91_set_A_periph(AT91_PIN_PC9, 0);	/* LCDD5 */
--	at91_set_A_periph(AT91_PIN_PC10, 0);	/* LCDD6 */
--	at91_set_A_periph(AT91_PIN_PC11, 0);	/* LCDD7 */
--	at91_set_A_periph(AT91_PIN_PC14, 0);	/* LCDD10 */
--	at91_set_A_periph(AT91_PIN_PC15, 0);	/* LCDD11 */
--	at91_set_A_periph(AT91_PIN_PC16, 0);	/* LCDD12 */
--	at91_set_B_periph(AT91_PIN_PC12, 0);	/* LCDD13 */
--	at91_set_A_periph(AT91_PIN_PC18, 0);	/* LCDD14 */
--	at91_set_A_periph(AT91_PIN_PC19, 0);	/* LCDD15 */
--	at91_set_A_periph(AT91_PIN_PC22, 0);	/* LCDD18 */
--	at91_set_A_periph(AT91_PIN_PC23, 0);	/* LCDD19 */
--	at91_set_A_periph(AT91_PIN_PC24, 0);	/* LCDD20 */
--	at91_set_B_periph(AT91_PIN_PC17, 0);	/* LCDD21 */
--	at91_set_A_periph(AT91_PIN_PC26, 0);	/* LCDD22 */
--	at91_set_A_periph(AT91_PIN_PC27, 0);	/* LCDD23 */
--
--	lcdc_data = *data;
--	platform_device_register(&at91_lcdc_device);
--}
--#else
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
--#endif
--
--
- /* --------------------------------------------------------------------
-  *  Image Sensor Interface
-  * -------------------------------------------------------------------- */
-@@ -618,6 +585,7 @@ static struct at91_device_table __initdata at91sam9263_device_table = {
- 	.ssc[0]		= &device_ssc0,
- 	.ssc[1]		= &device_ssc1,
- 	.ac97		= &device_ac97,
-+	.lcdc		= &device_lcdc,
- };
- 
- void __init at91sam9263_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 3f71e45..0f7cc97 100644
+index 3c05a6f..4f6c8e9 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -346,80 +346,46 @@ static struct __initdata at91_dev_table_ac97 device_ac97 = {
-  *  LCD Controller
+@@ -66,91 +66,24 @@ static struct __initdata at91_dev_table_basic_device device_usb_ehci = {
+  *  USB HS Device (Gadget)
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
--static u64 lcdc_dmamask = DMA_BIT_MASK(32);
--static struct atmel_lcdfb_info lcdc_data;
--
--static struct resource lcdc_resources[] = {
+-#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
+-static struct resource usba_udc_resources[] = {
 -	[0] = {
--		.start	= AT91SAM9G45_LCDC_BASE,
--		.end	= AT91SAM9G45_LCDC_BASE + SZ_4K - 1,
+-		.start	= AT91SAM9G45_UDPHS_FIFO,
+-		.end	= AT91SAM9G45_UDPHS_FIFO + SZ_512K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91SAM9G45_ID_LCDC,
--		.end	= AT91SAM9G45_ID_LCDC,
+-		.start	= AT91SAM9G45_BASE_UDPHS,
+-		.end	= AT91SAM9G45_BASE_UDPHS + SZ_1K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[2] = {
+-		.start	= AT91SAM9G45_ID_UDPHS,
+-		.end	= AT91SAM9G45_ID_UDPHS,
 -		.flags	= IORESOURCE_IRQ,
 -	},
-+static struct __initdata at91_pin_config lcdc_pins[] = {
-+	{AT91_PIN_PE0,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDPWR */
-+	{AT91_PIN_PE2,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDCC */
-+	{AT91_PIN_PE3,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDVSYNC */
-+	{AT91_PIN_PE4,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDHSYNC */
-+	{AT91_PIN_PE5,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDOTCK */
-+	{AT91_PIN_PE6,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDEN */
-+	{AT91_PIN_PE7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD0 */
-+	{AT91_PIN_PE8,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD1 */
-+	{AT91_PIN_PE9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD2 */
-+	{AT91_PIN_PE10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD3 */
-+	{AT91_PIN_PE11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD4 */
-+	{AT91_PIN_PE12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD5 */
-+	{AT91_PIN_PE13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD6 */
-+	{AT91_PIN_PE14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD7 */
-+	{AT91_PIN_PE15, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD8 */
-+	{AT91_PIN_PE16, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD9 */
-+	{AT91_PIN_PE17, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD10 */
-+	{AT91_PIN_PE18, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD11 */
-+	{AT91_PIN_PE19, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD12 */
-+	{AT91_PIN_PE20, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD13 */
-+	{AT91_PIN_PE21, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD14 */
-+	{AT91_PIN_PE22, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD15 */
-+	{AT91_PIN_PE23, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD16 */
-+	{AT91_PIN_PE24, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD17 */
-+	{AT91_PIN_PE25, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD18 */
-+	{AT91_PIN_PE26, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD19 */
-+	{AT91_PIN_PE27, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD20 */
-+	{AT91_PIN_PE28, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD21 */
-+	{AT91_PIN_PE29, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD22 */
-+	{AT91_PIN_PE30, AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDD23 */
-+};
-+
-+static struct __initdata at91_dev_table_lcdc device_lcdc = {
-+	.mmio_base	= AT91SAM9G45_LCDC_BASE,
-+	.irq		= AT91SAM9G45_ID_LCDC,
-+	.pins		= lcdc_pins,
-+	.nr_pins	= ARRAY_SIZE(lcdc_pins),
- };
- 
--static struct platform_device at91_lcdc_device = {
--	.name		= "atmel_lcdfb",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &lcdc_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &lcdc_data,
--	},
--	.resource	= lcdc_resources,
--	.num_resources	= ARRAY_SIZE(lcdc_resources),
 -};
 -
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
+-#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
+-	[idx] = {						\
+-		.name		= nam,				\
+-		.index		= idx,				\
+-		.fifo_size	= maxpkt,			\
+-		.nr_banks	= maxbk,			\
+-		.can_dma	= dma,				\
+-		.can_isoc	= isoc,				\
+-	}
+-
+ static struct usba_ep_data usba_udc_ep[] __initdata = {
+-	EP("ep0", 0, 64, 1, 0, 0),
+-	EP("ep1", 1, 1024, 2, 1, 1),
+-	EP("ep2", 2, 1024, 2, 1, 1),
+-	EP("ep3", 3, 1024, 3, 1, 0),
+-	EP("ep4", 4, 1024, 3, 1, 0),
+-	EP("ep5", 5, 1024, 3, 1, 1),
+-	EP("ep6", 6, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep0", 0, 64, 1, 0, 0),
++	AT91_UDC_HS_EP("ep1", 1, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep2", 2, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep3", 3, 1024, 3, 1, 0),
++	AT91_UDC_HS_EP("ep4", 4, 1024, 3, 1, 0),
++	AT91_UDC_HS_EP("ep5", 5, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep6", 6, 1024, 3, 1, 1),
+ };
+ 
+-#undef EP
+-
+-/*
+- * pdata doesn't have room for any endpoints, so we need to
+- * append room for the ones we need right after it.
+- */
+-static struct {
+-	struct usba_platform_data pdata;
+-	struct usba_ep_data ep[7];
+-} usba_udc_data;
+-
+-static struct platform_device at91_usba_udc_device = {
+-	.name		= "atmel_usba_udc",
+-	.id		= -1,
+-	.dev		= {
+-				.platform_data	= &usba_udc_data.pdata,
+-	},
+-	.resource	= usba_udc_resources,
+-	.num_resources	= ARRAY_SIZE(usba_udc_resources),
++static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
++	.fifo_base	= AT91SAM9G45_UDPHS_FIFO,
++	.mmio_base	= AT91SAM9G45_BASE_UDPHS,
++	.irq		= AT91SAM9G45_ID_UDPHS,
++	.endpoints	= usba_udc_ep,
++	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
+ };
+ 
+-void __init at91_add_device_usba(struct usba_platform_data *data)
 -{
--	if (!data)
--		return;
+-	usba_udc_data.pdata.vbus_pin = -EINVAL;
+-	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
 -
--	at91_set_A_periph(AT91_PIN_PE0, 0);	/* LCDDPWR */
+-	if (data && data->vbus_pin > 0) {
+-		at91_set_gpio_input(data->vbus_pin, 0);
+-		at91_set_deglitch(data->vbus_pin, 1);
+-		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+-	}
 -
--	at91_set_A_periph(AT91_PIN_PE2, 0);	/* LCDCC */
--	at91_set_A_periph(AT91_PIN_PE3, 0);	/* LCDVSYNC */
--	at91_set_A_periph(AT91_PIN_PE4, 0);	/* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PE5, 0);	/* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PE6, 0);	/* LCDDEN */
--	at91_set_A_periph(AT91_PIN_PE7, 0);	/* LCDD0 */
--	at91_set_A_periph(AT91_PIN_PE8, 0);	/* LCDD1 */
--	at91_set_A_periph(AT91_PIN_PE9, 0);	/* LCDD2 */
--	at91_set_A_periph(AT91_PIN_PE10, 0);	/* LCDD3 */
--	at91_set_A_periph(AT91_PIN_PE11, 0);	/* LCDD4 */
--	at91_set_A_periph(AT91_PIN_PE12, 0);	/* LCDD5 */
--	at91_set_A_periph(AT91_PIN_PE13, 0);	/* LCDD6 */
--	at91_set_A_periph(AT91_PIN_PE14, 0);	/* LCDD7 */
--	at91_set_A_periph(AT91_PIN_PE15, 0);	/* LCDD8 */
--	at91_set_A_periph(AT91_PIN_PE16, 0);	/* LCDD9 */
--	at91_set_A_periph(AT91_PIN_PE17, 0);	/* LCDD10 */
--	at91_set_A_periph(AT91_PIN_PE18, 0);	/* LCDD11 */
--	at91_set_A_periph(AT91_PIN_PE19, 0);	/* LCDD12 */
--	at91_set_A_periph(AT91_PIN_PE20, 0);	/* LCDD13 */
--	at91_set_A_periph(AT91_PIN_PE21, 0);	/* LCDD14 */
--	at91_set_A_periph(AT91_PIN_PE22, 0);	/* LCDD15 */
--	at91_set_A_periph(AT91_PIN_PE23, 0);	/* LCDD16 */
--	at91_set_A_periph(AT91_PIN_PE24, 0);	/* LCDD17 */
--	at91_set_A_periph(AT91_PIN_PE25, 0);	/* LCDD18 */
--	at91_set_A_periph(AT91_PIN_PE26, 0);	/* LCDD19 */
--	at91_set_A_periph(AT91_PIN_PE27, 0);	/* LCDD20 */
--	at91_set_A_periph(AT91_PIN_PE28, 0);	/* LCDD21 */
--	at91_set_A_periph(AT91_PIN_PE29, 0);	/* LCDD22 */
--	at91_set_A_periph(AT91_PIN_PE30, 0);	/* LCDD23 */
+-	/* Pullup pin is handled internally by USB device peripheral */
 -
--	lcdc_data = *data;
--	platform_device_register(&at91_lcdc_device);
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+-	platform_device_register(&at91_usba_udc_device);
 -}
 -#else
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
+-void __init at91_add_device_usba(struct usba_platform_data *data) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  Timer/Counter block
+  *  Ethernet
   * -------------------------------------------------------------------- */
-@@ -666,6 +632,7 @@ static struct at91_device_table __initdata at91sam9g45_device_table = {
- 	.ssc[0]		= &device_ssc0,
- 	.ssc[1]		= &device_ssc1,
- 	.ac97		= &device_ac97,
-+	.lcdc		= &device_lcdc,
+@@ -543,6 +476,7 @@ static struct at91_device_table __initdata at91sam9g45_device_table = {
+ 	.lcdc		= &device_lcdc,
+ 	.tsadcc		= &device_tsadcc,
+ 	.hdmac		= &device_hdmac,
++	.udc_hs		= &device_udc_hs,
  };
  
  void __init at91sam9g45_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 3b6010b..927cbd7 100644
+index fe73270..7518958 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -242,71 +242,37 @@ static struct __initdata at91_dev_table_ac97 device_ac97 = {
-  *  LCD Controller
+@@ -40,97 +40,24 @@ static struct __initdata at91_dev_table_hdmac device_hdmac = {
+  *  USB HS Device (Gadget)
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
--static u64 lcdc_dmamask = DMA_BIT_MASK(32);
--static struct atmel_lcdfb_info lcdc_data;
+-#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
 -
--static struct resource lcdc_resources[] = {
+-static struct resource usba_udc_resources[] = {
 -	[0] = {
--		.start	= AT91SAM9RL_LCDC_BASE,
--		.end	= AT91SAM9RL_LCDC_BASE + SZ_4K - 1,
+-		.start	= AT91SAM9RL_UDPHS_FIFO,
+-		.end	= AT91SAM9RL_UDPHS_FIFO + SZ_512K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91SAM9RL_ID_LCDC,
--		.end	= AT91SAM9RL_ID_LCDC,
+-		.start	= AT91SAM9RL_BASE_UDPHS,
+-		.end	= AT91SAM9RL_BASE_UDPHS + SZ_1K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[2] = {
+-		.start	= AT91SAM9RL_ID_UDPHS,
+-		.end	= AT91SAM9RL_ID_UDPHS,
 -		.flags	= IORESOURCE_IRQ,
 -	},
-+static struct __initdata at91_pin_config lcdc_pins[] = {
-+	{AT91_PIN_PC1,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDPWR */
-+	{AT91_PIN_PC5,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDHSYNC */
-+	{AT91_PIN_PC6,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDOTCK */
-+	{AT91_PIN_PC7,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDDEN */
-+	{AT91_PIN_PC3,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* LCDCC */
-+	{AT91_PIN_PC9,  AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD3 */
-+	{AT91_PIN_PC10, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD4 */
-+	{AT91_PIN_PC11, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD5 */
-+	{AT91_PIN_PC12, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD6 */
-+	{AT91_PIN_PC13, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD7 */
-+	{AT91_PIN_PC15, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD11 */
-+	{AT91_PIN_PC16, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD12 */
-+	{AT91_PIN_PC17, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD13 */
-+	{AT91_PIN_PC18, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD14 */
-+	{AT91_PIN_PC19, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD15 */
-+	{AT91_PIN_PC20, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD18 */
-+	{AT91_PIN_PC21, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD19 */
-+	{AT91_PIN_PC22, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD20 */
-+	{AT91_PIN_PC23, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD21 */
-+	{AT91_PIN_PC24, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD22 */
-+	{AT91_PIN_PC25, AT91_PIN_PERIPH_B, 0, 0, 0},	/* LCDD23 */
- };
- 
--static struct platform_device at91_lcdc_device = {
--	.name		= "atmel_lcdfb",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &lcdc_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &lcdc_data,
--	},
--	.resource	= lcdc_resources,
--	.num_resources	= ARRAY_SIZE(lcdc_resources),
-+static struct __initdata at91_dev_table_lcdc device_lcdc = {
-+	.mmio_base	= AT91SAM9RL_LCDC_BASE,
-+	.irq		= AT91SAM9RL_ID_LCDC,
-+	.pins		= lcdc_pins,
-+	.nr_pins	= ARRAY_SIZE(lcdc_pins),
- };
- 
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
--{
--	if (!data) {
--		return;
+-};
+-
+-#define EP(nam, idx, maxpkt, maxbk, dma, isoc)			\
+-	[idx] = {						\
+-		.name		= nam,				\
+-		.index		= idx,				\
+-		.fifo_size	= maxpkt,			\
+-		.nr_banks	= maxbk,			\
+-		.can_dma	= dma,				\
+-		.can_isoc	= isoc,				\
 -	}
 -
--	at91_set_B_periph(AT91_PIN_PC1, 0);	/* LCDPWR */
--	at91_set_A_periph(AT91_PIN_PC5, 0);	/* LCDHSYNC */
--	at91_set_A_periph(AT91_PIN_PC6, 0);	/* LCDDOTCK */
--	at91_set_A_periph(AT91_PIN_PC7, 0);	/* LCDDEN */
--	at91_set_A_periph(AT91_PIN_PC3, 0);	/* LCDCC */
--	at91_set_B_periph(AT91_PIN_PC9, 0);	/* LCDD3 */
--	at91_set_B_periph(AT91_PIN_PC10, 0);	/* LCDD4 */
--	at91_set_B_periph(AT91_PIN_PC11, 0);	/* LCDD5 */
--	at91_set_B_periph(AT91_PIN_PC12, 0);	/* LCDD6 */
--	at91_set_B_periph(AT91_PIN_PC13, 0);	/* LCDD7 */
--	at91_set_B_periph(AT91_PIN_PC15, 0);	/* LCDD11 */
--	at91_set_B_periph(AT91_PIN_PC16, 0);	/* LCDD12 */
--	at91_set_B_periph(AT91_PIN_PC17, 0);	/* LCDD13 */
--	at91_set_B_periph(AT91_PIN_PC18, 0);	/* LCDD14 */
--	at91_set_B_periph(AT91_PIN_PC19, 0);	/* LCDD15 */
--	at91_set_B_periph(AT91_PIN_PC20, 0);	/* LCDD18 */
--	at91_set_B_periph(AT91_PIN_PC21, 0);	/* LCDD19 */
--	at91_set_B_periph(AT91_PIN_PC22, 0);	/* LCDD20 */
--	at91_set_B_periph(AT91_PIN_PC23, 0);	/* LCDD21 */
--	at91_set_B_periph(AT91_PIN_PC24, 0);	/* LCDD22 */
--	at91_set_B_periph(AT91_PIN_PC25, 0);	/* LCDD23 */
+ static struct usba_ep_data usba_udc_ep[] __initdata = {
+-	EP("ep0", 0, 64, 1, 0, 0),
+-	EP("ep1", 1, 1024, 2, 1, 1),
+-	EP("ep2", 2, 1024, 2, 1, 1),
+-	EP("ep3", 3, 1024, 3, 1, 0),
+-	EP("ep4", 4, 1024, 3, 1, 0),
+-	EP("ep5", 5, 1024, 3, 1, 1),
+-	EP("ep6", 6, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep0", 0, 64, 1, 0, 0),
++	AT91_UDC_HS_EP("ep1", 1, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep2", 2, 1024, 2, 1, 1),
++	AT91_UDC_HS_EP("ep3", 3, 1024, 3, 1, 0),
++	AT91_UDC_HS_EP("ep4", 4, 1024, 3, 1, 0),
++	AT91_UDC_HS_EP("ep5", 5, 1024, 3, 1, 1),
++	AT91_UDC_HS_EP("ep6", 6, 1024, 3, 1, 1),
+ };
+ 
+-#undef EP
 -
--	lcdc_data = *data;
--	platform_device_register(&at91_lcdc_device);
+-/*
+- * pdata doesn't have room for any endpoints, so we need to
+- * append room for the ones we need right after it.
+- */
+-static struct {
+-	struct usba_platform_data pdata;
+-	struct usba_ep_data ep[7];
+-} usba_udc_data;
+-
+-static struct platform_device at91_usba_udc_device = {
+-	.name		= "atmel_usba_udc",
+-	.id		= -1,
+-	.dev		= {
+-				.platform_data	= &usba_udc_data.pdata,
+-	},
+-	.resource	= usba_udc_resources,
+-	.num_resources	= ARRAY_SIZE(usba_udc_resources),
++static struct at91_dev_table_udc_hs __initdata device_udc_hs = {
++	.fifo_base	= AT91SAM9RL_UDPHS_FIFO,
++	.mmio_base	= AT91SAM9RL_BASE_UDPHS,
++	.irq		= AT91SAM9RL_ID_UDPHS,
++	.endpoints	= usba_udc_ep,
++	.nr_endpoints	= ARRAY_SIZE(usba_udc_ep),
+ };
+ 
+-void __init at91_add_device_usba(struct usba_platform_data *data)
+-{
+-	/*
+-	 * Invalid pins are 0 on AT91, but the usba driver is shared
+-	 * with AVR32, which use negative values instead. Once/if
+-	 * gpio_is_valid() is ported to AT91, revisit this code.
+-	 */
+-	usba_udc_data.pdata.vbus_pin = -EINVAL;
+-	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
+-
+-	if (data && data->vbus_pin > 0) {
+-		at91_set_gpio_input(data->vbus_pin, 0);
+-		at91_set_deglitch(data->vbus_pin, 1);
+-		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+-	}
+-
+-	/* Pullup pin is handled internally by USB device peripheral */
+-
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+-	platform_device_register(&at91_usba_udc_device);
 -}
 -#else
--void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
+-void __init at91_add_device_usba(struct usba_platform_data *data) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  Timer/Counter block
+  *  MMC / SD
   * -------------------------------------------------------------------- */
-@@ -541,6 +507,7 @@ static struct at91_device_table __initdata at91sam9rl_device_table = {
- 	.ssc[0]		= &device_ssc0,
- 	.ssc[1]		= &device_ssc1,
- 	.ac97		= &device_ac97,
-+	.lcdc		= &device_lcdc,
+@@ -419,6 +346,7 @@ static struct at91_device_table __initdata at91sam9rl_device_table = {
+ 	.lcdc		= &device_lcdc,
+ 	.tsadcc		= &device_tsadcc,
+ 	.hdmac		= &device_hdmac,
++	.udc_hs		= &device_udc_hs,
  };
  
  void __init at91sam9rl_init_devices(void)
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 86f0640..ad32529 100644
+index 40c305d..30e676d 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -1579,6 +1579,81 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
- void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
+@@ -1767,6 +1767,85 @@ static void __init at91_add_device_rtc(void)
+ static void __init at91_add_device_rtc(void) {}
  #endif
  
 +/* --------------------------------------------------------------------
-+ *  LCD Controller
++ *  USB HS Device (Gadget)
 + * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
-+static u64 lcdc_dmamask = DMA_BIT_MASK(32);
-+static struct atmel_lcdfb_info lcdc_data;
-+
-+static struct resource lcdc_resources[] = {
++#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
++static struct resource usba_udc_resources[] = {
 +	[0] = {
-+		.end	= SZ_4K,
++		.end	= SZ_512K,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+#if defined(CONFIG_FB_INTSRAM)
-+	[2] = {
++		.end	= SZ_1K,
 +		.flags	= IORESOURCE_MEM,
 +	},
-+#endif
-+};
-+
-+static struct platform_device at91_lcdc_device = {
-+	.name		= "atmel_lcdfb",
-+	.id		= 0,
-+	.dev		= {
-+				.dma_mask		= &lcdc_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &lcdc_data,
++	[2] = {
++		.flags	= IORESOURCE_IRQ,
 +	},
-+	.resource	= lcdc_resources,
-+	.num_resources	= ARRAY_SIZE(lcdc_resources),
 +};
 +
-+void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
++/*
++ * pdata doesn't have room for any endpoints, so we need to
++ * append room for the ones we need right after it.
++ */
++static struct {
++	struct usba_platform_data pdata;
++	struct usba_ep_data ep[8];
++} usba_udc_data;
++
++static struct platform_device at91_usba_udc_device = {
++	.name		= "atmel_usba_udc",
++	.id		= -1,
++	.dev		= {
++				.platform_data	= &usba_udc_data.pdata,
++	},
++	.resource	= usba_udc_resources,
++	.num_resources	= ARRAY_SIZE(usba_udc_resources),
++};
++
++void __init at91_add_device_usba(struct usba_platform_data *data)
 +{
-+	struct at91_dev_table_lcdc *info = devices->lcdc;
++	struct at91_dev_table_udc_hs *info = devices->udc_hs;
 +
 +	BUG_ON(!info);
-+	init_resource_mem(&lcdc_resources[0], info->mmio_base);
-+	init_resource_irq(&lcdc_resources[1], info->irq);
++	init_resource_mem(&usba_udc_resources[0], info->fifo_base);
++	init_resource_mem(&usba_udc_resources[1], info->mmio_base);
++	init_resource_irq(&usba_udc_resources[2], info->irq);
 +
++	/* Custom platform initialisation */
 +	if (info->device_init)
 +		info->device_init();
 +
-+#if defined(CONFIG_FB_INTSRAM)
-+	if (info->sram_base) {
-+		void __iomem *fb;
-+		struct resource *fb_res = &lcdc_resources[2];
-+		size_t fb_len;
++	/*
++	 * Invalid pins are 0 on AT91, but the usba driver is shared
++	 * with AVR32, which use negative values instead. Once/if
++	 * gpio_is_valid() is ported to AT91, revisit this code.
++	 */
++	usba_udc_data.pdata.vbus_pin = -EINVAL;
++	usba_udc_data.pdata.num_ep = info->nr_endpoints;
++	memcpy(usba_udc_data.ep, info->endpoints,
++	       info->nr_endpoints * sizeof(struct usba_ep_data));
 +
-+		lcdc_resources[2].size = info->sram_size;
-+		init_resource_mem(&lcdc_resources[2], info->sram_base);
-+
-+		fb_len = fb_res->end - fb_res->start + 1;
-+		fb = ioremap(fb_res->start, fb_len);
-+		if (fb) {
-+			memset(fb, 0, fb_len);
-+			iounmap(fb);
-+		}
++	if (data && data->vbus_pin > 0) {
++		at91_set_gpio_input(data->vbus_pin, 0);
++		at91_set_deglitch(data->vbus_pin, 1);
++		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
 +	}
-+#endif
 +
-+	if (!data)
-+		return;
++	/* Pullup pin is handled internally by USB device peripheral */
 +
-+	at91_config_pins(info->pins, info->nr_pins);
-+	lcdc_data = *data;
-+	platform_device_register(&at91_lcdc_device);
++	/* Clocks */
++	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
++	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
++
++	platform_device_register(&at91_usba_udc_device);
 +}
 +#else
-+void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
++void __init at91_add_device_usba(struct usba_platform_data *data) {}
 +#endif
 +
  static int __init at91_add_standard_devices(void)
  {
  	at91_add_device_tc();
 diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index 3d6ca83..65a036c 100644
+index 417c959..a1374fa 100644
 --- a/arch/arm/mach-at91/devices.h
 +++ b/arch/arm/mach-at91/devices.h
-@@ -147,6 +147,16 @@ struct at91_dev_table_ac97 {
- 	struct at91_pin_config	pins[4];	/* FS, CK, TX, RX */
+@@ -170,6 +170,25 @@ struct at91_dev_table_hdmac {
+ 	int			have_slave;
  };
  
-+struct at91_dev_table_lcdc {
++#define AT91_UDC_HS_EP(nam, idx, maxpkt, maxbk, dma, isoc)	\
++	[idx] = {						\
++		.name		= nam,				\
++		.index		= idx,				\
++		.fifo_size	= maxpkt,			\
++		.nr_banks	= maxbk,			\
++		.can_dma	= dma,				\
++		.can_isoc	= isoc,				\
++	}
++
++struct at91_dev_table_udc_hs {
++	unsigned		fifo_base;
 +	unsigned		mmio_base;
 +	int			irq;
-+	unsigned		sram_base;	/* Only on AT91SAM9261 */
-+	unsigned		sram_size;
 +	void			(*device_init)(void);
-+	struct at91_pin_config	*pins;
-+	int			nr_pins;
++	struct usba_ep_data	*endpoints;
++	int			nr_endpoints;
 +};
 +
  struct at91_device_table {
  	struct at91_dev_table_ethernet		*ethernet;
  	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -163,6 +173,7 @@ struct at91_device_table {
- 	struct at91_dev_table_pwm		*pwm;
- 	struct at91_dev_table_ssc		*ssc[4];
- 	struct at91_dev_table_ac97		*ac97;
-+	struct at91_dev_table_lcdc		*lcdc;
+@@ -189,6 +208,7 @@ struct at91_device_table {
+ 	struct at91_dev_table_lcdc		*lcdc;
+ 	struct at91_dev_table_tsadcc		*tsadcc;
+ 	struct at91_dev_table_hdmac		*hdmac;
++	struct at91_dev_table_udc_hs		*udc_hs;
  };
  
  extern void __init at91_init_devices(struct at91_device_table *device_table);
