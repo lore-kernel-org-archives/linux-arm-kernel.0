@@ -1,9 +1,9 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 21 Apr 2011 05:43:21 -0000
-Subject: [PATCH v2 12/23] at91: Make UART devices common
-In-Reply-To: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303364535-11557-13-git-send-email-ryan@bluewatersys.com>
+Date: Wed, 20 Apr 2011 01:11:34 -0000
+Subject: [RFC PATCH 12/23] at91: Make UART devices common
+In-Reply-To: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
+References: <1303261827-27730-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303261827-27730-14-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -53,10 +53,10 @@ Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
  38 files changed, 922 insertions(+), 2168 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 9220201..9910fc8 100644
+index 20fe358..e002ef2 100644
 --- a/arch/arm/mach-at91/at572d940hf_devices.c
 +++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -195,238 +195,61 @@ static struct at91_dev_table_rtt device_rtt __initdata = {
+@@ -195,238 +195,61 @@ static struct __initdata at91_dev_table_rtt device_rtt = {
   *  UART
   * -------------------------------------------------------------------- */
  
@@ -66,7 +66,7 @@ index 9220201..9910fc8 100644
 -		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
 -		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
 -		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -137,7 +137,7 @@ index 9220201..9910fc8 100644
 -				.dma_mask		= &uart0_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &uart0_data,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT572D940HF_BASE_US0,
 +	.irq		= AT572D940HF_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -174,7 +174,7 @@ index 9220201..9910fc8 100644
 -		.start	= AT572D940HF_ID_US1,
 -		.end	= AT572D940HF_ID_US1,
 -		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT572D940HF_BASE_US1,
 +	.irq		= AT572D940HF_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -202,7 +202,7 @@ index 9220201..9910fc8 100644
 -				.dma_mask		= &uart1_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &uart1_data,
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT572D940HF_BASE_US2,
 +	.irq		= AT572D940HF_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -338,7 +338,7 @@ index 9220201..9910fc8 100644
  /* --------------------------------------------------------------------
   *  mAgic
   * -------------------------------------------------------------------- */
-@@ -512,6 +335,10 @@ static struct at91_device_table at572d940hf_device_table __initdata = {
+@@ -512,6 +335,10 @@ static struct at91_device_table __initdata at572d940hf_device_table = {
  	.spi[1]		= &device_spi1,
  	.tcb[0]		= &device_tcb,
  	.rtt[0]		= &device_rtt,
@@ -350,7 +350,7 @@ index 9220201..9910fc8 100644
  
  void __init at572d940hf_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index dce861c..754a562 100644
+index 3a73ac8..9aa7b40 100644
 --- a/arch/arm/mach-at91/at91cap9_devices.c
 +++ b/arch/arm/mach-at91/at91cap9_devices.c
 @@ -609,236 +609,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -413,7 +413,7 @@ index dce861c..754a562 100644
 -static struct atmel_uart_data uart0_data = {
 -	.use_dma_tx	= 1,
 -	.use_dma_rx	= 1,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -426,7 +426,7 @@ index dce861c..754a562 100644
 +	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91CAP9_BASE_US0,
 +	.irq		= AT91CAP9_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -440,7 +440,7 @@ index dce861c..754a562 100644
 +	.cts_pin	= {AT91_PIN_PA25, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91CAP9_BASE_US1,
 +	.irq		= AT91CAP9_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -454,7 +454,7 @@ index dce861c..754a562 100644
 +	.cts_pin	= {AT91_PIN_PD8, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91CAP9_BASE_US2,
 +	.irq		= AT91CAP9_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -640,10 +640,10 @@ index dce861c..754a562 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91cap9_device_table __initdata = {
+ static struct at91_device_table __initdata at91cap9_device_table = {
  	.ethernet	= &device_eth,
  	.usbh_ohci	= &device_usbh_ohci,
-@@ -850,6 +675,10 @@ static struct at91_device_table at91cap9_device_table __initdata = {
+@@ -850,6 +675,10 @@ static struct at91_device_table __initdata at91cap9_device_table = {
  	.spi[1]		= &device_spi1,
  	.tcb[0]		= &device_tcb,
  	.rtt[0]		= &device_rtt,
@@ -655,7 +655,7 @@ index dce861c..754a562 100644
  
  void __init at91cap9_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 6cec253..3a783f4 100644
+index 243054a..8f5ffb5 100644
 --- a/arch/arm/mach-at91/at91rm9200_devices.c
 +++ b/arch/arm/mach-at91/at91rm9200_devices.c
 @@ -472,299 +472,84 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -691,7 +691,7 @@ index 6cec253..3a783f4 100644
 -				.dma_mask		= &dbgu_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &dbgu_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -739,7 +739,7 @@ index 6cec253..3a783f4 100644
 -				.dma_mask		= &uart0_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &uart0_data,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91RM9200_BASE_US0,
 +	.irq		= AT91RM9200_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -878,7 +878,7 @@ index 6cec253..3a783f4 100644
 +	.cts_pin	= {AT91_PIN_PA21, AT91_PIN_PERIPH_A, 1, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91RM9200_BASE_US1,
 +	.irq		= AT91RM9200_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -900,7 +900,7 @@ index 6cec253..3a783f4 100644
 +	.dsr_pin	= {AT91_PIN_PB25, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91RM9200_BASE_US2,
 +	.irq		= AT91RM9200_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -930,7 +930,7 @@ index 6cec253..3a783f4 100644
 +	.cts_pin	= {AT91_PIN_PA30, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart3 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart3 = {
 +	.mmio_base	= AT91RM9200_BASE_US3,
 +	.irq		= AT91RM9200_ID_US3,
 +	.clock_asc	= "usart3_clk",
@@ -1024,10 +1024,10 @@ index 6cec253..3a783f4 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91rm9200_device_table __initdata = {
+ static struct at91_device_table __initdata at91rm9200_device_table = {
  	.ethernet	= &device_eth,
  	.usbh_ohci	= &device_usbh_ohci,
-@@ -775,6 +560,11 @@ static struct at91_device_table at91rm9200_device_table __initdata = {
+@@ -775,6 +560,11 @@ static struct at91_device_table __initdata at91rm9200_device_table = {
  	.spi[0]		= &device_spi,
  	.tcb[0]		= &device_tcb0,
  	.tcb[1]		= &device_tcb1,
@@ -1040,7 +1040,7 @@ index 6cec253..3a783f4 100644
  
  void __init at91rm9200_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 8f1f866..0759be2 100644
+index b2b8416..2a99cd8 100644
 --- a/arch/arm/mach-at91/at91sam9260_devices.c
 +++ b/arch/arm/mach-at91/at91sam9260_devices.c
 @@ -278,378 +278,104 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -1076,7 +1076,7 @@ index 8f1f866..0759be2 100644
 -				.dma_mask		= &dbgu_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &dbgu_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -1102,7 +1102,7 @@ index 8f1f866..0759be2 100644
 -		.start	= AT91SAM9260_BASE_US0,
 -		.end	= AT91SAM9260_BASE_US0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91SAM9260_BASE_US0,
 +	.irq		= AT91SAM9260_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -1124,7 +1124,7 @@ index 8f1f866..0759be2 100644
 +	.ri_pin		= {AT91_PIN_PB25, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91SAM9260_BASE_US1,
 +	.irq		= AT91SAM9260_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -1154,7 +1154,7 @@ index 8f1f866..0759be2 100644
 +	.cts_pin	= {AT91_PIN_PB29, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91SAM9260_BASE_US2,
 +	.irq		= AT91SAM9260_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -1196,7 +1196,7 @@ index 8f1f866..0759be2 100644
 +	.cts_pin	= {AT91_PIN_PA5, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart3 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart3 = {
 +	.mmio_base	= AT91SAM9260_BASE_US3,
 +	.irq		= AT91SAM9260_ID_US3,
 +	.clock_asc	= "usart3_clk",
@@ -1214,7 +1214,7 @@ index 8f1f866..0759be2 100644
 +	.cts_pin	= {AT91_PIN_PC10, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart4 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart4 = {
 +	.mmio_base	= AT91SAM9260_BASE_US4,
 +	.irq		= AT91SAM9260_ID_US4,
 +	.clock_asc	= "usart4_clk",
@@ -1283,7 +1283,7 @@ index 8f1f866..0759be2 100644
 -				.dma_mask		= &uart2_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &uart2_data,
-+static struct at91_dev_table_uart device_uart5 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart5 = {
 +	.mmio_base	= AT91SAM9260_BASE_US5,
 +	.irq		= AT91SAM9260_ID_US5,
 +	.clock_asc	= "usart5_clk",
@@ -1506,7 +1506,7 @@ index 8f1f866..0759be2 100644
  /* --------------------------------------------------------------------
   *  CF/IDE
   * -------------------------------------------------------------------- */
-@@ -779,6 +505,13 @@ static struct at91_device_table at91sam9260_device_table __initdata = {
+@@ -779,6 +505,13 @@ static struct at91_device_table __initdata at91sam9260_device_table = {
  	.tcb[0]		= &device_tcb0,
  	.tcb[1]		= &device_tcb1,
  	.rtt[0]		= &device_rtt,
@@ -1521,7 +1521,7 @@ index 8f1f866..0759be2 100644
  
  void __init at91sam9260_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index bc9f0c7..9e48f36 100644
+index 6f719d5..c355c23 100644
 --- a/arch/arm/mach-at91/at91sam9261_devices.c
 +++ b/arch/arm/mach-at91/at91sam9261_devices.c
 @@ -425,236 +425,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -1638,7 +1638,7 @@ index bc9f0c7..9e48f36 100644
 -				.dma_mask		= &uart1_dmamask,
 -				.coherent_dma_mask	= DMA_BIT_MASK(32),
 -				.platform_data		= &uart1_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -1669,7 +1669,7 @@ index bc9f0c7..9e48f36 100644
 -		.start	= AT91SAM9261_BASE_US2,
 -		.end	= AT91SAM9261_BASE_US2 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91SAM9261_BASE_US0,
 +	.irq		= AT91SAM9261_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -1687,7 +1687,7 @@ index bc9f0c7..9e48f36 100644
 +	.cts_pin	= {AT91_PIN_PC11, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91SAM9261_BASE_US1,
 +	.irq		= AT91SAM9261_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -1717,7 +1717,7 @@ index bc9f0c7..9e48f36 100644
 +	.cts_pin	= {AT91_PIN_PA13, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91SAM9261_BASE_US2,
 +	.irq		= AT91SAM9261_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -1805,10 +1805,10 @@ index bc9f0c7..9e48f36 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91sam9261_device_table __initdata = {
+ static struct at91_device_table __initdata at91sam9261_device_table = {
  	.usbh_ohci	= &device_usbh_ohci,
  	.udc		= &device_udc,
-@@ -665,6 +490,10 @@ static struct at91_device_table at91sam9261_device_table __initdata = {
+@@ -665,6 +490,10 @@ static struct at91_device_table __initdata at91sam9261_device_table = {
  	.spi[1]		= &device_spi1,
  	.tcb[0]		= &device_tcb,
  	.rtt[0]		= &device_rtt,
@@ -1820,7 +1820,7 @@ index bc9f0c7..9e48f36 100644
  
  void __init at91sam9261_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 109e230..1bc3da2 100644
+index 1e8e84a..e5f0164 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
 @@ -715,237 +715,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -1927,7 +1927,7 @@ index 109e230..1bc3da2 100644
 -static struct atmel_uart_data uart1_data = {
 -	.use_dma_tx	= 1,
 -	.use_dma_rx	= 1,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -1940,7 +1940,7 @@ index 109e230..1bc3da2 100644
 +	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91SAM9263_BASE_US0,
 +	.irq		= AT91SAM9263_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -1954,7 +1954,7 @@ index 109e230..1bc3da2 100644
 +	.cts_pin	= {AT91_PIN_PA29, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91SAM9263_BASE_US1,
 +	.irq		= AT91SAM9263_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -1968,7 +1968,7 @@ index 109e230..1bc3da2 100644
 +	.cts_pin	= {AT91_PIN_PD8, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91SAM9263_BASE_US2,
 +	.irq		= AT91SAM9263_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -2111,10 +2111,10 @@ index 109e230..1bc3da2 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91sam9263_device_table __initdata = {
+ static struct at91_device_table __initdata at91sam9263_device_table = {
  	.ethernet	= &device_eth,
  	.usbh_ohci	= &device_usbh_ohci,
-@@ -959,6 +783,10 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
+@@ -959,6 +783,10 @@ static struct at91_device_table __initdata at91sam9263_device_table = {
  	.tcb[0]		= &device_tcb,
  	.rtt[0]		= &device_rtt0,
  	.rtt[1]		= &device_rtt1,
@@ -2126,7 +2126,7 @@ index 109e230..1bc3da2 100644
  
  void __init at91sam9263_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 96631f3..be9435b 100644
+index 16006d5..c832917 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
 @@ -748,284 +748,75 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -2289,7 +2289,7 @@ index 96631f3..be9435b 100644
 -	},
 -	.resource	= uart2_resources,
 -	.num_resources	= ARRAY_SIZE(uart2_resources),
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -2302,7 +2302,7 @@ index 96631f3..be9435b 100644
 +	.rx_pin		= {AT91_PIN_PB12, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91SAM9G45_BASE_US0,
 +	.irq		= AT91SAM9G45_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -2316,7 +2316,7 @@ index 96631f3..be9435b 100644
 +	.cts_pin	= {AT91_PIN_PB15, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91SAM9G45_BASE_US1,
 +	.irq		= AT91SAM9G45_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -2330,7 +2330,7 @@ index 96631f3..be9435b 100644
 +	.cts_pin	= {AT91_PIN_PD17, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91SAM9G45_BASE_US2,
 +	.irq		= AT91SAM9G45_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -2344,7 +2344,7 @@ index 96631f3..be9435b 100644
 +	.cts_pin	= {AT91_PIN_PC11, AT91_PIN_PERIPH_B, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart3 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart3 = {
 +	.mmio_base	= AT91SAM9G45_BASE_US3,
 +	.irq		= AT91SAM9G45_ID_US3,
 +	.clock_asc	= "usart3_clk",
@@ -2478,10 +2478,10 @@ index 96631f3..be9435b 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91sam9g45_device_table __initdata = {
+ static struct at91_device_table __initdata at91sam9g45_device_table = {
  	.ethernet	= &device_eth,
  	.usbh_ohci	= &device_usb_ohci,
-@@ -1040,6 +831,11 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
+@@ -1040,6 +831,11 @@ static struct at91_device_table __initdata at91sam9g45_device_table = {
  	.tcb[0]		= &device_tcb0,
  	.tcb[1]		= &device_tcb1,
  	.rtt[0]		= &device_rtt,
@@ -2494,7 +2494,7 @@ index 96631f3..be9435b 100644
  
  void __init at91sam9g45_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index fa11eac..8f43d23 100644
+index a6ce60c..e7a1fe1 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
 @@ -626,292 +626,79 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
@@ -2533,7 +2533,7 @@ index fa11eac..8f43d23 100644
 -	},
 -	.resource	= dbgu_resources,
 -	.num_resources	= ARRAY_SIZE(dbgu_resources),
-+static struct at91_dev_table_uart device_dbgu __initdata = {
++static struct __initdata at91_dev_table_uart device_dbgu = {
 +	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
 +	.irq		= AT91_ID_SYS,
 +	.clock_asc	= "mck",
@@ -2546,7 +2546,7 @@ index fa11eac..8f43d23 100644
 +	.rx_pin		= {AT91_PIN_PA21, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart0 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart0 = {
 +	.mmio_base	= AT91SAM9RL_BASE_US0,
 +	.irq		= AT91SAM9RL_ID_US0,
 +	.clock_asc	= "usart0_clk",
@@ -2564,7 +2564,7 @@ index fa11eac..8f43d23 100644
 +	.ri_pin		= {AT91_PIN_PD17, AT91_PIN_PERIPH_A, 0, 0, 0},
 +};
 +
-+static struct at91_dev_table_uart device_uart1 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart1 = {
 +	.mmio_base	= AT91SAM9RL_BASE_US1,
 +	.irq		= AT91SAM9RL_ID_US1,
 +	.clock_asc	= "usart1_clk",
@@ -2578,7 +2578,7 @@ index fa11eac..8f43d23 100644
 +	.cts_pin	= {AT91_PIN_PA19, AT91_PIN_PERIPH_B, 0, 0, 0},	
 +};
 +
-+static struct at91_dev_table_uart device_uart2 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart2 = {
 +	.mmio_base	= AT91SAM9RL_BASE_US2,
 +	.irq		= AT91SAM9RL_ID_US2,
 +	.clock_asc	= "usart2_clk",
@@ -2592,7 +2592,7 @@ index fa11eac..8f43d23 100644
 +	.cts_pin	= {AT91_PIN_PA30, AT91_PIN_PERIPH_A, 0, 0, 0},	
 +};
 +
-+static struct at91_dev_table_uart device_uart3 __initdata = {
++static struct __initdata at91_dev_table_uart device_uart3 = {
 +	.mmio_base	= AT91SAM9RL_BASE_US3,
 +	.irq		= AT91SAM9RL_ID_US3,
 +	.clock_asc	= "usart3_clk",
@@ -2858,10 +2858,10 @@ index fa11eac..8f43d23 100644
 -void __init at91_add_device_serial(void) {}
 -#endif
 -
- static struct at91_device_table at91sam9rl_device_table __initdata = {
+ static struct at91_device_table __initdata at91sam9rl_device_table = {
  	.mmc[0]		= &device_mmc,
  	.nand		= &device_nand,
-@@ -919,6 +706,11 @@ static struct at91_device_table at91sam9rl_device_table __initdata = {
+@@ -919,6 +706,11 @@ static struct at91_device_table __initdata at91sam9rl_device_table = {
  	.spi[0]		= &device_spi,
  	.tcb[0]		= &device_tcb,
  	.rtt[0]		= &device_rtt,
@@ -3437,7 +3437,7 @@ index ef80db1..de79e28 100644
  	/* set serial console to ttyS0 (ie, DBGU) */
  	at91_set_serial_console(0);
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 760ed81..22a22ff 100644
+index 5d254cb..f94b27d 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
 @@ -23,6 +23,7 @@
@@ -3446,7 +3446,7 @@ index 760ed81..22a22ff 100644
  #include "devices.h"
 +#include "generic.h"
  
- static struct at91_device_table *devices __initdata;
+ static __initdata struct at91_device_table *devices;
  
 @@ -1000,6 +1001,308 @@ void __init at91_init_devices(struct at91_device_table *device_table)
  	devices = device_table;
