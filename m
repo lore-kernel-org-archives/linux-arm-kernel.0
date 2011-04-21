@@ -1,50 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Apr 2011 01:59:18 -0700
-Subject: [PATCH] omap: Run make savedefconfig on omap2plus_defconfig to
-	shrink it
-In-Reply-To: <20110421085303.GN31131@pengutronix.de>
-References: <20110421064423.GD13688@atomide.com>
-	<20110421082328.GK31131@pengutronix.de>
-	<20110421084910.GF13688@atomide.com>
-	<20110421085303.GN31131@pengutronix.de>
-Message-ID: <20110421085918.GG13688@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Apr 2011 11:03:55 +0200
+Subject: [PATCH 1/3] bitops: add ifdef CONFIG_GENERIC_FIND_BIT_LE guard
+In-Reply-To: <BANLkTimBF312svk0mRkt5_Y=t+B12cLW+Q@mail.gmail.com>
+References: <1303309252-9946-1-git-send-email-akinobu.mita@gmail.com>
+	<201104201631.40017.arnd@arndb.de>
+	<BANLkTimBF312svk0mRkt5_Y=t+B12cLW+Q@mail.gmail.com>
+Message-ID: <201104211103.55929.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [110421 01:49]:
-> On Thu, Apr 21, 2011 at 01:49:10AM -0700, Tony Lindgren wrote:
-> > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [110421 01:20]:
-> > > On Wed, Apr 20, 2011 at 11:44:23PM -0700, Tony Lindgren wrote:
-> > > > This shrinks it down a bit more and makes it easier
-> > > > to patch later on.
-> > > Maybe pointing out why it's shrinkable would be nice.
-> > > E.g.
-> > > 
-> > > 	After commit
-> > > 
-> > > 		ffb63e3 (omap2/3/4: Select all omaps and boards by default
-> > > 
-> > > 	many explicit settings can be dropped from the defconfig.
-> > 
-> > Good point, updated patch below.
-> > 
-> > Regards,
-> > 
-> > Tony
-> > 
-> > 
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Wed, 20 Apr 2011 23:37:06 -0700
-> > Subject: [PATCH] omap: Run make savedefconfig on omap2plus_defconfig to shrink it
-> > 
-> > After commit ffb63e3 (omap2/3/4: Select all omaps and boards by default)
-> > may explicit settings can be dropped from the defconfig.
-> s/may/many/
+On Thursday 21 April 2011, Akinobu Mita wrote:
+> Should we also kill CONFIG_GENERIC_FIND_BIT_LE option comletely,
+> then add the #ifdef for each find_*() in lib/find_next_bit.c and always build
+> it unconditionally ?
 
-Oops, thanks will update.
- 
-> I think ffb63e3 doesn't explain all changes, but ok.
+I think that would be more consistent. It's not a big difference anyway, so
+do it only if you feel motivated. There are a lot of other things that could
+be changed this way, I'd only change it while reworking other aspects in order
+to avoid accidentally breaking things.
 
-Yeah..
-
-Tony
+	Arnd
