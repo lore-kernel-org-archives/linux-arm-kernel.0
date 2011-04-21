@@ -1,47 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 21 Apr 2011 11:31:17 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104211045220.3323@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421072259.GG31131@pengutronix.de>
-	<alpine.LFD.2.02.1104211045220.3323@ionos>
-Message-ID: <20110421103117.GB16776@sirena.org.uk>
+From: madhavi.linux@gmail.com (Madhavi Manchala)
+Date: Thu, 21 Apr 2011 16:01:20 +0530
+Subject: Error in head-common.S file while ARM Linux booting
+Message-ID: <BANLkTi=rVF1r-3WpF+iBWMSgy46VnoVx=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
-> On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+Dear All,
 
-> > If there were a pointer tracking the parent you still needed to program
-> > out the get_parent function anyhow to set the pointer initially. But I
-> > agree that in other situations having a pointer is more comfortable and
-> > saves ugly error handling e.g. in set_parent.
+I have developed machine code for my Samsung S3C2510A MCU under Linux
+kernel 2.6.36. The code exists at arch/arm/mach-s3c2510a. I developed
+only CPU, UART and Clocks initialization code, especially. For
+developing the S3C2510A HAL code, I have gone through the existing
+mach-s3c2410 code.
 
-> That's nonsense. Why do you want a get_parent() function at all?
-> parent is set up when the clock is established in the clock tree. And
-> that's not done by some random driver. That's a property of the clock.
+I build vmlinux image on a Linux box in the ELF format for my Samsung
+MCU. Then, I am trying to load the build vmlinux image on to my
+device?s (targets) RAM area using J-link J-TAG and J-LinkGDBServer
+tool with a gdbinit script file from Cygwin on a Windows XP system.
+The gdb init script file initializes the CPU system configuration
+registers, RAM, Flash and UART registers and then loads ELF image.
 
-That's not universal - right now the drivers can and do know about this
-on some platforms.  In some cases there will be requirements beyond the
-clock rate which mean that the driver will need to be able to tell the
-framework that, for example, it needs one clock to be in the same clock
-domain as another.
+I am able to put break points in the developed HAL code. However, when
+I run (continue) from gdb prompt, I did not see any break points in
+the GDB server tool, but, when I press ?Ctrl+C?, I am seeing the
+following messages.
 
-> > >    - a field for the base register
+<gdb> break s3c2510a_init
+Breakpoint 1 at 0x3000b648: file arch/arm/mach-s3c2510a/s3c2510a.c, line 59.
+<gdb> c
+Continuing.
 
-> > This is not needed for all clocks (at least not a say void __iomem *). I
-> > think it's fine here to leave that to the platforms as it is now.
+Pressing ?control+c?, then the statements are as follows.
 
-> Crap. All clocks which are configurable in some way or can be
-> enabled/disabled need access register(s) so you need a base address.
+Program received signal SIGTRAP, Trace/Breakpoint trap.
+__error_p () at head-common.S:142
 
-That's not reliably the case, some systems have some of the clock tree
-(esepcialy the core parts of the tree) controlled by a system management
-unit which isn't memory mapped and it's common for I2C or SPI connected
-chips to be involved to some extent too.  One advantage we should be
-able to get from this framework is that it will be much easier to have
-standard drivers for off-SoC chips that could be shared.
+<gdb>bt
+#0 __error_p () at head-common.S:142
+
+Why am I seeing these errors? Am I missing any CPU configuration, still?
+
+FYI: I build the kernel with debugging information enabled i.e. I set
+CONFIG_DEBUG_KERNEL to y. I did not see any debug messages in the
+hyper terminal.
+I have gone through the following links. However, there are all based
+on the 2.4.x kernel versions. I think, they are slightly different.
+http://gicl.cs.drexel.edu/people/sevy/linux/ARM_Linux_boot_sequence.html
+http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
+
+Any hints/help/links would be appreciated.
+
+Thanks and Regards,
+Madhavi M.
