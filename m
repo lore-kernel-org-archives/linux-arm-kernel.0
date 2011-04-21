@@ -1,70 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2011 16:12:49 +0200
-Subject: [PATCH] drivers: brcmaxi: provide amba axi functionality in
-	separate module
-In-Reply-To: <1303331669-31293-1-git-send-email-arend@broadcom.com>
-References: <1303331669-31293-1-git-send-email-arend@broadcom.com>
-Message-ID: <201104211612.49805.arnd@arndb.de>
+Date: Thu, 21 Apr 2011 16:18:31 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <003301cc002c$f67ba0c0$e372e240$%szyprowski@samsung.com>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104211400.13289.arnd@arndb.de>
+	<003301cc002c$f67ba0c0$e372e240$%szyprowski@samsung.com>
+Message-ID: <201104211618.31418.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 April 2011, Arend van Spriel wrote:
-> The open-source community is looking for a library which will detect
-> cores in a chip using axi backplane. Another proposal has been
-> sent by Rafa? Mi?ecki, which registers detected cores in the linux
-> device tree to be claimed by device drivers. This implies cores will
-> always provide a system function to the kernel which is indepent from
-> other cores and have very loose or no coupling. If this is not true,
-> exceptions need to be added in the device registration process. This
-> means knowledge of specific devices from specific vendors is sitting
-> in a bus driver. Whether the exceptions are rarely or likely is a
-> pending question.
-
-Hi Arend,
-
-I have two very general comments about this:
-
-> To feed the discussion this implementation takes a different approach.
-> A calling entity (being a pci device driver, or SoC initialization
-> sequence) registers a table with core identities and a callback function.
-> It then starts the scan and for each detected core with a callback
-> function it does the call providing the core information. Apart from
-> that it provides some basic operations on the core.
+On Thursday 21 April 2011, Marek Szyprowski wrote:
+> > No, I think that would be much worse, it definitely destroys all kinds of
+> > assumptions that the core code makes about devices. However, I don't think
+> > it's much of a problem to just create two child devices and use them
+> > from the main driver, you don't really need to create a device_driver
+> > to bind to each of them.
 > 
-> It has been tested using the brcmsmac driver (in drivers/staging/brcm80211).
+> I must have missed something. Video codec is a platform device and struct
+> device pointer is gathered from it (&pdev->dev). How can I define child
+> devices and attach them to the platform device?
 
-The API split between PCI and non-PCI devices appears to be
-unhelpful. Can't you abstract the interface so that a user
-would apply the exact same interfaces in both cases, and handle
-the differences internally?
+There are a number of ways:
 
-> +/* Core Codes */
-> +#define	NODEV_CORE_ID		0x700	/* Invalid coreid */
-> +#define	CC_CORE_ID		0x800	/* chipcommon core */
-> +#define	ILINE20_CORE_ID		0x801	/* iline20 core */
-> +#define	SRAM_CORE_ID		0x802	/* sram core */
-> +#define	SDRAM_CORE_ID		0x803	/* sdram core */
-> +#define	PCI_CORE_ID		0x804	/* pci core */
-> +#define	MIPS_CORE_ID		0x805	/* mips core */
-> +#define	ENET_CORE_ID		0x806	/* enet mac core */
-> +#define	CODEC_CORE_ID		0x807	/* v90 codec core */
-> +#define	USB_CORE_ID		0x808	/* usb 1.1 host/device core */
-> +#define	ADSL_CORE_ID		0x809	/* ADSL core */
-> +#define	ILINE100_CORE_ID	0x80a	/* iline100 core */
-> +#define	IPSEC_CORE_ID		0x80b	/* ipsec core */
-> +#define	UTOPIA_CORE_ID		0x80c	/* utopia core */
-> +#define	PCMCIA_CORE_ID		0x80d	/* pcmcia core */
-> +#define	SOCRAM_CORE_ID		0x80e	/* internal memory core */
-> +#define	MEMC_CORE_ID		0x80f	/* memc sdram core */
-> +#define	OFDM_CORE_ID		0x810	/* OFDM phy core */
-> ...
+* Do device_create() with &pdev->dev as the parent, inside of the
+  codec driver, with a new class you create for this purpose
+* Do device_register() for a device, in the same way
+* Create the additional platform devices in the platform code,
+  with their parents pointing to the code device, then
+  look for them using device_for_each_child in the driver
+* Create two codec devices in parallel and bind to both with your
+  driver, ideally splitting up the resources between the two
+  devices in a meaningful way.
 
-This list to me is a strong hint that the cores behind the AXI bridge
-should normally be actual devices in Linux, i.e. the approach that
-Rafa? suggested.  The vast majority of these is something that in Linux
-would be operated by a device driver. The exceptions that I can see
-are CPU cores and bus bridges, both of which we typically also represent
-as devices in the flattened device tree, even though they typically
-don't have a Linux driver attached to them.
+None of them are extremely nice, but it's not that hard either.
+You should probably prototype a few of these approaches to see
+which one is the least ugly one.
 
 	Arnd
