@@ -1,42 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Apr 2011 20:13:13 +0900
+Date: Thu, 21 Apr 2011 20:15:29 +0900
 Subject: Cleanup Samsung stuff
-In-Reply-To: <BANLkTikxV+4Zxf6Mh1se-h396G4m4qiwaQ@mail.gmail.com>
+In-Reply-To: <BANLkTim2VJBoO-otakfVQaYsXLTyM91jsA@mail.gmail.com>
 References: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
 	<20110419080307.GA26650@sirena.org.uk>
 	<BANLkTim2VJBoO-otakfVQaYsXLTyM91jsA@mail.gmail.com>
-	<BANLkTikxV+4Zxf6Mh1se-h396G4m4qiwaQ@mail.gmail.com>
-Message-ID: <031801cc0015$1eec2f10$5cc48d30$%kim@samsung.com>
+Message-ID: <031901cc0015$6e4cc560$4ae65020$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Domenico Andreoli wrote:
+Thomas Abraham wrote:
 > 
-> On Tue, Apr 19, 2011 at 10:40 AM, Thomas Abraham <thomas.ab@samsung.com>
-> wrote:
-> > On Tue, Apr 19, 2011 at 1:33 PM, Mark Brown
-> > <broonie@opensource.wolfsonmicro.com> wrote:
-> >> On Tue, Apr 19, 2011 at 10:46:47AM +0900, Kukjin Kim wrote:
-> >>
-> >>> - Device tree (with Linaro)
-> >>
-> >> What is going on with device tree? ?I've asked a couple of times about
-> >> this in the other thread but I'm still not clear where the code is or
-> >> what could usefully be done with it.
+> On Tue, Apr 19, 2011 at 1:33 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Tue, Apr 19, 2011 at 10:46:47AM +0900, Kukjin Kim wrote:
 > >
-> > Currently I am working on supporting clkdev and Jeremy's common clock
-> > for all of Samsung's platforms and then continue with the device tree
-> > support for s5pv310.
+> >> - Device tree (with Linaro)
+> >
+> > What is going on with device tree? ?I've asked a couple of times about
+> > this in the other thread but I'm still not clear where the code is or
+> > what could usefully be done with it.
 > 
-> I already posted some patches that add DeviceTree to s3c24xx (gpio, sdi).
-> I'm hanging on sdi because I found that mmc-spi already has some DT
-> support and I'm working to generalize it.
+> The initial work on Samsung's s5pv310 is available at
+> http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-
+> February/004350.html
 > 
-> If nobody opposes I'll continue with the effort.
+> It is based on Grant's tree.
+> git://git.secretlab.ca/git/linux-2.6 devicetree/test
+> 
+> Currently I am working on supporting clkdev and Jeremy's common clock
+> for all of Samsung's platforms and then continue with the device tree
+> support for s5pv310.
+> 
+Hi Thomas,
 
-Could you please send them to me and Ben Dooks?
+Thanks for your reply.
 
-Thanks.
+I also will review your patches of device tree and supporting clkdev soon.
+
+If any updates after your posting, please let me know :)
 
 Best regards,
 Kgene.
