@@ -1,49 +1,60 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 21 Apr 2011 16:52:50 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110421114220.GJ13688@atomide.com>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421072259.GG31131@pengutronix.de>
-	<alpine.LFD.2.02.1104211045220.3323@ionos>
-	<20110421103117.GB16776@sirena.org.uk>
-	<20110421114220.GJ13688@atomide.com>
-Message-ID: <alpine.LFD.2.02.1104211651540.3323@ionos>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 21 Apr 2011 16:56:08 +0200
+Subject: [PATCH] mach-at91: gsia18s board improvements and bug fixes
+In-Reply-To: <1303291399-4075-1-git-send-email-plyatov@gmail.com>
+References: <1303291399-4075-1-git-send-email-plyatov@gmail.com>
+Message-ID: <4DB04588.9000201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2011, Tony Lindgren wrote:
+Hi Igor,
 
-> * Mark Brown <broonie@opensource.wolfsonmicro.com> [110421 03:29]:
-> > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
-> > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
-> > 
-> > > > If there were a pointer tracking the parent you still needed to program
-> > > > out the get_parent function anyhow to set the pointer initially. But I
-> > > > agree that in other situations having a pointer is more comfortable and
-> > > > saves ugly error handling e.g. in set_parent.
-> > 
-> > > That's nonsense. Why do you want a get_parent() function at all?
-> > > parent is set up when the clock is established in the clock tree. And
-> > > that's not done by some random driver. That's a property of the clock.
-> > 
-> > That's not universal - right now the drivers can and do know about this
-> > on some platforms.  In some cases there will be requirements beyond the
-> > clock rate which mean that the driver will need to be able to tell the
-> > framework that, for example, it needs one clock to be in the same clock
-> > domain as another.
-> 
-> Also there can be multiple parent clocks. An example are the timers on
-> omaps where the parent clock can be either the 32KiHz clock or external
-> source clock. ?his may need to be reprogrammed dynamically in some cases
-> for advanced idle modes as one of the parent clocks may be shut down.
+Le 20/04/2011 11:23, Igor Plyatov :
+> * AT91_PIN_Pxxx port names replaced by human readable GPO_xxxx, GPI_xxxx,
+>   GPIO_xxxx names. This simplify source code and schematic maintenance.
 
-If you need to propagate from bottom up, then you need a list of
-childs in struct clk. Right ?
+Maybe it simplifies schematic reading because the actual cpu pin names
+are not indicated on your schematic... But for code, the AT91 pin names
+are required, so, no for this part of the patch.
+You may know that there is an effort ongoing to minimize the amount of
+not needed / duplicated information in the kernel, I am afraid but I
+think this renaming is not needed.
 
-Thanks,
+Moreover, I think that the "Buttons" part of the file:
+arch/arm/mach-at91/include/mach/gsia18s.h
+should be removed.
 
-	tglx
+> * Active logic levels and default states corrected for GPOs.
+
+Ok for this.
+
+> * Replace small functions which use platform_register_device() by its direct
+>   calls.
+
+Ok for this.
+
+> * Remove GPIO_CARD_UNMOUNT_1 gpio_keys_button, because it not used.
+
+Ok for this.
+
+> * debounce_interval added for critical buttons.
+
+Ok for this.
+
+> * Remove unneeded GPI setup code for buttons, because this done by corresponding
+>   driver.
+
+I do not see this, can you elaborate?
+
+> * pcf8574x_0x20_setup() and pcf8574x_0x20_teardown functions small refactoring.
+
+Ok for this.
+
+> Signed-off-by: Igor Plyatov <plyatov@gmail.com>
+
+So, can you please rewrite your patch, we will be pleased to integrate
+it in a "fix" update of at91 Linux.
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
