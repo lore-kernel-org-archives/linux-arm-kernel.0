@@ -1,52 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 21 Apr 2011 13:35:42 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104211403130.3323@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-Message-ID: <20110421123542.GE11788@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Apr 2011 15:46:19 +0300
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
+	to be appended to zImage
+In-Reply-To: <20110421080238.GE13688@atomide.com>
+References: <20110324231830.2586.7150.stgit@riker>
+	<20110328091259.GA18721@S2100-06.ap.freescale.net>
+	<20110413140030.GE12665@atomide.com>
+	<20110420054746.GA31127@S2100-06.ap.freescale.net>
+	<20110420073445.GB31127@S2100-06.ap.freescale.net>
+	<20110421080238.GE13688@atomide.com>
+Message-ID: <20110421124618.GA15060@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 02:20:22PM +0200, Thomas Gleixner wrote:
-> On Thu, 21 Apr 2011, Mark Brown wrote:
+* Tony Lindgren <tony@atomide.com> [110421 11:00]:
+> * Shawn Guo <shawn.guo@freescale.com> [110420 00:27]:
+> > On Wed, Apr 20, 2011 at 01:47:47PM +0800, Shawn Guo wrote:
+> > > I would like to confirm it fixes your setup before I send fixing
+> > > patch to remove 'static' from global variables in all platform
+> > > uncompress.h.
+> > > 
+> > Just saw Nico's patch, so ignore above lines ...
+> 
+> Thanks looks like removing static only changes things so now
+> "Warning: Neither atags nor dtb found" error message printed out.
 
-> > There's nothing intrinsic about the concept of a clock which means that
-> > it needs to be memory mapped or have a particular set of registers for
-> > us to work with.  This sounds like something that ought to be factored
-> > out but it's not obvious to me that it should be part of the core struct.
+But also Nico's patch fixes the corruption of the DT data during
+uncompress, so I'm getting much further now.
 
-> Care to look over the various implementations and find out that a lot
-> of them look like:
+Now the problem is that the DT data is zeroed out by the time code
+gets to setup_machine_fdt. I wonder if I'm missing some patch?
 
-Please bear in mind that due to the fact that we've currently got one
-clock implementation per subarchitecture anything off-SoC has some
-serious barriers to implementation in kernel.  For the system management
-units you'd be looking at very new systems, this is a new development.
+I'm using grant's devicetree/arm branch + DT append patch + Nico's
+static fix + my relocate fix.
 
-> Just in about 100 variations of the theme. Which is basically the same
-> as we have in irq chip implementations. And I showed how much of these
-> things can be factored out when done right. And even if a particular
-> clock does not implement enable/disable calls, then having
-> regs.enable_reg around is not a problem.
+Oh well have to look at it again next week..
 
-This is why I said "This sounds like something that ought to be factored
-out but it's not obvious to me that it should be part of the core
-struct" above - I agree strongly that we should have a generic memory
-mapped implementation which factors out all the redundant code you'd get
-for these clocks.
-
-> Because that's what we implement via container_of now. And we can add
-> such stuff which is obvious right away.
-
-That's exactly the sort of thing I'm suggesting.  You were asking for
-this to be part of struct clk itself, embedding the struct clk in a
-struct mm_clk (or whatever) and having standard ops for the mm_clk a
-much better abstraction.
+Tony
