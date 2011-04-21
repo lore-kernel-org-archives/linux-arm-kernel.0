@@ -1,58 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Apr 2011 03:49:54 -0700
-Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel end
-In-Reply-To: <20110421055945.GB13688@atomide.com>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-	<20110421055945.GB13688@atomide.com>
-Message-ID: <20110421104954.GH13688@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Apr 2011 19:57:17 +0900
+Subject: Cleanup Samsung stuff
+In-Reply-To: <9fibsi$eg5ubh@out1.ip07ir2.opaltelecom.net>
+References: <012801cbfe33$a76fa490$f64eedb0$%kim@samsung.com>
+	<9fibsi$eg5ubh@out1.ip07ir2.opaltelecom.net>
+Message-ID: <031601cc0012$e58769d0$b0963d70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we end up overwriting ourselves. This fixes booting
-on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
-(ARM: 6750/1: improvements to compressed/head.S).
+Nick Pelling wrote:
+> 
+> Hi Kgene,
+> 
+Hi :)
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> At 10:46 19/04/2011 +0900, Kukjin Kim wrote:
+> >As a note, I'm doing(or preparing) following at the moment.
+> >- Removing some "mach-s5pxxxx"s
+> 
+> Are you planning to remove mach-s5pc100? If yes, is this with the
+> intention of reducing arch/arm code size (by merging, say, with the
+> s5pc110 tree), or because of some upcoming Samsung EOL event? :-(
+> 
+Hmm...There is no decisions about that yet. Just I'm thinking and checking
+the status of each ARCH(mach-xxxx).
+Of course, if any updates, will inform here.
 
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -282,6 +282,7 @@ dtb_check_done:
- 
- /*
-  * Check to see if we will overwrite ourselves.
-+ *   r1  = corrupted, temporary uncompressed kernel end 
-  *   r4  = final kernel address
-  *   r5  = start of this image
-  *   r9  = size of decompressed image
-@@ -292,15 +293,24 @@ dtb_check_done:
-  */
- 		cmp	r4, r10
- 		bhs	wont_overwrite
--		add	r10, r4, r9
--		cmp	r10, r5
-+		add	r1, r4, r9
-+		cmp	r1, r5
- 		bls	wont_overwrite
- 
-+		/*
-+		 * Check if the compressed image end is past the uncompressed
-+		 * kernel end. In that case, relocate ourselves to the end
-+		 * of the compressed image instead of the uncompressed kernel
-+		 * end to avoid overwriting ourselves.
-+		 */
-+		cmp	r10, r1
-+		movls	r10, r1
-+
- /*
-  * Relocate ourselves past the end of the decompressed kernel.
-  *   r5  = start of this image
-  *   r6  = _edata
-- *   r10 = end of the decompressed kernel
-+ *   r10 = end of the decompressed kernel or end of this image if larger
-  * Because we always copy ahead, we need to do it from the end and go
-  * backward in case the source and destination overlap.
-  */
+> (I'm building security cameras based on the s5pc100, working with
+> mach-s5pc100 issues every day).
+> 
+Only for S5PC100?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
