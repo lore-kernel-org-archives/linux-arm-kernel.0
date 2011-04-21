@@ -1,23 +1,41 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 21 Apr 2011 12:33:01 -0500
-Subject: [PATCH v2 23/23] at91: Remove mAgic and ISI device code
-In-Reply-To: <1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
-Message-ID: <0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 21 Apr 2011 12:01:28 -0600
+Subject: [PATCH 0/4] Tegra patches for 2.6.40
+Message-ID: <1303408892-7472-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
->
-> The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
-> have drivers yet and therefore the platform code in arch/arm/mach-at91
-> is unused and can be removed.
+Below are the patches I have queued up for Tegra in 2.6.40.
 
-Is anyone planning on adding these drivers?
+The first 2 and last 1 are bug fixes and can be applied immediately. I
+believe these are all reposts too.
 
-I wonder if it makes sense to add the infrastructure to devices.[ch] and
-convert the users even it the drivers are not in mainline yet?
+The 3rd updates the Seaboard board to define to required platform data
+for the audio driver. This one patch relies on the git pull request that
+I sent out earlier today.
 
-Regards,
-Hartley
+I tested:
+
+* After applying these changes, everything builds OK and runs fine on
+  Harmony, including audio.
+* After additionally merging Mark's ASoC for-2.6.40/for-next branch,
+  there are no merge conflicts, everything builds OK, and everything
+  runs OK on Seaboard clamshell, including a full audio checkout.
+  Note that non-clamshell Seaboard has difficulty initializing I2C.
+  I'm investigating this, but don't expect to need to modify any of
+  these changes because of this issue; most likely some unrelated bug
+  needs fixing.
+ 
+Stephen Warren (4):
+  ARM: Tegra: Harmony: Fix conflicting GPIO numbering
+  ARM: Tegra: Seaboard: Re-order sdhci device registration
+  ARM: Tegra: Seaboard board updates for audio
+  ARM: tegra: Harmony: Register and configure WM8903 IRQ GPIO
+
+ arch/arm/mach-tegra/board-harmony-power.c   |    4 +-
+ arch/arm/mach-tegra/board-harmony.c         |    3 +
+ arch/arm/mach-tegra/board-harmony.h         |    3 +-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   21 +++++++++-
+ arch/arm/mach-tegra/board-seaboard.c        |   56 ++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/board-seaboard.h        |   12 ++++--
+ 6 files changed, 89 insertions(+), 10 deletions(-)
