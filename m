@@ -1,94 +1,182 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 21 Apr 2011 17:11:15 +0800
-Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTimq8_R-CJmryTvRWHZ+-2vqj-Y6cQ@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
-	<20110417164830.GE17935@S2100-06.ap.freescale.net>
-	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
-	<20110420140120.GF1965@S2100-06.ap.freescale.net>
-	<BANLkTimzk89VC1Vti4CZ60TTJ20e2YpwNg@mail.gmail.com>
-	<20110421062924.GB4024@S2100-06.ap.freescale.net>
-	<BANLkTimq8_R-CJmryTvRWHZ+-2vqj-Y6cQ@mail.gmail.com>
-Message-ID: <20110421091115.GH4024@S2100-06.ap.freescale.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Apr 2011 11:12:36 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110421072259.GG31131@pengutronix.de>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1104211045220.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 10:46:18AM +0200, Per Forlin wrote:
-> On 21 April 2011 08:29, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Wed, Apr 20, 2011 at 05:30:22PM +0200, Per Forlin wrote:
-> > [...]
-> >> Remove dma_map and dma_unmap from your host driver and run the tests
-> >> (obviously nonblocking and blocking will have the same results). If
-> >> there is still no performance gain the cache penalty is very small on
-> >> your platform and therefore nonblocking doesn't improve things much.
-> >> Please let me know the result.
-> >>
-> > Sorry, I could not understand. ?What's the point to run the test when
-> > the driver is even broken. ?The removal of ?dma_map_sg and
-> > dma_unmap_sg makes mxs-mmc host driver broken.
-> The point is only to get a measurement of the cost of handling
-> dma_map_sg and dma_unmap_sg, this is the maximum time mmc nonblocking
-> can save.
-> The nonblocking mmc_test should save the total time of dma_map_sg and
-> dma_unmap_sg, if the pre_req and post_req hooks are implemented
-> correctly.
-> Running without dma_map_sg and dma_unmap_sg will confirm if the
-> pre_req and post_req hooks are implemented correctly.
+On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > Which is a complete failure to begin with. Why the heck do you need a
+> > callback to figure that out?
+> > 
+> > Because someone claimed, that you need a callback to make it safe from
+> > changing? Or what's the reason for this?
+> If there were a pointer tracking the parent you still needed to program
+> out the get_parent function anyhow to set the pointer initially. But I
+> agree that in other situations having a pointer is more comfortable and
+> saves ugly error handling e.g. in set_parent.
+
+That's nonsense. Why do you want a get_parent() function at all?
+parent is set up when the clock is established in the clock tree. And
+that's not done by some random driver. That's a property of the clock.
+
+> >    It lacks:
+> >    
+> >    - a flag field for properties
+> Up to now there are no properties to distinguish. When the first comes
+> up such a field is easily added, no?
+
+Crap. FIXED_CLOCK_RATE is the first thing which comes to my mind
+ 
+> >    - a field for the parent
+> I can agree here, see above.
 > 
-With dma_map_sg and dma_unmap_sg removed, the mmc_test gave very low
-numbers, though blocking and non-blocking numbers are same.  Is it
-an indication that pre_req and post_req hooks are not implemented
-correctly?  If yes, can you please help to catch the mistakes?
+> >    - a field for the current clock rate
+> Then you need a mechanism to notify the children if the rate or parent
+> of a clock changes. I assume you won't allow that for a clock that has
+> more than one (enabled) consumer. 
 
-Thanks.
+Here we go. That's why I say that this code is not a framework at
+all. It's a random conglomorate of random functions with no
+functionality at all.
 
-mc0: Test case 39. Read performance with blocking req 4k to 4MB...
-mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB) took 56.875013015 seconds (2
-359 kB/s, 2304 KiB/s, 576.14 IOPS)
-mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB) took 47.407562500 seconds (
-2831 kB/s, 2764 KiB/s, 345.59 IOPS)
-mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB) took 42.708718750 seconds (3
-142 kB/s, 3068 KiB/s, 191.81 IOPS)
-mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB) took 40.227125000 seconds (3
-336 kB/s, 3258 KiB/s, 101.82 IOPS)
-mmc0: Transfer of 2048 x 128 sectors (2048 x 64 KiB) took 38.915750000 seconds (
-3448 kB/s, 3368 KiB/s, 52.62 IOPS)
-mmc0: Transfer of 1024 x 256 sectors (1024 x 128 KiB) took 38.249562498 seconds
-(3509 kB/s, 3426 KiB/s, 26.77 IOPS)
-mmc0: Transfer of 512 x 512 sectors (512 x 256 KiB) took 37.912342548 seconds (3
-540 kB/s, 3457 KiB/s, 13.50 IOPS)
-mmc0: Transfer of 256 x 1024 sectors (256 x 512 KiB) took 37.743876391 seconds (
-3556 kB/s, 3472 KiB/s, 6.78 IOPS)
-mmc0: Transfer of 128 x 2048 sectors (128 x 1024 KiB) took 37.658104019 seconds
-(3564 kB/s, 3480 KiB/s, 3.39 IOPS)
-mmc0: Transfer of 39 x 6630 sectors (39 x 3315 KiB) took 37.086429038 seconds (3
-569 kB/s, 3486 KiB/s, 1.05 IOPS)
-mmc0: Result: OK
-mmc0: Test case 40. Read performance with none blocking req 4k to 4MB...
-mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB) took 56.732932555 seconds (2
-365 kB/s, 2310 KiB/s, 577.58 IOPS)
-mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB) took 47.342812500 seconds (
-2835 kB/s, 2768 KiB/s, 346.07 IOPS)
-mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB) took 42.673906250 seconds (3
-145 kB/s, 3071 KiB/s, 191.96 IOPS)
-mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB) took 40.208218750 seconds (3
-338 kB/s, 3259 KiB/s, 101.86 IOPS)
-mmc0: Transfer of 2048 x 128 sectors (2048 x 64 KiB) took 38.906750000 seconds (
-3449 kB/s, 3368 KiB/s, 52.63 IOPS)
-mmc0: Transfer of 1024 x 256 sectors (1024 x 128 KiB) took 38.244749999 seconds
-(3509 kB/s, 3427 KiB/s, 26.77 IOPS)
-mmc0: Transfer of 512 x 512 sectors (512 x 256 KiB) took 37.909719946 seconds (3
-540 kB/s, 3457 KiB/s, 13.50 IOPS)
-mmc0: Transfer of 256 x 1024 sectors (256 x 512 KiB) took 37.741834105 seconds (
-3556 kB/s, 3472 KiB/s, 6.78 IOPS)
-mmc0: Transfer of 128 x 2048 sectors (128 x 1024 KiB) took 37.657555456 seconds
-(3564 kB/s, 3480 KiB/s, 3.39 IOPS)
-mmc0: Transfer of 39 x 6630 sectors (39 x 3315 KiB) took 37.086351431 seconds (3
-569 kB/s, 3486 KiB/s, 1.05 IOPS)
-mmc0: Result: OK
-mmc0: Tests completed.
+> Knowing only very few platforms I
+> don't know if that is something you can forbid.
+ 
+Did you ever take the time to look over the various clk
+implementations and try to see the patterens there? Obviously not, so
+what are you arguing about?
 
--- 
-Regards,
-Shawn
+> >    - a field for the base register
+> This is not needed for all clocks (at least not a say void __iomem *). I
+> think it's fine here to leave that to the platforms as it is now.
+
+Crap. All clocks which are configurable in some way or can be
+enabled/disabled need access register(s) so you need a base address.
+
+> >    - a struct for the offsets of the most common registers relative to
+> >      base
+> I'm not sure I understand you right here. If this is about not
+> duplicating data/code for similar clocks, this works (IMHO) fine with
+> the current approach (ie. sharing the ops pointer).
+
+Right and have tons of duplicated 
+
+      struct myclock {
+      	     struct clk;
+	     void *base;
+	     unsigned long enable_reg;
+	     unsigned long enable_reg_cache;
+     };
+
+all over the place. Brilliant.
+ 
+> >    optionally a set of common register accessor functions like I did
+> >    for the generic irq chip.
+> Agreed, this can (and should) come when the base API is fixed.
+
+Base API ?
+ 
+> > 2) The "framework" API is just a set of low level primitive helper
+> >    functions
+> > 
+> >    It lacks:
+> > 
+> >    - proper refcounting. clk_get() / clk_put() should do that at the
+> >      framework level.
+> For most clocks it's not important if they are referenced somewhere.
+> What should be done with that reference count at the framework level?
+> The only thing I currently can come up with now is to module_get an
+> optional owner. I'm not convinced this is worth to include in the
+> framework. Still it should be possible to do, and it is.
+
+For most clocks it's not important to be protected by a spinlock
+either, for many clocks even the prepare mutex is not needed.
+
+The whole point of frameworks is to figure out common patterns and
+implement them in a common place. That includes code which is not
+needed for many of the users of the code. See all the other
+infrastructure stuff: clocksources, clockevents, genirq. Strictly most
+of arch/* could do with half of the functionality, but that's not an
+argument to implement only half of it and keep the rest somewhere in
+the arch/ driver/ implementation.
+
+> >    - proper mechanisms to sanity check clk_set_parent(),
+> >      clk_set_rate() et. al.
+> > 
+> >      This is not a implementation detail inside a specific clock. It's
+> >      a problem which is common at least on the tree level:
+> > 
+> >                     rootclk
+> >                  /          \
+> >               clk1          clk2   
+> >              /   \
+> >            clk3  clk4
+> >           /
+> >          clk5
+> > 
+> >     So now you want to change the rate of clk1. Can you do that?
+> >     
+> >     No, but where is the sanity check which prevents that ?
+> I assume your ascii art should imply that clk3 and clk4 are enabled?
+> What is the policy you suggest?
+> This was discussed at some point[1] with the result that the user of
+> set_rate should be aware of the clk tree and the changes it introduces
+> for now and that some policy could still be added later.  Ditto for
+> set_parent. 
+
+Crap. We add a new framework now and we better think twice before
+starting to grow any user at all.
+
+> It's easy enough to implement such a policy on top of Jeremy's patches.
+> I'm not able to see already now all the requirements of all users of the
+> clk-API. So I agree with you that it probably isn't (yet) the perfect
+> framework, but I think it's a good base to see these requirements.
+
+Stop calling this a framework and stop telling me that it's easy to
+implement stuff on top of it.
+
+> > So unless you fix this stuff you should not even think about
+> > converting anything to this "framework". That's just waste of time and
+> > effort. Aside of declaring it stable and useful ....
+> With stable I didn't intend to say something about the quality (though I
+> still think it's a good thing), but that I won't rewrite the commits
+> such that others can base their work on top of them.
+
+Stop that bullshit already. We don't add stuff which has questionable
+quality and questionable functionality.
+
+> Before your mail nobody spoke up against these patches and some people
+> see a value in them and want to convert their platform to it. So
+
+Yes, because most involved people have the same narrow mindset as you
+and all you could agree on was the least common denominator of non
+functionality. People who have taste and see the big picture gave up
+on that. But that does not mean that it's good and something which
+should go near the tree or be provided for anyone to convert his
+platform to it.
+
+> providing a branch seems sensible to me.
+
+Provide as much branches as you see fit. They wont go near anything.
+
+> I don't say that this common struct clk is perfect already now and I
+> expect it to change here and there. It allows to consolidate some code
+> and so is a good thing. I think nobody disagrees that when having
+> converted most or all platforms to it we're not done. It's just the
+> first step. Maybe one of the next is to add a "class" of clocks that
+> looks similar to this:
+
+Wrong. We make a sensible functionality first and then convert bulk
+instead of doing it over and over again.
+
+Thanks,
+
+	tglx
