@@ -1,199 +1,49 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 21 Apr 2011 17:50:11 +0300
-Subject: [PATCH 1/2] arm: omap: fix bug with multiple smsc911x devices
-Message-ID: <1303397412-24813-1-git-send-email-grinberg@compulab.co.il>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Apr 2011 16:52:50 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110421114220.GJ13688@atomide.com>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110421103117.GB16776@sirena.org.uk>
+	<20110421114220.GJ13688@atomide.com>
+Message-ID: <alpine.LFD.2.02.1104211651540.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kobject (c06a4250): tried to init an initialized object, something is
-seriously wrong.
+On Thu, 21 Apr 2011, Tony Lindgren wrote:
 
-introduced by commit 66293989:
-(omap: convert boards that use SMSC911x to use gpmc-smsc911x)
+> * Mark Brown <broonie@opensource.wolfsonmicro.com> [110421 03:29]:
+> > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
+> > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > 
+> > > > If there were a pointer tracking the parent you still needed to program
+> > > > out the get_parent function anyhow to set the pointer initially. But I
+> > > > agree that in other situations having a pointer is more comfortable and
+> > > > saves ugly error handling e.g. in set_parent.
+> > 
+> > > That's nonsense. Why do you want a get_parent() function at all?
+> > > parent is set up when the clock is established in the clock tree. And
+> > > that's not done by some random driver. That's a property of the clock.
+> > 
+> > That's not universal - right now the drivers can and do know about this
+> > on some platforms.  In some cases there will be requirements beyond the
+> > clock rate which mean that the driver will need to be able to tell the
+> > framework that, for example, it needs one clock to be in the same clock
+> > domain as another.
+> 
+> Also there can be multiple parent clocks. An example are the timers on
+> omaps where the parent clock can be either the 32KiHz clock or external
+> source clock. ?his may need to be reprogrammed dynamically in some cases
+> for advanced idle modes as one of the parent clocks may be shut down.
 
-fixed by allocating struct platform_device dynamically.
+If you need to propagate from bottom up, then you need a list of
+childs in struct clk. Right ?
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-This has been boot tested with nfs root on cm-t35,
-and build tested on all other affected boards.
+Thanks,
 
- arch/arm/mach-omap2/board-cm-t35.c              |    2 ++
- arch/arm/mach-omap2/board-igep0020.c            |    1 +
- arch/arm/mach-omap2/board-ldp.c                 |    1 +
- arch/arm/mach-omap2/board-omap3evm.c            |    1 +
- arch/arm/mach-omap2/board-omap3logic.c          |    1 +
- arch/arm/mach-omap2/board-omap3stalker.c        |    1 +
- arch/arm/mach-omap2/board-overo.c               |    2 ++
- arch/arm/mach-omap2/board-zoom-debugboard.c     |    1 +
- arch/arm/mach-omap2/gpmc-smsc911x.c             |   16 +++++-----------
- arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |    1 +
- 10 files changed, 16 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index b5772c1..7c70f56 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -69,6 +69,7 @@
- #include <plat/gpmc-smsc911x.h>
- 
- static struct omap_smsc911x_platform_data cm_t35_smsc911x_cfg = {
-+	.id		= 0,
- 	.cs             = CM_T35_SMSC911X_CS,
- 	.gpio_irq       = CM_T35_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-@@ -76,6 +77,7 @@ static struct omap_smsc911x_platform_data cm_t35_smsc911x_cfg = {
- };
- 
- static struct omap_smsc911x_platform_data sb_t35_smsc911x_cfg = {
-+	.id		= 1,
- 	.cs             = SB_T35_SMSC911X_CS,
- 	.gpio_irq       = SB_T35_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 5b9bde7..2bf12fb 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -195,6 +195,7 @@ static void __init igep2_flash_init(void) {}
- #include <plat/gpmc-smsc911x.h>
- 
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
-+	.id		= -1,
- 	.cs             = IGEP2_SMSC911X_CS,
- 	.gpio_irq       = IGEP2_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index ea9f049..94cfd82 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -218,6 +218,7 @@ static struct spi_board_info ldp_spi_board_info[] __initdata = {
- };
- 
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
-+	.id		= -1,
- 	.cs             = LDP_SMSC911X_CS,
- 	.gpio_irq       = LDP_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 3fc85c6..fc5c1d8 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -104,6 +104,7 @@ static void __init omap3_evm_get_revision(void)
- #include <plat/gpmc-smsc911x.h>
- 
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
-+	.id		= -1,
- 	.cs             = OMAP3EVM_SMSC911X_CS,
- 	.gpio_irq       = OMAP3EVM_ETHR_GPIO_IRQ,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index a49e6cf..06248e7 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -144,6 +144,7 @@ static void __init board_mmc_init(void)
- }
- 
- static struct omap_smsc911x_platform_data __initdata board_smsc911x_data = {
-+	.id		= -1,
- 	.cs             = OMAP3LOGIC_SMSC911X_CS,
- 	.gpio_irq       = -EINVAL,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 848016c..ae4eaf5 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -64,6 +64,7 @@
- #define OMAP3STALKER_SMC911X_CS	5
- 
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
-+	.id		= -1,
- 	.cs             = OMAP3STALKER_SMC911X_CS,
- 	.gpio_irq       = OMAP3STALKER_ETHR_GPIO_IRQ,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 4016166..165e1fa 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -149,6 +149,7 @@ static inline void __init overo_ads7846_init(void) { return; }
- #include <plat/gpmc-smsc911x.h>
- 
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
-+	.id		= 0,
- 	.cs             = OVERO_SMSC911X_CS,
- 	.gpio_irq       = OVERO_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-@@ -156,6 +157,7 @@ static struct omap_smsc911x_platform_data smsc911x_cfg = {
- };
- 
- static struct omap_smsc911x_platform_data smsc911x2_cfg = {
-+	.id		= 1,
- 	.cs             = OVERO_SMSC911X2_CS,
- 	.gpio_irq       = OVERO_SMSC911X2_GPIO,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
-index 2ee9ab9..d6f6e93 100644
---- a/arch/arm/mach-omap2/board-zoom-debugboard.c
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
-@@ -28,6 +28,7 @@
- #define ZOOM_ETHR_START	DEBUG_BASE
- 
- static struct omap_smsc911x_platform_data zoom_smsc911x_cfg = {
-+	.id		= -1,
- 	.cs             = ZOOM_SMSC911X_CS,
- 	.gpio_irq       = ZOOM_SMSC911X_GPIO,
- 	.gpio_reset     = -EINVAL,
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index b331f3c..d30293a 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -41,16 +41,6 @@ static struct smsc911x_platform_config gpmc_smsc911x_config = {
- 	.flags		= SMSC911X_USE_16BIT,
- };
- 
--static struct platform_device gpmc_smsc911x_device = {
--	.name		= "smsc911x",
--	.id		= -1,
--	.num_resources	= ARRAY_SIZE(gpmc_smsc911x_resources),
--	.resource	= gpmc_smsc911x_resources,
--	.dev		= {
--		.platform_data = &gpmc_smsc911x_config,
--	},
--};
--
- /*
-  * Initialize smsc911x device connected to the GPMC. Note that we
-  * assume that pin multiplexing is done in the board-*.c file,
-@@ -58,6 +48,7 @@ static struct platform_device gpmc_smsc911x_device = {
-  */
- void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
- {
-+	struct platform_device *pdev;
- 	unsigned long cs_mem_base;
- 	int ret;
- 
-@@ -97,7 +88,10 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
- 	if (gpmc_cfg->flags)
- 		gpmc_smsc911x_config.flags = gpmc_cfg->flags;
- 
--	if (platform_device_register(&gpmc_smsc911x_device) < 0) {
-+	pdev = platform_device_register_resndata(NULL, "smsc911x", gpmc_cfg->id,
-+		 gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
-+		 &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
-+	if (!pdev) {
- 		printk(KERN_ERR "Unable to register smsc911x device\n");
- 		gpio_free(gpmc_cfg->gpio_reset);
- 		goto free2;
-diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-index 872de0bf..d3f1579 100644
---- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-@@ -14,6 +14,7 @@
- #ifndef __ASM_ARCH_OMAP_GPMC_SMSC911X_H__
- 
- struct omap_smsc911x_platform_data {
-+	int	id;
- 	int	cs;
- 	int	gpio_irq;
- 	int	gpio_reset;
--- 
-1.7.3.4
+	tglx
