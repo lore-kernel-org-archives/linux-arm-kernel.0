@@ -1,47 +1,40 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 21 Apr 2011 20:11:56 +0300
-Subject: [PATCH] Enhanced ethtool API of CPSW driver in order to be able
-	to address even more than one PHY.
-In-Reply-To: <1303402638-29884-1-git-send-email-sven.fischer@snom.com>
-References: <1303402638-29884-1-git-send-email-sven.fischer@snom.com>
-Message-ID: <20110421165014.GA2035@nataf.siach.name>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 21 Apr 2011 10:21:06 -0700
+Subject: [GIT PULL] Please pull ASoC's tegra branch into Tegra for-next
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04973BB857@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sven,
+Colin, Erik, Olof,
 
-On Thu, Apr 21, 2011 at 06:17:18PM +0200, Sven Fischer wrote:
-> Linked ethtool ioctls ETHTOOL_GSET and ETHTOOL_SSET to the CPSW switch driver and added a new ioctl ETHTOOL_GPHYLINK.
-> 
-> The new ETHTOOL_GPHYLINK, which gets the PHY link status of a specific PHY, makes ETHTOOL_GLINK obsolete, because it was not working PHY specific.
-> 
-> ETHTOOL_GSET and ETHTOOL_SSET ioctls are now able to access a specific PHY as well.
+Please pull
 
-A few comments:
+git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound-2.6.git tegra
 
-1. Please wrap the patch description lines at 80 characters
+into Tegra's for-next, or whichever branch is appropriate for 2.6.40 work.
 
-2. You should Cc the networking devices mailing list at netdev at vger.kernel.org 
-   on this patch
+This will bring in:
 
-3. Please separate changes to generic code (like ethtool, phy) from changes to 
-   a specific driver (like cpsw).
+47912a6 ARM: Tegra: select MACH_HAS_SND_SOC_TEGRA_WM8903
+61a6d07 ARM: Tegra: Add to tegra_wm8903_platform_data
+7b33af2 ASoC: Tegra: Rename pdev tegra-snd-harmony to tegra-snd-wm8903
+4651d55 ARM: Tegra: Rename harmony_audio.h -> tegra_wm8903_pdata.h
+a6360dd Linux 2.6.39-rc3
 
-By the way, this cpsw driver does not appear to exist in the current mainline 
-kernel. When sending a patch against a development tree, please specify which 
-one.
+The changes are required to add Seaboard audio support into the Tegra
+branch. I'll post patches for that later today.
 
-baruch
+I have tested that:
 
-> ---
->  drivers/net/cpsw.c      |   53 +++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/net/phy/phy.c   |    9 ++++++++
->  include/linux/ethtool.h |   12 +++++++++-
->  include/linux/phy.h     |    1 +
->  net/core/ethtool.c      |   28 ++++++++++++++++++++++++-
->  5 files changed, 101 insertions(+), 2 deletions(-)
+* The merge has no conflicts.
+* The merge result compiles.
+* The resultant kernel runs OK on Harmony.
+* With the addition of the patch below, which is required to fix an
+  already-extant bug in Tegra's for-next branch, and which I'll repost
+  later today, audio on Harmony works fully.
+  ARM: Tegra: Harmony: Fix conflicting GPIO numbering
+
+Thank you.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+nvpublic
