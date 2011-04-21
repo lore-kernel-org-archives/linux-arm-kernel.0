@@ -1,39 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Apr 2011 15:46:19 +0300
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <20110421080238.GE13688@atomide.com>
-References: <20110324231830.2586.7150.stgit@riker>
-	<20110328091259.GA18721@S2100-06.ap.freescale.net>
-	<20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-Message-ID: <20110421124618.GA15060@atomide.com>
+Date: Thu, 21 Apr 2011 15:47:38 +0300
+Subject: [PATCH 1/3] ARM: zImage: no need to get the decompressed size
+	from the filesystem
+In-Reply-To: <1303272904-31392-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<1303272904-31392-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20110421124737.GB15060@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110421 11:00]:
-> * Shawn Guo <shawn.guo@freescale.com> [110420 00:27]:
-> > On Wed, Apr 20, 2011 at 01:47:47PM +0800, Shawn Guo wrote:
-> > > I would like to confirm it fixes your setup before I send fixing
-> > > patch to remove 'static' from global variables in all platform
-> > > uncompress.h.
-> > > 
-> > Just saw Nico's patch, so ignore above lines ...
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110420 07:12]:
+> In commit d239b1dc093d the hardcoded 4x estimate for the decompressed
+> kernel size was replaced by the exact Image file size and passed to
+> the linker as a symbol value.  Turns out that this is unneeded as the
+> size is already included at the end of the compressed piggy data.
+> For those compressed formats that don't include this data, the build
+> system already takes care of appending it using size_append in
+> scripts/Makefile.lib.  So let's use that instead.
 > 
-> Thanks looks like removing static only changes things so now
-> "Warning: Neither atags nor dtb found" error message printed out.
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-But also Nico's patch fixes the corruption of the DT data during
-uncompress, so I'm getting much further now.
+Works fine on the boards I'm using:
 
-Now the problem is that the DT data is zeroed out by the time code
-gets to setup_machine_fdt. I wonder if I'm missing some patch?
-
-I'm using grant's devicetree/arm branch + DT append patch + Nico's
-static fix + my relocate fix.
-
-Oh well have to look at it again next week..
-
-Tony
+Tested-by: Tony Lindgren <tony@atomide.com> 
