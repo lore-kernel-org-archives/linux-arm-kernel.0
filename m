@@ -1,42 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 20 Apr 2011 17:26:55 -0700
-Subject: [PATCH 3/7] OMAP4: GPIO: Save/restore context
-In-Reply-To: <1303139217-10285-4-git-send-email-charu@ti.com> (Charulatha
-	Varadarajan's message of "Mon, 18 Apr 2011 20:36:53 +0530")
-References: <1303139217-10285-4-git-send-email-charu@ti.com>
-Message-ID: <87hb9s4fg0.fsf@ti.com>
+From: bn@niasdigital.com (Ben Nizette)
+Date: Thu, 21 Apr 2011 10:29:11 +1000
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <BANLkTi=W7jaVtW1FThvG_ca57q+yDz1kzQ@mail.gmail.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+	<BANLkTi=W7jaVtW1FThvG_ca57q+yDz1kzQ@mail.gmail.com>
+Message-ID: <62B5223C-AFC9-4DF6-B0BD-2678E082047D@niasdigital.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-> From: Charulatha V <charu@ti.com>
->
-> Modify the omap_gpio_save/restore_context to support OMAP4
-> architecture so that the OMAP GPIO driver need not be modified
-> when OMAP4 off mode support is available.
->
-> Signed-off-by: Charulatha V <charu@ti.com>
-> ---
->  arch/arm/plat-omap/gpio.c |  131 +++++++++++++++++++++++++++++---------------
->  1 files changed, 86 insertions(+), 45 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-> index 74085b5..e68da08 100644
-> --- a/arch/arm/plat-omap/gpio.c
-> +++ b/arch/arm/plat-omap/gpio.c
-> @@ -2022,43 +2022,62 @@ void omap2_gpio_resume_after_idle(void)
->  
->  #endif
->  
-> -#ifdef CONFIG_ARCH_OMAP3
-> -/* save the registers of bank 2-6 */
->  void omap_gpio_save_context(void)
->  {
->  	int i;
->  
-> -	/* saving banks from 2-6 only since GPIO1 is in WKUP */
+RESEND, sorry if you get this twice.  Crappy MUA..
 
-Minor: these comment removals belong in the previous patch.
+On 20/04/2011, at 10:21 PM, Linus Walleij wrote:
 
-Kevin
+> 2011/4/19 Ben Nizette <bn@niasdigital.com>:
+>> On 18/04/2011, at 10:26 PM, Alan Cox wrote:
+>> 
+>>> The logical extension to that is to delete the gpio layer because the
+>>> board code can do it ?
+>> 
+>> Well anything that is done once at startup, yes,
+> 
+> This patch is about biasing and drive modes. We need to alter
+> these at runtime (from board code, indeed) due to the fact that
+> when you go to sleep e.g. floating a pin yeilds better power
+> characteristics.
+
+This is actually an interesting case because floating pins yeild
+/worse/ power characteristics (each transistor of the push-pull
+is on a little bit and you get a path straight through) [1].  To
+get good power performance you want to pull an input pin high or
+low but which of those two directions depends on external
+constraints, i.e. the board.  This is a case where the driver
+should /not/ go playing with things it can't fully understand.
+
+Perhaps one of the properties that a board can set in a gpio chip
+driver is the suspend state and have suspend/resume hooks in the
+gpio chip take care of setting things up on each side.
+
+	--Ben.
+
+[1] http://processors.wiki.ti.com/index.php/Optimizing_IO_Power_Consumption
+
+> 
+> Linus Walleij
