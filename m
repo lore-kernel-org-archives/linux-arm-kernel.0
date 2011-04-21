@@ -1,829 +1,1223 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 21 Apr 2011 17:41:58 +1200
-Subject: [PATCH v2 06/23] at91: Make NAND device common
+Date: Thu, 21 Apr 2011 17:42:00 +1200
+Subject: [PATCH v2 08/23] at91: Make SPI device common
 In-Reply-To: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
 References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303364535-11557-7-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303364535-11557-9-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual NAND code for each at91 variant with a single
+Replace the individual SPI code for each at91 variant with a single
 implementation in devices.c
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at572d940hf_devices.c |   65 ++++--------------------
- arch/arm/mach-at91/at91cap9_devices.c    |   62 ++--------------------
- arch/arm/mach-at91/at91rm9200_devices.c  |   81 +++++++-----------------------
- arch/arm/mach-at91/at91sam9260_devices.c |   62 ++--------------------
- arch/arm/mach-at91/at91sam9261_devices.c |   63 ++++-------------------
- arch/arm/mach-at91/at91sam9263_devices.c |   62 ++--------------------
- arch/arm/mach-at91/at91sam9g45_devices.c |   62 ++--------------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   66 ++----------------------
- arch/arm/mach-at91/devices.c             |   76 ++++++++++++++++++++++++++++
- arch/arm/mach-at91/devices.h             |   12 ++++
- 10 files changed, 158 insertions(+), 453 deletions(-)
+ arch/arm/mach-at91/at572d940hf_devices.c |  122 +++++-------------------------
+ arch/arm/mach-at91/at91cap9_devices.c    |  122 +++++-------------------------
+ arch/arm/mach-at91/at91rm9200_devices.c  |   69 ++---------------
+ arch/arm/mach-at91/at91sam9260_devices.c |  122 +++++-------------------------
+ arch/arm/mach-at91/at91sam9261_devices.c |  122 +++++-------------------------
+ arch/arm/mach-at91/at91sam9263_devices.c |  122 +++++-------------------------
+ arch/arm/mach-at91/at91sam9g45_devices.c |  122 +++++-------------------------
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   67 ++--------------
+ arch/arm/mach-at91/devices.c             |  103 +++++++++++++++++++++++++
+ arch/arm/mach-at91/devices.h             |   11 +++
+ 10 files changed, 252 insertions(+), 730 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 2d029a7..771e1bf 100644
+index 482de24..5f497c6 100644
 --- a/arch/arm/mach-at91/at572d940hf_devices.c
 +++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -104,64 +104,20 @@ static struct at91_dev_table_mmc device_mmc __initdata = {
-  *  NAND / SmartMedia
+@@ -142,114 +142,30 @@ static struct at91_dev_table_twi device_twi1 __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
--	{
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-static struct resource spi0_resources[] = {
+-	[0] = {
+-		.start	= AT572D940HF_BASE_SPI0,
+-		.end	= AT572D940HF_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_pin_config nand_pins[] __initdata = {
-+	{AT91_PIN_PB28, AT91_PIN_PERIPH_A, 0, 0, 0},	/* A[22] */
-+	{AT91_PIN_PA28, AT91_PIN_PERIPH_B, 0, 0, 0},	/* NANDOE */
-+	{AT91_PIN_PA29, AT91_PIN_PERIPH_B, 0, 0, 0},	/* NANDWE */
- };
- 
--static struct platform_device at572d940hf_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_CS3A_SMC_SMARTMEDIA,
-+	.pins		= nand_pins,
-+	.nr_pins	= ARRAY_SIZE(nand_pins),
+-	[1] = {
+-		.start	= AT572D940HF_ID_SPI0,
+-		.end	= AT572D940HF_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at572d940hf_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT572D940HF_BASE_SPI0,
++	.irq			= AT572D940HF_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_A, 0, 0, 0},
  };
  
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT572D940HF_BASE_SPI1,
+-		.end	= AT572D940HF_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT572D940HF_ID_SPI1,
+-		.end	= AT572D940HF_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT572D940HF_BASE_SPI1,
++	.irq			= AT572D940HF_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PC3, AT91_PIN_PC4, AT91_PIN_PC5, AT91_PIN_PC6,
+ 	},
++	.pin_miso		= {AT91_PIN_PC0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PC1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PC2, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at572d940hf_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PC3, AT91_PIN_PC4, AT91_PIN_PC5, AT91_PIN_PC6 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	at91_set_A_periph(AT91_PIN_PB28, 0);		/* A[22] */
--	at91_set_B_periph(AT91_PIN_PA28, 0);		/* NANDOE */
--	at91_set_B_periph(AT91_PIN_PA29, 0);		/* NANDWE */
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_A_periph(AT91_PIN_PA0, 0);	/* SPI0_MISO */
+-		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+-		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
 -
--	nand_data = *data;
--	platform_device_register(&at572d940hf_nand_device);
+-		at91_clock_associate("spi0_clk", &at572d940hf_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at572d940hf_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PC0, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PC1, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PC2, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at572d940hf_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at572d940hf_spi1_device);
+-	}
 -}
--
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  Timer/Counter blocks
   * -------------------------------------------------------------------- */
-@@ -787,6 +743,7 @@ static struct at91_device_table at572d940hf_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.udc		= &device_udc,
- 	.mmc[0]		= &device_mmc,
-+	.nand		= &device_nand,
+@@ -661,6 +577,8 @@ static struct at91_device_table at572d940hf_device_table __initdata = {
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi0,
+ 	.twi[1]		= &device_twi1,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at572d940hf_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 9a5c59c..773eb95 100644
+index a647963..a54b6a5 100644
 --- a/arch/arm/mach-at91/at91cap9_devices.c
 +++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -228,64 +228,13 @@ static struct at91_dev_table_mmc device_mmc1 __initdata = {
-  *  NAND / SmartMedia
+@@ -251,114 +251,30 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
+-static struct resource spi0_resources[] = {
 -	[0] = {
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-		.start	= AT91CAP9_BASE_SPI0,
+-		.end	= AT91CAP9_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91_BASE_SYS + AT91_ECC,
--		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA,
-+	.ecc_mmio_base	= AT91_BASE_SYS + AT91_ECC,
- };
- 
--static struct platform_device at91cap9_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
+-		.start	= AT91CAP9_ID_SPI0,
+-		.end	= AT91CAP9_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91cap9_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT91CAP9_BASE_SPI0,
++	.irq			= AT91CAP9_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PA5, AT91_PIN_PA3, AT91_PIN_PD0, AT91_PIN_PD1,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_B, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_B, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_B, 0, 0, 0},
+ };
+ 
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PA5, AT91_PIN_PA3, AT91_PIN_PD0, AT91_PIN_PD1 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT91CAP9_BASE_SPI1,
+-		.end	= AT91CAP9_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91CAP9_ID_SPI1,
+-		.end	= AT91CAP9_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT91CAP9_BASE_SPI1,
++	.irq			= AT91CAP9_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB15, AT91_PIN_PB16, AT91_PIN_PB17, AT91_PIN_PB18,
+ 	},
++	.pin_miso		= {AT91_PIN_PB12, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PC13, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PC14, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at91cap9_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PB15, AT91_PIN_PB16, AT91_PIN_PB17, AT91_PIN_PB18 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	nand_data = *data;
--	platform_device_register(&at91cap9_nand_device);
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_B_periph(AT91_PIN_PA0, 0);	/* SPI0_MISO */
+-		at91_set_B_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+-		at91_set_B_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
+-
+-		at91_clock_associate("spi0_clk", &at91cap9_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at91cap9_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PB12, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PB13, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB14, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at91cap9_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at91cap9_spi1_device);
+-	}
 -}
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  Timer/Counter block
   * -------------------------------------------------------------------- */
-@@ -1101,6 +1050,7 @@ static struct at91_device_table at91cap9_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.mmc[0]		= &device_mmc0,
+@@ -989,6 +905,8 @@ static struct at91_device_table at91cap9_device_table __initdata = {
  	.mmc[1]		= &device_mmc1,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at91cap9_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 4763662..90ca534 100644
+index a889114..6567e3c 100644
 --- a/arch/arm/mach-at91/at91rm9200_devices.c
 +++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -198,70 +198,26 @@ static struct at91_dev_table_mmc device_mmc __initdata = {
-  *  NAND / SmartMedia
+@@ -235,69 +235,17 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
--	{
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-static struct resource spi_resources[] = {
+-	[0] = {
+-		.start	= AT91RM9200_BASE_SPI,
+-		.end	= AT91RM9200_BASE_SPI + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct platform_device at91rm9200_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
+-	[1] = {
+-		.start	= AT91RM9200_ID_SPI,
+-		.end	= AT91RM9200_ID_SPI,
+-		.flags	= IORESOURCE_IRQ,
+-	},
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91rm9200_spi_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi __initdata = {
++	.mmio_base		= AT91RM9200_BASE_SPI,
++	.irq			= AT91RM9200_ID_SPI,
++	.standard_cs_pins	= {
++		AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6,
+ 	},
+-	.resource	= spi_resources,
+-	.num_resources	= ARRAY_SIZE(spi_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static const unsigned spi_standard_cs[4] = { AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned int csa;
+-	int i;
+-	unsigned long cs_pin;
 -
--	if (!data)
--		return;
+-	at91_set_A_periph(AT91_PIN_PA0, 0);	/* MISO */
+-	at91_set_A_periph(AT91_PIN_PA1, 0);	/* MOSI */
+-	at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPCK */
 -
--	/* enable the address range of CS3 */
--	csa = at91_sys_read(AT91_EBI_CSA);
--	at91_sys_write(AT91_EBI_CSA, csa | AT91_EBI_CS3A_SMC_SMARTMEDIA);
+-	/* Enable SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else
+-			cs_pin = spi_standard_cs[devices[i].chip_select];
 -
--	/* set the bus interface characteristics */
--	at91_sys_write(AT91_SMC_CSR(3), AT91_SMC_ACSS_STD | AT91_SMC_DBW_8 | AT91_SMC_WSEN
-+static struct at91_pin_config nand_pins[] __initdata = {
-+	{AT91_PIN_PC1, AT91_PIN_PERIPH_A, 0, 0, 0},	/* SMOE */
-+	{AT91_PIN_PC3, AT91_PIN_PERIPH_A, 0, 0, 0},	/* SMWE */
-+};
-+
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_EBI_CSA,
-+	.enable		= AT91_EBI_CS3A_SMC_SMARTMEDIA,
-+	.flags_reg	= AT91_SMC_CSR(3),
-+	.flags		= (
-+		  AT91_SMC_ACSS_STD | AT91_SMC_DBW_8 | AT91_SMC_WSEN
- 		| AT91_SMC_NWS_(5)
- 		| AT91_SMC_TDF_(1)
--		| AT91_SMC_RWSETUP_(0)	/* tDS Data Set up Time 30 - ns */
--		| AT91_SMC_RWHOLD_(1)	/* tDH Data Hold Time 20 - ns */
--	);
+-		if (devices[i].chip_select == 0)	/* for CS0 errata */
+-			at91_set_A_periph(cs_pin, 0);
+-		else
+-			at91_set_gpio_output(cs_pin, 1);
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
--
--	at91_set_A_periph(AT91_PIN_PC1, 0);		/* SMOE */
--	at91_set_A_periph(AT91_PIN_PC3, 0);		/* SMWE */
--
--	nand_data = *data;
--	platform_device_register(&at91rm9200_nand_device);
+-	spi_register_board_info(devices, nr_devices);
+-	platform_device_register(&at91rm9200_spi_device);
 -}
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
-+		| AT91_SMC_RWSETUP_(0)	 /* tDS Data Set up Time 30 - ns */
-+		| AT91_SMC_RWHOLD_(1)	 /* tDH Data Hold Time 20 - ns */
-+		),
-+	.pins		= nand_pins,
-+	.nr_pins	= ARRAY_SIZE(nand_pins),
-+};
- 
+-
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
-@@ -1005,6 +961,7 @@ static struct at91_device_table at91rm9200_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.udc		= &device_udc,
+  *  Timer/Counter blocks
+  * -------------------------------------------------------------------- */
+@@ -899,6 +847,7 @@ static struct at91_device_table at91rm9200_device_table __initdata = {
  	.mmc[0]		= &device_mmc,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi,
  };
  
  void __init at91rm9200_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 5f1aaca..f48ad70 100644
+index ed2e071..9ccb731 100644
 --- a/arch/arm/mach-at91/at91sam9260_devices.c
 +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -113,64 +113,13 @@ static struct at91_dev_table_mmc device_mmc __initdata = {
-  *  NAND / SmartMedia
+@@ -136,114 +136,30 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
+-static struct resource spi0_resources[] = {
 -	[0] = {
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-		.start	= AT91SAM9260_BASE_SPI0,
+-		.end	= AT91SAM9260_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91_BASE_SYS + AT91_ECC,
--		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_CS3A_SMC_SMARTMEDIA,
-+	.ecc_mmio_base	= AT91_BASE_SYS + AT91_ECC,
- };
- 
--static struct platform_device at91sam9260_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
+-		.start	= AT91SAM9260_ID_SPI0,
+-		.end	= AT91SAM9260_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91sam9260_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT91SAM9260_BASE_SPI0,
++	.irq			= AT91SAM9260_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PA3, AT91_PIN_PC11, AT91_PIN_PC16, AT91_PIN_PC17,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PA3, AT91_PIN_PC11, AT91_PIN_PC16, AT91_PIN_PC17 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9260_BASE_SPI1,
+-		.end	= AT91SAM9260_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9260_ID_SPI1,
+-		.end	= AT91SAM9260_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT91SAM9260_BASE_SPI1,
++	.irq			= AT91SAM9260_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB3, AT91_PIN_PC5, AT91_PIN_PC4, AT91_PIN_PC3,
+ 	},
++	.pin_miso		= {AT91_PIN_PB0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PB1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PB2, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at91sam9260_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PB3, AT91_PIN_PC5, AT91_PIN_PC4, AT91_PIN_PC3 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	nand_data = *data;
--	platform_device_register(&at91sam9260_nand_device);
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_A_periph(AT91_PIN_PA0, 0);	/* SPI0_MISO */
+-		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+-		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi0_clk", &at91sam9260_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9260_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PB0, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PB1, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB2, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at91sam9260_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9260_spi1_device);
+-	}
 -}
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  Timer/Counter blocks
   * -------------------------------------------------------------------- */
-@@ -1065,6 +1014,7 @@ static struct at91_device_table at91sam9260_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.udc		= &device_udc,
+@@ -951,6 +867,8 @@ static struct at91_device_table at91sam9260_device_table __initdata = {
  	.mmc[0]		= &device_mmc,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at91sam9260_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 4bf9a09..9505ae3 100644
+index 15c701b..dd19119 100644
 --- a/arch/arm/mach-at91/at91sam9261_devices.c
 +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -70,63 +70,19 @@ static struct at91_dev_table_mmc device_mmc __initdata = {
-  *  NAND / SmartMedia
+@@ -99,114 +99,30 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
--	{
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-static struct resource spi0_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9261_BASE_SPI0,
+-		.end	= AT91SAM9261_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_pin_config nand_pins[] __initdata = {
-+	{AT91_PIN_PC0, AT91_PIN_PERIPH_A, 0, 0, 0},	/* NANDOE */
-+	{AT91_PIN_PC1, AT91_PIN_PERIPH_A, 0, 0, 0},	/* NANDWE */
- };
- 
--static struct platform_device atmel_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_CS3A_SMC_SMARTMEDIA,
-+	.pins		= nand_pins,
-+	.nr_pins	= ARRAY_SIZE(nand_pins),
+-	[1] = {
+-		.start	= AT91SAM9261_ID_SPI0,
+-		.end	= AT91SAM9261_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91sam9261_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT91SAM9261_BASE_SPI0,
++	.irq			= AT91SAM9261_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_A, 0, 0, 0},
  };
  
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PA5, AT91_PIN_PA6 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9261_BASE_SPI1,
+-		.end	= AT91SAM9261_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9261_ID_SPI1,
+-		.end	= AT91SAM9261_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT91SAM9261_BASE_SPI1,
++	.irq			= AT91SAM9261_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB28, AT91_PIN_PA24, AT91_PIN_PA25, AT91_PIN_PA26,
+ 	},
++	.pin_miso		= {AT91_PIN_PB30, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PB31, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PB29, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at91sam9261_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PB28, AT91_PIN_PA24, AT91_PIN_PA25, AT91_PIN_PA26 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	at91_set_A_periph(AT91_PIN_PC0, 0);		/* NANDOE */
--	at91_set_A_periph(AT91_PIN_PC1, 0);		/* NANDWE */
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_A_periph(AT91_PIN_PA0, 0);	/* SPI0_MISO */
+-		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+-		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
 -
--	nand_data = *data;
--	platform_device_register(&atmel_nand_device);
+-		at91_clock_associate("spi0_clk", &at91sam9261_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9261_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PB30, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PB31, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB29, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at91sam9261_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9261_spi1_device);
+-	}
 -}
--
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  LCD Controller
   * -------------------------------------------------------------------- */
-@@ -920,6 +876,7 @@ static struct at91_device_table at91sam9261_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.udc		= &device_udc,
+@@ -814,6 +730,8 @@ static struct at91_device_table at91sam9261_device_table __initdata = {
  	.mmc[0]		= &device_mmc,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at91sam9261_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 708d24a..37b06f7 100644
+index d0580ef..b049f93 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -248,64 +248,13 @@ void __init at91_add_device_cf(struct at91_cf_data *data) {}
-  *  NAND / SmartMedia
+@@ -271,114 +271,30 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
+-static struct resource spi0_resources[] = {
 -	[0] = {
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-		.start	= AT91SAM9263_BASE_SPI0,
+-		.end	= AT91SAM9263_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91_BASE_SYS + AT91_ECC0,
--		.end	= AT91_BASE_SYS + AT91_ECC0 + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBI0CSA,
-+	.enable		= AT91_MATRIX_EBI0_CS3A_SMC_SMARTMEDIA,
-+	.ecc_mmio_base	= AT91_BASE_SYS + AT91_ECC0,
- };
- 
--static struct platform_device at91sam9263_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
+-		.start	= AT91SAM9263_ID_SPI0,
+-		.end	= AT91SAM9263_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91sam9263_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT91SAM9263_BASE_SPI0,
++	.irq			= AT91SAM9263_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PA5, AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PB11,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PA0, AT91_PIN_PERIPH_B, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA1, AT91_PIN_PERIPH_B, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA2, AT91_PIN_PERIPH_B, 0, 0, 0},
+ };
+ 
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PA5, AT91_PIN_PA3, AT91_PIN_PA4, AT91_PIN_PB11 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9263_BASE_SPI1,
+-		.end	= AT91SAM9263_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9263_ID_SPI1,
+-		.end	= AT91SAM9263_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT91SAM9263_BASE_SPI1,
++	.irq			= AT91SAM9263_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB15, AT91_PIN_PB16, AT91_PIN_PB17, AT91_PIN_PB18,
+ 	},
++	.pin_miso		= {AT91_PIN_PB12, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PB13, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PB14, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at91sam9263_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PB15, AT91_PIN_PB16, AT91_PIN_PB17, AT91_PIN_PB18 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBI0CSA);
--	at91_sys_write(AT91_MATRIX_EBI0CSA, csa | AT91_MATRIX_EBI0_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	nand_data = *data;
--	platform_device_register(&at91sam9263_nand_device);
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_B_periph(AT91_PIN_PA0, 0);	/* SPI0_MISO */
+-		at91_set_B_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+-		at91_set_B_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
+-
+-		at91_clock_associate("spi0_clk", &at91sam9263_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9263_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PB12, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PB13, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB14, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at91sam9263_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9263_spi1_device);
+-	}
 -}
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  AC97
   * -------------------------------------------------------------------- */
-@@ -1222,6 +1171,7 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.udc		= &device_udc,
- 	.mmc[0]		= &device_mmc0,
+@@ -1109,6 +1025,8 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
  	.mmc[1]		= &device_mmc1,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at91sam9263_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 745b1a2..9650547 100644
+index 7b83b0b..b25c0cc 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -272,64 +272,13 @@ static struct at91_dev_table_mmc device_mmc1 __initdata = {
-  *  NAND / SmartMedia
+@@ -303,114 +303,30 @@ static struct at91_dev_table_twi device_twi1 __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
+-static struct resource spi0_resources[] = {
 -	[0] = {
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-		.start	= AT91SAM9G45_BASE_SPI0,
+-		.end	= AT91SAM9G45_BASE_SPI0 + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91_BASE_SYS + AT91_ECC,
--		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA,
-+	.ecc_mmio_base	= AT91_BASE_SYS + AT91_ECC,
- };
- 
--static struct platform_device at91sam9g45_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
+-		.start	= AT91SAM9G45_ID_SPI0,
+-		.end	= AT91SAM9G45_ID_SPI0,
+-		.flags	= IORESOURCE_IRQ,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91sam9g45_spi0_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi0 __initdata = {
++	.mmio_base		= AT91SAM9G45_BASE_SPI0,
++	.irq			= AT91SAM9G45_ID_SPI0,
++	.clk_asc		= "spi0_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB3, AT91_PIN_PB18, AT91_PIN_PB19, AT91_PIN_PD27,
+ 	},
+-	.resource	= spi0_resources,
+-	.num_resources	= ARRAY_SIZE(spi0_resources),
++	.pin_miso		= {AT91_PIN_PB0, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PB1, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PB2, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static const unsigned spi0_standard_cs[4] = { AT91_PIN_PB3, AT91_PIN_PB18, AT91_PIN_PB19, AT91_PIN_PD27 };
+-
+-static struct resource spi1_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9G45_BASE_SPI1,
+-		.end	= AT91SAM9G45_BASE_SPI1 + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9G45_ID_SPI1,
+-		.end	= AT91SAM9G45_ID_SPI1,
+-		.flags	= IORESOURCE_IRQ,
++static struct at91_dev_table_spi device_spi1 __initdata = {
++	.mmio_base		= AT91SAM9G45_BASE_SPI1,
++	.irq			= AT91SAM9G45_ID_SPI1,
++	.clk_asc		= "spi1_clk",
++	.standard_cs_pins	= {
++		AT91_PIN_PB17, AT91_PIN_PD28, AT91_PIN_PD18, AT91_PIN_PD19,
+ 	},
++	.pin_miso		= {AT91_PIN_PB14, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PB15, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PB16, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static struct platform_device at91sam9g45_spi1_device = {
+-	.name		= "atmel_spi",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= spi1_resources,
+-	.num_resources	= ARRAY_SIZE(spi1_resources),
+-};
+-
+-static const unsigned spi1_standard_cs[4] = { AT91_PIN_PB17, AT91_PIN_PD28, AT91_PIN_PD18, AT91_PIN_PD19 };
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
+-	short enable_spi0 = 0;
+-	short enable_spi1 = 0;
 -
--	if (!data)
--		return;
+-	/* Choose SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else if (devices[i].bus_num == 0)
+-			cs_pin = spi0_standard_cs[devices[i].chip_select];
+-		else
+-			cs_pin = spi1_standard_cs[devices[i].chip_select];
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA);
+-		if (devices[i].bus_num == 0)
+-			enable_spi0 = 1;
+-		else
+-			enable_spi1 = 1;
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
+-	spi_register_board_info(devices, nr_devices);
 -
--	nand_data = *data;
--	platform_device_register(&at91sam9g45_nand_device);
+-	/* Configure SPI bus(es) */
+-	if (enable_spi0) {
+-		at91_set_A_periph(AT91_PIN_PB0, 0);	/* SPI0_MISO */
+-		at91_set_A_periph(AT91_PIN_PB1, 0);	/* SPI0_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB2, 0);	/* SPI0_SPCK */
+-
+-		at91_clock_associate("spi0_clk", &at91sam9g45_spi0_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9g45_spi0_device);
+-	}
+-	if (enable_spi1) {
+-		at91_set_A_periph(AT91_PIN_PB14, 0);	/* SPI1_MISO */
+-		at91_set_A_periph(AT91_PIN_PB15, 0);	/* SPI1_MOSI */
+-		at91_set_A_periph(AT91_PIN_PB16, 0);	/* SPI1_SPCK */
+-
+-		at91_clock_associate("spi1_clk", &at91sam9g45_spi1_device.dev, "spi_clk");
+-		platform_device_register(&at91sam9g45_spi1_device);
+-	}
 -}
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  AC97
   * -------------------------------------------------------------------- */
-@@ -1347,6 +1296,7 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
- 	.usbh_ehci	= &device_usb_ehci,
- 	.mmc[0]		= &device_mmc0,
- 	.mmc[1]		= &device_mmc1,
-+	.nand		= &device_nand,
+@@ -1189,6 +1105,8 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi0,
+ 	.twi[1]		= &device_twi1,
++	.spi[0]		= &device_spi0,
++	.spi[1]		= &device_spi1,
  };
  
  void __init at91sam9g45_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 352e30c..e0b7302 100644
+index 2b24e7d..55a0918 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -189,68 +189,13 @@ static struct at91_dev_table_mmc device_mmc __initdata = {
-  *  NAND / SmartMedia
+@@ -212,67 +212,17 @@ static struct at91_dev_table_twi device_twi __initdata = {
+  *  SPI
   * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
--static struct atmel_nand_data nand_data;
+-#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
 -
--#define NAND_BASE	AT91_CHIPSELECT_3
--
--static struct resource nand_resources[] = {
+-static struct resource spi_resources[] = {
 -	[0] = {
--		.start	= NAND_BASE,
--		.end	= NAND_BASE + SZ_256M - 1,
+-		.start	= AT91SAM9RL_BASE_SPI,
+-		.end	= AT91SAM9RL_BASE_SPI + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91_BASE_SYS + AT91_ECC,
--		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+static struct at91_dev_table_nand device_nand __initdata = {
-+	.chip_select	= 3,
-+	.enable_reg	= AT91_MATRIX_EBICSA,
-+	.enable		= AT91_MATRIX_CS3A_SMC_SMARTMEDIA,
-+	.ecc_mmio_base	= AT91_BASE_SYS + AT91_ECC,
- };
- 
--static struct platform_device atmel_nand_device = {
--	.name		= "atmel_nand",
--	.id		= -1,
--	.dev		= {
--				.platform_data	= &nand_data,
+-		.start	= AT91SAM9RL_ID_SPI,
+-		.end	= AT91SAM9RL_ID_SPI,
+-		.flags	= IORESOURCE_IRQ,
 -	},
--	.resource	= nand_resources,
--	.num_resources	= ARRAY_SIZE(nand_resources),
 -};
 -
--void __init at91_add_device_nand(struct atmel_nand_data *data)
+-static struct platform_device at91sam9rl_spi_device = {
+-	.name		= "atmel_spi",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &spi_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
++static struct at91_dev_table_spi device_spi __initdata = {
++	.mmio_base		= AT91SAM9RL_BASE_SPI,
++	.irq			= AT91SAM9RL_ID_SPI,
++	.standard_cs_pins	= {
++		AT91_PIN_PA28, AT91_PIN_PB7, AT91_PIN_PD8, AT91_PIN_PD9,
+ 	},
+-	.resource	= spi_resources,
+-	.num_resources	= ARRAY_SIZE(spi_resources),
++	.pin_miso		= {AT91_PIN_PA25, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_mosi		= {AT91_PIN_PA26, AT91_PIN_PERIPH_A, 0, 0, 0},
++	.pin_spck		= {AT91_PIN_PA27, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-static const unsigned spi_standard_cs[4] = { AT91_PIN_PA28, AT91_PIN_PB7, AT91_PIN_PD8, AT91_PIN_PD9 };
+-
+-
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
 -{
--	unsigned long csa;
+-	int i;
+-	unsigned long cs_pin;
 -
--	if (!data)
--		return;
+-	at91_set_A_periph(AT91_PIN_PA25, 0);	/* MISO */
+-	at91_set_A_periph(AT91_PIN_PA26, 0);	/* MOSI */
+-	at91_set_A_periph(AT91_PIN_PA27, 0);	/* SPCK */
 -
--	csa = at91_sys_read(AT91_MATRIX_EBICSA);
--	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+-	/* Enable SPI chip-selects */
+-	for (i = 0; i < nr_devices; i++) {
+-		if (devices[i].controller_data)
+-			cs_pin = (unsigned long) devices[i].controller_data;
+-		else
+-			cs_pin = spi_standard_cs[devices[i].chip_select];
 -
--	/* enable pin */
--	if (data->enable_pin)
--		at91_set_gpio_output(data->enable_pin, 1);
+-		/* enable chip-select pin */
+-		at91_set_gpio_output(cs_pin, 1);
 -
--	/* ready/busy pin */
--	if (data->rdy_pin)
--		at91_set_gpio_input(data->rdy_pin, 1);
+-		/* pass chip-select pin to driver */
+-		devices[i].controller_data = (void *) cs_pin;
+-	}
 -
--	/* card detect pin */
--	if (data->det_pin)
--		at91_set_gpio_input(data->det_pin, 1);
--
--	at91_set_A_periph(AT91_PIN_PB4, 0);		/* NANDOE */
--	at91_set_A_periph(AT91_PIN_PB5, 0);		/* NANDWE */
--
--	nand_data = *data;
--	platform_device_register(&atmel_nand_device);
+-	spi_register_board_info(devices, nr_devices);
+-	platform_device_register(&at91sam9rl_spi_device);
 -}
--
 -#else
--void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+-void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  TWI (i2c)
+  *  AC97
   * -------------------------------------------------------------------- */
-@@ -1152,6 +1097,7 @@ void __init at91_add_device_serial(void) {}
- 
- static struct at91_device_table at91sam9rl_device_table __initdata = {
+@@ -1035,6 +985,7 @@ static struct at91_device_table at91sam9rl_device_table __initdata = {
  	.mmc[0]		= &device_mmc,
-+	.nand		= &device_nand,
+ 	.nand		= &device_nand,
+ 	.twi[0]		= &device_twi,
++	.spi[0]		= &device_spi,
  };
  
  void __init at91sam9rl_init_devices(void)
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 3d9708f..8c70529 100644
+index 93eb8bd..9914b6f 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -529,6 +529,82 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
- }
- #else
- void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data) {}
-+#endif 
-+
+@@ -729,6 +729,109 @@ void __init at91_add_device_i2c(short i2c_id,
+ 				int nr_devices) {}
+ #endif
+ 
 +/* --------------------------------------------------------------------
-+ *  NAND / SmartMedia
++ *  SPI
 + * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_MTD_NAND_ATMEL) || defined(CONFIG_MTD_NAND_ATMEL_MODULE)
-+static struct atmel_nand_data nand_data;
++#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
++static u64 spi_dmamask = DMA_BIT_MASK(32);
 +
-+static struct resource nand_resources[] = {
++static struct resource spi0_resources[] = {
 +	[0] = {
-+		.end	= SZ_256M,
++		.end	= SZ_16K,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		/* ECC resource, not all at91 variants have this */
-+		.end	= SZ_512,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
-+static struct platform_device at91_nand_device = {
-+	.name		= "atmel_nand",
-+	.id		= -1,
-+	.dev		= {
-+				.platform_data	= &nand_data,
++		.flags	= IORESOURCE_IRQ,
 +	},
-+	.resource	= nand_resources,
-+	/* We fill in num_resources in at91_add_device_nand */
 +};
 +
-+void __init at91_add_device_nand(struct atmel_nand_data *data)
-+{
-+	struct at91_dev_table_nand *info = devices->nand;
-+	unsigned long csa;
++static struct platform_device at91_spi0_device = {
++	.name		= "atmel_spi",
++	.id		= 0,
++	.dev		= {
++				.dma_mask		= &spi_dmamask,
++				.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++	.resource	= spi0_resources,
++	.num_resources	= ARRAY_SIZE(spi0_resources),
++};
 +
-+	BUG_ON(!info);
-+	init_resource_mem(&nand_resources[0],
-+			  (info->chip_select + 1) * 0x10000000);
-+	if (info->ecc_mmio_base) {
-+		init_resource_mem(&nand_resources[1], info->ecc_mmio_base);
-+		at91_nand_device.num_resources = 2;
-+	} else {
-+		at91_nand_device.num_resources = 1;
++static struct resource spi1_resources[] = {
++	[0] = {
++		.end	= SZ_16K,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device at91_spi1_device = {
++	.name		= "atmel_spi",
++	.id		= 1,
++	.dev		= {
++				.dma_mask		= &spi_dmamask,
++				.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++	.resource	= spi1_resources,
++	.num_resources	= ARRAY_SIZE(spi1_resources),
++};
++
++void __init at91_add_device_spi(struct spi_board_info *spi_devices,
++				int nr_devices)
++{
++	struct at91_dev_table_spi *info;
++	int i;
++	unsigned long cs_pin;
++	short enable_spi0 = 0;
++	short enable_spi1 = 0;
++
++	/* Choose SPI chip-selects */
++	for (i = 0; i < nr_devices; i++) {
++		info = devices->spi[spi_devices[i].bus_num];
++		BUG_ON(!info);
++
++		if (spi_devices[i].controller_data)
++			cs_pin = (unsigned long)spi_devices[i].controller_data;
++		else
++			cs_pin = info->standard_cs_pins[spi_devices[i].chip_select];
++
++		/* enable chip-select pin */
++		at91_set_gpio_output(cs_pin, 1);
++
++		/* pass chip-select pin to driver */
++		spi_devices[i].controller_data = (void *)cs_pin;
++
++		at91_config_pins(&info->pin_miso, 1);
++		at91_config_pins(&info->pin_mosi, 1);
++		at91_config_pins(&info->pin_spck, 1);
++
++		if (spi_devices[i].bus_num == 0) {
++			enable_spi0 = 1;
++			if (info->clk_asc)
++				at91_clock_associate(info->clk_asc,
++						     &at91_spi0_device.dev,
++						     "spi_clk");
++		} else {
++			enable_spi1 = 1;
++			if (info->clk_asc)
++				at91_clock_associate(info->clk_asc,
++						     &at91_spi1_device.dev,
++						     "spi_clk");
++		}
 +	}
 +
-+	if (!data)
-+		return;
-+
-+	/* enable the address range for the chip-select */
-+	csa = at91_sys_read(info->enable_reg);
-+	at91_sys_write(info->enable_reg, csa | info->enable);
-+
-+	if (info->flags_reg && info->flags)
-+		at91_sys_write(info->flags_reg, info->flags);
-+
-+	/* enable pin */
-+	if (data->enable_pin)
-+		at91_set_gpio_output(data->enable_pin, 1);
-+
-+	/* ready/busy pin */
-+	if (data->rdy_pin)
-+		at91_set_gpio_input(data->rdy_pin, 1);
-+
-+	/* card detect pin */
-+	if (data->det_pin)
-+		at91_set_gpio_input(data->det_pin, 1);
-+
-+	if (info->pins)
-+		at91_config_pins(info->pins, info->nr_pins);
-+
-+	nand_data = *data;
-+	platform_device_register(&at91_nand_device);
++	spi_register_board_info(spi_devices, nr_devices);
++	if (enable_spi0)
++		platform_device_register(&at91_spi0_device);
++	if (enable_spi1)
++		platform_device_register(&at91_spi1_device);
 +}
 +#else
-+void __init at91_add_device_nand(struct atmel_nand_data *data) {}
- #endif
- 
++void __init at91_add_device_spi(struct spi_board_info *spi_devices, int nr_devices) {}
++#endif
++
  void __init at91_init_devices(struct at91_device_table *device_table)
+ {
+ 	devices = device_table;
 diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index eab2f54..3e9ec54 100644
+index 9b99be2..ba85523 100644
 --- a/arch/arm/mach-at91/devices.h
 +++ b/arch/arm/mach-at91/devices.h
-@@ -62,12 +62,24 @@ struct at91_dev_table_mmc {
- 	struct at91_mmc_pins	slot[2];
+@@ -81,6 +81,16 @@ struct at91_dev_table_twi {
+ 	int			udelay;		/* For i2c-gpio */
  };
  
-+struct at91_dev_table_nand {
-+	unsigned		chip_select;
-+	unsigned		enable_reg;
-+	unsigned		enable;
-+	unsigned		ecc_mmio_base;
-+	unsigned		flags_reg;
-+	unsigned		flags;
-+	struct at91_pin_config	*pins;
-+	int			nr_pins;
++struct at91_dev_table_spi {
++	unsigned		mmio_base;
++	int			irq;
++	const char		*clk_asc;
++	int			standard_cs_pins[4];
++	struct at91_pin_config	pin_miso;
++	struct at91_pin_config	pin_mosi;
++	struct at91_pin_config	pin_spck;
 +};
 +
  struct at91_device_table {
  	struct at91_dev_table_ethernet		*ethernet;
  	struct at91_dev_table_usb_ohci		*usbh_ohci;
- 	struct at91_dev_table_basic_device	*usbh_ehci;
- 	struct at91_dev_table_basic_device	*udc;
+@@ -89,6 +99,7 @@ struct at91_device_table {
  	struct at91_dev_table_mmc		*mmc[2];
-+	struct at91_dev_table_nand		*nand;
+ 	struct at91_dev_table_nand		*nand;
+ 	struct at91_dev_table_twi		*twi[2];
++	struct at91_dev_table_spi		*spi[2];
  };
  
  extern void __init at91_init_devices(struct at91_device_table *device_table);
