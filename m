@@ -1,49 +1,60 @@
-From: trinabh@linux.vnet.ibm.com (Trinabh Gupta)
-Date: Thu, 21 Apr 2011 10:12:59 +0530
-Subject: [linux-pm] [RFC PATCH V3 1/4] cpuidle: Move dev->last_residency
-	update to driver	enter routine; remove dev->last_state
-In-Reply-To: <87pqog6dfw.fsf@ti.com>
-References: <20110420065445.332.13688.stgit@tringupt.in.ibm.com>
-	<20110420065523.332.58678.stgit@tringupt.in.ibm.com>
-	<87pqog6dfw.fsf@ti.com>
-Message-ID: <4DAFB5D3.1030804@linux.vnet.ibm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 21 Apr 2011 10:17:32 +0530
+Subject: [PATCH] OMAP4: clockdomain: Follow recommended enable sequence
+In-Reply-To: <alpine.DEB.2.00.1104201340450.5985@utopia.booyaka.com>
+References: <1299245123-23444-1-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1103081937100.15132@utopia.booyaka.com>
+	<4D775418.6050105@ti.com>
+	<alpine.DEB.2.00.1103100514210.15132@utopia.booyaka.com>
+	<alpine.DEB.2.00.1103100734490.15132@utopia.booyaka.com>
+	<4D7A22F6.5050806@ti.com>
+	<alpine.DEB.2.00.1104201340450.5985@utopia.booyaka.com>
+Message-ID: <4DAFB6E4.3080304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/20/2011 10:57 PM, Kevin Hilman wrote:
-> Trinabh Gupta<trinabh@linux.vnet.ibm.com>  writes:
+On 4/21/2011 1:12 AM, Paul Walmsley wrote:
 >
->> Cpuidle subsystem only suggests the state to enter and does not
->> guarantee if the suggested state is entered. The actual entered state
->> may be different because of software or hardware demotion. Software
->> demotion is done by the back-end cpuidle driver and can be accounted
->> correctly. Current cpuidle code uses last_state field to capture the
->> actual state entered and based on that updates the statistics for the
->> state entered.
->>
->> Ideally the driver enter routine should update the counters,
->> and it should return the state actually entered rather than the time
->> spent there.
+> Hi Rajendra, Santosh,
 >
-> OK, the return type was changed to return the state index instead of the
-> time, but since the governors are still relying on dev->last_residency,
-> drivers are required to update it.
+> just FYI I just observed this happening without the clockdomain patch, and
+> tracked this down.  It seems that there is an intermittent
+> problem with the OMAP L3 bus code.  On the 35xx BeagleBoard here, it
+> occasionally hangs after powerup:
 >
-> Because of that, why not keep the update of the  time/usage counters
-> in common code rather than duplicating it (9 times in this patch) into
-> all the drivers?
-
-Hi Kevin,
-
-Thanks for your review. Yes, we can do like this and it would prevent
-duplication of code. I just wanted to make cpuidle handle only selection
-and entering of state, and leave everything else to the driver which
-knows best about these things.
-
-But both are functionally same and definitely statistics update inside
-cpuidle_idle_call() prevents duplication of code.
-
-Thanks,
--Trinabh
+> [    0.810119] OMAP GPIO hardware version 2.5
+> [    0.815368] OMAP GPIO hardware version 2.5
+> [    0.820465] OMAP GPIO hardware version 2.5
+> [    0.825531] OMAP GPIO hardware version 2.5
+> [    0.830657] OMAP GPIO hardware version 2.5
+> [    0.835784] OMAP GPIO hardware version 2.5
+> [    0.840881] initcall omap_gpio_drv_reg+0x0/0xc returned 0 after 38146
+> usecs
+> [    0.848358] calling  bdi_class_init+0x0/0x50 @ 1
+> [    0.854003] initcall bdi_class_init+0x0/0x50 returned 0 after 0 usecs
+> [    0.860870] calling  kobject_uevent_init+0x0/0x20 @ 1
+> [    0.866363] initcall kobject_uevent_init+0x0/0x20 returned 0 after 0
+> usecs
+> [    0.873626] calling  gpiolib_sysfs_init+0x0/0x98 @ 1
+> [    0.885894] initcall gpiolib_sysfs_init+0x0/0x98 returned 0 after 0
+> usecs
+> [    0.893157] calling  lcd_class_init+0x0/0x58 @ 1
+> [    0.898742] initcall lcd_class_init+0x0/0x58 returned 0 after 0 usecs
+> [    0.905731] calling  backlight_class_init+0x0/0x70 @ 1
+> [    0.911834] initcall backlight_class_init+0x0/0x70 returned 0 after 0
+> usecs
+> [    0.919219] calling  tty_class_init+0x0/0x3c @ 1
+> [    0.924743] initcall tty_class_init+0x0/0x3c returned 0 after 0 usecs
+> [    0.931610] calling  vtconsole_class_init+0x0/0xe4 @ 1
+> [    0.938812] initcall vtconsole_class_init+0x0/0xe4 returned 0 after
+> 7629 usecs
+> [    0.946472] calling  wakeup_sources_debugfs_init+0x0/0x3c @ 1
+> [    0.952606] initcall wakeup_sources_debugfs_init+0x0/0x3c returned 0
+> after 0 usecs
+> [    0.960571] calling  spi_init+0x0/0x88 @ 1
+> [    0.966247] initcall spi_init+0x0/0x88 returned 0 after 0 usecs
+> [    0.972564] calling  i2c_init+0x0/0x70 @ 1
+> [    0.978485] initcall i2c_init+0x0/0x70 returned 0 after 0 usecs
+> [    0.984832] calling  omap3_l3_init+0x0/0x14 @ 1
+>
+Will have a look at it
