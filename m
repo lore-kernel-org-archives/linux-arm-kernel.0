@@ -1,45 +1,42 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 21 Apr 2011 16:21:24 -0500
-Subject: [PATCH v2 20/23] at91: Make high speed USB gadget device common
-In-Reply-To: <1303364535-11557-21-git-send-email-ryan@bluewatersys.com>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-21-git-send-email-ryan@bluewatersys.com>
-Message-ID: <0D753D10438DA54287A00B027084269764D243016B@AUSP01VMBX24.collaborationhost.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 21 Apr 2011 17:26:25 -0400 (EDT)
+Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel
+	end
+In-Reply-To: <alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110420072156.GA28679@atomide.com>
+	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1104211711240.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
->
-> Replace the individual high-speed UDC code for each at91 variant with
-> a single implementation in devices.c
->
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> ---
->  arch/arm/mach-at91/at91cap9_devices.c    |  114 ++++++------------------------
->  arch/arm/mach-at91/at91sam9g45_devices.c |   94 ++++---------------------
->  arch/arm/mach-at91/at91sam9rl_devices.c  |  100 ++++----------------------
->  arch/arm/mach-at91/devices.c             |   79 +++++++++++++++++++++
->  arch/arm/mach-at91/devices.h             |   20 +++++
->  5 files changed, 150 insertions(+), 257 deletions(-)
+On Thu, 21 Apr 2011, Nicolas Pitre wrote:
 
-Thanks for sending part 12/23 of the series.
+> On Thu, 21 Apr 2011, Tony Lindgren wrote:
+> 
+> > Otherwise we end up overwriting ourselves. This fixes booting
+> > on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
+> > (ARM: 6750/1: improvements to compressed/head.S).
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> I don't understand why this is needed.  The copy loop is explicitly 
+> copying from the end going backward exactly to cope with this 
+> possibility.
 
-I tried applying all of the patches to linux-next and got this on part 20/23:
+I think your patch is 1) unneeded (see the copy loop code and the 
+comment before it), and 2) simply hiding the real bug.
 
-patching file arch/arm/mach-at91/at91cap9_devices.c
-Hunk #1 FAILED at 51.
-1 out of 2 hunks FAILED -- saving rejects to file arch/arm/mach-at91/at91cap9_devices.c.rej
-patching file arch/arm/mach-at91/at91sam9g45_devices.c
-Hunk #1 FAILED at 66.
-1 out of 2 hunks FAILED -- saving rejects to file arch/arm/mach-at91/at91sam9g45_devices.c.rej
-patching file arch/arm/mach-at91/at91sam9rl_devices.c
-Hunk #1 FAILED at 40.
-1 out of 2 hunks FAILED -- saving rejects to file arch/arm/mach-at91/at91sam9rl_devices.c.rej
-patching file arch/arm/mach-at91/devices.c
-patching file arch/arm/mach-at91/devices.h
+I just need to modify the code in compressed/misc.c slightly for the 
+lzma decompressor to start or stop working randomly.  It seems that this 
+code might be sensitive to slight displacement in memory caused by 
+modifications to totally unrelated code.  I'm still trying to track this 
+down.
 
 
-What kernel should this apply to?
-
-Thanks,
-Hartley
+Nicolas
