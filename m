@@ -1,49 +1,33 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Thu, 21 Apr 2011 13:09:30 -0700
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104212129.17013.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>
-Message-ID: <20110421130930.4be9e9e1@jbarnes-desktop>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 22 Apr 2011 08:12:53 +1200
+Subject: [PATCH v2 23/23] at91: Remove mAgic and ISI device code
+In-Reply-To: <0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
+References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
+	<1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
+	<0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4DB08FC5.2@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2011 21:29:16 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> I think the recent discussions on linaro-mm-sig and the BoF last week
-> at ELC have been quite productive, and at least my understanding
-> of the missing pieces has improved quite a bit. This is a list of
-> things that I think need to be done in the kernel. Please complain
-> if any of these still seem controversial:
+On 22/04/11 05:33, H Hartley Sweeten wrote:
+> On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
+>>
+>> The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
+>> have drivers yet and therefore the platform code in arch/arm/mach-at91
+>> is unused and can be removed.
 > 
-> 1. Fix the arm version of dma_alloc_coherent. It's in use today and
->    is broken on modern CPUs because it results in both cached and
->    uncached mappings. Rebecca suggested different approaches how to
->    get there.
+> Is anyone planning on adding these drivers?
 > 
-> 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
->    that this is needed, and it currently is not implemented, with
->    an outdated comment explaining why it used to not be possible
->    to do it.
-> 
-> 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
->    both IOMMU and direct mapped DMA on some machines.
+> I wonder if it makes sense to add the infrastructure to devices.[ch] and
+> convert the users even it the drivers are not in mainline yet?
 
-I don't think the DMA mapping and allocation APIs are sufficient for
-high performance graphics at least.  It's fairly common to allocate a
-bunch of buffers necessary to render a scene, build up a command buffer
-that references them, then hand the whole thing off to the kernel to
-execute at once on the GPU.  That allows for a lot of extra efficiency,
-since it allows you to batch the MMU binding until execution occurs (or
-even put it off entirely until the page is referenced by the GPU in the
-case of faulting support).  It's also necessary to avoid livelocks
-between two clients trying to render; if mapping is incremental on both
-sides, it's possible that neither will be able to make forward
-progress due to IOMMU space exhaustion.
+I removed them because there is currently a push to reduce the size of
+the ARM tree. The ISI code has been there since 2008 and the mAgic
+device code since 2009 without drivers. The ISI device at least is
+supported on more than one variant, but only had code present for the
+AT91SAM9263.
 
-So that argues for separating allocation from mapping both on the user
-side (which I think everyone agrees on) as well as on the kernel side,
-both for CPU access (which some drivers won't need) and for GPU access.
+I think it is better to remove them now, and then if/when drivers get
+added the support code can be added to the common framework.
 
--- 
-Jesse Barnes, Intel Open Source Technology Center
+~Ryan
