@@ -1,29 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 21 Apr 2011 14:29:25 +0800
-Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTimzk89VC1Vti4CZ60TTJ20e2YpwNg@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
-	<20110417164830.GE17935@S2100-06.ap.freescale.net>
-	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
-	<20110420140120.GF1965@S2100-06.ap.freescale.net>
-	<BANLkTimzk89VC1Vti4CZ60TTJ20e2YpwNg@mail.gmail.com>
-Message-ID: <20110421062924.GB4024@S2100-06.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Apr 2011 08:48:31 +0200
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <E0A55C1E-9DA0-4FFE-90EE-575BB1E649CB@niasdigital.com>
+References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
+	<3F5641E3-C443-4541-9FDA-24D215597C1F@niasdigital.com>
+	<20110418091902.13345132@lxorguk.ukuu.org.uk>
+	<92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+	<BANLkTi=W7jaVtW1FThvG_ca57q+yDz1kzQ@mail.gmail.com>
+	<E0A55C1E-9DA0-4FFE-90EE-575BB1E649CB@niasdigital.com>
+Message-ID: <BANLkTin_e1Kkn=KGvnqCHvnJVZczRwdnVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 05:30:22PM +0200, Per Forlin wrote:
-[...]
-> Remove dma_map and dma_unmap from your host driver and run the tests
-> (obviously nonblocking and blocking will have the same results). If
-> there is still no performance gain the cache penalty is very small on
-> your platform and therefore nonblocking doesn't improve things much.
-> Please let me know the result.
-> 
-Sorry, I could not understand.  What's the point to run the test when
-the driver is even broken.  The removal of  dma_map_sg and
-dma_unmap_sg makes mxs-mmc host driver broken.
+2011/4/21 Ben Nizette <bn@niasdigital.com>:
 
--- 
-Regards,
-Shawn
+>> This patch is about biasing and drive modes. We need to alter
+>> these at runtime (from board code, indeed) due to the fact that
+>> when you go to sleep e.g. floating a pin yeilds better power
+>> characteristics.
+>
+> This is actually an interesting case because floating pins yeild
+> /worse/ power characteristics (each transistor of the push-pull
+> is on a little bit and you get a path straight through) [1]. ?To
+> get good power performance you want to pull an input pin high or
+> low but which of those two directions depends on external
+> constraints, i.e. the board.
+
+Yeah, mea culpa, I twisted it around in my head. I mean the
+reverse. So this is why there are GPIO_CONFIG_BIAS_HIGH
+and GPIO_CONFIG_BIAS_GROUND in the predefined pin
+bias states.
+
+(I do get it, don't worry, I was in electroscience before I
+turned computer science actually...)
+
+> ?This is a case where the driver
+> should /not/ go playing with things it can't fully understand.
+>
+> Perhaps one of the properties that a board can set in a gpio chip
+> driver is the suspend state and have suspend/resume hooks in the
+> gpio chip take care of setting things up on each side.
+
+Yes, the API is not only for drivers, it's for boards alright.
+
+Pushing it to drivers/gpio give us two advantages:
+
+1. Depopulate the overpopulated arch/arm/* etc trees
+2. Give an overview so the GPIO maintainer and others can
+  think about consolidations
+3. Clear cut drivers that can have runtime PM hooks etc...
+
+Linus Walleij
