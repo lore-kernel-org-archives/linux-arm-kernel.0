@@ -1,32 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 21 Apr 2011 09:22:07 -0400 (EDT)
-Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel
-	end
-In-Reply-To: <20110421104954.GH13688@atomide.com>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-	<20110421055945.GB13688@atomide.com>
-	<20110421104954.GH13688@atomide.com>
-Message-ID: <alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+From: shweta.gulati@ti.com (Gulati, Shweta)
+Date: Thu, 21 Apr 2011 18:57:26 +0530
+Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB033D7EB768@dbde02.ent.ti.com>
+References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB033D7EB768@dbde02.ent.ti.com>
+Message-ID: <BANLkTin4jETyDMDAE70M7rook=D4cW_mqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2011, Tony Lindgren wrote:
+Hi,
 
-> Otherwise we end up overwriting ourselves. This fixes booting
-> on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
-> (ARM: 6750/1: improvements to compressed/head.S).
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Wed, Apr 20, 2011 at 7:05 PM, Janorkar, Mayuresh <mayur@ti.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of Gulati, Shweta
+>> Sent: Wednesday, April 20, 2011 2:55 PM
+>> To: linux-omap at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org; Gulati, Shweta; Nayak, Rajendra;
+>> Paul Wamsley
+>> Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+>>
+>> From: Gulati, Shweta <shweta.gulati@ti.com>
+>>
+>> Core Clk Tree shows incorrect Clk rates at OPP50, as
+>> in commit e07f469d284ca3d1f5dcf5438c22982be98bc071
+>> calling of 'recalc' in API clk_set_rate is unintentionally
+>> removed, because of which clock's tree rates get goofed
+>> up when DVFS happens. This Patch adds recalc API back.
+>
+> I see that the patch is not adding API back.
+> It is adding a call to the API.
+Will Modify Commit message.
+>>
+>> Tested on OMAP3630 SDP Board.
+>>
+>> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Paul Wamsley <paul@pwsan.com>
+>> ---
+>> ?arch/arm/plat-omap/clock.c | ? ?5 ++++-
+>> ?1 files changed, 4 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+>> index c9122dd..5a0d06b 100644
+>> --- a/arch/arm/plat-omap/clock.c
+>> +++ b/arch/arm/plat-omap/clock.c
+>> @@ -130,8 +130,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>>
+>> ? ? ? spin_lock_irqsave(&clockfw_lock, flags);
+>> ? ? ? ret = arch_clock->clk_set_rate(clk, rate);
+>> - ? ? if (ret == 0)
+>> + ? ? if (ret == 0) {
+>
+> checking if (!ret) is an intelligent way.
+> But it is an individual's choice.
+It doesn't make much difference.
+>> + ? ? ? ? ? ? if (clk->recalc)
+>> + ? ? ? ? ? ? ? ? ? ? clk->rate = clk->recalc(clk);
+>> ? ? ? ? ? ? ? propagate_rate(clk);
+>> + ? ? }
+>> ? ? ? spin_unlock_irqrestore(&clockfw_lock, flags);
+>>
+>> ? ? ? return ret;
+>> --
+>> 1.7.0.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-I don't understand why this is needed.  The copy loop is explicitly 
-copying from the end going backward exactly to cope with this 
-possibility.
-
-Hmmm...
 
 
-Nicolas
+-- 
+Thanks,
+Regards,
+Shweta
