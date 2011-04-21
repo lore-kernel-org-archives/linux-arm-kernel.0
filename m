@@ -1,48 +1,44 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
-Date: Thu, 21 Apr 2011 10:44:07 +0200
-Subject: [RFC PATCH 06/12] ARM: ux500: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <1303326501-15664-7-git-send-email-marc.zyngier@arm.com>
-References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <C832F8F5D375BD43BFA11E82E0FE9FE00AEE891699@EXDCVYMBSTM005.EQ1STM.local>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Thu, 21 Apr 2011 10:46:18 +0200
+Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
+In-Reply-To: <20110421062924.GB4024@S2100-06.ap.freescale.net>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
+	<20110417164830.GE17935@S2100-06.ap.freescale.net>
+	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
+	<20110420140120.GF1965@S2100-06.ap.freescale.net>
+	<BANLkTimzk89VC1Vti4CZ60TTJ20e2YpwNg@mail.gmail.com>
+	<20110421062924.GB4024@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTimq8_R-CJmryTvRWHZ+-2vqj-Y6cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, April 21, 2011 12:38 AM
-> To: LAK
-> Cc: Srinidhi KASAGAR; Linus WALLEIJ
-> Subject: [RFC PATCH 06/12] ARM: ux500: use remapped PPI interrupts for
-> local timer
-> 
-> Use the normal interrupt scheme for the local timers by using
-> a remapped PPI interrupt.
-> 
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-ux500/Kconfig      |    1 +
->  arch/arm/mach-ux500/localtimer.c |    3 ++-
->  2 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-> index 5862601..6f3eb99 100644
-> --- a/arch/arm/mach-ux500/Kconfig
-> +++ b/arch/arm/mach-ux500/Kconfig
-> @@ -4,6 +4,7 @@ config UX500_SOC_COMMON
->  	bool
->  	default y
->  	select ARM_GIC
-> +	select ARM_GIC_VPPI
+On 21 April 2011 08:29, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Wed, Apr 20, 2011 at 05:30:22PM +0200, Per Forlin wrote:
+> [...]
+>> Remove dma_map and dma_unmap from your host driver and run the tests
+>> (obviously nonblocking and blocking will have the same results). If
+>> there is still no performance gain the cache penalty is very small on
+>> your platform and therefore nonblocking doesn't improve things much.
+>> Please let me know the result.
+>>
+> Sorry, I could not understand. ?What's the point to run the test when
+> the driver is even broken. ?The removal of ?dma_map_sg and
+> dma_unmap_sg makes mxs-mmc host driver broken.
+The point is only to get a measurement of the cost of handling
+dma_map_sg and dma_unmap_sg, this is the maximum time mmc nonblocking
+can save.
+The nonblocking mmc_test should save the total time of dma_map_sg and
+dma_unmap_sg, if the pre_req and post_req hooks are implemented
+correctly.
+Running without dma_map_sg and dma_unmap_sg will confirm if the
+pre_req and post_req hooks are implemented correctly.
 
-Here you added VPPI and in the other patch 12/12 you remove this
-again and make it one time selectable based on CONFIG_SMP.
-is that done just for readability purpose?
-
-Otherwise, for mach-ux500:
-Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-
-srinidhi
+>
+> --
+> Regards,
+> Shawn
+>
+>
+Regards,
+Per
