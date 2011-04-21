@@ -1,205 +1,205 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 21 Apr 2011 17:42:11 +1200
-Subject: [PATCH v2 19/23] at91: Make RTC device common
+Date: Thu, 21 Apr 2011 17:42:15 +1200
+Subject: [PATCH v2 23/23] at91: Remove mAgic and ISI device code
 In-Reply-To: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
 References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303364535-11557-20-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC device code for the AT91RM9200, AT91SAM9G45 and AT91SAM9RL are
-all exactly the same. Remove the individual implementations and
-replace them with a single version in devices.c
+The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
+have drivers yet and therefore the platform code in arch/arm/mach-at91
+is unused and can be removed.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91rm9200_devices.c  |   33 -----------------------------
- arch/arm/mach-at91/at91sam9g45_devices.c |   33 -----------------------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   34 ------------------------------
- arch/arm/mach-at91/devices.c             |   20 +++++++++++++++++
- 4 files changed, 20 insertions(+), 100 deletions(-)
+ arch/arm/mach-at91/at572d940hf_devices.c  |   73 -----------------------------
+ arch/arm/mach-at91/at91sam9263_devices.c  |   50 --------------------
+ arch/arm/mach-at91/board-at572d940hf_ek.c |    2 -
+ arch/arm/mach-at91/include/mach/board.h   |    6 --
+ 4 files changed, 0 insertions(+), 131 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 9f678de..f251ed1 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -277,25 +277,6 @@ static struct at91_dev_table_tcb device_tcb1 __initdata = {
+diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
+index 9910fc8..26aa567 100644
+--- a/arch/arm/mach-at91/at572d940hf_devices.c
++++ b/arch/arm/mach-at91/at572d940hf_devices.c
+@@ -250,79 +250,6 @@ static struct at91_dev_table_uart device_uart2 __initdata = {
+ 	.cts_pin	= {AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
+ 
+-/* --------------------------------------------------------------------
+- *  mAgic
+- * -------------------------------------------------------------------- */
+-
+-#ifdef CONFIG_MAGICV
+-static struct resource mAgic_resources[] = {
+-	{
+-		.start = AT91_MAGIC_PM_BASE,
+-		.end   = AT91_MAGIC_PM_BASE + AT91_MAGIC_PM_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_I_BASE,
+-		.end   = AT91_MAGIC_DM_I_BASE + AT91_MAGIC_DM_I_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_F_BASE,
+-		.end   = AT91_MAGIC_DM_F_BASE + AT91_MAGIC_DM_F_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_DB_BASE,
+-		.end   = AT91_MAGIC_DM_DB_BASE + AT91_MAGIC_DM_DB_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_REGS_BASE,
+-		.end   = AT91_MAGIC_REGS_BASE + AT91_MAGIC_REGS_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_EXTPAGE_BASE,
+-		.end   = AT91_MAGIC_EXTPAGE_BASE + AT91_MAGIC_EXTPAGE_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MSIRQ0,
+-		.end    = AT572D940HF_ID_MSIRQ0,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MHALT,
+-		.end    = AT572D940HF_ID_MHALT,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MEXC,
+-		.end    = AT572D940HF_ID_MEXC,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MEDMA,
+-		.end    = AT572D940HF_ID_MEDMA,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device mAgic_device = {
+-	.name           = "mAgic",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(mAgic_resources),
+-	.resource       = mAgic_resources,
+-};
+-
+-void __init at91_add_device_mAgic(void)
+-{
+-	platform_device_register(&mAgic_device);
+-}
+-#else
+-void __init at91_add_device_mAgic(void) {}
+-#endif
+-
+ static struct at91_device_table at572d940hf_device_table __initdata = {
+ 	.ethernet	= &device_eth,
+ 	.usbh_ohci	= &device_usbh_ohci,
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index b06246c..4bb42ae 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -309,56 +309,6 @@ static struct at91_dev_table_lcdc device_lcdc __initdata = {
  };
  
  /* --------------------------------------------------------------------
-- *  RTC
+- *  Image Sensor Interface
 - * -------------------------------------------------------------------- */
 -
--#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
--static struct platform_device at91rm9200_rtc_device = {
--	.name		= "at91_rtc",
--	.id		= -1,
--	.num_resources	= 0,
+-#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
+-
+-struct resource isi_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9263_BASE_ISI,
+-		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9263_ID_ISI,
+-		.end	= AT91SAM9263_ID_ISI,
+-		.flags	= IORESOURCE_IRQ,
+-	},
 -};
 -
--static void __init at91_add_device_rtc(void)
--{
--	platform_device_register(&at91rm9200_rtc_device);
--}
--#else
--static void __init at91_add_device_rtc(void) {}
--#endif
--
--/* --------------------------------------------------------------------
-  *  SSC -- Synchronous Serial Controller
-  * -------------------------------------------------------------------- */
- 
-@@ -444,17 +425,3 @@ void __init at91rm9200_init_devices(void)
- {
- 	at91_init_devices(&at91rm9200_device_table);
- }
--
--/* -------------------------------------------------------------------- */
--
--/*
-- * These devices are always present and don't need any board-specific
-- * setup.
-- */
--static int __init at91_add_standard_devices(void)
--{
--	at91_add_device_rtc();
--	return 0;
--}
--
--arch_initcall(at91_add_standard_devices);
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index f67a675..3627c2e 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -377,26 +377,6 @@ static struct at91_dev_table_tcb device_tcb1 __initdata = {
- };
- 
- /* --------------------------------------------------------------------
-- *  RTC
-- * -------------------------------------------------------------------- */
--
--#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
--static struct platform_device at91sam9g45_rtc_device = {
--	.name		= "at91_rtc",
+-static struct platform_device at91sam9263_isi_device = {
+-	.name		= "at91_isi",
 -	.id		= -1,
--	.num_resources	= 0,
+-	.resource	= isi_resources,
+-	.num_resources	= ARRAY_SIZE(isi_resources),
 -};
 -
--static void __init at91_add_device_rtc(void)
+-void __init at91_add_device_isi(void)
 -{
--	platform_device_register(&at91sam9g45_rtc_device);
+-	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
+-	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
+-	at91_set_A_periph(AT91_PIN_PE2, 0);	/* ISI_D2 */
+-	at91_set_A_periph(AT91_PIN_PE3, 0);	/* ISI_D3 */
+-	at91_set_A_periph(AT91_PIN_PE4, 0);	/* ISI_D4 */
+-	at91_set_A_periph(AT91_PIN_PE5, 0);	/* ISI_D5 */
+-	at91_set_A_periph(AT91_PIN_PE6, 0);	/* ISI_D6 */
+-	at91_set_A_periph(AT91_PIN_PE7, 0);	/* ISI_D7 */
+-	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
+-	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
+-	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
+-	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
+-	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
+-	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
+-	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
+-	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
 -}
 -#else
--static void __init at91_add_device_rtc(void) {}
+-void __init at91_add_device_isi(void) {}
 -#endif
 -
 -
 -/* --------------------------------------------------------------------
-  *  Touchscreen
+  *  Timer/Counter block
   * -------------------------------------------------------------------- */
  
-@@ -569,16 +549,3 @@ void __init at91sam9g45_init_devices(void)
- {
- 	at91_init_devices(&at91sam9g45_device_table);
+diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+index d768cdb..5ee7f6a 100644
+--- a/arch/arm/mach-at91/board-at572d940hf_ek.c
++++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+@@ -312,8 +312,6 @@ static void __init eb_board_init(void)
+ 	at91_add_device_mmc(0, &eb_mmc_data);
+ 	/* Ethernet */
+ 	at91_add_device_eth(&eb_eth_data);
+-	/* mAgic */
+-	at91_add_device_mAgic();
  }
--
--/* -------------------------------------------------------------------- */
--/*
-- * These devices are always present and don't need any board-specific
-- * setup.
-- */
--static int __init at91_add_standard_devices(void)
--{
--	at91_add_device_rtc();
--	return 0;
--}
--
--arch_initcall(at91_add_standard_devices);
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 3dac87f..2aa465b 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -271,26 +271,6 @@ static struct at91_dev_table_tsadcc device_tsadcc __initdata = {
- };
  
- /* --------------------------------------------------------------------
-- *  RTC
-- * -------------------------------------------------------------------- */
--
--#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
--static struct platform_device at91sam9rl_rtc_device = {
--	.name		= "at91_rtc",
--	.id		= -1,
--	.num_resources	= 0,
--};
--
--static void __init at91_add_device_rtc(void)
--{
--	platform_device_register(&at91sam9rl_rtc_device);
--}
--#else
--static void __init at91_add_device_rtc(void) {}
--#endif
--
--
--/* --------------------------------------------------------------------
-  *  RTT
-  * -------------------------------------------------------------------- */
+ MACHINE_START(AT572D940HFEB, "Atmel AT91D940HF-EB")
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 851c6c2..cee6419 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -186,9 +186,6 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
+  /* AC97 */
+ extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
  
-@@ -445,17 +425,3 @@ void __init at91sam9rl_init_devices(void)
- {
- 	at91_init_devices(&at91sam9rl_device_table);
- }
+- /* ISI */
+-extern void __init at91_add_device_isi(void);
 -
--/* -------------------------------------------------------------------- */
--
--/*
-- * These devices are always present and don't need any board-specific
-- * setup.
-- */
--static int __init at91_add_standard_devices(void)
--{
--	at91_add_device_rtc();
--	return 0;
--}
--
--arch_initcall(at91_add_standard_devices);
-diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 19bb082..e3c9661 100644
---- a/arch/arm/mach-at91/devices.c
-+++ b/arch/arm/mach-at91/devices.c
-@@ -1748,12 +1748,32 @@ void __init at91_add_device_hdmac(void)
- void __init at91_add_device_hdmac(void) {}
- #endif
+  /* Touchscreen Controller */
+ struct at91_tsadcc_data {
+ 	unsigned int    adc_clock;
+@@ -208,9 +205,6 @@ extern void __init at91_init_leds(u8 cpu_led, u8 timer_led);
+ extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
+ extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
  
-+/* --------------------------------------------------------------------
-+ *  RTC
-+ * -------------------------------------------------------------------- */
-+
-+#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
-+static struct platform_device at91_rtc_device = {
-+	.name		= "at91_rtc",
-+	.id		= -1,
-+	.num_resources	= 0,
-+};
-+
-+static void __init at91_add_device_rtc(void)
-+{
-+	platform_device_register(&at91_rtc_device);
-+}
-+#else
-+static void __init at91_add_device_rtc(void) {}
-+#endif
-+
- static int __init at91_add_standard_devices(void)
- {
- 	at91_add_device_tc();
- 	at91_add_device_rtt();
- 	at91_add_device_watchdog();
- 	at91_add_device_hdmac();
-+	at91_add_device_rtc();
- 	return 0;
- }
+- /* AT572D940HF DSP */
+-extern void __init at91_add_device_mAgic(void);
+-
+ /* FIXME: this needs a better location, but gets stuff building again */
+ extern int at91_suspend_entering_slow_clock(void);
  
 -- 
 1.7.0.4
