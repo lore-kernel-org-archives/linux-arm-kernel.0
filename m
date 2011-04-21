@@ -1,58 +1,59 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 20 Apr 2011 16:59:16 -0700
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <20110419062633.GA15620@atomide.com> (Tony Lindgren's message of
-	"Tue, 19 Apr 2011 09:26:33 +0300")
-References: <1303139217-10285-1-git-send-email-charu@ti.com>
-	<20110419062633.GA15620@atomide.com>
-Message-ID: <87r58w4gq3.fsf@ti.com>
+Date: Wed, 20 Apr 2011 17:25:31 -0700
+Subject: [PATCH] OMAP2+: powerdomain: fix typo: lose context --> loose context
+Message-ID: <1303345531-8435-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Before we get any users of this function, fix the name (and comments)
+to use loose instead of lose.
 
-Tony Lindgren <tony@atomide.com> writes:
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies to v2.6.39-rc4
 
-> * Varadarajan, Charulatha <charu@ti.com> [110418 18:00]:
->> From: Charulatha V <charu@ti.com>
->> 
->> Use PM runtime framework in OMAP GPIO driver.
-> ...
->  
->>  arch/arm/mach-omap2/gpio.c             |    6 +
->>  arch/arm/mach-omap2/pm34xx.c           |   22 +-
->>  arch/arm/plat-omap/gpio.c              |  766 ++++++++++++++++++--------------
->>  arch/arm/plat-omap/include/plat/gpio.h |    3 +-
->>  4 files changed, 439 insertions(+), 358 deletions(-)
->
-> Before this series gets merged we first need to do the following:
-> - Pass some registers in platform_data so we can have common
->   functions in gpio.c instead of having to test for the bank->method
->   in each function. This allows getting rid of the ifdefs as
->   discussed in the ARM Linux consolidation thread.
+ arch/arm/mach-omap2/powerdomain.c |    6 +++---
+ arch/arm/mach-omap2/powerdomain.h |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-I have a series that starts this process, will post it shortly.
-
-> - Move it to drivers/gpio
->
-> - Further consolidate with whatever common GPIO code might
->   be coming up.
-
-Is the above order required?
-
-IMO, before we move it to drivers/gpio, this code needs to be runtime PM
-converted (using this series from Charu.)  The runtime PM conversion
-removes a bunch of platform-specific hacks that should be moved into
-drivers/*.
-
-Personally, I think we should go in this order
-
-- runtime PM conversion
-- #ifdef cleanup
-- move to drivers/gpio
-- look at consolidation with other drivers
-
-I'm willing to queue the GPIO work in my tree while it's under way if
-you like as well.
-
-Kevin
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 9af0847..ec3423f 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -960,18 +960,18 @@ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
+ }
+ 
+ /**
+- * pwrdm_can_ever_lose_context - can this powerdomain ever lose context?
++ * pwrdm_can_ever_loose_context - can this powerdomain ever loose context?
+  * @pwrdm: struct powerdomain *
+  *
+  * Given a struct powerdomain * @pwrdm, returns 1 if the powerdomain
+- * can lose either memory or logic context or if @pwrdm is invalid, or
++ * can loose either memory or logic context or if @pwrdm is invalid, or
+  * returns 0 otherwise.  This function is not concerned with how the
+  * powerdomain registers are programmed (i.e., to go off or not); it's
+  * concerned with whether it's ever possible for this powerdomain to
+  * go off while some other part of the chip is active.  This function
+  * assumes that every powerdomain can go to either ON or INACTIVE.
+  */
+-bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
++bool pwrdm_can_ever_loose_context(struct powerdomain *pwrdm)
+ {
+ 	int i;
+ 
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index d23d979..95d5b9e 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -208,7 +208,7 @@ int pwrdm_pre_transition(void);
+ int pwrdm_post_transition(void);
+ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
+ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
+-bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
++bool pwrdm_can_ever_loose_context(struct powerdomain *pwrdm);
+ 
+ extern void omap2xxx_powerdomains_init(void);
+ extern void omap3xxx_powerdomains_init(void);
+-- 
+1.7.4
