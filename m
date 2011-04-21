@@ -1,110 +1,34 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 21 Apr 2011 13:32:21 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <201104201807.27314.arnd@arndb.de>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104191629.49676.arnd@arndb.de>
-	<007301cbff6a$f17a4710$d46ed530$%szyprowski@samsung.com>
-	<201104201807.27314.arnd@arndb.de>
-Message-ID: <003001cc0017$c7fb3a40$57f1aec0$%szyprowski@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Apr 2011 04:39:16 -0700
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110421101340.GA16776@sirena.org.uk>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<20110421101340.GA16776@sirena.org.uk>
+Message-ID: <20110421113916.GI13688@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, April 20, 2011 6:07 PM Arnd Bergmann wrote:
-
-> On Wednesday 20 April 2011, Marek Szyprowski wrote:
-> > On Tuesday, April 19, 2011 4:30 PM Arnd Bergmann wrote:
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [110421 03:11]:
+> On Thu, Apr 21, 2011 at 09:22:59AM +0200, Uwe Kleine-K?nig wrote:
+> > On Wed, Apr 20, 2011 at 09:52:15PM +0200, Thomas Gleixner wrote:
 > 
-> > > Sounds good. I think we should put it into a new drivers/iommu, along
-> > > with your specific iommu implementation, and then we can convert the
-> > > existing ones over to use that.
-> >
-> > I see, this sounds quite reasonable. I think I finally got how this
-> should
-> > be implemented.
-> >
-> > The only question is how a device can allocate a buffer that will be most
-> > convenient for IOMMU mapping (i.e. will require least entries to map)?
-> >
-> > IOMMU can create a contiguous mapping for ANY set of pages, but it
-> performs
-> > much better if the pages are grouped into 64KiB or 1MiB areas.
-> >
-> > Can device allocate a buffer without mapping it into kernel space?
+> > >    - a field for the current clock rate
 > 
-> Not today as far as I know. You can register coherent memory per device
-> using dma_declare_coherent_memory(), which will be used to back
-> dma_alloc_coherent(), but I believe it is always mapped right now.
-
-This is not exactly what I meant.
-
-As we have IOMMU, the device driver can access any system memory. However
-the performance will be better if the buffer is composed of larger contiguous
-parts (like 64KiB or 1MiB). I would like to avoid putting logic that manages
-buffer allocation into the device drivers. It would be best if such buffers
-could be allocated by a single call to dma-mapping API.
-
-Right now there is dma_alloc_coherent() function, which is used by the
-drivers to allocate a contiguous block of memory and map it to DMA addresses.
-With IOMMU implementation it is quite easy to provide a replacement for it
-that will allocate some set of pages and map into device virtual address
-space as a contiguous buffer. 
-
-This will have the advantage that the same multimedia device driver
-will work on both systems - Samsung S5PC110 (without IOMMU) and Exynos4
-(with IOMMU).
-
-However dma_alloc_coherent() besides allocating memory also implies some
-particular type of memory mapping for it. IMHO it might be a good idea to
-separate these 2 things (allocation and mapping) somewhere in the future.
-
-On systems with IOMMU the dma_map_sg() can be also used to create a mapping
-in device virtual address space, but the driver will still need to allocate
-the memory by itself.
-
-(snipped)
-
-> > > > Getting back to our video codec - it has 2 IOMMU controllers. The
-> codec
-> > > > hardware is able to address only 256MiB of space. Do you have an idea
-> how
-> > > > this can be handled with dma-mapping API? The only idea that comes to
-> my
-> > > > mind is to provide a second, fake 'struct device' and use it for
-> > > allocations
-> > > > for the second IOMMU controller.
-> > >
-> > > Good question.
-> > >
-> > > How do you even decide which controller to use from the driver?
-> > > I would need to understand better what you are trying to do to
-> > > give a good recommendation.
-> >
-> > Both controllers are used by the hardware depending on the buffer type.
-> > For example, buffers with chroma video data are accessed by first (called
-> > 'left') memory channel, the others (with luma video data) - by the second
-> > channel (called 'right'). Each memory channel is limited to 256MiB
-> address
-> > space and best performance is achieved when buffers are allocated in
-> > separate physical memory banks (the boards usually have 2 or more memory
-> banks,
-> > memory is not interleaved).
+> > Then you need a mechanism to notify the children if the rate or parent
+> > of a clock changes. I assume you won't allow that for a clock that has
+> > more than one (enabled) consumer. Knowing only very few platforms I
+> > don't know if that is something you can forbid.
 > 
-> Ok, I see. Having one device per channel as you suggested could probably
-> work around this, and it's at least consistent with how you'd represent
-> IOMMUs in the device tree. It is not ideal because it makes the video
-> driver more complex when it now has to deal with multiple struct device
-> that it binds to, but I can't think of any nicer way either.
+> I suspect you need it - cpufreq style scaling of the core clocks (which
+> many SoCs can do) involves pretty much the entire clock tree, though
+> obviously the idea is that the effects get hidden at the edges.
 
-Well, this will definitely complicate the codec driver. I wonder if allowing
-the driver to kmalloc(sizeof(struct device))) and copy the relevant data
-from the 'proper' struct device will be better idea. It is still hack but 
-definitely less intrusive for the driver.
+That's correct, scaling of the whole clock tree is needed for
+cpufreq and DVFS. An example is scaling of the L3 bus on omaps.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Tony
