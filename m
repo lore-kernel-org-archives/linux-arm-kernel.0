@@ -1,40 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Apr 2011 16:18:31 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <003301cc002c$f67ba0c0$e372e240$%szyprowski@samsung.com>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104211400.13289.arnd@arndb.de>
-	<003301cc002c$f67ba0c0$e372e240$%szyprowski@samsung.com>
-Message-ID: <201104211618.31418.arnd@arndb.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Apr 2011 16:29:48 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110421103117.GB16776@sirena.org.uk>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110421103117.GB16776@sirena.org.uk>
+Message-ID: <alpine.LFD.2.02.1104211629160.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 April 2011, Marek Szyprowski wrote:
-> > No, I think that would be much worse, it definitely destroys all kinds of
-> > assumptions that the core code makes about devices. However, I don't think
-> > it's much of a problem to just create two child devices and use them
-> > from the main driver, you don't really need to create a device_driver
-> > to bind to each of them.
-> 
-> I must have missed something. Video codec is a platform device and struct
-> device pointer is gathered from it (&pdev->dev). How can I define child
-> devices and attach them to the platform device?
+On Thu, 21 Apr 2011, Mark Brown wrote:
+> That's not reliably the case, some systems have some of the clock tree
+> (esepcialy the core parts of the tree) controlled by a system management
+> unit which isn't memory mapped and it's common for I2C or SPI connected
+> chips to be involved to some extent too.  One advantage we should be
+> able to get from this framework is that it will be much easier to have
+> standard drivers for off-SoC chips that could be shared.
 
-There are a number of ways:
-
-* Do device_create() with &pdev->dev as the parent, inside of the
-  codec driver, with a new class you create for this purpose
-* Do device_register() for a device, in the same way
-* Create the additional platform devices in the platform code,
-  with their parents pointing to the code device, then
-  look for them using device_for_each_child in the driver
-* Create two codec devices in parallel and bind to both with your
-  driver, ideally splitting up the resources between the two
-  devices in a meaningful way.
-
-None of them are extremely nice, but it's not that hard either.
-You should probably prototype a few of these approaches to see
-which one is the least ugly one.
-
-	Arnd
+Fair enough.
+ 
