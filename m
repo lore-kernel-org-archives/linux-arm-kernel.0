@@ -1,33 +1,40 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 22 Apr 2011 08:12:53 +1200
-Subject: [PATCH v2 23/23] at91: Remove mAgic and ISI device code
-In-Reply-To: <0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
-	<0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4DB08FC5.2@bluewatersys.com>
+From: davej@redhat.com (Dave Jones)
+Date: Thu, 21 Apr 2011 16:14:56 -0400
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <20110419160545.GJ1765@opensource.wolfsonmicro.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<201104191655.13133.arnd@arndb.de>
+	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+	<201104191801.19348.arnd@arndb.de>
+	<20110419160545.GJ1765@opensource.wolfsonmicro.com>
+Message-ID: <20110421201455.GA18083@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/11 05:33, H Hartley Sweeten wrote:
-> On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
->>
->> The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
->> have drivers yet and therefore the platform code in arch/arm/mach-at91
->> is unused and can be removed.
-> 
-> Is anyone planning on adding these drivers?
-> 
-> I wonder if it makes sense to add the infrastructure to devices.[ch] and
-> convert the users even it the drivers are not in mainline yet?
+On Tue, Apr 19, 2011 at 05:05:46PM +0100, Mark Brown wrote:
+ > On Tue, Apr 19, 2011 at 06:01:19PM +0200, Arnd Bergmann wrote:
+ > 
+ > > I think it would be good to have the out of the individual
+ > > platforms, in particular in order to get better reviews of
+ > > new cpufreq drivers by people that are interested in them.
+ > 
+ > FWIW when I pushed the S3C64x0 cpufreq driver into mainline I posted the
+ > driver to the cpufreq list and maintainers but never got any response
+ > from them.
 
-I removed them because there is currently a push to reduce the size of
-the ARM tree. The ISI code has been there since 2008 and the mAgic
-device code since 2009 without drivers. The ISI device at least is
-supported on more than one variant, but only had code present for the
-AT91SAM9263.
+Like I said in another mail, the platform-specific nature of cpufreq drivers
+means that the only people who can really review them are people familiar
+with the architecture. (modulo the cpufreq api bits, but it's usually
+either no-brainer stuff, or bugs that aren't immediately obvious from review,
+like some of the locking mistakes we've historically seen)
 
-I think it is better to remove them now, and then if/when drivers get
-added the support code can be added to the common framework.
+This is why I don't believe that moving this code from arch/ to drivers/
+will change anything.
 
-~Ryan
+if there's commonality between some of the ARM arch drivers, why can't
+there be a arch/arm/cpufreq/ dir for the shared code, and do everything there ?
+
+Right now "move it out of the arm tree into the cpufreq tree" just seems
+like a cop-out to hide the problem.
+
+	Dave
