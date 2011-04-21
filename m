@@ -1,57 +1,70 @@
-From: matteo.fortini@gmail.com (Matteo Fortini)
-Date: Thu, 21 Apr 2011 16:03:49 +0200
-Subject: [PATCH] Fix for missed MII interrupts and MDIO timeouts when FEC is
-	in STOP
-Message-ID: <BANLkTinkkquz1d=T-PpTSz1dpsBswD19tQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Apr 2011 16:12:49 +0200
+Subject: [PATCH] drivers: brcmaxi: provide amba axi functionality in
+	separate module
+In-Reply-To: <1303331669-31293-1-git-send-email-arend@broadcom.com>
+References: <1303331669-31293-1-git-send-email-arend@broadcom.com>
+Message-ID: <201104211612.49805.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are experiencing unrecoverable timeouts if we disconnect a cable from the
-FEC. This patch solves the issue by keeping the Ethernet enabled even in
-STOP. The RM doesn't state it, but i seems that if disabled, the Ethernet is
-not issuing interrupts to the core.
-(See
-http://forums.freescale.com/t5/i-MX-Microprocessors/iMX28-Network-MDIO-timeout-recovery-and-lost-IRQs/td-p/73309
-)
+On Wednesday 20 April 2011, Arend van Spriel wrote:
+> The open-source community is looking for a library which will detect
+> cores in a chip using axi backplane. Another proposal has been
+> sent by Rafa? Mi?ecki, which registers detected cores in the linux
+> device tree to be claimed by device drivers. This implies cores will
+> always provide a system function to the kernel which is indepent from
+> other cores and have very loose or no coupling. If this is not true,
+> exceptions need to be added in the device registration process. This
+> means knowledge of specific devices from specific vendors is sitting
+> in a bus driver. Whether the exceptions are rarely or likely is a
+> pending question.
 
+Hi Arend,
 
----
-?drivers/net/fec.c | ? ?7 ++++++-
-?1 files changed, 6 insertions(+), 1 deletions(-)
+I have two very general comments about this:
 
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index d0e2e69..26ea72d 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -121,8 +121,10 @@
-?#if defined(CONFIG_FEC_1588) && defined(CONFIG_ARCH_MX28)
-?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII | \
-? ? ? ? ? ? ? ? FEC_ENET_TS_AVAIL | FEC_ENET_TS_TIMER)
-+#define FEC_STOP_IMASK (FEC_ENET_MII)
-?#else
-?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
-+#define FEC_STOP_IMASK (FEC_ENET_MII)
-?#endif
+> To feed the discussion this implementation takes a different approach.
+> A calling entity (being a pci device driver, or SoC initialization
+> sequence) registers a table with core identities and a callback function.
+> It then starts the scan and for each detected core with a callback
+> function it does the call providing the core information. Apart from
+> that it provides some basic operations on the core.
+> 
+> It has been tested using the brcmsmac driver (in drivers/staging/brcm80211).
 
-?/* The FEC stores dest/src/type, data, and checksum for receive packets.
-@@ -1409,6 +1411,9 @@ fec_stop(struct net_device *dev)
-? ? writel(1, fep->hwp + FEC_ECNTRL);
-? ? udelay(10);
+The API split between PCI and non-PCI devices appears to be
+unhelpful. Can't you abstract the interface so that a user
+would apply the exact same interfaces in both cases, and handle
+the differences internally?
 
-+ ? ?/* Reactivate the controller to get the IRQs */
-+ ? ?writel(0x00000002, fep->hwp + FEC_ECNTRL);
-+
-?#ifdef CONFIG_ARCH_MXS
-? ? /* Check MII or RMII */
-? ? if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
-@@ -1423,7 +1428,7 @@ fec_stop(struct net_device *dev)
-? ? writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
-? ? if (fep->ptimer_present)
-? ? ? ? fec_ptp_stop(fep->ptp_priv);
-- ? ?writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
-+ ? ?writel(FEC_STOP_IMASK, fep->hwp + FEC_IMASK);
+> +/* Core Codes */
+> +#define	NODEV_CORE_ID		0x700	/* Invalid coreid */
+> +#define	CC_CORE_ID		0x800	/* chipcommon core */
+> +#define	ILINE20_CORE_ID		0x801	/* iline20 core */
+> +#define	SRAM_CORE_ID		0x802	/* sram core */
+> +#define	SDRAM_CORE_ID		0x803	/* sdram core */
+> +#define	PCI_CORE_ID		0x804	/* pci core */
+> +#define	MIPS_CORE_ID		0x805	/* mips core */
+> +#define	ENET_CORE_ID		0x806	/* enet mac core */
+> +#define	CODEC_CORE_ID		0x807	/* v90 codec core */
+> +#define	USB_CORE_ID		0x808	/* usb 1.1 host/device core */
+> +#define	ADSL_CORE_ID		0x809	/* ADSL core */
+> +#define	ILINE100_CORE_ID	0x80a	/* iline100 core */
+> +#define	IPSEC_CORE_ID		0x80b	/* ipsec core */
+> +#define	UTOPIA_CORE_ID		0x80c	/* utopia core */
+> +#define	PCMCIA_CORE_ID		0x80d	/* pcmcia core */
+> +#define	SOCRAM_CORE_ID		0x80e	/* internal memory core */
+> +#define	MEMC_CORE_ID		0x80f	/* memc sdram core */
+> +#define	OFDM_CORE_ID		0x810	/* OFDM phy core */
+> ...
 
-? ? netif_stop_queue(dev);
-? ? fep->link = 0;
---
-1.7.4.2
+This list to me is a strong hint that the cores behind the AXI bridge
+should normally be actual devices in Linux, i.e. the approach that
+Rafa? suggested.  The vast majority of these is something that in Linux
+would be operated by a device driver. The exceptions that I can see
+are CPU cores and bus bridges, both of which we typically also represent
+as devices in the flattened device tree, even though they typically
+don't have a Linux driver attached to them.
+
+	Arnd
