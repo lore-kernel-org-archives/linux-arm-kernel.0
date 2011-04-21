@@ -1,50 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 Apr 2011 15:35:31 +0100
-Subject: [PATCH] ARM: futex: add SMP futex support when !CPU_USE_DOMAINS
-In-Reply-To: <alpine.LFD.2.00.1104201329520.24613@xanadu.home>
-References: <1302267519-18156-1-git-send-email-will.deacon@arm.com>
-	<1303313347.11314.4.camel@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1104201329520.24613@xanadu.home>
-Message-ID: <003201cc0031$5dd242c0$1976c840$@deacon@arm.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Thu, 21 Apr 2011 16:38:09 +0200
+Subject: [PATCH] drivers: brcmaxi: provide amba axi functionality in
+	separate module
+In-Reply-To: <201104211612.49805.arnd@arndb.de>
+References: <1303331669-31293-1-git-send-email-arend@broadcom.com>
+	<201104211612.49805.arnd@arndb.de>
+Message-ID: <op.vuallvn63ri7v4@arend-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Thu, 21 Apr 2011 16:12:49 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> On Wed, 20 Apr 2011, Will Deacon wrote:
-> 
-> > On Fri, 2011-04-08 at 13:58 +0100, Will Deacon wrote:
-> > > This patch uses the load/store exclusive instructions to add SMP futex
-> > > support for ARM.
-> > >
-> > > Since the ARM architecture does not provide instructions for
-> > > unprivileged exclusive memory accesses, we can only provide SMP futexes
-> > > when CPU domain support is disabled.
-> > >
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm/include/asm/futex.h |  137 +++++++++++++++++++++++++++--------------
-> > >  1 files changed, 90 insertions(+), 47 deletions(-)
-> >
-> > Any comments on this patch? The LTP tests for {get,set}_robust_list seem
-> > happy enough but any review would be welcome.
-> 
-> I looked at http://article.gmane.org/gmane.linux.ports.arm.kernel/81847
-> back then, and one issue I found with that version was the fact that the
-> #ifdef condition were wrong (not depending on !CONFIG_CPU_USE_DOMAINS.
+> On Wednesday 20 April 2011, Arend van Spriel wrote:
+>> The open-source community is looking for a library which will detect
+>> cores in a chip using axi backplane. Another proposal has been
+>> sent by Rafa? Mi?ecki, which registers detected cores in the linux
+>> device tree to be claimed by device drivers. This implies cores will
+>> always provide a system function to the kernel which is indepent from
+>> other cores and have very loose or no coupling. If this is not true,
+>> exceptions need to be added in the device registration process. This
+>> means knowledge of specific devices from specific vendors is sitting
+>> in a bus driver. Whether the exceptions are rarely or likely is a
+>> pending question.
+>
+> Hi Arend,
+>
+> I have two very general comments about this:
+>
+>> To feed the discussion this implementation takes a different approach.
+>> A calling entity (being a pci device driver, or SoC initialization
+>> sequence) registers a table with core identities and a callback  
+>> function.
+>> It then starts the scan and for each detected core with a callback
+>> function it does the call providing the core information. Apart from
+>> that it provides some basic operations on the core.
+>>
+>> It has been tested using the brcmsmac driver (in  
+>> drivers/staging/brcm80211).
+>
+> The API split between PCI and non-PCI devices appears to be
+> unhelpful. Can't you abstract the interface so that a user
+> would apply the exact same interfaces in both cases, and handle
+> the differences internally?
 
-Yes, I only noticed that patch after I'd written my version. Actually,
-after looking at the current state of the domains code, I don't understand
-why we have CONFIG_CPU_USE_DOMAINS at all since the definition of __range_ok
-checks the address regardless of domain usage.
- 
-> Your version looks better though, just by looking at the net amount of
-> lines added.
+Ok. that can be arranged ;-)
 
-Ha, that's certainly the metric of the moment! I might be able to make
-the exception table macros cleaner by taking some labels as arguments,
-but I'm not sure if it's worth it or not.
+>> +/* Core Codes */
+>> +#define	NODEV_CORE_ID		0x700	/* Invalid coreid */
+>> +#define	CC_CORE_ID		0x800	/* chipcommon core */
+>> +#define	ILINE20_CORE_ID		0x801	/* iline20 core */
+>> +#define	SRAM_CORE_ID		0x802	/* sram core */
+>> +#define	SDRAM_CORE_ID		0x803	/* sdram core */
+>> +#define	PCI_CORE_ID		0x804	/* pci core */
+>> +#define	MIPS_CORE_ID		0x805	/* mips core */
+>> +#define	ENET_CORE_ID		0x806	/* enet mac core */
+>> +#define	CODEC_CORE_ID		0x807	/* v90 codec core */
+>> +#define	USB_CORE_ID		0x808	/* usb 1.1 host/device core */
+>> +#define	ADSL_CORE_ID		0x809	/* ADSL core */
+>> +#define	ILINE100_CORE_ID	0x80a	/* iline100 core */
+>> +#define	IPSEC_CORE_ID		0x80b	/* ipsec core */
+>> +#define	UTOPIA_CORE_ID		0x80c	/* utopia core */
+>> +#define	PCMCIA_CORE_ID		0x80d	/* pcmcia core */
+>> +#define	SOCRAM_CORE_ID		0x80e	/* internal memory core */
+>> +#define	MEMC_CORE_ID		0x80f	/* memc sdram core */
+>> +#define	OFDM_CORE_ID		0x810	/* OFDM phy core */
+>> ...
+>
+> This list to me is a strong hint that the cores behind the AXI bridge
+> should normally be actual devices in Linux, i.e. the approach that
+> Rafa? suggested.  The vast majority of these is something that in Linux
+> would be operated by a device driver. The exceptions that I can see
+> are CPU cores and bus bridges, both of which we typically also represent
+> as devices in the flattened device tree, even though they typically
+> don't have a Linux driver attached to them.
 
-Cheers,
+Fine. Your providing the kind of feedback I was looking for. The  
+OFDM_CORE_ID is also an exception.
 
-Will
+So could a device driver claim multiple cores/devices to assure other  
+drivers are not accessing those? I would prefer that over having  
+exceptions coded in the axi bus driver, like the chipcommon core  
+(CC_CORE_ID). I assume it can be done by the device table. Is that correct?
+
+Rafa?,
+
+Would it be possible to make chipcommon driver optional (not doing the  
+initialization)?
+
+Gr. AvS
+-- 
+"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
