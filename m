@@ -1,52 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Apr 2011 22:59:45 -0700
-Subject: [PATCH 0/3] fix some issues with the kernel decompressor
-In-Reply-To: <alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-Message-ID: <20110421055945.GB13688@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 21 Apr 2011 14:25:36 +0800
+Subject: [PATCH] mmc: mxs-mmc: add support for pre_req and post_req
+In-Reply-To: <BANLkTi=UR4NDEGjFkTnp_2UG4T1qUEPATw@mail.gmail.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1303058010-30256-1-git-send-email-shawn.guo@linaro.org>
+	<20110417164830.GE17935@S2100-06.ap.freescale.net>
+	<BANLkTimwvX633UaUoc4P4DD1xnpLbMTrZA@mail.gmail.com>
+	<20110420140120.GF1965@S2100-06.ap.freescale.net>
+	<BANLkTi=UR4NDEGjFkTnp_2UG4T1qUEPATw@mail.gmail.com>
+Message-ID: <20110421062535.GA4024@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110420 10:16]:
-> On Wed, 20 Apr 2011, Tony Lindgren wrote:
+On Wed, Apr 20, 2011 at 05:22:34PM +0200, Per Forlin wrote:
+[...]
+> > Do you have omap_hsmmc and mmci mmc_test result data to share?
+> >
+> I keep the here:
+> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
 > 
-> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110420 05:57]:
-> > > On Wed, 20 Apr 2011, Tony Lindgren wrote:
-> > > 
-> > > > * Nicolas Pitre <nicolas.pitre@linaro.org> [110419 21:12]:
-> > > > > Here some patches to fix some issues with the zImage code.  The LZMA
-> > > > > decompressor now works for me, and the DT append patch should work
-> > > > > on all platforms now too.
-> > > > 
-> > > > Weird still no luck here booting n900 zImage.. LZMA image prints
-> > > > corrupt error, and only works if the image is relocated further
-> > > > by 1MB or so. With the following hack n900 boots, so some size
-> > > > calculations still are wrong. No luck with DT append patch either.
-> > > > 
-> > > > Any ideas why the following helps on n900?
-> > > 
-> > > No idea.  This could indicate that the lzma code is crapping into memory 
-> > > outside of its output buffer.  The fact that my patch #2/3 makes lzma 
-> > > decompression suddenly work for me with no apparent explanation is not 
-> > > reassuring either.
-> > 
-> > With gzip kernel looks like I need to move the kernel further by 8MB
-> > instead of 1MB for some reason..
-> 
-> What kernel config are you using?
+Actually, I have seen this page before.  I was wondering if you have
+mmc_test raw data (test log of cases #37 ~ #40) to share.
 
-This is omap2plus_defconfig with DEBUG_LL and EARLY_PRINTK added on
-v2.6.39-rc4 with no extra patches.
-
-This same kernel binary boots everything except n900. It also boots
-n8x0 just fine, and that too is using nolo bootloader with zImage.
-
-Out of your three patches only the last one seems to make any difference
-where it now prints an error about DT data not found if the DT append
-patches are applied.
-
-Tony
+-- 
+Regards,
+Shawn
