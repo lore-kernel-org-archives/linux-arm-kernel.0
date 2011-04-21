@@ -1,81 +1,161 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 21 Apr 2011 13:55:58 +0900
-Subject: [linux-pm] [TuxOnIce-devel] [RFC PATCH] Current status,
-	suspend-to-disk support on ARM
-In-Reply-To: <BANLkTinp1+6Ocmy5LAUEiPwAje+VnrTo9Q@mail.gmail.com>
-References: <alpine.DEB.2.00.1104041424310.690@localhost6.localdomain6>
-	<20110412183208.GC26916@elf.ucw.cz>
-	<alpine.DEB.2.00.1104131020080.29883@localhost6.localdomain6>
-	<201104132338.03003.rjw@sisk.pl>
-	<alpine.DEB.2.00.1104141747310.9967@localhost6.localdomain6>
-	<BANLkTinroLCypX-iG0xGpnyxBk=P5TVtJQ@mail.gmail.com>
-	<alpine.DEB.2.00.1104191859260.4937@localhost6.localdomain6>
-	<BANLkTinp1+6Ocmy5LAUEiPwAje+VnrTo9Q@mail.gmail.com>
-Message-ID: <BANLkTinXOR+AhsTtgLdnnmT=1Q4M5Q5LWA@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 21 Apr 2011 17:41:53 +1200
+Subject: [PATCH v2 01/23] at91: Add common devices framework
+In-Reply-To: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
+References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303364535-11557-2-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Matt,
+Each AT91 variant (AT91RM9200, AT91SAM9260, etc) currently has its own
+devices file, which includes the MMIO address, interrupt
+configuration, GPIO setup, etc for each device. This results in a large
+amount of duplicated code.
 
-On Wed, Apr 20, 2011 at 4:14 PM, Matt Hsu <matt@0xlab.org> wrote:
->
->>
->> Also, I'd like to investigate whether ARM will require a set of
->> platform_hibernation_ops - Samsung's patch from last December,
->>
->> http://www.spinics.net/lists/arm-kernel/msg108565.html
->
-> ??? Hi FrankH,
->
-> ???? The patch seems has connection with this
->
-> ???? www.kernel.org/doc/ols/2010/ols2010-pages-9-18.pdf
+This patch introduces a framework for adding shared devices for the
+AT91 platform. The subsequent patches in this series replace the
+multiple device setup implementations for each device with single
+implementations in the new framework.
 
-Actually, those patches had no direct connections with that anyway. :)
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+---
+ arch/arm/mach-at91/Makefile  |    2 +-
+ arch/arm/mach-at91/devices.c |   70 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/devices.h |   36 +++++++++++++++++++++
+ 3 files changed, 107 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-at91/devices.c
+ create mode 100644 arch/arm/mach-at91/devices.h
 
->
-> ? ? You can see the section 4.3 fast device reactivation.
-> ? ? It does the similar thing? as STR, but drivers status are kept in
-> hibernation image instead of main memory.
-> ??? I guess this is why this patch comes out.
-
-Yes, this SoC has registers that require STR/Hibernation to save the
-status. They include power, clock, memory-control, gpio, uart related
-registers.
-
->
-> ??? In the current device driver model, there are no appropriate handling
-> specific to
-> ??? hibernation_suspend/hibernation_resume ops.
->
-> ??? So they make their own interface/platform drivers.
-
-Correct.
-
-If the interface looks like dev_pm_ops, it would be virtually perfect. :)
-
->
->>
->> seems to indicate that they believe it's necessary at least on some ARM
->> hardware. OMAP has similar functions to that, it'd be great to unify.
->>
->>
->> FrankH.
->>
-> --
-> - Matt
->
-> _______________________________________________
-> linux-pm mailing list
-> linux-pm at lists.linux-foundation.org
-> https://lists.linux-foundation.org/mailman/listinfo/linux-pm
->
-
-
-
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index a83835e..14962f2 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-obj-y		:= irq.o gpio.o
++obj-y		:= irq.o gpio.o devices.o
+ obj-m		:=
+ obj-n		:=
+ obj-		:=
+diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
+new file mode 100644
+index 0000000..6f6e0d5
+--- /dev/null
++++ b/arch/arm/mach-at91/devices.c
+@@ -0,0 +1,70 @@
++/*
++ * arch/arm/mach-at91/devices.c
++ *
++ *  Copyright (C) 2011 Bluewater Systems
++ *  Copyright (C) 2011 Ryan Mallon <ryan@bluewatersys.com>
++ * 
++ * Based on code from arch/arm/mach-at91/*_devices.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++
++#include "devices.h"
++
++static struct at91_device_table *devices __initdata;
++
++static __init void at91_config_pins(struct at91_pin_config *pins, int nr_pins)
++{
++	int i;
++
++	for (i = 0; i < nr_pins; i++) {		
++		switch (pins[i].mode) {
++		case AT91_PIN_PERIPH_A:
++			at91_set_A_periph(pins[i].pin, pins[i].pullup);
++			break;
++
++		case AT91_PIN_PERIPH_B:
++			at91_set_B_periph(pins[i].pin, pins[i].pullup);
++			break;
++
++		default:
++			/* GPIO */
++			if (pins[i].direction == GPIOF_DIR_OUT)
++				at91_set_gpio_output(pins[i].pin,
++						     pins[i].value);
++			else
++				at91_set_gpio_input(pins[i].pin,
++						    pins[i].pullup);
++			break;
++		}
++	}
++}
++
++static inline void __init init_resource_mem(struct resource *res,
++					    unsigned mmio_base)
++{
++	BUG_ON(res->flags != IORESOURCE_MEM);
++	res->start = mmio_base;
++	res->end  += mmio_base - 1;
++}
++
++static inline void __init init_resource_irq(struct resource *res, int irq)
++{
++	if (irq) {
++		BUG_ON(res->flags != IORESOURCE_IRQ);
++		res->start = irq;
++		res->end   = irq;
++	}
++}
++
++void __init at91_init_devices(struct at91_device_table *device_table)
++{
++	devices = device_table;
++}
+diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
+new file mode 100644
+index 0000000..738f736
+--- /dev/null
++++ b/arch/arm/mach-at91/devices.h
+@@ -0,0 +1,36 @@
++/*
++ * arch/arm/mach-at91/devices.h
++ *
++ *  Copyright (C) 2011 Bluewater Systems
++ *  Copyright (C) 2011 Ryan Mallon <ryan@bluewatersys.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#ifndef _AT91_DEVICES_H
++#define _AT91_DEVICES_H
++
++enum {
++	AT91_PIN_PERIPH_A,
++	AT91_PIN_PERIPH_B,
++	AT91_PIN_GPIO,
++};
++
++struct at91_pin_config {
++	int pin;
++	int mode;
++	int pullup;
++	int direction;
++	int value;
++};
++
++struct at91_device_table {
++};
++
++extern void __init at91_init_devices(struct at91_device_table *device_table);
++
++#endif /* _AT91_DEVICES_H */
 -- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+1.7.0.4
