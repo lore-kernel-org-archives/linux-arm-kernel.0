@@ -1,40 +1,44 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 21 Apr 2011 10:21:06 -0700
-Subject: [GIT PULL] Please pull ASoC's tegra branch into Tegra for-next
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04973BB857@HQMAIL01.nvidia.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Apr 2011 19:28:09 +0200 (CEST)
+Subject: arm: msm: Convert irq-vic to generic irq chip
+In-Reply-To: <4DB0611D.6040902@codeaurora.org>
+References: <20110416211221.853079766@linutronix.de>
+	<20110416211308.455390167@linutronix.de>
+	<4DB0611D.6040902@codeaurora.org>
+Message-ID: <alpine.LFD.2.02.1104211926550.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin, Erik, Olof,
+On Thu, 21 Apr 2011, Abhijeet Dharmapurikar wrote:
+> On 04/16/2011 02:14 PM, Thomas Gleixner wrote:
+> However, let me explain that SMSM arrays are. MSM has a different interrupt
+> controller that monitors few of the lines that the VIC does.
+> This parallel interrupt controller is activated when the MSM goes to low
+> power modes.
+> 
+> For idle case, if an interrupt not monitored by the parallel interrupt
+> controller is enabled, we avoid going to low power modes. It is unreasonable
+> to check all the shadow registers to find if such is the case, so we maintain
+> the unmask status of such interrupts in
+> static uint32_t msm_irq_idle_disable[VIC_NUM_REGS]. If any bit is set we dont
+> go to low power mode. This code is not upstreamed yet, I can submit it on top
+> of this patch.
+> 
+> The reason for explaining this is to ask if we should extend the generic chip
+> to have a function that returns if any interrupts besides the wakeup ones are
+> unmasked. It would return
+> 
+> mask_cache & ~wakeup_active  if mask_cache bit set means interrupt is unmasked
+> ~mask_cache & ~wakeup_active if mask_cache bit set means interrupts is masked
+> 
+> or you would prefer the driver do that check?
 
-Please pull
+That wants to be a function in the core as I assume that there are
+similar usecases in tree.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound-2.6.git tegra
+Another question is whether you could move to the arm/common/vic.c
+implementation completely.
 
-into Tegra's for-next, or whichever branch is appropriate for 2.6.40 work.
+Thanks,
 
-This will bring in:
-
-47912a6 ARM: Tegra: select MACH_HAS_SND_SOC_TEGRA_WM8903
-61a6d07 ARM: Tegra: Add to tegra_wm8903_platform_data
-7b33af2 ASoC: Tegra: Rename pdev tegra-snd-harmony to tegra-snd-wm8903
-4651d55 ARM: Tegra: Rename harmony_audio.h -> tegra_wm8903_pdata.h
-a6360dd Linux 2.6.39-rc3
-
-The changes are required to add Seaboard audio support into the Tegra
-branch. I'll post patches for that later today.
-
-I have tested that:
-
-* The merge has no conflicts.
-* The merge result compiles.
-* The resultant kernel runs OK on Harmony.
-* With the addition of the patch below, which is required to fix an
-  already-extant bug in Tegra's for-next branch, and which I'll repost
-  later today, audio on Harmony works fully.
-  ARM: Tegra: Harmony: Fix conflicting GPIO numbering
-
-Thank you.
-
--- 
-nvpublic
+	tglx
