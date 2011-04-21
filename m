@@ -1,153 +1,205 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 21 Apr 2011 17:42:14 +1200
-Subject: [PATCH v2 22/23] at91: Move at91sam9263 CAN device to common devices
+Date: Thu, 21 Apr 2011 17:42:11 +1200
+Subject: [PATCH v2 19/23] at91: Make RTC device common
 In-Reply-To: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
 References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1303364535-11557-23-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1303364535-11557-20-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CAN device is only used on the AT91SAM9263. Move it to the common
-devices.c file to be consistent with other devices.
+The RTC device code for the AT91RM9200, AT91SAM9G45 and AT91SAM9RL are
+all exactly the same. Remove the individual implementations and
+replace them with a single version in devices.c
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91sam9263_devices.c |   37 +++++-----------------------
- arch/arm/mach-at91/devices.c             |   38 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/devices.h             |    7 +++++
- 3 files changed, 52 insertions(+), 30 deletions(-)
+ arch/arm/mach-at91/at91rm9200_devices.c  |   33 -----------------------------
+ arch/arm/mach-at91/at91sam9g45_devices.c |   33 -----------------------------
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   34 ------------------------------
+ arch/arm/mach-at91/devices.c             |   20 +++++++++++++++++
+ 4 files changed, 20 insertions(+), 100 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 70cf41a..b06246c 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -263,39 +263,15 @@ static struct at91_dev_table_ac97 device_ac97 __initdata = {
-  *  CAN Controller
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_CAN_AT91) || defined(CONFIG_CAN_AT91_MODULE)
--static struct resource can_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_CAN,
--		.end	= AT91SAM9263_BASE_CAN + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_CAN,
--		.end	= AT91SAM9263_ID_CAN,
--		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_can device_can __initdata = {
-+	.mmio_base	= AT91SAM9263_BASE_CAN,
-+	.irq		= AT91SAM9263_ID_CAN,
-+	.pins		= {
-+		{AT91_PIN_PA13, AT91_PIN_PERIPH_A, 0, 0, 0},	/* CANTX */
-+		{AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},	/* CANRX */
- 	},
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 9f678de..f251ed1 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -277,25 +277,6 @@ static struct at91_dev_table_tcb device_tcb1 __initdata = {
  };
  
--static struct platform_device at91sam9263_can_device = {
--	.name		= "at91_can",
+ /* --------------------------------------------------------------------
+- *  RTC
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
+-static struct platform_device at91rm9200_rtc_device = {
+-	.name		= "at91_rtc",
 -	.id		= -1,
--	.resource	= can_resources,
--	.num_resources	= ARRAY_SIZE(can_resources),
+-	.num_resources	= 0,
 -};
 -
--void __init at91_add_device_can(struct at91_can_data *data)
+-static void __init at91_add_device_rtc(void)
 -{
--	at91_set_A_periph(AT91_PIN_PA13, 0);	/* CANTX */
--	at91_set_A_periph(AT91_PIN_PA14, 0);	/* CANRX */
--	at91sam9263_can_device.dev.platform_data = data;
--
--	platform_device_register(&at91sam9263_can_device);
+-	platform_device_register(&at91rm9200_rtc_device);
 -}
 -#else
--void __init at91_add_device_can(struct at91_can_data *data) {}
+-static void __init at91_add_device_rtc(void) {}
 -#endif
 -
- /* --------------------------------------------------------------------
-  *  LCD Controller
+-/* --------------------------------------------------------------------
+  *  SSC -- Synchronous Serial Controller
   * -------------------------------------------------------------------- */
-@@ -536,6 +512,7 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.ac97		= &device_ac97,
- 	.lcdc		= &device_lcdc,
- 	.cf		= &device_cf,
-+	.can		= &device_can,
+ 
+@@ -444,17 +425,3 @@ void __init at91rm9200_init_devices(void)
+ {
+ 	at91_init_devices(&at91rm9200_device_table);
+ }
+-
+-/* -------------------------------------------------------------------- */
+-
+-/*
+- * These devices are always present and don't need any board-specific
+- * setup.
+- */
+-static int __init at91_add_standard_devices(void)
+-{
+-	at91_add_device_rtc();
+-	return 0;
+-}
+-
+-arch_initcall(at91_add_standard_devices);
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index f67a675..3627c2e 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -377,26 +377,6 @@ static struct at91_dev_table_tcb device_tcb1 __initdata = {
  };
  
- void __init at91sam9263_init_devices(void)
+ /* --------------------------------------------------------------------
+- *  RTC
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
+-static struct platform_device at91sam9g45_rtc_device = {
+-	.name		= "at91_rtc",
+-	.id		= -1,
+-	.num_resources	= 0,
+-};
+-
+-static void __init at91_add_device_rtc(void)
+-{
+-	platform_device_register(&at91sam9g45_rtc_device);
+-}
+-#else
+-static void __init at91_add_device_rtc(void) {}
+-#endif
+-
+-
+-/* --------------------------------------------------------------------
+  *  Touchscreen
+  * -------------------------------------------------------------------- */
+ 
+@@ -569,16 +549,3 @@ void __init at91sam9g45_init_devices(void)
+ {
+ 	at91_init_devices(&at91sam9g45_device_table);
+ }
+-
+-/* -------------------------------------------------------------------- */
+-/*
+- * These devices are always present and don't need any board-specific
+- * setup.
+- */
+-static int __init at91_add_standard_devices(void)
+-{
+-	at91_add_device_rtc();
+-	return 0;
+-}
+-
+-arch_initcall(at91_add_standard_devices);
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 3dac87f..2aa465b 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -271,26 +271,6 @@ static struct at91_dev_table_tsadcc device_tsadcc __initdata = {
+ };
+ 
+ /* --------------------------------------------------------------------
+- *  RTC
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
+-static struct platform_device at91sam9rl_rtc_device = {
+-	.name		= "at91_rtc",
+-	.id		= -1,
+-	.num_resources	= 0,
+-};
+-
+-static void __init at91_add_device_rtc(void)
+-{
+-	platform_device_register(&at91sam9rl_rtc_device);
+-}
+-#else
+-static void __init at91_add_device_rtc(void) {}
+-#endif
+-
+-
+-/* --------------------------------------------------------------------
+  *  RTT
+  * -------------------------------------------------------------------- */
+ 
+@@ -445,17 +425,3 @@ void __init at91sam9rl_init_devices(void)
+ {
+ 	at91_init_devices(&at91sam9rl_device_table);
+ }
+-
+-/* -------------------------------------------------------------------- */
+-
+-/*
+- * These devices are always present and don't need any board-specific
+- * setup.
+- */
+-static int __init at91_add_standard_devices(void)
+-{
+-	at91_add_device_rtc();
+-	return 0;
+-}
+-
+-arch_initcall(at91_add_standard_devices);
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index c53de9c..119d966 100644
+index 19bb082..e3c9661 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -1951,6 +1951,44 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- void __init at91_add_device_cf(struct at91_cf_data *data) {}
+@@ -1748,12 +1748,32 @@ void __init at91_add_device_hdmac(void)
+ void __init at91_add_device_hdmac(void) {}
  #endif
  
 +/* --------------------------------------------------------------------
-+ *  CAN Controller
++ *  RTC
 + * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_CAN_AT91) || defined(CONFIG_CAN_AT91_MODULE)
-+static struct resource can_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device at91_can_device = {
-+	.name		= "at91_can",
++#if defined(CONFIG_RTC_DRV_AT91RM9200) || defined(CONFIG_RTC_DRV_AT91RM9200_MODULE)
++static struct platform_device at91_rtc_device = {
++	.name		= "at91_rtc",
 +	.id		= -1,
-+	.resource	= can_resources,
-+	.num_resources	= ARRAY_SIZE(can_resources),
++	.num_resources	= 0,
 +};
 +
-+void __init at91_add_device_can(struct at91_can_data *data)
++static void __init at91_add_device_rtc(void)
 +{
-+	struct at91_dev_table_can *info = devices->can;
-+
-+	BUG_ON(!info);
-+	init_resource_mem(&can_resources[0], info->mmio_base);
-+	init_resource_irq(&can_resources[1], info->irq);
-+
-+	at91_config_pins(info->pins, ARRAY_SIZE(info->pins));
-+	at91_can_device.dev.platform_data = data;
-+	platform_device_register(&at91sam9263_can_device);
++	platform_device_register(&at91_rtc_device);
 +}
 +#else
-+void __init at91_add_device_can(struct at91_can_data *data) {}
++static void __init at91_add_device_rtc(void) {}
 +#endif
 +
  static int __init at91_add_standard_devices(void)
  {
  	at91_add_device_tc();
-diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index 74f1b9a..846f36f 100644
---- a/arch/arm/mach-at91/devices.h
-+++ b/arch/arm/mach-at91/devices.h
-@@ -202,6 +202,12 @@ struct at91_dev_table_cf {
- 	int			nr_pins;
- };
+ 	at91_add_device_rtt();
+ 	at91_add_device_watchdog();
+ 	at91_add_device_hdmac();
++	at91_add_device_rtc();
+ 	return 0;
+ }
  
-+struct at91_dev_table_can {
-+	unsigned		mmio_base;
-+	int			irq;
-+	struct at91_pin_config	pins[2];	/* TX, RX */
-+};
-+
- struct at91_device_table {
- 	struct at91_dev_table_ethernet		*ethernet;
- 	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -223,6 +229,7 @@ struct at91_device_table {
- 	struct at91_dev_table_hdmac		*hdmac;
- 	struct at91_dev_table_udc_hs		*udc_hs;
- 	struct at91_dev_table_cf		*cf;
-+	struct at91_dev_table_can		*can;
- };
- 
- extern void __init at91_init_devices(struct at91_device_table *device_table);
 -- 
 1.7.0.4
