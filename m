@@ -1,36 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Apr 2011 16:09:11 -0700
-Subject: [PATCH] msm: timer: Fix DGT rate on 8960 and 8660
-Message-ID: <1303427351-16825-1-git-send-email-sboyd@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 21 Apr 2011 18:19:37 -0500
+Subject: [PATCH v2 02/23] at91: Make Ethernet device common
+In-Reply-To: <1303364535-11557-3-git-send-email-ryan@bluewatersys.com>
+References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
+	<1303364535-11557-3-git-send-email-ryan@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D24302CC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DGT runs at 27 MHz divided by 4 on 8660 and 8960.
+On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
+>
+> Replace the individual Ethernet device code for each at91 variant with
+> a single implementation in devices.
+>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/timer.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+[snip]
 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 38b95e9..ed73a38 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -55,10 +55,12 @@ enum timer_location {
- #if defined(CONFIG_ARCH_QSD8X50)
- #define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
- #define MSM_DGT_SHIFT (0)
--#elif defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60) || \
--				      defined(CONFIG_ARCH_MSM8960)
-+#elif defined(CONFIG_ARCH_MSM7X30)
- #define DGT_HZ (24576000 / 4) /* 24.576 MHz (LPXO) / 4 by default */
- #define MSM_DGT_SHIFT (0)
-+#elif defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960)
-+#define DGT_HZ (27000000 / 4) /* 27 MHz (PXO) / 4 by default */
-+#define MSM_DGT_SHIFT (0)
- #else
- #define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
- #define MSM_DGT_SHIFT (5)
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
+> index 6f6e0d5..4ecbd38 100644
+> --- a/arch/arm/mach-at91/devices.c
+> +++ b/arch/arm/mach-at91/devices.c
+> @@ -14,8 +14,11 @@
+>   */
+>  
+>  #include <linux/platform_device.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/gpio.h>
+>  
+> +#include <mach/board.h>
+> +
+>  #include "devices.h"
+>  
+>  static struct at91_device_table *devices __initdata;
+> @@ -64,6 +67,64 @@ static inline void __init init_resource_irq(struct resource *res, int irq)
+>  	}
+>  }
+>  
+> +/* --------------------------------------------------------------------
+> + *  Ethernet
+> + * -------------------------------------------------------------------- */
+> +
+> +#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
+> +static u64 eth_dmamask = DMA_BIT_MASK(32);
+> +static struct at91_eth_data eth_data;
+> +
+> +static struct resource eth_resources[] = {
+> +	[0] = {
+> +		.end	= SZ_16K,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91_eth_device = {
+> +	.name		= "macb",
+> +	.id		= -1,
+> +	.dev		= {
+> +				.dma_mask		= &eth_dmamask,
+> +				.coherent_dma_mask	= DMA_BIT_MASK(32),
+
+Doesn't this work also?
+
++static struct platform_device at91_eth_device = {
++	.name		= "macb",
++	.id		= -1,
++	.dev		= {
++		.dma_mask		= &at91_eth_device.dev.coherent_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
+
+That will get rid of the static u64 variable used for every dma capable device.
+
+Regards,
+Hartley
