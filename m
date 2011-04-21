@@ -1,59 +1,50 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Apr 2011 09:53:51 +0100
-Subject: [RFC PATCH 06/12] ARM: ux500: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <C832F8F5D375BD43BFA11E82E0FE9FE00AEE891699@EXDCVYMBSTM005.EQ1STM.local>
-References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-7-git-send-email-marc.zyngier@arm.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00AEE891699@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <1303376031.27148.59.camel@e102391-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Apr 2011 01:59:18 -0700
+Subject: [PATCH] omap: Run make savedefconfig on omap2plus_defconfig to
+	shrink it
+In-Reply-To: <20110421085303.GN31131@pengutronix.de>
+References: <20110421064423.GD13688@atomide.com>
+	<20110421082328.GK31131@pengutronix.de>
+	<20110421084910.GF13688@atomide.com>
+	<20110421085303.GN31131@pengutronix.de>
+Message-ID: <20110421085918.GG13688@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-04-21 at 10:44 +0200, Srinidhi KASAGAR wrote:
-> > -----Original Message-----
-> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> > Sent: Thursday, April 21, 2011 12:38 AM
-> > To: LAK
-> > Cc: Srinidhi KASAGAR; Linus WALLEIJ
-> > Subject: [RFC PATCH 06/12] ARM: ux500: use remapped PPI interrupts for
-> > local timer
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [110421 01:49]:
+> On Thu, Apr 21, 2011 at 01:49:10AM -0700, Tony Lindgren wrote:
+> > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [110421 01:20]:
+> > > On Wed, Apr 20, 2011 at 11:44:23PM -0700, Tony Lindgren wrote:
+> > > > This shrinks it down a bit more and makes it easier
+> > > > to patch later on.
+> > > Maybe pointing out why it's shrinkable would be nice.
+> > > E.g.
+> > > 
+> > > 	After commit
+> > > 
+> > > 		ffb63e3 (omap2/3/4: Select all omaps and boards by default
+> > > 
+> > > 	many explicit settings can be dropped from the defconfig.
 > > 
-> > Use the normal interrupt scheme for the local timers by using
-> > a remapped PPI interrupt.
+> > Good point, updated patch below.
 > > 
-> > Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> > Cc: Linus Walleij <linus.walleij@stericsson.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/mach-ux500/Kconfig      |    1 +
-> >  arch/arm/mach-ux500/localtimer.c |    3 ++-
-> >  2 files changed, 3 insertions(+), 1 deletions(-)
+> > Regards,
 > > 
-> > diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-> > index 5862601..6f3eb99 100644
-> > --- a/arch/arm/mach-ux500/Kconfig
-> > +++ b/arch/arm/mach-ux500/Kconfig
-> > @@ -4,6 +4,7 @@ config UX500_SOC_COMMON
-> >  	bool
-> >  	default y
-> >  	select ARM_GIC
-> > +	select ARM_GIC_VPPI
-> 
-> Here you added VPPI and in the other patch 12/12 you remove this
-> again and make it one time selectable based on CONFIG_SMP.
-> is that done just for readability purpose?
+> > Tony
+> > 
+> > 
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Wed, 20 Apr 2011 23:37:06 -0700
+> > Subject: [PATCH] omap: Run make savedefconfig on omap2plus_defconfig to shrink it
+> > 
+> > After commit ffb63e3 (omap2/3/4: Select all omaps and boards by default)
+> > may explicit settings can be dropped from the defconfig.
+> s/may/many/
 
-This is in the interest of having a bisectable tree. Because I convert
-each platform one at a time, I cannot immediately make CONFIG_SMP select
-VPPI (that would break all the not-yet-converted platforms). Once all
-platforms are using VPPI, patch #12 does the cleanup for configuration.
+Oops, thanks will update.
+ 
+> I think ffb63e3 doesn't explain all changes, but ok.
 
-> Otherwise, for mach-ux500:
-> Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Yeah..
 
-Thanks,
-
-	M.
--- 
-Reality is an implementation detail.
+Tony
