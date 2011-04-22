@@ -1,110 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Apr 2011 09:04:18 -0700
-Subject: [RFC PATCH 11/18] OMAP: GPIO: Remove dependency on gpio_bank_count
-In-Reply-To: <1303470512-19671-12-git-send-email-charu@ti.com> (Charulatha
-	V.'s message of "Fri, 22 Apr 2011 16:38:25 +0530")
-References: <1303470512-19671-1-git-send-email-charu@ti.com>
-	<1303470512-19671-12-git-send-email-charu@ti.com>
-Message-ID: <87oc3yxofx.fsf@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 22 Apr 2011 18:14:04 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104221124270.3323@ionos>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421074214.GE15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211113030.3323@ionos>
+	<20110421120656.GF15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211632240.3323@ionos>
+	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
+	<alpine.LFD.2.02.1104221124270.3323@ionos>
+Message-ID: <alpine.LFD.2.02.1104221812000.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Charulatha V <charu@ti.com> writes:
+On Fri, 22 Apr 2011, Thomas Gleixner wrote:
+> On Thu, 21 Apr 2011, Colin Cross wrote:
+> 
+> Yes, and that's exaclty what we don't want to have. You still need a
+> global lock for doing the full tree acquisition and the only advantage
+> which is left is that you can do parallel prepare/unprepare and
+> everything else (parent settings, rate propagations) will need to do
+> the locking dance.
 
-> gpio_bank_count is the count of number of GPIO devices
-> in a SoC. Remove this dependency from the driver. Also remove
-> the dependency on array of pointers to gpio_bank struct of
-> all GPIO devices.
->
-> The cpu_is*() checks used in omap2_gpio_prepare_for_idle() and
-> omap2_gpio_resume_after_idle() would be removed in one of the
-> patches in this series
->
-> Signed-off-by: Charulatha V <charu@ti.com>
-> ---
->  arch/arm/mach-omap1/gpio15xx.c         |    1 -
->  arch/arm/mach-omap1/gpio16xx.c         |    2 -
->  arch/arm/mach-omap1/gpio7xx.c          |    2 -
->  arch/arm/mach-omap2/gpio.c             |    1 +
->  arch/arm/plat-omap/gpio.c              |  165 ++++++++++++++++----------------
->  arch/arm/plat-omap/include/plat/gpio.h |    3 -
->  6 files changed, 83 insertions(+), 91 deletions(-)
->
-> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-> index 7a7a123..3763db3 100644
-> --- a/arch/arm/mach-omap1/gpio15xx.c
-> +++ b/arch/arm/mach-omap1/gpio15xx.c
-> @@ -189,7 +189,6 @@ static int __init omap15xx_gpio_init(void)
->  	omap15xx_mpu_gpio_config.gpio_fn = &gpio_fn;
->  	platform_device_register(&omap15xx_gpio);
->  
-> -	gpio_bank_count = 2;
->  	return 0;
->  }
->  postcore_initcall(omap15xx_gpio_init);
-> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-> index f05e0c7..6a99b01 100644
-> --- a/arch/arm/mach-omap1/gpio16xx.c
-> +++ b/arch/arm/mach-omap1/gpio16xx.c
-> @@ -316,8 +316,6 @@ static int __init omap16xx_gpio_init(void)
->  		platform_device_register(omap16xx_gpio_dev[i]);
->  	}
->  
-> -	gpio_bank_count = ARRAY_SIZE(omap16xx_gpio_dev);
-> -
->  	return 0;
->  }
->  postcore_initcall(omap16xx_gpio_init);
-> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
-> index 1103efc..cd6bad7 100644
-> --- a/arch/arm/mach-omap1/gpio7xx.c
-> +++ b/arch/arm/mach-omap1/gpio7xx.c
-> @@ -355,8 +355,6 @@ static int __init omap7xx_gpio_init(void)
->  		platform_device_register(omap7xx_gpio_dev[i]);
->  	}
->  
-> -	gpio_bank_count = ARRAY_SIZE(omap7xx_gpio_dev);
-> -
->  	return 0;
->  }
->  postcore_initcall(omap7xx_gpio_init);
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 25fe8a4..a46f4a5 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -28,6 +28,7 @@
->  #define OMAP2_GPIO_INDEX_MASK		0x1f
->  #define OMAP2_GPIO_IRQENA_MASK		0xffffffff
->  
-> +int gpio_bank_count;
+And worse with the prepare/unprepare separation you need to do the
+lock dance twice in some cases. Once for the mutex and once for the
+spinlock. Not really a intriguing idea.
 
-Why is this needed here?
+Thanks,
 
->  int bank_width;
->  static u16 *reg_map;
->  static u16 omap2_gpio_reg_offsets[] = {
+	tglx
 
-[...]
-
->  void omap2_gpio_prepare_for_idle(int off_mode)
->  {
-> -	int i, c = 0;
-> -	int min = 0;
-> -
-> -	if (cpu_is_omap34xx())
-> -		min = 1;
-> +	int c = 0;
-> +	struct gpio_bank *bank;
->  
-> -	for (i = min; i < gpio_bank_count; i++) {
-> -		struct gpio_bank *bank = &gpio_bank[i];
-> +	list_for_each_entry(bank, &omap_gpio_list, node) {
-
-
-Note that on 34xx, this isn't an equivalent functional change, since
-the for loop starts a 1 and the list traversal covers all banks.
-
-I think your powerdomain 'can lose context' patch is needed before this
-one.
-
-Kevin
+ 
