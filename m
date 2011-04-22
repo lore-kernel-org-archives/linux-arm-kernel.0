@@ -1,37 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Apr 2011 18:14:04 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104221124270.3323@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421120656.GF15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211632240.3323@ionos>
-	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
-	<alpine.LFD.2.02.1104221124270.3323@ionos>
-Message-ID: <alpine.LFD.2.02.1104221812000.3323@ionos>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Apr 2011 19:41:59 +0200
+Subject: [PATCH v2 3/5] dmaengine: at_hdmac: debug information sg_len for
+	prep_slave_sg
+In-Reply-To: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
+References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
+Message-ID: <5c1f9b7a5843b1e476a3f3e98d4e8d2fa6065f16.1303493836.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2011, Thomas Gleixner wrote:
-> On Thu, 21 Apr 2011, Colin Cross wrote:
-> 
-> Yes, and that's exaclty what we don't want to have. You still need a
-> global lock for doing the full tree acquisition and the only advantage
-> which is left is that you can do parallel prepare/unprepare and
-> everything else (parent settings, rate propagations) will need to do
-> the locking dance.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-And worse with the prepare/unprepare separation you need to do the
-lock dance twice in some cases. Once for the mutex and once for the
-spinlock. Not really a intriguing idea.
-
-Thanks,
-
-	tglx
-
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index ed9d924..8f50a0f 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -687,7 +687,8 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	struct scatterlist	*sg;
+ 	size_t			total_len = 0;
  
+-	dev_vdbg(chan2dev(chan), "prep_slave_sg: %s f0x%lx\n",
++	dev_vdbg(chan2dev(chan), "prep_slave_sg (%d): %s f0x%lx\n",
++			sg_len,
+ 			direction == DMA_TO_DEVICE ? "TO DEVICE" : "FROM DEVICE",
+ 			flags);
+ 
+-- 
+1.7.3
