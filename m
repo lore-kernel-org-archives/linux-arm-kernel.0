@@ -1,39 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 23 Apr 2011 07:48:46 +0200
-Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <20110318155428.GA22087@n2100.arm.linux.org.uk>
-References: <87vczkmy94.fsf@macbook.be.48ers.dk>
-	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
-	<871v26m8tf.fsf@macbook.be.48ers.dk>
-	<20110317085835.GC29758@n2100.arm.linux.org.uk>
-	<87wrjyksnm.fsf@macbook.be.48ers.dk>
-	<20110317093403.GA15396@pulham.picochip.com>
-	<20110317215101.GC2927@pulham.picochip.com>
-	<20110318154118.GQ29758@n2100.arm.linux.org.uk>
-	<20110318154839.GB3393@pulham.picochip.com>
-	<20110318155428.GA22087@n2100.arm.linux.org.uk>
-Message-ID: <20110423054846.GF23775@game.jcrosoft.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 22 Apr 2011 17:47:25 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <20110418170752.GQ16019@shareable.org>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<20110412203303.GA16019@shareable.org>
+	<20110418135243.GB1479@ucw.cz>
+	<20110418170752.GQ16019@shareable.org>
+Message-ID: <20110422154344.GA7526@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I happy to split the driver and arch updates, but I'm not sure that it 
-> > can be done in such a way that platforms would build between the arch 
-> > and driver merges.
-> > 
-> > > I'm also concious that this has become ready for potentially merging
-> > > during the merge window, and therefore hasn't had previous exposure
-> > > in linux-next, and so should wait until the next merge window.  I do
-> > > feel that I'm going to be yelled at for saying that... but I'm sure
-> > > I'll also be yelled at if I did take it.
-> > 
-> > I don't have any problem with waiting until the next merge window, and 
-> > to be honest I'd like see these patches have some time in next as I 
-> > can't test them on devices with a MACB.
-> 
-> Okay, that sounds like a very good reason to wait until Nicolas can
-> review them and provide an ack.
-David Russell If you don't mind I'll apply it on at91 tree as we prepare other
-huge update on mach-at91
+Hi!
 
-Best Regards,
-J.
+> > ...but note that no existing  filesystem is safe on media such
+> > as usb sticks, SD and CF cards...
+> 
+> Sadly.  Do you know by now if enough information is available now to
+> make it possible even in principle?
+
+> Alternatively, do you know if there's been much progress
+> characterising particular manufacturers/parts/brands or identifiable
+> characteristics etc. to find ones on which a power fail safe
+> filesystem is possible, even if it's just in principle for the moment?
+
+There's nice table somewhere. If at least size of "big block" (usually
+4MB) is known, safe fs should be possible. OTOH 4MB commit block is
+not going to be too efficient.
+
+Plus, I was told new MMC standard has "write reliable" option...
+
+> Sadly I know of a large number of systems using CF or cheap ATA SSDs
+> that were installed assuming ext3 is reliable when they are powered
+> off at the wall every day.  That's because a lot of people assume they
+> are solid-state drop-in replacements for hard disks, as that is how
+> they are advertised.
+
+False advertising, I'm afraid. I wanter if SATA SSDs do better...?
+								       Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
