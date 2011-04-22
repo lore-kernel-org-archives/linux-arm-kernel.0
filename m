@@ -1,55 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Apr 2011 23:28:43 -0700
-Subject: [PATCH] ARM: Fix relocation if image end past uncompressed
-	kernel end
-In-Reply-To: <alpine.LFD.2.00.1104212233170.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-	<20110421055945.GB13688@atomide.com>
-	<20110421104954.GH13688@atomide.com>
-	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
-	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
-	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
-Message-ID: <20110422062843.GA841@atomide.com>
+From: matteo.fortini@gmail.com (Matteo Fortini)
+Date: Fri, 22 Apr 2011 08:36:17 +0200
+Subject: [PATCH] Fix for missed MII interrupts and MDIO timeouts when FEC
+	is in STOP
+In-Reply-To: <20110421181026.GA429@tarshish>
+References: <BANLkTinkkquz1d=T-PpTSz1dpsBswD19tQ@mail.gmail.com>
+	<20110421181026.GA429@tarshish>
+Message-ID: <BANLkTim9EGaxvYvgEVFAh+iZmu4nfboSdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110421 20:20]:
-> On Thu, 21 Apr 2011, Nicolas Pitre wrote:
-> 
-> > On Thu, 21 Apr 2011, Nicolas Pitre wrote:
-> > 
-> > > On Thu, 21 Apr 2011, Tony Lindgren wrote:
-> > > 
-> > > > Otherwise we end up overwriting ourselves. This fixes booting
-> > > > on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
-> > > > (ARM: 6750/1: improvements to compressed/head.S).
-> > > > 
-> > > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > I don't understand why this is needed.  The copy loop is explicitly 
-> > > copying from the end going backward exactly to cope with this 
-> > > possibility.
-> > 
-> > I think your patch is 1) unneeded (see the copy loop code and the 
-> > comment before it), and 2) simply hiding the real bug.
+Ok I sent it to netdev, let's see if they accept it. The interface is
+not working without it.
+I patched the opensource.freescale.com git tree, since it is the most
+common start for iMX.
 
-Yes so it seems, but it also seems that there is still something else wrong..
+Regards
 
-> > I just need to modify the code in compressed/misc.c slightly for the 
-> > lzma decompressor to start or stop working randomly.  It seems that this 
-> > code might be sensitive to slight displacement in memory caused by 
-> > modifications to totally unrelated code.  I'm still trying to track this 
-> > down.
-> 
-> I found the bugger.  The problem was a bad stack alignment.
-
-.. as this patch won't solve the n900 booting problem with zImage.
-With LZMA I'm still also getting "LZMA data is corrupt".
-
-Regards,
-
-Tony
+On Thu, Apr 21, 2011 at 8:10 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Matteo,
+>
+> On Thu, Apr 21, 2011 at 04:03:49PM +0200, Matteo Fortini wrote:
+>> We are experiencing unrecoverable timeouts if we disconnect a cable from the
+>> FEC. This patch solves the issue by keeping the Ethernet enabled even in
+>> STOP. The RM doesn't state it, but i seems that if disabled, the Ethernet is
+>> not issuing interrupts to the core.
+>> (See
+>> http://forums.freescale.com/t5/i-MX-Microprocessors/iMX28-Network-MDIO-timeout-recovery-and-lost-IRQs/td-p/73309
+>> )
+>
+> Please send network driver patches to the network drivers mailing list at
+> netdev at vger.kernel.org.
+>
+> This patch does not apply to the current mainline kernel. Which kernel tree
+> are you using?
+>
+> baruch
+>
+>> ---
+>> ?drivers/net/fec.c | ? ?7 ++++++-
+>> ?1 files changed, 6 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+>> index d0e2e69..26ea72d 100644
+>> --- a/drivers/net/fec.c
+>> +++ b/drivers/net/fec.c
+>> @@ -121,8 +121,10 @@
+>> ?#if defined(CONFIG_FEC_1588) && defined(CONFIG_ARCH_MX28)
+>> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII | \
+>> ? ? ? ? ? ? ? ? FEC_ENET_TS_AVAIL | FEC_ENET_TS_TIMER)
+>> +#define FEC_STOP_IMASK (FEC_ENET_MII)
+>> ?#else
+>> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
+>> +#define FEC_STOP_IMASK (FEC_ENET_MII)
+>> ?#endif
+>>
+>> ?/* The FEC stores dest/src/type, data, and checksum for receive packets.
+>> @@ -1409,6 +1411,9 @@ fec_stop(struct net_device *dev)
+>> ? ? writel(1, fep->hwp + FEC_ECNTRL);
+>> ? ? udelay(10);
+>>
+>> + ? ?/* Reactivate the controller to get the IRQs */
+>> + ? ?writel(0x00000002, fep->hwp + FEC_ECNTRL);
+>> +
+>> ?#ifdef CONFIG_ARCH_MXS
+>> ? ? /* Check MII or RMII */
+>> ? ? if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
+>> @@ -1423,7 +1428,7 @@ fec_stop(struct net_device *dev)
+>> ? ? writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+>> ? ? if (fep->ptimer_present)
+>> ? ? ? ? fec_ptp_stop(fep->ptp_priv);
+>> - ? ?writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
+>> + ? ?writel(FEC_STOP_IMASK, fep->hwp + FEC_IMASK);
+>>
+>> ? ? netif_stop_queue(dev);
+>> ? ? fep->link = 0;
+>
+> --
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~. .~ ? Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+> ? - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>
