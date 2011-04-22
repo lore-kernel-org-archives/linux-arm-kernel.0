@@ -1,78 +1,72 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Apr 2011 16:01:55 -0700
-Subject: [PATCH 03/15] OMAP: GPIO: move bank width into struct gpio_bank
+Date: Fri, 22 Apr 2011 16:01:56 -0700
+Subject: [PATCH 04/15] OMAP: GPIO: _get_gpio_irqbank_mask: replace hard-coded
+	mask with bank->width
 In-Reply-To: <1303513327-14532-1-git-send-email-khilman@ti.com>
 References: <1303513327-14532-1-git-send-email-khilman@ti.com>
-Message-ID: <1303513327-14532-4-git-send-email-khilman@ti.com>
+Message-ID: <1303513327-14532-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than having a file-global bank_width variable, move it into
-struct gpio_bank so it can be bank-specific.   Note the bank width
-is already passed per-bank via platform_data, so current code would
-be incorrect if any banks had different width.
+Replace hard-coded mask values with bank->width which is already coming
+from platform_data.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/gpio.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/plat-omap/gpio.c |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 8b5ca6e..443fb9a 100644
+index 443fb9a..6e51a20 100644
 --- a/arch/arm/plat-omap/gpio.c
 +++ b/arch/arm/plat-omap/gpio.c
-@@ -159,6 +159,7 @@ struct gpio_bank {
- 	struct device *dev;
- 	bool dbck_flag;
- 	int stride;
-+	u32 width;
- };
+@@ -823,46 +823,40 @@ static u32 _get_gpio_irqbank_mask(struct gpio_bank *bank)
+ 	void __iomem *reg = bank->base;
+ 	int inv = 0;
+ 	u32 l;
+-	u32 mask;
++	u32 mask = (1 << bank->width) - 1;
  
- #ifdef CONFIG_ARCH_OMAP3
-@@ -184,8 +185,6 @@ static struct omap3_gpio_regs gpio_context[OMAP34XX_NR_GPIOS];
-  */
- static struct gpio_bank *gpio_bank;
- 
--static int bank_width;
--
- /* TODO: Analyze removing gpio_bank_count usage from driver code */
- int gpio_bank_count;
- 
-@@ -983,7 +982,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 		if (bank->non_wakeup_gpios & (1 << gpio)) {
- 			printk(KERN_ERR "Unable to modify wakeup on "
- 					"non-wakeup GPIO%d\n",
--					(bank - gpio_bank) * 32 + gpio);
-+			       (bank - gpio_bank) * bank->width + gpio);
- 			return -EINVAL;
- 		}
- 		spin_lock_irqsave(&bank->lock, flags);
-@@ -1650,14 +1649,14 @@ static void __init omap_gpio_chip_init(struct gpio_bank *bank)
- 	} else {
- 		bank->chip.label = "gpio";
- 		bank->chip.base = gpio;
--		gpio += bank_width;
-+		gpio += bank->width;
- 	}
--	bank->chip.ngpio = bank_width;
-+	bank->chip.ngpio = bank->width;
- 
- 	gpiochip_add(&bank->chip);
- 
- 	for (j = bank->virtual_irq_start;
--		     j < bank->virtual_irq_start + bank_width; j++) {
-+		     j < bank->virtual_irq_start + bank->width; j++) {
- 		irq_set_lockdep_class(j, &gpio_lock_class);
- 		irq_set_chip_data(j, bank);
- 		if (bank_is_mpuio(bank))
-@@ -1707,7 +1706,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	bank->dev = &pdev->dev;
- 	bank->dbck_flag = pdata->dbck_flag;
- 	bank->stride = pdata->bank_stride;
--	bank_width = pdata->bank_width;
-+	bank->width = pdata->bank_width;
- 
- 	spin_lock_init(&bank->lock);
- 
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+ 		reg += OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+-		mask = 0xffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+ 	case METHOD_GPIO_1510:
+ 		reg += OMAP1510_GPIO_INT_MASK;
+-		mask = 0xffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP16XX
+ 	case METHOD_GPIO_1610:
+ 		reg += OMAP1610_GPIO_IRQENABLE1;
+-		mask = 0xffff;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ 	case METHOD_GPIO_7XX:
+ 		reg += OMAP7XX_GPIO_INT_MASK;
+-		mask = 0xffffffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 	case METHOD_GPIO_24XX:
+ 		reg += OMAP24XX_GPIO_IRQENABLE1;
+-		mask = 0xffffffff;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP4)
+ 	case METHOD_GPIO_44XX:
+ 		reg += OMAP4_GPIO_IRQSTATUSSET0;
+-		mask = 0xffffffff;
+ 		break;
+ #endif
+ 	default:
 -- 
 1.7.4
