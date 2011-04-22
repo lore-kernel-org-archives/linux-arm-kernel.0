@@ -1,36 +1,66 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 21 Apr 2011 21:57:36 -0700
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <alpine.LFD.2.02.1104212146400.3323@ionos>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-Message-ID: <4DB10AC0.2000709@codeaurora.org>
+From: plyatov@gmail.com (Igor Plyatov)
+Date: Fri, 22 Apr 2011 09:00:13 +0400
+Subject: [PATCH] mach-at91: gsia18s board improvements and bug fixes
+In-Reply-To: <4DB04588.9000201@atmel.com>
+References: <1303291399-4075-1-git-send-email-plyatov@gmail.com>
+	<4DB04588.9000201@atmel.com>
+Message-ID: <4DB10B5D.1020602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2011 12:48 PM, Thomas Gleixner wrote:
-> On Fri, 15 Apr 2011, Sascha Hauer wrote:
->> From: Jeremy Kerr<jeremy.kerr@canonical.com>
->> + * @get:	Called by the core clock code when a device driver acquires a
->> + *		clock via clk_get(). Optional.
->> + *
->> + * @put:	Called by the core clock code when a devices driver releases a
->> + *		clock via clk_put(). Optional.
+Hi Nicolas!
+> Hi Igor,
 >
-> These callbacks are completely pointless. There are only two non empty
-> implementations in tree:
+> Le 20/04/2011 11:23, Igor Plyatov :
+>> * AT91_PIN_Pxxx port names replaced by human readable GPO_xxxx, GPI_xxxx,
+>>    GPIO_xxxx names. This simplify source code and schematic maintenance.
+> Maybe it simplifies schematic reading because the actual cpu pin names
+> are not indicated on your schematic... But for code, the AT91 pin names
+> are required, so, no for this part of the patch.
+> You may know that there is an effort ongoing to minimize the amount of
+> not needed / duplicated information in the kernel, I am afraid but I
+> think this renaming is not needed.
 >
-> One does a try_module_get(clk->owner), which should be done in generic
-> code. The other does special clock enabling magic which wants to go to
-> clk->prepare().
+> Moreover, I think that the "Buttons" part of the file:
+> arch/arm/mach-at91/include/mach/gsia18s.h
+> should be removed.
 
-Aren't you kinda contradicting yourself? In the other thread you say 
-that when we implement a generic framework, you will have to implement 
-more than what a specific arch would need. This seems to be exactly one 
-of those cases. What's wrong with it?
+OK. Corrected.
 
--Saravana
+>> * Active logic levels and default states corrected for GPOs.
+> Ok for this.
+>
+>> * Replace small functions which use platform_register_device() by its direct
+>>    calls.
+> Ok for this.
+>
+>> * Remove GPIO_CARD_UNMOUNT_1 gpio_keys_button, because it not used.
+> Ok for this.
+>
+>> * debounce_interval added for critical buttons.
+> Ok for this.
+>
+>> * Remove unneeded GPI setup code for buttons, because this done by corresponding
+>>    driver.
+> I do not see this, can you elaborate?
+
+The "gsia18s_add_device_buttons" function removed, because GPIs 
+initialization done by "gpio_keys" driver and this function replaced by 
+"platform_register_device" direct call.
+
+>> * pcf8574x_0x20_setup() and pcf8574x_0x20_teardown functions small refactoring.
+> Ok for this.
+>
+>> Signed-off-by: Igor Plyatov<plyatov@gmail.com>
+> So, can you please rewrite your patch, we will be pleased to integrate
+> it in a "fix" update of at91 Linux.
+>
+> Thanks, best regards,
+
+Rewritten and will be published as "[PATCH v2] mach-at91: gsia18s board 
+improvements and bug fixes".
+
+Best regards!
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Igor Plyatov
