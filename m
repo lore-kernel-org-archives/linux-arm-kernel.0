@@ -1,34 +1,61 @@
-From: philipp.zabel@gmail.com (pHilipp Zabel)
-Date: Fri, 22 Apr 2011 12:35:20 +0200
-Subject: [PATCH] pxa/mioa701: use gpio arrays for global and gsm gpio
-	initialization
-In-Reply-To: <87tydre1c7.fsf@free.fr>
-References: <1303329331.21545.7.camel@flow>
-	<87tydre1c7.fsf@free.fr>
-Message-ID: <BANLkTimXsD6BYa2PPXmrY=aABLNFSRW4Sw@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 22 Apr 2011 20:01:45 +0900
+Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
+In-Reply-To: <BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
+Message-ID: <4DB16019.8000800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 11:33 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Philipp Zabel <philipp.zabel@gmail.com> writes:
->
->> gpio_request_arrays() / gpio_free_arrays() are functional replacements for
->> mio_gpio_request() / mio_gpio_free(), which are now obsolete.
+Hi Andrei..
+
+Did you test this patch with ADMA?
+I wonder that be increased performance or others..
+
+Regards,
+Jaehoon Chung
+
+Andrei Warkentin wrote:
+> Hi Shawn,
+> 
+> On Sat, Apr 16, 2011 at 11:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
+>> If not calling pre_req() before sdhci_request(), request()
+>> will prepare the cache just like it did it before.
+>> It is optional to use pre_req() and post_req().
 >>
->> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
->
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Dmitry Artamonow pointed out that contrary to
-hx4700/mio_gpio_request(), gpio_request_array() is silent when a
-request fails. Would you prefer something like
-
-int rc;
-rc = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
-if (rc)
-    pr_err("MioA701: Failed to request GPIOs.\n");
-
-in there?
-
-regards
-Philipp
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> ---
+>> I worked out the patch by referring to Per's patch below.
+>>
+>>  omap_hsmmc: add support for pre_req and post_req
+>>
+>> It adds pre_req and post_req support for sdhci based host drivers to
+>> work with Per's non-blocking optimization.  But I only have imx esdhc
+>> based hardware to test.  Unfortunately, I can not measure the
+>> performance gain using mmc_test, because the current esdhc driver on
+>> mainline fails on the test.  So I just did a quick test using 'dd',
+>> but sadly, I did not see noticeable performance gain here.  The
+>> followings are possible reasons I can think of right away.
+>>
+>> * The patch did not add pre_req and post_req correctly.  Please help
+>>  review to catch the mistakes if any.
+>> * The imx esdhc driver uses SDHCI_SDMA (max_segs is 1) than SDHCI_ADAM
+>>  (max_segs is 128), due to the broken ADMA support on imx esdhc.  So
+>>  can people holding other sdhci based hardware give a try on the
+>>  patch?
+>>
+>> Hopefully, I can find some time to have a close look at the mmc_test
+>> failure and the broken ADMA with imx esdhc.
+>>
+> 
+> I'll try it out...
+> 
+> A
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
