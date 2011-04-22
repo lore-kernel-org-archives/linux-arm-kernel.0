@@ -1,696 +1,1076 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 22 Apr 2011 17:39:53 +0800
-Subject: [PATCH v6 1/3] MTD : add the common code for GPMI controller
-	driver
-In-Reply-To: <19887.57747.43423.753598@ipc1.ka-ro>
-References: <1303267549-18377-1-git-send-email-b32955@freescale.com>	<1303267549-18377-2-git-send-email-b32955@freescale.com>
-	<19887.57747.43423.753598@ipc1.ka-ro>
-Message-ID: <4DB14CE9.2040602@freescale.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 22 Apr 2011 18:51:34 +0900
+Subject: [PATCH] ARM: S3C64XX: Remove gpio-bank-X header files
+Message-ID: <1303465894-16870-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-> Huang Shijie writes:
->> These files contain the common code for the GPMI driver.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   drivers/mtd/nand/gpmi-nfc/gpmi-nfc.c | 2501 ++++++++++++++++++++++++++++++++++
->>   drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h |  488 +++++++
->>   2 files changed, 2989 insertions(+), 0 deletions(-)
->>   create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.c
->>   create mode 100644 drivers/mtd/nand/gpmi-nfc/gpmi-nfc.h
->>
->> diff --git a/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.c b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.c
->> new file mode 100644
->> index 0000000..53d6915
->> --- /dev/null
->> +++ b/drivers/mtd/nand/gpmi-nfc/gpmi-nfc.c
->> @@ -0,0 +1,2501 @@
->> +/*
->> + * Freescale GPMI NFC NAND Flash Driver
->> + *
->> + * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
->> + * Copyright (C) 2008 Embedded Alley Solutions, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program; if not, write to the Free Software Foundation, Inc.,
->> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
->> + */
->> +#include<linux/slab.h>
->> +#include "gpmi-nfc.h"
->> +
->> +/* add our owner bbt descriptor */
->> +static uint8_t scan_ff_pattern[] = { 0xff };
->> +static struct nand_bbt_descr gpmi_bbt_descr = {
->> +	.options	= 0,
->> +	.offs		= 0,
->> +	.len		= 1,
->> +	.pattern	= scan_ff_pattern
->> +};
->> +
->> +/* debug control */
->> +int gpmi_debug;
->> +
-> This could be a module_param.
->
-thanks.
->> +static ssize_t show_gpmi_debug(struct device *dev,
->> +				struct device_attribute *attr, char *buf)
->> +{
->> +	return sprintf(buf, "%d\n", gpmi_debug);
->> +}
->> +
->> +static ssize_t
->> +store_gpmi_debug(struct device *dev, struct device_attribute *attr,
->> +			const char *buf, size_t size)
->> +{
->> +	const char *p = buf;
->> +	unsigned long v;
->> +
->> +	if (strict_strtoul(p, 0,&v)<  0)
->> +		return size;
->> +
->> +	gpmi_debug = v;
->> +	return size;
->> +}
->> +
->> +static ssize_t show_ignorebad(struct device *dev,
->> +				struct device_attribute *attr, char *buf)
->> +{
->> +	struct gpmi_nfc_data *this = dev_get_drvdata(dev);
->> +	struct mil *mil =&this->mil;
->> +
->> +	return sprintf(buf, "%d\n", mil->ignore_bad_block_marks);
->> +}
->> +
->> +static ssize_t
->> +store_ignorebad(struct device *dev, struct device_attribute *attr,
->> +			const char *buf, size_t size)
->> +{
->> +	struct gpmi_nfc_data *this = dev_get_drvdata(dev);
->> +	struct mil *mil =&this->mil;
->> +	const char *p = buf;
->> +	unsigned long v;
->> +
->> +	if (strict_strtoul(p, 0,&v)<  0)
->> +		return size;
->>
-> return -EINVAL would be more appropriate here.
->
->> +
->> +	if (v>  0)
->> +		v = 1;
->> +
->> +	if (v != mil->ignore_bad_block_marks) {
->>
-> These lines could be reduced to:
-> 	if (!v == mil->ignore_bad_block_marks) {
->
-:)
->> +		if (v) {
->> +			/*
->> +			 * This will cause the NAND Flash MTD code to believe
->> +			 * that it never created a BBT and force it to call our
->> +			 * block_bad function.
->> +			 *
->> +			 * See mil_block_bad for more details.
->> +			 */
->> +			mil->saved_bbt = mil->nand.bbt;
->> +			mil->nand.bbt  = NULL;
->> +		} else {
->> +			/*
->> +			 * Restore the NAND Flash MTD's pointer
->> +			 * to its in-memory BBT.
->> +			 */
->> +			mil->nand.bbt = mil->saved_bbt;
->> +		}
->> +		mil->ignore_bad_block_marks = v;
->> +	}
->> +	return size;
->> +}
->> +
-> [...]
->> +/* This will be called after the DMA operation is finished. */
->> +static void dma_irq_callback(void *param)
->> +{
->> +	struct gpmi_nfc_data *this = param;
->> +	struct nfc_hal *nfc = this->nfc;
->> +	struct mil *mil =&this->mil;
->> +
->> +	complete(&nfc->dma_done);
->> +
->> +	switch (this->dma_type) {
->> +	case DMA_FOR_COMMAND:
->> +		dma_unmap_sg(this->dev,&mil->cmd_sgl, 1, DMA_TO_DEVICE);
->> +		break;
->> +
->> +	case DMA_FOR_READ_DATA:
->> +		dma_unmap_sg(this->dev,&mil->data_sgl, 1, DMA_FROM_DEVICE);
->> +		if (mil->direct_dma_map_ok == false)
->> +			memcpy(mil->upper_buf, (char *)mil->data_buffer_dma,
->>
-> pointless cast.
-thanks.
-> [...]
->> +static int acquire_dma_channels(struct gpmi_nfc_data *this,
->> +				const char *resource_name,
->> +				unsigned *low_channel, unsigned *high_channel)
->> +{
->> +	struct platform_device *pdev = this->pdev;
-> 	struct gpmi_nfc_platform_data *pdata = pdev->dev.platform_data;
-> see below.
->
->> +	struct resource *r, *r_dma;
->> +	unsigned int i;
->> +
->> +	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, resource_name);
->> +	r_dma = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
->> +					GPMI_NFC_DMA_INTERRUPT_RES_NAME);
->> +	if (!r || !r_dma) {
->> +		log("Can't get resource for DMA");
->> +		return -ENXIO;
->> +	}
->> +
->> +	/* used in gpmi_dma_filter() */
->> +	this->private = r;
->> +
->> +	for (i = r->start; i<= r->end; i++) {
->> +		dma_cap_mask_t		mask;
->> +		struct dma_chan		*dma_chan;
->> +
-> 		if (i - r->start>= pdata->max_chip_count)
-> 			break;
->
-This is a good idea. it can limits the real dma channels.
->> +		dma_cap_zero(mask);
->> +		dma_cap_set(DMA_SLAVE, mask);
->> +
->> +		/* get the DMA interrupt */
->> +		this->dma_data.chan_irq = r_dma->start +
->> +			((r_dma->start != r_dma->end) ? (i - r->start) : 0);
->> +
->> +		dma_chan = dma_request_channel(mask, gpmi_dma_filter, this);
->> +		if (!dma_chan)
->> +			goto acquire_err;
->> +		/* fill the first empty item */
->> +		this->dma_chans[i - r->start] = dma_chan;
->> +	}
->> +
->> +	*low_channel  = r->start;
->> +	*high_channel = r->end;
-> 	*high_channel = i;
->
-> This will acquire only those DMA channels that are actually needed.
->
-> [...]
->> +static int read_page_prepare(struct gpmi_nfc_data *this,
->> +			void *destination, unsigned length,
->> +			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
->> +			void **use_virt, dma_addr_t *use_phys)
->> +{
->> +	struct device  *dev = this->dev;
->> +	dma_addr_t destination_phys = ~0;
->> +
->> +	if (virt_addr_valid(destination))
->> +		destination_phys = dma_map_single(dev, (void *)destination,
->>
-> pointless cast.
->
-> [...]
->> +static int mil_alloc_dma_buffer(struct gpmi_nfc_data *this)
->> +{
->> +	struct nfc_geometry *geo =&this->nfc_geometry;
->> +	struct device *dev = this->dev;
->> +	struct mil *mil =&this->mil;
->> +
->> +	/* [1] Allocate a command buffer. PAGE_SIZE is enough. */
->> +	mil->cmd_buffer = kzalloc(PAGE_SIZE, GFP_DMA);
->> +	if (mil->cmd_buffer == NULL)
->> +		goto error_alloc;
->> +
->> +	/* [2] Allocate a read/write data buffer. PAGE_SIZE is enough. */
->> +	mil->data_buffer_dma = kzalloc(PAGE_SIZE, GFP_DMA);
->> +	if (mil->data_buffer_dma == NULL)
->> +		goto error_alloc;
->> +
->> +	/*
->> +	 * [3] Allocate the page buffer.
->> +	 *
->> +	 * Both the payload buffer and the auxiliary buffer must appear on
->> +	 * 32-bit boundaries. We presume the size of the payload buffer is a
->> +	 * power of two and is much larger than four, which guarantees the
->> +	 * auxiliary buffer will appear on a 32-bit boundary.
->> +	 */
->> +	mil->page_buffer_size = geo->payload_size_in_bytes +
->> +				geo->auxiliary_size_in_bytes;
->> +
->> +	mil->page_buffer_virt = dma_alloc_coherent(dev, mil->page_buffer_size,
->> +					&mil->page_buffer_phys, GFP_DMA);
->> +	if (!mil->page_buffer_virt)
->> +		goto error_alloc;
->> +
->> +
->> +	/* Slice up the page buffer. */
->> +	mil->payload_virt = mil->page_buffer_virt;
->> +	mil->payload_phys = mil->page_buffer_phys;
->> +	mil->auxiliary_virt = ((char *) mil->payload_virt) +
->>
-> unnecessary cast.
->
-> [...]
->
-> The functions from here thru gpmi_nfc_probe could be marked __devinit,
-> so they can be discarded after boot.
->> +static int nand_boot_set_geometry(struct gpmi_nfc_data *this)
->> +{
->> +	struct boot_rom_geometry *geometry =&this->rom_geometry;
->> +
->> +	/*
->> +	 * Set the boot block stride size.
->> +	 *
->> +	 * In principle, we should be reading this from the OTP bits, since
->> +	 * that's where the ROM is going to get it. In fact, we don't have any
->> +	 * way to read the OTP bits, so we go with the default and hope for the
->> +	 * best.
->> +	 */
->> +	geometry->stride_size_in_pages = 64;
->> +
->> +	/*
->> +	 * Set the search area stride exponent.
->> +	 *
->> +	 * In principle, we should be reading this from the OTP bits, since
->> +	 * that's where the ROM is going to get it. In fact, we don't have any
->> +	 * way to read the OTP bits, so we go with the default and hope for the
->> +	 * best.
->> +	 */
->> +	geometry->search_area_stride_exponent = 2;
->> +
->> +	if (gpmi_debug&  GPMI_DEBUG_INIT)
->> +		log("stride size in page : %d, search areas : %d",
->> +			geometry->stride_size_in_pages,
->> +			geometry->search_area_stride_exponent);
->> +	return 0;
->> +}
->> +
->> +static const char  *fingerprint = "STMP";
->> +static int mx23_check_transcription_stamp(struct gpmi_nfc_data *this)
->> +{
->> +	struct boot_rom_geometry *rom_geo =&this->rom_geometry;
->> +	struct mil *mil =&this->mil;
->> +	struct mtd_info *mtd =&mil->mtd;
->> +	struct nand_chip *nand =&mil->nand;
->> +	unsigned int search_area_size_in_strides;
->> +	unsigned int stride;
->> +	unsigned int page;
->> +	loff_t byte;
->> +	uint8_t *buffer = nand->buffers->databuf;
->> +	int saved_chip_number;
->> +	int found_an_ncb_fingerprint = false;
->> +
->> +	/* Compute the number of strides in a search area. */
->> +	search_area_size_in_strides = 1<<  rom_geo->search_area_stride_exponent;
->> +
->> +	/* Select chip 0. */
->> +	saved_chip_number = mil->current_chip;
->> +	nand->select_chip(mtd, 0);
->> +
->> +	/*
->> +	 * Loop through the first search area, looking for the NCB fingerprint.
->> +	 */
->> +	pr_info("Scanning for an NCB fingerprint...\n");
->> +
->> +	for (stride = 0; stride<  search_area_size_in_strides; stride++) {
->> +		/* Compute the page and byte addresses. */
->> +		page = stride * rom_geo->stride_size_in_pages;
->> +		byte = page   * mtd->writesize;
->> +
->> +		pr_info("  Looking for a fingerprint in page 0x%x\n", page);
->> +
->> +		/*
->> +		 * Read the NCB fingerprint. The fingerprint is four bytes long
->> +		 * and starts in the 12th byte of the page.
->> +		 */
->> +		nand->cmdfunc(mtd, NAND_CMD_READ0, 12, page);
->> +		nand->read_buf(mtd, buffer, strlen(fingerprint));
->> +
->> +		/* Look for the fingerprint. */
->> +		if (!memcmp(buffer, fingerprint, strlen(fingerprint))) {
->> +			found_an_ncb_fingerprint = true;
->> +			break;
->> +		}
->> +
->> +	}
->> +
->> +	/* Deselect chip 0. */
->> +	nand->select_chip(mtd, saved_chip_number);
->> +
->> +	if (found_an_ncb_fingerprint)
->> +		pr_info("  Found a fingerprint\n");
->> +	else
->> +		pr_info("  No fingerprint found\n");
->> +	return found_an_ncb_fingerprint;
->> +}
->> +
->> +/* Writes a transcription stamp. */
->> +static int mx23_write_transcription_stamp(struct gpmi_nfc_data *this)
->> +{
->> +	struct device *dev = this->dev;
->> +	struct boot_rom_geometry *rom_geo =&this->rom_geometry;
->> +	struct mil *mil =&this->mil;
->> +	struct mtd_info *mtd =&mil->mtd;
->> +	struct nand_chip *nand =&mil->nand;
->> +	unsigned int block_size_in_pages;
->> +	unsigned int search_area_size_in_strides;
->> +	unsigned int search_area_size_in_pages;
->> +	unsigned int search_area_size_in_blocks;
->> +	unsigned int block;
->> +	unsigned int stride;
->> +	unsigned int page;
->> +	loff_t       byte;
->> +	uint8_t      *buffer = nand->buffers->databuf;
->> +	int saved_chip_number;
->> +	int status;
->> +
->> +	/* Compute the search area geometry. */
->> +	block_size_in_pages = mtd->erasesize / mtd->writesize;
->> +	search_area_size_in_strides = 1<<  rom_geo->search_area_stride_exponent;
->> +	search_area_size_in_pages = search_area_size_in_strides *
->> +					rom_geo->stride_size_in_pages;
->> +	search_area_size_in_blocks =
->> +		  (search_area_size_in_pages + (block_size_in_pages - 1)) /
->> +				    block_size_in_pages;
->> +
->> +	pr_info("-------------------------------------------\n");
->> +	pr_info("Search Area Geometry\n");
->> +	pr_info("-------------------------------------------\n");
->> +	pr_info("Search Area Size in Blocks : %u", search_area_size_in_blocks);
->> +	pr_info("Search Area Size in Strides: %u", search_area_size_in_strides);
->> +	pr_info("Search Area Size in Pages  : %u", search_area_size_in_pages);
->> +
->> +	/* Select chip 0. */
->> +	saved_chip_number = mil->current_chip;
->> +	nand->select_chip(mtd, 0);
->> +
->> +	/* Loop over blocks in the first search area, erasing them. */
->> +	pr_info("Erasing the search area...\n");
->> +
->> +	for (block = 0; block<  search_area_size_in_blocks; block++) {
->> +		/* Compute the page address. */
->> +		page = block * block_size_in_pages;
->> +
->> +		/* Erase this block. */
->> +		pr_info("  Erasing block 0x%x\n", block);
->> +		nand->cmdfunc(mtd, NAND_CMD_ERASE1, -1, page);
->> +		nand->cmdfunc(mtd, NAND_CMD_ERASE2, -1, -1);
->> +
->> +		/* Wait for the erase to finish. */
->> +		status = nand->waitfunc(mtd, nand);
->> +		if (status&  NAND_STATUS_FAIL)
->> +			dev_err(dev, "[%s] Erase failed.\n", __func__);
->> +	}
->> +
->> +	/* Write the NCB fingerprint into the page buffer. */
->> +	memset(buffer, ~0, mtd->writesize);
->> +	memset(nand->oob_poi, ~0, mtd->oobsize);
->> +	memcpy(buffer + 12, fingerprint, strlen(fingerprint));
->> +
->> +	/* Loop through the first search area, writing NCB fingerprints. */
->> +	pr_info("Writing NCB fingerprints...\n");
->> +	for (stride = 0; stride<  search_area_size_in_strides; stride++) {
->> +		/* Compute the page and byte addresses. */
->> +		page = stride * rom_geo->stride_size_in_pages;
->> +		byte = page   * mtd->writesize;
->> +
->> +		/* Write the first page of the current stride. */
->> +		pr_info("  Writing an NCB fingerprint in page 0x%x\n", page);
->> +		nand->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
->> +		nand->ecc.write_page_raw(mtd, nand, buffer);
->> +		nand->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
->> +
->> +		/* Wait for the write to finish. */
->> +		status = nand->waitfunc(mtd, nand);
->> +		if (status&  NAND_STATUS_FAIL)
->> +			dev_err(dev, "[%s] Write failed.\n", __func__);
->> +	}
->> +
->> +	/* Deselect chip 0. */
->> +	nand->select_chip(mtd, saved_chip_number);
->> +	return 0;
->> +}
->> +
->> +int mx23_boot_init(struct gpmi_nfc_data  *this)
->> +{
->> +	struct device *dev = this->dev;
->> +	struct mil *mil =&this->mil;
->> +	struct nand_chip *nand =&mil->nand;
->> +	struct mtd_info *mtd =&mil->mtd;
->> +	unsigned int block_count;
->> +	unsigned int block;
->> +	int     chip;
->> +	int     page;
->> +	loff_t  byte;
->> +	uint8_t block_mark;
->> +	int     error = 0;
->> +
->> +	/*
->> +	 * If control arrives here, we can't use block mark swapping, which
->> +	 * means we're forced to use transcription. First, scan for the
->> +	 * transcription stamp. If we find it, then we don't have to do
->> +	 * anything -- the block marks are already transcribed.
->> +	 */
->> +	if (mx23_check_transcription_stamp(this))
->> +		return 0;
->> +
->> +	/*
->> +	 * If control arrives here, we couldn't find a transcription stamp, so
->> +	 * so we presume the block marks are in the conventional location.
->> +	 */
->> +	pr_info("Transcribing bad block marks...\n");
->> +
->> +	/* Compute the number of blocks in the entire medium. */
->> +	block_count = nand->chipsize>>  nand->phys_erase_shift;
->> +
->> +	/*
->> +	 * Loop over all the blocks in the medium, transcribing block marks as
->> +	 * we go.
->> +	 */
->> +	for (block = 0; block<  block_count; block++) {
->> +		/*
->> +		 * Compute the chip, page and byte addresses for this block's
->> +		 * conventional mark.
->> +		 */
->> +		chip = block>>  (nand->chip_shift - nand->phys_erase_shift);
->> +		page = block<<  (nand->phys_erase_shift - nand->page_shift);
->> +		byte = block<<   nand->phys_erase_shift;
->> +
->> +		/* Select the chip. */
->> +		nand->select_chip(mtd, chip);
->> +
->> +		/* Send the command to read the conventional block mark. */
->> +		nand->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
->> +
->> +		/* Read the conventional block mark. */
->> +		block_mark = nand->read_byte(mtd);
->> +
->> +		/*
->> +		 * Check if the block is marked bad. If so, we need to mark it
->> +		 * again, but this time the result will be a mark in the
->> +		 * location where we transcribe block marks.
->> +		 *
->> +		 * Notice that we have to explicitly set the marking_a_bad_block
->> +		 * member before we call through the block_markbad function
->> +		 * pointer in the owning struct nand_chip. If we could call
->> +		 * though the block_markbad function pointer in the owning
->> +		 * struct mtd_info, which we have hooked, then this would be
->> +		 * taken care of for us. Unfortunately, we can't because that
->> +		 * higher-level code path will do things like consulting the
->> +		 * in-memory bad block table -- which doesn't even exist yet!
->> +		 * So, we have to call at a lower level and handle some details
->> +		 * ourselves.
->> +		 */
->> +		if (block_mark != 0xff) {
->> +			pr_info("Transcribing mark in block %u\n", block);
->> +			mil->marking_a_bad_block = true;
->> +			error = nand->block_markbad(mtd, byte);
->> +			mil->marking_a_bad_block = false;
->> +			if (error)
->> +				dev_err(dev, "Failed to mark block bad with "
->> +							"error %d\n", error);
->> +		}
->> +
->> +		/* Deselect the chip. */
->> +		nand->select_chip(mtd, -1);
->> +	}
->> +
->> +	/* Write the stamp that indicates we've transcribed the block marks. */
->> +	mx23_write_transcription_stamp(this);
->> +	return 0;
->> +}
->> +
->> +static int nand_boot_init(struct gpmi_nfc_data  *this)
->> +{
->> +	nand_boot_set_geometry(this);
->> +
->> +	/* This is ROM arch-specific initilization before the BBT scanning. */
->> +	if (GPMI_IS_MX23(this))
->> +		return mx23_boot_init(this);
->> +	return 0;
->> +}
->> +
->> +static void show_nfc_geometry(struct nfc_geometry *geo)
->> +{
->> +	pr_info("---------------------------------------\n");
->> +	pr_info("	NFC Geometry (used by BCH)\n");
->> +	pr_info("---------------------------------------\n");
->> +	pr_info("ECC Algorithm          : %s\n", geo->ecc_algorithm);
->> +	pr_info("ECC Strength           : %u\n", geo->ecc_strength);
->> +	pr_info("Page Size in Bytes     : %u\n", geo->page_size_in_bytes);
->> +	pr_info("Metadata Size in Bytes : %u\n", geo->metadata_size_in_bytes);
->> +	pr_info("ECC Chunk Size in Bytes: %u\n", geo->ecc_chunk_size_in_bytes);
->> +	pr_info("ECC Chunk Count        : %u\n", geo->ecc_chunk_count);
->> +	pr_info("Payload Size in Bytes  : %u\n", geo->payload_size_in_bytes);
->> +	pr_info("Auxiliary Size in Bytes: %u\n", geo->auxiliary_size_in_bytes);
->> +	pr_info("Auxiliary Status Offset: %u\n", geo->auxiliary_status_offset);
->> +	pr_info("Block Mark Byte Offset : %u\n", geo->block_mark_byte_offset);
->> +	pr_info("Block Mark Bit Offset  : %u\n", geo->block_mark_bit_offset);
->> +}
->> +
->> +static int mil_set_geometry(struct gpmi_nfc_data *this)
->> +{
->> +	struct nfc_hal *nfc = this->nfc;
->> +	struct nfc_geometry *geo =&this->nfc_geometry;
->> +	int error;
->> +
->> +	/* Free the temporary DMA memory for read ID case */
->> +	mil_free_dma_buffer(this);
->> +
->> +	/* Set up the NFC geometry which is used by BCH. */
->> +	error = nfc->set_geometry(this);
->> +	if (error != 0) {
->> +		log("NFC set geometry error : %d", error);
->> +		return error;
->> +	}
->> +	if (gpmi_debug&  GPMI_DEBUG_INIT)
->> +		show_nfc_geometry(geo);
->> +
->> +	/* Alloc the new DMA buffers according to the pagesize and oobsize */
->> +	return mil_alloc_dma_buffer(this);
->> +}
->> +
->> +static int mil_pre_bbt_scan(struct gpmi_nfc_data  *this)
->> +{
->> +	struct nand_chip *nand =&this->mil.nand;
->> +	struct mtd_info *mtd =&this->mil.mtd;
->> +	struct nand_ecclayout *layout = nand->ecc.layout;
->> +	struct nfc_hal *nfc = this->nfc;
->> +	int error;
->> +
->> +	/* fix the ECC layout before the scanning */
->> +	layout->eccbytes          = 0;
->> +	layout->oobavail          = mtd->oobsize;
->> +	layout->oobfree[0].offset = 0;
->> +	layout->oobfree[0].length = mtd->oobsize;
->> +
->> +	mtd->oobavail = nand->ecc.layout->oobavail;
->> +
->> +	/* Set up swap block-mark, must be set before the mil_set_geometry() */
->> +	if (GPMI_IS_MX23(this))
->> +		this->swap_block_mark = false;
->> +	else
->> +		this->swap_block_mark = true;
->> +
->> +	/* Set up the medium geometry */
->> +	error = mil_set_geometry(this);
->> +	if (error)
->> +		return error;
->> +
->> +	/* extra init */
->> +	if (nfc->extra_init) {
->> +		error = nfc->extra_init(this);
->> +		if (error != 0)
->> +			return error;
->> +	}
->> +
->> +	/* NAND boot init, depends on the mil_set_geometry(). */
->> +	return nand_boot_init(this);
->> +}
->> +
->> +static int mil_scan_bbt(struct mtd_info *mtd)
->> +{
->> +	struct nand_chip *nand = mtd->priv;
->> +	struct gpmi_nfc_data *this = nand->priv;
->> +	int error;
->> +
->> +	/* Prepare for the BBT scan. */
->> +	error = mil_pre_bbt_scan(this);
->> +	if (error)
->> +		return error;
->> +
->> +	/* use the default BBT implementation */
->> +	return nand_default_bbt(mtd);
->> +}
->> +
->> +static const char *cmd_parse = "cmdlinepart";
->>
-> This should be a NULL terminated list of strings:
-> static const char *cmd_parse[] = { "cmdlinepart", NULL };
->
-thanks a lot.
->> +static int mil_partitions_init(struct gpmi_nfc_data *this)
->> +{
->> +	struct gpmi_nfc_platform_data *pdata = this->pdata;
->> +	struct mil *mil =&this->mil;
->> +	struct mtd_info *mtd =&mil->mtd;
->> +
->> +	/* use the command line for simple partitions layout */
->> +	mil->partition_count = parse_mtd_partitions(mtd,&cmd_parse,
->> +						&mil->partitions, 0);
->> +	if (mil->partition_count)
->> +		return add_mtd_partitions(mtd, mil->partitions,
->> +					mil->partition_count);
->> +
->> +	/* The complicated partitions layout uses this. */
->> +	if (pdata->partitions&&  pdata->partition_count>  0)
->> +		return add_mtd_partitions(mtd, pdata->partitions,
->> +					pdata->partition_count);
->> +	return 0;
-> How about:
-> 	return mtd_add_device(mtd);
-> so you will get the whole flash registered in case there are no
-> partitions defined.
->
-no problem.
->> +#ifdef CONFIG_PM
->> +static int gpmi_nfc_suspend(struct platform_device *pdev, pm_message_t state)
->> +{
->> +	return 0;
->> +}
->> +static int gpmi_nfc_resume(struct platform_device *pdev)
->> +{
->> +	return 0;
->> +}
->> +#else
->> +#define gpmi_nfc_suspend NULL
->> +#define gpmi_nfc_resume  NULL
->> +#endif
->> +
-> There is no point in adding empty suspend/resume functions.
-> Furthermore you should use dev_pm_ops.
->
-Ok.  I think the gpmi needs to do nothing when suspend.
+The gpio-bank-X header files of S3C64XX have defines which can be
+substituted by more common API, so they can be removed. This is compile
+tested only.
 
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+---
+ arch/arm/mach-s3c64xx/dev-spi.c                  |   20 ++----
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h |   48 --------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h |   60 -----------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h |   53 ---------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h |   49 --------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h |   44 -------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h |   71 ---------------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h |   42 ------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h |   74 ----------------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h |   40 ------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h |   36 -----------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h |   54 ----------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h |   70 --------------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h |   69 --------------------
+ arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h |   46 -------------
+ arch/arm/mach-s3c64xx/mach-smdk6410.c            |    1 -
+ arch/arm/mach-s3c64xx/pm.c                       |   35 +++++------
+ arch/arm/mach-s3c64xx/setup-i2c0.c               |    7 +--
+ arch/arm/mach-s3c64xx/setup-i2c1.c               |    7 +--
+ arch/arm/mach-s3c64xx/sleep.S                    |    8 ++-
+ 20 files changed, 34 insertions(+), 800 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
 
-Best Regards
-Huang shijie
-> Lothar Wa?mann
+diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
+index 405e621..82db072 100644
+--- a/arch/arm/mach-s3c64xx/dev-spi.c
++++ b/arch/arm/mach-s3c64xx/dev-spi.c
+@@ -16,7 +16,6 @@
+ 
+ #include <mach/dma.h>
+ #include <mach/map.h>
+-#include <mach/gpio-bank-c.h>
+ #include <mach/spi-clocks.h>
+ #include <mach/irqs.h>
+ 
+@@ -40,23 +39,15 @@ static char *spi_src_clks[] = {
+  */
+ static int s3c64xx_spi_cfg_gpio(struct platform_device *pdev)
+ {
++	unsigned int base;
++
+ 	switch (pdev->id) {
+ 	case 0:
+-		s3c_gpio_cfgpin(S3C64XX_GPC(0), S3C64XX_GPC0_SPI_MISO0);
+-		s3c_gpio_cfgpin(S3C64XX_GPC(1), S3C64XX_GPC1_SPI_CLKO);
+-		s3c_gpio_cfgpin(S3C64XX_GPC(2), S3C64XX_GPC2_SPI_MOSIO);
+-		s3c_gpio_setpull(S3C64XX_GPC(0), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S3C64XX_GPC(1), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S3C64XX_GPC(2), S3C_GPIO_PULL_UP);
++		base = S3C64XX_GPC(0);
+ 		break;
+ 
+ 	case 1:
+-		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_SPI_MISO1);
+-		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_SPI_CLK1);
+-		s3c_gpio_cfgpin(S3C64XX_GPC(6), S3C64XX_GPC6_SPI_MOSI1);
+-		s3c_gpio_setpull(S3C64XX_GPC(4), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S3C64XX_GPC(5), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S3C64XX_GPC(6), S3C_GPIO_PULL_UP);
++		base = S3C64XX_GPC(4);
+ 		break;
+ 
+ 	default:
+@@ -64,6 +55,9 @@ static int s3c64xx_spi_cfg_gpio(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	s3c_gpio_cfgall_range(base, 3,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
+deleted file mode 100644
+index 34212e1..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank A register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPACON			(S3C64XX_GPA_BASE + 0x00)
+-#define S3C64XX_GPADAT			(S3C64XX_GPA_BASE + 0x04)
+-#define S3C64XX_GPAPUD			(S3C64XX_GPA_BASE + 0x08)
+-#define S3C64XX_GPACONSLP		(S3C64XX_GPA_BASE + 0x0c)
+-#define S3C64XX_GPAPUDSLP		(S3C64XX_GPA_BASE + 0x10)
+-
+-#define S3C64XX_GPA_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPA_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPA_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPA0_UART_RXD0		(0x02 << 0)
+-#define S3C64XX_GPA0_EINT_G1_0		(0x07 << 0)
+-
+-#define S3C64XX_GPA1_UART_TXD0		(0x02 << 4)
+-#define S3C64XX_GPA1_EINT_G1_1		(0x07 << 4)
+-
+-#define S3C64XX_GPA2_UART_nCTS0		(0x02 << 8)
+-#define S3C64XX_GPA2_EINT_G1_2		(0x07 << 8)
+-
+-#define S3C64XX_GPA3_UART_nRTS0		(0x02 << 12)
+-#define S3C64XX_GPA3_EINT_G1_3		(0x07 << 12)
+-
+-#define S3C64XX_GPA4_UART_RXD1		(0x02 << 16)
+-#define S3C64XX_GPA4_EINT_G1_4		(0x07 << 16)
+-
+-#define S3C64XX_GPA5_UART_TXD1		(0x02 << 20)
+-#define S3C64XX_GPA5_EINT_G1_5		(0x07 << 20)
+-
+-#define S3C64XX_GPA6_UART_nCTS1		(0x02 << 24)
+-#define S3C64XX_GPA6_EINT_G1_6		(0x07 << 24)
+-
+-#define S3C64XX_GPA7_UART_nRTS1		(0x02 << 28)
+-#define S3C64XX_GPA7_EINT_G1_7		(0x07 << 28)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
+deleted file mode 100644
+index 7232c03..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
++++ /dev/null
+@@ -1,60 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank B register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPBCON			(S3C64XX_GPB_BASE + 0x00)
+-#define S3C64XX_GPBDAT			(S3C64XX_GPB_BASE + 0x04)
+-#define S3C64XX_GPBPUD			(S3C64XX_GPB_BASE + 0x08)
+-#define S3C64XX_GPBCONSLP		(S3C64XX_GPB_BASE + 0x0c)
+-#define S3C64XX_GPBPUDSLP		(S3C64XX_GPB_BASE + 0x10)
+-
+-#define S3C64XX_GPB_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPB_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPB_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPB0_UART_RXD2		(0x02 << 0)
+-#define S3C64XX_GPB0_EXTDMA_REQ		(0x03 << 0)
+-#define S3C64XX_GPB0_IrDA_RXD		(0x04 << 0)
+-#define S3C64XX_GPB0_ADDR_CF0		(0x05 << 0)
+-#define S3C64XX_GPB0_EINT_G1_8		(0x07 << 0)
+-
+-#define S3C64XX_GPB1_UART_TXD2		(0x02 << 4)
+-#define S3C64XX_GPB1_EXTDMA_ACK		(0x03 << 4)
+-#define S3C64XX_GPB1_IrDA_TXD		(0x04 << 4)
+-#define S3C64XX_GPB1_ADDR_CF1		(0x05 << 4)
+-#define S3C64XX_GPB1_EINT_G1_9		(0x07 << 4)
+-
+-#define S3C64XX_GPB2_UART_RXD3		(0x02 << 8)
+-#define S3C64XX_GPB2_IrDA_RXD		(0x03 << 8)
+-#define S3C64XX_GPB2_EXTDMA_REQ		(0x04 << 8)
+-#define S3C64XX_GPB2_ADDR_CF2		(0x05 << 8)
+-#define S3C64XX_GPB2_I2C_SCL1		(0x06 << 8)
+-#define S3C64XX_GPB2_EINT_G1_10		(0x07 << 8)
+-
+-#define S3C64XX_GPB3_UART_TXD3		(0x02 << 12)
+-#define S3C64XX_GPB3_IrDA_TXD		(0x03 << 12)
+-#define S3C64XX_GPB3_EXTDMA_ACK		(0x04 << 12)
+-#define S3C64XX_GPB3_I2C_SDA1		(0x06 << 12)
+-#define S3C64XX_GPB3_EINT_G1_11		(0x07 << 12)
+-
+-#define S3C64XX_GPB4_IrDA_SDBW		(0x02 << 16)
+-#define S3C64XX_GPB4_CAM_FIELD		(0x03 << 16)
+-#define S3C64XX_GPB4_CF_DATA_DIR	(0x04 << 16)
+-#define S3C64XX_GPB4_EINT_G1_12		(0x07 << 16)
+-
+-#define S3C64XX_GPB5_I2C_SCL0		(0x02 << 20)
+-#define S3C64XX_GPB5_EINT_G1_13		(0x07 << 20)
+-
+-#define S3C64XX_GPB6_I2C_SDA0		(0x02 << 24)
+-#define S3C64XX_GPB6_EINT_G1_14		(0x07 << 24)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
+deleted file mode 100644
+index db189ab..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank C register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPCCON			(S3C64XX_GPC_BASE + 0x00)
+-#define S3C64XX_GPCDAT			(S3C64XX_GPC_BASE + 0x04)
+-#define S3C64XX_GPCPUD			(S3C64XX_GPC_BASE + 0x08)
+-#define S3C64XX_GPCCONSLP		(S3C64XX_GPC_BASE + 0x0c)
+-#define S3C64XX_GPCPUDSLP		(S3C64XX_GPC_BASE + 0x10)
+-
+-#define S3C64XX_GPC_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPC_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPC_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPC0_SPI_MISO0		(0x02 << 0)
+-#define S3C64XX_GPC0_EINT_G2_0		(0x07 << 0)
+-
+-#define S3C64XX_GPC1_SPI_CLKO		(0x02 << 4)
+-#define S3C64XX_GPC1_EINT_G2_1		(0x07 << 4)
+-
+-#define S3C64XX_GPC2_SPI_MOSIO		(0x02 << 8)
+-#define S3C64XX_GPC2_EINT_G2_2		(0x07 << 8)
+-
+-#define S3C64XX_GPC3_SPI_nCSO		(0x02 << 12)
+-#define S3C64XX_GPC3_EINT_G2_3		(0x07 << 12)
+-
+-#define S3C64XX_GPC4_SPI_MISO1		(0x02 << 16)
+-#define S3C64XX_GPC4_MMC2_CMD		(0x03 << 16)
+-#define S3C64XX_GPC4_I2S_V40_DO0	(0x05 << 16)
+-#define S3C64XX_GPC4_EINT_G2_4		(0x07 << 16)
+-
+-#define S3C64XX_GPC5_SPI_CLK1		(0x02 << 20)
+-#define S3C64XX_GPC5_MMC2_CLK		(0x03 << 20)
+-#define S3C64XX_GPC5_I2S_V40_DO1	(0x05 << 20)
+-#define S3C64XX_GPC5_EINT_G2_5		(0x07 << 20)
+-
+-#define S3C64XX_GPC6_SPI_MOSI1		(0x02 << 24)
+-#define S3C64XX_GPC6_EINT_G2_6		(0x07 << 24)
+-
+-#define S3C64XX_GPC7_SPI_nCS1		(0x02 << 28)
+-#define S3C64XX_GPC7_I2S_V40_DO2	(0x05 << 28)
+-#define S3C64XX_GPC7_EINT_G2_7		(0x07 << 28)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
+deleted file mode 100644
+index 1a01cee..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank D register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPDCON			(S3C64XX_GPD_BASE + 0x00)
+-#define S3C64XX_GPDDAT			(S3C64XX_GPD_BASE + 0x04)
+-#define S3C64XX_GPDPUD			(S3C64XX_GPD_BASE + 0x08)
+-#define S3C64XX_GPDCONSLP		(S3C64XX_GPD_BASE + 0x0c)
+-#define S3C64XX_GPDPUDSLP		(S3C64XX_GPD_BASE + 0x10)
+-
+-#define S3C64XX_GPD_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPD_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPD_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPD0_PCM0_SCLK		(0x02 << 0)
+-#define S3C64XX_GPD0_I2S0_CLK		(0x03 << 0)
+-#define S3C64XX_GPD0_AC97_BITCLK	(0x04 << 0)
+-#define S3C64XX_GPD0_EINT_G3_0		(0x07 << 0)
+-
+-#define S3C64XX_GPD1_PCM0_EXTCLK	(0x02 << 4)
+-#define S3C64XX_GPD1_I2S0_CDCLK		(0x03 << 4)
+-#define S3C64XX_GPD1_AC97_nRESET	(0x04 << 4)
+-#define S3C64XX_GPD1_EINT_G3_1		(0x07 << 4)
+-
+-#define S3C64XX_GPD2_PCM0_FSYNC		(0x02 << 8)
+-#define S3C64XX_GPD2_I2S0_LRCLK		(0x03 << 8)
+-#define S3C64XX_GPD2_AC97_SYNC		(0x04 << 8)
+-#define S3C64XX_GPD2_EINT_G3_2		(0x07 << 8)
+-
+-#define S3C64XX_GPD3_PCM0_SIN		(0x02 << 12)
+-#define S3C64XX_GPD3_I2S0_DI		(0x03 << 12)
+-#define S3C64XX_GPD3_AC97_SDI		(0x04 << 12)
+-#define S3C64XX_GPD3_EINT_G3_3		(0x07 << 12)
+-
+-#define S3C64XX_GPD4_PCM0_SOUT		(0x02 << 16)
+-#define S3C64XX_GPD4_I2S0_D0		(0x03 << 16)
+-#define S3C64XX_GPD4_AC97_SDO		(0x04 << 16)
+-#define S3C64XX_GPD4_EINT_G3_4		(0x07 << 16)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
+deleted file mode 100644
+index f057adb..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank E register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPECON			(S3C64XX_GPE_BASE + 0x00)
+-#define S3C64XX_GPEDAT			(S3C64XX_GPE_BASE + 0x04)
+-#define S3C64XX_GPEPUD			(S3C64XX_GPE_BASE + 0x08)
+-#define S3C64XX_GPECONSLP		(S3C64XX_GPE_BASE + 0x0c)
+-#define S3C64XX_GPEPUDSLP		(S3C64XX_GPE_BASE + 0x10)
+-
+-#define S3C64XX_GPE_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPE_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPE_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPE0_PCM1_SCLK		(0x02 << 0)
+-#define S3C64XX_GPE0_I2S1_CLK		(0x03 << 0)
+-#define S3C64XX_GPE0_AC97_BITCLK	(0x04 << 0)
+-
+-#define S3C64XX_GPE1_PCM1_EXTCLK	(0x02 << 4)
+-#define S3C64XX_GPE1_I2S1_CDCLK		(0x03 << 4)
+-#define S3C64XX_GPE1_AC97_nRESET	(0x04 << 4)
+-
+-#define S3C64XX_GPE2_PCM1_FSYNC		(0x02 << 8)
+-#define S3C64XX_GPE2_I2S1_LRCLK		(0x03 << 8)
+-#define S3C64XX_GPE2_AC97_SYNC		(0x04 << 8)
+-
+-#define S3C64XX_GPE3_PCM1_SIN		(0x02 << 12)
+-#define S3C64XX_GPE3_I2S1_DI		(0x03 << 12)
+-#define S3C64XX_GPE3_AC97_SDI		(0x04 << 12)
+-
+-#define S3C64XX_GPE4_PCM1_SOUT		(0x02 << 16)
+-#define S3C64XX_GPE4_I2S1_D0		(0x03 << 16)
+-#define S3C64XX_GPE4_AC97_SDO		(0x04 << 16)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
+deleted file mode 100644
+index 62ab8f5..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank F register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPFCON			(S3C64XX_GPF_BASE + 0x00)
+-#define S3C64XX_GPFDAT			(S3C64XX_GPF_BASE + 0x04)
+-#define S3C64XX_GPFPUD			(S3C64XX_GPF_BASE + 0x08)
+-#define S3C64XX_GPFCONSLP		(S3C64XX_GPF_BASE + 0x0c)
+-#define S3C64XX_GPFPUDSLP		(S3C64XX_GPF_BASE + 0x10)
+-
+-#define S3C64XX_GPF_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPF_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPF_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPF0_CAMIF_CLK		(0x02 << 0)
+-#define S3C64XX_GPF0_EINT_G4_0		(0x03 << 0)
+-
+-#define S3C64XX_GPF1_CAMIF_HREF		(0x02 << 2)
+-#define S3C64XX_GPF1_EINT_G4_1		(0x03 << 2)
+-
+-#define S3C64XX_GPF2_CAMIF_PCLK		(0x02 << 4)
+-#define S3C64XX_GPF2_EINT_G4_2		(0x03 << 4)
+-
+-#define S3C64XX_GPF3_CAMIF_nRST		(0x02 << 6)
+-#define S3C64XX_GPF3_EINT_G4_3		(0x03 << 6)
+-
+-#define S3C64XX_GPF4_CAMIF_VSYNC	(0x02 << 8)
+-#define S3C64XX_GPF4_EINT_G4_4		(0x03 << 8)
+-
+-#define S3C64XX_GPF5_CAMIF_YDATA0	(0x02 << 10)
+-#define S3C64XX_GPF5_EINT_G4_5		(0x03 << 10)
+-
+-#define S3C64XX_GPF6_CAMIF_YDATA1	(0x02 << 12)
+-#define S3C64XX_GPF6_EINT_G4_6		(0x03 << 12)
+-
+-#define S3C64XX_GPF7_CAMIF_YDATA2	(0x02 << 14)
+-#define S3C64XX_GPF7_EINT_G4_7		(0x03 << 14)
+-
+-#define S3C64XX_GPF8_CAMIF_YDATA3	(0x02 << 16)
+-#define S3C64XX_GPF8_EINT_G4_8		(0x03 << 16)
+-
+-#define S3C64XX_GPF9_CAMIF_YDATA4	(0x02 << 18)
+-#define S3C64XX_GPF9_EINT_G4_9		(0x03 << 18)
+-
+-#define S3C64XX_GPF10_CAMIF_YDATA5	(0x02 << 20)
+-#define S3C64XX_GPF10_EINT_G4_10	(0x03 << 20)
+-
+-#define S3C64XX_GPF11_CAMIF_YDATA6	(0x02 << 22)
+-#define S3C64XX_GPF11_EINT_G4_11	(0x03 << 22)
+-
+-#define S3C64XX_GPF12_CAMIF_YDATA7	(0x02 << 24)
+-#define S3C64XX_GPF12_EINT_G4_12	(0x03 << 24)
+-
+-#define S3C64XX_GPF13_PWM_ECLK		(0x02 << 26)
+-#define S3C64XX_GPF13_EINT_G4_13	(0x03 << 26)
+-
+-#define S3C64XX_GPF14_PWM_TOUT0		(0x02 << 28)
+-#define S3C64XX_GPF14_CLKOUT0		(0x03 << 28)
+-
+-#define S3C64XX_GPF15_PWM_TOUT1		(0x02 << 30)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
+deleted file mode 100644
+index b94954a..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
++++ /dev/null
+@@ -1,42 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank G register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPGCON			(S3C64XX_GPG_BASE + 0x00)
+-#define S3C64XX_GPGDAT			(S3C64XX_GPG_BASE + 0x04)
+-#define S3C64XX_GPGPUD			(S3C64XX_GPG_BASE + 0x08)
+-#define S3C64XX_GPGCONSLP		(S3C64XX_GPG_BASE + 0x0c)
+-#define S3C64XX_GPGPUDSLP		(S3C64XX_GPG_BASE + 0x10)
+-
+-#define S3C64XX_GPG_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPG_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPG_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPG0_MMC0_CLK		(0x02 << 0)
+-#define S3C64XX_GPG0_EINT_G5_0		(0x07 << 0)
+-
+-#define S3C64XX_GPG1_MMC0_CMD		(0x02 << 4)
+-#define S3C64XX_GPG1_EINT_G5_1		(0x07 << 4)
+-
+-#define S3C64XX_GPG2_MMC0_DATA0		(0x02 << 8)
+-#define S3C64XX_GPG2_EINT_G5_2		(0x07 << 8)
+-
+-#define S3C64XX_GPG3_MMC0_DATA1		(0x02 << 12)
+-#define S3C64XX_GPG3_EINT_G5_3		(0x07 << 12)
+-
+-#define S3C64XX_GPG4_MMC0_DATA2		(0x02 << 16)
+-#define S3C64XX_GPG4_EINT_G5_4		(0x07 << 16)
+-
+-#define S3C64XX_GPG5_MMC0_DATA3		(0x02 << 20)
+-#define S3C64XX_GPG5_EINT_G5_5		(0x07 << 20)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
+deleted file mode 100644
+index 5d75aaa..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank H register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPHCON0			(S3C64XX_GPH_BASE + 0x00)
+-#define S3C64XX_GPHCON1			(S3C64XX_GPH_BASE + 0x04)
+-#define S3C64XX_GPHDAT			(S3C64XX_GPH_BASE + 0x08)
+-#define S3C64XX_GPHPUD			(S3C64XX_GPH_BASE + 0x0c)
+-#define S3C64XX_GPHCONSLP		(S3C64XX_GPH_BASE + 0x10)
+-#define S3C64XX_GPHPUDSLP		(S3C64XX_GPH_BASE + 0x14)
+-
+-#define S3C64XX_GPH_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
+-#define S3C64XX_GPH_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
+-#define S3C64XX_GPH_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
+-
+-#define S3C64XX_GPH0_MMC1_CLK		(0x02 << 0)
+-#define S3C64XX_GPH0_KP_COL0		(0x04 << 0)
+-#define S3C64XX_GPH0_EINT_G6_0		(0x07 << 0)
+-
+-#define S3C64XX_GPH1_MMC1_CMD		(0x02 << 4)
+-#define S3C64XX_GPH1_KP_COL1		(0x04 << 4)
+-#define S3C64XX_GPH1_EINT_G6_1		(0x07 << 4)
+-
+-#define S3C64XX_GPH2_MMC1_DATA0		(0x02 << 8)
+-#define S3C64XX_GPH2_KP_COL2		(0x04 << 8)
+-#define S3C64XX_GPH2_EINT_G6_2		(0x07 << 8)
+-
+-#define S3C64XX_GPH3_MMC1_DATA1		(0x02 << 12)
+-#define S3C64XX_GPH3_KP_COL3		(0x04 << 12)
+-#define S3C64XX_GPH3_EINT_G6_3		(0x07 << 12)
+-
+-#define S3C64XX_GPH4_MMC1_DATA2		(0x02 << 16)
+-#define S3C64XX_GPH4_KP_COL4		(0x04 << 16)
+-#define S3C64XX_GPH4_EINT_G6_4		(0x07 << 16)
+-
+-#define S3C64XX_GPH5_MMC1_DATA3		(0x02 << 20)
+-#define S3C64XX_GPH5_KP_COL5		(0x04 << 20)
+-#define S3C64XX_GPH5_EINT_G6_5		(0x07 << 20)
+-
+-#define S3C64XX_GPH6_MMC1_DATA4		(0x02 << 24)
+-#define S3C64XX_GPH6_MMC2_DATA0		(0x03 << 24)
+-#define S3C64XX_GPH6_KP_COL6		(0x04 << 24)
+-#define S3C64XX_GPH6_I2S_V40_BCLK	(0x05 << 24)
+-#define S3C64XX_GPH6_ADDR_CF0		(0x06 << 24)
+-#define S3C64XX_GPH6_EINT_G6_6		(0x07 << 24)
+-
+-#define S3C64XX_GPH7_MMC1_DATA5		(0x02 << 28)
+-#define S3C64XX_GPH7_MMC2_DATA1		(0x03 << 28)
+-#define S3C64XX_GPH7_KP_COL7		(0x04 << 28)
+-#define S3C64XX_GPH7_I2S_V40_CDCLK	(0x05 << 28)
+-#define S3C64XX_GPH7_ADDR_CF1		(0x06 << 28)
+-#define S3C64XX_GPH7_EINT_G6_7		(0x07 << 28)
+-
+-#define S3C64XX_GPH8_MMC1_DATA6		(0x02 <<  0)
+-#define S3C64XX_GPH8_MMC2_DATA2		(0x03 <<  0)
+-#define S3C64XX_GPH8_I2S_V40_LRCLK	(0x05 <<  0)
+-#define S3C64XX_GPH8_ADDR_CF2		(0x06 <<  0)
+-#define S3C64XX_GPH8_EINT_G6_8		(0x07 <<  0)
+-
+-#define S3C64XX_GPH9_OUTPUT		(0x01 <<  4)
+-#define S3C64XX_GPH9_MMC1_DATA7		(0x02 <<  4)
+-#define S3C64XX_GPH9_MMC2_DATA3		(0x03 <<  4)
+-#define S3C64XX_GPH9_I2S_V40_DI		(0x05 <<  4)
+-#define S3C64XX_GPH9_EINT_G6_9		(0x07 <<  4)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
+deleted file mode 100644
+index 4ceaa60..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank I register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPICON			(S3C64XX_GPI_BASE + 0x00)
+-#define S3C64XX_GPIDAT			(S3C64XX_GPI_BASE + 0x04)
+-#define S3C64XX_GPIPUD			(S3C64XX_GPI_BASE + 0x08)
+-#define S3C64XX_GPICONSLP		(S3C64XX_GPI_BASE + 0x0c)
+-#define S3C64XX_GPIPUDSLP		(S3C64XX_GPI_BASE + 0x10)
+-
+-#define S3C64XX_GPI_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPI_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPI_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPI0_VD0		(0x02 << 0)
+-#define S3C64XX_GPI1_VD1		(0x02 << 2)
+-#define S3C64XX_GPI2_VD2		(0x02 << 4)
+-#define S3C64XX_GPI3_VD3		(0x02 << 6)
+-#define S3C64XX_GPI4_VD4		(0x02 << 8)
+-#define S3C64XX_GPI5_VD5		(0x02 << 10)
+-#define S3C64XX_GPI6_VD6		(0x02 << 12)
+-#define S3C64XX_GPI7_VD7		(0x02 << 14)
+-#define S3C64XX_GPI8_VD8		(0x02 << 16)
+-#define S3C64XX_GPI9_VD9		(0x02 << 18)
+-#define S3C64XX_GPI10_VD10		(0x02 << 20)
+-#define S3C64XX_GPI11_VD11		(0x02 << 22)
+-#define S3C64XX_GPI12_VD12		(0x02 << 24)
+-#define S3C64XX_GPI13_VD13		(0x02 << 26)
+-#define S3C64XX_GPI14_VD14		(0x02 << 28)
+-#define S3C64XX_GPI15_VD15		(0x02 << 30)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
+deleted file mode 100644
+index 6f25cd0..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank J register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPJCON			(S3C64XX_GPJ_BASE + 0x00)
+-#define S3C64XX_GPJDAT			(S3C64XX_GPJ_BASE + 0x04)
+-#define S3C64XX_GPJPUD			(S3C64XX_GPJ_BASE + 0x08)
+-#define S3C64XX_GPJCONSLP		(S3C64XX_GPJ_BASE + 0x0c)
+-#define S3C64XX_GPJPUDSLP		(S3C64XX_GPJ_BASE + 0x10)
+-
+-#define S3C64XX_GPJ_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPJ_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPJ_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPJ0_VD16		(0x02 << 0)
+-#define S3C64XX_GPJ1_VD17		(0x02 << 2)
+-#define S3C64XX_GPJ2_VD18		(0x02 << 4)
+-#define S3C64XX_GPJ3_VD19		(0x02 << 6)
+-#define S3C64XX_GPJ4_VD20		(0x02 << 8)
+-#define S3C64XX_GPJ5_VD21		(0x02 << 10)
+-#define S3C64XX_GPJ6_VD22		(0x02 << 12)
+-#define S3C64XX_GPJ7_VD23		(0x02 << 14)
+-#define S3C64XX_GPJ8_LCD_HSYNC		(0x02 << 16)
+-#define S3C64XX_GPJ9_LCD_VSYNC		(0x02 << 18)
+-#define S3C64XX_GPJ10_LCD_VDEN		(0x02 << 20)
+-#define S3C64XX_GPJ11_LCD_VCLK		(0x02 << 22)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
+deleted file mode 100644
+index d0aeda1..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank N register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPNCON			(S3C64XX_GPN_BASE + 0x00)
+-#define S3C64XX_GPNDAT			(S3C64XX_GPN_BASE + 0x04)
+-#define S3C64XX_GPNPUD			(S3C64XX_GPN_BASE + 0x08)
+-
+-#define S3C64XX_GPN_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPN_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPN_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPN0_EINT0		(0x02 << 0)
+-#define S3C64XX_GPN0_KP_ROW0		(0x03 << 0)
+-
+-#define S3C64XX_GPN1_EINT1		(0x02 << 2)
+-#define S3C64XX_GPN1_KP_ROW1		(0x03 << 2)
+-
+-#define S3C64XX_GPN2_EINT2		(0x02 << 4)
+-#define S3C64XX_GPN2_KP_ROW2		(0x03 << 4)
+-
+-#define S3C64XX_GPN3_EINT3		(0x02 << 6)
+-#define S3C64XX_GPN3_KP_ROW3		(0x03 << 6)
+-
+-#define S3C64XX_GPN4_EINT4		(0x02 << 8)
+-#define S3C64XX_GPN4_KP_ROW4		(0x03 << 8)
+-
+-#define S3C64XX_GPN5_EINT5		(0x02 << 10)
+-#define S3C64XX_GPN5_KP_ROW5		(0x03 << 10)
+-
+-#define S3C64XX_GPN6_EINT6		(0x02 << 12)
+-#define S3C64XX_GPN6_KP_ROW6		(0x03 << 12)
+-
+-#define S3C64XX_GPN7_EINT7		(0x02 << 14)
+-#define S3C64XX_GPN7_KP_ROW7		(0x03 << 14)
+-
+-#define S3C64XX_GPN8_EINT8		(0x02 << 16)
+-#define S3C64XX_GPN9_EINT9		(0x02 << 18)
+-#define S3C64XX_GPN10_EINT10		(0x02 << 20)
+-#define S3C64XX_GPN11_EINT11		(0x02 << 22)
+-#define S3C64XX_GPN12_EINT12		(0x02 << 24)
+-#define S3C64XX_GPN13_EINT13		(0x02 << 26)
+-#define S3C64XX_GPN14_EINT14		(0x02 << 28)
+-#define S3C64XX_GPN15_EINT15		(0x02 << 30)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
+deleted file mode 100644
+index 21868fa..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
++++ /dev/null
+@@ -1,70 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank O register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPOCON			(S3C64XX_GPO_BASE + 0x00)
+-#define S3C64XX_GPODAT			(S3C64XX_GPO_BASE + 0x04)
+-#define S3C64XX_GPOPUD			(S3C64XX_GPO_BASE + 0x08)
+-#define S3C64XX_GPOCONSLP		(S3C64XX_GPO_BASE + 0x0c)
+-#define S3C64XX_GPOPUDSLP		(S3C64XX_GPO_BASE + 0x10)
+-
+-#define S3C64XX_GPO_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPO_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPO_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPO0_MEM0_nCS2		(0x02 << 0)
+-#define S3C64XX_GPO0_EINT_G7_0		(0x03 << 0)
+-
+-#define S3C64XX_GPO1_MEM0_nCS3		(0x02 << 2)
+-#define S3C64XX_GPO1_EINT_G7_1		(0x03 << 2)
+-
+-#define S3C64XX_GPO2_MEM0_nCS4		(0x02 << 4)
+-#define S3C64XX_GPO2_EINT_G7_2		(0x03 << 4)
+-
+-#define S3C64XX_GPO3_MEM0_nCS5		(0x02 << 6)
+-#define S3C64XX_GPO3_EINT_G7_3		(0x03 << 6)
+-
+-#define S3C64XX_GPO4_EINT_G7_4		(0x03 << 8)
+-
+-#define S3C64XX_GPO5_EINT_G7_5		(0x03 << 10)
+-
+-#define S3C64XX_GPO6_MEM0_ADDR6		(0x02 << 12)
+-#define S3C64XX_GPO6_EINT_G7_6		(0x03 << 12)
+-
+-#define S3C64XX_GPO7_MEM0_ADDR7		(0x02 << 14)
+-#define S3C64XX_GPO7_EINT_G7_7		(0x03 << 14)
+-
+-#define S3C64XX_GPO8_MEM0_ADDR8		(0x02 << 16)
+-#define S3C64XX_GPO8_EINT_G7_8		(0x03 << 16)
+-
+-#define S3C64XX_GPO9_MEM0_ADDR9		(0x02 << 18)
+-#define S3C64XX_GPO9_EINT_G7_9		(0x03 << 18)
+-
+-#define S3C64XX_GPO10_MEM0_ADDR10	(0x02 << 20)
+-#define S3C64XX_GPO10_EINT_G7_10	(0x03 << 20)
+-
+-#define S3C64XX_GPO11_MEM0_ADDR11	(0x02 << 22)
+-#define S3C64XX_GPO11_EINT_G7_11	(0x03 << 22)
+-
+-#define S3C64XX_GPO12_MEM0_ADDR12	(0x02 << 24)
+-#define S3C64XX_GPO12_EINT_G7_12	(0x03 << 24)
+-
+-#define S3C64XX_GPO13_MEM0_ADDR13	(0x02 << 26)
+-#define S3C64XX_GPO13_EINT_G7_13	(0x03 << 26)
+-
+-#define S3C64XX_GPO14_MEM0_ADDR14	(0x02 << 28)
+-#define S3C64XX_GPO14_EINT_G7_14	(0x03 << 28)
+-
+-#define S3C64XX_GPO15_MEM0_ADDR15	(0x02 << 30)
+-#define S3C64XX_GPO15_EINT_G7_15	(0x03 << 30)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
+deleted file mode 100644
+index 46bcfb6..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
++++ /dev/null
+@@ -1,69 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank P register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPPCON			(S3C64XX_GPP_BASE + 0x00)
+-#define S3C64XX_GPPDAT			(S3C64XX_GPP_BASE + 0x04)
+-#define S3C64XX_GPPPUD			(S3C64XX_GPP_BASE + 0x08)
+-#define S3C64XX_GPPCONSLP		(S3C64XX_GPP_BASE + 0x0c)
+-#define S3C64XX_GPPPUDSLP		(S3C64XX_GPP_BASE + 0x10)
+-
+-#define S3C64XX_GPP_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPP_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPP_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPP0_MEM0_ADDRV		(0x02 << 0)
+-#define S3C64XX_GPP0_EINT_G8_0		(0x03 << 0)
+-
+-#define S3C64XX_GPP1_MEM0_SMCLK		(0x02 << 2)
+-#define S3C64XX_GPP1_EINT_G8_1		(0x03 << 2)
+-
+-#define S3C64XX_GPP2_MEM0_nWAIT		(0x02 << 4)
+-#define S3C64XX_GPP2_EINT_G8_2		(0x03 << 4)
+-
+-#define S3C64XX_GPP3_MEM0_RDY0_ALE	(0x02 << 6)
+-#define S3C64XX_GPP3_EINT_G8_3		(0x03 << 6)
+-
+-#define S3C64XX_GPP4_MEM0_RDY1_CLE	(0x02 << 8)
+-#define S3C64XX_GPP4_EINT_G8_4		(0x03 << 8)
+-
+-#define S3C64XX_GPP5_MEM0_INTsm0_FWE	(0x02 << 10)
+-#define S3C64XX_GPP5_EINT_G8_5		(0x03 << 10)
+-
+-#define S3C64XX_GPP6_MEM0_(null)	(0x02 << 12)
+-#define S3C64XX_GPP6_EINT_G8_6		(0x03 << 12)
+-
+-#define S3C64XX_GPP7_MEM0_INTsm1_FRE	(0x02 << 14)
+-#define S3C64XX_GPP7_EINT_G8_7		(0x03 << 14)
+-
+-#define S3C64XX_GPP8_MEM0_RPn_RnB	(0x02 << 16)
+-#define S3C64XX_GPP8_EINT_G8_8		(0x03 << 16)
+-
+-#define S3C64XX_GPP9_MEM0_ATA_RESET	(0x02 << 18)
+-#define S3C64XX_GPP9_EINT_G8_9		(0x03 << 18)
+-
+-#define S3C64XX_GPP10_MEM0_ATA_INPACK	(0x02 << 20)
+-#define S3C64XX_GPP10_EINT_G8_10	(0x03 << 20)
+-
+-#define S3C64XX_GPP11_MEM0_ATA_REG	(0x02 << 22)
+-#define S3C64XX_GPP11_EINT_G8_11	(0x03 << 22)
+-
+-#define S3C64XX_GPP12_MEM0_ATA_WE	(0x02 << 24)
+-#define S3C64XX_GPP12_EINT_G8_12	(0x03 << 24)
+-
+-#define S3C64XX_GPP13_MEM0_ATA_OE	(0x02 << 26)
+-#define S3C64XX_GPP13_EINT_G8_13	(0x03 << 26)
+-
+-#define S3C64XX_GPP14_MEM0_ATA_CD	(0x02 << 28)
+-#define S3C64XX_GPP14_EINT_G8_14	(0x03 << 28)
+-
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h b/arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
+deleted file mode 100644
+index 1712223..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/* linux/arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- * 	Ben Dooks <ben@simtec.co.uk>
+- * 	http://armlinux.simtec.co.uk/
+- *
+- * GPIO Bank Q register and configuration definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S3C64XX_GPQCON			(S3C64XX_GPQ_BASE + 0x00)
+-#define S3C64XX_GPQDAT			(S3C64XX_GPQ_BASE + 0x04)
+-#define S3C64XX_GPQPUD			(S3C64XX_GPQ_BASE + 0x08)
+-#define S3C64XX_GPQCONSLP		(S3C64XX_GPQ_BASE + 0x0c)
+-#define S3C64XX_GPQPUDSLP		(S3C64XX_GPQ_BASE + 0x10)
+-
+-#define S3C64XX_GPQ_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
+-#define S3C64XX_GPQ_INPUT(__gpio)	(0x0 << ((__gpio) * 2))
+-#define S3C64XX_GPQ_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
+-
+-#define S3C64XX_GPQ0_MEM0_ADDR18_RAS	(0x02 << 0)
+-#define S3C64XX_GPQ0_EINT_G9_0		(0x03 << 0)
+-
+-#define S3C64XX_GPQ1_MEM0_ADDR19_CAS	(0x02 << 2)
+-#define S3C64XX_GPQ1_EINT_G9_1		(0x03 << 2)
+-
+-#define S3C64XX_GPQ2_EINT_G9_2		(0x03 << 4)
+-
+-#define S3C64XX_GPQ3_EINT_G9_3		(0x03 << 6)
+-
+-#define S3C64XX_GPQ4_EINT_G9_4		(0x03 << 8)
+-
+-#define S3C64XX_GPQ5_EINT_G9_5		(0x03 << 10)
+-
+-#define S3C64XX_GPQ6_EINT_G9_6		(0x03 << 12)
+-
+-#define S3C64XX_GPQ7_MEM0_ADDR17_WENDMC	(0x02 << 14)
+-#define S3C64XX_GPQ7_EINT_G9_7		(0x03 << 14)
+-
+-#define S3C64XX_GPQ8_MEM0_ADDR16_APDMC	(0x02 << 16)
+-#define S3C64XX_GPQ8_EINT_G9_8		(0x03 << 16)
+-
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 686a4f2..2c0353a 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -50,7 +50,6 @@
+ #include <mach/hardware.h>
+ #include <mach/regs-fb.h>
+ #include <mach/map.h>
+-#include <mach/gpio-bank-f.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 79412f7..7ccfdc4 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -30,27 +30,16 @@
+ #include <mach/regs-gpio-memport.h>
+ 
+ #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
+-#include <mach/gpio-bank-n.h>
+-
+ void s3c_pm_debug_smdkled(u32 set, u32 clear)
+ {
+-	unsigned long flags;
+-	u32 reg;
+-
+-	local_irq_save(flags);
+-	reg = __raw_readl(S3C64XX_GPNCON);
+-	reg &= ~(S3C64XX_GPN_CONMASK(12) | S3C64XX_GPN_CONMASK(13) |
+-		 S3C64XX_GPN_CONMASK(14) | S3C64XX_GPN_CONMASK(15));
+-	reg |= S3C64XX_GPN_OUTPUT(12) | S3C64XX_GPN_OUTPUT(13) |
+-	       S3C64XX_GPN_OUTPUT(14) | S3C64XX_GPN_OUTPUT(15);
+-	__raw_writel(reg, S3C64XX_GPNCON);
+-
+-	reg = __raw_readl(S3C64XX_GPNDAT);
+-	reg &= ~(clear << 12);
+-	reg |= set << 12;
+-	__raw_writel(reg, S3C64XX_GPNDAT);
+-
+-	local_irq_restore(flags);
++	int i;
++
++	for (i = 0; i < 4; i++) {
++		if (clear & (1 << i))
++			gpio_direction_output(S3C64XX_GPN(12 + i), 0);
++		if (set & (1 << i))
++			gpio_direction_output(S3C64XX_GPN(12 + i), 1);
++	}
+ }
+ #endif
+ 
+@@ -187,6 +176,14 @@ static int s3c64xx_pm_init(void)
+ 	pm_cpu_prep = s3c64xx_pm_prepare;
+ 	pm_cpu_sleep = s3c64xx_cpu_suspend;
+ 	pm_uart_udivslot = 1;
++
++#ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
++	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
++	gpio_request(S3C64XX_GPN(13), "DEBUG_LED1");
++	gpio_request(S3C64XX_GPN(14), "DEBUG_LED2");
++	gpio_request(S3C64XX_GPN(15), "DEBUG_LED3");
++#endif
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-s3c64xx/setup-i2c0.c b/arch/arm/mach-s3c64xx/setup-i2c0.c
+index 406192a..241af94 100644
+--- a/arch/arm/mach-s3c64xx/setup-i2c0.c
++++ b/arch/arm/mach-s3c64xx/setup-i2c0.c
+@@ -18,14 +18,11 @@
+ 
+ struct platform_device; /* don't need the contents */
+ 
+-#include <mach/gpio-bank-b.h>
+ #include <plat/iic.h>
+ #include <plat/gpio-cfg.h>
+ 
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+ {
+-	s3c_gpio_cfgpin(S3C64XX_GPB(5), S3C64XX_GPB5_I2C_SCL0);
+-	s3c_gpio_cfgpin(S3C64XX_GPB(6), S3C64XX_GPB6_I2C_SDA0);
+-	s3c_gpio_setpull(S3C64XX_GPB(5), S3C_GPIO_PULL_UP);
+-	s3c_gpio_setpull(S3C64XX_GPB(6), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgall_range(S3C64XX_GPB(5), 2,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+ }
+diff --git a/arch/arm/mach-s3c64xx/setup-i2c1.c b/arch/arm/mach-s3c64xx/setup-i2c1.c
+index 1ee62c9..3d13a96 100644
+--- a/arch/arm/mach-s3c64xx/setup-i2c1.c
++++ b/arch/arm/mach-s3c64xx/setup-i2c1.c
+@@ -18,14 +18,11 @@
+ 
+ struct platform_device; /* don't need the contents */
+ 
+-#include <mach/gpio-bank-b.h>
+ #include <plat/iic.h>
+ #include <plat/gpio-cfg.h>
+ 
+ void s3c_i2c1_cfg_gpio(struct platform_device *dev)
+ {
+-	s3c_gpio_cfgpin(S3C64XX_GPB(2), S3C64XX_GPB2_I2C_SCL1);
+-	s3c_gpio_cfgpin(S3C64XX_GPB(3), S3C64XX_GPB3_I2C_SDA1);
+-	s3c_gpio_setpull(S3C64XX_GPB(2), S3C_GPIO_PULL_UP);
+-	s3c_gpio_setpull(S3C64XX_GPB(3), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgall_range(S3C64XX_GPB(2), 2,
++			      S3C_GPIO_SFN(6), S3C_GPIO_PULL_UP);
+ }
+diff --git a/arch/arm/mach-s3c64xx/sleep.S b/arch/arm/mach-s3c64xx/sleep.S
+index afe5a76..1f87732 100644
+--- a/arch/arm/mach-s3c64xx/sleep.S
++++ b/arch/arm/mach-s3c64xx/sleep.S
+@@ -20,7 +20,6 @@
+ #define S3C64XX_VA_GPIO (0x0)
+ 
+ #include <mach/regs-gpio.h>
+-#include <mach/gpio-bank-n.h>
+ 
+ #define LL_UART (S3C_PA_UART + (0x400 * CONFIG_S3C_LOWLEVEL_UART_PORT))
+ 
+@@ -68,6 +67,13 @@ ENTRY(s3c_cpu_resume)
+ 	ldr	r2, =LL_UART		/* for debug */
+ 
+ #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
++
++#define S3C64XX_GPNCON			(S3C64XX_GPN_BASE + 0x00)
++#define S3C64XX_GPNDAT			(S3C64XX_GPN_BASE + 0x04)
++
++#define S3C64XX_GPN_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
++#define S3C64XX_GPN_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
++
+ 	/* Initialise the GPIO state if we are debugging via the SMDK LEDs,
+ 	 * as the uboot version supplied resets these to inputs during the
+ 	 * resume checks.
+-- 
+1.7.1
