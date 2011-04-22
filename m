@@ -1,105 +1,94 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Apr 2011 16:02:04 -0700
-Subject: [PATCH 12/15] OMAP: GPIO: remove useless gpio_valid() & check_gpio()
-	checks
+Date: Fri, 22 Apr 2011 16:02:05 -0700
+Subject: [PATCH 13/15] OMAP: GPIO: cleanup _set_gpio_wakeup(), remove ifdefs
 In-Reply-To: <1303513327-14532-1-git-send-email-khilman@ti.com>
 References: <1303513327-14532-1-git-send-email-khilman@ti.com>
-Message-ID: <1303513327-14532-13-git-send-email-khilman@ti.com>
+Message-ID: <1303513327-14532-14-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions are useless.  They are only called in a few places,
-and where they are called, the GPIO has already been converted from an
-IRQ or masked, so these functions will never fail.
+Make _set_gpio_wakeup() generic by removing ifdefs.  Code for the
+various SoCs/bank-methods was already the same, except for the
+non-wakeup GPIO checking.  But that flag is set on a per-SoC basis, so
+can be used for all SoCs.
+
+While here, use pr_err() and remove GPIO bank calculation assumption
+based on subtracting bank pointers.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/gpio.c |   45 ---------------------------------------------
- 1 files changed, 0 insertions(+), 45 deletions(-)
+ arch/arm/plat-omap/gpio.c |   49 +++++++++++++-------------------------------
+ 1 files changed, 15 insertions(+), 34 deletions(-)
 
 diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 1b674fd..a025b7a 100644
+index a025b7a..82afed8 100644
 --- a/arch/arm/plat-omap/gpio.c
 +++ b/arch/arm/plat-omap/gpio.c
-@@ -92,40 +92,6 @@ int gpio_bank_count;
- #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
- #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
- 
--static inline int gpio_valid(int gpio)
--{
--	if (gpio < 0)
--		return -1;
--	if (cpu_class_is_omap1() && OMAP_GPIO_IS_MPUIO(gpio)) {
--		if (gpio >= OMAP_MAX_GPIO_LINES + 16)
--			return -1;
--		return 0;
--	}
--	if (cpu_is_omap15xx() && gpio < 16)
--		return 0;
--	if ((cpu_is_omap16xx()) && gpio < 64)
--		return 0;
--	if (cpu_is_omap7xx() && gpio < 192)
--		return 0;
--	if (cpu_is_omap2420() && gpio < 128)
--		return 0;
--	if (cpu_is_omap2430() && gpio < 160)
--		return 0;
--	if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && gpio < 192)
--		return 0;
--	return -1;
--}
--
--static int check_gpio(int gpio)
--{
--	if (unlikely(gpio_valid(gpio) < 0)) {
--		printk(KERN_ERR "omap-gpio: invalid GPIO %d\n", gpio);
--		dump_stack();
--		return -1;
--	}
--	return 0;
--}
--
- static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+@@ -535,42 +535,23 @@ static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int ena
+  */
+ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
  {
- 	void __iomem *reg = bank->base;
-@@ -174,9 +140,6 @@ static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
- {
- 	void __iomem *reg = bank->base + bank->regs->datain;
+-	unsigned long uninitialized_var(flags);
++	u32 gpio_bit = GPIO_BIT(bank, gpio);
++	unsigned long flags;
  
--	if (check_gpio(gpio) < 0)
--		return -EINVAL;
--
- 	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
- }
- 
-@@ -184,9 +147,6 @@ static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
- {
- 	void __iomem *reg = bank->base + bank->regs->dataout;
- 
--	if (check_gpio(gpio) < 0)
--		return -EINVAL;
--
- 	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
- }
- 
-@@ -463,9 +423,6 @@ static int gpio_irq_type(struct irq_data *d, unsigned type)
- 	else
- 		gpio = d->irq - IH_GPIO_BASE;
- 
--	if (check_gpio(gpio) < 0)
--		return -EINVAL;
--
- 	if (type & ~IRQ_TYPE_SENSE_MASK)
+-	switch (bank->method) {
+-#ifdef CONFIG_ARCH_OMAP16XX
+-	case METHOD_MPUIO:
+-	case METHOD_GPIO_1610:
+-		spin_lock_irqsave(&bank->lock, flags);
+-		if (enable)
+-			bank->suspend_wakeup |= (1 << gpio);
+-		else
+-			bank->suspend_wakeup &= ~(1 << gpio);
+-		spin_unlock_irqrestore(&bank->lock, flags);
+-		return 0;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+-	case METHOD_GPIO_24XX:
+-	case METHOD_GPIO_44XX:
+-		if (bank->non_wakeup_gpios & (1 << gpio)) {
+-			printk(KERN_ERR "Unable to modify wakeup on "
+-					"non-wakeup GPIO%d\n",
+-			       (bank - gpio_bank) * bank->width + gpio);
+-			return -EINVAL;
+-		}
+-		spin_lock_irqsave(&bank->lock, flags);
+-		if (enable)
+-			bank->suspend_wakeup |= (1 << gpio);
+-		else
+-			bank->suspend_wakeup &= ~(1 << gpio);
+-		spin_unlock_irqrestore(&bank->lock, flags);
+-		return 0;
+-#endif
+-	default:
+-		printk(KERN_ERR "Can't enable GPIO wakeup for method %i\n",
+-		       bank->method);
++	if (bank->non_wakeup_gpios & gpio_bit) {
++		pr_err("Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
  		return -EINVAL;
+ 	}
++
++	spin_lock_irqsave(&bank->lock, flags);
++	if (enable)
++		bank->suspend_wakeup |= gpio_bit;
++	else
++		bank->suspend_wakeup &= ~gpio_bit;
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return 0;
+ }
  
-@@ -631,8 +588,6 @@ static int gpio_wake_enable(struct irq_data *d, unsigned int enable)
- 	struct gpio_bank *bank;
+ static void _reset_gpio(struct gpio_bank *bank, int gpio)
+@@ -589,7 +570,7 @@ static int gpio_wake_enable(struct irq_data *d, unsigned int enable)
  	int retval;
  
--	if (check_gpio(gpio) < 0)
--		return -ENODEV;
  	bank = irq_data_get_irq_chip_data(d);
- 	retval = _set_gpio_wakeup(bank, GPIO_INDEX(bank, gpio), enable);
+-	retval = _set_gpio_wakeup(bank, GPIO_INDEX(bank, gpio), enable);
++	retval = _set_gpio_wakeup(bank, gpio, enable);
  
+ 	return retval;
+ }
 -- 
 1.7.4
