@@ -1,82 +1,67 @@
-From: matteo.fortini@gmail.com (Matteo Fortini)
-Date: Fri, 22 Apr 2011 08:36:17 +0200
-Subject: [PATCH] Fix for missed MII interrupts and MDIO timeouts when FEC
-	is in STOP
-In-Reply-To: <20110421181026.GA429@tarshish>
-References: <BANLkTinkkquz1d=T-PpTSz1dpsBswD19tQ@mail.gmail.com>
-	<20110421181026.GA429@tarshish>
-Message-ID: <BANLkTim9EGaxvYvgEVFAh+iZmu4nfboSdQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Apr 2011 00:09:18 -0700
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104211651540.3323@ionos>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110421103117.GB16776@sirena.org.uk>
+	<20110421114220.GJ13688@atomide.com>
+	<alpine.LFD.2.02.1104211651540.3323@ionos>
+Message-ID: <20110422070918.GB841@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok I sent it to netdev, let's see if they accept it. The interface is
-not working without it.
-I patched the opensource.freescale.com git tree, since it is the most
-common start for iMX.
+* Thomas Gleixner <tglx@linutronix.de> [110421 07:49]:
+> On Thu, 21 Apr 2011, Tony Lindgren wrote:
+> 
+> > * Mark Brown <broonie@opensource.wolfsonmicro.com> [110421 03:29]:
+> > > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
+> > > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > 
+> > > > > If there were a pointer tracking the parent you still needed to program
+> > > > > out the get_parent function anyhow to set the pointer initially. But I
+> > > > > agree that in other situations having a pointer is more comfortable and
+> > > > > saves ugly error handling e.g. in set_parent.
+> > > 
+> > > > That's nonsense. Why do you want a get_parent() function at all?
+> > > > parent is set up when the clock is established in the clock tree. And
+> > > > that's not done by some random driver. That's a property of the clock.
+> > > 
+> > > That's not universal - right now the drivers can and do know about this
+> > > on some platforms.  In some cases there will be requirements beyond the
+> > > clock rate which mean that the driver will need to be able to tell the
+> > > framework that, for example, it needs one clock to be in the same clock
+> > > domain as another.
+> > 
+> > Also there can be multiple parent clocks. An example are the timers on
+> > omaps where the parent clock can be either the 32KiHz clock or external
+> > source clock. ?his may need to be reprogrammed dynamically in some cases
+> > for advanced idle modes as one of the parent clocks may be shut down.
+> 
+> If you need to propagate from bottom up, then you need a list of
+> childs in struct clk. Right ?
 
-Regards
+Yes we need to be able to reprogram all children if the parent clock needs
+to be reprogrammed for cpufreq/DVFS.
 
-On Thu, Apr 21, 2011 at 8:10 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Matteo,
->
-> On Thu, Apr 21, 2011 at 04:03:49PM +0200, Matteo Fortini wrote:
->> We are experiencing unrecoverable timeouts if we disconnect a cable from the
->> FEC. This patch solves the issue by keeping the Ethernet enabled even in
->> STOP. The RM doesn't state it, but i seems that if disabled, the Ethernet is
->> not issuing interrupts to the core.
->> (See
->> http://forums.freescale.com/t5/i-MX-Microprocessors/iMX28-Network-MDIO-timeout-recovery-and-lost-IRQs/td-p/73309
->> )
->
-> Please send network driver patches to the network drivers mailing list at
-> netdev at vger.kernel.org.
->
-> This patch does not apply to the current mainline kernel. Which kernel tree
-> are you using?
->
-> baruch
->
->> ---
->> ?drivers/net/fec.c | ? ?7 ++++++-
->> ?1 files changed, 6 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
->> index d0e2e69..26ea72d 100644
->> --- a/drivers/net/fec.c
->> +++ b/drivers/net/fec.c
->> @@ -121,8 +121,10 @@
->> ?#if defined(CONFIG_FEC_1588) && defined(CONFIG_ARCH_MX28)
->> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII | \
->> ? ? ? ? ? ? ? ? FEC_ENET_TS_AVAIL | FEC_ENET_TS_TIMER)
->> +#define FEC_STOP_IMASK (FEC_ENET_MII)
->> ?#else
->> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
->> +#define FEC_STOP_IMASK (FEC_ENET_MII)
->> ?#endif
->>
->> ?/* The FEC stores dest/src/type, data, and checksum for receive packets.
->> @@ -1409,6 +1411,9 @@ fec_stop(struct net_device *dev)
->> ? ? writel(1, fep->hwp + FEC_ECNTRL);
->> ? ? udelay(10);
->>
->> + ? ?/* Reactivate the controller to get the IRQs */
->> + ? ?writel(0x00000002, fep->hwp + FEC_ECNTRL);
->> +
->> ?#ifdef CONFIG_ARCH_MXS
->> ? ? /* Check MII or RMII */
->> ? ? if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
->> @@ -1423,7 +1428,7 @@ fec_stop(struct net_device *dev)
->> ? ? writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
->> ? ? if (fep->ptimer_present)
->> ? ? ? ? fec_ptp_stop(fep->ptp_priv);
->> - ? ?writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
->> + ? ?writel(FEC_STOP_IMASK, fep->hwp + FEC_IMASK);
->>
->> ? ? netif_stop_queue(dev);
->> ? ? fep->link = 0;
->
-> --
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~. .~ ? Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
-> ? - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
->
+Also a child may need to change the parent clock like I wrote above.
+However, it might be possible to deal with this by registering the same
+child for both parents and handle that directly in the driver for the
+special cases if that simplifies things.
+
+In some clk_set_rate cases for a child the parent clock may need to be
+reprogrammed to provide the desired rate. I don't know how common this
+is, and this may be doable by requesting both parent and child in the
+driver if that simplifies things.
+
+Would be good to hear Paul's comments on this, as he probably knows best
+what's really needed so I've added him to Cc.
+
+Regards,
+
+Tony
