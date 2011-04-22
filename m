@@ -1,35 +1,36 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 22 Apr 2011 14:18:06 -0700
-Subject: Common clock and dvfs
-In-Reply-To: <20110422203526.GC4768@sirena.org.uk>
-References: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
-	<20110422194027.GB4768@sirena.org.uk>
-	<BANLkTin9mbGKAMB4Bgd=5th+6FgS9gMCtA@mail.gmail.com>
-	<20110422203526.GC4768@sirena.org.uk>
-Message-ID: <BANLkTikhAiujU=Fmpvp-hWAeoTBNXZoEEA@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 22 Apr 2011 15:26:25 -0700
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104221857060.3323@ionos>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>	<alpine.LFD.2.02.1104201704350.3323@ionos>	<20110420185922.GD31131@pengutronix.de>	<alpine.LFD.2.02.1104202113250.3323@ionos>	<20110421074214.GE15233@pengutronix.de>	<alpine.LFD.2.02.1104211113030.3323@ionos>	<20110421120656.GF15233@pengutronix.de>	<alpine.LFD.2.02.1104211632240.3323@ionos>	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>	<alpine.LFD.2.02.1104221124270.3323@ionos>	<BANLkTim8GUuMxwfHFoVv=LfQFuh4QaPn+Q@mail.gmail.com>
+	<alpine.LFD.2.02.1104221857060.3323@ionos>
+Message-ID: <4DB20091.1070509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2011 at 1:35 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Apr 22, 2011 at 12:48:37PM -0700, Colin Cross wrote:
->> On Fri, Apr 22, 2011 at 12:40 PM, Mark Brown
+On 04/22/2011 09:57 AM, Thomas Gleixner wrote:
+> On Fri, 22 Apr 2011, Colin Cross wrote:
 >
->> > This sounds like it assumes a 1:1 mapping between clocks and supplies
->> > which is going to break at some point. ?It should be handlable but will
->> > add complexity.
+>> On Fri, Apr 22, 2011 at 2:51 AM, Thomas Gleixner<tglx@linutronix.de>  wrote:
+>>> Another thing I'm pondering is to provide the ability to maintain
+>>> separate clk trees. So you can have individual domains which have
+>>> their per clk tree locking. Would that make sense ?
+>>
+>> Clock trees are likely to be linked somewhere - an external clock chip
+>> that drives the main clock input on the SoC, or an SoC clock output
+>> that drives a chip with an internal clock tree.  Domains would have to
+>> be dynamically managed to ensure two clocks from different clock chips
+>> that become linked are moved under the same clock lock.  Probably
+>> easier to keep a global lock.
 >
->> Almost every platform requires a many-to-one mapping between clocks
->> and supplies (many clocks fed off one supply), and I bet at least one
->> platform has one clock that requires changing two supplies, so a
->
-> In most of the platforms I've looked at the supported configurations are
-> specified en masse as operating points so it definitely ends up being
-> the case, you get a set of frequencies and a set of voltages specified
-> as a block.
+> Ok. It's easy enough to split later if the need arises.
 
-I see.  Do you happen to know if there are any max voltage
-requirements for clocks?  Would running one clock in a group at a low
-operating point and another at a high operating point cause a problem,
-assuming the voltage is set to what is required by the high operating
-point?
+MSM certainly has the need for having independent clock trees. I would 
+like support for this to be in from the start otherwise it's going to 
+really screw clocks in one of the trees.
+
+-Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
