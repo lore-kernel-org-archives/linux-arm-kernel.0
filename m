@@ -1,34 +1,52 @@
 From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 22 Apr 2011 17:38:23 +0530
-Subject: [PATCH v4 05/11] mfd: pruss SUART private data.
+Date: Fri, 22 Apr 2011 17:38:25 +0530
+Subject: [PATCH v4 07/11] da850: pruss SUART platform specific additions.
 In-Reply-To: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
 References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <1303474109-6212-6-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <1303474109-6212-8-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PRUSS SUART data.
+This patch adds the McASP clock alias.
+The alias is used by the pruss suart driver
+for enabling the McASP PSC.
 
 Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 ---
- include/linux/mfd/pruss.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/mfd/pruss.h b/include/linux/mfd/pruss.h
-index 8ef25b3..c5e2af2 100644
---- a/include/linux/mfd/pruss.h
-+++ b/include/linux/mfd/pruss.h
-@@ -87,6 +87,11 @@
- #define PRU_INTC_CHANMAP12_HALF		(0x00010908)
- #define PRU_INTC_REGMAP_MASK		(0xFFFFFFFF)
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index f51c9ad..8f41ae4 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -567,9 +567,27 @@ static struct platform_device da8xx_pruss_mfddev = {
+ 	.resource	= da8xx_pruss_resources,
+ };
  
-+struct da850_evm_pruss_suart_data {
-+	u32 version;
-+	int (*setup)(void);
-+};
++#ifdef CONFIG_SERIAL_PRUSS_SUART_MODULE
++static int da8xx_mcasp_clk_add_alias(void)
++{
++	return clk_add_alias(NULL, "da8xx_pruss_uart.0",
++			NULL, &da850_mcasp_device.dev);
++}
++#else
++static int da8xx_mcasp_clk_add_alias(void)
++{
++	return 0;
++}
++#endif
+ int __init da8xx_register_pruss_mfd(struct mfd_cell *cell)
+ {
++	int ret;
 +
- s32 pruss_enable(struct device *dev, u8 pruss_num);
+ 	da8xx_pruss_mfddev.dev.platform_data = cell;
++
++	ret = da8xx_mcasp_clk_add_alias();
++	if (ret < 0)
++		return ret;
+ 	return platform_device_register(&da8xx_pruss_mfddev);
+ }
  
- s32 pruss_load(struct device *dev, u8 pruss_num,
 -- 
 1.7.2.3
