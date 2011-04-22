@@ -1,61 +1,210 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 22 Apr 2011 20:01:45 +0900
-Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
-In-Reply-To: <BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
-	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
-Message-ID: <4DB16019.8000800@samsung.com>
+From: charu@ti.com (Charulatha V)
+Date: Fri, 22 Apr 2011 16:38:24 +0530
+Subject: [RFC PATCH 10/18] OMAP: GPIO: cleanup set wakeup/suspend/resume funcs
+In-Reply-To: <1303470512-19671-1-git-send-email-charu@ti.com>
+References: <1303470512-19671-1-git-send-email-charu@ti.com>
+Message-ID: <1303470512-19671-11-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrei..
+Avoid the usage of cpu_is* checks and CONFIG_ARCH_OMAP* checks
+from _set_gpio_wakeup and gpio suspend/resume functions.
 
-Did you test this patch with ADMA?
-I wonder that be increased performance or others..
+Signed-off-by: Charulatha V <charu@ti.com>
+---
+ arch/arm/plat-omap/gpio.c |  109 ++++++++++++++-------------------------------
+ 1 files changed, 33 insertions(+), 76 deletions(-)
 
-Regards,
-Jaehoon Chung
-
-Andrei Warkentin wrote:
-> Hi Shawn,
-> 
-> On Sat, Apr 16, 2011 at 11:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
->> If not calling pre_req() before sdhci_request(), request()
->> will prepare the cache just like it did it before.
->> It is optional to use pre_req() and post_req().
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> I worked out the patch by referring to Per's patch below.
->>
->>  omap_hsmmc: add support for pre_req and post_req
->>
->> It adds pre_req and post_req support for sdhci based host drivers to
->> work with Per's non-blocking optimization.  But I only have imx esdhc
->> based hardware to test.  Unfortunately, I can not measure the
->> performance gain using mmc_test, because the current esdhc driver on
->> mainline fails on the test.  So I just did a quick test using 'dd',
->> but sadly, I did not see noticeable performance gain here.  The
->> followings are possible reasons I can think of right away.
->>
->> * The patch did not add pre_req and post_req correctly.  Please help
->>  review to catch the mistakes if any.
->> * The imx esdhc driver uses SDHCI_SDMA (max_segs is 1) than SDHCI_ADAM
->>  (max_segs is 128), due to the broken ADMA support on imx esdhc.  So
->>  can people holding other sdhci based hardware give a try on the
->>  patch?
->>
->> Hopefully, I can find some time to have a close look at the mmc_test
->> failure and the broken ADMA with imx esdhc.
->>
-> 
-> I'll try it out...
-> 
-> A
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 5fe6dbf..df2414d 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -30,6 +30,7 @@
+ #include <mach/gpio.h>
+ #include <asm/mach/irq.h>
+ 
++#define OMAP_GPIO_WAKE_SET_CLR_ALL	0xffffffff
+ #define	MPUIO_GPIO_IRQENA_MASK	0xffff
+ /*
+  * OMAP1510 GPIO registers
+@@ -140,10 +141,8 @@ struct gpio_bank {
+ 	u16 irq;
+ 	u16 virtual_irq_start;
+ 	int method;
+-#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
+ 	u32 suspend_wakeup;
+ 	u32 saved_wakeup;
+-#endif
+ 	u32 non_wakeup_gpios;
+ 	u32 enabled_non_wakeup_gpios;
+ 
+@@ -630,18 +629,6 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 	unsigned long uninitialized_var(flags);
+ 
+ 	switch (bank->method) {
+-#ifdef CONFIG_ARCH_OMAP16XX
+-	case METHOD_MPUIO:
+-	case METHOD_GPIO_1610:
+-		spin_lock_irqsave(&bank->lock, flags);
+-		if (enable)
+-			bank->suspend_wakeup |= (1 << gpio);
+-		else
+-			bank->suspend_wakeup &= ~(1 << gpio);
+-		spin_unlock_irqrestore(&bank->lock, flags);
+-		return 0;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+ 	case METHOD_GPIO_24XX:
+ 	case METHOD_GPIO_44XX:
+ 		if (bank->non_wakeup_gpios & (1 << gpio)) {
+@@ -650,6 +637,8 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 					(bank - gpio_bank) * 32 + gpio);
+ 			return -EINVAL;
+ 		}
++	case METHOD_MPUIO:
++	case METHOD_GPIO_1610:
+ 		spin_lock_irqsave(&bank->lock, flags);
+ 		if (enable)
+ 			bank->suspend_wakeup |= (1 << gpio);
+@@ -657,7 +646,6 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 			bank->suspend_wakeup &= ~(1 << gpio);
+ 		spin_unlock_irqrestore(&bank->lock, flags);
+ 		return 0;
+-#endif
+ 	default:
+ 		printk(KERN_ERR "Can't enable GPIO wakeup for method %i\n",
+ 		       bank->method);
+@@ -1347,51 +1335,35 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
+ static int omap_gpio_suspend(struct sys_device *dev, pm_message_t mesg)
+ {
+ 	int i;
+ 
+-	if (!cpu_class_is_omap2() && !cpu_is_omap16xx())
+-		return 0;
+-
+ 	for (i = 0; i < gpio_bank_count; i++) {
+ 		struct gpio_bank *bank = &gpio_bank[i];
+-		void __iomem *wake_status;
+-		void __iomem *wake_clear;
+-		void __iomem *wake_set;
++		u32 wake_status;
++		u32 wake_clear;
++		u32 wake_set;
+ 		unsigned long flags;
+ 
+-		switch (bank->method) {
+-#ifdef CONFIG_ARCH_OMAP16XX
+-		case METHOD_GPIO_1610:
+-			wake_status = bank->base + OMAP1610_GPIO_WAKEUPENABLE;
+-			wake_clear = bank->base + OMAP1610_GPIO_CLEAR_WAKEUPENA;
+-			wake_set = bank->base + OMAP1610_GPIO_SET_WAKEUPENA;
++		if ((bank->method <= METHOD_GPIO_1510) ||
++				(bank->method == METHOD_GPIO_7XX)) {
+ 			break;
+-#endif
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-		case METHOD_GPIO_24XX:
+-			wake_status = bank->base + OMAP24XX_GPIO_WAKE_EN;
+-			wake_clear = bank->base + OMAP24XX_GPIO_CLEARWKUENA;
+-			wake_set = bank->base + OMAP24XX_GPIO_SETWKUENA;
+-			break;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP4
+-		case METHOD_GPIO_44XX:
+-			wake_status = bank->base + OMAP4_GPIO_IRQWAKEN0;
+-			wake_clear = bank->base + OMAP4_GPIO_IRQWAKEN0;
+-			wake_set = bank->base + OMAP4_GPIO_IRQWAKEN0;
+-			break;
+-#endif
+-		default:
+-			continue;
++		} else if (bank->method == METHOD_GPIO_44XX) {
++			wake_status = IRQWAKEN0;
++			wake_clear = IRQWAKEN0;
++			wake_set = IRQWAKEN0;
++		} else {
++			wake_status = WAKE_EN;
++			wake_clear = CLEARWKUENA;
++			wake_set = SETWKUENA;
+ 		}
+ 
+ 		spin_lock_irqsave(&bank->lock, flags);
+-		bank->saved_wakeup = __raw_readl(wake_status);
+-		__raw_writel(0xffffffff, wake_clear);
+-		__raw_writel(bank->suspend_wakeup, wake_set);
++		bank->saved_wakeup = gpio_fn.gpio_read(bank->base, wake_status);
++		gpio_fn.gpio_write(OMAP_GPIO_WAKE_SET_CLR_ALL, bank->base,
++					wake_clear);
++		gpio_fn.gpio_write(bank->suspend_wakeup, bank->base, wake_set);
+ 		spin_unlock_irqrestore(&bank->lock, flags);
+ 	}
+ 
+@@ -1402,41 +1374,27 @@ static int omap_gpio_resume(struct sys_device *dev)
+ {
+ 	int i;
+ 
+-	if (!cpu_class_is_omap2() && !cpu_is_omap16xx())
+-		return 0;
+-
+ 	for (i = 0; i < gpio_bank_count; i++) {
+ 		struct gpio_bank *bank = &gpio_bank[i];
+-		void __iomem *wake_clear;
+-		void __iomem *wake_set;
++		u32 wake_clear;
++		u32 wake_set;
+ 		unsigned long flags;
+ 
+-		switch (bank->method) {
+-#ifdef CONFIG_ARCH_OMAP16XX
+-		case METHOD_GPIO_1610:
+-			wake_clear = bank->base + OMAP1610_GPIO_CLEAR_WAKEUPENA;
+-			wake_set = bank->base + OMAP1610_GPIO_SET_WAKEUPENA;
++		if ((bank->method <= METHOD_GPIO_1510) ||
++				(bank->method == METHOD_GPIO_7XX)) {
+ 			break;
+-#endif
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-		case METHOD_GPIO_24XX:
+-			wake_clear = bank->base + OMAP24XX_GPIO_CLEARWKUENA;
+-			wake_set = bank->base + OMAP24XX_GPIO_SETWKUENA;
+-			break;
+-#endif
+-#ifdef CONFIG_ARCH_OMAP4
+-		case METHOD_GPIO_44XX:
+-			wake_clear = bank->base + OMAP4_GPIO_IRQWAKEN0;
+-			wake_set = bank->base + OMAP4_GPIO_IRQWAKEN0;
+-			break;
+-#endif
+-		default:
+-			continue;
++		} else if (bank->method == METHOD_GPIO_44XX) {
++			wake_clear = IRQWAKEN0;
++			wake_set = IRQWAKEN0;
++		} else {
++			wake_clear = CLEARWKUENA;
++			wake_set = SETWKUENA;
+ 		}
+ 
+ 		spin_lock_irqsave(&bank->lock, flags);
+-		__raw_writel(0xffffffff, wake_clear);
+-		__raw_writel(bank->saved_wakeup, wake_set);
++		gpio_fn.gpio_write(OMAP_GPIO_WAKE_SET_CLR_ALL, bank->base,
++					wake_clear);
++		gpio_fn.gpio_write(bank->saved_wakeup, bank->base, wake_set);
+ 		spin_unlock_irqrestore(&bank->lock, flags);
+ 	}
+ 
+@@ -1454,7 +1412,6 @@ static struct sys_device omap_gpio_device = {
+ 	.cls		= &omap_gpio_sysclass,
+ };
+ 
+-#endif
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+ 
+-- 
+1.7.1
