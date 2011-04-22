@@ -1,43 +1,33 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 22 Apr 2011 08:28:05 +0800
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <alpine.LFD.2.02.1104212146400.3323@ionos>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-Message-ID: <20110422002805.GA2268@richard-laptop>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 22 Apr 2011 09:34:00 +0900
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <BANLkTim5umALqafjA2e88UCLzMp9LQu3_Q@mail.gmail.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110421130930.4be9e9e1@jbarnes-desktop>
+	<BANLkTim5umALqafjA2e88UCLzMp9LQu3_Q@mail.gmail.com>
+Message-ID: <BANLkTimz8zprEw7H_i8g2qj8RyyougiBBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Fri, Apr 22, 2011 at 6:52 AM, Zach Pfeffer <zach.pfeffer@linaro.org> wrote:
+>
+> I agree with Jesse that the separation of mapping from allocation is
+> central to the current usage models. I realize most people didn't like
+> VCMM, but it provided an abstraction for this - if software can handle
+> the multiple mapper approach in a rational way across ARM than we can
+> solve a lot of problems with all the map and unmap current solutions
+> and we don't have to hack in coherency.
+>
 
-On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
-> On Fri, 15 Apr 2011, Sascha Hauer wrote:
-> > From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > + * @get:	Called by the core clock code when a device driver acquires a
-> > + *		clock via clk_get(). Optional.
-> > + *
-> > + * @put:	Called by the core clock code when a devices driver releases a
-> > + *		clock via clk_put(). Optional.
-> 
-> These callbacks are completely pointless. There are only two non empty
-> implementations in tree:
-> 
-> One does a try_module_get(clk->owner), which should be done in generic
-> code. The other does special clock enabling magic which wants to go to
-> clk->prepare().
-You forget mach-u300 __clk_get. It updates some registers.
-The ops get/put let arch clock driver have a chance to do special things at the
-time when a user begins to use the clock.
+Hi.
+I've also noticed that VCMM is the reasonable idea for IOMMU mappings.
+We often deal with physical memory blocks to map multiple way.
+Allocation of physical memory itself is also important for some
+peripheral devices
+because it is beneficial to get larger page frame for their performance.
 
-Thanks
-Richard
-> 
-> Thanks,
-> 
-> 	tglx
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+IOMMU api does not provide virtual memory management.
+DMA api is not flexible for all our use-cases.
+
+Regards,
+KyongHo.
