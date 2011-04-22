@@ -1,84 +1,68 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 21 Apr 2011 23:23:22 -0400 (EDT)
-Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel
-	end
-In-Reply-To: <alpine.LFD.2.00.1104211711240.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-	<20110421055945.GB13688@atomide.com>
-	<20110421104954.GH13688@atomide.com>
-	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
-	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1104212233170.24613@xanadu.home>
+Date: Thu, 21 Apr 2011 23:26:47 -0400
+Subject: [PATCH 2/3] ARM: zImage: don't ignore error returned from decompress()
+Message-ID: <1303442808-14275-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2011, Nicolas Pitre wrote:
-
-> On Thu, 21 Apr 2011, Nicolas Pitre wrote:
-> 
-> > On Thu, 21 Apr 2011, Tony Lindgren wrote:
-> > 
-> > > Otherwise we end up overwriting ourselves. This fixes booting
-> > > on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
-> > > (ARM: 6750/1: improvements to compressed/head.S).
-> > > 
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > I don't understand why this is needed.  The copy loop is explicitly 
-> > copying from the end going backward exactly to cope with this 
-> > possibility.
-> 
-> I think your patch is 1) unneeded (see the copy loop code and the 
-> comment before it), and 2) simply hiding the real bug.
-> 
-> I just need to modify the code in compressed/misc.c slightly for the 
-> lzma decompressor to start or stop working randomly.  It seems that this 
-> code might be sensitive to slight displacement in memory caused by 
-> modifications to totally unrelated code.  I'm still trying to track this 
-> down.
-
-I found the bugger.  The problem was a bad stack alignment.
-
------ >8
-
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-ARM: zImage: make sure the stack is 64-bit aligned
-
-With ARMv5+ and EABI, the compiler expects a 64-bit aligned stack so
-instructions like STRD and LDRD can be used.  Without this, mysterious
-boot failures were seen semi randomly with the LZMA decompressor.
-
-While at it, let's align .bss as well.
+If decompress() returns an error without calling error(), we must
+not attempt to boot the resulting kernel.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/boot/compressed/decompress.c |    4 ++--
+ arch/arm/boot/compressed/misc.c       |   13 +++++++++----
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 58ac434..79b5c62 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -74,7 +74,7 @@ ZTEXTADDR	:= $(CONFIG_ZBOOT_ROM_TEXT)
- ZBSSADDR	:= $(CONFIG_ZBOOT_ROM_BSS)
- else
- ZTEXTADDR	:= 0
--ZBSSADDR	:= ALIGN(4)
-+ZBSSADDR	:= ALIGN(8)
- endif
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 4c72a97..07be5a2 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -44,7 +44,7 @@ extern void error(char *);
+ #include "../../../../lib/decompress_unlzma.c"
+ #endif
  
- SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
-index 5309909..ea80abe 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.in
-+++ b/arch/arm/boot/compressed/vmlinux.lds.in
-@@ -54,6 +54,7 @@ SECTIONS
-   .bss			: { *(.bss) }
-   _end = .;
+-void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
++int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+-	decompress(input, len, NULL, NULL, output, NULL, error);
++	return decompress(input, len, NULL, NULL, output, NULL, error);
+ }
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index d771067..528d099 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -190,7 +190,7 @@ asmlinkage void __div0(void)
+ 	error("Attempting division by 0!");
+ }
  
-+  . = ALIGN(8);		/* the stack must be 64-bit aligned */
-   .stack		: { *(.stack) }
+-extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
++extern int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
  
-   .stab 0		: { *(.stab) }
+ 
+ void
+@@ -198,6 +198,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ 		unsigned long free_mem_ptr_end_p,
+ 		int arch_id)
+ {
++	int ret;
++
+ 	output_data		= (unsigned char *)output_start;
+ 	free_mem_ptr		= free_mem_ptr_p;
+ 	free_mem_end_ptr	= free_mem_ptr_end_p;
+@@ -206,7 +208,10 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ 	arch_decomp_setup();
+ 
+ 	putstr("Uncompressing Linux...");
+-	do_decompress(input_data, input_data_end - input_data,
+-			output_data, error);
+-	putstr(" done, booting the kernel.\n");
++	ret = do_decompress(input_data, input_data_end - input_data,
++			    output_data, error);
++	if (ret)
++		error("decompressor returned an error");
++	else
++		putstr(" done, booting the kernel.\n");
+ }
+-- 
+1.7.4
