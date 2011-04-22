@@ -1,49 +1,73 @@
 From: charu@ti.com (Charulatha V)
-Date: Fri, 22 Apr 2011 16:38:31 +0530
-Subject: [RFC PATCH 17/18] OMAP: GPIO: use dev_err* instead of printk
+Date: Fri, 22 Apr 2011 16:38:16 +0530
+Subject: [RFC PATCH 02/18] OMAP: GPIO: remove get_gpio_bank()
 In-Reply-To: <1303470512-19671-1-git-send-email-charu@ti.com>
 References: <1303470512-19671-1-git-send-email-charu@ti.com>
-Message-ID: <1303470512-19671-18-git-send-email-charu@ti.com>
+Message-ID: <1303470512-19671-3-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_info()/dev_err() instead of printk in OMAP GPIO driver
+use chip info to get the pointer to the struct gpio_bank for a
+given GPIO bank and remove get_gpio_bank().
 
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- arch/arm/plat-omap/gpio.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/gpio.c |   29 ++---------------------------
+ 1 files changed, 2 insertions(+), 27 deletions(-)
 
 diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 9c3e865..7ae9f6f 100644
+index 9164bd4..498e1df 100644
 --- a/arch/arm/plat-omap/gpio.c
 +++ b/arch/arm/plat-omap/gpio.c
-@@ -66,7 +66,7 @@ static int omap_gpio_sysinit(void);
- static int check_gpio(int gpio)
+@@ -189,31 +189,6 @@ static int bank_width;
+ /* TODO: Analyze removing gpio_bank_count usage from driver code */
+ int gpio_bank_count;
+ 
+-static inline struct gpio_bank *get_gpio_bank(int gpio)
+-{
+-	if (cpu_is_omap15xx()) {
+-		if (OMAP_GPIO_IS_MPUIO(gpio))
+-			return &gpio_bank[0];
+-		return &gpio_bank[1];
+-	}
+-	if (cpu_is_omap16xx()) {
+-		if (OMAP_GPIO_IS_MPUIO(gpio))
+-			return &gpio_bank[0];
+-		return &gpio_bank[1 + (gpio >> 4)];
+-	}
+-	if (cpu_is_omap7xx()) {
+-		if (OMAP_GPIO_IS_MPUIO(gpio))
+-			return &gpio_bank[0];
+-		return &gpio_bank[1 + (gpio >> 5)];
+-	}
+-	if (cpu_is_omap24xx())
+-		return &gpio_bank[gpio >> 5];
+-	if (cpu_is_omap34xx() || cpu_is_omap44xx())
+-		return &gpio_bank[gpio >> 5];
+-	BUG();
+-	return NULL;
+-}
+-
+ static inline int get_gpio_index(int gpio)
  {
- 	if (unlikely(gpio_fn.gpio_valid(gpio) < 0)) {
--		printk(KERN_ERR "omap-gpio: invalid GPIO %d\n", gpio);
-+		pr_err("omap-gpio: invalid GPIO %d\n", gpio);
- 		dump_stack();
- 		return -1;
- 	}
-@@ -470,7 +470,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 	case METHOD_GPIO_24XX:
- 	case METHOD_GPIO_44XX:
- 		if (bank->non_wakeup_gpios & (1 << gpio)) {
--			printk(KERN_ERR "Unable to modify wakeup on "
-+			dev_err(bank->dev, "Unable to modify wakeup on "
- 					"non-wakeup GPIO%d\n",
- 					bank->id * 32 + gpio);
- 			return -EINVAL;
-@@ -485,7 +485,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 		spin_unlock_irqrestore(&bank->lock, flags);
- 		return 0;
- 	default:
--		printk(KERN_ERR "Can't enable GPIO wakeup for method %i\n",
-+		dev_err(bank->dev, "Can't enable GPIO wakeup for method %i\n",
- 		       bank->method);
- 		return -EINVAL;
- 	}
+ 	if (cpu_is_omap7xx())
+@@ -1393,7 +1368,7 @@ static struct platform_device omap_mpuio_device = {
+ 
+ static inline void mpuio_init(void)
+ {
+-	struct gpio_bank *bank = get_gpio_bank(OMAP_MPUIO(0));
++	struct gpio_bank *bank = &gpio_bank[0];
+ 	platform_set_drvdata(&omap_mpuio_device, bank);
+ 
+ 	if (platform_driver_register(&omap_mpuio_driver) == 0)
+@@ -1469,7 +1444,7 @@ static int gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	u32 mask;
+ 
+ 	gpio = chip->base + offset;
+-	bank = get_gpio_bank(gpio);
++	bank = container_of(chip, struct gpio_bank, chip);
+ 	reg = bank->base;
+ 	mask = 1 << get_gpio_index(gpio);
+ 
 -- 
 1.7.1
