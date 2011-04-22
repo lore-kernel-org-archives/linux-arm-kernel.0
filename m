@@ -1,118 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Apr 2011 15:47:37 +0800
-Subject: [PATCH] MXS DMA: enable CLKGATE before accessing registers
-In-Reply-To: <dc6791e4e926902967a182107d4558d5e0a16381.1303373126.git.LW@KARO-electronics.de>
-References: <9888fc5695f320d8b5e9a9014fe0c1a0eab24bb5.1303373126.git.LW@KARO-electronics.de>
-	<dc6791e4e926902967a182107d4558d5e0a16381.1303373126.git.LW@KARO-electronics.de>
-Message-ID: <20110422074736.GC4431@S2100-06.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Apr 2011 09:56:41 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <201104211025.34420.arnd@arndb.de>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+	<BANLkTinxThB+2+fv4qUD5dyguV-5hUva3A@mail.gmail.com>
+	<201104211025.34420.arnd@arndb.de>
+Message-ID: <BANLkTineKF3Yw+o_PNaq=6btm2MU7TBB+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 11:22:32AM +0200, Lothar Wa?mann wrote:
-> After calling mxs_dma_disable_chan() for a channel, that channel
-> becomes unusable because some controller registers can only be written
-> when the clock is enabled via CLKGATE.
-> 
-> Signed-off-by: Lothar Wa??mann <LW@KARO-electronics.de>
+2011/4/21 Arnd Bergmann <arnd@arndb.de>:
 
-Acked-by:  Shawn Guo <shawn.guo@freescale.com>
+>> Most MFD things are, like I2C chips and stuff but this one sure
+>> match the title "multifunctional device", just that it's very singleton
+>> and very close to the SoC core.
+>
+> One property of MFD devices is that they register a fixed set of
+> child devices (cells) that are each providing separate functionality
+> and have their own drivers. If that's not the case with prcmu,
+> I think it should not be an MFD driver.
 
-However...
+It's both-and. The power domain regulators and cpufreq are
+platform devices and will work nicely as MFD cells spawn
+off the PRCMU. (Just that nooned did it that way before.)
 
-> ---
->  drivers/dma/mxs-dma.c |   45 ++++++++++++++++++++++++---------------------
->  1 files changed, 24 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 5b9b66a..329405c 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -131,6 +131,23 @@ struct mxs_dma_engine {
->  	int				irqmap[MXS_DMA_CHANNELS];
->  };
->  
-> +static inline void mxs_dma_clkgate(struct mxs_dma_chan *mxs_chan, int enable)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +	int set_clr = enable ? MXS_CLR_ADDR : MXS_SET_ADDR;
-> +
-> +	/* enable apbh channel clock */
-> +	if (dma_is_apbh()) {
-> +		if (apbh_is_old())
-> +			writel(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> +				mxs_dma->base + HW_APBHX_CTRL0 + set_clr);
-> +		else
-> +			writel(1 << chan_id,
-> +				mxs_dma->base + HW_APBHX_CTRL0 + set_clr);
-> +	}
-> +}
-> +
->  static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
->  {
->  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> @@ -149,38 +166,21 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
->  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
->  	int chan_id = mxs_chan->chan.chan_id;
->  
-> +	/* clkgate needs to be enabled before writing other registers */
-> +	mxs_dma_clkgate(mxs_chan, 1);
-> +
->  	/* set cmd_addr up */
->  	writel(mxs_chan->ccw_phys,
->  		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
->  
-> -	/* enable apbh channel clock */
-> -	if (dma_is_apbh()) {
-> -		if (apbh_is_old())
-> -			writel(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> -				mxs_dma->base + HW_APBHX_CTRL0 + MXS_CLR_ADDR);
-> -		else
-> -			writel(1 << chan_id,
-> -				mxs_dma->base + HW_APBHX_CTRL0 + MXS_CLR_ADDR);
-> -	}
-> -
->  	/* write 1 to SEMA to kick off the channel */
->  	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
->  }
->  
->  static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
->  {
-> -	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> -	int chan_id = mxs_chan->chan.chan_id;
-> -
->  	/* disable apbh channel clock */
-> -	if (dma_is_apbh()) {
-> -		if (apbh_is_old())
-> -			writel(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> -				mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> -		else
-> -			writel(1 << chan_id,
-> -				mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> -	}
-> +	mxs_dma_clkgate(mxs_chan, 0);
->  
->  	mxs_chan->status = DMA_SUCCESS;
->  }
-> @@ -359,7 +359,10 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
->  	if (ret)
->  		goto err_clk;
->  
-> +	/* clkgate needs to be enabled for reset to finish */
-> +	mxs_dma_clkgate(mxs_chan, 1);
->  	mxs_dma_reset_chan(mxs_chan);
-... I do not remember any special reason to call mxs_dma_reset_chan()
-here when I wrote the code.  Now I start guessing it's not necessary.
+The big deviating thing is the clock tree, which also use calls to
+the PRCMU. I would argue that the problem is rather that clocks
+are not modeled as devices rather than that the PRCMU would
+be modeled as an MFD device.
 
-> +	mxs_dma_clkgate(mxs_chan, 0);
->  
->  	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
->  	mxs_chan->desc.tx_submit = mxs_dma_tx_submit;
-> -- 
-> 1.5.6.5
-> 
-> 
-
--- 
-Regards,
-Shawn
+Linus Walleij
