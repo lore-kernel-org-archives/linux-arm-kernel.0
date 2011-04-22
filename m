@@ -1,91 +1,152 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Apr 2011 16:02:06 -0700
-Subject: [PATCH 14/15] OMAP: GPIO: debounce remove SoC specific registers,
-	use pdata
+Date: Fri, 22 Apr 2011 16:02:07 -0700
+Subject: [PATCH 15/15] OMAP: GPIO: cleanup show revision, remove cpu_is checks,
+	display only once
 In-Reply-To: <1303513327-14532-1-git-send-email-khilman@ti.com>
 References: <1303513327-14532-1-git-send-email-khilman@ti.com>
-Message-ID: <1303513327-14532-15-git-send-email-khilman@ti.com>
+Message-ID: <1303513327-14532-16-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use register offsets passed in from pdata for accessing debounce registers.
+Remove cpu_is_* checks from gpio_show_revision() by passing in the
+revision address offset from platform data.  SoCs with no revision
+register (15xx, 7xx, and all MPUIOs) use -1 to signify no register.
+
+While here, all GPIO banks are assumed to be the same revision, so fix
+show_revision() to only show the revision for the first bank it finds.
+This removes duplicate GPIO revision prints during boot.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    4 ++++
- arch/arm/plat-omap/gpio.c              |   15 +++------------
- arch/arm/plat-omap/include/plat/gpio.h |    2 ++
- 3 files changed, 9 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap1/gpio15xx.c         |    2 ++
+ arch/arm/mach-omap1/gpio16xx.c         |    2 ++
+ arch/arm/mach-omap1/gpio7xx.c          |    2 ++
+ arch/arm/mach-omap2/gpio.c             |    2 ++
+ arch/arm/plat-omap/gpio.c              |   14 ++++++--------
+ arch/arm/plat-omap/include/plat/gpio.h |    1 +
+ 6 files changed, 15 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index 9175624..6f77c36 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -35,6 +35,7 @@ static struct __initdata resource omap15xx_mpu_gpio_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
++	.revision       = -1,
+ 	.direction	= OMAP_MPUIO_IO_CNTL,
+ 	.datain		= OMAP_MPUIO_INPUT_LATCH,
+ 	.dataout	= OMAP_MPUIO_OUTPUT,
+@@ -75,6 +76,7 @@ static struct __initdata resource omap15xx_gpio_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
++	.revision	= -1,
+ 	.direction	= OMAP1510_GPIO_DIR_CONTROL,
+ 	.datain		= OMAP1510_GPIO_DATA_INPUT,
+ 	.dataout	= OMAP1510_GPIO_DATA_OUTPUT,
+diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+index a6d4a71..6cbfc70 100644
+--- a/arch/arm/mach-omap1/gpio16xx.c
++++ b/arch/arm/mach-omap1/gpio16xx.c
+@@ -38,6 +38,7 @@ static struct __initdata resource omap16xx_mpu_gpio_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
++	.revision       = -1,
+ 	.direction	= OMAP_MPUIO_IO_CNTL,
+ 	.datain		= OMAP_MPUIO_INPUT_LATCH,
+ 	.dataout	= OMAP_MPUIO_OUTPUT,
+@@ -78,6 +79,7 @@ static struct __initdata resource omap16xx_gpio1_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
++	.revision       = OMAP1610_GPIO_REVISION,
+ 	.direction	= OMAP1610_GPIO_DIRECTION,
+ 	.set_dataout	= OMAP1610_GPIO_SET_DATAOUT,
+ 	.clr_dataout	= OMAP1610_GPIO_CLEAR_DATAOUT,
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 880f3cb..293a22e 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -40,6 +40,7 @@ static struct __initdata resource omap7xx_mpu_gpio_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
++	.revision       = -1,
+ 	.direction	= OMAP_MPUIO_IO_CNTL / 2,
+ 	.datain		= OMAP_MPUIO_INPUT_LATCH / 2,
+ 	.dataout	= OMAP_MPUIO_OUTPUT / 2,
+@@ -80,6 +81,7 @@ static struct __initdata resource omap7xx_gpio1_resources[] = {
+ };
+ 
+ static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
++	.revision       = -1,
+ 	.direction	= OMAP7XX_GPIO_DIR_CONTROL,
+ 	.datain		= OMAP7XX_GPIO_DATA_INPUT,
+ 	.dataout	= OMAP7XX_GPIO_DATA_OUTPUT,
 diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index cc26677..316d930 100644
+index 316d930..9a46d77 100644
 --- a/arch/arm/mach-omap2/gpio.c
 +++ b/arch/arm/mach-omap2/gpio.c
-@@ -81,6 +81,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->irqenable = OMAP24XX_GPIO_IRQENABLE1;
- 		pdata->regs->set_irqenable = OMAP24XX_GPIO_SETIRQENABLE1;
- 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
-+		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
-+		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
+@@ -71,6 +71,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 	case 0:
+ 	case 1:
+ 		pdata->bank_type = METHOD_GPIO_24XX;
++		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
+ 		pdata->regs->direction = OMAP24XX_GPIO_OE;
+ 		pdata->regs->datain = OMAP24XX_GPIO_DATAIN;
+ 		pdata->regs->dataout = OMAP24XX_GPIO_DATAOUT;
+@@ -86,6 +87,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
  		break;
  	case 2:
  		pdata->bank_type = METHOD_GPIO_44XX;
-@@ -94,6 +96,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
- 		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
- 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
-+		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
-+		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
- 		break;
- 	default:
- 		WARN(1, "Invalid gpio bank_type\n");
++		pdata->regs->revision = OMAP4_GPIO_REVISION;
+ 		pdata->regs->direction = OMAP4_GPIO_OE;
+ 		pdata->regs->datain = OMAP4_GPIO_DATAIN;
+ 		pdata->regs->dataout = OMAP4_GPIO_DATAOUT;
 diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 82afed8..17f29cc 100644
+index 17f29cc..f88616e 100644
 --- a/arch/arm/plat-omap/gpio.c
 +++ b/arch/arm/plat-omap/gpio.c
-@@ -170,7 +170,7 @@ do {	\
- static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 		unsigned debounce)
+@@ -985,19 +985,17 @@ static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
+ 
+ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
  {
--	void __iomem		*reg = bank->base;
-+	void __iomem		*reg;
- 	u32			val;
- 	u32			l;
++	static bool called;
+ 	u32 rev;
  
-@@ -186,19 +186,10 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 
- 	l = GPIO_BIT(bank, gpio);
- 
--	if (bank->method == METHOD_GPIO_44XX)
--		reg += OMAP4_GPIO_DEBOUNCINGTIME;
+-	if (cpu_is_omap16xx() && !(bank->method != METHOD_MPUIO))
+-		rev = __raw_readw(bank->base + OMAP1610_GPIO_REVISION);
+-	else if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		rev = __raw_readl(bank->base + OMAP24XX_GPIO_REVISION);
+-	else if (cpu_is_omap44xx())
+-		rev = __raw_readl(bank->base + OMAP4_GPIO_REVISION);
 -	else
--		reg += OMAP24XX_GPIO_DEBOUNCE_VAL;
--
-+	reg = bank->base + bank->regs->debounce;
- 	__raw_writel(debounce, reg);
++	if (called || bank->regs->revision == -1)
+ 		return;
  
--	reg = bank->base;
--	if (bank->method == METHOD_GPIO_44XX)
--		reg += OMAP4_GPIO_DEBOUNCENABLE;
--	else
--		reg += OMAP24XX_GPIO_DEBOUNCE_EN;
--
-+	reg = bank->base + bank->regs->debounce_en;
- 	val = __raw_readl(reg);
+-	printk(KERN_INFO "OMAP GPIO hardware version %d.%d\n",
++	rev = __raw_readw(bank->base + bank->regs->revision);
++	pr_info("OMAP GPIO hardware version %d.%d\n",
+ 		(rev >> 4) & 0x0f, rev & 0x0f);
++
++	called = true;
+ }
  
- 	if (debounce) {
+ /* This lock class tells lockdep that GPIO irqs are in a different
 diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index c7e3a56..7a3f067 100644
+index 7a3f067..91e8de3 100644
 --- a/arch/arm/plat-omap/include/plat/gpio.h
 +++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -185,6 +185,8 @@ struct omap_gpio_reg_offs {
- 	u16 irqenable;
- 	u16 set_irqenable;
- 	u16 clr_irqenable;
-+	u16 debounce;
-+	u16 debounce_en;
- 
- 	bool irqenable_inv;
+@@ -175,6 +175,7 @@ struct omap_gpio_dev_attr {
  };
+ 
+ struct omap_gpio_reg_offs {
++	u16 revision;
+ 	u16 direction;
+ 	u16 datain;
+ 	u16 dataout;
 -- 
 1.7.4
