@@ -1,97 +1,62 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 22 Apr 2011 10:25:42 +0300
-Subject: [PATCH] Fix for missed MII interrupts and MDIO timeouts when FEC
-	is in STOP
-In-Reply-To: <BANLkTim9EGaxvYvgEVFAh+iZmu4nfboSdQ@mail.gmail.com>
-References: <BANLkTinkkquz1d=T-PpTSz1dpsBswD19tQ@mail.gmail.com>
-	<20110421181026.GA429@tarshish>
-	<BANLkTim9EGaxvYvgEVFAh+iZmu4nfboSdQ@mail.gmail.com>
-Message-ID: <20110422072542.GB429@tarshish>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 22 Apr 2011 09:33:56 +0200
+Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <201104211618.31418.arnd@arndb.de>
+References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
+	<201104211400.13289.arnd@arndb.de>
+	<003301cc002c$f67ba0c0$e372e240$%szyprowski@samsung.com>
+	<201104211618.31418.arnd@arndb.de>
+Message-ID: <000001cc00bf$a3afc220$eb0f4660$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Metteo,
+Hello,
 
-On Fri, Apr 22, 2011 at 08:36:17AM +0200, Matteo Fortini wrote:
-> Ok I sent it to netdev, let's see if they accept it.
+On Thursday, April 21, 2011 4:19 PM Arnd Bergmann wrote:
 
-Keeping the linux-arm-kernel list Cc on the patch is a good idea.
-
-> The interface is not working without it.
-> I patched the opensource.freescale.com git tree, since it is the most
-> common start for iMX.
-
-The networking drivers maintainer (David Miller) can not possibly accept this 
-patch because it does not apply to the current mainline kernel. For patches 
-against the Freescale git tree you should contact Freescale.
-
-Which i.MX variant is this?
-
-I suggest you to try the latest mainline kernel, or the i.MX kernel 
-development tree at http://git.pengutronix.de/?p=imx/linux-2.6.git;a=summary.
-
-baruch
-
-> On Thu, Apr 21, 2011 at 8:10 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > Hi Matteo,
+> On Thursday 21 April 2011, Marek Szyprowski wrote:
+> > > No, I think that would be much worse, it definitely destroys all kinds
+> of
+> > > assumptions that the core code makes about devices. However, I don't
+> think
+> > > it's much of a problem to just create two child devices and use them
+> > > from the main driver, you don't really need to create a device_driver
+> > > to bind to each of them.
 > >
-> > On Thu, Apr 21, 2011 at 04:03:49PM +0200, Matteo Fortini wrote:
-> >> We are experiencing unrecoverable timeouts if we disconnect a cable from the
-> >> FEC. This patch solves the issue by keeping the Ethernet enabled even in
-> >> STOP. The RM doesn't state it, but i seems that if disabled, the Ethernet is
-> >> not issuing interrupts to the core.
-> >> (See
-> >> http://forums.freescale.com/t5/i-MX-Microprocessors/iMX28-Network-MDIO-timeout-recovery-and-lost-IRQs/td-p/73309
-> >> )
-> >
-> > Please send network driver patches to the network drivers mailing list at
-> > netdev at vger.kernel.org.
-> >
-> > This patch does not apply to the current mainline kernel. Which kernel tree
-> > are you using?
-> >
-> > baruch
-> >
-> >> ---
-> >> ?drivers/net/fec.c | ? ?7 ++++++-
-> >> ?1 files changed, 6 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> >> index d0e2e69..26ea72d 100644
-> >> --- a/drivers/net/fec.c
-> >> +++ b/drivers/net/fec.c
-> >> @@ -121,8 +121,10 @@
-> >> ?#if defined(CONFIG_FEC_1588) && defined(CONFIG_ARCH_MX28)
-> >> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII | \
-> >> ? ? ? ? ? ? ? ? FEC_ENET_TS_AVAIL | FEC_ENET_TS_TIMER)
-> >> +#define FEC_STOP_IMASK (FEC_ENET_MII)
-> >> ?#else
-> >> ?#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
-> >> +#define FEC_STOP_IMASK (FEC_ENET_MII)
-> >> ?#endif
-> >>
-> >> ?/* The FEC stores dest/src/type, data, and checksum for receive packets.
-> >> @@ -1409,6 +1411,9 @@ fec_stop(struct net_device *dev)
-> >> ? ? writel(1, fep->hwp + FEC_ECNTRL);
-> >> ? ? udelay(10);
-> >>
-> >> + ? ?/* Reactivate the controller to get the IRQs */
-> >> + ? ?writel(0x00000002, fep->hwp + FEC_ECNTRL);
-> >> +
-> >> ?#ifdef CONFIG_ARCH_MXS
-> >> ? ? /* Check MII or RMII */
-> >> ? ? if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
-> >> @@ -1423,7 +1428,7 @@ fec_stop(struct net_device *dev)
-> >> ? ? writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
-> >> ? ? if (fep->ptimer_present)
-> >> ? ? ? ? fec_ptp_stop(fep->ptp_priv);
-> >> - ? ?writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
-> >> + ? ?writel(FEC_STOP_IMASK, fep->hwp + FEC_IMASK);
-> >>
-> >> ? ? netif_stop_queue(dev);
-> >> ? ? fep->link = 0;
+> > I must have missed something. Video codec is a platform device and struct
+> > device pointer is gathered from it (&pdev->dev). How can I define child
+> > devices and attach them to the platform device?
+> 
+> There are a number of ways:
+> 
+> * Do device_create() with &pdev->dev as the parent, inside of the
+>   codec driver, with a new class you create for this purpose
+> * Do device_register() for a device, in the same way
+> * Create the additional platform devices in the platform code,
+>   with their parents pointing to the code device, then
+>   look for them using device_for_each_child in the driver
 
+IMHO this will be the cleanest way. Thanks for the idea.
+
+> * Create two codec devices in parallel and bind to both with your
+>   driver, ideally splitting up the resources between the two
+>   devices in a meaningful way.
+
+Video codec has only standard 2 resources - ioregs and irq, so there
+is not much left for such splitting.
+
+> None of them are extremely nice, but it's not that hard either.
+> You should probably prototype a few of these approaches to see
+> which one is the least ugly one.
+
+Ok. Today while iterating over the hardware requirements I noticed
+one more thing. Our codec hardware has one more, odd requirement for
+video buffers. The DMA addresses need to be aligned to 8KiB or 16KiB
+(depending on buffer type). Do you have any idea how this can be
+handled in a generic way?
+
+Best regards
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Marek Szyprowski
+Samsung Poland R&D Center
