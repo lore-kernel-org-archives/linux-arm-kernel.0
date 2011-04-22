@@ -1,44 +1,88 @@
 From: charu@ti.com (Charulatha V)
-Date: Fri, 22 Apr 2011 16:38:15 +0530
-Subject: [RFC PATCH 01/18] OMAP1: GPIO: Fix mpuio_init() call
-In-Reply-To: <1303470512-19671-1-git-send-email-charu@ti.com>
-References: <1303470512-19671-1-git-send-email-charu@ti.com>
-Message-ID: <1303470512-19671-2-git-send-email-charu@ti.com>
+Date: Fri, 22 Apr 2011 16:38:14 +0530
+Subject: [RFC PATCH 00/18] OMAP: GPIO: cleanup GPIO driver
+Message-ID: <1303470512-19671-1-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In OMAP1 GPIO, MPUIO bank's initialization is called as part of
-omap_gpio_sysinit() which is an "arch_initcall". mpuio_init()
-relies on the gpio_bank pointer of MPUIO bank whose memory is
-allocated only during omap_gpio_probe(). Hence move mpuio_init()
-call as part of probe after the gpio_bank pointer is initialized.
+Modifies the OMAP GPIO driver to avoid usage of cpu_is* checks
+for different OMAP architectures. This is done by moving some
+architecture specific code to mach-omap* and call them from
+plat-omap* using function pointers. Also remove the register offset
+macros from OMAP GPIO driver and handle the same in mach-omap*.
 
-Signed-off-by: Charulatha V <charu@ti.com>
----
- arch/arm/plat-omap/gpio.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Avoid usage of gpio_bank_count and gpio_bank pointer array by
+means of maintaining a list. Removes the bank->method flag from
+the GPIO driver.
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index d2adcdd..9164bd4 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1697,6 +1697,8 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 		ret = init_gpio_info(pdev);
- 		if (ret)
- 			return ret;
-+		if (cpu_class_is_omap1())
-+			mpuio_init();
- 	}
- 
- 	id = pdev->id;
-@@ -2110,8 +2112,6 @@ static int __init omap_gpio_sysinit(void)
- {
- 	int ret = 0;
- 
--	mpuio_init();
--
- #if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
- 	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
- 		if (ret == 0) {
--- 
-1.7.1
+All OMAP1 SoCs has one MPUIO type GPIO bank. OMAP2+ does not have
+any MPUIO type GPIO bank. Since MPUIO type GPIO bank is the same for
+all OMAP1 CPUs, they are handled in plat-omap/ itself as
+there is no common gpio.c file for all cpu types in mach-omap1.
+They are identified by using bank->stride flag as it is '0'
+for other than MPUIO type banks.
+
+Patch series is based on mainline rc4 following commit:
+91e8549bde9e5cc88c5a2e8c8114389279e240b5
+Merge branch 'for-linus' of git://git.kernel.dk/linux-2.6-block
+
+Compile tested for:
+ - omap1_defconfig
+ - omap2plus_defconfig
+
+Boot test (success on the following boards):
+ - OMAP1710-H3
+ - OMAP2420-H4
+ - OMAP3430-SDP
+ - OMAP3430-Zoom2
+ - OMAP3630-Zoom3
+ - OMAP4430-SDP
+ - OMAP4430-Blaze
+
+GPIO module functionality testing (success on the following boards):
+ - OMAP2420-H4
+ - OMAP3430-SDP
+ - OMAP3430-Zoom2
+ - OMAP3630-Zoom3
+ - OMAP4430-SDP
+ - OMAP4430-Blaze
+
+PM Testing (success as given below):
+OMAP3430-SDP: retention, off_mode, system_wide suspend, gpio wakeup
+OMAP3630-Zoom3: retention, system_wide suspend
+using the following:
+	     echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
+	     echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
+	     echo '5' > /debug/pm_debug/wakeup_timer_seconds
+	     echo 1 > /debug/pm_debug/sleep_while_idle
+	     echo 1 > /debug/pm_debug/enable_off_mode
+
+Charulatha V (18):
+  OMAP1: GPIO: Fix mpuio_init() call
+  OMAP: GPIO: remove get_gpio_bank()
+  OMAP: GPIO: Move gpio_get_index() to mach-omap
+  OMAP: GPIO: Move gpio_valid() to SoC specific files
+  OMAP: GPIO: cleanup datain,dataout,set dir funcs
+  OMAP: GPIO: cleanup set trigger func
+  OMAP: GPIO: cleanup set/get IRQ, clr irqstatus funcs
+  OMAP: GPIO: req/free: Remove reg offset macros usage
+  OMAP: GPIO: cleanup gpio_irq_handler
+  OMAP: GPIO: cleanup set wakeup/suspend/resume funcs
+  OMAP: GPIO: Remove dependency on gpio_bank_count
+  OMAP: GPIO: cleanup set_debounce, idle/resume_after_idle
+  OMAP: GPIO: cleanup save/restore context
+  OMAP: GPIO: Remove CONFIG_ARCH_OMAP16XX/OMAP2+ defines
+  OMAP: GPIO: cleanup gpio_show_rev
+  OMAP: GPIO: move omap_gpio_mod_init to mach-omap
+  OMAP: GPIO: use dev_err* instead of printk
+  OMAP: GPIO: Remove usage of bank method
+
+ arch/arm/mach-omap1/gpio15xx.c         |  110 ++-
+ arch/arm/mach-omap1/gpio16xx.c         |  174 +++-
+ arch/arm/mach-omap1/gpio7xx.c          |  132 ++-
+ arch/arm/mach-omap2/gpio.c             |  476 +++++++++-
+ arch/arm/plat-omap/gpio.c              | 1770 ++++++++------------------------
+ arch/arm/plat-omap/include/plat/gpio.h |  108 ++-
+ 6 files changed, 1380 insertions(+), 1390 deletions(-)
