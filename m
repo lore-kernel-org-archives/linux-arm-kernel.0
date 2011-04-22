@@ -1,1339 +1,899 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 22 Apr 2011 17:50:15 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <1303474267-6344-2-git-send-email-subhasish@mistralsolutions.com>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474267-6344-2-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4DB1A3B7.7060300@pengutronix.de>
+Date: Fri, 22 Apr 2011 18:00:03 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4DB1A603.2090208@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2011 02:11 PM, Subhasish Ghosh wrote:
-> This patch adds support for the CAN device emulated on PRUSS.
-
-After commenting the code inline, some remarks:
-- Your tx path looks broken, see commits inline
-- Please setup a proper struct to describe your register layout, make
-  use of arrays for rx and tx
-- don't use u32, s32 for not hardware related variables like return
-  codes and loop counter.
-- the routines that load and save the can data bytes from/into your
-  mailbox look way to complicated. Please write down the layout so that
-  we can think of a elegant way to do it
-- a lot of functions unconditionally return 0, make them void if no
-  error can happen
-- think about using managed devices, that would simplify the probe and
-  release function
-
+On 04/22/2011 02:08 PM, Subhasish Ghosh wrote:
+> This patch adds the pruss MFD driver and associated include files.
+> For details regarding the PRUSS please refer the folowing link:
+> http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+> 
+> The rational behind the MFD driver being the fact that multiple devices can
+> be implemented on the cores independently. This is determined by the nature
+> of the program which is loaded into the PRU's instruction memory.
+> A device may be de-initialized and another loaded or two different devices
+> can be run simultaneously on the two cores.
+> It's also possible, as in our case, to implement a single device on both
+> the PRU's resulting in improved load sharing.
 > 
 > Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 > ---
->  drivers/net/can/Kconfig     |    7 +
->  drivers/net/can/Makefile    |    1 +
->  drivers/net/can/pruss_can.c | 1074 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1082 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/net/can/pruss_can.c
+>  drivers/mfd/Kconfig            |   10 +
+>  drivers/mfd/Makefile           |    1 +
+>  drivers/mfd/pruss.c            |  513 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/pruss.h      |  130 ++++++++++
+>  include/linux/mfd/pruss_core.h |  128 ++++++++++
+>  5 files changed, 782 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mfd/pruss.c
+>  create mode 100644 include/linux/mfd/pruss.h
+>  create mode 100644 include/linux/mfd/pruss_core.h
 > 
-> diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
-> index 5dec456..4682a4f 100644
-> --- a/drivers/net/can/Kconfig
-> +++ b/drivers/net/can/Kconfig
-> @@ -111,6 +111,13 @@ config PCH_CAN
->  	  embedded processor.
->  	  This driver can access CAN bus.
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 0284c53..41479e4 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -92,6 +92,16 @@ config MFD_TI_SSP
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called ti-ssp.
 >  
-> +config CAN_TI_DA8XX_PRU
-> +	depends on CAN_DEV && ARCH_DAVINCI && ARCH_DAVINCI_DA850
-> +	tristate "PRU based CAN emulation for DA8XX"
-> +	---help---
-> +	Enable this to emulate a CAN controller on the PRU of DA8XX.
-> +	If not sure, mark N
-
-Please indent the help text with 1 tab and 2 spaces
-
+> +config MFD_DA8XX_PRUSS
+> +	tristate "Texas Instruments DA8XX PRUSS support"
+> +	depends on ARCH_DAVINCI_DA850
+> +	select MFD_CORE
+> +	help
+> +	  This driver provides support API for the programmable
+> +	  realtime unit (PRU) present on TI's da8xx processors. It
+> +	  provides basic read, write, config, enable, disable
+> +	  routines to facilitate devices emulated on it.
 > +
->  source "drivers/net/can/mscan/Kconfig"
+>  config HTC_EGPIO
+>  	bool "HTC EGPIO support"
+>  	depends on GENERIC_HARDIRQS && GPIOLIB && ARM
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index c56b6c7..8015dea 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -13,6 +13,7 @@ obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
+>  obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
 >  
->  source "drivers/net/can/sja1000/Kconfig"
-> diff --git a/drivers/net/can/Makefile b/drivers/net/can/Makefile
-> index 53c82a7..d0b7cbd 100644
-> --- a/drivers/net/can/Makefile
-> +++ b/drivers/net/can/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_CAN_SJA1000)	+= sja1000/
->  obj-$(CONFIG_CAN_MSCAN)		+= mscan/
->  obj-$(CONFIG_CAN_AT91)		+= at91_can.o
->  obj-$(CONFIG_CAN_TI_HECC)	+= ti_hecc.o
-> +obj-$(CONFIG_CAN_TI_DA8XX_PRU)	+= pruss_can.o
->  obj-$(CONFIG_CAN_MCP251X)	+= mcp251x.o
->  obj-$(CONFIG_CAN_BFIN)		+= bfin_can.o
->  obj-$(CONFIG_CAN_JANZ_ICAN3)	+= janz-ican3.o
-> diff --git a/drivers/net/can/pruss_can.c b/drivers/net/can/pruss_can.c
+>  obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+> +obj-$(CONFIG_MFD_DA8XX_PRUSS)	+= pruss.o
+>  obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+>  obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
+>  
+> diff --git a/drivers/mfd/pruss.c b/drivers/mfd/pruss.c
 > new file mode 100644
-> index 0000000..7702509
+> index 0000000..6836d5a
 > --- /dev/null
-> +++ b/drivers/net/can/pruss_can.c
-> @@ -0,0 +1,1074 @@
+> +++ b/drivers/mfd/pruss.c
+> @@ -0,0 +1,513 @@
 > +/*
-> + *  TI DA8XX PRU CAN Emulation device driver
-> + *  Author: subhasish at mistralsolutions.com
+> + * Copyright (C) 2010, 2011 Texas Instruments Incorporated
 > + *
-> + *  This driver supports TI's PRU CAN Emulation and the
-> + *  specs for the same is available at <http://www.ti.com>
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as  published by the
+> + * Free Software Foundation version 2.
 > + *
-> + *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
-> + *
-> + *  This program is free software; you can redistribute it and/or
-> + *  modify it under the terms of the GNU General Public License as
-> + *  published by the Free Software Foundation version 2.
-> + *
-> + *  This program is distributed as is WITHOUT ANY WARRANTY of any
-> + *  kind, whether express or implied; without even the implied warranty
-> + *  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
+> + * whether express or implied; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
 > + */
 > +
-> +#include <linux/module.h>
 > +#include <linux/init.h>
 > +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/module.h>
 > +#include <linux/bitops.h>
 > +#include <linux/interrupt.h>
+> +#include <linux/spinlock.h>
 > +#include <linux/errno.h>
-> +#include <linux/netdevice.h>
-> +#include <linux/skbuff.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/firmware.h>
 > +#include <linux/clk.h>
-> +#include <linux/types.h>
-> +#include <linux/sysfs.h>
-> +#include <linux/can.h>
-> +#include <linux/can/dev.h>
-> +#include <linux/can/error.h>
 > +#include <linux/mfd/pruss.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
 > +
-> +#define PRUSS_CAN_RX_PRU_0			PRUSS_NUM0
-> +#define PRUSS_CAN_TX_PRU_1			PRUSS_NUM1
-> +#define PRUSS_CAN_TX_SYS_EVT			34
-> +#define PRUSS_CAN_RX_SYS_EVT			33
-> +#define PRUSS_CAN_ARM2DSP_SYS_EVT		32
-> +#define PRUSS_CAN_DELAY_LOOP_LENGTH		2
-> +#define PRUSS_CAN_TIMER_SETUP_DELAY		14
-> +#define PRUSS_CAN_GPIO_SETUP_DELAY		150
-> +#define PRUSS_CAN_TX_GBL_STAT_REG		(PRUSS_PRU1_BASE_ADDRESS + 0x04)
-> +#define PRUSS_CAN_TX_INTR_MASK_REG		(PRUSS_PRU1_BASE_ADDRESS + 0x08)
-> +#define PRUSS_CAN_TX_INTR_STAT_REG		(PRUSS_PRU1_BASE_ADDRESS + 0x0C)
-> +#define PRUSS_CAN_TX_MBOX0_STAT_REG		(PRUSS_PRU1_BASE_ADDRESS + 0x10)
-> +#define PRUSS_CAN_TX_ERR_CNTR_REG		(PRUSS_PRU1_BASE_ADDRESS + 0x30)
-
-I think Wolfgang and me have asked you to describe the register layout
-with a struct.
-
-> +#define PRUSS_CAN_TX_INT_STAT			0x2
-> +#define PRUSS_CAN_MBOX_OFFSET			0x40
-> +#define PRUSS_CAN_MBOX_SIZE			0x10
-> +#define PRUSS_CAN_MBOX_STAT_OFFSET		0x10
-> +#define PRUSS_CAN_MBOX_STAT_SIZE		0x04
-> +#define PRUSS_CAN_GBL_STAT_REG_VAL		0x00000040
-> +#define PRUSS_CAN_INTR_MASK_REG_VAL		0x00004000
-> +#define PRUSS_CAN_TIMING_VAL_TX			(PRUSS_PRU1_BASE_ADDRESS + 0xC0)
-> +#define PRUSS_CAN_TIMING_SETUP			(PRUSS_PRU1_BASE_ADDRESS + 0xC4)
-> +#define PRUSS_CAN_RX_GBL_STAT_REG		(PRUSS_PRU0_BASE_ADDRESS + 0x04)
-> +#define PRUSS_CAN_RX_INTR_MASK_REG		(PRUSS_PRU0_BASE_ADDRESS + 0x08)
-> +#define PRUSS_CAN_RX_INTR_STAT_REG		(PRUSS_PRU0_BASE_ADDRESS + 0x0C)
-> +#define PRUSS_CAN_RX_ERR_CNTR_REG		(PRUSS_PRU0_BASE_ADDRESS + 0x34)
-> +#define PRUSS_CAN_TIMING_VAL_RX			(PRUSS_PRU0_BASE_ADDRESS + 0xD0)
-> +#define PRUSS_CAN_BIT_TIMING_VAL_RX		(PRUSS_PRU0_BASE_ADDRESS + 0xD4)
-> +#define PRUSS_CAN_ID_MAP			(PRUSS_PRU0_BASE_ADDRESS + 0xF0)
-> +#define PRUSS_CAN_ERROR_ACTIVE			128
-> +#define PRUSS_CAN_GBL_STAT_REG_MASK		0x1F
-> +#define PRUSS_CAN_GBL_STAT_REG_SET_TX		0x80
-> +#define PRUSS_CAN_GBL_STAT_REG_SET_RX		0x40
-> +#define PRUSS_CAN_GBL_STAT_REG_STOP_TX		0x7F
-> +#define PRUSS_CAN_GBL_STAT_REG_STOP_RX		0xBF
-> +#define PRUSS_CAN_SET_TX_REQ			0x00000080
-> +#define PRUSS_CAN_STD_FRAME_MASK		18
-> +#define PRUSS_CAN_START				1
-> +#define PRUSS_CAN_MB_MIN			0
-> +#define PRUSS_CAN_MB_MAX			7
-> +#define PRUSS_CAN_MID_IDE			BIT(29)
-> +#define PRUSS_CAN_ISR_BIT_CCI			BIT(15)
-> +#define PRUSS_CAN_ISR_BIT_ESI			BIT(14)
-> +#define PRUSS_CAN_ISR_BIT_SRDI			BIT(13)
-> +#define PRUSS_CAN_ISR_BIT_RRI			BIT(8)
-> +#define PRUSS_CAN_GSR_BIT_EPM			BIT(4)
-> +#define PRUSS_CAN_GSR_BIT_BFM			BIT(3)
-> +#define PRUSS_CAN_RTR_BUFF_NUM			8
-> +#define PRUSS_DEF_NAPI_WEIGHT			8
-> +#define PRUSS_CAN_DRV_NAME "da8xx_pruss_can"
-> +#define PRUSS_CAN_DRV_DESC "TI PRU CAN Controller Driver v1.0"
-> +
-> +enum can_tx_dir {
-> +	TRANSMIT = 1,
-> +	RECEIVE
-
-please add a "," after RECEIVE
-
-> +};
-> +
-> +struct can_mbox {
-
-I suggest to add a namespace to these structs, e.g. pru_can_mbox. Same
-comment applies to the other structs.
-
-> +	canid_t can_id;
-
-You write this struct into the hardware, don't you? So you should not
-use kernel internal types to describe your hardware layout. Think about
-declaring this struct __packed__
-
-> +	u8 data[8];
-> +	u16 datalength;
-> +	u16 crc;
-> +};
-> +
-> +struct can_emu_cntx {
-> +	enum can_tx_dir txdir;
-> +	struct can_mbox mbox;
-> +	u32 mboxno;
-> +	u8 pruno;
-> +	u32 gbl_stat;
-> +	u32 intr_stat;
-> +	u32 mbox_stat;
-> +};
-> +
-> +struct can_emu_priv {
-> +	struct can_priv can;
-> +	struct napi_struct napi;
-> +	struct net_device *ndev;
+> +struct pruss_priv {
 > +	struct device *dev;
-> +	struct clk *clk_timer;
-> +	struct can_emu_cntx can_tx_cntx;
-> +	struct can_emu_cntx can_rx_cntx;
-
-I have not looked at the rest of the code, but it smells that you should
-make this an array of two cntx.
-
-> +	unsigned int clk_freq_pru;
-> +	unsigned int trx_irq;
-> +	unsigned int tx_head;
-> +	unsigned int tx_tail;
-> +	unsigned int tx_next;
-> +	unsigned int mbx_id[8];
+> +	spinlock_t lock;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	void __iomem *ioaddr;
 > +};
 > +
-> +static struct can_bittiming_const pru_can_bittiming_const = {
-> +	.name = PRUSS_CAN_DRV_NAME,
-> +	.tseg1_min = 1,
-> +	.tseg1_max = 16,
-> +	.tseg2_min = 1,
-> +	.tseg2_max = 8,
-> +	.sjw_max = 4,
-> +	.brp_min = 1,
-> +	.brp_max = 256,
-> +	.brp_inc = 1,
-> +};
-> +
-> +static int pru_can_mbox_write(struct device *dev,
-> +			struct can_emu_cntx *emu_cntx)
+> +s32 pruss_disable(struct device *dev, u8 pruss_num)
+make it a int function
 > +{
-> +	u32 offset = 0;
-                  ^^^^^
-
-not needed
-
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct prusscore_regs __iomem *h_pruss;
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
+> +	u32 temp_reg;
 > +
-> +	offset = PRUSS_PRU1_BASE_ADDRESS + PRUSS_CAN_MBOX_OFFSET
-> +			+ (PRUSS_CAN_MBOX_SIZE * emu_cntx->mboxno);
-> +
-> +	pruss_writel_multi(dev, offset, (u32 *) &(emu_cntx->mbox), 4);
-> +
-> +	return 0;
-> +}
-> +
-> +static int pru_can_mbox_read(struct device *dev,
-> +			struct can_emu_cntx *emu_cntx)
-> +{
-> +	u32 offset = 0;
-
-dito
-
-> +
-> +	offset = PRUSS_PRU0_BASE_ADDRESS + PRUSS_CAN_MBOX_OFFSET
-> +			+ (PRUSS_CAN_MBOX_SIZE * emu_cntx->mboxno);
-> +
-> +	pruss_readl_multi(dev, offset, (u32 *) &emu_cntx->mbox, 4);
-
-where does this "4" come from? consider using sizeof()
-
-> +
-> +	return 0;
-
-why do you return 0 here? pruss_readl_multi is not void, although it
-always returns 0, too. consider make all void.
-> +}
-> +
-> +static int pru_can_rx_id_set(struct device *dev, u32 nodeid, u32 mboxno)
-> +{
-> +	pruss_writel(dev, (PRUSS_CAN_ID_MAP + (mboxno * 4)), nodeid);
-> +
-> +	return 0;
-
-consider making this a void function.
-> +}
-> +
-> +static int pru_can_intr_stat_get(struct device *dev,
-> +		struct can_emu_cntx *emu_cntx)
-> +{
-> +	if (emu_cntx->pruno == PRUCORE_1)
-> +		pruss_readl(dev, PRUSS_CAN_TX_INTR_STAT_REG,
-> +				&emu_cntx->intr_stat);
-> +	else if (emu_cntx->pruno == PRUCORE_0)
-> +		pruss_readl(dev, PRUSS_CAN_RX_INTR_STAT_REG,
-> +				&emu_cntx->intr_stat);
-
-If you describe the register layout with a struct with an array
-containing with rx and tx registers you can get rid of the if..else..
-use emu_cntx->pruno as index to the array.
-
-> +	else
-> +		return -EINVAL;
-
-It's an internally used function, if emu_cntx->pruno is bogous here
-you've got really big problems. I think it's save to remove this. Then
-this function would become a void function.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int pru_can_gbl_stat_get(struct device *dev,
-> +		struct can_emu_cntx *emu_cntx)
-> +{
-> +	if (emu_cntx->pruno == PRUCORE_1)
-> +		pruss_readl(dev, PRUSS_CAN_TX_GBL_STAT_REG,
-> +				&emu_cntx->gbl_stat);
-> +	else if (emu_cntx->pruno == PRUCORE_0)
-> +		pruss_readl(dev, PRUSS_CAN_RX_GBL_STAT_REG,
-> +				&emu_cntx->gbl_stat);
-> +	else
-> +		return -EINVAL;
-> +	return 0;
-
-Same comments apply here, too.
-
-> +}
-> +
-> +static int pru_can_tx_mode_set(struct device *dev, bool transfer_flag,
-> +					enum can_tx_dir ecan_trx)
-> +{
-> +	u32 value;
-> +
-> +	if (ecan_trx == TRANSMIT) {
-> +		pruss_readl(dev, PRUSS_CAN_RX_GBL_STAT_REG, &value);
-> +		if (transfer_flag) {
-> +			value &= PRUSS_CAN_GBL_STAT_REG_MASK;
-> +			value |= PRUSS_CAN_GBL_STAT_REG_SET_TX;
-> +		} else
-> +			value &= PRUSS_CAN_GBL_STAT_REG_STOP_TX;
-> +
-> +		pruss_writel(dev, PRUSS_CAN_RX_GBL_STAT_REG, value);
-> +		pruss_writel(dev, PRUSS_CAN_TX_GBL_STAT_REG, value);
-> +	} else if (ecan_trx == RECEIVE) {
-> +		pruss_readl(dev, PRUSS_CAN_RX_GBL_STAT_REG, &value);
-> +		if (transfer_flag) {
-> +			value &= PRUSS_CAN_GBL_STAT_REG_MASK;
-> +			value |= PRUSS_CAN_GBL_STAT_REG_SET_RX;
-> +		} else
-> +			value &= PRUSS_CAN_GBL_STAT_REG_STOP_RX;
-> +
-> +		pruss_writel(dev, PRUSS_CAN_RX_GBL_STAT_REG, value);
-> +		pruss_writel(dev, PRUSS_CAN_TX_GBL_STAT_REG, value);
-> +	} else
-
-Same comments apply here, too.
-
+> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
 > +		return -EINVAL;
 > +
+> +	spin_lock(&pruss->lock);
+> +
+> +	/* pruss deinit */
+> +	iowrite32(0xFFFFFFFF, &pruss_mmap->intc.statclrint[pruss_num]);
+> +
+> +	/* Disable PRU */
+> +	h_pruss = &pruss_mmap->core[pruss_num];
+> +	temp_reg = ioread32(&h_pruss->control);
+> +	temp_reg = (temp_reg &
+> +			~PRUCORE_CONTROL_COUNTENABLE_MASK) |
+> +			((PRUCORE_CONTROL_COUNTENABLE_DISABLE <<
+> +			PRUCORE_CONTROL_COUNTENABLE_SHIFT) &
+> +			PRUCORE_CONTROL_COUNTENABLE_MASK);
+> +	iowrite32(temp_reg, &h_pruss->control);
+> +
+> +	temp_reg = ioread32(&h_pruss->control);
+> +	temp_reg = (temp_reg &
+> +		~PRUCORE_CONTROL_ENABLE_MASK) |
+> +		((PRUCORE_CONTROL_ENABLE_DISABLE <<
+> +		PRUCORE_CONTROL_ENABLE_SHIFT) &
+> +		PRUCORE_CONTROL_ENABLE_MASK);
+> +	iowrite32(temp_reg, &h_pruss->control);
+> +
+> +	/* Reset PRU */
+> +	iowrite32(PRUCORE_CONTROL_RESETVAL,
+> +				&h_pruss->control);
+> +	spin_unlock(&pruss->lock);
+> +
 > +	return 0;
+
+make it a void function?
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_disable);
 > +
-
-is this array const?
-> +static u32 pruss_intc_init[19][3] = {
-> +	{PRUSS_INTC_POLARITY0,		PRU_INTC_REGMAP_MASK,	0xFFFFFFFF},
-> +	{PRUSS_INTC_POLARITY1,		PRU_INTC_REGMAP_MASK,	0xFFFFFFFF},
-> +	{PRUSS_INTC_TYPE0,		PRU_INTC_REGMAP_MASK,	0x1C000000},
-> +	{PRUSS_INTC_TYPE1,		PRU_INTC_REGMAP_MASK,	0},
-> +	{PRUSS_INTC_GLBLEN,		0,			1},
-> +	{PRUSS_INTC_HOSTMAP0,		PRU_INTC_REGMAP_MASK,	0x03020100},
-> +	{PRUSS_INTC_HOSTMAP1,		PRU_INTC_REGMAP_MASK,	0x07060504},
-> +	{PRUSS_INTC_HOSTMAP2,		PRU_INTC_REGMAP_MASK,	0x0000908},
-> +	{PRUSS_INTC_CHANMAP0,		PRU_INTC_REGMAP_MASK,	0},
-> +	{PRUSS_INTC_CHANMAP8,		PRU_INTC_REGMAP_MASK,	0x00020200},
-> +	{PRUSS_INTC_STATIDXCLR,		0,			32},
-> +	{PRUSS_INTC_STATIDXCLR,		0,			19},
-> +	{PRUSS_INTC_ENIDXSET,		0,			19},
-> +	{PRUSS_INTC_STATIDXCLR,		0,			18},
-> +	{PRUSS_INTC_ENIDXSET,		0,			18},
-> +	{PRUSS_INTC_STATIDXCLR,		0,			34},
-> +	{PRUSS_INTC_ENIDXSET,		0,			34},
-> +	{PRUSS_INTC_ENIDXSET,		0,			32},
-> +	{PRUSS_INTC_HOSTINTEN,		0,			5}
-
-please add ","
-
-> +};
-> +
-> +static int pru_can_emu_init(struct device *dev, u32 pruclock)
+> +s32 pruss_enable(struct device *dev, u8 pruss_num)
+int?
 > +{
-> +	u32 value[8] = {[0 ... 7] = 1};
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct prusscore_regs __iomem *h_pruss;
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
 > +	u32 i;
-we usually use plain ints as a for-loop variable.
 > +
-> +	/* PRU Internal Registers Initializations */
-> +	pruss_writel_multi(dev, PRUSS_CAN_TX_MBOX0_STAT_REG, value, 8);
+> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
+> +		return -EINVAL;
+> +
+> +	h_pruss = &pruss_mmap->core[pruss_num];
+> +
+> +	/* Reset PRU  */
+> +	spin_lock(&pruss->lock);
+> +	iowrite32(PRUCORE_CONTROL_RESETVAL, &h_pruss->control);
 
-use sizeof(), or ARRAY_SIZE
+no need to lock the ram reset below?
+
+
+> +	spin_unlock(&pruss->lock);
+> +
+> +	/* Reset any garbage in the ram */
+> +	if (pruss_num == PRUCORE_0)
+> +		for (i = 0; i < PRUSS_PRU0_RAM_SZ; i++)
+> +			iowrite32(0x0, &pruss_mmap->dram0[i]);
+> +	else if (pruss_num == PRUCORE_1)
+> +		for (i = 0; i < PRUSS_PRU1_RAM_SZ; i++)
+> +			iowrite32(0x0, &pruss_mmap->dram1[i]);
+
+if you make a array for these
+
++struct pruss_map {
++	u8 dram0[512];
++	u8 res1[7680];
+
++	u8 dram1[512];
++	u8 res2[7680];
+..}
+
+you don't need the if..else..
 
 > +
-> +	*value = PRUSS_CAN_GBL_STAT_REG_VAL;
-> +	pruss_writel(dev, PRUSS_CAN_TX_GBL_STAT_REG, value[0]);
-> +	pruss_writel(dev, PRUSS_CAN_RX_GBL_STAT_REG, value[0]);
-
-why not:
-pruss_writel(dev, PRUSS_CAN_TX_GBL_STAT_REG, PRUSS_CAN_GBL_STAT_REG_VAL);
-
-> +
-> +	*value = PRUSS_CAN_INTR_MASK_REG_VAL;
-> +	pruss_writel(dev, PRUSS_CAN_TX_INTR_MASK_REG, value[0]);
-> +	pruss_writel(dev, PRUSS_CAN_RX_INTR_MASK_REG, value[0]);
-> +
-> +	for (i = 0; i < 19; i++)
-ARRAY_SIZE
-> +		(i < 12) ?	pruss_rmwl(dev, pruss_intc_init[i][0],
-> +						pruss_intc_init[i][1],
-> +						pruss_intc_init[i][2]) :
-> +				pruss_idx_writel(dev, pruss_intc_init[i][0],
-> +						pruss_intc_init[i][2]);
-
-if..else here, please
-
-or put the stuff into two arrays
-
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_enable);
 > +
-> +static void pru_can_emu_exit(struct device *dev)
+> +/* Load the specified PRU with code */
+> +s32 pruss_load(struct device *dev, u8 pruss_num,
+> +			u32 *pruss_code, u32 code_size_in_words)
 > +{
-> +	pruss_disable(dev, PRUSS_CAN_RX_PRU_0);
-> +	pruss_disable(dev, PRUSS_CAN_TX_PRU_1);
-> +}
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
+> +	u32 __iomem *pruss_iram;
+> +	u32 i;
 > +
-> +static int pru_can_tx(struct device *dev, u8 mboxnumber, u8 pruno)
-> +{
-> +	u32 value = 0;
-> +
-> +	if (PRUCORE_1 == pruno) {
-
-we usually write it the other way round...:
-if (pruno == PRUCORE_1)
-> +		value = PRUSS_CAN_SET_TX_REQ;
-> +		pruss_writel(dev, ((PRUSS_PRU1_BASE_ADDRESS +
-> +				(PRUSS_CAN_MBOX_STAT_OFFSET +
-> +				(PRUSS_CAN_MBOX_STAT_SIZE * mboxnumber)))
-> +				& 0xFFFF), value);
-
-don't use value, use PRUSS_CAN_SET_TX_REQ directly
-
-> +	} else if (PRUCORE_0 == pruno) {
-> +		pruss_readl(dev, PRUSS_CAN_RX_INTR_STAT_REG, &value);
-> +		value = value & ~(1 << mboxnumber);
-> +		pruss_writel(dev, PRUSS_CAN_RX_INTR_STAT_REG, value);
-> +		value = 0;
-> +		pruss_writel(dev, ((PRUSS_PRU0_BASE_ADDRESS +
-> +				(PRUSS_CAN_MBOX_STAT_OFFSET +
-> +				(PRUSS_CAN_MBOX_STAT_SIZE * mboxnumber)))
-> +				& 0xFFFF), value);
+> +	if (pruss_num == PRUCORE_0)
+> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram0;
+> +	else if (pruss_num == PRUCORE_1)
+> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram1;
+> +	else
 
 same here
-
-> +	} else
 > +		return -EINVAL;
-
-trust your own code, get rid of the -EINVAL, make this a void function.
-
+> +
+> +	pruss_enable(dev, pruss_num);
+> +
+> +	spin_lock(&pruss->lock);
+> +	/* Copy dMAX code to its instruction RAM  */
+> +	for (i = 0; i < code_size_in_words; i++)
+> +		iowrite32(pruss_code[i], (pruss_iram + i));
+> +
+> +	spin_unlock(&pruss->lock);
+> +
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_load);
 > +
-> +static int pru_can_reset_tx(struct device *dev)
+> +s32 pruss_run(struct device *dev, u8 pruss_num)
+int?
 > +{
-> +	pruss_idx_writel(dev, PRUSS_INTC_STATIDXCLR, PRUSS_CAN_ARM2DSP_SYS_EVT);
-> +	pruss_idx_writel(dev, PRUSS_INTC_ENIDXSET, PRUSS_CAN_ARM2DSP_SYS_EVT);
-> +	pruss_idx_writel(dev, PRUSS_INTC_STATIDXSET, PRUSS_CAN_ARM2DSP_SYS_EVT);
-> +	return 0;
-
-void function?
-> +}
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct prusscore_regs __iomem *h_pruss;
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
+> +	u32 temp_reg;
 > +
-> +static void pru_can_mask_ints(struct device *dev, u32 trx, bool enable)
-> +{
-> +	u32 value = 0;
-
-not needed
-> +
-> +	value = (trx == PRUSS_CAN_TX_PRU_1) ?
-> +		PRUSS_CAN_TX_SYS_EVT : PRUSS_CAN_RX_SYS_EVT;
-
-use a struct with arrays for the register description
-
-> +	enable ? pruss_idx_writel(dev, PRUSS_INTC_ENIDXSET, value) :
-> +		pruss_idx_writel(dev, PRUSS_INTC_ENIDXCLR, value);
-
-if..else
-> +}
-> +
-> +static unsigned int pru_can_get_error_cnt(struct device *dev, u8 pruno)
-> +{
-> +	u32 value = 0;
-not needed
-> +
-> +	if (pruno == PRUSS_CAN_RX_PRU_0)
-> +		pruss_readl(dev, PRUSS_CAN_RX_ERR_CNTR_REG, &value);
-> +	else if (pruno == PRUSS_CAN_TX_PRU_1)
-> +		pruss_readl(dev, PRUSS_CAN_TX_ERR_CNTR_REG, &value);
-> +	else
+> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
 > +		return -EINVAL;
-
-remove the -EINVAL
-
 > +
-> +	return value;
-> +}
+> +	h_pruss = &pruss_mmap->core[pruss_num];
 > +
-> +static unsigned int pru_can_get_intc_status(struct device *dev)
-> +{
-> +	u32 value = 0;
-not needed
+> +	/* Enable dMAX, let it execute the code we just copied */
+> +	spin_lock(&pruss->lock);
+> +	temp_reg = ioread32(&h_pruss->control);
+> +	temp_reg = (temp_reg &
+> +			~PRUCORE_CONTROL_COUNTENABLE_MASK) |
+> +			((PRUCORE_CONTROL_COUNTENABLE_ENABLE <<
+> +			PRUCORE_CONTROL_COUNTENABLE_SHIFT) &
+> +			PRUCORE_CONTROL_COUNTENABLE_MASK);
+> +	iowrite32(temp_reg, &h_pruss->control);
 > +
-> +	pruss_readl(dev, PRUSS_INTC_STATCLRINT1, &value);
-> +	return value;
-> +}
-> +
-> +static void pru_can_clr_intc_status(struct device *dev, u32 trx)
-> +{
-> +	u32 value = 0;
-dito
-> +
-> +	value = (trx == PRUSS_CAN_TX_PRU_1) ?
-> +		PRUSS_CAN_TX_SYS_EVT : PRUSS_CAN_RX_SYS_EVT;
-
-use a struct + array for the resiter desc
-
-> +	pruss_idx_writel(dev, PRUSS_INTC_STATIDXCLR, value);
-> +}
-> +
-> +static int pru_can_get_state(const struct net_device *ndev,
-> +					enum can_state *state)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	*state = priv->can.state;
-
-we don't implemnt this function anymore..
+> +	temp_reg = ioread32(&h_pruss->control);
+> +	temp_reg = (temp_reg &
+> +			~PRUCORE_CONTROL_ENABLE_MASK) |
+> +			((PRUCORE_CONTROL_ENABLE_ENABLE <<
+> +			PRUCORE_CONTROL_ENABLE_SHIFT) &
+> +			PRUCORE_CONTROL_ENABLE_MASK);
+> +	iowrite32(temp_reg, &h_pruss->control);
+> +	spin_unlock(&pruss->lock);
 > +
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_run);
 > +
-> +static int pru_can_set_bittiming(struct net_device *ndev)
+> +s32 pruss_wait_for_halt(struct device *dev, u8 pruss_num, u32 timeout)
 > +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	struct can_bittiming *bt = &priv->can.bittiming;
-> +	u32 value;
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct prusscore_regs __iomem *h_pruss;
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
+> +	u32 temp_reg;
+> +	u32 cnt = timeout;
 > +
-> +	value = priv->can.clock.freq / bt->bitrate;
-> +	pruss_writel(priv->dev, PRUSS_CAN_TIMING_VAL_TX, value);
-> +	pruss_writel(priv->dev, PRUSS_CAN_BIT_TIMING_VAL_RX, value);
+> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
+> +		return -EINVAL;
 > +
-> +	value = (bt->phase_seg2 + bt->phase_seg1 +
-> +			bt->prop_seg + 1) * bt->brp;
-> +	value = (value >> 1) - PRUSS_CAN_TIMER_SETUP_DELAY;
-> +	value = (value << 16) | value;
-> +	pruss_writel(priv->dev, PRUSS_CAN_TIMING_VAL_RX, value);
+> +	h_pruss = &pruss_mmap->core[pruss_num];
 > +
-> +	value = (PRUSS_CAN_GPIO_SETUP_DELAY *
-> +		(priv->clk_freq_pru / 1000000) / 1000) /
-> +		PRUSS_CAN_DELAY_LOOP_LENGTH;
-> +
-> +	pruss_writel(priv->dev, PRUSS_CAN_TIMING_SETUP, value);
-> +	return 0;
-> +}
-> +
-> +static void pru_can_stop(struct net_device *ndev)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +
-> +	pru_can_mask_ints(priv->dev, PRUSS_CAN_TX_PRU_1, false);
-> +	pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, false);
-> +	pru_can_reset_tx(priv->dev);
-> +	priv->can.state = CAN_STATE_STOPPED;
-> +}
-> +
-> +/*
-> + * This is to just set the can state to ERROR_ACTIVE
-> + *	ip link set canX up type can bitrate 125000
-
-fix the comment
-
-> + */
-> +static void pru_can_start(struct net_device *ndev)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +
-> +	if (priv->can.state != CAN_STATE_STOPPED)
-> +		pru_can_stop(ndev);
-> +
-> +	pru_can_mask_ints(priv->dev, PRUSS_CAN_TX_PRU_1, true);
-> +	pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, true);
-> +
-> +	pru_can_gbl_stat_get(priv->dev, &priv->can_tx_cntx);
-> +	pru_can_gbl_stat_get(priv->dev, &priv->can_rx_cntx);
-> +
-> +	if (PRUSS_CAN_GSR_BIT_EPM & priv->can_tx_cntx.gbl_stat)
-> +		priv->can.state = CAN_STATE_ERROR_PASSIVE;
-> +	else if (PRUSS_CAN_GSR_BIT_BFM & priv->can_tx_cntx.gbl_stat)
-> +		priv->can.state = CAN_STATE_BUS_OFF;
-> +	else
-> +		priv->can.state = CAN_STATE_ERROR_ACTIVE;
-> +}
-> +
-> +static int pru_can_set_mode(struct net_device *ndev, enum can_mode mode)
-> +{
-> +	int ret = 0;
-> +
-> +	switch (mode) {
-> +	case CAN_MODE_START:
-> +		pru_can_start(ndev);
-> +		netif_wake_queue(ndev);
-> +		break;
-> +	default:
-> +		ret = -EOPNOTSUPP;
-> +		break;
-> +	}
-> +	return ret;
-> +}
-> +
-> +static netdev_tx_t pru_can_start_xmit(struct sk_buff *skb,
-> +					struct net_device *ndev)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	struct can_frame *cf = (struct can_frame *)skb->data;
-> +	int count;
-> +	u8 *data = cf->data;
-> +	u8 dlc = cf->can_dlc;
-> +	u8 *pdata = NULL;
-> +
-> +	if (can_dropped_invalid_skb(ndev, skb))
-> +		return NETDEV_TX_OK;
-> +
-> +	netif_stop_queue(ndev);
-
-why do you stop the queue unconditionally here?
-
-
-> +	if (cf->can_id & CAN_EFF_FLAG)	/* Extended frame format */
-> +		priv->can_tx_cntx.mbox.can_id =
-> +		    (cf->can_id & CAN_EFF_MASK) | PRUSS_CAN_MID_IDE;
-> +	else			/* Standard frame format */
-> +		priv->can_tx_cntx.mbox.can_id =
-> +		    (cf->can_id & CAN_SFF_MASK) << PRUSS_CAN_STD_FRAME_MASK;
-> +
-> +	if (cf->can_id & CAN_RTR_FLAG)	/* Remote transmission request */
-> +		priv->can_tx_cntx.mbox.can_id |= CAN_RTR_FLAG;
-> +
-> +	pdata = &priv->can_tx_cntx.mbox.data[0] + (dlc - 1);
-> +	for (count = 0; count < (u8) dlc; count++)
-> +		*pdata-- = *data++;
-
-What does this loop do? endianess conversion? Please don't open code this.
-
-> +
-> +	priv->can_tx_cntx.mbox.datalength = (u16) dlc;
-no need to cast
-
-> +	priv->can_tx_cntx.mbox.crc = 0;
-> +/*
-> + * search for the next available mbx
-> + * if the next mbx is busy, then try the next + 1
-> + * do this until the head is reached.
-> + * if still unable to tx, stop accepting any packets
-> + * if able to tx and the head is reached, then reset next to tail, i.e mbx0
-> + * if head is not reached, then just point to the next mbx
-> + */
-
-indention, please
-
-Your tx algorithm looks fishy. You always use can_get_echo_skb(ndev, 0).
-This means you can have only 1 can frame on the fly. But you say you
-look for a free mailbox. You have to tx mailboxes in a defined order,
-otherwise your hardware/firmware is broken. If your hardware transmits
-frames in order, you always know which one will be the next free
-mailbox. You have a power of 2 number of mailboxes, you can simply apply
-a mask to get to the real mailbox number. No need for manual wrap
-around. Have a look at the at91_can tx sheme.
-
-Activate the tx_interrupt, putting a can frame into a mailbox, stop the
-tx_queue if there are no free mailboxes, or in case of a wrap around.
-Reenable the tx_queue in the tx_complete interrupt handler.
-
-> +	for (; priv->tx_next <= priv->tx_head; priv->tx_next++) {
-> +		priv->can_tx_cntx.mboxno = priv->tx_next;
-> +		if (-1 == pru_can_mbox_write(priv->dev,
-> +					&priv->can_tx_cntx)) {
-
-this function will always return 0.
-
-> +			if (priv->tx_next == priv->tx_head) {
-> +				priv->tx_next = priv->tx_tail;
-> +				netif_stop_queue(ndev);	/* IF stalled */
-> +				dev_err(priv->dev,
-> +					"%s: no tx mbx available", __func__);
-> +				return NETDEV_TX_BUSY;
-> +			} else
-> +				continue;
-> +		} else {
-> +			/* set transmit request */
-> +			pru_can_tx(priv->dev, priv->tx_next,
-> +						PRUSS_CAN_TX_PRU_1);
-> +			pru_can_tx_mode_set(priv->dev, false, RECEIVE);
-> +			pru_can_tx_mode_set(priv->dev, true, TRANSMIT);
-> +			pru_can_reset_tx(priv->dev);
-> +			priv->tx_next++;
-> +			can_put_echo_skb(skb, ndev, 0);
-                                                   ^^^
-
-see comment above
-
+> +	while (cnt--) {
+> +		temp_reg = ioread32(&h_pruss->control);
+> +		if (((temp_reg & PRUCORE_CONTROL_RUNSTATE_MASK) >>
+> +				PRUCORE_CONTROL_RUNSTATE_SHIFT) ==
+> +				PRUCORE_CONTROL_RUNSTATE_HALT)
 > +			break;
-> +		}
+
+how long might this take? what about some delay, sleep, or reschedule?
+
 > +	}
-> +	if (priv->tx_next > priv->tx_head)
-> +		priv->tx_next = priv->tx_tail;
+> +	if (!cnt)
+> +		return -EBUSY;
 > +
-> +	return NETDEV_TX_OK;
-> +}
-> +
-> +static int pru_can_rx(struct net_device *ndev, u32 mbxno)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	struct net_device_stats *stats = &ndev->stats;
-> +	struct can_frame *cf;
-> +	struct sk_buff *skb;
-> +	u8 *data = NULL;
-> +	u8 *pdata = NULL;
-> +	int count = 0;
-> +
-> +	skb = alloc_can_skb(ndev, &cf);
-> +	if (!skb) {
-> +		if (printk_ratelimit())
-> +			dev_err(priv->dev,
-> +				"alloc_can_skb() failed\n");
-> +		return -ENOMEM;
-> +	}
-> +	data = cf->data;
-> +	/* get payload */
-> +	priv->can_rx_cntx.mboxno = mbxno;
-> +	if (pru_can_mbox_read(priv->dev, &priv->can_rx_cntx)) {
-
-function always returns 0!
-
-> +		dev_err(priv->dev, "failed to get data from mailbox\n");
-> +		return -EAGAIN;
-> +	}
-> +	/* give ownweship to pru */
-> +	pru_can_tx(priv->dev, mbxno, PRUSS_CAN_RX_PRU_0);
-> +
-> +	/* get data length code */
-> +	cf->can_dlc = get_can_dlc(priv->can_rx_cntx.mbox.datalength & 0xF);
-
-This looks to complicated. Please state how the individual can bytes are
-placed in the mailbox, so that we can think of a simpler way to do this.
-
-> +	if (cf->can_dlc <= 4) {
-> +		pdata = &priv->can_rx_cntx.mbox.data[4] + (4 - cf->can_dlc);
-> +		for (count = 0; count < cf->can_dlc; count++)
-> +			*data++ = *pdata++;
-> +	} else {
-> +		pdata = &priv->can_rx_cntx.mbox.data[4];
-> +		for (count = 0; count < 4; count++)
-> +			*data++ = *pdata++;
-> +		pdata = &priv->can_rx_cntx.mbox.data[3] - (cf->can_dlc - 5);
-> +		for (count = 0; count < cf->can_dlc - 4; count++)
-> +			*data++ = *pdata++;
-> +	}
-> +
-> +	/* get id extended or std */
-> +	if (priv->can_rx_cntx.mbox.can_id & PRUSS_CAN_MID_IDE)
-> +		cf->can_id = (priv->can_rx_cntx.mbox.can_id & CAN_EFF_MASK)
-> +								| CAN_EFF_FLAG;
-
-the usual way is to write the "|" at the end of the line.
-
-> +	else
-> +		cf->can_id = (priv->can_rx_cntx.mbox.can_id >> 18)
-> +							& CAN_SFF_MASK;
-> +
-> +	if (priv->can_rx_cntx.mbox.can_id & CAN_RTR_FLAG)
-> +		cf->can_id |= CAN_RTR_FLAG;
-
-please don't copy any data to the can frame in case if an RTR message.
-
-> +
-> +	stats->rx_bytes += cf->can_dlc;
-> +	netif_receive_skb(skb);
-> +	stats->rx_packets++;
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_wait_for_halt);
 > +
-> +static int pru_can_err(struct net_device *ndev, int int_status,
-> +			     int err_status)
+> +s32 pruss_writeb(struct device *dev, u32 offset, u8 pdatatowrite)
 > +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	struct net_device_stats *stats = &ndev->stats;
-> +	struct can_frame *cf;
-> +	struct sk_buff *skb;
-> +	u32 tx_err_cnt, rx_err_cnt;
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstowrite;
+
+we usually don't use "p" variable names for pointers
+
 > +
-> +	skb = alloc_can_err_skb(ndev, &cf);
-> +	if (!skb) {
-> +		if (printk_ratelimit())
-> +			dev_err(priv->dev,
-> +				"alloc_can_err_skb() failed\n");
-> +		return -ENOMEM;
-> +	}
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +	iowrite8(pdatatowrite, paddresstowrite);
 > +
-> +	if (err_status & PRUSS_CAN_GSR_BIT_EPM) {	/* error passive int */
-> +		priv->can.state = CAN_STATE_ERROR_PASSIVE;
-> +		++priv->can.can_stats.error_passive;
-> +		cf->can_id |= CAN_ERR_CRTL;
-> +		tx_err_cnt = pru_can_get_error_cnt(priv->dev,
-> +						PRUSS_CAN_TX_PRU_1);
-> +		rx_err_cnt = pru_can_get_error_cnt(priv->dev,
-> +						PRUSS_CAN_RX_PRU_0);
-> +		if (tx_err_cnt > PRUSS_CAN_ERROR_ACTIVE - 1)
-> +			cf->data[1] |= CAN_ERR_CRTL_TX_PASSIVE;
-> +		if (rx_err_cnt > PRUSS_CAN_ERROR_ACTIVE - 1)
-> +			cf->data[1] |= CAN_ERR_CRTL_RX_PASSIVE;
-> +
-> +		dev_dbg(priv->ndev->dev.parent, "Error passive interrupt\n");
-> +	}
-> +
-> +	if (err_status & PRUSS_CAN_GSR_BIT_BFM) {
-> +		priv->can.state = CAN_STATE_BUS_OFF;
-> +		cf->can_id |= CAN_ERR_BUSOFF;
-> +		/*
-> +		 *      Disable all interrupts in bus-off to avoid int hog
-> +		 *      this should be handled by the pru
-> +		 */
-> +		pru_can_mask_ints(priv->dev, PRUSS_CAN_TX_PRU_1, false);
-> +		pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, false);
-> +		can_bus_off(ndev);
-> +		dev_dbg(priv->ndev->dev.parent, "Bus off mode\n");
-> +	}
-> +
-> +	netif_rx(skb);
-> +	stats->rx_packets++;
-> +	stats->rx_bytes += cf->can_dlc;
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_writeb);
 > +
-> +static int pru_can_rx_poll(struct napi_struct *napi, int quota)
+> +s32 pruss_rmwb(struct device *dev, u32 offset, u8 mask, u8 val)
+void function?
 > +{
-> +	struct net_device *ndev = napi->dev;
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	u32 bit_set, mbxno = 0;
-> +	u32 num_pkts = 0;
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddress;
+> +	u32 preg_data;
 > +
-> +	if (!netif_running(ndev))
-> +		return 0;
+> +	paddress = pruss->ioaddr + offset;
 > +
-> +	do {
-> +		/* rx int sys_evt -> 33 */
-> +		pru_can_clr_intc_status(priv->dev, PRUSS_CAN_RX_PRU_0);
-> +		if (pru_can_intr_stat_get(priv->dev, &priv->can_rx_cntx))
-> +			return num_pkts;
+> +	spin_lock(&pruss->lock);
+> +	preg_data = ioread8(paddress);
+> +	preg_data &= ~mask;
+> +	preg_data |= val;
+> +	iowrite8(preg_data, paddress);
+> +	spin_unlock(&pruss->lock);
 > +
-> +		if (PRUSS_CAN_ISR_BIT_RRI & priv->can_rx_cntx.intr_stat) {
-> +			mbxno = PRUSS_CAN_RTR_BUFF_NUM;
-> +			pru_can_rx(ndev, mbxno);
-> +			num_pkts++;
-> +		} else {
-> +			/* Extract the mboxno from the status */
-> +			bit_set = fls(priv->can_rx_cntx.intr_stat & 0xFF);
-> +			if (bit_set) {
-> +				num_pkts++;
-> +				mbxno = bit_set - 1;
-> +				if (PRUSS_CAN_ISR_BIT_ESI & priv->can_rx_cntx.
-> +				    intr_stat) {
-> +					pru_can_gbl_stat_get(priv->dev,
-> +						&priv->can_rx_cntx);
-> +						pru_can_err(ndev,
-> +					priv->can_rx_cntx.intr_stat,
-> +					priv->can_rx_cntx.gbl_stat);
-> +				} else
-> +					pru_can_rx(ndev, mbxno);
-> +			} else
-> +				break;
-> +		}
-> +	} while (((PRUSS_CAN_TX_INT_STAT & pru_can_get_intc_status(priv->dev))
-> +						&& (num_pkts < quota)));
-> +
-> +	/* Enable packet interrupt if all pkts are handled */
-> +	if (!(PRUSS_CAN_TX_INT_STAT & pru_can_get_intc_status(priv->dev))) {
-> +		napi_complete(napi);
-> +		/* Re-enable RX mailbox interrupts */
-> +		pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, true);
-> +	}
-> +	return num_pkts;
-> +}
-> +
-> +static irqreturn_t pru_tx_can_intr(int irq, void *dev_id)
-> +{
-> +	struct net_device *ndev = dev_id;
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	struct net_device_stats *stats = &ndev->stats;
-> +	u32 bit_set, mbxno;
-> +
-> +	pru_can_intr_stat_get(priv->dev, &priv->can_tx_cntx);
-> +	if ((PRUSS_CAN_ISR_BIT_CCI & priv->can_tx_cntx.intr_stat)
-> +	    || (PRUSS_CAN_ISR_BIT_SRDI & priv->can_tx_cntx.intr_stat)) {
-> +		dev_dbg(priv->ndev->dev.parent, "tx_int_status = 0x%X\n",
-> +			    priv->can_tx_cntx.intr_stat);
-> +		can_free_echo_skb(ndev, 0);
-                                       ^^^
-
-make no sense if using multiple tx mailboxes
-
-> +	} else {
-> +		bit_set = fls(priv->can_tx_cntx.intr_stat & 0xFF);
-> +		if (!bit_set) {
-> +			dev_err(priv->dev, "%s: invalid mailbox number\n",
-> +								__func__);
-> +			can_free_echo_skb(ndev, 0);
-                                               ^^^^
-> +		} else {
-> +			mbxno = bit_set - 1;
-> +			if (PRUSS_CAN_ISR_BIT_ESI & priv->can_tx_cntx.
-> +								intr_stat) {
-> +				/* read gsr and ack pru */
-> +				pru_can_gbl_stat_get(priv->dev,
-> +							&priv->can_tx_cntx);
-> +				pru_can_err(ndev, priv->can_tx_cntx.intr_stat,
-> +						priv->can_tx_cntx.gbl_stat);
-> +			} else {
-> +				stats->tx_packets++;
-> +				/* stats->tx_bytes += dlc; */
-> +				/*can_get_echo_skb(ndev, 0);*/
-
-??
-
-> +			}
-> +		}
-> +	}
-> +	netif_wake_queue(ndev);
-> +	can_get_echo_skb(ndev, 0);
-again?
-> +	pru_can_tx_mode_set(priv->dev, true, RECEIVE);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t pru_rx_can_intr(int irq, void *dev_id)
-
-why is this function calles rx_can_intr it's a generic interrupt function..
-
-> +{
-> +	struct net_device *ndev = dev_id;
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	u32 intc_status = 0;
-> +
-> +	intc_status = pru_can_get_intc_status(priv->dev);
-> +
-> +	/* tx int sys_evt -> 34 */
-> +	if (intc_status & 4) {
-> +		pru_can_clr_intc_status(priv->dev, PRUSS_CAN_TX_PRU_1);
-> +		return pru_tx_can_intr(irq, dev_id);
-why are you returning here? is is possible the you have a can frame to
-receivce?
-> +	}
-> +	/* Disable RX mailbox interrupts and let NAPI reenable them */
-> +	if (intc_status & 2) {
-> +		pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, false);
-> +		napi_schedule(&priv->napi);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-               ^^^^^^^^^^^^
-
-that might not be true....
-
-> +}
-> +
-> +static int pru_can_open(struct net_device *ndev)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	s32 err;
-> +
-> +	/* register interrupt handler */
-> +	err = request_irq(priv->trx_irq, &pru_rx_can_intr, IRQF_SHARED,
-> +						"pru_can_irq", ndev);
-
-use dev->name for interrupt name
-
-> +	if (err) {
-> +		dev_err(priv->dev, "error requesting rx interrupt\n");
-> +		goto exit_trx_irq;
-> +	}
-> +	err = open_candev(ndev);
-> +	if (err) {
-> +		dev_err(priv->dev, "open_candev() failed %d\n", err);
-> +		goto exit_open;
-> +	}
-> +
-> +	pru_can_emu_init(priv->dev, priv->can.clock.freq);
-> +	priv->tx_tail = PRUSS_CAN_MB_MIN;
-> +	priv->tx_head = PRUSS_CAN_MB_MAX;
-> +	pru_can_start(ndev);
-> +	napi_enable(&priv->napi);
-> +	netif_start_queue(ndev);
-> +	return 0;
-> +
-> +exit_open:
-> +	free_irq(priv->trx_irq, ndev);
-> +exit_trx_irq:
-> +	return err;
-> +}
-> +
-> +static int pru_can_close(struct net_device *ndev)
-> +{
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +
-> +	netif_stop_queue(ndev);
-> +	napi_disable(&priv->napi);
-> +	close_candev(ndev);
-> +	free_irq(priv->trx_irq, ndev);
 > +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_rmwb);
 > +
-> +static const struct net_device_ops pru_can_netdev_ops = {
-> +	.ndo_open		= pru_can_open,
-> +	.ndo_stop		= pru_can_close,
-> +	.ndo_start_xmit		= pru_can_start_xmit,
-> +};
-> +
-> +/* Shows all the mailbox IDs */
-> +static ssize_t pru_sysfs_mbx_id_show(struct device *dev,
-> +		struct device_attribute *attr, char *buf)
+> +s32 pruss_readb(struct device *dev, u32 offset, u8 *pdatatoread)
+void?
 > +{
-> +	struct can_emu_priv *priv = netdev_priv(to_net_dev(dev));
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstoread;
 > +
-> +	return snprintf(buf, PAGE_SIZE, "<mbx_no:mbx_id>\n"
-> +					"0:0x%X 1:0x%X 2:0x%X 3:0x%X "
-> +					"4:0x%X 5:0x%X 6:0x%X 7:0x%X\n",
-> +					priv->mbx_id[0], priv->mbx_id[1],
-> +					priv->mbx_id[2], priv->mbx_id[3],
-> +					priv->mbx_id[4], priv->mbx_id[5],
-> +					priv->mbx_id[6], priv->mbx_id[7]);
+> +	paddresstoread = pruss->ioaddr + offset ;
+> +	*pdatatoread = ioread8(paddresstoread);
+> +
+> +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_readb);
 > +
-> +/*
-> + * Sets Mailbox IDs
-> + * This should be programmed as mbx_num:mbx_id (in hex)
-> + * eg: $ echo 0:0x123 > /sys/class/net/can0/mbx_id
-> + */
-> +static ssize_t pru_sysfs_mbx_id_set(struct device *dev,
-> +		struct device_attribute *attr, const char *buf, size_t count)
+> +s32 pruss_readb_multi(struct device *dev, u32 offset,
+> +		u8 *pdatatoread, u16 bytestoread)
+viod?
 > +{
-> +	struct net_device *ndev = to_net_dev(dev);
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
-> +	unsigned long can_id;
-> +	unsigned long mbx_num;
-> +	char mbx[2] = {*buf, '\0'}; /* mbx num */
-> +	ssize_t ret = count;
-> +	s32 err;
-
-I think you have to lock here:
-rtnl_lock();
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	u8 __iomem *paddresstoread;
+> +	u16 i;
+int?
 > +
-> +	if (ndev->flags & IFF_UP) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
+> +	paddresstoread = pruss->ioaddr + offset;
 > +
-> +	if (*(buf + 1) != ':') {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
+> +	for (i = 0; i < bytestoread; i++)
+> +		*pdatatoread++ = ioread8(paddresstoread++);
 > +
-> +	err = strict_strtoul(mbx, 0, &mbx_num);
-> +	if (err) {
-> +		ret = err;
-> +		goto out;
-> +	}
-> +
-> +	if (mbx_num > 7) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	err = strict_strtoul((buf + 2), 0, &can_id);
-> +	if (err) {
-> +		ret = err;
-> +		goto out;
-> +	}
-> +
-> +	priv->mbx_id[mbx_num] = can_id;
-> +	pru_can_rx_id_set(priv->dev, priv->mbx_id[mbx_num], mbx_num);
-> +
-> +	return ret;
-> +out:
-> +	dev_err(priv->dev, "invalid buffer format\n");
-> +	return ret;
+> +	return 0;
 > +}
+> +EXPORT_SYMBOL_GPL(pruss_readb_multi);
 > +
-> +static DEVICE_ATTR(mbx_id, S_IWUSR | S_IRUGO,
-> +	pru_sysfs_mbx_id_show, pru_sysfs_mbx_id_set);
-> +
-> +static struct attribute *pru_sysfs_attrs[] = {
-> +	&dev_attr_mbx_id.attr,
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group pru_sysfs_attr_group = {
-> +	.attrs = pru_sysfs_attrs,
-> +};
-> +
-> +static int __devinit pru_can_probe(struct platform_device *pdev)
+> +s32 pruss_writel(struct device *dev, u32 offset,
+> +		u32 pdatatowrite)
+void?
 > +{
-> +	struct net_device *ndev = NULL;
-> +	const struct da850_evm_pruss_can_data *pdata;
-> +	struct can_emu_priv *priv = NULL;
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstowrite;
+> +
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +	iowrite32(pdatatowrite, paddresstowrite);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_writel);
+> +
+> +s32 pruss_writel_multi(struct device *dev, u32 offset,
+> +		u32 *pdatatowrite, u16 wordstowrite)
+void?
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	u32 __iomem *paddresstowrite;
+> +	u16 i;
+> +
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +
+> +	for (i = 0; i < wordstowrite; i++)
+> +		iowrite32(*pdatatowrite++, paddresstowrite++);
+memcopy_to_iomem?
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_writel_multi);
+> +
+> +s32 pruss_rmwl(struct device *dev, u32 offset, u32 mask, u32 val)
+void?
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddress;
+> +	u32 preg_data;
+> +
+> +	paddress = pruss->ioaddr + offset;
+> +
+> +	spin_lock(&pruss->lock);
+> +	preg_data = ioread32(paddress);
+> +	preg_data &= ~mask;
+> +	preg_data |= val;
+> +	iowrite32(preg_data, paddress);
+> +	spin_unlock(&pruss->lock);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_rmwl);
+> +
+> +s32 pruss_readl(struct device *dev, u32 offset, u32 *pdatatoread)
+void? or return the read value
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstoread;
+> +
+> +	paddresstoread = pruss->ioaddr + offset;
+> +	*pdatatoread = ioread32(paddresstoread);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_readl);
+> +
+> +s32 pruss_readl_multi(struct device *dev, u32 offset,
+> +		u32 *pdatatoread, u16 wordstoread)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	u32 __iomem *paddresstoread;
+> +	u16 i;
+> +
+> +	paddresstoread = pruss->ioaddr + offset;
+> +	for (i = 0; i < wordstoread; i++)
+> +		*pdatatoread++ = ioread32(paddresstoread++);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_readl_multi);
+> +
+> +s32 pruss_writew(struct device *dev, u32 offset, u16 pdatatowrite)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstowrite;
+> +
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +	iowrite16(pdatatowrite, paddresstowrite);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_writew);
+> +
+> +s32 pruss_rmww(struct device *dev, u32 offset, u16 mask, u16 val)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddress;
+> +	u32 preg_data;
+> +
+> +	paddress = pruss->ioaddr + offset;
+> +
+> +	spin_lock(&pruss->lock);
+> +	preg_data = ioread16(paddress);
+> +	preg_data &= ~mask;
+> +	preg_data |= val;
+> +	iowrite16(preg_data, paddress);
+> +	spin_unlock(&pruss->lock);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_rmww);
+> +
+> +s32 pruss_readw(struct device *dev, u32 offset, u16 *pdatatoread)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstoread;
+> +
+> +	paddresstoread = pruss->ioaddr + offset;
+> +	*pdatatoread = ioread16(paddresstoread);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_readw);
+> +
+> +s32 pruss_idx_writel(struct device *dev, u32 offset, u32 value)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstowrite;
+> +
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +	iowrite32(value, paddresstowrite);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_idx_writel);
+> +
+> +static int pruss_mfd_add_devices(struct platform_device *pdev)
+> +{
 > +	struct device *dev = &pdev->dev;
-> +	struct clk *clk_pruss;
-> +	const struct firmware *fw_rx;
-> +	const struct firmware *fw_tx;
-> +	u32 err;
-use int
+> +	struct mfd_cell *cell = pdev->dev.platform_data;
+> +	s32 err, i, num_devices = 0;
 > +
-> +	pdata = dev->platform_data;
-> +	if (!pdata) {
-> +		dev_err(&pdev->dev, "platform data not found\n");
-> +		return -EINVAL;
-> +	}
-> +	(pdata->setup)();
-
-no need fot the ( )
-
-> +
-> +	ndev = alloc_candev(sizeof(struct can_emu_priv), PRUSS_CAN_MB_MAX + 1);
-> +	if (!ndev) {
-> +		dev_err(&pdev->dev, "alloc_candev failed\n");
-> +		err = -ENOMEM;
-> +		goto probe_exit;
+> +	for (i = 0; cell[i].name; i++) {
+> +		err = mfd_add_devices(dev, 0, &cell[i], 1, NULL, 0);
+> +		if (err) {
+> +			dev_err(dev, "cannot add mfd cell: %s\n",
+> +						cell[i].name);
+> +			continue;
+> +		}
+> +		num_devices++;
+> +		dev_info(dev, "mfd: added %s device\n", cell[i].name);
 > +	}
 > +
-> +	ndev->sysfs_groups[0] = &pru_sysfs_attr_group;
+> +	return num_devices;
+> +}
 > +
-> +	priv = netdev_priv(ndev);
+> +static int __devinit pruss_probe(struct platform_device *pdev)
+> +{
+> +	struct pruss_priv *pruss_dev = NULL;
+> +	s32 err;
 > +
-> +	priv->trx_irq = platform_get_irq(to_platform_device(dev->parent), 0);
-> +	if (!priv->trx_irq) {
-> +		dev_err(&pdev->dev, "unable to get pru "
-> +						"interrupt resources!\n");
+> +	pruss_dev = kzalloc(sizeof(struct pruss_priv), GFP_KERNEL);
+> +	if (!pruss_dev)
+> +		return -ENOMEM;
+> +
+> +	pruss_dev->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!pruss_dev->res) {
+> +		dev_err(&pdev->dev,
+> +		"unable to get pruss memory resources!\n");
 > +		err = -ENODEV;
-> +		goto probe_exit;
+> +		goto probe_exit_kfree;
 > +	}
 > +
-> +	priv->ndev = ndev;
-> +	priv->dev = dev;
-> +
-> +	priv->can.bittiming_const = &pru_can_bittiming_const;
-> +	priv->can.do_set_bittiming = pru_can_set_bittiming;
-> +	priv->can.do_set_mode = pru_can_set_mode;
-> +	priv->can.do_get_state = pru_can_get_state;
-> +	priv->can_tx_cntx.pruno = PRUSS_CAN_TX_PRU_1;
-> +	priv->can_rx_cntx.pruno = PRUSS_CAN_RX_PRU_0;
-> +
-> +	/* we support local echo, no arp */
-> +	ndev->flags |= (IFF_ECHO | IFF_NOARP);
-
-no need to se NOARP
-
-> +
-> +	/* pdev->dev->device_private->driver_data = ndev */
-> +	platform_set_drvdata(pdev, ndev);
-> +	SET_NETDEV_DEV(ndev, &pdev->dev);
-> +	ndev->netdev_ops = &pru_can_netdev_ops;
-> +
-> +	priv->clk_timer = clk_get(&pdev->dev, "pll1_sysclk2");
-> +	if (IS_ERR(priv->clk_timer)) {
-> +		dev_err(&pdev->dev, "no timer clock available\n");
-> +		err = PTR_ERR(priv->clk_timer);
-> +		priv->clk_timer = NULL;
-> +		goto probe_exit_candev;
+> +	if (!request_mem_region(pruss_dev->res->start,
+> +		resource_size(pruss_dev->res), dev_name(&pdev->dev))) {
+> +		dev_err(&pdev->dev, "pruss memory region already claimed!\n");
+> +		err = -EBUSY;
+> +		goto probe_exit_kfree;
 > +	}
 > +
-> +	priv->can.clock.freq = clk_get_rate(priv->clk_timer);
+> +	pruss_dev->ioaddr = ioremap(pruss_dev->res->start,
+> +	resource_size(pruss_dev->res));
+> +	if (!pruss_dev->ioaddr) {
+> +		dev_err(&pdev->dev, "ioremap failed\n");
+> +		err = -ENOMEM;
+> +		goto probe_exit_free_region;
+> +	}
 > +
-> +	clk_pruss = clk_get(NULL, "pruss");
-> +	if (IS_ERR(clk_pruss)) {
+> +	pruss_dev->clk = clk_get(NULL, "pruss");
+> +	if (IS_ERR(pruss_dev->clk)) {
 > +		dev_err(&pdev->dev, "no clock available: pruss\n");
 > +		err = -ENODEV;
-> +		goto probe_exit_clk;
+> +		pruss_dev->clk = NULL;
+> +		goto probe_exit_iounmap;
 > +	}
-> +	priv->clk_freq_pru = clk_get_rate(clk_pruss);
-> +	clk_put(clk_pruss);
-
-why do you put the clock here?
+> +	spin_lock_init(&pruss_dev->lock);
 > +
-> +	err = register_candev(ndev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "register_candev() failed\n");
-> +		err = -ENODEV;
-> +		goto probe_exit_clk;
-> +	}
+> +	clk_enable(pruss_dev->clk);
 > +
-> +	err = request_firmware(&fw_tx, "PRU_CAN_Emulation_Tx.bin",
-> +			&pdev->dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "can't load firmware\n");
-> +		err = -ENODEV;
-> +		goto probe_exit_clk;
-> +	}
+> +	err = pruss_mfd_add_devices(pdev);
+> +	if (!err)
+> +		goto probe_exit_clock;
 > +
-> +	dev_info(&pdev->dev, "fw_tx size %d. downloading...\n", fw_tx->size);
-> +
-> +	err = request_firmware(&fw_rx, "PRU_CAN_Emulation_Rx.bin",
-> +			&pdev->dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "can't load firmware\n");
-> +		err = -ENODEV;
-> +		goto probe_release_fw;
-> +	}
-> +	dev_info(&pdev->dev, "fw_rx size %d. downloading...\n", fw_rx->size);
-> +
-> +	/* init the pru */
-> +	pru_can_emu_init(priv->dev, priv->can.clock.freq);
-> +	udelay(200);
-> +
-> +	netif_napi_add(ndev, &priv->napi, pru_can_rx_poll,
-> +					PRUSS_DEF_NAPI_WEIGHT);
-
-personally I'd wait to add the interface to napi until the firmware is
-loaded.
-
-> +
-> +	pruss_enable(priv->dev, PRUSS_CAN_RX_PRU_0);
-> +	pruss_enable(priv->dev, PRUSS_CAN_TX_PRU_1);
-> +
-> +	/* download firmware into pru */
-> +	err = pruss_load(priv->dev, PRUSS_CAN_RX_PRU_0,
-> +		(u32 *)fw_rx->data, (fw_rx->size / 4));
-> +	if (err) {
-> +		dev_err(&pdev->dev, "firmware download error\n");
-> +		err = -ENODEV;
-> +		goto probe_release_fw_1;
-> +	}
-> +	release_firmware(fw_rx);
-> +	err = pruss_load(priv->dev, PRUSS_CAN_TX_PRU_1,
-> +		(u32 *)fw_tx->data, (fw_tx->size / 4));
-> +	if (err) {
-> +		dev_err(&pdev->dev, "firmware download error\n");
-> +		err = -ENODEV;
-> +		goto probe_release_fw_1;
-> +	}
-> +	release_firmware(fw_tx);
-> +
-> +	pruss_run(priv->dev, PRUSS_CAN_RX_PRU_0);
-> +	pruss_run(priv->dev, PRUSS_CAN_TX_PRU_1);
-> +
-> +	dev_info(&pdev->dev,
-> +		 "%s device registered (trx_irq = %d,  clk = %d)\n",
-> +		 PRUSS_CAN_DRV_NAME, priv->trx_irq, priv->can.clock.freq);
-> +
+> +	platform_set_drvdata(pdev, pruss_dev);
+> +	pruss_dev->dev = &pdev->dev;
 > +	return 0;
 > +
-> +probe_release_fw_1:
-> +	release_firmware(fw_rx);
-> +probe_release_fw:
-> +	release_firmware(fw_tx);
-> +probe_exit_clk:
-> +	clk_put(priv->clk_timer);
-> +probe_exit_candev:
-> +	if (NULL != ndev)
-> +		free_candev(ndev);
-> +probe_exit:
+> +probe_exit_clock:
+> +	clk_put(pruss_dev->clk);
+> +	clk_disable(pruss_dev->clk);
+> +probe_exit_iounmap:
+> +	iounmap(pruss_dev->ioaddr);
+> +probe_exit_free_region:
+> +	release_mem_region(pruss_dev->res->start,
+> +			resource_size(pruss_dev->res));
+> +probe_exit_kfree:
+> +	kfree(pruss_dev);
 > +	return err;
 > +}
 > +
-> +static int __devexit pru_can_remove(struct platform_device *pdev)
+> +static int __devexit pruss_remove(struct platform_device *pdev)
 > +{
-> +	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct can_emu_priv *priv = netdev_priv(ndev);
+> +	struct device *dev = &pdev->dev;
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev);
 > +
-> +	pru_can_stop(ndev);
-> +	pru_can_emu_exit(priv->dev);
-> +	clk_put(priv->clk_timer);
-> +	unregister_candev(ndev);
-> +	free_candev(ndev);
-> +	platform_set_drvdata(pdev, NULL);
+> +	mfd_remove_devices(dev);
+> +	pruss_disable(dev, PRUCORE_0);
+> +	pruss_disable(dev, PRUCORE_1);
+> +	clk_disable(pruss->clk);
+> +	clk_put(pruss->clk);
+> +	iounmap(pruss->ioaddr);
+> +	release_mem_region(pruss->res->start, resource_size(pruss->res));
+> +	kfree(pruss);
+> +	dev_set_drvdata(dev, NULL);
 > +	return 0;
 > +}
 > +
-> +#ifdef CONFIG_PM
-> +static int pru_can_suspend(struct platform_device *pdev,
-> +			pm_message_t mesg)
-> +{
-> +	dev_info(&pdev->dev, "%s not yet implemented\n", __func__);
-> +	return 0;
-> +}
-> +
-> +static int pru_can_resume(struct platform_device *pdev)
-> +{
-> +	dev_info(&pdev->dev, "%s not yet implemented\n", __func__);
-> +	return 0;
-> +}
-> +#else
-> +#define pru_can_suspend NULL
-> +#define pru_can_resume NULL
-> +#endif
-> +
-> +static struct platform_driver omapl_pru_can_driver = {
-> +	.probe		= pru_can_probe,
-> +	.remove		= __devexit_p(pru_can_remove),
-> +	.suspend	= pru_can_suspend,
-> +	.resume		= pru_can_resume,
-> +	.driver		= {
-> +		.name	= PRUSS_CAN_DRV_NAME,
+> +static struct platform_driver pruss_driver = {
+> +	.probe	= pruss_probe,
+> +	.remove	= __devexit_p(pruss_remove),
+> +	.driver	= {
+> +		.name	= "pruss_mfd",
 > +		.owner	= THIS_MODULE,
-> +	},
+> +	}
 > +};
 > +
-> +static int __init pru_can_init(void)
+> +static int __init pruss_init(void)
 > +{
-> +	pr_debug(KERN_INFO PRUSS_CAN_DRV_DESC "\n");
-> +	return platform_driver_register(&omapl_pru_can_driver);
+> +	return platform_driver_register(&pruss_driver);
 > +}
+> +module_init(pruss_init);
 > +
-> +module_init(pru_can_init);
-> +
-> +static void __exit pru_can_exit(void)
+> +static void __exit pruss_exit(void)
 > +{
-> +	pr_debug(KERN_INFO PRUSS_CAN_DRV_DESC " unloaded\n");
-> +	platform_driver_unregister(&omapl_pru_can_driver);
+> +	platform_driver_unregister(&pruss_driver);
 > +}
+> +module_exit(pruss_exit);
 > +
-> +module_exit(pru_can_exit);
-> +
-> +MODULE_AUTHOR("Subhasish Ghosh <subhasish@mistralsolutions.com>");
+> +MODULE_DESCRIPTION("Programmable Realtime Unit (PRU) Driver");
+> +MODULE_AUTHOR("Subhasish Ghosh");
 > +MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("omapl pru CAN netdevice driver");
+> diff --git a/include/linux/mfd/pruss.h b/include/linux/mfd/pruss.h
+> new file mode 100644
+> index 0000000..8ef25b3
+> --- /dev/null
+> +++ b/include/linux/mfd/pruss.h
+> @@ -0,0 +1,130 @@
+> +/*
+> + * Copyright (C) 2010, 2011 Texas Instruments Incorporated
+> + * Author: Jitendra Kumar <jitendra@mistralsolutions.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as  published by the
+> + * Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
+> + * whether express or implied; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +
+> +#ifndef _PRUSS_H_
+> +#define _PRUSS_H_
+> +
+> +#include <linux/types.h>
+> +#include <linux/platform_device.h>
+> +#include "pruss_core.h"
+> +
+> +#define PRUSS_NUM0			PRUCORE_0
+> +#define PRUSS_NUM1			PRUCORE_1
+> +
+> +#define PRUSS_PRU0_RAM_SZ		512
+> +#define PRUSS_PRU1_RAM_SZ		512
+> +#define PRUSS_PRU0_BASE_ADDRESS		0
+> +#define PRUSS_PRU1_BASE_ADDRESS		0x2000
+> +#define PRUSS_INTC_BASE_ADDRESS		(PRUSS_PRU0_BASE_ADDRESS + 0x4000)
+> +#define PRUSS_INTC_GLBLEN		(PRUSS_INTC_BASE_ADDRESS + 0x10)
+> +#define PRUSS_INTC_GLBLNSTLVL		(PRUSS_INTC_BASE_ADDRESS + 0x1C)
+> +#define PRUSS_INTC_STATIDXSET		(PRUSS_INTC_BASE_ADDRESS + 0x20)
+> +#define PRUSS_INTC_STATIDXCLR		(PRUSS_INTC_BASE_ADDRESS + 0x24)
+> +#define PRUSS_INTC_ENIDXSET		(PRUSS_INTC_BASE_ADDRESS + 0x28)
+> +#define PRUSS_INTC_ENIDXCLR		(PRUSS_INTC_BASE_ADDRESS + 0x2C)
+> +#define PRUSS_INTC_HSTINTENIDXSET	(PRUSS_INTC_BASE_ADDRESS + 0x34)
+> +#define PRUSS_INTC_HSTINTENIDXCLR	(PRUSS_INTC_BASE_ADDRESS + 0x38)
+> +#define PRUSS_INTC_GLBLPRIIDX		(PRUSS_INTC_BASE_ADDRESS + 0x80)
+> +#define PRUSS_INTC_STATSETINT0		(PRUSS_INTC_BASE_ADDRESS + 0x200)
+> +#define PRUSS_INTC_STATSETINT1		(PRUSS_INTC_BASE_ADDRESS + 0x204)
+> +#define PRUSS_INTC_STATCLRINT0		(PRUSS_INTC_BASE_ADDRESS + 0x280)
+> +#define PRUSS_INTC_STATCLRINT1		(PRUSS_INTC_BASE_ADDRESS + 0x284)
+> +#define PRUSS_INTC_ENABLESET0		(PRUSS_INTC_BASE_ADDRESS + 0x300)
+> +#define PRUSS_INTC_ENABLESET1		(PRUSS_INTC_BASE_ADDRESS + 0x304)
+> +#define PRUSS_INTC_ENABLECLR0		(PRUSS_INTC_BASE_ADDRESS + 0x380)
+> +#define PRUSS_INTC_ENABLECLR1		(PRUSS_INTC_BASE_ADDRESS + 0x384)
+> +#define PRUSS_INTC_CHANMAP0		(PRUSS_INTC_BASE_ADDRESS + 0x400)
+> +#define PRUSS_INTC_CHANMAP1		(PRUSS_INTC_BASE_ADDRESS + 0x404)
+> +#define PRUSS_INTC_CHANMAP2		(PRUSS_INTC_BASE_ADDRESS + 0x408)
+> +#define PRUSS_INTC_CHANMAP3		(PRUSS_INTC_BASE_ADDRESS + 0x40C)
+> +#define PRUSS_INTC_CHANMAP4		(PRUSS_INTC_BASE_ADDRESS + 0x410)
+> +#define PRUSS_INTC_CHANMAP5		(PRUSS_INTC_BASE_ADDRESS + 0x414)
+> +#define PRUSS_INTC_CHANMAP6		(PRUSS_INTC_BASE_ADDRESS + 0x418)
+> +#define PRUSS_INTC_CHANMAP7		(PRUSS_INTC_BASE_ADDRESS + 0x41C)
+> +#define PRUSS_INTC_CHANMAP8		(PRUSS_INTC_BASE_ADDRESS + 0x420)
+> +#define PRUSS_INTC_CHANMAP9		(PRUSS_INTC_BASE_ADDRESS + 0x424)
+> +#define PRUSS_INTC_CHANMAP10		(PRUSS_INTC_BASE_ADDRESS + 0x428)
+> +#define PRUSS_INTC_CHANMAP11		(PRUSS_INTC_BASE_ADDRESS + 0x42C)
+> +#define PRUSS_INTC_CHANMAP12		(PRUSS_INTC_BASE_ADDRESS + 0x430)
+> +#define PRUSS_INTC_CHANMAP13		(PRUSS_INTC_BASE_ADDRESS + 0x434)
+> +#define PRUSS_INTC_CHANMAP14		(PRUSS_INTC_BASE_ADDRESS + 0x438)
+> +#define PRUSS_INTC_CHANMAP15		(PRUSS_INTC_BASE_ADDRESS + 0x43C)
+> +#define PRUSS_INTC_HOSTMAP0		(PRUSS_INTC_BASE_ADDRESS + 0x800)
+> +#define PRUSS_INTC_HOSTMAP1		(PRUSS_INTC_BASE_ADDRESS + 0x804)
+> +#define PRUSS_INTC_HOSTMAP2		(PRUSS_INTC_BASE_ADDRESS + 0x808)
+> +#define PRUSS_INTC_POLARITY0		(PRUSS_INTC_BASE_ADDRESS + 0xD00)
+> +#define PRUSS_INTC_POLARITY1		(PRUSS_INTC_BASE_ADDRESS + 0xD04)
+> +#define PRUSS_INTC_TYPE0		(PRUSS_INTC_BASE_ADDRESS + 0xD80)
+> +#define PRUSS_INTC_TYPE1		(PRUSS_INTC_BASE_ADDRESS + 0xD84)
+> +#define PRUSS_INTC_HOSTINTEN		(PRUSS_INTC_BASE_ADDRESS + 0x1500)
+> +#define PRUSS_INTC_HOSTINTLVL_MAX	9
+> +
+> +#define PRU_INTC_HOSTMAP0_CHAN		(0x03020100)
+> +#define PRU_INTC_HOSTMAP1_CHAN		(0x07060504)
+> +#define PRU_INTC_HOSTMAP2_CHAN		(0x00000908)
+> +
+> +#define PRU_INTC_CHANMAP7_SYS_EVT31	(0x00000000)
+> +#define PRU_INTC_CHANMAP8_FULL		(0x02020100)
+> +#define PRU_INTC_CHANMAP9_FULL		(0x04040303)
+> +#define PRU_INTC_CHANMAP10_FULL		(0x06060505)
+> +#define PRU_INTC_CHANMAP11_FULL		(0x08080707)
+> +#define PRU_INTC_CHANMAP12_FULL		(0x00010909)
+> +#define PRU_INTC_CHANMAP8_HALF		(0x03020100)
+> +#define PRU_INTC_CHANMAP9_HALF		(0x07060504)
+> +#define PRU_INTC_CHANMAP10_HALF		(0x03020908)
+> +#define PRU_INTC_CHANMAP11_HALF		(0x07060504)
+> +#define PRU_INTC_CHANMAP12_HALF		(0x00010908)
+> +#define PRU_INTC_REGMAP_MASK		(0xFFFFFFFF)
+> +
+> +s32 pruss_enable(struct device *dev, u8 pruss_num);
+> +
+> +s32 pruss_load(struct device *dev, u8 pruss_num,
+> +	u32 *pruss_code, u32 code_size_in_words);
+> +
+> +s32 pruss_run(struct device *dev, u8 pruss_num);
+> +
+> +s32 pruss_wait_for_halt(struct device *dev, u8 pruss_num, u32 timeout);
+> +
+> +s32 pruss_disable(struct device *dev, u8 pruss_num);
+> +
+> +s32 pruss_writeb(struct device *dev, u32 offset, u8 pdatatowrite);
+> +
+> +s32 pruss_rmwb(struct device *dev, u32 offset, u8 mask, u8 val);
+> +
+> +s32 pruss_readb(struct device *dev, u32 offset, u8 *pdatatoread);
+> +
+> +s32 pruss_readb_multi(struct device *dev, u32 offset,
+> +		u8 *pdatatoread, u16 bytestoread);
+> +
+> +s32 pruss_readl(struct device *dev, u32 offset, u32 *pdatatoread);
+> +
+> +s32 pruss_readl_multi(struct device *dev, u32 offset,
+> +		u32 *pdatatoread, u16 wordstoread);
+> +
+> +s32 pruss_writel(struct device *dev, u32 offset, u32 pdatatowrite);
+> +
+> +s32 pruss_writel_multi(struct device *dev, u32 offset,
+> +		u32 *pdatatowrite, u16 wordstowrite);
+> +
+> +s32 pruss_rmwl(struct device *dev, u32 offset, u32 mask, u32 val);
+> +
+> +s32 pruss_idx_writel(struct device *dev, u32 offset, u32 value);
+> +
+> +s32 pruss_writew(struct device *dev, u32 offset, u16 datatowrite);
+> +
+> +s32 pruss_rmww(struct device *dev, u32 offset, u16 mask, u16 val);
+> +
+> +s32 pruss_readw(struct device *dev, u32 offset, u16 *pdatatoread);
+> +
+> +#endif	/* End _PRUSS_H_ */
+> diff --git a/include/linux/mfd/pruss_core.h b/include/linux/mfd/pruss_core.h
+> new file mode 100644
+> index 0000000..48e2b99
+> --- /dev/null
+> +++ b/include/linux/mfd/pruss_core.h
+> @@ -0,0 +1,128 @@
+> +/*
+> + * Copyright (C) 2010, 2011 Texas Instruments Incorporated
+> + * Author: Jitendra Kumar <jitendra@mistralsolutions.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as  published by the
+> + * Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
+> + * whether express or implied; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +
+> +#ifndef _PRUSS_CORE_H_
+> +#define _PRUSS_CORE_H_
+> +
+> +#include <linux/types.h>
+> +
+> +#define PRUCORE_0		(0)
+> +#define PRUCORE_1		(1)
+> +
+> +#define PRUCORE_CONTROL_PCRESETVAL_MASK			(0xFFFF0000u)
+> +#define PRUCORE_CONTROL_PCRESETVAL_SHIFT		(0x00000010u)
+> +#define PRUCORE_CONTROL_PCRESETVAL_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_RUNSTATE_MASK			(0x00008000u)
+> +#define PRUCORE_CONTROL_RUNSTATE_SHIFT			(0x0000000Fu)
+> +#define PRUCORE_CONTROL_RUNSTATE_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_RUNSTATE_HALT			(0x00000000u)
+> +#define PRUCORE_CONTROL_RUNSTATE_RUN			(0x00000001u)
+> +#define PRUCORE_CONTROL_SINGLESTEP_MASK			(0x00000100u)
+> +#define PRUCORE_CONTROL_SINGLESTEP_SHIFT		(0x00000008u)
+> +#define PRUCORE_CONTROL_SINGLESTEP_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_SINGLESTEP_FREERUN		(0x00000000u)
+> +#define PRUCORE_CONTROL_SINGLESTEP_SINGLE		(0x00000001u)
+> +#define PRUCORE_CONTROL_COUNTENABLE_MASK		(0x00000008u)
+> +#define PRUCORE_CONTROL_COUNTENABLE_SHIFT		(0x00000003u)
+> +#define PRUCORE_CONTROL_COUNTENABLE_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_COUNTENABLE_DISABLE		(0x00000000u)
+> +#define PRUCORE_CONTROL_COUNTENABLE_ENABLE		(0x00000001u)
+> +#define PRUCORE_CONTROL_SLEEPING_MASK			(0x00000004u)
+> +#define PRUCORE_CONTROL_SLEEPING_SHIFT			(0x00000002u)
+> +#define PRUCORE_CONTROL_SLEEPING_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_SLEEPING_NOTASLEEP		(0x00000000u)
+> +#define PRUCORE_CONTROL_SLEEPING_ASLEEP			(0x00000001u)
+> +#define PRUCORE_CONTROL_ENABLE_MASK			(0x00000002u)
+> +#define PRUCORE_CONTROL_ENABLE_SHIFT			(0x00000001u)
+> +#define PRUCORE_CONTROL_ENABLE_RESETVAL			(0x00000000u)
+> +#define PRUCORE_CONTROL_ENABLE_DISABLE			(0x00000000u)
+> +#define PRUCORE_CONTROL_ENABLE_ENABLE			(0x00000001u)
+> +#define PRUCORE_CONTROL_SOFTRESET_MASK			(0x00000001u)
+> +#define PRUCORE_CONTROL_SOFTRESET_SHIFT			(0x00000000u)
+> +#define PRUCORE_CONTROL_SOFTRESET_RESETVAL		(0x00000000u)
+> +#define PRUCORE_CONTROL_SOFTRESET_RESET			(0x00000000u)
+> +#define PRUCORE_CONTROL_SOFTRESET_OUT_OF_RESET		(0x00000001u)
+> +#define PRUCORE_CONTROL_RESETVAL			(0x00000000u)
+> +
+> +struct prusscore_regs {
+> +	u32 control;
+> +	u32 status;
+> +	u32 wakeup;
+> +	u32 cyclecnt;
+> +	u32 stallcnt;
+> +	u8  rsvd0[12];
+> +	u32 contabblkidx0;
+> +	u32 contabblkidx1;
+> +	u32 contabproptr0;
+> +	u32 contabproptr1;
+> +	u8  rsvd1[976];
+> +	u32 intgpr[32];
+> +	u32 intcter[32];
+> +	u8  rsvd2[768];
+> +};
+> +
+> +struct pruss_intc_regs {
+> +	u32 revid;
+> +	u32 control;
+> +	u8  res1[8];
+> +	u32 glblen;
+> +	u8  res2[8];
+> +	u32 glblnstlvl;
+> +	u32 statidxset;
+> +	u32 statidxclr;
+> +	u32 enidxset;
+> +	u32 enidxclr;
+> +	u8  res3[4];
+> +	u32 hostintenidxset;
+> +	u32 hostintenidxclr;
+> +	u8  res4[68];
+> +	u32 glblpriidx;
+> +	u8  res5[380];
+> +	u32 statsetint[2];
+> +	u8  res6[120];
+> +	u32 statclrint[2];
+> +	u8  res7[120];
+> +	u32 enableset[2];
+> +	u8  res8[120];
+> +	u32 enableclr[2];
+> +	u8  res9[120];
+> +	u32 chanmap[16];
+> +	u8  res10[960];
+> +	u32 hostmap[2];
+> +	u8  res11[248];
+> +	u32 hostintpriidx[10];
+> +	u8  res12[984];
+> +	u32 polarity[2];
+> +	u8  res13[120];
+> +	u32 type[2];
+> +	u8  res14[888];
+> +	u32 hostintnstlvl[10];
+> +	u8  res15[984];
+> +	u32 hostinten;
+> +	u8  res16[6907];
+> +};
+> +
+> +struct pruss_map {
+> +	u8 dram0[512];
+> +	u8 res1[7680];
+> +	u8 dram1[512];
+> +	u8 res2[7680];
+> +	struct pruss_intc_regs intc;
+> +	struct prusscore_regs core[2];
+> +	u8 iram0[4096];
+> +	u8 res3[12288];
+> +	u8 iram1[4096];
+> +	u8 res4[12288];
+> +};
+> +#endif
 
 regards, Marc
 
@@ -1349,4 +909,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 262 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110422/bd2fdced/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110422/15a6ff63/attachment-0001.sig>
