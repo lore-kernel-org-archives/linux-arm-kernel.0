@@ -1,30 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 22 Apr 2011 10:58:43 -0400 (EDT)
-Subject: support for operating Kirkwood in big endian mode?
-In-Reply-To: <19889.37313.25234.626786@pilspetsen.it.uu.se>
-References: <19889.37313.25234.626786@pilspetsen.it.uu.se>
-Message-ID: <alpine.LFD.2.00.1104221049460.24613@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 22 Apr 2011 07:59:42 -0700
+Subject: [RFC PATCH 03/18] OMAP: GPIO: Move gpio_get_index() to mach-omap
+In-Reply-To: <1303470512-19671-4-git-send-email-charu@ti.com> (Charulatha V.'s
+	message of "Fri, 22 Apr 2011 16:38:17 +0530")
+References: <1303470512-19671-1-git-send-email-charu@ti.com>
+	<1303470512-19671-4-git-send-email-charu@ti.com>
+Message-ID: <87wrimz601.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Apr 2011, Mikael Pettersson wrote:
+Charulatha V <charu@ti.com> writes:
 
-> The Kirkwood docs specify that the core can be operated in both big
-> and little endian modes, but indicate that some peripherals in the
-> SoC require drivers to perform byteswapping in some case for big
-> endian operation.
-> 
-> Does the kernel support operating a Kirkwood in big endian mode?
+> gpio_get_index() uses cpu_is* checks. Move this function from
+> plat-omap/gpio.c to SoC specific GPIO files in mach-omap*/ and
+> use pdata to pass the function pointer.
+>
+> Signed-off-by: Charulatha V <charu@ti.com>
 
-It was never attempted.  So no, the kernel doesn't support Kirkwood in 
-BE.  However this shouldn't be hard to achieve sor someone with interest 
-and motivation as most things might just work already.
+This one isn't really needed.  The index should be calculated by using
+the bank width.
 
-> Supposedly there's a document "AN-183" that describes the details,
-> but I've not been able to locate a public copy of it.
+Below is a patch doing the same thing but using bitops and avoiding the
+need for pdata function pointers.
 
-You'd have to ask Marvell people for it I guess.  I'm no longer with 
-Marvell and therefore no longer have access to the non-public documents.
-
-
-Nicolas
+Kevin
