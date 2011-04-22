@@ -1,51 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Apr 2011 13:36:44 +0200
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <BANLkTinrtoGhL3CXJZGWzf8+BwFSRsdk0w@mail.gmail.com>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTinrtoGhL3CXJZGWzf8+BwFSRsdk0w@mail.gmail.com>
-Message-ID: <BANLkTikDCmH-WX1u3e9c7gc2U9HJ88RBUQ@mail.gmail.com>
+Date: Fri, 22 Apr 2011 13:46:28 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <BANLkTineKF3Yw+o_PNaq=6btm2MU7TBB+g@mail.gmail.com>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<BANLkTi=kGxL9N-RNqxmeqs4zeYo0zzfmhQ@mail.gmail.com>
+	<BANLkTinxThB+2+fv4qUD5dyguV-5hUva3A@mail.gmail.com>
+	<201104211025.34420.arnd@arndb.de>
+	<BANLkTineKF3Yw+o_PNaq=6btm2MU7TBB+g@mail.gmail.com>
+Message-ID: <BANLkTimMpJAchM4NgOGYeTW7S7E03GQHaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/21 Stijn Devriendt <highguy@gmail.com>:
+2011/4/22 Linus Walleij <linus.walleij@linaro.org>:
 
-> There's a couple of things I added on top of what you already seem to have:
-> - in include/linux/of_gpio.h the of_gpio_flags were extended to
-> support open-drain in device-trees.
+> The big deviating thing is the clock tree, which also use calls to
+> the PRCMU. I would argue that the problem is rather that clocks
+> are not modeled as devices rather than that the PRCMU would
+> be modeled as an MFD device.
 
-Device tree support can very well be handled as an add-on I believe,
-please feel free to do that on top of my patch set :-)
+Which sort of begets the question of whether Russell is OK with
+pushing clock tree implementations to drivers/clk/*...
 
-> - the debugfs support in gpiolib was also updated to export the current state to
-> ?the user through sysfs.
+I'll be perfectly happy doing that too, so if I:
 
-Hm, I've rewritten the mechanism (see latest patch set) to just take
-anonymous parameter and argument. This means it's hard to do
-this in any generic manner, and debugfs printing och config parameters
-need to be pushed to each driver.
+- Put the PRCMU driver in drivers/mfd/prcmu-db8500.c
+- Put the cpufreq driver in drivers/cpufreq/cpufreq-db8500.c
+- Put the clock tree in drivers/clk/clock-db8500.c
 
-> I'd also like to add (if not already mentioned by others) that in
-> general drivers that use GPIOs are unaware of their physical
-> connection on the board. Having this information
-> in device-tree or platform-data equivalent solves this.
+My diffstat (which was 50% of the ARM +++ in the next tree)
+will most certainly instead go to NEGATIVE in arch/arm/* and
+be an appetizing pull target.
 
-Yes, this has been mentioned a few times, and a few times I have
-replied that there is not one word in the patch set that says anything
-about whether drivers or board code or whatever shall make use of
-the mechanism, it's just an interface...
-
-I don't understand why this keeps popping up, have I written
-*anything* unclear about this?
-
-> Secondly I tend to disagree with the "silently ignored" case when the
-> underlying driver
-> does not support setting drive mode. You can easily break the chip if
-> setting the drive
-> mode fails (although the HW designers may have selected the faulty
-> chip then ;) ).
-
-In the latest version the config operation returns an error code.
+Needless to say it'll require some ACK:ing. I have mixed feelings
+about this but it does depopulate the ARM tree.
 
 Yours,
 Linus Walleij
