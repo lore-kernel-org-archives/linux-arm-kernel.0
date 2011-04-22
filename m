@@ -1,90 +1,43 @@
 From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 22 Apr 2011 17:38:29 +0530
-Subject: [PATCH v4 11/11] da850: pruss CAN board specific additions.
-In-Reply-To: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <1303474109-6212-12-git-send-email-subhasish@mistralsolutions.com>
+Date: Fri, 22 Apr 2011 17:41:06 +0530
+Subject: [PATCH v4 0/1] pruss CAN driver.
+Message-ID: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the pruss CAN pinmux and registers the device
-with the pruss mfd driver.
+This patch adds a SocketCAN complaint CAN Network driver implemented on
+the Programmable Real Time Unit (PRUSS) available on da8xx
+processors from Texas Instruments.
 
-Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
----
- arch/arm/mach-davinci/board-da850-evm.c |   46 +++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
+It utilizes both available PRUs on da8xx for concurrent Rx/Tx processing
+and load sharing. PRU0 is used as Rx and PRU1 as Tx.
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e7fdf31..e1ff18c 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -48,6 +48,7 @@
- 
- #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
- #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
-+#define DA850_PRUSS_CAN_TRX_PIN		GPIO_TO_PIN(2, 0)
- 
- #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
- 
-@@ -1117,6 +1118,43 @@ static __init int da850_evm_init_cpufreq(void)
- static __init int da850_evm_init_cpufreq(void) { return 0; }
- #endif
- 
-+static const short da850_evm_pruss_can_pins[] = {
-+	DA850_PRUSS_PRU0_R31_0, DA850_PRUSS_PRU1_R30_15,
-+	DA850_PRUSS_PRU1_R31_18, DA850_GPIO2_0,
-+	-1
-+};
-+
-+static int __init da850_evm_pruss_can_setup(void)
-+{
-+	int ret, val = 0;
-+	void __iomem *cfg_chip3_reg;
-+
-+	ret = davinci_cfg_reg_list(da850_evm_pruss_can_pins);
-+	if (ret)
-+		pr_warning("%s: da850_evm_pruss_can_pins mux setup "
-+					"failed:%d\n", __func__, ret);
-+	cfg_chip3_reg = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
-+	val = __raw_readl(cfg_chip3_reg);
-+	val |= BIT(3);
-+	__raw_writel(val, cfg_chip3_reg);
-+
-+	/* value = 0 to enable the CAN transceiver */
-+	ret = gpio_request_one(DA850_PRUSS_CAN_TRX_PIN,
-+			GPIOF_OUT_INIT_LOW, "pruss_can_en");
-+	if (ret) {
-+		pr_warning("Cannot setup GPIO %d\n", DA850_PRUSS_CAN_TRX_PIN);
-+		gpio_free(DA850_PRUSS_CAN_TRX_PIN);
-+	}
-+
-+	return ret;
-+}
-+
-+static struct da850_evm_pruss_can_data can_data = {
-+	.version	= 1,
-+	.setup		= da850_evm_pruss_can_setup,
-+};
-+
-+
- static const short da850_evm_pruss_suart_pins[] = {
- 	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
- 	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR,
-@@ -1161,6 +1199,14 @@ static struct mfd_cell cell[] = {
- 		.resources	= da850_evm_pruss_suart_resource,
- 	},
- 	{
-+		.id		= 1,
-+		.name		= "da8xx_pruss_can",
-+		.platform_data	= &can_data,
-+		.data_size	= sizeof(can_data),
-+		.num_resources  = 0,
-+		.resources	= NULL,
-+	},
-+	{
- 		.name		= NULL,
- 	},
- };
+This controller also supports ID filtering at the device level.
+Eight different ID can be programmed into the device through
+the sysfs interface exported by the driver.
+
+version 4:
+=========
+* added NAPI
+* added sysfs entry for programming mailbox IDs
+* added bittiming interface from the kernel
+* removed unused function
+* improved coding style
+* removed unwanted files
+* merged required files into the driver
+* code cleanup as per review comments
+
+NOTE:	The versioning is being maintained in sequence with the complete set
+	of patches submitted for the PRUSS.
+
+Subhasish Ghosh (1):
+  can: add pruss CAN driver.
+
+ drivers/net/can/Kconfig     |    7 +
+ drivers/net/can/Makefile    |    1 +
+ drivers/net/can/pruss_can.c | 1074 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 1082 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/net/can/pruss_can.c
+
 -- 
 1.7.2.3
