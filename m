@@ -1,61 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 22 Apr 2011 16:02:39 +0200
-Subject: [RFC PATCH 00/18] OMAP: GPIO: cleanup GPIO driver
-In-Reply-To: <1303470512-19671-1-git-send-email-charu@ti.com>
-References: <1303470512-19671-1-git-send-email-charu@ti.com>
-Message-ID: <20110422140239.GG15233@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 22 Apr 2011 10:12:01 -0400 (EDT)
+Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel
+	end
+In-Reply-To: <20110422062843.GA841@atomide.com>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110420072156.GA28679@atomide.com>
+	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
+	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
+	<20110422062843.GA841@atomide.com>
+Message-ID: <alpine.LFD.2.00.1104220959440.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 21 Apr 2011, Tony Lindgren wrote:
 
-On Fri, Apr 22, 2011 at 04:38:14PM +0530, Charulatha V wrote:
-> Modifies the OMAP GPIO driver to avoid usage of cpu_is* checks
-> for different OMAP architectures. This is done by moving some
-> architecture specific code to mach-omap* and call them from
-> plat-omap* using function pointers. Also remove the register offset
-> macros from OMAP GPIO driver and handle the same in mach-omap*.
+> * Nicolas Pitre <nicolas.pitre@linaro.org> [110421 20:20]:
+> > I found the bugger.  The problem was a bad stack alignment.
 > 
-> Avoid usage of gpio_bank_count and gpio_bank pointer array by
-> means of maintaining a list. Removes the bank->method flag from
-> the GPIO driver.
-> 
-> All OMAP1 SoCs has one MPUIO type GPIO bank. OMAP2+ does not have
-> any MPUIO type GPIO bank. Since MPUIO type GPIO bank is the same for
-> all OMAP1 CPUs, they are handled in plat-omap/ itself as
-> there is no common gpio.c file for all cpu types in mach-omap1.
-> They are identified by using bank->stride flag as it is '0'
-> for other than MPUIO type banks.
+> .. as this patch won't solve the n900 booting problem with zImage.
+> With LZMA I'm still also getting "LZMA data is corrupt".
 
-The omap gpio code clearly deserves a cleanup, but I think this series
-does not go far enough. There are only a handful of possible ways to
-implement a gpio hardware, most of them can be abstracted in a similar
-way Thomas did for the irq handlers and then we can handle most SoC
-specific gpio code in generic code.
+Hmmm......
 
-Something like the following comes to my mind:
+Is it possible you have bad RAM?  In compressed/head.S, locate this 
+code:
 
-struct gpio_chip_mmio_regs {
-	unsigned long output_set_reg;
-	unsigned long output_clean_reg;
-	unsigned long direction_reg;
-	unsigned long status_reg;
-};
+#ifdef CONFIG_AUTO_ZRELADDR
+                @ determine final kernel image address
+                mov     r4, pc
+                and     r4, r4, #0xf8000000
+                add     r4, r4, #TEXT_OFFSET
+#else
+                ldr     r4, =zreladdr
+#endif
 
-struct gpio_chip_mmio {
-	struct gpio_chip_mmio_regs *regs;
-	void __iomem *base;
-	void (*direction_output)(struct gpio_chip_mmio *, int);
-	void (*direction_input)(struct gpio_chip_mmio *, int);
-	struct gpio_chip chip;
-};
+Right after that, simply override r4 with a physical address towards the 
+end of the RAM, say 8MB before end of RAM (unless your decompressed 
+kernel is larger than that).  That won't make a booting system, but at 
+least you will be able to test the decompressor when loaded at various 
+locations in memory without involving the relocation loop.
 
-int gpio_chip_mmio_add(struct gpio_chip_mmio *);
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas
