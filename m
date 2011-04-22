@@ -1,33 +1,30 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 22 Apr 2011 09:34:00 +0900
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <BANLkTim5umALqafjA2e88UCLzMp9LQu3_Q@mail.gmail.com>
-References: <201104212129.17013.arnd@arndb.de>
-	<20110421130930.4be9e9e1@jbarnes-desktop>
-	<BANLkTim5umALqafjA2e88UCLzMp9LQu3_Q@mail.gmail.com>
-Message-ID: <BANLkTimz8zprEw7H_i8g2qj8RyyougiBBw@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Thu, 21 Apr 2011 20:13:13 -0700
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
+References: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
+Message-ID: <4DB0F249.6000307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2011 at 6:52 AM, Zach Pfeffer <zach.pfeffer@linaro.org> wrote:
->
-> I agree with Jesse that the separation of mapping from allocation is
-> central to the current usage models. I realize most people didn't like
-> VCMM, but it provided an abstraction for this - if software can handle
-> the multiple mapper approach in a rational way across ARM than we can
-> solve a lot of problems with all the map and unmap current solutions
-> and we don't have to hack in coherency.
->
+Vikram Narayanan wrote:
+> And also, are clocksoure and clockevents dependent on each other? I
+> see in some platforms, that they have used 2 different timers for the
+> above. Can a same clock be used for both clocksource and clockevents?
+> Please throw some light on this. If it can be used so, what ties up
+> the clocksource and clockevent?
 
-Hi.
-I've also noticed that VCMM is the reasonable idea for IOMMU mappings.
-We often deal with physical memory blocks to map multiple way.
-Allocation of physical memory itself is also important for some
-peripheral devices
-because it is beneficial to get larger page frame for their performance.
+You can look at msm for an example of a single timer being used both as
+a clocksource and a clockevent. We end up shutting off the clocksource
+whenever we shut down the clockevent. This does cause some issues.
+Switching clocksources at runtime does not work. It will also cause
+problems if you implement your own sched_clock function, as it will have
+little choice but to return a stale cached value whenever the clockevent
+is disabled, such as in the suspend path.
 
-IOMMU api does not provide virtual memory management.
-DMA api is not flexible for all our use-cases.
+Jeff
 
-Regards,
-KyongHo.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
