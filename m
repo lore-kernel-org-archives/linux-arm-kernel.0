@@ -1,69 +1,117 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Apr 2011 11:51:37 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421120656.GF15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211632240.3323@ionos>
-	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1104221124270.3323@ionos>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 22 Apr 2011 12:02:23 +0200
+Subject: [PATCH V15 0/4] ptp: IEEE 1588 hardware clock support
+Message-ID: <cover.1303466102.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Apr 2011, Colin Cross wrote:
-> On Thu, Apr 21, 2011 at 8:38 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> > There is no way around that. Everything else is going to be the
-> > locking hell and racy all over the place.
-> 
-> Per clock locks are useful if you have some very slow clocks and some
-> very fast clocks.  PLLs may take 20 ms to lock, and preventing any
-> other call to clk_prepare for that long could be problematic.  The
-> problem was worse before the clk_enable/clk_prepare split, maybe it's
-> not necessary at all any more.
-> 
-> For Tegra, I solved my clock locking problems by (almost) always
-> locking from child to parent, the normal case for
-> clk_enable/clk_prepare. In general, you only need to lock parent and
-> then child if you store the rate of the child in the child's clk
-> struct and need to update it when the parent changes, or when
-> traversing the tree for debugging output.  I solved the first problem
-> by storing the relation between the child and the parent in the child
-> struct and locking from child to parent on clk_get_rate calls to
-> calculate the rate, and the second by using a trylock loop over the
-> list of clocks (see arch/arm/mach-tegra/clock.c).
+Here is V15 of the PHC patch series. I had been a bit lazy in adding
+the acks that have accumulated since V13, and so now I have added them
+into the commit message, unless the particular patch changed
+substantially since the ack.
 
-Yes, and that's exaclty what we don't want to have. You still need a
-global lock for doing the full tree acquisition and the only advantage
-which is left is that you can do parallel prepare/unprepare and
-everything else (parent settings, rate propagations) will need to do
-the locking dance.
+* Introduction
 
-And the bad thing about your approach is that it requires a full tree
-lock acquisition all the time, while the real operation might be just
-affecting 3 clocks out of 50. To avoid that you'd need to do the
-trylock dance over the child list.
+  The aim of this patch set is to add support for PTP Hardware Clocks
+  (PHCs) into the Linux kernel. The patch series builds upon the
+  dynamic posix clock work appearing in kernel version 2.6.39.
 
-I doubt it's worth the trouble, really.
+  Support for obtaining timestamps from a PHC already exists via the
+  SO_TIMESTAMPING socket option, integrated in kernel version 2.6.30.
+  This patch set completes the picture by allow user space programs to
+  adjust the PHC and to control its ancillary features.
 
-> Now that clk_prepare and clk_enable are split, the long-held locks
-> (for plls, maybe dvfs?) are separated from the short-held locks for
-> clk_enable/clk_disable, and the cost of global serialization is much
-> more acceptable.
+* Patches for ptpd on sf.net
+  https://sourceforge.net/tracker/?group_id=139814&atid=744634
+  3225599 [PATCH 1/3] Convert to POSIX clock API.
+  3225603 [PATCH 2/3] Adapted to use the Linux PTP Hardware Clock API. 
+  3225607 [PATCH 3/3] Adapted to use the newer SO_TIMESTAMPING Linux API.
 
-Right. And that's how we start. Simple. If it turns out to be a real
-issue, then we can revisit the fine grained locking approach, but I
-really want to avoid it as far as possible.
+* PHC Patch ChangeLog
+** v15
+*** general
+    - allow test program to set system time from PTP HW clock
+*** ixp46x and phyter packet matching
+    - check packet bounds
+    - handle variable ipv4 header length
+    - replace magic numbers with macros
 
-Another thing I'm pondering is to provide the ability to maintain
-separate clk trees. So you can have individual domains which have
-their per clk tree locking. Would that make sense ?
+* Why all the CCs?
+  - One driver is for PowerPC, and adds device tree stuff.
+  - One driver is for the ARM Xscale IXP465.
 
-Thanks,
+* Previous Discussions
+  - [V14] http://lkml.org/lkml/2011/4/18/16
+  - [V13] http://lkml.org/lkml/2011/3/27/2
+  - [V12] http://lkml.org/lkml/2011/2/28/53
+  - [V11] http://lkml.org/lkml/2011/2/23/107
+  - [V10] http://lkml.org/lkml/2011/1/27/71
+  - [V9]  http://lkml.org/lkml/2011/1/13/65
+  - [V8]  http://lkml.org/lkml/2010/12/31/128
+  - [V7]  http://lkml.org/lkml/2010/12/16/195
+  - [V6]  http://lkml.org/lkml/2010/9/23/310
+  - [V5]  http://lkml.org/lkml/2010/8/16/90
+  - Thomas Gleixner: Rework of the PTP support series core code
+    http://lkml.org/lkml/2011/2/1/137
+  - Dynamic clock devices [RFC]
+    http://lkml.org/lkml/2010/11/4/290
+  - POSIX clock tuning syscall with dynamic clock ids
+    http://lkml.org/lkml/2010/9/3/119
+  - POSIX clock tuning syscall with static clock ids
+    http://lkml.org/lkml/2010/8/23/49
+  - Versions 1-4 appeared on the netdev list.
 
-	tglx
+
+Richard Cochran (4):
+  ptp: Added a brand new class driver for ptp clocks.
+  ptp: Added a clock that uses the eTSEC found on the MPC85xx.
+  ptp: Added a clock driver for the IXP46x.
+  ptp: Added a clock driver for the National Semiconductor PHYTER.
+
+ Documentation/ABI/testing/sysfs-ptp                |   98 ++
+ .../devicetree/bindings/net/fsl-tsec-phy.txt       |   54 +
+ Documentation/ptp/ptp.txt                          |   89 ++
+ Documentation/ptp/testptp.c                        |  381 +++++++
+ Documentation/ptp/testptp.mk                       |   33 +
+ arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h      |   78 ++
+ arch/powerpc/boot/dts/mpc8313erdb.dts              |   13 +
+ arch/powerpc/boot/dts/mpc8572ds.dts                |   13 +
+ arch/powerpc/boot/dts/p2020ds.dts                  |   13 +
+ arch/powerpc/boot/dts/p2020rdb.dts                 |   13 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/net/Makefile                               |    1 +
+ drivers/net/arm/ixp4xx_eth.c                       |  195 ++++-
+ drivers/net/gianfar_ptp.c                          |  588 +++++++++++
+ drivers/net/phy/Makefile                           |    1 +
+ drivers/net/phy/dp83640.c                          | 1100 ++++++++++++++++++++
+ drivers/net/phy/dp83640_reg.h                      |  267 +++++
+ drivers/ptp/Kconfig                                |   75 ++
+ drivers/ptp/Makefile                               |    7 +
+ drivers/ptp/ptp_chardev.c                          |  159 +++
+ drivers/ptp/ptp_clock.c                            |  343 ++++++
+ drivers/ptp/ptp_ixp46x.c                           |  332 ++++++
+ drivers/ptp/ptp_private.h                          |   92 ++
+ drivers/ptp/ptp_sysfs.c                            |  230 ++++
+ include/linux/Kbuild                               |    1 +
+ include/linux/ptp_classify.h                       |    7 +
+ include/linux/ptp_clock.h                          |   84 ++
+ include/linux/ptp_clock_kernel.h                   |  139 +++
+ 29 files changed, 4406 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-ptp
+ create mode 100644 Documentation/ptp/ptp.txt
+ create mode 100644 Documentation/ptp/testptp.c
+ create mode 100644 Documentation/ptp/testptp.mk
+ create mode 100644 arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h
+ create mode 100644 drivers/net/gianfar_ptp.c
+ create mode 100644 drivers/net/phy/dp83640.c
+ create mode 100644 drivers/net/phy/dp83640_reg.h
+ create mode 100644 drivers/ptp/Kconfig
+ create mode 100644 drivers/ptp/Makefile
+ create mode 100644 drivers/ptp/ptp_chardev.c
+ create mode 100644 drivers/ptp/ptp_clock.c
+ create mode 100644 drivers/ptp/ptp_ixp46x.c
+ create mode 100644 drivers/ptp/ptp_private.h
+ create mode 100644 drivers/ptp/ptp_sysfs.c
+ create mode 100644 include/linux/ptp_clock.h
+ create mode 100644 include/linux/ptp_clock_kernel.h
