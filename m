@@ -1,43 +1,39 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 23 Apr 2011 05:17:25 +0200
-Subject: AT91 pull request
-Message-ID: <20110423031725.GE23775@game.jcrosoft.org>
+Date: Sat, 23 Apr 2011 07:48:46 +0200
+Subject: [PATCHv2 3/9] macb: unify at91 and avr32 platform data
+In-Reply-To: <20110318155428.GA22087@n2100.arm.linux.org.uk>
+References: <87vczkmy94.fsf@macbook.be.48ers.dk>
+	<AANLkTi=TiRnc0ceosH-P7fN7wKrLZE0MCJHQ30gM_Q9b@mail.gmail.com>
+	<871v26m8tf.fsf@macbook.be.48ers.dk>
+	<20110317085835.GC29758@n2100.arm.linux.org.uk>
+	<87wrjyksnm.fsf@macbook.be.48ers.dk>
+	<20110317093403.GA15396@pulham.picochip.com>
+	<20110317215101.GC2927@pulham.picochip.com>
+	<20110318154118.GQ29758@n2100.arm.linux.org.uk>
+	<20110318154839.GB3393@pulham.picochip.com>
+	<20110318155428.GA22087@n2100.arm.linux.org.uk>
+Message-ID: <20110423054846.GF23775@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-	This is bug fixes and one old patch that just add the 5series chip id only
-	needed by drivers
-	the soc full support will be delayed until the current work on the cleannup
-	of at91 will be weel advanced
-
-	Could you pull
-
-The following changes since commit 0f1d9f78ce41a8874d30271ef8480e6f8f7f1fce:
-
-  Merge branch 'tty-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty-2.6 (2011-04-22 16:19:19 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-2.6-at91.git for-linus
-
-Greg Ungerer (2):
-      arm: at91: minimal defconfig for at91x40 SoC
-      arm: at91: fix compiler warning for eb01 board build
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      at91: Add ARCH_ID and basic cpu macros definition for 5series chips family.
-
-Uwe Kleine-K?nig (1):
-      ARM: at91: AT91CAP9 has a macb device
-
- arch/arm/configs/at91x40_defconfig    |   48 +++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Kconfig            |    1 +
- arch/arm/mach-at91/board-eb01.c       |    7 ++++-
- arch/arm/mach-at91/include/mach/cpu.h |   28 +++++++++++++++++++
- 4 files changed, 83 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/configs/at91x40_defconfig
+> > I happy to split the driver and arch updates, but I'm not sure that it 
+> > can be done in such a way that platforms would build between the arch 
+> > and driver merges.
+> > 
+> > > I'm also concious that this has become ready for potentially merging
+> > > during the merge window, and therefore hasn't had previous exposure
+> > > in linux-next, and so should wait until the next merge window.  I do
+> > > feel that I'm going to be yelled at for saying that... but I'm sure
+> > > I'll also be yelled at if I did take it.
+> > 
+> > I don't have any problem with waiting until the next merge window, and 
+> > to be honest I'd like see these patches have some time in next as I 
+> > can't test them on devices with a MACB.
+> 
+> Okay, that sounds like a very good reason to wait until Nicolas can
+> review them and provide an ack.
+David Russell If you don't mind I'll apply it on at91 tree as we prepare other
+huge update on mach-at91
 
 Best Regards,
-J & nico.
+J.
