@@ -1,33 +1,64 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Apr 2011 16:06:42 -0700
-Subject: [linux-pm] [RFC PATCH V3 4/4] cpuidle: Single/Global registration
-	of idle states
-In-Reply-To: <4DAFB847.50404@linux.vnet.ibm.com> (Trinabh Gupta's message of
-	"Thu, 21 Apr 2011 10:23:27 +0530")
-References: <20110420065445.332.13688.stgit@tringupt.in.ibm.com>
-	<20110420065608.332.30043.stgit@tringupt.in.ibm.com>
-	<87k4eo6d5m.fsf@ti.com> <4DAFB847.50404@linux.vnet.ibm.com>
-Message-ID: <871v0tvqbh.fsf@ti.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 22 Apr 2011 17:48:23 -0700
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104230054260.3323@ionos>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421074214.GE15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211113030.3323@ionos>
+	<20110421120656.GF15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211632240.3323@ionos>
+	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
+	<alpine.LFD.2.02.1104221124270.3323@ionos>
+	<BANLkTim8GUuMxwfHFoVv=LfQFuh4QaPn+Q@mail.gmail.com>
+	<alpine.LFD.2.02.1104221857060.3323@ionos>
+	<4DB20091.1070509@codeaurora.org>
+	<alpine.LFD.2.02.1104230054260.3323@ionos>
+Message-ID: <4DB221D7.4030703@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Trinabh,
+On 04/22/2011 03:55 PM, Thomas Gleixner wrote:
+> On Fri, 22 Apr 2011, Saravana Kannan wrote:
+>
+>> On 04/22/2011 09:57 AM, Thomas Gleixner wrote:
+>>> On Fri, 22 Apr 2011, Colin Cross wrote:
+>>>
+>>>> On Fri, Apr 22, 2011 at 2:51 AM, Thomas Gleixner<tglx@linutronix.de>
+>>>> wrote:
+>>>>> Another thing I'm pondering is to provide the ability to maintain
+>>>>> separate clk trees. So you can have individual domains which have
+>>>>> their per clk tree locking. Would that make sense ?
+>>>>
+>>>> Clock trees are likely to be linked somewhere - an external clock chip
+>>>> that drives the main clock input on the SoC, or an SoC clock output
+>>>> that drives a chip with an internal clock tree.  Domains would have to
+>>>> be dynamically managed to ensure two clocks from different clock chips
+>>>> that become linked are moved under the same clock lock.  Probably
+>>>> easier to keep a global lock.
+>>>
+>>> Ok. It's easy enough to split later if the need arises.
+>>
+>> MSM certainly has the need for having independent clock trees. I would like
+>> support for this to be in from the start otherwise it's going to really screw
+>> clocks in one of the trees.
+>
+> Are they completely independent or do you need a global
+> synchronization mechanism between those clock trees as well ?
+>
+> Thanks,
+>
+> 	tglx
 
-Trinabh Gupta <trinabh@linux.vnet.ibm.com> writes:
+They are completely independent. No synchronization is needed between 
+these clock trees. It's basically a bunch of clocks controlled by 
+another processor that has it's own set of PLLs, etc.
 
-[...]
+-Saravana
 
-> I just wanted to get comments on the design and understand how it
-> affects various architectures in question. It looks to me as if the
-> design should be okay and infact better for architectures like ARM
-> since they do not have different idle states for different cpus and
-> thus do not require per-cpu registration.  Global registration would
-> work and be simpler; please correct me if I am wrong.
-
-Yes, I agree that the new design is better, I especially like that it's
-more clear (and expected) that final state decision making is to be done
-directly in the driver without the back-and-forth in the current setup.
-
-Thanks,
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
