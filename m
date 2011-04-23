@@ -1,45 +1,48 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 24 Apr 2011 09:26:21 +1000
+Date: Sun, 24 Apr 2011 09:34:20 +1000
 Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104211147300.3323@ionos>
+In-Reply-To: <4DB221D7.4030703@codeaurora.org>
 References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
 	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<alpine.LFD.2.02.1104201704350.3323@ionos>
 	<20110420185922.GD31131@pengutronix.de>
 	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<4DAFD5AA.9020404@codeaurora.org>
-	<alpine.LFD.2.02.1104211147300.3323@ionos>
-Message-ID: <1303601181.2513.132.camel@pasglop>
+	<20110421074214.GE15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211113030.3323@ionos>
+	<20110421120656.GF15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211632240.3323@ionos>
+	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
+	<alpine.LFD.2.02.1104221124270.3323@ionos>
+	<BANLkTim8GUuMxwfHFoVv=LfQFuh4QaPn+Q@mail.gmail.com>
+	<alpine.LFD.2.02.1104221857060.3323@ionos>
+	<4DB20091.1070509@codeaurora.org>
+	<alpine.LFD.2.02.1104230054260.3323@ionos>
+	<4DB221D7.4030703@codeaurora.org>
+Message-ID: <1303601660.2513.135.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-04-21 at 12:33 +0200, Thomas Gleixner wrote:
+On Fri, 2011-04-22 at 17:48 -0700, Saravana Kannan wrote:
 > 
-> Depends, there is a lot of sane hardware out there (not necessarily in
-> the ARM SoC world). We can do with a pointer if the need arises.
->  
-> > >     optionally a set of common register accessor functions like I did
-> > >     for the generic irq chip.
-> > 
-> > Again, I don't see the point in having this in the common code. May be I'm
-> > missing something?
-> 
-> See my RFC patch of a generic irq chip implementation and how much
-> duplicated five line inline functions they removed.
->  
-> > IMO, a better option instead of the base register and the offsets would be an
-> > option to have a priv_data pointer. I forgot the exact use case, but we
-> > thought that would have been helpful when we tried to port the msm clock
-> > driver in our tree on top of Jeremy's patches.
-> 
-> It works either way, but we should try to comeup with a sensible
-> common base struct for sane hardware. 
+> They are completely independent. No synchronization is needed between 
+> these clock trees. It's basically a bunch of clocks controlled by 
+> another processor that has it's own set of PLLs, etc. 
 
-Doesn't have to be in the base struct tho. I think a better approach is
-to keep the base struct reasonably API-only, and have an
-"implementation" subclass called something like simple_clk for example,
-that carries those few fields common to most MMIO based implementation
-and which can be created with existing "helper" code for the most common
-ones.
+In fact the common struct clk work that Jeremy picked up from initial
+patches I did for powerpc was intended for just that ... ie by moving
+the implementation out to have the clock "provider" being the one
+creating the clock objects.
 
+There's many other similar cases, ie, you can have a multifunction
+device (wifi + bt + mmc reader for example) which has its own internal
+clock network and might want to use struct clk to handle clocks between
+those parts.
+
+None of that should sit in the arch or platform code.
+
+In fact, with the device-tree, you could completely represent the
+binding between those objects without involving any platform code, that
+was the original intend and I hope that ARM eventually gets there.
+
+Cheers,
 Ben.
