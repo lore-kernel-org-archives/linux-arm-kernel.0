@@ -1,43 +1,27 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 22 Apr 2011 17:47:25 +0200
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <20110418170752.GQ16019@shareable.org>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-	<20110418135243.GB1479@ucw.cz>
-	<20110418170752.GQ16019@shareable.org>
-Message-ID: <20110422154344.GA7526@ucw.cz>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 23 Apr 2011 12:38:12 +0530
+Subject: [PATCH] OMAP4: SRAM: Fix warning: format '%08lx' expects type
+	'long unsigned int'
+In-Reply-To: <4D9993AD.3080401@ti.com>
+References: <1301907896-30954-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110404091223.GA19854@n2100.arm.linux.org.uk>
+	<4D9993AD.3080401@ti.com>
+Message-ID: <4DB27ADC.6050105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Tony,
 
-> > ...but note that no existing  filesystem is safe on media such
-> > as usb sticks, SD and CF cards...
-> 
-> Sadly.  Do you know by now if enough information is available now to
-> make it possible even in principle?
+On 4/4/2011 3:17 PM, Santosh Shilimkar wrote:
+> On 4/4/2011 2:42 PM, Russell King - ARM Linux wrote:
+[....]
 
-> Alternatively, do you know if there's been much progress
-> characterising particular manufacturers/parts/brands or identifiable
-> characteristics etc. to find ones on which a power fail safe
-> filesystem is possible, even if it's just in principle for the moment?
+> Thanks for pointing out this. I see Will's commit on this
+> one "29a38193"
+> Here is the updated patch as you suggested.
 
-There's nice table somewhere. If at least size of "big block" (usually
-4MB) is known, safe fs should be possible. OTOH 4MB commit block is
-not going to be too efficient.
+Are you considering this patch and another one [1] for the -rc's?
 
-Plus, I was told new MMC standard has "write reliable" option...
-
-> Sadly I know of a large number of systems using CF or cheap ATA SSDs
-> that were installed assuming ext3 is reliable when they are powered
-> off at the wall every day.  That's because a lot of people assume they
-> are solid-state drop-in replacements for hard disks, as that is how
-> they are advertised.
-
-False advertising, I'm afraid. I wanter if SATA SSDs do better...?
-								       Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards
+Santosh
+[1] http://eeek.borgchat.net/lists/linux-omap/msg49557.html
