@@ -1,53 +1,75 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Sat, 23 Apr 2011 17:07:19 +0200
-Subject: [PATCH] drivers: brcmaxi: provide amba axi functionality in
-	separate module
-In-Reply-To: <BANLkTinUWNvkigqkOQeYsyaAKnVXOCji8w@mail.gmail.com>
-References: <1303331669-31293-1-git-send-email-arend@broadcom.com>
-	<201104211612.49805.arnd@arndb.de> <op.vuallvn63ri7v4@arend-laptop>
-	<BANLkTinUWNvkigqkOQeYsyaAKnVXOCji8w@mail.gmail.com>
-Message-ID: <op.vuecahou3ri7v4@arend-laptop>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 23 Apr 2011 17:30:37 +0200 (CEST)
+Subject: [PATCH 01/10] Add a common struct clk
+In-Reply-To: <20110423140839.GA3229@richard-laptop>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
+	<alpine.LFD.2.02.1104212146400.3323@ionos>
+	<20110422002805.GA2268@richard-laptop>
+	<alpine.LFD.2.02.1104221122410.3323@ionos>
+	<20110423140839.GA3229@richard-laptop>
+Message-ID: <alpine.LFD.2.02.1104231701320.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Apr 2011 14:33:21 +0200, Jonas Gorski <jonas.gorski@gmail.com>  
-wrote:
+On Sat, 23 Apr 2011, Richard Zhao wrote:
+> On Fri, Apr 22, 2011 at 11:23:49AM +0200, Thomas Gleixner wrote:
+> > On Fri, 22 Apr 2011, Richard Zhao wrote:
+> > > Hi Thomas,
+> > > 
+> > > On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
+> > > > On Fri, 15 Apr 2011, Sascha Hauer wrote:
+> > > > > From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > > > > + * @get:	Called by the core clock code when a device driver acquires a
+> > > > > + *		clock via clk_get(). Optional.
+> > > > > + *
+> > > > > + * @put:	Called by the core clock code when a devices driver releases a
+> > > > > + *		clock via clk_put(). Optional.
+> > > > 
+> > > > These callbacks are completely pointless. There are only two non empty
+> > > > implementations in tree:
+> > > > 
+> > > > One does a try_module_get(clk->owner), which should be done in generic
+> > > > code. The other does special clock enabling magic which wants to go to
+> > > > clk->prepare().
+> > > You forget mach-u300 __clk_get. It updates some registers.
+> > > The ops get/put let arch clock driver have a chance to do special things at the
+> > > time when a user begins to use the clock.
+> > 
+> > No I did not forget. It's exactly the code which wants to go into
+> > clk->prepare. Which you have to call _before_ doing anything with the
+> > clock, so there is no need for an extra callback.
+> No. clk_prepare only have to be called before clk_enable, but not have to for
+> other operations, set_rate/set_parent etc.
 
-> On 21 April 2011 16:38, Arend van Spriel <arend@broadcom.com> wrote:
->> Would it be possible to make chipcommon driver optional (not doing the
->> initialization)?
->
-> This would need to be done on a per-device/bus basis, at least for
-> embedded. Consider the following setup (which is quite common for dual
-> band routers):
->
-> BCM4718 (bus A)
-   +- MIPS74k
-> +- Common Core <- provides flash write access, GPIOs, watchdog, ...
-> +- 802.11 Core <- for 2.4Ghz wifi
-> +- PCIe Core
->   + BCM43224 (bus B)
->     +- Common Core
->     +- 802.11 Core <- for 5Ghz wifi
->
-> (I omitted any cores not relevant for the example)
+And why do you need those registers set before you actually
+prepare/enable the clock? Just to set the rate register? You can store
+that information and set it on prepare. Before prepare/enable the
+value of the rate register is totally irrelevant.
 
-The MIPS may be relevant as well ;-)
+The point of anything whats named get and put in the kernel is to
+obtain or drop a reference to an object.
 
-In the example above I would expect two axi bus driver instances for bus A  
-and bus B.
+Putting arbitrary initialization into such functions is a really bad
+hack.
 
-> So eventually you want to able to drive both 802.11 cores, but can't
-> exclusively claim both common cores.
+And looking at that u300 code, it's borken:
 
-I would expect to be probed twice. One call for 2.4GHz 802.11 core  
-referencing to bus A and one call for 5GHz 802.11 core referencing to bus  
-B.
+    user1: clk_get("MCLK");
+    	   clk_set_rate(.....);
 
-Regarding chipcommon I agree that it requires one init sequence per  
-device. I would just like to have the option to provide a custom  
-initialization function for chip common (and possibly pcie) somehow.
+    user2: clk_get("MCLK");
 
-Gr. AvS
--- 
-"The world is indeed comic, but the joke is on mankind." ? H.P. Lovecraft
+The second clk_get() call will overwrite what ?
+
+The fact that you decided to put that into the absolutely wrong
+function is not an argument for keeping those callbacks.
+
+The only real usecase for __clk_get() is the
+try_module_get()/module_put() code which will become part of the
+generic code. It does exaclty what get and put are meant for: dealing
+with refcounts.
+
+Thanks,
+
+	tglx
