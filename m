@@ -1,63 +1,127 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 22 Apr 2011 17:48:23 -0700
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104230054260.3323@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421120656.GF15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211632240.3323@ionos>
-	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
-	<alpine.LFD.2.02.1104221124270.3323@ionos>
-	<BANLkTim8GUuMxwfHFoVv=LfQFuh4QaPn+Q@mail.gmail.com>
-	<alpine.LFD.2.02.1104221857060.3323@ionos>
-	<4DB20091.1070509@codeaurora.org>
-	<alpine.LFD.2.02.1104230054260.3323@ionos>
-Message-ID: <4DB221D7.4030703@codeaurora.org>
+Date: Fri, 22 Apr 2011 18:21:26 -0700
+Subject: Common clock and dvfs
+In-Reply-To: <alpine.LFD.2.02.1104222039330.3323@ionos>
+References: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
+	<alpine.LFD.2.02.1104222039330.3323@ionos>
+Message-ID: <4DB22996.8020109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2011 03:55 PM, Thomas Gleixner wrote:
-> On Fri, 22 Apr 2011, Saravana Kannan wrote:
+On 04/22/2011 12:37 PM, Thomas Gleixner wrote:
+> On Fri, 22 Apr 2011, Colin Cross wrote:
 >
->> On 04/22/2011 09:57 AM, Thomas Gleixner wrote:
->>> On Fri, 22 Apr 2011, Colin Cross wrote:
->>>
->>>> On Fri, Apr 22, 2011 at 2:51 AM, Thomas Gleixner<tglx@linutronix.de>
->>>> wrote:
->>>>> Another thing I'm pondering is to provide the ability to maintain
->>>>> separate clk trees. So you can have individual domains which have
->>>>> their per clk tree locking. Would that make sense ?
->>>>
->>>> Clock trees are likely to be linked somewhere - an external clock chip
->>>> that drives the main clock input on the SoC, or an SoC clock output
->>>> that drives a chip with an internal clock tree.  Domains would have to
->>>> be dynamically managed to ensure two clocks from different clock chips
->>>> that become linked are moved under the same clock lock.  Probably
->>>> easier to keep a global lock.
->>>
->>> Ok. It's easy enough to split later if the need arises.
->>
->> MSM certainly has the need for having independent clock trees. I would like
->> support for this to be in from the start otherwise it's going to really screw
->> clocks in one of the trees.
+>> Is the clock api the right place to do dvfs, or should the clock api
+>> be kept simple, and more complicated operations like dvfs be kept
+>> outside?
 >
-> Are they completely independent or do you need a global
-> synchronization mechanism between those clock trees as well ?
+> I think it's an orthogonal issue which can be solved once we have
+> generic implementations in place for clk_ functions which result in
+> DFVS relevant changes.
 >
-> Thanks,
+> clk_prepare()
+> {
+> 	lock_tree();
+> 	if (dvfs_validate())
+> 		return -ECRAP;
+> 	prepare();
+> 	unlock_tree();
+> }
 >
-> 	tglx
+> clk_unprepare()
+> {
+> 	lock_tree();
+> 	unprepare();
+> 	dvfs_recalc();
+> 	unlock_tree();
+> }
+>
+> clk_set_rate()
+> {
+> 	lock_tree();
+>
+> 	if (rate>  clk->rate&&  dvfs_prevalidate(rate))
+> 		return -ECRAP;
+>
+> 	set_and_propagate_rate();
+>
+> 	if (rate<  old->rate)
+> 	   dvfs_recalc();
+>
+> 	unlock_tree();
+> }
 
-They are completely independent. No synchronization is needed between 
-these clock trees. It's basically a bunch of clocks controlled by 
-another processor that has it's own set of PLLs, etc.
+I understand that this is just some example code, but I'm not sure how 
+accurate you were trying to be. So, I will assume the worst.
 
--Saravana
+I really don't like this lock the whole clock tree approach for DVFS. I 
+think a better approach would be something like this:
+
+struct dvfs_tuple {
+	long	max_rate; /* Max rate for this DVFS level. */
+	int	dvfs_level;
+};
+
+/* Yeah, bad name. pick what you like. */
+struct dvfs_class {
+	int 	*level_cnt;
+	int 	num_levels;
+	int (*dvfs_update) (int level);
+	mutex	lock;
+}
+
+stuct clk {
+	...
+	/* Last entry would have {LONG_MAX, highest level in dvfs}, */
+	struct	dvfs_tuple *dvfs_list;
+	struct  dvfs_class *dvfs_class;
+}
+
+Then
+
+clk_prepare() {
+	for each dvfs tuple {
+		if current_rate <= max_rate; {
+			level = dvfs_level;
+			break;
+		}
+	}
+
+	lock(dvfs_class->mutex);
+
+	clk->dvfs_class->level_cnt[level]++;
+	/* Find highest level in this dvfs class with non-zero count */
+	if(clk->dvfs_class->update(highest_level))
+		return -ECRAP;
+	/* Yes, I see locking err, but you get the point */
+	unlock(dvfs_class->mutex);
+	
+	clk->ops->prepare(clk);
+}
+
+I did some crappy factorization of functions, returning -ECRAP without 
+unlocking, etc, but you get the point.
+
+Whether the "level" translates to controlling power supply A or B or A & 
+B is upto the implementation of dvfs_class->dvfs_update() which is per 
+SOC/mach/arch.
+
+This will keep the dvfs data structure common for all clocks, remove the 
+need to traverse the entire tree and keep the generic code agnostic of 
+1-1 vs. many-1 vs many-many.
+
+> We can put the dvfs functions into the propagation code as well and
+> back out there when dvfs tells us. That probably works nicely for
+> prepare and unprepare, but might be complex for set_rate in the actual
+> set_rate propagation (except when the rate is less than the original
+> one).
+
+For set rate, you lock the dvfs class, increment the count for the new 
+rate's dvfs_level, decrement it for the previous dvfs level, and then 
+call dvfs_update() with the max level in that class, unlock dvfs_class.
+
+Thanks,
+Saravana
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
