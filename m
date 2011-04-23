@@ -1,26 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 23 Apr 2011 11:23:30 +0200
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <20110422154344.GA7526@ucw.cz>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-	<20110418135243.GB1479@ucw.cz>
-	<20110418170752.GQ16019@shareable.org>
-	<20110422154344.GA7526@ucw.cz>
-Message-ID: <BANLkTimZZEr8fqXbuBjpYxF1quBFv7Oihg@mail.gmail.com>
+From: jonas.gorski@gmail.com (Jonas Gorski)
+Date: Sat, 23 Apr 2011 14:33:21 +0200
+Subject: [PATCH] drivers: brcmaxi: provide amba axi functionality in
+	separate module
+In-Reply-To: <op.vuallvn63ri7v4@arend-laptop>
+References: <1303331669-31293-1-git-send-email-arend@broadcom.com>
+	<201104211612.49805.arnd@arndb.de> <op.vuallvn63ri7v4@arend-laptop>
+Message-ID: <BANLkTinUWNvkigqkOQeYsyaAKnVXOCji8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/22 Pavel Machek <pavel@ucw.cz>:
+On 21 April 2011 16:38, Arend van Spriel <arend@broadcom.com> wrote:
+> Would it be possible to make chipcommon driver optional (not doing the
+> initialization)?
 
-> Plus, I was told new MMC standard has "write reliable" option...
+This would need to be done on a per-device/bus basis, at least for
+embedded. Consider the following setup (which is quite common for dual
+band routers):
 
-I think Per F?rlin looked into reliable write. The latest eMMC cards
-has this, but OTOMH it was too darn slow to be used on current
-chips/"cards".
+BCM4718
++- Common Core <- provides flash write access, GPIOs, watchdog, ...
++- 802.11 Core <- for 2.4Ghz wifi
++- PCIe Core
+  + BCM43224
+    +- Common Core
+    +- 802.11 Core <- for 5Ghz wifi
 
-Per, Sebastian: any details?
+(I omitted any cores not relevant for the example)
 
-Yours,
-Linus Walleij
+So eventually you want to able to drive both 802.11 cores, but can't
+exclusively claim both common cores.
+
+Regards
+Jonas
