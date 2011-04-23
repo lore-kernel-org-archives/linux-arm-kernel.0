@@ -1,44 +1,24 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 23 Apr 2011 18:37:23 +0200 (CEST)
-Subject: genirq: Generic irq chip available in git
-Message-ID: <alpine.LFD.2.02.1104231805321.3323@ionos>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 23 Apr 2011 11:00:21 -0600 (MDT)
+Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+In-Reply-To: <BANLkTi=Ab0EJ3fAQGHBOyPd+eAJHWcjtuA@mail.gmail.com>
+References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+	<alpine.DEB.2.00.1104201351180.12683@utopia.booyaka.com>
+	<BANLkTi=Ab0EJ3fAQGHBOyPd+eAJHWcjtuA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1104231059050.6742@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic irq chip infrastructure patches are now available in
+On Thu, 21 Apr 2011, Gulati, Shweta wrote:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip irq/for-arm
+> Yes, but in current code clk_set_rate of dpll3_m2 - 
+> 'omap3_core_dpll_m2_set_rate' doesn't update clk.rate, I will submit 
+> patch fixing that bug and will make sure that set_rate of all clocks 
+> should update clk.rate
 
-The top commit is cfefd21e693dca791bf9ecfc9dd3794facad533c
+Yes, that's the right thing to do, please send that.  Such a patch was 
+originally part of the series for the last merge window; it seems I 
+inadvertently dropped it.
 
-Russell said, he'll pull that into his devel tree, so patches can be
-applied there. SoC maintainers running their own git trees can pull it
-as well so they can apply the patches for their platforms.
 
-There is a small change in the interface vs. the previous posted
-version:
-
-irq_setup_generic_chip() has now an additional argument to pass init
-flags in. There are two flags available right now:
-
- * @IRQ_GC_INIT_MASK_CACHE:     Initialize the mask_cache by reading mask reg
-
-The original code checked for the set/clr_bit functions, but with that
-change it can be used for other implementations as well.
-
- * @IRQ_GC_INIT_NESTED_LOCK:    Set the lock class of the irqs to nested for
- *                              irq chips which need to call irq_set_wake() on
- *                              the parent irq. Usually GPIO implementations
-
-This is for those gpio chips which all have their own gpio_lock_class
-and the setter loop.
-
-I fixed up the patches I sent out earlier. They are available from:
-
-  http://master.kernel.org/~tglx/patches-arm-gc.tar.bz2
-
-if you don't want to fixup the stuff yourself.
-
-Happy Easter!
-
-      tglx
+- Paul
