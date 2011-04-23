@@ -1,75 +1,44 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 23 Apr 2011 17:30:37 +0200 (CEST)
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <20110423140839.GA3229@richard-laptop>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-	<20110422002805.GA2268@richard-laptop>
-	<alpine.LFD.2.02.1104221122410.3323@ionos>
-	<20110423140839.GA3229@richard-laptop>
-Message-ID: <alpine.LFD.2.02.1104231701320.3323@ionos>
+Date: Sat, 23 Apr 2011 18:37:23 +0200 (CEST)
+Subject: genirq: Generic irq chip available in git
+Message-ID: <alpine.LFD.2.02.1104231805321.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Apr 2011, Richard Zhao wrote:
-> On Fri, Apr 22, 2011 at 11:23:49AM +0200, Thomas Gleixner wrote:
-> > On Fri, 22 Apr 2011, Richard Zhao wrote:
-> > > Hi Thomas,
-> > > 
-> > > On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
-> > > > On Fri, 15 Apr 2011, Sascha Hauer wrote:
-> > > > > From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > > > > + * @get:	Called by the core clock code when a device driver acquires a
-> > > > > + *		clock via clk_get(). Optional.
-> > > > > + *
-> > > > > + * @put:	Called by the core clock code when a devices driver releases a
-> > > > > + *		clock via clk_put(). Optional.
-> > > > 
-> > > > These callbacks are completely pointless. There are only two non empty
-> > > > implementations in tree:
-> > > > 
-> > > > One does a try_module_get(clk->owner), which should be done in generic
-> > > > code. The other does special clock enabling magic which wants to go to
-> > > > clk->prepare().
-> > > You forget mach-u300 __clk_get. It updates some registers.
-> > > The ops get/put let arch clock driver have a chance to do special things at the
-> > > time when a user begins to use the clock.
-> > 
-> > No I did not forget. It's exactly the code which wants to go into
-> > clk->prepare. Which you have to call _before_ doing anything with the
-> > clock, so there is no need for an extra callback.
-> No. clk_prepare only have to be called before clk_enable, but not have to for
-> other operations, set_rate/set_parent etc.
+The generic irq chip infrastructure patches are now available in
 
-And why do you need those registers set before you actually
-prepare/enable the clock? Just to set the rate register? You can store
-that information and set it on prepare. Before prepare/enable the
-value of the rate register is totally irrelevant.
+git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip irq/for-arm
 
-The point of anything whats named get and put in the kernel is to
-obtain or drop a reference to an object.
+The top commit is cfefd21e693dca791bf9ecfc9dd3794facad533c
 
-Putting arbitrary initialization into such functions is a really bad
-hack.
+Russell said, he'll pull that into his devel tree, so patches can be
+applied there. SoC maintainers running their own git trees can pull it
+as well so they can apply the patches for their platforms.
 
-And looking at that u300 code, it's borken:
+There is a small change in the interface vs. the previous posted
+version:
 
-    user1: clk_get("MCLK");
-    	   clk_set_rate(.....);
+irq_setup_generic_chip() has now an additional argument to pass init
+flags in. There are two flags available right now:
 
-    user2: clk_get("MCLK");
+ * @IRQ_GC_INIT_MASK_CACHE:     Initialize the mask_cache by reading mask reg
 
-The second clk_get() call will overwrite what ?
+The original code checked for the set/clr_bit functions, but with that
+change it can be used for other implementations as well.
 
-The fact that you decided to put that into the absolutely wrong
-function is not an argument for keeping those callbacks.
+ * @IRQ_GC_INIT_NESTED_LOCK:    Set the lock class of the irqs to nested for
+ *                              irq chips which need to call irq_set_wake() on
+ *                              the parent irq. Usually GPIO implementations
 
-The only real usecase for __clk_get() is the
-try_module_get()/module_put() code which will become part of the
-generic code. It does exaclty what get and put are meant for: dealing
-with refcounts.
+This is for those gpio chips which all have their own gpio_lock_class
+and the setter loop.
 
-Thanks,
+I fixed up the patches I sent out earlier. They are available from:
 
-	tglx
+  http://master.kernel.org/~tglx/patches-arm-gc.tar.bz2
+
+if you don't want to fixup the stuff yourself.
+
+Happy Easter!
+
+      tglx
