@@ -1,62 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 24 Apr 2011 22:14:30 +0200
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110424094557.GA2310@richard-laptop>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110424094557.GA2310@richard-laptop>
-Message-ID: <20110424201430.GR31131@pengutronix.de>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 25 Apr 2011 01:09:04 +0300
+Subject: [PATCH 0/4] omap: cleanup board files
+Message-ID: <cover.1303682352.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 24, 2011 at 05:45:57PM +0800, Richard Zhao wrote:
-> Hi Uwe,
-> On Wed, Apr 20, 2011 at 04:07:37PM +0200, Uwe Kleine-K?nig wrote:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > only compile tested so far.
-> > 
-> > Best regards
-> > Uwe
-> > 
-> >  drivers/clk/clk.c   |   43 +++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/clk.h |    8 ++++++++
-> >  2 files changed, 51 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 264c809..7627815 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -14,10 +14,23 @@
-> >  int clk_prepare(struct clk *clk)
-> >  {
-> >  	int ret = 0;
-> > +	struct clk *parent = ERR_PTR(-ENOSYS);
-> >  
-> >  	if (!clk)
-> >  		return 0;
-> >  
-> > +	if (clk->ops->flags & CLK_OPS_GENERIC_PARENT) {
-> > +		parent = clk_get_parent(clk);
-> > +
-> > +		if (!IS_ERR(parent)) {
-> > +			ret = clk_prepare(parent);
-> > +			if (ret)
-> > +				return ret;
-> > +		} else if (PTR_ERR(parent) != -ENOSYS)
-> > +			/* -ENOSYS means no parent and is OK */
-> > +			return PTR_ERR(parent);
-> > +	}
-> Is this supposed to be in prepare_lock? If prepare_count > 1, we need do nothing.
-> Other parent operations need to be in lock protect too.
-Yeah, I noticed that myself, too. Also it would be nice to handle the
-set_parent callback.
+Hi Tony,
 
-Best regards
-Uwe
+These patches cleanup some of the common code in the board files. The changes
+are basically almost mechanically move the code shared among several boards
+into some common place.
+There are a lot of places for further improvement, especially DSS and TWL
+initialization. I'll try to find some time to sort these out as well.
+
+Special thanks to Igor Grinberg for the original idea :)
+
+Mike Rapoport (4):
+  omap: consolidate touch screen initialization among different boards
+  omap: use common initialization for PMIC i2c bus
+  omap: move detection of NAND CS to common-board-devices
+  omap: musb: introduce default baord config
+
+ arch/arm/mach-omap2/Makefile                 |    2 +
+ arch/arm/mach-omap2/board-2430sdp.c          |   20 +---
+ arch/arm/mach-omap2/board-3430sdp.c          |   85 ++-------------
+ arch/arm/mach-omap2/board-4430sdp.c          |   16 +---
+ arch/arm/mach-omap2/board-cm-t35.c           |   78 +-------------
+ arch/arm/mach-omap2/board-devkit8000.c       |  119 +--------------------
+ arch/arm/mach-omap2/board-igep0020.c         |   23 +----
+ arch/arm/mach-omap2/board-igep0030.c         |   21 +---
+ arch/arm/mach-omap2/board-ldp.c              |   77 +-------------
+ arch/arm/mach-omap2/board-omap3beagle.c      |   66 +-----------
+ arch/arm/mach-omap2/board-omap3evm.c         |   72 +------------
+ arch/arm/mach-omap2/board-omap3logic.c       |   13 +--
+ arch/arm/mach-omap2/board-omap3pandora.c     |   69 +-----------
+ arch/arm/mach-omap2/board-omap3stalker.c     |   78 +-------------
+ arch/arm/mach-omap2/board-omap3touchbook.c   |  101 ++----------------
+ arch/arm/mach-omap2/board-omap4panda.c       |   17 +---
+ arch/arm/mach-omap2/board-overo.c            |  108 +------------------
+ arch/arm/mach-omap2/board-rm680.c            |   21 +---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   13 +--
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   21 +---
+ arch/arm/mach-omap2/common-board-devices.c   |  148 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/common-board-devices.h   |   52 +++++++++
+ arch/arm/mach-omap2/usb-musb.c               |   14 +++-
+ 23 files changed, 293 insertions(+), 941 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/common-board-devices.c
+ create mode 100644 arch/arm/mach-omap2/common-board-devices.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.3.1
