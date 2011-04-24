@@ -1,80 +1,238 @@
 From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sun, 24 Apr 2011 17:55:54 +0800
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <BANLkTi=-nV4=KV-Zodsbor8TG1faB_PhwA@mail.gmail.com>
+Date: Sun, 24 Apr 2011 21:48:33 +0800
+Subject: [PATCH 05/10] clk: Add support for simple dividers
+In-Reply-To: <1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
 References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-	<20110422002805.GA2268@richard-laptop>
-	<alpine.LFD.2.02.1104221122410.3323@ionos>
-	<20110423140839.GA3229@richard-laptop>
-	<alpine.LFD.2.02.1104231701320.3323@ionos>
-	<BANLkTi=-nV4=KV-Zodsbor8TG1faB_PhwA@mail.gmail.com>
-Message-ID: <20110424095554.GB2310@richard-laptop>
+	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110424134833.GC2310@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 24, 2011 at 09:20:30AM +0200, Linus Walleij wrote:
-> 2011/4/23 Thomas Gleixner <tglx@linutronix.de>:
-> > On Sat, 23 Apr 2011, Richard Zhao wrote:
-> >> On Fri, Apr 22, 2011 at 11:23:49AM +0200, Thomas Gleixner wrote:
-> >> > On Fri, 22 Apr 2011, Richard Zhao wrote:
-> >> > > > One does a try_module_get(clk->owner), which should be done in generic
-> >> > > > code. The other does special clock enabling magic which wants to go to
-> >> > > > clk->prepare().
-> >> > > >
-> >> > > You forget mach-u300 __clk_get. It updates some registers.
-> >> > > The ops get/put let arch clock driver have a chance to do special things at the
-> >> > > time when a user begins to use the clock.
-> >> >
-> >> > No I did not forget. It's exactly the code which wants to go into
-> >> > clk->prepare. Which you have to call _before_ doing anything with the
-> >> > clock, so there is no need for an extra callback.
-> >>
-> >> No. clk_prepare only have to be called before clk_enable, but not have to for
-> >> other operations, set_rate/set_parent etc.
-> >
-> > And why do you need those registers set before you actually
-> > prepare/enable the clock? Just to set the rate register? You can store
-> > that information and set it on prepare. Before prepare/enable the
-> > value of the rate register is totally irrelevant.
-> >
-> > The point of anything whats named get and put in the kernel is to
-> > obtain or drop a reference to an object.
-> >
-> > Putting arbitrary initialization into such functions is a really bad
-> > hack.
-> >
-> > And looking at that u300 code, it's borken:
-> >
-> > ? ?user1: clk_get("MCLK");
-> > ? ? ? ? ? clk_set_rate(.....);
-> >
-> > ? ?user2: clk_get("MCLK");
-> >
-> > The second clk_get() call will overwrite what ?
+On Fri, Apr 15, 2011 at 09:08:10PM +0200, Sascha Hauer wrote:
+> This patch adds support for the most common type of divider,
+> which expects a register, width and shift values to desacribe
+> the location of the divider. The divider can be zero based
+> or one based (div = reg_val + 1 vs. div = reg_val).
 > 
-> Heh yeah that is the case, and this code can just as well live in the
-> ->prepare() function.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> ---
+>  drivers/clk/Kconfig       |    3 +
+>  drivers/clk/Makefile      |    1 +
+>  drivers/clk/clk-divider.c |  132 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk.h       |   31 +++++++++++
+>  4 files changed, 167 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/clk-divider.c
 > 
-> The clock that goes to "MCLK" and "MSPRO" is utilizing a common
-> clock divider, which sounds backwards, but in practice this is because
-> it's and MMC or Memory Stick Pro block clock, and you cannot pinmux
-> in both in the ASIC, they are connected to the same pins and either
-> function need its own support electronics. So naturally only one of
-> them is ever active at the same time.
-> 
-> This should be *properly* reflected by creating the pin/padmux
-> framework and have the clock prepare() call hook back into that,
-> so that when you try to activate say "mclk" you need to mux in these
-> pins and if the mspro is muxed in at that time you return -ENODEV
-> and the clock code bails out.
-> 
-> We should just move it to prepare() and I'll fix it up if need be.
-Great, so we don't need __clk_get/put. The only purpose of clk_get is
-to return pointer of clk.
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 6e3ae54..76bb4c9 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -5,3 +5,6 @@ config CLKDEV_LOOKUP
+>  
+>  config USE_COMMON_STRUCT_CLK
+>  	bool
+> +
+> +config USE_COMMON_CLK_DIVIDER
+> +	bool
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index a1a06d3..723d884 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -1,3 +1,4 @@
+>  
+>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>  obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
+> +obj-$(CONFIG_USE_COMMON_CLK_DIVIDER) += clk-divider.o
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> new file mode 100644
+> index 0000000..2de94df
+> --- /dev/null
+> +++ b/drivers/clk/clk-divider.c
+> @@ -0,0 +1,132 @@
+> +/*
+> + * Copyright (C) 2011 Sascha Hauer <s.hauer@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Standard functionality for the common clock API.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +
+> +#define to_clk_divider(clk) (container_of(clk, struct clk_divider, clk))
+> +
+> +static unsigned long clk_divider_get_rate(struct clk *clk)
+> +{
+> +	struct clk_divider *divider = to_clk_divider(clk);
+> +	unsigned long rate = clk_get_rate(divider->parent);
+> +	unsigned int div;
+> +
+> +	div = readl(divider->reg) >> divider->shift;
+> +	div &= (1 << divider->width) - 1;
+> +
+> +	if (!(divider->flags & CLK_DIVIDER_FLAG_ONE_BASED))
+> +		div++;
+> +
+> +	return rate / div;
+> +}
+> +
+> +static int clk_divider_bestdiv(struct clk *clk, unsigned long rate,
+> +		unsigned long *best_parent_rate)
+> +{
+> +	struct clk_divider *divider = to_clk_divider(clk);
+> +	int i, bestdiv = 0;
+> +	unsigned long parent_rate, best = 0, now, maxdiv;
+> +
+> +	maxdiv = (1 << divider->width);
+> +
+> +	if (divider->flags & CLK_DIVIDER_FLAG_ONE_BASED)
+> +		maxdiv--;
+> +
+> +	/*
+> +	 * The maximum divider we can use without overflowing
+> +	 * unsigned long in rate * i below
+> +	 */
+> +	maxdiv = min(ULONG_MAX / rate, maxdiv);
+> +
+> +	for (i = 1; i <= maxdiv; i++) {
+> +		parent_rate = clk_round_rate(divider->parent, (rate + 1) * i);
+> +		now = parent_rate / i;
+> +
+> +		if (now <= rate && now >= best) {
+> +			bestdiv = i;
+> +			best = now;
+> +		}
+> +	}
+> +
+> +	if (!bestdiv) {
+> +		bestdiv = (1 << divider->width);
+> +		parent_rate = clk_round_rate(divider->parent, 1);
+> +	} else {
+> +		parent_rate = best * bestdiv;
+> +	}
+> +
+> +	if (best_parent_rate)
+> +		*best_parent_rate = parent_rate;
+> +
+> +	return bestdiv;
+> +}
+> +
+> +static long clk_divider_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	unsigned long best_parent_rate;
+> +	int div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
+> +
+> +	return best_parent_rate / div;
+> +}
+> +
+> +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	unsigned long best_parent_rate;
+> +	struct clk_divider *divider = to_clk_divider(clk);
+> +	unsigned int div;
+> +	int ret;
+> +	unsigned long flags = 0;
+> +	u32 val;
+> +
+> +	div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
+> +
+> +	if (rate != best_parent_rate / div)
+> +		return -EINVAL;
+> +
+> +	ret = clk_set_rate(divider->parent, best_parent_rate);
+why do you set parent rate? It may impact hte parent's other children.
 
 Thanks
 Richard
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (divider->lock)
+> +		spin_lock_irqsave(divider->lock, flags);
+> +
+> +	if (!(divider->flags & CLK_DIVIDER_FLAG_ONE_BASED))
+> +		div--;
+> +
+> +	val = readl(divider->reg);
+> +	val &= ~(((1 << divider->width) - 1) << divider->shift);
+> +	val |= div << divider->shift;
+> +	writel(val, divider->reg);
+> +
+> +	if (divider->lock)
+> +		spin_unlock_irqrestore(divider->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clk *clk_divider_get_parent(struct clk *clk)
+> +{
+> +	struct clk_divider *divider = to_clk_divider(clk);
+> +
+> +	return divider->parent;
+> +}
+> +
+> +struct clk_ops clk_divider_ops = {
+> +	.prepare = clk_parent_prepare,
+> +	.unprepare = clk_parent_unprepare,
+> +	.enable = clk_parent_enable,
+> +	.disable = clk_parent_disable,
+> +	.get_rate = clk_divider_get_rate,
+> +	.round_rate = clk_divider_round_rate,
+> +	.set_rate = clk_divider_set_rate,
+> +	.get_parent = clk_divider_get_parent,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_divider_ops);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index d014341..6f9771b 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -180,6 +180,37 @@ unsigned long clk_parent_get_rate(struct clk *clk);
+>  long clk_parent_round_rate(struct clk *clk, unsigned long rate);
+>  int clk_parent_set_rate(struct clk *clk, unsigned long rate);
+>  
+> +/**
+> + * clock divider
+> + *
+> + * @clk		clock source
+> + * @reg		register containing the divider
+> + * @shift	shift to the divider
+> + * @width	width of the divider
+> + * @lock	register lock
+> + * @parent	parent clock
+> + *
+> + * This clock implements get_rate/set_rate/round_rate. prepare/unprepare and
+> + * enable/disable are passed through to the parent.
+> + *
+> + * The divider is calculated as div = reg_val + 1
+> + * or if CLK_DIVIDER_FLAG_ONE_BASED is set as div = reg_val
+> + * (with reg_val == 0 considered invalid)
+> + */
+> +struct clk_divider {
+> +	struct clk	clk;
+> +	void __iomem	*reg;
+> +	unsigned char	shift;
+> +	unsigned char	width;
+> +	unsigned int	div;
+> +	struct clk	*parent;
+> +	spinlock_t	*lock;
+> +#define CLK_DIVIDER_FLAG_ONE_BASED	(1 << 0)
+> +	unsigned int	flags;
+> +};
+> +
+> +extern struct clk_ops clk_divider_ops;
+> +
+>  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+>  
+>  /*
+> -- 
+> 1.7.4.1
 > 
-> Linus Walleij
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
