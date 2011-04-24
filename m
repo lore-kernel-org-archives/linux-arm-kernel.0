@@ -1,48 +1,86 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 24 Apr 2011 09:34:20 +1000
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <4DB221D7.4030703@codeaurora.org>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421120656.GF15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211632240.3323@ionos>
-	<BANLkTikU9RLy9VR+tOPMt0u6zJp-bW5_Cw@mail.gmail.com>
-	<alpine.LFD.2.02.1104221124270.3323@ionos>
-	<BANLkTim8GUuMxwfHFoVv=LfQFuh4QaPn+Q@mail.gmail.com>
-	<alpine.LFD.2.02.1104221857060.3323@ionos>
-	<4DB20091.1070509@codeaurora.org>
-	<alpine.LFD.2.02.1104230054260.3323@ionos>
-	<4DB221D7.4030703@codeaurora.org>
-Message-ID: <1303601660.2513.135.camel@pasglop>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sun, 24 Apr 2011 10:54:45 +0800
+Subject: [PATCH 01/10] Add a common struct clk
+In-Reply-To: <alpine.LFD.2.02.1104231701320.3323@ionos>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
+	<alpine.LFD.2.02.1104212146400.3323@ionos>
+	<20110422002805.GA2268@richard-laptop>
+	<alpine.LFD.2.02.1104221122410.3323@ionos>
+	<20110423140839.GA3229@richard-laptop>
+	<alpine.LFD.2.02.1104231701320.3323@ionos>
+Message-ID: <20110424025444.GA1996@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-22 at 17:48 -0700, Saravana Kannan wrote:
+On Sat, Apr 23, 2011 at 05:30:37PM +0200, Thomas Gleixner wrote:
+> On Sat, 23 Apr 2011, Richard Zhao wrote:
+> > On Fri, Apr 22, 2011 at 11:23:49AM +0200, Thomas Gleixner wrote:
+> > > On Fri, 22 Apr 2011, Richard Zhao wrote:
+> > > > Hi Thomas,
+> > > > 
+> > > > On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
+> > > > > On Fri, 15 Apr 2011, Sascha Hauer wrote:
+> > > > > > From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > > > > > + * @get:	Called by the core clock code when a device driver acquires a
+> > > > > > + *		clock via clk_get(). Optional.
+> > > > > > + *
+> > > > > > + * @put:	Called by the core clock code when a devices driver releases a
+> > > > > > + *		clock via clk_put(). Optional.
+> > > > > 
+> > > > > These callbacks are completely pointless. There are only two non empty
+> > > > > implementations in tree:
+> > > > > 
+> > > > > One does a try_module_get(clk->owner), which should be done in generic
+> > > > > code. The other does special clock enabling magic which wants to go to
+> > > > > clk->prepare().
+> > > > You forget mach-u300 __clk_get. It updates some registers.
+> > > > The ops get/put let arch clock driver have a chance to do special things at the
+> > > > time when a user begins to use the clock.
+> > > 
+> > > No I did not forget. It's exactly the code which wants to go into
+> > > clk->prepare. Which you have to call _before_ doing anything with the
+> > > clock, so there is no need for an extra callback.
+> > No. clk_prepare only have to be called before clk_enable, but not have to for
+> > other operations, set_rate/set_parent etc.
 > 
-> They are completely independent. No synchronization is needed between 
-> these clock trees. It's basically a bunch of clocks controlled by 
-> another processor that has it's own set of PLLs, etc. 
+> And why do you need those registers set before you actually
+> prepare/enable the clock? Just to set the rate register? You can store
+> that information and set it on prepare. Before prepare/enable the
+> value of the rate register is totally irrelevant.
+Generally, the divider and enable registers can be set seperately.
+> 
+> The point of anything whats named get and put in the kernel is to
+> obtain or drop a reference to an object.
+> 
+> Putting arbitrary initialization into such functions is a really bad
+> hack.
+> 
+> And looking at that u300 code, it's borken:
+> 
+>     user1: clk_get("MCLK");
+>     	   clk_set_rate(.....);
+> 
+>     user2: clk_get("MCLK");
+> 
+> The second clk_get() call will overwrite what ?
+> 
+> The fact that you decided to put that into the absolutely wrong
+> function is not an argument for keeping those callbacks.
+Better ask u300 maintainer whether the _clk_get/put stuff may be moved to other
+functions. If yes, I agree to remove get/put from ops.
+> 
+> The only real usecase for __clk_get() is the
+> try_module_get()/module_put() code which will become part of the
+> generic code. It does exaclty what get and put are meant for: dealing
+> with refcounts.
+It might be usefull for loadable clock module. But do we already have such use
+case? Even clock module is loadable, it'll never unloaded unless clock hw module
+support hot plug.
 
-In fact the common struct clk work that Jeremy picked up from initial
-patches I did for powerpc was intended for just that ... ie by moving
-the implementation out to have the clock "provider" being the one
-creating the clock objects.
-
-There's many other similar cases, ie, you can have a multifunction
-device (wifi + bt + mmc reader for example) which has its own internal
-clock network and might want to use struct clk to handle clocks between
-those parts.
-
-None of that should sit in the arch or platform code.
-
-In fact, with the device-tree, you could completely represent the
-binding between those objects without involving any platform code, that
-was the original intend and I hope that ARM eventually gets there.
-
-Cheers,
-Ben.
+Thanks
+Richard
+> 
+> Thanks,
+> 
+> 	tglx
