@@ -1,922 +1,749 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 25 Apr 2011 01:09:05 +0300
-Subject: [PATCH 1/4] omap: consolidate touch screen initialization among
-	different boards
+Date: Mon, 25 Apr 2011 01:09:06 +0300
+Subject: [PATCH 2/4] omap: use common initialization for PMIC i2c bus
 In-Reply-To: <cover.1303682352.git.mike@compulab.co.il>
 References: <cover.1303682352.git.mike@compulab.co.il>
-Message-ID: <1738251a50b70224f124d4a54c157cc5e3c6db77.1303682352.git.mike@compulab.co.il>
+Message-ID: <25a0570058487a07e86cc88486a0c975e7cc0c69.1303682352.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add common-board-devices.c that will contain the code for peripheral
-devices initializatoin shared between multiple boards.
-Start small with touchscreen initialization.
+Introduce omap_pmic_init that registers i2c bus and PMIC device on that
+bus and add omap2/3/4 wrappers for common cases.
 
 Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 ---
- arch/arm/mach-omap2/Makefile               |    2 +
- arch/arm/mach-omap2/board-3430sdp.c        |   65 ++-------------------
- arch/arm/mach-omap2/board-cm-t35.c         |   58 +------------------
- arch/arm/mach-omap2/board-devkit8000.c     |   56 +------------------
- arch/arm/mach-omap2/board-ldp.c            |   57 +------------------
- arch/arm/mach-omap2/board-omap3evm.c       |   51 +----------------
- arch/arm/mach-omap2/board-omap3pandora.c   |   49 +---------------
- arch/arm/mach-omap2/board-omap3stalker.c   |   49 +---------------
- arch/arm/mach-omap2/board-omap3touchbook.c |   36 +-----------
- arch/arm/mach-omap2/board-overo.c          |   46 +--------------
- arch/arm/mach-omap2/common-board-devices.c |   85 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/common-board-devices.h |   18 ++++++
- 12 files changed, 128 insertions(+), 444 deletions(-)
- create mode 100644 arch/arm/mach-omap2/common-board-devices.c
- create mode 100644 arch/arm/mach-omap2/common-board-devices.h
+ arch/arm/mach-omap2/board-2430sdp.c          |   13 ++-----------
+ arch/arm/mach-omap2/board-3430sdp.c          |   12 +-----------
+ arch/arm/mach-omap2/board-4430sdp.c          |   16 ++--------------
+ arch/arm/mach-omap2/board-cm-t35.c           |   12 +-----------
+ arch/arm/mach-omap2/board-devkit8000.c       |   12 +-----------
+ arch/arm/mach-omap2/board-igep0020.c         |   15 ++-------------
+ arch/arm/mach-omap2/board-igep0030.c         |   13 ++-----------
+ arch/arm/mach-omap2/board-ldp.c              |   12 +-----------
+ arch/arm/mach-omap2/board-omap3beagle.c      |   13 ++-----------
+ arch/arm/mach-omap2/board-omap3evm.c         |   21 +++------------------
+ arch/arm/mach-omap2/board-omap3logic.c       |   13 ++-----------
+ arch/arm/mach-omap2/board-omap3pandora.c     |   12 +-----------
+ arch/arm/mach-omap2/board-omap3stalker.c     |   21 +++------------------
+ arch/arm/mach-omap2/board-omap3touchbook.c   |   12 +-----------
+ arch/arm/mach-omap2/board-omap4panda.c       |   17 ++---------------
+ arch/arm/mach-omap2/board-overo.c            |   12 +-----------
+ arch/arm/mach-omap2/board-rm680.c            |   13 ++-----------
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   13 ++-----------
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   13 ++-----------
+ arch/arm/mach-omap2/common-board-devices.c   |   21 +++++++++++++++++++++
+ arch/arm/mach-omap2/common-board-devices.h   |   24 ++++++++++++++++++++++++
+ 21 files changed, 78 insertions(+), 232 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 512b152..43c5c22 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -270,3 +270,5 @@ obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 1fa6bb8..99b3f2d 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -41,6 +41,7 @@
  
- disp-$(CONFIG_OMAP2_DSS)		:= display.o
- obj-y					+= $(disp-m) $(disp-y)
-+
-+obj-y					+= common-board-devices.o
+ #include "mux.h"
+ #include "hsmmc.h"
++#include "common-board-devices.h"
+ 
+ #define SDP2430_CS0_BASE	0x04000000
+ #define SECONDARY_LCD_GPIO		147
+@@ -180,15 +181,6 @@ static struct twl4030_platform_data sdp2430_twldata = {
+ 	.vmmc1		= &sdp2430_vmmc1,
+ };
+ 
+-static struct i2c_board_info __initdata sdp2430_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_24XX_SYS_NIRQ,
+-		.platform_data = &sdp2430_twldata,
+-	},
+-};
+-
+ static struct i2c_board_info __initdata sdp2430_i2c1_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("isp1301_omap", 0x2D),
+@@ -201,8 +193,7 @@ static int __init omap2430_i2c_init(void)
+ {
+ 	omap_register_i2c_bus(1, 100, sdp2430_i2c1_boardinfo,
+ 			ARRAY_SIZE(sdp2430_i2c1_boardinfo));
+-	omap_register_i2c_bus(2, 2600, sdp2430_i2c_boardinfo,
+-			ARRAY_SIZE(sdp2430_i2c_boardinfo));
++	omap2_pmic_init("twl4030", &sdp2430_twldata);
+ 	return 0;
+ }
+ 
 diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 9afd087..3726465 100644
+index 3726465..b12400e 100644
 --- a/arch/arm/mach-omap2/board-3430sdp.c
 +++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -19,7 +19,6 @@
- #include <linux/input.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/ads7846.h>
- #include <linux/i2c/twl.h>
- #include <linux/regulator/machine.h>
- #include <linux/io.h>
-@@ -48,6 +47,7 @@
+@@ -528,20 +528,10 @@ static struct twl4030_platform_data sdp3430_twldata = {
+ 	.vpll2		= &sdp3430_vpll2,
+ };
+ 
+-static struct i2c_board_info __initdata sdp3430_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &sdp3430_twldata,
+-	},
+-};
+-
+ static int __init omap3430_i2c_init(void)
+ {
+ 	/* i2c1 for PMIC only */
+-	omap_register_i2c_bus(1, 2600, sdp3430_i2c_boardinfo,
+-			ARRAY_SIZE(sdp3430_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &sdp3430_twldata);
+ 	/* i2c2 on camera connector (for sensor control) and optional isp1301 */
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	/* i2c3 on display connector (for DVI, tfp410) */
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 56702c5..7073542 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -42,6 +42,7 @@
  #include "hsmmc.h"
- #include "pm.h"
+ #include "timer-gp.h"
  #include "control.h"
 +#include "common-board-devices.h"
  
- #define CONFIG_DISABLE_HFCLK 1
- 
-@@ -123,58 +123,6 @@ static struct twl4030_keypad_data sdp3430_kp_data = {
- 	.rep		= 1,
+ #define ETH_KS8851_IRQ			34
+ #define ETH_KS8851_POWER_ON		48
+@@ -575,14 +576,6 @@ static struct twl4030_platform_data sdp4430_twldata = {
+ 	.usb		= &omap4_usbphy_data
  };
  
--static int ts_gpio;	/* Needed for ads7846_get_pendown_state */
--
--/**
-- * @brief ads7846_dev_init : Requests & sets GPIO line for pen-irq
-- *
-- * @return - void. If request gpio fails then Flag KERN_ERR.
-- */
--static void ads7846_dev_init(void)
--{
--	if (gpio_request(ts_gpio, "ADS7846 pendown") < 0) {
--		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
--		return;
--	}
--
--	gpio_direction_input(ts_gpio);
--	gpio_set_debounce(ts_gpio, 310);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(ts_gpio);
--}
--
--static struct ads7846_platform_data tsc2046_config __initdata = {
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--	.wakeup				= true,
--};
--
--
--static struct omap2_mcspi_device_config tsc2046_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info sdp3430_spi_board_info[] __initdata = {
--	[0] = {
--		/*
--		 * TSC2046 operates at a max freqency of 2MHz, so
--		 * operate slightly below@1.5MHz
--		 */
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &tsc2046_mcspi_config,
--		.irq			= 0,
--		.platform_data		= &tsc2046_config,
+-static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl6030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = OMAP44XX_IRQ_SYS_1N,
+-		.platform_data = &sdp4430_twldata,
 -	},
 -};
--
--
- #define SDP3430_LCD_PANEL_BACKLIGHT_GPIO	8
- #define SDP3430_LCD_PANEL_ENABLE_GPIO		5
- 
-@@ -880,6 +828,8 @@ static struct omap_musb_board_data musb_board_data = {
- 
- static void __init omap_3430sdp_init(void)
+ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("tmp105", 0x48),
+@@ -598,12 +591,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
+ };
+ static int __init omap4_i2c_init(void)
  {
-+	int gpio_pendown;
-+
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_board_config = sdp3430_config;
- 	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
-@@ -887,13 +837,10 @@ static void __init omap_3430sdp_init(void)
- 	omap3430_i2c_init();
- 	omap_display_init(&sdp3430_dss_data);
- 	if (omap_rev() > OMAP3430_REV_ES1_0)
--		ts_gpio = SDP3430_TS_GPIO_IRQ_SDPV2;
-+		gpio_pendown = SDP3430_TS_GPIO_IRQ_SDPV2;
- 	else
--		ts_gpio = SDP3430_TS_GPIO_IRQ_SDPV1;
--	sdp3430_spi_board_info[0].irq = gpio_to_irq(ts_gpio);
--	spi_register_board_info(sdp3430_spi_board_info,
--				ARRAY_SIZE(sdp3430_spi_board_info));
--	ads7846_dev_init();
-+		gpio_pendown = SDP3430_TS_GPIO_IRQ_SDPV1;
-+	omap_ads7846_init(1, gpio_pendown, 310, NULL);
- 	board_serial_init();
- 	usb_musb_init(&musb_board_data);
- 	board_smc91x_init();
+-	/*
+-	 * Phoenix Audio IC needs I2C1 to
+-	 * start with 400 KHz or less
+-	 */
+-	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
+-			ARRAY_SIZE(sdp4430_i2c_boardinfo));
++	omap4_pmic_init("twl6030", &sdp4430_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
+ 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
 diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index b5772c1..9e5b8be 100644
+index 9e5b8be..1a9e6be 100644
 --- a/arch/arm/mach-omap2/board-cm-t35.c
 +++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -54,6 +54,7 @@
- #include "mux.h"
- #include "sdram-micron-mt46h32m32lf-6.h"
- #include "hsmmc.h"
-+#include "common-board-devices.h"
+@@ -539,19 +539,9 @@ static struct twl4030_platform_data cm_t35_twldata = {
+ 	.vpll2		= &cm_t35_vpll2,
+ };
  
- #define CM_T35_GPIO_PENDOWN	57
- 
-@@ -175,61 +176,6 @@ static void __init cm_t35_init_nand(void)
- static inline void cm_t35_init_nand(void) {}
- #endif
- 
--#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
--	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
--#include <linux/spi/ads7846.h>
--
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(CM_T35_GPIO_PENDOWN);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max			= 0x0fff,
--	.y_max			= 0x0fff,
--	.x_plate_ohms		= 180,
--	.pressure_max		= 255,
--	.debounce_max		= 10,
--	.debounce_tol		= 3,
--	.debounce_rep		= 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--};
--
--static struct spi_board_info cm_t35_spi_board_info[] __initdata = {
+-static struct i2c_board_info __initdata cm_t35_i2c_boardinfo[] = {
 -	{
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(CM_T35_GPIO_PENDOWN),
--		.platform_data		= &ads7846_config,
+-		I2C_BOARD_INFO("tps65930", 0x48),
+-		.flags		= I2C_CLIENT_WAKE,
+-		.irq		= INT_34XX_SYS_NIRQ,
+-		.platform_data	= &cm_t35_twldata,
 -	},
 -};
 -
--static void __init cm_t35_init_ads7846(void)
--{
--	if ((gpio_request(CM_T35_GPIO_PENDOWN, "ADS7846_PENDOWN") == 0) &&
--	    (gpio_direction_input(CM_T35_GPIO_PENDOWN) == 0)) {
--		gpio_export(CM_T35_GPIO_PENDOWN, 0);
--	} else {
--		pr_err("CM-T35: could not obtain gpio for ADS7846_PENDOWN\n");
--		return;
--	}
--
--	spi_register_board_info(cm_t35_spi_board_info,
--				ARRAY_SIZE(cm_t35_spi_board_info));
--}
--#else
--static inline void cm_t35_init_ads7846(void) {}
--#endif
--
- #define CM_T35_LCD_EN_GPIO 157
- #define CM_T35_LCD_BL_GPIO 58
- #define CM_T35_DVI_EN_GPIO 54
-@@ -732,7 +678,7 @@ static void __init cm_t35_init(void)
- 	omap_serial_init();
- 	cm_t35_init_i2c();
- 	cm_t35_init_nand();
--	cm_t35_init_ads7846();
-+	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, NULL);
- 	cm_t35_init_ethernet();
- 	cm_t35_init_led();
- 	cm_t35_init_display();
+ static void __init cm_t35_init_i2c(void)
+ {
+-	omap_register_i2c_bus(1, 2600, cm_t35_i2c_boardinfo,
+-			      ARRAY_SIZE(cm_t35_i2c_boardinfo));
++	omap3_pmic_init("tps65930", &cm_t35_twldata);
+ }
+ 
+ static void __init cm_t35_init_early(void)
 diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 65f9fde..9f8338d 100644
+index 9f8338d..983f44b 100644
 --- a/arch/arm/mach-omap2/board-devkit8000.c
 +++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -51,7 +51,6 @@
- #include <plat/mcspi.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/ads7846.h>
- #include <linux/dm9000.h>
- #include <linux/interrupt.h>
+@@ -366,19 +366,9 @@ static struct twl4030_platform_data devkit8000_twldata = {
+ 	.keypad		= &devkit8000_kp_data,
+ };
  
-@@ -60,6 +59,7 @@
+-static struct i2c_board_info __initdata devkit8000_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("tps65930", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &devkit8000_twldata,
+-	},
+-};
+-
+ static int __init devkit8000_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, devkit8000_i2c_boardinfo,
+-			ARRAY_SIZE(devkit8000_i2c_boardinfo));
++	omap3_pmic_init("tps65930", &devkit8000_twldata);
+ 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
+ 	 * projector don't work reliably with 400kHz */
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 5b9bde7..a0fd10e 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -38,6 +38,7 @@
  #include "mux.h"
  #include "hsmmc.h"
+ #include "sdram-numonyx-m65kxxxxam.h"
++#include "common-board-devices.h"
+ 
+ #define IGEP2_SMSC911X_CS       5
+ #define IGEP2_SMSC911X_GPIO     176
+@@ -536,15 +537,6 @@ static struct twl4030_platform_data igep2_twldata = {
+ 	.vio		= &igep2_vio,
+ };
+ 
+-static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags		= I2C_CLIENT_WAKE,
+-		.irq		= INT_34XX_SYS_NIRQ,
+-		.platform_data	= &igep2_twldata,
+-	},
+-};
+-
+ static struct i2c_board_info __initdata igep2_i2c3_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("eeprom", 0x50),
+@@ -555,10 +547,7 @@ static void __init igep2_i2c_init(void)
+ {
+ 	int ret;
+ 
+-	ret = omap_register_i2c_bus(1, 2600, igep2_i2c1_boardinfo,
+-		ARRAY_SIZE(igep2_i2c1_boardinfo));
+-	if (ret)
+-		pr_warning("IGEP2: Could not register I2C1 bus (%d)\n", ret);
++	omap3_pmic_init("twl4030", &igep2_twldata);
+ 
+ 	/*
+ 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
+diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
+index 2cf86c3..a831e85 100644
+--- a/arch/arm/mach-omap2/board-igep0030.c
++++ b/arch/arm/mach-omap2/board-igep0030.c
+@@ -35,6 +35,7 @@
+ #include "mux.h"
+ #include "hsmmc.h"
+ #include "sdram-numonyx-m65kxxxxam.h"
++#include "common-board-devices.h"
+ 
+ #define IGEP3_GPIO_LED0_GREEN	54
+ #define IGEP3_GPIO_LED0_RED	53
+@@ -349,19 +350,9 @@ static struct twl4030_platform_data igep3_twl4030_pdata = {
+ 	.vio		= &igep3_vio,
+ };
+ 
+-static struct i2c_board_info __initdata igep3_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags		= I2C_CLIENT_WAKE,
+-		.irq		= INT_34XX_SYS_NIRQ,
+-		.platform_data	= &igep3_twl4030_pdata,
+-	},
+-};
+-
+ static int __init igep3_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, igep3_i2c_boardinfo,
+-			ARRAY_SIZE(igep3_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &igep3_twl4030_pdata);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index 155b423..7482c75 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -265,19 +265,9 @@ static struct twl4030_platform_data ldp_twldata = {
+ 	.keypad		= &ldp_kp_twl4030_data,
+ };
+ 
+-static struct i2c_board_info __initdata ldp_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &ldp_twldata,
+-	},
+-};
+-
+ static int __init omap_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, ldp_i2c_boardinfo,
+-			ARRAY_SIZE(ldp_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &ldp_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 33007fd..13a1664 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -52,6 +52,7 @@
+ #include "hsmmc.h"
  #include "timer-gp.h"
+ #include "pm.h"
 +#include "common-board-devices.h"
  
  #define NAND_BLOCK_SIZE		SZ_128K
  
-@@ -463,56 +463,6 @@ static void __init devkit8000_init_irq(void)
- #endif
- }
+@@ -453,15 +454,6 @@ static struct twl4030_platform_data beagle_twldata = {
+ 	.vpll2		= &beagle_vpll2,
+ };
  
--static void __init devkit8000_ads7846_init(void)
--{
--	int gpio = OMAP3_DEVKIT_TS_GPIO;
--	int ret;
--
--	ret = gpio_request(gpio, "ads7846_pen_down");
--	if (ret < 0) {
--		printk(KERN_ERR "Failed to request GPIO %d for "
--				"ads7846 pen down IRQ\n", gpio);
--		return;
--	}
--
--	gpio_direction_input(gpio);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(OMAP3_DEVKIT_TS_GPIO);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max                  = 0x0fff,
--	.y_max                  = 0x0fff,
--	.x_plate_ohms           = 180,
--	.pressure_max           = 255,
--	.debounce_max           = 10,
--	.debounce_tol           = 5,
--	.debounce_rep           = 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--	.settle_delay_usecs     = 150,
--};
--
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info devkit8000_spi_board_info[] __initdata = {
+-static struct i2c_board_info __initdata beagle_i2c_boardinfo[] = {
 -	{
--		.modalias		= "ads7846",
--		.bus_num		= 2,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(OMAP3_DEVKIT_TS_GPIO),
--		.platform_data		= &ads7846_config,
--	}
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &beagle_twldata,
+-	},
 -};
 -
- #define OMAP_DM9000_BASE	0x2c000000
+ static struct i2c_board_info __initdata beagle_i2c_eeprom[] = {
+        {
+                I2C_BOARD_INFO("eeprom", 0x50),
+@@ -470,8 +462,7 @@ static struct i2c_board_info __initdata beagle_i2c_eeprom[] = {
  
- static struct resource omap_dm9000_resources[] = {
-@@ -795,10 +745,8 @@ static void __init devkit8000_init(void)
- 			ARRAY_SIZE(devkit8000_devices));
+ static int __init omap3_beagle_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, beagle_i2c_boardinfo,
+-			ARRAY_SIZE(beagle_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &beagle_twldata);
+ 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
+ 	 * projector don't work reliably with 400kHz */
+ 	omap_register_i2c_bus(3, 100, beagle_i2c_eeprom, ARRAY_SIZE(beagle_i2c_eeprom));
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index 376ea87..5066b0b 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -604,28 +604,13 @@ static struct twl4030_platform_data omap3evm_twldata = {
+ 	.vdac		= &omap3_evm_vdac,
+ 	.vpll2		= &omap3_evm_vpll2,
+ 	.vio		= &omap3evm_vio,
+-};
+-
+-static struct i2c_board_info __initdata omap3evm_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &omap3evm_twldata,
+-	},
++	.vmmc1		= &omap3evm_vmmc1,
++	.vsim		= &omap3evm_vsim,
+ };
  
- 	omap_display_init(&devkit8000_dss_data);
--	spi_register_board_info(devkit8000_spi_board_info,
--	ARRAY_SIZE(devkit8000_spi_board_info));
- 
--	devkit8000_ads7846_init();
-+	omap_ads7846_init(2, OMAP3_DEVKIT_TS_GPIO, 0, NULL);
- 
- 	usb_musb_init(&musb_board_data);
- 	usbhs_init(&usbhs_bdata);
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index ea9f049..155b423 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -22,7 +22,6 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/ads7846.h>
- #include <linux/regulator/machine.h>
- #include <linux/i2c/twl.h>
- #include <linux/io.h>
-@@ -49,6 +48,7 @@
- #include "mux.h"
+ static int __init omap3_evm_i2c_init(void)
+ {
+-	/*
+-	 * REVISIT: These entries can be set in omap3evm_twl_data
+-	 * after a merge with MFD tree
+-	 */
+-	omap3evm_twldata.vmmc1 = &omap3evm_vmmc1;
+-	omap3evm_twldata.vsim = &omap3evm_vsim;
+-
+-	omap_register_i2c_bus(1, 2600, omap3evm_i2c_boardinfo,
+-			ARRAY_SIZE(omap3evm_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &omap3evm_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index a49e6cf..60d9be4 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -37,6 +37,7 @@
  #include "hsmmc.h"
+ #include "timer-gp.h"
  #include "control.h"
 +#include "common-board-devices.h"
  
- #define LDP_SMSC911X_CS		1
- #define LDP_SMSC911X_GPIO	152
-@@ -168,55 +168,6 @@ static struct platform_device ldp_gpio_keys_device = {
- 	},
+ #include <plat/mux.h>
+ #include <plat/board.h>
+@@ -93,19 +94,9 @@ static struct twl4030_platform_data omap3logic_twldata = {
+ 	.vmmc1		= &omap3logic_vmmc1,
  };
  
--static int ts_gpio;
--
--/**
-- * @brief ads7846_dev_init : Requests & sets GPIO line for pen-irq
-- *
-- * @return - void. If request gpio fails then Flag KERN_ERR.
-- */
--static void ads7846_dev_init(void)
--{
--	if (gpio_request(ts_gpio, "ads7846 irq") < 0) {
--		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
--		return;
--	}
--
--	gpio_direction_input(ts_gpio);
--	gpio_set_debounce(ts_gpio, 310);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(ts_gpio);
--}
--
--static struct ads7846_platform_data tsc2046_config __initdata = {
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--};
--
--static struct omap2_mcspi_device_config tsc2046_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info ldp_spi_board_info[] __initdata = {
--	[0] = {
--		/*
--		 * TSC2046 operates at a max freqency of 2MHz, so
--		 * operate slightly below@1.5MHz
--		 */
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &tsc2046_mcspi_config,
--		.irq			= 0,
--		.platform_data		= &tsc2046_config,
+-static struct i2c_board_info __initdata omap3logic_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &omap3logic_twldata,
 -	},
 -};
 -
- static struct omap_smsc911x_platform_data smsc911x_cfg = {
- 	.cs             = LDP_SMSC911X_CS,
- 	.gpio_irq       = LDP_SMSC911X_GPIO,
-@@ -399,11 +350,7 @@ static void __init omap_ldp_init(void)
- 	ldp_init_smsc911x();
- 	omap_i2c_init();
- 	platform_add_devices(ldp_devices, ARRAY_SIZE(ldp_devices));
--	ts_gpio = 54;
--	ldp_spi_board_info[0].irq = gpio_to_irq(ts_gpio);
--	spi_register_board_info(ldp_spi_board_info,
--				ARRAY_SIZE(ldp_spi_board_info));
--	ads7846_dev_init();
-+	omap_ads7846_init(1, 54, 310, NULL);
- 	omap_serial_init();
- 	usb_musb_init(&musb_board_data);
- 	board_nand_init(ldp_nand_partitions,
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 3fc85c6..376ea87 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -50,6 +50,7 @@
- #include "mux.h"
- #include "sdram-micron-mt46h32m32lf-6.h"
- #include "hsmmc.h"
-+#include "common-board-devices.h"
- 
- #define OMAP3_EVM_TS_GPIO	175
- #define OMAP3_EVM_EHCI_VBUS	22
-@@ -630,51 +631,6 @@ static int __init omap3_evm_i2c_init(void)
+ static int __init omap3logic_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, omap3logic_i2c_boardinfo,
+-				ARRAY_SIZE(omap3logic_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &omap3logic_twldata);
  	return 0;
  }
- 
--static void ads7846_dev_init(void)
--{
--	if (gpio_request(OMAP3_EVM_TS_GPIO, "ADS7846 pendown") < 0)
--		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
--
--	gpio_direction_input(OMAP3_EVM_TS_GPIO);
--	gpio_set_debounce(OMAP3_EVM_TS_GPIO, 310);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max			= 0x0fff,
--	.y_max			= 0x0fff,
--	.x_plate_ohms		= 180,
--	.pressure_max		= 255,
--	.debounce_max		= 10,
--	.debounce_tol		= 3,
--	.debounce_rep		= 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--	.settle_delay_usecs	= 150,
--	.wakeup				= true,
--};
--
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info omap3evm_spi_board_info[] = {
--	[0] = {
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(OMAP3_EVM_TS_GPIO),
--		.platform_data		= &ads7846_config,
--	},
--};
--
- static struct omap_board_config_kernel omap3_evm_config[] __initdata = {
- };
- 
-@@ -792,9 +748,6 @@ static void __init omap3_evm_init(void)
- 
- 	omap_display_init(&omap3_evm_dss_data);
- 
--	spi_register_board_info(omap3evm_spi_board_info,
--				ARRAY_SIZE(omap3evm_spi_board_info));
--
- 	omap_serial_init();
- 
- 	/* OMAP3EVM uses ISP1504 phy and so register nop transceiver */
-@@ -827,7 +780,7 @@ static void __init omap3_evm_init(void)
- 	}
- 	usb_musb_init(&musb_board_data);
- 	usbhs_init(&usbhs_bdata);
--	ads7846_dev_init();
-+	omap_ads7846_init(1, OMAP3_EVM_TS_GPIO, 310, NULL);
- 	omap3evm_init_smsc911x();
- 	omap3_evm_display_init();
  
 diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 07dba88..517701a 100644
+index 517701a..b99cc64 100644
 --- a/arch/arm/mach-omap2/board-omap3pandora.c
 +++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -22,7 +22,6 @@
- #include <linux/platform_device.h>
+@@ -544,15 +544,6 @@ static struct twl4030_platform_data omap3pandora_twldata = {
+ 	.bci		= &pandora_bci_data,
+ };
  
- #include <linux/spi/spi.h>
--#include <linux/spi/ads7846.h>
- #include <linux/regulator/machine.h>
- #include <linux/i2c/twl.h>
- #include <linux/wl12xx.h>
-@@ -52,6 +51,7 @@
- #include "mux.h"
- #include "sdram-micron-mt46h32m32lf-6.h"
- #include "hsmmc.h"
-+#include "common-board-devices.h"
- 
- #define PANDORA_WIFI_IRQ_GPIO		21
- #define PANDORA_WIFI_NRESET_GPIO	23
-@@ -570,53 +570,8 @@ static int __init omap3pandora_i2c_init(void)
- 	return 0;
- }
- 
--static void __init omap3pandora_ads7846_init(void)
--{
--	int gpio = OMAP3_PANDORA_TS_GPIO;
--	int ret;
--
--	ret = gpio_request(gpio, "ads7846_pen_down");
--	if (ret < 0) {
--		printk(KERN_ERR "Failed to request GPIO %d for "
--				"ads7846 pen down IRQ\n", gpio);
--		return;
--	}
--
--	gpio_direction_input(gpio);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(OMAP3_PANDORA_TS_GPIO);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max			= 0x0fff,
--	.y_max			= 0x0fff,
--	.x_plate_ohms		= 180,
--	.pressure_max		= 255,
--	.debounce_max		= 10,
--	.debounce_tol		= 3,
--	.debounce_rep		= 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
+-static struct i2c_board_info __initdata omap3pandora_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("tps65950", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &omap3pandora_twldata,
+-	},
 -};
 -
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
- static struct spi_board_info omap3pandora_spi_board_info[] __initdata = {
+ static struct i2c_board_info __initdata omap3pandora_i2c3_boardinfo[] = {
  	{
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(OMAP3_PANDORA_TS_GPIO),
--		.platform_data		= &ads7846_config,
--	}, {
- 		.modalias		= "tpo_td043mtea1_panel_spi",
- 		.bus_num		= 1,
- 		.chip_select		= 1,
-@@ -705,7 +660,7 @@ static void __init omap3pandora_init(void)
- 	omap_serial_init();
- 	spi_register_board_info(omap3pandora_spi_board_info,
- 			ARRAY_SIZE(omap3pandora_spi_board_info));
--	omap3pandora_ads7846_init();
-+	omap_ads7846_init(1, OMAP3_PANDORA_TS_GPIO, 0, NULL);
- 	usbhs_init(&usbhs_bdata);
- 	usb_musb_init(&musb_board_data);
- 	gpmc_nand_init(&pandora_nand_data);
+ 		I2C_BOARD_INFO("bq27500", 0x55),
+@@ -562,8 +553,7 @@ static struct i2c_board_info __initdata omap3pandora_i2c3_boardinfo[] = {
+ 
+ static int __init omap3pandora_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, omap3pandora_i2c_boardinfo,
+-			ARRAY_SIZE(omap3pandora_i2c_boardinfo));
++	omap3_pmic_init("tps65950", &omap3pandora_twldata);
+ 	/* i2c2 pins are not connected */
+ 	omap_register_i2c_bus(3, 100, omap3pandora_i2c3_boardinfo,
+ 			ARRAY_SIZE(omap3pandora_i2c3_boardinfo));
 diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 848016c..671ceb0 100644
+index 671ceb0..a1d550f 100644
 --- a/arch/arm/mach-omap2/board-omap3stalker.c
 +++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -45,7 +45,6 @@
- #include <plat/mcspi.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/spi/spi.h>
--#include <linux/spi/ads7846.h>
- #include <linux/interrupt.h>
- #include <linux/smsc911x.h>
- #include <linux/i2c/at24.h>
-@@ -54,6 +53,7 @@
- #include "mux.h"
- #include "hsmmc.h"
- #include "timer-gp.h"
-+#include "common-board-devices.h"
- 
- #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
- #include <plat/gpmc-smsc911x.h>
-@@ -498,49 +498,6 @@ static int __init omap3_stalker_i2c_init(void)
- }
- 
- #define OMAP3_STALKER_TS_GPIO	175
--static void ads7846_dev_init(void)
--{
--	if (gpio_request(OMAP3_STALKER_TS_GPIO, "ADS7846 pendown") < 0)
--		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
--
--	gpio_direction_input(OMAP3_STALKER_TS_GPIO);
--	gpio_set_debounce(OMAP3_STALKER_TS_GPIO, 310);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(OMAP3_STALKER_TS_GPIO);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max			= 0x0fff,
--	.y_max			= 0x0fff,
--	.x_plate_ohms		= 180,
--	.pressure_max		= 255,
--	.debounce_max		= 10,
--	.debounce_tol		= 3,
--	.debounce_rep		= 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--	.settle_delay_usecs	= 150,
+@@ -455,15 +455,8 @@ static struct twl4030_platform_data omap3stalker_twldata = {
+ 	.codec		= &omap3stalker_codec_data,
+ 	.vdac		= &omap3_stalker_vdac,
+ 	.vpll2		= &omap3_stalker_vpll2,
 -};
 -
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode		= 0,
--	.single_channel		= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info omap3stalker_spi_board_info[] = {
--	[0] = {
--	       .modalias	= "ads7846",
--	       .bus_num		= 1,
--	       .chip_select	= 0,
--	       .max_speed_hz	= 1500000,
--	       .controller_data	= &ads7846_mcspi_config,
--	       .irq		= OMAP_GPIO_IRQ(OMAP3_STALKER_TS_GPIO),
--	       .platform_data	= &ads7846_config,
--	},
--};
- 
- static struct omap_board_config_kernel omap3_stalker_config[] __initdata = {
+-static struct i2c_board_info __initdata omap3stalker_i2c_boardinfo[] = {
+-	{
+-	 I2C_BOARD_INFO("twl4030", 0x48),
+-	 .flags		= I2C_CLIENT_WAKE,
+-	 .irq		= INT_34XX_SYS_NIRQ,
+-	 .platform_data	= &omap3stalker_twldata,
+-	 },
++	.vmmc1		= &omap3stalker_vmmc1,
++	.vsim		= &omap3stalker_vsim,
  };
-@@ -602,13 +559,11 @@ static void __init omap3_stalker_init(void)
- 			     ARRAY_SIZE(omap3_stalker_devices));
  
- 	omap_display_init(&omap3_stalker_dss_data);
--	spi_register_board_info(omap3stalker_spi_board_info,
--				ARRAY_SIZE(omap3stalker_spi_board_info));
+ static struct at24_platform_data fram_info = {
+@@ -482,15 +475,7 @@ static struct i2c_board_info __initdata omap3stalker_i2c_boardinfo3[] = {
  
- 	omap_serial_init();
- 	usb_musb_init(&musb_board_data);
- 	usbhs_init(&usbhs_bdata);
--	ads7846_dev_init();
-+	omap_ads7846_init(1, OMAP3_STALKER_TS_GPIO, 310, NULL);
- 
- 	omap_mux_init_gpio(21, OMAP_PIN_OUTPUT);
- 	omap_mux_init_gpio(18, OMAP_PIN_INPUT_PULLUP);
+ static int __init omap3_stalker_i2c_init(void)
+ {
+-	/*
+-	 * REVISIT: These entries can be set in omap3evm_twl_data
+-	 * after a merge with MFD tree
+-	 */
+-	omap3stalker_twldata.vmmc1 = &omap3stalker_vmmc1;
+-	omap3stalker_twldata.vsim = &omap3stalker_vsim;
+-
+-	omap_register_i2c_bus(1, 2600, omap3stalker_i2c_boardinfo,
+-			      ARRAY_SIZE(omap3stalker_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &omap3stalker_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, omap3stalker_i2c_boardinfo3,
+ 			      ARRAY_SIZE(omap3stalker_i2c_boardinfo3));
 diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index 127cb17..15f9d7d 100644
+index 15f9d7d..0a9b329 100644
 --- a/arch/arm/mach-omap2/board-omap3touchbook.c
 +++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -52,6 +52,7 @@
- #include "mux.h"
- #include "hsmmc.h"
- #include "timer-gp.h"
-+#include "common-board-devices.h"
- 
- #include <asm/setup.h>
- 
-@@ -301,19 +302,7 @@ static int __init omap3_touchbook_i2c_init(void)
- 	return 0;
- }
- 
--static void __init omap3_ads7846_init(void)
--{
--	if (gpio_request(OMAP3_TS_GPIO, "ads7846_pen_down")) {
--		printk(KERN_ERR "Failed to request GPIO %d for "
--				"ads7846 pen down IRQ\n", OMAP3_TS_GPIO);
--		return;
--	}
--
--	gpio_direction_input(OMAP3_TS_GPIO);
--	gpio_set_debounce(OMAP3_TS_GPIO, 310);
--}
--
--static struct ads7846_platform_data ads7846_config = {
-+static struct ads7846_platform_data ads7846_pdata = {
- 	.x_min			= 100,
- 	.y_min			= 265,
- 	.x_max			= 3950,
-@@ -327,23 +316,6 @@ static struct ads7846_platform_data ads7846_config = {
- 	.keep_vref_on		= 1,
+@@ -274,15 +274,6 @@ static struct twl4030_platform_data touchbook_twldata = {
+ 	.vpll2		= &touchbook_vpll2,
  };
  
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static struct spi_board_info omap3_ads7846_spi_board_info[] __initdata = {
+-static struct i2c_board_info __initdata touchbook_i2c_boardinfo[] = {
 -	{
--		.modalias		= "ads7846",
--		.bus_num		= 4,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(OMAP3_TS_GPIO),
--		.platform_data		= &ads7846_config,
--	}
+-		I2C_BOARD_INFO("twl4030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &touchbook_twldata,
+-	},
 -};
 -
- static struct gpio_led gpio_leds[] = {
+ static struct i2c_board_info __initdata touchBook_i2c_boardinfo[] = {
  	{
- 		.name			= "touchbook::usr0",
-@@ -526,9 +498,7 @@ static void __init omap3_touchbook_init(void)
- 	gpio_direction_output(176, true);
+ 		I2C_BOARD_INFO("bq27200", 0x55),
+@@ -292,8 +283,7 @@ static struct i2c_board_info __initdata touchBook_i2c_boardinfo[] = {
+ static int __init omap3_touchbook_i2c_init(void)
+ {
+ 	/* Standard TouchBook bus */
+-	omap_register_i2c_bus(1, 2600, touchbook_i2c_boardinfo,
+-			ARRAY_SIZE(touchbook_i2c_boardinfo));
++	omap3_pmic_init("twl4030", &touchbook_twldata);
  
- 	/* Touchscreen and accelerometer */
--	spi_register_board_info(omap3_ads7846_spi_board_info,
--				ARRAY_SIZE(omap3_ads7846_spi_board_info));
--	omap3_ads7846_init();
-+	omap_ads7846_init(4, OMAP3_TS_GPIO, 310, &ads7846_pdata);
- 	usb_musb_init(&musb_board_data);
- 	usbhs_init(&usbhs_bdata);
- 	omap3touchbook_flash_init();
+ 	/* Additional TouchBook bus */
+ 	omap_register_i2c_bus(3, 100, touchBook_i2c_boardinfo,
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index f3a7b10..7eaad62 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -46,6 +46,7 @@
+ #include "hsmmc.h"
+ #include "control.h"
+ #include "mux.h"
++#include "common-board-devices.h"
+ 
+ #define GPIO_HUB_POWER		1
+ #define GPIO_HUB_NRESET		62
+@@ -408,15 +409,6 @@ static struct twl4030_platform_data omap4_panda_twldata = {
+ 	.usb		= &omap4_usbphy_data,
+ };
+ 
+-static struct i2c_board_info __initdata omap4_panda_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl6030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = OMAP44XX_IRQ_SYS_1N,
+-		.platform_data = &omap4_panda_twldata,
+-	},
+-};
+-
+ /*
+  * Display monitor features are burnt in their EEPROM as EDID data. The EEPROM
+  * is connected as I2C slave device, and can be accessed at address 0x50
+@@ -429,12 +421,7 @@ static struct i2c_board_info __initdata panda_i2c_eeprom[] = {
+ 
+ static int __init omap4_panda_i2c_init(void)
+ {
+-	/*
+-	 * Phoenix Audio IC needs I2C1 to
+-	 * start with 400 KHz or less
+-	 */
+-	omap_register_i2c_bus(1, 400, omap4_panda_i2c_boardinfo,
+-			ARRAY_SIZE(omap4_panda_i2c_boardinfo));
++	omap4_pmic_init("twl6030", &omap4_panda_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	/*
+ 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
 diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 4016166..abe4f14 100644
+index abe4f14..d0621dc 100644
 --- a/arch/arm/mach-omap2/board-overo.c
 +++ b/arch/arm/mach-omap2/board-overo.c
-@@ -56,6 +56,7 @@
+@@ -538,19 +538,9 @@ static struct twl4030_platform_data overo_twldata = {
+ 	.vpll2		= &overo_vpll2,
+ };
+ 
+-static struct i2c_board_info __initdata overo_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("tps65950", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &overo_twldata,
+-	},
+-};
+-
+ static int __init overo_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, overo_i2c_boardinfo,
+-			ARRAY_SIZE(overo_i2c_boardinfo));
++	omap3_pmic_init("tps65950", &overo_twldata);
+ 	/* i2c2 pins are used for gpio */
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 2af8b05..8e710ff 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -31,6 +31,7 @@
  #include "mux.h"
- #include "sdram-micron-mt46h32m32lf-6.h"
+ #include "hsmmc.h"
+ #include "sdram-nokia.h"
++#include "common-board-devices.h"
+ 
+ static struct regulator_consumer_supply rm680_vemmc_consumers[] = {
+ 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+@@ -90,19 +91,9 @@ static struct twl4030_platform_data rm680_twl_data = {
+ 	/* add rest of the children here */
+ };
+ 
+-static struct i2c_board_info __initdata rm680_twl_i2c_board_info[] = {
+-	{
+-		I2C_BOARD_INFO("twl5031", 0x48),
+-		.flags		= I2C_CLIENT_WAKE,
+-		.irq		= INT_34XX_SYS_NIRQ,
+-		.platform_data	= &rm680_twl_data,
+-	},
+-};
+-
+ static void __init rm680_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2900, rm680_twl_i2c_board_info,
+-				ARRAY_SIZE(rm680_twl_i2c_board_info));
++	omap_pmic_init(1, 2900, "twl5031", INT_34XX_SYS_NIRQ, &rm680_twl_data);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ }
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index bbcb677..a5bf5e9 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -43,6 +43,7 @@
+ 
+ #include "mux.h"
  #include "hsmmc.h"
 +#include "common-board-devices.h"
  
- #define OVERO_GPIO_BT_XGATE	15
- #define OVERO_GPIO_W2W_NRESET	16
-@@ -74,30 +75,6 @@
+ #define SYSTEM_REV_B_USES_VAUX3	0x1699
+ #define SYSTEM_REV_S_USES_VAUX3 0x8
+@@ -777,15 +778,6 @@ static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata_or_module =
+ 	.power_gpio		= 98,
+ };
+ 
+-static struct i2c_board_info __initdata rx51_peripherals_i2c_board_info_1[] = {
+-	{
+-		I2C_BOARD_INFO("twl5030", 0x48),
+-		.flags = I2C_CLIENT_WAKE,
+-		.irq = INT_34XX_SYS_NIRQ,
+-		.platform_data = &rx51_twldata,
+-	},
+-};
+-
+ /* Audio setup data */
+ static struct aic3x_setup_data rx51_aic34_setup = {
+ 	.gpio_func[0] = AIC3X_GPIO1_FUNC_DISABLED,
+@@ -833,8 +825,7 @@ static int __init rx51_i2c_init(void)
+ 		rx51_twldata.vaux3 = &rx51_vaux3_cam;
+ 	}
+ 	rx51_twldata.vmmc2 = &rx51_vmmc2;
+-	omap_register_i2c_bus(1, 2200, rx51_peripherals_i2c_board_info_1,
+-			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
++	omap_pmic_init(1, 2200, "twl5030", INT_34XX_SYS_NIRQ, &rx51_twldata);
+ 	omap_register_i2c_bus(2, 100, rx51_peripherals_i2c_board_info_2,
+ 			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_2));
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index 8dee754..e4870c2 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -31,6 +31,7 @@
+ 
+ #include "mux.h"
+ #include "hsmmc.h"
++#include "common-board-devices.h"
+ 
+ #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
+ #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
+@@ -349,15 +350,6 @@ static struct twl4030_platform_data zoom_twldata = {
+ 	.vdac		= &zoom_vdac,
+ };
+ 
+-static struct i2c_board_info __initdata zoom_i2c_boardinfo[] = {
+-	{
+-		I2C_BOARD_INFO("twl5030", 0x48),
+-		.flags		= I2C_CLIENT_WAKE,
+-		.irq		= INT_34XX_SYS_NIRQ,
+-		.platform_data	= &zoom_twldata,
+-	},
+-};
+-
+ static int __init omap_i2c_init(void)
+ {
+ 	if (machine_is_omap_zoom2()) {
+@@ -365,8 +357,7 @@ static int __init omap_i2c_init(void)
+ 		zoom_audio_data.hs_extmute = 1;
+ 		zoom_audio_data.set_hs_extmute = zoom2_set_hs_extmute;
+ 	}
+-	omap_register_i2c_bus(1, 2400, zoom_i2c_boardinfo,
+-			ARRAY_SIZE(zoom_i2c_boardinfo));
++	omap_pmic_init(1, 2400, "twl5030", INT_34XX_SYS_NIRQ, &zoom_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
+index fad41ec..cea31dd 100644
+--- a/arch/arm/mach-omap2/common-board-devices.c
++++ b/arch/arm/mach-omap2/common-board-devices.c
+@@ -20,14 +20,35 @@
+  *
+  */
+ 
++#include <linux/i2c.h>
++#include <linux/i2c/twl.h>
++
+ #include <linux/gpio.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+ 
++#include <plat/i2c.h>
+ #include <plat/mcspi.h>
+ 
+ #include "common-board-devices.h"
+ 
++static struct i2c_board_info __initdata pmic_i2c_board_info = {
++	.addr		= 0x48,
++	.flags		= I2C_CLIENT_WAKE,
++};
++
++void __init omap_pmic_init(int bus, u32 clkrate,
++			   const char *pmic_type, int pmic_irq,
++			   struct twl4030_platform_data *pmic_data)
++{
++	strncpy(pmic_i2c_board_info.type, pmic_type,
++		sizeof(pmic_i2c_board_info.type));
++	pmic_i2c_board_info.irq = pmic_irq;
++	pmic_i2c_board_info.platform_data = pmic_data;
++
++	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
++}
++
+ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
+ 	.turbo_mode	= 0,
+ 	.single_channel	= 1,	/* 0: slave, 1: master */
+diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+index 75f9248d..0ec3e07 100644
+--- a/arch/arm/mach-omap2/common-board-devices.h
++++ b/arch/arm/mach-omap2/common-board-devices.h
+@@ -1,6 +1,30 @@
+ #ifndef __OMAP_COMMON_BOARD_DEVICES__
+ #define __OMAP_COMMON_BOARD_DEVICES__
+ 
++struct twl4030_platform_data;
++
++void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
++		    struct twl4030_platform_data *pmic_data);
++
++static inline void omap2_pmic_init(const char *pmic_type,
++				   struct twl4030_platform_data *pmic_data)
++{
++	omap_pmic_init(2, 2600, pmic_type, INT_24XX_SYS_NIRQ, pmic_data);
++}
++
++static inline void omap3_pmic_init(const char *pmic_type,
++				   struct twl4030_platform_data *pmic_data)
++{
++	omap_pmic_init(1, 2600, pmic_type, INT_34XX_SYS_NIRQ, pmic_data);
++}
++
++static inline void omap4_pmic_init(const char *pmic_type,
++				   struct twl4030_platform_data *pmic_data)
++{
++	/* Phoenix Audio IC needs I2C1 to start with 400 KHz or less */
++	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
++}
++
  #if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
  	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
- 
--#include <linux/spi/ads7846.h>
--
--static struct omap2_mcspi_device_config ads7846_mcspi_config = {
--	.turbo_mode	= 0,
--	.single_channel	= 1,	/* 0: slave, 1: master */
--};
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(OVERO_GPIO_PENDOWN);
--}
--
--static struct ads7846_platform_data ads7846_config = {
--	.x_max			= 0x0fff,
--	.y_max			= 0x0fff,
--	.x_plate_ohms		= 180,
--	.pressure_max		= 255,
--	.debounce_max		= 10,
--	.debounce_tol		= 3,
--	.debounce_rep		= 1,
--	.get_pendown_state	= ads7846_get_pendown_state,
--	.keep_vref_on		= 1,
--};
--
- /* fixed regulator for ads7846 */
- static struct regulator_consumer_supply ads7846_supply =
- 	REGULATOR_SUPPLY("vcc", "spi1.0");
-@@ -128,14 +105,7 @@ static struct platform_device vads7846_device = {
- 
- static void __init overo_ads7846_init(void)
- {
--	if ((gpio_request(OVERO_GPIO_PENDOWN, "ADS7846_PENDOWN") == 0) &&
--	    (gpio_direction_input(OVERO_GPIO_PENDOWN) == 0)) {
--		gpio_export(OVERO_GPIO_PENDOWN, 0);
--	} else {
--		printk(KERN_ERR "could not obtain gpio for ADS7846_PENDOWN\n");
--		return;
--	}
--
-+	omap_ads7846_init(1, OVERO_GPIO_PENDOWN, 0, NULL);
- 	platform_device_register(&vads7846_device);
- }
- 
-@@ -587,18 +557,6 @@ static int __init overo_i2c_init(void)
- }
- 
- static struct spi_board_info overo_spi_board_info[] __initdata = {
--#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
--	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
--	{
--		.modalias		= "ads7846",
--		.bus_num		= 1,
--		.chip_select		= 0,
--		.max_speed_hz		= 1500000,
--		.controller_data	= &ads7846_mcspi_config,
--		.irq			= OMAP_GPIO_IRQ(OVERO_GPIO_PENDOWN),
--		.platform_data		= &ads7846_config,
--	},
--#endif
- #if defined(CONFIG_PANEL_LGPHILIPS_LB035Q02) || \
- 	defined(CONFIG_PANEL_LGPHILIPS_LB035Q02_MODULE)
- 	{
-diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-new file mode 100644
-index 0000000..fad41ec
---- /dev/null
-+++ b/arch/arm/mach-omap2/common-board-devices.c
-@@ -0,0 +1,85 @@
-+/*
-+ * common-board-devices.c
-+ *
-+ * Copyright (C) 2011 CompuLab, Ltd.
-+ * Author: Mike Rapoport <mike@compulab.co.il>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ *
-+ */
-+
-+#include <linux/gpio.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/ads7846.h>
-+
-+#include <plat/mcspi.h>
-+
-+#include "common-board-devices.h"
-+
-+static struct omap2_mcspi_device_config ads7846_mcspi_config = {
-+	.turbo_mode	= 0,
-+	.single_channel	= 1,	/* 0: slave, 1: master */
-+};
-+
-+static struct ads7846_platform_data ads7846_config = {
-+	.x_max			= 0x0fff,
-+	.y_max			= 0x0fff,
-+	.x_plate_ohms		= 180,
-+	.pressure_max		= 255,
-+	.debounce_max		= 10,
-+	.debounce_tol		= 3,
-+	.debounce_rep		= 1,
-+	.gpio_pendown		= -EINVAL,
-+	.keep_vref_on		= 1,
-+};
-+
-+static struct spi_board_info ads7846_spi_board_info __initdata = {
-+	.modalias		= "ads7846",
-+	.bus_num		= -EINVAL,
-+	.chip_select		= 0,
-+	.max_speed_hz		= 1500000,
-+	.controller_data	= &ads7846_mcspi_config,
-+	.irq			= -EINVAL,
-+	.platform_data		= &ads7846_config,
-+};
-+
-+void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
-+			      struct ads7846_platform_data *board_pdata)
-+{
-+	struct spi_board_info *spi_bi = &ads7846_spi_board_info;
-+	int err;
-+
-+	err = gpio_request(gpio_pendown, "TS PenDown");
-+	if (err) {
-+		pr_err("Could not obtain gpio for TS PenDown: %d\n", err);
-+		return;
-+	}
-+
-+	gpio_direction_input(gpio_pendown);
-+	gpio_export(gpio_pendown, 0);
-+
-+	if (gpio_debounce)
-+		gpio_set_debounce(gpio_pendown, gpio_debounce);
-+
-+	ads7846_config.gpio_pendown = gpio_pendown;
-+
-+	spi_bi->bus_num	= bus_num;
-+	spi_bi->irq	= OMAP_GPIO_IRQ(gpio_pendown);
-+
-+	if (board_pdata)
-+		spi_bi->platform_data = board_pdata;
-+
-+	spi_register_board_info(&ads7846_spi_board_info, 1);
-+}
-diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
-new file mode 100644
-index 0000000..75f9248d
---- /dev/null
-+++ b/arch/arm/mach-omap2/common-board-devices.h
-@@ -0,0 +1,18 @@
-+#ifndef __OMAP_COMMON_BOARD_DEVICES__
-+#define __OMAP_COMMON_BOARD_DEVICES__
-+
-+#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
-+	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
-+struct ads7846_platform_data;
-+
-+void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
-+		       struct ads7846_platform_data *board_pdata);
-+#else
-+static inline void omap_ads7846_init(int bus_num,
-+				     int gpio_pendown, int gpio_debounce,
-+				     struct ads7846_platform_data *board_data)
-+{
-+}
-+#endif
-+
-+#endif /* __OMAP_COMMON_BOARD_DEVICES__ */
+ struct ads7846_platform_data;
 -- 
 1.7.3.1
