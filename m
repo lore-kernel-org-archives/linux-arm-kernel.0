@@ -1,141 +1,117 @@
 From: weitway@gmail.com (weitway at gmail.com)
-Date: Mon, 25 Apr 2011 21:39:37 +0800
-Subject: [PATCH 4/9] ARM i.MX51 babbage: Add framebuffer support
-Message-ID: <1303738777-27626-1-git-send-email-weitway@gmail.com>
+Date: Mon, 25 Apr 2011 21:40:39 +0800
+Subject: [PATCH 5/9] ARM i.MX53 loco: Add framebuffer support
+Message-ID: <1303738839-27659-1-git-send-email-weitway@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jason Chen <b02280@freescale.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Jason Chen <Jason.Chen@freescale.com>
 Signed-off-by: Jason Chen <Jason.Chen@linaro.org>
 ---
- arch/arm/mach-mx5/Kconfig              |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c |   74 ++++++++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |   23 +++++++++++++++++++++++
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    9 ++++++---
+ 3 files changed, 30 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 799fbc4..a512364 100644
+index a512364..4f38f4e 100644
 --- a/arch/arm/mach-mx5/Kconfig
 +++ b/arch/arm/mach-mx5/Kconfig
-@@ -70,6 +70,7 @@ config MACH_MX51_BABBAGE
+@@ -200,6 +200,7 @@ config MACH_MX53_LOCO
  	select IMX_HAVE_PLATFORM_IMX_UART
  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	select IMX_HAVE_PLATFORM_SPI_IMX
+ 	select IMX_HAVE_PLATFORM_GPIO_KEYS
 +	select IMX_HAVE_PLATFORM_IMX_IPUV3
  	help
- 	  Include support for MX51 Babbage platform, also known as MX51EVK in
- 	  u-boot. This includes specific configurations for the board and its
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index c7b3fab..5689220 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -19,10 +19,12 @@
- #include <linux/input.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 1b947e8..5232c41 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -22,10 +22,12 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
 +#include <video/imx-ipu-v3.h>
  
  #include <mach/common.h>
  #include <mach/hardware.h>
- #include <mach/iomux-mx51.h>
+ #include <mach/iomux-mx53.h>
 +#include <mach/ipu-v3.h>
  
- #include <asm/irq.h>
- #include <asm/setup.h>
-@@ -154,6 +156,41 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
- 	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
- 	MX51_PAD_CSPI1_SS0__GPIO4_24,
- 	MX51_PAD_CSPI1_SS1__GPIO4_25,
-+
-+	/* Display */
-+	MX51_PAD_DISPB2_SER_DIN__GPIO3_5,
-+	MX51_PAD_DISPB2_SER_DIO__GPIO3_6,
-+	MX51_PAD_NANDF_D12__GPIO3_28,
-+
-+	MX51_PAD_DISP1_DAT0__DISP1_DAT0,
-+	MX51_PAD_DISP1_DAT1__DISP1_DAT1,
-+	MX51_PAD_DISP1_DAT2__DISP1_DAT2,
-+	MX51_PAD_DISP1_DAT3__DISP1_DAT3,
-+	MX51_PAD_DISP1_DAT4__DISP1_DAT4,
-+	MX51_PAD_DISP1_DAT5__DISP1_DAT5,
-+	MX51_PAD_DISP1_DAT6__DISP1_DAT6,
-+	MX51_PAD_DISP1_DAT7__DISP1_DAT7,
-+	MX51_PAD_DISP1_DAT8__DISP1_DAT8,
-+	MX51_PAD_DISP1_DAT9__DISP1_DAT9,
-+	MX51_PAD_DISP1_DAT10__DISP1_DAT10,
-+	MX51_PAD_DISP1_DAT11__DISP1_DAT11,
-+	MX51_PAD_DISP1_DAT12__DISP1_DAT12,
-+	MX51_PAD_DISP1_DAT13__DISP1_DAT13,
-+	MX51_PAD_DISP1_DAT14__DISP1_DAT14,
-+	MX51_PAD_DISP1_DAT15__DISP1_DAT15,
-+	MX51_PAD_DISP1_DAT16__DISP1_DAT16,
-+	MX51_PAD_DISP1_DAT17__DISP1_DAT17,
-+	MX51_PAD_DISP1_DAT18__DISP1_DAT18,
-+	MX51_PAD_DISP1_DAT19__DISP1_DAT19,
-+	MX51_PAD_DISP1_DAT20__DISP1_DAT20,
-+	MX51_PAD_DISP1_DAT21__DISP1_DAT21,
-+	MX51_PAD_DISP1_DAT22__DISP1_DAT22,
-+	MX51_PAD_DISP1_DAT23__DISP1_DAT23,
-+#define MX51_PAD_DI_GP4__IPU_DI2_PIN15                 IOMUX_PAD(0x758, 0x350, 4, 0x0,   0, NO_PAD_CTRL)
-+	MX51_PAD_DI_GP4__IPU_DI2_PIN15,
-+
-+	/* I2C DVI enable */
-+	MX51_PAD_CSI2_HSYNC__GPIO4_14,
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -37,6 +39,8 @@
+ #define MX53_LOCO_POWER			IMX_GPIO_NR(1, 8)
+ #define MX53_LOCO_UI1			IMX_GPIO_NR(2, 14)
+ #define MX53_LOCO_UI2			IMX_GPIO_NR(2, 15)
++#define LOCO_DISP0_DET_INT		IMX_GPIO_NR(3, 31)
++#define LOCO_DISP0_RESET		IMX_GPIO_NR(5, 0)
+ #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+ 
+ static iomux_v3_cfg_t mx53_loco_pads[] = {
+@@ -225,6 +229,23 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
+ 	.bitrate = 100000,
  };
  
- /* Serial ports */
-@@ -331,6 +368,23 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
- 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
- };
- 
-+static struct ipuv3_fb_platform_data babbage_fb0_data = {
-+	.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++static struct ipuv3_fb_platform_data loco_fb0_data = {
++	.interface_pix_fmt = IPU_PIX_FMT_RGB565,
 +	.flags = IMX_IPU_FB_USE_MODEDB | IMX_IPU_FB_USE_OVERLAY,
 +	.display = 0,
 +};
 +
-+static struct ipuv3_fb_platform_data babbage_fb1_data = {
++static struct ipuv3_fb_platform_data loco_fb1_data = {
 +	.interface_pix_fmt = IPU_PIX_FMT_RGB565,
 +	.flags = IMX_IPU_FB_USE_MODEDB,
 +	.display = 1,
 +};
 +
 +static struct imx_ipuv3_platform_data ipu_data = {
-+	.fb_head0_platform_data = &babbage_fb0_data,
-+	.fb_head1_platform_data = &babbage_fb1_data,
++	.fb_head0_platform_data = &loco_fb0_data,
++	.fb_head1_platform_data = &loco_fb1_data,
 +};
 +
- /*
-  * Board specific initialization.
-  */
-@@ -381,6 +435,26 @@ static void __init mx51_babbage_init(void)
- 		ARRAY_SIZE(mx51_babbage_spi_board_info));
- 	imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
- 	imx51_add_imx2_wdt(0, NULL);
+ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+@@ -238,6 +259,8 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_sdhci_esdhc_imx(0, NULL);
+ 	imx53_add_sdhci_esdhc_imx(2, NULL);
+ 	imx_add_gpio_keys(&loco_button_data);
 +
-+#define GPIO_DVI_DETECT	(2 * 32 + 28)
-+#define GPIO_DVI_RESET	(2 * 32 + 5)
-+#define GPIO_DVI_PWRDN	(2 * 32 + 6)
-+#define GPIO_DVI_I2C	(3 * 32 + 14)
-+
-+	/* DVI Detect */
-+	gpio_request(GPIO_DVI_DETECT, "dvi detect");
-+	gpio_direction_input(GPIO_DVI_DETECT);
-+	/* DVI Reset - Assert for i2c disabled mode */
-+	gpio_request(GPIO_DVI_RESET, "dvi reset");
-+	gpio_direction_output(GPIO_DVI_RESET, 0);
-+	/* DVI Power-down */
-+	gpio_request(GPIO_DVI_PWRDN, "dvi pwdn");
-+	gpio_direction_output(GPIO_DVI_PWRDN, 1);
-+
-+	gpio_request(GPIO_DVI_I2C, "dvi i2c");
-+	gpio_direction_output(GPIO_DVI_I2C, 0);
-+
-+	imx51_add_ipuv3(0, &ipu_data);
++	imx53_add_ipuv3(0, &ipu_data);
  }
  
- static void __init mx51_babbage_timer_init(void)
+ static void __init mx53_loco_timer_init(void)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 6b89c1b..a3d38bd 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1452,9 +1452,9 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
+ 	_REGISTER_CLOCK(NULL, "mipi_hsp", mipi_hsp_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", NULL, ipu_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", "di0", ipu_di0_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", "di1", ipu_di1_clk)
+ 	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+ };
+ 
+@@ -1476,6 +1476,9 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", NULL, ipu_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", "di0", ipu_di0_clk)
++	_REGISTER_CLOCK("imx-ipuv3.0", "di1", ipu_di1_clk)
+ };
+ 
+ static void clk_tree_init(void)
 -- 
 1.7.1
