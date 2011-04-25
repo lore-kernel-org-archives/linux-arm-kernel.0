@@ -1,34 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Apr 2011 11:57:45 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110425020348.GA6540@shlinux1.ap.freescale.net>
-References: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-	<20110421123542.GE11788@opensource.wolfsonmicro.com>
-	<20110425020348.GA6540@shlinux1.ap.freescale.net>
-Message-ID: <20110425105744.GA30859@opensource.wolfsonmicro.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 25 Apr 2011 16:29:25 +0530
+Subject: [PATCH V4 resend] rtc: Adding support for spear rtc
+In-Reply-To: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+References: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+Message-ID: <4DB5540D.9050204@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 10:03:49AM +0800, Richard Zhao wrote:
-> On Thu, Apr 21, 2011 at 01:35:42PM +0100, Mark Brown wrote:
+On 02/09/2011 04:06 PM, Viresh KUMAR wrote:
+> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> 
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/rtc/Kconfig     |    8 +
+>  drivers/rtc/Makefile    |    1 +
+>  drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 543 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/rtc/rtc-spear.c
+> 
 
-> > Please bear in mind that due to the fact that we've currently got one
-> > clock implementation per subarchitecture anything off-SoC has some
-> > serious barriers to implementation in kernel.  For the system management
-> > units you'd be looking at very new systems, this is a new development.
+Russell,
 
-> How many arch have off-soc clocks? Where's the source? 
-> At least for arm, nearly all is memory mapped clock registers. clk is free
-> to override, we just need abstract the most common things.
+We have been waiting for response from rtc's mailing list from a very long time,
+but didn't got any feedback till date.
+As this driver is specific to SPEAr, can we get this added through arm's tree??
 
-Even for many ARMs it's common for the clock tree to be rooted in the
-PMIC (since it will always be on), and of course the full system clock
-tree will not just include the CPU but also any other digital components
-in the system.
+--
+viresh
