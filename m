@@ -1,41 +1,36 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 25 Apr 2011 12:20:33 +0530
-Subject: davinci: Use generic irq chip
-In-Reply-To: <20110416211307.686087239@linutronix.de>
-References: <20110416211221.853079766@linutronix.de>
-	<20110416211307.686087239@linutronix.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CAE2FAB@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 25 Apr 2011 16:08:11 +0900
+Subject: [patch 03/16] arm: s5p: Use clocksource based sched_clock
+In-Reply-To: <20110423205131.787423063@linutronix.de>
+References: <20110423205036.795894921@linutronix.de>
+	<20110423205131.787423063@linutronix.de>
+Message-ID: <043d01cc0317$921bfa60$b653ef20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Sun, Apr 17, 2011 at 02:44:08, Thomas Gleixner wrote:
-> Simple conversion which simply uses the fact that the second irq chip
-> base address has offset 0x04 to the first one.
+Thomas Gleixner wrote:
 > 
 > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 
-Boot tested it on a DM365 EVM.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Tested-by: Sekhar Nori <nsekhar@ti.com>
+(snip)
 
-> @@ -152,13 +103,8 @@ void __init davinci_irq_init(void)
->  		davinci_irq_writel(pri, i);
->  	}
->  
-> -	/* set up genirq dispatch for ARM INTC */
-> -	for (i = 0; i < davinci_soc_info.intc_irq_num; i++) {
-> -		irq_set_chip(i, &davinci_irq_chip_0);
-> -		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> -		if (i != IRQ_TINT1_TINT34)
-> -			irq_set_handler(i, handle_edge_irq);
-> -		else
-> -			irq_set_handler(i, handle_level_irq);
-> -	}
-> +	for (i = 0, j= 0; i < davinci_soc_info.intc_irq_num; i += 32, j += 0x04)
-                   ^
-There is a space needed before the '=' as pointed by checkpatch.
+>  struct clocksource time_clocksource = {
+>  	.name		= "s5p_clocksource_timer",
+>  	.rating		= 250,
+>  	.read		= s5p_timer_read,
+>  	.mask		= CLOCKSOURCE_MASK(32),
+> -	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS |
+> CLOCKS_SOURCE_SCHED_CLOCK,
 
-Thanks,
-Sekhar
+As Stephen Boyd said, with fixing CLOCK_SOURCE_SCHED_CLOCK :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
