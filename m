@@ -1,83 +1,54 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 26 Apr 2011 08:15:19 +1200
+Date: Tue, 26 Apr 2011 08:16:06 +1200
 Subject: [PATCH v2 02/23] at91: Make Ethernet device common
-In-Reply-To: <0D753D10438DA54287A00B027084269764D24302CC@AUSP01VMBX24.collaborationhost.net>
+In-Reply-To: <0D753D10438DA54287A00B027084269764D24302A7@AUSP01VMBX24.collaborationhost.net>
 References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
 	<1303364535-11557-3-git-send-email-ryan@bluewatersys.com>
-	<0D753D10438DA54287A00B027084269764D24302CC@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4DB5D657.2040103@bluewatersys.com>
+	<0D753D10438DA54287A00B027084269764D24302A7@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4DB5D686.5050208@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2011 11:19 AM, H Hartley Sweeten wrote:
+On 04/22/2011 11:02 AM, H Hartley Sweeten wrote:
 > On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
 >>
 >> Replace the individual Ethernet device code for each at91 variant with
 >> a single implementation in devices.
 >>
 >> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> 
-> [snip]
-> 
->> diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
->> index 6f6e0d5..4ecbd38 100644
->> --- a/arch/arm/mach-at91/devices.c
->> +++ b/arch/arm/mach-at91/devices.c
->> @@ -14,8 +14,11 @@
->>   */
+>> ---
+>>
+>>  arch/arm/mach-at91/at572d940hf.c         |    4 +
+>>  arch/arm/mach-at91/at572d940hf_devices.c |   83 +++++++----------------
+>>  arch/arm/mach-at91/at91cap9.c            |    4 +
+>>  arch/arm/mach-at91/at91cap9_devices.c    |  103 ++++++++++------------------
+>>  arch/arm/mach-at91/at91rm9200.c          |    4 +
+>>  arch/arm/mach-at91/at91rm9200_devices.c  |  103 ++++++++++------------------
+>>  arch/arm/mach-at91/at91sam9260.c         |    4 +
+>>  arch/arm/mach-at91/at91sam9260_devices.c |  104 +++++++++++------------------
+>>  arch/arm/mach-at91/at91sam9263.c         |    4 +
+>>  arch/arm/mach-at91/at91sam9263_devices.c |  102 ++++++++++------------------
+>>  arch/arm/mach-at91/at91sam9g45.c         |    4 +
+>>  arch/arm/mach-at91/at91sam9g45_devices.c |  108 +++++++++++-------------------
+>>  arch/arm/mach-at91/devices.c             |   61 +++++++++++++++++
+>>  arch/arm/mach-at91/devices.h             |   10 +++
+>>  14 files changed, 309 insertions(+), 389 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
+>> index a6b9c68..48c1ec2 100644
+>> --- a/arch/arm/mach-at91/at572d940hf.c
+>> +++ b/arch/arm/mach-at91/at572d940hf.c
+>> @@ -34,6 +34,8 @@
+>>  #include "generic.h"
+>>  #include "clock.h"
 >>  
->>  #include <linux/platform_device.h>
->> +#include <linux/dma-mapping.h>
->>  #include <linux/gpio.h>
->>  
->> +#include <mach/board.h>
->> +
->>  #include "devices.h"
->>  
->>  static struct at91_device_table *devices __initdata;
->> @@ -64,6 +67,64 @@ static inline void __init init_resource_irq(struct resource *res, int irq)
->>  	}
->>  }
->>  
->> +/* --------------------------------------------------------------------
->> + *  Ethernet
->> + * -------------------------------------------------------------------- */
->> +
->> +#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
->> +static u64 eth_dmamask = DMA_BIT_MASK(32);
->> +static struct at91_eth_data eth_data;
->> +
->> +static struct resource eth_resources[] = {
->> +	[0] = {
->> +		.end	= SZ_16K,
->> +		.flags	= IORESOURCE_MEM,
->> +	},
->> +	[1] = {
->> +		.flags	= IORESOURCE_IRQ,
->> +	},
->> +};
->> +
->> +static struct platform_device at91_eth_device = {
->> +	.name		= "macb",
->> +	.id		= -1,
->> +	.dev		= {
->> +				.dma_mask		= &eth_dmamask,
->> +				.coherent_dma_mask	= DMA_BIT_MASK(32),
+>> +extern void at572d940hf_init_devices(void);
 > 
-> Doesn't this work also?
-> 
-> +static struct platform_device at91_eth_device = {
-> +	.name		= "macb",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.dma_mask		= &at91_eth_device.dev.coherent_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> 
-> That will get rid of the static u64 variable used for every dma capable device.
+> You might consider moving this, and all the other similar externs, to the generic.h
+> header.  That's where all the other platform init functions are defined.
 
-Possibly. I think it should be done as a separate patch though. I've
-tried to introduce as little code change as possible with this patch set
-to avoid introducing additional bugs.
+I put the externs in the .c files since that is the only place they are
+actually called from. What is the general consensus on this?
 
 ~Ryan
 
