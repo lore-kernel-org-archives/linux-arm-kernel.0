@@ -1,113 +1,77 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Mon, 25 Apr 2011 15:47:38 +0900
-Subject: [PATCH] ASoC: SAMSUNG: Add quirk to support Exynos4 PCM audio
-Message-ID: <1303714058-647-1-git-send-email-sbkim73@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 25 Apr 2011 02:33:22 -0600 (MDT)
+Subject: Common clock and dvfs
+In-Reply-To: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
+References: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1104250211000.6742@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4 pcm block is different from previous one.
-Unlike previous one, Exynos4 doesn't have SCLK divider in the pcm block.
-For this reason, This patch added quirk handling for Exynos4 pcm cpu driver.
+(cc Tony, Beno?t)
 
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
----
- sound/soc/samsung/pcm.c |   44 ++++++++++++++++++++++++++++----------------
- 1 files changed, 28 insertions(+), 16 deletions(-)
+Hi,
 
-diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
-index 9c7e8b4..f007a5b 100644
---- a/sound/soc/samsung/pcm.c
-+++ b/sound/soc/samsung/pcm.c
-@@ -10,7 +10,6 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--
- #include <linux/clk.h>
- #include <linux/io.h>
- 
-@@ -128,6 +127,7 @@ struct s3c_pcm_info {
- 
- 	struct s3c_dma_params	*dma_playback;
- 	struct s3c_dma_params	*dma_capture;
-+	u32	quirks;
- };
- 
- static struct s3c2410_dma_client s3c_pcm_dma_client_out = {
-@@ -299,25 +299,34 @@ static int s3c_pcm_hw_params(struct snd_pcm_substream *substream,
- 
- 	spin_lock_irqsave(&pcm->lock, flags);
- 
--	/* Get hold of the PCMSOURCE_CLK */
--	clkctl = readl(regs + S3C_PCM_CLKCTL);
--	if (clkctl & S3C_PCM_CLKCTL_SERCLKSEL_PCLK)
--		clk = pcm->pclk;
--	else
-+	if (pcm->quirks == QUIRK_NO_DIV) {
- 		clk = pcm->cclk;
-+		if (clk_get_rate(clk) != (pcm->sclk_per_fs*params_rate(params))) {
-+			clk_set_rate(clk, pcm->sclk_per_fs*params_rate(params));
-+		}
-+		sync_div = clk_get_rate(clk)/(params_rate(params))-1;
-+	}
-+	else {
-+		/* Get hold of the PCMSOURCE_CLK */
-+		clkctl = readl(regs + S3C_PCM_CLKCTL);
-+		if (clkctl & S3C_PCM_CLKCTL_SERCLKSEL_PCLK)
-+			clk = pcm->pclk;
-+		else
-+			clk = pcm->cclk;
- 
--	/* Set the SCLK divider */
--	sclk_div = clk_get_rate(clk) / pcm->sclk_per_fs /
--					params_rate(params) / 2 - 1;
-+		/* Set the SCLK divider */
-+		sclk_div = clk_get_rate(clk) / pcm->sclk_per_fs /
-+				params_rate(params) / 2 - 1;
- 
--	clkctl &= ~(S3C_PCM_CLKCTL_SCLKDIV_MASK
--			<< S3C_PCM_CLKCTL_SCLKDIV_SHIFT);
--	clkctl |= ((sclk_div & S3C_PCM_CLKCTL_SCLKDIV_MASK)
--			<< S3C_PCM_CLKCTL_SCLKDIV_SHIFT);
-+		clkctl &= ~(S3C_PCM_CLKCTL_SCLKDIV_MASK
-+				<< S3C_PCM_CLKCTL_SCLKDIV_SHIFT);
-+		clkctl |= ((sclk_div & S3C_PCM_CLKCTL_SCLKDIV_MASK)
-+				<< S3C_PCM_CLKCTL_SCLKDIV_SHIFT);
- 
--	/* Set the SYNC divider */
--	sync_div = pcm->sclk_per_fs - 1;
-+		sync_div = pcm->sclk_per_fs - 1;
-+	}
- 
-+	/* Set the SYNC divider */
- 	clkctl &= ~(S3C_PCM_CLKCTL_SYNCDIV_MASK
- 				<< S3C_PCM_CLKCTL_SYNCDIV_SHIFT);
- 	clkctl |= ((sync_div & S3C_PCM_CLKCTL_SYNCDIV_MASK)
-@@ -330,7 +339,6 @@ static int s3c_pcm_hw_params(struct snd_pcm_substream *substream,
- 	dev_dbg(pcm->dev, "PCMSOURCE_CLK-%lu SCLK=%ufs SCLK_DIV=%d SYNC_DIV=%d\n",
- 				clk_get_rate(clk), pcm->sclk_per_fs,
- 				sclk_div, sync_div);
--
- 	return 0;
- }
- 
-@@ -494,6 +502,7 @@ static __devinit int s3c_pcm_dev_probe(struct platform_device *pdev)
- 	struct s3c_pcm_info *pcm;
- 	struct resource *mem_res, *dmatx_res, *dmarx_res;
- 	struct s3c_audio_pdata *pcm_pdata;
-+	struct samsung_i2s *pcm_cfg;
- 	int ret;
- 
- 	/* Check for valid device index */
-@@ -531,6 +540,9 @@ static __devinit int s3c_pcm_dev_probe(struct platform_device *pdev)
- 	pcm = &s3c_pcm[pdev->id];
- 	pcm->dev = &pdev->dev;
- 
-+	pcm_cfg = &pcm_pdata->type.i2s;
-+	pcm->quirks = pcm_cfg->quirks;
-+
- 	spin_lock_init(&pcm->lock);
- 
- 	/* Default is 128fs */
--- 
-1.7.1
+By way of brief introduction, I'm currently the maintainer of the OMAP 
+clock code and data, as well as some other low-level OMAP kernel pieces.
+
+On Fri, 22 Apr 2011, Colin Cross wrote:
+
+> The Tegra way is to put everything dvfs related under the clock
+> framework.  Enabling (or preparing, in the new clock world) or raising
+> the frequency calls dvfs_set_rate before touching the clock, which
+> looks up the required voltage on a voltage rail, aggregates it with
+> the other voltage requests, and passes the minimum voltage required to
+> the regulator api.  Disabling or unpreparing, or lowering the
+> frequency changes the clock first, and then calls dvfs_set_rate.  For
+> a generic implementation, an SoC would provide the clock/dvfs
+> framework with a list of clocks, the voltages required for each
+> frequency step on the clock, and the regulator name to change.  The
+> frequency/voltage tables are similar to OPP, except that OPP gets
+> voltages for a device instead of a clock.  In a few odd cases (Tegra
+> always has a few odd cases), a clock that is internal to a device and
+> not exposed to the clock framework (pclk output on the display, for
+> example) has a voltage requirement, which requires some devices to
+> manually call dvfs_set_rate directly, but with a common clock
+> framework it would probably be possible for the display driver to
+> export pclk as a real clock.
+> 
+> The proposed OMAP4 way (I believe, correct me if I am wrong) is to
+> create a new api outside the clock api that calls into both the clock
+> api and the regulator api in the correct order for each operation,
+> using OPP to determine the voltage.
+
+Some people may have proposed this approach, but that's definitely not my 
+perspective.  I don't think it's a good design, and have so far declined 
+to merge any DVFS code that doesn't use clk_set_rate() as its interface 
+(from the device driver's perspective), at least until the proponents of 
+the separate-API camp can explain why it's needed.
+
+> This has a few disadvantages (obviously, I am biased, having written 
+> the Tegra code) - clocks and voltages are tied to a device, which is not 
+> always the case for platforms outside of OMAP,
+
+It's not the case for OMAP either.
+
+> and drivers must know if their hardware requires voltage scaling.  The 
+> clock api becomes unsafe to use on any device that requires dvfs, as it 
+> could change the frequency higher than the supported voltage.
+> 
+> Is the clock api the right place to do dvfs, or should the clock api
+> be kept simple, and more complicated operations like dvfs be kept
+> outside?
+
+My personal opinion is that the clock framework is the right place for 
+this, since it's a defined interface that is already exposed to drivers.
+
+However, since the current clock interface doesn't anticipate that some 
+code (e.g. CPUFreq) may need to change a clock's rate while some other 
+code (e.g. a device driver) is currently using that clock, the clock 
+interface will need to be expanded somewhat to handle this safely.  Clock 
+notifiers are needed, plus the ability for clock users to indicate when it 
+is safe for an in-use clock's rate/parent to change.
+
+I'd been planning to post patches for that stuff for 2.6.40 until all of 
+the recent drama started.  I guess I should post them anyway...
+
+
+- Paul
