@@ -1,30 +1,22 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 25 Apr 2011 16:29:25 +0530
-Subject: [PATCH V4 resend] rtc: Adding support for spear rtc
-In-Reply-To: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
-References: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
-Message-ID: <4DB5540D.9050204@st.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Apr 2011 12:02:30 +0100
+Subject: [RFC] What is the preferred way to share ADC unit between
+	hwmon and input(ts) drivers?
+In-Reply-To: <4DB4C252.30005@emcraft.com>
+References: <4DB4C252.30005@emcraft.com>
+Message-ID: <20110425110230.GD4768@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2011 04:06 PM, Viresh KUMAR wrote:
-> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> 
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/rtc/Kconfig     |    8 +
->  drivers/rtc/Makefile    |    1 +
->  drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 543 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/rtc/rtc-spear.c
-> 
+On Mon, Apr 25, 2011 at 04:37:38AM +0400, Ilya Yanok wrote:
 
-Russell,
+> So, to add both input and hwmon drivers we need to serialize the
+> register accesses. I was thinking about adding some middle-layer to
+> perform the actual conversion. The question is what is the preferred way
+> to add such a middle layer? Should we use a multi-function device driver
+> for this or just some platform-specific code (as S3C does)? Or maybe
+> there is another way?
 
-We have been waiting for response from rtc's mailing list from a very long time,
-but didn't got any feedback till date.
-As this driver is specific to SPEAr, can we get this added through arm's tree??
-
---
-viresh
+IIO would probably be the standard API to use but that's still stuck in
+staging.  I'd suggest doing a custom API and then transitioning to IIO
+when that moves out of staging.
