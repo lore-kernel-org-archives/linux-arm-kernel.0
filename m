@@ -1,80 +1,96 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 25 Apr 2011 15:21:17 -0700
-Subject: [PATCH resend] rtc: Adding support for spear rtc
-In-Reply-To: <b5f52fa9b1acd0c524ecb357788b22a1b6d8fa9c.1303730912.git.viresh.kumar@st.com>
-References: <b5f52fa9b1acd0c524ecb357788b22a1b6d8fa9c.1303730912.git.viresh.kumar@st.com>
-Message-ID: <20110425152117.424cdba1.akpm@linux-foundation.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 26 Apr 2011 10:51:53 +1200
+Subject: [PATCH 07/14] at91: switch gpio to early platfrom device
+In-Reply-To: <1303756284-26529-7-git-send-email-plagnioj@jcrosoft.com>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4DB5FB09.8020501@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2011 17:00:26 +0530
-Viresh Kumar <viresh.kumar@st.com> wrote:
-
-> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> 
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+On 04/26/2011 06:31 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 > ---
->  drivers/rtc/Kconfig     |    8 +
->  drivers/rtc/Makefile    |    1 +
->  drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 543 insertions(+), 0 deletions(-)
+> need patch
+> clkdev: add support to lookup for early platform device
 
-The driver looks nice and clean.
+<snip>
 
->
-> ...
->
-> +static void rtc_wait_not_busy(struct spear_rtc_config *config)
-> +{
-> +	int status, count = 0;
-> +	unsigned long flags;
+> diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
+> new file mode 100644
+> index 0000000..4d39f9b
+> --- /dev/null
+> +++ b/arch/arm/mach-at91/devices.h
+> @@ -0,0 +1,55 @@
+> +/*
+> + * arch/arm/mach-at91/devices.h
+> + *
+> + * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> + *
+> + * Under GPLv2
+> + *
+> + */
 > +
-> +	/* Assuming BUSY may stay active for 80 msec) */
-> +	for (count = 0; count < 80; count++) {
-> +		spin_lock_irqsave(&config->lock, flags);
-> +		status = readl(config->ioaddr + STATUS_REG);
-> +		spin_unlock_irqrestore(&config->lock, flags);
-> +		if ((status & STATUS_BUSY) == 0)
-> +			break;
-> +		/* check status busy, after each msec */
-> +		msleep(1);
+> +#ifndef _AT91_DEVICES_H
+> +#define _AT91_DEVICES_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define RES_MEM(size)				\
+> +	{					\
+> +		.end	= size - 1,		\
+> +		.flags	= IORESOURCE_MEM,	\
 > +	}
-> +}
-
-Question.  What activity causes STATUS_BUSY to become set?
-
->
-> ...
->
-> +static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct rtc_device *rtc = platform_get_drvdata(pdev);
-> +	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-> +	unsigned int time, date;
 > +
-> +	/* we don't report wday/yday/isdst ... */
-> +	rtc_wait_not_busy(config);
-
-Because here, we've waited for STATUS_BUSY to clear, but we don't
-appear to have taken any steps to prevent it from getting set again
-while these steps:
-
-> +	time = readl(config->ioaddr + TIME_REG);
-> +	date = readl(config->ioaddr + DATE_REG);
-> +	tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-> +	tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-> +	tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-> +	tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-> +	tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-> +	tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-
-are in progress?
-
-> +	bcd2tm(tm);
-> +	return 0;
+> +#define RES_IRQ()				\
+> +	{					\
+> +		.flags	= IORESOURCE_IRQ,	\
+> +	}
+> +
+> +
+> +static inline void set_resource_mem(struct resource *res, resource_size_t mmio_base)
+> +{
+> +	BUG_ON(res->flags != IORESOURCE_MEM);
+> +	res->start = mmio_base;
+> +	res->end  += mmio_base;
 > +}
->
-> ...
->
+> +
+> +static inline void set_resource_irq(struct resource *res, int irq)
+> +{
+> +	if (!irq)
+> +		return;
+> +
+> +	BUG_ON(res->flags != IORESOURCE_IRQ);
+> +	res->start = irq;
+> +	res->end   = irq;
+> +}
+> +
+> +struct at91_dev_resource {
+> +	resource_size_t	mmio_base;
+> +	int		irq;
+> +};
+> +
+> +struct at91_dev_resource_array {
+> +	struct at91_dev_resource *resource;
+> +	int num_resources;
+> +};
+
+We will have to consolidate here since this conflicts with my patch set.
+Our approaches are pretty similar though, so hopefully it's not too big
+a deal. How do you want to manage the merging of our patches? Do you
+want to take my stuff via your tree and handle the merge there or do you
+want be to try rebasing my patches on top of a branch of your git tree?
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
