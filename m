@@ -1,1107 +1,699 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 25 Apr 2011 20:31:12 +0200
-Subject: [PATCH 02/14] at91: introduce commom AT91_BASE_SYS
+Date: Mon, 25 Apr 2011 20:31:20 +0200
+Subject: [PATCH 10/14] at91: switch st timer to early platform devices
 In-Reply-To: <20110425180847.GA12904@game.jcrosoft.org>
 References: <20110425180847.GA12904@game.jcrosoft.org>
-Message-ID: <1303756284-26529-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1303756284-26529-10-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on all at91 except rm9200 and x40 have the System Controller start in reallity
-at 0xffffc000 of 16KiB
-
-on rm9200 it's start at 0xfffe4000 of 111KiB with non reserved data starting
-at 0xfffff000
-
-so we will use a common AT91_BASE_SYS at 0xffffc000 of 16KiB
-and map the same memory space
+this will allow to specify the resources per soc
+and have only one time init for all boards except x40
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/Makefile                   |    2 +-
- arch/arm/mach-at91/at572d940hf.c              |   12 +++---
- arch/arm/mach-at91/at91cap9.c                 |   13 +++---
- arch/arm/mach-at91/at91rm9200.c               |   13 +++---
- arch/arm/mach-at91/at91sam9260.c              |   18 +++-----
- arch/arm/mach-at91/at91sam9261.c              |   18 +++-----
- arch/arm/mach-at91/at91sam9263.c              |   13 +++---
- arch/arm/mach-at91/at91sam9g45.c              |   13 +++---
- arch/arm/mach-at91/at91sam9rl.c               |   18 +++-----
- arch/arm/mach-at91/board-1arm.c               |    2 +-
- arch/arm/mach-at91/board-afeb-9260v1.c        |    2 +-
- arch/arm/mach-at91/board-at572d940hf_ek.c     |    2 +-
- arch/arm/mach-at91/board-cam60.c              |    2 +-
- arch/arm/mach-at91/board-cap9adk.c            |    2 +-
- arch/arm/mach-at91/board-carmeva.c            |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c           |    2 +-
- arch/arm/mach-at91/board-cpuat91.c            |    2 +-
- arch/arm/mach-at91/board-csb337.c             |    2 +-
- arch/arm/mach-at91/board-csb637.c             |    2 +-
- arch/arm/mach-at91/board-eb9200.c             |    2 +-
- arch/arm/mach-at91/board-ecbat91.c            |    2 +-
- arch/arm/mach-at91/board-eco920.c             |    2 +-
- arch/arm/mach-at91/board-flexibity.c          |    2 +-
- arch/arm/mach-at91/board-foxg20.c             |    2 +-
- arch/arm/mach-at91/board-kafa.c               |    2 +-
- arch/arm/mach-at91/board-kb9202.c             |    2 +-
- arch/arm/mach-at91/board-neocore926.c         |    2 +-
- arch/arm/mach-at91/board-picotux200.c         |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c          |    2 +-
- arch/arm/mach-at91/board-rm9200dk.c           |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c           |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c         |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c          |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c          |    2 +-
- arch/arm/mach-at91/board-sam9263ek.c          |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c          |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c       |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c           |    2 +-
- arch/arm/mach-at91/board-snapper9260.c        |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c          |    2 +-
- arch/arm/mach-at91/board-usb-a9260.c          |    2 +-
- arch/arm/mach-at91/board-usb-a9263.c          |    2 +-
- arch/arm/mach-at91/board-yl-9200.c            |    2 +-
- arch/arm/mach-at91/generic.h                  |    9 +----
- arch/arm/mach-at91/include/mach/at572d940hf.h |    1 -
- arch/arm/mach-at91/include/mach/at91cap9.h    |    1 -
- arch/arm/mach-at91/include/mach/at91rm9200.h  |    1 -
- arch/arm/mach-at91/include/mach/at91sam9260.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9261.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9263.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9g45.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9rl.h  |    1 -
- arch/arm/mach-at91/include/mach/hardware.h    |   14 ++++++
- arch/arm/mach-at91/soc.c                      |   57 +++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h                      |   22 ++++++++++
- 55 files changed, 184 insertions(+), 114 deletions(-)
- create mode 100644 arch/arm/mach-at91/soc.c
- create mode 100644 arch/arm/mach-at91/soc.h
+ arch/arm/mach-at91/at91rm9200.c       |    6 +
+ arch/arm/mach-at91/at91rm9200_time.c  |  271 +++++++++++++++++++++++---------
+ arch/arm/mach-at91/board-1arm.c       |    2 +-
+ arch/arm/mach-at91/board-carmeva.c    |    2 +-
+ arch/arm/mach-at91/board-cpuat91.c    |    2 +-
+ arch/arm/mach-at91/board-csb337.c     |    2 +-
+ arch/arm/mach-at91/board-csb637.c     |    2 +-
+ arch/arm/mach-at91/board-eb9200.c     |    2 +-
+ arch/arm/mach-at91/board-ecbat91.c    |    2 +-
+ arch/arm/mach-at91/board-eco920.c     |    2 +-
+ arch/arm/mach-at91/board-kafa.c       |    2 +-
+ arch/arm/mach-at91/board-kb9202.c     |    2 +-
+ arch/arm/mach-at91/board-picotux200.c |    2 +-
+ arch/arm/mach-at91/board-rm9200dk.c   |    2 +-
+ arch/arm/mach-at91/board-rm9200ek.c   |    2 +-
+ arch/arm/mach-at91/board-yl-9200.c    |    2 +-
+ arch/arm/mach-at91/generic.h          |    2 +-
+ arch/arm/mach-at91/soc.c              |   21 +++-
+ arch/arm/mach-at91/soc.h              |    1 +
+ 19 files changed, 237 insertions(+), 92 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index a83835e..eeb5287 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
- 
--obj-y		:= irq.o gpio.o
-+obj-y		:= irq.o gpio.o soc.o
- obj-m		:=
- obj-n		:=
- obj-		:=
-diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-index a6b9c68..df0d691 100644
---- a/arch/arm/mach-at91/at572d940hf.c
-+++ b/arch/arm/mach-at91/at572d940hf.c
-@@ -31,16 +31,12 @@
- #include <mach/at91_pmc.h>
- #include <mach/at91_rstc.h>
- 
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
- static struct map_desc at572d940hf_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= AT91_IO_VIRT_BASE - AT572D940HF_SRAM_SIZE,
- 		.pfn		= __phys_to_pfn(AT572D940HF_SRAM_BASE),
- 		.length		= AT572D940HF_SRAM_SIZE,
-@@ -302,7 +298,7 @@ static void at572d940hf_reset(void)
-  *  AT572D940HF processor initialization
-  * -------------------------------------------------------------------- */
- 
--void __init at572d940hf_initialize(unsigned long main_clock)
-+static void __init at572d940hf_initialize(unsigned long main_clock)
- {
- 	/* Map peripherals */
- 	iotable_init(at572d940hf_io_desc, ARRAY_SIZE(at572d940hf_io_desc));
-@@ -375,3 +371,7 @@ void __init at572d940hf_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	at91_gpio_irq_setup();
- }
- 
-+struct at91_soc __initdata at572d940hf_soc = {
-+	.name = "at572d940hf",
-+	.init = at572d940hf_initialize,
-+};
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index 7337617..4c06b19 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -25,16 +25,12 @@
- #include <mach/at91_rstc.h>
- #include <mach/at91_shdwc.h>
- 
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
- static struct map_desc at91cap9_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= AT91_IO_VIRT_BASE - AT91CAP9_SRAM_SIZE,
- 		.pfn		= __phys_to_pfn(AT91CAP9_SRAM_BASE),
- 		.length		= AT91CAP9_SRAM_SIZE,
-@@ -303,7 +299,7 @@ static void at91cap9_poweroff(void)
-  *  AT91CAP9 processor initialization
-  * -------------------------------------------------------------------- */
- 
--void __init at91cap9_initialize(unsigned long main_clock)
-+static void __init at91cap9_initialize(unsigned long main_clock)
- {
- 	/* Map peripherals */
- 	iotable_init(at91cap9_io_desc, ARRAY_SIZE(at91cap9_io_desc));
-@@ -381,3 +377,8 @@ void __init at91cap9_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
-+
-+struct at91_soc __initdata at91cap9_soc = {
-+	.name = "at91cap9",
-+	.init = at91cap9_initialize,
-+};
 diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 7bdf566..46ae08f 100644
+index e80d544..7b9d3a4 100644
 --- a/arch/arm/mach-at91/at91rm9200.c
 +++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -20,16 +20,12 @@
+@@ -378,6 +378,11 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0	/* Advanced Interrupt Controller (IRQ6) */
+ };
+ 
++struct at91_dev_resource at91rm9200_st __initdata = {
++	.mmio_base	= AT91_ST,
++	.irq		= AT91_ID_SYS,
++};
++
+ struct at91_soc __initdata at91rm9200_soc = {
+ 	.name = "at91rm9200",
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
+@@ -386,4 +391,5 @@ struct at91_soc __initdata at91rm9200_soc = {
+ 		.resource = at91rm9200_pios,
+ 		.num_resources = ARRAY_SIZE(at91rm9200_pios),
+ 	},
++	.st = &at91rm9200_st,
+ };
+diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+index 1dd69c8..538ee40 100644
+--- a/arch/arm/mach-at91/at91rm9200_time.c
++++ b/arch/arm/mach-at91/at91rm9200_time.c
+@@ -1,8 +1,9 @@
+ /*
+  * linux/arch/arm/mach-at91/at91rm9200_time.c
+  *
+- *  Copyright (C) 2003 SAN People
+- *  Copyright (C) 2003 ATMEL
++ * Copyright (C) 2003 SAN People
++ * Copyright (C) 2003 ATMEL
++ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -20,30 +21,58 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/clockchips.h>
+-
+-#include <asm/mach/time.h>
++#include <linux/slab.h>
+ 
  #include <mach/at91_st.h>
- #include <mach/cpu.h>
  
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
- static struct map_desc at91rm9200_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= AT91_VA_BASE_EMAC,
- 		.pfn		= __phys_to_pfn(AT91RM9200_BASE_EMAC),
- 		.length		= SZ_16K,
-@@ -278,7 +274,7 @@ void __init at91rm9200_set_type(int type)
- /* --------------------------------------------------------------------
-  *  AT91RM9200 processor initialization
-  * -------------------------------------------------------------------- */
--void __init at91rm9200_initialize(unsigned long main_clock)
-+static void __init at91rm9200_initialize(unsigned long main_clock)
- {
- 	/* Map peripherals */
- 	iotable_init(at91rm9200_io_desc, ARRAY_SIZE(at91rm9200_io_desc));
-@@ -354,3 +350,8 @@ void __init at91rm9200_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
-+
-+struct at91_soc __initdata at91rm9200_soc = {
-+	.name = "at91rm9200",
-+	.init = at91rm9200_initialize,
+-static unsigned long last_crtr;
+-static u32 irqmask;
+-static struct clock_event_device clkevt;
++struct at91_st_data {
++	void __iomem *mapbase;
++	unsigned long last_crtr;
++	u32 irqmask;
++	struct clock_event_device ced;
++	struct clocksource cs;
++	struct irqaction irqaction;
++	struct platform_device *pdev;
 +};
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 32524ef..b1a9aa4 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -22,18 +22,10 @@
- #include <mach/at91_rstc.h>
- #include <mach/at91_shdwc.h>
++
++static inline unsigned int at91_st_read(struct at91_st_data *data,
++					 unsigned int reg_offset)
++{
++	return __raw_readl(data->mapbase + reg_offset);
++}
++
++static inline void at91_st_write(struct at91_st_data *data,
++			unsigned int reg_offset, unsigned long value)
++{
++	__raw_writel(value, data->mapbase + reg_offset);
++}
++
++static struct at91_st_data *cs_to_at91_st(struct clocksource *cs)
++{
++	return container_of(cs, struct at91_st_data, cs);
++}
++
++static struct at91_st_data *ced_to_at91_st(struct clock_event_device *ced)
++{
++	return container_of(ced, struct at91_st_data, ced);
++}
  
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
+ /*
+  * The ST_CRTR is updated asynchronously to the master clock ... but
+  * the updates as seen by the CPU don't seem to be strictly monotonic.
+  * Waiting until we read the same value twice avoids glitching.
+  */
+-static inline unsigned long read_CRTR(void)
++static inline unsigned long read_CRTR(struct at91_st_data *data)
+ {
+ 	unsigned long x1, x2;
  
--static struct map_desc at91sam9260_io_desc[] __initdata = {
--	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}
+-	x1 = at91_sys_read(AT91_ST_CRTR);
++	x1 = at91_st_read(data, AT91_ST_CRTR);
+ 	do {
+-		x2 = at91_sys_read(AT91_ST_CRTR);
++		x2 = at91_st_read(data, AT91_ST_CRTR);
+ 		if (x1 == x2)
+ 			break;
+ 		x1 = x2;
+@@ -54,9 +83,13 @@ static inline unsigned long read_CRTR(void)
+ /*
+  * IRQ handler for the timer.
+  */
+-static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
++static irqreturn_t at91_st_interrupt(int irq, void *dev_id)
+ {
+-	u32	sr = at91_sys_read(AT91_ST_SR) & irqmask;
++	struct at91_st_data *data = (struct at91_st_data*)dev_id;
++	struct clock_event_device *ced = &data->ced;
++	u32 sr;
++
++	sr = at91_st_read(data, AT91_ST_SR) & data->irqmask;
+ 
+ 	/*
+ 	 * irqs should be disabled here, but as the irq is shared they are only
+@@ -66,17 +99,17 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+ 
+ 	/* simulate "oneshot" timer with alarm */
+ 	if (sr & AT91_ST_ALMS) {
+-		clkevt.event_handler(&clkevt);
++		ced->event_handler(ced);
+ 		return IRQ_HANDLED;
+ 	}
+ 
+ 	/* periodic mode should handle delayed ticks */
+ 	if (sr & AT91_ST_PITS) {
+-		u32	crtr = read_CRTR();
++		u32	crtr = read_CRTR(data);
+ 
+-		while (((crtr - last_crtr) & AT91_ST_CRTV) >= LATCH) {
+-			last_crtr += LATCH;
+-			clkevt.event_handler(&clkevt);
++		while (((crtr - data->last_crtr) & AT91_ST_CRTV) >= LATCH) {
++			data->last_crtr += LATCH;
++			ced->event_handler(ced);
+ 		}
+ 		return IRQ_HANDLED;
+ 	}
+@@ -85,60 +118,51 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-static struct irqaction at91rm9200_timer_irq = {
+-	.name		= "at91_tick",
+-	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= at91rm9200_timer_interrupt
 -};
 -
- static struct map_desc at91sam9260_sram_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9260_SRAM_SIZE,
-@@ -300,10 +292,9 @@ static void __init at91sam9xe_initialize(void)
- 	iotable_init(at91sam9xe_sram_desc, ARRAY_SIZE(at91sam9xe_sram_desc));
- }
- 
--void __init at91sam9260_initialize(unsigned long main_clock)
-+static void __init at91sam9260_initialize(unsigned long main_clock)
+-static cycle_t read_clk32k(struct clocksource *cs)
++static cycle_t at91_st_clocksource_read(struct clocksource *cs)
  {
- 	/* Map peripherals */
--	iotable_init(at91sam9260_io_desc, ARRAY_SIZE(at91sam9260_io_desc));
+-	return read_CRTR();
+-}
++	struct at91_st_data *data = cs_to_at91_st(cs);
  
- 	if (cpu_is_at91sam9xe())
- 		at91sam9xe_initialize();
-@@ -380,3 +371,8 @@ void __init at91sam9260_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
-+
-+struct at91_soc __initdata at91sam9260_soc = {
-+	.name = "at91sam9260",
-+	.init = at91sam9260_initialize,
-+};
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index fcad886..3851e77 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -22,18 +22,10 @@
- #include <mach/at91_rstc.h>
- #include <mach/at91_shdwc.h>
- 
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
--static struct map_desc at91sam9261_io_desc[] __initdata = {
--	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	},
+-static struct clocksource clk32k = {
+-	.name		= "32k_counter",
+-	.rating		= 150,
+-	.read		= read_clk32k,
+-	.mask		= CLOCKSOURCE_MASK(20),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 -};
--
- static struct map_desc at91sam9261_sram_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9261_SRAM_SIZE,
-@@ -267,10 +259,9 @@ static void at91sam9261_poweroff(void)
-  *  AT91SAM9261 processor initialization
-  * -------------------------------------------------------------------- */
++	return read_CRTR(data);
++}
  
--void __init at91sam9261_initialize(unsigned long main_clock)
-+static void __init at91sam9261_initialize(unsigned long main_clock)
+-static void
+-clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
++static void at91_st_clock_event_mode(enum clock_event_mode mode,
++				      struct clock_event_device *dev)
  {
- 	/* Map peripherals */
--	iotable_init(at91sam9261_io_desc, ARRAY_SIZE(at91sam9261_io_desc));
- 
- 	if (cpu_is_at91sam9g10())
- 		iotable_init(at91sam9g10_sram_desc, ARRAY_SIZE(at91sam9g10_sram_desc));
-@@ -346,3 +337,8 @@ void __init at91sam9261_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
++	struct at91_st_data *data = ced_to_at91_st(dev);
 +
-+struct at91_soc __initdata at91sam9261_soc = {
-+	.name = "at91sam9261",
-+	.init = at91sam9261_initialize,
-+};
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 249f900..481a890 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -21,16 +21,12 @@
- #include <mach/at91_rstc.h>
- #include <mach/at91_shdwc.h>
+ 	/* Disable and flush pending timer interrupts */
+ 	at91_sys_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+-	(void) at91_sys_read(AT91_ST_SR);
++	(void) at91_st_read(data, AT91_ST_SR);
  
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
+-	last_crtr = read_CRTR();
++	data->last_crtr = read_CRTR(data);
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		/* PIT for periodic irqs; fixed rate of 1/HZ */
+-		irqmask = AT91_ST_PITS;
+-		at91_sys_write(AT91_ST_PIMR, LATCH);
++		data->irqmask = AT91_ST_PITS;
++		at91_st_write(data, AT91_ST_PIMR, LATCH);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		/* ALM for oneshot irqs, set by next_event()
+ 		 * before 32 seconds have passed
+ 		 */
+-		irqmask = AT91_ST_ALMS;
+-		at91_sys_write(AT91_ST_RTAR, last_crtr);
++		data->irqmask = AT91_ST_ALMS;
++		at91_st_write(data, AT91_ST_RTAR, data->last_crtr);
+ 		break;
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_RESUME:
+-		irqmask = 0;
++		data->irqmask = 0;
+ 		break;
+ 	}
+-	at91_sys_write(AT91_ST_IER, irqmask);
++	at91_st_write(data, AT91_ST_IER, data->irqmask);
+ }
  
- static struct map_desc at91sam9263_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9263_SRAM0_SIZE,
- 		.pfn		= __phys_to_pfn(AT91SAM9263_SRAM0_BASE),
- 		.length		= AT91SAM9263_SRAM0_SIZE,
-@@ -279,7 +275,7 @@ static void at91sam9263_poweroff(void)
-  *  AT91SAM9263 processor initialization
-  * -------------------------------------------------------------------- */
- 
--void __init at91sam9263_initialize(unsigned long main_clock)
-+static void __init at91sam9263_initialize(unsigned long main_clock)
+-static int
+-clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
++static int at91_st_clock_event_next(unsigned long delta,
++				   struct clock_event_device *ced)
  {
- 	/* Map peripherals */
- 	iotable_init(at91sam9263_io_desc, ARRAY_SIZE(at91sam9263_io_desc));
-@@ -351,3 +347,8 @@ void __init at91sam9263_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
+-	u32		alm;
+-	int		status = 0;
++	struct at91_st_data *data = ced_to_at91_st(ced);
++	u32 alm;
++	int status = 0;
+ 
+ 	BUG_ON(delta < 2);
+ 
+@@ -151,59 +175,154 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+ 	 * with the value then held in CRTR ... which would mean the match
+ 	 * wouldn't trigger until 32 seconds later, after CRTR wraps.
+ 	 */
+-	alm = read_CRTR();
++	alm = read_CRTR(data);
+ 
+ 	/* Cancel any pending alarm; flush any pending IRQ */
+-	at91_sys_write(AT91_ST_RTAR, alm);
+-	(void) at91_sys_read(AT91_ST_SR);
++	at91_st_write(data, AT91_ST_RTAR, alm);
++	(void) at91_st_read(data, AT91_ST_SR);
+ 
+ 	/* Schedule alarm by writing RTAR. */
+ 	alm += delta;
+-	at91_sys_write(AT91_ST_RTAR, alm);
++	at91_st_write(data, AT91_ST_RTAR, alm);
+ 
+ 	return status;
  }
-+
-+struct at91_soc __initdata at91sam9263_soc = {
-+	.name = "at91sam9263",
-+	.init = at91sam9263_initialize,
-+};
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index c67b47f..9cb5090 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -22,16 +22,12 @@
- #include <mach/at91_shdwc.h>
- #include <mach/cpu.h>
  
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
- static struct map_desc at91sam9g45_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= AT91_IO_VIRT_BASE - AT91SAM9G45_SRAM_SIZE,
- 		.pfn		= __phys_to_pfn(AT91SAM9G45_SRAM_BASE),
- 		.length		= AT91SAM9G45_SRAM_SIZE,
-@@ -306,7 +302,7 @@ static void at91sam9g45_poweroff(void)
-  *  AT91SAM9G45 processor initialization
-  * -------------------------------------------------------------------- */
- 
--void __init at91sam9g45_initialize(unsigned long main_clock)
-+static void __init at91sam9g45_initialize(unsigned long main_clock)
- {
- 	/* Map peripherals */
- 	iotable_init(at91sam9g45_io_desc, ARRAY_SIZE(at91sam9g45_io_desc));
-@@ -378,3 +374,8 @@ void __init at91sam9g45_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
-+
-+struct at91_soc __initdata at91sam9g45_soc = {
-+	.name = "at91sam9g45",
-+	.init = at91sam9g45_initialize,
-+};
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 6a9d24e..e6f23c3 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -21,18 +21,10 @@
- #include <mach/at91_rstc.h>
- #include <mach/at91_shdwc.h>
- 
-+#include "soc.h"
- #include "generic.h"
- #include "clock.h"
- 
--static struct map_desc at91sam9rl_io_desc[] __initdata = {
--	{
--		.virtual	= AT91_VA_BASE_SYS,
--		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	},
+-static struct clock_event_device clkevt = {
+-	.name		= "at91_tick",
+-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.shift		= 32,
+-	.rating		= 150,
+-	.set_next_event	= clkevt32k_next_event,
+-	.set_mode	= clkevt32k_mode,
 -};
--
- static struct map_desc at91sam9rl_sram_desc[] __initdata = {
- 	{
- 		.pfn		= __phys_to_pfn(AT91SAM9RL_SRAM_BASE),
-@@ -252,12 +244,11 @@ static void at91sam9rl_poweroff(void)
-  *  AT91SAM9RL processor initialization
-  * -------------------------------------------------------------------- */
++static void at91_st_register_clockevent(struct at91_st_data *data)
++{
++	struct clock_event_device *ced = &data->ced;
  
--void __init at91sam9rl_initialize(unsigned long main_clock)
-+static void __init at91sam9rl_initialize(unsigned long main_clock)
- {
- 	unsigned long cidr, sram_size;
- 
- 	/* Map peripherals */
--	iotable_init(at91sam9rl_io_desc, ARRAY_SIZE(at91sam9rl_io_desc));
- 
- 	cidr = at91_sys_read(AT91_DBGU_CIDR);
- 
-@@ -343,3 +334,8 @@ void __init at91sam9rl_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
- }
+-/*
+- * ST (system timer) module supports both clockevents and clocksource.
+- */
+-void __init at91rm9200_timer_init(void)
++	memset(ced, 0, sizeof(*ced));
 +
-+struct at91_soc __initdata at91sam9rl_soc = {
-+	.name = "at91sam9rl",
-+	.init = at91sam9rl_initialize,
-+};
++	ced->name = "at91_tick";
++	ced->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++	ced->shift = 32;
++	ced->rating = 150;
++	ced->set_next_event = at91_st_clock_event_next;
++	ced->set_mode = at91_st_clock_event_mode;
++	ced->mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, ced->shift);
++	ced->max_delta_ns = clockevent_delta2ns(AT91_ST_ALMV, ced);
++	ced->min_delta_ns = clockevent_delta2ns(2, ced) + 1;
++	ced->cpumask = cpumask_of(0);
++
++	dev_info(&data->pdev->dev, "used for clock events\n");
++
++	clockevents_register_device(ced);
++}
++
++static int at91_st_register_clocksource(struct at91_st_data *data)
+ {
++	struct clocksource *cs = &data->cs;
++
++	cs->name = "32k_counter";
++	cs->rating = 150;
++	cs->read = at91_st_clocksource_read;
++	cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
++	cs->mask = CLOCKSOURCE_MASK(20);
++
++	dev_info(&data->pdev->dev, "used as clock source\n");
++
++	clocksource_register_hz(cs, AT91_SLOW_CLOCK);
++
++	return 0;
++}
++
++static int at91_st_setup(struct at91_st_data *data,
++			  struct platform_device *pdev)
++{
++	struct resource	*res;
++	int		irq;
++	int		ret = -ENXIO;
++
++	memset(data, 0, sizeof(struct at91_st_data));
++	data->pdev = pdev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "failed to get I/O memory\n");
++		goto err0;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "failed to get irq\n");
++		goto err0;
++	}
++
++	/* map memory, let mapbase point to our channel */
++	data->mapbase = (void * __iomem)(res->start + AT91_VA_BASE_SYS);
++
++	/* request irq using setup_irq() (too early for request_irq()) */
++	data->irqaction.name = "at91_tick";
++	data->irqaction.handler = at91_st_interrupt;
++	data->irqaction.dev_id = data;
++	data->irqaction.flags = IRQF_SHARED | IRQF_DISABLED |
++				IRQF_TIMER  | IRQF_IRQPOLL;
++
+ 	/* Disable all timer interrupts, and clear any pending ones */
+ 	at91_sys_write(AT91_ST_IDR,
+ 		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
+ 	(void) at91_sys_read(AT91_ST_SR);
+ 
+-	/* Make IRQs happen for the system timer */
+-	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
+-
+ 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
+ 	 * directly for the clocksource and all clockevents, after adjusting
+ 	 * its prescaler from the 1 Hz default.
+ 	 */
+ 	at91_sys_write(AT91_ST_RTMR, 1);
+ 
+-	/* Setup timer clockevent, with minimum of two ticks (important!!) */
+-	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
+-	clkevt.max_delta_ns = clockevent_delta2ns(AT91_ST_ALMV, &clkevt);
+-	clkevt.min_delta_ns = clockevent_delta2ns(2, &clkevt) + 1;
+-	clkevt.cpumask = cpumask_of(0);
+-	clockevents_register_device(&clkevt);
++	/*
++	 * Register clocksource.  The high order bits of PIV are unused,
++	 * so this isn't a 32-bit counter unless we get clockevent irqs.
++	 */
++	at91_st_register_clocksource(data);
++
++	/* Set up irq handler */
++	setup_irq(irq, &data->irqaction);
+ 
+-	/* register clocksource */
+-	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
++	/* Set up and register clockevents */
++	at91_st_register_clockevent(data);
++
++	return 0;
++
++err0:
++	return ret;
++}
++
++static int __devinit at91_st_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct at91_st_data *data;
++
++	if (!is_early_platform_device(pdev)) {
++		pr_info("at91_st.%d: call via non early plaform\n", pdev->id);
++		return 0;
++	}
++
++	data = kmalloc(sizeof(struct at91_st_data), GFP_KERNEL);
++	if (data == NULL) {
++		dev_err(&pdev->dev, "failed to allocate driver data\n");
++		return -ENOMEM;
++	}
++
++	ret = at91_st_setup(data, pdev);
++
++	if (ret)
++		kfree(data);
++
++	return ret;
+ }
+ 
+-struct sys_timer at91rm9200_timer = {
+-	.init		= at91rm9200_timer_init,
++static int __devexit at91_st_remove(struct platform_device *pdev)
++{
++	return -EBUSY; /* cannot unregister clockevent and clocksource */
++}
++
++static struct platform_driver at91_st_device_driver = {
++	.probe		= at91_st_probe,
++	.remove		= __devexit_p(at91_st_remove),
++	.driver		= {
++		.name	= "at91_st",
++	}
+ };
+ 
++early_platform_init("earlytimer", &at91_st_device_driver);
 diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index d294293..b0d235e 100644
+index ba08329..b487dff 100644
 --- a/arch/arm/mach-at91/board-1arm.c
 +++ b/arch/arm/mach-at91/board-1arm.c
-@@ -46,7 +46,7 @@ static void __init onearm_map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index cba7f77..855c641 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -51,7 +51,7 @@
- static void __init afeb9260_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-index 8ad58bd..ca796c2 100644
---- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-+++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-@@ -50,7 +50,7 @@
- static void __init eb_map_io(void)
- {
- 	/* Initialize processor: 12.500 MHz crystal */
--	at572d940hf_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index b54e3e6..f6b08f0 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -48,7 +48,7 @@
- static void __init cam60_map_io(void)
- {
- 	/* Initialize processor: 10 MHz crystal */
--	at91sam9260_initialize(10000000);
-+	at91_initialize(10000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index 69aa349..f9138dc 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -53,7 +53,7 @@
- static void __init cap9adk_map_io(void)
- {
- 	/* Initialize processor: 12 MHz crystal */
--	at91cap9_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* Setup the LEDs: USER1 and USER2 LED for cpu/timer... */
- 	at91_init_leds(AT91_PIN_PA10, AT91_PIN_PA11);
+@@ -97,7 +97,7 @@ static void __init onearm_board_init(void)
+ MACHINE_START(ONEARM, "Ajeco 1ARM single board computer")
+ 	/* Maintainer: Lennert Buytenhek <buytenh@wantstofly.org> */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= onearm_map_io,
+ 	.init_irq	= onearm_init_irq,
+ 	.init_machine	= onearm_board_init,
 diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index ac8f224..f87fd72 100644
+index cb888cf..d2178fd 100644
 --- a/arch/arm/mach-at91/board-carmeva.c
 +++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -43,7 +43,7 @@
- static void __init carmeva_map_io(void)
- {
- 	/* Initialize processor: 20.000 MHz crystal */
--	at91rm9200_initialize(20000000);
-+	at91_initialize(20000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 3838594..c228d3a 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -50,7 +50,7 @@
- static void __init cpu9krea_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -163,7 +163,7 @@ static void __init carmeva_board_init(void)
+ MACHINE_START(CARMEVA, "Carmeva")
+ 	/* Maintainer: Conitec Datasystems */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= carmeva_map_io,
+ 	.init_irq	= carmeva_init_irq,
+ 	.init_machine	= carmeva_board_init,
 diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index c25db34..7858e3c 100644
+index 33ddbfa..1afdad4 100644
 --- a/arch/arm/mach-at91/board-cpuat91.c
 +++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -57,7 +57,7 @@ static void __init cpuat91_map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -180,7 +180,7 @@ static void __init cpuat91_board_init(void)
+ MACHINE_START(CPUAT91, "Eukrea")
+ 	/* Maintainer: Eric Benard - EUKREA Electromatique */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= cpuat91_map_io,
+ 	.init_irq	= cpuat91_init_irq,
+ 	.init_machine	= cpuat91_board_init,
 diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index 2a3f2f7..a3dd759 100644
+index 354e85e..1a61446 100644
 --- a/arch/arm/mach-at91/board-csb337.c
 +++ b/arch/arm/mach-at91/board-csb337.c
-@@ -46,7 +46,7 @@
- static void __init csb337_map_io(void)
- {
- 	/* Initialize processor: 3.6864 MHz crystal */
--	at91rm9200_initialize(3686400);
-+	at91_initialize(3686400);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
+@@ -258,7 +258,7 @@ static void __init csb337_board_init(void)
+ MACHINE_START(CSB337, "Cogent CSB337")
+ 	/* Maintainer: Bill Gatliff */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= csb337_map_io,
+ 	.init_irq	= csb337_init_irq,
+ 	.init_machine	= csb337_board_init,
 diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-index d42a7c3..5849ed1 100644
+index 9bff91f..efe7c39 100644
 --- a/arch/arm/mach-at91/board-csb637.c
 +++ b/arch/arm/mach-at91/board-csb637.c
-@@ -43,7 +43,7 @@
- static void __init csb637_map_io(void)
- {
- 	/* Initialize processor: 3.6864 MHz crystal */
--	at91rm9200_initialize(3686400);
-+	at91_initialize(3686400);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -139,7 +139,7 @@ static void __init csb637_board_init(void)
+ MACHINE_START(CSB637, "Cogent CSB637")
+ 	/* Maintainer: Bill Gatliff */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= csb637_map_io,
+ 	.init_irq	= csb637_init_irq,
+ 	.init_machine	= csb637_board_init,
 diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index e732350..1dee160 100644
+index 8101ef0..9643bf5 100644
 --- a/arch/arm/mach-at91/board-eb9200.c
 +++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -43,7 +43,7 @@
- static void __init eb9200_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
+@@ -121,7 +121,7 @@ static void __init eb9200_board_init(void)
  
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+ MACHINE_START(ATEB9200, "Embest ATEB9200")
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= eb9200_map_io,
+ 	.init_irq	= eb9200_init_irq,
+ 	.init_machine	= eb9200_board_init,
 diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index 587ed99..3bfc55a 100644
+index 7fb26f9..5a1537a 100644
 --- a/arch/arm/mach-at91/board-ecbat91.c
 +++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -49,7 +49,7 @@ static void __init ecb_at91map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
+@@ -173,7 +173,7 @@ static void __init ecb_at91board_init(void)
+ MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
+ 	/* Maintainer: emQbit.com */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= ecb_at91map_io,
+ 	.init_irq	= ecb_at91init_irq,
+ 	.init_machine	= ecb_at91board_init,
 diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index 5cc591f..85d0742 100644
+index 9c979bb..efd160d 100644
 --- a/arch/arm/mach-at91/board-eco920.c
 +++ b/arch/arm/mach-at91/board-eco920.c
-@@ -35,7 +35,7 @@ static void __init eco920_map_io(void)
- 	/* Set cpu type: PQFP */
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index c8a62dc..345ba51 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -40,7 +40,7 @@
- static void __init flexibity_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index dfc7dfe..6948af9 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -60,7 +60,7 @@
- static void __init foxg20_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -135,7 +135,7 @@ static void __init eco920_board_init(void)
+ MACHINE_START(ECO920, "eco920")
+ 	/* Maintainer: Sascha Hauer */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= eco920_map_io,
+ 	.init_irq	= eco920_init_irq,
+ 	.init_machine	= eco920_board_init,
 diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 1def877..944ad13 100644
+index cf7e7a0..b20bd84 100644
 --- a/arch/arm/mach-at91/board-kafa.c
 +++ b/arch/arm/mach-at91/board-kafa.c
-@@ -46,7 +46,7 @@ static void __init kafa_map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
+@@ -99,7 +99,7 @@ static void __init kafa_board_init(void)
+ MACHINE_START(KAFA, "Sperry-Sun KAFA")
+ 	/* Maintainer: Sergei Sharonov */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= kafa_map_io,
+ 	.init_irq	= kafa_init_irq,
+ 	.init_machine	= kafa_board_init,
 diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index ad0fe91..e744e44 100644
+index a56cdee..570b00d 100644
 --- a/arch/arm/mach-at91/board-kb9202.c
 +++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -48,7 +48,7 @@ static void __init kb9202_map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 10 MHz crystal */
--	at91rm9200_initialize(10000000);
-+	at91_initialize(10000000);
- 
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index fe5f1d4..2bd4cda 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -54,7 +54,7 @@
- static void __init neocore926_map_io(void)
- {
- 	/* Initialize processor: 20 MHz crystal */
--	at91sam9263_initialize(20000000);
-+	at91_initialize(20000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -140,7 +140,7 @@ static void __init kb9202_board_init(void)
+ MACHINE_START(KB9200, "KB920x")
+ 	/* Maintainer: KwikByte, Inc. */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= kb9202_map_io,
+ 	.init_irq	= kb9202_init_irq,
+ 	.init_machine	= kb9202_board_init,
 diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index c153863..d22b1a3 100644
+index 3267b95..5184964 100644
 --- a/arch/arm/mach-at91/board-picotux200.c
 +++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -46,7 +46,7 @@
- static void __init picotux200_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index 69d15a8..d977e7e 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -51,7 +51,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
--	at91sam9260_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -124,7 +124,7 @@ static void __init picotux200_board_init(void)
+ MACHINE_START(PICOTUX2XX, "picotux 200")
+ 	/* Maintainer: Kleinhenz Elektronik GmbH */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= picotux200_map_io,
+ 	.init_irq	= picotux200_init_irq,
+ 	.init_machine	= picotux200_board_init,
 diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index b8f3b3d..0175eef 100644
+index c14f2c2..d715327 100644
 --- a/arch/arm/mach-at91/board-rm9200dk.c
 +++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -48,7 +48,7 @@
- static void __init dk_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
+@@ -228,7 +228,7 @@ static void __init dk_board_init(void)
+ MACHINE_START(AT91RM9200DK, "Atmel AT91RM9200-DK")
+ 	/* Maintainer: SAN People/Atmel */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= dk_map_io,
+ 	.init_irq	= dk_init_irq,
+ 	.init_machine	= dk_board_init,
 diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index b55edc6..882d016 100644
+index ffd69c0..755929c 100644
 --- a/arch/arm/mach-at91/board-rm9200ek.c
 +++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -48,7 +48,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index 25a26be..36f765a 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -47,7 +47,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PA9, AT91_PIN_PA6);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index fb05ec0..cc864a9 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -53,7 +53,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index a0b182e..010636c 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -57,7 +57,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9261_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PA13, AT91_PIN_PA14);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 3c9cbd8..0c3a54d 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -56,7 +56,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 16.367 MHz crystal */
--	at91sam9263_initialize(16367660);
-+	at91_initialize(16367660);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 2de10ca..74676c6 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -64,7 +64,7 @@ static int inline ek_have_2mmc(void)
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 200e155..15ccaad 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -50,7 +50,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
--	at91sam9g45_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 3bf3408..7b232b3 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -41,7 +41,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
--	at91sam9rl_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 17f7d9b..db5e67a 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -42,7 +42,7 @@
- 
- static void __init snapper9260_map_io(void)
- {
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Debug on ttyS0 */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index f8902b1..bd0c8ce 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -35,7 +35,7 @@
- void __init stamp9g20_map_io(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91sam9260_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-usb-a9260.c b/arch/arm/mach-at91/board-usb-a9260.c
-index 07784ba..8b0955f 100644
---- a/arch/arm/mach-at91/board-usb-a9260.c
-+++ b/arch/arm/mach-at91/board-usb-a9260.c
-@@ -51,7 +51,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
--	at91sam9260_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-usb-a9263.c b/arch/arm/mach-at91/board-usb-a9263.c
-index b6145089..5b2a7bb 100644
---- a/arch/arm/mach-at91/board-usb-a9263.c
-+++ b/arch/arm/mach-at91/board-usb-a9263.c
-@@ -50,7 +50,7 @@
- static void __init ek_map_io(void)
- {
- 	/* Initialize processor: 12.00 MHz crystal */
--	at91sam9263_initialize(12000000);
-+	at91_initialize(12000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
+@@ -194,7 +194,7 @@ static void __init ek_board_init(void)
+ MACHINE_START(AT91RM9200EK, "Atmel AT91RM9200-EK")
+ 	/* Maintainer: SAN People/Atmel */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= ek_map_io,
+ 	.init_irq	= ek_init_irq,
+ 	.init_machine	= ek_board_init,
 diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index 097328b..b473252 100644
+index e9ca130..16bb91d 100644
 --- a/arch/arm/mach-at91/board-yl-9200.c
 +++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -56,7 +56,7 @@ static void __init yl9200_map_io(void)
- 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
- 
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000);
-+	at91_initialize(18432000);
- 
- 	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
- 	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
+@@ -599,7 +599,7 @@ static void __init yl9200_board_init(void)
+ MACHINE_START(YL9200, "uCdragon YL-9200")
+ 	/* Maintainer: S.Birtles */
+ 	.boot_params	= AT91_SDRAM_BASE + 0x100,
+-	.timer		= &at91rm9200_timer,
++	.timer		= &at91_timer,
+ 	.map_io		= yl9200_map_io,
+ 	.init_irq	= yl9200_init_irq,
+ 	.init_machine	= yl9200_board_init,
 diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 87ec31d..e1a5007 100644
+index 1cfe696..eb01942 100644
 --- a/arch/arm/mach-at91/generic.h
 +++ b/arch/arm/mach-at91/generic.h
-@@ -10,15 +10,8 @@
+@@ -22,7 +22,7 @@ extern void __init at91_aic_init(unsigned int priority[]);
  
-  /* Processors */
- extern void __init at91rm9200_set_type(int type);
--extern void __init at91rm9200_initialize(unsigned long main_clock);
--extern void __init at91sam9260_initialize(unsigned long main_clock);
--extern void __init at91sam9261_initialize(unsigned long main_clock);
--extern void __init at91sam9263_initialize(unsigned long main_clock);
--extern void __init at91sam9rl_initialize(unsigned long main_clock);
--extern void __init at91sam9g45_initialize(unsigned long main_clock);
-+extern void __init at91_initialize(unsigned long main_clock);
- extern void __init at91x40_initialize(unsigned long main_clock);
--extern void __init at91cap9_initialize(unsigned long main_clock);
--extern void __init at572d940hf_initialize(unsigned long main_clock);
+  /* Timer */
+ struct sys_timer;
+-extern struct sys_timer at91rm9200_timer;
++extern struct sys_timer at91_timer;
+ extern struct sys_timer at91_timer;
+ extern struct sys_timer at91x40_timer;
  
-  /* Interrupts */
- extern void __init at91rm9200_init_interrupts(unsigned int priority[]);
-diff --git a/arch/arm/mach-at91/include/mach/at572d940hf.h b/arch/arm/mach-at91/include/mach/at572d940hf.h
-index be510cf..2dc22d3 100644
---- a/arch/arm/mach-at91/include/mach/at572d940hf.h
-+++ b/arch/arm/mach-at91/include/mach/at572d940hf.h
-@@ -83,7 +83,6 @@
- #define AT572D940HF_BASE_EMAC	0xfffd8000
- #define AT572D940HF_BASE_CAN0	0xfffdc000
- #define AT572D940HF_BASE_CAN1	0xfffe0000
--#define AT91_BASE_SYS		0xffffea00
- 
- 
- /*
-diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-index 9c6af97..adac25a 100644
---- a/arch/arm/mach-at91/include/mach/at91cap9.h
-+++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-@@ -77,7 +77,6 @@
- #define AT91CAP9_BASE_EMAC		0xfffbc000
- #define AT91CAP9_BASE_ADC		0xfffc0000
- #define AT91CAP9_BASE_ISI		0xfffc4000
--#define AT91_BASE_SYS			0xffffe200
- 
- /*
-  * System Peripherals (offset from AT91_BASE_SYS)
-diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
-index 7898315..aedc28f 100644
---- a/arch/arm/mach-at91/include/mach/at91rm9200.h
-+++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
-@@ -76,7 +76,6 @@
- #define AT91RM9200_BASE_SSC1	0xfffd4000
- #define AT91RM9200_BASE_SSC2	0xfffd8000
- #define AT91RM9200_BASE_SPI	0xfffe0000
--#define AT91_BASE_SYS		0xfffff000
- 
- 
- /*
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index 6c53b95..6da5ce6 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -78,7 +78,6 @@
- #define AT91SAM9260_BASE_TC4		0xfffdc040
- #define AT91SAM9260_BASE_TC5		0xfffdc080
- #define AT91SAM9260_BASE_ADC		0xfffe0000
--#define AT91_BASE_SYS			0xffffe800
- 
- /*
-  * System Peripherals (offset from AT91_BASE_SYS)
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-index 2b56185..6c4ea40 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9261.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-@@ -62,7 +62,6 @@
- #define AT91SAM9261_BASE_SSC2		0xfffc4000
- #define AT91SAM9261_BASE_SPI0		0xfffc8000
- #define AT91SAM9261_BASE_SPI1		0xfffcc000
--#define AT91_BASE_SYS			0xffffea00
- 
- 
- /*
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-index 2091f1e..1572453 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9263.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-@@ -72,7 +72,6 @@
- #define AT91SAM9263_BASE_EMAC		0xfffbc000
- #define AT91SAM9263_BASE_ISI		0xfffc4000
- #define AT91SAM9263_BASE_2DGE		0xfffc8000
--#define AT91_BASE_SYS			0xffffe000
- 
- /*
-  * System Peripherals (offset from AT91_BASE_SYS)
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-index a526869..b00cc18 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-@@ -84,7 +84,6 @@
- #define AT91SAM9G45_BASE_TC3		0xfffd4000
- #define AT91SAM9G45_BASE_TC4		0xfffd4040
- #define AT91SAM9G45_BASE_TC5		0xfffd4080
--#define AT91_BASE_SYS			0xffffe200
- 
- /*
-  * System Peripherals (offset from AT91_BASE_SYS)
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-index 87ba851..b6c18c7 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-@@ -66,7 +66,6 @@
- #define AT91SAM9RL_BASE_TSC	0xfffd0000
- #define AT91SAM9RL_BASE_UDPHS	0xfffd4000
- #define AT91SAM9RL_BASE_AC97C	0xfffd8000
--#define AT91_BASE_SYS		0xffffc000
- 
- 
- /*
-diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-index 3d64a75..b7ff44a 100644
---- a/arch/arm/mach-at91/include/mach/hardware.h
-+++ b/arch/arm/mach-at91/include/mach/hardware.h
-@@ -16,6 +16,20 @@
- 
- #include <asm/sizes.h>
- 
-+#if !defined(CONFIG_ARCH_AT91X40)
-+/*
-+ * on all at91 except rm9200 and x40 have the System Controller start in reallity
-+ * at 0xffffc000 of 16KiB
-+ *
-+ * on rm9200 it's start at 0xfffe4000 of 111KiB with non reserved data starting
-+ * at 0xfffff000
-+ *
-+ * so we will use a common AT91_BASE_SYS at 0xffffc000 of 16KiB
-+ * and map the same memory space
-+ */
-+#define AT91_BASE_SYS	0xffffc000
-+#endif
-+
- #if defined(CONFIG_ARCH_AT91RM9200)
- #include <mach/at91rm9200.h>
- #elif defined(CONFIG_ARCH_AT91SAM9260) || defined(CONFIG_ARCH_AT91SAM9G20)
 diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-new file mode 100644
-index 0000000..81f5815
---- /dev/null
+index 7b44be2..1b05997 100644
+--- a/arch/arm/mach-at91/soc.c
 +++ b/arch/arm/mach-at91/soc.c
-@@ -0,0 +1,57 @@
+@@ -229,18 +229,37 @@ static struct platform_device at91_pit_device = {
+ 	.num_resources	= ARRAY_SIZE(pit_resources),
+ };
+ 
 +/*
-+ *
-+ * Copyright (C) 2007 Atmel Corporation.
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Under GPLv2
-+ *
++ * ST (system timer) module supports both clockevents and clocksource.
 + */
-+
-+#include <linux/module.h>
-+#include <linux/io.h>
-+
-+#include <asm/mach/map.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/cpu.h>
-+
-+#include "soc.h"
-+#include "generic.h"
-+
-+static struct at91_soc __initdata current_soc;
-+
-+static struct map_desc at91_io_desc __initdata = {
-+	.virtual	= AT91_VA_BASE_SYS,
-+	.pfn		= __phys_to_pfn(AT91_BASE_SYS),
-+	.length		= SZ_16K,
-+	.type		= MT_DEVICE,
++static struct resource st_resources[] = {
++	[0] = RES_MEM(SZ_256),
++	[1] = RES_IRQ(),
 +};
 +
-+void __init at91_initialize(unsigned long main_clock)
-+{
-+	/* Map peripherals */
-+	iotable_init(&at91_io_desc, 1);
++static struct platform_device at91_st_device = {
++	.name		= "at91_st",
++	.id		= 0,
++	.resource	= st_resources,
++	.num_resources	= ARRAY_SIZE(st_resources),
++};
 +
-+	if (cpu_is_at91rm9200())
-+		current_soc = at91rm9200_soc;
-+	else if (cpu_is_at91sam9260())
-+		current_soc = at91sam9260_soc;
-+	else if (cpu_is_at91sam9261())
-+		current_soc = at91sam9261_soc;
-+	else if (cpu_is_at91sam9263())
-+		current_soc = at91sam9263_soc;
-+	else if (cpu_is_at91sam9rl())
-+		current_soc = at91sam9rl_soc;
-+	else if (cpu_is_at91sam9g45())
-+		current_soc = at91sam9g45_soc;
-+	else if (cpu_is_at91cap9())
-+		current_soc = at91cap9_soc;
-+	else if (cpu_is_at572d940hf())
-+		current_soc = at572d940hf_soc;
-+	else
-+		panic("Impossible to detect the CPU type");
-+
-+	pr_info("AT91: detected soc: %s\n", current_soc.name);
-+
-+	current_soc.init(main_clock);
-+}
+ static void __init at91_timer_init(void)
+ {
+ 	struct at91_dev_resource *res;
+ 	struct platform_device *pdev;
+ 	struct resource *r;
+ 
+-	BUG_ON(!current_soc.pit);
++	BUG_ON(!current_soc.pit && !current_soc.st);
+ 
+ 	if (current_soc.pit) {
+ 		r = pit_resources;
+ 		res = current_soc.pit;
+ 		pdev = &at91_pit_device;
++	} else {
++		r = st_resources;
++		res = current_soc.st;
++		pdev = &at91_st_device;
+ 	}
+ 
+ 	set_resource_mem(&r[0], res->mmio_base);
 diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-new file mode 100644
-index 0000000..6c30d74
---- /dev/null
+index 8df07a2..a60ac0a 100644
+--- a/arch/arm/mach-at91/soc.h
 +++ b/arch/arm/mach-at91/soc.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2007 Atmel Corporation.
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Under GPLv2
-+ *
-+ */
-+
-+struct at91_soc {
-+	char *name;
-+
-+	void (*init)(unsigned long main_clock);
-+};
-+
-+extern struct at91_soc at91rm9200_soc;
-+extern struct at91_soc at91sam9260_soc;
-+extern struct at91_soc at91sam9261_soc;
-+extern struct at91_soc at91sam9263_soc;
-+extern struct at91_soc at91sam9rl_soc;
-+extern struct at91_soc at91sam9g45_soc;
-+extern struct at91_soc at91cap9_soc;
-+extern struct at91_soc at572d940hf_soc;
+@@ -14,6 +14,7 @@ struct at91_soc {
+ 
+ 	struct at91_dev_resource_array gpio;
+ 	struct at91_dev_resource *pit;
++	struct at91_dev_resource *st;
+ 
+ 	void (*init)(unsigned long main_clock);
+ };
 -- 
 1.7.4.1
