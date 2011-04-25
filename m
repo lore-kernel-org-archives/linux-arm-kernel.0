@@ -1,96 +1,67 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 26 Apr 2011 10:51:53 +1200
-Subject: [PATCH 07/14] at91: switch gpio to early platfrom device
-In-Reply-To: <1303756284-26529-7-git-send-email-plagnioj@jcrosoft.com>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-7-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4DB5FB09.8020501@bluewatersys.com>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Mon, 25 Apr 2011 16:33:27 -0700
+Subject: console_cpu_notify can cause scheduling BUG during CPU hotplug
+Message-ID: <4DB604C7.8090305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2011 06:31 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> ---
-> need patch
-> clkdev: add support to lookup for early platform device
+Hi,
 
-<snip>
+I've run into a crash scenario during CPU hotplug on ARM/MSM where we 
+BUG() due to a schedule while atomic in v2.6.38-rc6. The issue appears 
+to be that the console cpu notifier can block on a semaphore during 
+cpu_stopper_thread's atomic code path. Preemption is explicitly disabled 
+in cpu_stopper_thread.
 
-> diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-> new file mode 100644
-> index 0000000..4d39f9b
-> --- /dev/null
-> +++ b/arch/arm/mach-at91/devices.h
-> @@ -0,0 +1,55 @@
-> +/*
-> + * arch/arm/mach-at91/devices.h
-> + *
-> + * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> + *
-> + * Under GPLv2
-> + *
-> + */
-> +
-> +#ifndef _AT91_DEVICES_H
-> +#define _AT91_DEVICES_H
-> +
-> +#include <linux/types.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define RES_MEM(size)				\
-> +	{					\
-> +		.end	= size - 1,		\
-> +		.flags	= IORESOURCE_MEM,	\
-> +	}
-> +
-> +#define RES_IRQ()				\
-> +	{					\
-> +		.flags	= IORESOURCE_IRQ,	\
-> +	}
-> +
-> +
-> +static inline void set_resource_mem(struct resource *res, resource_size_t mmio_base)
-> +{
-> +	BUG_ON(res->flags != IORESOURCE_MEM);
-> +	res->start = mmio_base;
-> +	res->end  += mmio_base;
-> +}
-> +
-> +static inline void set_resource_irq(struct resource *res, int irq)
-> +{
-> +	if (!irq)
-> +		return;
-> +
-> +	BUG_ON(res->flags != IORESOURCE_IRQ);
-> +	res->start = irq;
-> +	res->end   = irq;
-> +}
-> +
-> +struct at91_dev_resource {
-> +	resource_size_t	mmio_base;
-> +	int		irq;
-> +};
-> +
-> +struct at91_dev_resource_array {
-> +	struct at91_dev_resource *resource;
-> +	int num_resources;
-> +};
+The suspected path was added with this commit:
 
-We will have to consolidate here since this conflicts with my patch set.
-Our approaches are pretty similar though, so hopefully it's not too big
-a deal. How do you want to manage the merging of our patches? Do you
-want to take my stuff via your tree and handle the merge there or do you
-want be to try rebasing my patches on top of a branch of your git tree?
+commit 034260d6779087431a8b2f67589c68b919299e5c
+Author: Kevin Cernekee <cernekee@gmail.com>
+Date:   Thu Jun 3 22:11:25 2010 -0700
 
-~Ryan
+     printk: fix delayed messages from CPU hotplug events
+
+I was curious if this scenario was accounted for in the design of the 
+console CPU notifier. One workaround for this problem is to remove 
+CPU_DEAD from the possible actions in console_cpu_notify(). In fact, 
+v1-v4 of the patch above did not have CPU_DEAD, CPU_DYING or 
+CPU_DOWN_FAILED in the list of actions. I wasn't able to track down why 
+the other cases were added in the final patch.
+
+Crash log:
+
+<3>[   21.408237] BUG: scheduling while atomic: migration/1/371/0x00000002
+<4>[   21.408247] Modules linked in:
+<4>[   21.408286] [<c0050e40>] (unwind_backtrace+0x0/0x128) from 
+[<c056748c>] (schedule+0x9c/0x6c4)
+<4>[   21.408303] [<c056748c>] (schedule+0x9c/0x6c4) from [<c0567d04>] 
+(schedule_timeout+0x1c/0x208)
+<4>[   21.408319] [<c0567d04>] (schedule_timeout+0x1c/0x208) from 
+[<c0568fac>] (__down+0x68/0x98)
+<4>[   21.408337] [<c0568fac>] (__down+0x68/0x98) from [<c00d844c>] 
+(down+0x2c/0x3c)
+<4>[   21.408354] [<c00d844c>] (down+0x2c/0x3c) from [<c00bb23c>] 
+(console_lock+0x38/0x60)
+<4>[   21.408377] [<c00bb23c>] (console_lock+0x38/0x60) from 
+[<c0564c80>] (console_cpu_notify+0x20/0x2c)
+<4>[   21.408394] [<c0564c80>] (console_cpu_notify+0x20/0x2c) from 
+[<c00d8488>] (notifier_call_chain+0x2c/0x70)
+<4>[   21.408410] [<c00d8488>] (notifier_call_chain+0x2c/0x70) from 
+[<c00bc318>] (__cpu_notify+0x24/0x3c)
+<4>[   21.408425] [<c00bc318>] (__cpu_notify+0x24/0x3c) from 
+[<c0552e7c>] (take_cpu_down+0x2c/0x34)
+<4>[   21.408444] [<c0552e7c>] (take_cpu_down+0x2c/0x34) from 
+[<c00f34d4>] (stop_machine_cpu_stop+0xc0/0x11c)
+<4>[   21.408462] [<c00f34d4>] (stop_machine_cpu_stop+0xc0/0x11c) from 
+[<c00f337c>] (cpu_stopper_thread+0xc8/0x160)
+<4>[   21.408482] [<c00f337c>] (cpu_stopper_thread+0xc8/0x160) from 
+[<c00d30b0>] (kthread+0x80/0x88)
+<4>[   21.408498] [<c00d30b0>] (kthread+0x80/0x88) from [<c004b6a0>] 
+(kernel_thread_exit+0x0/0x8)
+
+Thanks,
+Mike
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
