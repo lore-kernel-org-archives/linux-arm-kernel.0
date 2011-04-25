@@ -1,37 +1,41 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Sun, 24 Apr 2011 23:11:32 -0700
-Subject: arm: msm: Convert irq-vic to generic irq chip
-In-Reply-To: <alpine.LFD.2.02.1104211926550.3323@ionos>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 25 Apr 2011 12:20:33 +0530
+Subject: davinci: Use generic irq chip
+In-Reply-To: <20110416211307.686087239@linutronix.de>
 References: <20110416211221.853079766@linutronix.de>
-	<20110416211308.455390167@linutronix.de>
-	<4DB0611D.6040902@codeaurora.org>
-	<alpine.LFD.2.02.1104211926550.3323@ionos>
-Message-ID: <4DB51094.3040003@codeaurora.org>
+	<20110416211307.686087239@linutronix.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CAE2FAB@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2011 10:28 AM, Thomas Gleixner wrote:
-> On Thu, 21 Apr 2011, Abhijeet Dharmapurikar wrote:
->> On 04/16/2011 02:14 PM, Thomas Gleixner wrote:
->
-> Another question is whether you could move to the arm/common/vic.c
-> implementation completely.
+Hi Thomas,
 
-arm/common/vic.c doesnt have a set_type callback. We have some edge 
-triggered interrupts as wakeup interrupts and need the PENDING flag in 
-the descriptor set when disabled. Can we move msm_irq_set_type() to 
-arm/common/vic.c ?
+On Sun, Apr 17, 2011 at 02:44:08, Thomas Gleixner wrote:
+> Simple conversion which simply uses the fact that the second irq chip
+> base address has offset 0x04 to the first one.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 
-Additionally
-- the register map is different between msm's vic and the common one.
-- the common one uses some PL190 registers, not sure what that is. The 
-VIC can operate in few different modes, perhaps it refers to vectored 
-mode as opposed to non vectored mode, msm uses the non vectored mode.
-- vic_init2() seems like it is initializing a cascaded interrupt 
-controller. msm doesnt use cascaded vics.
+Boot tested it on a DM365 EVM.
 
-I dont think msm can move to using the common vic.c.
+Tested-by: Sekhar Nori <nsekhar@ti.com>
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> @@ -152,13 +103,8 @@ void __init davinci_irq_init(void)
+>  		davinci_irq_writel(pri, i);
+>  	}
+>  
+> -	/* set up genirq dispatch for ARM INTC */
+> -	for (i = 0; i < davinci_soc_info.intc_irq_num; i++) {
+> -		irq_set_chip(i, &davinci_irq_chip_0);
+> -		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+> -		if (i != IRQ_TINT1_TINT34)
+> -			irq_set_handler(i, handle_edge_irq);
+> -		else
+> -			irq_set_handler(i, handle_level_irq);
+> -	}
+> +	for (i = 0, j= 0; i < davinci_soc_info.intc_irq_num; i += 32, j += 0x04)
+                   ^
+There is a space needed before the '=' as pointed by checkpatch.
+
+Thanks,
+Sekhar
