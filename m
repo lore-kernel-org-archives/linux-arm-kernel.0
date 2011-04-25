@@ -1,1030 +1,1785 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 25 Apr 2011 20:31:19 +0200
-Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
+Date: Mon, 25 Apr 2011 20:31:16 +0200
+Subject: [PATCH 06/14 v3] at91: switch to CLKDEV_LOOKUP
 In-Reply-To: <20110425180847.GA12904@game.jcrosoft.org>
 References: <20110425180847.GA12904@game.jcrosoft.org>
-Message-ID: <1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1303756284-26529-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will allow to specify the resources per soc
-
-as the 5series use a different start address for the pit
+we do not change the clock naming convention so does not need to switch
+the AVR32 yet
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/at572d940hf.c           |    6 +
- arch/arm/mach-at91/at91cap9.c              |    6 +
- arch/arm/mach-at91/at91sam9260.c           |    6 +
- arch/arm/mach-at91/at91sam9261.c           |    6 +
- arch/arm/mach-at91/at91sam9263.c           |    6 +
- arch/arm/mach-at91/at91sam926x_time.c      |  277 +++++++++++++++++++++-------
- arch/arm/mach-at91/at91sam9g45.c           |    6 +
- arch/arm/mach-at91/at91sam9rl.c            |    6 +
- arch/arm/mach-at91/board-afeb-9260v1.c     |    2 +-
- arch/arm/mach-at91/board-at572d940hf_ek.c  |    2 +-
- arch/arm/mach-at91/board-cam60.c           |    2 +-
- arch/arm/mach-at91/board-cap9adk.c         |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c        |    2 +-
- arch/arm/mach-at91/board-flexibity.c       |    2 +-
- arch/arm/mach-at91/board-foxg20.c          |    2 +-
- arch/arm/mach-at91/board-gsia18s.c         |    2 +-
- arch/arm/mach-at91/board-neocore926.c      |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c    |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c       |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c      |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c       |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c       |    2 +-
- arch/arm/mach-at91/board-sam9263ek.c       |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c       |    4 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c    |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c        |    2 +-
- arch/arm/mach-at91/board-snapper9260.c     |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c       |    4 +-
- arch/arm/mach-at91/board-usb-a926x.c       |    4 +-
- arch/arm/mach-at91/devices.c               |    4 +-
- arch/arm/mach-at91/generic.h               |    2 +-
- arch/arm/mach-at91/include/mach/at91_pit.h |    8 +-
- arch/arm/mach-at91/soc.c                   |   42 +++++
- arch/arm/mach-at91/soc.h                   |    1 +
- 34 files changed, 327 insertions(+), 97 deletions(-)
+v3:
+	udpate at91x40
 
+Best Regards,
+J.
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/mach-at91/at572d940hf.c         |   64 +++++++++++++++++++++++
+ arch/arm/mach-at91/at572d940hf_devices.c |   22 ++++----
+ arch/arm/mach-at91/at91cap9.c            |   58 ++++++++++++++++++++
+ arch/arm/mach-at91/at91cap9_devices.c    |   28 ++++------
+ arch/arm/mach-at91/at91rm9200.c          |   50 ++++++++++++++++++
+ arch/arm/mach-at91/at91rm9200_devices.c  |   28 ++++------
+ arch/arm/mach-at91/at91sam9260.c         |   51 ++++++++++++++++++
+ arch/arm/mach-at91/at91sam9260_devices.c |   31 ++++-------
+ arch/arm/mach-at91/at91sam9261.c         |   55 +++++++++++++++++++
+ arch/arm/mach-at91/at91sam9261_devices.c |   26 ++++-----
+ arch/arm/mach-at91/at91sam9263.c         |   54 +++++++++++++++++++
+ arch/arm/mach-at91/at91sam9263_devices.c |   24 ++++----
+ arch/arm/mach-at91/at91sam9g45.c         |   84 +++++++++++++++++++++++-------
+ arch/arm/mach-at91/at91sam9g45_devices.c |   31 ++++-------
+ arch/arm/mach-at91/at91sam9rl.c          |   51 ++++++++++++++++++
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   27 ++++-----
+ arch/arm/mach-at91/at91x40.c             |    5 --
+ arch/arm/mach-at91/clock.c               |   54 +++++--------------
+ arch/arm/mach-at91/clock.h               |   19 ++++++-
+ arch/arm/mach-at91/generic.h             |   12 ++++-
+ arch/arm/mach-at91/include/mach/clkdev.h |    7 +++
+ 22 files changed, 595 insertions(+), 187 deletions(-)
+ create mode 100644 arch/arm/mach-at91/include/mach/clkdev.h
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 377a7a5..920273d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -288,6 +288,7 @@ config ARCH_AT91
+ 	bool "Atmel AT91"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select HAVE_CLK
++	select CLKDEV_LOOKUP
+ 	help
+ 	  This enables support for systems based on the Atmel AT91RM9200,
+ 	  AT91SAM9 and AT91CAP9 processors.
 diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-index b788861..66405af 100644
+index 15ecb64..b9c48d5 100644
 --- a/arch/arm/mach-at91/at572d940hf.c
 +++ b/arch/arm/mach-at91/at572d940hf.c
-@@ -417,6 +417,11 @@ static unsigned int at572d940hf_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
+@@ -201,6 +201,37 @@ static struct clk *periph_clocks[] __initdata = {
+ 	/* irq0 .. irq2 */
  };
  
-+struct at91_dev_resource at572d940hf_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("macb_clk", &macb_clk),
++	CLKDEV_CON_ID("mci_clk", &mmc_clk),
++	CLKDEV_CON_ID("udc_clk", &udc_clk),
++	CLKDEV_CON_ID("twi0_clk", &twi0_clk),
++	CLKDEV_CON_ID("ssc0_clk", &ssc0_clk),
++	CLKDEV_CON_ID("ssc1_clk", &ssc1_clk),
++	CLKDEV_CON_ID("ssc2_clk", &ssc2_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_ID("ssc3_clk", &ssc3_clk),
++	CLKDEV_CON_ID("twi1_clk", &twi1_clk),
++	CLKDEV_CON_ID("can0_clk", &can0_clk),
++	CLKDEV_CON_ID("can1_clk", &can1_clk),
++	CLKDEV_CON_ID("mAgicV_clk", &mAgicV_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
 +};
 +
- struct at91_soc __initdata at572d940hf_soc = {
- 	.name = "at572d940hf",
- 	.default_irq_priority = at572d940hf_default_irq_priority,
-@@ -425,4 +430,5 @@ struct at91_soc __initdata at572d940hf_soc = {
- 		.resource = at572d940hf_pios,
- 		.num_resources = ARRAY_SIZE(at572d940hf_pios),
- 	},
-+	.pit = &at572d940hf_pit,
- };
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index f60ec74..dd5e858 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -420,6 +420,11 @@ static unsigned int at91cap9_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller (IRQ1) */
- };
- 
-+struct at91_dev_resource at91cap9_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
 +};
 +
- struct at91_soc __initdata at91cap9_soc = {
- 	.name = "at91cap9",
- 	.default_irq_priority = at91cap9_default_irq_priority,
-@@ -428,4 +433,5 @@ struct at91_soc __initdata at91cap9_soc = {
- 		.resource = at91cap9_pios,
- 		.num_resources = ARRAY_SIZE(at91cap9_pios),
- 	},
-+	.pit = &at91cap9_pit,
- };
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 4859231..0567556b 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -409,6 +409,11 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
-+struct at91_dev_resource at91sam9260_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
-+};
-+
- struct at91_soc __initdata at91sam9260_soc = {
- 	.name = "at91sam9260",
- 	.default_irq_priority = at91sam9260_default_irq_priority,
-@@ -417,4 +422,5 @@ struct at91_soc __initdata at91sam9260_soc = {
- 		.resource = at91sam9260_pios,
- 		.num_resources = ARRAY_SIZE(at91sam9260_pios),
- 	},
-+	.pit = &at91sam9260_pit,
- };
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 5a3f68b..603c6fe 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -375,6 +375,11 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
-+struct at91_dev_resource at91sam9261_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
-+};
-+
- struct at91_soc __initdata at91sam9261_soc = {
- 	.name = "at91sam9261",
- 	.default_irq_priority = at91sam9261_default_irq_priority,
-@@ -383,4 +388,5 @@ struct at91_soc __initdata at91sam9261_soc = {
- 		.resource = at91sam9261_pios,
- 		.num_resources = ARRAY_SIZE(at91sam9261_pios),
- 	},
-+	.pit = &at91sam9261_pit,
- };
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 9a0b3b4..e7ff884 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -384,6 +384,11 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller (IRQ1) */
- };
- 
-+struct at91_dev_resource at91sam9263_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
-+};
-+
- struct at91_soc __initdata at91sam9263_soc = {
- 	.name = "at91sam9263",
- 	.default_irq_priority = at91sam9263_default_irq_priority,
-@@ -392,4 +397,5 @@ struct at91_soc __initdata at91sam9263_soc = {
- 		.resource = at91sam9263_pios,
- 		.num_resources = ARRAY_SIZE(at91sam9263_pios),
- 	},
-+	.pit = &at91sam9263_pit,
- };
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 4ba8549..82ddaa7 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -4,69 +4,96 @@
-  * Copyright (C) 2005-2006 M. Amine SAYA, ATMEL Rousset, France
-  * Revision	 2005 M. Nicolas Diremdjian, ATMEL Rousset, France
-  * Converted to ClockSource/ClockEvents by David Brownell.
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/clockchips.h>
--
--#include <asm/mach/time.h>
-+#include <linux/slab.h>
- 
- #include <mach/at91_pit.h>
- 
-+struct at91_pit_data {
-+	void __iomem *mapbase;
-+	u32 pit_cycle;		/* write-once */
-+	u32 pit_cnt;		/* access only w/system irq blocked */
-+	struct clock_event_device ced;
-+	struct clocksource cs;
-+	struct irqaction irqaction;
-+	struct platform_device *pdev;
-+};
- 
- #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
- #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
- 
--static u32 pit_cycle;		/* write-once */
--static u32 pit_cnt;		/* access only w/system irq blocked */
-+static inline unsigned int at91_pit_read(struct at91_pit_data *data,
-+					 unsigned int reg_offset)
-+{
-+	return __raw_readl(data->mapbase + reg_offset);
-+}
-+
-+static inline void at91_pit_write(struct at91_pit_data *data,
-+			unsigned int reg_offset, unsigned long value)
-+{
-+	__raw_writel(value, data->mapbase + reg_offset);
-+}
- 
-+static struct at91_pit_data *cs_to_at91_pit(struct clocksource *cs)
-+{
-+	return container_of(cs, struct at91_pit_data, cs);
-+}
-+
-+static struct at91_pit_data *ced_to_at91_pit(struct clock_event_device *ced)
-+{
-+	return container_of(ced, struct at91_pit_data, ced);
-+}
- 
  /*
-  * Clocksource:  just a monotonic counter of MCK/16 cycles.
-  * We don't care whether or not PIT irqs are enabled.
-  */
--static cycle_t read_pit_clk(struct clocksource *cs)
-+static cycle_t at91_pit_clocksource_read(struct clocksource *cs)
+  * The five programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -230,6 +261,13 @@ static struct clk pck3 = {
+ 	.id		= 3,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++	CLKDEV_CON_ID("pck2", &pck2),
++	CLKDEV_CON_ID("pck3", &pck3),
++};
++
+ static struct clk mAgicV_mem_clk = {
+ 	.name		= "mAgicV_mem_clk",
+ 	.pmc_mask	= AT91_PMC_PCK4,
+@@ -237,6 +275,9 @@ static struct clk mAgicV_mem_clk = {
+ 	.id		= 4,
+ };
+ 
++static struct clk_lookup mAgicV_mem_clk_lookup =
++	CLKDEV_CON_ID("mAgicV_mem_clk", &mAgicV_mem_clk);
++
+ /* HClocks */
+ static struct clk hck0 = {
+ 	.name		= "hck0",
+@@ -251,6 +292,11 @@ static struct clk hck1 = {
+ 	.id		= 1,
+ };
+ 
++static struct clk_lookup hc_clocks_lookups[] = {
++	CLKDEV_CON_ID("hck0", &hck0),
++	CLKDEV_CON_ID("hck1", &hck1),
++};
++
+ static void __init at572d940hf_register_clocks(void)
  {
-+	struct at91_pit_data *data = cs_to_at91_pit(cs);
- 	unsigned long flags;
- 	u32 elapsed;
- 	u32 t;
+ 	int i;
+@@ -258,14 +304,32 @@ static void __init at572d940hf_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
  
- 	raw_local_irq_save(flags);
--	elapsed = pit_cnt;
--	t = at91_sys_read(AT91_PIT_PIIR);
-+	elapsed = data->pit_cnt;
-+	t = at91_pit_read(data, AT91_PIT_PIIR);
- 	raw_local_irq_restore(flags);
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++
+ 	clk_register(&mAgicV_mem_clk);
++	clkdev_add(&mAgicV_mem_clk_lookup);
  
--	elapsed += PIT_PICNT(t) * pit_cycle;
-+	elapsed += PIT_PICNT(t) * data->pit_cycle;
- 	elapsed += PIT_CPIV(t);
- 	return elapsed;
+ 	clk_register(&hck0);
+ 	clk_register(&hck1);
++
++	clkdev_add_table(hc_clocks_lookups,
++			 ARRAY_SIZE(hc_clocks_lookups));
++}
++
++struct clk* __init at572d940hf_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
  }
  
--static struct clocksource pit_clk = {
--	.name		= "pit",
--	.rating		= 175,
--	.read		= read_pit_clk,
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
+index e52c8e0..84e0b07 100644
+--- a/arch/arm/mach-at91/at572d940hf_devices.c
++++ b/arch/arm/mach-at91/at572d940hf_devices.c
+@@ -532,7 +532,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
  
- /*
-  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
-  */
--static void
--pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-+static void at91_pit_clock_event_mode(enum clock_event_mode mode,
-+				      struct clock_event_device *dev)
- {
-+	struct at91_pit_data *data = ced_to_at91_pit(dev);
-+	u32 tmp;
-+
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		/* update clocksource counter */
--		pit_cnt += pit_cycle * PIT_PICNT(at91_sys_read(AT91_PIT_PIVR));
--		at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
--				| AT91_PIT_PITIEN);
-+		tmp = PIT_PICNT(at91_pit_read(data, AT91_PIT_PIVR));
-+		data->pit_cnt += data->pit_cycle * tmp;
-+		at91_pit_write(data, AT91_PIT_MR, (data->pit_cycle - 1)
-+				| AT91_PIT_PITEN | AT91_PIT_PITIEN);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		BUG();
-@@ -74,27 +101,22 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	case CLOCK_EVT_MODE_UNUSED:
- 		/* disable irq, leaving the clocksource active */
--		at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-+		at91_pit_write(data, AT91_PIT_MR,
-+				(data->pit_cycle - 1) | AT91_PIT_PITEN);
- 		break;
- 	case CLOCK_EVT_MODE_RESUME:
- 		break;
+-		at91_clock_associate("spi0_clk", &at572d940hf_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at572d940hf_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -540,7 +539,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PC1, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PC2, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at572d940hf_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at572d940hf_spi1_device);
  	}
  }
- 
--static struct clock_event_device pit_clkevt = {
--	.name		= "pit",
--	.features	= CLOCK_EVT_FEAT_PERIODIC,
--	.shift		= 32,
--	.rating		= 100,
--	.set_mode	= pit_clkevt_mode,
--};
--
- 
- /*
-  * IRQ handler for the timer.
-  */
--static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
-+static irqreturn_t at91_pit_interrupt(int irq, void *dev_id)
+@@ -588,9 +586,6 @@ static struct platform_device at572d940hf_tcb_device = {
+ static void __init at91_add_device_tc(void)
  {
-+	struct at91_pit_data *data = (struct at91_pit_data*)dev_id;
-+
- 	/*
- 	 * irqs should be disabled here, but as the irq is shared they are only
- 	 * guaranteed to be off if the timer irq is registered first.
-@@ -102,15 +124,15 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- 	WARN_ON_ONCE(!irqs_disabled());
- 
- 	/* The PIT interrupt may be disabled, and is shared */
--	if ((pit_clkevt.mode == CLOCK_EVT_MODE_PERIODIC)
--			&& (at91_sys_read(AT91_PIT_SR) & AT91_PIT_PITS)) {
-+	if ((data->ced.mode == CLOCK_EVT_MODE_PERIODIC)
-+			&& (at91_pit_read(data, AT91_PIT_SR) & AT91_PIT_PITS)) {
- 		unsigned nr_ticks;
- 
- 		/* Get number of ticks performed before irq, and ack it */
--		nr_ticks = PIT_PICNT(at91_sys_read(AT91_PIT_PIVR));
-+		nr_ticks = PIT_PICNT(at91_pit_read(data, AT91_PIT_PIVR));
- 		do {
--			pit_cnt += pit_cycle;
--			pit_clkevt.event_handler(&pit_clkevt);
-+			data->pit_cnt += data->pit_cycle;
-+			data->ced.event_handler(&data->ced);
- 			nr_ticks--;
- 		} while (nr_ticks);
- 
-@@ -120,69 +142,192 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- 	return IRQ_NONE;
+ 	/* this chip has a separate clock and irq for each TC channel */
+-	at91_clock_associate("tc0_clk", &at572d940hf_tcb_device.dev, "t0_clk");
+-	at91_clock_associate("tc1_clk", &at572d940hf_tcb_device.dev, "t1_clk");
+-	at91_clock_associate("tc2_clk", &at572d940hf_tcb_device.dev, "t2_clk");
+ 	platform_device_register(&at572d940hf_tcb_device);
+ }
+ #else
+@@ -828,22 +823,18 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at572d940hf_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT572D940HF_ID_US0:
+ 			pdev = &at572d940hf_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT572D940HF_ID_US1:
+ 			pdev = &at572d940hf_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT572D940HF_ID_US2:
+ 			pdev = &at572d940hf_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -855,10 +846,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
  }
  
--static struct irqaction at91sam926x_pit_irq = {
--	.name		= "at91_tick",
--	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= at91sam926x_pit_interrupt
--};
-+static void at91_pit_stop(struct at91_pit_data *data)
-+{
-+	/* Disable timer and irqs */
-+	at91_pit_write(data, AT91_PIT_MR, 0);
-+}
- 
--static void at91sam926x_pit_reset(void)
-+static void at91_pit_reset(struct at91_pit_data *data)
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
  {
- 	/* Disable timer and irqs */
--	at91_sys_write(AT91_PIT_MR, 0);
-+	at91_pit_stop(data);
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at572d940hf_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
  
- 	/* Clear any pending interrupts, wait for PIT to stop counting */
--	while (PIT_CPIV(at91_sys_read(AT91_PIT_PIVR)) != 0)
-+	while (PIT_CPIV(at91_pit_read(data, AT91_PIT_PIVR)) != 0)
- 		cpu_relax();
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index 6bf8eba..1ba614a1 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -218,6 +218,44 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0 .. irq1
+ };
  
- 	/* Start PIT but don't enable IRQ */
--	at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-+	at91_pit_write(data, AT91_PIT_MR, (data->pit_cycle - 1) | AT91_PIT_PITEN);
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioABCD_clk", &pioABCD_clk),
++	CLKDEV_CON_ID("mpb0_clk", &mpb0_clk),
++	CLKDEV_CON_ID("mpb1_clk", &mpb1_clk),
++	CLKDEV_CON_ID("mpb2_clk", &mpb2_clk),
++	CLKDEV_CON_ID("mpb3_clk", &mpb3_clk),
++	CLKDEV_CON_ID("mpb4_clk", &mpb4_clk),
++	CLKDEV_CON_ID("can_clk", &can_clk),
++	CLKDEV_CON_ID("twi_clk", &twi_clk),
++	CLKDEV_CON_ID("ac97_clk", &ac97_clk),
++	CLKDEV_CON_ID("tcb_clk", &tcb_clk),
++	CLKDEV_CON_ID("pwm_clk", &pwm_clk),
++	CLKDEV_CON_ID("macb_clk", &macb_clk),
++	CLKDEV_CON_ID("aestdes_clk", &aestdes_clk),
++	CLKDEV_CON_ID("adc_clk", &adc_clk),
++	CLKDEV_CON_ID("isi_clk", &isi_clk),
++	CLKDEV_CON_ID("lcdc_clk", &lcdc_clk),
++	CLKDEV_CON_ID("dma_clk", &dma_clk),
++	CLKDEV_CON_ID("udphs_clk", &udphs_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_DEV_ID("hclk", "atmel_usba_udc.0", &utmi_clk),
++	CLKDEV_CON_DEV_ID("pclk", "atmel_usba_udc.0", &udphs_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.0", &mmc0_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.1", &mmc1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
++	CLKDEV_CON_DEV_ID("ssc", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("ssc", "ssc.1", &ssc1_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++};
++
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -247,6 +285,13 @@ static struct clk pck3 = {
+ 	.id		= 3,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++	CLKDEV_CON_ID("pck2", &pck2),
++	CLKDEV_CON_ID("pck3", &pck3),
++};
++
+ static void __init at91cap9_register_clocks(void)
+ {
+ 	int i;
+@@ -254,10 +299,23 @@ static void __init at91cap9_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91cap9_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index eae412c..0537e15 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -181,10 +181,6 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 
+ 	/* Pullup pin is handled internally by USB device peripheral */
+ 
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+ 	platform_device_register(&at91_usba_udc_device);
+ }
+ #else
+@@ -355,7 +351,6 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		}
+ 
+ 		mmc0_data = *data;
+-		at91_clock_associate("mci0_clk", &at91cap9_mmc0_device.dev, "mci_clk");
+ 		platform_device_register(&at91cap9_mmc0_device);
+ 	} else {			/* MCI1 */
+ 		/* CLK */
+@@ -373,7 +368,6 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		}
+ 
+ 		mmc1_data = *data;
+-		at91_clock_associate("mci1_clk", &at91cap9_mmc1_device.dev, "mci_clk");
+ 		platform_device_register(&at91cap9_mmc1_device);
+ 	}
+ }
+@@ -614,7 +608,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_B_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+ 		at91_set_B_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
+ 
+-		at91_clock_associate("spi0_clk", &at91cap9_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at91cap9_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -622,7 +615,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB13, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB14, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at91cap9_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at91cap9_spi1_device);
+ 	}
+ }
+@@ -660,7 +652,6 @@ static struct platform_device at91cap9_tcb_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has one clock and irq for all three TC channels */
+-	at91_clock_associate("tcb_clk", &at91cap9_tcb_device.dev, "t0_clk");
+ 	platform_device_register(&at91cap9_tcb_device);
+ }
+ #else
+@@ -1001,12 +992,10 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91CAP9_ID_SSC0:
+ 		pdev = &at91cap9_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "ssc");
+ 		break;
+ 	case AT91CAP9_ID_SSC1:
+ 		pdev = &at91cap9_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "ssc");
+ 		break;
+ 	default:
+ 		return;
+@@ -1205,22 +1194,18 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91cap9_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91CAP9_ID_US0:
+ 			pdev = &at91cap9_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91CAP9_ID_US1:
+ 			pdev = &at91cap9_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91CAP9_ID_US2:
+ 			pdev = &at91cap9_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1232,10 +1217,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91cap9_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index afb29b9..29a2a8a 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -188,6 +188,36 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0 .. irq6
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("udc_clk", &udc_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_ID("ether_clk", &ether_clk),
++	CLKDEV_CON_ID("mci_clk", &mmc_clk),
++	CLKDEV_CON_ID("twi_clk", &twi_clk),
++	CLKDEV_CON_ID("spi_clk", &spi_clk),
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("pioD_clk", &pioD_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
++	CLKDEV_CON_DEV_ID("ssc", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("ssc", "ssc.1", &ssc1_clk),
++	CLKDEV_CON_DEV_ID("ssc", "ssc.2", &ssc2_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
++};
++
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -217,6 +247,13 @@ static struct clk pck3 = {
+ 	.id		= 3,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++	CLKDEV_CON_ID("pck2", &pck2),
++	CLKDEV_CON_ID("pck3", &pck3),
++};
++
+ static void __init at91rm9200_register_clocks(void)
+ {
+ 	int i;
+@@ -224,10 +261,23 @@ static void __init at91rm9200_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91rm9200_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 761559e..81ba341 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -645,14 +645,7 @@ static struct platform_device at91rm9200_tcb1_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has a separate clock and irq for each TC channel */
+-	at91_clock_associate("tc0_clk", &at91rm9200_tcb0_device.dev, "t0_clk");
+-	at91_clock_associate("tc1_clk", &at91rm9200_tcb0_device.dev, "t1_clk");
+-	at91_clock_associate("tc2_clk", &at91rm9200_tcb0_device.dev, "t2_clk");
+ 	platform_device_register(&at91rm9200_tcb0_device);
+-
+-	at91_clock_associate("tc3_clk", &at91rm9200_tcb1_device.dev, "t0_clk");
+-	at91_clock_associate("tc4_clk", &at91rm9200_tcb1_device.dev, "t1_clk");
+-	at91_clock_associate("tc5_clk", &at91rm9200_tcb1_device.dev, "t2_clk");
+ 	platform_device_register(&at91rm9200_tcb1_device);
+ }
+ #else
+@@ -849,17 +842,14 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91RM9200_ID_SSC0:
+ 		pdev = &at91rm9200_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "ssc");
+ 		break;
+ 	case AT91RM9200_ID_SSC1:
+ 		pdev = &at91rm9200_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "ssc");
+ 		break;
+ 	case AT91RM9200_ID_SSC2:
+ 		pdev = &at91rm9200_ssc2_device;
+ 		configure_ssc2_pins(pins);
+-		at91_clock_associate("ssc2_clk", &pdev->dev, "ssc");
+ 		break;
+ 	default:
+ 		return;
+@@ -1115,27 +1105,22 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91rm9200_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91RM9200_ID_US0:
+ 			pdev = &at91rm9200_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91RM9200_ID_US1:
+ 			pdev = &at91rm9200_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91RM9200_ID_US2:
+ 			pdev = &at91rm9200_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91RM9200_ID_US3:
+ 			pdev = &at91rm9200_uart3_device;
+ 			configure_usart3_pins(pins);
+-			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1147,10 +1132,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91rm9200_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 7bbdd2f..685a379 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -214,6 +214,39 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0 .. irq2
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("adc_clk", &adc_clk),
++	CLKDEV_CON_ID("mci_clk", &mmc_clk),
++	CLKDEV_CON_ID("udc_clk", &udc_clk),
++	CLKDEV_CON_ID("twi_clk", &twi_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_ID("macb_clk", &macb_clk),
++	CLKDEV_CON_ID("isi_clk", &isi_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	/* this chip has a separate clock and irq for each TC channel */
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
++	CLKDEV_CON_DEV_ID("t3_clk", "atmel_tcb.1", &tc3_clk),
++	CLKDEV_CON_DEV_ID("t4_clk", "atmel_tcb.1", &tc4_clk),
++	CLKDEV_CON_DEV_ID("t5_clk", "atmel_tcb.1", &tc5_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.5", &usart4_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.6", &usart5_clk),
++};
++
+ /*
+  * The two programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -231,6 +264,11 @@ static struct clk pck1 = {
+ 	.id		= 1,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++};
++
+ static void __init at91sam9260_register_clocks(void)
+ {
+ 	int i;
+@@ -238,8 +276,21 @@ static void __init at91sam9260_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91sam9260_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 6f8ec8d..e323c17 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -609,7 +609,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi0_clk", &at91sam9260_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9260_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -617,7 +616,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB1, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB2, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at91sam9260_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9260_spi1_device);
+ 	}
+ }
+@@ -694,15 +692,7 @@ static struct platform_device at91sam9260_tcb1_device = {
+ 
+ static void __init at91_add_device_tc(void)
+ {
+-	/* this chip has a separate clock and irq for each TC channel */
+-	at91_clock_associate("tc0_clk", &at91sam9260_tcb0_device.dev, "t0_clk");
+-	at91_clock_associate("tc1_clk", &at91sam9260_tcb0_device.dev, "t1_clk");
+-	at91_clock_associate("tc2_clk", &at91sam9260_tcb0_device.dev, "t2_clk");
+ 	platform_device_register(&at91sam9260_tcb0_device);
+-
+-	at91_clock_associate("tc3_clk", &at91sam9260_tcb1_device.dev, "t0_clk");
+-	at91_clock_associate("tc4_clk", &at91sam9260_tcb1_device.dev, "t1_clk");
+-	at91_clock_associate("tc5_clk", &at91sam9260_tcb1_device.dev, "t2_clk");
+ 	platform_device_register(&at91sam9260_tcb1_device);
+ }
+ #else
+@@ -820,7 +810,6 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91SAM9260_ID_SSC:
+ 		pdev = &at91sam9260_ssc_device;
+ 		configure_ssc_pins(pins);
+-		at91_clock_associate("ssc_clk", &pdev->dev, "pclk");
+ 		break;
+ 	default:
+ 		return;
+@@ -1145,37 +1134,30 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91sam9260_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US0:
+ 			pdev = &at91sam9260_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US1:
+ 			pdev = &at91sam9260_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US2:
+ 			pdev = &at91sam9260_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US3:
+ 			pdev = &at91sam9260_uart3_device;
+ 			configure_usart3_pins(pins);
+-			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US4:
+ 			pdev = &at91sam9260_uart4_device;
+ 			configure_usart4_pins();
+-			at91_clock_associate("usart4_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9260_ID_US5:
+ 			pdev = &at91sam9260_uart5_device;
+ 			configure_usart5_pins();
+-			at91_clock_associate("usart5_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1187,10 +1169,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91sam9260_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 768f4b7..bf28740 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -170,6 +170,33 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0 .. irq2
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("mci_clk", &mmc_clk),
++	CLKDEV_CON_ID("udc_clk", &udc_clk),
++	CLKDEV_CON_ID("twi_clk", &twi_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_ID("lcdc_clk", &lcdc_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	/* this chip has a separate clock and irq for each TC channel */
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++};
++
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -199,6 +226,13 @@ static struct clk pck3 = {
+ 	.id		= 3,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++	CLKDEV_CON_ID("pck2", &pck2),
++	CLKDEV_CON_ID("pck3", &pck3),
++};
++
+ /* HClocks */
+ static struct clk hck0 = {
+ 	.name		= "hck0",
+@@ -213,6 +247,11 @@ static struct clk hck1 = {
+ 	.id		= 1,
+ };
+ 
++static struct clk_lookup hc_clocks_lookups[] = {
++	CLKDEV_CON_ID("hck0", &hck0),
++	CLKDEV_CON_ID("hck1", &hck1),
++};
++
+ static void __init at91sam9261_register_clocks(void)
+ {
+ 	int i;
+@@ -220,13 +259,29 @@ static void __init at91sam9261_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
+ 
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++
+ 	clk_register(&hck0);
+ 	clk_register(&hck1);
++
++	clkdev_add_table(hc_clocks_lookups,
++			 ARRAY_SIZE(hc_clocks_lookups));
++}
++
++struct clk* __init at91sam9261_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 8792f9b..d078b16 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -426,7 +426,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
+ 
+-		at91_clock_associate("spi0_clk", &at91sam9261_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9261_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -434,7 +433,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB31, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB29, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at91sam9261_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9261_spi1_device);
+ 	}
+ }
+@@ -581,10 +579,6 @@ static struct platform_device at91sam9261_tcb_device = {
+ 
+ static void __init at91_add_device_tc(void)
+ {
+-	/* this chip has a separate clock and irq for each TC channel */
+-	at91_clock_associate("tc0_clk", &at91sam9261_tcb_device.dev, "t0_clk");
+-	at91_clock_associate("tc1_clk", &at91sam9261_tcb_device.dev, "t1_clk");
+-	at91_clock_associate("tc2_clk", &at91sam9261_tcb_device.dev, "t2_clk");
+ 	platform_device_register(&at91sam9261_tcb_device);
+ }
+ #else
+@@ -786,17 +780,14 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91SAM9261_ID_SSC0:
+ 		pdev = &at91sam9261_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "pclk");
+ 		break;
+ 	case AT91SAM9261_ID_SSC1:
+ 		pdev = &at91sam9261_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "pclk");
+ 		break;
+ 	case AT91SAM9261_ID_SSC2:
+ 		pdev = &at91sam9261_ssc2_device;
+ 		configure_ssc2_pins(pins);
+-		at91_clock_associate("ssc2_clk", &pdev->dev, "pclk");
+ 		break;
+ 	default:
+ 		return;
+@@ -995,22 +986,18 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91sam9261_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9261_ID_US0:
+ 			pdev = &at91sam9261_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9261_ID_US1:
+ 			pdev = &at91sam9261_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9261_ID_US2:
+ 			pdev = &at91sam9261_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1022,10 +1009,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91sam9261_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 97aae4f..763170b 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -195,6 +195,37 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0 .. irq1
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioCDE_clk", &pioCDE_clk),
++	CLKDEV_CON_ID("can_clk", &can_clk),
++	CLKDEV_CON_ID("twi_clk", &twi_clk),
++	CLKDEV_CON_ID("ac97_clk", &ac97_clk),
++	CLKDEV_CON_ID("pwm_clk", &pwm_clk),
++	CLKDEV_CON_ID("macb_clk", &macb_clk),
++	CLKDEV_CON_ID("dma_clk", &dma_clk),
++	CLKDEV_CON_ID("2dge_clk", &twodge_clk),
++	CLKDEV_CON_ID("udc_clkk", &udc_clk),
++	CLKDEV_CON_ID("isi_clk", &isi_clk),
++	CLKDEV_CON_ID("lcdc_clk", &lcdc_clk),
++	CLKDEV_CON_ID("ohci_clk", &ohci_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.0", &mmc0_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.1", &mmc1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++};
++
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -224,6 +255,13 @@ static struct clk pck3 = {
+ 	.id		= 3,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++	CLKDEV_CON_ID("pck2", &pck2),
++	CLKDEV_CON_ID("pck3", &pck3),
++};
++
+ static void __init at91sam9263_register_clocks(void)
+ {
+ 	int i;
+@@ -231,10 +269,26 @@ static void __init at91sam9263_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
++	clkdev_add_table(usart_clocks_lookups,
++			 ARRAY_SIZE(usart_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91sam9263_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 47a9f96..b84f178 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -308,7 +308,6 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		}
+ 
+ 		mmc0_data = *data;
+-		at91_clock_associate("mci0_clk", &at91sam9263_mmc0_device.dev, "mci_clk");
+ 		platform_device_register(&at91sam9263_mmc0_device);
+ 	} else {			/* MCI1 */
+ 		/* CLK */
+@@ -339,7 +338,6 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		}
+ 
+ 		mmc1_data = *data;
+-		at91_clock_associate("mci1_clk", &at91sam9263_mmc1_device.dev, "mci_clk");
+ 		platform_device_register(&at91sam9263_mmc1_device);
+ 	}
+ }
+@@ -686,7 +684,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_B_periph(AT91_PIN_PA1, 0);	/* SPI0_MOSI */
+ 		at91_set_B_periph(AT91_PIN_PA2, 0);	/* SPI0_SPCK */
+ 
+-		at91_clock_associate("spi0_clk", &at91sam9263_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9263_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -694,7 +691,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB13, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB14, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at91sam9263_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9263_spi1_device);
+ 	}
+ }
+@@ -942,7 +938,6 @@ static struct platform_device at91sam9263_tcb_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has one clock and irq for all three TC channels */
+-	at91_clock_associate("tcb_clk", &at91sam9263_tcb_device.dev, "t0_clk");
+ 	platform_device_register(&at91sam9263_tcb_device);
+ }
+ #else
+@@ -1171,12 +1166,10 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91SAM9263_ID_SSC0:
+ 		pdev = &at91sam9263_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "pclk");
+ 		break;
+ 	case AT91SAM9263_ID_SSC1:
+ 		pdev = &at91sam9263_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "pclk");
+ 		break;
+ 	default:
+ 		return;
+@@ -1376,22 +1369,18 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91sam9263_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9263_ID_US0:
+ 			pdev = &at91sam9263_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9263_ID_US1:
+ 			pdev = &at91sam9263_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9263_ID_US2:
+ 			pdev = &at91sam9263_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1403,10 +1392,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91sam9263_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index b497614..a1561d4 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -180,22 +180,6 @@ static struct clk vdec_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ 
+-/* One additional fake clock for ohci */
+-static struct clk ohci_clk = {
+-	.name		= "ohci_clk",
+-	.pmc_mask	= 0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-	.parent		= &uhphs_clk,
+-};
+-
+-/* One additional fake clock for second TC block */
+-static struct clk tcb1_clk = {
+-	.name		= "tcb1_clk",
+-	.pmc_mask	= 0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-	.parent		= &tcb0_clk,
+-};
+-
+ static struct clk *periph_clocks[] __initdata = {
+ 	&pioA_clk,
+ 	&pioB_clk,
+@@ -224,10 +208,52 @@ static struct clk *periph_clocks[] __initdata = {
+ 	&udphs_clk,
+ 	&mmc1_clk,
+ 	// irq0
+-	&ohci_clk,
+-	&tcb1_clk,
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("pioDE_clk", &pioDE_clk),
++	CLKDEV_CON_ID("twi0_clk", &twi0_clk),
++	CLKDEV_CON_ID("twi1_clk", &twi1_clk),
++	CLKDEV_CON_ID("pwm_clk", &pwm_clk),
++	CLKDEV_CON_ID("tsc_clk", &tsc_clk),
++	CLKDEV_CON_ID("dma_clk", &dma_clk),
++	CLKDEV_CON_ID("uhphs_clk", &uhphs_clk),
++	CLKDEV_CON_ID("lcdc_clk", &lcdc_clk),
++	CLKDEV_CON_ID("ac97_clk", &ac97_clk),
++	CLKDEV_CON_ID("macb_clk", &macb_clk),
++	CLKDEV_CON_ID("isi_clk", &isi_clk),
++	CLKDEV_CON_ID("udphs_clk", &udphs_clk),
++	/* One additional fake clock for ohci */
++	CLKDEV_CON_ID("ohci_clk", &uhphs_clk),
++	CLKDEV_CON_DEV_ID("ehci_clk", "atmel-ehci.0", &uhphs_clk),
++	CLKDEV_CON_DEV_ID("hclk", "atmel_usba_udc.0", &utmi_clk),
++	CLKDEV_CON_DEV_ID("pclk", "atmel_usba_udc.0", &udphs_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.0", &mmc0_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.1", &mmc1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb0_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tcb0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
++};
++
++
++/* Video decoder clock - Only for sam9m10/sam9m11 */
++static struct clk_lookup vdec_clk_lookup =
++	CLKDEV_CON_ID("vdec_clk", &vdec_clk);
++
+ /*
+  * The two programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -245,6 +271,11 @@ static struct clk pck1 = {
+ 	.id		= 1,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++};
++
+ static void __init at91sam9g45_register_clocks(void)
+ {
+ 	int i;
+@@ -252,11 +283,26 @@ static void __init at91sam9g45_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
+-	if (cpu_is_at91sam9m10() || cpu_is_at91sam9m11())
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
++	if (cpu_is_at91sam9m10() || cpu_is_at91sam9m11()) {
+ 		clk_register(&vdec_clk);
++		clkdev_add(&vdec_clk_lookup);
++	}
+ 
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91sam9g45_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 6c1a2fe..f9ac1da 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -180,7 +180,6 @@ void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data)
+ 	}
+ 
+ 	usbh_ehci_data = *data;
+-	at91_clock_associate("uhphs_clk", &at91_usbh_ehci_device.dev, "ehci_clk");
+ 	platform_device_register(&at91_usbh_ehci_device);
+ }
+ #else
+@@ -266,10 +265,6 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 
+ 	/* Pullup pin is handled internally by USB device peripheral */
+ 
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+ 	platform_device_register(&at91_usba_udc_device);
+ }
+ #else
+@@ -478,7 +473,6 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
+ 		}
+ 
+ 		mmc0_data = *data;
+-		at91_clock_associate("mci0_clk", &at91sam9g45_mmc0_device.dev, "mci_clk");
+ 		platform_device_register(&at91sam9g45_mmc0_device);
+ 
+ 	} else {			/* MCI1 */
+@@ -504,7 +498,6 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
+ 		}
+ 
+ 		mmc1_data = *data;
+-		at91_clock_associate("mci1_clk", &at91sam9g45_mmc1_device.dev, "mci_clk");
+ 		platform_device_register(&at91sam9g45_mmc1_device);
+ 
+ 	}
+@@ -801,7 +794,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB1, 0);	/* SPI0_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB2, 0);	/* SPI0_SPCK */
+ 
+-		at91_clock_associate("spi0_clk", &at91sam9g45_spi0_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9g45_spi0_device);
+ 	}
+ 	if (enable_spi1) {
+@@ -809,7 +801,6 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		at91_set_A_periph(AT91_PIN_PB15, 0);	/* SPI1_MOSI */
+ 		at91_set_A_periph(AT91_PIN_PB16, 0);	/* SPI1_SPCK */
+ 
+-		at91_clock_associate("spi1_clk", &at91sam9g45_spi1_device.dev, "spi_clk");
+ 		platform_device_register(&at91sam9g45_spi1_device);
+ 	}
+ }
+@@ -1000,9 +991,7 @@ static struct platform_device at91sam9g45_tcb1_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has one clock and irq for all six TC channels */
+-	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
+ 	platform_device_register(&at91sam9g45_tcb0_device);
+-	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
+ 	platform_device_register(&at91sam9g45_tcb1_device);
+ }
+ #else
+@@ -1286,12 +1275,10 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91SAM9G45_ID_SSC0:
+ 		pdev = &at91sam9g45_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "pclk");
+ 		break;
+ 	case AT91SAM9G45_ID_SSC1:
+ 		pdev = &at91sam9g45_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "pclk");
+ 		break;
+ 	default:
+ 		return;
+@@ -1533,27 +1520,22 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91sam9g45_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9G45_ID_US0:
+ 			pdev = &at91sam9g45_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9G45_ID_US1:
+ 			pdev = &at91sam9g45_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9G45_ID_US2:
+ 			pdev = &at91sam9g45_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9G45_ID_US3:
+ 			pdev = &at91sam9g45_uart3_device;
+ 			configure_usart3_pins(pins);
+-			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1565,10 +1547,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91sam9g45_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 19e2e5a..80acd8f 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -183,6 +183,39 @@ static struct clk *periph_clocks[] __initdata = {
+ 	// irq0
+ };
+ 
++static struct clk_lookup periph_clocks_lookups[] = {
++	CLKDEV_CON_ID("pioA_clk", &pioA_clk),
++	CLKDEV_CON_ID("pioB_clk", &pioB_clk),
++	CLKDEV_CON_ID("pioC_clk", &pioC_clk),
++	CLKDEV_CON_ID("pioD_clk", &pioD_clk),
++	CLKDEV_CON_ID("mci_clk", &mmc_clk),
++	CLKDEV_CON_ID("twi0_clk", &twi0_clk),
++	CLKDEV_CON_ID("twi1_clk", &twi1_clk),
++	CLKDEV_CON_ID("spi_clk", &spi_clk),
++	CLKDEV_CON_ID("pwm_clk", &pwm_clk),
++	CLKDEV_CON_ID("tsc_clk", &tsc_clk),
++	CLKDEV_CON_ID("dma_clk", &dma_clk),
++	CLKDEV_CON_ID("udphs_clk", &udphs_clk),
++	CLKDEV_CON_ID("lcdc_clk", &lcdc_clk),
++	CLKDEV_CON_ID("ac97_clk", &ac97_clk),
++	CLKDEV_CON_DEV_ID("hclk", "atmel_usba_udc.0", &utmi_clk),
++	CLKDEV_CON_DEV_ID("pclk", "atmel_usba_udc.0", &udphs_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
++};
++
++static struct clk_lookup usart_clocks_lookups[] = {
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "atmel_usart.4", &usart3_clk),
++};
++
++
+ /*
+  * The two programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+@@ -200,6 +233,11 @@ static struct clk pck1 = {
+ 	.id		= 1,
+ };
+ 
++static struct clk_lookup program_clocks_lookups[] = {
++	CLKDEV_CON_ID("pck0", &pck0),
++	CLKDEV_CON_ID("pck1", &pck1),
++};
++
+ static void __init at91sam9rl_register_clocks(void)
+ {
+ 	int i;
+@@ -207,8 +245,21 @@ static void __init at91sam9rl_register_clocks(void)
+ 	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+ 		clk_register(periph_clocks[i]);
+ 
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
++
++	clkdev_add_table(program_clocks_lookups,
++			 ARRAY_SIZE(program_clocks_lookups));
++}
++
++struct clk* __init at91sam9rl_get_uart_clock(int id)
++{
++	if (id >= ARRAY_SIZE(usart_clocks_lookups))
++		return NULL;
++	return usart_clocks_lookups[id].clk;
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 2d8d519..e4dc0e9 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -155,10 +155,6 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 
+ 	/* Pullup pin is handled internally by USB device peripheral */
+ 
+-	/* Clocks */
+-	at91_clock_associate("utmi_clk", &at91_usba_udc_device.dev, "hclk");
+-	at91_clock_associate("udphs_clk", &at91_usba_udc_device.dev, "pclk");
+-
+ 	platform_device_register(&at91_usba_udc_device);
+ }
+ #else
+@@ -606,9 +602,6 @@ static struct platform_device at91sam9rl_tcb_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has a separate clock and irq for each TC channel */
+-	at91_clock_associate("tc0_clk", &at91sam9rl_tcb_device.dev, "t0_clk");
+-	at91_clock_associate("tc1_clk", &at91sam9rl_tcb_device.dev, "t1_clk");
+-	at91_clock_associate("tc2_clk", &at91sam9rl_tcb_device.dev, "t2_clk");
+ 	platform_device_register(&at91sam9rl_tcb_device);
+ }
+ #else
+@@ -892,12 +885,10 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ 	case AT91SAM9RL_ID_SSC0:
+ 		pdev = &at91sam9rl_ssc0_device;
+ 		configure_ssc0_pins(pins);
+-		at91_clock_associate("ssc0_clk", &pdev->dev, "pclk");
+ 		break;
+ 	case AT91SAM9RL_ID_SSC1:
+ 		pdev = &at91sam9rl_ssc1_device;
+ 		configure_ssc1_pins(pins);
+-		at91_clock_associate("ssc1_clk", &pdev->dev, "pclk");
+ 		break;
+ 	default:
+ 		return;
+@@ -1147,27 +1138,22 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		case 0:		/* DBGU */
+ 			pdev = &at91sam9rl_dbgu_device;
+ 			configure_dbgu_pins();
+-			at91_clock_associate("mck", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9RL_ID_US0:
+ 			pdev = &at91sam9rl_uart0_device;
+ 			configure_usart0_pins(pins);
+-			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9RL_ID_US1:
+ 			pdev = &at91sam9rl_uart1_device;
+ 			configure_usart1_pins(pins);
+-			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9RL_ID_US2:
+ 			pdev = &at91sam9rl_uart2_device;
+ 			configure_usart2_pins(pins);
+-			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
+ 			break;
+ 		case AT91SAM9RL_ID_US3:
+ 			pdev = &at91sam9rl_uart3_device;
+ 			configure_usart3_pins(pins);
+-			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
+ 			break;
+ 		default:
+ 			return;
+@@ -1179,10 +1165,21 @@ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ 		at91_uarts[portnr] = pdev;
+ }
+ 
++static struct clk_lookup console_lookups = {
++	.con_id = "usart",
++};
++
+ void __init at91_set_serial_console(unsigned portnr)
+ {
+-	if (portnr < ATMEL_MAX_UART)
++	struct atmel_uart_data *pdata;
++
++	if (portnr < ATMEL_MAX_UART) {
+ 		atmel_default_console_device = at91_uarts[portnr];
++
++		pdata = atmel_default_console_device->dev.platform_data;
++		console_lookups.clk = at91sam9rl_get_uart_clock(pdata->num);
++		clkdev_add(&console_lookups);
++	}
+ }
+ 
+ void __init at91_add_device_serial(void)
+diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+index ad3ec85..56ba3bd 100644
+--- a/arch/arm/mach-at91/at91x40.c
++++ b/arch/arm/mach-at91/at91x40.c
+@@ -37,11 +37,6 @@ unsigned long clk_get_rate(struct clk *clk)
+ 	return AT91X40_MASTER_CLOCK;
+ }
+ 
+-struct clk *clk_get(struct device *dev, const char *id)
+-{
+-	return NULL;
+-}
+-
+ void __init at91x40_initialize(unsigned long main_clock)
+ {
+ 	at91_extern_irq = (1 << AT91X40_ID_IRQ0) | (1 << AT91X40_ID_IRQ1)
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 9113da6..2f2f8a6 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -163,7 +163,7 @@ static struct clk udpck = {
+ 	.parent		= &pllb,
+ 	.mode		= pmc_sys_mode,
+ };
+-static struct clk utmi_clk = {
++struct clk utmi_clk = {
+ 	.name		= "utmi_clk",
+ 	.parent		= &main_clk,
+ 	.pmc_mask	= AT91_PMC_UPLLEN,	/* in CKGR_UCKR */
+@@ -182,7 +182,7 @@ static struct clk uhpck = {
+  * memory, interfaces to on-chip peripherals, the AIC, and sometimes more
+  * (e.g baud rate generation).  It's sourced from one of the primary clocks.
+  */
+-static struct clk mck = {
++struct clk mck = {
+ 	.name		= "mck",
+ 	.pmc_mask	= AT91_PMC_MCKRDY,	/* in PMC_SR */
+ };
+@@ -215,43 +215,6 @@ static struct clk __init *at91_css_to_clk(unsigned long css)
+ 	return NULL;
  }
  
 -/*
-- * Set up both clocksource and clockevent support.
+- * Associate a particular clock with a function (eg, "uart") and device.
+- * The drivers can then request the same 'function' with several different
+- * devices and not care about which clock name to use.
 - */
--static void __init at91sam926x_pit_init(void)
-+static int at91_pit_clocksource_enable(struct clocksource *cs)
-+{
-+	struct at91_pit_data *data = cs_to_at91_pit(cs);
-+
-+	at91_pit_reset(data);
-+
-+	return 0;
-+}
-+
-+static void at91_pit_clocksource_resume(struct clocksource *cs)
-+{
-+	struct at91_pit_data *data = cs_to_at91_pit(cs);
-+
-+	at91_pit_reset(data);
-+}
-+
-+static void at91_pit_clocksource_disable(struct clocksource *cs)
-+{
-+	struct at91_pit_data *data = cs_to_at91_pit(cs);
-+
-+	at91_pit_stop(data);
-+}
-+
-+static void at91_pit_register_clockevent(struct at91_pit_data *data,
-+					 unsigned long pit_rate)
-+{
-+	struct clock_event_device *ced = &data->ced;
-+
-+	memset(ced, 0, sizeof(*ced));
-+
-+	ced->name = "pit";
-+	ced->features = CLOCK_EVT_FEAT_PERIODIC;
-+	ced->shift = 32;
-+	ced->rating = 100;
-+	ced->set_mode = at91_pit_clock_event_mode;
-+	ced->cpumask = cpumask_of(0);
-+	ced->mult = div_sc(pit_rate, NSEC_PER_SEC, ced->shift);
-+
-+	dev_info(&data->pdev->dev, "used for clock events\n");
-+
-+	clockevents_register_device(ced);
-+}
-+
-+static int at91_pit_register_clocksource(struct at91_pit_data *data,
-+					 unsigned long pit_rate)
-+{
-+	struct clocksource *cs = &data->cs;
-+	unsigned bits;
-+
-+	cs->name = "pit";
-+	cs->rating = 175;
-+	cs->shift = 20;
-+	cs->read = at91_pit_clocksource_read;
-+	cs->enable = at91_pit_clocksource_enable;
-+	cs->disable = at91_pit_clocksource_disable;
-+	cs->suspend = at91_pit_clocksource_disable;
-+	cs->resume = at91_pit_clocksource_resume;
-+	cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+
-+	cs->mult = clocksource_hz2mult(pit_rate, cs->shift);
-+	bits = 12 /* PICNT */ + ilog2(data->pit_cycle) /* PIV */;
-+	cs->mask = CLOCKSOURCE_MASK(bits);
-+
-+	dev_info(&data->pdev->dev, "used as clock source\n");
-+
-+	clocksource_register_hz(cs, pit_rate);
-+
-+	return 0;
-+}
-+
-+static int at91_pit_setup(struct at91_pit_data *data,
-+			  struct platform_device *pdev)
+-void __init at91_clock_associate(const char *id, struct device *dev, const char *func)
+-{
+-	struct clk *clk = clk_get(NULL, id);
+-
+-	if (!dev || !clk || !IS_ERR(clk_get(dev, func)))
+-		return;
+-
+-	clk->function = func;
+-	clk->dev = dev;
+-}
+-
+-/* clocks cannot be de-registered no refcounting necessary */
+-struct clk *clk_get(struct device *dev, const char *id)
+-{
+-	struct clk *clk;
+-
+-	list_for_each_entry(clk, &clocks, node) {
+-		if (strcmp(id, clk->name) == 0)
+-			return clk;
+-		if (clk->function && (dev == clk->dev) && strcmp(id, clk->function) == 0)
+-			return clk;
+-	}
+-
+-	return ERR_PTR(-ENOENT);
+-}
+-EXPORT_SYMBOL(clk_get);
+-
+-void clk_put(struct clk *clk)
+-{
+-}
+-EXPORT_SYMBOL(clk_put);
+-
+ static void __clk_enable(struct clk *clk)
  {
- 	unsigned long	pit_rate;
--	unsigned	bits;
-+	struct resource	*res;
-+	int		irq;
-+	int		ret = -ENXIO;
-+
-+	memset(data, 0, sizeof(struct at91_pit_data));
-+	data->pdev = pdev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to get I/O memory\n");
-+		goto err0;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "failed to get irq\n");
-+		goto err0;
-+	}
-+
-+	/* map memory, let mapbase point to our channel */
-+	data->mapbase = (void * __iomem)(res->start + AT91_VA_BASE_SYS);
-+
-+	/* request irq using setup_irq() (too early for request_irq()) */
-+	data->irqaction.name = "at91_tick";
-+	data->irqaction.handler = at91_pit_interrupt;
-+	data->irqaction.dev_id = data;
-+	data->irqaction.flags = IRQF_SHARED | IRQF_DISABLED |
-+				IRQF_TIMER  | IRQF_IRQPOLL;
- 
- 	/*
- 	 * Use our actual MCK to figure out how many MCK/16 ticks per
- 	 * 1/HZ period (instead of a compile-time constant LATCH).
- 	 */
- 	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
--	pit_cycle = (pit_rate + HZ/2) / HZ;
--	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
-+	data->pit_cycle = (pit_rate + HZ/2) / HZ;
-+	WARN_ON(((data->pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
- 
- 	/* Initialize and enable the timer */
--	at91sam926x_pit_reset();
-+	at91_pit_reset(data);
- 
- 	/*
- 	 * Register clocksource.  The high order bits of PIV are unused,
- 	 * so this isn't a 32-bit counter unless we get clockevent irqs.
- 	 */
--	bits = 12 /* PICNT */ + ilog2(pit_cycle) /* PIV */;
--	pit_clk.mask = CLOCKSOURCE_MASK(bits);
--	clocksource_register_hz(&pit_clk, pit_rate);
-+	at91_pit_register_clocksource(data, pit_rate);
- 
- 	/* Set up irq handler */
--	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
-+	setup_irq(irq, &data->irqaction);
- 
- 	/* Set up and register clockevents */
--	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
--	pit_clkevt.cpumask = cpumask_of(0);
--	clockevents_register_device(&pit_clkevt);
-+	at91_pit_register_clockevent(data, pit_rate);
-+
-+	return 0;
-+
-+err0:
-+	return ret;
-+}
-+
-+static int __devinit at91_pit_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct at91_pit_data *data;
-+
-+	if (!is_early_platform_device(pdev)) {
-+		pr_info("at91_pit.%d: call via non early plaform\n", pdev->id);
-+		return 0;
-+	}
-+
-+	data = kmalloc(sizeof(struct at91_pit_data), GFP_KERNEL);
-+	if (data == NULL) {
-+		dev_err(&pdev->dev, "failed to allocate driver data\n");
-+		return -ENOMEM;
-+	}
-+
-+	ret = at91_pit_setup(data, pdev);
-+
-+	if (ret)
-+		kfree(data);
-+
-+	return ret;
+ 	if (clk->parent)
+@@ -662,6 +625,17 @@ static void __init at91_upll_usbfs_clock_init(unsigned long main_clock)
+ 	uhpck.rate_hz /= 1 + ((at91_sys_read(AT91_PMC_USB) & AT91_PMC_OHCIUSBDIV) >> 8);
  }
  
--static void at91sam926x_pit_suspend(void)
-+static int __devexit at91_pit_remove(struct platform_device *pdev)
++static struct clk_lookup lookups[] = {
++	CLKDEV_CON_ID("clk32k", &clk32k),
++	CLKDEV_CON_ID("main", &main_clk),
++	CLKDEV_CON_ID("plla", &plla),
++	CLKDEV_CON_ID("mck", &mck),
++	CLKDEV_CON_ID("pllb", &pllb),
++	CLKDEV_CON_ID("udpck", &udpck),
++	CLKDEV_CON_ID("utmi_clk", &utmi_clk),
++	CLKDEV_CON_ID("uhpck", &uhpck),
++};
++
+ int __init at91_clock_init(unsigned long main_clock)
  {
--	/* Disable timer */
--	at91_sys_write(AT91_PIT_MR, 0);
-+	return -EBUSY; /* cannot unregister clockevent and clocksource */
- }
+ 	unsigned tmp, freq, mckr;
+@@ -771,6 +745,8 @@ int __init at91_clock_init(unsigned long main_clock)
+ 	/* MCK and CPU clock are "always on" */
+ 	clk_enable(&mck);
  
--struct sys_timer at91sam926x_timer = {
--	.init		= at91sam926x_pit_init,
--	.suspend	= at91sam926x_pit_suspend,
--	.resume		= at91sam926x_pit_reset,
-+static struct platform_driver at91_pit_device_driver = {
-+	.probe		= at91_pit_probe,
-+	.remove		= __devexit_p(at91_pit_remove),
-+	.driver		= {
-+		.name	= "at91_pit",
-+	}
- };
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
 +
-+early_platform_init("earlytimer", &at91_pit_device_driver);
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 0fee23f..077eecf 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -402,6 +402,11 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller (IRQ0) */
- };
- 
-+struct at91_dev_resource at91sam9g45_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
-+};
-+
- struct at91_soc __initdata at91sam9g45_soc = {
- 	.name = "at91sam9g45",
- 	.default_irq_priority = at91sam9g45_default_irq_priority,
-@@ -410,4 +415,5 @@ struct at91_soc __initdata at91sam9g45_soc = {
- 		.resource = at91sam9g45_pios,
- 		.num_resources = ARRAY_SIZE(at91sam9g45_pios),
- 	},
-+	.pit = &at91sam9g45_pit,
- };
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index ec62ca01..7623617 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -368,6 +368,11 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
-+struct at91_dev_resource at91sam9rl_pit __initdata = {
-+	.mmio_base	= AT91_PIT,
-+	.irq		= AT91_ID_SYS,
-+};
-+
- struct at91_soc __initdata at91sam9rl_soc = {
- 	.name = "at91sam9rl",
- 	.default_irq_priority = at91sam9rl_default_irq_priority,
-@@ -376,4 +381,5 @@ struct at91_soc __initdata at91sam9rl_soc = {
- 		.resource = at91sam9rl_pios,
- 		.num_resources = ARRAY_SIZE(at91sam9rl_pios),
- 	},
-+	.pit = &at91sam9rl_pit,
- };
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 3103bb1..71304fe 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -219,7 +219,7 @@ static void __init afeb9260_board_init(void)
- MACHINE_START(AFEB9260, "Custom afeb9260 board")
- 	/* Maintainer: Sergey Lapin <slapin@ossfans.org> */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= afeb9260_map_io,
- 	.init_irq	= afeb9260_init_irq,
- 	.init_machine	= afeb9260_board_init,
-diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-index 1d24493..61d11af 100644
---- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-+++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-@@ -316,7 +316,7 @@ static void __init eb_board_init(void)
- MACHINE_START(AT572D940HFEB, "Atmel AT91D940HF-EB")
- 	/* Maintainer: Atmel <costa.antonior@gmail.com> */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= eb_map_io,
- 	.init_irq	= eb_init_irq,
- 	.init_machine	= eb_board_init,
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index d3a65e2..5d65fe5 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -199,7 +199,7 @@ static void __init cam60_board_init(void)
- MACHINE_START(CAM60, "KwikByte CAM60")
- 	/* Maintainer: KwikByte */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= cam60_map_io,
- 	.init_irq	= cam60_init_irq,
- 	.init_machine	= cam60_board_init,
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index 8f0a53e..939a2a6 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -397,7 +397,7 @@ static void __init cap9adk_board_init(void)
- MACHINE_START(AT91CAP9ADK, "Atmel AT91CAP9A-DK")
- 	/* Maintainer: Stelian Pop <stelian.pop@leadtechdesign.com> */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= cap9adk_map_io,
- 	.init_irq	= cap9adk_init_irq,
- 	.init_machine	= cap9adk_board_init,
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 544995c..625f485 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -376,7 +376,7 @@ MACHINE_START(CPUAT9G20, "Eukrea CPU9G20")
- #endif
- 	/* Maintainer: Eric Benard - EUKREA Electromatique */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= cpu9krea_map_io,
- 	.init_irq	= cpu9krea_init_irq,
- 	.init_machine	= cpu9krea_board_init,
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index 15cf7ab..478ae2f 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -155,7 +155,7 @@ static void __init flexibity_board_init(void)
- MACHINE_START(FLEXIBITY, "Flexibity Connect")
- 	/* Maintainer: Maxim Osipov */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= flexibity_map_io,
- 	.init_irq	= flexibity_init_irq,
- 	.init_machine	= flexibity_board_init,
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index 53032d4..51de65f 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -267,7 +267,7 @@ static void __init foxg20_board_init(void)
- MACHINE_START(ACMENETUSFOXG20, "Acme Systems srl FOX Board G20")
- 	/* Maintainer: Sergio Tanzilli */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= foxg20_map_io,
- 	.init_irq	= foxg20_init_irq,
- 	.init_machine	= foxg20_board_init,
-diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-index 41f7164..8d40325 100644
---- a/arch/arm/mach-at91/board-gsia18s.c
-+++ b/arch/arm/mach-at91/board-gsia18s.c
-@@ -577,7 +577,7 @@ static void __init gsia18s_board_init(void)
- 
- MACHINE_START(GSIA18S, "GS_IA18_S")
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= gsia18s_map_io,
- 	.init_irq	= init_irq,
- 	.init_machine	= gsia18s_board_init,
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index 2d1dec2..b313b7e 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -388,7 +388,7 @@ static void __init neocore926_board_init(void)
- MACHINE_START(NEOCORE926, "ADENEO NEOCORE 926")
- 	/* Maintainer: ADENEO */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= neocore926_map_io,
- 	.init_irq	= neocore926_init_irq,
- 	.init_machine	= neocore926_board_init,
-diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-index aa0a660..b577569 100644
---- a/arch/arm/mach-at91/board-pcontrol-g20.c
-+++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-@@ -223,7 +223,7 @@ static void __init pcontrol_g20_board_init(void)
- MACHINE_START(PCONTROL_G20, "PControl G20")
- 	/* Maintainer: pgsellmann at portner-elektronik.at */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= pcontrol_g20_map_io,
- 	.init_irq	= init_irq,
- 	.init_machine	= pcontrol_g20_board_init,
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index e26fa6e..b131aab 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -269,7 +269,7 @@ static void __init ek_board_init(void)
- MACHINE_START(QIL_A9260, "CALAO QIL_A9260")
- 	/* Maintainer: calao-systems */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index e4e19aa..2b569e6 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -213,7 +213,7 @@ static void __init ek_board_init(void)
- MACHINE_START(SAM9_L9260, "Olimex SAM9-L9260")
- 	/* Maintainer: Olimex */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 2307a1c..e27951f 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -354,7 +354,7 @@ static void __init ek_board_init(void)
- MACHINE_START(AT91SAM9260EK, "Atmel AT91SAM9260-EK")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index e1c4274..9160999 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -621,7 +621,7 @@ MACHINE_START(AT91SAM9G10EK, "Atmel AT91SAM9G10-EK")
- #endif
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 43c421d..1dfb4ad 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -452,7 +452,7 @@ static void __init ek_board_init(void)
- MACHINE_START(AT91SAM9263EK, "Atmel AT91SAM9263-EK")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 5a5df34..aff0782 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -404,7 +404,7 @@ static void __init ek_board_init(void)
- MACHINE_START(AT91SAM9G20EK, "Atmel AT91SAM9G20-EK")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-@@ -413,7 +413,7 @@ MACHINE_END
- MACHINE_START(AT91SAM9G20EK_2MMC, "Atmel AT91SAM9G20-EK 2 MMC Slot Mod")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index fef316a..9aa68d7 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -422,7 +422,7 @@ static void __init ek_board_init(void)
- MACHINE_START(AT91SAM9M10G45EK, "Atmel AT91SAM9M10G45-EK")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 535c975..4020808 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -330,7 +330,7 @@ static void __init ek_board_init(void)
- MACHINE_START(AT91SAM9RLEK, "Atmel AT91SAM9RL-EK")
- 	/* Maintainer: Atmel */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index a5d5d89..b5a8bd8 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -179,7 +179,7 @@ static void __init snapper9260_board_init(void)
- 
- MACHINE_START(SNAPPER_9260, "Bluewater Systems Snapper 9260/9G20 module")
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= snapper9260_map_io,
- 	.init_irq	= snapper9260_init_irq,
- 	.init_machine	= snapper9260_board_init,
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 1b435c3..1c92df0 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -299,7 +299,7 @@ static void __init stamp9g20evb_board_init(void)
- MACHINE_START(PORTUXG20, "taskit PortuxG20")
- 	/* Maintainer: taskit GmbH */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= portuxg20_map_io,
- 	.init_irq	= init_irq,
- 	.init_machine	= portuxg20_board_init,
-@@ -308,7 +308,7 @@ MACHINE_END
- MACHINE_START(STAMP9G20, "taskit Stamp9G20")
- 	/* Maintainer: taskit GmbH */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= stamp9g20evb_map_io,
- 	.init_irq	= init_irq,
- 	.init_machine	= stamp9g20evb_board_init,
-diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
-index a1cb555..349e31a 100644
---- a/arch/arm/mach-at91/board-usb-a926x.c
-+++ b/arch/arm/mach-at91/board-usb-a926x.c
-@@ -280,7 +280,7 @@ static void __init ek_board_init(void)
- MACHINE_START(USB_A9263, "CALAO USB_A9263")
- 	/* Maintainer: calao-systems */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-@@ -289,7 +289,7 @@ MACHINE_END
- MACHINE_START(USB_A9260, "CALAO USB_A9260")
- 	/* Maintainer: calao-systems */
- 	.boot_params	= AT91_SDRAM_BASE + 0x100,
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_timer,
- 	.map_io		= ek_map_io,
- 	.init_irq	= ek_init_irq,
- 	.init_machine	= ek_board_init,
-diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 03ded48..b11154d 100644
---- a/arch/arm/mach-at91/devices.c
-+++ b/arch/arm/mach-at91/devices.c
-@@ -8,8 +8,8 @@
-  *
+ 	printk("Clocks: CPU %u MHz, master %u MHz, main %u.%03u MHz\n",
+ 		freq / 1000000, (unsigned) mck.rate_hz / 1000000,
+ 		(unsigned) main_clock / 1000000,
+diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
+index 6cf4b78..f0d8776 100644
+--- a/arch/arm/mach-at91/clock.h
++++ b/arch/arm/mach-at91/clock.h
+@@ -6,6 +6,8 @@
+  * published by the Free Software Foundation.
   */
  
--#include <linux/platform_device.h>
- 
--#include "devices.h"
++#include <linux/clkdev.h>
 +
-+#include "soc.h"
+ #define CLK_TYPE_PRIMARY	0x1
+ #define CLK_TYPE_PLL		0x2
+ #define CLK_TYPE_PROGRAMMABLE	0x4
+@@ -16,8 +18,6 @@
+ struct clk {
+ 	struct list_head node;
+ 	const char	*name;		/* unique clock name */
+-	const char	*function;	/* function of the clock */
+-	struct device	*dev;		/* device associated with function */
+ 	unsigned long	rate_hz;
+ 	struct clk	*parent;
+ 	u32		pmc_mask;
+@@ -29,3 +29,18 @@ struct clk {
  
  
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index b2c7c3a..1cfe696 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -23,7 +23,7 @@ extern void __init at91_aic_init(unsigned int priority[]);
-  /* Timer */
- struct sys_timer;
- extern struct sys_timer at91rm9200_timer;
--extern struct sys_timer at91sam926x_timer;
-+extern struct sys_timer at91_timer;
- extern struct sys_timer at91x40_timer;
- 
-  /* Clocks */
-diff --git a/arch/arm/mach-at91/include/mach/at91_pit.h b/arch/arm/mach-at91/include/mach/at91_pit.h
-index 974d0bd..380ef93 100644
---- a/arch/arm/mach-at91/include/mach/at91_pit.h
-+++ b/arch/arm/mach-at91/include/mach/at91_pit.h
-@@ -16,16 +16,16 @@
- #ifndef AT91_PIT_H
- #define AT91_PIT_H
- 
--#define AT91_PIT_MR		(AT91_PIT + 0x00)	/* Mode Register */
-+#define AT91_PIT_MR		(0x00)			/* Mode Register */
- #define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
- #define		AT91_PIT_PITEN		(1 << 24)		/* Timer Enabled */
- #define		AT91_PIT_PIV		(0xfffff)		/* Periodic Interval Value */
- 
--#define AT91_PIT_SR		(AT91_PIT + 0x04)	/* Status Register */
-+#define AT91_PIT_SR		(0x04)			/* Status Register */
- #define		AT91_PIT_PITS		(1 << 0)		/* Timer Status */
- 
--#define AT91_PIT_PIVR		(AT91_PIT + 0x08)	/* Periodic Interval Value Register */
--#define AT91_PIT_PIIR		(AT91_PIT + 0x0c)	/* Periodic Interval Image Register */
-+#define AT91_PIT_PIVR		(0x08)			/* Periodic Interval Value Register */
-+#define AT91_PIT_PIIR		(0x0c)			/* Periodic Interval Image Register */
- #define		AT91_PIT_PICNT		(0xfff << 20)		/* Interval Counter */
- #define		AT91_PIT_CPIV		(0xfffff)		/* Inverval Value */
- 
-diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-index 0e8604c..7b44be2 100644
---- a/arch/arm/mach-at91/soc.c
-+++ b/arch/arm/mach-at91/soc.c
-@@ -11,6 +11,7 @@
- #include <linux/io.h>
- 
- #include <asm/mach/map.h>
-+#include <asm/mach/time.h>
- 
- #include <mach/hardware.h>
- #include <mach/cpu.h>
-@@ -212,3 +213,44 @@ static void __init at91_add_gpio(void)
- 	early_platform_driver_register_all("early_at91_gpio");
- 	early_platform_driver_probe("early_at91_gpio", nb , 0);
- }
+ extern int __init clk_register(struct clk *clk);
++extern struct clk mck;
++extern struct clk utmi_clk;
 +
-+/*
-+ * Set up both clocksource and clockevent support.
-+ */
-+static struct resource pit_resources[] = {
-+	[0] = RES_MEM(SZ_16),
-+	[1] = RES_IRQ(),
-+};
-+
-+static struct platform_device at91_pit_device = {
-+	.name		= "at91_pit",
-+	.id		= 0,
-+	.resource	= pit_resources,
-+	.num_resources	= ARRAY_SIZE(pit_resources),
-+};
-+
-+static void __init at91_timer_init(void)
-+{
-+	struct at91_dev_resource *res;
-+	struct platform_device *pdev;
-+	struct resource *r;
-+
-+	BUG_ON(!current_soc.pit);
-+
-+	if (current_soc.pit) {
-+		r = pit_resources;
-+		res = current_soc.pit;
-+		pdev = &at91_pit_device;
++#define CLKDEV_CON_ID(_id, _clk)			\
++	{						\
++		.con_id = _id,				\
++		.clk = _clk,				\
 +	}
 +
-+	set_resource_mem(&r[0], res->mmio_base);
-+	set_resource_irq(&r[1], res->irq);
-+
-+	early_platform_add_devices(&pdev, 1);
-+	early_platform_driver_register_all("earlytimer");
-+	early_platform_driver_probe("earlytimer", 1 , 0);
-+}
-+
-+struct sys_timer at91_timer = {
-+	.init		= at91_timer_init,
-+};
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index bf90d48..8df07a2 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -13,6 +13,7 @@ struct at91_soc {
- 	unsigned int *default_irq_priority;
++#define CLKDEV_CON_DEV_ID(_con_id, _dev_id, _clk)	\
++	{						\
++		.con_id = _con_id,			\
++		.dev_id = _dev_id,			\
++		.clk = _clk,				\
++	}
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 3b5ff68..a039726 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
  
- 	struct at91_dev_resource_array gpio;
-+	struct at91_dev_resource *pit;
++#include <linux/clkdev.h>
++
+  /* Processors */
+ extern void __init at91rm9200_set_type(int type);
+ extern void __init at91_initialize(unsigned long main_clock);
+@@ -26,8 +28,16 @@ extern struct sys_timer at91x40_timer;
  
- 	void (*init)(unsigned long main_clock);
- };
+  /* Clocks */
+ extern int __init at91_clock_init(unsigned long main_clock);
++extern struct clk* __init at91rm9200_get_uart_clock(int id);
++extern struct clk* __init at91sam9260_get_uart_clock(int id);
++extern struct clk* __init at91sam9261_get_uart_clock(int id);
++extern struct clk* __init at91sam9263_get_uart_clock(int id);
++extern struct clk* __init at91sam9rl_get_uart_clock(int id);
++extern struct clk* __init at91sam9g45_get_uart_clock(int id);
++extern struct clk* __init at91x40_get_uart_clock(int id);
++extern struct clk* __init at91cap9_get_uart_clock(int id);
++extern struct clk* __init at572d940hf_get_uart_clock(int id);
+ struct device;
+-extern void __init at91_clock_associate(const char *id, struct device *dev, const char *func);
+ 
+  /* Power Management */
+ extern void at91_irq_suspend(void);
+diff --git a/arch/arm/mach-at91/include/mach/clkdev.h b/arch/arm/mach-at91/include/mach/clkdev.h
+new file mode 100644
+index 0000000..04b37a8
+--- /dev/null
++++ b/arch/arm/mach-at91/include/mach/clkdev.h
+@@ -0,0 +1,7 @@
++#ifndef __ASM_MACH_CLKDEV_H
++#define __ASM_MACH_CLKDEV_H
++
++#define __clk_get(clk) ({ 1; })
++#define __clk_put(clk) do { } while (0)
++
++#endif
 -- 
 1.7.4.1
