@@ -1,62 +1,116 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 26 Apr 2011 08:16:06 +1200
-Subject: [PATCH v2 02/23] at91: Make Ethernet device common
-In-Reply-To: <0D753D10438DA54287A00B027084269764D24302A7@AUSP01VMBX24.collaborationhost.net>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-3-git-send-email-ryan@bluewatersys.com>
-	<0D753D10438DA54287A00B027084269764D24302A7@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4DB5D686.5050208@bluewatersys.com>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Mon, 25 Apr 2011 13:17:01 -0700
+Subject: [RFC PATCH 01/12] ARM: gic: add per-cpu interrupt multiplexer
+In-Reply-To: <1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
+References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
+	<1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4DB5D6BD.3000405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2011 11:02 AM, H Hartley Sweeten wrote:
-> On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
->>
->> Replace the individual Ethernet device code for each at91 variant with
->> a single implementation in devices.
->>
->> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
->> ---
->>
->>  arch/arm/mach-at91/at572d940hf.c         |    4 +
->>  arch/arm/mach-at91/at572d940hf_devices.c |   83 +++++++----------------
->>  arch/arm/mach-at91/at91cap9.c            |    4 +
->>  arch/arm/mach-at91/at91cap9_devices.c    |  103 ++++++++++------------------
->>  arch/arm/mach-at91/at91rm9200.c          |    4 +
->>  arch/arm/mach-at91/at91rm9200_devices.c  |  103 ++++++++++------------------
->>  arch/arm/mach-at91/at91sam9260.c         |    4 +
->>  arch/arm/mach-at91/at91sam9260_devices.c |  104 +++++++++++------------------
->>  arch/arm/mach-at91/at91sam9263.c         |    4 +
->>  arch/arm/mach-at91/at91sam9263_devices.c |  102 ++++++++++------------------
->>  arch/arm/mach-at91/at91sam9g45.c         |    4 +
->>  arch/arm/mach-at91/at91sam9g45_devices.c |  108 +++++++++++-------------------
->>  arch/arm/mach-at91/devices.c             |   61 +++++++++++++++++
->>  arch/arm/mach-at91/devices.h             |   10 +++
->>  14 files changed, 309 insertions(+), 389 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
->> index a6b9c68..48c1ec2 100644
->> --- a/arch/arm/mach-at91/at572d940hf.c
->> +++ b/arch/arm/mach-at91/at572d940hf.c
->> @@ -34,6 +34,8 @@
->>  #include "generic.h"
->>  #include "clock.h"
->>  
->> +extern void at572d940hf_init_devices(void);
-> 
-> You might consider moving this, and all the other similar externs, to the generic.h
-> header.  That's where all the other platform init functions are defined.
+Marc Zyngier wrote:
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index e9c2ff8..60f8915 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -42,6 +42,11 @@ struct gic_chip_data {
+>  	unsigned int irq_offset;
+>  	void __iomem *dist_base;
+>  	void __iomem *cpu_base;
+> +#ifdef CONFIG_ARM_GIC_VPPI
+> +	int	     ppi_base;
+> +	int	     vppi_base;
+> +	u16	     nrppis;
+> +#endif
+>  };
 
-I put the externs in the .c files since that is the only place they are
-actually called from. What is the general consensus on this?
+Can you put some document around this struct? Mention that ppi_base, 
+vppi_base and nrppis will be zero for non-primary gic.
 
-~Ryan
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+>  static void __init gic_dist_init(struct gic_chip_data *gic,
+>  	unsigned int irq_start)
+>  {
+> -	unsigned int gic_irqs, irq_limit, i;
+> +	unsigned int gic_irqs, irq_limit, i, nrvppis = 0;
+>  	void __iomem *base = gic->dist_base;
+>  	u32 cpumask = 1 << smp_processor_id();
+> +	u32 dist_ctr, nrcpus;
+>  
+>  	cpumask |= cpumask << 8;
+>  	cpumask |= cpumask << 16;
+> @@ -278,11 +359,32 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+>  	 * Find out how many interrupts are supported.
+>  	 * The GIC only supports up to 1020 interrupt sources.
+>  	 */
+> -	gic_irqs = readl(base + GIC_DIST_CTR) & 0x1f;
+> -	gic_irqs = (gic_irqs + 1) * 32;
+> +	dist_ctr = readl(base + GIC_DIST_CTR);
+> +	gic_irqs = ((dist_ctr & 0x1f) + 1) * 32;
+>  	if (gic_irqs > 1020)
+>  		gic_irqs = 1020;
+>  
+> +	/* Find out how many CPUs are supported (8 max). */
+> +	nrcpus = ((dist_ctr >> 5) & 7) + 1;
+> +
+> +#ifdef CONFIG_ARM_GIC_VPPI
+> +	/*
+> +	 * Nobody would be insane enough to use PPIs on a secondary
+> +	 * GIC, right?
+> +	 */
+> +	if (gic == &gic_data[0]) {
+> +		gic->nrppis = 16 - (irq_start % 16);
+> +		gic->ppi_base = gic->irq_offset + 32 - gic->nrppis;
+> +		nrvppis = gic->nrppis * nrcpus;
+> +	} else {
+> +		gic->ppi_base = 0;
+> +		gic->vppi_base = 0;
+> +	}
+> +#endif
+> +
+> +	pr_info("Configuring GIC with %d sources (%d additional PPIs)\n",
+> +		gic_irqs, nrvppis);
+> +
+>  	/*
+>  	 * Set all global interrupts to be level triggered, active low.
+>  	 */
+> @@ -312,17 +414,39 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+>  	 * Limit number of interrupts registered to the platform maximum
+>  	 */
+>  	irq_limit = gic->irq_offset + gic_irqs;
+> -	if (WARN_ON(irq_limit > NR_IRQS))
+> +	if (WARN_ON((irq_limit) > NR_IRQS))
+>  		irq_limit = NR_IRQS;
+>  
+>  	/*
+>  	 * Setup the Linux IRQ subsystem.
+>  	 */
+>  	for (i = irq_start; i < irq_limit; i++) {
+> -		irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
+> +#ifdef CONFIG_ARM_GIC_VPPI
+> +		if (nrvppis && gic_irq_is_ppi(gic, i))
+> +			irq_set_chip_and_handler(i, &gic_chip, gic_handle_ppi);
+> +		else
+> +#endif
+> +		{
+> +			irq_set_chip_and_handler(i, &gic_chip,
+> +						 handle_fasteoi_irq);
+> +			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+> +		}
+> +		irq_set_chip_data(i, gic);
+> +	}
+> +
+> +#ifdef CONFIG_ARM_GIC_VPPI
+> +	if (!nrvppis)
+> +		goto out;
+> +	gic->vppi_base = irq_alloc_descs(-1, 0, nrvppis, 0);
+> +	if (unlikely(WARN_ON(gic->vppi_base < 0)))
+> +		goto out;
+> +	for (i = gic->vppi_base; i < (gic->vppi_base + nrvppis); i++) {
+> +		irq_set_chip_and_handler(i, &gic_ppi_chip, handle_fasteoi_irq);
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Can we do with handle_percpu_irq instead of handle_fasteoi_irq?
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
