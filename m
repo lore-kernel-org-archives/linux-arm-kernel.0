@@ -1,32 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Apr 2011 15:44:51 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110425144132.GA1873@richard-laptop>
-References: <20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-	<20110421123542.GE11788@opensource.wolfsonmicro.com>
-	<20110425020348.GA6540@shlinux1.ap.freescale.net>
-	<20110425105744.GA30859@opensource.wolfsonmicro.com>
-	<20110425144132.GA1873@richard-laptop>
-Message-ID: <20110425144451.GB31523@opensource.wolfsonmicro.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 25 Apr 2011 21:21:57 +0530
+Subject: [GIT PULL] DaVinci fixes for 2.6.39-rc
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CAE33C8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 10:41:32PM +0800, Richard Zhao wrote:
-> On Mon, Apr 25, 2011 at 11:57:45AM +0100, Mark Brown wrote:
+Hi Russell,
 
-> > Even for many ARMs it's common for the clock tree to be rooted in the
-> > PMIC (since it will always be on), and of course the full system clock
-> > tree will not just include the CPU but also any other digital components
-> > in the system.
+Please pull the following DaVinci fixes for 2.6.39-rc.
 
-> Yes, I see pmic or other on-board osc may be clock source. I just didn't realize
-> anyone will put them to clk. 
+Thanks,
+Sekhar
 
-My point here is that right now nobody does anything like that unless
-they really have to in part because this then makes the driver for the
-off-SoC chip get tied in to the chip clock structure.
+The following changes since commit f0e615c3cb72b42191b558c130409335812621d8:
+  Linus Torvalds (1):
+        Linux 2.6.39-rc4
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git davinci-fixes
+
+Kevin Hilman (1):
+      davinci: fix DEBUG_LL code for p2v changes
+
+Michael Williamson (2):
+      davinci: mityomapl138: Use correct id for NAND controller
+      davinci: mityomapl138: Use auto-probe to determine attached PHY ID
+
+Russell King - ARM Linux (1):
+      ARM: Davinci: Fix I2C build errors
+
+Sergei Shtylyov (1):
+      DA830: fix SPI1 base address
+
+ arch/arm/mach-davinci/Kconfig                    |    6 ++++++
+ arch/arm/mach-davinci/board-mityomapl138.c       |    4 ++--
+ arch/arm/mach-davinci/devices-da8xx.c            |   12 +++++++++---
+ arch/arm/mach-davinci/include/mach/debug-macro.S |   13 ++++++++-----
+ arch/arm/mach-davinci/include/mach/serial.h      |    2 +-
+ 5 files changed, 26 insertions(+), 11 deletions(-)
