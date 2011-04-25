@@ -1,196 +1,1023 @@
 From: weitway@gmail.com (weitway at gmail.com)
-Date: Mon, 25 Apr 2011 21:38:29 +0800
-Subject: [PATCH 2/9] ARM i.MX5: Add IPU device support
-Message-ID: <1303738709-27562-1-git-send-email-weitway@gmail.com>
+Date: Mon, 25 Apr 2011 21:39:02 +0800
+Subject: [PATCH 3/9] Add i.MX5 framebuffer driver
+Message-ID: <1303738742-27594-1-git-send-email-weitway@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jason Chen <b02280@freescale.com>
 
+This patch adds framebuffer support to the Freescale i.MX SoCs
+equipped with an IPU v3, so far these are the i.MX51/53.
+
+This driver has been tested on the i.MX51 babbage board with
+both DVI and analog VGA in different resolutions and color depths.
+It has also been tested on a custom i.MX51 board using a fixed
+resolution panel.
+
+On i.MX53, it has been tested on the i.MX51 loco board with
+WVGA LCD panel.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Jason Chen <Jason.Chen@freescale.com>
 Signed-off-by: Jason Chen <Jason.Chen@linaro.org>
 ---
- arch/arm/mach-mx5/devices-imx51.h               |    4 +
- arch/arm/mach-mx5/devices-imx53.h               |    4 +
- arch/arm/plat-mxc/devices/Kconfig               |    4 +
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   87 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |   13 ++++
- arch/arm/plat-mxc/include/mach/mx53.h           |    2 +-
- 7 files changed, 114 insertions(+), 1 deletions(-)
+ drivers/video/Kconfig  |   11 +
+ drivers/video/Makefile |    1 +
+ drivers/video/mx5fb.c  |  952 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 964 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-index e11bc0e..058a86f 100644
---- a/arch/arm/mach-mx5/devices-imx51.h
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -52,3 +52,7 @@ extern const struct imx_mxc_pwm_data imx51_mxc_pwm_data[];
- extern const struct imx_imx_keypad_data imx51_imx_keypad_data;
- #define imx51_add_imx_keypad(pdata)	\
- 	imx_add_imx_keypad(&imx51_imx_keypad_data, pdata)
-+
-+extern const struct imx_ipuv3_data imx51_ipuv3_data __initconst;
-+#define imx51_add_ipuv3(id, pdata)	\
-+	imx_add_ipuv3(id, &imx51_ipuv3_data, pdata)
-diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-index 48f4c8c..664473a 100644
---- a/arch/arm/mach-mx5/devices-imx53.h
-+++ b/arch/arm/mach-mx5/devices-imx53.h
-@@ -32,3 +32,7 @@ extern const struct imx_spi_imx_data imx53_ecspi_data[];
- extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[];
- #define imx53_add_imx2_wdt(id, pdata)	\
- 	imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
-+
-+extern const struct imx_ipuv3_data imx53_ipuv3_data __initconst;
-+#define imx53_add_ipuv3(id, pdata)	\
-+	imx_add_ipuv3(id, &imx53_ipuv3_data, pdata)
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index bd294ad..029880e 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -76,3 +76,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index ef502b8..ab92938 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -2297,6 +2297,17 @@ config FB_MX3
+ 	  far only synchronous displays are supported. If you plan to use
+ 	  an LCD display with your i.MX31 system, say Y here.
  
- config IMX_HAVE_PLATFORM_SPI_IMX
- 	bool
++config FB_MX5
++	tristate "MX5 Framebuffer support"
++	depends on FB && FB_IMX_IPU_V3
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
++	select FB_MODE_HELPERS
++	help
++	  This is a framebuffer device for the i.MX5 LCD Controller. If you
++	  plan to use an LCD display with your i.MX5 system, say Y here.
 +
-+config IMX_HAVE_PLATFORM_IMX_IPUV3
-+	bool
-+
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index ad2922a..2d4d16f 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -24,3 +24,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RTC) += platform-mxc_rtc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_IPUV3) +=  platform-imx_ipuv3.o
-diff --git a/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+ config FB_BROADSHEET
+ 	tristate "E-Ink Broadsheet/Epson S1D13521 controller support"
+ 	depends on FB
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index d40faf5..554b051 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -153,6 +153,7 @@ obj-$(CONFIG_FB_BFIN_LQ035Q1)     += bfin-lq035q1-fb.o
+ obj-$(CONFIG_FB_BFIN_T350MCQB)	  += bfin-t350mcqb-fb.o
+ obj-$(CONFIG_FB_BFIN_7393)        += bfin_adv7393fb.o
+ obj-$(CONFIG_FB_MX3)		  += mx3fb.o
++obj-$(CONFIG_FB_MX5)		  += mx5fb.o
+ obj-$(CONFIG_FB_DA8XX)		  += da8xx-fb.o
+ obj-$(CONFIG_FB_MXS)		  += mxsfb.o
+ obj-$(CONFIG_FB_IMX_IPU_V3)	  += imx-ipu-v3/
+diff --git a/drivers/video/mx5fb.c b/drivers/video/mx5fb.c
 new file mode 100644
-index 0000000..b5487ec
+index 0000000..98e0f73
 --- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
-@@ -0,0 +1,87 @@
++++ b/drivers/video/mx5fb.c
+@@ -0,0 +1,952 @@
 +/*
-+ * Copyright (C) 2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ *
++ * Framebuffer Framebuffer Driver for SDC
 + */
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
 +
-+#define imx5_ipuv3_data_entry_single(soc, size, ipu_init)	        \
-+	{                                                               \
-+		.iobase = soc ## _IPU_CTRL_BASE_ADDR,                   \
-+		.irq_err = soc ## _INT_IPU_ERR,                         \
-+		.irq = soc ## _INT_IPU_SYN,                             \
-+		.irq_start = MXC_IPU_IRQ_START,                         \
-+		.iosize = size,                                         \
-+		.init = ipu_init,                                       \
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/interrupt.h>
++#include <linux/slab.h>
++#include <linux/fb.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/mfd/core.h>
++#include <linux/dma-mapping.h>
++#include <linux/console.h>
++#include <video/imx-ipu-v3.h>
++#include <asm/uaccess.h>
++#include <mach/ipu-v3.h>
++
++#define DRIVER_NAME "imx-ipuv3-fb"
++
++struct imx_ipu_fb_info {
++	void			*ipu;
++	int			ipu_channel_num;
++	struct ipu_channel	*ipu_ch;
++	struct dc_channel	*dc_ch;
++	int			di_no;
++	u32			ipu_di_pix_fmt;
++	u32			ipu_in_pix_fmt;
++
++	u32			pseudo_palette[16];
++
++	struct ipu_dp		*dp;
++	struct dmfc_channel	*dmfc;
++	struct ipu_di		*di;
++	struct fb_info		*slave;
++	struct fb_info		*master;
++	bool			enabled;
++
++	/* overlay specific fields */
++	bool			blank_state;
++	int			ovlxres, ovlyres;
++};
++
++static int imx_ipu_fb_set_fix(struct fb_info *info)
++{
++	struct fb_fix_screeninfo *fix = &info->fix;
++	struct fb_var_screeninfo *var = &info->var;
++
++	fix->line_length = var->xres_virtual * var->bits_per_pixel / 8;
++
++	fix->type = FB_TYPE_PACKED_PIXELS;
++	fix->accel = FB_ACCEL_NONE;
++	fix->visual = FB_VISUAL_TRUECOLOR;
++	fix->xpanstep = 0;
++	fix->ypanstep = 1;
++	fix->ywrapstep = 1;
++
++	return 0;
++}
++
++static int imx_ipu_fb_map_video_memory(struct fb_info *fbi)
++{
++	int size;
++
++	size = fbi->var.yres_virtual * fbi->fix.line_length;
++
++	if (fbi->screen_base) {
++		if (fbi->fix.smem_len >= size)
++			return 0;
++		else {
++			dev_err(fbi->device,
++				"Framebuffer memory is not enough for (%d)\n", size);
++			fbi->fix.smem_len = 0;
++			fbi->fix.smem_start = 0;
++			return -ENOMEM;
++		}
 +	}
 +
-+#ifdef CONFIG_SOC_IMX51
-+int __init mx51_ipuv3_init(void)
-+{
-+	int ret = 0;
-+	u32 val;
++	fbi->screen_base = dma_alloc_writecombine(fbi->device,
++				size,
++				(dma_addr_t *)&fbi->fix.smem_start,
++				GFP_DMA);
++	if (fbi->screen_base == 0) {
++		dev_err(fbi->device, "Unable to allocate framebuffer memory (%d)\n",
++				size);
++		fbi->fix.smem_len = 0;
++		fbi->fix.smem_start = 0;
++		return -ENOMEM;
++	}
 +
-+	/* hard reset the IPU */
-+	val = readl(MX51_IO_ADDRESS(MX51_SRC_BASE_ADDR));
-+	val |= 1 << 3;
-+	writel(val, MX51_IO_ADDRESS(MX51_SRC_BASE_ADDR));
++	fbi->fix.smem_len = size;
++	fbi->screen_size = fbi->fix.smem_len;
++
++	dev_dbg(fbi->device, "allocated fb @ paddr=0x%08lx, size=%d\n",
++		fbi->fix.smem_start, fbi->fix.smem_len);
++
++	/* Clear the screen */
++	memset((char *)fbi->screen_base, 0, fbi->fix.smem_len);
++
++	return 0;
++}
++
++static void imx_ipu_fb_enable(struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++
++	if (mxc_fbi->enabled)
++		return;
++
++	ipu_di_enable(mxc_fbi->di);
++	ipu_dmfc_enable_channel(mxc_fbi->dmfc);
++	ipu_idmac_enable_channel(mxc_fbi->ipu_ch);
++	ipu_dc_enable_channel(mxc_fbi->dc_ch);
++	if (mxc_fbi->dp)
++		ipu_dp_enable_channel(mxc_fbi->dp);
++	mxc_fbi->enabled = 1;
++}
++
++static void imx_ipu_fb_disable(struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++
++	if (!mxc_fbi->enabled)
++		return;
++
++	if (mxc_fbi->dp)
++		ipu_dp_disable_channel(mxc_fbi->dp);
++	ipu_dc_disable_channel(mxc_fbi->dc_ch);
++	ipu_idmac_disable_channel(mxc_fbi->ipu_ch);
++	ipu_dmfc_disable_channel(mxc_fbi->dmfc);
++	ipu_di_disable(mxc_fbi->di);
++
++	mxc_fbi->enabled = 0;
++}
++
++static int calc_vref(struct fb_var_screeninfo *var)
++{
++	unsigned long htotal, vtotal;
++
++	htotal = var->xres + var->right_margin + var->hsync_len + var->left_margin;
++	vtotal = var->yres + var->lower_margin + var->vsync_len + var->upper_margin;
++
++	if (!htotal || !vtotal)
++		return 60;
++
++	return PICOS2KHZ(var->pixclock) * 1000 / vtotal / htotal;
++}
++
++static int calc_bandwidth(struct fb_var_screeninfo *var, unsigned int vref)
++{
++	return var->xres * var->yres * vref;
++}
++
++static int imx_ipu_fb_set_par(struct fb_info *fbi)
++{
++	int ret;
++	struct ipu_di_signal_cfg sig_cfg;
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++	u32 out_pixel_fmt;
++	int interlaced = 0;
++	struct fb_var_screeninfo *var = &fbi->var;
++	int enabled = mxc_fbi->enabled;
++
++	dev_dbg(fbi->device, "Reconfiguring framebuffer %dx%d-%d\n",
++		fbi->var.xres, fbi->var.yres, fbi->var.bits_per_pixel);
++
++	if (enabled)
++		imx_ipu_fb_disable(fbi);
++
++	fbi->fix.line_length = var->xres_virtual * var->bits_per_pixel / 8;
++
++	ret = imx_ipu_fb_map_video_memory(fbi);
++	if (ret)
++		return ret;
++
++	if (var->vmode & FB_VMODE_INTERLACED)
++		interlaced = 1;
++
++	memset(&sig_cfg, 0, sizeof(sig_cfg));
++	out_pixel_fmt = mxc_fbi->ipu_di_pix_fmt;
++
++	if (var->vmode & FB_VMODE_INTERLACED)
++		sig_cfg.interlaced = 1;
++	if (var->vmode & FB_VMODE_ODD_FLD_FIRST) /* PAL */
++		sig_cfg.odd_field_first = 1;
++	if (var->sync & FB_SYNC_EXT)
++		sig_cfg.ext_clk = 1;
++	if (var->sync & FB_SYNC_HOR_HIGH_ACT)
++		sig_cfg.Hsync_pol = 1;
++	if (var->sync & FB_SYNC_VERT_HIGH_ACT)
++		sig_cfg.Vsync_pol = 1;
++	if (!(var->sync & FB_SYNC_CLK_LAT_FALL))
++		sig_cfg.clk_pol = 1;
++	if (var->sync & FB_SYNC_DATA_INVERT)
++		sig_cfg.data_pol = 1;
++	if (!(var->sync & FB_SYNC_OE_LOW_ACT))
++		sig_cfg.enable_pol = 1;
++	if (var->sync & FB_SYNC_CLK_IDLE_EN)
++		sig_cfg.clkidle_en = 1;
++
++	dev_dbg(fbi->device, "pixclock = %lu.%03lu MHz\n",
++		PICOS2KHZ(var->pixclock) / 1000,
++		PICOS2KHZ(var->pixclock) % 1000);
++
++	sig_cfg.width = var->xres;
++	sig_cfg.height = var->yres;
++	sig_cfg.pixel_fmt = out_pixel_fmt;
++	sig_cfg.h_start_width = var->left_margin;
++	sig_cfg.h_sync_width = var->hsync_len;
++	sig_cfg.h_end_width = var->right_margin;
++	sig_cfg.v_start_width = var->upper_margin;
++	sig_cfg.v_sync_width = var->vsync_len;
++	sig_cfg.v_end_width = var->lower_margin;
++	sig_cfg.v_to_h_sync = 0;
++
++	if (mxc_fbi->dp) {
++		ret = ipu_dp_setup_channel(mxc_fbi->dp, mxc_fbi->ipu_in_pix_fmt,
++				out_pixel_fmt, 1);
++		if (ret) {
++			dev_dbg(fbi->device, "initializing display processor failed with %d\n",
++				ret);
++			return ret;
++		}
++	}
++
++	ret = ipu_dc_init_sync(mxc_fbi->dc_ch, mxc_fbi->di_no, interlaced,
++			out_pixel_fmt, fbi->var.xres);
++	if (ret) {
++		dev_dbg(fbi->device, "initializing display controller failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ret = ipu_di_init_sync_panel(mxc_fbi->di,
++				PICOS2KHZ(var->pixclock) * 1000UL,
++				&sig_cfg);
++	if (ret) {
++		dev_dbg(fbi->device, "initializing panel failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	fbi->mode = (struct fb_videomode *)fb_match_mode(var, &fbi->modelist);
++	var->xoffset = var->yoffset = 0;
++
++	if (fbi->var.vmode & FB_VMODE_INTERLACED)
++		interlaced = 1;
++
++	ret = ipu_idmac_init_channel_buffer(mxc_fbi->ipu_ch,
++					mxc_fbi->ipu_in_pix_fmt,
++					var->xres, var->yres,
++					fbi->fix.line_length,
++					IPU_ROTATE_NONE,
++					fbi->fix.smem_start,
++					0,
++					0, 0, interlaced);
++	if (ret) {
++		dev_dbg(fbi->device, "init channel buffer failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ret = ipu_dmfc_init_channel(mxc_fbi->dmfc, var->xres);
++	if (ret) {
++		dev_dbg(fbi->device, "initializing dmfc channel failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ret = ipu_dmfc_alloc_bandwidth(mxc_fbi->dmfc, calc_bandwidth(var, calc_vref(var)));
++	if (ret) {
++		dev_dbg(fbi->device, "allocating dmfc bandwidth failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	if (enabled)
++		imx_ipu_fb_enable(fbi);
 +
 +	return ret;
 +}
 +
-+const struct imx_ipuv3_data imx51_ipuv3_data __initconst =
-+			imx5_ipuv3_data_entry_single(MX51,
-+			SZ_512M, mx51_ipuv3_init);
-+#endif /* ifdef CONFIG_SOC_IMX51 */
-+
-+#ifdef CONFIG_SOC_IMX53
-+int __init mx53_ipuv3_init(void)
-+{
-+	int ret = 0;
-+	u32 val;
-+
-+	/* hard reset the IPU */
-+	val = readl(MX53_IO_ADDRESS(MX53_SRC_BASE_ADDR));
-+	val |= 1 << 3;
-+	writel(val, MX53_IO_ADDRESS(MX53_SRC_BASE_ADDR));
-+
-+	return ret;
-+}
-+
-+const struct imx_ipuv3_data imx53_ipuv3_data __initconst =
-+			imx5_ipuv3_data_entry_single(MX53,
-+			SZ_128M, mx53_ipuv3_init);
-+#endif
-+
-+struct platform_device *__init imx_add_ipuv3(
-+		int id, const struct imx_ipuv3_data *data,
-+		struct imx_ipuv3_platform_data *pdata)
-+{
-+	struct resource res[] = {
-+		{
-+			.start = data->iobase,
-+			.end = data->iobase + data->iosize - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = data->irq,
-+			.end = data->irq,
-+			.flags = IORESOURCE_IRQ,
-+		}, {
-+			.start = data->irq_err,
-+			.end = data->irq_err,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
-+
-+	pdata->init = data->init;
-+	pdata->irq_start = data->irq_start;
-+
-+	return imx_add_platform_device("imx-ipuv3", id,
-+			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
-+}
-+
-+
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index fa84773..bc6764b 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -291,3 +291,16 @@ struct imx_spi_imx_data {
- struct platform_device *__init imx_add_spi_imx(
- 		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata);
-+
-+#include <mach/ipu-v3.h>
-+struct imx_ipuv3_data {
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	resource_size_t irq_err;
-+	resource_size_t irq;
-+	unsigned int irq_start;
-+	int (*init) (void);
++/*
++ * These are the bitfields for each
++ * display depth that we support.
++ */
++struct imxfb_rgb {
++	struct fb_bitfield	red;
++	struct fb_bitfield	green;
++	struct fb_bitfield	blue;
++	struct fb_bitfield	transp;
 +};
-+struct platform_device *__init imx_add_ipuv3(
-+		int id, const struct imx_ipuv3_data *data,
-+		struct imx_ipuv3_platform_data *pdata);
-diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-index 9d2a1ef..645d250 100644
---- a/arch/arm/plat-mxc/include/mach/mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/mx53.h
-@@ -31,7 +31,7 @@
- /*
-  * Graphics Memory of GPU
-  */
--#define MX53_IPU_CTRL_BASE_ADDR	0x18000000
-+#define MX53_IPU_CTRL_BASE_ADDR	0x00000000 /*real is 0x18000000, for codeing convenience*/
- #define MX53_GPU2D_BASE_ADDR		0x20000000
- #define MX53_GPU_BASE_ADDR		0x30000000
- #define MX53_GPU_GMEM_BASE_ADDR	0xF8020000
++
++static struct imxfb_rgb def_rgb_8 = {
++	.red	= { .offset =  5, .length = 3, },
++	.green	= { .offset =  2, .length = 3, },
++	.blue	= { .offset =  0, .length = 2, },
++	.transp = { .offset =  0, .length = 0, },
++};
++
++static struct imxfb_rgb def_rgb_16 = {
++	.red	= { .offset = 11, .length = 5, },
++	.green	= { .offset =  5, .length = 6, },
++	.blue	= { .offset =  0, .length = 5, },
++	.transp = { .offset =  0, .length = 0, },
++};
++
++static struct imxfb_rgb def_rgb_24 = {
++	.red	= { .offset = 16, .length = 8, },
++	.green	= { .offset =  8, .length = 8, },
++	.blue	= { .offset =  0, .length = 8, },
++	.transp = { .offset =  0, .length = 0, },
++};
++
++static struct imxfb_rgb def_rgb_32 = {
++	.red	= { .offset = 16, .length = 8, },
++	.green	= { .offset =  8, .length = 8, },
++	.blue	= { .offset =  0, .length = 8, },
++	.transp = { .offset = 24, .length = 8, },
++};
++
++/*
++ * Check framebuffer variable parameters and adjust to valid values.
++ *
++ * @param       var      framebuffer variable parameters
++ *
++ * @param       info     framebuffer information pointer
++ */
++static int imx_ipu_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
++{
++	struct imx_ipu_fb_info *mxc_fbi = info->par;
++	struct imxfb_rgb *rgb;
++
++	/* we don't support xpan, force xres_virtual to be equal to xres */
++	var->xres_virtual = var->xres;
++
++	if (var->yres_virtual < var->yres)
++		var->yres_virtual = var->yres;
++
++	switch (var->bits_per_pixel) {
++	case 8:
++		rgb = &def_rgb_8;
++		break;
++	case 16:
++		rgb = &def_rgb_16;
++		mxc_fbi->ipu_in_pix_fmt = IPU_PIX_FMT_RGB565;
++		break;
++	case 24:
++		rgb = &def_rgb_24;
++		mxc_fbi->ipu_in_pix_fmt = IPU_PIX_FMT_BGR24;
++		break;
++	case 32:
++		rgb = &def_rgb_32;
++		mxc_fbi->ipu_in_pix_fmt = IPU_PIX_FMT_BGR32;
++		break;
++	default:
++		var->bits_per_pixel = 24;
++		rgb = &def_rgb_24;
++		mxc_fbi->ipu_in_pix_fmt = IPU_PIX_FMT_BGR24;
++	}
++
++	var->red    = rgb->red;
++	var->green  = rgb->green;
++	var->blue   = rgb->blue;
++	var->transp = rgb->transp;
++
++	return 0;
++}
++
++static inline unsigned int chan_to_field(u_int chan, struct fb_bitfield *bf)
++{
++	chan &= 0xffff;
++	chan >>= 16 - bf->length;
++	return chan << bf->offset;
++}
++
++static int imx_ipu_fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
++			   u_int trans, struct fb_info *fbi)
++{
++	unsigned int val;
++	int ret = 1;
++
++	/*
++	 * If greyscale is true, then we convert the RGB value
++	 * to greyscale no matter what visual we are using.
++	 */
++	if (fbi->var.grayscale)
++		red = green = blue = (19595 * red + 38470 * green +
++				      7471 * blue) >> 16;
++	switch (fbi->fix.visual) {
++	case FB_VISUAL_TRUECOLOR:
++		/*
++		 * 16-bit True Colour.  We encode the RGB value
++		 * according to the RGB bitfield information.
++		 */
++		if (regno < 16) {
++			u32 *pal = fbi->pseudo_palette;
++
++			val = chan_to_field(red, &fbi->var.red);
++			val |= chan_to_field(green, &fbi->var.green);
++			val |= chan_to_field(blue, &fbi->var.blue);
++
++			pal[regno] = val;
++			ret = 0;
++		}
++		break;
++
++	case FB_VISUAL_STATIC_PSEUDOCOLOR:
++	case FB_VISUAL_PSEUDOCOLOR:
++		break;
++	}
++
++	return ret;
++}
++
++static void imx_ipu_fb_enable_overlay(struct fb_info *fbi);
++static void imx_ipu_fb_disable_overlay(struct fb_info *fbi);
++
++static int imx_ipu_fb_blank(int blank, struct fb_info *info)
++{
++	struct imx_ipu_fb_info *mxc_fbi = info->par;
++
++	dev_dbg(info->device, "blank = %d\n", blank);
++
++	switch (blank) {
++	case FB_BLANK_POWERDOWN:
++	case FB_BLANK_VSYNC_SUSPEND:
++	case FB_BLANK_HSYNC_SUSPEND:
++	case FB_BLANK_NORMAL:
++		if (mxc_fbi->slave)
++			imx_ipu_fb_disable_overlay(mxc_fbi->slave);
++		imx_ipu_fb_disable(info);
++		break;
++	case FB_BLANK_UNBLANK:
++		imx_ipu_fb_enable(info);
++		if (mxc_fbi->slave)
++			imx_ipu_fb_enable_overlay(mxc_fbi->slave);
++		break;
++	}
++
++	return 0;
++}
++
++static int imx_ipu_fb_pan_display(struct fb_var_screeninfo *var,
++		struct fb_info *info)
++{
++	struct imx_ipu_fb_info *mxc_fbi = info->par;
++	unsigned long base;
++	int ret;
++
++	if (info->var.yoffset == var->yoffset)
++		return 0;	/* No change, do nothing */
++
++	base = var->yoffset * var->xres_virtual * var->bits_per_pixel / 8;
++	base += info->fix.smem_start;
++
++	ret = ipu_wait_for_interrupt(mxc_fbi->ipu,
++			IPU_IRQ_EOF(mxc_fbi->ipu_channel_num), 100);
++	if (ret)
++		return ret;
++
++	if (ipu_idmac_update_channel_buffer(mxc_fbi->ipu_ch, 0, base)) {
++		dev_err(info->device,
++			"Error updating SDC buf to address=0x%08lX\n", base);
++	}
++
++	info->var.yoffset = var->yoffset;
++
++	return 0;
++}
++
++static struct fb_ops imx_ipu_fb_ops = {
++	.owner		= THIS_MODULE,
++	.fb_set_par	= imx_ipu_fb_set_par,
++	.fb_check_var	= imx_ipu_fb_check_var,
++	.fb_setcolreg	= imx_ipu_fb_setcolreg,
++	.fb_pan_display	= imx_ipu_fb_pan_display,
++	.fb_fillrect	= cfb_fillrect,
++	.fb_copyarea	= cfb_copyarea,
++	.fb_imageblit	= cfb_imageblit,
++	.fb_blank	= imx_ipu_fb_blank,
++};
++
++/*
++ * Overlay functions
++ */
++static void imx_ipu_fb_enable_overlay(struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++
++	/*
++	 * This function is called unconditionally from imx_ipu_fb_blank to
++	 * enable/disable the overlay when the background is (un)blanked. So
++	 * we decide upon blank_state whether we should actually enable the
++	 * overlay.
++	 */
++	if (!mxc_fbi->blank_state)
++		return;
++
++	if (mxc_fbi->enabled)
++		return;
++
++	ipu_dmfc_enable_channel(mxc_fbi->dmfc);
++	ipu_idmac_enable_channel(mxc_fbi->ipu_ch);
++	ipu_dp_enable_fg(mxc_fbi->dp);
++	mxc_fbi->enabled = 1;
++	ipu_dp_set_color_key(mxc_fbi->dp, 1, 0x434343);
++}
++
++static void imx_ipu_fb_disable_overlay(struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++
++	if (!mxc_fbi->enabled)
++		return;
++
++	ipu_dp_disable_fg(mxc_fbi->dp);
++	ipu_wait_for_interrupt(mxc_fbi->ipu, IPU_IRQ_BG_SF_END, 100);
++	ipu_idmac_disable_channel(mxc_fbi->ipu_ch);
++	ipu_dmfc_disable_channel(mxc_fbi->dmfc);
++	mxc_fbi->enabled = 0;
++}
++
++#define NONSTD_TO_XPOS(x)	(((x) >> 0)  & 0xfff)
++#define NONSTD_TO_YPOS(x)	(((x) >> 12) & 0xfff)
++#define NONSTD_TO_ALPHA(x)	(((x) >> 24) & 0xff)
++
++static int imx_ipu_fb_check_var_overlay(struct fb_var_screeninfo *var,
++		struct fb_info *info)
++{
++	struct imx_ipu_fb_info *mxc_fbi = info->par;
++	struct fb_info *fbi_master = mxc_fbi->master;
++	struct fb_var_screeninfo *var_master = &fbi_master->var;
++	int ret;
++	static int xpos, ypos;
++
++	xpos = NONSTD_TO_XPOS(var->nonstd);
++	ypos = NONSTD_TO_YPOS(var->nonstd);
++
++	ret = imx_ipu_fb_check_var(var, info);
++	if (ret)
++		return ret;
++
++	if (var->xres + xpos > var_master->xres)
++		return -EINVAL;
++	if (var->yres + ypos > var_master->yres)
++		return -EINVAL;
++
++	return 0;
++}
++
++static int imx_ipu_fb_set_par_overlay(struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++	struct fb_var_screeninfo *var = &fbi->var;
++	struct fb_info *fbi_master = mxc_fbi->master;
++	struct imx_ipu_fb_info *mxc_fbi_master = fbi_master->par;
++	struct fb_var_screeninfo *var_master = &fbi_master->var;
++	int ret;
++	int interlaced = 0;
++	int enabled = mxc_fbi->enabled;
++	int xpos, ypos, alpha;
++	int resolution_change;
++
++	dev_dbg(fbi->device, "Reconfiguring framebuffer %dx%d-%d\n",
++		fbi->var.xres, fbi->var.yres, fbi->var.bits_per_pixel);
++
++	resolution_change = mxc_fbi->ovlxres != var->xres ||
++		mxc_fbi->ovlyres != var->yres;
++
++	if (enabled && resolution_change)
++		imx_ipu_fb_disable_overlay(fbi);
++
++	fbi->fix.line_length = var->xres_virtual *
++				var->bits_per_pixel / 8;
++
++	xpos = NONSTD_TO_XPOS(var->nonstd);
++	ypos = NONSTD_TO_YPOS(var->nonstd);
++	alpha = NONSTD_TO_ALPHA(var->nonstd);
++
++	if (resolution_change) {
++		ret = imx_ipu_fb_map_video_memory(fbi);
++		if (ret)
++			return ret;
++	}
++
++	if (!resolution_change && enabled)
++		ipu_wait_for_interrupt(mxc_fbi_master->ipu,
++			IPU_IRQ_EOF(mxc_fbi_master->ipu_channel_num), 100);
++
++	ipu_dp_set_window_pos(mxc_fbi->dp, xpos, ypos);
++	ipu_dp_set_global_alpha(mxc_fbi->dp, 1, alpha, 1);
++
++	var->xoffset = var->yoffset = 0;
++
++	if (resolution_change) {
++		if (var->vmode & FB_VMODE_INTERLACED)
++			interlaced = 1;
++
++		ret = ipu_idmac_init_channel_buffer(mxc_fbi->ipu_ch,
++					mxc_fbi->ipu_in_pix_fmt,
++					var->xres, var->yres,
++					fbi->fix.line_length,
++					IPU_ROTATE_NONE,
++					fbi->fix.smem_start,
++					0,
++					0, 0, interlaced);
++		if (ret) {
++			dev_dbg(fbi->device, "init channel buffer failed with %d\n",
++				ret);
++			return ret;
++		}
++
++		ret = ipu_dmfc_init_channel(mxc_fbi->dmfc, var->xres);
++		if (ret) {
++			dev_dbg(fbi->device, "initializing dmfc channel failed with %d\n",
++				ret);
++			return ret;
++		}
++
++		ret = ipu_dmfc_alloc_bandwidth(mxc_fbi->dmfc, calc_bandwidth(var, calc_vref(var_master)));
++		if (ret) {
++			dev_dbg(fbi->device, "allocating dmfc bandwidth failed with %d\n",
++				ret);
++			return ret;
++		}
++		mxc_fbi->ovlxres = var->xres;
++		mxc_fbi->ovlyres = var->yres;
++	}
++
++	if (enabled && resolution_change)
++		imx_ipu_fb_enable_overlay(fbi);
++
++	return ret;
++}
++
++static int imx_ipu_fb_blank_overlay(int blank, struct fb_info *fbi)
++{
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++
++	dev_dbg(fbi->device, "blank = %d\n", blank);
++
++	switch (blank) {
++	case FB_BLANK_POWERDOWN:
++	case FB_BLANK_VSYNC_SUSPEND:
++	case FB_BLANK_HSYNC_SUSPEND:
++	case FB_BLANK_NORMAL:
++		mxc_fbi->blank_state = 0;
++		imx_ipu_fb_disable_overlay(fbi);
++		break;
++	case FB_BLANK_UNBLANK:
++		mxc_fbi->blank_state = 1;
++		imx_ipu_fb_enable_overlay(fbi);
++		break;
++	}
++
++	return 0;
++}
++
++static struct fb_ops imx_ipu_fb_overlay_ops = {
++	.owner		= THIS_MODULE,
++	.fb_set_par	= imx_ipu_fb_set_par_overlay,
++	.fb_check_var	= imx_ipu_fb_check_var_overlay,
++	.fb_setcolreg	= imx_ipu_fb_setcolreg,
++	.fb_pan_display	= imx_ipu_fb_pan_display,
++	.fb_fillrect	= cfb_fillrect,
++	.fb_copyarea	= cfb_copyarea,
++	.fb_imageblit	= cfb_imageblit,
++	.fb_blank	= imx_ipu_fb_blank_overlay,
++};
++
++static struct fb_info *imx_ipu_fb_init_fbinfo(struct device *dev, struct fb_ops *ops)
++{
++	struct fb_info *fbi;
++	struct imx_ipu_fb_info *mxc_fbi;
++
++	fbi = framebuffer_alloc(sizeof(struct imx_ipu_fb_info), dev);
++	if (!fbi)
++		return NULL;
++
++	BUG_ON(fbi->par == NULL);
++	mxc_fbi = fbi->par;
++
++	fbi->var.activate = FB_ACTIVATE_NOW;
++
++	fbi->fbops = ops;
++	fbi->flags = FBINFO_FLAG_DEFAULT;
++	fbi->pseudo_palette = mxc_fbi->pseudo_palette;
++
++	fb_alloc_cmap(&fbi->cmap, 16, 0);
++
++	return fbi;
++}
++
++static int imx_ipu_fb_init_overlay(struct platform_device *pdev,
++		struct fb_info *fbi_master, int ipu_channel)
++{
++	struct imx_ipu_fb_info *mxc_fbi_master = fbi_master->par;
++	struct fb_info *ovlfbi;
++	struct imx_ipu_fb_info *ovl_mxc_fbi;
++	int ret;
++
++	ovlfbi = imx_ipu_fb_init_fbinfo(&pdev->dev, &imx_ipu_fb_overlay_ops);
++	if (!ovlfbi)
++		return -ENOMEM;
++
++	ovl_mxc_fbi = ovlfbi->par;
++	ovl_mxc_fbi->ipu_ch =
++		ipu_idmac_get(mxc_fbi_master->ipu, ipu_channel);
++	ovl_mxc_fbi->dmfc =
++		ipu_dmfc_get(mxc_fbi_master->ipu, ipu_channel);
++	ovl_mxc_fbi->di = NULL;
++	ovl_mxc_fbi->dp = mxc_fbi_master->dp;
++	ovl_mxc_fbi->master = fbi_master;
++	mxc_fbi_master->slave = ovlfbi;
++
++	ovlfbi->var.xres = 240;
++	ovlfbi->var.yres = 320;
++	ovlfbi->var.yres_virtual = ovlfbi->var.yres;
++	ovlfbi->var.xres_virtual = ovlfbi->var.xres;
++	imx_ipu_fb_check_var(&ovlfbi->var, ovlfbi);
++	imx_ipu_fb_set_fix(ovlfbi);
++
++	ret = register_framebuffer(ovlfbi);
++	if (ret) {
++		framebuffer_release(ovlfbi);
++		return ret;
++	}
++
++	ipu_dp_set_global_alpha(ovl_mxc_fbi->dp, 0, 0, 1);
++	ipu_dp_set_color_key(ovl_mxc_fbi->dp, 1, 0x434343);
++
++	imx_ipu_fb_set_par_overlay(ovlfbi);
++
++	return 0;
++}
++
++static void imx_ipu_fb_exit_overlay(struct platform_device *pdev,
++		struct fb_info *fbi_master, int ipu_channel)
++{
++	struct imx_ipu_fb_info *mxc_fbi_master = fbi_master->par;
++	struct fb_info *ovlfbi = mxc_fbi_master->slave;
++	struct imx_ipu_fb_info *ovl_mxc_fbi = ovlfbi->par;
++
++	imx_ipu_fb_blank_overlay(FB_BLANK_POWERDOWN, ovlfbi);
++
++	unregister_framebuffer(ovlfbi);
++
++	ipu_idmac_put(ovl_mxc_fbi->ipu_ch);
++	ipu_dmfc_free_bandwidth(ovl_mxc_fbi->dmfc);
++	ipu_dmfc_put(ovl_mxc_fbi->dmfc);
++
++	framebuffer_release(ovlfbi);
++}
++
++static int imx_ipu_fb_find_mode(struct fb_info *fbi)
++{
++	int ret;
++	struct fb_videomode *mode_array;
++	struct fb_modelist *modelist;
++	struct fb_var_screeninfo *var = &fbi->var;
++	int i = 0;
++
++	list_for_each_entry(modelist, &fbi->modelist, list)
++		i++;
++
++	mode_array = kmalloc(sizeof (struct fb_modelist) * i, GFP_KERNEL);
++	if (!mode_array)
++		return -ENOMEM;
++
++	i = 0;
++	list_for_each_entry(modelist, &fbi->modelist, list)
++		mode_array[i++] = modelist->mode;
++
++	ret = fb_find_mode(&fbi->var, fbi, NULL, mode_array, i, NULL, 16);
++	if (ret == 0)
++		return -EINVAL;
++
++	dev_dbg(fbi->device, "found %dx%d-%d hs:%d:%d:%d vs:%d:%d:%d\n",
++			var->xres, var->yres, var->bits_per_pixel,
++			var->hsync_len, var->left_margin, var->right_margin,
++			var->vsync_len, var->upper_margin, var->lower_margin);
++
++	kfree(mode_array);
++
++	return 0;
++}
++
++static int __devinit imx_ipu_fb_probe(struct platform_device *pdev)
++{
++	struct fb_info *fbi;
++	struct imx_ipu_fb_info *mxc_fbi;
++	struct ipuv3_fb_platform_data *plat_data = mfd_get_data(pdev);
++	int ret = 0, i;
++
++	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++
++	fbi = imx_ipu_fb_init_fbinfo(&pdev->dev, &imx_ipu_fb_ops);
++	if (!fbi)
++		return -ENOMEM;
++
++	mxc_fbi = fbi->par;
++
++	mxc_fbi->ipu = ipu_get_soc(plat_data->ipu);
++	if (IS_ERR(mxc_fbi->ipu))
++		return -ENODEV;
++	mxc_fbi->ipu_channel_num = plat_data->ipu_channel_bg;
++	mxc_fbi->ipu_di_pix_fmt = plat_data->interface_pix_fmt;
++	mxc_fbi->di_no = plat_data->display;
++
++	mxc_fbi->ipu_ch = ipu_idmac_get(mxc_fbi->ipu, plat_data->ipu_channel_bg);
++	if (IS_ERR(mxc_fbi->ipu_ch)) {
++		ret = PTR_ERR(mxc_fbi->ipu_ch);
++		goto failed_request_ipu;
++	}
++
++	mxc_fbi->dmfc = ipu_dmfc_get(mxc_fbi->ipu, plat_data->ipu_channel_bg);
++	if (IS_ERR(mxc_fbi->ipu_ch)) {
++		ret = PTR_ERR(mxc_fbi->ipu_ch);
++		goto failed_request_dmfc;
++	}
++
++	mxc_fbi->dc_ch = ipu_dc_get(mxc_fbi->ipu, plat_data->dc_channel);
++	if (IS_ERR(mxc_fbi->dc_ch)) {
++		ret = PTR_ERR(mxc_fbi->dc_ch);
++		goto failed_request_dc;
++	}
++
++	if (plat_data->dp_channel >= 0) {
++		mxc_fbi->dp = ipu_dp_get(mxc_fbi->ipu);
++		if (IS_ERR(mxc_fbi->dp)) {
++			ret = PTR_ERR(mxc_fbi->ipu_ch);
++			goto failed_request_dp;
++		}
++	}
++
++	mxc_fbi->di = ipu_di_get(mxc_fbi->ipu, plat_data->display);
++	if (IS_ERR(mxc_fbi->di)) {
++		ret = PTR_ERR(mxc_fbi->di);
++		goto failed_request_di;
++	}
++
++	fbi->var.yres_virtual = fbi->var.yres;
++
++	INIT_LIST_HEAD(&fbi->modelist);
++	for (i = 0; i < plat_data->num_modes; i++)
++		fb_add_videomode(&plat_data->modes[i], &fbi->modelist);
++
++	imx_ipu_fb_find_mode(fbi);
++
++	imx_ipu_fb_check_var(&fbi->var, fbi);
++	imx_ipu_fb_set_fix(fbi);
++	ret = register_framebuffer(fbi);
++	if (ret < 0)
++		goto failed_register;
++
++	imx_ipu_fb_set_par(fbi);
++	imx_ipu_fb_blank(FB_BLANK_UNBLANK, fbi);
++
++	if (plat_data->ipu_channel_fg >= 0 && plat_data->flags & IMX_IPU_FB_USE_OVERLAY)
++		imx_ipu_fb_init_overlay(pdev, fbi, plat_data->ipu_channel_fg);
++
++	platform_set_drvdata(pdev, fbi);
++
++	return 0;
++
++failed_register:
++	ipu_di_put(mxc_fbi->di);
++failed_request_di:
++	if (plat_data->dp_channel >= 0)
++		ipu_dp_put(mxc_fbi->dp);
++failed_request_dp:
++	ipu_dc_put(mxc_fbi->dc_ch);
++failed_request_dc:
++	ipu_dmfc_put(mxc_fbi->dmfc);
++failed_request_dmfc:
++	ipu_idmac_put(mxc_fbi->ipu_ch);
++failed_request_ipu:
++	fb_dealloc_cmap(&fbi->cmap);
++	framebuffer_release(fbi);
++
++	return ret;
++}
++
++static int __devexit imx_ipu_fb_remove(struct platform_device *pdev)
++{
++	struct fb_info *fbi = platform_get_drvdata(pdev);
++	struct imx_ipu_fb_info *mxc_fbi = fbi->par;
++	struct ipuv3_fb_platform_data *plat_data = pdev->dev.platform_data;
++
++	if (plat_data->ipu_channel_fg >= 0 && plat_data->flags & IMX_IPU_FB_USE_OVERLAY)
++		imx_ipu_fb_exit_overlay(pdev, fbi, plat_data->ipu_channel_fg);
++
++	imx_ipu_fb_blank(FB_BLANK_POWERDOWN, fbi);
++
++	dma_free_writecombine(fbi->device, fbi->fix.smem_len,
++			      fbi->screen_base, fbi->fix.smem_start);
++
++	if (&fbi->cmap)
++		fb_dealloc_cmap(&fbi->cmap);
++
++	unregister_framebuffer(fbi);
++
++	if (plat_data->dp_channel >= 0)
++		ipu_dp_put(mxc_fbi->dp);
++	ipu_dmfc_free_bandwidth(mxc_fbi->dmfc);
++	ipu_dmfc_put(mxc_fbi->dmfc);
++	ipu_di_put(mxc_fbi->di);
++	ipu_idmac_put(mxc_fbi->ipu_ch);
++
++	framebuffer_release(fbi);
++
++	return 0;
++}
++
++static struct platform_driver imx_ipu_fb_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++	},
++	.probe = imx_ipu_fb_probe,
++	.remove = __devexit_p(imx_ipu_fb_remove),
++};
++
++static int __init imx_ipu_fb_init(void)
++{
++	return platform_driver_register(&imx_ipu_fb_driver);
++}
++
++static void __exit imx_ipu_fb_exit(void)
++{
++	platform_driver_unregister(&imx_ipu_fb_driver);
++}
++
++module_init(imx_ipu_fb_init);
++module_exit(imx_ipu_fb_exit);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc.");
++MODULE_DESCRIPTION("i.MX framebuffer driver");
++MODULE_LICENSE("GPL");
++MODULE_SUPPORTED_DEVICE("fb");
 -- 
 1.7.1
