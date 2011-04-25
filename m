@@ -1,23 +1,19 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Apr 2011 12:03:03 +0100
-Subject: Common clock and dvfs
-In-Reply-To: <BANLkTikhAiujU=Fmpvp-hWAeoTBNXZoEEA@mail.gmail.com>
-References: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
-	<20110422194027.GB4768@sirena.org.uk>
-	<BANLkTin9mbGKAMB4Bgd=5th+6FgS9gMCtA@mail.gmail.com>
-	<20110422203526.GC4768@sirena.org.uk>
-	<BANLkTikhAiujU=Fmpvp-hWAeoTBNXZoEEA@mail.gmail.com>
-Message-ID: <20110425110303.GB30859@opensource.wolfsonmicro.com>
+Date: Mon, 25 Apr 2011 12:11:50 +0100
+Subject: [rtc-linux] Re: [PATCH V4 resend] rtc: Adding support for
+	spear rtc
+In-Reply-To: <4DB5540D.9050204@st.com>
+References: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+	<4DB5540D.9050204@st.com>
+Message-ID: <20110425111150.GE4768@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2011 at 02:18:06PM -0700, Colin Cross wrote:
+On Mon, Apr 25, 2011 at 04:29:25PM +0530, viresh kumar wrote:
 
-> I see.  Do you happen to know if there are any max voltage
-> requirements for clocks?  Would running one clock in a group at a low
-> operating point and another at a high operating point cause a problem,
-> assuming the voltage is set to what is required by the high operating
-> point?
+> We have been waiting for response from rtc's mailing list from a very long time,
+> but didn't got any feedback till date.
+> As this driver is specific to SPEAr, can we get this added through arm's tree??
 
-I'm not aware of any such requirements, and my understanding of the
-electrical engineering issues suggests that they'd be unlikely.
+Generally Andrew Morton ends up taking RTC patches - you should probably
+resend with a copy to him.
