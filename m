@@ -1,44 +1,37 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Mon, 25 Apr 2011 07:25:12 +0200
-Subject: [RFC] What is the preferred way to share ADC unit between
-	hwmon and input(ts) drivers?
-In-Reply-To: <4DB4C252.30005@emcraft.com>
-References: <4DB4C252.30005@emcraft.com>
-Message-ID: <20110425052512.GB484@kurt.e-circ.dyndns.org>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Sun, 24 Apr 2011 23:11:32 -0700
+Subject: arm: msm: Convert irq-vic to generic irq chip
+In-Reply-To: <alpine.LFD.2.02.1104211926550.3323@ionos>
+References: <20110416211221.853079766@linutronix.de>
+	<20110416211308.455390167@linutronix.de>
+	<4DB0611D.6040902@codeaurora.org>
+	<alpine.LFD.2.02.1104211926550.3323@ionos>
+Message-ID: <4DB51094.3040003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 04:37:38AM +0400, Ilya Yanok wrote:
-> Hello,
-> 
-> we are working with Freescale i.MX25 SoC which has the same register
-> space for ADC and touch-screen controller (AFAIK, that's pretty common
-> situation).
-> So, to add both input and hwmon drivers we need to serialize the
-> register accesses.
+On 04/21/2011 10:28 AM, Thomas Gleixner wrote:
+> On Thu, 21 Apr 2011, Abhijeet Dharmapurikar wrote:
+>> On 04/16/2011 02:14 PM, Thomas Gleixner wrote:
+>
+> Another question is whether you could move to the arm/common/vic.c
+> implementation completely.
 
-1 physical device may contain several 'class_device's, even if they're of
-different types.  So in a single platform_device probe function, you can do
-both 'input_register_device' and 'hwmon_register_device'.
-This way of working actually puts 2 drivers in 1 file, and let those
-share 1 lock (mutex or so). A peripheral with 2 functions mixed together
-should IMHO be addressed this way. Your driver is the coupling
-between hardware (mixed functions) and Linux device model (clean seperation).
+arm/common/vic.c doesnt have a set_type callback. We have some edge 
+triggered interrupts as wakeup interrupts and need the PENDING flag in 
+the descriptor set when disabled. Can we move msm_irq_set_type() to 
+arm/common/vic.c ?
 
-> I was thinking about adding some middle-layer to
-> perform the actual conversion. The question is what is the preferred way
-> to add such a middle layer?
+Additionally
+- the register map is different between msm's vic and the common one.
+- the common one uses some PL190 registers, not sure what that is. The 
+VIC can operate in few different modes, perhaps it refers to vectored 
+mode as opposed to non vectored mode, msm uses the non vectored mode.
+- vic_init2() seems like it is initializing a cascaded interrupt 
+controller. msm doesnt use cascaded vics.
 
-IMHO a middle layer for this type of problem is a bit overkill.
+I dont think msm can move to using the common vic.c.
 
-> Should we use a multi-function device driver
-> for this or just some platform-specific code (as S3C does)? Or maybe
-> there is another way?
-
-AFAIK MFD is a solution when multiple devices have sequential register maps.
-MFD does no locking.
-
-Just my ideas...
-Maybe I don't understand your problem exactly...
-
-Kurt
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
