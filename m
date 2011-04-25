@@ -1,22 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Apr 2011 12:02:30 +0100
-Subject: [RFC] What is the preferred way to share ADC unit between
-	hwmon and input(ts) drivers?
-In-Reply-To: <4DB4C252.30005@emcraft.com>
-References: <4DB4C252.30005@emcraft.com>
-Message-ID: <20110425110230.GD4768@sirena.org.uk>
+Date: Mon, 25 Apr 2011 12:03:03 +0100
+Subject: Common clock and dvfs
+In-Reply-To: <BANLkTikhAiujU=Fmpvp-hWAeoTBNXZoEEA@mail.gmail.com>
+References: <BANLkTimVXbp1pFsGPcs-RPY+PTOF6ZRyoQ@mail.gmail.com>
+	<20110422194027.GB4768@sirena.org.uk>
+	<BANLkTin9mbGKAMB4Bgd=5th+6FgS9gMCtA@mail.gmail.com>
+	<20110422203526.GC4768@sirena.org.uk>
+	<BANLkTikhAiujU=Fmpvp-hWAeoTBNXZoEEA@mail.gmail.com>
+Message-ID: <20110425110303.GB30859@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 04:37:38AM +0400, Ilya Yanok wrote:
+On Fri, Apr 22, 2011 at 02:18:06PM -0700, Colin Cross wrote:
 
-> So, to add both input and hwmon drivers we need to serialize the
-> register accesses. I was thinking about adding some middle-layer to
-> perform the actual conversion. The question is what is the preferred way
-> to add such a middle layer? Should we use a multi-function device driver
-> for this or just some platform-specific code (as S3C does)? Or maybe
-> there is another way?
+> I see.  Do you happen to know if there are any max voltage
+> requirements for clocks?  Would running one clock in a group at a low
+> operating point and another at a high operating point cause a problem,
+> assuming the voltage is set to what is required by the high operating
+> point?
 
-IIO would probably be the standard API to use but that's still stuck in
-staging.  I'd suggest doing a custom API and then transitioning to IIO
-when that moves out of staging.
+I'm not aware of any such requirements, and my understanding of the
+electrical engineering issues suggests that they'd be unlikely.
