@@ -1,33 +1,20 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 26 Apr 2011 23:58:33 +0800
-Subject: [PATCH] ARM: ARCH_SMDK2410: add select S3C_DEV_USB_HOST to fix
-	build error
-Message-ID: <1303833513.24142.3.camel@phoenix>
+From: mindentropy@gmail.com (mindentropy)
+Date: Tue, 26 Apr 2011 21:46:19 +0530
+Subject: Clarification regarding DMA in s3c2440.
+Message-ID: <201104262146.20149.mindentropy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add select S3C_DEV_USB_HOST for ARCH_SMDK2410 to fix below build error.
+Hi All,
 
-  LD      .tmp_vmlinux1
-arch/arm/mach-s3c2410/built-in.o:(.init.data+0x30): undefined reference to `s3c_device_ohci'
-make: *** [.tmp_vmlinux1] Error 1
+   I am having some trouble understanding the datasheet of s3c2440 CPU in
+the DMA part.(I am trying to understand the dma controller code).
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/mach-s3c2410/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+In chapter 8 second page under the heading DMA request sources the
+number of sources should be 7 and not 4. In the s3c2410 the sources
+are 5 but they have given it as 4. I would be really grateful if
+somebody can please verify it and let me know where I am going wrong.
 
-diff --git a/arch/arm/mach-s3c2410/Kconfig b/arch/arm/mach-s3c2410/Kconfig
-index 7245a55..81b45e6 100644
---- a/arch/arm/mach-s3c2410/Kconfig
-+++ b/arch/arm/mach-s3c2410/Kconfig
-@@ -66,6 +66,7 @@ menu "S3C2410 Machines"
- config ARCH_SMDK2410
- 	bool "SMDK2410/A9M2410"
- 	select CPU_S3C2410
-+	select S3C_DEV_USB_HOST
- 	select MACH_SMDK
- 	help
- 	   Say Y here if you are using the SMDK2410 or the derived module A9M2410
--- 
-1.7.1
+Link location : http://www.friendlyarm.net/dl.php?file=S3C2440.pdf
+
+Thanks in advance. 
