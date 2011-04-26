@@ -1,63 +1,29 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Tue, 26 Apr 2011 18:27:26 +0200
-Subject: [PATCH v3] [ARM] MX1: Add ARMadeus Systems APF9328 board support
-In-Reply-To: <20110426132033.GT31131@pengutronix.de>
-References: <1302022268-42787-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20110426132033.GT31131@pengutronix.de>
-Message-ID: <20110426182726.0f5d8ada@trabucayre.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 26 Apr 2011 18:31:08 +0200
+Subject: [PM8921 MFD V5 0/6] pm8921 core and subdevices
+In-Reply-To: <8yatydl6krj.fsf@huya.qualcomm.com>
+References: <1302039657-19395-1-git-send-email-adharmap@codeaurora.org>
+	<20110426150746.GF3175@sortiz-mobl>
+	<8yatydl6krj.fsf@huya.qualcomm.com>
+Message-ID: <20110426163107.GH3175@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Apr 2011 15:20:33 +0200
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > +static struct platform_device apf9328_flash_device = {
-> > +	.name		= "physmap-flash",
-> > +	.id		= 0,
-> > +	.dev = {
-> > +		.platform_data = &apf9328_flash_data,
-> > +	},
-> > +	.resource = &flash_resource,
-> > +	.num_resources = 1,
-> ARRAY_SIZE(flash_resource) please
->
-ARRAY_SIZE() is not usable for flash_resource because this is not an array. This
-way to set the FLASH resource size is commonly used on others boards. 
+Hi David,
+
+On Tue, Apr 26, 2011 at 09:27:12AM -0700, David Brown wrote:
+> On Tue, Apr 26 2011, Samuel Ortiz wrote:
 > 
-> > +};
-> > +
-> > +/*
-> > + * APF9328 has a DM9000 Ethernet controller
-> > + */
-> > +static const struct dm9000_plat_data dm9000_setup __initconst = {
-> > +	.flags          = DM9000_PLATF_16BITONLY
-> > +};
-> ditto here (no init, no const)
+> > I have applied patch #1 and #2 to my for-next branch. For 3 and4, I'll wait
+> > for Grant's ACK. As for #5, I'd like to get an ACK from the current MSM
+> > maintainers.
 > 
-> > +
-> > +static const struct resource dm9000_resources[] __initconst = {
-> > +	[0] = {
-> > +		.start  = (MX1_CS4_PHYS + 0x00C00000),
-> > +		.end    = (MX1_CS4_PHYS + 0x00C00001),
-> hmm, are you sure about the sizes here? The parenthesis are not needed.
->
-Yes. Chip is mapped that way on apf9328 board.
->
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[1] = {
-> > +		.start  = (MX1_CS4_PHYS + 0x00C00002),
-> > +		.end    = (MX1_CS4_PHYS + 0x00C00003),
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[2] = {
-> > +		.start  = (IRQ_GPIOB(14)),
-> > +		.end    = (IRQ_GPIOB(14)),
-> > +		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
-> > +	},
-> > +};
-> > +
-> Best regards
-> Uwe
-> 
-Regards 
-Gwenha?l
+> I've replied to that patch with an Ack.
+Thanks a lot. I applied the patch now.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
