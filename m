@@ -1,28 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Apr 2011 18:47:41 -0700
-Subject: [PATCH v4] ARM: Use generic BUG() handler
-In-Reply-To: <143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
-References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
-	<4DA7A914.5020804@codeaurora.org>
-	<BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
-	<BANLkTin_TpzdQS96SPKUNye6vb2b55Qc4A@mail.gmail.com>
-	<143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
-Message-ID: <20110426014741.GB28721@quad.lixom.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 26 Apr 2011 09:54:37 +0800
+Subject: [PATCH 05/10] clk: Add support for simple dividers
+In-Reply-To: <20110425185113.GF14770@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
+	<20110424134833.GC2310@richard-laptop>
+	<20110425185113.GF14770@pengutronix.de>
+Message-ID: <20110426015435.GA4600@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 11:01:59AM -0700, Stephen Boyd wrote:
-
-> It's here:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6885/1
+On Mon, Apr 25, 2011 at 08:51:13PM +0200, Sascha Hauer wrote:
+> On Sun, Apr 24, 2011 at 09:48:33PM +0800, Richard Zhao wrote:
+> > > +
+> > > +	div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
+> > > +
+> > > +	if (rate != best_parent_rate / div)
+> > > +		return -EINVAL;
+> > > +
+> > > +	ret = clk_set_rate(divider->parent, best_parent_rate);
+> > why do you set parent rate? It may impact hte parent's other children.
+> >
 > 
-> I imagine it will be added when/if Russell picks it up. Sadly it
-> increases the LOC in ARM so Simon might need to really
-> sell it to get it merged.
+> In a newer version I already created a barrier flag for not setting the
+> parents rate. Setting the parents rate is needed for for example
+> cascaded dividers. Otherwise this could be much simpler.
+And do you find a way to let clock actual parents indepent on reset or uboot
+register settings. If we can register clk, maybe:
+if (clk->ops.hw_get_parent)
+	clk->parent = clk->ops->hw_get_parent;
 
-It's core code though, and the concern today is not with ARM core code
-as much as with the various platforms that are growing seemingly without
-upper bounds.
-
-
--Olof
+Thanks
+Richard
+> 
+> Sascha
+> 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
