@@ -1,102 +1,27 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 26 Apr 2011 08:45:07 -0500
-Subject: [PATCH 2/2] arm: omap: gpmc-smsc911x: minor style fixes
-In-Reply-To: <1303397412-24813-2-git-send-email-grinberg@compulab.co.il>
-References: <1303397412-24813-1-git-send-email-grinberg@compulab.co.il>
-	<1303397412-24813-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <BANLkTikw73F1RBmJC=+Z2msA3Wr7gG3AGQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2011 16:05:26 +0200
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <alpine.LFD.2.00.1104211629300.24613@xanadu.home>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<20110421201455.GA18083@redhat.com>
+	<alpine.LFD.2.00.1104211629300.24613@xanadu.home>
+Message-ID: <201104261605.26791.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 09:50, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> replace "printk(KERN_ERR" by "pr_err("
-> and fix needlessly multi-lined #ifdef
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
-> ?arch/arm/mach-omap2/gpmc-smsc911x.c ? ? ? ? ? ? | ? 14 +++++++-------
-> ?arch/arm/plat-omap/include/plat/gpmc-smsc911x.h | ? ?3 +--
-> ?2 files changed, 8 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-> index d30293a..b45efff 100644
-> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+On Thursday 21 April 2011, Nicolas Pitre wrote:
+> > if there's commonality between some of the ARM arch drivers, why can't
+> > there be a arch/arm/cpufreq/ dir for the shared code, and do everything there ?
+> 
+> Because usually there isn't.  "ARM" is just a CPU architecture, not a 
+> system architecture.  Everything around the core is different from one 
+> vendor to the next.  And when commonality exists it is much easier to 
+> deal with if it is close together.
 
-minor suggestion: wont using pr_fmt help to reduce the need to add %s,
-__func__ for pr_err through out the file?
+Exactly. To make matters worse, we are starting to see a number of vendors
+that use multiple CPU architectures with the same I/O devices (e.g. Renesas,
+Freescale, Xilinx, TI, ...). Not sure if any of these use the same cpufreq
+register on more than one architecture, but it's quite likely to happen
+at some point.
 
-Regards,
-Nishanth Menon
-
-
-
-> @@ -55,7 +55,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?gpmc_cfg = board_data;
->
-> ? ? ? ?if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPMC mem for smsc911x\n");
-> + ? ? ? ? ? ? ? pr_err("%s: Failed to request GPMC mem region\n", __func__);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
->
-> @@ -63,8 +63,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
->
-> ? ? ? ?if (gpio_request(gpmc_cfg->gpio_irq, "smsc911x irq") < 0) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_irq);
-> + ? ? ? ? ? ? ? pr_err("%s: Failed to request IRQ GPIO%d\n", __func__,
-> + ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_irq);
-> ? ? ? ? ? ? ? ?goto free1;
-> ? ? ? ?}
->
-> @@ -74,8 +74,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
-> ? ? ? ? ? ? ? ?ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
-> ? ? ? ? ? ? ? ?if (ret) {
-> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x reset\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_reset);
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to request reset GPIO%d\n", __func__,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_reset);
-> ? ? ? ? ? ? ? ? ? ? ? ?goto free2;
-> ? ? ? ? ? ? ? ?}
->
-> @@ -92,7 +92,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ? ? ? ? ? gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
-> ? ? ? ? ? ? ? ? &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
-> ? ? ? ?if (!pdev) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Unable to register smsc911x device\n");
-> + ? ? ? ? ? ? ? pr_err("%s: Unable to register platform device\n", __func__);
-> ? ? ? ? ? ? ? ?gpio_free(gpmc_cfg->gpio_reset);
-> ? ? ? ? ? ? ? ?goto free2;
-> ? ? ? ?}
-> @@ -104,5 +104,5 @@ free2:
-> ?free1:
-> ? ? ? ?gpmc_cs_free(gpmc_cfg->cs);
->
-> - ? ? ? printk(KERN_ERR "Could not initialize smsc911x\n");
-> + ? ? ? pr_err("Could not initialize smsc911x\n");
-> ?}
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> index d3f1579..ea6c9c8 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> @@ -21,8 +21,7 @@ struct omap_smsc911x_platform_data {
-> ? ? ? ?u32 ? ? flags;
-> ?};
->
-> -#if defined(CONFIG_SMSC911X) || \
-> - ? ? ? defined(CONFIG_SMSC911X_MODULE)
-> +#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
->
-> ?extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
->
-> --
-> 1.7.3.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+	Arnd
