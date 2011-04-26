@@ -1,34 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2011 00:29:41 -0700
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
-References: <1303139217-10285-1-git-send-email-charu@ti.com>
-	<20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
-	<20110421054221.GF5918@atomide.com>
-	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
-Message-ID: <20110426072941.GA3755@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Apr 2011 09:45:03 +0200
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
+	sched_clock
+In-Reply-To: <1303758649.2816.57.camel@work-vm>
+References: <20110423205036.795894921@linutronix.de>
+	<BANLkTi=5Uz_TNKOiJKDn7Mh30fxv3aY67Q@mail.gmail.com>
+	<1303758649.2816.57.camel@work-vm>
+Message-ID: <BANLkTim9BaWLDCnSzeD-kjFwF+c+37KRjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [110423 01:32]:
-> 2011/4/21 Tony Lindgren <tony@atomide.com>:
-> > * Kevin Hilman <khilman@ti.com> [110421 02:56]:
-> 
-> >> > - Move it to drivers/gpio
-> >> >
-> >> > - Further consolidate with whatever common GPIO code might
-> >> > ? be coming up.
-> >>
-> >> Is the above order required?
-> >
-> > Yes please. Otherwise we'll have more of the "crazy churn" in
-> > arch/arm/*omap*/ and the runtime PM patches should apply easily
-> > in drivers/gpio too.
-> 
-> Since you'll probably be dependent on stuff happening in my patches
-> to move stuff into drivers/gpio I'll be happy to carry the patches in my
-> gpio-consolidation branch with Tony's ACKs if need be.
+2011/4/25 john stultz <johnstul@us.ibm.com>:
+> On Sun, 2011-04-24 at 09:27 +0200, Linus Walleij wrote:
+>> Any reason why we can't simply move *all* of these to
+>> drivers/clocksource/* and proceed with consolidation there?
+>
+> This gives me some pause, as having the clocksources in the platform
+> code makes it easier to know what platform needs to be tested when a
+> change is made. The rule so far has been if more then one arch can make
+> use of it, it should be moved to the drivers/clocksource dir. Otherwise,
+> leave it close to any arch specific code that manages the hardware.
 
-Sounds good to me.
+That means that by definition anything in a plat-* directory, say e.g.
+plat-nomadik/timer.c and plat-omap/dmtimer.c should go into
+drivers/clocksource I believe?
 
-Tony
+Yours,
+Linus Walleij
