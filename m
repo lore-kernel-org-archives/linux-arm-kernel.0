@@ -1,37 +1,66 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 26 Apr 2011 15:06:30 +0400
-Subject: [PATCH v4 03/11] da850: pruss platform specific additions.
-In-Reply-To: <1303474109-6212-4-git-send-email-subhasish@mistralsolutions.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-4-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4DB6A736.3030609@mvista.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Tue, 26 Apr 2011 17:18:47 +0530
+Subject: [PATCH 15/15] OMAP: GPIO: cleanup show revision, remove cpu_is
+	checks, display only once
+In-Reply-To: <1303513327-14532-16-git-send-email-khilman@ti.com>
+References: <1303513327-14532-1-git-send-email-khilman@ti.com>
+	<1303513327-14532-16-git-send-email-khilman@ti.com>
+Message-ID: <BANLkTimwFezON_qX+wr3Gj+A3EOEbD81YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Kevin,
 
-On 22-04-2011 16:08, Subhasish Ghosh wrote:
+On Sat, Apr 23, 2011 at 04:32, Kevin Hilman <khilman@ti.com> wrote:
+> Remove cpu_is_* checks from gpio_show_revision() by passing in the
+> revision address offset from platform data. ?SoCs with no revision
+> register (15xx, 7xx, and all MPUIOs) use -1 to signify no register.
+>
+> While here, all GPIO banks are assumed to be the same revision, so fix
+> show_revision() to only show the revision for the first bank it finds.
+> This removes duplicate GPIO revision prints during boot.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> ?arch/arm/mach-omap1/gpio15xx.c ? ? ? ? | ? ?2 ++
+> ?arch/arm/mach-omap1/gpio16xx.c ? ? ? ? | ? ?2 ++
+> ?arch/arm/mach-omap1/gpio7xx.c ? ? ? ? ?| ? ?2 ++
+> ?arch/arm/mach-omap2/gpio.c ? ? ? ? ? ? | ? ?2 ++
+> ?arch/arm/plat-omap/gpio.c ? ? ? ? ? ? ?| ? 14 ++++++--------
+> ?arch/arm/plat-omap/include/plat/gpio.h | ? ?1 +
+> ?6 files changed, 15 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+> index 9175624..6f77c36 100644
+> --- a/arch/arm/mach-omap1/gpio15xx.c
+> +++ b/arch/arm/mach-omap1/gpio15xx.c
+> @@ -35,6 +35,7 @@ static struct __initdata resource omap15xx_mpu_gpio_resources[] = {
+> ?};
+>
+> ?static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
+> + ? ? ? .revision ? ? ? = -1,
 
-> This patch adds the platform device and assignes the platform resources
-> for the PRUSS mfd driver.
+Assigning -1 to u16 type. Instead you may want to use 0xffff?
 
-> Signed-off-by: Subhasish Ghosh<subhasish@mistralsolutions.com>
+> ? ? ? ?.direction ? ? ?= OMAP_MPUIO_IO_CNTL,
+> ? ? ? ?.datain ? ? ? ? = OMAP_MPUIO_INPUT_LATCH,
+> ? ? ? ?.dataout ? ? ? ?= OMAP_MPUIO_OUTPUT,
+> @@ -75,6 +76,7 @@ static struct __initdata resource omap15xx_gpio_resources[] = {
+> ?};
 
-[...]
+<<snip>>
 
-> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-> index 09b8ddb..0c23035 100644
-> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-[...]
->   #include<mach/edma.h>
-> @@ -73,6 +75,7 @@ extern unsigned int da850_max_speed;
->   #define DA8XX_DDR2_CTL_BASE	0xb0000000
->   #define DA8XX_ARM_RAM_BASE	0xffff0000
->   #define DA8XX_SHARED_RAM_BASE	0x80000000
-> +#define DA8XX_PRUSS_MEM_BASE	0x01C30000
+> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+> index 7a3f067..91e8de3 100644
+> --- a/arch/arm/plat-omap/include/plat/gpio.h
+> +++ b/arch/arm/plat-omap/include/plat/gpio.h
+> @@ -175,6 +175,7 @@ struct omap_gpio_dev_attr {
+> ?};
+>
+> ?struct omap_gpio_reg_offs {
+> + ? ? ? u16 revision;
+> ? ? ? ?u16 direction;
+> ? ? ? ?u16 datain;
+> ? ? ? ?u16 dataout;
 
-    Keep the list sorted please. Also, this macro doesn't seem used outside 
-devices-da8xx.c, so should be moved there...
-
-WBR, Sergei
+-V Charulatha
