@@ -1,71 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Apr 2011 09:36:36 -0700
-Subject: [patch 01/16] time: Provide clocksource based sched_clock()
-In-Reply-To: <20110423205131.574884925@linutronix.de>
-References: <20110423205036.795894921@linutronix.de>
-	<20110423205131.574884925@linutronix.de>
-Message-ID: <4DB6F494.3040804@codeaurora.org>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Tue, 26 Apr 2011 18:39:01 +0200
+Subject: External serial 8250/16550
+In-Reply-To: <4DB44883.3000608@nlink.com.br>
+References: <4DB44883.3000608@nlink.com.br>
+Message-ID: <BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2011 01:54 PM, Thomas Gleixner wrote:
-> Many embedded platforms use the clocksource which is used for
-> timekeeping as their sched_clock as well. Though they need to take
-> care about the wraparounds as sched_clock() wants to be monotonic
-> increasing nsescs. The timekeeping code and the NOHZ core take care of
-> the timekeeping clocksource wraparound so we can simply use the
-> timekeeping clocksource if possible.
+hi Paulo,
+
+> I was called for help to add a external serial using a board based on
+> at91sam9g45,
+
+> ? ? ? ?at91_sys_write(AT91_SMC_CSR(1),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?AT91_SMC_ACSS_STD
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_DBW_8
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_BAT
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_WSEN
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_NWS_(32) ? ? /* wait states */
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_RWSETUP_(6) ?/* setup time */
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| AT91_SMC_RWHOLD_(4) ? /* hold time */
 >
-> clocksources which can be used by the clksrc sched_clock must have the
-> flag CLOCK_SOURCE_SCHED_CLOCK set. This works with the default (weak)
-> sched_clock implementation but the clksrc based function is also
-> provided for architectures where multi platform kernels might override
-> it. If there is no CLOCK_SOURCE_SCHED_CLOCK available, then the
-> function returns the jiffies based sched clock.
->
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ? ? ? ?);
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+Those AT91_SMC  registers and bits only exist on the AT91RM9200,
+whereas you're using a SAM9-based processor.
 
-MSM doesn't have a sched_clock(), so I applied this patch on top. Care
-to pick it up?
+You should be configuring the memory controller by:
+  #include <mach/at91sam9_smc.h>
+  #include "sam9_smc.h"
 
-8<-----
+and declaring a "struct sam9_smc_config" with all the setting &
+timings, and then calling:
+   sam9_smc_configure(CHIP_SELECT_NUMBER, &your_smc_config_struct);
 
-Subject: [PATCH] msm: timer: Support clocksource sched_clock()
 
-With the clocksource sched_clock() implementation we can support
-sched_clock on MSM with little effort.
+> But doesn't work, how to map correctly external serial port?
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/timer.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+If you specify UPF_IOREMAP in the "struct plat_serial8250_port" flags,
+the serial-driver will automatically map the IO region for you.
 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 38b95e9..c875f9a 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -96,7 +96,7 @@ static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
-        return IRQ_HANDLED;
- }
 
--static cycle_t msm_read_timer_count(struct clocksource *cs)
-+static cycle_t notrace msm_read_timer_count(struct clocksource *cs)
- {
-        struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
+> Is there any sample code for external uart using linux-2.6.36 and arm
+> AT91SAM9?
 
-@@ -186,7 +186,8 @@ static struct msm_clock msm_clocks[] = {
-                        .rating         = 300,
-                        .read           = msm_read_timer_count,
-                        .mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
--                       .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
-+                       .flags          = CLOCK_SOURCE_IS_CONTINUOUS |
-+                                         CLOCK_SOURCE_SCHED_CLOCK,
-                },
-                .irq = {
-                        .name    = "dg_timer",
+Not for a SAM9-based board.  But for an AT91RM9200 example, look at
+board-tms.c in the AT91 patches on http://maxim.org.za/at91_26.html .
+SAM9 should be the same, except for the SMC memory-controller
+configuration (as described above).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+Regards,
+  Andrew Victor
