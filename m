@@ -1,140 +1,37 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 26 Apr 2011 09:49:42 -0500
-Subject: [PATCH 2/2] arm: omap: gpmc-smsc911x: minor style fixes
-In-Reply-To: <4DB6D974.6080201@compulab.co.il>
-References: <1303397412-24813-1-git-send-email-grinberg@compulab.co.il>
-	<1303397412-24813-2-git-send-email-grinberg@compulab.co.il>
-	<BANLkTikw73F1RBmJC=+Z2msA3Wr7gG3AGQ@mail.gmail.com>
-	<4DB6D974.6080201@compulab.co.il>
-Message-ID: <BANLkTi=3eh+0zRD4jRDPoiGxMgCGeOdrww@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 26 Apr 2011 20:30:51 +0530
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <201102021700.20683.arnd@arndb.de>
+References: <201102021700.20683.arnd@arndb.de>
+Message-ID: <BANLkTi=-DFfdiBKZzRBxF-yMJFtWnzuk1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2011 at 09:40, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> Hi Nishanth,
+On Wed, Feb 2, 2011 at 21:30, Arnd Bergmann <arnd@arndb.de> wrote:
+> As noticed by Peter Maydell, the EHCI device driver in Linux gets
+> miscompiled by some versions of arm-gcc (still need to find out which)
+> due to a combination of problems:
 >
-> On 04/26/11 16:45, Menon, Nishanth wrote:
->
->> On Thu, Apr 21, 2011 at 09:50, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>> replace "printk(KERN_ERR" by "pr_err("
->>> and fix needlessly multi-lined #ifdef
->>>
->>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->>> ---
->>> ?arch/arm/mach-omap2/gpmc-smsc911x.c ? ? ? ? ? ? | ? 14 +++++++-------
->>> ?arch/arm/plat-omap/include/plat/gpmc-smsc911x.h | ? ?3 +--
->>> ?2 files changed, 8 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
->>> index d30293a..b45efff 100644
->>> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
->>> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
->> minor suggestion: wont using pr_fmt help to reduce the need to add %s,
->> __func__ for pr_err through out the file?
->
-> I don't understand of what "need" are you talking about.
-> I don't know of any need to add "%s, __func__" with pr_fmt...
-> I've added "%s, __func__" as a meter of choice.
-> IMO, it makes it easier to parse the dmesg output.
-> If anyone objects it, I can remove them,
-> but I think both pr_fmt and __func__ are nice here and
-> way better then "printk(KERN_*" with embedded "smsc911x".
-Allow me to rephrase.
-I like the change of printk->pr_err - thanks for doing it. just
-suggesting a minor improvement
+> 1. In include/linux/usb/ehci_def.h, struct ehci_caps is defined
+> with __attribute__((packed)), for no good reason. This is clearly
+> a bug and needs to get fixed, but other drivers have the same bug
 
-if you add the following line before the #includes
-#define pr_fmt(fmt) "%s: " fmt, __func__
-then
--               printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
--                               gpmc_cfg->gpio_irq);
-+               pr_err("%s: Failed to request IRQ GPIO%d\n", __func__,
-+                      gpmc_cfg->gpio_irq);
-becomes,
--               printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
--                               gpmc_cfg->gpio_irq);
-+               pr_err("Failed to request IRQ GPIO%d\n", gpmc_cfg->gpio_irq);
+Was a patch submitted for this?  I couldn't find it in the archives.
+U-Boot seems to be fixing this by adding an "aligned(4)" instead
+of removing the packed:
 
-Both give you exactly the output you would like to see (which I
-personally prefer as well), but the second could be lesser lines of
-code change ;)
+http://www.mail-archive.com/u-boot at lists.denx.de/msg51418.html
 
-Regards,
-Nishanth Menon
+> and it used to work. The attribute forces byte access on all members
+> accessed through pointer dereference, which is not allowed on
+> MMIO accesses in general. The specific code triggering the problem
+> in Peter's case is in ehci-omap.c:
+> ? ? ? ?omap->ehci->regs = hcd->regs
+> ? ? ? ? ? ? ? ?+ HC_LENGTH(readl(&omap->ehci->caps->hc_capbase));
 
->
->>> @@ -55,7 +55,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>> ? ? ? ?gpmc_cfg = board_data;
->>>
->>> ? ? ? ?if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
->>> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPMC mem for smsc911x\n");
->>> + ? ? ? ? ? ? ? pr_err("%s: Failed to request GPMC mem region\n", __func__);
->>> ? ? ? ? ? ? ? ?return;
->>> ? ? ? ?}
->>>
->>> @@ -63,8 +63,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>> ? ? ? ?gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
->>>
->>> ? ? ? ?if (gpio_request(gpmc_cfg->gpio_irq, "smsc911x irq") < 0) {
->>> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_irq);
->>> + ? ? ? ? ? ? ? pr_err("%s: Failed to request IRQ GPIO%d\n", __func__,
->>> + ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_irq);
->>> ? ? ? ? ? ? ? ?goto free1;
->>> ? ? ? ?}
->>>
->>> @@ -74,8 +74,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>> ? ? ? ?if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
->>> ? ? ? ? ? ? ? ?ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
->>> ? ? ? ? ? ? ? ?if (ret) {
->>> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x reset\n",
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_reset);
->>> + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to request reset GPIO%d\n", __func__,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_reset);
->>> ? ? ? ? ? ? ? ? ? ? ? ?goto free2;
->>> ? ? ? ? ? ? ? ?}
->>>
->>> @@ -92,7 +92,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>> ? ? ? ? ? ? ? ? gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
->>> ? ? ? ? ? ? ? ? &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
->>> ? ? ? ?if (!pdev) {
->>> - ? ? ? ? ? ? ? printk(KERN_ERR "Unable to register smsc911x device\n");
->>> + ? ? ? ? ? ? ? pr_err("%s: Unable to register platform device\n", __func__);
->>> ? ? ? ? ? ? ? ?gpio_free(gpmc_cfg->gpio_reset);
->>> ? ? ? ? ? ? ? ?goto free2;
->>> ? ? ? ?}
->>> @@ -104,5 +104,5 @@ free2:
->>> ?free1:
->>> ? ? ? ?gpmc_cs_free(gpmc_cfg->cs);
->>>
->>> - ? ? ? printk(KERN_ERR "Could not initialize smsc911x\n");
->>> + ? ? ? pr_err("Could not initialize smsc911x\n");
->>> ?}
->>> diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
->>> index d3f1579..ea6c9c8 100644
->>> --- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
->>> +++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
->>> @@ -21,8 +21,7 @@ struct omap_smsc911x_platform_data {
->>> ? ? ? ?u32 ? ? flags;
->>> ?};
->>>
->>> -#if defined(CONFIG_SMSC911X) || \
->>> - ? ? ? defined(CONFIG_SMSC911X_MODULE)
->>> +#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
->>>
->>> ?extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
->>>
->>> --
->>> 1.7.3.4
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>>
->
-> --
-> Regards,
-> Igor.
->
->
+In my case it's this writel() in ehci-hub.c that gets chopped into
+strbs:
+
+	/* force reset to complete */
+	ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
+				status_reg);
