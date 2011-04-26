@@ -1,27 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Apr 2011 09:48:02 +0200
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <4DB5C307.1060507@codeaurora.org>
-References: <1303076273-8093-1-git-send-email-linus.walleij@stericsson.com>
-	<4DB5C307.1060507@codeaurora.org>
-Message-ID: <BANLkTikvzghJ3Ey82mWiMU3T28VC8WuAtA@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 26 Apr 2011 10:02:11 +0200 (CEST)
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
+	sched_clock
+In-Reply-To: <BANLkTi=5Uz_TNKOiJKDn7Mh30fxv3aY67Q@mail.gmail.com>
+References: <20110423205036.795894921@linutronix.de>
+	<BANLkTi=5Uz_TNKOiJKDn7Mh30fxv3aY67Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1104261001030.3323@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/25 Rohit Vaswani <rvaswani@codeaurora.org>:
+On Sun, 24 Apr 2011, Linus Walleij wrote:
 
-> Another API to select this would make it more powerful. At boot a lot of
-> gpios are configured by the board-file.
+> 2011/4/23 Thomas Gleixner <tglx@linutronix.de>:
+> 
+> > Most of ARM sched_clocks is using the timekeeping clocksource as the
+> > sched_clock. Only versatile uses a different clock for it, but there
+> > is no real reason why it can't use the clocksource as well.
+> 
+> Excellent patch set!
+> 
+> > Another 650 lines gone :)
+> 
+> Any reason why we can't simply move *all* of these to
+> drivers/clocksource/* and proceed with consolidation there?
+> 
+> It must be a pain having to grep through the tree to find all of
+> these (even though I bet you know them all by heart now).
 
-Yeah I have already revised this patchset...
+Russell has a patch which creates clocksource_mmio. That will replace
+all the mmio (read some random register) based clocksources all over
+the place.
 
-> How do you feel about another API that can accepts the gpio config
-> parameters (void *data) and set them all at once?
-> This would make it more generic to suit different gpio parameters that an
-> arch might have.
+Thanks,
 
-It's done that way now, and as Alan noted it fits hand-in-glove with
-devicetree initialization that way too.
-
-Yours,
-Linus Walleij
+	tglx
