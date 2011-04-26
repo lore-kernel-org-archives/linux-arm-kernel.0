@@ -1,89 +1,50 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 26 Apr 2011 06:27:14 +0200
-Subject: [PATCH 02/14] at91: introduce commom AT91_BASE_SYS
-In-Reply-To: <4DB5EC1A.7080400@bluewatersys.com>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-2-git-send-email-plagnioj@jcrosoft.com>
-	<4DB5EC1A.7080400@bluewatersys.com>
-Message-ID: <20110426042714.GE12904@game.jcrosoft.org>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 26 Apr 2011 09:36:56 +0530
+Subject: [PATCH v2 1/5] dmaengine: at_hdmac: modify way to use interrupts
+In-Reply-To: <1303790574.896.11.camel@vkoul-udesk3>
+References: <3ee5a0e314a22339ad7a15a5425045f5ed244eab.1301678094.git.nicolas.ferre@atmel.com>
+	<3ee5a0e314a22339ad7a15a5425045f5ed244eab.1303493836.git.nicolas.ferre@atmel.com>
+	<1303790574.896.11.camel@vkoul-udesk3>
+Message-ID: <1303790816.896.12.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> > index 7bdf566..46ae08f 100644
-> > --- a/arch/arm/mach-at91/at91rm9200.c
-> > +++ b/arch/arm/mach-at91/at91rm9200.c
-> > @@ -20,16 +20,12 @@
-> >  #include <mach/at91_st.h>
-> >  #include <mach/cpu.h>
+On Tue, 2011-04-26 at 09:32 +0530, Koul, Vinod wrote:
+> On Fri, 2011-04-22 at 19:41 +0200, Nicolas Ferre wrote:
+> > Now we use Buffer Transfer Completed interrupts. If we
+> > want a chained buffer completed information, we setup the
+> > ATC_IEN bit in CTRLB register in the lli.
+> > This is done by set_desc_eol() function and used by
+> > memcpy/slave_sg functions.
+> > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  drivers/dma/at_hdmac.c      |    4 ++--
+> >  drivers/dma/at_hdmac_regs.h |   11 ++++++++---
+> >  2 files changed, 10 insertions(+), 5 deletions(-)
+> > 
 > >  
-> > +#include "soc.h"
-> >  #include "generic.h"
-> >  #include "clock.h"
-> >  
-> >  static struct map_desc at91rm9200_io_desc[] __initdata = {
-> >  	{
-> > -		.virtual	= AT91_VA_BASE_SYS,
-> > -		.pfn		= __phys_to_pfn(AT91_BASE_SYS),
-> > -		.length		= SZ_4K,
-> > -		.type		= MT_DEVICE,
-> > -	}, {
+> Looks like your forgot to run checkpatch
+> WARNING: line over 80 characters
+> #401: FILE: drivers/dma/at_hdmac_regs.h:106:
+> +#define MEM_IF			0		/* specify AHB interface 0 as memory interface */
 > 
-> If the RM9200 system controller is not at the same base address as the
-> other variants then how does the common AT91_BASE_SYS work correctly? I
-> can't see an offseting code. What am I missing?
-you have reserved memory and the then we map it in memory
-cf hardware.h
+> WARNING: line over 80 characters
+> #402: FILE: drivers/dma/at_hdmac_regs.h:107:
+> +#define PER_IF			1		/* specify AHB interface 1 as peripheral interface
+> */
 > 
-> <snip>
+> WARNING: line over 80 characters
+> #689: FILE: drivers/dma/at_hdmac.c:899:
+> +			direction == DMA_TO_DEVICE ? "TO DEVICE" : "FROM DEVICE",
 > 
-> > diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-> > index 3d64a75..b7ff44a 100644
-> > --- a/arch/arm/mach-at91/include/mach/hardware.h
-> > +++ b/arch/arm/mach-at91/include/mach/hardware.h
-> > @@ -16,6 +16,20 @@
-> >  
-> >  #include <asm/sizes.h>
-> >  
-> > +#if !defined(CONFIG_ARCH_AT91X40)
-> > +/*
-> > + * on all at91 except rm9200 and x40 have the System Controller start in reallity
-> > + * at 0xffffc000 of 16KiB
-> > + *
-> > + * on rm9200 it's start at 0xfffe4000 of 111KiB with non reserved data starting
-> > + * at 0xfffff000
-> > + *
-> > + * so we will use a common AT91_BASE_SYS at 0xffffc000 of 16KiB
-> > + * and map the same memory space
+> total: 0 errors, 3 warnings, 465 lines checked
 > 
-> Please reword this as suggested for the changelog.
+> While I am okay with 3rd one, you can easily reformat code for first two
+> and avoid these two warnings...
 > 
-> <snip>
-> 
-> > diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-> > new file mode 100644
-> > index 0000000..6c30d74
-> > --- /dev/null
-> > +++ b/arch/arm/mach-at91/soc.h
-> > @@ -0,0 +1,22 @@
-> > +/*
-> > + * Copyright (C) 2007 Atmel Corporation.
-> > + * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > + *
-> > + * Under GPLv2
-> > + *
-> > + */
-> > +
-> > +struct at91_soc {
-> > +	char *name;
-> 
-> Should be const. Do we really need the name of the AT91 variant? We
-> could just export the initialize function and get rid of this new struct
-> which would further reduce the line count?
-yeah some board can have different soc so print is usefull
+And your 4th patch fails to apply on my tree, please rebase these to my
+tree as well
 
-I do not want to export 1000 of functions as done today
-the struct is here for this
-
-Best Regards,
-J.
+-- 
+~Vinod
