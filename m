@@ -1,166 +1,107 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 27 Apr 2011 09:22:39 +1200
-Subject: [RFC] ep93xx: switch gpio to early platform device
-In-Reply-To: <201104261357.53245.hartleys@visionengravers.com>
-References: <201104261357.53245.hartleys@visionengravers.com>
-Message-ID: <4DB7379F.10403@bluewatersys.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 26 Apr 2011 17:31:20 -0400 (EDT)
+Subject: [PATCH] ARM: Fix bad SP address after relocating kernel
+In-Reply-To: <20110426123746.GC3755@atomide.com>
+References: <20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
+	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
+	<20110422062843.GA841@atomide.com>
+	<alpine.LFD.2.00.1104220959440.24613@xanadu.home>
+	<20110426085700.GJ16892@atomide.com>
+	<20110426123746.GC3755@atomide.com>
+Message-ID: <alpine.LFD.2.00.1104261700270.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2011 08:57 AM, H Hartley Sweeten wrote:
-> Convert the ep93xx gpio support into an early platform device. 
+On Tue, 26 Apr 2011, Tony Lindgren wrote:
+
+> Otherwise cache_clean_flush can overwrite some of the relocated
+> area depending on where the kernel image gets loaded. This fixes
+> booting on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
+> (ARM: 6750/1: improvements to compressed/head.S).
+
+Gaaaah.  Indeed.
+
+> Thanks to Aaro Koskinen <aaro.koskinen@nokia.com> for debugging
+> the address of the relocated area that gets corrupted, and to
+> Nicolas Pitre <nicolas.pitre@linaro.org> for the other uncompress
+> related fixes.
 > 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Hi Hartley,
+I think there could be a better fix yet.  Could you test this patch:
 
-Couple of comments below.
-
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 8207954..e2d9e3e 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -241,6 +241,27 @@ unsigned int ep93xx_chip_revision(void)
->  }
->  
->  /*************************************************************************
-> + * EP93xx gpio
-> + *************************************************************************/
-> +static struct platform_device ep93xx_gpio_device = {
-> +	.name		= "ep93xx-gpio",
-> +	.id		= -1,
-> +};
-> +
-> +static struct platform_device *ep93xx_early_gpio_device[] __initdata = {
-> +	&ep93xx_gpio_device,
-> +};
-
-Maybe just call this ep93xx_early_devices. That way if we add additional
-early devices it doesn't need to get renamed?
-
-> +
-> +static void __init ep93xx_init_early_gpio(void)
-> +{
-> +	int num = ARRAY_SIZE(ep93xx_early_gpio_device);
-> +
-> +	early_platform_add_devices(ep93xx_early_gpio_device, num);
-> +	early_platform_driver_register_all("early_ep93xx_gpio");
-> +	early_platform_driver_probe("early_ep93xx_gpio", num, 0);
-> +}
-> +
-> +/*************************************************************************
->   * EP93xx peripheral handling
->   *************************************************************************/
->  #define EP93XX_UART_MCR_OFFSET		(0x0100)
-> @@ -866,14 +887,12 @@ void __init ep93xx_register_ac97(void)
->  	platform_device_register(&ep93xx_pcm_device);
->  }
->  
-> -extern void ep93xx_gpio_init(void);
-> -
->  void __init ep93xx_init_devices(void)
->  {
->  	/* Disallow access to MaverickCrunch initially */
->  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
->  
-> -	ep93xx_gpio_init();
-> +	ep93xx_init_early_gpio();
->  
->  	amba_device_register(&uart1_device, &iomem_resource);
->  	amba_device_register(&uart2_device, &iomem_resource);
-> diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
-> index a5a9ff7..e820316 100644
-> --- a/arch/arm/mach-ep93xx/gpio.c
-> +++ b/arch/arm/mach-ep93xx/gpio.c
-> @@ -4,6 +4,7 @@
->   * Generic EP93xx GPIO handling
->   *
->   * Copyright (c) 2008 Ryan Mallon <ryan@bluewatersys.com>
-> + * Copyright (c) 2011 H Hartley Sweeten <hsweeten@visionengravers.com>
->   *
->   * Based on code originally from:
->   *  linux/arch/arm/mach-ep93xx/core.c
-> @@ -13,10 +14,9 @@
->   *  published by the Free Software Foundation.
->   */
->  
-> -#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
-> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
-This is really a separate change. I don't mind, but wonder if it should
-be a separate patch.
-
-> -#include <linux/init.h>
-> -#include <linux/module.h>
-> +#include <linux/platform_device.h>
->  #include <linux/seq_file.h>
->  #include <linux/io.h>
->  #include <linux/gpio.h>
-> @@ -406,10 +406,15 @@ static struct ep93xx_gpio_chip ep93xx_gpio_banks[] = {
->  	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56),
->  };
->  
-> -void __init ep93xx_gpio_init(void)
-> +static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
->  {
->  	int i;
->  
-> +	if (!is_early_platform_device(pdev)) {
-> +		pr_info("called via non early platform\n");
-> +		return 0;
-
-pr_err? Should probably either return an error code, or just warn and
-then fall through and register anyway.
-
-> +	}
-> +
->  	/* Set Ports C, D, E, G, and H for GPIO use */
->  	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
->  				 EP93XX_SYSCON_DEVCFG_GONK |
-> @@ -431,4 +436,22 @@ void __init ep93xx_gpio_init(void)
->  
->  		gpiochip_add(chip);
->  	}
-> +
-> +	pr_info("subsystem initialized\n");
-
-We don't need more noise in the syslog :-).
-
-> +	return 0;
-> +}
-> +
-> +static int __devexit ep93xx_gpio_remove(struct platform_device *pdev)
-> +{
-> +	return -EBUSY;
-
-Isn't the remove function optional? From what I can tell the return type
-of driver->remove never gets checked anyway?
-
->  }
-> +
-> +static struct platform_driver ep93xx_gpio_driver = {
-> +	.driver		= {
-> +		.name	= "ep93xx-gpio",
-> +	},
-> +	.probe		= ep93xx_gpio_probe,
-> +	.remove		= __devexit_p(ep93xx_gpio_remove),
-> +};
-> +
-> +early_platform_init("early_ep93xx_gpio", &ep93xx_gpio_driver);
-
-This can be moved to drivers/gpio/ now also right? If so, it should be a
-separate patch after this one.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index adf583c..8e3c54b 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -838,9 +838,11 @@ __armv3_mmu_cache_off:
+  * Clean and flush the cache to maintain consistency.
+  *
+  * On exit,
+- *  r1, r2, r3, r9, r10, r11, r12 corrupted
++ *  r0, r1, r2, r3, r5, r9, r10, r11, r12, sp corrupted
+  * This routine must preserve:
+  *  r4, r6, r7, r8
++ *
++ * Yes, sp is destroyed by this call in the armv7 hierarchical case.
+  */
+ 		.align	5
+ cache_clean_flush:
+@@ -888,7 +890,6 @@ __armv7_mmu_cache_flush:
+ 		b	iflush
+ hierarchical:
+ 		mcr	p15, 0, r10, c7, c10, 5	@ DMB
+-		stmfd	sp!, {r0-r7, r9-r11}
+ 		mrc	p15, 1, r0, c0, c0, 1	@ read clidr
+ 		ands	r3, r0, #0x7000000	@ extract loc from clidr
+ 		mov	r3, r3, lsr #23		@ left align loc bit field
+@@ -905,31 +906,31 @@ loop1:
+ 		mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr
+ 		and	r2, r1, #7		@ extract the length of the cache lines
+ 		add	r2, r2, #4		@ add 4 (line length offset)
+-		ldr	r4, =0x3ff
+-		ands	r4, r4, r1, lsr #3	@ find maximum number on the way size
+-		clz	r5, r4			@ find bit position of way size increment
+-		ldr	r7, =0x7fff
+-		ands	r7, r7, r1, lsr #13	@ extract max number of the index size
++		ldr	r9, =0x3ff
++		ands	r9, r9, r1, lsr #3	@ find maximum number on the way size
++		clz	r5, r9			@ find bit position of way size increment
++		mov	sp, r9
++		ldr	r9, =0x7fff
++		ands	r1, r9, r1, lsr #13	@ extract max number of the index size
+ loop2:
+-		mov	r9, r4			@ create working copy of max way size
++		mov	r9, sp			@ create working copy of max way size
+ loop3:
+  ARM(		orr	r11, r10, r9, lsl r5	) @ factor way and cache number into r11
+- ARM(		orr	r11, r11, r7, lsl r2	) @ factor index number into r11
+- THUMB(		lsl	r6, r9, r5		)
+- THUMB(		orr	r11, r10, r6		) @ factor way and cache number into r11
+- THUMB(		lsl	r6, r7, r2		)
+- THUMB(		orr	r11, r11, r6		) @ factor index number into r11
++ ARM(		orr	r11, r11, r1, lsl r2	) @ factor index number into r11
++ THUMB(		lsl	r12, r9, r5		)
++ THUMB(		orr	r11, r10, r12		) @ factor way and cache number into r11
++ THUMB(		lsl	r12, r1, r2		)
++ THUMB(		orr	r11, r11, r12		) @ factor index number into r11
+ 		mcr	p15, 0, r11, c7, c14, 2	@ clean & invalidate by set/way
+ 		subs	r9, r9, #1		@ decrement the way
+ 		bge	loop3
+-		subs	r7, r7, #1		@ decrement the index
++		subs	r1, r1, #1		@ decrement the index
+ 		bge	loop2
+ skip:
+ 		add	r10, r10, #2		@ increment cache number
+ 		cmp	r3, r10
+ 		bgt	loop1
+ finished:
+-		ldmfd	sp!, {r0-r7, r9-r11}
+ 		mov	r10, #0			@ swith back to cache level 0
+ 		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
+ iflush:
