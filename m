@@ -1,9 +1,9 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 26 Apr 2011 03:11:40 +0200
-Subject: [PATCH 14/14] at91: move clock subsystem init to soc generic init
+Date: Tue, 26 Apr 2011 03:11:39 +0200
+Subject: [PATCH 13/14] at91: move register clocks to soc generic init
 In-Reply-To: <20110425180847.GA12904@game.jcrosoft.org>
 References: <20110425180847.GA12904@game.jcrosoft.org>
-Message-ID: <1303780300-2205-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1303780300-2205-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,230 +11,219 @@ Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/at572d940hf.c |    5 +----
- arch/arm/mach-at91/at91cap9.c    |    5 +----
- arch/arm/mach-at91/at91rm9200.c  |    5 +----
- arch/arm/mach-at91/at91sam9260.c |    5 +----
- arch/arm/mach-at91/at91sam9261.c |    5 +----
- arch/arm/mach-at91/at91sam9263.c |    5 +----
- arch/arm/mach-at91/at91sam9g45.c |    5 +----
- arch/arm/mach-at91/at91sam9rl.c  |    5 +----
- arch/arm/mach-at91/soc.c         |    5 ++++-
- arch/arm/mach-at91/soc.h         |    2 +-
- 10 files changed, 13 insertions(+), 34 deletions(-)
+ arch/arm/mach-at91/at572d940hf.c |    4 +---
+ arch/arm/mach-at91/at91cap9.c    |    4 +---
+ arch/arm/mach-at91/at91rm9200.c  |    4 +---
+ arch/arm/mach-at91/at91sam9260.c |    4 +---
+ arch/arm/mach-at91/at91sam9261.c |    4 +---
+ arch/arm/mach-at91/at91sam9263.c |    4 +---
+ arch/arm/mach-at91/at91sam9g45.c |    4 +---
+ arch/arm/mach-at91/at91sam9rl.c  |    4 +---
+ arch/arm/mach-at91/soc.c         |    3 +++
+ arch/arm/mach-at91/soc.h         |    1 +
+ 10 files changed, 12 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
-index 7d7a4f2..f945171 100644
+index 66405af..7d7a4f2 100644
 --- a/arch/arm/mach-at91/at572d940hf.c
 +++ b/arch/arm/mach-at91/at572d940hf.c
-@@ -359,7 +359,7 @@ static void at572d940hf_reset(void)
-  *  AT572D940HF processor initialization
-  * -------------------------------------------------------------------- */
+@@ -370,9 +370,6 @@ static void __init at572d940hf_initialize(unsigned long main_clock)
  
--static void __init at572d940hf_initialize(unsigned long main_clock)
-+static void __init at572d940hf_initialize(void)
- {
- 	/* Map peripherals */
- 	iotable_init(at572d940hf_io_desc, ARRAY_SIZE(at572d940hf_io_desc));
-@@ -367,9 +367,6 @@ static void __init at572d940hf_initialize(unsigned long main_clock)
- 	at91_arch_reset = at572d940hf_reset;
- 	at91_extern_irq = (1 << AT572D940HF_ID_IRQ0) | (1 << AT572D940HF_ID_IRQ1)
- 			| (1 << AT572D940HF_ID_IRQ2);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at572d940hf_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -425,6 +422,7 @@ struct at91_dev_resource at572d940hf_pit __initdata = {
+ struct at91_soc __initdata at572d940hf_soc = {
+ 	.name = "at572d940hf",
+ 	.default_irq_priority = at572d940hf_default_irq_priority,
++	.register_clocks = at572d940hf_register_clocks,
+ 	.init = at572d940hf_initialize,
+ 	.gpio = {
+ 		.resource = at572d940hf_pios,
 diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index c304d9c..3487f97 100644
+index dd5e858..c304d9c 100644
 --- a/arch/arm/mach-at91/at91cap9.c
 +++ b/arch/arm/mach-at91/at91cap9.c
-@@ -356,7 +356,7 @@ static void at91cap9_poweroff(void)
-  *  AT91CAP9 processor initialization
-  * -------------------------------------------------------------------- */
+@@ -368,9 +368,6 @@ static void __init at91cap9_initialize(unsigned long main_clock)
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
  
--static void __init at91cap9_initialize(unsigned long main_clock)
-+static void __init at91cap9_initialize(void)
- {
- 	/* Map peripherals */
- 	iotable_init(at91cap9_io_desc, ARRAY_SIZE(at91cap9_io_desc));
-@@ -365,9 +365,6 @@ static void __init at91cap9_initialize(unsigned long main_clock)
- 	pm_power_off = at91cap9_poweroff;
- 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
- 
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91cap9_register_clocks();
 -
  	/* Remember the silicon revision */
  	if (cpu_is_at91cap9_revB())
  		system_rev = 0xB;
+@@ -428,6 +425,7 @@ struct at91_dev_resource at91cap9_pit __initdata = {
+ struct at91_soc __initdata at91cap9_soc = {
+ 	.name = "at91cap9",
+ 	.default_irq_priority = at91cap9_default_irq_priority,
++	.register_clocks = at91cap9_register_clocks,
+ 	.init = at91cap9_initialize,
+ 	.gpio = {
+ 		.resource = at91cap9_pios,
 diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index f5f5711..1a16ca1 100644
+index 7b9d3a4..f5f5711 100644
 --- a/arch/arm/mach-at91/at91rm9200.c
 +++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -312,7 +312,7 @@ static void at91rm9200_reset(void)
- /* --------------------------------------------------------------------
-  *  AT91RM9200 processor initialization
-  * -------------------------------------------------------------------- */
--static void __init at91rm9200_initialize(unsigned long main_clock)
-+static void __init at91rm9200_initialize(void)
- {
- 	if (cpu_is_at91rm9200_bga())
- 		at91rm9200_soc.gpio.num_resources = AT91RM9200_BGA;
-@@ -327,9 +327,6 @@ static void __init at91rm9200_initialize(unsigned long main_clock)
- 			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
- 			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
- 			| (1 << AT91RM9200_ID_IRQ6);
+@@ -330,9 +330,6 @@ static void __init at91rm9200_initialize(unsigned long main_clock)
+ 
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91rm9200_register_clocks();
  }
  
  
+@@ -386,6 +383,7 @@ struct at91_dev_resource at91rm9200_st __initdata = {
+ struct at91_soc __initdata at91rm9200_soc = {
+ 	.name = "at91rm9200",
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
++	.register_clocks = at91rm9200_register_clocks,
+ 	.init = at91rm9200_initialize,
+ 	.gpio = {
+ 		.resource = at91rm9200_pios,
 diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 7a2d10b..ae0bf40 100644
+index 0567556b..7a2d10b 100644
 --- a/arch/arm/mach-at91/at91sam9260.c
 +++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -344,7 +344,7 @@ static void __init at91sam9xe_initialize(void)
- 	iotable_init(at91sam9xe_sram_desc, ARRAY_SIZE(at91sam9xe_sram_desc));
- }
+@@ -362,9 +362,6 @@ static void __init at91sam9260_initialize(unsigned long main_clock)
  
--static void __init at91sam9260_initialize(unsigned long main_clock)
-+static void __init at91sam9260_initialize(void)
- {
- 	/* Map peripherals */
- 
-@@ -359,9 +359,6 @@ static void __init at91sam9260_initialize(unsigned long main_clock)
- 	pm_power_off = at91sam9260_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91sam9260_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -417,6 +414,7 @@ struct at91_dev_resource at91sam9260_pit __initdata = {
+ struct at91_soc __initdata at91sam9260_soc = {
+ 	.name = "at91sam9260",
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
++	.register_clocks = at91sam9260_register_clocks,
+ 	.init = at91sam9260_initialize,
+ 	.gpio = {
+ 		.resource = at91sam9260_pios,
 diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index a2ee99d..52bd316 100644
+index 603c6fe..a2ee99d 100644
 --- a/arch/arm/mach-at91/at91sam9261.c
 +++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -311,7 +311,7 @@ static void at91sam9261_poweroff(void)
-  *  AT91SAM9261 processor initialization
-  * -------------------------------------------------------------------- */
+@@ -328,9 +328,6 @@ static void __init at91sam9261_initialize(unsigned long main_clock)
  
--static void __init at91sam9261_initialize(unsigned long main_clock)
-+static void __init at91sam9261_initialize(void)
- {
- 	/* Map peripherals */
- 
-@@ -325,9 +325,6 @@ static void __init at91sam9261_initialize(unsigned long main_clock)
- 	pm_power_off = at91sam9261_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
- 			| (1 << AT91SAM9261_ID_IRQ2);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91sam9261_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -383,6 +380,7 @@ struct at91_dev_resource at91sam9261_pit __initdata = {
+ struct at91_soc __initdata at91sam9261_soc = {
+ 	.name = "at91sam9261",
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
++	.register_clocks = at91sam9261_register_clocks,
+ 	.init = at91sam9261_initialize,
+ 	.gpio = {
+ 		.resource = at91sam9261_pios,
 diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 0b9a6b4..619565a 100644
+index e7ff884..0b9a6b4 100644
 --- a/arch/arm/mach-at91/at91sam9263.c
 +++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -326,7 +326,7 @@ static void at91sam9263_poweroff(void)
-  *  AT91SAM9263 processor initialization
-  * -------------------------------------------------------------------- */
+@@ -337,9 +337,6 @@ static void __init at91sam9263_initialize(unsigned long main_clock)
  
--static void __init at91sam9263_initialize(unsigned long main_clock)
-+static void __init at91sam9263_initialize(void)
- {
- 	/* Map peripherals */
- 	iotable_init(at91sam9263_io_desc, ARRAY_SIZE(at91sam9263_io_desc));
-@@ -334,9 +334,6 @@ static void __init at91sam9263_initialize(unsigned long main_clock)
- 	at91_arch_reset = at91sam9_alt_reset;
- 	pm_power_off = at91sam9263_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91sam9263_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -392,6 +389,7 @@ struct at91_dev_resource at91sam9263_pit __initdata = {
+ struct at91_soc __initdata at91sam9263_soc = {
+ 	.name = "at91sam9263",
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
++	.register_clocks = at91sam9263_register_clocks,
+ 	.init = at91sam9263_initialize,
+ 	.gpio = {
+ 		.resource = at91sam9263_pios,
 diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 96cfc16..bad29a3 100644
+index 077eecf..96cfc16 100644
 --- a/arch/arm/mach-at91/at91sam9g45.c
 +++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -344,7 +344,7 @@ static void at91sam9g45_poweroff(void)
-  *  AT91SAM9G45 processor initialization
-  * -------------------------------------------------------------------- */
+@@ -355,9 +355,6 @@ static void __init at91sam9g45_initialize(unsigned long main_clock)
  
--static void __init at91sam9g45_initialize(unsigned long main_clock)
-+static void __init at91sam9g45_initialize(void)
- {
- 	/* Map peripherals */
- 	iotable_init(at91sam9g45_io_desc, ARRAY_SIZE(at91sam9g45_io_desc));
-@@ -352,9 +352,6 @@ static void __init at91sam9g45_initialize(unsigned long main_clock)
- 	at91_arch_reset = at91sam9g45_reset;
- 	pm_power_off = at91sam9g45_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91sam9g45_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -410,6 +407,7 @@ struct at91_dev_resource at91sam9g45_pit __initdata = {
+ struct at91_soc __initdata at91sam9g45_soc = {
+ 	.name = "at91sam9g45",
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
++	.register_clocks = at91sam9g45_register_clocks,
+ 	.init = at91sam9g45_initialize,
+ 	.gpio = {
+ 		.resource = at91sam9g45_pios,
 diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 638e921..82d3805 100644
+index 7623617..638e921 100644
 --- a/arch/arm/mach-at91/at91sam9rl.c
 +++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -292,7 +292,7 @@ static void at91sam9rl_poweroff(void)
-  *  AT91SAM9RL processor initialization
-  * -------------------------------------------------------------------- */
+@@ -321,9 +321,6 @@ static void __init at91sam9rl_initialize(unsigned long main_clock)
  
--static void __init at91sam9rl_initialize(unsigned long main_clock)
-+static void __init at91sam9rl_initialize(void)
- {
- 	unsigned long cidr, sram_size;
- 
-@@ -318,9 +318,6 @@ static void __init at91sam9rl_initialize(unsigned long main_clock)
- 	at91_arch_reset = at91sam9_alt_reset;
- 	pm_power_off = at91sam9rl_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -
--	/* Init clock subsystem */
--	at91_clock_init(main_clock);
+-	/* Register the processor-specific clocks */
+-	at91sam9rl_register_clocks();
  }
  
  /* --------------------------------------------------------------------
+@@ -376,6 +373,7 @@ struct at91_dev_resource at91sam9rl_pit __initdata = {
+ struct at91_soc __initdata at91sam9rl_soc = {
+ 	.name = "at91sam9rl",
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
++	.register_clocks = at91sam9rl_register_clocks,
+ 	.init = at91sam9rl_initialize,
+ 	.gpio = {
+ 		.resource = at91sam9rl_pios,
 diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-index c82d219..2d4e415 100644
+index 1b05997..c82d219 100644
 --- a/arch/arm/mach-at91/soc.c
 +++ b/arch/arm/mach-at91/soc.c
-@@ -115,7 +115,10 @@ void __init at91_initialize(unsigned long main_clock)
+@@ -117,6 +117,9 @@ void __init at91_initialize(unsigned long main_clock)
  
- 	pr_info("AT91: detected soc: %s\n", current_soc.name);
+ 	current_soc.init(main_clock);
  
--	current_soc.init(main_clock);
-+	current_soc.init();
++	/* Register the processor-specific clocks */
++	current_soc.register_clocks();
 +
-+	/* Init clock subsystem */
-+	at91_clock_init(main_clock);
- 
- 	/* Register the processor-specific clocks */
- 	current_soc.register_clocks();
+ 	/* Register GPIO subsystem */
+ 	at91_add_gpio();
+ }
 diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index ca8b30e..21c66fd 100644
+index a60ac0a..ca8b30e 100644
 --- a/arch/arm/mach-at91/soc.h
 +++ b/arch/arm/mach-at91/soc.h
-@@ -17,7 +17,7 @@ struct at91_soc {
+@@ -16,6 +16,7 @@ struct at91_soc {
+ 	struct at91_dev_resource *pit;
  	struct at91_dev_resource *st;
  
- 	void (*register_clocks)(void);
--	void (*init)(unsigned long main_clock);
-+	void (*init)(void);
++	void (*register_clocks)(void);
+ 	void (*init)(unsigned long main_clock);
  };
  
- extern struct at91_soc at572d940hf_soc;
 -- 
 1.7.4.1
