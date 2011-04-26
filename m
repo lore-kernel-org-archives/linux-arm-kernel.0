@@ -1,108 +1,166 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 26 Apr 2011 16:08:28 -0500
-Subject: [PATCH v2 2/2] arm: omap: gpmc-smsc911x: minor style fixes
-In-Reply-To: <1303835156-14516-1-git-send-email-grinberg@compulab.co.il>
-References: <4DB6E937.7090904@compulab.co.il>
-	<1303835156-14516-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <BANLkTim-cu5_-pt5VxBunjqLWiHyHuo2xg@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 27 Apr 2011 09:22:39 +1200
+Subject: [RFC] ep93xx: switch gpio to early platform device
+In-Reply-To: <201104261357.53245.hartleys@visionengravers.com>
+References: <201104261357.53245.hartleys@visionengravers.com>
+Message-ID: <4DB7379F.10403@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2011 at 11:25, Igor Grinberg <grinberg@compulab.co.il> wrote:
->
-> replace "printk(KERN_ERR" by "pr_err("
-> and fix needlessly multi-lined #ifdef
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+On 04/27/2011 08:57 AM, H Hartley Sweeten wrote:
+> Convert the ep93xx gpio support into an early platform device. 
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Acked-by: Nishanth Menon <nm@ti.com>
+Hi Hartley,
 
-Regards,
-Nishanth Menon
-
+Couple of comments below.
 
 > ---
-> v2: ? ? added pr_fmt so the pr_*() calls would be cleaner (thanks Nishanth)
-> ? ? ? ?Nishanth, this time it does not affect the n-o-l,
-> ? ? ? ?but it is indeed cleaner
->
->
-> ?arch/arm/mach-omap2/gpmc-smsc911x.c ? ? ? ? ? ? | ? 14 +++++++-------
-> ?arch/arm/plat-omap/include/plat/gpmc-smsc911x.h | ? ?3 +--
-> ?2 files changed, 8 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-> index d30293a..e09374a 100644
-> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-> @@ -10,6 +10,7 @@
-> ?* it under the terms of the GNU General Public License version 2 as
-> ?* published by the Free Software Foundation.
-> ?*/
-> +#define pr_fmt(fmt) "%s: " fmt, __func__
->
-> ?#include <linux/kernel.h>
-> ?#include <linux/platform_device.h>
-> @@ -55,7 +56,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?gpmc_cfg = board_data;
->
-> ? ? ? ?if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPMC mem for smsc911x\n");
-> + ? ? ? ? ? ? ? pr_err("Failed to request GPMC mem region\n");
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
->
-> @@ -63,8 +64,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
->
-> ? ? ? ?if (gpio_request(gpmc_cfg->gpio_irq, "smsc911x irq") < 0) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_irq);
-> + ? ? ? ? ? ? ? pr_err("Failed to request IRQ GPIO%d\n", gpmc_cfg->gpio_irq);
-> ? ? ? ? ? ? ? ?goto free1;
-> ? ? ? ?}
->
-> @@ -74,8 +74,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ?if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
-> ? ? ? ? ? ? ? ?ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
-> ? ? ? ? ? ? ? ?if (ret) {
-> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x reset\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_reset);
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("Failed to request reset GPIO%d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_reset);
-> ? ? ? ? ? ? ? ? ? ? ? ?goto free2;
-> ? ? ? ? ? ? ? ?}
->
-> @@ -92,7 +92,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> ? ? ? ? ? ? ? ? gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
-> ? ? ? ? ? ? ? ? &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
-> ? ? ? ?if (!pdev) {
-> - ? ? ? ? ? ? ? printk(KERN_ERR "Unable to register smsc911x device\n");
-> + ? ? ? ? ? ? ? pr_err("Unable to register platform device\n");
-> ? ? ? ? ? ? ? ?gpio_free(gpmc_cfg->gpio_reset);
-> ? ? ? ? ? ? ? ?goto free2;
-> ? ? ? ?}
-> @@ -104,5 +104,5 @@ free2:
-> ?free1:
-> ? ? ? ?gpmc_cs_free(gpmc_cfg->cs);
->
-> - ? ? ? printk(KERN_ERR "Could not initialize smsc911x\n");
-> + ? ? ? pr_err("Could not initialize smsc911x device\n");
-> ?}
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> index d3f1579..ea6c9c8 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-> @@ -21,8 +21,7 @@ struct omap_smsc911x_platform_data {
-> ? ? ? ?u32 ? ? flags;
-> ?};
->
-> -#if defined(CONFIG_SMSC911X) || \
-> - ? ? ? defined(CONFIG_SMSC911X_MODULE)
-> +#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
->
-> ?extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
->
-> --
-> 1.7.3.4
->
+> 
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 8207954..e2d9e3e 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -241,6 +241,27 @@ unsigned int ep93xx_chip_revision(void)
+>  }
+>  
+>  /*************************************************************************
+> + * EP93xx gpio
+> + *************************************************************************/
+> +static struct platform_device ep93xx_gpio_device = {
+> +	.name		= "ep93xx-gpio",
+> +	.id		= -1,
+> +};
+> +
+> +static struct platform_device *ep93xx_early_gpio_device[] __initdata = {
+> +	&ep93xx_gpio_device,
+> +};
+
+Maybe just call this ep93xx_early_devices. That way if we add additional
+early devices it doesn't need to get renamed?
+
+> +
+> +static void __init ep93xx_init_early_gpio(void)
+> +{
+> +	int num = ARRAY_SIZE(ep93xx_early_gpio_device);
+> +
+> +	early_platform_add_devices(ep93xx_early_gpio_device, num);
+> +	early_platform_driver_register_all("early_ep93xx_gpio");
+> +	early_platform_driver_probe("early_ep93xx_gpio", num, 0);
+> +}
+> +
+> +/*************************************************************************
+>   * EP93xx peripheral handling
+>   *************************************************************************/
+>  #define EP93XX_UART_MCR_OFFSET		(0x0100)
+> @@ -866,14 +887,12 @@ void __init ep93xx_register_ac97(void)
+>  	platform_device_register(&ep93xx_pcm_device);
+>  }
+>  
+> -extern void ep93xx_gpio_init(void);
+> -
+>  void __init ep93xx_init_devices(void)
+>  {
+>  	/* Disallow access to MaverickCrunch initially */
+>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
+>  
+> -	ep93xx_gpio_init();
+> +	ep93xx_init_early_gpio();
+>  
+>  	amba_device_register(&uart1_device, &iomem_resource);
+>  	amba_device_register(&uart2_device, &iomem_resource);
+> diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+> index a5a9ff7..e820316 100644
+> --- a/arch/arm/mach-ep93xx/gpio.c
+> +++ b/arch/arm/mach-ep93xx/gpio.c
+> @@ -4,6 +4,7 @@
+>   * Generic EP93xx GPIO handling
+>   *
+>   * Copyright (c) 2008 Ryan Mallon <ryan@bluewatersys.com>
+> + * Copyright (c) 2011 H Hartley Sweeten <hsweeten@visionengravers.com>
+>   *
+>   * Based on code originally from:
+>   *  linux/arch/arm/mach-ep93xx/core.c
+> @@ -13,10 +14,9 @@
+>   *  published by the Free Software Foundation.
+>   */
+>  
+> -#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
+> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+This is really a separate change. I don't mind, but wonder if it should
+be a separate patch.
+
+> -#include <linux/init.h>
+> -#include <linux/module.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+> @@ -406,10 +406,15 @@ static struct ep93xx_gpio_chip ep93xx_gpio_banks[] = {
+>  	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56),
+>  };
+>  
+> -void __init ep93xx_gpio_init(void)
+> +static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
+>  {
+>  	int i;
+>  
+> +	if (!is_early_platform_device(pdev)) {
+> +		pr_info("called via non early platform\n");
+> +		return 0;
+
+pr_err? Should probably either return an error code, or just warn and
+then fall through and register anyway.
+
+> +	}
+> +
+>  	/* Set Ports C, D, E, G, and H for GPIO use */
+>  	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+>  				 EP93XX_SYSCON_DEVCFG_GONK |
+> @@ -431,4 +436,22 @@ void __init ep93xx_gpio_init(void)
+>  
+>  		gpiochip_add(chip);
+>  	}
+> +
+> +	pr_info("subsystem initialized\n");
+
+We don't need more noise in the syslog :-).
+
+> +	return 0;
+> +}
+> +
+> +static int __devexit ep93xx_gpio_remove(struct platform_device *pdev)
+> +{
+> +	return -EBUSY;
+
+Isn't the remove function optional? From what I can tell the return type
+of driver->remove never gets checked anyway?
+
+>  }
+> +
+> +static struct platform_driver ep93xx_gpio_driver = {
+> +	.driver		= {
+> +		.name	= "ep93xx-gpio",
+> +	},
+> +	.probe		= ep93xx_gpio_probe,
+> +	.remove		= __devexit_p(ep93xx_gpio_remove),
+> +};
+> +
+> +early_platform_init("early_ep93xx_gpio", &ep93xx_gpio_driver);
+
+This can be moved to drivers/gpio/ now also right? If so, it should be a
+separate patch after this one.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
