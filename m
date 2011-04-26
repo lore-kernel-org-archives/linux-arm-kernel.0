@@ -1,105 +1,122 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Apr 2011 10:05:36 +0100
-Subject: [RFC PATCH 02/12] ARM: smp_twd: add support for remapped PPI
-	interrupts
-In-Reply-To: <4DB5A991.90002@codeaurora.org>
+Date: Tue, 26 Apr 2011 10:08:16 +0100
+Subject: [RFC PATCH 01/12] ARM: gic: add per-cpu interrupt multiplexer
+In-Reply-To: <4DB5D6BD.3000405@codeaurora.org>
 References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-3-git-send-email-marc.zyngier@arm.com>
-	<4DB5A991.90002@codeaurora.org>
-Message-ID: <20110426100536.37b9b2ce@taxman.wild-wind.fr.eu.org>
+	<1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
+	<4DB5D6BD.3000405@codeaurora.org>
+Message-ID: <20110426100816.137d4f45@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2011 10:04:17 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Mon, 25 Apr 2011 13:17:01 -0700
+Abhijeet Dharmapurikar <adharmap@codeaurora.org> wrote:
 
-Hi Stephen,
-
-> On 4/20/2011 12:08 PM, Marc Zyngier wrote:
-> > diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
-> > index ec0bbf7..c599795 100644
-> > --- a/arch/arm/include/asm/entry-macro-multi.S
-> > +++ b/arch/arm/include/asm/entry-macro-multi.S
-> > @@ -24,7 +24,7 @@
-> >  	adrne	lr, BSYM(1b)
-> >  	bne	do_IPI
-> >  
-> > -#ifdef CONFIG_LOCAL_TIMERS
-> > +#if defined(CONFIG_LOCAL_TIMERS) && !defined(CONFIG_ARM_GIC_VPPI)
-> >  	test_for_ltirq r0, r6, r5, lr
-> >  	movne	r0, sp
-> >  	adrne	lr, BSYM(1b)
-> > diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
-> > index c115b82..14a3363 100644
-> > --- a/arch/arm/include/asm/hardware/entry-macro-gic.S
-> > +++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
-> > @@ -17,23 +17,26 @@
-> >  	.endm
-> >  #endif
-> >  
+> Marc Zyngier wrote:
+> > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > index e9c2ff8..60f8915 100644
+> > --- a/arch/arm/common/gic.c
+> > +++ b/arch/arm/common/gic.c
+> > @@ -42,6 +42,11 @@ struct gic_chip_data {
+> >  	unsigned int irq_offset;
+> >  	void __iomem *dist_base;
+> >  	void __iomem *cpu_base;
 > > +#ifdef CONFIG_ARM_GIC_VPPI
-> > +#define DO_IRQ_BASE	16
-> > +#else
-> > +#define DO_IRQ_BASE	30
+> > +	int	     ppi_base;
+> > +	int	     vppi_base;
+> > +	u16	     nrppis;
+> > +#endif
+> >  };
+> 
+> Can you put some document around this struct? Mention that ppi_base, 
+> vppi_base and nrppis will be zero for non-primary gic.
+
+Sure.
+
+> >  static void __init gic_dist_init(struct gic_chip_data *gic,
+> >  	unsigned int irq_start)
+> >  {
+> > -	unsigned int gic_irqs, irq_limit, i;
+> > +	unsigned int gic_irqs, irq_limit, i, nrvppis = 0;
+> >  	void __iomem *base = gic->dist_base;
+> >  	u32 cpumask = 1 << smp_processor_id();
+> > +	u32 dist_ctr, nrcpus;
+> >  
+> >  	cpumask |= cpumask << 8;
+> >  	cpumask |= cpumask << 16;
+> > @@ -278,11 +359,32 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+> >  	 * Find out how many interrupts are supported.
+> >  	 * The GIC only supports up to 1020 interrupt sources.
+> >  	 */
+> > -	gic_irqs = readl(base + GIC_DIST_CTR) & 0x1f;
+> > -	gic_irqs = (gic_irqs + 1) * 32;
+> > +	dist_ctr = readl(base + GIC_DIST_CTR);
+> > +	gic_irqs = ((dist_ctr & 0x1f) + 1) * 32;
+> >  	if (gic_irqs > 1020)
+> >  		gic_irqs = 1020;
+> >  
+> > +	/* Find out how many CPUs are supported (8 max). */
+> > +	nrcpus = ((dist_ctr >> 5) & 7) + 1;
+> > +
+> > +#ifdef CONFIG_ARM_GIC_VPPI
+> > +	/*
+> > +	 * Nobody would be insane enough to use PPIs on a secondary
+> > +	 * GIC, right?
+> > +	 */
+> > +	if (gic == &gic_data[0]) {
+> > +		gic->nrppis = 16 - (irq_start % 16);
+> > +		gic->ppi_base = gic->irq_offset + 32 - gic->nrppis;
+> > +		nrvppis = gic->nrppis * nrcpus;
+> > +	} else {
+> > +		gic->ppi_base = 0;
+> > +		gic->vppi_base = 0;
+> > +	}
 > > +#endif
 > > +
-> >  /*
-> >   * The interrupt numbering scheme is defined in the
-> >   * interrupt controller spec.  To wit:
-> >   *
-> >   * Interrupts 0-15 are IPI
-> > - * 16-28 are reserved
-> > - * 29-31 are local.  We allow 30 to be used for the watchdog.
-> > + * 16-31 are local.  We allow 30 to be used for the watchdog.
-> >   * 32-1020 are global
-> >   * 1021-1022 are reserved
-> >   * 1023 is "spurious" (no interrupt)
-> >   *
-> > - * For now, we ignore all local interrupts so only return an interrupt if it's
-> > - * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
-> > - *
-> >   * A simple read from the controller will tell us the number of the highest
-> >   * priority enabled interrupt.  We then just need to check whether it is in the
-> > - * valid range for an IRQ (30-1020 inclusive).
-> > + * valid range for an IRQ (30-1020 inclusive). If CONFIG_ARM_GIC_VPPI is
-> > + * enabled, local interrupts are handled the same way as global ones.
-> >   */
+> > +	pr_info("Configuring GIC with %d sources (%d additional PPIs)\n",
+> > +		gic_irqs, nrvppis);
+> > +
+> >  	/*
+> >  	 * Set all global interrupts to be level triggered, active low.
+> >  	 */
+> > @@ -312,17 +414,39 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+> >  	 * Limit number of interrupts registered to the platform maximum
+> >  	 */
+> >  	irq_limit = gic->irq_offset + gic_irqs;
+> > -	if (WARN_ON(irq_limit > NR_IRQS))
+> > +	if (WARN_ON((irq_limit) > NR_IRQS))
+> >  		irq_limit = NR_IRQS;
 > >  
-> >  	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-> > @@ -43,7 +46,7 @@
-> >  
-> >  	ldr	\tmp, =1021
-> >  	bic     \irqnr, \irqstat, #0x1c00
-> > -	cmp     \irqnr, #29
-> > +	cmp     \irqnr, #(DO_IRQ_BASE - 1)
-> >  	cmpcc	\irqnr, \irqnr
-> >  	cmpne	\irqnr, \tmp
-> >  	cmpcs	\irqnr, \irqnr
-> > @@ -63,6 +66,7 @@
-> >  	cmpcs	\irqnr, \irqnr
-> >  	.endm
-> >  
-> > +#ifndef CONFIG_ARM_GIC_VPPI
-> >  /* As above, this assumes that irqstat and base are preserved.. */
-> >  
-> >  	.macro test_for_ltirq, irqnr, irqstat, base, tmp
-> > @@ -73,3 +77,4 @@
-> >  	streq	\irqstat, [\base, #GIC_CPU_EOI]
-> >  	cmp	\tmp, #0
-> >  	.endm
+> >  	/*
+> >  	 * Setup the Linux IRQ subsystem.
+> >  	 */
+> >  	for (i = irq_start; i < irq_limit; i++) {
+> > -		irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
+> > +#ifdef CONFIG_ARM_GIC_VPPI
+> > +		if (nrvppis && gic_irq_is_ppi(gic, i))
+> > +			irq_set_chip_and_handler(i, &gic_chip, gic_handle_ppi);
+> > +		else
 > > +#endif
+> > +		{
+> > +			irq_set_chip_and_handler(i, &gic_chip,
+> > +						 handle_fasteoi_irq);
+> > +			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+> > +		}
+> > +		irq_set_chip_data(i, gic);
+> > +	}
+> > +
+> > +#ifdef CONFIG_ARM_GIC_VPPI
+> > +	if (!nrvppis)
+> > +		goto out;
+> > +	gic->vppi_base = irq_alloc_descs(-1, 0, nrvppis, 0);
+> > +	if (unlikely(WARN_ON(gic->vppi_base < 0)))
+> > +		goto out;
+> > +	for (i = gic->vppi_base; i < (gic->vppi_base + nrvppis); i++) {
+> > +		irq_set_chip_and_handler(i, &gic_ppi_chip, handle_fasteoi_irq);
 > 
-> I would expect these bits to be part of the first patch in this series
-> because they're necessary to actually use the CONFIG_ARM_GIC_VPPI
-> option. Can you move them to the first patch?
+> Can we do with handle_percpu_irq instead of handle_fasteoi_irq?
 
-I'd tend to agree with you, though local timer being the only user of
-PPIs, it doesn't matter that much... ;-)
-
-I'll move these changes to the first patch on the next iteration of the
-patch set.
-
-Thanks,
+Ah, very good point. Should work just fine. Thanks for the suggestion!
 
 	M.
 -- 
