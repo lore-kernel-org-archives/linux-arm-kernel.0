@@ -1,42 +1,110 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 27 Apr 2011 01:39:03 +0200
-Subject: [PATCH 03/14] at91: factorize at91 interrupts init to soc
-In-Reply-To: <BANLkTimRb91DDB-LffjARrUdC5fxyzif9w@mail.gmail.com>
+Date: Wed, 27 Apr 2011 01:45:14 +0200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <4DB7299D.80308@bluewatersys.com>
 References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-3-git-send-email-plagnioj@jcrosoft.com>
-	<0D753D10438DA54287A00B027084269764D256A077@AUSP01VMBX24.collaborationhost.net>
-	<20110426172912.GA29103@game.jcrosoft.org>
-	<BANLkTimRb91DDB-LffjARrUdC5fxyzif9w@mail.gmail.com>
-Message-ID: <20110426233903.GB29103@game.jcrosoft.org>
+	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+	<4DB64DC3.70609@bluewatersys.com>
+	<20110426064216.GJ12904@game.jcrosoft.org>
+	<4DB7299D.80308@bluewatersys.com>
+Message-ID: <20110426234514.GC29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 00:04 Wed 27 Apr     , Andrew Victor wrote:
-> hi,
+> > yes it's for now we can use one soc at a time I'm working to remove those
+> > issue and make then soc specific
+> > before doint this I need to fix pm, interrupt, earlyprintk, ll_debug, etc...
+> >
+> > for gpio and timers it's already fix so one by one and it will be clean
+> > in those 2 we can now specify on the soc the resource so we do not need to
+> > have the same AT91_PIOx, AT91_ST and AT91_PIT for all soc
+> > they can have their own.
+> >
+> > When this cleanup will be finished we will have
+> > AT91SAM9263_PIOx AT91SAM9263_PIT etc...
+> > and only common define when they are really common
+> >>> all of this work is in preparation to allow multiple soc in the same kernel
+> >>> that's also why I map the system controller the same way on all at91 arm9
+> >> If the __cpu_is macros, which read the registers directly, remain then I
+> >> don't see how this can be generic between the various SoCs?
+> > because they will be use only at the begenning before any drivers or other ip
+> > enable so we can use them later it will not be the case anymore
+> >
+> > Best Regards,
+> > J.
+> I think that a better approach is to have only the cpu_is_ macros which
+> read the shadow value and then have at91_initialize (or some other
+> function which is init called before anything needs the cpu_is_ macros)
+> which just directly reads the cpu id registers and fills in the
+> structure. You won't need a structure that way either, just an id.
+> Something like:
 > 
-> >> All the board files call at91_init_interrupts with a NULL priority. ?Why not just
-> >> remove the parameter entirely, make MACHINE_START.init_irq = at91_init_interrupts,
-> >> and then remove all the {board}_init_irq functions.
+> /* include/mach/cpu.h */
 > 
-> > keep it is important as the irq priority can be board specific as we have
-> > nearly no fifo on at91
-> > agreed to too have a a generic function
+> /* Base SoC types */
 > 
-> As of this patch:
->   http://git.kernel.org/?p=linux/kernel/git/stable/linux-2.6.35.y.git;a=commit;h=e58aa3d2d0cc01ad8d6f7f640a0670433f794922
-> interrupt priority / nesting were disabled in the core IRQ code.
-> So even though we configure the AT91's AIC controller for priority
-> levels, it won't as make much difference as before.  Only if you have
-> multiple pending interrupts, will the one with the highest priority be
-> serviced first.
-I'm aware of it yes but the priority can be programed for each board
-and f if we use the preempt to will be true again
+> #define AT91_SOC_AT91RM9200	0x1
+> #define AT91_SOC_AT91SAM9260	0x2
 > 
-> Also, you might want to look into changing the AIC's handler from
-> handle_level_irq() to the handle_fasteoi_irq().
-> Then the irq_finish() can be removed from the low-level ARM
-> asm_do_IRQ() handler.
-I plan to rework the interrupt drivers
+> /* Extended SoC types */
+> #define AT91_SOC_AT91SAM9XE	(0x1 << 16)
+> 
+> /* Accessor macros */
+> #define AT91_SOC_TYPE(x)	((x) & 0xffff)
+> #define AT91_SOC_EXT_TYPE(x)	(((x) >> 16) & 0xffff)
+> 
+> extern unsigned long at91_soc_id;
+> 
+> #define cpu_is_at91rm9200()	(AT91_SOC_TYPE(at91_soc_id) == AT91_SOC_AT91RM9200)
+> #define cpu_is_at91sam9260()	(AT91_SOC_TYPE(at91_soc_id) == AT91_SOC_AT91SAM9260)
+> #define cpu_is_at91sam9xe()	(AT91_SOC_EXT_TYPE(at91_soc_id) == AT91_SOC_AT91SAM9XE)
+> 
+> /* soc.c */
+> unsigned long at91_soc_id = 0;
+> 
+> static void at91_detect_cpu(void)
+> {
+> 	unsigned long cpu_id, full_id, arch_id, exid;
+> 
+> 
+> 	full_id = at91_sys_read(AT91_DBGU_CIDR);
+> 	cpu_id  = full_id & !AT91_CIDR_VERSION);
+> 	arch_id = full_id & AT91_CIDR_ARCH;
+> 	exid    = at91_sys_read(AT91_DBGU_EXID);
+> 
+> 	switch (cpu_id) {
+> 	case ARCH_ID_AT91RM9200:
+> 		at91_soc_id = AT91_SOC_AT91RM9200;
+> 		current_soc = at91rm9200_soc;
+> 		break;
+> 
+> 	case ARCH_ID_AT91SAM9260:
+> 		at91_soc_id = AT91_SOC_AT91SAM9260;
+> 		if (arch_id == ARCH_FAMILY_AT91SAM9XE)
+> 			at91_soc_id |= AT91_SOC_AT91SAM9XE;
+> 		current_soc = at91sam9260_soc;
+> 		break;
+> 	...
+> 	
+> 	default:
+> 		panic("Unknown AT91 SoC type\n");
+> 	}
+> } 
+> 
+> 
+> This way the cpu detection code is much clearer and easier to read and
+> only one set of __cpu_is macros are needed. The values for
+> ARCH_ID_AT91RM9200, etc can be moved into soc.c since they are not
+> needed elsewhere.
+This will never work you do not listen
+
+the DBUG is at DIFFERENT base address on the AT91
+you need to check them one by one
+
+I keep the structure to keep more imformation inside and do not want to be
+limited by a 32bit and complex encoding to maintain
 
 Best Regards,
 J.
