@@ -1,53 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Apr 2011 21:00:33 -0700
-Subject: [RFC PATCH 01/12] ARM: gic: add per-cpu interrupt multiplexer
-In-Reply-To: <1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
-References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4DB64361.4050904@codeaurora.org>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 26 Apr 2011 09:16:59 +0530
+Subject: [PATCH V2 0/7] dmaengine/dw_dmac updates
+In-Reply-To: <cover.1303194835.git.viresh.kumar@st.com>
+References: <cover.1303194835.git.viresh.kumar@st.com>
+Message-ID: <1303789619.896.4.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just minor comments. I'm not a GIC or IRQ expert (yet).
+On Tue, 2011-04-19 at 14:02 +0530, Viresh Kumar wrote:
+> This patchset fixes few issues and extends its support.
+> 
+> Changes in V2:
+>  - lflags added in dw_dma_chan instead of dw_dma
+>  - Patch from Linus Walleij added for pause and resume functionality.
+> 
+> Linus Walleij (1):
+>   dmaengine/dw_dmac: implement pause and resume in dwc_control
+> 
+> Viresh Kumar (6):
+>   dmaengine/dw_dmac: Replace spin_lock_bh with irqsave variants
+>   dmaengine/dw_dmac: Enable resubmission from callback routine.
+>   dmaengine/dw_dmac: call dwc_descriptor_complete from dwc_control with
+>     lock held
+>   dmaengine/dw_dmac: don't call callback routine in case
+>     dmaengine_terminate_all() is called
+>   dmaengine/dw_dmac: set residue as total len in dwc_tx_status if
+>     status is !DMA_SUCCESS
+>   dmaengine/dw_dmac: Divide one sg to many desc, if sg len is greater
+>     than DWC_MAX_COUNT
+> 
+>  drivers/dma/dw_dmac.c      |  179 ++++++++++++++++++++++++++++----------------
+>  drivers/dma/dw_dmac_regs.h |    2 +
+>  2 files changed, 117 insertions(+), 64 deletions(-)
+> 
+Viresh,
 
-On 4/20/2011 12:08 PM, Marc Zyngier wrote:
-> @@ -312,17 +414,39 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
->  	 * Limit number of interrupts registered to the platform maximum
->  	 */
->  	irq_limit = gic->irq_offset + gic_irqs;
-> -	if (WARN_ON(irq_limit > NR_IRQS))
-> +	if (WARN_ON((irq_limit) > NR_IRQS))
+The patch series fails to apply in my next. Can you please rebase to my
+tree and resend again
 
-() are RFC leftovers?
+FWIW: my tree is at git://git.infradead.org/users/vkoul/slave-dma.git
 
->  		irq_limit = NR_IRQS;
->  
->  	/*
->  	 * Setup the Linux IRQ subsystem.
->  	 */
->  	for (i = irq_start; i < irq_limit; i++) {
-> -		irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
-> +#ifdef CONFIG_ARM_GIC_VPPI
-> +		if (nrvppis && gic_irq_is_ppi(gic, i))
-> +			irq_set_chip_and_handler(i, &gic_chip, gic_handle_ppi);
-> +		else
-> +#endif
-> +		{
-> +			irq_set_chip_and_handler(i, &gic_chip,
-> +						 handle_fasteoi_irq);
-> +			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> +		}
-> +		irq_set_chip_data(i, gic);
-> +	}
-> +
-> +#ifdef CONFIG_ARM_GIC_VPPI
-> +	if (!nrvppis)
-> +		goto out;
-> +	gic->vppi_base = irq_alloc_descs(-1, 0, nrvppis, 0);
-> +	if (unlikely(WARN_ON(gic->vppi_base < 0)))
-
-WARN_ON should already have an unlikely in it.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+~Vinod
