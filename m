@@ -1,79 +1,108 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 26 Apr 2011 23:06:27 +0200
-Subject: [RFC PATCH v2 1/3] PM / Core: suspend_again callback for
-	device PM.
-In-Reply-To: <201104262247.44113.rjw@sisk.pl>
-References: <1303288106-2965-1-git-send-email-myungjoo.ham@samsung.com>
-	<201104261347.21811.rjw@sisk.pl>
-	<20110426203543.GB27140@elf.ucw.cz>
-	<201104262247.44113.rjw@sisk.pl>
-Message-ID: <20110426210627.GA28033@elf.ucw.cz>
+From: nm@ti.com (Menon, Nishanth)
+Date: Tue, 26 Apr 2011 16:08:28 -0500
+Subject: [PATCH v2 2/2] arm: omap: gpmc-smsc911x: minor style fixes
+In-Reply-To: <1303835156-14516-1-git-send-email-grinberg@compulab.co.il>
+References: <4DB6E937.7090904@compulab.co.il>
+	<1303835156-14516-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <BANLkTim-cu5_-pt5VxBunjqLWiHyHuo2xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Apr 26, 2011 at 11:25, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>
+> replace "printk(KERN_ERR" by "pr_err("
+> and fix needlessly multi-lined #ifdef
+>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 
-> > > "too heavy" (in fact it's much lighter weight than resuming all devices
-> > > that your approach doesn't prevent from happening, so for example on my
-> > > desktop/notebook machines I woulnd't mind at all if user space were
-> > > thawed after all of the devices had been resumed).
-> > 
-> > Well, it would be behavior change for the user. I told the zaurus to
-> > go s2ram, I do not expect it to wake up after 5 minutes because it
-> > needed to check battery status.
-> > 
-> > I'd have to modify my userland to retry suspend again and again and
-> > again...
-> 
-> And that's exactly what should be done.  Have a user space process controlling
-> that, because avoiding to thaw user space doesn't buy us almost
-> anything.
+Acked-by: Nishanth Menon <nm@ti.com>
 
-That makes Zaurus implement different user-kernel interface than PC
-class machine, because of hardware quirk.
+Regards,
+Nishanth Menon
 
-> Now, I know that it's probably easier to modify the kernel than to write
-> a user space tool for that, test it and so on, but "easier" is not necessarily
-> "better".
 
-It is easier, allows us to keep same user-kernel interface on PC and
-Zaurus, and is compatible with 2.6.38.
-
-Heck, I'm used to typing "echo mem > /sys/power/state". I should not
-have to learn different interface just because Zaurus does not have
-proper hardware charger.
-
-> > I'm not sure if we need to cover hibernation. Do you know any machine
-> > that needs this for hibernation case?
-> 
-> Yes, any machine that "needs" it while suspended.  What's the difference,
-> after all?  The only difference is that there's an image on permanent storage
-> in the hibernation case.  You still can overheat a battery when charging it
-> while hibernated, right?
-
-No, you can not; not on Zaurus.
-
-It can not really power down; it is always sleeping. s2ram is sleep in
-operating system, hibernation or poweroff is sleep in bootloader.
-
-Bootloader takes care of battery in that case.
-
-> > > To conclude, I'm not sure about the approach.  In particular, I'm not sure
-> > > if the benefit is worth the effort and the resulting complications (ie. the
-> > > possibility of having to deal with wakeup signals not requested by user
-> > > space) seem to be a bit too far reaching.
-> > 
-> > We already have platform-specific hacks to do exactly this at least on
-> > Zaurus. Moving it to common code means that hacks are not duplicated..
-> 
-> Well, good to know they are there, but I'm still not sure what to do about
-> that.  At the moment I feel like having too little information to really
-> decide, so perhaps please point me to the code you're talking about for
-> starters.
-
-Ok, see the spitz_should_wakeup() function in arch/arm/mach-pxa/* and
-should_wakeup() usage.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> ---
+> v2: ? ? added pr_fmt so the pr_*() calls would be cleaner (thanks Nishanth)
+> ? ? ? ?Nishanth, this time it does not affect the n-o-l,
+> ? ? ? ?but it is indeed cleaner
+>
+>
+> ?arch/arm/mach-omap2/gpmc-smsc911x.c ? ? ? ? ? ? | ? 14 +++++++-------
+> ?arch/arm/plat-omap/include/plat/gpmc-smsc911x.h | ? ?3 +--
+> ?2 files changed, 8 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> index d30293a..e09374a 100644
+> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> @@ -10,6 +10,7 @@
+> ?* it under the terms of the GNU General Public License version 2 as
+> ?* published by the Free Software Foundation.
+> ?*/
+> +#define pr_fmt(fmt) "%s: " fmt, __func__
+>
+> ?#include <linux/kernel.h>
+> ?#include <linux/platform_device.h>
+> @@ -55,7 +56,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?gpmc_cfg = board_data;
+>
+> ? ? ? ?if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPMC mem for smsc911x\n");
+> + ? ? ? ? ? ? ? pr_err("Failed to request GPMC mem region\n");
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+>
+> @@ -63,8 +64,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
+>
+> ? ? ? ?if (gpio_request(gpmc_cfg->gpio_irq, "smsc911x irq") < 0) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_irq);
+> + ? ? ? ? ? ? ? pr_err("Failed to request IRQ GPIO%d\n", gpmc_cfg->gpio_irq);
+> ? ? ? ? ? ? ? ?goto free1;
+> ? ? ? ?}
+>
+> @@ -74,8 +74,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
+> ? ? ? ? ? ? ? ?ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
+> ? ? ? ? ? ? ? ?if (ret) {
+> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x reset\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_reset);
+> + ? ? ? ? ? ? ? ? ? ? ? pr_err("Failed to request reset GPIO%d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_reset);
+> ? ? ? ? ? ? ? ? ? ? ? ?goto free2;
+> ? ? ? ? ? ? ? ?}
+>
+> @@ -92,7 +92,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ? ? ? ? ? gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
+> ? ? ? ? ? ? ? ? &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
+> ? ? ? ?if (!pdev) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Unable to register smsc911x device\n");
+> + ? ? ? ? ? ? ? pr_err("Unable to register platform device\n");
+> ? ? ? ? ? ? ? ?gpio_free(gpmc_cfg->gpio_reset);
+> ? ? ? ? ? ? ? ?goto free2;
+> ? ? ? ?}
+> @@ -104,5 +104,5 @@ free2:
+> ?free1:
+> ? ? ? ?gpmc_cs_free(gpmc_cfg->cs);
+>
+> - ? ? ? printk(KERN_ERR "Could not initialize smsc911x\n");
+> + ? ? ? pr_err("Could not initialize smsc911x device\n");
+> ?}
+> diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> index d3f1579..ea6c9c8 100644
+> --- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> +++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> @@ -21,8 +21,7 @@ struct omap_smsc911x_platform_data {
+> ? ? ? ?u32 ? ? flags;
+> ?};
+>
+> -#if defined(CONFIG_SMSC911X) || \
+> - ? ? ? defined(CONFIG_SMSC911X_MODULE)
+> +#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+>
+> ?extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
+>
+> --
+> 1.7.3.4
+>
