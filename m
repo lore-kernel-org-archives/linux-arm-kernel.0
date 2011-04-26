@@ -1,20 +1,28 @@
-From: mindentropy@gmail.com (mindentropy)
-Date: Tue, 26 Apr 2011 21:46:19 +0530
-Subject: Clarification regarding DMA in s3c2440.
-Message-ID: <201104262146.20149.mindentropy@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 26 Apr 2011 09:21:59 -0700
+Subject: [RFC PATCH 02/12] ARM: smp_twd: add support for remapped PPI
+	interrupts
+In-Reply-To: <20110426100536.37b9b2ce@taxman.wild-wind.fr.eu.org>
+References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>	<1303326501-15664-3-git-send-email-marc.zyngier@arm.com>	<4DB5A991.90002@codeaurora.org>
+	<20110426100536.37b9b2ce@taxman.wild-wind.fr.eu.org>
+Message-ID: <4DB6F127.8050605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 04/26/2011 02:05 AM, Marc Zyngier wrote:
+> I'd tend to agree with you, though local timer being the only user of
+> PPIs, it doesn't matter that much... ;-)
+>
+>
+>
+> I'll move these changes to the first patch on the next iteration of the
+> patch set.
+>
 
-   I am having some trouble understanding the datasheet of s3c2440 CPU in
-the DMA part.(I am trying to understand the dma controller code).
+Thanks. It mattered to me when I only pulled down the first patch and
+the MSM patch and tested it out and was confused why the timer tick
+wasn't happening. MSM doesn't have the ARM twd.
 
-In chapter 8 second page under the heading DMA request sources the
-number of sources should be 7 and not 4. In the s3c2410 the sources
-are 5 but they have given it as 4. I would be really grateful if
-somebody can please verify it and let me know where I am going wrong.
-
-Link location : http://www.friendlyarm.net/dl.php?file=S3C2440.pdf
-
-Thanks in advance. 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
