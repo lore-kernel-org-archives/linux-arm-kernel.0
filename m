@@ -1,45 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 26 Apr 2011 14:51:00 -0400 (EDT)
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <BANLkTi=-DFfdiBKZzRBxF-yMJFtWnzuk1g@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1104261447481.2035-100000@iolanthe.rowland.org>
+From: pwaechtler@mac.com (Peter Waechtler)
+Date: Tue, 26 Apr 2011 21:00:42 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<BANLkTimZZEr8fqXbuBjpYxF1quBFv7Oihg@mail.gmail.com>
+	<BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
+Message-ID: <201104262100.42670.pwaechtler@mac.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Apr 2011, Rabin Vincent wrote:
-
-> On Wed, Feb 2, 2011 at 21:30, Arnd Bergmann <arnd@arndb.de> wrote:
-> > As noticed by Peter Maydell, the EHCI device driver in Linux gets
-> > miscompiled by some versions of arm-gcc (still need to find out which)
-> > due to a combination of problems:
-> >
-> > 1. In include/linux/usb/ehci_def.h, struct ehci_caps is defined
-> > with __attribute__((packed)), for no good reason. This is clearly
-> > a bug and needs to get fixed, but other drivers have the same bug
+Am Dienstag, 26. April 2011, 12:33:29 schrieb Per Forlin:
+> On 23 April 2011 11:23, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > 2011/4/22 Pavel Machek <pavel@ucw.cz>:
+> >> Plus, I was told new MMC standard has "write reliable" option...
+> > 
+> > I think Per F?rlin looked into reliable write. The latest eMMC cards
+> > has this, but OTOMH it was too darn slow to be used on current
+> > chips/"cards".
+> > 
+> > Per, Sebastian: any details?
 > 
-> Was a patch submitted for this?  I couldn't find it in the archives.
-> U-Boot seems to be fixing this by adding an "aligned(4)" instead
-> of removing the packed:
+> I had plans to add reliable writes and do benchmarking but I never got
+> to it. Right now I have no plans to pick it up.
 > 
-> http://www.mail-archive.com/u-boot at lists.denx.de/msg51418.html
-
-ISTR a patch was submitted,  but apparently it never got picked up.
-
-> > and it used to work. The attribute forces byte access on all members
-> > accessed through pointer dereference, which is not allowed on
-> > MMIO accesses in general. The specific code triggering the problem
-> > in Peter's case is in ehci-omap.c:
-> > ? ? ? ?omap->ehci->regs = hcd->regs
-> > ? ? ? ? ? ? ? ?+ HC_LENGTH(readl(&omap->ehci->caps->hc_capbase));
+> > Yours,
+> > Linus Walleij
 > 
-> In my case it's this writel() in ehci-hub.c that gets chopped into
-> strbs:
-> 
-> 	/* force reset to complete */
-> 	ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
-> 				status_reg);
+> Regards,
+> Per
 
-Why would that get messed up?  The status_reg variable doesn't have any 
-__atribute__((packed)) associated with it.
+As far as I understood the spec, reliable write only makes statements like
+either the old data is still intact - or the new data was written 
+(completely).
 
-Alan Stern
+	Peter
