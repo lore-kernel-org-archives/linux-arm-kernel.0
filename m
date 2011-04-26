@@ -1,99 +1,54 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Tue, 26 Apr 2011 22:23:41 +0900
-Subject: [PATCH v2 4/6] arm: use asm-generic/bitops/le.h
-In-Reply-To: <1303824223-3566-1-git-send-email-akinobu.mita@gmail.com>
-References: <1303824223-3566-1-git-send-email-akinobu.mita@gmail.com>
-Message-ID: <1303824223-3566-5-git-send-email-akinobu.mita@gmail.com>
+From: david.vrabel@csr.com (David Vrabel)
+Date: Tue, 26 Apr 2011 14:29:03 +0100
+Subject: [PATCH v2 01/12] mmc: add none blocking mmc request function
+In-Reply-To: <BANLkTimaTe0qD5sbEJj88YRv2DZv=1oxTQ@mail.gmail.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>	<1302116833-24540-2-git-send-email-per.forlin@linaro.org>	<4DA81F42.3070208@csr.com>
+	<BANLkTimaTe0qD5sbEJj88YRv2DZv=1oxTQ@mail.gmail.com>
+Message-ID: <4DB6C89F.10903@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous style change enables to use asm-generic/bitops/le.h
-on arm.
+On 20/04/11 08:17, Per Forlin wrote:
+> 
+>> Using a MMC request queue has other benefits -- it allows multiple users
+>> without having to claim/release the host.  This would be useful for
+>> (especially multi-function) SDIO.
+>
+> You mean claim and release would be done only within the mmc core. The
+> timed saved here would equal the time it takes to release and claim
+> the host.
+> Claim and release can also be used for power management to indicate if
+> any client is using the host, if not the power can be switched off.
 
-Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
+Isn't there a separate runtime power management API that different from
+claim/release?
 
-No change from previous submission
+> I just want to make sure I understand the multi-function SDIO case, I
+> haven't done any work with SDIO.
+> Can the SDIO functions compete over the same claim_host at the same time?
+> Example: if function 1 claims the host, function 2 and function 3 also
+> want to claim the host but have to wait for function 1 to release the
+> host.
 
- arch/arm/include/asm/bitops.h |   43 ++++------------------------------------
- 1 files changed, 5 insertions(+), 38 deletions(-)
+This is the case.   Each function driver has to claim exclusive access
+to the host.
 
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index 18a024b..b4892a0 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -203,8 +203,6 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
- #define find_first_bit(p,sz)		_find_first_bit_le(p,sz)
- #define find_next_bit(p,sz,off)		_find_next_bit_le(p,sz,off)
- 
--#define WORD_BITOFF_TO_LE(x)		((x))
--
- #else
- /*
-  * These are the big endian, atomic definitions.
-@@ -214,8 +212,6 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
- #define find_first_bit(p,sz)		_find_first_bit_be(p,sz)
- #define find_next_bit(p,sz,off)		_find_next_bit_be(p,sz,off)
- 
--#define WORD_BITOFF_TO_LE(x)		((x) ^ 0x18)
--
- #endif
- 
- #if __LINUX_ARM_ARCH__ < 5
-@@ -287,40 +283,7 @@ static inline int fls(int x)
- #include <asm-generic/bitops/hweight.h>
- #include <asm-generic/bitops/lock.h>
- 
--static inline void __set_bit_le(int nr, void *addr)
--{
--	__set_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline void __clear_bit_le(int nr, void *addr)
--{
--	__clear_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline int __test_and_set_bit_le(int nr, void *addr)
--{
--	return __test_and_set_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline int test_and_set_bit_le(int nr, void *addr)
--{
--	return test_and_set_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline int __test_and_clear_bit_le(int nr, void *addr)
--{
--	return __test_and_clear_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline int test_and_clear_bit_le(int nr, void *addr)
--{
--	return test_and_clear_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
--
--static inline int test_bit_le(int nr, const void *addr)
--{
--	return test_bit(WORD_BITOFF_TO_LE(nr), addr);
--}
-+#ifdef __ARMEB__
- 
- static inline int find_first_zero_bit_le(const void *p, unsigned size)
- {
-@@ -340,6 +303,10 @@ static inline int find_next_bit_le(const void *p, int size, int offset)
- }
- #define find_next_bit_le find_next_bit_le
- 
-+#endif
-+
-+#include <asm-generic/bitops/le.h>
-+
- /*
-  * Ext2 is defined to use little-endian byte ordering.
-  */
+> What is the extra benefit of having the internal request queue for
+> multi function SDIO?
+
+It reduces the delays between commands if multiple drivers are sending
+commands.  I estimated performance improvements with 2-3% from just
+removing the need to claim/release in one particular SDIO function
+driver.  Performance improvements for multi-function cards would be a
+bit more (5% perhaps?).
+
+The more important benefit is the simplification of the API.
+
+David
 -- 
-1.7.4.4
+David Vrabel, Senior Software Engineer, Drivers
+CSR, Churchill House, Cambridge Business Park,  Tel: +44 (0)1223 692562
+Cowley Road, Cambridge, CB4 0WZ                 http://www.csr.com/
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
