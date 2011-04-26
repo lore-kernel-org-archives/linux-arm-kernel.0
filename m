@@ -1,64 +1,28 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 26 Apr 2011 10:26:01 +0900
-Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
-In-Reply-To: <BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
-	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
-Message-ID: <4DB61F29.4090600@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 25 Apr 2011 18:47:41 -0700
+Subject: [PATCH v4] ARM: Use generic BUG() handler
+In-Reply-To: <143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
+References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
+	<4DA7A914.5020804@codeaurora.org>
+	<BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
+	<BANLkTin_TpzdQS96SPKUNye6vb2b55Qc4A@mail.gmail.com>
+	<143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
+Message-ID: <20110426014741.GB28721@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn
+On Wed, Apr 20, 2011 at 11:01:59AM -0700, Stephen Boyd wrote:
 
-I tested using ADMA with your patch...(benchmark : IOzone)
-But I didn't get improvement of performance with ADMA..
-(i can see improvement of performance with SDMA)
+> It's here:
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6885/1
+> 
+> I imagine it will be added when/if Russell picks it up. Sadly it
+> increases the LOC in ARM so Simon might need to really
+> sell it to get it merged.
 
-I want to know how you think about this..
+It's core code though, and the concern today is not with ARM core code
+as much as with the various platforms that are growing seemingly without
+upper bounds.
 
-Regards,
-Jaehoon Chung
 
-Andrei Warkentin wrote:
-> Hi Shawn,
-> 
-> On Sat, Apr 16, 2011 at 11:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> pre_req() runs dma_map_sg() post_req() runs dma_unmap_sg.
->> If not calling pre_req() before sdhci_request(), request()
->> will prepare the cache just like it did it before.
->> It is optional to use pre_req() and post_req().
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> I worked out the patch by referring to Per's patch below.
->>
->>  omap_hsmmc: add support for pre_req and post_req
->>
->> It adds pre_req and post_req support for sdhci based host drivers to
->> work with Per's non-blocking optimization.  But I only have imx esdhc
->> based hardware to test.  Unfortunately, I can not measure the
->> performance gain using mmc_test, because the current esdhc driver on
->> mainline fails on the test.  So I just did a quick test using 'dd',
->> but sadly, I did not see noticeable performance gain here.  The
->> followings are possible reasons I can think of right away.
->>
->> * The patch did not add pre_req and post_req correctly.  Please help
->>  review to catch the mistakes if any.
->> * The imx esdhc driver uses SDHCI_SDMA (max_segs is 1) than SDHCI_ADAM
->>  (max_segs is 128), due to the broken ADMA support on imx esdhc.  So
->>  can people holding other sdhci based hardware give a try on the
->>  patch?
->>
->> Hopefully, I can find some time to have a close look at the mmc_test
->> failure and the broken ADMA with imx esdhc.
->>
-> 
-> I'll try it out...
-> 
-> A
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-Olof
