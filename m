@@ -1,50 +1,43 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 26 Apr 2011 12:09:21 +0200
-Subject: [PATCH v6 1/3] MTD : add the common code for GPMI controller
-	driver
-In-Reply-To: <4DB63360.8010908@freescale.com>
-References: <1303267549-18377-1-git-send-email-b32955@freescale.com>
-	<1303267549-18377-2-git-send-email-b32955@freescale.com>
-	<19887.57747.43423.753598@ipc1.ka-ro>
-	<4DB63360.8010908@freescale.com>
-Message-ID: <19894.39377.436330.612744@ipc1.ka-ro>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 26 Apr 2011 12:21:08 +0200
+Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
+In-Reply-To: <20110426024758.GB6145@S2100-06.ap.freescale.net>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
+	<4DB61F29.4090600@samsung.com>
+	<20110426024758.GB6145@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTinmDS1MayqUwNvWKvhjV3LPbu1u=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 26 April 2011 04:47, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Tue, Apr 26, 2011 at 10:26:01AM +0900, Jaehoon Chung wrote:
+>> Hi Shawn
+>>
+>> I tested using ADMA with your patch...(benchmark : IOzone)
+>> But I didn't get improvement of performance with ADMA..
+>> (i can see improvement of performance with SDMA)
+>>
+>> I want to know how you think about this..
+>>
+> It's still an open question if pre_req and post_req were correctly
+> added, even you have seen improvement of SDMA case with IOzone. ?I
+> would leave the question to Per Forlin.
+>
+Performance numbers from user space may vary.
+Currently I am looking into how the block layer adds request to the
+mmc blockdev. I can see that if is common that one read request is
+pushed to the mmc blockdev queue after the previous request has
+already finished. For this scenario there will no improvement. If
+running IOzone with large record sizes multiple requests are queued up
+in the mmc blockdev queue and this results in increase of bandwidth.
+The mmc_test are intended to help verifying if the pre_req and
+post_req are implemented correctly and give a number of the maximum
+gain in performance.
 
-Huang Shijie writes:
-> Hi:
-> > Huang Shijie writes:
-> >> +/* debug control */
-> >> +int gpmi_debug;
-> >> +
-> > This could be a module_param.
-> >
-> I think the module_param is not easy to use.
-> I want to know the log when the gpmi driver is running, and change the 
-> log level as soon
-> as my need changs.
-> 
-> So I prefer to use the origin method.
-> 
-> 
-|static int debug;
-|module_param(debug, int, S_IRUGO | S_IWUSR);
-is all you need to do exactly what you want.
-
-You can write to /sys/module/imx28-gpmi-nfc/parameters/debug at any
-time to change the debug level.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> --
+> Regards,
+> Shawn
+Regards,
+Per
