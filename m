@@ -1,39 +1,97 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 26 Apr 2011 23:36:33 +0200
-Subject: [RFC 0/4] convert stmp into mxs and delete the obsolete platform
-In-Reply-To: <BANLkTi=9PbJtGSJBZjAP8zwY8PO3NetNyQ@mail.gmail.com>
-References: <1303093838-23959-1-git-send-email-w.sang@pengutronix.de>
-	<BANLkTikybn1pwiz-SrgdSwV6aRcKHMAENg@mail.gmail.com>
-	<20110418091215.GC31131@pengutronix.de>
-	<BANLkTi=9PbJtGSJBZjAP8zwY8PO3NetNyQ@mail.gmail.com>
-Message-ID: <20110426213633.GA1228@pengutronix.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 26 Apr 2011 23:46:57 +0200
+Subject: [RFC PATCH v2 1/3] PM / Core: suspend_again callback for device
+	PM.
+In-Reply-To: <20110426210627.GA28033@elf.ucw.cz>
+References: <1303288106-2965-1-git-send-email-myungjoo.ham@samsung.com>
+	<201104262247.44113.rjw@sisk.pl>
+	<20110426210627.GA28033@elf.ucw.cz>
+Message-ID: <201104262346.58046.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
-
-> >> may we FIRST see how you are going to fit it into mach-mxc? NAK from
-> >> me before I see that.
-> > I don't understand that nak. mach-mxs doesn't have to do anything with
-> > plat-mxc codewise. (There are some similarities, e.g. both types of
-> > machines are called i.MXYZ (which I consider to have marketing reasons).)
+On Tuesday, April 26, 2011, Pavel Machek wrote:
+> Hi!
 > 
-> well, looks like I've missed the actual patch so I might be wrong.
-> I'll try to run the code even.
+> > > > "too heavy" (in fact it's much lighter weight than resuming all devices
+> > > > that your approach doesn't prevent from happening, so for example on my
+> > > > desktop/notebook machines I woulnd't mind at all if user space were
+> > > > thawed after all of the devices had been resumed).
+> > > 
+> > > Well, it would be behavior change for the user. I told the zaurus to
+> > > go s2ram, I do not expect it to wake up after 5 minutes because it
+> > > needed to check battery status.
+> > > 
+> > > I'd have to modify my userland to retry suspend again and again and
+> > > again...
+> > 
+> > And that's exactly what should be done.  Have a user space process controlling
+> > that, because avoiding to thaw user space doesn't buy us almost
+> > anything.
+> 
+> That makes Zaurus implement different user-kernel interface than PC
+> class machine, because of hardware quirk.
 
-Do you have more comments now that the patches are available?
+Let me say that again: If Zaurus needs to resume everything except for
+user space periodically to monitor the battery charger, I'm not sure if our
+suspend interface is the right one for it in the first place.
+
+It seriously looks like a workaround for the lack of appropriately implemented
+runtime PM, just like the Android's opportunistic suspend.
+
+> > Now, I know that it's probably easier to modify the kernel than to write
+> > a user space tool for that, test it and so on, but "easier" is not necessarily
+> > "better".
+> 
+> It is easier, allows us to keep same user-kernel interface on PC and
+> Zaurus, and is compatible with 2.6.38.
+> 
+> Heck, I'm used to typing "echo mem > /sys/power/state". I should not
+> have to learn different interface just because Zaurus does not have
+> proper hardware charger.
+
+No, this interface should not be used on Zaurus at all.  It's not mean for
+that and while you can hack it to kind of work, it still is hacking rather
+than designing things.
+
+> > > I'm not sure if we need to cover hibernation. Do you know any machine
+> > > that needs this for hibernation case?
+> > 
+> > Yes, any machine that "needs" it while suspended.  What's the difference,
+> > after all?  The only difference is that there's an image on permanent storage
+> > in the hibernation case.  You still can overheat a battery when charging it
+> > while hibernated, right?
+> 
+> No, you can not; not on Zaurus.
+> 
+> It can not really power down; it is always sleeping. s2ram is sleep in
+> operating system,
+
+Which is not the meaning of S2RAM I use.
+
+> hibernation or poweroff is sleep in bootloader.
+> 
+> Bootloader takes care of battery in that case.
+
+So the difference is that we let someone else worry.  Cool. :-)
+
+> > > > To conclude, I'm not sure about the approach.  In particular, I'm not sure
+> > > > if the benefit is worth the effort and the resulting complications (ie. the
+> > > > possibility of having to deal with wakeup signals not requested by user
+> > > > space) seem to be a bit too far reaching.
+> > > 
+> > > We already have platform-specific hacks to do exactly this at least on
+> > > Zaurus. Moving it to common code means that hacks are not duplicated..
+> > 
+> > Well, good to know they are there, but I'm still not sure what to do about
+> > that.  At the moment I feel like having too little information to really
+> > decide, so perhaps please point me to the code you're talking about for
+> > starters.
+> 
+> Ok, see the spitz_should_wakeup() function in arch/arm/mach-pxa/* and
+> should_wakeup() usage.
+
+OK, I will.
 
 Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110426/9ce1357c/attachment.sig>
+Rafael
