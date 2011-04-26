@@ -1,49 +1,34 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 26 Apr 2011 09:54:37 +0800
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <20110425185113.GF14770@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
-	<20110424134833.GC2310@richard-laptop>
-	<20110425185113.GF14770@pengutronix.de>
-Message-ID: <20110426015435.GA4600@b20223-02.ap.freescale.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 26 Apr 2011 10:47:59 +0800
+Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
+In-Reply-To: <4DB61F29.4090600@samsung.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
+	<4DB61F29.4090600@samsung.com>
+Message-ID: <20110426024758.GB6145@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 08:51:13PM +0200, Sascha Hauer wrote:
-> On Sun, Apr 24, 2011 at 09:48:33PM +0800, Richard Zhao wrote:
-> > > +
-> > > +	div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
-> > > +
-> > > +	if (rate != best_parent_rate / div)
-> > > +		return -EINVAL;
-> > > +
-> > > +	ret = clk_set_rate(divider->parent, best_parent_rate);
-> > why do you set parent rate? It may impact hte parent's other children.
-> >
+On Tue, Apr 26, 2011 at 10:26:01AM +0900, Jaehoon Chung wrote:
+> Hi Shawn
 > 
-> In a newer version I already created a barrier flag for not setting the
-> parents rate. Setting the parents rate is needed for for example
-> cascaded dividers. Otherwise this could be much simpler.
-And do you find a way to let clock actual parents indepent on reset or uboot
-register settings. If we can register clk, maybe:
-if (clk->ops.hw_get_parent)
-	clk->parent = clk->ops->hw_get_parent;
+> I tested using ADMA with your patch...(benchmark : IOzone)
+> But I didn't get improvement of performance with ADMA..
+> (i can see improvement of performance with SDMA)
+> 
+> I want to know how you think about this..
+> 
+It's still an open question if pre_req and post_req were correctly
+added, even you have seen improvement of SDMA case with IOzone.  I
+would leave the question to Per Forlin.
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+With your result, I'm interested in trying IOzone test with esdhc
+to see any difference with SDMA.
+
+BTW, what is the number of performance improvement you are seeing?
+And do you have mmc_test result to share?
+
+-- 
+Regards,
+Shawn
