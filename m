@@ -1,85 +1,83 @@
 From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 26 Apr 2011 23:45:47 +0100
-Subject: MMC and reliable write - was: since when does ARM map the kernel
-	memory in sections?
-In-Reply-To: <201104262238.02979.pwaechtler@mac.com>
+Date: Tue, 26 Apr 2011 23:58:18 +0100
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <BANLkTi=Zn+kDfErZN6tm6yxHTt4v6o7XNw@mail.gmail.com>
 References: <201104122052.17453.pwaechtler@mac.com>
-	<201104262100.42670.pwaechtler@mac.com>
-	<20110426190719.GA5832@shareable.org>
-	<201104262238.02979.pwaechtler@mac.com>
-Message-ID: <20110426224546.GC5832@shareable.org>
+	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<20110412203303.GA16019@shareable.org>
+	<20110418135243.GB1479@ucw.cz>
+	<20110418170752.GQ16019@shareable.org>
+	<20110422154344.GA7526@ucw.cz>
+	<BANLkTimZZEr8fqXbuBjpYxF1quBFv7Oihg@mail.gmail.com>
+	<BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
+	<BANLkTi=Zn+kDfErZN6tm6yxHTt4v6o7XNw@mail.gmail.com>
+Message-ID: <20110426225818.GD5832@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Waechtler wrote:
-> JEDEC Standard No. 84-A441
-> Page 56
+Andrei Warkentin wrote:
+> Hi Per,
 > 
+> On Tue, Apr 26, 2011 at 5:33 AM, Per Forlin <per.forlin@linaro.org> wrote:
+> > On 23 April 2011 11:23, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> 2011/4/22 Pavel Machek <pavel@ucw.cz>:
+> >>
+> >>> Plus, I was told new MMC standard has "write reliable" option...
+> >>
+> >> I think Per F?rlin looked into reliable write. The latest eMMC cards
+> >> has this, but OTOMH it was too darn slow to be used on current
+> >> chips/"cards".
+> >>
+> >> Per, Sebastian: any details?
+> > I had plans to add reliable writes and do benchmarking but I never got
+> > to it. Right now I have no plans to pick it up.
+> >
+> >>
 > 
-> Reliable Write: Multiple block write with pre-defined block count and 
-> Reliable Write parameters. This transaction is similar to the basic pre-
-> defined multiple-block write (defined in previous bullet) with the
-> following exceptions. The old data pointed to by a logical address must remain 
-> unchanged until the new data written to same logical address has been 
-> successfully programmed. This is to ensure that the target address 
-> updated by the reliable write transaction never contains undefined data. 
+> Reliable writes are in mmc-next already. As an improvement to that
+> path, I have a CMD23-bounded request support patch set which is
+> pending.
 > 
-> Data must remain valid even if a sudden power loss occurs during the 
-> programming.
-> 
-> There are two versions of reliable write: legacy implementation and the 
-> enhance implementation. The type of reliable write supported by the device is 
-> indicated by the EN_REL_WR bit in the
-> WR_REL_PARAM extended CSD register.
->  For the case of EN_REL_WR = 0 :
-> 
-> 
-> More fun on page 147ff:
-> 
-> ? WR_REL_SET [167]
-> The write reliability settings register indicates the reliability setting for 
-> each of the user and general
-> area partitions in the device. The contents of this register are read only if 
-> the HS_CTRL_REL is 0 in
-> the WR_REL_PARAM extended CSD register. The default value of these bits is not 
-> specified and is
-> determined by the device.
-> 
-> 
-> it goes on with:
-> 
-> Bit[4]: WR_DATA_REL_4
-> 0x0: In general purpose partition 4, the write operation has been optimized 
-> for performance and existing data in the partition could be at risk if a power
-> failure occurs.
->
-> 0x1: In general purpose partition 4, the device protects previously written 
-> data if power failure occurs during a write operation.
+> Reliable writes are exposed via REQ_FUA.
 
-Hmm...  It all hinges on whether "previously written data" refers just
-to the region being overwritten, or to all the other data in the
-partition?
+Are you sure that's appropriate?
 
-If MMC writes are specified to only affect the data being written with
-a Write command, and to have stably committed the data when Write
-returns, then "Reliable Write" just means "atomic", and filesystems
-and databases don't actually need that.
+Unless I have misunderstood (very possible), REQ_FUA means writes hit
+non-volatile storage before acknowledgement, not that they are atomic.
+I think the normal users of REQ_FUA don't require or expect large
+atomic writes; they use it as a shortcut for (write & flush this
+write) without implying anything else is flushed.
 
-Hard disks don't guarantee that, and it's not a problem.  Filesystems
-and databases need barriers and/or durable (stable) commits, and for
-writes in one area not to corrupt data in a different area.
+> Keep in mind that flash cards don't have a volatile cache, so once an
+> MMC transaction goes through the data is in flash.
 
-*That's* a problem with other flash devices (and possibly some RAIDs):
-Writes to one area can corrupt data in sectors that aren't being
-written to, over quite a large distance.
+Does that not mean MMC already provides REQ_FUA semantics on every
+transactions?
 
-I can't tell from the above specification excerpt (by itself) what is
-being guaranteed; it seems ambiguous, but maybe there's a clearer
-definition elsewhere.
+I don't know much about MMC, but the problems reported with other
+flash devices are either volatile cache (so may not apply to
+conformant MMCs), or random corruption of data that was supposed to be
+stored long ago, even data quite far from the locations being written
+at the time, because the flash is presumably reorganising itself.
+There are even reports of data loss resulting from power removal while
+reading.
 
-It is conceivable that checksums and metadata could be stored into a
-"reliable" partition and some kinds of file data into an "unreliable"
-partition, where filesystem integrity is important and nobody cares
-about the actual data! :-)
+> All reliable writes guarantee is flash state if an MMC transaction
+> is interrupted in the middle. Additionally, the "new" reliable write
+> (as opposed to legacy) is even less useful, since it only provides
+> that guarantee at a sector boundary.
+
+Perhaps the sector bondary limitation makes it faster and/or limits
+the amount of buffer required, and/or allows the device to accept
+larger write transactions.  Which is good if it means reliability
+doesn't get switched off or faked.  Or perhaps it's just to align, a
+little, with perceived behaviour of hard disks.
+
+Hard disks don't guarantee large atomic writes as far as I know, so
+filesystems & databases generally don't assume it, and it's not really
+a problem.  Some people say you can rely on a single 512-byte sector
+being atomically updated or not on a hard disk, but some don't; I'm
+siding with the latter.  (SQLite has a storage flag you can set if you
+know the storage has that property, to tweak its commit strategy.)
 
 -- Jamie
