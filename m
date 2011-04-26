@@ -1,63 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Apr 2011 10:12:05 +0100
-Subject: [RFC PATCH 01/12] ARM: gic: add per-cpu interrupt multiplexer
-In-Reply-To: <4DB64361.4050904@codeaurora.org>
-References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-2-git-send-email-marc.zyngier@arm.com>
-	<4DB64361.4050904@codeaurora.org>
-Message-ID: <20110426101205.6696a6ea@taxman.wild-wind.fr.eu.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 26 Apr 2011 12:09:21 +0200
+Subject: [PATCH v6 1/3] MTD : add the common code for GPMI controller
+	driver
+In-Reply-To: <4DB63360.8010908@freescale.com>
+References: <1303267549-18377-1-git-send-email-b32955@freescale.com>
+	<1303267549-18377-2-git-send-email-b32955@freescale.com>
+	<19887.57747.43423.753598@ipc1.ka-ro>
+	<4DB63360.8010908@freescale.com>
+Message-ID: <19894.39377.436330.612744@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Apr 2011 21:00:33 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi,
 
-> Just minor comments. I'm not a GIC or IRQ expert (yet).
+Huang Shijie writes:
+> Hi:
+> > Huang Shijie writes:
+> >> +/* debug control */
+> >> +int gpmi_debug;
+> >> +
+> > This could be a module_param.
+> >
+> I think the module_param is not easy to use.
+> I want to know the log when the gpmi driver is running, and change the 
+> log level as soon
+> as my need changs.
 > 
-> On 4/20/2011 12:08 PM, Marc Zyngier wrote:
-> > @@ -312,17 +414,39 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
-> >  	 * Limit number of interrupts registered to the platform maximum
-> >  	 */
-> >  	irq_limit = gic->irq_offset + gic_irqs;
-> > -	if (WARN_ON(irq_limit > NR_IRQS))
-> > +	if (WARN_ON((irq_limit) > NR_IRQS))
+> So I prefer to use the origin method.
 > 
-> () are RFC leftovers?
-
-Just a fossil dating back from an early version of the patch. Will fix.
-
-> >  		irq_limit = NR_IRQS;
-> >  
-> >  	/*
-> >  	 * Setup the Linux IRQ subsystem.
-> >  	 */
-> >  	for (i = irq_start; i < irq_limit; i++) {
-> > -		irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
-> > +#ifdef CONFIG_ARM_GIC_VPPI
-> > +		if (nrvppis && gic_irq_is_ppi(gic, i))
-> > +			irq_set_chip_and_handler(i, &gic_chip, gic_handle_ppi);
-> > +		else
-> > +#endif
-> > +		{
-> > +			irq_set_chip_and_handler(i, &gic_chip,
-> > +						 handle_fasteoi_irq);
-> > +			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> > +		}
-> > +		irq_set_chip_data(i, gic);
-> > +	}
-> > +
-> > +#ifdef CONFIG_ARM_GIC_VPPI
-> > +	if (!nrvppis)
-> > +		goto out;
-> > +	gic->vppi_base = irq_alloc_descs(-1, 0, nrvppis, 0);
-> > +	if (unlikely(WARN_ON(gic->vppi_base < 0)))
 > 
-> WARN_ON should already have an unlikely in it.
+|static int debug;
+|module_param(debug, int, S_IRUGO | S_IWUSR);
+is all you need to do exactly what you want.
 
-Good point. Will fix as well.
+You can write to /sys/module/imx28-gpmi-nfc/parameters/debug at any
+time to change the debug level.
 
-Thanks for reviewing,
 
-	M.
+Lothar Wa?mann
 -- 
-I'm the slime oozin' out from your TV set...
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
