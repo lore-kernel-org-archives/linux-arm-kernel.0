@@ -1,56 +1,85 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 27 Apr 2011 00:32:41 +0200
-Subject: [RFC PATCH v2 1/3] PM / Core: suspend_again callback for device
-	PM.
-In-Reply-To: <201104262346.58046.rjw@sisk.pl>
-References: <1303288106-2965-1-git-send-email-myungjoo.ham@samsung.com>
-	<20110426210627.GA28033@elf.ucw.cz>
-	<201104262346.58046.rjw@sisk.pl>
-Message-ID: <201104270032.42046.rjw@sisk.pl>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 26 Apr 2011 23:45:47 +0100
+Subject: MMC and reliable write - was: since when does ARM map the kernel
+	memory in sections?
+In-Reply-To: <201104262238.02979.pwaechtler@mac.com>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<201104262100.42670.pwaechtler@mac.com>
+	<20110426190719.GA5832@shareable.org>
+	<201104262238.02979.pwaechtler@mac.com>
+Message-ID: <20110426224546.GC5832@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 26, 2011, Rafael J. Wysocki wrote:
-> On Tuesday, April 26, 2011, Pavel Machek wrote:
-...
-> > Ok, see the spitz_should_wakeup() function in arch/arm/mach-pxa/* and
-> > should_wakeup() usage.
+Peter Waechtler wrote:
+> JEDEC Standard No. 84-A441
+> Page 56
 > 
-> OK, I will.
+> 
+> Reliable Write: Multiple block write with pre-defined block count and 
+> Reliable Write parameters. This transaction is similar to the basic pre-
+> defined multiple-block write (defined in previous bullet) with the
+> following exceptions. The old data pointed to by a logical address must remain 
+> unchanged until the new data written to same logical address has been 
+> successfully programmed. This is to ensure that the target address 
+> updated by the reliable write transaction never contains undefined data. 
+> 
+> Data must remain valid even if a sudden power loss occurs during the 
+> programming.
+> 
+> There are two versions of reliable write: legacy implementation and the 
+> enhance implementation. The type of reliable write supported by the device is 
+> indicated by the EN_REL_WR bit in the
+> WR_REL_PARAM extended CSD register.
+>  For the case of EN_REL_WR = 0 :
+> 
+> 
+> More fun on page 147ff:
+> 
+> ? WR_REL_SET [167]
+> The write reliability settings register indicates the reliability setting for 
+> each of the user and general
+> area partitions in the device. The contents of this register are read only if 
+> the HS_CTRL_REL is 0 in
+> the WR_REL_PARAM extended CSD register. The default value of these bits is not 
+> specified and is
+> determined by the device.
+> 
+> 
+> it goes on with:
+> 
+> Bit[4]: WR_DATA_REL_4
+> 0x0: In general purpose partition 4, the write operation has been optimized 
+> for performance and existing data in the partition could be at risk if a power
+> failure occurs.
+>
+> 0x1: In general purpose partition 4, the device protects previously written 
+> data if power failure occurs during a write operation.
 
-Well, as far as I can tell, on Zaurus this is all done within the platform
-->enter() callback, so it doesn't carry out the device resume, while the
-proposed $subject patch does.  For this reason, I'm not even sure if the
-proposed approach is really suitable for Zaurus (the resuming and suspending
-of all devices every once a while will cost quite some enery I guess).
+Hmm...  It all hinges on whether "previously written data" refers just
+to the region being overwritten, or to all the other data in the
+partition?
 
-Still, in the unlikely case it is suitable, here's my opinion.
+If MMC writes are specified to only affect the data being written with
+a Write command, and to have stably committed the data when Write
+returns, then "Reliable Write" just means "atomic", and filesystems
+and databases don't actually need that.
 
-I don't think syscore_ops is the right place to put the new "suspend
-again" callback for reasons stated previously.
+Hard disks don't guarantee that, and it's not a problem.  Filesystems
+and databases need barriers and/or durable (stable) commits, and for
+writes in one area not to corrupt data in a different area.
 
-I also don't think dev_pm_ops is the right place to put such a callback,
-because it will only be necessary on very few platforms and there's no
-reason why every driver, subsystem or power domain in the kernel should care.
+*That's* a problem with other flash devices (and possibly some RAIDs):
+Writes to one area can corrupt data in sectors that aren't being
+written to, over quite a large distance.
 
-Moreover, the usage cases appear to be suspend-specific.
+I can't tell from the above specification excerpt (by itself) what is
+being guaranteed; it seems ambiguous, but maybe there's a clearer
+definition elsewhere.
 
-For the above reasons, the only place the "suspend again" callback may be
-put into is struct platform_suspend_ops.  Then, suspend_devices_and_enter()
-may be modified so that it loops between dpm_suspend_start() and
-dpm_suspend_end() until that callback returns "false" and there are no
-wakeup events (as indicated by pm_wakeup_pending(); but please note that
-this would require suspend_enter() to indicate that pm_wakeup_pending()
-returned "true" and events_check_enabled should not be reset until
-we're sure that we _really_ want to resume).
+It is conceivable that checksums and metadata could be stored into a
+"reliable" partition and some kinds of file data into an "unreliable"
+partition, where filesystem integrity is important and nobody cares
+about the actual data! :-)
 
-Alternatively, if that's sufficient, suspend_enter() may be called in a
-loop until the "suspend again" callback returns "false" and there are no
-wakeup events (in the above sense).
-
-The callback can be called "repeat" and return bool as far as I'm concerned,
-but I'm not insisting on that.
-
-MyungJoo, would that be suitable to you?
-
-Rafael
+-- Jamie
