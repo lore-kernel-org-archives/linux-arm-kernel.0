@@ -1,36 +1,23 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Tue, 26 Apr 2011 09:26:26 -0700
-Subject: [PM8921 MFD V5 5/6] MAINTAINERS: Add patterns for pmic 8921 files
-	to MSM subsystem
-In-Reply-To: <1302039657-19395-6-git-send-email-adharmap@codeaurora.org>
-	(Abhijeet Dharmapurikar's message of "Tue, 5 Apr 2011 14:40:56 -0700")
+Date: Tue, 26 Apr 2011 09:27:12 -0700
+Subject: [PM8921 MFD V5 0/6] pm8921 core and subdevices
+In-Reply-To: <20110426150746.GF3175@sortiz-mobl> (Samuel Ortiz's message of
+	"Tue, 26 Apr 2011 17:07:47 +0200")
 References: <1302039657-19395-1-git-send-email-adharmap@codeaurora.org>
-	<1302039657-19395-6-git-send-email-adharmap@codeaurora.org>
-Message-ID: <8yay62x6kst.fsf@huya.qualcomm.com>
+	<20110426150746.GF3175@sortiz-mobl>
+Message-ID: <8yatydl6krj.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05 2011, Abhijeet Dharmapurikar wrote:
+On Tue, Apr 26 2011, Samuel Ortiz wrote:
 
-> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> ---
->  MAINTAINERS |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6b4b9cd..b9db68b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -916,6 +916,8 @@ F:	drivers/mmc/host/msm_sdcc.h
->  F:	drivers/tty/serial/msm_serial.h
->  F:	drivers/tty/serial/msm_serial.c
->  F:	drivers/platform/msm/
-> +F:	drivers/*/pm8???-*
-> +F:	include/linux/mfd/pm8xxx/
->  T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
->  S:	Maintained
+> I have applied patch #1 and #2 to my for-next branch. For 3 and4, I'll wait
+> for Grant's ACK. As for #5, I'd like to get an ACK from the current MSM
+> maintainers.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+I've replied to that patch with an Ack.
+
+David
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
