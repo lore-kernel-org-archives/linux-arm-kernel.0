@@ -1,35 +1,31 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 26 Apr 2011 19:04:45 +0200
-Subject: Status of arch/arm in linux-next
-In-Reply-To: <201104261605.26791.arnd@arndb.de>
-References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104211629300.24613@xanadu.home>
-	<201104261605.26791.arnd@arndb.de>
-Message-ID: <201104261904.45923.rjw@sisk.pl>
+Date: Tue, 26 Apr 2011 19:14:13 +0200
+Subject: [PATCH 11/14] PM / AVR32: Use struct syscore_ops instead of
+	sysdevs for PM
+In-Reply-To: <1303820532.3125.12.camel@hcegtvedt>
+References: <201103280125.11750.rjw@sisk.pl> <201104172313.09712.rjw@sisk.pl>
+	<1303820532.3125.12.camel@hcegtvedt>
+Message-ID: <201104261914.14351.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 26, 2011, Arnd Bergmann wrote:
-> On Thursday 21 April 2011, Nicolas Pitre wrote:
-> > > if there's commonality between some of the ARM arch drivers, why can't
-> > > there be a arch/arm/cpufreq/ dir for the shared code, and do everything there ?
+On Tuesday, April 26, 2011, Hans-Christian Egtvedt wrote:
+> On Sun, 2011-04-17 at 23:13 +0200, Rafael J. Wysocki wrote:
+> > From: Rafael J. Wysocki <rjw@sisk.pl>
 > > 
-> > Because usually there isn't.  "ARM" is just a CPU architecture, not a 
-> > system architecture.  Everything around the core is different from one 
-> > vendor to the next.  And when commonality exists it is much easier to 
-> > deal with if it is close together.
+> > Convert some AVR32 architecture's code to using struct syscore_ops
+> > objects for power management instead of sysdev classes and sysdevs.
+> > 
+> > This simplifies the code and reduces the kernel's memory footprint.
+> > It also is necessary for removing sysdevs from the kernel entirely in
+> > the future.
+> > 
+> > Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 > 
-> Exactly. To make matters worse, we are starting to see a number of vendors
-> that use multiple CPU architectures with the same I/O devices (e.g. Renesas,
-> Freescale, Xilinx, TI, ...). Not sure if any of these use the same cpufreq
-> register on more than one architecture, but it's quite likely to happen
-> at some point.
+> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+> 
+> Thanks, nice work. Tested and run on hardware.
 
-Indeed.  So in my opinion it makes sense to move code into the drivers
-directory, at least the code that's going to be used by multiple platforms
-(that need not be a complete driver).
+Thanks!
 
-We're doing the same thing with the runtime PM code at the moment.
-
-Thanks,
 Rafael
