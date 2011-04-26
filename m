@@ -1,32 +1,102 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Tue, 26 Apr 2011 18:59:50 +0530
-Subject: [PATCH v16 01/13] davinci vpbe: V4L2 display driver for DM644X SoC
-In-Reply-To: <4DB6682F.2010109@gmail.com>
-References: <1301737249-4012-1-git-send-email-manjunath.hadli@ti.com>,
-	<4DB6682F.2010109@gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BBC5CAC@dbde02.ent.ti.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Tue, 26 Apr 2011 08:45:07 -0500
+Subject: [PATCH 2/2] arm: omap: gpmc-smsc911x: minor style fixes
+In-Reply-To: <1303397412-24813-2-git-send-email-grinberg@compulab.co.il>
+References: <1303397412-24813-1-git-send-email-grinberg@compulab.co.il>
+	<1303397412-24813-2-git-send-email-grinberg@compulab.co.il>
+Message-ID: <BANLkTikw73F1RBmJC=+Z2msA3Wr7gG3AGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
-  Davinci family of devices consist of mainly Dm6446, Dm6467, Dm365, Dm355 which are dissimilar to OMAP devices in features and registers, and some (for ex Dm6467) in entire architecture. the current driver which you are seeing is DM6446, but the intent is to build-up the same code with support for DM355 and dM365 which belong to the same family and have almost same features and registers. There is no plan to share code with OMAP directory.
+On Thu, Apr 21, 2011 at 09:50, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> replace "printk(KERN_ERR" by "pr_err("
+> and fix needlessly multi-lined #ifdef
+>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+> ?arch/arm/mach-omap2/gpmc-smsc911x.c ? ? ? ? ? ? | ? 14 +++++++-------
+> ?arch/arm/plat-omap/include/plat/gpmc-smsc911x.h | ? ?3 +--
+> ?2 files changed, 8 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> index d30293a..b45efff 100644
+> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
 
-Thanks and Regards,
--Manju
-________________________________________
-From: Vladimir Pantelic [vladoman at gmail.com]
-Sent: Tuesday, April 26, 2011 12:07 PM
-To: Hadli, Manjunath
-Cc: LMML; Kevin Hilman; LAK; Nori, Sekhar; dlos
-Subject: Re: [PATCH v16 01/13] davinci vpbe: V4L2 display driver for DM644X SoC
+minor suggestion: wont using pr_fmt help to reduce the need to add %s,
+__func__ for pr_err through out the file?
 
-Manjunath Hadli wrote:
-> This is the display driver for Texas Instruments's DM644X family
-> SoC. This patch contains the main implementation of the driver with the
-> V4L2 interface. The driver implements the streaming model with
-> support for both kernel allocated buffers and user pointers. It also
-> implements all of the necessary IOCTLs necessary and supported by the
-> video display device.
+Regards,
+Nishanth Menon
 
-is there any hope/chance to make this share code with the omap v4l2
-driver in drivers/media/video/omap?
+
+
+> @@ -55,7 +55,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?gpmc_cfg = board_data;
+>
+> ? ? ? ?if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPMC mem for smsc911x\n");
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request GPMC mem region\n", __func__);
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+>
+> @@ -63,8 +63,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?gpmc_smsc911x_resources[0].end = cs_mem_base + 0xff;
+>
+> ? ? ? ?if (gpio_request(gpmc_cfg->gpio_irq, "smsc911x irq") < 0) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_irq);
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request IRQ GPIO%d\n", __func__,
+> + ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_irq);
+> ? ? ? ? ? ? ? ?goto free1;
+> ? ? ? ?}
+>
+> @@ -74,8 +74,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ?if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
+> ? ? ? ? ? ? ? ?ret = gpio_request(gpmc_cfg->gpio_reset, "smsc911x reset");
+> ? ? ? ? ? ? ? ?if (ret) {
+> - ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO%d for smsc911x reset\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpmc_cfg->gpio_reset);
+> + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to request reset GPIO%d\n", __func__,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpmc_cfg->gpio_reset);
+> ? ? ? ? ? ? ? ? ? ? ? ?goto free2;
+> ? ? ? ? ? ? ? ?}
+>
+> @@ -92,7 +92,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> ? ? ? ? ? ? ? ? gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
+> ? ? ? ? ? ? ? ? &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
+> ? ? ? ?if (!pdev) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "Unable to register smsc911x device\n");
+> + ? ? ? ? ? ? ? pr_err("%s: Unable to register platform device\n", __func__);
+> ? ? ? ? ? ? ? ?gpio_free(gpmc_cfg->gpio_reset);
+> ? ? ? ? ? ? ? ?goto free2;
+> ? ? ? ?}
+> @@ -104,5 +104,5 @@ free2:
+> ?free1:
+> ? ? ? ?gpmc_cs_free(gpmc_cfg->cs);
+>
+> - ? ? ? printk(KERN_ERR "Could not initialize smsc911x\n");
+> + ? ? ? pr_err("Could not initialize smsc911x\n");
+> ?}
+> diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> index d3f1579..ea6c9c8 100644
+> --- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> +++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+> @@ -21,8 +21,7 @@ struct omap_smsc911x_platform_data {
+> ? ? ? ?u32 ? ? flags;
+> ?};
+>
+> -#if defined(CONFIG_SMSC911X) || \
+> - ? ? ? defined(CONFIG_SMSC911X_MODULE)
+> +#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+>
+> ?extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
+>
+> --
+> 1.7.3.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
