@@ -1,57 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Apr 2011 16:23:45 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <201104261610.15481.arnd@arndb.de>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104211618.31418.arnd@arndb.de>
-	<000001cc00bf$a3afc220$eb0f4660$%szyprowski@samsung.com>
-	<201104261610.15481.arnd@arndb.de>
-Message-ID: <003e01cc041d$8d3d76c0$a7b86440$%szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Apr 2011 16:26:19 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110421130930.4be9e9e1@jbarnes-desktop>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110421130930.4be9e9e1@jbarnes-desktop>
+Message-ID: <201104261626.20152.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, April 26, 2011 4:10 PM Arnd Bergmann wrote:
-
-> On Friday 22 April 2011, Marek Szyprowski wrote:
-> > > * Create two codec devices in parallel and bind to both with your
-> > >   driver, ideally splitting up the resources between the two
-> > >   devices in a meaningful way.
-> >
-> > Video codec has only standard 2 resources - ioregs and irq, so there
-> > is not much left for such splitting.
+On Thursday 21 April 2011, Jesse Barnes wrote:
+> On Thu, 21 Apr 2011 21:29:16 +0200
+> Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Ok, I see.
+> > I think the recent discussions on linaro-mm-sig and the BoF last week
+> > at ELC have been quite productive, and at least my understanding
+> > of the missing pieces has improved quite a bit. This is a list of
+> > things that I think need to be done in the kernel. Please complain
+> > if any of these still seem controversial:
+> > 
+> > 1. Fix the arm version of dma_alloc_coherent. It's in use today and
+> >    is broken on modern CPUs because it results in both cached and
+> >    uncached mappings. Rebecca suggested different approaches how to
+> >    get there.
+> > 
+> > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> >    that this is needed, and it currently is not implemented, with
+> >    an outdated comment explaining why it used to not be possible
+> >    to do it.
+> > 
+> > 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
+> >    both IOMMU and direct mapped DMA on some machines.
 > 
-> > > None of them are extremely nice, but it's not that hard either.
-> > > You should probably prototype a few of these approaches to see
-> > > which one is the least ugly one.
-> >
-> > Ok. Today while iterating over the hardware requirements I noticed
-> > one more thing. Our codec hardware has one more, odd requirement for
-> > video buffers. The DMA addresses need to be aligned to 8KiB or 16KiB
-> > (depending on buffer type). Do you have any idea how this can be
-> > handled in a generic way?
+> I don't think the DMA mapping and allocation APIs are sufficient for
+> high performance graphics at least.  It's fairly common to allocate a
+> bunch of buffers necessary to render a scene, build up a command buffer
+> that references them, then hand the whole thing off to the kernel to
+> execute at once on the GPU.  That allows for a lot of extra efficiency,
+> since it allows you to batch the MMU binding until execution occurs (or
+> even put it off entirely until the page is referenced by the GPU in the
+> case of faulting support).  It's also necessary to avoid livelocks
+> between two clients trying to render; if mapping is incremental on both
+> sides, it's possible that neither will be able to make forward
+> progress due to IOMMU space exhaustion.
 > 
-> I don't think you can force the mappings to be aligned to that size
-> in the streaming mapping, but you should be able to just align inside
-> of dma_map_single etc and map a larger region.
-> 
-> For the allocation functions (dma_alloc_coherent, dma_alloc_noncoherent),
-> using alloc_pages to allocate multiples of the size you need should
-> always give you aligned buffers because of the way that the underlying
-> buddy allocator works.
+> So that argues for separating allocation from mapping both on the user
+> side (which I think everyone agrees on) as well as on the kernel side,
+> both for CPU access (which some drivers won't need) and for GPU access.
 
-Well, I thought about the alignment of the IOVA mapping. I will probably
-handle it with some additional archdata stuff.
+I don't thing that this argument has anything to do with what the
+underlying API should be, right? I can see this built on top of either
+the dma-mapping headers with extensions to map potentially uncached
+pages, and with the iommu API. Neither way would however save us from
+implementing the three items listed above.
 
-I've started hacking ARM dma-mapping interface to get support for 
-dma-mapping-common.h and then to integrate with Samsung IOMMU driver.
-I hope to post the initial version before Linaro meeting in Budapest.
+It's certainly a good point to note that we should have a way to
+allocate pages for a device without mapping them into any address
+space right away. My feeling is still that the dma mapping API is
+the right place for this, because it is the only part of the kernel
+that has knowledge about whether a device needs uncached memory for
+coherent access, under what constraints it can map noncontiguous
+memory into its own address space, and what its addressing capabilities
+are (dma mask).
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+	Arnd
