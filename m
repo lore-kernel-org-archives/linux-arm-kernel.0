@@ -1,54 +1,32 @@
-From: david.vrabel@csr.com (David Vrabel)
-Date: Tue, 26 Apr 2011 14:29:03 +0100
-Subject: [PATCH v2 01/12] mmc: add none blocking mmc request function
-In-Reply-To: <BANLkTimaTe0qD5sbEJj88YRv2DZv=1oxTQ@mail.gmail.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>	<1302116833-24540-2-git-send-email-per.forlin@linaro.org>	<4DA81F42.3070208@csr.com>
-	<BANLkTimaTe0qD5sbEJj88YRv2DZv=1oxTQ@mail.gmail.com>
-Message-ID: <4DB6C89F.10903@csr.com>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Tue, 26 Apr 2011 18:59:50 +0530
+Subject: [PATCH v16 01/13] davinci vpbe: V4L2 display driver for DM644X SoC
+In-Reply-To: <4DB6682F.2010109@gmail.com>
+References: <1301737249-4012-1-git-send-email-manjunath.hadli@ti.com>,
+	<4DB6682F.2010109@gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BBC5CAC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/11 08:17, Per Forlin wrote:
-> 
->> Using a MMC request queue has other benefits -- it allows multiple users
->> without having to claim/release the host.  This would be useful for
->> (especially multi-function) SDIO.
->
-> You mean claim and release would be done only within the mmc core. The
-> timed saved here would equal the time it takes to release and claim
-> the host.
-> Claim and release can also be used for power management to indicate if
-> any client is using the host, if not the power can be switched off.
+Hello Vladimir,
+  Davinci family of devices consist of mainly Dm6446, Dm6467, Dm365, Dm355 which are dissimilar to OMAP devices in features and registers, and some (for ex Dm6467) in entire architecture. the current driver which you are seeing is DM6446, but the intent is to build-up the same code with support for DM355 and dM365 which belong to the same family and have almost same features and registers. There is no plan to share code with OMAP directory.
 
-Isn't there a separate runtime power management API that different from
-claim/release?
+Thanks and Regards,
+-Manju
+________________________________________
+From: Vladimir Pantelic [vladoman at gmail.com]
+Sent: Tuesday, April 26, 2011 12:07 PM
+To: Hadli, Manjunath
+Cc: LMML; Kevin Hilman; LAK; Nori, Sekhar; dlos
+Subject: Re: [PATCH v16 01/13] davinci vpbe: V4L2 display driver for DM644X SoC
 
-> I just want to make sure I understand the multi-function SDIO case, I
-> haven't done any work with SDIO.
-> Can the SDIO functions compete over the same claim_host at the same time?
-> Example: if function 1 claims the host, function 2 and function 3 also
-> want to claim the host but have to wait for function 1 to release the
-> host.
+Manjunath Hadli wrote:
+> This is the display driver for Texas Instruments's DM644X family
+> SoC. This patch contains the main implementation of the driver with the
+> V4L2 interface. The driver implements the streaming model with
+> support for both kernel allocated buffers and user pointers. It also
+> implements all of the necessary IOCTLs necessary and supported by the
+> video display device.
 
-This is the case.   Each function driver has to claim exclusive access
-to the host.
-
-> What is the extra benefit of having the internal request queue for
-> multi function SDIO?
-
-It reduces the delays between commands if multiple drivers are sending
-commands.  I estimated performance improvements with 2-3% from just
-removing the need to claim/release in one particular SDIO function
-driver.  Performance improvements for multi-function cards would be a
-bit more (5% perhaps?).
-
-The more important benefit is the simplification of the API.
-
-David
--- 
-David Vrabel, Senior Software Engineer, Drivers
-CSR, Churchill House, Cambridge Business Park,  Tel: +44 (0)1223 692562
-Cowley Road, Cambridge, CB4 0WZ                 http://www.csr.com/
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+is there any hope/chance to make this share code with the omap v4l2
+driver in drivers/media/video/omap?
