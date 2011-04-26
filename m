@@ -1,48 +1,26 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 26 Apr 2011 15:24:09 -0500
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-	<20110418135243.GB1479@ucw.cz>
-	<20110418170752.GQ16019@shareable.org>
-	<20110422154344.GA7526@ucw.cz>
-	<BANLkTimZZEr8fqXbuBjpYxF1quBFv7Oihg@mail.gmail.com>
-	<BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
-Message-ID: <BANLkTi=Zn+kDfErZN6tm6yxHTt4v6o7XNw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Apr 2011 21:30:44 +0100
+Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with
+	irqsave variants
+In-Reply-To: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+Message-ID: <20110426203044.GA17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+On Mon, Apr 18, 2011 at 04:19:59PM +0530, Viresh Kumar wrote:
+>  static struct dw_desc *dwc_desc_get(struct dw_dma_chan *dwc)
+>  {
+> +	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
+>  	struct dw_desc *desc, *_desc;
+>  	struct dw_desc *ret = NULL;
+>  	unsigned int i = 0;
+>  
+> -	spin_lock_bh(&dwc->lock);
+> +	spin_lock_irqsave(&dwc->lock, dw->flags);
 
-On Tue, Apr 26, 2011 at 5:33 AM, Per Forlin <per.forlin@linaro.org> wrote:
-> On 23 April 2011 11:23, Linus Walleij <linus.walleij@linaro.org> wrote:
->> 2011/4/22 Pavel Machek <pavel@ucw.cz>:
->>
->>> Plus, I was told new MMC standard has "write reliable" option...
->>
->> I think Per F?rlin looked into reliable write. The latest eMMC cards
->> has this, but OTOMH it was too darn slow to be used on current
->> chips/"cards".
->>
->> Per, Sebastian: any details?
-> I had plans to add reliable writes and do benchmarking but I never got
-> to it. Right now I have no plans to pick it up.
->
->>
+It's a very bad idea to store the IRQ flags like this - it means that
+another thread operating on this corrupts this threads interrupt flag
+settings.
 
-Reliable writes are in mmc-next already. As an improvement to that
-path, I have a CMD23-bounded request support patch set which is
-pending.
-
-Reliable writes are exposed via REQ_FUA.
-
-Keep in mind that flash cards don't have a volatile cache, so once an
-MMC transaction goes through the data is in flash. All reliable writes
-guarantee is flash state if an MMC transaction is interrupted in the
-middle. Additionally, the "new" reliable write (as opposed to legacy)
-is even less useful, since it only provides that guarantee at a sector
-boundary.
-
-A
+It should be a local variable.
