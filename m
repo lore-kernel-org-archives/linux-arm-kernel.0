@@ -1,42 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Apr 2011 16:10:15 +0200
-Subject: [PATCH 2/7] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
-	driver
-In-Reply-To: <000001cc00bf$a3afc220$eb0f4660$%szyprowski@samsung.com>
-References: <1303118804-5575-1-git-send-email-m.szyprowski@samsung.com>
-	<201104211618.31418.arnd@arndb.de>
-	<000001cc00bf$a3afc220$eb0f4660$%szyprowski@samsung.com>
-Message-ID: <201104261610.15481.arnd@arndb.de>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 26 Apr 2011 16:22:12 +0200
+Subject: [PATCH v2 01/12] mmc: add none blocking mmc request function
+In-Reply-To: <4DB6C89F.10903@csr.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302116833-24540-2-git-send-email-per.forlin@linaro.org>
+	<4DA81F42.3070208@csr.com>
+	<BANLkTimaTe0qD5sbEJj88YRv2DZv=1oxTQ@mail.gmail.com>
+	<4DB6C89F.10903@csr.com>
+Message-ID: <BANLkTinVL7NJpgGF0KZAdmqgyu2pXyKFkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 April 2011, Marek Szyprowski wrote:
-> > * Create two codec devices in parallel and bind to both with your
-> >   driver, ideally splitting up the resources between the two
-> >   devices in a meaningful way.
-> 
-> Video codec has only standard 2 resources - ioregs and irq, so there
-> is not much left for such splitting.
+On 26 April 2011 15:29, David Vrabel <david.vrabel@csr.com> wrote:
+> On 20/04/11 08:17, Per Forlin wrote:
+>>
+>>> Using a MMC request queue has other benefits -- it allows multiple users
+>>> without having to claim/release the host. ?This would be useful for
+>>> (especially multi-function) SDIO.
+>>
+>> You mean claim and release would be done only within the mmc core. The
+>> timed saved here would equal the time it takes to release and claim
+>> the host.
+>> Claim and release can also be used for power management to indicate if
+>> any client is using the host, if not the power can be switched off.
+>
+> Isn't there a separate runtime power management API that different from
+> claim/release?
+>
+I misunderstood. I thought you meant that the claim() and release()
+were not needed if having an internal request queue in core.c.
+Please discard my comment.
 
-Ok, I see.
+>> I just want to make sure I understand the multi-function SDIO case, I
+>> haven't done any work with SDIO.
+>> Can the SDIO functions compete over the same claim_host at the same time?
+>> Example: if function 1 claims the host, function 2 and function 3 also
+>> want to claim the host but have to wait for function 1 to release the
+>> host.
+>
+> This is the case. ? Each function driver has to claim exclusive access
+> to the host.
+>
+>> What is the extra benefit of having the internal request queue for
+>> multi function SDIO?
+>
+> It reduces the delays between commands if multiple drivers are sending
+> commands. ?I estimated performance improvements with 2-3% from just
+> removing the need to claim/release in one particular SDIO function
+> driver. ?Performance improvements for multi-function cards would be a
+> bit more (5% perhaps?).
+>
+Your estimates are promising.
 
-> > None of them are extremely nice, but it's not that hard either.
-> > You should probably prototype a few of these approaches to see
-> > which one is the least ugly one.
-> 
-> Ok. Today while iterating over the hardware requirements I noticed
-> one more thing. Our codec hardware has one more, odd requirement for
-> video buffers. The DMA addresses need to be aligned to 8KiB or 16KiB
-> (depending on buffer type). Do you have any idea how this can be
-> handled in a generic way?
+> The more important benefit is the simplification of the API.
+I agree. I will make a prototype for this. I don't think I will be
+able to find time for this until middle of May. I let know you when I
+have patches.
 
-I don't think you can force the mappings to be aligned to that size
-in the streaming mapping, but you should be able to just align inside
-of dma_map_single etc and map a larger region.
-
-For the allocation functions (dma_alloc_coherent, dma_alloc_noncoherent),
-using alloc_pages to allocate multiples of the size you need should
-always give you aligned buffers because of the way that the underlying
-buddy allocator works.
-
-	Arnd
+>
+> David
+Thanks,
+Per
