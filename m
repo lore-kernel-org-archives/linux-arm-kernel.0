@@ -1,34 +1,55 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Apr 2011 11:50:54 +0300
-Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource
-	based sched_clock
-In-Reply-To: <BANLkTim9BaWLDCnSzeD-kjFwF+c+37KRjQ@mail.gmail.com>
-References: <20110423205036.795894921@linutronix.de>
-	<BANLkTi=5Uz_TNKOiJKDn7Mh30fxv3aY67Q@mail.gmail.com>
-	<1303758649.2816.57.camel@work-vm>
-	<BANLkTim9BaWLDCnSzeD-kjFwF+c+37KRjQ@mail.gmail.com>
-Message-ID: <20110426085053.GH16892@atomide.com>
+Date: Tue, 26 Apr 2011 11:57:00 +0300
+Subject: [PATCH] ARM: Fix relocation if image end past uncompressed
+	kernel end
+In-Reply-To: <alpine.LFD.2.00.1104220959440.24613@xanadu.home>
+References: <alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
+	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
+	<20110422062843.GA841@atomide.com>
+	<alpine.LFD.2.00.1104220959440.24613@xanadu.home>
+Message-ID: <20110426085700.GJ16892@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [110426 10:41]:
-> 2011/4/25 john stultz <johnstul@us.ibm.com>:
-> > On Sun, 2011-04-24 at 09:27 +0200, Linus Walleij wrote:
-> >> Any reason why we can't simply move *all* of these to
-> >> drivers/clocksource/* and proceed with consolidation there?
-> >
-> > This gives me some pause, as having the clocksources in the platform
-> > code makes it easier to know what platform needs to be tested when a
-> > change is made. The rule so far has been if more then one arch can make
-> > use of it, it should be moved to the drivers/clocksource dir. Otherwise,
-> > leave it close to any arch specific code that manages the hardware.
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110422 17:08]:
+> On Thu, 21 Apr 2011, Tony Lindgren wrote:
 > 
-> That means that by definition anything in a plat-* directory, say e.g.
-> plat-nomadik/timer.c and plat-omap/dmtimer.c should go into
-> drivers/clocksource I believe?
+> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110421 20:20]:
+> > > I found the bugger.  The problem was a bad stack alignment.
+> > 
+> > .. as this patch won't solve the n900 booting problem with zImage.
+> > With LZMA I'm still also getting "LZMA data is corrupt".
+> 
+> Hmmm......
+> 
+> Is it possible you have bad RAM?  In compressed/head.S, locate this 
+> code:
 
-Or drivers/timers as they may be generic hardware timers? They are
-not necessarily used for clocksource.
+This is happening on all n900 boards AFAIK.
+ 
+> #ifdef CONFIG_AUTO_ZRELADDR
+>                 @ determine final kernel image address
+>                 mov     r4, pc
+>                 and     r4, r4, #0xf8000000
+>                 add     r4, r4, #TEXT_OFFSET
+> #else
+>                 ldr     r4, =zreladdr
+> #endif
+> 
+> Right after that, simply override r4 with a physical address towards the 
+> end of the RAM, say 8MB before end of RAM (unless your decompressed 
+> kernel is larger than that).  That won't make a booting system, but at 
+> least you will be able to test the decompressor when loaded at various 
+> locations in memory without involving the relocation loop.
+
+OK thanks, I'll take a look. I guess it could also be a cache flush
+issue or borderline memory timings set in the bootloader.
 
 Regards,
 
