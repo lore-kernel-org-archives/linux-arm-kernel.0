@@ -1,25 +1,31 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Tue, 26 Apr 2011 17:32:50 +0530
-Subject: [PATCH 11/15] OMAP: GPIO: convert MPUIO IRQ over to generic
-	irq_chip
-In-Reply-To: <1303513327-14532-12-git-send-email-khilman@ti.com>
-References: <1303513327-14532-1-git-send-email-khilman@ti.com>
-	<1303513327-14532-12-git-send-email-khilman@ti.com>
-Message-ID: <BANLkTinsqVCu+iKePkKK3G-MDQEm6UDd6A@mail.gmail.com>
+From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
+Date: Tue, 26 Apr 2011 14:22:12 +0200
+Subject: [PATCH 11/14] PM / AVR32: Use struct syscore_ops instead of
+	sysdevs for PM
+In-Reply-To: <201104172313.09712.rjw@sisk.pl>
+References: <201103280125.11750.rjw@sisk.pl>
+	<201104172301.54115.rjw@sisk.pl>  <201104172313.09712.rjw@sisk.pl>
+Message-ID: <1303820532.3125.12.camel@hcegtvedt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On Sun, 2011-04-17 at 23:13 +0200, Rafael J. Wysocki wrote:
+> From: Rafael J. Wysocki <rjw@sisk.pl>
+> 
+> Convert some AVR32 architecture's code to using struct syscore_ops
+> objects for power management instead of sysdev classes and sysdevs.
+> 
+> This simplifies the code and reduces the kernel's memory footprint.
+> It also is necessary for removing sysdevs from the kernel entirely in
+> the future.
+> 
+> Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
 
-On Sat, Apr 23, 2011 at 04:32, Kevin Hilman <khilman@ti.com> wrote:
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> ?arch/arm/plat-omap/gpio.c | ? 74 ++++++++++++++++++--------------------------
-> ?1 files changed, 30 insertions(+), 44 deletions(-)
->
+Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
 
-Patch description is missing.
+Thanks, nice work. Tested and run on hardware.
 
--V Charulatha
+<snipp>
 
-<<snip>>
+-- 
+Hans-Christian Egtvedt
