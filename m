@@ -1,49 +1,56 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 27 Apr 2011 15:12:04 -0700
-Subject: [PATCH] clkdev: add support to lookup for early platform device
-In-Reply-To: <20110427150057.GH29103@game.jcrosoft.org>
-References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110427084247.GK17290@n2100.arm.linux.org.uk>
-	<20110427103145.GF29103@game.jcrosoft.org>
-	<20110427104758.GG29103@game.jcrosoft.org>
-	<20110427150057.GH29103@game.jcrosoft.org>
-Message-ID: <20110427221204.GC12787@suse.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Apr 2011 18:16:09 -0400 (EDT)
+Subject: [PATCH] ARM: Fix relocation if image end past uncompressed kernel
+	end
+In-Reply-To: <20110427125631.GF3755@atomide.com>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110420072156.GA28679@atomide.com>
+	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<20110427124726.GE3755@atomide.com>
+	<20110427125631.GF3755@atomide.com>
+Message-ID: <alpine.LFD.2.00.1104271810450.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 05:00:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 12:47 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 12:31 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 09:42 Wed 27 Apr     , Russell King - ARM Linux wrote:
-> > > > On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > early platform device may do not have a device name as the slab is not yet
-> > > > > available. So to search a clock base on the dev_id we need to search first the
-> > > > > device base name and then the id
-> > > > 
-> > > > I really don't like this.  IDs are platform device specific, and this is
-> > > > a platform devince independent layer.
-> > > > 
-> > > > If you want to do this, then add a platform_device_clk_get() call, which
-> > > > takes the platform device and connection id.  Uses the platform device
-> > > > infrastructure to format the device name, and use clk_get_sys() to look
-> > > > up the device/connection id from that.
-> > > I do not want to alloc a string in the clkdev
-> > > but if you prefer
-> > I check we can not do so
-> > if slab is not available we can not use kmalloc
+On Wed, 27 Apr 2011, Tony Lindgren wrote:
+
+> * Tony Lindgren <tony@atomide.com> [110427 05:44]:
+> > We can't overwrite the running code when relocating only a small amount,
+> > say 0x100 or so.
 > > 
-> > so we can not generate the dev.init_name
-> I check also we can not use the bootmem as it's too early in the init
-> so allocate the dev_id is not possible
+> > There's no need to relocate all the way past the compressed kernel,
+> > we just need to relocate past the size of the code in head.o.
+> > 
+> > Updated patch below using the GOT end instead of the compressed
+> > image end.
 > 
-> use a satic buffer I'm not so happy about it
-> the only other solution is this one
-> 
-> which Greg or you prefer
+> Oops, the mov should be movle of course. Updated patch below.
 
-I have no idea what you are asking, please be more specific, hopefully
-including a patch showing what you are referring to.
+This is wrong.  You're using r12 before it is fixed up with the 
+proper offset.
 
-thanks,
+And this could simply be fixed with a big enough constant like this:
 
-greg k-h
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 8dab5e3..71fc1d9 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -250,8 +250,11 @@ restart:	adr	r0, LC0
+  * Because we always copy ahead, we need to do it from the end and go
+  * backward in case the source and destination overlap.
+  */
+-		/* Round up to next 256-byte boundary. */
+-		add	r10, r10, #256
++		/*
++		 * Round to a 256-byte boundary on the next page. This
++		 * avoids overwriting ourself if the offset is small.
++		 */
++		add	r10, r10, #4096
+ 		bic	r10, r10, #255
+ 
+ 		sub	r9, r6, r5		@ size to copy
