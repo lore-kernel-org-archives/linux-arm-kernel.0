@@ -1,30 +1,28 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 15:49:52 +0530
-Subject: [PATCH v4 03/11] da850: pruss platform specific additions.
-In-Reply-To: <4DB7EA5E.7000507@mvista.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-4-git-send-email-subhasish@mistralsolutions.com>
-	<4DB6A736.3030609@mvista.com>
-	<0A4FA4CFE83C4DD4BA36491027E93552@subhasishg>
-	<4DB7EA5E.7000507@mvista.com>
-Message-ID: <FFF161AFDE56421C871D7E5457C0BE92@subhasishg>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 27 Apr 2011 12:31:45 +0200
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <20110427084247.GK17290@n2100.arm.linux.org.uk>
+References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110427084247.GK17290@n2100.arm.linux.org.uk>
+Message-ID: <20110427103145.GF29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> #include<mach/edma.h>
->>>> @@ -73,6 +75,7 @@ extern unsigned int da850_max_speed;
->>>> #define DA8XX_DDR2_CTL_BASE 0xb0000000
->>>> #define DA8XX_ARM_RAM_BASE 0xffff0000
->>>> #define DA8XX_SHARED_RAM_BASE 0x80000000
->>>> +#define DA8XX_PRUSS_MEM_BASE 0x01C30000
->
->>> Keep the list sorted please. Also, this macro doesn't seem used outside
->>> devices-da8xx.c, so should be moved there...
->
->> SG - But would it not be better to have all device addresses at the same 
->> place.
->
->    They are not at the same place already -- which is intentional. The 
-> ones used locally in devices-da8xx.c should be #define'd there.
+On 09:42 Wed 27 Apr     , Russell King - ARM Linux wrote:
+> On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > early platform device may do not have a device name as the slab is not yet
+> > available. So to search a clock base on the dev_id we need to search first the
+> > device base name and then the id
+> 
+> I really don't like this.  IDs are platform device specific, and this is
+> a platform devince independent layer.
+> 
+> If you want to do this, then add a platform_device_clk_get() call, which
+> takes the platform device and connection id.  Uses the platform device
+> infrastructure to format the device name, and use clk_get_sys() to look
+> up the device/connection id from that.
+I do not want to alloc a string in the clkdev
+but if you prefer
 
-SG -- Ok, Will do 
+Best Regards,
+J.
