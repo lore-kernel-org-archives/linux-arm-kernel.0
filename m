@@ -1,42 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Apr 2011 10:22:20 +0200
-Subject: [PATCH v4] [ARM] MX1: Add ARMadeus Systems APF9328 board support
-In-Reply-To: <1303842222-28209-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1303842222-28209-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20110427082220.GC31131@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2011 09:36:57 +0100
+Subject: [PATCH] ARM: tegra: consolidate GIC extension usage
+In-Reply-To: <1303297104-18887-1-git-send-email-marc.zyngier@arm.com>
+References: <1303297104-18887-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110427083657.GI17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2011 at 06:23:42PM +0000, Gwenhael Goavec-Merou wrote:
-> APF9328 is an i.MXL based SOM (System On Module) that can be plugged on
-> several docking/development boards. Here only basic module support
-> is added (Ethernet, Serial, NOR Flash).
+On Wed, Apr 20, 2011 at 11:58:24AM +0100, Marc Zyngier wrote:
+> Tegra uses its own GIC extension mechanism to drive another interrupt
+> controller, used as a wake-up source.
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
-> Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
-> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Move this functionality to the recently introduced gic_arch_extn.
+> Adding an eoi method also ensures that the knowledge of the interrupt
+> flow control is removed from the Tegra code.
 
-If someone else still has concerns some very minor comments for an
-eventual v5:
+A good follow-on step would be...
 
- - You could add a real name to the maintainer statement in the MACHINE
-   block;
- - you could substitute
+>  static void tegra_mask(struct irq_data *d)
+>  {
+> -	tegra_gic_mask_irq(d);
+>  	tegra_legacy_mask_irq(d->irq);
+>  }
 
-	(32 * 1024 * 1024)
+... arranging tegra_legacy_mask_irq() etc to take struct irq_data directly.
+These functions could then be removed entirely as they serve no useful
+purpose other than transforming the new API back to the old API.
 
-   by
+>  
+>  static void tegra_unmask(struct irq_data *d)
+>  {
+> -	tegra_gic_unmask_irq(d);
+>  	tegra_legacy_unmask_irq(d->irq);
+>  }
+>  
+>  static void tegra_ack(struct irq_data *d)
+>  {
+>  	tegra_legacy_force_irq_clr(d->irq);
+> -	tegra_gic_ack_irq(d);
+> +}
+> +
+> +static void tegra_eoi(struct irq_data *d)
+> +{
+> +	tegra_legacy_force_irq_clr(d->irq);
+>  }
+>  
+>  static int tegra_retrigger(struct irq_data *d)
+> @@ -125,36 +123,16 @@ static int tegra_retrigger(struct irq_data *d)
+>  	return 1;
+>  }
+>  
+> -static struct irq_chip tegra_irq = {
+> -	.name			= "PPI",
+> -	.irq_ack		= tegra_ack,
+> -	.irq_mask		= tegra_mask,
+> -	.irq_unmask		= tegra_unmask,
+> -	.irq_retrigger		= tegra_retrigger,
+> -};
+> -
+>  void __init tegra_init_irq(void)
+>  {
+> -	struct irq_chip *gic;
+> -	unsigned int i;
+> -	int irq;
+> -
+>  	tegra_init_legacy_irq();
+>  
+> +	gic_arch_extn.irq_eoi		= tegra_eoi;
+> +	gic_arch_extn.irq_ack		= tegra_ack;
+> +	gic_arch_extn.irq_mask		= tegra_mask;
+> +	gic_arch_extn.irq_unmask	= tegra_unmask;
+> +	gic_arch_extn.irq_retrigger	= tegra_retrigger;
 
-	SZ_32M
-
-   ;
-
-
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Hmm, gic_arch_extn should've been a pointer rather than a structure to avoid
+architectures repeatedly doing this kind of initialization...
