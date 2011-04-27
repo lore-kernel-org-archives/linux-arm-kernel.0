@@ -1,86 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 27 Apr 2011 12:16:19 +0900
-Subject: [PATCH] ARM: S3C64XX: Remove gpio-bank-X header files
-In-Reply-To: <4DB782BD.9020205@samsung.com>
-References: <1303465894-16870-1-git-send-email-jy0922.shim@samsung.com>
-	<052c01cc047a$5cb8d500$162a7f00$%kim@samsung.com>
-	<4DB782BD.9020205@samsung.com>
-Message-ID: <054301cc0489$82a27fa0$87e77ee0$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 27 Apr 2011 05:18:08 +0200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <4DB775A5.7030306@bluewatersys.com>
+References: <1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+	<4DB64DC3.70609@bluewatersys.com>
+	<20110426064216.GJ12904@game.jcrosoft.org>
+	<4DB7299D.80308@bluewatersys.com>
+	<20110426234514.GC29103@game.jcrosoft.org>
+	<4DB75FA8.10207@bluewatersys.com>
+	<20110427012707.GD29103@game.jcrosoft.org>
+	<4DB775A5.7030306@bluewatersys.com>
+Message-ID: <20110427031808.GE29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+On 13:47 Wed 27 Apr     , Ryan Mallon wrote:
+> On 04/27/2011 01:27 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>>
+> >>>> This way the cpu detection code is much clearer and easier to read and
+> >>>> only one set of __cpu_is macros are needed. The values for
+> >>>> ARCH_ID_AT91RM9200, etc can be moved into soc.c since they are not
+> >>>> needed elsewhere.
+> >>> This will never work you do not listen
+> >>>
+> >>> the DBUG is at DIFFERENT base address on the AT91
+> >>> you need to check them one by one
+> >>>
+> >>> I keep the structure to keep more imformation inside and do not want to be
+> >>> limited by a 32bit and complex encoding to maintain
+> >>>
+> >>> Best Regards,
+> >>> J.
+> >> You can only be running one machine at a time. Are you implying that
+> >> this change breaks at91_sys_read in such a way that it reads the wrong
+> >> registers? If so, then its definitely a NAK.
+> > Certernly not ALL of the current work is too allow in a UNIQUE kernel to have
+> > all the atmel inside and other vendors and boards in the same kernel
 > 
-> On 2011-04-27 ?? 10:27, Kukjin Kim wrote:
-> > Joonyoung Shim wrote:
-> >>
-> >> The gpio-bank-X header files of S3C64XX have defines which can be
-> >> substituted by more common API, so they can be removed. This is compile
-> >> tested only.
-> >>
-> >> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
-> >> ---
-> > Hi,
-> >
-> > Oh, great.
-> >
-> > I also tried to remove useless gpio header files :) and it is in my
-> dev/gpio
-> > branch. But I think, this is better.
-> > Anyway there are small comments.
-> >
-> > (snip)
-> >
-> >>   void s3c_pm_debug_smdkled(u32 set, u32 clear)
-> >>   {
-> >> -	unsigned long flags;
-> >> -	u32 reg;
-> >> -
-> >> -	local_irq_save(flags);
-> >> -	reg = __raw_readl(S3C64XX_GPNCON);
-> >> -	reg&= ~(S3C64XX_GPN_CONMASK(12) | S3C64XX_GPN_CONMASK(13) |
-> >> -		 S3C64XX_GPN_CONMASK(14) | S3C64XX_GPN_CONMASK(15));
-> >> -	reg |= S3C64XX_GPN_OUTPUT(12) | S3C64XX_GPN_OUTPUT(13) |
-> >> -	       S3C64XX_GPN_OUTPUT(14) | S3C64XX_GPN_OUTPUT(15);
-> >> -	__raw_writel(reg, S3C64XX_GPNCON);
-> >> -
-> >> -	reg = __raw_readl(S3C64XX_GPNDAT);
-> >> -	reg&= ~(clear<<  12);
-> >> -	reg |= set<<  12;
-> >> -	__raw_writel(reg, S3C64XX_GPNDAT);
-> >> -
-> >> -	local_irq_restore(flags);
-> >> +	int i;
-> >> +
-> >> +	for (i = 0; i<  4; i++) {
-> >> +		if (clear&  (1<<  i))
-> >> +			gpio_direction_output(S3C64XX_GPN(12 + i), 0);
-> >> +		if (set&  (1<<  i))
-> >> +			gpio_direction_output(S3C64XX_GPN(12 + i), 1);
-> >> +	}
-> >
-> > Hmm...
-> >
-> > According to comments in gpio_direction_{input,output}, it isn't called
-> more
-> > than once...but it can be called twice in your code. And need
-> > local_irq_{save,restore} around them.
-> >
-> 
-> OK, gpio_set_value will need here instead of gpio_diretion_output.
-> 
-> > So how about keeping old codes here? In addtion, as you know, need to keep
-> > definitions of S3C64XX_GPNxxx now :(
-> >
-> 
-> I won't keep old codes, it can replace fully.
-> 
-Ok, I agree with you :)
+> Agreed. At the moment we still have a situation where we can only
+> compile one at91 SoC variant into the kernel. So, at the moment, we do
+> not need to deal with the fact that the DBGU exists at different
+> locations, we can just read it for the board that we are booting on.
+This patch series goal is to allow to have a UNIQUE kernel so all the drivers
+and new code are write with this requirement
 
-Thanks.
+so no the double implementation is needed
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+no new code will accepted if it's does have this in considaration
+> 
+> What I am objecting to is adding two entire sets of cpu_is macros which
+> is just needless extra code with no benefit. We should determine the
+> cpu/SoC type _once_ inside a single function (at91_initialize) and the
+> the cpu_is macros should just read the shadow value. There is no reason
+> to have two sets of macros.
+Those two macro set does not have the same constrains
+
+cpu_is is to be soc agnostic
+__cpu_is is to be soc specific
+
+so yes they are needed
+
+and I'll update the __cpu_is soon so they will not use at91_sys_read anymore
+
+Best Regards,
+J.
