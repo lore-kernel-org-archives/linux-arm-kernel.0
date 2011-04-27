@@ -1,42 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Apr 2011 10:57:16 +0100
-Subject: [PATCH] ARM: perf: remove erroneous check on active_events
-Message-ID: <1303898236-14263-1-git-send-email-mark.rutland@arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 27 Apr 2011 14:05:18 +0400
+Subject: [PATCH v4 03/11] da850: pruss platform specific additions.
+In-Reply-To: <0A4FA4CFE83C4DD4BA36491027E93552@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-4-git-send-email-subhasish@mistralsolutions.com>
+	<4DB6A736.3030609@mvista.com>
+	<0A4FA4CFE83C4DD4BA36491027E93552@subhasishg>
+Message-ID: <4DB7EA5E.7000507@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When initialising a PMU, there is a check to protect against races with
-other CPUs filling all of the available event slots. Since armpmu_add
-checks that an event can be scheduled, we do not need to do this at
-initialisation time. Furthermore the current code is broken because it
-assumes that atomic_inc_not_zero will unconditionally increment
-active_counts and then tries to decrement it again on failure.
+Hello.
 
-This patch removes the broken, redundant code.
+On 27-04-2011 10:43, Subhasish Ghosh wrote:
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/kernel/perf_event.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+>>> #include<mach/edma.h>
+>>> @@ -73,6 +75,7 @@ extern unsigned int da850_max_speed;
+>>> #define DA8XX_DDR2_CTL_BASE 0xb0000000
+>>> #define DA8XX_ARM_RAM_BASE 0xffff0000
+>>> #define DA8XX_SHARED_RAM_BASE 0x80000000
+>>> +#define DA8XX_PRUSS_MEM_BASE 0x01C30000
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index fd6403c..29a0cf8 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -560,11 +560,6 @@ static int armpmu_event_init(struct perf_event *event)
- 	event->destroy = hw_perf_event_destroy;
- 
- 	if (!atomic_inc_not_zero(&active_events)) {
--		if (atomic_read(&active_events) > armpmu->num_events) {
--			atomic_dec(&active_events);
--			return -ENOSPC;
--		}
--
- 		mutex_lock(&pmu_reserve_mutex);
- 		if (atomic_read(&active_events) == 0) {
- 			err = armpmu_reserve_hardware();
--- 
-1.7.0.4
+>> Keep the list sorted please. Also, this macro doesn't seem used outside
+>> devices-da8xx.c, so should be moved there...
+
+> SG - But would it not be better to have all device addresses at the same place.
+
+    They are not at the same place already -- which is intentional. The ones 
+used locally in devices-da8xx.c should be #define'd there.
+
+WBR, Sergei
