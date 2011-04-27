@@ -1,39 +1,70 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 21:09:01 +0100
-Subject: cachepolicy on arm UP/SMP
-In-Reply-To: <BANLkTi=6t=iLNcWPCtOoDai50A5N9m08UQ@mail.gmail.com>
-References: <163eed8.b6ba.12f1441357c.Coremail.bill_carson@126.com>
-	<BANLkTi=6t=iLNcWPCtOoDai50A5N9m08UQ@mail.gmail.com>
-Message-ID: <20110427200901.GV17290@n2100.arm.linux.org.uk>
+Date: Wed, 27 Apr 2011 21:16:05 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104271302.44249.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104271056.49920.arnd@arndb.de>
+	<20110427090923.GO17290@n2100.arm.linux.org.uk>
+	<201104271302.44249.arnd@arndb.de>
+Message-ID: <20110427201605.GW17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 06:10:34PM +0100, Catalin Marinas wrote:
-> 2011/4/2 rocky <bill_carson@126.com>:
-> > I am a little confused about arm cachepolicy for UP/SMP.
-> >
-> > in arch/arm/mm/mmu.c
-> > for UP , default cache policy is CPOLICY_WRITEBACK;
-> > while for SMP, cache policy is overrided with? WRITEALLOC.
-> >
-> > why does SMP cannot use WRITEBACK?
-> > It is about coherency issue?
+On Wed, Apr 27, 2011 at 01:02:43PM +0200, Arnd Bergmann wrote:
+> On Wednesday 27 April 2011, Russell King - ARM Linux wrote:
+> > On Wed, Apr 27, 2011 at 10:56:49AM +0200, Arnd Bergmann wrote:
+> > > We probably still need to handle both the coherent and noncoherent case
+> > > in each dma_map_ops implementation, at least for those combinations where
+> > > they matter (definitely the linear mapping). However, I think that using
+> > > dma_mapping_common.h would let us use an architecture-independent dma_map_ops
+> > > for the generic iommu code that Marek wants to introduce now.
+> > 
+> > The 'do we have an iommu or not' question and the 'do we need to do cache
+> > coherency' question are two independent questions which are unrelated to
+> > each other.  There are four unique but equally valid combinations.
+> > 
+> > Pushing the cache coherency question down into the iommu stuff will mean
+> > that we'll constantly be fighting against the 'but this iommu works on x86'
+> > shite that we've fought with over block device crap for years.  I have
+> > no desire to go there.
 > 
-> Historical reasons I think because ARM11MPCore only supported WBWA
-> caches, though even if only WB configuration was set.
-> 
-> Note that WB or WBWA is just a hint and the processor is allowed to do
-> write allocation or ignore it. We could simply make both the same at
-> least on ARMv6+ hardware (and I'm more in favour of WBWA).
+> Ok, I see. I believe we could avoid having to fight with the people that
+> only care about coherent architectures if we just have two separate
+> implementations of dma_map_ops in the iommu code, one for coherent
+> and one for noncoherent DMA. Any architecture that only needs one
+> of them would then only enable the Kconfig options for that implementation
+> and not care about the other one.
 
-The WB vs WBWA argument is rather religious.  It really depends a lot on
-your workload.
+But then we have to invent yet another whole new API to deal with the
+cache coherency issues - which makes for more documentation, and eventually
+more abuse because it won't quite do what architectures want it to do,
+etc.
 
-While you can measure things like "ooh, it makes memcpy lots faster",
-that alone is not the full story - it may make memcpy faster, but if your
-application isn't about copying lots of data, but making random accesses,
-it could result in a net performance loss instead.
+> Yes, that sounds definitely possible. I guess it could be as simple
+> as having a flag somewhere in struct device if we want to make it
+> architecture independent.
 
-So, leaving things as-is (being the established status quo) is best.
-Those who have applications moving lots of data about without the
-benefits of zero copy can easily enable WBWA if they so choose.
+I was referring to a flag in the dma_ops to say whether the DMA ops
+implementation requires DMA cache coherency.  In the case of swiotlb,
+performing full DMA cache coherency is a pure waste of CPU cycles -
+and probably makes DMA much more expensive than merely switching back
+to using PIO.
+
+I'm really not interested in producing "generic" interfaces which end up
+throwing the baby out with the bath water when we already have a better
+implementation in place - even if the hardware sucks.  That's not
+forward progress as far as I'm concerned.
+
+> As for making the default being to do cache handling, I'm not completely
+> sure how that would work on architectures where most devices are coherent.
+> If I understood the DRM people correctly, some x86 machine have noncoherent
+> DMA in their GPUs while everything else is coherent.
+
+Well, it sounds like struct device needs a flag to indicate whether it is
+coherent or not - but exactly how this gets set seems to be architecture
+dependent.  I don't see bus or driver code being able to make the necessary
+decisions - eg, tulip driver on x86 would be coherent, but tulip driver on
+ARM would be non-coherent.
+
+Nevertheless, doing it on a per-device basis is definitely the right
+answer.
