@@ -1,38 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 09:39:47 +0100
-Subject: [PATCH v1 3/3]ARM: mmp: support mmc on pxa910 dkb board
-In-Reply-To: <BANLkTi=MitQ4R7CTcsrnrQU7wrh=sUWM5Q@mail.gmail.com>
-References: <BANLkTin1mbEnZcq53r26nJBfC5YTwK7f1A@mail.gmail.com>
-	<BANLkTi=MitQ4R7CTcsrnrQU7wrh=sUWM5Q@mail.gmail.com>
-Message-ID: <20110427083947.GJ17290@n2100.arm.linux.org.uk>
+Date: Wed, 27 Apr 2011 09:42:47 +0100
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110427084247.GK17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 06:44:39PM +0800, Eric Miao wrote:
-> > diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-> > index c8a85f1..718b87c 100644
-> > --- a/arch/arm/mach-mmp/ttc_dkb.c
-> > +++ b/arch/arm/mach-mmp/ttc_dkb.c
-> > @@ -17,6 +17,9 @@
-> > ?#include <linux/interrupt.h>
-> > ?#include <linux/regulator/machine.h>
-> > ?#include <linux/regulator/fixed.h>
-> > +#include <linux/mmc/sdhci.h>
-> > +#include <linux/gpio.h>
+On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> early platform device may do not have a device name as the slab is not yet
+> available. So to search a clock base on the dev_id we need to search first the
+> device base name and then the id
 
-Ok.
+I really don't like this.  IDs are platform device specific, and this is
+a platform devince independent layer.
 
-> > +#include <linux/err.h>
-> >
-> > ?#include <asm/mach-types.h>
-> > ?#include <asm/mach/arch.h>
-> > @@ -24,6 +27,7 @@
-> > ?#include <mach/addr-map.h>
-> > ?#include <mach/mfp-pxa910.h>
-> > ?#include <mach/pxa910.h>
-> > +#include <mach/gpio.h>
+If you want to do this, then add a platform_device_clk_get() call, which
+takes the platform device and connection id.  Uses the platform device
+infrastructure to format the device name, and use clk_get_sys() to look
+up the device/connection id from that.
 
-Not ok.  mach/gpio.h is included by asm/gpio.h, which is included by
-linux/gpio.h.  You should always include linux/gpio.h rather than its
-asm/ or mach/ counterparts in case functionality is moved out of the
-architecture-level headers into the architecture-independent headers.
+Not only will that be more simple, but it'll also avoid putting bus-
+specific code into bus-agnostic layers.
