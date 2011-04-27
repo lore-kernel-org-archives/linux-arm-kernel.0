@@ -1,20 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 21:27:18 +0100
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <BANLkTimpp5xpt5VkVDWpikw_Ex8XT6-69Q@mail.gmail.com>
+Date: Wed, 27 Apr 2011 21:29:42 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110427230344I.fujita.tomonori@lab.ntt.co.jp>
 References: <201104212129.17013.arnd@arndb.de>
-	<201104271056.49920.arnd@arndb.de>
-	<20110427090923.GO17290@n2100.arm.linux.org.uk>
-	<201104271302.44249.arnd@arndb.de>
-	<BANLkTi==KPpTg5PZ61p1xtbBijxND7JUow@mail.gmail.com>
-	<BANLkTimpp5xpt5VkVDWpikw_Ex8XT6-69Q@mail.gmail.com>
-Message-ID: <20110427202718.GZ17290@n2100.arm.linux.org.uk>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+	<20110427230344I.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20110427202942.GA17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 08:44:38PM +0300, Anca Emanuel wrote:
-> @Russell: contact Linaro. They need you.
-> Make sure their effort is the right thing to do.
+On Wed, Apr 27, 2011 at 11:06:00PM +0900, FUJITA Tomonori wrote:
+> On Wed, 27 Apr 2011 10:52:25 +0100
+> Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+> > Anyway, we end up with different DMA ops per device via dev_archdata.
+> 
+> Several architectures already do. What's wrong with the approach for
+> arm?
 
-Sorry, don't understand your message.  I don't do brief twitter-like
-impossible to comprehend messages.
+Please read the rest of the thread, where I've already explained the
+issue.
