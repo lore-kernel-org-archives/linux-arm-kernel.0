@@ -1,32 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2011 22:48:15 +0200
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110427202603.GY17290@n2100.arm.linux.org.uk>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104272221.48601.arnd@arndb.de>
-	<20110427202603.GY17290@n2100.arm.linux.org.uk>
-Message-ID: <201104272248.15969.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2011 21:48:35 +0100
+Subject: [PATCH 1/3] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <4DB01B57.9090909@linaro.org>
+References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
+	<201104172036.45052.arnd@arndb.de> <4DAFFC6B.80708@linaro.org>
+	<201104211303.04043.arnd@arndb.de> <4DB01B57.9090909@linaro.org>
+Message-ID: <20110427204835.GB17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2011 22:26:03 Russell King - ARM Linux wrote:
-> Maybe something in asm/pci.h - but that invites having lots of bus
-> specific header files in asm/.
+On Thu, Apr 21, 2011 at 12:56:07PM +0100, Lee Jones wrote:
+> Hi Arnd,
 > 
-> A better solution imho would be to have an architecture callback for
-> struct device which gets registered, which can inspect the type of
-> the device, and set the flag depending on where it appears in the
-> tree.
+> </snip>
+> 
+> >>> (I believe this would be Copyright Linaro Ltd, not ST-Ericsson SA,
+> >>> but better ask internally in ST-Ericsson about what your rules are)
+> >>
+> >> We've had internal discussions about this. I believe this is the correct
+> >> thing to do. The Copyright should stay with ST-Ericsson.
+> > 
+> > Ok, in that case, I'd suggest you use your ST-Ericsson address for
+> > Signed-off-by and the author statement above.
+> 
+> I'm not an ST-Ericsson employee, thus do not have an associated address.
+> 
+> I work for Linaro, currently on assignment to ST-Ericsson.
 
-Ah, I was under the assumption that there was already a callback
-for this. We have a dma_set_coherent_mask() implementation in
-some pci hosts (ixp4xx and it8152), but that's not a proper
-callback that can be override per host and it does not
-actually do what we were talking about here. I guess the callback
-should live in struct hw_pci in case of ARM, and set a new field
-in struct device_dma_parameters.
+It was my understanding gained last week was that Linaro is a separate
+organization, and that while folk are working for Linaro, stuff they
+create belongs to Linaro and not the company whose office they happen
+to be sitting in.
 
-Maybe we don't even need a new flag if we just set
-device->coherent_dma_mask to zero.
-
-	Arnd
+I also thought Linaro was supposed to be an organization for solving
+the _common_ problems being experienced by each member organization,
+rather than being a contracting house to any one particular
+organization.  Am I mistaken?
