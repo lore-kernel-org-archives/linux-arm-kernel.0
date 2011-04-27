@@ -1,28 +1,34 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 27 Apr 2011 15:34:04 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <4DB81A12.1000006@grandegger.com>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<1303474267-6344-2-git-send-email-subhasish@mistralsolutions.com>	<4DB1A3B7.7060300@pengutronix.de>
-	<4DB5D452.9050500@grandegger.com>	<46D523E49EFF489F9B088AE7B9CD7286@subhasishg>
-	<4DB81A12.1000006@grandegger.com>
-Message-ID: <4DB81B4C.9050404@grandegger.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2011 15:32:24 +0200
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <20110427131905.GF5832@shareable.org>
+References: <BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
+	<BANLkTikcsJxvJAPMigvXXzbKdXsDEdeTXA@mail.gmail.com>
+	<20110427131905.GF5832@shareable.org>
+Message-ID: <201104271532.24898.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2011 03:28 PM, Wolfgang Grandegger wrote:
-> On 04/27/2011 03:08 PM, Subhasish Ghosh wrote:
->>>
->>> - Use just *one* value per sysfs file
->>
->> SG - I felt adding entry for each mbx_id will clutter the sysfs.
->>        Is it ok to do that.
+On Wednesday 27 April 2011, Jamie Lokier wrote:
+> Imho, only if there's a use for it.  If this is about whole partitions
+> picking up random data corruption, versus not doing so, then I suggest
+> the choice of "Reliable Write" vs. "Unreliable Write" be a mount
+> option or hdparm-style block device option.
 > 
-> No, see:
-> 
-> http://lxr.linux.no/#linux+v2.6.38/Documentation/filesystems/sysfs.txt#L56
+> If there are tighter guarantees, such as "Unreliable Write" corruption
+> being limited to the written naturally aligned 1MB blocks (say), and
+> it was genuinely faster, that would be really valuable information to
+> pass up to filesystems - and to userspace - as you can structure
+> reliability around that in lots of ways.
 
-s/No/Yes/
+In all the SDHC cards that I have seen, the corruption should be local to
+an erase block of the size that is supposedly found in
+/sys/block/mmcblk*/device/preferred_erase_size, which is typically 4 MB.
 
-Sorry for the confusion.
+However, I don't think that the standard actually guarantees this and,
+worse, some cards that I have seen actually lie about the erase block
+size and claim that it is 4 MB when it is actually 1.5, 2, 3 or 8 MB.
 
-Wolfgang.
+For eMMC devices, I don't think we can read the erase block size.
+
+	Arnd
