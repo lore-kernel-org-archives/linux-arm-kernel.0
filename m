@@ -1,28 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Apr 2011 18:10:34 +0100
-Subject: cachepolicy on arm UP/SMP
-In-Reply-To: <163eed8.b6ba.12f1441357c.Coremail.bill_carson@126.com>
-References: <163eed8.b6ba.12f1441357c.Coremail.bill_carson@126.com>
-Message-ID: <BANLkTi=6t=iLNcWPCtOoDai50A5N9m08UQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 27 Apr 2011 13:10:46 -0400 (EDT)
+Subject: [alsa-devel] [PATCH] ASoC: prevent compilers from optimising pll
+	calculation into __aeabi__uldivmod
+In-Reply-To: <BANLkTima_RChkz07Vdno8vMt-J=KOen6rg@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
+	<BANLkTima_RChkz07Vdno8vMt-J=KOen6rg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1104271305580.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/2 rocky <bill_carson@126.com>:
-> I am a little confused about arm cachepolicy for UP/SMP.
->
-> in arch/arm/mm/mmu.c
-> for UP , default cache policy is CPOLICY_WRITEBACK;
-> while for SMP, cache policy is overrided with? WRITEALLOC.
->
-> why does SMP cannot use WRITEBACK?
-> It is about coherency issue?
+On Wed, 27 Apr 2011, Barry Song wrote:
 
-Historical reasons I think because ARM11MPCore only supported WBWA
-caches, though even if only WB configuration was set.
+> 2011/4/27 Stephen Warren <swarren@nvidia.com>:
+> > Barry Song wrote at Wednesday, April 27, 2011 1:28 AM:
+> >> The newest compiliers can optimize pll calculation in several codecs into
+> >> __aeabi__uldivmod which doesn't exist in kernel.
+> >> Then the link will fail:
+> >> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8974.ko] undefined!
+> >> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8940.ko] undefined!
+> >> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8510.ko] undefined!
+> >> This patch prevent the optimizaton by insert ASM.
+> >
+> > Aren't there compiler flags that tell gcc it isn't operating in a hosted(?)
+> > environment, and hence not to emit calls to these functions? If so, I
+> > imagine they should be added to the kernel's core (or ARM arch ) makefiles.
+> >
+> > I doubt __aeabi_uldivmod is the only function of this type. How was this
+> > solved for other such functions; does the kernel implement the AEABI
+> > functions, and this implementation is simply missing?
+> 
+> __aeabi_uldivmod is not implemented by kernel, others are implemented
+> in arch/arm/lib/lib1funcs.S:
+> extern void __aeabi_idiv(void);
+> extern void __aeabi_idivmod(void);
+> extern void __aeabi_lasr(void);
+> extern void __aeabi_llsl(void);
+> extern void __aeabi_llsr(void);
+> extern void __aeabi_lmul(void);
+> extern void __aeabi_uidiv(void);
+> extern void __aeabi_uidivmod(void);
+> extern void __aeabi_ulcmp(void);
 
-Note that WB or WBWA is just a hint and the processor is allowed to do
-write allocation or ignore it. We could simply make both the same at
-least on ARMv6+ hardware (and I'm more in favour of WBWA).
+This is not the point.  uldivmod will not be implemented on purpose 
+because this is a kernel policy _not_ to create any code that would 
+require it.
 
--- 
-Catalin
+And the description above is wrong too.  It's not about "the newest 
+compiler can optimize ..." but rather "the newest compiler has a bug 
+that leave a stray reference to __aeabi_uldivmod in the compiled 
+object."  As far as I'm concerned, the code is fine as is.  It is the 
+compiler that is wrong.
+
+
+Nicolas
