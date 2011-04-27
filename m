@@ -1,56 +1,52 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Apr 2011 15:35:26 +0200
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 27 Apr 2011 19:08:03 +0530
 Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
+In-Reply-To: <201104271516.30951.arnd@arndb.de>
 References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
 	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A603.2090208@pengutronix.de>
-	<EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
-	<4DB7C5F7.3080103@pengutronix.de>
-	<20110427091252.GP17290@n2100.arm.linux.org.uk>
-	<5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
-Message-ID: <4DB81B9E.3000401@pengutronix.de>
+	<201104271516.30951.arnd@arndb.de>
+Message-ID: <FED5DF6465AF41C58DBD4E0EEB200E60@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2011 03:18 PM, Subhasish Ghosh wrote:
-> My problem is, I am doing something like this:
-> 
-> s32 pruss_writel_multi(struct device *dev, u32 offset,
->                u32 *pdatatowrite, u16 wordstowrite)
-> {
->        struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
->        u32 __iomem *paddresstowrite;
->        u16 i;
-> 
->        paddresstowrite = pruss->ioaddr + offset;
-> 
->        for (i = 0; i < wordstowrite; i++)
->                iowrite32(*pdatatowrite++, paddresstowrite++);
-> 
->        return 0;
-> }
-> 
-> So, if I make paddresstowrite as void, it will not work. The above
-> implementation does not generate any sparse errors though.
+PRU's resulting in improved load sharing.
+>>
+>> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+>
+> Hi Subhasish,
+>
+> This looks like great progress since the last time I looked at the
+> pruss mfd driver, good work there!
+>
+> Thanks to your explanations and the documentation link, I now have
+> a better understanding of what is actually going on here, but I'd
+> still like to understandhow the decision is made regarding what programs
+> are loaded into each PRU and how the MFD cells are set up.
 
-Incrementing a u32 pointer will result in increasing the address by 4
-bytes. Incrementing a void pointer will result in increasing the address
-by just one byte. (Pointer arithmetic on void * is a gnu extension but
-IMHO a pretty nice one, though)
+>
+> Is this a fixed setting for each board that strictly depends on how
+> the external pins are connected, or is it possible to use the same
+> hardware for different purposes based on the program?
 
-regards, Marc
+SG  -- The PRU pins are exposed as is on the main board,
+            we have separate add on daughter cards
+            specific to the protocol implemented on it.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+>
+> If I read your code correctly, you hardwire the usage of the two
+> PRUs in the da850 board code, which makes it impossible to use
+> them in different ways even if the hardware supports it. If this is
+> indeed the case, using an MFD device might not be the best option
+> and we should try to come up with a way to dynamically repurpose
+> the PRU with some user interface.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110427/d0a11efa/attachment.sig>
+SG -- It depends upon how the firmware is implemented. If another
+            firmware is downloaded on it, it will emulate another device.
+            Also, if a firmware emulated on it supports switching between 
+devices,
+            that too is possible. Its just a microcontroller, we can do 
+whatever we feel like
+            with it. Both the PRUs have separate instruction/data ram, so 
+both can be used
+            to implement two different devices.
+ 
