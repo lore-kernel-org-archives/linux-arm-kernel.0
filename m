@@ -1,60 +1,29 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 27 Apr 2011 21:07:28 +0530
-Subject: [PATCHv2] echi: remove structure packing from ehci_def
-In-Reply-To: <4DB832FB.8030805@ru.mvista.com>
-References: <4DB832FB.8030805@ru.mvista.com>
-Message-ID: <1303918648-7196-1-git-send-email-rabin@rab.in>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 27 Apr 2011 18:41:19 +0300
+Subject: Clarification regarding DMA in s3c2440.
+In-Reply-To: <201104262146.20149.mindentropy@gmail.com>
+References: <201104262146.20149.mindentropy@gmail.com>
+Message-ID: <201104271841.19619.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pointed out by Arnd Bergmann, in include/linux/usb/ehci_def.h, struct
-ehci_caps is defined with __attribute__((packed)) for no good reason,
-and this triggers undefined behaviour when using ARM's readl() on
-pointers to elements of this structure:
+On Tuesday 26 April 2011 19:16:19 mindentropy wrote:
+> Hi All,
+> 
+>    I am having some trouble understanding the datasheet of s3c2440 CPU in
+> the DMA part.(I am trying to understand the dma controller code).
+> 
+> In chapter 8 second page under the heading DMA request sources the
+> number of sources should be 7 and not 4.
 
-http://lkml.kernel.org/r/201102021700.20683.arnd at arndb.de
+True
 
-The same problem exists with the other two structures in ehci_def.h too,
-so remove the __attribute__((packed)) from all of them.
+> In the s3c2410 the sources
+> are 5 but they have given it as 4.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-v2: clarify that the problem is not just with struct ehci_caps
+s3c2440 has 18 dma sources, but not every channel is valid for some source, 
+check arch/arm/mach-s3c2440/dma.c, struct s3c24xx_dma_map - it follows table 
+8-1 in mentioned datasheet.
 
- include/linux/usb/ehci_def.h |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/include/linux/usb/ehci_def.h b/include/linux/usb/ehci_def.h
-index e49dfd4..7879943 100644
---- a/include/linux/usb/ehci_def.h
-+++ b/include/linux/usb/ehci_def.h
-@@ -52,7 +52,7 @@ struct ehci_caps {
- #define HCC_PGM_FRAMELISTLEN(p) ((p)&(1 << 1))  /* true: periodic_size changes*/
- #define HCC_64BIT_ADDR(p)       ((p)&(1))       /* true: can use 64-bit addr */
- 	u8		portroute[8];	 /* nibbles for routing - offset 0xC */
--} __attribute__ ((packed));
-+};
- 
- 
- /* Section 2.3 Host Controller Operational Registers */
-@@ -150,7 +150,7 @@ struct ehci_regs {
- #define PORT_CSC	(1<<1)		/* connect status change */
- #define PORT_CONNECT	(1<<0)		/* device connected */
- #define PORT_RWC_BITS   (PORT_CSC | PORT_PEC | PORT_OCC)
--} __attribute__ ((packed));
-+};
- 
- #define USBMODE		0x68		/* USB Device mode */
- #define USBMODE_SDIS	(1<<3)		/* Stream disable */
-@@ -194,7 +194,7 @@ struct ehci_dbg_port {
- 	u32	data47;
- 	u32	address;
- #define DBGP_EPADDR(dev, ep)	(((dev)<<8)|(ep))
--} __attribute__ ((packed));
-+};
- 
- #ifdef CONFIG_EARLY_PRINTK_DBGP
- #include <linux/init.h>
--- 
-1.7.4.1
+Regards
+Vasily
