@@ -1,62 +1,40 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 27 Apr 2011 09:38:39 +0200
-Subject: console_cpu_notify can cause scheduling BUG during CPU hotplug
-In-Reply-To: <4DB733D4.3000002@codeaurora.org>
-References: <4DB604C7.8090305@codeaurora.org>
-	<BANLkTimPHaiiiVC_A6jtUtaa_pYJuhepYg@mail.gmail.com>
-	<4DB65EEC.7060604@ti.com> <4DB733D4.3000002@codeaurora.org>
-Message-ID: <20110427073839.GA16718@liondog.tnic>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Apr 2011 00:48:33 -0700
+Subject: [PATCH] ARM: Fix bad SP address after relocating kernel
+In-Reply-To: <alpine.LFD.2.00.1104261700270.24613@xanadu.home>
+References: <20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
+	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
+	<20110422062843.GA841@atomide.com>
+	<alpine.LFD.2.00.1104220959440.24613@xanadu.home>
+	<20110426085700.GJ16892@atomide.com>
+	<20110426123746.GC3755@atomide.com>
+	<alpine.LFD.2.00.1104261700270.24613@xanadu.home>
+Message-ID: <20110427074833.GD3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2011 at 02:06:28PM -0700, Michael Bohan wrote:
-> On 4/25/2011 10:58 PM, Santosh Shilimkar wrote:
-> >On 4/26/2011 5:48 AM, Kevin Cernekee wrote:
-> >>On Mon, Apr 25, 2011 at 4:33 PM, Michael Bohan<mbohan@codeaurora.org>
-> >>wrote:
-> >>>I was curious if this scenario was accounted for in the design of the
-> >>>console CPU notifier. One workaround for this problem is to remove
-> >>>CPU_DEAD
-> >>>from the possible actions in console_cpu_notify(). In fact, v1-v4 of the
-> >>>patch above did not have CPU_DEAD, CPU_DYING or CPU_DOWN_FAILED in
-> >>>the list
-> >>>of actions. I wasn't able to track down why the other cases were
-> >>>added in
-> >>>the final patch.
-> >>
-> >>Here is the background information on the CPU_{DEAD,DYING,DOWN_FAILED}
-> >>cases:
-> >>
-> >>http://lkml.org/lkml/2010/6/29/65
-> >That's right.
-> >May be the change log for commit '034260d67' would have been
-> >bit more descriptive about the CPU hot-plug events.
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110426 14:28]:
+> On Tue, 26 Apr 2011, Tony Lindgren wrote:
 > 
-> Thanks for the clarification. Now regarding the problem, it seems
-> like we can't be taking a semaphore in that path. That is to say, we
-> can't be calling console_lock from within stop_machine. A few
-> options that come to mind:
+> > Otherwise cache_clean_flush can overwrite some of the relocated
+> > area depending on where the kernel image gets loaded. This fixes
+> > booting on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
+> > (ARM: 6750/1: improvements to compressed/head.S).
 > 
-> -Use console_trylock and accept the possibility that the output is
-> not guaranteed to be synchronous with the hotplug operation.
-> -Defer the console output emission (eg. workqueue) during hotplug.
-> -Hybrid of the two: if the console_trylock fails, then we defer the
-> console output emission.
+> Gaaaah.  Indeed.
 > 
-> Any opinions? I can submit a patch if one of these approaches is reasonable.
+> > Thanks to Aaro Koskinen <aaro.koskinen@nokia.com> for debugging
+> > the address of the relocated area that gets corrupted, and to
+> > Nicolas Pitre <nicolas.pitre@linaro.org> for the other uncompress
+> > related fixes.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> I think there could be a better fix yet.  Could you test this patch:
 
-Great, whatever you guys come up with, we'd like to give it a run too.
-We (AMD) hit the same issue in one of our tests but in our case we end
-up in an endless loop of the state machine at stop_machine_cpu_stop()
-since the core being offlined cannot ack the state transition to
-STOPMACHINE_EXIT due to a similar reason.
+Cool that works too and avoids using the stack, so that's a better fix:
 
-One possible fix is dropping CPU_DYING from console_cpu_notify()
-since it is called into by the offlining path in
-kernel/cpu.c::take_cpu_down().
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
+Tested-by: Tony Lindgren <tony@atomide.com>
