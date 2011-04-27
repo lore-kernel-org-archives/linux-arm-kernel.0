@@ -1,40 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Apr 2011 00:48:33 -0700
-Subject: [PATCH] ARM: Fix bad SP address after relocating kernel
-In-Reply-To: <alpine.LFD.2.00.1104261700270.24613@xanadu.home>
-References: <20110421055945.GB13688@atomide.com>
-	<20110421104954.GH13688@atomide.com>
-	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
-	<alpine.LFD.2.00.1104211711240.24613@xanadu.home>
-	<alpine.LFD.2.00.1104212233170.24613@xanadu.home>
-	<20110422062843.GA841@atomide.com>
-	<alpine.LFD.2.00.1104220959440.24613@xanadu.home>
-	<20110426085700.GJ16892@atomide.com>
-	<20110426123746.GC3755@atomide.com>
-	<alpine.LFD.2.00.1104261700270.24613@xanadu.home>
-Message-ID: <20110427074833.GD3755@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2011 08:35:14 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104212129.17013.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+Message-ID: <20110427073514.GH17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110426 14:28]:
-> On Tue, 26 Apr 2011, Tony Lindgren wrote:
-> 
-> > Otherwise cache_clean_flush can overwrite some of the relocated
-> > area depending on where the kernel image gets loaded. This fixes
-> > booting on n900 after commit 6d7d0ae51574943bf571d269da3243257a2d15db
-> > (ARM: 6750/1: improvements to compressed/head.S).
-> 
-> Gaaaah.  Indeed.
-> 
-> > Thanks to Aaro Koskinen <aaro.koskinen@nokia.com> for debugging
-> > the address of the relocated area that gets corrupted, and to
-> > Nicolas Pitre <nicolas.pitre@linaro.org> for the other uncompress
-> > related fixes.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> I think there could be a better fix yet.  Could you test this patch:
+On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
+> 1. Fix the arm version of dma_alloc_coherent. It's in use today and
+>    is broken on modern CPUs because it results in both cached and
+>    uncached mappings. Rebecca suggested different approaches how to
+>    get there.
 
-Cool that works too and avoids using the stack, so that's a better fix:
+I also suggested various approaches and produced patches, which I'm slowly
+feeding in.  However, I think whatever we do, we'll end up breaking
+something along the line - especially as various places assume that
+dma_alloc_coherent() is ultimately backed by memory with a struct page.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+> 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+>    that this is needed, and it currently is not implemented, with
+>    an outdated comment explaining why it used to not be possible
+>    to do it.
+
+dma_alloc_noncoherent is an entirely pointless API afaics.
+
+> 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
+>    both IOMMU and direct mapped DMA on some machines.
+> 
+> 4. Implement an architecture independent version of dma_map_ops
+>    based on the iommu.h API. As Joerg mentioned, this has been
+>    missing for some time, and it would be better to do it once
+>    than for each IOMMU separately. This is probably a lot of work.
+
+dma_map_ops design is broken - we can't have the entire DMA API indirected
+through that structure.  Whether you have an IOMMU or not is completely
+independent of whether you have to do DMA cache handling.  Moreover, with
+dmabounce, having the DMA cache handling in place doesn't make sense.
+
+So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
+for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
+work like that.
+
+I believe the dma_map_ops stuff in asm-generic to be entirely unsuitable
+for ARM.
