@@ -1,87 +1,216 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Wed, 27 Apr 2011 15:36:25 +0900
-Subject: [RFC PATCH v2 1/3] PM / Core: suspend_again callback for device
-	PM.
-In-Reply-To: <201104270032.42046.rjw@sisk.pl>
-References: <1303288106-2965-1-git-send-email-myungjoo.ham@samsung.com>
-	<20110426210627.GA28033@elf.ucw.cz>
-	<201104262346.58046.rjw@sisk.pl> <201104270032.42046.rjw@sisk.pl>
-Message-ID: <BANLkTi=QDjBtY2WypXjYzyAOUGYjf_oRvw@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 27 Apr 2011 12:09:47 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <4DB1A603.2090208@pengutronix.de>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
+	<4DB1A603.2090208@pengutronix.de>
+Message-ID: <EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 7:32 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Tuesday, April 26, 2011, Rafael J. Wysocki wrote:
->> On Tuesday, April 26, 2011, Pavel Machek wrote:
-> ...
->> > Ok, see the spitz_should_wakeup() function in arch/arm/mach-pxa/* and
->> > should_wakeup() usage.
->>
->> OK, I will.
->
-> Well, as far as I can tell, on Zaurus this is all done within the platform
-> ->enter() callback, so it doesn't carry out the device resume, while the
-> proposed $subject patch does. ?For this reason, I'm not even sure if the
-> proposed approach is really suitable for Zaurus (the resuming and suspending
-> of all devices every once a while will cost quite some enery I guess).
+Hi Mark,
 
-In fact, the kernel "hacks" of mine have been looping at
-sysdev-suspend/resume implemented with platform_suspend_ops; thus it
-does not carry device resume either.
-I've moved the looping point to general device-suspend/resume because
-I thought that other systems may require active devices.
-However, if others can be satisfied without resumed devices, it is
-perfect with me to move that inside device resume as well.
 
->
-> Still, in the unlikely case it is suitable, here's my opinion.
->
-> I don't think syscore_ops is the right place to put the new "suspend
-> again" callback for reasons stated previously.
->
-> I also don't think dev_pm_ops is the right place to put such a callback,
-> because it will only be necessary on very few platforms and there's no
-> reason why every driver, subsystem or power domain in the kernel should care.
->
-> Moreover, the usage cases appear to be suspend-specific.
->
-> For the above reasons, the only place the "suspend again" callback may be
-> put into is struct platform_suspend_ops. ?Then, suspend_devices_and_enter()
-> may be modified so that it loops between dpm_suspend_start() and
-> dpm_suspend_end() until that callback returns "false" and there are no
-> wakeup events (as indicated by pm_wakeup_pending(); but please note that
-> this would require suspend_enter() to indicate that pm_wakeup_pending()
-> returned "true" and events_check_enabled should not be reset until
-> we're sure that we _really_ want to resume).
->
-> Alternatively, if that's sufficient, suspend_enter() may be called in a
-> loop until the "suspend again" callback returns "false" and there are no
-> wakeup events (in the above sense).
->
-> The callback can be called "repeat" and return bool as far as I'm concerned,
-> but I'm not insisting on that.
->
-> MyungJoo, would that be suitable to you?
+- Is it ok to have u32 etc for __iomem cookie ?
 
-As long as sysdevs are resumed and some devices/subsystems (I2C-PMIC,
-ADC, and RTC in my cases) can be selectively resumed and suspended, it
-is fine.
-Thus, your "alternative" suggestion is perfect with me. Actually, this
-is almost going back to the original hack. =)
+> +
+> +s32 pruss_disable(struct device *dev, u8 pruss_num)
+make it a int function
 
-I'll submit next revision with platform_suspend_ops later.
+SG -- Ok will do
 
-Thank you!
+> +
+> +	/* Reset PRU */
+> +	iowrite32(PRUCORE_CONTROL_RESETVAL,
+> +				&h_pruss->control);
+> +	spin_unlock(&pruss->lock);
+> +
+> +	return 0;
 
->
-> Rafael
->
+make it a void function?
 
-Cheers!
-- MyungJoo
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+SG -- This should be int, in case of invalid pru num, we ret an error.
+
+
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_disable);
+> +
+> +s32 pruss_enable(struct device *dev, u8 pruss_num)
+int?
+
+SG -- Ok will do
+
+
+> +
+> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
+> +		return -EINVAL;
+> +
+> +	h_pruss = &pruss_mmap->core[pruss_num];
+> +
+> +	/* Reset PRU  */
+> +	spin_lock(&pruss->lock);
+> +	iowrite32(PRUCORE_CONTROL_RESETVAL, &h_pruss->control);
+
+no need to lock the ram reset below?
+
+SG -- I don't think its required. We just reset the RAM during init and 
+since each pru can only be attached to only one device, the access
+        will be already serialized based upon the pru num.
+
+
+> +	/* Reset any garbage in the ram */
+> +	if (pruss_num == PRUCORE_0)
+> +		for (i = 0; i < PRUSS_PRU0_RAM_SZ; i++)
+> +			iowrite32(0x0, &pruss_mmap->dram0[i]);
+> +	else if (pruss_num == PRUCORE_1)
+> +		for (i = 0; i < PRUSS_PRU1_RAM_SZ; i++)
+> +			iowrite32(0x0, &pruss_mmap->dram1[i]);
+if you make a array for these
++struct pruss_map {
++	u8 dram0[512];
++	u8 res1[7680];
+
++	u8 dram1[512];
++	u8 res2[7680];
+..}
+you don't need the if..else..
+
+SG - The dram/iram is not contiguous, there is a reserved space in between, 
+how do I declare an array for it.
+
+
+> +/* Load the specified PRU with code */
+> +s32 pruss_load(struct device *dev, u8 pruss_num,
+> +			u32 *pruss_code, u32 code_size_in_words)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
+> +	u32 __iomem *pruss_iram;
+> +	u32 i;
+> +
+> +	if (pruss_num == PRUCORE_0)
+> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram0;
+> +	else if (pruss_num == PRUCORE_1)
+> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram1;
+> +	else
+same here
+
+SG - same here.
+
+
+> +s32 pruss_run(struct device *dev, u8 pruss_num)
+int?
+
+SG - Ok, Will do.
+
+
+> +	while (cnt--) {
+> +		temp_reg = ioread32(&h_pruss->control);
+> +		if (((temp_reg & PRUCORE_CONTROL_RUNSTATE_MASK) >>
+> +				PRUCORE_CONTROL_RUNSTATE_SHIFT) ==
+> +				PRUCORE_CONTROL_RUNSTATE_HALT)
+> +			break;
+how long might this take? what about some delay, sleep, or reschedule?
+
+SG - This does not take more than 10 to 20 counts,
+
+
+> +s32 pruss_writeb(struct device *dev, u32 offset, u8 pdatatowrite)
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstowrite;
+we usually don't use "p" variable names for pointers
+
+SG - Ok, will remove.
+
+
+> +s32 pruss_rmwb(struct device *dev, u32 offset, u8 mask, u8 val)
+void function?
+
+SG - Ok, will do.
+
+> +
+> +s32 pruss_readb(struct device *dev, u32 offset, u8 *pdatatoread)
+void?
+
+SG - Ok, will do.
+
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	void __iomem *paddresstoread;
+> +
+> +	paddresstoread = pruss->ioaddr + offset ;
+> +	*pdatatoread = ioread8(paddresstoread);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_readb);
+> +
+> +s32 pruss_readb_multi(struct device *dev, u32 offset,
+> +		u8 *pdatatoread, u16 bytestoread)
+viod?
+
+SG - Ok, will do.
+
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	u8 __iomem *paddresstoread;
+> +	u16 i;
+int?
+
+SG - Ok, will do.
+
+
+
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_readb_multi);
+> +
+> +s32 pruss_writel(struct device *dev, u32 offset,
+> +		u32 pdatatowrite)
+void?
+
+SG - Ok, will do.
+
+
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_writel);
+> +
+> +s32 pruss_writel_multi(struct device *dev, u32 offset,
+> +		u32 *pdatatowrite, u16 wordstowrite)
+void?
+
+SG - Ok, will do.
+
+> +{
+> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+> +	u32 __iomem *paddresstowrite;
+> +	u16 i;
+> +
+> +	paddresstowrite = pruss->ioaddr + offset;
+> +
+> +	for (i = 0; i < wordstowrite; i++)
+> +		iowrite32(*pdatatowrite++, paddresstowrite++);
+memcopy_to_iomem?
+
+SG -- I did not understand, could you please elaborate.
+
+
+> +
+> +s32 pruss_rmwl(struct device *dev, u32 offset, u32 mask, u32 val)
+void?
+
+SG - Ok, will do.
+
+
+> +}
+> +EXPORT_SYMBOL_GPL(pruss_rmwl);
+> +
+> +s32 pruss_readl(struct device *dev, u32 offset, u32 *pdatatoread)
+void? or return the read value
+
+SG - Ok, will do.
+
+ 
