@@ -1,115 +1,73 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Wed, 27 Apr 2011 08:02:39 -0700
-Subject: [PATCH] plat-pxa: Enable ability to adjust SD/MMC clocks
-In-Reply-To: <20110427093328.GU17290@n2100.arm.linux.org.uk>
-References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
-	<20110427093328.GU17290@n2100.arm.linux.org.uk>
-Message-ID: <161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 27 Apr 2011 23:09:55 +0800
+Subject: [alsa-devel] [PATCH] ASoC: prevent compilers from optimising pll
+	calculation into __aeabi__uldivmod
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
+Message-ID: <BANLkTimHdgOp-=gQy78c9p57zLKWFTjtXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2011/4/27 Stephen Warren <swarren@nvidia.com>:
+> Barry Song wrote at Wednesday, April 27, 2011 1:28 AM:
+>> The newest compiliers can optimize pll calculation in several codecs into
+>> __aeabi__uldivmod which doesn't exist in kernel.
+>> Then the link will fail:
+>> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8974.ko] undefined!
+>> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8940.ko] undefined!
+>> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8510.ko] undefined!
+>> This patch prevent the optimizaton by insert ASM.
+>
+> Aren't there compiler flags that tell gcc it isn't operating in a hosted(?)
+> environment, and hence not to emit calls to these functions? If so, I
+> imagine they should be added to the kernel's core (or ARM arch ) makefiles.
 
+not real. it is right for gcc to call __aeabi_uldivmod while it think
+it is good. most time, people change kernel codes to avoid this kind
+of optimization:
 
+http://comments.gmane.org/gmane.linux.kernel/965262
 
+Another example is time.h:
 
-Begin forwarded message:
+{
+ns += a->tv_nsec;
+while(unlikely(ns >= NSEC_PER_SEC)) {
++ /* The following asm() prevents the compiler from
++ * optimising this loop into a modulo operation. */
++ asm("" : "+r"(ns));
++
+ns -= NSEC_PER_SEC;
+a->tv_sec++;
+}
 
-> From: Philip Rakity <prakity@marvell.com>
-> Date: April 22, 2011 1:18:33 PM PDT
-> To: "linux-mmc at vger.kernel.org" <linux-mmc@vger.kernel.org>
-> Cc: Zhangfei Gao <zgao6@marvell.com>
-> Subject: [PATCH] sdhci: sdhci-pxa.c: Add post reset processing for chip specific registers 
-> 
-> 
-> RESET_ALL resets chips private registers.
-> Reset to values specified in board file.
-> 
-> depends on board specific mach-mmp/plat-pxa sdhci.h definitions
-> 
-> Signed-off-by: Philip Rakity <prakity@marvell.com>
-> ---
-> drivers/mmc/host/sdhci-pxa.c |   42 ++++++++++++++++++++++++++++++++++++++++++
-> 1 files changed, 42 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-pxa.c b/drivers/mmc/host/sdhci-pxa.c
-> index c8abf0f..1dc0988 100644
-> --- a/drivers/mmc/host/sdhci-pxa.c
-> +++ b/drivers/mmc/host/sdhci-pxa.c
-> @@ -29,6 +29,13 @@
-> 
-> #define DRIVER_NAME	"sdhci-pxa"
-> 
-> +#define SD_CLOCK_AND_BURST_SIZE_SETUP   0x10A
-> +#define SDCLK_DELAY_MASK     0x1F
-> +#define SDCLK_SEL_MASK       0x1
-> +#define SDCLK_DELAY_SHIFT    9
-> +#define SDCLK_SEL_SHIFT      8
+>
+> I doubt __aeabi_uldivmod is the only function of this type. How was this
+> solved for other such functions; does the kernel implement the AEABI
+> functions, and this implementation is simply missing?
+>
+> But yes either way, ask on the main kernel or ARM kernel mailing list
+> (ARM now CC'd)
+>
+> diff --git a/sound/soc/codecs/wm8510.c b/sound/soc/codecs/wm8510.c
+> index db0dced..a636b15 100644
+> --- a/sound/soc/codecs/wm8510.c
+> +++ b/sound/soc/codecs/wm8510.c
+> @@ -258,6 +258,12 @@ static void pll_factors(unsigned int target, unsigned int source)
+> ? ? ? ?Nmod = target % source;
+> ? ? ? ?Kpart = FIXED_PLL_SIZE * (long long)Nmod;
+>
+> + ? ? ? /*
+> + ? ? ? ?* The following asm() prevents the compiler from optimising
+> + ? ? ? ?* into a standard EABI function __aeabi__uldivmod()
+> + ? ? ? ?*/
+> + ? ? ? asm("" : "+r"(source));
 > +
-> +
-> struct sdhci_pxa {
-> 	struct sdhci_host		*host;
-> 	struct sdhci_pxa_platdata	*pdata;
-> @@ -53,7 +60,42 @@ static void enable_clock(struct sdhci_host *host)
-> 	}
-> }
-> 
-> +static void set_clock_and_burst_size(struct sdhci_host *host)
-> +{
-> +	u16 tmp;
-> +	struct sdhci_pxa *pxa = sdhci_priv(host);
-> +
-> +	pr_debug("%s:%s: adjust = %d\n",
-> +		__func__, mmc_hostname(host->mmc), pxa->pdata->adjust_clocks);
-> +
-> +	if (pxa->pdata->adjust_clocks) {
-> +		tmp = readw(host->ioaddr + SD_CLOCK_AND_BURST_SIZE_SETUP);
-> +		pr_debug("%s:%s: (B) SD_CLOCK_AND_BURST = %04X, "
-> +			"delay = %d, sel = %d\n",
-> +			__func__, mmc_hostname(host->mmc), tmp,
-> +			pxa->pdata->clk_delay, pxa->pdata->clk_select);
-> +		tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
-> +		tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
-> +		tmp |= (pxa->pdata->clk_delay & SDCLK_DELAY_MASK) <<
-> +			SDCLK_DELAY_SHIFT;
-> +		tmp |= (pxa->pdata->clk_select & SDCLK_SEL_MASK) <<
-> +			SDCLK_SEL_SHIFT;
-> +		writew(tmp, host->ioaddr + SD_CLOCK_AND_BURST_SIZE_SETUP);
-> +		pr_debug("%s:%s: (A) SD_CLOCK_AND_BURST_SIZE_SETUP = %04X\n",
-> +			__func__, mmc_hostname(host->mmc), tmp);
-> +	}
-> +}
-> +
-> +static void platform_reset_exit(struct sdhci_host *host, u8 mask)
-> +{
-> +	if (mask == SDHCI_RESET_ALL) {
-> +		/* reset private registers */
-> +		set_clock_and_burst_size(host);
-> +	}
-> +}
-> +
-> static struct sdhci_ops sdhci_pxa_ops = {
-> +	.platform_reset_exit = platform_reset_exit,
-> };
-> 
-> /*****************************************************************************\
-> -- 
-> 1.7.0.4
-> 
-> 
+> ? ? ? ?do_div(Kpart, source);
+>
+> ? ? ? ?K = Kpart & 0xFFFFFFFF;
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-On Apr 27, 2011, at 2:33 AM, Russell King - ARM Linux wrote:
-
-> On Fri, Apr 22, 2011 at 01:13:28PM -0700, Philip Rakity wrote:
->> The PXA168, PXA910, and MMP2 SoC have the ability to adjust the SD/MMC
->> clock.  This feature is useful and required depending on the board
->> design.  Add infrastructure to support SD clock tuning.
-> 
-> It just adds fields to a structure which remain unused.  On its own this
-> patch is useless, and I don't see a patch which makes use of these new
-> fields in any way.  Did you forget to copy it to the linux-arm-kernel
-> list?
+> nvpublic
+>
+>
