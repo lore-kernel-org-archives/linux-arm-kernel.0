@@ -1,93 +1,34 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 10:53:38 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <20110426124519.GC5977@suse.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<20110425212056.GA29313@kroah.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
-	<20110426124519.GC5977@suse.de>
-Message-ID: <35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 27 Apr 2011 11:29:49 +0530
+Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with	irqsave
+	variants
+In-Reply-To: <20110426203306.GC17290@n2100.arm.linux.org.uk>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+	<4DAD2AE9.7060106@st.com>
+	<20110426203306.GC17290@n2100.arm.linux.org.uk>
+Message-ID: <4DB7B0D5.5050504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> There should be no build time dependency with this patch
->> (the above patch just changes which pool of SRAM the
->> allocation happens from)
->>
->> But, this brings out an important dependency of the patch
->> calling platform specific sram allocator functions. There
->> has been SRAM allocator consolidation work done by Russell
->> and as a result the SRAM allocator API for DaVinci will
->> actually change.
+On 04/27/2011 02:03 AM, Russell King - ARM Linux wrote:
+> On Tue, Apr 19, 2011 at 11:55:45AM +0530, viresh kumar wrote:
+>> This must have been added in dw_dma_chan instead :(
+>> Will resend it.
+> 
+> Even that doesn't work.  It has to be a local variable.
 
-I earlier had an implementation where I would get the sram memory addresses
-through the .resource structure and ioremap it in the driver.
+Hello,
 
->>The driver should probably just get sram
->> space through platform data so that it doesn't depend on the
->> platform specific sram allocation function.
+There are two kinds of locks taken in dw_dmac: spin_lock_bh and spin_lock.
+spin_lock_bh is taken from routines called from external drivers and spin_lock
+taken inside tasklet.
+For reasons mentioned earlier, spin_lock_bh has to be replaced with spin_lock_irqsave.
 
-Are you suggesting that I go back to that implementation.
-Also, should I remove the dependency list from the patch comments then.
+Now, Is simple spin_lock() sufficient inside tasklet?? As dma API's can be called
+from interrupt context (which will try to take spin_lock_irqsave).
 
+I think spin_lock must be replaced with irqsave variants, even in tasklet.
+Now if we do that, do we need this tasklet at all??
 
---------------------------------------------------
-From: "Greg KH" <gregkh@suse.de>
-Sent: Tuesday, April 26, 2011 6:15 PM
-To: "Nori, Sekhar" <nsekhar@ti.com>
-Cc: "Greg KH" <greg@kroah.com>; "Subhasish Ghosh" 
-<subhasish@mistralsolutions.com>; 
-<davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; "Watkins, Melissa" 
-<m-watkins@ti.com>; <sachi@mistralsolutions.com>; "Andrew Morton" 
-<akpm@linux-foundation.org>; "Randy Dunlap" <randy.dunlap@oracle.com>; "open 
-list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v4 08/11] tty: add pruss SUART driver
-
-> On Tue, Apr 26, 2011 at 12:21:04PM +0530, Nori, Sekhar wrote:
->> On Tue, Apr 26, 2011 at 02:50:56, Greg KH wrote:
->> > On Fri, Apr 22, 2011 at 05:38:26PM +0530, Subhasish Ghosh wrote:
->> > > This patch adds support for the TTY compliant
->> > > Soft-UART device emulated on PRUSS.
->> > >
->> > > This patch depends on:
->> > > davinci: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS.
->> > >             https://patchwork.kernel.org/patch/615681/
->>
->> This is already in mainline. Plus this patch
->> doesn't really seem to depend on this commit.
->>
->> > > davinci: changed SRAM allocator to shared ram.
->> > >             https://patchwork.kernel.org/patch/549351/
->>
->> There should be no build time dependency with this patch
->> (the above patch just changes which pool of SRAM the
->> allocation happens from)
->>
->> But, this brings out an important dependency of the patch
->> calling platform specific sram allocator functions. There
->> has been SRAM allocator consolidation work done by Russell
->> and as a result the SRAM allocator API for DaVinci will
->> actually change. The driver should probably just get sram
->> space through platform data so that it doesn't depend on the
->> platform specific sram allocation function.
->
-> Ok, care to fix up the code then?
->
->> > Who is going to be applying these patches to the tree?
->> >
->> > Should this driver go through a davinci subtree because of these
->> > dependancies?
->>
->> No, driver and platform changes can be merged separately
->> if the above aspect is taken care of. Russell has been
->> pushing back on merging driver patches through his tree
->> unless absolutely required.
->
-> That's fine, I'll take it through my tree then, care to resolve the
-> above issue and resend it?
->
-> thanks,
->
-> greg k-h 
+-- 
+viresh
