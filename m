@@ -1,39 +1,49 @@
-From: mbohan@codeaurora.org (Michael Bohan)
-Date: Wed, 27 Apr 2011 15:12:19 -0700
-Subject: console_cpu_notify can cause scheduling BUG during CPU hotplug
-In-Reply-To: <20110427073839.GA16718@liondog.tnic>
-References: <4DB604C7.8090305@codeaurora.org>
-	<BANLkTimPHaiiiVC_A6jtUtaa_pYJuhepYg@mail.gmail.com>
-	<4DB65EEC.7060604@ti.com> <4DB733D4.3000002@codeaurora.org>
-	<20110427073839.GA16718@liondog.tnic>
-Message-ID: <4DB894C3.2040300@codeaurora.org>
+From: gregkh@suse.de (Greg KH)
+Date: Wed, 27 Apr 2011 15:12:04 -0700
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <20110427150057.GH29103@game.jcrosoft.org>
+References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110427084247.GK17290@n2100.arm.linux.org.uk>
+	<20110427103145.GF29103@game.jcrosoft.org>
+	<20110427104758.GG29103@game.jcrosoft.org>
+	<20110427150057.GH29103@game.jcrosoft.org>
+Message-ID: <20110427221204.GC12787@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/27/2011 12:38 AM, Borislav Petkov wrote:
-> Great, whatever you guys come up with, we'd like to give it a run too.
-> We (AMD) hit the same issue in one of our tests but in our case we end
-> up in an endless loop of the state machine at stop_machine_cpu_stop()
-> since the core being offlined cannot ack the state transition to
-> STOPMACHINE_EXIT due to a similar reason.
->
-> One possible fix is dropping CPU_DYING from console_cpu_notify()
-> since it is called into by the offlining path in
-> kernel/cpu.c::take_cpu_down().
+On Wed, Apr 27, 2011 at 05:00:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:47 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:31 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 09:42 Wed 27 Apr     , Russell King - ARM Linux wrote:
+> > > > On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > early platform device may do not have a device name as the slab is not yet
+> > > > > available. So to search a clock base on the dev_id we need to search first the
+> > > > > device base name and then the id
+> > > > 
+> > > > I really don't like this.  IDs are platform device specific, and this is
+> > > > a platform devince independent layer.
+> > > > 
+> > > > If you want to do this, then add a platform_device_clk_get() call, which
+> > > > takes the platform device and connection id.  Uses the platform device
+> > > > infrastructure to format the device name, and use clk_get_sys() to look
+> > > > up the device/connection id from that.
+> > > I do not want to alloc a string in the clkdev
+> > > but if you prefer
+> > I check we can not do so
+> > if slab is not available we can not use kmalloc
+> > 
+> > so we can not generate the dev.init_name
+> I check also we can not use the bootmem as it's too early in the init
+> so allocate the dev_id is not possible
+> 
+> use a satic buffer I'm not so happy about it
+> the only other solution is this one
+> 
+> which Greg or you prefer
 
-This seems to be a different problem. Could you elaborate about why 
-removing CPU_DYING from console_cpu_notify resolves your problem? What 
-are other possible fixes?
+I have no idea what you are asking, please be more specific, hopefully
+including a patch showing what you are referring to.
 
-In the failure case I witnessed, we're attempting to sleep in atomic 
-mode, which is a clear violation caused by the addition of CPU_DYING. I 
-haven't thoroughly investigated whether other actions in 
-console_cpu_notify (eg. ONLINE, DEAD, DOWN_FAILED, UP_CANCELED) are in 
-atomic mode violation as well.
+thanks,
 
-Thanks,
-Mike
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+greg k-h
