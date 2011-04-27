@@ -1,17 +1,29 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Wed, 27 Apr 2011 23:06:00 +0900
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-References: <201104212129.17013.arnd@arndb.de>
-	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-Message-ID: <20110427230344I.fujita.tomonori@lab.ntt.co.jp>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 27 Apr 2011 19:36:00 +0530
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <Pine.LNX.4.44L0.1104261447481.2035-100000@iolanthe.rowland.org>
+References: <BANLkTi=-DFfdiBKZzRBxF-yMJFtWnzuk1g@mail.gmail.com>
+	<Pine.LNX.4.44L0.1104261447481.2035-100000@iolanthe.rowland.org>
+Message-ID: <BANLkTimxLjvq2GC8_TJJk9OXZ9fPc-JKiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Apr 2011 10:52:25 +0100
-Catalin Marinas <catalin.marinas@arm.com> wrote:
+On Wed, Apr 27, 2011 at 00:21, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Tue, 26 Apr 2011, Rabin Vincent wrote:
+>> In my case it's this writel() in ehci-hub.c that gets chopped into
+>> strbs:
+>>
+>> ? ? ? /* force reset to complete */
+>> ? ? ? ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? status_reg);
+>
+> Why would that get messed up? ?The status_reg variable doesn't have any
+> __atribute__((packed)) associated with it.
 
-> Anyway, we end up with different DMA ops per device via dev_archdata.
+The initialization of status_reg is:
 
-Several architectures already do. What's wrong with the approach for
-arm?
+	u32 __iomem *status_reg
+		= &ehci->regs->port_status[(wIndex & 0xff) - 1];
+
+where ehci->regs is a pointer to the packed struct ehci_regs.  So, this
+is the same problem of casting pointers to stricter alignment.
