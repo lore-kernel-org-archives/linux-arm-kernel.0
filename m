@@ -1,34 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Apr 2011 15:32:24 +0200
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <20110427131905.GF5832@shareable.org>
-References: <BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<BANLkTikcsJxvJAPMigvXXzbKdXsDEdeTXA@mail.gmail.com>
-	<20110427131905.GF5832@shareable.org>
-Message-ID: <201104271532.24898.arnd@arndb.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Apr 2011 15:35:26 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
+	<4DB1A603.2090208@pengutronix.de>
+	<EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
+	<4DB7C5F7.3080103@pengutronix.de>
+	<20110427091252.GP17290@n2100.arm.linux.org.uk>
+	<5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
+Message-ID: <4DB81B9E.3000401@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2011, Jamie Lokier wrote:
-> Imho, only if there's a use for it.  If this is about whole partitions
-> picking up random data corruption, versus not doing so, then I suggest
-> the choice of "Reliable Write" vs. "Unreliable Write" be a mount
-> option or hdparm-style block device option.
+On 04/27/2011 03:18 PM, Subhasish Ghosh wrote:
+> My problem is, I am doing something like this:
 > 
-> If there are tighter guarantees, such as "Unreliable Write" corruption
-> being limited to the written naturally aligned 1MB blocks (say), and
-> it was genuinely faster, that would be really valuable information to
-> pass up to filesystems - and to userspace - as you can structure
-> reliability around that in lots of ways.
+> s32 pruss_writel_multi(struct device *dev, u32 offset,
+>                u32 *pdatatowrite, u16 wordstowrite)
+> {
+>        struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
+>        u32 __iomem *paddresstowrite;
+>        u16 i;
+> 
+>        paddresstowrite = pruss->ioaddr + offset;
+> 
+>        for (i = 0; i < wordstowrite; i++)
+>                iowrite32(*pdatatowrite++, paddresstowrite++);
+> 
+>        return 0;
+> }
+> 
+> So, if I make paddresstowrite as void, it will not work. The above
+> implementation does not generate any sparse errors though.
 
-In all the SDHC cards that I have seen, the corruption should be local to
-an erase block of the size that is supposedly found in
-/sys/block/mmcblk*/device/preferred_erase_size, which is typically 4 MB.
+Incrementing a u32 pointer will result in increasing the address by 4
+bytes. Incrementing a void pointer will result in increasing the address
+by just one byte. (Pointer arithmetic on void * is a gnu extension but
+IMHO a pretty nice one, though)
 
-However, I don't think that the standard actually guarantees this and,
-worse, some cards that I have seen actually lie about the erase block
-size and claim that it is 4 MB when it is actually 1.5, 2, 3 or 8 MB.
+regards, Marc
 
-For eMMC devices, I don't think we can read the erase block size.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110427/d0a11efa/attachment.sig>
