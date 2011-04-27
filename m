@@ -1,58 +1,92 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Apr 2011 13:00:07 +0100
-Subject: [RFC PATCH 01/15] perf: provide PMU when initing events
-Message-ID: <mailman.71.1313415780.20020.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 27 Apr 2011 10:31:51 +0100
+Subject: [RFC PATCH 02/15] ARM: perf: only register a CPU PMU when present
+Message-ID: <mailman.72.1313415781.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, an event's 'pmu' field is set after pmu::event_init() is
-called. This means that pmu::event_init() must figure out which struct
-pmu the event was initialised from. This makes it difficult to
-consolidate common event initialisation code for similar PMUs, and
-very difficult to implement drivers for PMUs which can have multiple
-instances (e.g. a USB controller PMU, a GPU PMU, etc).
+Currently, an "empty" struct pmu is registered as the CPU PMU,
+regardless of whether there is a physical PMU. This burdens the
+accessor functions with checks to see whether a PMU is actually
+present.
 
-This patch sets the 'pmu' field before initialising the event, allowing
-event init code to identify the struct pmu instance easily. In the
-event of failure to initialise an event, the event is destroyed via
-kfree() without calling perf_event::destroy(), so this shouldn't
-result in bad behaviour even if the destroy field was set before
-failure to initialise was noted.
+This patch changes initialisation to register a PMU only if there is a
+supported PMU present, and removes the checks that this change makes
+redundant.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/events/core.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/perf_event.c |   18 ++----------------
+ 1 files changed, 2 insertions(+), 16 deletions(-)
 
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index b8785e2..68c8017 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -5715,6 +5715,7 @@ struct pmu *perf_init_event(struct perf_event *event)
- 	pmu = idr_find(&pmu_idr, event->attr.type);
- 	rcu_read_unlock();
- 	if (pmu) {
-+		event->pmu = pmu;
- 		ret = pmu->event_init(event);
- 		if (ret)
- 			pmu = ERR_PTR(ret);
-@@ -5722,6 +5723,7 @@ struct pmu *perf_init_event(struct perf_event *event)
- 	}
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 5d60c9c..753648c 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -250,9 +250,6 @@ armpmu_stop(struct perf_event *event, int flags)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
  
- 	list_for_each_entry_rcu(pmu, &pmus, entry) {
-+		event->pmu = pmu;
- 		ret = pmu->event_init(event);
- 		if (!ret)
- 			goto unlock;
-@@ -5848,8 +5850,6 @@ done:
- 		return ERR_PTR(err);
- 	}
- 
--	event->pmu = pmu;
+-	if (!armpmu)
+-		return;
 -
- 	if (!event->parent) {
- 		if (event->attach_state & PERF_ATTACH_TASK)
- 			jump_label_inc(&perf_sched_events);
+ 	/*
+ 	 * ARM pmu always has to update the counter, so ignore
+ 	 * PERF_EF_UPDATE, see comments in armpmu_start().
+@@ -270,9 +267,6 @@ armpmu_start(struct perf_event *event, int flags)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
+ 
+-	if (!armpmu)
+-		return;
+-
+ 	/*
+ 	 * ARM pmu always has to reprogram the period, so ignore
+ 	 * PERF_EF_RELOAD, see the comment below.
+@@ -567,9 +561,6 @@ static int armpmu_event_init(struct perf_event *event)
+ 		return -ENOENT;
+ 	}
+ 
+-	if (!armpmu)
+-		return -ENODEV;
+-
+ 	event->destroy = hw_perf_event_destroy;
+ 
+ 	if (!atomic_inc_not_zero(&active_events)) {
+@@ -599,9 +590,6 @@ static void armpmu_enable(struct pmu *pmu)
+ 	int idx, enabled = 0;
+ 	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
+ 
+-	if (!armpmu)
+-		return;
+-
+ 	for (idx = 0; idx < armpmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+ 
+@@ -618,8 +606,7 @@ static void armpmu_enable(struct pmu *pmu)
+ 
+ static void armpmu_disable(struct pmu *pmu)
+ {
+-	if (armpmu)
+-		armpmu->stop();
++	armpmu->stop();
+ }
+ 
+ static struct pmu pmu = {
+@@ -738,12 +725,11 @@ init_hw_perf_events(void)
+ 	if (armpmu) {
+ 		pr_info("enabled with %s PMU driver, %d counters available\n",
+ 			armpmu->name, armpmu->num_events);
++		perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
+ 	} else {
+ 		pr_info("no hardware support available\n");
+ 	}
+ 
+-	perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
+-
+ 	return 0;
+ }
+ early_initcall(init_hw_perf_events);
 -- 
 1.7.0.4
