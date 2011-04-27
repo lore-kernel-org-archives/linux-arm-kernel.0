@@ -1,52 +1,226 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 19:08:03 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201104271516.30951.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<201104271516.30951.arnd@arndb.de>
-Message-ID: <FED5DF6465AF41C58DBD4E0EEB200E60@subhasishg>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 27 Apr 2011 16:56:37 +0300
+Subject: [PATCH] leds: drop leds-h1940 driver
+Message-ID: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PRU's resulting in improved load sharing.
->>
->> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
->
-> Hi Subhasish,
->
-> This looks like great progress since the last time I looked at the
-> pruss mfd driver, good work there!
->
-> Thanks to your explanations and the documentation link, I now have
-> a better understanding of what is actually going on here, but I'd
-> still like to understandhow the decision is made regarding what programs
-> are loaded into each PRU and how the MFD cells are set up.
+H1940 machine now uses leds-gpio and leds-h1940 has no users anymore. So
+drop it.
 
->
-> Is this a fixed setting for each board that strictly depends on how
-> the external pins are connected, or is it possible to use the same
-> hardware for different purposes based on the program?
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/leds/Kconfig      |    7 --
+ drivers/leds/Makefile     |    1 -
+ drivers/leds/leds-h1940.c |  170 ---------------------------------------------
+ 3 files changed, 0 insertions(+), 178 deletions(-)
+ delete mode 100644 drivers/leds/leds-h1940.c
 
-SG  -- The PRU pins are exposed as is on the main board,
-            we have separate add on daughter cards
-            specific to the protocol implemented on it.
-
->
-> If I read your code correctly, you hardwire the usage of the two
-> PRUs in the da850 board code, which makes it impossible to use
-> them in different ways even if the hardware supports it. If this is
-> indeed the case, using an MFD device might not be the best option
-> and we should try to come up with a way to dynamically repurpose
-> the PRU with some user interface.
-
-SG -- It depends upon how the firmware is implemented. If another
-            firmware is downloaded on it, it will emulate another device.
-            Also, if a firmware emulated on it supports switching between 
-devices,
-            that too is possible. Its just a microcontroller, we can do 
-whatever we feel like
-            with it. Both the PRUs have separate instruction/data ram, so 
-both can be used
-            to implement two different devices.
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 9bec869..3040d06 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -115,13 +115,6 @@ config LEDS_ALIX2
+ 	  This option enables support for the PCEngines ALIX.2 and ALIX.3 LEDs.
+ 	  You have to set leds-alix2.force=1 for boards with Award BIOS.
  
+-config LEDS_H1940
+-	tristate "LED Support for iPAQ H1940 device"
+-	depends on LEDS_CLASS
+-	depends on ARCH_H1940
+-	help
+-	  This option enables support for the LEDs on the h1940.
+-
+ config LEDS_COBALT_QUBE
+ 	tristate "LED Support for the Cobalt Qube series front LED"
+ 	depends on LEDS_CLASS
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index 39c80fc..0b6ad37 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -17,7 +17,6 @@ obj-$(CONFIG_LEDS_NET48XX)		+= leds-net48xx.o
+ obj-$(CONFIG_LEDS_NET5501)		+= leds-net5501.o
+ obj-$(CONFIG_LEDS_WRAP)			+= leds-wrap.o
+ obj-$(CONFIG_LEDS_ALIX2)		+= leds-alix2.o
+-obj-$(CONFIG_LEDS_H1940)		+= leds-h1940.o
+ obj-$(CONFIG_LEDS_COBALT_QUBE)		+= leds-cobalt-qube.o
+ obj-$(CONFIG_LEDS_COBALT_RAQ)		+= leds-cobalt-raq.o
+ obj-$(CONFIG_LEDS_SUNFIRE)		+= leds-sunfire.o
+diff --git a/drivers/leds/leds-h1940.c b/drivers/leds/leds-h1940.c
+deleted file mode 100644
+index 173d104..0000000
+--- a/drivers/leds/leds-h1940.c
++++ /dev/null
+@@ -1,170 +0,0 @@
+-/*
+- * drivers/leds/leds-h1940.c
+- * Copyright (c) Arnaud Patard <arnaud.patard@rtp-net.org>
+- *
+- * This file is subject to the terms and conditions of the GNU General Public
+- * License.  See the file COPYING in the main directory of this archive for
+- * more details.
+- *
+- * H1940 leds driver
+- *
+- */
+-
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/delay.h>
+-#include <linux/string.h>
+-#include <linux/ctype.h>
+-#include <linux/leds.h>
+-#include <linux/gpio.h>
+-
+-#include <mach/regs-gpio.h>
+-#include <mach/hardware.h>
+-#include <mach/h1940-latch.h>
+-
+-/*
+- * Green led.
+- */
+-static void h1940_greenled_set(struct led_classdev *led_dev,
+-			       enum led_brightness value)
+-{
+-	switch (value) {
+-	case LED_HALF:
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+-		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+-		break;
+-	case LED_FULL:
+-		h1940_latch_control(0, H1940_LATCH_LED_GREEN);
+-		s3c2410_gpio_setpin(S3C2410_GPA7, 1);
+-		break;
+-	default:
+-	case LED_OFF:
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+-		h1940_latch_control(H1940_LATCH_LED_GREEN, 0);
+-		s3c2410_gpio_setpin(S3C2410_GPA7, 0);
+-		break;
+-	}
+-}
+-
+-static struct led_classdev h1940_greenled = {
+-	.name			= "h1940:green",
+-	.brightness_set		= h1940_greenled_set,
+-	.default_trigger	= "h1940-charger",
+-};
+-
+-/*
+- * Red led.
+- */
+-static void h1940_redled_set(struct led_classdev *led_dev,
+-			     enum led_brightness value)
+-{
+-	switch (value) {
+-	case LED_HALF:
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+-		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+-		break;
+-	case LED_FULL:
+-		h1940_latch_control(0, H1940_LATCH_LED_RED);
+-		s3c2410_gpio_setpin(S3C2410_GPA1, 1);
+-		break;
+-	default:
+-	case LED_OFF:
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+-		h1940_latch_control(H1940_LATCH_LED_RED, 0);
+-		s3c2410_gpio_setpin(S3C2410_GPA1, 0);
+-		break;
+-	}
+-}
+-
+-static struct led_classdev h1940_redled = {
+-	.name			= "h1940:red",
+-	.brightness_set		= h1940_redled_set,
+-	.default_trigger	= "h1940-charger",
+-};
+-
+-/*
+- * Blue led.
+- * (it can only be blue flashing led)
+- */
+-static void h1940_blueled_set(struct led_classdev *led_dev,
+-			      enum led_brightness value)
+-{
+-	if (value) {
+-		/* flashing Blue */
+-		h1940_latch_control(0, H1940_LATCH_LED_FLASH);
+-		s3c2410_gpio_setpin(S3C2410_GPA3, 1);
+-	} else {
+-		h1940_latch_control(H1940_LATCH_LED_FLASH, 0);
+-		s3c2410_gpio_setpin(S3C2410_GPA3, 0);
+-	}
+-
+-}
+-
+-static struct led_classdev h1940_blueled = {
+-	.name			= "h1940:blue",
+-	.brightness_set		= h1940_blueled_set,
+-	.default_trigger	= "h1940-bluetooth",
+-};
+-
+-static int __devinit h1940leds_probe(struct platform_device *pdev)
+-{
+-	int ret;
+-
+-	ret = led_classdev_register(&pdev->dev, &h1940_greenled);
+-	if (ret)
+-		goto err_green;
+-
+-	ret = led_classdev_register(&pdev->dev, &h1940_redled);
+-	if (ret)
+-		goto err_red;
+-
+-	ret = led_classdev_register(&pdev->dev, &h1940_blueled);
+-	if (ret)
+-		goto err_blue;
+-
+-	return 0;
+-
+-err_blue:
+-	led_classdev_unregister(&h1940_redled);
+-err_red:
+-	led_classdev_unregister(&h1940_greenled);
+-err_green:
+-	return ret;
+-}
+-
+-static int h1940leds_remove(struct platform_device *pdev)
+-{
+-	led_classdev_unregister(&h1940_greenled);
+-	led_classdev_unregister(&h1940_redled);
+-	led_classdev_unregister(&h1940_blueled);
+-	return 0;
+-}
+-
+-
+-static struct platform_driver h1940leds_driver = {
+-	.driver		= {
+-		.name	= "h1940-leds",
+-		.owner	= THIS_MODULE,
+-	},
+-	.probe		= h1940leds_probe,
+-	.remove		= h1940leds_remove,
+-};
+-
+-
+-static int __init h1940leds_init(void)
+-{
+-	return platform_driver_register(&h1940leds_driver);
+-}
+-
+-static void __exit h1940leds_exit(void)
+-{
+-	platform_driver_unregister(&h1940leds_driver);
+-}
+-
+-module_init(h1940leds_init);
+-module_exit(h1940leds_exit);
+-
+-MODULE_AUTHOR("Arnaud Patard <arnaud.patard@rtp-net.org>");
+-MODULE_DESCRIPTION("LED driver for the iPAQ H1940");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:h1940-leds");
+-- 
+1.7.5.rc1
