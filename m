@@ -1,46 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Apr 2011 07:23:06 -0700
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <20110421124618.GA15060@atomide.com>
-References: <20110324231830.2586.7150.stgit@riker>
-	<20110328091259.GA18721@S2100-06.ap.freescale.net>
-	<20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-Message-ID: <20110427142306.GI3755@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Apr 2011 15:29:30 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110427230344I.fujita.tomonori@lab.ntt.co.jp>
+References: <201104212129.17013.arnd@arndb.de>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+	<20110427230344I.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <1303914570.15101.33.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110421 05:44]:
-> * Tony Lindgren <tony@atomide.com> [110421 11:00]:
-> > * Shawn Guo <shawn.guo@freescale.com> [110420 00:27]:
-> > > On Wed, Apr 20, 2011 at 01:47:47PM +0800, Shawn Guo wrote:
-> > > > I would like to confirm it fixes your setup before I send fixing
-> > > > patch to remove 'static' from global variables in all platform
-> > > > uncompress.h.
-> > > > 
-> > > Just saw Nico's patch, so ignore above lines ...
-> > 
-> > Thanks looks like removing static only changes things so now
-> > "Warning: Neither atags nor dtb found" error message printed out.
+On Wed, 2011-04-27 at 15:06 +0100, FUJITA Tomonori wrote:
+> On Wed, 27 Apr 2011 10:52:25 +0100
+> Catalin Marinas <catalin.marinas@arm.com> wrote:
 > 
-> But also Nico's patch fixes the corruption of the DT data during
-> uncompress, so I'm getting much further now.
+> > Anyway, we end up with different DMA ops per device via dev_archdata.
 > 
-> Now the problem is that the DT data is zeroed out by the time code
-> gets to setup_machine_fdt. I wonder if I'm missing some patch?
-> 
-> I'm using grant's devicetree/arm branch + DT append patch + Nico's
-> static fix + my relocate fix.
-> 
-> Oh well have to look at it again next week..
+> Several architectures already do. What's wrong with the approach for
+> arm?
 
-I guess the issue is that when setup_machine_fdt gets called we only
-have minimal MMU mapping done.
+Nothing wrong IMHO but it depends on how you group the DMA ops as it may
+not be feasible to have all the combinations dmabounce/iommu/coherency
+combinations. I think the main combinations would be:
 
-So I guess there's some other patch related to it?
+1. standard (no-iommu) + non-coherent
+2. standard (no-iommu) + coherent
+3. iommu + non-coherent
+4. iommu + coherent
+5. dmabounce + non-coherent
+6. dmabounce + coherent
 
-Tony
+I think dmabounce and iommu can be exclusive (unless the iommu cannot
+access the whole RAM). If that's the case, we can have three type of DMA
+ops:
+
+1. standard
+2. iommu
+3. dmabounce
+
+with an additional flag via dev_archdata for cache coherency level (a
+device may be able to snoop the L1 or L2 cache etc.)
+
+-- 
+Catalin
