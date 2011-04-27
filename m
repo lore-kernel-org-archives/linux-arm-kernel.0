@@ -1,42 +1,49 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 12:33:08 +0530
-Subject: [PATCH v4 11/11] da850: pruss CAN board specific additions.
-In-Reply-To: <4DB6A509.2010009@mvista.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-12-git-send-email-subhasish@mistralsolutions.com>
-	<4DB6A509.2010009@mvista.com>
-Message-ID: <1F65A5A7A9494B73A22BDA7D64355767@subhasishg>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 27 Apr 2011 10:23:37 +0300
+Subject: [PATCH 4/4] omap: musb: introduce default baord config
+In-Reply-To: <FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
+	<FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
+Message-ID: <4DB7C479.8030507@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/27/11 07:23, Oleg Drokin wrote:
+> Hello!
+> 
+> On Apr 24, 2011, at 6:09 PM, Mike Rapoport wrote:
+>> -void __init usb_musb_init(struct omap_musb_board_data *board_data)
+>> +static struct omap_musb_board_data musb_default_board_data = {
+>> +	.interface_type		= MUSB_INTERFACE_ULPI,
+>> +	.mode			= MUSB_OTG,
+> 
+> In fact can you make it more generic with ifdefs like this?
+> (since there are tons of boards taht are client only or would like to be compiled in some other way):
 
->> +static int __init da850_evm_pruss_can_setup(void)
->> +{
->> + int ret, val = 0;
->> + void __iomem *cfg_chip3_reg;
+I didn't want to change current functionality. The purpose of this patch is to
+reduce amount of code shared among board files.
+If certain board needs mode other than OTG it can still pass musb_board_data.
+
+> +#ifdef CONFIG_USB_MUSB_OTG
+> +       .mode                   = MUSB_OTG,
+> +#elif defined(CONFIG_USB_MUSB_HDRC_HCD)
+> +       .mode                   = MUSB_HOST,
+> +#elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
+> +       .mode                   = MUSB_PERIPHERAL,
+> +#endif
+> 
+>> +	.power			= 100,
+>> +};
 >> +
->> + ret = davinci_cfg_reg_list(da850_evm_pruss_can_pins);
->> + if (ret)
->> + pr_warning("%s: da850_evm_pruss_can_pins mux setup "
->> + "failed:%d\n", __func__, ret);
->
->    Yet you continue to initialize... you should stop here I think.
+> 
+> Thanks!
+> 
+> Bye,
+>     Oleg
+> 
 
-SG - Ok, will ret error.
 
->
->> + /* value = 0 to enable the CAN transceiver */
->> + ret = gpio_request_one(DA850_PRUSS_CAN_TRX_PIN,
->> + GPIOF_OUT_INIT_LOW, "pruss_can_en");
->> + if (ret) {
->> + pr_warning("Cannot setup GPIO %d\n", DA850_PRUSS_CAN_TRX_PIN);
->> + gpio_free(DA850_PRUSS_CAN_TRX_PIN);
->
->    Doesn't gpio_request_one() handle freeing GPIO on error?
-
-SG - It does handle error, will remove. But I have another problem,
-        Suppose the init failed due to some other reason during probe.
-        How can I do a gpio_free, do I need some kind of deinit for the 
-setup ?
-
- 
+-- 
+Sincerely yours,
+Mike.
