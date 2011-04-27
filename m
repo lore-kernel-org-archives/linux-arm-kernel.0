@@ -1,122 +1,116 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 26 Apr 2011 20:13:48 -0500
-Subject: MMC and reliable write - was: since when does ARM map the kernel
-	memory in sections?
-In-Reply-To: <20110426224546.GC5832@shareable.org>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<201104262100.42670.pwaechtler@mac.com>
-	<20110426190719.GA5832@shareable.org>
-	<201104262238.02979.pwaechtler@mac.com>
-	<20110426224546.GC5832@shareable.org>
-Message-ID: <BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 27 Apr 2011 10:27:57 +0900
+Subject: [PATCH] ARM: S3C64XX: Remove gpio-bank-X header files
+In-Reply-To: <1303465894-16870-1-git-send-email-jy0922.shim@samsung.com>
+References: <1303465894-16870-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <052c01cc047a$5cb8d500$162a7f00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Joonyoung Shim wrote:
+> 
+> The gpio-bank-X header files of S3C64XX have defines which can be
+> substituted by more common API, so they can be removed. This is compile
+> tested only.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> ---
+>  arch/arm/mach-s3c64xx/dev-spi.c                  |   20 ++----
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h |   48 --------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h |   60 -----------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h |   53 ---------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h |   49 --------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h |   44 -------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h |   71
+--------------------
+> -
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h |   42 ------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h |   74
+--------------------
+> --
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h |   40 ------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h |   36 -----------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h |   54 ----------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h |   70
+--------------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h |   69
+--------------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h |   46 -------------
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c            |    1 -
+>  arch/arm/mach-s3c64xx/pm.c                       |   35 +++++------
+>  arch/arm/mach-s3c64xx/setup-i2c0.c               |    7 +--
+>  arch/arm/mach-s3c64xx/setup-i2c1.c               |    7 +--
+>  arch/arm/mach-s3c64xx/sleep.S                    |    8 ++-
+>  20 files changed, 34 insertions(+), 800 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
+> 
 
-On Tue, Apr 26, 2011 at 5:45 PM, Jamie Lokier <jamie@shareable.org> wrote:
-> Peter Waechtler wrote:
->> JEDEC Standard No. 84-A441
->> Page 56
->>
->>
->> Reliable Write: Multiple block write with pre-defined block count and
->> Reliable Write parameters. This transaction is similar to the basic pre-
->> defined multiple-block write (defined in previous bullet) with the
->> following exceptions. The old data pointed to by a logical address must remain
->> unchanged until the new data written to same logical address has been
->> successfully programmed. This is to ensure that the target address
->> updated by the reliable write transaction never contains undefined data.
->>
->> Data must remain valid even if a sudden power loss occurs during the
->> programming.
->>
->> There are two versions of reliable write: legacy implementation and the
->> enhance implementation. The type of reliable write supported by the device is
->> indicated by the EN_REL_WR bit in the
->> WR_REL_PARAM extended CSD register.
->> ?For the case of EN_REL_WR = 0 :
->>
->>
->> More fun on page 147ff:
->>
->> ? WR_REL_SET [167]
->> The write reliability settings register indicates the reliability setting for
->> each of the user and general
->> area partitions in the device. The contents of this register are read only if
->> the HS_CTRL_REL is 0 in
->> the WR_REL_PARAM extended CSD register. The default value of these bits is not
->> specified and is
->> determined by the device.
->>
->>
->> it goes on with:
->>
->> Bit[4]: WR_DATA_REL_4
->> 0x0: In general purpose partition 4, the write operation has been optimized
->> for performance and existing data in the partition could be at risk if a power
->> failure occurs.
->>
->> 0x1: In general purpose partition 4, the device protects previously written
->> data if power failure occurs during a write operation.
->
-> Hmm... ?It all hinges on whether "previously written data" refers just
-> to the region being overwritten, or to all the other data in the
-> partition?
->
-> If MMC writes are specified to only affect the data being written with
-> a Write command, and to have stably committed the data when Write
-> returns, then "Reliable Write" just means "atomic", and filesystems
-> and databases don't actually need that.
->
-> Hard disks don't guarantee that, and it's not a problem. ?Filesystems
-> and databases need barriers and/or durable (stable) commits, and for
-> writes in one area not to corrupt data in a different area.
->
-> *That's* a problem with other flash devices (and possibly some RAIDs):
-> Writes to one area can corrupt data in sectors that aren't being
-> written to, over quite a large distance.
->
-> I can't tell from the above specification excerpt (by itself) what is
-> being guaranteed; it seems ambiguous, but maybe there's a clearer
-> definition elsewhere.
->
-> It is conceivable that checksums and metadata could be stored into a
-> "reliable" partition and some kinds of file data into an "unreliable"
-> partition, where filesystem integrity is important and nobody cares
-> about the actual data! :-)
->
-> -- Jamie
->
+Hi,
 
-I think this basically says - don't end up with corrupt flash if I
-pull the power when doing this MMC transaction.
-If you pull power during a regular write, you could end up with ALL
-erase units affected being wiped.
+Oh, great.
 
-Note, that the new definition of reliable writes provides a guarantee
-to a sector boundary. So if you interrupt
-the transaction, you will end up with [new data] followed by [old
-data]. The old definition guaranteed the entire range,
-but the transaction was only reliable when done over a sector or erase unit.
+I also tried to remove useless gpio header files :) and it is in my dev/gpio
+branch. But I think, this is better.
+Anyway there are small comments.
 
-This means I jumped the gun on implementing REQ_FUA as reliable write,
-as REQ_FUA says nothing about atomicity.
-OTOH, I don't think anything in the block layer expects massive data
-corruption on power loss. In my defence, I saw REQ_FUA
-as being "prevent data corruption during power loss", hence the
-reliable write via REQ_FUA in mmc layer.
+(snip)
 
-So my question -
-a) how should reliable writes be handled? REQ_META?
-b) how do we make sure to not wind up with data corruption and MMCs
-for work loads where you know power can be removed at any moment?
+>  void s3c_pm_debug_smdkled(u32 set, u32 clear)
+>  {
+> -	unsigned long flags;
+> -	u32 reg;
+> -
+> -	local_irq_save(flags);
+> -	reg = __raw_readl(S3C64XX_GPNCON);
+> -	reg &= ~(S3C64XX_GPN_CONMASK(12) | S3C64XX_GPN_CONMASK(13) |
+> -		 S3C64XX_GPN_CONMASK(14) | S3C64XX_GPN_CONMASK(15));
+> -	reg |= S3C64XX_GPN_OUTPUT(12) | S3C64XX_GPN_OUTPUT(13) |
+> -	       S3C64XX_GPN_OUTPUT(14) | S3C64XX_GPN_OUTPUT(15);
+> -	__raw_writel(reg, S3C64XX_GPNCON);
+> -
+> -	reg = __raw_readl(S3C64XX_GPNDAT);
+> -	reg &= ~(clear << 12);
+> -	reg |= set << 12;
+> -	__raw_writel(reg, S3C64XX_GPNDAT);
+> -
+> -	local_irq_restore(flags);
+> +	int i;
+> +
+> +	for (i = 0; i < 4; i++) {
+> +		if (clear & (1 << i))
+> +			gpio_direction_output(S3C64XX_GPN(12 + i), 0);
+> +		if (set & (1 << i))
+> +			gpio_direction_output(S3C64XX_GPN(12 + i), 1);
+> +	}
 
-We could always turn on reliable writes (not good perf wise). We could
-turn on reliable writes for a particular range (enhanced user
-partition). We could also turn on reliable writes for a specific
-hardware partition. We could even create mapping layer that will
-occasionally atomically flush data to flash, while the actual fs
-accesses go to RAM.
+Hmm...
 
-A
+According to comments in gpio_direction_{input,output}, it isn't called more
+than once...but it can be called twice in your code. And need
+local_irq_{save,restore} around them.
+
+So how about keeping old codes here? In addtion, as you know, need to keep
+definitions of S3C64XX_GPNxxx now :(
+
+Others looks ok.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
