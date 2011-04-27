@@ -1,38 +1,73 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 18:45:06 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<20110425212056.GA29313@kroah.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
-	<20110426124519.GC5977@suse.de>
-	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
-Message-ID: <F6E90395B84D4E9FA9497247841035FC@subhasishg>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 27 Apr 2011 15:13:45 +0200
+Subject: [PATCH 04/10] plat-nomadik: gpio show all pins in debug
+Message-ID: <1303910025-3400-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- >> >>The driver should probably just get sram
->> >> space through platform data so that it doesn't depend on the
->> >> platform specific sram allocation function.
->>
->> Are you suggesting that I go back to that implementation.
->
-> No, the platform code should use the SRAM allocator and
-> pass on the allocated memory to the driver.
+From: Rabin Vincent <rabin.vincent@stericsson.com>
 
-SG - So, should I call the sram_alloc() in the platform setup function. 
-Something like this:
+Useful to check the status of the runtime pin muxing.
 
-suart_probe() {
-...
-pdata.setup(&sram_aadr);
-...use sram data;
-}
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+[Squashed, modified to use chip-internal IRQ trigger state]
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-nomadik/gpio.c |   31 +++++++++++++++++++++++++++----
+ 1 files changed, 27 insertions(+), 4 deletions(-)
 
-suart_remove() {
-...
-pdata.free(&sram_aadr);
-...
-} 
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index f49748e..e6d62b9 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -815,20 +815,43 @@ static void nmk_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 		bool pull;
+ 		u32 bit = 1 << i;
+ 
+-		if (!label)
+-			continue;
+-
+ 		is_out = readl(nmk_chip->addr + NMK_GPIO_DIR) & bit;
+ 		pull = !(readl(nmk_chip->addr + NMK_GPIO_PDIS) & bit);
+ 		mode = nmk_gpio_get_mode(gpio);
+ 		seq_printf(s, " gpio-%-3d (%-20.20s) %s %s %s %s",
+-			gpio, label,
++			gpio, label ?: "(none)",
+ 			is_out ? "out" : "in ",
+ 			chip->get
+ 				? (chip->get(chip, i) ? "hi" : "lo")
+ 				: "?  ",
+ 			(mode < 0) ? "unknown" : modes[mode],
+ 			pull ? "pull" : "none");
++
++		if (label && !is_out) {
++			int		irq = gpio_to_irq(gpio);
++			struct irq_desc	*desc = irq_to_desc(irq);
++
++			/* This races with request_irq(), set_irq_type(),
++			 * and set_irq_wake() ... but those are "rare".
++			 */
++			if (irq >= 0 && desc->action) {
++				char *trigger;
++				u32 bitmask = nmk_gpio_get_bitmask(gpio);
++
++				if (nmk_chip->edge_rising & bitmask)
++					trigger = "edge-rising";
++				else if (nmk_chip->edge_falling & bitmask)
++					trigger = "edge-falling";
++				else
++					trigger = "edge-undefined";
++
++				seq_printf(s, " irq-%d %s%s",
++					irq, trigger,
++					irqd_is_wakeup_set(&desc->irq_data)
++						? " wakeup" : "");
++			}
++		}
++
+ 		seq_printf(s, "\n");
+ 	}
+ }
+-- 
+1.7.3.2
