@@ -1,122 +1,18 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 27 Apr 2011 15:06:49 +0530
-Subject: [PATCH V3 7/7] dmaengine/dw_dmac: implement pause and resume in
-	dwc_control
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 27 Apr 2011 15:10:39 +0530
+Subject: [PATCH V3 0/7] dmaengine/dw_dmac updates
 In-Reply-To: <cover.1303896566.git.viresh.kumar@st.com>
 References: <cover.1303896566.git.viresh.kumar@st.com>
-Message-ID: <b65d6a70ba743112de3c02247b1298c84783e5d4.1303896567.git.viresh.kumar@st.com>
+	<cover.1303896566.git.viresh.kumar@st.com>
+Message-ID: <4DB7E497.8070205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 04/27/2011 03:06 PM, Viresh KUMAR wrote:
+> This patchset fixes few issues and extends its support.
+> 
 
-Some peripherals like amba-pl011 needs pause to be implemented in DMA controller
-drivers. This also returns correct status from dwc_tx_status() in case chan is
-paused.
+Sorry for two copies of same pathset :(
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/dma/dw_dmac.c      |   59 +++++++++++++++++++++++++++++---------------
- drivers/dma/dw_dmac_regs.h |    1 +
- 2 files changed, 40 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 014654d..ba1a2a4 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -841,34 +841,50 @@ static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	struct dw_dma		*dw = to_dw_dma(chan->device);
- 	struct dw_desc		*desc, *_desc;
- 	unsigned long		flags;
-+	u32			cfglo;
- 	LIST_HEAD(list);
- 
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
-+	if (cmd == DMA_PAUSE) {
-+		spin_lock_irqsave(&dwc->lock, flags);
- 
--	/*
--	 * This is only called when something went wrong elsewhere, so
--	 * we don't really care about the data. Just disable the
--	 * channel. We still have to poll the channel enable bit due
--	 * to AHB/HSB limitations.
--	 */
--	spin_lock_irqsave(&dwc->lock, flags);
-+		cfglo = channel_readl(dwc, CFG_LO);
-+		channel_writel(dwc, CFG_LO, cfglo | DWC_CFGL_CH_SUSP);
-+		while (!(channel_readl(dwc, CFG_LO) & DWC_CFGL_FIFO_EMPTY))
-+			cpu_relax();
- 
--	channel_clear_bit(dw, CH_EN, dwc->mask);
-+		dwc->paused = true;
-+		spin_unlock_irqrestore(&dwc->lock, flags);
-+	} else if (cmd == DMA_RESUME) {
-+		if (!dwc->paused)
-+			return 0;
- 
--	while (dma_readl(dw, CH_EN) & dwc->mask)
--		cpu_relax();
-+		spin_lock_irqsave(&dwc->lock, flags);
- 
--	/* active_list entries will end up before queued entries */
--	list_splice_init(&dwc->queue, &list);
--	list_splice_init(&dwc->active_list, &list);
-+		cfglo = channel_readl(dwc, CFG_LO);
-+		channel_writel(dwc, CFG_LO, cfglo & ~DWC_CFGL_CH_SUSP);
-+		dwc->paused = false;
- 
--	/* Flush all pending and queued descriptors */
--	list_for_each_entry_safe(desc, _desc, &list, desc_node)
--		dwc_descriptor_complete(dwc, desc, 0, flags);
-+		spin_unlock_irqrestore(&dwc->lock, flags);
-+	} else if (cmd == DMA_TERMINATE_ALL) {
-+		spin_lock_irqsave(&dwc->lock, flags);
- 
--	spin_unlock_irqrestore(&dwc->lock, flags);
-+		channel_clear_bit(dw, CH_EN, dwc->mask);
-+		while (dma_readl(dw, CH_EN) & dwc->mask)
-+			cpu_relax();
-+
-+		dwc->paused = false;
-+
-+		/* active_list entries will end up before queued entries */
-+		list_splice_init(&dwc->queue, &list);
-+		list_splice_init(&dwc->active_list, &list);
-+
-+		/* Flush all pending and queued descriptors */
-+		list_for_each_entry_safe(desc, _desc, &list, desc_node)
-+			dwc_descriptor_complete(dwc, desc, 0, flags);
-+
-+		spin_unlock_irqrestore(&dwc->lock, flags);
-+	} else
-+		return -ENXIO;
- 
- 	return 0;
- }
-@@ -905,6 +921,9 @@ dwc_tx_status(struct dma_chan *chan,
- 	else
- 		dma_set_tx_state(txstate, last_complete, last_used, 0);
- 
-+	if (dwc->paused)
-+		return DMA_PAUSED;
-+
- 	return ret;
- }
- 
-diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-index 720f821..c968597 100644
---- a/drivers/dma/dw_dmac_regs.h
-+++ b/drivers/dma/dw_dmac_regs.h
-@@ -138,6 +138,7 @@ struct dw_dma_chan {
- 	void __iomem		*ch_regs;
- 	u8			mask;
- 	u8			priority;
-+	bool			paused;
- 
- 	spinlock_t		lock;
- 
 -- 
-1.7.3.4
+viresh
