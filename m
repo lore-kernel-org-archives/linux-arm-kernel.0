@@ -1,73 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 27 Apr 2011 23:09:55 +0800
-Subject: [alsa-devel] [PATCH] ASoC: prevent compilers from optimising pll
-	calculation into __aeabi__uldivmod
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
-Message-ID: <BANLkTimHdgOp-=gQy78c9p57zLKWFTjtXw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 27 Apr 2011 17:00:57 +0200
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <20110427104758.GG29103@game.jcrosoft.org>
+References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110427084247.GK17290@n2100.arm.linux.org.uk>
+	<20110427103145.GF29103@game.jcrosoft.org>
+	<20110427104758.GG29103@game.jcrosoft.org>
+Message-ID: <20110427150057.GH29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/27 Stephen Warren <swarren@nvidia.com>:
-> Barry Song wrote at Wednesday, April 27, 2011 1:28 AM:
->> The newest compiliers can optimize pll calculation in several codecs into
->> __aeabi__uldivmod which doesn't exist in kernel.
->> Then the link will fail:
->> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8974.ko] undefined!
->> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8940.ko] undefined!
->> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8510.ko] undefined!
->> This patch prevent the optimizaton by insert ASM.
->
-> Aren't there compiler flags that tell gcc it isn't operating in a hosted(?)
-> environment, and hence not to emit calls to these functions? If so, I
-> imagine they should be added to the kernel's core (or ARM arch ) makefiles.
+On 12:47 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:31 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 09:42 Wed 27 Apr     , Russell King - ARM Linux wrote:
+> > > On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > early platform device may do not have a device name as the slab is not yet
+> > > > available. So to search a clock base on the dev_id we need to search first the
+> > > > device base name and then the id
+> > > 
+> > > I really don't like this.  IDs are platform device specific, and this is
+> > > a platform devince independent layer.
+> > > 
+> > > If you want to do this, then add a platform_device_clk_get() call, which
+> > > takes the platform device and connection id.  Uses the platform device
+> > > infrastructure to format the device name, and use clk_get_sys() to look
+> > > up the device/connection id from that.
+> > I do not want to alloc a string in the clkdev
+> > but if you prefer
+> I check we can not do so
+> if slab is not available we can not use kmalloc
+> 
+> so we can not generate the dev.init_name
+I check also we can not use the bootmem as it's too early in the init
+so allocate the dev_id is not possible
 
-not real. it is right for gcc to call __aeabi_uldivmod while it think
-it is good. most time, people change kernel codes to avoid this kind
-of optimization:
+use a satic buffer I'm not so happy about it
+the only other solution is this one
 
-http://comments.gmane.org/gmane.linux.kernel/965262
+which Greg or you prefer
 
-Another example is time.h:
-
-{
-ns += a->tv_nsec;
-while(unlikely(ns >= NSEC_PER_SEC)) {
-+ /* The following asm() prevents the compiler from
-+ * optimising this loop into a modulo operation. */
-+ asm("" : "+r"(ns));
-+
-ns -= NSEC_PER_SEC;
-a->tv_sec++;
-}
-
->
-> I doubt __aeabi_uldivmod is the only function of this type. How was this
-> solved for other such functions; does the kernel implement the AEABI
-> functions, and this implementation is simply missing?
->
-> But yes either way, ask on the main kernel or ARM kernel mailing list
-> (ARM now CC'd)
->
-> diff --git a/sound/soc/codecs/wm8510.c b/sound/soc/codecs/wm8510.c
-> index db0dced..a636b15 100644
-> --- a/sound/soc/codecs/wm8510.c
-> +++ b/sound/soc/codecs/wm8510.c
-> @@ -258,6 +258,12 @@ static void pll_factors(unsigned int target, unsigned int source)
-> ? ? ? ?Nmod = target % source;
-> ? ? ? ?Kpart = FIXED_PLL_SIZE * (long long)Nmod;
->
-> + ? ? ? /*
-> + ? ? ? ?* The following asm() prevents the compiler from optimising
-> + ? ? ? ?* into a standard EABI function __aeabi__uldivmod()
-> + ? ? ? ?*/
-> + ? ? ? asm("" : "+r"(source));
-> +
-> ? ? ? ?do_div(Kpart, source);
->
-> ? ? ? ?K = Kpart & 0xFFFFFFFF;
->
-> --
-> nvpublic
->
->
+Best Regards,
+J.
