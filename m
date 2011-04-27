@@ -1,44 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 21:20:16 +0100
-Subject: RAID/dmaengine violates the dma-streaming API
-In-Reply-To: <BANLkTi=30Q5=TAaPcE8SXt417S6e=RaY3Q@mail.gmail.com>
-References: <BANLkTinMA_U1r6K4t8UZKUr4nZBsWPSv9w@mail.gmail.com>
-	<BANLkTi=30Q5=TAaPcE8SXt417S6e=RaY3Q@mail.gmail.com>
-Message-ID: <20110427202016.GX17290@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Apr 2011 22:21:48 +0200
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110427201605.GW17290@n2100.arm.linux.org.uk>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104271302.44249.arnd@arndb.de>
+	<20110427201605.GW17290@n2100.arm.linux.org.uk>
+Message-ID: <201104272221.48601.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 02:42:57PM +0300, saeed bishara wrote:
-> On Sun, Apr 17, 2011 at 7:00 PM, saeed bishara <saeed.bishara@gmail.com> wrote:
-> > Hi,
-> > ? ? when md uses the dma for offloading xor and memcpy operations, it
-> > violates the dma-mapping API. ?here is the scenario I'm taking about
-> > (under write to degraded raid5):
-> > 1. ops_run_prexor sends xor operation from buffers A and B, and the
-> > destination is A.
-> > 2. ops_run_biodrain: sends mempcy operation from C to B.
-> > 3. ops_run_reconstruct5: sends xor operation from A and B, and the
-> > destination is A again.
-> >
-> > in step 1, the async tx maps A using dma_map_page, and in step 3, it
-> > maps again the same buffer. but, if the request from step 1 still
-> > being handled the dma engine, then we end with a case where the buffer
-> > mapped while it still belongs to the dma hw.
-> > when the arch is ARMv6/SMP mode (without io coherency), the cache
-> > maintenance involves read/write access to the buffers, that means, the
-> > second mapping above may access the buffer(with read/write) while the
-> > dma is writing to it!!.
-> >
-> Russell/Dan,
->      can you have a look into this issue? what I see here is that the
-> raid stack issues dma_map_page to a buffer that still owned by DMA.
+On Wednesday 27 April 2011 22:16:05 Russell King - ARM Linux wrote:
+> > As for making the default being to do cache handling, I'm not completely
+> > sure how that would work on architectures where most devices are coherent.
+> > If I understood the DRM people correctly, some x86 machine have noncoherent
+> > DMA in their GPUs while everything else is coherent.
+> 
+> Well, it sounds like struct device needs a flag to indicate whether it is
+> coherent or not - but exactly how this gets set seems to be architecture
+> dependent.  I don't see bus or driver code being able to make the necessary
+> decisions - eg, tulip driver on x86 would be coherent, but tulip driver on
+> ARM would be non-coherent.
+> 
+> Nevertheless, doing it on a per-device basis is definitely the right
+> answer.
 
-I already mentioned this issue to Dan, and pointed out that it's
-a violation of the buffer ownership rules.  I don't remember clearly
-what the outcome of it is, but there's not a lot which can be done at
-architecture level about it.
+The flag would not get set by the driver that uses the device but
+the driver that found it, e.g. the PCI bus or the platform code,
+which should know about these things and also install the appropriate
+iommu or mapping operations.
 
-I think the buffer mapping was going to be moved upwards, to prevent
-the multiple buffer mapping issue.  I don't know if patches were
-produced though (and I don't have hardware to be able to produce and
-test such patches against.)
+	Arnd
