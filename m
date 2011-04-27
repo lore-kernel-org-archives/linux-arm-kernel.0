@@ -1,27 +1,37 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 27 Apr 2011 09:17:07 +0530
-Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with	irqsave
-	variants
-In-Reply-To: <20110426203306.GC17290@n2100.arm.linux.org.uk>
-References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
-	<4DAD2AE9.7060106@st.com>
-	<20110426203306.GC17290@n2100.arm.linux.org.uk>
-Message-ID: <4DB791BB.8050207@st.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Wed, 27 Apr 2011 00:23:18 -0400
+Subject: [PATCH 4/4] omap: musb: introduce default baord config
+In-Reply-To: <c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
+Message-ID: <FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2011 02:03 AM, Russell King - ARM Linux wrote:
-> On Tue, Apr 19, 2011 at 11:55:45AM +0530, viresh kumar wrote:
->> This must have been added in dw_dma_chan instead :(
->> Will resend it.
-> 
-> Even that doesn't work.  It has to be a local variable.
+Hello!
 
-I assumed that flags wouldn't be updated if lock is already taken by some other thread.
-In which case global flags would have worked fine.
-But as i see now, that's incorrect. Flags is always changed, whether or not lock is taken.
+On Apr 24, 2011, at 6:09 PM, Mike Rapoport wrote:
+> -void __init usb_musb_init(struct omap_musb_board_data *board_data)
+> +static struct omap_musb_board_data musb_default_board_data = {
+> +	.interface_type		= MUSB_INTERFACE_ULPI,
+> +	.mode			= MUSB_OTG,
 
-Will resend it again.
+In fact can you make it more generic with ifdefs like this?
+(since there are tons of boards taht are client only or would like to be compiled in some other way):
 
--- 
-viresh
++#ifdef CONFIG_USB_MUSB_OTG
++       .mode                   = MUSB_OTG,
++#elif defined(CONFIG_USB_MUSB_HDRC_HCD)
++       .mode                   = MUSB_HOST,
++#elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
++       .mode                   = MUSB_PERIPHERAL,
++#endif
+
+> +	.power			= 100,
+> +};
+> +
+
+Thanks!
+
+Bye,
+    Oleg
