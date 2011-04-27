@@ -1,44 +1,90 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 28 Apr 2011 07:31:06 +1000
+Date: Thu, 28 Apr 2011 07:37:51 +1000
 Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104212129.17013.arnd@arndb.de>
+In-Reply-To: <20110427073514.GH17290@n2100.arm.linux.org.uk>
 References: <201104212129.17013.arnd@arndb.de>
-Message-ID: <1303939866.2513.180.camel@pasglop>
+	<20110427073514.GH17290@n2100.arm.linux.org.uk>
+Message-ID: <1303940271.2513.187.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-04-21 at 21:29 +0200, Arnd Bergmann wrote:
+On Wed, 2011-04-27 at 08:35 +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
+> > 1. Fix the arm version of dma_alloc_coherent. It's in use today and
+> >    is broken on modern CPUs because it results in both cached and
+> >    uncached mappings. Rebecca suggested different approaches how to
+> >    get there.
 > 
-> 7. Extend the dma_map_ops to have a way for mapping a buffer
->    from dma_alloc_{non,}coherent into user space. We have not
->    discussed that yet, but after thinking this for some time, I
->    believe this would be the right approach to map buffers into
->    user space from code that doesn't care about the underlying
->    hardware.
+> I also suggested various approaches and produced patches, which I'm slowly
+> feeding in.  However, I think whatever we do, we'll end up breaking
+> something along the line - especially as various places assume that
+> dma_alloc_coherent() is ultimately backed by memory with a struct page.
 
-Yes. There is a dma_mmap_coherent() call that's not part of the "Real"
-API but is implemented by some archs and used by Alsa (I added support
-for it on powerpc recently).
+Our implementation for embedded ppc has a similar problem. It currently
+uses a pool of memory and does virtual mappings on it which means no
+struct page easy to get to. How do you do on your side ? A fixed size
+pool that you take out of the linear mapping ? Or you allocate pages in
+the linear mapping and "unmap" them ? The problem I have with some
+embedded ppc's is that the linear map is mapped in chunks of 256M or
+so....
 
-Maybe that should go into the dma ops.
+> > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> >    that this is needed, and it currently is not implemented, with
+> >    an outdated comment explaining why it used to not be possible
+> >    to do it.
+> 
+> dma_alloc_noncoherent is an entirely pointless API afaics.
 
-The question remains, if we ever want to do more complex demand-paged
-operations, should we also expose a lower level set of functions to get
-struct page out of a dma_alloc_coherent() allocation and to get the
-pgprot for the user dma mapping ?
+I was about to ask what the point is ... (what is the expected
+semantic ? Memory that is reachable but not necessarily cache
+coherent ?)
 
-> After all these are in place, building anything on top of
-> dma_alloc_{non,}coherent should be much easier. The question
-> of passing buffers between V4L and DRM is still completely
-> unsolved as far as I can tell, but that discussion might become
-> more focused if we can agree on the above points and assume
-> that it will be done.
+> > 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
+> >    both IOMMU and direct mapped DMA on some machines.
+> > 
+> > 4. Implement an architecture independent version of dma_map_ops
+> >    based on the iommu.h API. As Joerg mentioned, this has been
+> >    missing for some time, and it would be better to do it once
+> >    than for each IOMMU separately. This is probably a lot of work.
+> 
+> dma_map_ops design is broken - we can't have the entire DMA API indirected
+> through that structure.
 
-My gut feeling is that it should be done by having V4L use DRM buffers
-in the first place...
+Why not ? That's the only way we can deal in my experience with multiple
+type of different iommu's etc... at runtime in a single kernel. We used
+to more/less have global function pointers in a long past but we moved
+to per device ops instead to cope with multiple DMA path within a given
+system and it works fine.
 
-> I expect that I will have to update the list above as people
-> point out mistakes in my assumptions.
+>   Whether you have an IOMMU or not is completely
+> independent of whether you have to do DMA cache handling.  Moreover, with
+> dmabounce, having the DMA cache handling in place doesn't make sense.
+
+Right. For now I don't have that problem on ppc as my iommu archs are
+also fully coherent, so it's a bit more tricky that way but can be
+handled I suppose by having the cache mgmnt be lib functions based on
+flags added to the struct device.
+
+> So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
+> for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
+> work like that.
+
+Well, the dmabounce and cache handling is one implementation that's just
+on/off with parameters no ?. iommu is different implementations. So the
+ops should be for the iommu backends. The dmabounce & cache handling is
+then done by those backends based on flags you stick in struct device
+for example.
+
+> I believe the dma_map_ops stuff in asm-generic to be entirely unsuitable
+> for ARM.
+
+I don't think it is :-)
 
 Cheers,
 Ben.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
