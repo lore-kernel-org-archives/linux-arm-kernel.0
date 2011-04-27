@@ -1,46 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 08:35:14 +0100
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104212129.17013.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>
-Message-ID: <20110427073514.GH17290@n2100.arm.linux.org.uk>
+Date: Wed, 27 Apr 2011 08:28:02 +0100
+Subject: [PATCH 1/6] dmaengine/dw_dmac: Replace spin_lock_bh with
+	irqsave variants
+In-Reply-To: <4DB7B0D5.5050504@st.com>
+References: <e52c8e679fbf3007cf7e5e4bcfc86ea208a09d7c.1303123511.git.viresh.kumar@st.com>
+	<4DAD2AE9.7060106@st.com>
+	<20110426203306.GC17290@n2100.arm.linux.org.uk>
+	<4DB7B0D5.5050504@st.com>
+Message-ID: <20110427072802.GG17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
-> 1. Fix the arm version of dma_alloc_coherent. It's in use today and
->    is broken on modern CPUs because it results in both cached and
->    uncached mappings. Rebecca suggested different approaches how to
->    get there.
-
-I also suggested various approaches and produced patches, which I'm slowly
-feeding in.  However, I think whatever we do, we'll end up breaking
-something along the line - especially as various places assume that
-dma_alloc_coherent() is ultimately backed by memory with a struct page.
-
-> 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
->    that this is needed, and it currently is not implemented, with
->    an outdated comment explaining why it used to not be possible
->    to do it.
-
-dma_alloc_noncoherent is an entirely pointless API afaics.
-
-> 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
->    both IOMMU and direct mapped DMA on some machines.
+On Wed, Apr 27, 2011 at 11:29:49AM +0530, viresh kumar wrote:
+> There are two kinds of locks taken in dw_dmac: spin_lock_bh and spin_lock.
+> spin_lock_bh is taken from routines called from external drivers and spin_lock
+> taken inside tasklet.
+> For reasons mentioned earlier, spin_lock_bh has to be replaced with spin_lock_irqsave.
 > 
-> 4. Implement an architecture independent version of dma_map_ops
->    based on the iommu.h API. As Joerg mentioned, this has been
->    missing for some time, and it would be better to do it once
->    than for each IOMMU separately. This is probably a lot of work.
+> Now, Is simple spin_lock() sufficient inside tasklet?? As dma API's can be called
+> from interrupt context (which will try to take spin_lock_irqsave).
 
-dma_map_ops design is broken - we can't have the entire DMA API indirected
-through that structure.  Whether you have an IOMMU or not is completely
-independent of whether you have to do DMA cache handling.  Moreover, with
-dmabounce, having the DMA cache handling in place doesn't make sense.
-
-So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
-for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
-work like that.
-
-I believe the dma_map_ops stuff in asm-generic to be entirely unsuitable
-for ARM.
+Tasklets can be interrupted, so no.
