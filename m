@@ -1,34 +1,56 @@
-From: mindentropy@gmail.com (mindentropy)
-Date: Wed, 27 Apr 2011 23:37:25 +0530
-Subject: Clarification regarding DMA in s3c2440.
-In-Reply-To: <201104271841.19619.anarsoul@gmail.com>
-References: <201104262146.20149.mindentropy@gmail.com>
-	<201104271841.19619.anarsoul@gmail.com>
-Message-ID: <201104272337.25880.mindentropy@gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Wed, 27 Apr 2011 11:16:14 -0700
+Subject: [PATCH] ARM: tegra: consolidate GIC extension usage
+In-Reply-To: <1303925937.28149.2.camel@e102144-lin.cambridge.arm.com>
+References: <1303297104-18887-1-git-send-email-marc.zyngier@arm.com>
+	<20110427083657.GI17290@n2100.arm.linux.org.uk>
+	<20110427124454.31470c8f@taxman.wild-wind.fr.eu.org>
+	<BANLkTi=eaTQ4w2j8C4Gs_=-zYdfY1m3Bfw@mail.gmail.com>
+	<1303925937.28149.2.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <BANLkTik6f6ih-MQPbF+qaOCAgG8pdBn7xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 Apr 2011 9:11:19 pm Vasily Khoruzhick wrote:
-> On Tuesday 26 April 2011 19:16:19 mindentropy wrote:
-> > Hi All,
-> > 
-> >    I am having some trouble understanding the datasheet of s3c2440 CPU in
-> > 
-> > the DMA part.(I am trying to understand the dma controller code).
-> > 
-> > In chapter 8 second page under the heading DMA request sources the
-> > number of sources should be 7 and not 4.
-> 
-> True
-> 
-> > In the s3c2410 the sources
-> > are 5 but they have given it as 4.
-> 
-> s3c2440 has 18 dma sources, but not every channel is valid for some source,
-> check arch/arm/mach-s3c2440/dma.c, struct s3c24xx_dma_map - it follows
-> table 8-1 in mentioned datasheet.
-> 
-> Regards
-> Vasily
+On Wed, Apr 27, 2011 at 10:38 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Colin,
+>
+> On Wed, 2011-04-27 at 18:34 +0100, Colin Cross wrote:
+>> On Wed, Apr 27, 2011 at 4:44 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> > On Wed, 27 Apr 2011 09:36:57 +0100
+>> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> >
+>> >> On Wed, Apr 20, 2011 at 11:58:24AM +0100, Marc Zyngier wrote:
+>> >>
+>> >> A good follow-on step would be...
+>> >>
+>> >> > ?static void tegra_mask(struct irq_data *d)
+>> >> > ?{
+>> >> > - ? tegra_gic_mask_irq(d);
+>> >> > ? ? tegra_legacy_mask_irq(d->irq);
+>> >> > ?}
+>> >>
+>> >> ... arranging tegra_legacy_mask_irq() etc to take struct irq_data directly.
+>> >> These functions could then be removed entirely as they serve no useful
+>> >> purpose other than transforming the new API back to the old API.
+>> >
+>> > How about the following patch? I haven't touched the gic_arch_extn part
+>> > as it would break Will's fastEOI patch set (which depends on this one),
+>> > but will prepare another patch cleaning up that part.
+>>
+>> I have a patch that fixes all of this and more as part of the Tegra PM
+>> series, but I was sitting on it assuming Tegra PM would not go into
+>> 2.6.40. ?Let me sort out the cleanups from the PM stuff, and I'll post
+>> a patch that drops legacy_irq.c entirely.
+>
+> Ok. Where does that leave my GIC fasteoi stuff? I'm becoming more
+> conscious of the chained_entry/exit functions sitting there unused in
+> the kernel and it would be good to get the plumbed into all of the
+> platforms sooner rather than later.
+>
+> Ideally your cleanup patch will mean that I don't have to touch the
+> Tegra irq.c, leaving me with just the GPIO changes (which you can Ack if
+> you like :).
 
-Thanks for the reply. I am following the source. Much clearer there :)
+The irq.c changes call your chained functions.  I have changes for
+gpio.c that will conflict as well, and I haven't had a chance to test
+yours and reconcile them with mine.  I'll try to get to it this week.
