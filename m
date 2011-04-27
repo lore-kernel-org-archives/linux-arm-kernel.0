@@ -1,28 +1,39 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 28 Apr 2011 07:45:37 +1000
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-References: <201104212129.17013.arnd@arndb.de>
-	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-Message-ID: <1303940737.2513.190.camel@pasglop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Apr 2011 22:55:09 +0100
+Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
+In-Reply-To: <20110420163238.5f0e5ea6@lxorguk.ukuu.org.uk>
+References: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
+	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
+	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
+	<20110419093855.36910400@lxorguk.ukuu.org.uk>
+	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
+	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
+	<BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
+	<BANLkTi=Oc+y+31KugbEy66Mp96=bf_G8Mg@mail.gmail.com>
+	<BANLkTinv_-6dJJXAWc=NFTceXGA9sabanA@mail.gmail.com>
+	<20110420163238.5f0e5ea6@lxorguk.ukuu.org.uk>
+Message-ID: <20110427215509.GE17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-04-27 at 10:52 +0100, Catalin Marinas wrote:
+On Wed, Apr 20, 2011 at 04:32:38PM +0100, Alan Cox wrote:
+> > Even if some people are only muxing pins that can also be used as GPIO,
+> > this is not always the case. We can shunt out the same pins to be used as
+> > I2C or SPI for example, that means this cannot be handled in a GPIO
+> > driver since it has nothing to do with GPIO pins at all.
 > 
-> It's not broken since we moved to using Normal non-cacheable memory
-> for the coherent DMA buffers (as long as you flush the cacheable alias
-> before using the buffer, as we already do). The ARM ARM currently says
-> unpredictable for such situations but this is being clarified in
-> future updates and the Normal non-cacheable vs cacheable aliases can
-> be used (given correct cache maintenance before using the buffer).
+> It sounds very much to me like it belongs in the GPIO driver. That is the
+> one piece of code which knows what it is doing for all this configuration.
 
-Don't you have a risk where speculative loads or prefetches might bring
-back some stuff into the cache via the cachable mapping ? Is that an
-issue ? As long as it's non-dirty and the cachable mapping isn't
-otherwise used, I suppose it might be a non-issue, tho I've seen in
-powerpc land cases of processors that can checkstop if a subsequent non
-cachable access "hits" the stuff that was loaded in the cache.
+I don't think so.  See PXA devices, where MFP (multifunction pin)
+configuration is entirely separate from GPIO - and there's some MFPs
+which don't even have GPIOs associated with them.
 
-Cheers,
-Ben.
+If I'm reading the PXA930 MFP header file right, it also appears that
+GPIOs can be configured on to multiple different pins (eg, GPIO46 can
+be on GPIO46 or DF_nWE.  So refering to GPIO46 does not give you
+sufficient information for exactly what pin is to be configured here.
+
+To complicate matters, MFP configuration on PXA deals with stuff like
+low power mode configuration, drive strength, etc which is completely
+independent of the GPIO layer.
