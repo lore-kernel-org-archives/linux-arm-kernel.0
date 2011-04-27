@@ -1,25 +1,105 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Apr 2011 10:12:52 +0100
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <4DB7C5F7.3080103@pengutronix.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A603.2090208@pengutronix.de>
-	<EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
-	<4DB7C5F7.3080103@pengutronix.de>
-Message-ID: <20110427091252.GP17290@n2100.arm.linux.org.uk>
+Date: Wed, 27 Apr 2011 10:19:49 +0100
+Subject: [PATCH v2 4/6] arm: use asm-generic/bitops/le.h
+In-Reply-To: <1303824223-3566-5-git-send-email-akinobu.mita@gmail.com>
+References: <1303824223-3566-1-git-send-email-akinobu.mita@gmail.com>
+	<1303824223-3566-5-git-send-email-akinobu.mita@gmail.com>
+Message-ID: <20110427091949.GQ17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 09:29:59AM +0200, Marc Kleine-Budde wrote:
-> On 04/27/2011 08:39 AM, Subhasish Ghosh wrote:
-> > - Is it ok to have u32 etc for __iomem cookie ?
+On Tue, Apr 26, 2011 at 10:23:41PM +0900, Akinobu Mita wrote:
+> The previous style change enables to use asm-generic/bitops/le.h
+> on arm.
 > 
-> no - "void __iomem *" is "void __iomem *"
+> Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Actually, it is _provided_ you don't directly dereference it.  You can
-then do pointer arithmetic on it in the usual way - which is about the
-only valid thing to do with an __iomem pointer.  The voidness just acts
-as an additional check against direct dereferences of this.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-The important thing though is that the code passes sparse checks.
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> 
+> No change from previous submission
+> 
+>  arch/arm/include/asm/bitops.h |   43 ++++------------------------------------
+>  1 files changed, 5 insertions(+), 38 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index 18a024b..b4892a0 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -203,8 +203,6 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>  #define find_first_bit(p,sz)		_find_first_bit_le(p,sz)
+>  #define find_next_bit(p,sz,off)		_find_next_bit_le(p,sz,off)
+>  
+> -#define WORD_BITOFF_TO_LE(x)		((x))
+> -
+>  #else
+>  /*
+>   * These are the big endian, atomic definitions.
+> @@ -214,8 +212,6 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>  #define find_first_bit(p,sz)		_find_first_bit_be(p,sz)
+>  #define find_next_bit(p,sz,off)		_find_next_bit_be(p,sz,off)
+>  
+> -#define WORD_BITOFF_TO_LE(x)		((x) ^ 0x18)
+> -
+>  #endif
+>  
+>  #if __LINUX_ARM_ARCH__ < 5
+> @@ -287,40 +283,7 @@ static inline int fls(int x)
+>  #include <asm-generic/bitops/hweight.h>
+>  #include <asm-generic/bitops/lock.h>
+>  
+> -static inline void __set_bit_le(int nr, void *addr)
+> -{
+> -	__set_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline void __clear_bit_le(int nr, void *addr)
+> -{
+> -	__clear_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline int __test_and_set_bit_le(int nr, void *addr)
+> -{
+> -	return __test_and_set_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline int test_and_set_bit_le(int nr, void *addr)
+> -{
+> -	return test_and_set_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline int __test_and_clear_bit_le(int nr, void *addr)
+> -{
+> -	return __test_and_clear_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline int test_and_clear_bit_le(int nr, void *addr)
+> -{
+> -	return test_and_clear_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> -
+> -static inline int test_bit_le(int nr, const void *addr)
+> -{
+> -	return test_bit(WORD_BITOFF_TO_LE(nr), addr);
+> -}
+> +#ifdef __ARMEB__
+>  
+>  static inline int find_first_zero_bit_le(const void *p, unsigned size)
+>  {
+> @@ -340,6 +303,10 @@ static inline int find_next_bit_le(const void *p, int size, int offset)
+>  }
+>  #define find_next_bit_le find_next_bit_le
+>  
+> +#endif
+> +
+> +#include <asm-generic/bitops/le.h>
+> +
+>  /*
+>   * Ext2 is defined to use little-endian byte ordering.
+>   */
+> -- 
+> 1.7.4.4
+> 
