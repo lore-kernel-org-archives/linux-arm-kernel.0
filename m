@@ -1,45 +1,40 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 27 Apr 2011 13:23:37 -0500
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Wed, 27 Apr 2011 20:49:45 +0200
+Subject: [PATCH] pxa/magician: align MAGICIAN_EGPIO_BASE with NR_BUILTIN_GPIO
+Message-ID: <1303930187.14964.5.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 27, 2011 6:13 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> This rewrites the U300 GPIO driver using gpiolib and the irq_chip
-> abstractions, makes it runtime-configured rather than compile-time,
-> and moves it to the drivers/gpio subsystem where it belongs,
-> depopulating the ARM tree of one more driver.
->
-> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Commit a0a4dcbca73a418477f439e812193e2591b46751
+"ARM: pxa: align NR_BUILTIN_GPIO with GPIO interrupt number"
+increased NR_BUILTIN_GPIO from 128 to PXA_GPIO_IRQ_NUM (192).
+Adjust the previously hardcoded MAGICIAN_EGPIO_BASE accordingly.
 
-If this and other platform-specific GPIO drivers are going to be
-moved to the drivers/gpio subsystem, the Kconfig and Makefile should
-probably be updated to reflect this.
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/magician.h |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-In drivers/gpio/Kconfig:
-
-#
-# platform-neutral GPIO infrastructure and expanders
-#
-
-And in drivers/gpio/Makefile:
-
-# generic gpio support: dedicated expander chips, etc
-#
-# NOTE: platform-specific GPIO drivers don't belong in the
-# drivers/gpio directory; put them with other platform setup
-# code, IRQ controllers, board init, etc.
-
-The Makefile should probably be reordered, either alphabetically
-or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
-alphabetically in order to reduce merge conflicts.
-
-Regards,
-Hartley
+diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
+index 0a2efcf..e9e6162 100644
+--- a/arch/arm/mach-pxa/include/mach/magician.h
++++ b/arch/arm/mach-pxa/include/mach/magician.h
+@@ -12,6 +12,7 @@
+ #ifndef _MAGICIAN_H_
+ #define _MAGICIAN_H_
+ 
++#include <mach/gpio.h>
+ #include <mach/irqs.h>
+ 
+ /*
+@@ -77,7 +78,7 @@
+  * CPLD EGPIOs
+  */
+ 
+-#define MAGICIAN_EGPIO_BASE			0x80 /* GPIO_BOARD_START */
++#define MAGICIAN_EGPIO_BASE			NR_BUILTIN_GPIO
+ #define MAGICIAN_EGPIO(reg,bit) \
+ 	(MAGICIAN_EGPIO_BASE + 8*reg + bit)
+ 
+-- 
+1.7.4.4
