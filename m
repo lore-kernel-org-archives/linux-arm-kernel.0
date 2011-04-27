@@ -1,47 +1,27 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 18:48:54 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <20110427091252.GP17290@n2100.arm.linux.org.uk>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A603.2090208@pengutronix.de>
-	<EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
-	<4DB7C5F7.3080103@pengutronix.de>
-	<20110427091252.GP17290@n2100.arm.linux.org.uk>
-Message-ID: <5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Apr 2011 15:18:55 +0200
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <20110426072941.GA3755@atomide.com>
+References: <1303139217-10285-1-git-send-email-charu@ti.com>
+	<20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
+	<20110421054221.GF5918@atomide.com>
+	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
+	<20110426072941.GA3755@atomide.com>
+Message-ID: <BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My problem is, I am doing something like this:
+2011/4/26 Tony Lindgren <tony@atomide.com>:
+> * Linus Walleij <linus.walleij@linaro.org> [110423 01:32]:
+>> Since you'll probably be dependent on stuff happening in my patches
+>> to move stuff into drivers/gpio I'll be happy to carry the patches in my
+>> gpio-consolidation branch with Tony's ACKs if need be.
+>
+> Sounds good to me.
 
-s32 pruss_writel_multi(struct device *dev, u32 offset,
-                u32 *pdatatowrite, u16 wordstowrite)
-{
-        struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-        u32 __iomem *paddresstowrite;
-        u16 i;
+I've just posted a patch series that moves "our" two GPIO drivers to
+drivers/gpio, they should serve as good inspiration... Tell me if I can
+help out, stack patches on top of this series and I'll carry them.
 
-        paddresstowrite = pruss->ioaddr + offset;
-
-        for (i = 0; i < wordstowrite; i++)
-                iowrite32(*pdatatowrite++, paddresstowrite++);
-
-        return 0;
-}
-
-So, if I make paddresstowrite as void, it will not work. 
-The above implementation does not generate any sparse errors though.
-
-
-> On Wed, Apr 27, 2011 at 09:29:59AM +0200, Marc Kleine-Budde wrote:
->> On 04/27/2011 08:39 AM, Subhasish Ghosh wrote:
->> > - Is it ok to have u32 etc for __iomem cookie ?
->> 
->> no - "void __iomem *" is "void __iomem *"
-> 
-> Actually, it is _provided_ you don't directly dereference it.  You can
-> then do pointer arithmetic on it in the usual way - which is about the
-> only valid thing to do with an __iomem pointer.  The voidness just acts
-> as an additional check against direct dereferences of this.
-> 
-> The important thing though is that the code passes sparse checks. 
+Yours,
+Linus Walleij
