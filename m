@@ -1,57 +1,64 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 27 Apr 2011 17:16:42 -0500
-Subject: [PATCH 1/2] gpio: add pin biasing and drive mode to gpiolib
-In-Reply-To: <20110427215509.GE17290@n2100.arm.linux.org.uk>
-References: <92FFDB9F-37F1-4618-A53D-FEF4151A4953@niasdigital.com>
-	<20110418132629.12d9a106@lxorguk.ukuu.org.uk>
-	<6C3F739A-A157-4796-9572-C6B0FAC2565E@niasdigital.com>
-	<20110419093855.36910400@lxorguk.ukuu.org.uk>
-	<BANLkTimqpP2k1tBvRL0BXs9E-Q=3bh0C7Q@mail.gmail.com>
-	<BANLkTint6DGgosVkjK-sveyA9SL9WVS4Mg@mail.gmail.com>
-	<BANLkTinv-MSg5Sobg2X1cJpAwPkM1Gevcg@mail.gmail.com>
-	<BANLkTi=Oc+y+31KugbEy66Mp96=bf_G8Mg@mail.gmail.com>
-	<BANLkTinv_-6dJJXAWc=NFTceXGA9sabanA@mail.gmail.com>
-	<20110420163238.5f0e5ea6@lxorguk.ukuu.org.uk>
-	<20110427215509.GE17290@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B027084269764D26C391E@AUSP01VMBX24.collaborationhost.net>
+From: dan.j.williams@gmail.com (Dan Williams)
+Date: Wed, 27 Apr 2011 16:12:49 -0700
+Subject: RAID/dmaengine violates the dma-streaming API
+In-Reply-To: <20110427202016.GX17290@n2100.arm.linux.org.uk>
+References: <BANLkTinMA_U1r6K4t8UZKUr4nZBsWPSv9w@mail.gmail.com>
+	<BANLkTi=30Q5=TAaPcE8SXt417S6e=RaY3Q@mail.gmail.com>
+	<20110427202016.GX17290@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikBoek0-138wdeqJxF+A3UiN7h-zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 27, 2011 2:55 PM, Russell King wrote:
-> On Wed, Apr 20, 2011 at 04:32:38PM +0100, Alan Cox wrote:
->>> Even if some people are only muxing pins that can also be used as GPIO,
->>> this is not always the case. We can shunt out the same pins to be used as
->>> I2C or SPI for example, that means this cannot be handled in a GPIO
->>> driver since it has nothing to do with GPIO pins at all.
->> 
->> It sounds very much to me like it belongs in the GPIO driver. That is the
->> one piece of code which knows what it is doing for all this configuration.
+On Wed, Apr 27, 2011 at 1:20 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 27, 2011 at 02:42:57PM +0300, saeed bishara wrote:
+>> On Sun, Apr 17, 2011 at 7:00 PM, saeed bishara <saeed.bishara@gmail.com> wrote:
+>> > Hi,
+>> > ? ? when md uses the dma for offloading xor and memcpy operations, it
+>> > violates the dma-mapping API. ?here is the scenario I'm taking about
+>> > (under write to degraded raid5):
+>> > 1. ops_run_prexor sends xor operation from buffers A and B, and the
+>> > destination is A.
+>> > 2. ops_run_biodrain: sends mempcy operation from C to B.
+>> > 3. ops_run_reconstruct5: sends xor operation from A and B, and the
+>> > destination is A again.
+>> >
+>> > in step 1, the async tx maps A using dma_map_page, and in step 3, it
+>> > maps again the same buffer. but, if the request from step 1 still
+>> > being handled the dma engine, then we end with a case where the buffer
+>> > mapped while it still belongs to the dma hw.
+>> > when the arch is ARMv6/SMP mode (without io coherency), the cache
+>> > maintenance involves read/write access to the buffers, that means, the
+>> > second mapping above may access the buffer(with read/write) while the
+>> > dma is writing to it!!.
+>> >
+>> Russell/Dan,
+>> ? ? ?can you have a look into this issue? what I see here is that the
+>> raid stack issues dma_map_page to a buffer that still owned by DMA.
 >
-> I don't think so.  See PXA devices, where MFP (multifunction pin)
-> configuration is entirely separate from GPIO - and there's some MFPs
-> which don't even have GPIOs associated with them.
+> I already mentioned this issue to Dan, and pointed out that it's
+> a violation of the buffer ownership rules. ?I don't remember clearly
+> what the outcome of it is, but there's not a lot which can be done at
+> architecture level about it.
 >
-> If I'm reading the PXA930 MFP header file right, it also appears that
-> GPIOs can be configured on to multiple different pins (eg, GPIO46 can
-> be on GPIO46 or DF_nWE.  So refering to GPIO46 does not give you
-> sufficient information for exactly what pin is to be configured here.
+> I think the buffer mapping was going to be moved upwards, to prevent
+> the multiple buffer mapping issue. ?I don't know if patches were
+> produced though (and I don't have hardware to be able to produce and
+> test such patches against.)
 >
-> To complicate matters, MFP configuration on PXA deals with stuff like
-> low power mode configuration, drive strength, etc which is completely
-> independent of the GPIO layer.
 
-I agree with Russell.  The muxing goes way beyond GPIO use.
+This is still on my plate and is waiting for me to get out from
+underneath the isci driver effort.  I was thinking to push it all to
+md and kill the api, but then had an idea of an async_session data
+structure that could automatically marshal a chain of transfers
+between mapping domains.  The fast path would be a chain that stays
+within one mapping domain, but the infrastructure would be able to
+devolve to support pathological cases like
+dma_domain1->cpu->dma_domain2 chains.  So md would need to manipulate
+async_sessions, but it could rely on the async_tx api to handle dma
+mapping details.
 
-On the i.MX for example, the iomux is used to configured what the pads on the
-chip are used for.  The pad configuration might be gpio related or it could be
-setting the pad for use by one of the internal peripherals.
+That's my 10,000 foot view at least.
 
-For instance, on the i.MX35 the uart3 rxd signal can appear on the pads: RTS2,
-SD2_DATA0, ATA_DATA10, or FEC_TX_CLK.  All of these pads can also be configured
-as a gpio or for use by some other on-board peripheral.
-
-Also, like Russell mentions for the PXA930, some of the gpios can be routed to
-multiple pins.  And some of the pads have no gpio use but multiple other uses.
-
-Regards,
-Hartley
+--
+Dan
