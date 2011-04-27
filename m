@@ -1,122 +1,83 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Wed, 27 Apr 2011 15:09:02 +0200
-Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
-Message-ID: <1303909742.18407.12.camel@redbox>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 27 Apr 2011 15:12:23 +0200
+Subject: [PATCH 00/10] U300 and Ux500 GPIO consolidation patch set
+Message-ID: <1303909943-3261-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91's AIC interrupt controller will internally mask the current
-(and lower-priority) interrupts until software acknowledges that the
-interrupt was handled by writing to the AIC_EOICR register.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-This matches the "fasteoi" IRQ flow-handler, so convert the AT91 to use
-handle_fasteoi_irq rather than handle_level_irq.
+This is the latest incarnation of the GPIO consolidation patch set
+which will not be pushed to my -next tree. If maintainer prefer
+that I squash patches rather than stack them in logical steps
+like this then tell me.
 
-This also allows the irq_finish() call to be removed from the low-level
-ARM IRQ handler.
+Since it deletes a whopping ~2000 lines from arch/arm/* it looks
+like a viable target for the 2.6.40 merge window.
 
+ACKs requested for the drivers/gpio/* stuff primarily.
 
-Signed-off-by: Andrew Victor <linux@maxim.org.za>
+Fredrik Svensson (1):
+  plat-nomadik: remove pull-pinconfig and add SPI2
 
+Linus Walleij (6):
+  gpio: add a custom configuration mechanism to gpiolib
+  mach-u300: rewrite gpio driver, move to drivers/gpio
+  gpio: move the Nomadik GPIO driver to drivers/gpio
+  gpio/nomadik-gpio: work with all machines
+  gpio/nomadik-gpio: factor out state cast function
+  gpio/nomadik-gpio: merge pinconfig API
 
+Rabin Vincent (2):
+  plat-nomadik: gpio show all pins in debug
+  plat-nomadik: disable clocks when unused
 
-diff -urN -x CVS linux-2.6.38/arch/arm/kernel/irq.c linux-2.6/arch/arm/kernel/irq.c
---- linux-2.6.38/arch/arm/kernel/irq.c	2011-04-27 12:28:25.609111745 +0200
-+++ linux-2.6/arch/arm/kernel/irq.c	2011-04-27 14:20:32.784167994 +0200
-@@ -42,13 +42,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
--/*
-- * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
-- */
--#ifndef irq_finish
--#define irq_finish(irq) do { } while (0)
--#endif
--
- unsigned long irq_err_count;
- 
- int show_interrupts(struct seq_file *p, void *v)
-@@ -135,9 +128,6 @@
- 		generic_handle_irq(irq);
- 	}
- 
--	/* AT91 specific workaround */
--	irq_finish(irq);
--
- 	irq_exit();
- 	set_irq_regs(old_regs);
- }
-diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
---- linux-2.6.38/arch/arm/mach-at91/gpio.c	2011-04-27 12:28:26.157080664 +0200
-+++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-27 14:45:42.672364605 +0200
-@@ -392,8 +392,6 @@
- 	at91_gpio = get_irq_chip_data(irq);
- 	pio = at91_gpio->regbase;
- 
--	/* temporarily mask (level sensitive) parent IRQ */
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 	for (;;) {
- 		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
- 		 * When there none are pending, we're finished unless we need
-@@ -429,8 +427,8 @@
- 			isr >>= 1;
- 		}
- 	}
--	desc->irq_data.chip->irq_unmask(&desc->irq_data);
--	/* now it may re-trigger */
-+	/* acknowledge interrupt - now it may re-trigger */
-+	desc->irq_data.chip->irq_eoi(&desc->irq_data);
- }
- 
- /*--------------------------------------------------------------------------*/
-diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h linux-2.6/arch/arm/mach-at91/include/mach/irqs.h
---- linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h	2009-06-10 05:05:27.000000000 +0200
-+++ linux-2.6/arch/arm/mach-at91/include/mach/irqs.h	2011-04-27 14:20:48.471334804 +0200
-@@ -28,13 +28,6 @@
- 
- 
- /*
-- * Acknowledge interrupt with AIC after interrupt has been handled.
-- *   (by kernel/irq.c)
-- */
--#define irq_finish(irq) do { at91_sys_write(AT91_AIC_EOICR, 0); } while (0)
--
--
--/*
-  * IRQ interrupt symbols are the AT91xxx_ID_* symbols
-  * for IRQs handled directly through the AIC, or else the AT91_PIN_*
-  * symbols in gpio.h for ones handled indirectly as GPIOs.
-diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/irq.c linux-2.6/arch/arm/mach-at91/irq.c
---- linux-2.6.38/arch/arm/mach-at91/irq.c	2011-04-27 12:28:26.197078404 +0200
-+++ linux-2.6/arch/arm/mach-at91/irq.c	2011-04-27 14:23:29.817625842 +0200
-@@ -46,6 +46,12 @@
- 	at91_sys_write(AT91_AIC_IECR, 1 << d->irq);
- }
- 
-+static void at91_aic_eoi(struct irq_data *d)
-+{
-+	/* Acknowledge with AIC after interrupt has been handled */
-+	at91_sys_write(AT91_AIC_EOICR, 0);	
-+}
-+
- unsigned int at91_extern_irq;
- 
- #define is_extern_irq(irq) ((1 << (irq)) & at91_extern_irq)
-@@ -122,6 +128,7 @@
- 	.irq_ack	= at91_aic_mask_irq,
- 	.irq_mask	= at91_aic_mask_irq,
- 	.irq_unmask	= at91_aic_unmask_irq,
-+	.irq_eoi	= at91_aic_eoi,
- 	.irq_set_type	= at91_aic_set_type,
- 	.irq_set_wake	= at91_aic_set_wake,
- };
-@@ -144,7 +151,7 @@
- 		at91_sys_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
- 
- 		set_irq_chip(i, &at91_aic_chip);
--		set_irq_handler(i, handle_level_irq);
-+		set_irq_handler(i, handle_fasteoi_irq);
- 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
- 
- 		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
+Rickard Andersson (1):
+  plat-nomadik: add function to read GPIO pull down status
+
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/mach-nomadik/Kconfig                      |    2 +-
+ arch/arm/mach-nomadik/board-nhk8815.c              |    3 +-
+ arch/arm/mach-nomadik/cpu-8815.c                   |    1 +
+ arch/arm/mach-nomadik/i2c-8815nhk.c                |   14 +-
+ arch/arm/mach-nomadik/include/mach/gpio.h          |    8 +-
+ arch/arm/mach-u300/Kconfig                         |    1 +
+ arch/arm/mach-u300/Makefile                        |    6 +-
+ arch/arm/mach-u300/core.c                          |   31 +-
+ arch/arm/mach-u300/gpio.c                          |  700 ----------------
+ arch/arm/mach-u300/include/mach/gpio.h             |  163 +----
+ arch/arm/mach-u300/include/mach/irqs.h             |   25 +-
+ arch/arm/mach-ux500/Kconfig                        |    2 +-
+ arch/arm/mach-ux500/board-mop500-pins.c            |    3 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c             |    1 +
+ arch/arm/mach-ux500/board-u5500-sdi.c              |    3 +-
+ arch/arm/mach-ux500/cpu-db5500.c                   |    3 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |    5 +-
+ arch/arm/mach-ux500/devices-common.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/gpio.h            |    8 +-
+ arch/arm/mach-ux500/pins-db5500.h                  |    2 +
+ arch/arm/mach-ux500/pins-db8500.h                  |  144 ++--
+ arch/arm/plat-nomadik/Kconfig                      |    5 -
+ arch/arm/plat-nomadik/Makefile                     |    1 -
+ arch/arm/plat-nomadik/include/plat/gpio.h          |   93 ---
+ arch/arm/plat-nomadik/include/plat/pincfg.h        |  144 ----
+ drivers/gpio/Kconfig                               |   17 +
+ drivers/gpio/Makefile                              |    2 +
+ drivers/gpio/gpiolib.c                             |   28 +
+ .../gpio.c => drivers/gpio/nomadik-gpio.c          |  857 +++++++++++---------
+ drivers/gpio/u300-gpio.c                           |  836 +++++++++++++++++++
+ include/asm-generic/gpio.h                         |    8 +-
+ include/linux/gpio.h                               |   61 ++
+ include/linux/gpio/nomadik.h                       |  291 +++++++
+ include/linux/gpio/u300.h                          |   32 +
+ 35 files changed, 1922 insertions(+), 1583 deletions(-)
+ delete mode 100644 arch/arm/mach-u300/gpio.c
+ delete mode 100644 arch/arm/plat-nomadik/include/plat/gpio.h
+ delete mode 100644 arch/arm/plat-nomadik/include/plat/pincfg.h
+ rename arch/arm/plat-nomadik/gpio.c => drivers/gpio/nomadik-gpio.c (57%)
+ create mode 100644 drivers/gpio/u300-gpio.c
+ create mode 100644 include/linux/gpio/nomadik.h
+ create mode 100644 include/linux/gpio/u300.h
+
+-- 
+1.7.3.2
