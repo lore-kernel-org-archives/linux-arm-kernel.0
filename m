@@ -1,55 +1,42 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 27 Apr 2011 12:22:49 +0530
-Subject: [PATCH V7 02/17] SPEAr13xx: Add PCIe host controller base driver
-	support.
-In-Reply-To: <201104172219.01493.arnd@arndb.de>
-References: <cover.1298977728.git.viresh.kumar@st.com>
-	<4DA47085.9090209@gmail.com> <4DA59635.2020705@st.com>
-	<201104172219.01493.arnd@arndb.de>
-Message-ID: <4DB7BD41.50108@st.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 27 Apr 2011 12:33:08 +0530
+Subject: [PATCH v4 11/11] da850: pruss CAN board specific additions.
+In-Reply-To: <4DB6A509.2010009@mvista.com>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-12-git-send-email-subhasish@mistralsolutions.com>
+	<4DB6A509.2010009@mvista.com>
+Message-ID: <1F65A5A7A9494B73A22BDA7D64355767@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/18/2011 1:49 AM, Arnd Bergmann wrote:
-> On Wednesday 13 April 2011, pratyush wrote:
->>> Other vendors are likely to have the same IP, but none of the code here
->>> is written to be common. In light of recent discussions this would be a
->>> good candidate to avoid future duplication.
->>>
->>> It doesn't appear that pcie.c contains much SPEAr specific code. The few
->>> defines and structs that are could be passed in. Some comments below.
->>>
->>
->> Yes, this driver is for an PCIe host which uses Synopsys IP. But 
->> SPEAr specific wrapper has been used heavily in the code.
->> Synopsis provides some signal which can be interfaced to registers
->> for CPU access. This interface can be different for different vendor.
->> All the application registers are SPEAr specific representation
->> and may not be same for other vendor.
->> So all accesses for app_reg in the code may not be similar in other 
->> implementation. 
->>
->> ...
-> 
-> But they could also be the same in another implementation, right?
-> 
-> I would suggest in general to make the code as generic as easily possible
-> and put it into an appropriate location for sharing, but not spending
 
-Our next SOC has new revision of Synopsys PCIe Controller, which has more
-generic application interface registers. I am planning to divide code for
-this new SOC, so that it would be easily usable if someone has same controller.
-What could be the best location for shared code?
+>> +static int __init da850_evm_pruss_can_setup(void)
+>> +{
+>> + int ret, val = 0;
+>> + void __iomem *cfg_chip3_reg;
+>> +
+>> + ret = davinci_cfg_reg_list(da850_evm_pruss_can_pins);
+>> + if (ret)
+>> + pr_warning("%s: da850_evm_pruss_can_pins mux setup "
+>> + "failed:%d\n", __func__, ret);
+>
+>    Yet you continue to initialize... you should stop here I think.
 
-Regards
-Pratyush
+SG - Ok, will ret error.
 
-> too much effort on making it more generic than needed.
-> 
-> The next port that needs a variant of the code can then modify the
-> driver accordingly to add the necessary differences and ways to
-> detect them.
-> 
-> 	Arnd
-> .
-> 
+>
+>> + /* value = 0 to enable the CAN transceiver */
+>> + ret = gpio_request_one(DA850_PRUSS_CAN_TRX_PIN,
+>> + GPIOF_OUT_INIT_LOW, "pruss_can_en");
+>> + if (ret) {
+>> + pr_warning("Cannot setup GPIO %d\n", DA850_PRUSS_CAN_TRX_PIN);
+>> + gpio_free(DA850_PRUSS_CAN_TRX_PIN);
+>
+>    Doesn't gpio_request_one() handle freeing GPIO on error?
+
+SG - It does handle error, will remove. But I have another problem,
+        Suppose the init failed due to some other reason during probe.
+        How can I do a gpio_free, do I need some kind of deinit for the 
+setup ?
+
+ 
