@@ -1,108 +1,122 @@
 From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 26 Apr 2011 19:59:19 -0500
-Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
-In-Reply-To: <4DB16019.8000800@samsung.com>
-References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
-	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
-	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
-	<4DB16019.8000800@samsung.com>
-Message-ID: <BANLkTik2L8b8L5qngtd+fwAa+GJbXYQXWg@mail.gmail.com>
+Date: Tue, 26 Apr 2011 20:13:48 -0500
+Subject: MMC and reliable write - was: since when does ARM map the kernel
+	memory in sections?
+In-Reply-To: <20110426224546.GC5832@shareable.org>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<201104262100.42670.pwaechtler@mac.com>
+	<20110426190719.GA5832@shareable.org>
+	<201104262238.02979.pwaechtler@mac.com>
+	<20110426224546.GC5832@shareable.org>
+Message-ID: <BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jamie,
 
-On Fri, Apr 22, 2011 at 6:01 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Andrei..
+On Tue, Apr 26, 2011 at 5:45 PM, Jamie Lokier <jamie@shareable.org> wrote:
+> Peter Waechtler wrote:
+>> JEDEC Standard No. 84-A441
+>> Page 56
+>>
+>>
+>> Reliable Write: Multiple block write with pre-defined block count and
+>> Reliable Write parameters. This transaction is similar to the basic pre-
+>> defined multiple-block write (defined in previous bullet) with the
+>> following exceptions. The old data pointed to by a logical address must remain
+>> unchanged until the new data written to same logical address has been
+>> successfully programmed. This is to ensure that the target address
+>> updated by the reliable write transaction never contains undefined data.
+>>
+>> Data must remain valid even if a sudden power loss occurs during the
+>> programming.
+>>
+>> There are two versions of reliable write: legacy implementation and the
+>> enhance implementation. The type of reliable write supported by the device is
+>> indicated by the EN_REL_WR bit in the
+>> WR_REL_PARAM extended CSD register.
+>> ?For the case of EN_REL_WR = 0 :
+>>
+>>
+>> More fun on page 147ff:
+>>
+>> ? WR_REL_SET [167]
+>> The write reliability settings register indicates the reliability setting for
+>> each of the user and general
+>> area partitions in the device. The contents of this register are read only if
+>> the HS_CTRL_REL is 0 in
+>> the WR_REL_PARAM extended CSD register. The default value of these bits is not
+>> specified and is
+>> determined by the device.
+>>
+>>
+>> it goes on with:
+>>
+>> Bit[4]: WR_DATA_REL_4
+>> 0x0: In general purpose partition 4, the write operation has been optimized
+>> for performance and existing data in the partition could be at risk if a power
+>> failure occurs.
+>>
+>> 0x1: In general purpose partition 4, the device protects previously written
+>> data if power failure occurs during a write operation.
 >
-> Did you test this patch with ADMA?
-> I wonder that be increased performance or others..
+> Hmm... ?It all hinges on whether "previously written data" refers just
+> to the region being overwritten, or to all the other data in the
+> partition?
+>
+> If MMC writes are specified to only affect the data being written with
+> a Write command, and to have stably committed the data when Write
+> returns, then "Reliable Write" just means "atomic", and filesystems
+> and databases don't actually need that.
+>
+> Hard disks don't guarantee that, and it's not a problem. ?Filesystems
+> and databases need barriers and/or durable (stable) commits, and for
+> writes in one area not to corrupt data in a different area.
+>
+> *That's* a problem with other flash devices (and possibly some RAIDs):
+> Writes to one area can corrupt data in sectors that aren't being
+> written to, over quite a large distance.
+>
+> I can't tell from the above specification excerpt (by itself) what is
+> being guaranteed; it seems ambiguous, but maybe there's a clearer
+> definition elsewhere.
+>
+> It is conceivable that checksums and metadata could be stored into a
+> "reliable" partition and some kinds of file data into an "unreliable"
+> partition, where filesystem integrity is important and nobody cares
+> about the actual data! :-)
+>
+> -- Jamie
+>
 
-FWIW...
+I think this basically says - don't end up with corrupt flash if I
+pull the power when doing this MMC transaction.
+If you pull power during a regular write, you could end up with ALL
+erase units affected being wiped.
 
-ADMA
+Note, that the new definition of reliable writes provides a guarantee
+to a sector boundary. So if you interrupt
+the transaction, you will end up with [new data] followed by [old
+data]. The old definition guaranteed the entire range,
+but the transaction was only reliable when done over a sector or erase unit.
 
-With changes
+This means I jumped the gun on implementing REQ_FUA as reliable write,
+as REQ_FUA says nothing about atomicity.
+OTOH, I don't think anything in the block layer expects massive data
+corruption on power loss. In my defence, I saw REQ_FUA
+as being "prevent data corruption during power loss", hence the
+reliable write via REQ_FUA in mmc layer.
 
-adb shell "echo 0 > /sys/module/sdhci/parameters/no_prepost"
-time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/with"
+So my question -
+a) how should reliable writes be handled? REQ_META?
+b) how do we make sure to not wind up with data corruption and MMCs
+for work loads where you know power can be removed at any moment?
 
-real	0m37.245s
-user	0m0.010s
-sys	0m0.000s
-
-Without changes
-
-adb shell "echo 1 > /sys/module/sdhci/parameters/no_prepost"
-time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/without"
-
-real	0m38.400s
-user	0m0.000s
-sys	0m0.010s
-
-SDMA plus BOUNCE_BUFFER
-
-With changes
-
-adb shell "echo 0 > /sys/module/sdhci/parameters/no_prepost"
-time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/with"
-
-real	0m37.999s
-user	0m0.000s
-sys	0m0.010s
-
-Without changes
-
-adb shell "echo 1 > /sys/module/sdhci/parameters/no_prepost"
-time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/without"
-
-real	0m39.717s
-user	0m0.000s
-sys	0m0.010s
-
-Collected data using this patch on top of Shawn's...
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 3320c75..f698586 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -39,6 +39,7 @@
- #endif
-
- static unsigned int debug_quirks = 0;
-+static unsigned int no_prepost = 0;
-
- static void sdhci_prepare_data(struct sdhci_host *, struct mmc_data *);
- static void sdhci_finish_data(struct sdhci_host *);
-@@ -1140,6 +1141,8 @@ static void sdhci_pre_req(struct mmc_host *mmc,
-struct mmc_request *mrq,
-                          bool is_first_req)
- {
-        struct sdhci_host *host = mmc_priv(mmc);
-+       if (no_prepost)
-+               return;
-
-        if (mrq->data->host_cookie) {
-                mrq->data->host_cookie = 0;
-@@ -1157,6 +1160,9 @@ static void sdhci_post_req(struct mmc_host *mmc,
-struct mmc_request *mrq,
-        struct sdhci_host *host = mmc_priv(mmc);
-        struct mmc_data *data = mrq->data;
-
-+       if (no_prepost)
-+               return;
-+
-        if (host->flags & SDHCI_REQ_USE_DMA) {
-                dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-                             (data->flags & MMC_DATA_WRITE) ?
-@@ -2163,6 +2169,7 @@ module_init(sdhci_drv_init);
- module_exit(sdhci_drv_exit);
-
- module_param(debug_quirks, uint, 0444);
-+module_param(no_prepost, uint, 0644);
-
- MODULE_AUTHOR("Pierre Ossman <pierre@ossman.eu>");
- MODULE_DESCRIPTION("Secure Digital Host Controller Interface core driver");
-
+We could always turn on reliable writes (not good perf wise). We could
+turn on reliable writes for a particular range (enhanced user
+partition). We could also turn on reliable writes for a specific
+hardware partition. We could even create mapping layer that will
+occasionally atomically flush data to flash, while the actual fs
+accesses go to RAM.
 
 A
