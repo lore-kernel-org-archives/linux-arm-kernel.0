@@ -1,56 +1,45 @@
-From: ccross@google.com (Colin Cross)
-Date: Wed, 27 Apr 2011 11:16:14 -0700
-Subject: [PATCH] ARM: tegra: consolidate GIC extension usage
-In-Reply-To: <1303925937.28149.2.camel@e102144-lin.cambridge.arm.com>
-References: <1303297104-18887-1-git-send-email-marc.zyngier@arm.com>
-	<20110427083657.GI17290@n2100.arm.linux.org.uk>
-	<20110427124454.31470c8f@taxman.wild-wind.fr.eu.org>
-	<BANLkTi=eaTQ4w2j8C4Gs_=-zYdfY1m3Bfw@mail.gmail.com>
-	<1303925937.28149.2.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <BANLkTik6f6ih-MQPbF+qaOCAgG8pdBn7xA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 27 Apr 2011 13:23:37 -0500
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 10:38 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Colin,
+On Wednesday, April 27, 2011 6:13 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 >
-> On Wed, 2011-04-27 at 18:34 +0100, Colin Cross wrote:
->> On Wed, Apr 27, 2011 at 4:44 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> > On Wed, 27 Apr 2011 09:36:57 +0100
->> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> >
->> >> On Wed, Apr 20, 2011 at 11:58:24AM +0100, Marc Zyngier wrote:
->> >>
->> >> A good follow-on step would be...
->> >>
->> >> > ?static void tegra_mask(struct irq_data *d)
->> >> > ?{
->> >> > - ? tegra_gic_mask_irq(d);
->> >> > ? ? tegra_legacy_mask_irq(d->irq);
->> >> > ?}
->> >>
->> >> ... arranging tegra_legacy_mask_irq() etc to take struct irq_data directly.
->> >> These functions could then be removed entirely as they serve no useful
->> >> purpose other than transforming the new API back to the old API.
->> >
->> > How about the following patch? I haven't touched the gic_arch_extn part
->> > as it would break Will's fastEOI patch set (which depends on this one),
->> > but will prepare another patch cleaning up that part.
->>
->> I have a patch that fixes all of this and more as part of the Tegra PM
->> series, but I was sitting on it assuming Tegra PM would not go into
->> 2.6.40. ?Let me sort out the cleanups from the PM stuff, and I'll post
->> a patch that drops legacy_irq.c entirely.
+> This rewrites the U300 GPIO driver using gpiolib and the irq_chip
+> abstractions, makes it runtime-configured rather than compile-time,
+> and moves it to the drivers/gpio subsystem where it belongs,
+> depopulating the ARM tree of one more driver.
 >
-> Ok. Where does that leave my GIC fasteoi stuff? I'm becoming more
-> conscious of the chained_entry/exit functions sitting there unused in
-> the kernel and it would be good to get the plumbed into all of the
-> platforms sooner rather than later.
->
-> Ideally your cleanup patch will mean that I don't have to touch the
-> Tegra irq.c, leaving me with just the GPIO changes (which you can Ack if
-> you like :).
+> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-The irq.c changes call your chained functions.  I have changes for
-gpio.c that will conflict as well, and I haven't had a chance to test
-yours and reconcile them with mine.  I'll try to get to it this week.
+If this and other platform-specific GPIO drivers are going to be
+moved to the drivers/gpio subsystem, the Kconfig and Makefile should
+probably be updated to reflect this.
+
+In drivers/gpio/Kconfig:
+
+#
+# platform-neutral GPIO infrastructure and expanders
+#
+
+And in drivers/gpio/Makefile:
+
+# generic gpio support: dedicated expander chips, etc
+#
+# NOTE: platform-specific GPIO drivers don't belong in the
+# drivers/gpio directory; put them with other platform setup
+# code, IRQ controllers, board init, etc.
+
+The Makefile should probably be reordered, either alphabetically
+or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
+alphabetically in order to reduce merge conflicts.
+
+Regards,
+Hartley
