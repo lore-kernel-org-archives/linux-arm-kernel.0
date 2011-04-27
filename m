@@ -1,67 +1,174 @@
-From: alexdeucher@gmail.com (Alex Deucher)
-Date: Wed, 27 Apr 2011 12:16:49 -0400
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104271302.44249.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104271056.49920.arnd@arndb.de>
-	<20110427090923.GO17290@n2100.arm.linux.org.uk>
-	<201104271302.44249.arnd@arndb.de>
-Message-ID: <BANLkTi==KPpTg5PZ61p1xtbBijxND7JUow@mail.gmail.com>
+From: camhirundo@gmail.com (Hirundo Cam)
+Date: Thu, 28 Apr 2011 00:34:46 +0800
+Subject: [PATCH] kirkwood: add dir-665 support
+Message-ID: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 7:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 27 April 2011, Russell King - ARM Linux wrote:
->> On Wed, Apr 27, 2011 at 10:56:49AM +0200, Arnd Bergmann wrote:
->> > We probably still need to handle both the coherent and noncoherent case
->> > in each dma_map_ops implementation, at least for those combinations where
->> > they matter (definitely the linear mapping). However, I think that using
->> > dma_mapping_common.h would let us use an architecture-independent dma_map_ops
->> > for the generic iommu code that Marek wants to introduce now.
->>
->> The 'do we have an iommu or not' question and the 'do we need to do cache
->> coherency' question are two independent questions which are unrelated to
->> each other. ?There are four unique but equally valid combinations.
->>
->> Pushing the cache coherency question down into the iommu stuff will mean
->> that we'll constantly be fighting against the 'but this iommu works on x86'
->> shite that we've fought with over block device crap for years. ?I have
->> no desire to go there.
->
-> Ok, I see. I believe we could avoid having to fight with the people that
-> only care about coherent architectures if we just have two separate
-> implementations of dma_map_ops in the iommu code, one for coherent
-> and one for noncoherent DMA. Any architecture that only needs one
-> of them would then only enable the Kconfig options for that implementation
-> and not care about the other one.
->
->> What we need is a proper abstraction where the DMA ops can say whether
->> they can avoid DMA cache handling (eg, swiotlb or dmabounce stuff) but
->> default to DMA cache handling being the norm - and the DMA cache handling
->> performed in the level above the DMA ops indirection.
->
-> Yes, that sounds definitely possible. I guess it could be as simple
-> as having a flag somewhere in struct device if we want to make it
-> architecture independent.
->
-> As for making the default being to do cache handling, I'm not completely
-> sure how that would work on architectures where most devices are coherent.
-> If I understood the DRM people correctly, some x86 machine have noncoherent
-> DMA in their GPUs while everything else is coherent.
+This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
+LEDs, GPIO, Buttons remains unknown.
 
-On radeon hardware at least the on chip gart mechanism supports both
-snooped cache coherent pages and uncached, non-snooped pages.
+To use this patch, u-boot must also be modified.
 
-Alex
+Signed-off-by: Hirundo Cam <camhirundo@gmail.com>
+---
+ arch/arm/mach-kirkwood/Kconfig            |    6 ++
+ arch/arm/mach-kirkwood/Makefile           |    1 +
+ arch/arm/mach-kirkwood/mv88f6281_dir665.c |  107 +++++++++++++++++++++++++++++
+ arch/arm/tools/mach-types                 |    1 +
+ 4 files changed, 115 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-kirkwood/mv88f6281_dir665.c
 
->
-> Maybe we can default to arch_is_coherent() and allow a device to override
-> that when it knows better.
->
-> ? ? ? ?Arnd
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
->
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 7fc603b..296d97f 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -26,6 +26,12 @@ config MACH_MV88F6281GTW_GE
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell 88F6281 GTW GE Board.
+ 
++config MACH_MV88F6281_DIR665
++	bool "Marvell 88F6281 DIR665 Board"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  88F6281 DIR665 Board.
++
+ config MACH_SHEEVAPLUG
+ 	bool "Marvell SheevaPlug Reference Board"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 5dcaa81..f86649f 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -3,6 +3,7 @@ obj-y				+= common.o addr-map.o irq.o pcie.o mpp.o
+ obj-$(CONFIG_MACH_DB88F6281_BP)		+= db88f6281-bp-setup.o
+ obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
+ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
++obj-$(CONFIG_MACH_MV88F6281_DIR665)	+= mv88f6281_dir665.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+diff --git a/arch/arm/mach-kirkwood/mv88f6281_dir665.c b/arch/arm/mach-kirkwood/mv88f6281_dir665.c
+new file mode 100644
+index 0000000..41aa7ef
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/mv88f6281_dir665.c
+@@ -0,0 +1,107 @@
++/*
++ * arch/arm/mach-kirkwood/mv88f6281_dir665.c
++ *
++ * Marvell 88F6281 DIR-665 Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/pci.h>
++#include <linux/irq.h>
++#include <linux/mtd/physmap.h>
++#include <linux/timer.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/ethtool.h>
++#include <linux/gpio.h>
++#include <linux/leds.h>
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/orion_spi.h>
++#include <net/dsa.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/pci.h>
++#include <mach/kirkwood.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mv643xx_eth_platform_data mv88f6281_dir665_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_NONE,
++	.speed		= SPEED_1000,
++	.duplex		= DUPLEX_FULL,
++};
++
++static struct mv643xx_eth_platform_data mv88f6281_dir665_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_NONE,
++	.speed		= SPEED_1000,
++	.duplex		= DUPLEX_FULL,
++};
++
++static struct dsa_chip_data mv88f6281_dir665_switch_chip_data = {
++	.port_names[0]	= "lan4",
++	.port_names[1]	= "lan3",
++	.port_names[2]	= "lan2",
++	.port_names[3]	= "lan1",
++	.port_names[6]	= "cpu",
++};
++
++static struct dsa_platform_data mv88f6281_dir665_switch_plat_data = {
++	.nr_chips	= 1,
++	.chip		= &mv88f6281_dir665_switch_chip_data,
++};
++
++static const struct flash_platform_data mv88f6281_dir665_spi_slave_data = {
++	.type		= "mx25l12805d",
++};
++
++static struct spi_board_info __initdata mv88f6281_dir665_spi_slave_info[] = {
++	{
++		.modalias	= "m25p80",
++		.platform_data	= &mv88f6281_dir665_spi_slave_data,
++		.irq		= -1,
++		.max_speed_hz	= 50000000,
++		.bus_num	= 0,
++		.chip_select	= 0,
++	},
++};
++
++static void __init mv88f6281_dir665_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_init();
++
++	kirkwood_ehci_init();
++	kirkwood_ge00_init(&mv88f6281_dir665_ge00_data);
++	kirkwood_ge01_init(&mv88f6281_dir665_ge01_data);
++	kirkwood_ge00_switch_init(&mv88f6281_dir665_switch_plat_data, NO_IRQ);
++	spi_register_board_info(mv88f6281_dir665_spi_slave_info,
++				ARRAY_SIZE(mv88f6281_dir665_spi_slave_info));
++	kirkwood_spi_init();
++	kirkwood_uart0_init();
++}
++
++static int __init mv88f6281_dir665_pci_init(void)
++{
++	if (machine_is_mv88f6281_dir665())
++		kirkwood_pcie_init(KW_PCIE0);
++
++	return 0;
++}
++subsys_initcall(mv88f6281_dir665_pci_init);
++
++MACHINE_START(MV88F6281_DIR665, "Marvell 88F6281 DIR665 Board")
++	.boot_params	= 0x00000100,
++	.init_machine	= mv88f6281_dir665_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 7ca41f0..02d008d 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -1099,3 +1099,4 @@ ecuv5			MACH_ECUV5		ECUV5			3421
+ hsgx6d			MACH_HSGX6D		HSGX6D			3422
+ dawad7			MACH_DAWAD7		DAWAD7			3423
+ sam9repeater		MACH_SAM9REPEATER	SAM9REPEATER		3424
++mv88f6281_dir665	MACH_MV88F6281_DIR665	MV88F6281_DIR665	3425
+-- 
+1.7.3.5
