@@ -1,96 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Apr 2011 18:34:14 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add support for pre-sleep/post-restore gpio
-	control
-Message-ID: <1303925654-27715-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 27 Apr 2011 10:36:06 -0700
+Subject: [PATCH V2 2/2] mtd: msm_nand: Add initial msm nand driver support.
+In-Reply-To: <4DB83E70.4050402@codeaurora.org> (Murali Nalajala's message of
+	"Wed, 27 Apr 2011 21:34:00 +0530")
+References: <1302938249-4601-1-git-send-email-mnalajal@codeaurora.org>
+	<4DABE8FE.5040300@parrot.com> <4DB6C13F.2020402@codeaurora.org>
+	<4DB80E2A.4000203@parrot.com> <4DB83E70.4050402@codeaurora.org>
+Message-ID: <8yapqo74mwp.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
+On Wed, Apr 27 2011, Murali Nalajala wrote:
 
-Add a callback so that per-arch can do pre-sleep and post-resume
-gpio configuration so that for the S3C64XX, the GPIO configuration
-is restored before the sleep mode is cleared.
+> We have used nand base kind of implementation wherever is possible.
+> eg: We have leveraged the code from nand base to detect the nand
+> device properties.
 
-For the S3C64XX case, it means that the GPIOs get set back to normal
-operation after the restore code puts the original configurations
-back in after the
+Basing code off of other code but with modification is very different
+than using that other code.  Copying and modifying creates more code
+that can miss fixes and other changes.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c2410/include/mach/pm-core.h |    3 +++
- arch/arm/mach-s3c64xx/include/mach/pm-core.h |   17 +++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/pm-core.h |    3 +++
- arch/arm/plat-samsung/pm.c                   |    2 ++
- 4 files changed, 25 insertions(+), 0 deletions(-)
+I do think there is value in working with the nand code.  Remember that
+the nand code is not immutable.  If there is something that almost does
+what msm_nand needs, perhaps is can be changed to support that as well.
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/pm-core.h b/arch/arm/mach-s3c2410/include/mach/pm-core.h
-index 70a83b2..45eea52 100644
---- a/arch/arm/mach-s3c2410/include/mach/pm-core.h
-+++ b/arch/arm/mach-s3c2410/include/mach/pm-core.h
-@@ -62,3 +62,6 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
- 					   struct pm_uart_save *save)
- {
- }
-+
-+static inline void s3c_pm_restored_gpios(void) { }
-+static inline void s3c_pm_saved_gpios(void) { }
-diff --git a/arch/arm/mach-s3c64xx/include/mach/pm-core.h b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-index 4ed0f58..38659be 100644
---- a/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
-@@ -96,3 +96,20 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
- 		save->ucon = new_ucon;
- 	}
- }
-+
-+static inline void s3c_pm_restored_gpios(void)
-+{
-+	/* ensure sleep mode has been cleared from the system */
-+
-+	__raw_writel(0, S3C64XX_SLPEN);
-+}
-+
-+static inline void s3c_pm_saved_gpios(void)
-+{
-+	/* turn on the sleep mode and keep it there, as it seems that during
-+	 * suspend the xCON registers get re-set and thus you can end up with
-+	 * problems between going to sleep and resuming.
-+	 */
-+
-+	__raw_writel(S3C64XX_SLPEN_USE_xSLP, S3C64XX_SLPEN);
-+}
-diff --git a/arch/arm/mach-s5pv210/include/mach/pm-core.h b/arch/arm/mach-s5pv210/include/mach/pm-core.h
-index e8d394f..3e22109 100644
---- a/arch/arm/mach-s5pv210/include/mach/pm-core.h
-+++ b/arch/arm/mach-s5pv210/include/mach/pm-core.h
-@@ -41,3 +41,6 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
- {
- 	/* nothing here yet */
- }
-+
-+static inline void s3c_pm_restored_gpios(void) { }
-+static inline void s3c_pm_saved_gpios(void) { }
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index 5c0a440..4f9a951 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -268,6 +268,7 @@ static int s3c_pm_enter(suspend_state_t state)
- 	/* save all necessary core registers not covered by the drivers */
- 
- 	s3c_pm_save_gpios();
-+	s3c_pm_saved_gpios();
- 	s3c_pm_save_uarts();
- 	s3c_pm_save_core();
- 
-@@ -309,6 +310,7 @@ static int s3c_pm_enter(suspend_state_t state)
- 	s3c_pm_restore_core();
- 	s3c_pm_restore_uarts();
- 	s3c_pm_restore_gpios();
-+	s3c_pm_restored_gpios();
- 
- 	s3c_pm_debug_init();
- 
+David
+
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
