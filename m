@@ -1,47 +1,108 @@
 From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 26 Apr 2011 19:27:57 -0500
-Subject: since when does ARM map the kernel memory in sections?
-In-Reply-To: <20110426225818.GD5832@shareable.org>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<BANLkTin0NMo7ZDrnTmBghYeRC9wxJu7zrw@mail.gmail.com>
-	<20110412203303.GA16019@shareable.org>
-	<20110418135243.GB1479@ucw.cz>
-	<20110418170752.GQ16019@shareable.org>
-	<20110422154344.GA7526@ucw.cz>
-	<BANLkTimZZEr8fqXbuBjpYxF1quBFv7Oihg@mail.gmail.com>
-	<BANLkTikNqO_xGgsUrZ2fid4ZmA8P6AoHLA@mail.gmail.com>
-	<BANLkTi=Zn+kDfErZN6tm6yxHTt4v6o7XNw@mail.gmail.com>
-	<20110426225818.GD5832@shareable.org>
-Message-ID: <BANLkTikcsJxvJAPMigvXXzbKdXsDEdeTXA@mail.gmail.com>
+Date: Tue, 26 Apr 2011 19:59:19 -0500
+Subject: [PATCH] mmc: sdhci: add support for pre_req and post_req
+In-Reply-To: <4DB16019.8000800@samsung.com>
+References: <1302116833-24540-1-git-send-email-per.forlin@linaro.org>
+	<1302972516-8673-1-git-send-email-shawn.guo@linaro.org>
+	<BANLkTi=pqGyijbfuHD=uQzPnaYvNOQyzdg@mail.gmail.com>
+	<4DB16019.8000800@samsung.com>
+Message-ID: <BANLkTik2L8b8L5qngtd+fwAa+GJbXYQXWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 26, 2011 at 5:58 PM, Jamie Lokier <jamie@shareable.org> wrote:
->>
->> Reliable writes are exposed via REQ_FUA.
+Hi,
+
+On Fri, Apr 22, 2011 at 6:01 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Andrei..
 >
-> Are you sure that's appropriate?
->
-> Unless I have misunderstood (very possible), REQ_FUA means writes hit
-> non-volatile storage before acknowledgement, not that they are atomic.
-> I think the normal users of REQ_FUA don't require or expect large
-> atomic writes; they use it as a shortcut for (write & flush this
-> write) without implying anything else is flushed.
+> Did you test this patch with ADMA?
+> I wonder that be increased performance or others..
 
-I would agree with you that it's not the best mapping. However, a failed
-MMC write transaction has other properties. If I understand correctly,
-depending on mode of failure (say pulling power), you might wind up
-with extra data getting erased (because erase
-happens at erase unit boundary), and erase can be done before all the
-data was transferred from host to card.
+FWIW...
 
-The connection I made between FUA and reliable writes, is that you
-were guaranteed "physical presence" of the written data on
-storage medium as long as the transaction went through successfully. I
-can see where I assumed more than I should have.... If that's not the
-correct interpretation I will change it.
+ADMA
 
-REQ_META doesn't sound like the right candidate, because it's
-enforcing policy. Should there be a REQ_ATOMIC request type?
+With changes
+
+adb shell "echo 0 > /sys/module/sdhci/parameters/no_prepost"
+time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/with"
+
+real	0m37.245s
+user	0m0.010s
+sys	0m0.000s
+
+Without changes
+
+adb shell "echo 1 > /sys/module/sdhci/parameters/no_prepost"
+time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/without"
+
+real	0m38.400s
+user	0m0.000s
+sys	0m0.010s
+
+SDMA plus BOUNCE_BUFFER
+
+With changes
+
+adb shell "echo 0 > /sys/module/sdhci/parameters/no_prepost"
+time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/with"
+
+real	0m37.999s
+user	0m0.000s
+sys	0m0.010s
+
+Without changes
+
+adb shell "echo 1 > /sys/module/sdhci/parameters/no_prepost"
+time adb shell "iozone -a -f /cache/file -g 4m > /mnt/obb/without"
+
+real	0m39.717s
+user	0m0.000s
+sys	0m0.010s
+
+Collected data using this patch on top of Shawn's...
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 3320c75..f698586 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -39,6 +39,7 @@
+ #endif
+
+ static unsigned int debug_quirks = 0;
++static unsigned int no_prepost = 0;
+
+ static void sdhci_prepare_data(struct sdhci_host *, struct mmc_data *);
+ static void sdhci_finish_data(struct sdhci_host *);
+@@ -1140,6 +1141,8 @@ static void sdhci_pre_req(struct mmc_host *mmc,
+struct mmc_request *mrq,
+                          bool is_first_req)
+ {
+        struct sdhci_host *host = mmc_priv(mmc);
++       if (no_prepost)
++               return;
+
+        if (mrq->data->host_cookie) {
+                mrq->data->host_cookie = 0;
+@@ -1157,6 +1160,9 @@ static void sdhci_post_req(struct mmc_host *mmc,
+struct mmc_request *mrq,
+        struct sdhci_host *host = mmc_priv(mmc);
+        struct mmc_data *data = mrq->data;
+
++       if (no_prepost)
++               return;
++
+        if (host->flags & SDHCI_REQ_USE_DMA) {
+                dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+                             (data->flags & MMC_DATA_WRITE) ?
+@@ -2163,6 +2169,7 @@ module_init(sdhci_drv_init);
+ module_exit(sdhci_drv_exit);
+
+ module_param(debug_quirks, uint, 0444);
++module_param(no_prepost, uint, 0644);
+
+ MODULE_AUTHOR("Pierre Ossman <pierre@ossman.eu>");
+ MODULE_DESCRIPTION("Secure Digital Host Controller Interface core driver");
+
 
 A
