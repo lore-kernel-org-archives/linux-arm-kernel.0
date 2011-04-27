@@ -1,216 +1,25 @@
 From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 12:09:47 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <4DB1A603.2090208@pengutronix.de>
+Date: Wed, 27 Apr 2011 12:13:12 +0530
+Subject: [PATCH v4 03/11] da850: pruss platform specific additions.
+In-Reply-To: <4DB6A736.3030609@mvista.com>
 References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A603.2090208@pengutronix.de>
-Message-ID: <EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
+	<1303474109-6212-4-git-send-email-subhasish@mistralsolutions.com>
+	<4DB6A736.3030609@mvista.com>
+Message-ID: <0A4FA4CFE83C4DD4BA36491027E93552@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
+>>   #include<mach/edma.h>
+>> @@ -73,6 +75,7 @@ extern unsigned int da850_max_speed;
+>>   #define DA8XX_DDR2_CTL_BASE 0xb0000000
+>>   #define DA8XX_ARM_RAM_BASE 0xffff0000
+>>   #define DA8XX_SHARED_RAM_BASE 0x80000000
+>> +#define DA8XX_PRUSS_MEM_BASE 0x01C30000
+>
+>    Keep the list sorted please. Also, this macro doesn't seem used outside 
+> devices-da8xx.c, so should be moved there...
 
-- Is it ok to have u32 etc for __iomem cookie ?
-
-> +
-> +s32 pruss_disable(struct device *dev, u8 pruss_num)
-make it a int function
-
-SG -- Ok will do
-
-> +
-> +	/* Reset PRU */
-> +	iowrite32(PRUCORE_CONTROL_RESETVAL,
-> +				&h_pruss->control);
-> +	spin_unlock(&pruss->lock);
-> +
-> +	return 0;
-
-make it a void function?
-
-SG -- This should be int, in case of invalid pru num, we ret an error.
-
-
-> +}
-> +EXPORT_SYMBOL_GPL(pruss_disable);
-> +
-> +s32 pruss_enable(struct device *dev, u8 pruss_num)
-int?
-
-SG -- Ok will do
-
-
-> +
-> +	if ((pruss_num != PRUCORE_0) && (pruss_num != PRUCORE_1))
-> +		return -EINVAL;
-> +
-> +	h_pruss = &pruss_mmap->core[pruss_num];
-> +
-> +	/* Reset PRU  */
-> +	spin_lock(&pruss->lock);
-> +	iowrite32(PRUCORE_CONTROL_RESETVAL, &h_pruss->control);
-
-no need to lock the ram reset below?
-
-SG -- I don't think its required. We just reset the RAM during init and 
-since each pru can only be attached to only one device, the access
-        will be already serialized based upon the pru num.
-
-
-> +	/* Reset any garbage in the ram */
-> +	if (pruss_num == PRUCORE_0)
-> +		for (i = 0; i < PRUSS_PRU0_RAM_SZ; i++)
-> +			iowrite32(0x0, &pruss_mmap->dram0[i]);
-> +	else if (pruss_num == PRUCORE_1)
-> +		for (i = 0; i < PRUSS_PRU1_RAM_SZ; i++)
-> +			iowrite32(0x0, &pruss_mmap->dram1[i]);
-if you make a array for these
-+struct pruss_map {
-+	u8 dram0[512];
-+	u8 res1[7680];
-
-+	u8 dram1[512];
-+	u8 res2[7680];
-..}
-you don't need the if..else..
-
-SG - The dram/iram is not contiguous, there is a reserved space in between, 
-how do I declare an array for it.
-
-
-> +/* Load the specified PRU with code */
-> +s32 pruss_load(struct device *dev, u8 pruss_num,
-> +			u32 *pruss_code, u32 code_size_in_words)
-> +{
-> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-> +	struct pruss_map __iomem *pruss_mmap = pruss->ioaddr;
-> +	u32 __iomem *pruss_iram;
-> +	u32 i;
-> +
-> +	if (pruss_num == PRUCORE_0)
-> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram0;
-> +	else if (pruss_num == PRUCORE_1)
-> +		pruss_iram = (u32 __iomem *)&pruss_mmap->iram1;
-> +	else
-same here
-
-SG - same here.
-
-
-> +s32 pruss_run(struct device *dev, u8 pruss_num)
-int?
-
-SG - Ok, Will do.
-
-
-> +	while (cnt--) {
-> +		temp_reg = ioread32(&h_pruss->control);
-> +		if (((temp_reg & PRUCORE_CONTROL_RUNSTATE_MASK) >>
-> +				PRUCORE_CONTROL_RUNSTATE_SHIFT) ==
-> +				PRUCORE_CONTROL_RUNSTATE_HALT)
-> +			break;
-how long might this take? what about some delay, sleep, or reschedule?
-
-SG - This does not take more than 10 to 20 counts,
-
-
-> +s32 pruss_writeb(struct device *dev, u32 offset, u8 pdatatowrite)
-> +{
-> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-> +	void __iomem *paddresstowrite;
-we usually don't use "p" variable names for pointers
-
-SG - Ok, will remove.
-
-
-> +s32 pruss_rmwb(struct device *dev, u32 offset, u8 mask, u8 val)
-void function?
-
-SG - Ok, will do.
-
-> +
-> +s32 pruss_readb(struct device *dev, u32 offset, u8 *pdatatoread)
-void?
-
-SG - Ok, will do.
-
-> +{
-> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-> +	void __iomem *paddresstoread;
-> +
-> +	paddresstoread = pruss->ioaddr + offset ;
-> +	*pdatatoread = ioread8(paddresstoread);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pruss_readb);
-> +
-> +s32 pruss_readb_multi(struct device *dev, u32 offset,
-> +		u8 *pdatatoread, u16 bytestoread)
-viod?
-
-SG - Ok, will do.
-
-> +{
-> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-> +	u8 __iomem *paddresstoread;
-> +	u16 i;
-int?
-
-SG - Ok, will do.
-
-
-
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pruss_readb_multi);
-> +
-> +s32 pruss_writel(struct device *dev, u32 offset,
-> +		u32 pdatatowrite)
-void?
-
-SG - Ok, will do.
-
-
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pruss_writel);
-> +
-> +s32 pruss_writel_multi(struct device *dev, u32 offset,
-> +		u32 *pdatatowrite, u16 wordstowrite)
-void?
-
-SG - Ok, will do.
-
-> +{
-> +	struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
-> +	u32 __iomem *paddresstowrite;
-> +	u16 i;
-> +
-> +	paddresstowrite = pruss->ioaddr + offset;
-> +
-> +	for (i = 0; i < wordstowrite; i++)
-> +		iowrite32(*pdatatowrite++, paddresstowrite++);
-memcopy_to_iomem?
-
-SG -- I did not understand, could you please elaborate.
-
-
-> +
-> +s32 pruss_rmwl(struct device *dev, u32 offset, u32 mask, u32 val)
-void?
-
-SG - Ok, will do.
-
-
-> +}
-> +EXPORT_SYMBOL_GPL(pruss_rmwl);
-> +
-> +s32 pruss_readl(struct device *dev, u32 offset, u32 *pdatatoread)
-void? or return the read value
-
-SG - Ok, will do.
-
+SG - But would it not be better to have all device addresses at the same 
+place.
  
