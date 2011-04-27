@@ -1,29 +1,46 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 27 Apr 2011 19:36:00 +0530
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <Pine.LNX.4.44L0.1104261447481.2035-100000@iolanthe.rowland.org>
-References: <BANLkTi=-DFfdiBKZzRBxF-yMJFtWnzuk1g@mail.gmail.com>
-	<Pine.LNX.4.44L0.1104261447481.2035-100000@iolanthe.rowland.org>
-Message-ID: <BANLkTimxLjvq2GC8_TJJk9OXZ9fPc-JKiA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Apr 2011 07:23:06 -0700
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
+	to be appended to zImage
+In-Reply-To: <20110421124618.GA15060@atomide.com>
+References: <20110324231830.2586.7150.stgit@riker>
+	<20110328091259.GA18721@S2100-06.ap.freescale.net>
+	<20110413140030.GE12665@atomide.com>
+	<20110420054746.GA31127@S2100-06.ap.freescale.net>
+	<20110420073445.GB31127@S2100-06.ap.freescale.net>
+	<20110421080238.GE13688@atomide.com>
+	<20110421124618.GA15060@atomide.com>
+Message-ID: <20110427142306.GI3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 00:21, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Tue, 26 Apr 2011, Rabin Vincent wrote:
->> In my case it's this writel() in ehci-hub.c that gets chopped into
->> strbs:
->>
->> ? ? ? /* force reset to complete */
->> ? ? ? ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? status_reg);
->
-> Why would that get messed up? ?The status_reg variable doesn't have any
-> __atribute__((packed)) associated with it.
+* Tony Lindgren <tony@atomide.com> [110421 05:44]:
+> * Tony Lindgren <tony@atomide.com> [110421 11:00]:
+> > * Shawn Guo <shawn.guo@freescale.com> [110420 00:27]:
+> > > On Wed, Apr 20, 2011 at 01:47:47PM +0800, Shawn Guo wrote:
+> > > > I would like to confirm it fixes your setup before I send fixing
+> > > > patch to remove 'static' from global variables in all platform
+> > > > uncompress.h.
+> > > > 
+> > > Just saw Nico's patch, so ignore above lines ...
+> > 
+> > Thanks looks like removing static only changes things so now
+> > "Warning: Neither atags nor dtb found" error message printed out.
+> 
+> But also Nico's patch fixes the corruption of the DT data during
+> uncompress, so I'm getting much further now.
+> 
+> Now the problem is that the DT data is zeroed out by the time code
+> gets to setup_machine_fdt. I wonder if I'm missing some patch?
+> 
+> I'm using grant's devicetree/arm branch + DT append patch + Nico's
+> static fix + my relocate fix.
+> 
+> Oh well have to look at it again next week..
 
-The initialization of status_reg is:
+I guess the issue is that when setup_machine_fdt gets called we only
+have minimal MMU mapping done.
 
-	u32 __iomem *status_reg
-		= &ehci->regs->port_status[(wIndex & 0xff) - 1];
+So I guess there's some other patch related to it?
 
-where ehci->regs is a pointer to the packed struct ehci_regs.  So, this
-is the same problem of casting pointers to stricter alignment.
+Tony
