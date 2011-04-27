@@ -1,33 +1,28 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 28 Apr 2011 07:41:07 +1000
+Date: Thu, 28 Apr 2011 07:45:37 +1000
 Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110427202603.GY17290@n2100.arm.linux.org.uk>
+In-Reply-To: <BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
 References: <201104212129.17013.arnd@arndb.de>
-	<201104271302.44249.arnd@arndb.de>
-	<20110427201605.GW17290@n2100.arm.linux.org.uk>
-	<201104272221.48601.arnd@arndb.de>
-	<20110427202603.GY17290@n2100.arm.linux.org.uk>
-Message-ID: <1303940467.2513.188.camel@pasglop>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+Message-ID: <1303940737.2513.190.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> As I said above, I don't think bus code can do it.  Take my example
-> above of a tulip pci device on x86 and a tulip pci device on ARM.  Both
-> use the same PCI code.
+On Wed, 2011-04-27 at 10:52 +0100, Catalin Marinas wrote:
 > 
-> Maybe something in asm/pci.h - but that invites having lots of bus
-> specific header files in asm/.
-> 
-> A better solution imho would be to have an architecture callback for
-> struct device which gets registered, which can inspect the type of
-> the device, and set the flag depending on where it appears in the
-> tree.
+> It's not broken since we moved to using Normal non-cacheable memory
+> for the coherent DMA buffers (as long as you flush the cacheable alias
+> before using the buffer, as we already do). The ARM ARM currently says
+> unpredictable for such situations but this is being clarified in
+> future updates and the Normal non-cacheable vs cacheable aliases can
+> be used (given correct cache maintenance before using the buffer).
 
-Now -that's gross :-)
+Don't you have a risk where speculative loads or prefetches might bring
+back some stuff into the cache via the cachable mapping ? Is that an
+issue ? As long as it's non-dirty and the cachable mapping isn't
+otherwise used, I suppose it might be a non-issue, tho I've seen in
+powerpc land cases of processors that can checkstop if a subsequent non
+cachable access "hits" the stuff that was loaded in the cache.
 
-For PCI you can have the flag propagate from the PHB down, for busses
-without a bus type (platform) then whoever instanciate them (the
-platform code) can set that appropriately.
-
+Cheers,
 Ben.
