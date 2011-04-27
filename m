@@ -1,44 +1,40 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 27 Apr 2011 16:49:02 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<20110425212056.GA29313@kroah.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
-	<20110426124519.GC5977@suse.de>
-	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 27 Apr 2011 14:42:57 +0300
+Subject: RAID/dmaengine violates the dma-streaming API
+In-Reply-To: <BANLkTinMA_U1r6K4t8UZKUr4nZBsWPSv9w@mail.gmail.com>
+References: <BANLkTinMA_U1r6K4t8UZKUr4nZBsWPSv9w@mail.gmail.com>
+Message-ID: <BANLkTi=30Q5=TAaPcE8SXt417S6e=RaY3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 10:53:38, Subhasish Ghosh wrote:
-> >> There should be no build time dependency with this patch
-> >> (the above patch just changes which pool of SRAM the
-> >> allocation happens from)
-> >>
-> >> But, this brings out an important dependency of the patch
-> >> calling platform specific sram allocator functions. There
-> >> has been SRAM allocator consolidation work done by Russell
-> >> and as a result the SRAM allocator API for DaVinci will
-> >> actually change.
-> 
-> I earlier had an implementation where I would get the sram memory addresses
-> through the .resource structure and ioremap it in the driver.
+On Sun, Apr 17, 2011 at 7:00 PM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> Hi,
+> ? ? when md uses the dma for offloading xor and memcpy operations, it
+> violates the dma-mapping API. ?here is the scenario I'm taking about
+> (under write to degraded raid5):
+> 1. ops_run_prexor sends xor operation from buffers A and B, and the
+> destination is A.
+> 2. ops_run_biodrain: sends mempcy operation from C to B.
+> 3. ops_run_reconstruct5: sends xor operation from A and B, and the
+> destination is A again.
+>
+> in step 1, the async tx maps A using dma_map_page, and in step 3, it
+> maps again the same buffer. but, if the request from step 1 still
+> being handled the dma engine, then we end with a case where the buffer
+> mapped while it still belongs to the dma hw.
+> when the arch is ARMv6/SMP mode (without io coherency), the cache
+> maintenance involves read/write access to the buffers, that means, the
+> second mapping above may access the buffer(with read/write) while the
+> dma is writing to it!!.
+>
+Russell/Dan,
+     can you have a look into this issue? what I see here is that the
+raid stack issues dma_map_page to a buffer that still owned by DMA.
 
-This is wrong since it assumes the whole SRAM is available
-for usage by your driver. We already have an allocator
-for SRAM.
+saeed
 
-> 
-> >>The driver should probably just get sram
-> >> space through platform data so that it doesn't depend on the
-> >> platform specific sram allocation function.
-> 
-> Are you suggesting that I go back to that implementation.
-
-No, the platform code should use the SRAM allocator and
-pass on the allocated memory to the driver.
-
-Thanks,
-Sekhar
+> also, from performance sake, it would be great if this multiple
+> mappings get avoided.
+>
+> saeed
+>
