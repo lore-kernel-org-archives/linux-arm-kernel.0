@@ -1,31 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Apr 2011 07:43:35 -0700
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-References: <20110324231830.2586.7150.stgit@riker>
-	<20110328091259.GA18721@S2100-06.ap.freescale.net>
-	<20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-	<20110427142306.GI3755@atomide.com>
-	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-Message-ID: <20110427144335.GK3755@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Apr 2011 10:48:07 -0400 (EDT)
+Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
+In-Reply-To: <20110427085336.GL17290@n2100.arm.linux.org.uk>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
+	<20110427085336.GL17290@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104271043160.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [110427 07:37]:
-> On Wed, 27 Apr 2011, Tony Lindgren wrote:
+On Wed, 27 Apr 2011, Russell King - ARM Linux wrote:
+
+> On Wed, Apr 20, 2011 at 12:15:03AM -0400, Nicolas Pitre wrote:
+> > The return value for decompress_kernel() is no longer used.  Furthermore,
+> > this was obtained and stored in a variable called output_ptr which is
+> > a complete misnomer for what is actually the size of the decompressed
+> > kernel image.  Let's get rid of it.
 > > 
-> > I guess the issue is that when setup_machine_fdt gets called we only
-> > have minimal MMU mapping done.
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > ---
+> > 
+> > BTW, I've yet to understand why, but this patch makes CONFIG_KERNEL_LZMA
+> > work for me.
 > 
-> In head.S (the final kernel image one) there is a 1MB mapping 
-> established when r2 contains a valid ATAG/DTB pointer.  See commit 
-> 4d901c42 (you even ACK'd it).
+> Hmm.  I've switched almost entirely to LZMA since it was introduced and it
+> works for me on all my platforms.  I haven't tested kernels rigorously since
+> your patches to the decompressor, so maybe there's a regression in there
+> somewhere.
+> 
+> Can you try LZMA with your various patches over the last four months
+> reverted?
 
-Yeah thanks was just looking at that too :) Need to debug further..
+Yes I did, and the issue turned up to be about the stack alignment wich 
+was not enforced to a 64 bit boundary.  Depending on the size of the 
+code and compressed kernel data, the stack would end up properly aligned 
+with a 50% probability.  And this was a problem only if your gcc version 
+emited LDRD/STRD type accesses to the stack.
 
-Tony
+I'm about to send you a pull request with all those fixes.
+
+
+Nicolas
