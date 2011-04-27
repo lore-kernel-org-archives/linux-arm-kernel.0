@@ -1,93 +1,73 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Wed, 27 Apr 2011 19:47:20 +0900
-Subject: [RFC PATCH v2 1/3] PM / Core: suspend_again callback for device
-	PM.
-In-Reply-To: <1303897603.4431.16.camel@oct.suse.cz>
-References: <1303288106-2965-1-git-send-email-myungjoo.ham@samsung.com>
-	<20110426210627.GA28033@elf.ucw.cz>
-	<201104262346.58046.rjw@sisk.pl> <201104270032.42046.rjw@sisk.pl>
-	<BANLkTi=QDjBtY2WypXjYzyAOUGYjf_oRvw@mail.gmail.com>
-	<1303897603.4431.16.camel@oct.suse.cz>
-Message-ID: <BANLkTik4v=8ME4p76dxboj_hs=m6P3EENA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 27 Apr 2011 12:51:52 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104271056.49920.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110427073514.GH17290@n2100.arm.linux.org.uk>
+	<201104271056.49920.arnd@arndb.de>
+Message-ID: <001001cc04c9$1e5caf30$5b160d90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 6:46 PM, Stanislav Brabec <utx@penguin.cz> wrote:
-> MyungJoo Ham wrote:
->
->> As long as sysdevs are resumed and some devices/subsystems (I2C-PMIC,
->> ADC, and RTC in my cases) can be selectively resumed and suspended, it
->> is fine.
->> Thus, your "alternative" suggestion is perfect with me. Actually, this
->> is almost going back to the original hack. =)
->>
->> I'll submit next revision with platform_suspend_ops later.
->
-> Does kernel have something like "sleepy task" interface, e. g. special
-> mode that is triggered by some sort of interrupt and instead of going to
-> perform full resume, it just lets a hook to wake up "manually" needed
-> devices, perform the "sleepy task" and then tell the system whether full
-> resume is requested?
+Hello,
 
-Not that I know of. I don't see anything that stops the resuming flow
-(full resume will be performed at any wakeup event before this patch)
+On Wednesday, April 27, 2011 10:57 AM Arnd Bergmann wrote:
 
-The patch that is going to be revised as mentioned will allow you to perform
-1) "manually" wake up some devices
-2) perform "sleepy tasks"
-3) "manually" suspend devices waked up at 1)
-4) tell the system whether full resume is requested.
-at the suspend_again callback of struct platform_suspend_ops suspend_ops.
+> On Wednesday 27 April 2011, Russell King - ARM Linux wrote:
+> > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> > >    that this is needed, and it currently is not implemented, with
+> > >    an outdated comment explaining why it used to not be possible
+> > >    to do it.
+> >
+> > dma_alloc_noncoherent is an entirely pointless API afaics.
+> 
+> The main use case that I can see for dma_alloc_noncoherent is being
+> able to allocate a large cacheable memory chunk that is mapped
+> contiguous into both kernel virtual and bus virtual space, but not
+> necessarily in contiguous in physical memory.
+> 
+> Without an IOMMU, I agree that it is pointless, because the only
+> sensible imlpementation would be alloc_pages_exact + dma_map_single.
 
-However, you may need some "helpers" to do 1 and 3 easily.
+Still it might be reasonable to use it in the drivers that will work
+on different platforms - one with iommu and one without.
+ 
+> > > 3. Convert ARM to use asm-generic/dma-mapping-common.h. We need
+> > >    both IOMMU and direct mapped DMA on some machines.
+> > >
+> > > 4. Implement an architecture independent version of dma_map_ops
+> > >    based on the iommu.h API. As Joerg mentioned, this has been
+> > >    missing for some time, and it would be better to do it once
+> > >    than for each IOMMU separately. This is probably a lot of work.
+> >
+> > dma_map_ops design is broken - we can't have the entire DMA API
+> indirected
+> > through that structure.  Whether you have an IOMMU or not is completely
+> > independent of whether you have to do DMA cache handling.  Moreover, with
+> > dmabounce, having the DMA cache handling in place doesn't make sense.
+> >
+> > So you can't have a dma_map_ops for the cache handling bits, a
+> dma_map_ops
+> > for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
+> > work like that.
+> >
+> > I believe the dma_map_ops stuff in asm-generic to be entirely unsuitable
+> > for ARM.
+> 
+> We probably still need to handle both the coherent and noncoherent case
+> in each dma_map_ops implementation, at least for those combinations where
+> they matter (definitely the linear mapping). However, I think that using
+> dma_mapping_common.h would let us use an architecture-independent
+> dma_map_ops
+> for the generic iommu code that Marek wants to introduce now.
+> 
+> I still don't understand how dmabounce works, but if it's similar to
+> swiotlb, we can have at least three different dma_map_ops: linear,
+> dmabounce and iommu.
 
-Anyway, for the "helpers" for 1) and 3), I expect that allowing the
-one who provide suspend_ops to provide a list of struct dev pointers
-that required wakeup would be enough.
+That's exactly what I want to make in the initial version of my patches.
 
-I'd look at this issue as well because I have the same issue, but I'd
-do it separately with the "suspend_again".
-
->
-> It can fit for Zaurus battery charging monitoring - timer interrupt
-> needs to wake just the SPI bus.
->
-> But I can imagine a GPS logger using such interface to save energy -
-> serial interrupt semi-wakes the system each second, but will not go to
-> do full resume. It just processes NMEA sentence and buffers the result.
-> Only if buffer becomes full, it issues full resume and writes data
-> somewhere.
-
-Sure, as long as the platform file (or machine/board file) has the
-suspend_again callback implemented correctly, it will work as you
-expected.
-
->
-> --
-> Best Regards / S pozdravem,
->
-> Stanislav Brabec
-> software developer
-> ---------------------------------------------------------------------
-> SUSE LINUX, s. r. o. ? ? ? ? ? ? ? ? ? ? ? ? ?e-mail: sbrabec at suse.cz
-> Lihovarsk? 1060/12 ? ? ? ? ? ? ? ? ? ? ? ? ? ?tel: +49 911 7405384547
-> 190 00 Praha 9 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?fax: +420 284 028 951
-> Czech Republic ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?http://www.suse.cz/
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-Cheers!
-
-- MyungJoo
+Best regards
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Marek Szyprowski
+Samsung Poland R&D Center
