@@ -1,129 +1,122 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 27 Apr 2011 18:38:19 +0530
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <4DB5D452.9050500@grandegger.com>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<1303474267-6344-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A3B7.7060300@pengutronix.de> <4DB5D452.9050500@grandegger.com>
-Message-ID: <46D523E49EFF489F9B088AE7B9CD7286@subhasishg>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Wed, 27 Apr 2011 15:09:02 +0200
+Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
+Message-ID: <1303909742.18407.12.camel@redbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> - Use just *one* value per sysfs file
+The AT91's AIC interrupt controller will internally mask the current
+(and lower-priority) interrupts until software acknowledges that the
+interrupt was handled by writing to the AIC_EOICR register.
 
-SG - I felt adding entry for each mbx_id will clutter the sysfs.
-        Is it ok to do that.
+This matches the "fasteoi" IRQ flow-handler, so convert the AT91 to use
+handle_fasteoi_irq rather than handle_level_irq.
 
-
->>> +static u32 pruss_intc_init[19][3] = {
->>> + {PRUSS_INTC_POLARITY0, PRU_INTC_REGMAP_MASK, 0xFFFFFFFF},
->>> + {PRUSS_INTC_POLARITY1, PRU_INTC_REGMAP_MASK, 0xFFFFFFFF},
->>> + {PRUSS_INTC_TYPE0, PRU_INTC_REGMAP_MASK, 0x1C000000},
->>> + {PRUSS_INTC_TYPE1, PRU_INTC_REGMAP_MASK, 0},
->>> + {PRUSS_INTC_GLBLEN, 0, 1},
->>> + {PRUSS_INTC_HOSTMAP0, PRU_INTC_REGMAP_MASK, 0x03020100},
->>> + {PRUSS_INTC_HOSTMAP1, PRU_INTC_REGMAP_MASK, 0x07060504},
->>> + {PRUSS_INTC_HOSTMAP2, PRU_INTC_REGMAP_MASK, 0x0000908},
->>> + {PRUSS_INTC_CHANMAP0, PRU_INTC_REGMAP_MASK, 0},
->>> + {PRUSS_INTC_CHANMAP8, PRU_INTC_REGMAP_MASK, 0x00020200},
->>> + {PRUSS_INTC_STATIDXCLR, 0, 32},
->>> + {PRUSS_INTC_STATIDXCLR, 0, 19},
->>> + {PRUSS_INTC_ENIDXSET, 0, 19},
->>> + {PRUSS_INTC_STATIDXCLR, 0, 18},
->>> + {PRUSS_INTC_ENIDXSET, 0, 18},
->>> + {PRUSS_INTC_STATIDXCLR, 0, 34},
->>> + {PRUSS_INTC_ENIDXSET, 0, 34},
->>> + {PRUSS_INTC_ENIDXSET, 0, 32},
->>> + {PRUSS_INTC_HOSTINTEN, 0, 5}
->>
->> please add ","
->
-> Also a struct to describe each entry would improve readability.
-> Then you could also use ARRAY_SIZE.
-
-SG _ I could not follow this, are you recommending that I create a structure 
-with three variables and then create
-            an array for it.
-something like:
-
-const static struct [] = {
-    {
-    unsigned int reg_base;
-    unsigned int reg_mask;
-    unsigned int reg_val;
-    },
-...
-};
+This also allows the irq_finish() call to be removed from the low-level
+ARM IRQ handler.
 
 
->>> + value = (PRUSS_CAN_GPIO_SETUP_DELAY *
->>> + (priv->clk_freq_pru / 1000000) / 1000) /
->>> + PRUSS_CAN_DELAY_LOOP_LENGTH;
->
-> This calculation looks delicate. 64-bit math would be safer.
-
-SG - This one works fine. I am dividing it twice to avoid the problem.
+Signed-off-by: Andrew Victor <linux@maxim.org.za>
 
 
->>> + pru_can_mask_ints(priv->dev, PRUSS_CAN_TX_PRU_1, false);
->>> + pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, false);
->>> + can_bus_off(ndev);
->>> + dev_dbg(priv->ndev->dev.parent, "Bus off mode\n");
->>> + }
->>> +
->>> + netif_rx(skb);
->
-> You should use netif_receive_skb(skb) here as well.
 
-SG - Ok, Will do.
-
->
-> if (PRUSS_CAN_ISR_BIT_ESI &
->     priv->can_rx_cntx.intr_stat) {
->
-> Is more readable.
-
-SG - Ok, Will do.
-
->
->
->>> + pru_can_gbl_stat_get(priv->dev,
->>> + &priv->can_rx_cntx);
->>> + pru_can_err(ndev,
->>> + priv->can_rx_cntx.intr_stat,
->>> + priv->can_rx_cntx.gbl_stat);
->
-> Please fix bogous indention.
-
-SG - Ok, Will do.
-
-
->>> +
->>> + pdata = dev->platform_data;
->>> + if (!pdata) {
->>> + dev_err(&pdev->dev, "platform data not found\n");
->>> + return -EINVAL;
->>> + }
->>> + (pdata->setup)();
->>
->> no need fot the ( )
-
-SG - Ok, Will do.
-
->>> + }
->>> +
->>> + priv->ndev = ndev;
->>> + priv->dev = dev;
->>> +
->>> + priv->can.bittiming_const = &pru_can_bittiming_const;
->>> + priv->can.do_set_bittiming = pru_can_set_bittiming;
->>> + priv->can.do_set_mode = pru_can_set_mode;
->>> + priv->can.do_get_state = pru_can_get_state;
->
-> Please remove that callback. It's not needed as state changes are
-> handled properly.
->
-
-SG -- Ok, Will do
-
+diff -urN -x CVS linux-2.6.38/arch/arm/kernel/irq.c linux-2.6/arch/arm/kernel/irq.c
+--- linux-2.6.38/arch/arm/kernel/irq.c	2011-04-27 12:28:25.609111745 +0200
++++ linux-2.6/arch/arm/kernel/irq.c	2011-04-27 14:20:32.784167994 +0200
+@@ -42,13 +42,6 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
  
+-/*
+- * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
+- */
+-#ifndef irq_finish
+-#define irq_finish(irq) do { } while (0)
+-#endif
+-
+ unsigned long irq_err_count;
+ 
+ int show_interrupts(struct seq_file *p, void *v)
+@@ -135,9 +128,6 @@
+ 		generic_handle_irq(irq);
+ 	}
+ 
+-	/* AT91 specific workaround */
+-	irq_finish(irq);
+-
+ 	irq_exit();
+ 	set_irq_regs(old_regs);
+ }
+diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
+--- linux-2.6.38/arch/arm/mach-at91/gpio.c	2011-04-27 12:28:26.157080664 +0200
++++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-27 14:45:42.672364605 +0200
+@@ -392,8 +392,6 @@
+ 	at91_gpio = get_irq_chip_data(irq);
+ 	pio = at91_gpio->regbase;
+ 
+-	/* temporarily mask (level sensitive) parent IRQ */
+-	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 	for (;;) {
+ 		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
+ 		 * When there none are pending, we're finished unless we need
+@@ -429,8 +427,8 @@
+ 			isr >>= 1;
+ 		}
+ 	}
+-	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+-	/* now it may re-trigger */
++	/* acknowledge interrupt - now it may re-trigger */
++	desc->irq_data.chip->irq_eoi(&desc->irq_data);
+ }
+ 
+ /*--------------------------------------------------------------------------*/
+diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h linux-2.6/arch/arm/mach-at91/include/mach/irqs.h
+--- linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h	2009-06-10 05:05:27.000000000 +0200
++++ linux-2.6/arch/arm/mach-at91/include/mach/irqs.h	2011-04-27 14:20:48.471334804 +0200
+@@ -28,13 +28,6 @@
+ 
+ 
+ /*
+- * Acknowledge interrupt with AIC after interrupt has been handled.
+- *   (by kernel/irq.c)
+- */
+-#define irq_finish(irq) do { at91_sys_write(AT91_AIC_EOICR, 0); } while (0)
+-
+-
+-/*
+  * IRQ interrupt symbols are the AT91xxx_ID_* symbols
+  * for IRQs handled directly through the AIC, or else the AT91_PIN_*
+  * symbols in gpio.h for ones handled indirectly as GPIOs.
+diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/irq.c linux-2.6/arch/arm/mach-at91/irq.c
+--- linux-2.6.38/arch/arm/mach-at91/irq.c	2011-04-27 12:28:26.197078404 +0200
++++ linux-2.6/arch/arm/mach-at91/irq.c	2011-04-27 14:23:29.817625842 +0200
+@@ -46,6 +46,12 @@
+ 	at91_sys_write(AT91_AIC_IECR, 1 << d->irq);
+ }
+ 
++static void at91_aic_eoi(struct irq_data *d)
++{
++	/* Acknowledge with AIC after interrupt has been handled */
++	at91_sys_write(AT91_AIC_EOICR, 0);	
++}
++
+ unsigned int at91_extern_irq;
+ 
+ #define is_extern_irq(irq) ((1 << (irq)) & at91_extern_irq)
+@@ -122,6 +128,7 @@
+ 	.irq_ack	= at91_aic_mask_irq,
+ 	.irq_mask	= at91_aic_mask_irq,
+ 	.irq_unmask	= at91_aic_unmask_irq,
++	.irq_eoi	= at91_aic_eoi,
+ 	.irq_set_type	= at91_aic_set_type,
+ 	.irq_set_wake	= at91_aic_set_wake,
+ };
+@@ -144,7 +151,7 @@
+ 		at91_sys_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
+ 
+ 		set_irq_chip(i, &at91_aic_chip);
+-		set_irq_handler(i, handle_level_irq);
++		set_irq_handler(i, handle_fasteoi_irq);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+ 
+ 		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
