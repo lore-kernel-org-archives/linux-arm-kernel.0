@@ -1,50 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Apr 2011 13:52:28 +0100
-Subject: [PATCH] ARM: cache-l2x0: fix wrong print of AUX_CTRL register
-In-Reply-To: <4DB80F2F.4020503@ti.com>
-References: <1303907194-3121-1-git-send-email-srinidhi.kasagar@stericsson.com>
-	<4DB80F2F.4020503@ti.com>
-Message-ID: <BANLkTi=HLjA0=dxyekxhaBibx2K4rHrsYQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 27 Apr 2011 09:55:04 -0300
+Subject: [PATCH v4] [ARM] MX1: Add ARMadeus Systems APF9328 board support
+In-Reply-To: <1303842222-28209-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1303842222-28209-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <BANLkTimoe_v3cud6XRtqz_Q4BS8Si7PMGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2011 13:42, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> On 4/27/2011 5:56 PM, srinidhi kasagar wrote:
->>
->> On platforms where l2x0 is already enabled and configured
->> by the secure code, printing the masked value of the
->> AUX_CTRL register seems to be wrong and differ from the
->> programmed value.
->>
->> Fix it by reading the AUX_CTRL register again.
->>
->> Signed-off-by: srinidhi kasagar<srinidhi.kasagar@stericsson.com>
->> Signed-off-by: Vijaya Kumar Kilari<vijay.kilari@stericsson.com>
->> ---
->> ?arch/arm/mm/cache-l2x0.c | ? ?2 ++
->> ?1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index ef59099..d07f8cb 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -340,6 +340,8 @@ void __init l2x0_init(void __iomem *base, __u32
->> aux_val, __u32 aux_mask)
->> ? ? ? ?outer_cache.disable = l2x0_disable;
->> ? ? ? ?outer_cache.set_debug = l2x0_set_debug;
->>
->> + ? ? ? aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
->> +
->
-> Can you not read this register in your machine code and pass
-> the right 'aux_val' as part of l2x0_init() ?
+2011/4/26 Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>:
+...
+> +static struct resource dm9000_resources[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .start ?= MX1_CS4_PHYS + 0x00C00000,
+> + ? ? ? ? ? ? ? .end ? ?= MX1_CS4_PHYS + 0x00C00001,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .start ?= MX1_CS4_PHYS + 0x00C00002,
+> + ? ? ? ? ? ? ? .end ? ?= MX1_CS4_PHYS + 0x00C00003,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? [2] = {
+> + ? ? ? ? ? ? ? .start ?= IRQ_GPIOB(14),
+> + ? ? ? ? ? ? ? .end ? ?= IRQ_GPIOB(14),
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+> + ? ? ? },
+> +};
 
-We already read this register in l2x0_init().
+No need to explicitly show the array index. The compiler can count it by itself.
 
-In theory, the Linux kernel shouldn't even touch this register but
-leave it to the boot loader or other firmware (or just some sane reset
-values that the hardware people should put). But no-one seems to be
-doing this.
+Regards,
 
--- 
-Catalin
+Fabio Estevam
