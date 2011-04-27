@@ -1,85 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 27 Apr 2011 22:48:05 +0800
-Subject: [PATCH 2/2] ARM: pxa: introduce {icip,
-	ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
-In-Reply-To: <1303915685-14823-1-git-send-email-eric.y.miao@gmail.com>
-References: <1303915685-14823-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1303915685-14823-2-git-send-email-eric.y.miao@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Apr 2011 10:55:33 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: zImage: fix issues with missing GOT entries
+	for some global variables
+In-Reply-To: <20110427085505.GM17290@n2100.arm.linux.org.uk>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<1303272904-31392-4-git-send-email-nicolas.pitre@linaro.org>
+	<20110427085505.GM17290@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104271048250.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-pxa/include/mach/irqs.h |    3 +++
- arch/arm/mach-pxa/irq.c               |   32 ++++++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 0 deletions(-)
+On Wed, 27 Apr 2011, Russell King - ARM Linux wrote:
 
-diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-index a94c694..564337d 100644
---- a/arch/arm/mach-pxa/include/mach/irqs.h
-+++ b/arch/arm/mach-pxa/include/mach/irqs.h
-@@ -106,9 +106,12 @@
- 
- #ifndef __ASSEMBLY__
- struct irq_data;
-+struct pt_regs;
- 
- void pxa_mask_irq(struct irq_data *);
- void pxa_unmask_irq(struct irq_data *);
-+void icip_handle_irq(struct pt_regs *);
-+void ichp_handle_irq(struct pt_regs *);
- #endif
- 
- #endif /* __ASM_MACH_IRQS_H */
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 0aeeff4..38be164 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -37,6 +37,8 @@
- #define IPR(i)			(((i) < 32) ? (0x01c + ((i) << 2)) :		\
- 				((i) < 64) ? (0x0b0 + (((i) - 32) << 2)) :	\
- 				      (0x144 + (((i) - 64) << 2)))
-+#define ICHP_VAL_IRQ		(1 << 31)
-+#define ICHP_IRQ(i)		(((i) >> 16) & 0x7fff)
- #define IPR_VALID		(1 << 31)
- #define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
- 
-@@ -127,6 +129,36 @@ static struct irq_chip pxa_low_gpio_chip = {
- 	.irq_set_type	= pxa_set_low_gpio_type,
- };
- 
-+asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
-+{
-+	uint32_t icip, icmr, mask;
-+
-+	do {
-+		icip = __raw_readl(IRQ_BASE + ICIP);
-+		icmr = __raw_readl(IRQ_BASE + ICMR);
-+		mask = icip & icmr;
-+
-+		if (mask == 0)
-+			break;
-+
-+		asm_do_IRQ(fls(mask) - 1, regs);
-+	} while (1);
-+}
-+
-+asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
-+{
-+	uint32_t ichp;
-+
-+	do {
-+		__asm__ __volatile__("mrc p6, 0, %0, c5, c0, 0\n": "=r"(ichp));
-+
-+		if ((ichp & ICHP_VAL_IRQ) == 0)
-+			break;
-+
-+		asm_do_IRQ(PXA_IRQ(ICHP_IRQ(ichp)), regs);
-+	} while (1);
-+}
-+
- static void __init pxa_init_low_gpio_irq(set_wake_t fn)
- {
- 	int irq;
--- 
-1.7.1
+> On Wed, Apr 20, 2011 at 12:15:04AM -0400, Nicolas Pitre wrote:
+> > Many architecture specific versions of uncompress.h make use of global
+> > variables marked static.  In such case the GOT is bypassed and the
+> > code in head.S can't relocate them.
+> 
+> No, we're not doing this - it creates confusion with static variables
+> declared inside functions.
+
+Yes, but in such case those variables would be allocated to the .data 
+section, and we're already discarding .data up front to prevent its 
+usage.  So there might not be static variables within functions used 
+now, unless they're also const.
+
+However I've discovered that static variables within functions with an 
+initial value of zero are instead allocated in the .bss section, and 
+always using a GOTOFF relocation.  So those can't be used either and 
+right now there is nothing preventing them.
+
+Anyway I've discarded this patch as it also makes problems with 
+architecture code including standard kernel header files containing 
+static inline functions.
+
+> It's far easier to audit for the presence of 'static' than it is for
+> the possibility of an ignored 'static' inside a function body.
+> 
+> Ensure that the uncompress.h header files are right.
+
+Exact.  And I now have a patch failing the build if the wrong usage is 
+made ending up in GOTOFF relocs that we can't support which is even 
+better than manual auditing.
+
+
+Nicolas
