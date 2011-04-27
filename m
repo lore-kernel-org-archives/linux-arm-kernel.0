@@ -1,94 +1,129 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 27 Apr 2011 14:07:19 +0100
-Subject: MMC and reliable write - was: since when does ARM map the kernel
-	memory in sections?
-In-Reply-To: <BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<201104262100.42670.pwaechtler@mac.com>
-	<20110426190719.GA5832@shareable.org>
-	<201104262238.02979.pwaechtler@mac.com>
-	<20110426224546.GC5832@shareable.org>
-	<BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
-Message-ID: <20110427130719.GE5832@shareable.org>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 27 Apr 2011 18:38:19 +0530
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DB5D452.9050500@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<1303474267-6344-2-git-send-email-subhasish@mistralsolutions.com>
+	<4DB1A3B7.7060300@pengutronix.de> <4DB5D452.9050500@grandegger.com>
+Message-ID: <46D523E49EFF489F9B088AE7B9CD7286@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrei Warkentin wrote:
-> I think this basically says - don't end up with corrupt flash if I
-> pull the power when doing this MMC transaction.
-> If you pull power during a regular write, you could end up with ALL
-> erase units affected being wiped.
-> 
-> Note, that the new definition of reliable writes provides a guarantee
-> to a sector boundary. So if you interrupt
-> the transaction, you will end up with [new data] followed by [old
-> data]. The old definition guaranteed the entire range,
-> but the transaction was only reliable when done over a sector or erase unit.
+>
+> - Use just *one* value per sysfs file
 
-The old definition might not have been implemented in practice, or
-might have caused performance problems -- or maybe it just wasn't that
-useful, because it's so different from what hard-disk-like filesystems
-expect of a block device.
+SG - I felt adding entry for each mbx_id will clutter the sysfs.
+        Is it ok to do that.
 
-> This means I jumped the gun on implementing REQ_FUA as reliable write,
-> as REQ_FUA says nothing about atomicity.
-> OTOH, I don't think anything in the block layer expects massive data
-> corruption on power loss. In my defence, I saw REQ_FUA
-> as being "prevent data corruption during power loss", hence the
-> reliable write via REQ_FUA in mmc layer.
-> 
-> So my question -
-> a) how should reliable writes be handled?
 
-If your understanding is this:
+>>> +static u32 pruss_intc_init[19][3] = {
+>>> + {PRUSS_INTC_POLARITY0, PRU_INTC_REGMAP_MASK, 0xFFFFFFFF},
+>>> + {PRUSS_INTC_POLARITY1, PRU_INTC_REGMAP_MASK, 0xFFFFFFFF},
+>>> + {PRUSS_INTC_TYPE0, PRU_INTC_REGMAP_MASK, 0x1C000000},
+>>> + {PRUSS_INTC_TYPE1, PRU_INTC_REGMAP_MASK, 0},
+>>> + {PRUSS_INTC_GLBLEN, 0, 1},
+>>> + {PRUSS_INTC_HOSTMAP0, PRU_INTC_REGMAP_MASK, 0x03020100},
+>>> + {PRUSS_INTC_HOSTMAP1, PRU_INTC_REGMAP_MASK, 0x07060504},
+>>> + {PRUSS_INTC_HOSTMAP2, PRU_INTC_REGMAP_MASK, 0x0000908},
+>>> + {PRUSS_INTC_CHANMAP0, PRU_INTC_REGMAP_MASK, 0},
+>>> + {PRUSS_INTC_CHANMAP8, PRU_INTC_REGMAP_MASK, 0x00020200},
+>>> + {PRUSS_INTC_STATIDXCLR, 0, 32},
+>>> + {PRUSS_INTC_STATIDXCLR, 0, 19},
+>>> + {PRUSS_INTC_ENIDXSET, 0, 19},
+>>> + {PRUSS_INTC_STATIDXCLR, 0, 18},
+>>> + {PRUSS_INTC_ENIDXSET, 0, 18},
+>>> + {PRUSS_INTC_STATIDXCLR, 0, 34},
+>>> + {PRUSS_INTC_ENIDXSET, 0, 34},
+>>> + {PRUSS_INTC_ENIDXSET, 0, 32},
+>>> + {PRUSS_INTC_HOSTINTEN, 0, 5}
+>>
+>> please add ","
+>
+> Also a struct to describe each entry would improve readability.
+> Then you could also use ARRAY_SIZE.
 
-   - "Reliable Write" only affects the range being written
+SG _ I could not follow this, are you recommending that I create a structure 
+with three variables and then create
+            an array for it.
+something like:
 
-   - "Normal Write" can corrupt ANY random part of the flash
-     (because you don't know where the physical erase blocks are, or
-     what reorganising it might provoke.)
+const static struct [] = {
+    {
+    unsigned int reg_base;
+    unsigned int reg_mask;
+    unsigned int reg_val;
+    },
+...
+};
 
-Then the answer's pretty clear.
-You have to use "Reliable Write" for everything.
 
-> REQ_META?
+>>> + value = (PRUSS_CAN_GPIO_SETUP_DELAY *
+>>> + (priv->clk_freq_pru / 1000000) / 1000) /
+>>> + PRUSS_CAN_DELAY_LOOP_LENGTH;
+>
+> This calculation looks delicate. 64-bit math would be safer.
 
-No, that's a scheduling hint; you can't assume filesystems
-consistently label "metadata needed for filesystem integrity" with
-that flag.  (And databases and VMs have similar needs, but don't get
-to choose REQ_ flags).
+SG - This one works fine. I am dividing it twice to avoid the problem.
 
-But even if they did, wouldn't a single normal write, from the above
-description, potentially corrupt all previously written metadata
-anyway, making it pointless?
 
-> b) how do we make sure to not wind up with data corruption and MMCs
-> for work loads where you know power can be removed at any moment?
+>>> + pru_can_mask_ints(priv->dev, PRUSS_CAN_TX_PRU_1, false);
+>>> + pru_can_mask_ints(priv->dev, PRUSS_CAN_RX_PRU_0, false);
+>>> + can_bus_off(ndev);
+>>> + dev_dbg(priv->ndev->dev.parent, "Bus off mode\n");
+>>> + }
+>>> +
+>>> + netif_rx(skb);
+>
+> You should use netif_receive_skb(skb) here as well.
 
-> We could always turn on reliable writes (not good perf wise). We could
-> turn on reliable writes for a particular range (enhanced user
-> partition).  We could also turn on reliable writes for a specific
-> hardware partition. 
+SG - Ok, Will do.
 
-It might have to be simply a mount option - let the user decide their
-priorities.
+>
+> if (PRUSS_CAN_ISR_BIT_ESI &
+>     priv->can_rx_cntx.intr_stat) {
+>
+> Is more readable.
 
-What's "enhanced user partition" -- is it a device feature?
+SG - Ok, Will do.
 
-> We could even create mapping layer that will occasionally atomically
-> flush data to flash, while the actual fs accesses go to RAM.
+>
+>
+>>> + pru_can_gbl_stat_get(priv->dev,
+>>> + &priv->can_rx_cntx);
+>>> + pru_can_err(ndev,
+>>> + priv->can_rx_cntx.intr_stat,
+>>> + priv->can_rx_cntx.gbl_stat);
+>
+> Please fix bogous indention.
 
-So using "Reliable Write" all the time, and using a flash-optimised
-filesystem (MTD-style like jffs2, ubifs, logfs) to group the writes
-consecutively into sensible block sizes?
+SG - Ok, Will do.
 
-I guess if the first small "Reliable Write" is quite slow, and a
-flash-optimised filesystem that performs write-behind just like disk
-filesystems, then will be plenty more data records queued up for
-writing after it, automatically making the write sizes increase to
-match the media's speed.  Add a little "anticipatory scheduling" perhaps.
 
-I presume "Reliable Write" must be to a contiguous range of the MMC's
-logical block presentation?
+>>> +
+>>> + pdata = dev->platform_data;
+>>> + if (!pdata) {
+>>> + dev_err(&pdev->dev, "platform data not found\n");
+>>> + return -EINVAL;
+>>> + }
+>>> + (pdata->setup)();
+>>
+>> no need fot the ( )
 
--- Jamie
+SG - Ok, Will do.
+
+>>> + }
+>>> +
+>>> + priv->ndev = ndev;
+>>> + priv->dev = dev;
+>>> +
+>>> + priv->can.bittiming_const = &pru_can_bittiming_const;
+>>> + priv->can.do_set_bittiming = pru_can_set_bittiming;
+>>> + priv->can.do_set_mode = pru_can_set_mode;
+>>> + priv->can.do_get_state = pru_can_get_state;
+>
+> Please remove that callback. It's not needed as state changes are
+> handled properly.
+>
+
+SG -- Ok, Will do
+
+ 
