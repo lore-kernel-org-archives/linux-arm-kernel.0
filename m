@@ -1,43 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 27 Apr 2011 17:00:57 +0200
-Subject: [PATCH] clkdev: add support to lookup for early platform device
-In-Reply-To: <20110427104758.GG29103@game.jcrosoft.org>
-References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110427084247.GK17290@n2100.arm.linux.org.uk>
-	<20110427103145.GF29103@game.jcrosoft.org>
-	<20110427104758.GG29103@game.jcrosoft.org>
-Message-ID: <20110427150057.GH29103@game.jcrosoft.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 27 Apr 2011 19:15:07 +0400
+Subject: [PATCH] echi: remove structure packing from ehci_def
+In-Reply-To: <1303914841-6379-1-git-send-email-rabin@rab.in>
+References: <1303914841-6379-1-git-send-email-rabin@rab.in>
+Message-ID: <4DB832FB.8030805@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:47 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 12:31 Wed 27 Apr     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 09:42 Wed 27 Apr     , Russell King - ARM Linux wrote:
-> > > On Wed, Apr 20, 2011 at 04:05:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > early platform device may do not have a device name as the slab is not yet
-> > > > available. So to search a clock base on the dev_id we need to search first the
-> > > > device base name and then the id
-> > > 
-> > > I really don't like this.  IDs are platform device specific, and this is
-> > > a platform devince independent layer.
-> > > 
-> > > If you want to do this, then add a platform_device_clk_get() call, which
-> > > takes the platform device and connection id.  Uses the platform device
-> > > infrastructure to format the device name, and use clk_get_sys() to look
-> > > up the device/connection id from that.
-> > I do not want to alloc a string in the clkdev
-> > but if you prefer
-> I check we can not do so
-> if slab is not available we can not use kmalloc
-> 
-> so we can not generate the dev.init_name
-I check also we can not use the bootmem as it's too early in the init
-so allocate the dev_id is not possible
+Hello.
 
-use a satic buffer I'm not so happy about it
-the only other solution is this one
+Rabin Vincent wrote:
 
-which Greg or you prefer
+> As pointed out by Arnd Bergmann, in include/linux/usb/ehci_def.h, struct
+> ehci_caps is defined with __attribute__((packed)) for no good reason,
 
-Best Regards,
-J.
+    You're talking only of one structure here, yet you're changing several...
+
+> and this triggers undefined behaviour when using ARM's readl() on
+> pointers to elements of this structure:
+
+> http://lkml.kernel.org/r/201102021700.20683.arnd at arndb.de
+
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  include/linux/usb/ehci_def.h |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+
+> diff --git a/include/linux/usb/ehci_def.h b/include/linux/usb/ehci_def.h
+> index e49dfd4..7879943 100644
+> --- a/include/linux/usb/ehci_def.h
+> +++ b/include/linux/usb/ehci_def.h
+> @@ -52,7 +52,7 @@ struct ehci_caps {
+>  #define HCC_PGM_FRAMELISTLEN(p) ((p)&(1 << 1))  /* true: periodic_size changes*/
+>  #define HCC_64BIT_ADDR(p)       ((p)&(1))       /* true: can use 64-bit addr */
+>  	u8		portroute[8];	 /* nibbles for routing - offset 0xC */
+> -} __attribute__ ((packed));
+> +};
+>  
+>  
+>  /* Section 2.3 Host Controller Operational Registers */
+> @@ -150,7 +150,7 @@ struct ehci_regs {
+>  #define PORT_CSC	(1<<1)		/* connect status change */
+>  #define PORT_CONNECT	(1<<0)		/* device connected */
+>  #define PORT_RWC_BITS   (PORT_CSC | PORT_PEC | PORT_OCC)
+> -} __attribute__ ((packed));
+> +};
+>  
+>  #define USBMODE		0x68		/* USB Device mode */
+>  #define USBMODE_SDIS	(1<<3)		/* Stream disable */
+> @@ -194,7 +194,7 @@ struct ehci_dbg_port {
+>  	u32	data47;
+>  	u32	address;
+>  #define DBGP_EPADDR(dev, ep)	(((dev)<<8)|(ep))
+> -} __attribute__ ((packed));
+> +};
+>  
+>  #ifdef CONFIG_EARLY_PRINTK_DBGP
+>  #include <linux/init.h>
+
+WBR, Sergei
