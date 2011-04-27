@@ -1,47 +1,28 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Wed, 27 Apr 2011 23:34:16 +0900
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1303914570.15101.33.camel@e102109-lin.cambridge.arm.com>
-References: <BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-	<20110427230344I.fujita.tomonori@lab.ntt.co.jp>
-	<1303914570.15101.33.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110427233156M.fujita.tomonori@lab.ntt.co.jp>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Apr 2011 07:38:45 -0700
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
+	to be appended to zImage
+In-Reply-To: <20110427142306.GI3755@atomide.com>
+References: <20110324231830.2586.7150.stgit@riker>
+	<20110328091259.GA18721@S2100-06.ap.freescale.net>
+	<20110413140030.GE12665@atomide.com>
+	<20110420054746.GA31127@S2100-06.ap.freescale.net>
+	<20110420073445.GB31127@S2100-06.ap.freescale.net>
+	<20110421080238.GE13688@atomide.com>
+	<20110421124618.GA15060@atomide.com>
+	<20110427142306.GI3755@atomide.com>
+Message-ID: <20110427143845.GJ3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Apr 2011 15:29:30 +0100
-Catalin Marinas <catalin.marinas@arm.com> wrote:
+* Tony Lindgren <tony@atomide.com> [110427 07:20]:
+> 
+> I guess the issue is that when setup_machine_fdt gets called we only
+> have minimal MMU mapping done.
+> 
+> So I guess there's some other patch related to it?
 
-> On Wed, 2011-04-27 at 15:06 +0100, FUJITA Tomonori wrote:
-> > On Wed, 27 Apr 2011 10:52:25 +0100
-> > Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > 
-> > > Anyway, we end up with different DMA ops per device via dev_archdata.
-> > 
-> > Several architectures already do. What's wrong with the approach for
-> > arm?
-> 
-> Nothing wrong IMHO but it depends on how you group the DMA ops as it may
-> not be feasible to have all the combinations dmabounce/iommu/coherency
-> combinations. I think the main combinations would be:
-> 
-> 1. standard (no-iommu) + non-coherent
-> 2. standard (no-iommu) + coherent
-> 3. iommu + non-coherent
-> 4. iommu + coherent
-> 5. dmabounce + non-coherent
-> 6. dmabounce + coherent
-> 
-> I think dmabounce and iommu can be exclusive (unless the iommu cannot
-> access the whole RAM). If that's the case, we can have three type of DMA
-> ops:
-> 
-> 1. standard
-> 2. iommu
-> 3. dmabounce
-> 
-> with an additional flag via dev_archdata for cache coherency level (a
-> device may be able to snoop the L1 or L2 cache etc.)
+Hmm head.S should already map the boot params address in r2..
+Looks like more debugging is needed.
 
-Sounds nothing wrong to me too. I like to see arm people to switch
-from dmabounce to swiotlb though.
+Tony
