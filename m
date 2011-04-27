@@ -1,108 +1,135 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 27 Apr 2011 15:14:20 +0200
-Subject: [PATCH 08/10] gpio/nomadik-gpio: work with all machines
-Message-ID: <1303910060-3538-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 27 Apr 2011 15:14:27 +0200
+Subject: [PATCH 09/10] gpio/nomadik-gpio: factor out state cast function
+Message-ID: <1303910067-3571-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The old NHK8815 machine does not have sleepmode, and it does not
-have the magic machine-specific cpu_is_u8500v2() macro either.
-Use platform data to pass in sleeping capability instead so we
-can compile for NHK8815.
+This factors out the container_of() magic to dereference the
+state struct from the gpio_chip into an inline function and adds
+a dummy config function.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    3 +++
- drivers/gpio/nomadik-gpio.c      |   13 +++++++++++--
- include/linux/gpio/nomadik.h     |    1 +
- 3 files changed, 15 insertions(+), 2 deletions(-)
+ drivers/gpio/nomadik-gpio.c  |   34 ++++++++++++++++++++++------------
+ include/linux/gpio/nomadik.h |    2 ++
+ 2 files changed, 24 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index f87f37c..69b4f00 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -152,6 +152,9 @@ static void __init db8500_add_gpios(void)
- 		/* No custom data yet */
- 	};
- 
-+	if (cpu_is_u8500v2())
-+		pdata.supports_sleepmode = true;
-+
- 	dbx500_add_gpios(ARRAY_AND_SIZE(db8500_gpio_base),
- 			 IRQ_DB8500_GPIO0, &pdata);
- }
 diff --git a/drivers/gpio/nomadik-gpio.c b/drivers/gpio/nomadik-gpio.c
-index dd2d728..b30b6a2 100644
+index b30b6a2..b8d5bae 100644
 --- a/drivers/gpio/nomadik-gpio.c
 +++ b/drivers/gpio/nomadik-gpio.c
-@@ -4,6 +4,7 @@
-  * Copyright (C) 2008,2009 STMicroelectronics
-  * Copyright (C) 2009 Alessandro Rubini <rubini@unipv.it>
-  *   Rewritten based on work by Prafulla WADASKAR <prafulla.wadaskar@st.com>
-+ * Copyright (C) 2011 Linus Walleij <linus.walleij@linaro.org>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -48,6 +49,7 @@ struct nmk_gpio_chip {
- 	u32 (*get_secondary_status)(unsigned int bank);
- 	void (*set_ioforce)(bool enable);
- 	spinlock_t lock;
-+	bool sleepmode;
- 	/* Keep track of configured edges */
- 	u32 edge_rising;
- 	u32 edge_falling;
-@@ -568,6 +570,12 @@ static void __nmk_gpio_irq_modify(struct nmk_gpio_chip *nmk_chip,
- static void __nmk_gpio_set_wake(struct nmk_gpio_chip *nmk_chip,
- 				int gpio, bool on)
- {
-+	if (nmk_chip->sleepmode) {
-+		__nmk_gpio_set_slpm(nmk_chip, gpio - nmk_chip->chip.base,
-+				    on ? NMK_GPIO_SLPM_WAKEUP_ENABLE
-+				    : NMK_GPIO_SLPM_WAKEUP_DISABLE);
-+	}
+@@ -67,6 +67,14 @@ static DEFINE_SPINLOCK(nmk_gpio_slpm_lock);
+ 
+ #define NUM_BANKS ARRAY_SIZE(nmk_gpio_chips)
+ 
++static inline struct nmk_gpio_chip *to_nmk_chip(struct gpio_chip *chip)
++{
++	struct nmk_gpio_chip *nmk_chip =
++		container_of(chip, struct nmk_gpio_chip, chip);
 +
- 	__nmk_gpio_irq_modify(nmk_chip, gpio, WAKE, on);
++	return nmk_chip;
++}
++
+ static void __nmk_gpio_set_mode(struct nmk_gpio_chip *nmk_chip,
+ 				unsigned offset, int gpio_mode)
+ {
+@@ -512,6 +520,13 @@ int nmk_gpio_get_mode(int gpio)
  }
+ EXPORT_SYMBOL(nmk_gpio_get_mode);
  
-@@ -1001,7 +1009,7 @@ void nmk_gpio_wakeups_suspend(void)
- 		writel(chip->fwimsc & chip->real_wake,
- 		       chip->addr + NMK_GPIO_FWIMSC);
++static int nmk_gpio_config(struct gpio_chip *chip, unsigned offset,
++			   u16 param, unsigned long *data)
++{
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
++
++	return 0;
++}
  
--		if (cpu_is_u8500v2()) {
-+		if (chip->sleepmode) {
- 			chip->slpm = readl(chip->addr + NMK_GPIO_SLPC);
+ /* IRQ functions */
+ static inline int nmk_gpio_get_bitmask(int gpio)
+@@ -804,8 +819,7 @@ static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
+ /* I/O Functions */
+ static int nmk_gpio_make_input(struct gpio_chip *chip, unsigned offset)
+ {
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
  
- 			/* 0 -> wakeup enable */
-@@ -1027,7 +1035,7 @@ void nmk_gpio_wakeups_resume(void)
- 		writel(chip->rwimsc, chip->addr + NMK_GPIO_RWIMSC);
- 		writel(chip->fwimsc, chip->addr + NMK_GPIO_FWIMSC);
+ 	clk_enable(nmk_chip->clk);
  
--		if (cpu_is_u8500v2())
-+		if (chip->sleepmode)
- 			writel(chip->slpm, chip->addr + NMK_GPIO_SLPC);
+@@ -818,8 +832,7 @@ static int nmk_gpio_make_input(struct gpio_chip *chip, unsigned offset)
  
- 		clk_disable(chip->clk);
-@@ -1114,6 +1122,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 	nmk_chip->secondary_parent_irq = secondary_irq;
- 	nmk_chip->get_secondary_status = pdata->get_secondary_status;
- 	nmk_chip->set_ioforce = pdata->set_ioforce;
-+	nmk_chip->sleepmode = pdata->supports_sleepmode;
- 	spin_lock_init(&nmk_chip->lock);
+ static int nmk_gpio_get_input(struct gpio_chip *chip, unsigned offset)
+ {
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
+ 	u32 bit = 1 << offset;
+ 	int value;
  
- 	chip = &nmk_chip->chip;
+@@ -835,8 +848,7 @@ static int nmk_gpio_get_input(struct gpio_chip *chip, unsigned offset)
+ static void nmk_gpio_set_output(struct gpio_chip *chip, unsigned offset,
+ 				int val)
+ {
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
+ 
+ 	clk_enable(nmk_chip->clk);
+ 
+@@ -848,8 +860,7 @@ static void nmk_gpio_set_output(struct gpio_chip *chip, unsigned offset,
+ static int nmk_gpio_make_output(struct gpio_chip *chip, unsigned offset,
+ 				int val)
+ {
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
+ 
+ 	clk_enable(nmk_chip->clk);
+ 
+@@ -862,8 +873,7 @@ static int nmk_gpio_make_output(struct gpio_chip *chip, unsigned offset,
+ 
+ static int nmk_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
+ 
+ 	return NOMADIK_GPIO_TO_IRQ(nmk_chip->chip.base) + offset;
+ }
+@@ -878,8 +888,7 @@ static void nmk_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	unsigned		i;
+ 	unsigned		gpio = chip->base;
+ 	int			is_out;
+-	struct nmk_gpio_chip *nmk_chip =
+-		container_of(chip, struct nmk_gpio_chip, chip);
++	struct nmk_gpio_chip *nmk_chip = to_nmk_chip(chip);
+ 	const char *modes[] = {
+ 		[NMK_GPIO_ALT_GPIO]	= "gpio",
+ 		[NMK_GPIO_ALT_A]	= "altA",
+@@ -947,6 +956,7 @@ static struct gpio_chip nmk_gpio_template = {
+ 	.get			= nmk_gpio_get_input,
+ 	.direction_output	= nmk_gpio_make_output,
+ 	.set			= nmk_gpio_set_output,
++	.config			= nmk_gpio_config,
+ 	.to_irq			= nmk_gpio_to_irq,
+ 	.dbg_show		= nmk_gpio_dbg_show,
+ 	.can_sleep		= 0,
 diff --git a/include/linux/gpio/nomadik.h b/include/linux/gpio/nomadik.h
-index 539dda8..cc956d1 100644
+index cc956d1..c16ee56 100644
 --- a/include/linux/gpio/nomadik.h
 +++ b/include/linux/gpio/nomadik.h
-@@ -81,6 +81,7 @@ struct nmk_gpio_platform_data {
- 	int num_gpio;
- 	u32 (*get_secondary_status)(unsigned int bank);
- 	void (*set_ioforce)(bool enable);
-+	bool supports_sleepmode;
- };
+@@ -12,6 +12,8 @@
+ #ifndef __GPIO_NOMADIK_H
+ #define __GPIO_NOMADIK_H
  
- #endif
++#include <linux/gpio.h>
++
+ /*
+  * "nmk_gpio" and "NMK_GPIO" stand for "Nomadik GPIO", leaving
+  * the "gpio" namespace for generic and cross-machine functions
 -- 
 1.7.3.2
