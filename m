@@ -1,56 +1,104 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Apr 2011 01:17:59 -0700
-Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
-In-Reply-To: <alpine.LFD.2.00.1104271043160.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
-	<20110427085336.GL17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104271043160.24613@xanadu.home>
-Message-ID: <20110428081759.GM3755@atomide.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Thu, 28 Apr 2011 10:22:12 +0200
+Subject: [PATCH 1/3] i2c: append hardware lock with bus lock
+In-Reply-To: <1303963358-4652-1-git-send-email-haojian.zhuang@gmail.com>
+References: <2011042801>
+	<1303963358-4652-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20110428102212.2d8d607c@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110427 07:44]:
-> On Wed, 27 Apr 2011, Russell King - ARM Linux wrote:
+Hi Haojian,
+
+On Thu, 28 Apr 2011 12:02:36 +0800, Haojian Zhuang wrote:
+> Both AP and CP are contained in Marvell PXA910 silicon. These two ARM
+> cores are sharing one pair of I2C pins.
 > 
-> > On Wed, Apr 20, 2011 at 12:15:03AM -0400, Nicolas Pitre wrote:
-> > > The return value for decompress_kernel() is no longer used.  Furthermore,
-> > > this was obtained and stored in a variable called output_ptr which is
-> > > a complete misnomer for what is actually the size of the decompressed
-> > > kernel image.  Let's get rid of it.
-> > > 
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > ---
-> > > 
-> > > BTW, I've yet to understand why, but this patch makes CONFIG_KERNEL_LZMA
-> > > work for me.
-> > 
-> > Hmm.  I've switched almost entirely to LZMA since it was introduced and it
-> > works for me on all my platforms.  I haven't tested kernels rigorously since
-> > your patches to the decompressor, so maybe there's a regression in there
-> > somewhere.
-> > 
-> > Can you try LZMA with your various patches over the last four months
-> > reverted?
+> In order to keep I2C transaction operated with atomic, hardware lock
+> (RIPC) is required. Because of this, bus lock in AP side can't afford
+> this requirement. Now hardware lock is appended.
+
+I have no objection to the idea, but one question: when using the
+hardware lock, isn't the software mutex redundant? I would expect that
+you call the hardware_lock/unlock functions _instead_ of
+rt_mutex_lock/unlock, rather than in addition to it. Or do you still
+need the rt_mutex to prevent priority inversion?
+
 > 
-> Yes I did, and the issue turned up to be about the stack alignment wich 
-> was not enforced to a 64 bit boundary.  Depending on the size of the 
-> code and compressed kernel data, the stack would end up properly aligned 
-> with a 50% probability.  And this was a problem only if your gcc version 
-> emited LDRD/STRD type accesses to the stack.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  drivers/i2c/i2c-core.c |   22 ++++++++++++++++++----
+>  include/linux/i2c.h    |    3 +++
+>  2 files changed, 21 insertions(+), 4 deletions(-)
 > 
-> I'm about to send you a pull request with all those fixes.
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 045ba6e..412c7a5 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -448,8 +448,11 @@ void i2c_lock_adapter(struct i2c_adapter *adapter)
+>  
+>  	if (parent)
+>  		i2c_lock_adapter(parent);
+> -	else
+> +	else {
+>  		rt_mutex_lock(&adapter->bus_lock);
+> +		if (adapter->hardware_lock)
+> +			adapter->hardware_lock();
+> +	}
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>  
+> @@ -460,11 +463,19 @@ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>  static int i2c_trylock_adapter(struct i2c_adapter *adapter)
+>  {
+>  	struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
+> +	int ret = 0;
+>  
+>  	if (parent)
+>  		return i2c_trylock_adapter(parent);
+> -	else
+> -		return rt_mutex_trylock(&adapter->bus_lock);
+> +	else {
+> +		ret = rt_mutex_trylock(&adapter->bus_lock);
+> +		if (ret && adapter->hardware_trylock) {
+> +			ret = adapter->hardware_trylock();
+> +			if (!ret)
+> +				i2c_unlock_adapter(adapter);
+> +		}
+> +		return ret;
+> +	}
+>  }
+>  
+>  /**
+> @@ -477,8 +488,11 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
+>  
+>  	if (parent)
+>  		i2c_unlock_adapter(parent);
+> -	else
+> +	else {
+> +		if (adapter->hardware_unlock)
+> +			adapter->hardware_unlock();
+>  		rt_mutex_unlock(&adapter->bus_lock);
+> +	}
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
+>  
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index 06a8d9c..b283b4e 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -361,6 +361,9 @@ struct i2c_adapter {
+>  
+>  	/* data fields that are valid for all devices	*/
+>  	struct rt_mutex bus_lock;
+> +	void (*hardware_lock)(void);
+> +	void (*hardware_unlock)(void);
+> +	int (*hardware_trylock)(void);
+>  
+>  	int timeout;			/* in jiffies */
+>  	int retries;
 
-Just to summarize, looks like there are three regressions:
 
-1. The stack alignment mentioned above
-2. Stack overwriting relocated kernel with cache flush in some cases on ARMv7
-3. Reloction overwriting running code when the relocate offset is small
-
-These fixes would be nice to get merged in the -rc cycle. Then the
-other patches like the static usage in uncompress.h can probably wait
-until the merge window.
-
-Regards,
-
-Tony
+-- 
+Jean Delvare
