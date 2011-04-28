@@ -1,33 +1,36 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Thu, 28 Apr 2011 22:17:42 +0200
-Subject: [PATCH v3] pxa/hx4700: use gpio arrays for global gpio initialization
-In-Reply-To: <20110428090528.GN17290@n2100.arm.linux.org.uk>
-References: <1303329317.21545.5.camel@flow> <20110421150226.GA10052@rainbow>
-	<1303930220.14964.8.camel@flow>
-	<20110428090528.GN17290@n2100.arm.linux.org.uk>
-Message-ID: <1304021863.6554.0.camel@flow>
+Date: Thu, 28 Apr 2011 22:19:32 +0200
+Subject: [PATCH v3] pxa/mioa701: use gpio arrays for global and gsm gpio
+	initialization
+In-Reply-To: <877haeetq5.fsf@free.fr>
+References: <1303329331.21545.7.camel@flow> <87tydre1c7.fsf@free.fr>
+	<BANLkTimXsD6BYa2PPXmrY=aABLNFSRW4Sw@mail.gmail.com>
+	<BANLkTinE3Rubb4Kr-JqT_6ep-LNwLmTd5A@mail.gmail.com>
+	<877haeetq5.fsf@free.fr>
+Message-ID: <1304021974.6554.2.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_request_array() is a functional replacement for hx4700_gpio_request(),
-which is now obsolete.
+gpio_request_array() / gpio_free_array() are functional replacements for
+mio_gpio_request() / mio_gpio_free(), which are now obsolete.
 
 Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/hx4700.c |   70 ++++++++++++--------------------------------
- 1 files changed, 19 insertions(+), 51 deletions(-)
+ arch/arm/mach-pxa/mioa701.c |   70 +++++++++---------------------------------
+ 1 files changed, 15 insertions(+), 55 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 9cdcca5..3254a60 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -135,42 +135,6 @@ static unsigned long hx4700_pin_config[] __initdata = {
- 	GPIO66_GPIO,	/* nSDIO_IRQ */
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index 23925db..403819c 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -177,50 +177,6 @@ static unsigned long mioa701_pin_config[] = {
+ 	MFP_CFG_OUT(GPIO116, AF0, DRIVE_HIGH),
  };
  
--#define HX4700_GPIO_IN(num, _desc) \
+-#define MIO_GPIO_IN(num, _desc) \
 -	{ .gpio = (num), .dir = 0, .desc = (_desc) }
--#define HX4700_GPIO_OUT(num, _init, _desc) \
+-#define MIO_GPIO_OUT(num, _init, _desc) \
 -	{ .gpio = (num), .dir = 1, .init = (_init), .desc = (_desc) }
 -struct gpio_ress {
 -	unsigned gpio : 8;
@@ -36,7 +39,7 @@ index 9cdcca5..3254a60 100644
 -	char *desc;
 -};
 -
--static int hx4700_gpio_request(struct gpio_ress *gpios, int size)
+-static int mio_gpio_request(struct gpio_ress *gpios, int size)
 -{
 -	int i, rc = 0;
 -	int gpio;
@@ -47,7 +50,7 @@ index 9cdcca5..3254a60 100644
 -		dir = gpios[i].dir;
 -		rc = gpio_request(gpio, gpios[i].desc);
 -		if (rc) {
--			pr_err("Error requesting GPIO %d(%s) : %d\n",
+-			printk(KERN_ERR "Error requesting GPIO %d(%s) : %d\n",
 -			       gpio, gpios[i].desc, rc);
 -			continue;
 -		}
@@ -61,54 +64,87 @@ index 9cdcca5..3254a60 100644
 -	return rc;
 -}
 -
- /*
-  * IRDA
-  */
-@@ -829,26 +793,30 @@ static struct platform_device *devices[] __initdata = {
- 	&pcmcia,
+-static void mio_gpio_free(struct gpio_ress *gpios, int size)
+-{
+-	int i;
+-
+-	for (i = 0; i < size; i++)
+-		gpio_free(gpios[i].gpio);
+-}
+-
+ /* LCD Screen and Backlight */
+ static struct platform_pwm_backlight_data mioa701_backlight_data = {
+ 	.pwm_id		= 0,
+@@ -346,16 +302,16 @@ irqreturn_t gsm_on_irq(int irq, void *p)
+ 	return IRQ_HANDLED;
+ }
+ 
+-struct gpio_ress gsm_gpios[] = {
+-	MIO_GPIO_IN(GPIO25_GSM_MOD_ON_STATE, "GSM state"),
+-	MIO_GPIO_IN(GPIO113_GSM_EVENT, "GSM event"),
++static struct gpio gsm_gpios[] = {
++	{ GPIO25_GSM_MOD_ON_STATE, GPIOF_IN, "GSM state" },
++	{ GPIO113_GSM_EVENT, GPIOF_IN, "GSM event" },
  };
+ 
+ static int __init gsm_init(void)
+ {
+ 	int rc;
+ 
+-	rc = mio_gpio_request(ARRAY_AND_SIZE(gsm_gpios));
++	rc = gpio_request_array(ARRAY_AND_SIZE(gsm_gpios));
+ 	if (rc)
+ 		goto err_gpio;
+ 	rc = request_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), gsm_on_irq,
+@@ -369,7 +325,7 @@ static int __init gsm_init(void)
+ 
+ err_irq:
+ 	printk(KERN_ERR "Mioa701: Can't request GSM_ON irq\n");
+-	mio_gpio_free(ARRAY_AND_SIZE(gsm_gpios));
++	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
+ err_gpio:
+ 	printk(KERN_ERR "Mioa701: gsm not available\n");
+ 	return rc;
+@@ -378,7 +334,7 @@ err_gpio:
+ static void gsm_exit(void)
+ {
+ 	free_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), NULL);
+-	mio_gpio_free(ARRAY_AND_SIZE(gsm_gpios));
++	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
+ }
+ 
+ /*
+@@ -776,14 +732,16 @@ static void mioa701_restart(char c, const char *cmd)
+ 	arm_machine_restart('s', cmd);
+ }
  
 -static struct gpio_ress global_gpios[] = {
--	HX4700_GPIO_IN(GPIO12_HX4700_ASIC3_IRQ, "ASIC3_IRQ"),
--	HX4700_GPIO_IN(GPIO13_HX4700_W3220_IRQ, "W3220_IRQ"),
--	HX4700_GPIO_IN(GPIO14_HX4700_nWLAN_IRQ, "WLAN_IRQ"),
--	HX4700_GPIO_OUT(GPIO59_HX4700_LCD_PC1,          1, "LCD_PC1"),
--	HX4700_GPIO_OUT(GPIO62_HX4700_LCD_nRESET,       1, "LCD_RESET"),
--	HX4700_GPIO_OUT(GPIO70_HX4700_LCD_SLIN1,        1, "LCD_SLIN1"),
--	HX4700_GPIO_OUT(GPIO84_HX4700_LCD_SQN,          1, "LCD_SQN"),
--	HX4700_GPIO_OUT(GPIO110_HX4700_LCD_LVDD_3V3_ON, 1, "LCD_LVDD"),
--	HX4700_GPIO_OUT(GPIO111_HX4700_LCD_AVDD_3V3_ON, 1, "LCD_AVDD"),
--	HX4700_GPIO_OUT(GPIO32_HX4700_RS232_ON,         1, "RS232_ON"),
--	HX4700_GPIO_OUT(GPIO71_HX4700_ASIC3_nRESET,     1, "ASIC3_nRESET"),
--	HX4700_GPIO_OUT(GPIO82_HX4700_EUART_RESET,      1, "EUART_RESET"),
--	HX4700_GPIO_OUT(GPIO105_HX4700_nIR_ON,          1, "nIR_EN"),
+-	MIO_GPIO_OUT(GPIO9_CHARGE_EN, 1, "Charger enable"),
+-	MIO_GPIO_OUT(GPIO18_POWEROFF, 0, "Power Off"),
+-	MIO_GPIO_OUT(GPIO87_LCD_POWER, 0, "LCD Power"),
 +static struct gpio global_gpios[] = {
-+	{ GPIO12_HX4700_ASIC3_IRQ, GPIOF_IN, "ASIC3_IRQ" },
-+	{ GPIO13_HX4700_W3220_IRQ, GPIOF_IN, "W3220_IRQ" },
-+	{ GPIO14_HX4700_nWLAN_IRQ, GPIOF_IN, "WLAN_IRQ" },
-+	{ GPIO59_HX4700_LCD_PC1,          GPIOF_OUT_INIT_HIGH, "LCD_PC1" },
-+	{ GPIO62_HX4700_LCD_nRESET,       GPIOF_OUT_INIT_HIGH, "LCD_RESET" },
-+	{ GPIO70_HX4700_LCD_SLIN1,        GPIOF_OUT_INIT_HIGH, "LCD_SLIN1" },
-+	{ GPIO84_HX4700_LCD_SQN,          GPIOF_OUT_INIT_HIGH, "LCD_SQN" },
-+	{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
-+	{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
-+	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
-+	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
-+	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
-+	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
++	{ GPIO9_CHARGE_EN, GPIOF_OUT_INIT_HIGH, "Charger enable" },
++	{ GPIO18_POWEROFF, GPIOF_OUT_INIT_LOW, "Power Off" },
++	{ GPIO87_LCD_POWER, GPIOF_OUT_INIT_LOW, "LCD Power" },
  };
  
- static void __init hx4700_init(void)
+ static void __init mioa701_machine_init(void)
  {
-+	int ret;
++	int rc;
 +
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
--	hx4700_gpio_request(ARRAY_AND_SIZE(global_gpios));
-+	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
-+	if (ret)
-+		pr_err("hx4700: Failed to request GPIOs: %d\n", ret);
- 
+ 	PSLR  = 0xff100000; /* SYSDEL=125ms, PWRDEL=125ms, PSLR_SL_ROD=1 */
+ 	PCFR = PCFR_DC_EN | PCFR_GPR_EN | PCFR_OPDE;
+ 	RTTR = 32768 - 1; /* Reset crazy WinCE value */
+@@ -793,7 +751,9 @@ static void __init mioa701_machine_init(void)
  	pxa_set_ffuart_info(NULL);
  	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+-	mio_gpio_request(ARRAY_AND_SIZE(global_gpios));
++	rc = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
++	if (rc)
++		pr_err("MioA701: Failed to request GPIOs: %d", rc);
+ 	bootstrap_init();
+ 	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
+ 	pxa_set_mci_info(&mioa701_mci_info);
 -- 
 1.7.4.4
