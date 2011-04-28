@@ -1,42 +1,77 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 20:20:17 +0100
-Subject: [PATCH v6 1/3] MTD : add the common code for GPMI controller
-	driver
-In-Reply-To: <1303267549-18377-2-git-send-email-b32955@freescale.com>
-References: <1303267549-18377-1-git-send-email-b32955@freescale.com>
-	<1303267549-18377-2-git-send-email-b32955@freescale.com>
-Message-ID: <20110428192017.GO17290@n2100.arm.linux.org.uk>
+Date: Thu, 28 Apr 2011 20:22:37 +0100
+Subject: [PATCH] at91: switch to CLKDEV_LOOKUP
+In-Reply-To: <20110420081624.GT31131@pengutronix.de>
+References: <1303271969-9794-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110420081624.GT31131@pengutronix.de>
+Message-ID: <20110428192237.GP17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 10:45:47AM +0800, Huang Shijie wrote:
-> +static inline int acquire_clock(struct gpmi_nfc_data *this, struct clk **clock)
-> +{
-> +	struct clk *c;
-> +
-> +	c = clk_get(&this->pdev->dev, NULL);
-> +	if (IS_ERR(c)) {
-> +		log("Can't own clock");
-> +		return PTR_ERR(c);
-> +	}
-> +	*clock = c;
-> +	return 0;
-> +}
-> +
-> +static void release_clock(struct gpmi_nfc_data *this, struct clk *clock)
-> +{
-> +	clk_put(clock);
-> +}
+On Wed, Apr 20, 2011 at 10:16:24AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Jean-Christophe,
+> 
+> On Wed, Apr 20, 2011 at 05:59:29AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >  /*
+> >   * The five programmable clocks.
+> >   * You must configure pin multiplexing to bring these signals out.
+> > @@ -234,6 +265,13 @@ static struct clk pck3 = {
+> >  	.id		= 3,
+> >  };
+> >  
+> > +static struct clk_lookup program_clocks_lookups[] = {
+> > +	CLKDEV_CON_ID("pck0", &pck0),
+> > +	CLKDEV_CON_ID("pck1", &pck1),
+> > +	CLKDEV_CON_ID("pck2", &pck2),
+> > +	CLKDEV_CON_ID("pck3", &pck3),
+> > +};
+> > +
+> >  static struct clk mAgicV_mem_clk = {
+> >  	.name		= "mAgicV_mem_clk",
+> >  	.pmc_mask	= AT91_PMC_PCK4,
+> > @@ -241,6 +279,9 @@ static struct clk mAgicV_mem_clk = {
+> >  	.id		= 4,
+> >  };
+> >  
+> > +static struct clk_lookup mAgicV_mem_clk_lookup =
+> > +	CLKDEV_CON_ID("mAgicV_mem_clk", &mAgicV_mem_clk);
+> > +
+> >  /* HClocks */
+> >  static struct clk hck0 = {
+> >  	.name		= "hck0",
+> > @@ -255,6 +296,11 @@ static struct clk hck1 = {
+> >  	.id		= 1,
+> >  };
+> >  
+> > +static struct clk_lookup hc_clocks_lookups[] = {
+> > +	CLKDEV_CON_ID("hck0", &hck0),
+> > +	CLKDEV_CON_ID("hck1", &hck1),
+> > +};
+> > +
+> >  static void __init at572d940hf_register_clocks(void)
+> >  {
+> >  	int i;
+> > @@ -262,14 +308,32 @@ static void __init at572d940hf_register_clocks(void)
+> >  	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+> >  		clk_register(periph_clocks[i]);
+> >  
+> > +	clkdev_add_table(periph_clocks_lookups,
+> > +			 ARRAY_SIZE(periph_clocks_lookups));
+> > +
+> Does it make sense to add a (maybe global) helper function ? la:
+> 
+> 	void __init clkdev_register_and_add_table(struct clk_lookup *cl, size_t num)
+> 	{
+> 		while (num--) {
+> 			clk_register(&cl->clk);
+> 			clkdev_add(cl);
+> 			++cl;
+> 		}
+> 	}
+> 
+> ? (The locking isn't optimal here, but I think you get the point.)
 
-Do you really need to abstract like this?  It appears to just complicate
-the code unnecessarily.
-
-> +#define log(a, ...) printk(KERN_INFO "[ %s : %.3d ] "a"\n", \
-> +			__func__, __LINE__,  ## __VA_ARGS__)
-
-Also, I don't like this log() function.  You can do the same with:
-
-#define pr_fmt(fmt) "[ %s : %.3d ] " fmt, __func__, __LINE__
-
-and use pr_info() instead.  Note that it's generally frowned upon to
-hide the \n inside the pr_fmt().
+Err no.  clk_register() has nothing to do with clkdev, and actually
+clkdev has no business knowing about clk_register() at all.  Note
+that clk_register() is not part of the clk API but a private
+function to the implementation.
