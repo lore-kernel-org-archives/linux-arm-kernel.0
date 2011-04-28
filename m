@@ -1,142 +1,95 @@
-From: torbenh@gmx.de (torbenh)
-Date: Thu, 28 Apr 2011 17:18:19 +0200
-Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
-In-Reply-To: <1303909742.18407.12.camel@redbox>
-References: <1303909742.18407.12.camel@redbox>
-Message-ID: <20110428151819.GE13755@siel.b>
+From: ashwinc@codeaurora.org (Ashwin Chaugule)
+Date: Thu, 28 Apr 2011 11:21:30 -0400
+Subject: [PATCH] ARM: perf: remove erroneous check on active_events
+In-Reply-To: <BANLkTi=J=4R2v5P2iOsf4M5_FMwWJ=JrZw@mail.gmail.com>
+References: <1303898236-14263-1-git-send-email-mark.rutland@arm.com>
+	<BANLkTi=J=4R2v5P2iOsf4M5_FMwWJ=JrZw@mail.gmail.com>
+Message-ID: <4DB985FA.1080508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 03:09:02PM +0200, Andrew Victor wrote:
-> The AT91's AIC interrupt controller will internally mask the current
-> (and lower-priority) interrupts until software acknowledges that the
-> interrupt was handled by writing to the AIC_EOICR register.
-> 
-> This matches the "fasteoi" IRQ flow-handler, so convert the AT91 to use
-> handle_fasteoi_irq rather than handle_level_irq.
-> 
-> This also allows the irq_finish() call to be removed from the low-level
-> ARM IRQ handler.
-> 
-> 
-> Signed-off-by: Andrew Victor <linux@maxim.org.za>
-> 
-> 
-> 
-> diff -urN -x CVS linux-2.6.38/arch/arm/kernel/irq.c linux-2.6/arch/arm/kernel/irq.c
-> --- linux-2.6.38/arch/arm/kernel/irq.c	2011-04-27 12:28:25.609111745 +0200
-> +++ linux-2.6/arch/arm/kernel/irq.c	2011-04-27 14:20:32.784167994 +0200
-> @@ -42,13 +42,6 @@
->  #include <asm/mach/irq.h>
->  #include <asm/mach/time.h>
->  
-> -/*
-> - * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
-> - */
-> -#ifndef irq_finish
-> -#define irq_finish(irq) do { } while (0)
-> -#endif
-> -
->  unsigned long irq_err_count;
->  
->  int show_interrupts(struct seq_file *p, void *v)
-> @@ -135,9 +128,6 @@
->  		generic_handle_irq(irq);
->  	}
->  
-> -	/* AT91 specific workaround */
-> -	irq_finish(irq);
-> -
->  	irq_exit();
->  	set_irq_regs(old_regs);
->  }
-> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
-> --- linux-2.6.38/arch/arm/mach-at91/gpio.c	2011-04-27 12:28:26.157080664 +0200
-> +++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-27 14:45:42.672364605 +0200
-> @@ -392,8 +392,6 @@
->  	at91_gpio = get_irq_chip_data(irq);
->  	pio = at91_gpio->regbase;
->  
-> -	/* temporarily mask (level sensitive) parent IRQ */
-> -	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  	for (;;) {
->  		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
->  		 * When there none are pending, we're finished unless we need
-> @@ -429,8 +427,8 @@
->  			isr >>= 1;
->  		}
->  	}
-> -	desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> -	/* now it may re-trigger */
-> +	/* acknowledge interrupt - now it may re-trigger */
-> +	desc->irq_data.chip->irq_eoi(&desc->irq_data);
->  }
+Hi Mark,
 
-why does this handler mess with the parent irq chip ?
-this looks pretty wrong to me.
+> From: Mark Rutland <mark.rutland@arm.com>
+>
+> When initialising a PMU, there is a check to protect against races with
+> other CPUs filling all of the available event slots. Since armpmu_add
+> checks that an event can be scheduled, we do not need to do this at
+> initialisation time. Furthermore the current code is broken because it
+> assumes that atomic_inc_not_zero will unconditionally increment
+> active_counts and then tries to decrement it again on failure.
+> 
+> This patch removes the broken, redundant code.
 
->  
->  /*--------------------------------------------------------------------------*/
-> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h linux-2.6/arch/arm/mach-at91/include/mach/irqs.h
-> --- linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h	2009-06-10 05:05:27.000000000 +0200
-> +++ linux-2.6/arch/arm/mach-at91/include/mach/irqs.h	2011-04-27 14:20:48.471334804 +0200
-> @@ -28,13 +28,6 @@
->  
->  
->  /*
-> - * Acknowledge interrupt with AIC after interrupt has been handled.
-> - *   (by kernel/irq.c)
-> - */
-> -#define irq_finish(irq) do { at91_sys_write(AT91_AIC_EOICR, 0); } while (0)
+Nice find ! I had a slightly different solution.
+
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> ---
+>  arch/arm/kernel/perf_event.c |    5 -----
+>  1 files changed, 0 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index fd6403c..29a0cf8 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -560,11 +560,6 @@ static int armpmu_event_init(struct perf_event *event)
+>        event->destroy = hw_perf_event_destroy;
+> 
+>        if (!atomic_inc_not_zero(&active_events)) {
+> -               if (atomic_read(&active_events) > armpmu->num_events) {
+> -                       atomic_dec(&active_events);
+> -                       return -ENOSPC;
+> -               }
 > -
-> -
-> -/*
->   * IRQ interrupt symbols are the AT91xxx_ID_* symbols
->   * for IRQs handled directly through the AIC, or else the AT91_PIN_*
->   * symbols in gpio.h for ones handled indirectly as GPIOs.
-> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/irq.c linux-2.6/arch/arm/mach-at91/irq.c
-> --- linux-2.6.38/arch/arm/mach-at91/irq.c	2011-04-27 12:28:26.197078404 +0200
-> +++ linux-2.6/arch/arm/mach-at91/irq.c	2011-04-27 14:23:29.817625842 +0200
-> @@ -46,6 +46,12 @@
->  	at91_sys_write(AT91_AIC_IECR, 1 << d->irq);
->  }
->  
-> +static void at91_aic_eoi(struct irq_data *d)
-> +{
-> +	/* Acknowledge with AIC after interrupt has been handled */
-> +	at91_sys_write(AT91_AIC_EOICR, 0);	
-> +}
-> +
->  unsigned int at91_extern_irq;
->  
->  #define is_extern_irq(irq) ((1 << (irq)) & at91_extern_irq)
-> @@ -122,6 +128,7 @@
->  	.irq_ack	= at91_aic_mask_irq,
+>                mutex_lock(&pmu_reserve_mutex);
+>                if (atomic_read(&active_events) == 0) {
+>                        err = armpmu_reserve_hardware();
+> --
 
-you should probably remove the ack. its just confusing.
+While its true that we check if we can schedule an event in add(), I think
+we should check it here, because, if we don't have space on the PMU,
+returning -ENOSPC will not "allocate" a perf_event instance.
 
->  	.irq_mask	= at91_aic_mask_irq,
->  	.irq_unmask	= at91_aic_unmask_irq,
-> +	.irq_eoi	= at91_aic_eoi,
->  	.irq_set_type	= at91_aic_set_type,
->  	.irq_set_wake	= at91_aic_set_wake,
->  };
-> @@ -144,7 +151,7 @@
->  		at91_sys_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
->  
->  		set_irq_chip(i, &at91_aic_chip);
-> -		set_irq_handler(i, handle_level_irq);
-> +		set_irq_handler(i, handle_fasteoi_irq);
->  		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
->  
->  		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Whereas, if we skip this check in the init function, the perf_event
+instance will be allocated but may or may not be "armed" on the pmu in
+add(). This is fine, except that perf-core code "rotates" the linked list
+of active events. When an event is allocated but can't be "armed" on the
+PMU, the perf-core normalizes its output. This shows up as (scaled by)
+against the output of the event in perf-stat.
+
+In practice, I've seen that when this happens, the output of the event has
+anywhere between 50-80% std deviation. Many users seem to not like this.
+So I think we should enforce support for only as many events as there are
+counters in the init function, and return -ENOSPC otherwise.
+
+If the event allocation fails, it'll show up as <not-counted>, which I
+think is better than using an output with very high std dev.
+
+How about something like this:-
+
+if (!atomic_inc_not_zero(&active_events)) {
+	mutex_lock
+	err = armpmu_reserve_hardware();
+	mutex_unlock
+	if (!err)
+		atomic_inc(&active_events);
+	..
+} else
+	if(atomic_read(&active_events) > armpmu->num_events)
+		atomic_dec(&active_events)
+		return -ENOSPC;
+}
+
+
+
+Cheers,
+Ashwin
+
 
 -- 
-torben Hohn
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
