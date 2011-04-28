@@ -1,59 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 19:31:32 +0100
-Subject: [PATCH v2 02/23] at91: Make Ethernet device common
-In-Reply-To: <0D753D10438DA54287A00B027084269764D26C44B4@AUSP01VMBX24.collaborationhost.net>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-3-git-send-email-ryan@bluewatersys.com>
-	<0D753D10438DA54287A00B027084269764D24302CC@AUSP01VMBX24.collaborationhost.net>
-	<20110428091517.GP17290@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D26C44B4@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110428183132.GH17290@n2100.arm.linux.org.uk>
+Date: Thu, 28 Apr 2011 19:43:32 +0100
+Subject: [PATCH] ARM: Suspend: Fix build error on ARCH_S5PC100
+In-Reply-To: <02c701cbf2be$0ebebb80$2c3c3280$%kim@samsung.com>
+References: <1301710155-16373-1-git-send-email-kgene.kim@samsung.com>
+	<20110402091904.GH8482@n2100.arm.linux.org.uk>
+	<02c701cbf2be$0ebebb80$2c3c3280$%kim@samsung.com>
+Message-ID: <20110428184332.GK17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 12:57:45PM -0500, H Hartley Sweeten wrote:
-> On Thursday, April 28, 2011 2:15 AM, Russell King wrote:
-> > On Thu, Apr 21, 2011 at 06:19:37PM -0500, H Hartley Sweeten wrote:
-> >> +static struct platform_device at91_eth_device = {
-> >> +	.name		= "macb",
-> >> +	.id		= -1,
-> >> +	.dev		= {
-> >> +		.dma_mask		= &at91_eth_device.dev.coherent_dma_mask,
-> >> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> >> 
-> >> That will get rid of the static u64 variable used for every dma
-> >> capable device.
-> >
-> > I've never really liked that, because coherent_dma_mask is never changed,
-> > but the value pointed to be dma_mask can be by drivers.  See dma_set_mask().
-> >
-> > So, calling dma_set_mask() on any device which does the above will also
-> > (unexpectedly?) change the coherent mask too.
-> >
-> > It's a minor point as we don't have many platform drivers using
-> > dma_set_mask().
+On Mon, Apr 04, 2011 at 08:47:17PM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > 
+> > On Sat, Apr 02, 2011 at 11:09:15AM +0900, Kukjin Kim wrote:
+> > > The current mainline codes of ARCH_S5PC100 can not support
+> > > suspend to ram. So needs this for preventing build error.
+> > >
+> > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > ---
+> > > Oops, I missed this in my previous patch.
+> > >
+> > > As I know, firstly ARCH_S5P64X0 will support suspend to ram
+> > > then ARCH_S5PC100 will do it. But right now, we need this.
+> > 
+> > I'd much rather do this a different way - let me know if this means
+> > the SoC based dependencies can be dropped.  Patches to follow.
 > 
-> So, if I understand this correctly...
+> Yeah, I checked your patches. It's ok to me but this is also needed right
+> now for preventing build errors with s5pc100_defconfig...because there is no
+> regarding headers for supporting suspend to ram.
 > 
-> 1) dev.coherent_dma_mask is a constant that defines the default dma mask of
-> the device.
+> However as I mentioned, the suspend to ram will be supported soon on them
+> then we can drop its dependencies.
 
-dev.coherent_dma_mask is used for dma_alloc_coherent() allocations.
-
-> 2) dev.dma_mask is a pointer to the dma mask that is being used by the device.
-
-dev.dma_mask is a pointer to the DMA mask being used by the dma_map_* API.
-
-> 3) The static variable pointed to by dev.dma_mask holds the dma mask being
-> used by the device.  The value can be modified by the driver.
-> 
-> Why couldn't a new field be added to struct device to replace the static
-> variable?  The code that sets up the device could do something like:
-> 
-> 	dev.used_dma_mask = dev.coherent_dma_mask;
-> 	dev.dma_mask = &dev.used_dma_mask;
-
-There was talk a while ago about getting rid of the pointer-ness of
-dma_mask, but I think there's a bit of historic baggage in there to do
-with the pre-device model PCI bus support code which gets in the way.
-Not too sure about that though.
+Could I have an updated patch which applies to mainline please?
