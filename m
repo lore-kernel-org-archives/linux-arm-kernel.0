@@ -1,39 +1,63 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Thu, 28 Apr 2011 16:24:30 +0900
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1303940737.2513.190.camel@pasglop>
-References: <201104212129.17013.arnd@arndb.de>
-	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-	<1303940737.2513.190.camel@pasglop>
-Message-ID: <BANLkTi=8fh97S00HwcCvXe84v=0i+BQ74Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 09:35:38 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <CF1FC9DE1796407FB4D636189646927F@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271605.09537.arnd@arndb.de>
+	<CF1FC9DE1796407FB4D636189646927F@subhasishg>
+Message-ID: <201104280935.38787.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 6:45 AM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
->
-> Don't you have a risk where speculative loads or prefetches might bring
-> back some stuff into the cache via the cachable mapping ? Is that an
-> issue ? As long as it's non-dirty and the cachable mapping isn't
-> otherwise used, I suppose it might be a non-issue, tho I've seen in
-> powerpc land cases of processors that can checkstop if a subsequent non
-> cachable access "hits" the stuff that was loaded in the cache.
->
-> Cheers,
-> Ben.
->
-As far as I know, ARM processors does not have the capability
-to detect non-cacheable access hits the stuff in  the cache.
+On Thursday 28 April 2011 09:17:21 Subhasish Ghosh wrote:
+> >
+> > You can easily do that by adding a small header to the firmware
+> > format and interpret that header by the MFD driver. When the name
+> > of the subdevice is part of that header, the MFD driver does not
+> > need to understand the difference, it can simply pass that on
+> > when creating its child devices.
+> 
+> I don't understand why loading the firmware should be done at the MFD 
+> driver.
+> The user already specifies the device he/she wants to start on the PRU via 
+> modprobe.
+> A driver can be inserted, which can download a printer firmware on one PRU 
+> and a
+> scanner firmware on the other. This way both cores can be used for separate 
+> purposes.
+> I mean, say in a real MFD controller, that will also have two separate cores 
+> running on it,
+> just that, the firmware on it would not be downloaded runtime but fused in 
+> some non volatile memory. 
 
-IMHO, speculative prefetch becomes a problem
-when a coherent buffer (that is not-cacheable in ARM) is modified by a
-DMA transaction
-while old data is already loaded in the cache via another cacheable
-mapping onto the buffer
-even though it is never touched by CPU.
-We can avoid this problem if the kernel removes 'executable' property
-from the cacheable mapping.
-But it is not able to modify page table entries in the direct mapping area.
+Then I must be misreading what your code currently does, because it does not
+match your explanations. What I see in the platform code is that you create
+MFD cells for specific devices that get automatically created by the MFD
+driver. This will cause udev to load the drivers for these devices, which
+then load the firmware they need.
 
-Regards,
-KyongHo
+Also, I cannot see how the method you describe would make it possible to
+the same driver into both units, e.g. when you want to have two serial
+ports. The reason is that you currently hardcode the PRU number in the
+driver and that you cannot load a single driver twice.
+
+Finally, I'm trying to make sure that whatever solution you come up with
+will still work when we migrate the code to using a flattened device tree.
+In that case, you would ideally put the device firmware into the device
+tree as a property that matches whatever you have connected on the specific
+board (at least as an option, you can still fall back to request_firmware).
+You definitely want automatic module loading in that case.
+
+Note that using module loading with specific parameters in order to
+match the hardware is not a recommended procedure any more. The code
+really needs to work the same way when all drivers are built into the
+kernel. It should not be hard to use the firmware loading mechanism
+in the MFD driver to both load the firmware and configure the devices
+appropriately so we always use the right driver for the currently
+active devices.
+
+	Arnd
+
+BTW, something is wrong with your email client line wrapping. I've fixed
+this up manually before when replying, but please find a way to get this
+right in the future.
