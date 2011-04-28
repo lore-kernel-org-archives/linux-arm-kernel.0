@@ -1,43 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 14:56:35 +0100
-Subject: [PATCH v4 0/4] OMAP: DMA: mstandby mode and runtime pm support
-In-Reply-To: <20110419110517.GG477@atomide.com>
-References: <1301322422-29886-1-git-send-email-manjugk@ti.com>
-	<20110419110517.GG477@atomide.com>
-Message-ID: <20110428135635.GC19709@n2100.arm.linux.org.uk>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Thu, 28 Apr 2011 16:04:59 +0200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <20110426042131.GD12904@game.jcrosoft.org>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+Message-ID: <BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 04:05:17AM -0700, Tony Lindgren wrote:
-> * G, Manjunath Kondaiah <manjugk@ti.com> [110328 07:29]:
-> > 
-> > G, Manjunath Kondaiah (4):
-> >   OMAP2+: PM: omap device: API's for handling mstandby mode
-> >   OMAP2+: DMA: prevent races while setting M idle mode to nostandby
-> >   OMAP: PM: DMA: Enable runtime pm
-> >   OMAP: DMA: Fix: context restore during off mode
-> > 
-> >  arch/arm/mach-omap1/dma.c                     |    1 +
-> >  arch/arm/mach-omap2/dma.c                     |   16 ++
-> >  arch/arm/mach-omap2/omap_hwmod.c              |   42 ++++++
-> >  arch/arm/plat-omap/dma.c                      |  196 +++++++++++++++++++++----
-> >  arch/arm/plat-omap/include/plat/dma.h         |    1 +
-> >  arch/arm/plat-omap/include/plat/omap_device.h |    2 +
-> >  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    4 +-
-> >  arch/arm/plat-omap/omap_device.c              |   62 ++++++++
-> >  8 files changed, 291 insertions(+), 33 deletions(-)
-> 
-> With the DMA code too we need to do the cleanup to move it
-> to drivers/dma before adding new features.
+hi,
 
-It also needs to conform to the DMA engine API, which is not well
-documented.  The points to watch out for are:
+>> If this eventually reduces code size then I think it is useful, but
+>> otherwise I'm not sure I see the point?
+> It's on purpose as the dbgu physical address is not at the same place
+> so read the other register really does not impact the chip but if we do it
+> later duting the boot or the life to the kernel it's an other story
+>
+> so the split between __cpu_is and cpu_is is necessarly
+>
+> all of this work is in preparation to allow multiple soc in the same kernel
+> that's also why I map the system controller the same way on all at91 arm9
 
-1. it passes lockdep.
-2. drivers _can_ submit new slave transactions during a previous slave
-   transaction callback.
-3. callbacks must be made from tasklet context.
-4. terminating a transaction dma dma_terminate_all() should not call any
-   callbacks (as they may submit new transactions, causing DMA to restart.)
+The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
+registers.
 
-I think that's about it, but there may be more.
+But the address of the DBGU differs between CPUs regardless if you map
+the system controller the same:
+   at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+   at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+   at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+   at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+   at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+   at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+   at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+   at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+
+So I don't see how you can "detect" the CPU without first knowing
+which CPU and therefore where the DBGU register is anyway.
+And probing different addresses for a value is not an acceptable solution.
+
+
+While having a single kernel image that supports AT91 processors is a
+good goal, the soc.h is a totally unnecessary complication.
+I can't think of any situation where an AT91 board.c file doesn't know
+what processor it has.
+
+So instead of :
+   boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
+at91XX_initialize()
+just do:
+   boardXYZ-init  -> at91XX_initialize()
+
+And soc.c's not really removing much code duplication...  most of the
+code in there is the newly-added early_platform_devices.
+
+
+Regards,
+  Andrew Victor
