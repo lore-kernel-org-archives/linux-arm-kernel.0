@@ -1,36 +1,56 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 28 Apr 2011 11:33:51 +0100
-Subject: [PATCH 0/5] ARM: kprobes: Fixes and additions for ARM
-	instruction emulation (part 6)
-In-Reply-To: <20110428075129.GG17290@n2100.arm.linux.org.uk>
-References: <1303206740-10101-1-git-send-email-tixy@yxit.co.uk>
-	<20110428075129.GG17290@n2100.arm.linux.org.uk>
-Message-ID: <1303986831.2441.17.camel@computer2.home>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 28 Apr 2011 13:35:31 +0300
+Subject: [PATCH] PXA: Fix typo in proc-xscale.S
+In-Reply-To: <20110428095548.GY17290@n2100.arm.linux.org.uk>
+References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
+	<4DB90DD8.7050406@compulab.co.il>
+	<20110428095548.GY17290@n2100.arm.linux.org.uk>
+Message-ID: <4DB942F3.1070601@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-04-28 at 08:51 +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 19, 2011 at 10:52:15AM +0100, Tixy wrote:
-> > (This is a sixth and final set of patches)
-> > 
-> > When kprobes are inserted into code an ARM instruction is replaced
-> > by a breakpoint. When this is hit, the original instruction must be
-> > emulated out-of-line. This patchset fixes some bugs in the instruction
-> > decoding and adds emulation for some newer ARMv7 instructions.
-> > 
-> > [PATCH 1/5] ARM: kprobes: Reject probing of undefined data processing instructions
-> > [PATCH 2/5] ARM: kprobes: Add emulation of MOVW and MOVT instructions
-> > [PATCH 3/5] ARM: kprobes: Add emulation of SBFX, UBFX, BFI and BFC instructions
-> > [PATCH 4/5] ARM: kprobes: Add emulation of hint instructions like NOP and WFI
-> > [PATCH 5/5] ARM: kprobes: Tidy-up kprobes-decode.c
-> 
-> I notice that Nicolas merged the 5th set rather than this set - and
-> Nicolas hasn't responded to these.  Please check with Nicolas whether
-> he's updated to the latest set.
+On 04/28/11 12:55, Russell King - ARM Linux wrote:
 
-Nicolas, I see you have part 6 in your personal Linaro kprobes branch,
-but Russell seems to imply that this is missing from a merge you did
-elsewhere. (I'm unsure where this merge might be.)
+> On Thu, Apr 28, 2011 at 09:48:56AM +0300, Igor Grinberg wrote:
+>> Hi Marek,
+>>
+>> On 04/28/11 04:46, Marek Vasut wrote:
+>>
+>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>>> ---
+>>>  arch/arm/mm/proc-xscale.S |    2 +-
+>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+>>> index ce233bc..42af976 100644
+>>> --- a/arch/arm/mm/proc-xscale.S
+>>> +++ b/arch/arm/mm/proc-xscale.S
+>>> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+>>>  	teq	r2, #DMA_TO_DEVICE
+>>>  	beq	xscale_dma_clean_range
+>>>  	b	xscale_dma_flush_range
+>>> -ENDPROC(xscsale_dma_a0_map_area)
+>>> +ENDPROC(xscale_dma_a0_map_area)
+>>>  
+>>>  /*
+>>>   *	dma_unmap_area(start, size, dir)
+>> Similar patch:
+>> http://www.spinics.net/lists/arm-kernel/msg118258.html
+>>
+>> has been sent to Russell quite a while ago,
+>> but somehow got lost or something.
+> As I keep saying, I'm useless dealing with patches sent only by email -
+> they tend to get quickly buried and forgotten, plus they need saving out,
+> sometimes editing and transferring between machines to be applied.
+>
+> The patch system greatly simplifies that effort, and ensures that patches
+> don't get forgotten.
+
+Apparently, not many people read Documentation/arm/README :(
+May be it would be helpful to add a note to the MAINTAINERS file
+regarding the patch system and tweak scripts/get_maintainer.pl
+to spit it out in appropriate cases?
 
 -- 
-Tixy
+Regards,
+Igor.
