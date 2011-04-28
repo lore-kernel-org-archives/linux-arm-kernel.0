@@ -1,50 +1,164 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 09:12:55 +0100
-Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
-In-Reply-To: <alpine.LFD.2.00.1104271043160.24613@xanadu.home>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
-	<20110427085336.GL17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104271043160.24613@xanadu.home>
-Message-ID: <20110428081255.GH17290@n2100.arm.linux.org.uk>
+Date: Thu, 28 Apr 2011 09:15:35 +0100
+Subject: [PATCH V2] genalloc: add support to specify the physical address
+In-Reply-To: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110428081535.GI17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 10:48:07AM -0400, Nicolas Pitre wrote:
-> On Wed, 27 Apr 2011, Russell King - ARM Linux wrote:
+On Wed, Apr 20, 2011 at 08:54:15AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> so we specify the virtual address as base of the pool chunk and then
+> get the physical address for hardware IP
 > 
-> > On Wed, Apr 20, 2011 at 12:15:03AM -0400, Nicolas Pitre wrote:
-> > > The return value for decompress_kernel() is no longer used.  Furthermore,
-> > > this was obtained and stored in a variable called output_ptr which is
-> > > a complete misnomer for what is actually the size of the decompressed
-> > > kernel image.  Let's get rid of it.
-> > > 
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > ---
-> > > 
-> > > BTW, I've yet to understand why, but this patch makes CONFIG_KERNEL_LZMA
-> > > work for me.
-> > 
-> > Hmm.  I've switched almost entirely to LZMA since it was introduced and it
-> > works for me on all my platforms.  I haven't tested kernels rigorously since
-> > your patches to the decompressor, so maybe there's a regression in there
-> > somewhere.
-> > 
-> > Can you try LZMA with your various patches over the last four months
-> > reverted?
+> as example on at91 we will use on spi, uart or macb
 > 
-> Yes I did, and the issue turned up to be about the stack alignment wich 
-> was not enforced to a 64 bit boundary.  Depending on the size of the 
-> code and compressed kernel data, the stack would end up properly aligned 
-> with a 50% probability.  And this was a problem only if your gcc version 
-> emited LDRD/STRD type accesses to the stack.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> ---
+> Hi Andrew,
+> 	I integrate the documentation fix
+> 	could replace the previous one with this one
 > 
-> I'm about to send you a pull request with all those fixes.
+> V2:
+> 	update documentation
+> 	use phys_addr_t for physical addr
+> Best Regards,
 
-Please first resend the entire set of patches for review - I've no idea
-what the set of patches contain having read through most of the emails
-on the decompressor which were sent over Easter.
+I notice no comments on this - maybe it needs to be Cc'd to linux-mm too?
 
-I really don't like the idea of getting rid of the 'sp' for the cache
-flush and stamping over a load of registers instead.  I think that's
-storing up problems for the future.
+Andrew - do you have any views on this?
+
+> J.
+>  include/linux/genalloc.h |   22 +++++++++++++++++++++-
+>  lib/genalloc.c           |   45 +++++++++++++++++++++++++++++++++++++--------
+>  2 files changed, 58 insertions(+), 9 deletions(-)
+> 
+> diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+> index b1c70f1..5bbebda 100644
+> --- a/include/linux/genalloc.h
+> +++ b/include/linux/genalloc.h
+> @@ -26,13 +26,33 @@ struct gen_pool {
+>  struct gen_pool_chunk {
+>  	spinlock_t lock;
+>  	struct list_head next_chunk;	/* next chunk in pool */
+> +	phys_addr_t phys_addr;		/* physical starting address of memory chunk */
+>  	unsigned long start_addr;	/* starting address of memory chunk */
+>  	unsigned long end_addr;		/* ending address of memory chunk */
+>  	unsigned long bits[0];		/* bitmap for allocating memory chunk */
+>  };
+>  
+>  extern struct gen_pool *gen_pool_create(int, int);
+> -extern int gen_pool_add(struct gen_pool *, unsigned long, size_t, int);
+> +extern phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long);
+> +extern int gen_pool_add_virt(struct gen_pool *, unsigned long, phys_addr_t,
+> +			     size_t, int);
+> +/**
+> + * gen_pool_add - add a new chunk of special memory to the pool
+> + * @pool: pool to add new memory chunk to
+> + * @addr: starting address of memory chunk to add to pool
+> + * @size: size in bytes of the memory chunk to add to pool
+> + * @nid: node id of the node the chunk structure and bitmap should be
+> + *       allocated on, or -1
+> + *
+> + * Add a new chunk of special memory to the specified pool.
+> + *
+> + * Returns 0 on success or a -ve errno on failure.
+> + */
+> +static inline int gen_pool_add(struct gen_pool *pool, unsigned long addr,
+> +			       size_t size, int nid)
+> +{
+> +	return gen_pool_add_virt(pool, addr, -1, size, nid);
+> +}
+>  extern void gen_pool_destroy(struct gen_pool *);
+>  extern unsigned long gen_pool_alloc(struct gen_pool *, size_t);
+>  extern void gen_pool_free(struct gen_pool *, unsigned long, size_t);
+> diff --git a/lib/genalloc.c b/lib/genalloc.c
+> index 1923f14..577ddf8 100644
+> --- a/lib/genalloc.c
+> +++ b/lib/genalloc.c
+> @@ -39,17 +39,20 @@ struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
+>  EXPORT_SYMBOL(gen_pool_create);
+>  
+>  /**
+> - * gen_pool_add - add a new chunk of special memory to the pool
+> + * gen_pool_add_virt - add a new chunk of special memory to the pool
+>   * @pool: pool to add new memory chunk to
+> - * @addr: starting address of memory chunk to add to pool
+> + * @virt: virtual starting address of memory chunk to add to pool
+> + * @phys: physical starting address of memory chunk to add to pool
+>   * @size: size in bytes of the memory chunk to add to pool
+>   * @nid: node id of the node the chunk structure and bitmap should be
+>   *       allocated on, or -1
+>   *
+>   * Add a new chunk of special memory to the specified pool.
+> + *
+> + * Returns 0 on success or a -ve errno on failure.
+>   */
+> -int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
+> -		 int nid)
+> +int gen_pool_add_virt(struct gen_pool *pool, unsigned long virt, phys_addr_t phys,
+> +		 size_t size, int nid)
+>  {
+>  	struct gen_pool_chunk *chunk;
+>  	int nbits = size >> pool->min_alloc_order;
+> @@ -58,11 +61,12 @@ int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
+>  
+>  	chunk = kmalloc_node(nbytes, GFP_KERNEL | __GFP_ZERO, nid);
+>  	if (unlikely(chunk == NULL))
+> -		return -1;
+> +		return -ENOMEM;
+>  
+>  	spin_lock_init(&chunk->lock);
+> -	chunk->start_addr = addr;
+> -	chunk->end_addr = addr + size;
+> +	chunk->phys_addr = phys;
+> +	chunk->start_addr = virt;
+> +	chunk->end_addr = virt + size;
+>  
+>  	write_lock(&pool->lock);
+>  	list_add(&chunk->next_chunk, &pool->chunks);
+> @@ -70,7 +74,32 @@ int gen_pool_add(struct gen_pool *pool, unsigned long addr, size_t size,
+>  
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL(gen_pool_add);
+> +EXPORT_SYMBOL(gen_pool_add_virt);
+> +
+> +/**
+> + * gen_pool_virt_to_phys - return the physical address of memory
+> + * @pool: pool to allocate from
+> + * @addr: starting address of memory
+> + *
+> + * Returns the physical address on success, or -1 on error.
+> + */
+> +phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long addr)
+> +{
+> +	struct list_head *_chunk;
+> +	struct gen_pool_chunk *chunk;
+> +
+> +	read_lock(&pool->lock);
+> +	list_for_each(_chunk, &pool->chunks) {
+> +		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
+> +
+> +		if (addr >= chunk->start_addr && addr < chunk->end_addr)
+> +			return chunk->phys_addr + addr - chunk->start_addr;
+> +	}
+> +	read_unlock(&pool->lock);
+> +
+> +	return -1;
+> +}
+> +EXPORT_SYMBOL(gen_pool_virt_to_phys);
+>  
+>  /**
+>   * gen_pool_destroy - destroy a special memory pool
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
