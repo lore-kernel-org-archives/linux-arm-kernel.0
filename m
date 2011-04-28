@@ -1,71 +1,91 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 28 Apr 2011 15:59:03 +1200
-Subject: [PATCH 0/14] at91: factorize soc init and switch to early platform
-In-Reply-To: <20110428024144.GJ29103@game.jcrosoft.org>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<4DB886FD.7000209@bluewatersys.com>
-	<20110428024144.GJ29103@game.jcrosoft.org>
-Message-ID: <4DB8E607.1090807@bluewatersys.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 28 Apr 2011 12:02:36 +0800
+Subject: [PATCH 1/3] i2c: append hardware lock with bus lock
+In-Reply-To: <2011042801>
+References: <2011042801>
+Message-ID: <1303963358-4652-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2011 02:41 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 09:13 Thu 28 Apr     , Ryan Mallon wrote:
->> On 04/26/2011 06:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> Hi,
->>>
->>> 	The following patch series start to factorize the soc init
->>> 	and switch gpio and timers to early platform
->>>
->>> 	diff stat on arm
->>>
->>> 	80 files changed, 1690 insertions(+), 2053 deletions(-)
->>
->> I finally had a chance to test this. On our Snapper 9G20 board
->> (AT91SAM9G20) the latest linux-next gives me:
->>
->> Starting kernel ...
->>
->> Uncompressing Linux... done, booting the kernel.
->> <5>Linux version 2.6.39-rc4-next-20110427+ (ryan at okiwi) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #850 Thu Apr 28 09:07:43 NZST 2011
->> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
->> CPU: VIVT data cache, VIVT instruction cache
->> Machine: Bluewater Systems Snapper 9260/9G20 module
->> Memory policy: ECC disabled, Data cache writeback
->> <0>Kernel panic - not syncing: Impossible to detect the CPU type
->> [<c002fb1c>] (unwind_backtrace+0x0/0xe4) from [<c0230820>] (panic+0x50/0x178)
->> [<c0230820>] (panic+0x50/0x178) from [<c000d414>] (at91_initialize+0x18/0x20)
->> [<c000d414>] (at91_initialize+0x18/0x20) from [<c000e298>] (snapper9260_map_io+0xc/0x5c)
->> [<c000e298>] (snapper9260_map_io+0xc/0x5c) from [<c000d0ec>] (paging_init+0x668/0x728)
->> [<c000d0ec>] (paging_init+0x668/0x728) from [<c000b5cc>] (setup_arch+0x39c/0x620)
->> [<c000b5cc>] (setup_arch+0x39c/0x620) from [<c000873c>] (start_kernel+0x6c/0x2c8)
->>
->>
->> I'll have a better look at this later to see if I can find the problem,
->> though I suspect the remapping of the AT91_DBGU location is to blame.
->> What platforms have you tested this on?
-> I already found the issue and fix it
-> 
->  git://github.com/at91linux/linux-2.6-at91.git test_cleanup
+Both AP and CP are contained in Marvell PXA910 silicon. These two ARM
+cores are sharing one pair of I2C pins.
 
-Okay, that is working a bit better, not quite booting yet, but a little
-further along :-).
+In order to keep I2C transaction operated with atomic, hardware lock
+(RIPC) is required. Because of this, bus lock in AP side can't afford
+this requirement. Now hardware lock is appended.
 
-Couple of bugs I've noticed so far: In board-stamp9g20.c and
-board-sam9g20ek.c you have missed the .init_irq initialisation change
-for the first MACHINE_START. It causes a build failure if either of
-these boards are included.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ drivers/i2c/i2c-core.c |   22 ++++++++++++++++++----
+ include/linux/i2c.h    |    3 +++
+ 2 files changed, 21 insertions(+), 4 deletions(-)
 
-Also at91x40 (e.g. board-eb01.c) does not get converted? I don't known
-anything about this SoC. Is this intentional?
-
-~Ryan
-
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 045ba6e..412c7a5 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -448,8 +448,11 @@ void i2c_lock_adapter(struct i2c_adapter *adapter)
+ 
+ 	if (parent)
+ 		i2c_lock_adapter(parent);
+-	else
++	else {
+ 		rt_mutex_lock(&adapter->bus_lock);
++		if (adapter->hardware_lock)
++			adapter->hardware_lock();
++	}
+ }
+ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+ 
+@@ -460,11 +463,19 @@ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+ static int i2c_trylock_adapter(struct i2c_adapter *adapter)
+ {
+ 	struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
++	int ret = 0;
+ 
+ 	if (parent)
+ 		return i2c_trylock_adapter(parent);
+-	else
+-		return rt_mutex_trylock(&adapter->bus_lock);
++	else {
++		ret = rt_mutex_trylock(&adapter->bus_lock);
++		if (ret && adapter->hardware_trylock) {
++			ret = adapter->hardware_trylock();
++			if (!ret)
++				i2c_unlock_adapter(adapter);
++		}
++		return ret;
++	}
+ }
+ 
+ /**
+@@ -477,8 +488,11 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
+ 
+ 	if (parent)
+ 		i2c_unlock_adapter(parent);
+-	else
++	else {
++		if (adapter->hardware_unlock)
++			adapter->hardware_unlock();
+ 		rt_mutex_unlock(&adapter->bus_lock);
++	}
+ }
+ EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
+ 
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index 06a8d9c..b283b4e 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -361,6 +361,9 @@ struct i2c_adapter {
+ 
+ 	/* data fields that are valid for all devices	*/
+ 	struct rt_mutex bus_lock;
++	void (*hardware_lock)(void);
++	void (*hardware_unlock)(void);
++	int (*hardware_trylock)(void);
+ 
+ 	int timeout;			/* in jiffies */
+ 	int retries;
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+1.7.1
