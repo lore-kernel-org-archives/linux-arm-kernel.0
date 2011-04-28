@@ -1,99 +1,27 @@
-From: vikram186@gmail.com (Vikram Narayanan)
-Date: Thu, 28 Apr 2011 22:59:01 +0530
-Subject: Architecture specific implementations for tickless kernel and
-	deferrable timers
-In-Reply-To: <20110428142822.GN17290@n2100.arm.linux.org.uk>
-References: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
-	<4DB0F249.6000307@codeaurora.org>
-	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
-	<20110426203756.GD17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
-	<alpine.LFD.2.02.1104271015000.3323@ionos>
-	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
-	<20110428133826.GM17290@n2100.arm.linux.org.uk>
-	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-	<20110428142822.GN17290@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 28 Apr 2011 12:41:38 -0500
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
+	<BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D26C443E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 7:58 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 28, 2011 at 07:24:41PM +0530, Vikram Narayanan wrote:
->> On Thu, Apr 28, 2011 at 7:08 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Apr 28, 2011 at 07:01:53PM +0530, Vikram Narayanan wrote:
->> >> I am still confused about the terms clocksource and clockevents. Can
->> >> someone please explain it in simple terms or lead me to a good
->> >> documentation that elaborates clearly about this?
->> >
->> > A clocksource is a monotonically incrementing counter which measures the
->> > passing of time.
->>
->> So, this is the timer that keeps the wall time always up as long as
->> the system is running. If the system isn't running, a backup RTC
->> should take care of the time. When the system is back, again
->> clocksource will be having the control.
->> Even if the above timer count overflows, that should be taken care of.
+On Thursday, April 28, 2011 12:08 AM, Linus Walleij wrote:
+> 2011/4/27 H Hartley Sweeten <hartleys@visionengravers.com>:
+>> The Makefile should probably be reordered, either alphabetically
+>> or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
+>> alphabetically in order to reduce merge conflicts.
 >
-> What basically happens is:
->
-> ? ? ? ?now = cs->read(cs);
-> ? ? ? ?delta = (now - cs->cycle_last) & cs->mask;
-> ? ? ? ?cs->cycle_last = now;
->
-> ? ? ? ?ns = clocksource_cyc2ns(delta, cs...);
->
-> ns now represents the amount of time which passed between this read and
-> the previous read. ?Note the mask in the calculation of delta ensures
-> that overflows are taken care of.
+> Yes, but if I do that in my patchset I will screw up Grants GPIO tree
+> completely, so I prefer that Grant do this. And maybe after pulling
+> in my GPIO consolidation tree to his in that case, so we don't get
+> undesired collisions. So leaving this for the GPIO maintainer.
 
-The timekeeping_get_ns() in kernel/time/timekeeping.c takes care of the above.
-So my job is to provide a good *continuous* clocksource with correct
-mult,shift and mask values.
-And also, the mult and shift values can be calculated from the
-clocks_calc_mult_shift() function.
-Then the arch independent code takes care of everything.
+This comment was intended for the GPIO maintainer.  Sorry for any
+confusion.
 
->
->> > This counter should never be reset.
->>
->> So this timer should always be on, no matter what happens to the system.
->
-> What I mean is that at no point should the clocksource counter be re-
-> initialized while the system is running and it is in use, otherwise
-> the 'delta' value will spike and 'ns' will become very large. ?You'll
-> then find the kernels idea of time spontaneously jumps forward when
-> it shouldn't.
->
->> > A clockevent device is some sort of timer which it used to trigger either
->> > a periodic interrupt or a one-shot interrupt to cause CPUs to do some
->> > maintainence task (such as reading the clock source, comparing that with
->> > the previous reading, and using the delta to update the kernels idea of
->> > current time.)
->>
->> This is used for setting up the next event by using the set_next_event
->> callback and set the mode(one shot or periodic) by set_mode callback.
->> So, this timer is the heart of tickless kernel functionality(NO_HZ).
->
-> Correct. ?The mode is changed when required - when switching to periodic
-> mode, you're expected to program the hardware for that mode and set it
-> up to produce interrupts at a frequency of HZ.
->
-The define HZ is important only for one-shot mode. and for a tickless
-kernel this value is not of great importance.
-And also if I use the same timer for clocksource and clockevent, it
-will surely gonna mess up my system's time sooner or latter.
-> When you're called to switch to one-shot mode, program it for one-shot
-> mode, disable it, and wait for set_next_event(). ?On set_next_event(),
-> you program the timer to produce an interrupt after the specified
-> interval and enable it.
->
-For the clockevent device, If I provide all the data structures,
-next_event and set_mode, then this will work perfectly.
-
-Hope I have understood your explanations in the right way and all my
-above statements make sense.
-
-Thanks,
-Vikram
+Regards,
+Hartley
