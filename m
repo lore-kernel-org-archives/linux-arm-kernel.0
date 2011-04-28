@@ -1,30 +1,39 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 28 Apr 2011 11:33:01 +0200
-Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
-In-Reply-To: <1303909742.18407.12.camel@redbox>
-References: <1303909742.18407.12.camel@redbox>
-Message-ID: <20110428093301.GB31786@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 10:51:27 +0100
+Subject: [PATCH] plat-pxa: Enable ability to adjust SD/MMC clocks
+In-Reply-To: <1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
+References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
+	<20110427093328.GU17290@n2100.arm.linux.org.uk>
+	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
+	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
+Message-ID: <20110428095127.GX17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:09 Wed 27 Apr     , Andrew Victor wrote:
-> The AT91's AIC interrupt controller will internally mask the current
-> (and lower-priority) interrupts until software acknowledges that the
-> interrupt was handled by writing to the AIC_EOICR register.
-> 
-> This matches the "fasteoi" IRQ flow-handler, so convert the AT91 to use
-> handle_fasteoi_irq rather than handle_level_irq.
-> 
-> This also allows the irq_finish() call to be removed from the low-level
-> ARM IRQ handler.
-> 
-> 
-> Signed-off-by: Andrew Victor <linux@maxim.org.za>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Wed, Apr 27, 2011 at 01:49:45PM -0700, Philip Rakity wrote:
+> The patches were submitted a while ago.
 
-Good for me
+It would be a good idea to reference them so that people know where to
+find then and what the status of them is.  It's also a good idea to
+Cc interested parties on related patches.
 
-I put it in the next or you take Thomas?
+A couple of points in one of those patches though:
 
-Best Regards,
-J.
+> +	if(gpio_request(reset, "sd8xxx reset")) {
+
+space between if and (.
+
+> +		printk(KERN_INFO "gpio %d request failed\n", reset);
+> +		return;
+> +	}
+> +
+> +	if(gpio_request(poweron, "sd8xxx PDn")) {
+> +		gpio_free(reset);
+> +		printk(KERN_INFO "gpio %d request failed\n", poweron);
+> +		return;
+> +	}
+> +
+> +	gpio_direction_output(poweron, 1);
+> +	msleep (1);
+
+No space between msleep and (.
