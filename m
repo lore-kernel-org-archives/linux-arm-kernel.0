@@ -1,26 +1,26 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Thu, 28 Apr 2011 19:12:23 +0200
-Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
-In-Reply-To: <20110428151819.GE13755@siel.b>
-References: <1303909742.18407.12.camel@redbox> <20110428151819.GE13755@siel.b>
-Message-ID: <BANLkTimUPfo0kMn3HPa5iZUO5g_b6rVKcA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 18:12:27 +0100
+Subject: [PATCH V3 4/7] dmaengine/dw_dmac: Enable resubmission from
+	callback routine.
+In-Reply-To: <adbd175c9fc15e65b584d342b65cd1c3c0c58322.1303896567.git.viresh.kumar@st.com>
+References: <cover.1303896566.git.viresh.kumar@st.com>
+	<adbd175c9fc15e65b584d342b65cd1c3c0c58322.1303896567.git.viresh.kumar@st.com>
+Message-ID: <20110428171227.GD17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Wed, Apr 27, 2011 at 03:06:46PM +0530, Viresh Kumar wrote:
+>  static void
+>  dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
+> -		bool callback_required)
+> +		bool callback_required, unsigned long flags)
+>  {
+...
+>  	if (callback_required) {
+> +		spin_unlock_irqrestore(&dwc->lock, flags);
+>  		if (callback)
+>  			callback(param);
+> +		spin_lock_irqsave(&dwc->lock, flags);
 
->> - ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
->> - ? ? /* now it may re-trigger */
->> + ? ? /* acknowledge interrupt - now it may re-trigger */
->> + ? ? desc->irq_data.chip->irq_eoi(&desc->irq_data);
->> ?}
->
-> why does this handler mess with the parent irq chip ?
-> this looks pretty wrong to me.
-
-This is a chained-handler, and without that line the end-of-interrupt
-doesn't seem to be signalled.
-
-
-Regards,
-  Andrew Victor
+Again, this isn't really on.  It seems to me that this code needs some
+serious reworking.
