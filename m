@@ -1,27 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 28 Apr 2011 22:14:33 +0800
-Subject: [GIT PULL] pxa: fix for v2.6.39-rc4
-Message-ID: <BANLkTimQ3mZS8pi_4MajhWbZ=QqqKiFdWA@mail.gmail.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Thu, 28 Apr 2011 16:16:25 +0200
+Subject: [PATCH 1/3] i2c: append hardware lock with bus lock
+In-Reply-To: <BANLkTin6jguQue_0Y74jGPnmhCcvWLBjHg@mail.gmail.com>
+References: <1303963358-4652-1-git-send-email-haojian.zhuang@gmail.com>
+	<20110428102212.2d8d607c@endymion.delvare>
+	<BANLkTin6jguQue_0Y74jGPnmhCcvWLBjHg@mail.gmail.com>
+Message-ID: <20110428161625.5eaacb85@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f0e615c3cb72b42191b558c130409335812621d8:
+Hi Eric,
 
-  Linux 2.6.39-rc4 (2011-04-18 21:26:00 -0700)
+On Thu, 28 Apr 2011 16:36:02 +0800, Eric Miao wrote:
+> On Thu, Apr 28, 2011 at 4:22 PM, Jean Delvare <khali@linux-fr.org> wrote:
+> > Hi Haojian,
+> >
+> > On Thu, 28 Apr 2011 12:02:36 +0800, Haojian Zhuang wrote:
+> >> Both AP and CP are contained in Marvell PXA910 silicon. These two ARM
+> >> cores are sharing one pair of I2C pins.
+> >>
+> >> In order to keep I2C transaction operated with atomic, hardware lock
+> >> (RIPC) is required. Because of this, bus lock in AP side can't afford
+> >> this requirement. Now hardware lock is appended.
+> >
+> > I have no objection to the idea, but one question: when using the
+> > hardware lock, isn't the software mutex redundant? I would expect that
+> > you call the hardware_lock/unlock functions _instead_ of
+> > rt_mutex_lock/unlock, rather than in addition to it. Or do you still
+> > need the rt_mutex to prevent priority inversion?
+> >
+> 
+> Jean,
+> 
+> It's actually not redundant. The hardware lock is used to protect
+> access to the same register regions between two processors (AP
+> and CP so called), while the software lock is used to protect
+> access from within the AP side.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+Are you suggesting that the hardware lock wouldn't mind being taken
+twice by the AP side? If it is the case, then indeed the software mutex
+is still needed to prevent it from happening.
 
-Ben Hutchings (1):
-      ARM: Fix .size directive for xscale_dma_a0_map_area
+That being said... I guess that avoiding a priority inversion is a good
+enough reason to always take the rt_mutex, regardless of the hardware
+lock implementation.
 
-Paul Parsons (1):
-      ARM: pxa/hx4700: bq24022 regulator needs to be enabled
+So, this patch is
 
-Philipp Zabel (1):
-      ARM: pxa/magician: bq24022 regulator needs to be enabled
+Acked-by: Jean Delvare <khali@linux-fr.org>
 
- arch/arm/mach-pxa/hx4700.c   |    2 +-
- arch/arm/mach-pxa/magician.c |    2 +-
- arch/arm/mm/proc-xscale.S    |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+I guess it makes more sense for me to let Ben apply it, as the other
+two patches in the series are for him too. This will avoid a dependency
+between our trees.
+
+-- 
+Jean Delvare
