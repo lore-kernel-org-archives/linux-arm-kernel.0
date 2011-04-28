@@ -1,44 +1,34 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 28 Apr 2011 14:25:09 +0200
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110428110129.GE17290@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 14:28:56 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110428105131.GD17290@n2100.arm.linux.org.uk>
 References: <201104212129.17013.arnd@arndb.de>
-	<20110427073514.GH17290@n2100.arm.linux.org.uk>
-	<20110428104143.GB13402@8bytes.org>
-	<20110428110129.GE17290@n2100.arm.linux.org.uk>
-Message-ID: <20110428122508.GC13402@8bytes.org>
+	<003e01cc058f$94beb490$be3c1db0$%szyprowski@samsung.com>
+	<20110428105131.GD17290@n2100.arm.linux.org.uk>
+Message-ID: <201104281428.56780.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 12:01:29PM +0100, Russell King - ARM Linux wrote:
+On Thursday 28 April 2011, Russell King - ARM Linux wrote:
+> What I'd suggest is that dma_alloc_noncoherent() should be architecture
+> independent, and should call into whatever iommu support the device has
+> to setup an approprite iommu mapping.  IOW, I don't see any need for
+> every architecture to provide its own dma_alloc_noncoherent() allocation
+> function - or indeed every iommu implementation to deal with the
+> allocation issues either.
 
-> dma_addr_t dma_map_page(struct device *dev, struct page *page, size_t offset,
->                         size_t size, enum dma_data_direction dir)
-> {
-> 	struct dma_map_ops *ops = get_dma_ops(dev);
-> 	dma_addr_t addr;
-> 
-> 	BUG_ON(!valid_dma_direction(dir));
-> 	if (ops->flags & DMA_MANAGE_CACHE || !dev->dma_cache_coherent)
-> 		__dma_page_cpu_to_dev(page, offset, size, dir);
-> 	addr = ops->map_page(dev, page, offset, size, dir, NULL);
-> 	debug_dma_map_page(dev, page, offset, size, dir, addr, false);
-> 
-> 	return addr;
-> }
-> 
-> Things like swiotlb and dmabounce would not set DMA_MANAGE_CACHE in
-> ops->flags, but real iommus and the standard no-iommu implementations
-> would be required to set it to ensure that data is visible in memory
-> for CPUs which have DMA incoherent caches.
+Almost all architectures today define dma_alloc_noncoherent to
+dma_alloc_coherent, which is totally fine on architectures
+where cacheable coherent mappings are the default or where
+we don't need to flush individual cache lines for dma_sync_*.
 
-Do we need flags for that? A flag is necessary if the cache-management
-differs between IOMMU implementations on the same platform. If
-cache-management is only specific to the platform (or architecture) then
-it does make more sense to just call the function without flag checking
-and every platform with coherent DMA just implements these as static
-inline noops.
+The problem with backing either of the two with alloc_pages or
+alloc_pages_exact is that you cannot do large allocation when
+physical memory is fragmented, even if you have an IOMMU.
 
-Regards,
+IMHO the allocation for both dma_alloc_coherent and
+dma_alloc_noncoherent should therefore depend on whether you
+have an IOMMU. If you do, you can easily allocate megabytes,
+e.g. for use as a frame buffer.
 
-	Joerg
+	Arnd
