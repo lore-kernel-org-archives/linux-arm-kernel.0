@@ -1,110 +1,61 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 28 Apr 2011 17:12:42 +0100
-Subject: [PATCH] ARM: perf: remove erroneous check on active_events
-In-Reply-To: <20110428154108.GV17290@n2100.arm.linux.org.uk>
-References: <1303898236-14263-1-git-send-email-mark.rutland@arm.com>
-	<20110428154108.GV17290@n2100.arm.linux.org.uk>
-Message-ID: <20110428161242.GE3052@pulham.picochip.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Thu, 28 Apr 2011 12:21:47 -0400
+Subject: [PATCH 4/4] omap: musb: introduce default baord config
+In-Reply-To: <20110428141818.GE19709@n2100.arm.linux.org.uk>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
+	<FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
+	<20110428141818.GE19709@n2100.arm.linux.org.uk>
+Message-ID: <9B236748-29D6-4129-AFCD-5D223CE18ECD@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 04:41:08PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 27, 2011 at 10:57:16AM +0100, Mark Rutland wrote:
-> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> > index fd6403c..29a0cf8 100644
-> > --- a/arch/arm/kernel/perf_event.c
-> > +++ b/arch/arm/kernel/perf_event.c
-> > @@ -560,11 +560,6 @@ static int armpmu_event_init(struct perf_event *event)
-> >  	event->destroy = hw_perf_event_destroy;
-> >  
-> >  	if (!atomic_inc_not_zero(&active_events)) {
-> > -		if (atomic_read(&active_events) > armpmu->num_events) {
-> > -			atomic_dec(&active_events);
-> 
-> Yuck.  This is a good example of atomic_* abuse.  The above does nothing
-> to deal with the situation where two threads are running thusly:
-> 
-> CPU0					CPU1
-> atomic_inc_not_zero(&active_events)
-> 					atomic_inc_not_zero(&active_events)
-> atomic_read(&active_events)
-> 					atomic_read(&active_events)
-> atomic_dec(&active_events)
-> 					atomic_dec(&active_events)
-> return -ENOSPC
-> 					return -ENOSPC
-> 
-> when one of those two should have succeeded.  I do wish people would
-> get out of the habbit of using atomic variables - they seem to be ripe
-> for this kind of abuse.
+Hello!
 
-Yup, I messed up there.  How about the patch below that eliminates the 
-atomic_t's entirely?  This means that we always lock the mutex in event 
-destruction rather than just for the last one but that seems acceptable 
-to me.
+On Apr 28, 2011, at 10:18 AM, Russell King - ARM Linux wrote:
+>>> -void __init usb_musb_init(struct omap_musb_board_data *board_data)
+>>> +static struct omap_musb_board_data musb_default_board_data = {
+>>> +	.interface_type		= MUSB_INTERFACE_ULPI,
+>>> +	.mode			= MUSB_OTG,
+>> 
+>> In fact can you make it more generic with ifdefs like this?
+>> (since there are tons of boards taht are client only or would like to be compiled in some other way):
+>> 
+>> +#ifdef CONFIG_USB_MUSB_OTG
+>> +       .mode                   = MUSB_OTG,
+>> +#elif defined(CONFIG_USB_MUSB_HDRC_HCD)
+>> +       .mode                   = MUSB_HOST,
+>> +#elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
+>> +       .mode                   = MUSB_PERIPHERAL,
+>> +#endif
+> If this is something that's desired, then it should not be done via ifdefs
+> but by platforms passing the mode argument into an initialization function.
+> Eventually, when we switch to some DT like system, this is the kind of
+> information that would be obtained from DT, and identifying this stuff
+> now will help when DT stuff comes along.
 
-The MIPS perf events code is based on this so could do with the same 
-change.
+Frankly, I am not even sure why the mode needs to be supplied by the board at all.
+The musb code already  has a very similar switch in musb_plat and so it totally looks like
+a duplicated specification of the same thing from the board file and from
+generic musb code where the original init value is then ignored.
 
-Jamie
+I see that in .29 the board file did not need to specify usb mode and it was all decided
+in musb-specific code, and I have no idea why that was later changed to the way it is now.
 
-8<---
+Would it just be better if a patch removing mode field from struct omap_musb_board_data
+is adopted like this (warning - not a real patch)?
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 35559f7..c7f834f 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -129,7 +129,6 @@ void __init usb_musb_init(struct omap_musb_board_data *board
+        musb_plat.clock = "ick";
+        musb_plat.board_data = board_data;
+        musb_plat.power = board_data->power >> 1;
+-       musb_plat.mode = board_data->mode;
+        musb_plat.extvbus = board_data->extvbus;
+ 
+        if (cpu_is_omap44xx())
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 69cfee0..439f006 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -458,16 +458,16 @@ armpmu_release_hardware(void)
- 	pmu_device = NULL;
- }
- 
--static atomic_t active_events = ATOMIC_INIT(0);
--static DEFINE_MUTEX(pmu_reserve_mutex);
-+static int active_events;
-+static DEFINE_MUTEX(active_event_lock);
- 
- static void
- hw_perf_event_destroy(struct perf_event *event)
- {
--	if (atomic_dec_and_mutex_lock(&active_events, &pmu_reserve_mutex)) {
-+	mutex_lock(&active_event_lock);
-+	if (--active_events == 0)
- 		armpmu_release_hardware();
--		mutex_unlock(&pmu_reserve_mutex);
--	}
-+	mutex_unlock(&active_event_lock);
- }
- 
- static int
-@@ -559,22 +559,18 @@ static int armpmu_event_init(struct perf_event *event)
- 
- 	event->destroy = hw_perf_event_destroy;
- 
--	if (!atomic_inc_not_zero(&active_events)) {
--		if (atomic_read(&active_events) > armpmu->num_events) {
--			atomic_dec(&active_events);
--			return -ENOSPC;
--		}
-+	mutex_lock(&active_event_lock);
- 
--		mutex_lock(&pmu_reserve_mutex);
--		if (atomic_read(&active_events) == 0) {
--			err = armpmu_reserve_hardware();
--		}
--
--		if (!err)
--			atomic_inc(&active_events);
--		mutex_unlock(&pmu_reserve_mutex);
-+	if (++active_events > armpmu->num_events) {
-+		--active_events;
-+		err = -ENOSPC;
- 	}
- 
-+	if (!err && active_events == 1)
-+		err = armpmu_reserve_hardware();
-+
-+	mutex_unlock(&active_event_lock);
-+
- 	if (err)
- 		return err;
- 
+Bye,
+    Oleg
