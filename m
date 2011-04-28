@@ -1,41 +1,131 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 28 Apr 2011 09:48:56 +0300
-Subject: [PATCH] PXA: Fix typo in proc-xscale.S
-In-Reply-To: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
-References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <4DB90DD8.7050406@compulab.co.il>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 28 Apr 2011 08:59:00 +0200
+Subject: [PATCH] gpio: rename VIA local config struct
+Message-ID: <1303973940-13296-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On 04/28/11 04:46, Marek Vasut wrote:
+The local VIA GPIO config struct "gpio_config" collides with my
+extension to the gpio_chip struct, so rename it to via_gpio_config
+so we don't get this clash.
 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mm/proc-xscale.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> index ce233bc..42af976 100644
-> --- a/arch/arm/mm/proc-xscale.S
-> +++ b/arch/arm/mm/proc-xscale.S
-> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
->  	teq	r2, #DMA_TO_DEVICE
->  	beq	xscale_dma_clean_range
->  	b	xscale_dma_flush_range
-> -ENDPROC(xscsale_dma_a0_map_area)
-> +ENDPROC(xscale_dma_a0_map_area)
->  
->  /*
->   *	dma_unmap_area(start, size, dir)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/video/via/via-gpio.c |   49 +++++++++++++++++++++--------------------
+ 1 files changed, 25 insertions(+), 24 deletions(-)
 
-Similar patch:
-http://www.spinics.net/lists/arm-kernel/msg118258.html
-
-has been sent to Russell quite a while ago,
-but somehow got lost or something.
-
+diff --git a/drivers/video/via/via-gpio.c b/drivers/video/via/via-gpio.c
+index c2a0a1c..4b26f3f 100644
+--- a/drivers/video/via/via-gpio.c
++++ b/drivers/video/via/via-gpio.c
+@@ -145,7 +145,7 @@ static int via_gpio_get(struct gpio_chip *chip, unsigned int nr)
+ }
+ 
+ 
+-static struct viafb_gpio_cfg gpio_config = {
++static struct viafb_gpio_cfg via_gpio_config = {
+ 	.gpio_chip = {
+ 		.label = "VIAFB onboard GPIO",
+ 		.owner = THIS_MODULE,
+@@ -183,8 +183,8 @@ static int viafb_gpio_resume(void *private)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
+-		viafb_gpio_enable(gpio_config.active_gpios[i]);
++	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i += 2)
++		viafb_gpio_enable(via_gpio_config.active_gpios[i]);
+ 	return 0;
+ }
+ 
+@@ -201,9 +201,9 @@ int viafb_gpio_lookup(const char *name)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i++)
+-		if (!strcmp(name, gpio_config.active_gpios[i]->vg_name))
+-			return gpio_config.gpio_chip.base + i;
++	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i++)
++		if (!strcmp(name, via_gpio_config.active_gpios[i]->vg_name))
++			return via_gpio_config.gpio_chip.base + i;
+ 	return -1;
+ }
+ EXPORT_SYMBOL_GPL(viafb_gpio_lookup);
+@@ -229,14 +229,15 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
+ 		for (gpio = viafb_all_gpios;
+ 		     gpio < viafb_all_gpios + VIAFB_NUM_GPIOS; gpio++)
+ 			if (gpio->vg_port_index == port_cfg[i].ioport_index) {
+-				gpio_config.active_gpios[ngpio] = gpio;
+-				gpio_config.gpio_names[ngpio] = gpio->vg_name;
++				via_gpio_config.active_gpios[ngpio] = gpio;
++				via_gpio_config.gpio_names[ngpio] =
++					gpio->vg_name;
+ 				ngpio++;
+ 			}
+ 	}
+-	gpio_config.gpio_chip.ngpio = ngpio;
+-	gpio_config.gpio_chip.names = gpio_config.gpio_names;
+-	gpio_config.vdev = vdev;
++	via_gpio_config.gpio_chip.ngpio = ngpio;
++	via_gpio_config.gpio_chip.names = via_gpio_config.gpio_names;
++	via_gpio_config.vdev = vdev;
+ 	if (ngpio == 0) {
+ 		printk(KERN_INFO "viafb: no GPIOs configured\n");
+ 		return 0;
+@@ -245,18 +246,18 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
+ 	 * Enable the ports.  They come in pairs, with a single
+ 	 * enable bit for both.
+ 	 */
+-	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
++	spin_lock_irqsave(&via_gpio_config.vdev->reg_lock, flags);
+ 	for (i = 0; i < ngpio; i += 2)
+-		viafb_gpio_enable(gpio_config.active_gpios[i]);
+-	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
++		viafb_gpio_enable(via_gpio_config.active_gpios[i]);
++	spin_unlock_irqrestore(&via_gpio_config.vdev->reg_lock, flags);
+ 	/*
+ 	 * Get registered.
+ 	 */
+-	gpio_config.gpio_chip.base = -1;  /* Dynamic */
+-	ret = gpiochip_add(&gpio_config.gpio_chip);
++	via_gpio_config.gpio_chip.base = -1;  /* Dynamic */
++	ret = gpiochip_add(&via_gpio_config.gpio_chip);
+ 	if (ret) {
+ 		printk(KERN_ERR "viafb: failed to add gpios (%d)\n", ret);
+-		gpio_config.gpio_chip.ngpio = 0;
++		via_gpio_config.gpio_chip.ngpio = 0;
+ 	}
+ #ifdef CONFIG_PM
+ 	viafb_pm_register(&viafb_gpio_pm_hooks);
+@@ -277,8 +278,8 @@ static int viafb_gpio_remove(struct platform_device *platdev)
+ 	/*
+ 	 * Get unregistered.
+ 	 */
+-	if (gpio_config.gpio_chip.ngpio > 0) {
+-		ret = gpiochip_remove(&gpio_config.gpio_chip);
++	if (via_gpio_config.gpio_chip.ngpio > 0) {
++		ret = gpiochip_remove(&via_gpio_config.gpio_chip);
+ 		if (ret) { /* Somebody still using it? */
+ 			printk(KERN_ERR "Viafb: GPIO remove failed\n");
+ 			return ret;
+@@ -287,11 +288,11 @@ static int viafb_gpio_remove(struct platform_device *platdev)
+ 	/*
+ 	 * Disable the ports.
+ 	 */
+-	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
+-		viafb_gpio_disable(gpio_config.active_gpios[i]);
+-	gpio_config.gpio_chip.ngpio = 0;
+-	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
++	spin_lock_irqsave(&via_gpio_config.vdev->reg_lock, flags);
++	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i += 2)
++		viafb_gpio_disable(via_gpio_config.active_gpios[i]);
++	via_gpio_config.gpio_chip.ngpio = 0;
++	spin_unlock_irqrestore(&via_gpio_config.vdev->reg_lock, flags);
+ 	return ret;
+ }
+ 
 -- 
-Regards,
-Igor.
+1.7.3.2
