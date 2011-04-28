@@ -1,30 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Apr 2011 22:37:38 +0100
-Subject: [PATCH] ARM: The mandatory barrier rmb() must be a dsb() in for
-	device accesses
-In-Reply-To: <20110428184538.GL17290@n2100.arm.linux.org.uk>
-References: <20110325101651.27120.56045.stgit@e102109-lin.cambridge.arm.com>
-	<AANLkTi=vx7fttc0B08dcfB_s9ya-98Rt-=a8Hr0QGvsM@mail.gmail.com>
-	<1301412104.583.85.camel@e102109-lin.cambridge.arm.com>
-	<BANLkTi=SgC3sT5aHpFc8Yi-JZrc1PPcVwA@mail.gmail.com>
-	<BANLkTi=37p-BWpzF2KT4J8PO+xEWrRjDfA@mail.gmail.com>
-	<BANLkTikcy_eut-HGexziTnoUcXOPLdyVfA@mail.gmail.com>
-	<BANLkTin4rfDMUB-Fa=AsL==SfJgaY0C2Zw@mail.gmail.com>
-	<BANLkTimh_TD-6gvbYC4UBCmqvkH8DpbKpQ@mail.gmail.com>
-	<20110428184538.GL17290@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTinpDetPeHhTxo-TdgG65xCTkx3JbA@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Thu, 28 Apr 2011 16:38:22 -0500
+Subject: since when does ARM map the kernel memory in sections?
+In-Reply-To: <201104282226.23005.pwaechtler@mac.com>
+References: <201104282226.23005.pwaechtler@mac.com>
+Message-ID: <BANLkTi=f72m_cxXCkKRWdefDKgr67cEf2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, 28 April 2011, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> So, what am I supposed to do with 6870/1 (rmb) and the wmb patch?
-> One or other is wrong - they certainly are not both correct as rmb()
-> can not be stronger than wmb().
+On Thu, Apr 28, 2011 at 3:26 PM, Peter Waechtler <pwaechtler@mac.com> wrote:
+> Am Mittwoch, 27. April 2011, 02:27:57 schrieben Sie:
+>> On Tue, Apr 26, 2011 at 5:58 PM, Jamie Lokier <jamie@shareable.org> wrote:
+>> >> Reliable writes are exposed via REQ_FUA.
+>> >
+>> > Are you sure that's appropriate?
+>> >
+>> > Unless I have misunderstood (very possible), REQ_FUA means writes hit
+>> > non-volatile storage before acknowledgement, not that they are atomic.
+>> > I think the normal users of REQ_FUA don't require or expect large
+>> > atomic writes; they use it as a shortcut for (write & flush this
+>> > write) without implying anything else is flushed.
+>>
+>> I would agree with you that it's not the best mapping. However, a failed
+>> MMC write transaction has other properties. If I understand correctly,
+>> depending on mode of failure (say pulling power), you might wind up
+>> with extra data getting erased (because erase
+>> happens at erase unit boundary), and erase can be done before all the
+>> data was transferred from host to card.
+>>
+>
+> No, it's not because of the erase unit size larger than write size.
+> An "erase unit" is cleared by garbage collection only IFF the complete unit is
+> unused - asynchronously by the ongoing write transaction. The problem with
+> damaging neighboring data is: density. No beer (today), i'm drinking wine ;)
+>
+> The cells storing the "bits" gets smaller and smaller and with multi level
+> cells even more bits are represented by "fewer electrons". Programming the
+> neighbor cell disturbs the fragile cells. If the error correction is disturbed
+> by power loss: off we go...
+>
+> Someone from the flash vendors eavesdropping? Please, pretty please ... :)
+>
+> ? ? ? ?Peter
+>
+> P.S. Andrei: sorry for reposting, but Kmail confuses me with "Reply to all"
+>
 
-Given Ming's reply to the wmb patch he posted, you should discard the
-wmb patch. As for the rmb one (6870/1), I already explained why it is
-needed.
+No problem, I'm confused actually if my mails got through... Here and
+in the other mmc flash reliability thread.
 
--- 
-Catalin
+A
