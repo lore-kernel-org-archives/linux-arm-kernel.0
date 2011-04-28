@@ -1,67 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 13:42:42 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 14:48:17 +0200
 Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110428122508.GC13402@8bytes.org>
+In-Reply-To: <20110428123616.GI17290@n2100.arm.linux.org.uk>
 References: <201104212129.17013.arnd@arndb.de>
-	<20110427073514.GH17290@n2100.arm.linux.org.uk>
-	<20110428104143.GB13402@8bytes.org>
-	<20110428110129.GE17290@n2100.arm.linux.org.uk>
-	<20110428122508.GC13402@8bytes.org>
-Message-ID: <20110428124242.GJ17290@n2100.arm.linux.org.uk>
+	<201104281412.40991.arnd@arndb.de>
+	<20110428123616.GI17290@n2100.arm.linux.org.uk>
+Message-ID: <201104281448.17359.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 02:25:09PM +0200, Joerg Roedel wrote:
-> On Thu, Apr 28, 2011 at 12:01:29PM +0100, Russell King - ARM Linux wrote:
+On Thursday 28 April 2011, Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 02:12:40PM +0200, Arnd Bergmann wrote:
+> > On Thursday 28 April 2011, Catalin Marinas wrote:
+> > > On Thu, 2011-04-28 at 01:15 +0100, Valdis.Kletnieks at vt.edu wrote:
+> > > > On Wed, 27 Apr 2011 12:08:28 BST, Catalin Marinas said:
+> > > > 
+> > > > > The current version of the ARM ARM says "unpredictable". But this
+> > > > > general definition of "unpredictable" does not allow it to deadlock
+> > > > > (hardware) or have security implications. It is however allowed to
+> > > > > corrupt data.
+> > > > 
+> > > > Not allowed to have security implications, but is allowed to corrupt data.
+> > > 
+> > > By security I was referring to TrustZone extensions. IOW, unpredictable
+> > > in normal (non-secure) world should not cause data corruption in the
+> > > secure world.
+> > 
+> > That definition is rather useless for operating systems that don't use
+> > Trustzone then, right?
 > 
-> > dma_addr_t dma_map_page(struct device *dev, struct page *page, size_t offset,
-> >                         size_t size, enum dma_data_direction dir)
-> > {
-> > 	struct dma_map_ops *ops = get_dma_ops(dev);
-> > 	dma_addr_t addr;
-> > 
-> > 	BUG_ON(!valid_dma_direction(dir));
-> > 	if (ops->flags & DMA_MANAGE_CACHE || !dev->dma_cache_coherent)
-> > 		__dma_page_cpu_to_dev(page, offset, size, dir);
-> > 	addr = ops->map_page(dev, page, offset, size, dir, NULL);
-> > 	debug_dma_map_page(dev, page, offset, size, dir, addr, false);
-> > 
-> > 	return addr;
-> > }
-> > 
-> > Things like swiotlb and dmabounce would not set DMA_MANAGE_CACHE in
-> > ops->flags, but real iommus and the standard no-iommu implementations
-> > would be required to set it to ensure that data is visible in memory
-> > for CPUs which have DMA incoherent caches.
+> I'm not sure what you're implying.  By running on a device with Trustzone
+> extensions, Linux is using them whether it knows it or not.
 > 
-> Do we need flags for that? A flag is necessary if the cache-management
-> differs between IOMMU implementations on the same platform. If
-> cache-management is only specific to the platform (or architecture) then
-> it does make more sense to just call the function without flag checking
-> and every platform with coherent DMA just implements these as static
-> inline noops.
+> Linux on ARMs evaluation boards runs on the secure size of the Trustzone
+> dividing line.  Linux on OMAP SoCs runs on the insecure size of that,
+> and has to make secure monitor calls to manipulate certain registers
+> (eg, to enable workarounds for errata etc).  As SMC calls are highly
+> implementation specific, there is and can be no "trustzone" driver.
 
-Sigh.  You're not seeing the point.
+My point was that when Linux runs in the secure partition (ok, I didn't
+know we did that, but still), anything that corrupts Linux data has
+security implications. If Linux runs outside of Trustzone, you can
+also currupt Linux and the security is completely pointless because
+after Linux is gone, you have nothing left that drives your devices
+or runs user processes.
 
-There is _no_ point doing the cache management _if_ we're using something
-like dmabounce or swiotlb, as we'll be using memcpy() at some point with
-the buffer.  Moreover, dmabounce or swiotlb may have to do its own cache
-management _after_ that memcpy() to ensure that the page cache requirements
-are met.
+The only case where TrustZone would help is when you have an operating
+system running in the secure partition as some sort of microkernel
+(a.k.a. hypervisor) and have the "unpredictable" behavior isolated
+in nonessential parts of the system.
 
-Doing DMA cache management for dmabounce or swiotlb will result in
-unnecessary overhead - and as we can see from the MMC discussions,
-it has a _significant_ performance impact.
-
-Think about it.  If you're using dmabounce, but still do the cache
-management:
-
-1. you flush the data out of the CPU cache back to memory.
-2. you allocate new memory using dma_alloc_coherent() for the DMA buffer
-   which is accessible to the device.
-3. you memcpy() the data out of the buffer you just flushed into the
-   DMA buffer - this re-fills the cache, evicting entries which may
-   otherwise be hot due to the cache fill policy.
-
-Step 1 is entirely unnecessary and is just a complete and utter waste of
-CPU resources.
+	Arnd
