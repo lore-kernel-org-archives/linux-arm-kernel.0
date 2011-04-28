@@ -1,25 +1,33 @@
-From: camhirundo@gmail.com (Hirundo Cam)
-Date: Thu, 28 Apr 2011 07:52:01 +0800
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-Message-ID: <BANLkTi=QLh1Po6Aj3Lgp5e15s_Cxkza4vw@mail.gmail.com>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Wed, 27 Apr 2011 20:15:29 -0400
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: Your message of "Wed, 27 Apr 2011 12:08:28 BST."
+	<1303902508.15101.21.camel@e102109-lin.cambridge.arm.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+	<201104271243.16868.arnd@arndb.de>
+	<1303902508.15101.21.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <11431.1303949729@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and Nico,
+On Wed, 27 Apr 2011 12:08:28 BST, Catalin Marinas said:
 
-2011/4/28 Hirundo Cam <camhirundo@gmail.com>
->
-> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
-> LEDs, GPIO, Buttons remains unknown.
->
-> To use this patch, u-boot must also be modified.
->
-> Signed-off-by: Hirundo Cam <camhirundo@gmail.com>
+> The current version of the ARM ARM says "unpredictable". But this
+> general definition of "unpredictable" does not allow it to deadlock
+> (hardware) or have security implications. It is however allowed to
+> corrupt data.
 
-Could you please help to tell who can help on review and apply this patch?
-Thanks.
+Not allowed to have security implications, but is allowed to corrupt data.
 
-Regards,
-Hirundo Cam.
+*boggle* :)
+
+(The problem being, of course, that if the attacker is able to predict/control
+what gets corrupted, it can easily end up leveraged into a security implication.)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110427/4722e31a/attachment.sig>
