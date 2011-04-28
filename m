@@ -1,23 +1,29 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 28 Apr 2011 23:38:07 +0900
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 16:39:59 +0200
 Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104281629.52863.arnd@arndb.de>
-References: <201104281428.56780.arnd@arndb.de>
-	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+In-Reply-To: <20110428143440.GP17290@n2100.arm.linux.org.uk>
+References: <201104212129.17013.arnd@arndb.de>
 	<201104281629.52863.arnd@arndb.de>
-Message-ID: <20110428233538V.fujita.tomonori@lab.ntt.co.jp>
+	<20110428143440.GP17290@n2100.arm.linux.org.uk>
+Message-ID: <201104281640.00107.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm busy at a conference so I've not read the whole thread yet..
+On Thursday 28 April 2011, Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 04:29:52PM +0200, Arnd Bergmann wrote:
+> > Given that people still want to have an interface that does what I
+> > though this one did, I guess we have two options:
+> > 
+> > * Kill off dma_cache_sync and replace it with calls to dma_sync_*
+> >   so we can start using dma_alloc_noncoherent on ARM
+> 
+> I don't think this is an option as dma_sync_*() is part of the streaming
+> DMA mapping API (dma_map_*) which participates in the idea of buffer
+> ownership, which the noncoherent API doesn't appear to.
 
-On Thu, 28 Apr 2011 16:29:52 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+I thought the problem was in fact that the noncoherent API cannot be
+implemented on architectures like ARM specifically because there is
+no concept of buffer ownership. The obvious way to fix that would
+be to redefine the API. What am I missing?
 
-> I was mistaken there: all drivers that use dma_alloc_noncoherent
-> either use dma_cache_sync() or they do something that is more broken,
-> but they don't do dma_sync_*.
-
-As the DMA-API.txt says, dma_alloc_noncoherent should be used with
-dma_cache_sync(). You shouldn't use dma_sync* API with a memory
-returned by dma_alloc_noncoherent().
+	Arnd
