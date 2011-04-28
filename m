@@ -1,34 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2011 14:28:56 +0200
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110428105131.GD17290@n2100.arm.linux.org.uk>
-References: <201104212129.17013.arnd@arndb.de>
-	<003e01cc058f$94beb490$be3c1db0$%szyprowski@samsung.com>
-	<20110428105131.GD17290@n2100.arm.linux.org.uk>
-Message-ID: <201104281428.56780.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 13:36:16 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104281412.40991.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de> <11431.1303949729@localhost>
+	<1303979259.26744.3.camel@e102109-lin.cambridge.arm.com>
+	<201104281412.40991.arnd@arndb.de>
+Message-ID: <20110428123616.GI17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 April 2011, Russell King - ARM Linux wrote:
-> What I'd suggest is that dma_alloc_noncoherent() should be architecture
-> independent, and should call into whatever iommu support the device has
-> to setup an approprite iommu mapping.  IOW, I don't see any need for
-> every architecture to provide its own dma_alloc_noncoherent() allocation
-> function - or indeed every iommu implementation to deal with the
-> allocation issues either.
+On Thu, Apr 28, 2011 at 02:12:40PM +0200, Arnd Bergmann wrote:
+> On Thursday 28 April 2011, Catalin Marinas wrote:
+> > On Thu, 2011-04-28 at 01:15 +0100, Valdis.Kletnieks at vt.edu wrote:
+> > > On Wed, 27 Apr 2011 12:08:28 BST, Catalin Marinas said:
+> > > 
+> > > > The current version of the ARM ARM says "unpredictable". But this
+> > > > general definition of "unpredictable" does not allow it to deadlock
+> > > > (hardware) or have security implications. It is however allowed to
+> > > > corrupt data.
+> > > 
+> > > Not allowed to have security implications, but is allowed to corrupt data.
+> > 
+> > By security I was referring to TrustZone extensions. IOW, unpredictable
+> > in normal (non-secure) world should not cause data corruption in the
+> > secure world.
+> 
+> That definition is rather useless for operating systems that don't use
+> Trustzone then, right?
 
-Almost all architectures today define dma_alloc_noncoherent to
-dma_alloc_coherent, which is totally fine on architectures
-where cacheable coherent mappings are the default or where
-we don't need to flush individual cache lines for dma_sync_*.
+I'm not sure what you're implying.  By running on a device with Trustzone
+extensions, Linux is using them whether it knows it or not.
 
-The problem with backing either of the two with alloc_pages or
-alloc_pages_exact is that you cannot do large allocation when
-physical memory is fragmented, even if you have an IOMMU.
-
-IMHO the allocation for both dma_alloc_coherent and
-dma_alloc_noncoherent should therefore depend on whether you
-have an IOMMU. If you do, you can easily allocate megabytes,
-e.g. for use as a frame buffer.
-
-	Arnd
+Linux on ARMs evaluation boards runs on the secure size of the Trustzone
+dividing line.  Linux on OMAP SoCs runs on the insecure size of that,
+and has to make secure monitor calls to manipulate certain registers
+(eg, to enable workarounds for errata etc).  As SMC calls are highly
+implementation specific, there is and can be no "trustzone" driver.
