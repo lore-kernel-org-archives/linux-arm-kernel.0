@@ -1,42 +1,71 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 28 Apr 2011 13:03:26 -0300
-Subject: [PATCH 2/2] ARM: mx5/mx51_babbage: Use gpio_request_one when
-	possible
-In-Reply-To: <20110428075500.GM31131@pengutronix.de>
-References: <1303951472-22234-1-git-send-email-festevam@gmail.com>
-	<1303951472-22234-2-git-send-email-festevam@gmail.com>
-	<20110428075500.GM31131@pengutronix.de>
-Message-ID: <4DB98FCE.8090706@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Apr 2011 18:07:22 +0200
+Subject: [PATCH 1/2] gpio: add a custom configuration mechanism to gpiolib
+In-Reply-To: <BANLkTi=o-2ML0MxNXa0SsFm8JQ1D+_4Zxw@mail.gmail.com>
+References: <1303315216-14852-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTi=o-2ML0MxNXa0SsFm8JQ1D+_4Zxw@mail.gmail.com>
+Message-ID: <BANLkTimy4zREJyAmtOVEMUSObxWBaJk8Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Mon, Apr 25, 2011 at 7:21 PM, Stijn Devriendt <highguy@gmail.com> wrote:
 
-On 4/28/2011 4:55 AM, Uwe Kleine-K?nig wrote:
-...
-  
->>  	/* Set USBH1_STP to GPIO and toggle it */
->>  	mxc_iomux_v3_setup_pad(usbh1stp_gpio);
-> This cannot go into the global list of pins to mux?
+> Why contain all values in the config rather than
+> // Actual config
+> #define GPIO_CONFIG_BIAS 0x1
+>
+> #define GPIO_BIAS_UNKNOWN 0x0
+> #define GPIO_BIAS_FLOAT 0x1
+> #define GPIO_BIAS_PULL_UP ? ? ? 0x2
+> #define GPIO_BIAS_PULL_DOWN ? ? 0x3
+> #define GPIO_BIAS_HIGH ? ? ? ? ?0x4
+> #define GPIO_BIAS_GROUND ? ? ? ? ? ? ? ?0x5
+> #define GPIO_BIAS_ARCH_SPECIFIC 0x100
+>
+> #define GPIO_CONFIG_DRIVE 0x2
+> /// omitted rest
+>
+> #define GPIO_CONFIG_COMPLEX_SAMPLE 0x3
+> struct gpio_complex_sample_config
+> {
+> ?// whatever here
+> };
+>
+> // code:
+> gpio_config(10, GPIO_CONFIG_BIAS, GPIO_BIAS_FLOAT);
+> struct gpio_complex_sample_config config = { ... };
+> gpio_config(10, GPIO_CONFIG_COMPLEX_SAMPLE, &config);
 
-This pin alternates its mode(GPIO and USB STP), so I think we can leave it defined here.
-> 
->> -	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
->> +	ret = gpio_request_one(BABBAGE_USBH1_STP,
->> +					GPIOF_OUT_INIT_LOW, "usbh1_stp");
->>  
->>  	if (ret) {
->>  		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
->>  		return ret;
->>  	}
->> -	gpio_direction_output(BABBAGE_USBH1_STP, 0);
->>  	gpio_set_value(BABBAGE_USBH1_STP, 1);
->>  	msleep(100);
-> Why is the sleep between set_value(1) and free? I would have expected it
-> between request_one(INIT_LOW) and set_value(1)?
+It doesn't work like that, since the gpio_config() function has this
+signature:
 
-Agreed. I haven?t changed the logic on this patch. Will send a third patch for fixing this.
+gpio_config(unsigned gpio, u16 param, unsigned long *data);
 
-Thanks,
+If you want to pass two parameters you need to store the second
+parameter in a variable and pass a pointer to that:
 
-Fabio Estevam
+unsigned long data = GPIO_BIAS_FLOAT;
+gpio_config(10, GPIO_CONFIG_BIAS, &data);
+
+Well you COULD do this:
+
+gpio_config(10, GPIO_CONFIG_BIAS, (unsigned long *) GPIO_BIAS_FLOAT);
+
+Which leads to inventing pointer-cast macros like we have
+for PTR_ERR() and similar to stash enumerators into the
+pointer... and since a corresponding get_* operation will
+not pass data in the pointer but an actual pointer it gets
+awfully asymmetric.
+
+So compared to enumerating and passing simply one argument
+and NULL:
+
+gpio_config(10, GPIO_CONFIG_BIAS_FLOAT, NULL);
+
+I think this is less ugly than either of the two above.
+
+Since this is a little bit of matter of taste, I will drive it in the current
+version unless there is an massive choir of "no" from all directions.
+
+Yours,
+Linus Walleij
