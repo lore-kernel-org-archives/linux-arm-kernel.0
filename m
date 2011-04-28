@@ -1,52 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Apr 2011 21:44:32 -0300
-Subject: [PATCH 2/2] ARM: mx5/mx51_babbage: Use gpio_request_one when possible
-In-Reply-To: <1303951472-22234-1-git-send-email-festevam@gmail.com>
-References: <1303951472-22234-1-git-send-email-festevam@gmail.com>
-Message-ID: <1303951472-22234-2-git-send-email-festevam@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 28 Apr 2011 03:46:04 +0200
+Subject: [PATCH] PXA: Fix typo in proc-xscale.S
+Message-ID: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using gpio_request followed by gpio_direction_output use gpio_request_one.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mm/proc-xscale.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 7b919bc..00203fb 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -179,25 +179,25 @@ static int gpio_usbh1_active(void)
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index ce233bc..42af976 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+ 	teq	r2, #DMA_TO_DEVICE
+ 	beq	xscale_dma_clean_range
+ 	b	xscale_dma_flush_range
+-ENDPROC(xscsale_dma_a0_map_area)
++ENDPROC(xscale_dma_a0_map_area)
  
- 	/* Set USBH1_STP to GPIO and toggle it */
- 	mxc_iomux_v3_setup_pad(usbh1stp_gpio);
--	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
-+	ret = gpio_request_one(BABBAGE_USBH1_STP,
-+					GPIOF_OUT_INIT_LOW, "usbh1_stp");
- 
- 	if (ret) {
- 		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
- 		return ret;
- 	}
--	gpio_direction_output(BABBAGE_USBH1_STP, 0);
- 	gpio_set_value(BABBAGE_USBH1_STP, 1);
- 	msleep(100);
- 	gpio_free(BABBAGE_USBH1_STP);
- 
- 	/* De-assert USB PHY RESETB */
--	ret = gpio_request(BABBAGE_USB_PHY_RESET, "phy_reset");
-+	ret = gpio_request_one(BABBAGE_USB_PHY_RESET,
-+					GPIOF_OUT_INIT_HIGH, "phy_reset");
- 
- 	if (ret) {
- 		pr_debug("failed to get MX51_PAD_EIM_D21__GPIO_2_5: %d\n", ret);
- 		return ret;
- 	}
--	gpio_direction_output(BABBAGE_USB_PHY_RESET, 1);
- 	return 0;
- }
- 
+ /*
+  *	dma_unmap_area(start, size, dir)
 -- 
-1.6.0.4
+1.7.4.1
