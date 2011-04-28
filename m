@@ -1,66 +1,75 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 28 Apr 2011 16:10:46 +0200
-Subject: [PATCH 05/14] at91: use structure to store the current soc
-In-Reply-To: <BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DB5F0C7.2070903@bluewatersys.com>
-	<20110426042131.GD12904@game.jcrosoft.org>
-	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
-Message-ID: <20110428141046.GB10594@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 15:28:22 +0100
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+References: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
+	<4DB0F249.6000307@codeaurora.org>
+	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
+	<20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+Message-ID: <20110428142822.GN17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:04 Thu 28 Apr     , Andrew Victor wrote:
-> hi,
-> 
-> >> If this eventually reduces code size then I think it is useful, but
-> >> otherwise I'm not sure I see the point?
-> > It's on purpose as the dbgu physical address is not at the same place
-> > so read the other register really does not impact the chip but if we do it
-> > later duting the boot or the life to the kernel it's an other story
+On Thu, Apr 28, 2011 at 07:24:41PM +0530, Vikram Narayanan wrote:
+> On Thu, Apr 28, 2011 at 7:08 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Apr 28, 2011 at 07:01:53PM +0530, Vikram Narayanan wrote:
+> >> I am still confused about the terms clocksource and clockevents. Can
+> >> someone please explain it in simple terms or lead me to a good
+> >> documentation that elaborates clearly about this?
 > >
-> > so the split between __cpu_is and cpu_is is necessarly
-> >
-> > all of this work is in preparation to allow multiple soc in the same kernel
-> > that's also why I map the system controller the same way on all at91 arm9
-> 
-> The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
-> registers.
-> 
-> But the address of the DBGU differs between CPUs regardless if you map
-> the system controller the same:
->    at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->    at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->    at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->    at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->    at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->    at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->    at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->    at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
-> 
-> So I don't see how you can "detect" the CPU without first knowing
-> which CPU and therefore where the DBGU register is anyway.
-> And probing different addresses for a value is not an acceptable solution.
-> 
-> 
-> While having a single kernel image that supports AT91 processors is a
-> good goal, the soc.h is a totally unnecessary complication.
-> I can't think of any situation where an AT91 board.c file doesn't know
-> what processor it has.
-> 
-> So instead of :
->    boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
-> at91XX_initialize()
-> just do:
->    boardXYZ-init  -> at91XX_initialize()
-except there is no need to known it and board seach as the usb-926x are the
-same nearly and do not need to known on which soc they are
+> > A clocksource is a monotonically incrementing counter which measures the
+> > passing of time.
+>
+> So, this is the timer that keeps the wall time always up as long as
+> the system is running. If the system isn't running, a backup RTC
+> should take care of the time. When the system is back, again
+> clocksource will be having the control.
+> Even if the above timer count overflows, that should be taken care of.
 
-ditto for other boards you do not need to known the soc we are on.
-And when you work on CPU module the board is the same but not the cpu on the
-module so detect the SOC allow to have one kernel for all and not multiple
-machine ID for each module and board combination
+What basically happens is:
 
-Best Regards,
-J.
+	now = cs->read(cs);
+	delta = (now - cs->cycle_last) & cs->mask;
+	cs->cycle_last = now;
+
+	ns = clocksource_cyc2ns(delta, cs...);
+
+ns now represents the amount of time which passed between this read and
+the previous read.  Note the mask in the calculation of delta ensures
+that overflows are taken care of.
+
+> > This counter should never be reset.
+>
+> So this timer should always be on, no matter what happens to the system.
+
+What I mean is that at no point should the clocksource counter be re-
+initialized while the system is running and it is in use, otherwise
+the 'delta' value will spike and 'ns' will become very large.  You'll
+then find the kernels idea of time spontaneously jumps forward when
+it shouldn't.
+
+> > A clockevent device is some sort of timer which it used to trigger either
+> > a periodic interrupt or a one-shot interrupt to cause CPUs to do some
+> > maintainence task (such as reading the clock source, comparing that with
+> > the previous reading, and using the delta to update the kernels idea of
+> > current time.)
+>
+> This is used for setting up the next event by using the set_next_event
+> callback and set the mode(one shot or periodic) by set_mode callback.
+> So, this timer is the heart of tickless kernel functionality(NO_HZ).
+
+Correct.  The mode is changed when required - when switching to periodic
+mode, you're expected to program the hardware for that mode and set it
+up to produce interrupts at a frequency of HZ.
+
+When you're called to switch to one-shot mode, program it for one-shot
+mode, disable it, and wait for set_next_event().  On set_next_event(),
+you program the timer to produce an interrupt after the specified
+interval and enable it.
