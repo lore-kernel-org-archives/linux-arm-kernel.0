@@ -1,66 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 19:24:20 +0100
-Subject: Architecture specific implementations for tickless kernel and
-	deferrable timers
-In-Reply-To: <BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
-References: <4DB0F249.6000307@codeaurora.org>
-	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
-	<20110426203756.GD17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
-	<alpine.LFD.2.02.1104271015000.3323@ionos>
-	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
-	<20110428133826.GM17290@n2100.arm.linux.org.uk>
-	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-	<20110428142822.GN17290@n2100.arm.linux.org.uk>
-	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
-Message-ID: <20110428182420.GF17290@n2100.arm.linux.org.uk>
+Date: Thu, 28 Apr 2011 19:29:28 +0100
+Subject: [PATCH] at91: fix map_io init usage
+In-Reply-To: <1304012240-13571-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1304012240-13571-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110428182928.GG17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 10:59:01PM +0530, Vikram Narayanan wrote:
-> On Thu, Apr 28, 2011 at 7:58 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > What basically happens is:
-> >
-> > ? ? ? ?now = cs->read(cs);
-> > ? ? ? ?delta = (now - cs->cycle_last) & cs->mask;
-> > ? ? ? ?cs->cycle_last = now;
-> >
-> > ? ? ? ?ns = clocksource_cyc2ns(delta, cs...);
-> >
-> > ns now represents the amount of time which passed between this read and
-> > the previous read. ?Note the mask in the calculation of delta ensures
-> > that overflows are taken care of.
+On Thu, Apr 28, 2011 at 07:37:20PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> switch early init to init_early and introduce soc map_io
 > 
-> The timekeeping_get_ns() in kernel/time/timekeeping.c takes care of the above.
-> So my job is to provide a good *continuous* clocksource with correct
-> mult,shift and mask values.
-> And also, the mult and shift values can be calculated from the
-> clocks_calc_mult_shift() function.
-
-For clocksources, please, no, don't use clocks_calc_mult_shift().  There
-is clocksource_register_hz() and clocksource_register_khz() which will
-sort out the shift and multiplier automatically for you.
-
-> The define HZ is important only for one-shot mode. and for a tickless
-> kernel this value is not of great importance.
-
-ITYM periodic mode.
-
-> And also if I use the same timer for clocksource and clockevent, it
-> will surely gonna mess up my system's time sooner or latter.
-
-Indeed it will.
-
-> > When you're called to switch to one-shot mode, program it for one-shot
-> > mode, disable it, and wait for set_next_event(). ?On set_next_event(),
-> > you program the timer to produce an interrupt after the specified
-> > interval and enable it.
->
-> For the clockevent device, If I provide all the data structures,
-> next_event and set_mode, then this will work perfectly.
+> with this Patch we will not do any more early device setup during the map io
 > 
-> Hope I have understood your explanations in the right way and all my
-> above statements make sense.
+> tks to Russel to point the new call back
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-I think so.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+The only thing I'd suggest is:
+
+> @@ -94,7 +94,8 @@ MACHINE_START(ONEARM, "Ajeco 1ARM single board computer")
+>  	/* Maintainer: Lennert Buytenhek <buytenh@wantstofly.org> */
+>  	.boot_params	= AT91_SDRAM_BASE + 0x100,
+>  	.timer		= &at91rm9200_timer,
+> -	.map_io		= onearm_map_io,
+> +	.map_io		= at91rm9200_map_io,
+>  	.init_irq	= onearm_init_irq,
+> +	.init_early	= onearm_init_early,
+>  	.init_machine	= onearm_board_init,
+
+Ordering these as:
+	.map_io
+	.init_early
+	.init_irq
+
+as that's the order which they're called.  The struct itself is actually
+layed out such that the members are called in order (which is: fixup,
+map_io, init_early, init_irq, timer, init_machine).  I wouldn't suggest
+doing a needless change to .timer in this patch though.
