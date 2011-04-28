@@ -1,23 +1,24 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Thu, 28 Apr 2011 22:03:03 +0200
-Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
-In-Reply-To: <20110428192403.GA21061@linutronix.de>
-References: <1303909742.18407.12.camel@redbox> <20110428151819.GE13755@siel.b>
-	<BANLkTimUPfo0kMn3HPa5iZUO5g_b6rVKcA@mail.gmail.com>
-	<20110428192403.GA21061@linutronix.de>
-Message-ID: <BANLkTikdnDtwZj1QgLxibRBiv=Ox8Y5PWg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 28 Apr 2011 22:05:32 +0200
+Subject: S3C2416, S3C2443 HS-SPI driver?
+Message-ID: <201104282205.33100.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Sebastian,
+Hi,
 
->>> why does this handler mess with the parent irq chip ?
->>> this looks pretty wrong to me.
->>
->>This is a chained-handler, and without that line the end-of-interrupt
->>doesn't seem to be signalled.
->
-> Most chain handler don't mess with other irq chips. Why is the parent
-> irq hanlder set level and not eoi? Wouldn't this make this superflous?
+does a driver for spi on s3c2416/s3c2443 SoCs exist somewhere? The one for the 
+other s3c24XX SoCs seems to be different.
 
-This patch changes the parent from level to eoi.
+I did a comparison of the spi-parts of s3c2416 and s3c6400 manuals and they 
+seem very much alike in their registers and working descriptions.
+
+The only real differences I found are bit 6 of CH_CFG (High_speed_en) which 
+only exists on 2416/2443 and the max values of RxTrigger and TxTrigger are 
+greater on 2416 than on 6400 (63 vs 40).
+
+So question for the samsung experts, could the s3c64xx spi-driver be a valid 
+starting point for me?
+
+Thanks
+Heiko
