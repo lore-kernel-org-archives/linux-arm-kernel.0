@@ -1,51 +1,45 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Thu, 28 Apr 2011 11:48:15 -0500
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <20110428134055.GA19709@n2100.arm.linux.org.uk>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<20110414223036.GA7335@n2100.arm.linux.org.uk>
-	<BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
-	<20110428134055.GA19709@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 28 Apr 2011 12:49:18 -0400 (EDT)
+Subject: [PATCH 0/5] ARM: kprobes: Fixes and additions for ARM instruction
+	emulation (part 6)
+In-Reply-To: <1303986831.2441.17.camel@computer2.home>
+References: <1303206740-10101-1-git-send-email-tixy@yxit.co.uk>
+	<20110428075129.GG17290@n2100.arm.linux.org.uk>
+	<1303986831.2441.17.camel@computer2.home>
+Message-ID: <alpine.LFD.2.00.1104281243290.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+On Thu, 28 Apr 2011, Tixy wrote:
 
-On Thu, Apr 28, 2011 at 8:40 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 15, 2011 at 06:26:40AM -0500, Gupta, Ramesh wrote:
->> Russell,
->>
->> On Thu, Apr 14, 2011 at 5:30 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
->> >> From: Ramesh Gupta <grgupta@ti.com>
->> >>
->> >> This patch is to flush the iommu page table entries from L1 and L2
->> >> caches using dma_map_single. This also simplifies the implementation
->> >> by removing the functions ?flush_iopgd_range/flush_iopte_range.
->> >
->> > No. ?This usage is just wrong. ?If you're going to use the DMA API then
->> > unmap it, otherwise the DMA API debugging will go awol.
->> >
->>
->> Thank you for the comments, this particular memory is always a write
->> from the A9 for MMU programming and
->> only read from the slave processor, that is the reason for not calling
->> the unmap. I can re-look into the changes to call
->> unmap in a proper way as this impacts the DMA API.
->> Are there any other ways to perform only flush the memory from L1/L2 caches?
->
-> We _could_ invent a new API to deal with this, which is probably going
-> to be far better in the longer term for page table based iommus. ?That's
-> going to need some thought - eg, do we need to pass a struct device
-> argument for the iommu cache flushing so we know whether we need to flush
-> or not (eg, if we have cache coherent iommus)...
+> On Thu, 2011-04-28 at 08:51 +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 19, 2011 at 10:52:15AM +0100, Tixy wrote:
+> > > (This is a sixth and final set of patches)
+> > > 
+> > > When kprobes are inserted into code an ARM instruction is replaced
+> > > by a breakpoint. When this is hit, the original instruction must be
+> > > emulated out-of-line. This patchset fixes some bugs in the instruction
+> > > decoding and adds emulation for some newer ARMv7 instructions.
+> > > 
+> > > [PATCH 1/5] ARM: kprobes: Reject probing of undefined data processing instructions
+> > > [PATCH 2/5] ARM: kprobes: Add emulation of MOVW and MOVT instructions
+> > > [PATCH 3/5] ARM: kprobes: Add emulation of SBFX, UBFX, BFI and BFC instructions
+> > > [PATCH 4/5] ARM: kprobes: Add emulation of hint instructions like NOP and WFI
+> > > [PATCH 5/5] ARM: kprobes: Tidy-up kprobes-decode.c
+> > 
+> > I notice that Nicolas merged the 5th set rather than this set - and
+> > Nicolas hasn't responded to these.  Please check with Nicolas whether
+> > he's updated to the latest set.
+> 
+> Nicolas, I see you have part 6 in your personal Linaro kprobes branch,
+> but Russell seems to imply that this is missing from a merge you did
+> elsewhere. (I'm unsure where this merge might be.)
 
-I agree with you, right now these functions are taking only start and
-end arguments but
-we can pass a struct deivice to these functions.
+All the kprobes patches I've reviewed are in the kprobes branch of 
+git://git.linaro.org/people/nico/linux.  So far I have 31 patches in 
+there.  If something is missing please let me know.
 
-thank you and regards
-Ramesh Gupta G
+I merged the lot in the Linaro kernel tree as well, that's all.
+
+
+Nicolas
