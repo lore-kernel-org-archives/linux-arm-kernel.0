@@ -1,43 +1,39 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Thu, 28 Apr 2011 12:52:49 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <4DB81B9E.3000401@pengutronix.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-2-git-send-email-subhasish@mistralsolutions.com>
-	<4DB1A603.2090208@pengutronix.de>
-	<EDC1056430EF4DA8A0D850CE1DEA28FC@subhasishg>
-	<4DB7C5F7.3080103@pengutronix.de>
-	<20110427091252.GP17290@n2100.arm.linux.org.uk>
-	<5BAE2D6F9E6047C19B6BE8FF26F7270B@subhasishg>
-	<4DB81B9E.3000401@pengutronix.de>
-Message-ID: <8430D2C750334C98B8E8D1469F2023C7@subhasishg>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Thu, 28 Apr 2011 16:24:30 +0900
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1303940737.2513.190.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+	<1303940737.2513.190.camel@pasglop>
+Message-ID: <BANLkTi=8fh97S00HwcCvXe84v=0i+BQ74Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 28, 2011 at 6:45 AM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+>
+> Don't you have a risk where speculative loads or prefetches might bring
+> back some stuff into the cache via the cachable mapping ? Is that an
+> issue ? As long as it's non-dirty and the cachable mapping isn't
+> otherwise used, I suppose it might be a non-issue, tho I've seen in
+> powerpc land cases of processors that can checkstop if a subsequent non
+> cachable access "hits" the stuff that was loaded in the cache.
+>
+> Cheers,
+> Ben.
+>
+As far as I know, ARM processors does not have the capability
+to detect non-cacheable access hits the stuff in  the cache.
 
-On 04/27/2011 03:18 PM, Subhasish Ghosh wrote:
-> My problem is, I am doing something like this:
->
-> s32 pruss_writel_multi(struct device *dev, u32 offset,
->                u32 *pdatatowrite, u16 wordstowrite)
-> {
->        struct pruss_priv *pruss = dev_get_drvdata(dev->parent);
->        u32 __iomem *paddresstowrite;
->        u16 i;
->
->        paddresstowrite = pruss->ioaddr + offset;
->
->        for (i = 0; i < wordstowrite; i++)
->                iowrite32(*pdatatowrite++, paddresstowrite++);
->
->        return 0;
-> }
->
-> So, if I make paddresstowrite as void, it will not work. The above
-> implementation does not generate any sparse errors though.
+IMHO, speculative prefetch becomes a problem
+when a coherent buffer (that is not-cacheable in ARM) is modified by a
+DMA transaction
+while old data is already loaded in the cache via another cacheable
+mapping onto the buffer
+even though it is never touched by CPU.
+We can avoid this problem if the kernel removes 'executable' property
+from the cacheable mapping.
+But it is not able to modify page table entries in the direct mapping area.
 
-Yes, that why I can work with readb_multi even if I have void __iomen *.
-
-But, how do I solve this problem. In the above function, I must use u32 
-__iomem * 
+Regards,
+KyongHo
