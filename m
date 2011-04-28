@@ -1,103 +1,72 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 29 Apr 2011 11:24:09 +1200
-Subject: [PATCH 05/14] at91: use structure to store the current soc
-In-Reply-To: <20110428230652.GB13104@game.jcrosoft.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 29 Apr 2011 01:38:23 +0200
+Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
+In-Reply-To: <20110428214632.GQ17290@n2100.arm.linux.org.uk>
 References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DB5F0C7.2070903@bluewatersys.com>
-	<20110426042131.GD12904@game.jcrosoft.org>
-	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
-	<20110428141046.GB10594@game.jcrosoft.org>
-	<4DB9CC07.4020903@bluewatersys.com>
-	<20110428230652.GB13104@game.jcrosoft.org>
-Message-ID: <4DB9F719.2080708@bluewatersys.com>
+	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
+	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
+	<20110428113427.GG17290@n2100.arm.linux.org.uk>
+	<20110428131538.GA10594@game.jcrosoft.org>
+	<1304009792.3081.8.camel@redbox>
+	<20110428181502.GE17290@n2100.arm.linux.org.uk>
+	<BANLkTimT4dpOKcuMbWOWU4Mz=Uk81642Rw@mail.gmail.com>
+	<20110428214632.GQ17290@n2100.arm.linux.org.uk>
+Message-ID: <20110428233823.GC13104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2011 11:06 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:20 Fri 29 Apr     , Ryan Mallon wrote:
->> On 04/29/2011 02:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 16:04 Thu 28 Apr     , Andrew Victor wrote:
->>>> hi,
->>>>
->>>>>> If this eventually reduces code size then I think it is useful, but
->>>>>> otherwise I'm not sure I see the point?
->>>>> It's on purpose as the dbgu physical address is not at the same place
->>>>> so read the other register really does not impact the chip but if we do it
->>>>> later duting the boot or the life to the kernel it's an other story
->>>>>
->>>>> so the split between __cpu_is and cpu_is is necessarly
->>>>>
->>>>> all of this work is in preparation to allow multiple soc in the same kernel
->>>>> that's also why I map the system controller the same way on all at91 arm9
->>>>
->>>> The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
->>>> registers.
->>>>
->>>> But the address of the DBGU differs between CPUs regardless if you map
->>>> the system controller the same:
->>>>    at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->>>>    at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->>>>    at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->>>>    at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->>>>    at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->>>>    at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->>>>    at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
->>>>    at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
->>>>
->>>> So I don't see how you can "detect" the CPU without first knowing
->>>> which CPU and therefore where the DBGU register is anyway.
->>>> And probing different addresses for a value is not an acceptable solution.
->>>>
->>>>
->>>> While having a single kernel image that supports AT91 processors is a
->>>> good goal, the soc.h is a totally unnecessary complication.
->>>> I can't think of any situation where an AT91 board.c file doesn't know
->>>> what processor it has.
->>>>
->>>> So instead of :
->>>>    boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
->>>> at91XX_initialize()
->>>> just do:
->>>>    boardXYZ-init  -> at91XX_initialize()
->>> except there is no need to known it and board seach as the usb-926x are the
->>> same nearly and do not need to known on which soc they are
->>>
->>> ditto for other boards you do not need to known the soc we are on.
->>> And when you work on CPU module the board is the same but not the cpu on the
->>> module so detect the SOC allow to have one kernel for all and not multiple
->>> machine ID for each module and board combination
->>
->> I Agree with Andrew. When can determine everything we need from the
->> mach-type. For boards such as the usb-926x we have two separate
->> mach-types for the 9263 and the 9260 variants. The init_machine callback
->> can be separated in this case so that both of the boards initialise the
->> correct cpu type.
-> I do work on board where is the case and I do not want to keep the limitation
-> and yes I'll put them mainline
+On 22:46 Thu 28 Apr     , Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 10:47:37PM +0200, Andrew Victor wrote:
+> > hi Russell,
+> > 
+> > >> I think it would be cleaner still if the "struct sys_timer" could
+> > >> include a register-base-address field. ?Russell?
+> > >
+> > > That's not really what all platforms want, and with the advent of
+> > > clocksources and clock events, I think the sys_timer thing is mostly
+> > > dead.
+> > 
+> > How would those systems initialize the system-timer?
+> > An "init_timer" method in the machine-description?
 > 
-> And Russell will not accept I'll create 10 or 20 machine ID for board / cpu
-> module combinaison just because of different I do not detect the SOC type
+> I was thinking of an init_timekeeping() callback in the machine record
+> rather than having platforms provide a useless sys_timer structure, and
+> maybe having an ARM generic init_legacy_timekeeping() function for those
+> platforms which still use sys_timer() to put into the init_timekeeping()
+> hook.
 > 
-> so I'll continue to detect the soc
+> I've not really firmed up the idea yet though.
+> 
+> Alternatively, if someone wants to come up with a better way to initialize
+> the clocksource and clock event stuff across all platforms...
 
-How? It has been pointed out that there is no way that this can be
-reliably done if you have all of the at91 socs built into a single
-kernel. You cannot know where the DBGU registers are to read determine
-the cpu/soc type.
+I propose we use early device as I did and Magnus did on SH-Mobile
 
-The most reliable way to do this, which also requires the least code, is
-to have the boards explicitly specify which cpu/soc type they are. In
-this case most of the cpu detection code can be removed. Only the minor
-variant (i.e. 9260/9G20) detection code would need to remain.
+we will have a common early param "earlytimer"
 
-~Ryan
+then we register the drivers like this
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+early_platform_init("earlytimer", &time_device_driver);
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+and in the arm init we just have to do
+early_platform_driver_register_all("earlytimer");
+and call
+early_platform_driver_probe("earlytimer", 1 , 0);
+or let the platform do so as some of them may have more than 1 timer to
+register example on shmobile
+
+We could also have two init one for soc one for machine
+if (machine_time_init)
+	machine_time_init()
+else
+	soc_time_init()
+
+as the timer is not really is ofen not machine specific but platform specific.
+I see that on shmobile, at91 (3 timers sam9, rm9200, x40), nomadok, and other
+
+This will simplify timer sharing across architecture such shmobile arm and sh
+for renesas but other vendor get the same issue when they soc on different
+architecture
+
+Best Regards,
+J.
