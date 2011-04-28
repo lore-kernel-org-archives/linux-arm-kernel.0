@@ -1,34 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 14:19:28 +0100
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104281502.16296.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>
-	<20110428122508.GC13402@8bytes.org>
-	<20110428124242.GJ17290@n2100.arm.linux.org.uk>
-	<201104281502.16296.arnd@arndb.de>
-Message-ID: <20110428131928.GL17290@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 28 Apr 2011 15:15:38 +0200
+Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
+In-Reply-To: <20110428113427.GG17290@n2100.arm.linux.org.uk>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
+	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
+	<20110428113427.GG17290@n2100.arm.linux.org.uk>
+Message-ID: <20110428131538.GA10594@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 03:02:16PM +0200, Arnd Bergmann wrote:
-> I think the misunderstanding is that you are saying we need the flag
-> in dma_map_ops because you prefer to keep the cache management outside
-> of the individual dma_map_ops implementations.
+On 12:34 Thu 28 Apr     , Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 01:23:03PM +0200, Andrew Victor wrote:
+> > hi,
+> > 
+> > > this will allow to specify the resources per soc
+> > >
+> > > as the 5series use a different start address for the pit
+> > 
+> > I really don't see the fascination with early platform_devices for timer.
+> > A sys_timer is initialized way earlier, and there are surely cleaner
+> > ways to just pass a "base address" through to the driver.
+> > The interrupt is always AT91_ID_SYS on all chips, so there is no point
+> > making it configurable.
 > 
-> What I guess J?rg is thinking of is to have the generic IOMMU version
-> of dma_map_ops call into the architecture specific code to manage the
-> caches on architectures that need it. That implementation would of
-> course not require the flag in dma_map_ops because the architecture
-> specific callback would use other ways (hardcoded for an architecture,
-> or looking at the individual device) to determine if this is ever needed.
+> Me too - it looks like this early device stuff is heading in the
+> wrong direction.
 > 
-> That is also what I had in mind earlier, but you argued against it
-> on the base that putting the logic into the common code would lead
-> to a higher risk of people accidentally breaking it when they only
-> care about coherent architectures.
+> There is a point when the kernel expects to have knowledge of the
+> passing of time initialized, and that's when the system_timer->init
+> callback is made.  At this point, everything is in place for the
+> ticks to start, and some of the subsequent parts of the kernel may
+> expect jiffies to be updating after this call has returned.
+> 
+> Shoving stuff in other random places in the initialization order is
+> asking for things to break - maybe not immediately, but down the
+> line as things change in the generic parts of the code.
+> 
+> Stick to using the callbacks provided for their defined purpose and
+> life will be easier.  It'll also be a lot easier to consolidate some
+> of the crap we've accumulated across each platform if everyone's
+> doing stuff in the same way.
+> 
+> And that's another reason to say no to this.  Please stop inventing new
+> ways to do things unless you're prepared to provide it as a replacement
+> for all the (ARM) platforms we have in the kernel.
+Personally I do not change the current arm way
 
-You still need this same cache handling code even when you don't have
-an iommu.  I don't see the point in having a dma_ops level of indirection
-followed by a separate iommu_ops level of indirection - it seems to me to
-be a waste of code and CPU time, and I don't see why its even necessary
-when there's a much simpler way to deal with it (as I illustrated).
+I init the timer during system_timer->init
+
+I just the the early device their to pass the resources
+but if switch all arm timer this way is fine to you I'm ready to do the whole
+update
+
+Best Regards,
+J.
