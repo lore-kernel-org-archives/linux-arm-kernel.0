@@ -1,27 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 09:35:47 +0100
-Subject: [PATCH] clkdev: add support to lookup for early platform device
-In-Reply-To: <20110428051203.GB3852@game.jcrosoft.org>
-References: <20110427084247.GK17290@n2100.arm.linux.org.uk>
-	<20110427103145.GF29103@game.jcrosoft.org>
-	<20110427104758.GG29103@game.jcrosoft.org>
-	<20110427150057.GH29103@game.jcrosoft.org>
-	<20110428020910.GA13539@linux-sh.org>
-	<20110428024559.GK29103@game.jcrosoft.org>
-	<20110428030817.GC13539@linux-sh.org>
-	<20110428031704.GL29103@game.jcrosoft.org>
-	<20110428033808.GE13539@linux-sh.org>
-	<20110428051203.GB3852@game.jcrosoft.org>
-Message-ID: <20110428083547.GM17290@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 28 Apr 2011 16:36:02 +0800
+Subject: [PATCH 1/3] i2c: append hardware lock with bus lock
+In-Reply-To: <20110428102212.2d8d607c@endymion.delvare>
+References: <1303963358-4652-1-git-send-email-haojian.zhuang@gmail.com>
+	<20110428102212.2d8d607c@endymion.delvare>
+Message-ID: <BANLkTin6jguQue_0Y74jGPnmhCcvWLBjHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 07:12:03AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> How did you manage to get the clock for the earlytimer?
+On Thu, Apr 28, 2011 at 4:22 PM, Jean Delvare <khali@linux-fr.org> wrote:
+> Hi Haojian,
+>
+> On Thu, 28 Apr 2011 12:02:36 +0800, Haojian Zhuang wrote:
+>> Both AP and CP are contained in Marvell PXA910 silicon. These two ARM
+>> cores are sharing one pair of I2C pins.
+>>
+>> In order to keep I2C transaction operated with atomic, hardware lock
+>> (RIPC) is required. Because of this, bus lock in AP side can't afford
+>> this requirement. Now hardware lock is appended.
+>
+> I have no objection to the idea, but one question: when using the
+> hardware lock, isn't the software mutex redundant? I would expect that
+> you call the hardware_lock/unlock functions _instead_ of
+> rt_mutex_lock/unlock, rather than in addition to it. Or do you still
+> need the rt_mutex to prevent priority inversion?
+>
 
-This is getting silly.  "Let's move all our devices to early" is insane.
-I can see someone then wanting an early-early-device because early has
-become just too late in the initialization.
+Jean,
 
-Come on guys, keep it simple and stop trying to contort the interfaces
-you're given into doing things they're not designed to do.
+It's actually not redundant. The hardware lock is used to protect
+access to the same register regions between two processors (AP
+and CP so called), while the software lock is used to protect
+access from within the AP side.
+
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>> ---
+>> ?drivers/i2c/i2c-core.c | ? 22 ++++++++++++++++++----
+>> ?include/linux/i2c.h ? ?| ? ?3 +++
+>> ?2 files changed, 21 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>> index 045ba6e..412c7a5 100644
+>> --- a/drivers/i2c/i2c-core.c
+>> +++ b/drivers/i2c/i2c-core.c
+>> @@ -448,8 +448,11 @@ void i2c_lock_adapter(struct i2c_adapter *adapter)
+>>
+>> ? ? ? if (parent)
+>> ? ? ? ? ? ? ? i2c_lock_adapter(parent);
+>> - ? ? else
+>> + ? ? else {
+>> ? ? ? ? ? ? ? rt_mutex_lock(&adapter->bus_lock);
+>> + ? ? ? ? ? ? if (adapter->hardware_lock)
+>> + ? ? ? ? ? ? ? ? ? ? adapter->hardware_lock();
+>> + ? ? }
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>>
+>> @@ -460,11 +463,19 @@ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>> ?static int i2c_trylock_adapter(struct i2c_adapter *adapter)
+>> ?{
+>> ? ? ? struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
+>> + ? ? int ret = 0;
+>>
+>> ? ? ? if (parent)
+>> ? ? ? ? ? ? ? return i2c_trylock_adapter(parent);
+>> - ? ? else
+>> - ? ? ? ? ? ? return rt_mutex_trylock(&adapter->bus_lock);
+>> + ? ? else {
+>> + ? ? ? ? ? ? ret = rt_mutex_trylock(&adapter->bus_lock);
+>> + ? ? ? ? ? ? if (ret && adapter->hardware_trylock) {
+>> + ? ? ? ? ? ? ? ? ? ? ret = adapter->hardware_trylock();
+>> + ? ? ? ? ? ? ? ? ? ? if (!ret)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i2c_unlock_adapter(adapter);
+>> + ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? return ret;
+>> + ? ? }
+>> ?}
+>>
+>> ?/**
+>> @@ -477,8 +488,11 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
+>>
+>> ? ? ? if (parent)
+>> ? ? ? ? ? ? ? i2c_unlock_adapter(parent);
+>> - ? ? else
+>> + ? ? else {
+>> + ? ? ? ? ? ? if (adapter->hardware_unlock)
+>> + ? ? ? ? ? ? ? ? ? ? adapter->hardware_unlock();
+>> ? ? ? ? ? ? ? rt_mutex_unlock(&adapter->bus_lock);
+>> + ? ? }
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
+>>
+>> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+>> index 06a8d9c..b283b4e 100644
+>> --- a/include/linux/i2c.h
+>> +++ b/include/linux/i2c.h
+>> @@ -361,6 +361,9 @@ struct i2c_adapter {
+>>
+>> ? ? ? /* data fields that are valid for all devices ? */
+>> ? ? ? struct rt_mutex bus_lock;
+>> + ? ? void (*hardware_lock)(void);
+>> + ? ? void (*hardware_unlock)(void);
+>> + ? ? int (*hardware_trylock)(void);
+>>
+>> ? ? ? int timeout; ? ? ? ? ? ? ? ? ? ?/* in jiffies */
+>> ? ? ? int retries;
+>
+>
+> --
+> Jean Delvare
+>
