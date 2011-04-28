@@ -1,81 +1,83 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 28 Apr 2011 18:50:24 -0400
-Subject: [PATCH 9/9] ARM: zImage: make sure no GOTOFF relocs are used with .bss
-	symbols
-In-Reply-To: <1304031024-5121-1-git-send-email-nico@fluxnic.net>
-References: <1304031024-5121-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1304031024-5121-10-git-send-email-nico@fluxnic.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 29 Apr 2011 01:06:52 +0200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <4DB9CC07.4020903@bluewatersys.com>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
+	<20110428141046.GB10594@game.jcrosoft.org>
+	<4DB9CC07.4020903@bluewatersys.com>
+Message-ID: <20110428230652.GB13104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+On 08:20 Fri 29 Apr     , Ryan Mallon wrote:
+> On 04/29/2011 02:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 16:04 Thu 28 Apr     , Andrew Victor wrote:
+> >> hi,
+> >>
+> >>>> If this eventually reduces code size then I think it is useful, but
+> >>>> otherwise I'm not sure I see the point?
+> >>> It's on purpose as the dbgu physical address is not at the same place
+> >>> so read the other register really does not impact the chip but if we do it
+> >>> later duting the boot or the life to the kernel it's an other story
+> >>>
+> >>> so the split between __cpu_is and cpu_is is necessarly
+> >>>
+> >>> all of this work is in preparation to allow multiple soc in the same kernel
+> >>> that's also why I map the system controller the same way on all at91 arm9
+> >>
+> >> The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
+> >> registers.
+> >>
+> >> But the address of the DBGU differs between CPUs regardless if you map
+> >> the system controller the same:
+> >>    at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> >>    at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+> >>    at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> >>    at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> >>    at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> >>    at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+> >>    at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+> >>    at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> >>
+> >> So I don't see how you can "detect" the CPU without first knowing
+> >> which CPU and therefore where the DBGU register is anyway.
+> >> And probing different addresses for a value is not an acceptable solution.
+> >>
+> >>
+> >> While having a single kernel image that supports AT91 processors is a
+> >> good goal, the soc.h is a totally unnecessary complication.
+> >> I can't think of any situation where an AT91 board.c file doesn't know
+> >> what processor it has.
+> >>
+> >> So instead of :
+> >>    boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
+> >> at91XX_initialize()
+> >> just do:
+> >>    boardXYZ-init  -> at91XX_initialize()
+> > except there is no need to known it and board seach as the usb-926x are the
+> > same nearly and do not need to known on which soc they are
+> > 
+> > ditto for other boards you do not need to known the soc we are on.
+> > And when you work on CPU module the board is the same but not the cpu on the
+> > module so detect the SOC allow to have one kernel for all and not multiple
+> > machine ID for each module and board combination
+> 
+> I Agree with Andrew. When can determine everything we need from the
+> mach-type. For boards such as the usb-926x we have two separate
+> mach-types for the 9263 and the 9260 variants. The init_machine callback
+> can be separated in this case so that both of the boards initialise the
+> correct cpu type.
+I do work on board where is the case and I do not want to keep the limitation
+and yes I'll put them mainline
 
-To be able to relocate the .bss section at run time independently from
-the rest of the code, we must make sure that no GOTOFF relocations are
-used with .bss symbols.  This usually means that no global variables can
-be marked static unless they're also const.
+And Russell will not accept I'll create 10 or 20 machine ID for board / cpu
+module combinaison just because of different I do not detect the SOC type
 
-To enforce this, suffice to fail the build whenever a private symbol
-is allocated to .bss and list those symbols for convenience.
+so I'll continue to detect the soc
 
-The user_stack and user_stack_end labels in head.S were converted into
-non exported symbols to remove false positives.
-
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/boot/compressed/Makefile |   15 ++++++++++++++-
- arch/arm/boot/compressed/head.S   |    6 +++---
- 2 files changed, 17 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 79b5c62..23aad07 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -120,10 +120,23 @@ lib1funcs = $(obj)/lib1funcs.o
- $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
- 	$(call cmd,shipped)
- 
-+# We need to prevent any GOTOFF relocs being used with references
-+# to symbols in the .bss section since we cannot relocate them
-+# independently from the rest at run time.  This can be achieved by
-+# ensuring that no private .bss symbols exist, as global symbols
-+# always have a GOT entry which is what we need.
-+# The .data section is already discarded by the linker script so no need
-+# to bother about it here.
-+check_for_bad_syms = \
-+bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
-+[ -z "$$bad_syms" ] || \
-+  ( echo "following symbols must have non local/private scope:" >&2; \
-+    echo "$$bad_syms" >&2; rm -f $@; false )
-+
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
- 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
- 	$(call if_changed,ld)
--	@:
-+	@$(check_for_bad_syms)
- 
- $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
- 	$(call if_changed,$(suffix_y))
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index b6eb643..dfaaae0 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -370,7 +370,7 @@ LC0:		.word	LC0			@ r1
- 		.word	input_data_end - 4	@ r10 (inflated size location)
- 		.word	_got_start		@ r11
- 		.word	_got_end		@ ip
--		.word	user_stack_end		@ sp
-+		.word	.L_user_stack_end	@ sp
- 		.size	LC0, . - LC0
- 
- #ifdef CONFIG_ARCH_RPC
-@@ -1098,5 +1098,5 @@ reloc_code_end:
- 
- 		.align
- 		.section ".stack", "aw", %nobits
--user_stack:	.space	4096
--user_stack_end:
-+.L_user_stack:	.space	4096
-+.L_user_stack_end:
--- 
-1.7.4
+Best Regards,
+J.
