@@ -1,78 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 17:45:28 +0100
-Subject: Getting a lot of zero values from a driver using DMA. D-cache
-	is not updated?
-In-Reply-To: <1303921659.19857.141.camel@SESTOWS194>
-References: <1303921659.19857.141.camel@SESTOWS194>
-Message-ID: <20110428164528.GX17290@n2100.arm.linux.org.uk>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Thu, 28 Apr 2011 11:48:15 -0500
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <20110428134055.GA19709@n2100.arm.linux.org.uk>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<20110414223036.GA7335@n2100.arm.linux.org.uk>
+	<BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
+	<20110428134055.GA19709@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 06:27:39PM +0200, Niclas Karlsson wrote:
-> I'm running linux on a custom made harware based on AT91SAM9263-ek
-> (evaluation board from Atmel). A touchcontroller (ads7846) is connected
-> to the SPI bus. When I read data
-> (cat /sys/bus/spi/devices/spi0.1/in0_input or in1_input) from the two
-> extra AD-channels in the ads7846 chip I get a zero value very often. The
-> ads7846 driver uses the atmel_spi driver. The ads7846 driver allocates
-> memory with kzalloc(). the atmel_spi then uses dma_map_single() before
-> starting the transfer with PDC (Peripheral Dma Controller). When the
-> transfer has finished, an interrupt is fired from the SPI.
-> dma_unmap_single() is then called and the value from the ADC should be
-> in the allocated buffer, but it's not. The buffer is still zero. If I
-> add a delay (like printk("wait\n")) the value from the ADC can be read
-> in the buffer. How do I fix this? Could it be that the d-cache is not
-> updated with the new value which is written by the PDC? If so, how do I
-> update the cache with the value the PDC just wrote to RAM?
+Hi Russel,
 
-I think we know this one.  The ADS7846 is basically buggy.
+On Thu, Apr 28, 2011 at 8:40 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 15, 2011 at 06:26:40AM -0500, Gupta, Ramesh wrote:
+>> Russell,
+>>
+>> On Thu, Apr 14, 2011 at 5:30 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
+>> >> From: Ramesh Gupta <grgupta@ti.com>
+>> >>
+>> >> This patch is to flush the iommu page table entries from L1 and L2
+>> >> caches using dma_map_single. This also simplifies the implementation
+>> >> by removing the functions ?flush_iopgd_range/flush_iopte_range.
+>> >
+>> > No. ?This usage is just wrong. ?If you're going to use the DMA API then
+>> > unmap it, otherwise the DMA API debugging will go awol.
+>> >
+>>
+>> Thank you for the comments, this particular memory is always a write
+>> from the A9 for MMU programming and
+>> only read from the slave processor, that is the reason for not calling
+>> the unmap. I can re-look into the changes to call
+>> unmap in a proper way as this impacts the DMA API.
+>> Are there any other ways to perform only flush the memory from L1/L2 caches?
+>
+> We _could_ invent a new API to deal with this, which is probably going
+> to be far better in the longer term for page table based iommus. ?That's
+> going to need some thought - eg, do we need to pass a struct device
+> argument for the iommu cache flushing so we know whether we need to flush
+> or not (eg, if we have cache coherent iommus)...
 
-I think this is the struct in question:
+I agree with you, right now these functions are taking only start and
+end arguments but
+we can pass a struct deivice to these functions.
 
-struct ser_req {
-        u8                      ref_on;
-        u8                      command;
-        u8                      ref_off;
-        u16                     scratch;
-        __be16                  sample;
-        struct spi_message      msg;
-        struct spi_transfer     xfer[6];
-};
-
-So, we have at offsets (hex):
-
-00: ref_on
-01: command
-02: ref_off
-03: scratch
-04: scratch
-05: sample
-06: sample
-07: unused
-08: struct spi_msg msg
-...
-
-Now, the CPU has these things called "cache lines".  They're normally
-about 32 bytes long for ARM926, aligned to a 32 byte natural boundary.
-Accessing any data within one of these cache lines results in the entire
-cache line being read into the cache.
-
-So, on dma_map_single() for sample, we writeback and invalidate the
-cache line containing this data, which also overlaps msg.
-
-When the driver then accesses msg, it drags the cache line back in,
-and if that happens _before_ DMA completes, the CPU will read the old
-value of sample back into the cache (iow zero, as set by kzalloc).
-DMA then completes, and the DMA buffer is unmapped.  On ARM926, unmap
-is a no-op operation, because of the DMA API buffer ownership rules.
-(Cache lines associated with DMA should not be shared with other data
-otherwise it causes the DMA API to go wrong - exactly as here.)
-
-So, when you next access 'sample' you read the value read into the cache,
-which will be zero.
-
-The right answer is to ensure that the DMA data is separated from the
-metadata for the transfer, either by a separate allocation or by
-ensuring that there's sufficient padding to avoid overlapping cache
-lines with the DMA data and metadata.  I'm not sure why that hasn't
-already been fixed.
+thank you and regards
+Ramesh Gupta G
