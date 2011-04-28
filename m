@@ -1,153 +1,70 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 28 Apr 2011 12:02:38 +0800
-Subject: [PATCH 3/3] ARM: mmp: add hardware lock support in PXA910
-In-Reply-To: <2011042801>
-References: <2011042801>
-Message-ID: <1303963358-4652-3-git-send-email-haojian.zhuang@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 28 Apr 2011 06:14:40 +0200
+Subject: [PATCH 0/14] at91: factorize soc init and switch to early platform
+In-Reply-To: <4DB8E607.1090807@bluewatersys.com>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<4DB886FD.7000209@bluewatersys.com>
+	<20110428024144.GJ29103@game.jcrosoft.org>
+	<4DB8E607.1090807@bluewatersys.com>
+Message-ID: <20110428041440.GO29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RIPC register is used to implement hardware lock between CP and
-AP in Marvell PXA910.
+On 15:59 Thu 28 Apr     , Ryan Mallon wrote:
+> On 04/28/2011 02:41 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 09:13 Thu 28 Apr     , Ryan Mallon wrote:
+> >> On 04/26/2011 06:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> Hi,
+> >>>
+> >>> 	The following patch series start to factorize the soc init
+> >>> 	and switch gpio and timers to early platform
+> >>>
+> >>> 	diff stat on arm
+> >>>
+> >>> 	80 files changed, 1690 insertions(+), 2053 deletions(-)
+> >>
+> >> I finally had a chance to test this. On our Snapper 9G20 board
+> >> (AT91SAM9G20) the latest linux-next gives me:
+> >>
+> >> Starting kernel ...
+> >>
+> >> Uncompressing Linux... done, booting the kernel.
+> >> <5>Linux version 2.6.39-rc4-next-20110427+ (ryan at okiwi) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #850 Thu Apr 28 09:07:43 NZST 2011
+> >> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> >> CPU: VIVT data cache, VIVT instruction cache
+> >> Machine: Bluewater Systems Snapper 9260/9G20 module
+> >> Memory policy: ECC disabled, Data cache writeback
+> >> <0>Kernel panic - not syncing: Impossible to detect the CPU type
+> >> [<c002fb1c>] (unwind_backtrace+0x0/0xe4) from [<c0230820>] (panic+0x50/0x178)
+> >> [<c0230820>] (panic+0x50/0x178) from [<c000d414>] (at91_initialize+0x18/0x20)
+> >> [<c000d414>] (at91_initialize+0x18/0x20) from [<c000e298>] (snapper9260_map_io+0xc/0x5c)
+> >> [<c000e298>] (snapper9260_map_io+0xc/0x5c) from [<c000d0ec>] (paging_init+0x668/0x728)
+> >> [<c000d0ec>] (paging_init+0x668/0x728) from [<c000b5cc>] (setup_arch+0x39c/0x620)
+> >> [<c000b5cc>] (setup_arch+0x39c/0x620) from [<c000873c>] (start_kernel+0x6c/0x2c8)
+> >>
+> >>
+> >> I'll have a better look at this later to see if I can find the problem,
+> >> though I suspect the remapping of the AT91_DBGU location is to blame.
+> >> What platforms have you tested this on?
+> > I already found the issue and fix it
+> > 
+> >  git://github.com/at91linux/linux-2.6-at91.git test_cleanup
+> 
+> Okay, that is working a bit better, not quite booting yet, but a little
+> further along :-).
+> 
+> Couple of bugs I've noticed so far: In board-stamp9g20.c and
+> board-sam9g20ek.c you have missed the .init_irq initialisation change
+> for the first MACHINE_START. It causes a build failure if either of
+> these boards are included.
+> 
+> Also at91x40 (e.g. board-eb01.c) does not get converted? I don't known
+> anything about this SoC. Is this intentional?
+Yes it's intentionnal
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/mach-mmp/include/mach/pxa910.h |    3 ++
- arch/arm/mach-mmp/pxa910.c              |   21 +++++++++++++-
- arch/arm/mach-mmp/ttc_dkb.c             |   45 +++++++++++++++++++++++++++++++
- 3 files changed, 68 insertions(+), 1 deletions(-)
+this is a nommu soc and with just timer and clock driver so I do not update it
+and this soc does not have a DBGU so until we have a real implementation it's
+stay as now
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 91be755..e7659a1 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -5,6 +5,9 @@ struct sys_timer;
- 
- extern struct sys_timer pxa910_timer;
- extern void __init pxa910_init_irq(void);
-+extern void pxa910_ripc_lock(void);
-+extern void pxa910_ripc_unlock(void);
-+extern int pxa910_ripc_trylock(void);
- 
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 8f92ccd..3190257 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -28,7 +28,10 @@
- #include "common.h"
- #include "clock.h"
- 
--#define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
-+#define MFPR_VIRT_BASE		(APB_VIRT_BASE + 0x1e000)
-+
-+#define RIPC0_VIRT_BASE		(APB_VIRT_BASE + 0x3D000)
-+#define RIPC0_STATUS		(RIPC0_VIRT_BASE + 0x00)
- 
- static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
- {
-@@ -100,6 +103,22 @@ void __init pxa910_init_irq(void)
- 	pxa910_init_gpio();
- }
- 
-+void pxa910_ripc_lock(void)
-+{
-+	while (__raw_readl(RIPC0_STATUS))
-+		cpu_relax();
-+}
-+
-+int pxa910_ripc_trylock(void)
-+{
-+	return (!__raw_readl(RIPC0_STATUS));
-+}
-+
-+void pxa910_ripc_unlock(void)
-+{
-+	__raw_writel(1, RIPC0_STATUS);
-+}
-+
- /* APB peripheral clocks */
- static APBC_CLK(uart1, PXA910_UART0, 1, 14745600);
- static APBC_CLK(uart2, PXA910_UART1, 1, 14745600);
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index e411039..c6af021 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -15,6 +15,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
- #include <linux/interrupt.h>
-+#include <linux/mfd/88pm860x.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -32,6 +33,10 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
- 	GPIO47_UART2_RXD,
- 	GPIO48_UART2_TXD,
- 
-+	/* I2C */
-+	GPIO53_CI2C_SCL,
-+	GPIO54_CI2C_SDA,
-+
- 	/* DFI */
- 	DF_IO0_ND_IO0,
- 	DF_IO1_ND_IO1,
-@@ -113,12 +118,52 @@ static struct platform_device *ttc_dkb_devices[] = {
- 	&ttc_dkb_device_onenand,
- };
- 
-+static struct pm860x_led_pdata dkb_pm860x_led[] = {
-+	{
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_RED,
-+	}, {
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_GREEN,
-+	}, {
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_BLUE,
-+	},
-+};
-+
-+static struct pm860x_platform_data dkb_pm8607_info = {
-+	.led			= &dkb_pm860x_led[0],
-+	.i2c_port		= GI2C_PORT,
-+	.companion_addr		= 0x11,
-+	.irq_mode		= 0,
-+	.irq_base		= IRQ_BOARD_START,
-+};
-+
-+static struct i2c_board_info dkb_i2c_info[] = {
-+	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &dkb_pm8607_info,
-+		.irq		= IRQ_PXA910_PMIC_INT,
-+	},
-+};
-+
-+static struct i2c_pxa_platform_data dkb_i2c_pdata = {
-+	.hardware_lock		= pxa910_ripc_lock,
-+	.hardware_unlock	= pxa910_ripc_unlock,
-+	.hardware_trylock	= pxa910_ripc_trylock,
-+};
-+
- static void __init ttc_dkb_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
- 
- 	/* on-chip devices */
- 	pxa910_add_uart(1);
-+	pxa910_add_twsi(0, &dkb_i2c_pdata, ARRAY_AND_SIZE(dkb_i2c_info));
- 
- 	/* off-chip devices */
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
--- 
-1.7.1
+Best Regards,
+J.
