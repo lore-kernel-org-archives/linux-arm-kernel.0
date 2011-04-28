@@ -1,47 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 19:15:02 +0100
-Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
-In-Reply-To: <1304009792.3081.8.camel@redbox>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
-	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
-	<20110428113427.GG17290@n2100.arm.linux.org.uk>
-	<20110428131538.GA10594@game.jcrosoft.org>
-	<1304009792.3081.8.camel@redbox>
-Message-ID: <20110428181502.GE17290@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 28 Apr 2011 14:20:20 -0400 (EDT)
+Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
+In-Reply-To: <20110428081759.GM3755@atomide.com>
+References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
+	<1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
+	<20110427085336.GL17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104271043160.24613@xanadu.home>
+	<20110428081759.GM3755@atomide.com>
+Message-ID: <alpine.LFD.2.00.1104281408060.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 06:56:32PM +0200, Andrew Victor wrote:
-> hi,
-> 
-> > > And that's another reason to say no to this.  Please stop inventing new
-> > > ways to do things unless you're prepared to provide it as a replacement
-> > > for all the (ARM) platforms we have in the kernel.
-> > Personally I do not change the current arm way
-> > 
-> > I init the timer during system_timer->init
-> > 
-> > I just the the early device their to pass the resources
-> > but if switch all arm timer this way is fine to you I'm ready to do the whole
-> > update
-> 
-> Well, attached is a simpler way of passing the base-address to the timer
-> drivers.  It will solve the timer issues with a single kernel supporting
-> multiple AT91 processors.
-> 
-> I think it would be cleaner still if the "struct sys_timer" could
-> include a register-base-address field.  Russell?
+On Thu, 28 Apr 2011, Tony Lindgren wrote:
 
-That's not really what all platforms want, and with the advent of
-clocksources and clock events, I think the sys_timer thing is mostly
-dead.
+> Just to summarize, looks like there are three regressions:
+> 
+> 1. The stack alignment mentioned above
 
-I've been thinking about killing it off for a while for those platforms
-using the GENERIC_CLOCKEVENTS stuff.  From what I can see, the only
-real users of it are: acorn (riscpc), at91x40, clps711x, ebsa110,
-ep93xx, h720x, ixp2000, ixp23xx, ks8695, nuc93x, pnx4008, and samsung.
+This one has been there forever.  I marked it for inclusion into 
+the stable tree.
 
-It would be nice to get the modern stuff out of that converted to the
-clockevents/clocksource stuff - any chance of that happening for
-AT91x40?
+> 2. Stack overwriting relocated kernel with cache flush in some cases on ARMv7
+
+Yes, and I reverted to your original patch.  I think I agree with RMK 
+about the fact that having a stack available is more sane than trying to 
+squeeze everything into registers (including sp as my patch did).
+
+> 3. Reloction overwriting running code when the relocate offset is small
+
+Yep.  However I agree with you that having a constant like my patch did 
+is prone to failure if the code grows big enough (unlikely but still).  
+However your usage of the GOT end is overshooting as only the copy loop 
+and cache flush code has to be protected.  I have an alternative patch 
+using an explicit symbol to mark critical code.
+
+> These fixes would be nice to get merged in the -rc cycle. Then the
+> other patches like the static usage in uncompress.h can probably wait
+> until the merge window.
+
+Right.  I have sorted them so Russell can send a pointer to the first 
+part to Linus and keep the rest for later.  I'll repost the whole set 
+soon anyway.
+
+
+Nicolas
