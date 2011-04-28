@@ -1,55 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Apr 2011 18:25:26 +0100
-Subject: [PATCH] ARM: perf: remove erroneous check on active_events
-In-Reply-To: <20110428161242.GE3052@pulham.picochip.com>
-References: <1303898236-14263-1-git-send-email-mark.rutland@arm.com>
-	<20110428154108.GV17290@n2100.arm.linux.org.uk>
-	<20110428161242.GE3052@pulham.picochip.com>
-Message-ID: <1304011526.4680.15.camel@e102144-lin.cambridge.arm.com>
+From: vikram186@gmail.com (Vikram Narayanan)
+Date: Thu, 28 Apr 2011 22:59:01 +0530
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <20110428142822.GN17290@n2100.arm.linux.org.uk>
+References: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
+	<4DB0F249.6000307@codeaurora.org>
+	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
+	<20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+	<20110428142822.GN17290@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys [adding Peter Z],
+On Thu, Apr 28, 2011 at 7:58 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 28, 2011 at 07:24:41PM +0530, Vikram Narayanan wrote:
+>> On Thu, Apr 28, 2011 at 7:08 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Apr 28, 2011 at 07:01:53PM +0530, Vikram Narayanan wrote:
+>> >> I am still confused about the terms clocksource and clockevents. Can
+>> >> someone please explain it in simple terms or lead me to a good
+>> >> documentation that elaborates clearly about this?
+>> >
+>> > A clocksource is a monotonically incrementing counter which measures the
+>> > passing of time.
+>>
+>> So, this is the timer that keeps the wall time always up as long as
+>> the system is running. If the system isn't running, a backup RTC
+>> should take care of the time. When the system is back, again
+>> clocksource will be having the control.
+>> Even if the above timer count overflows, that should be taken care of.
+>
+> What basically happens is:
+>
+> ? ? ? ?now = cs->read(cs);
+> ? ? ? ?delta = (now - cs->cycle_last) & cs->mask;
+> ? ? ? ?cs->cycle_last = now;
+>
+> ? ? ? ?ns = clocksource_cyc2ns(delta, cs...);
+>
+> ns now represents the amount of time which passed between this read and
+> the previous read. ?Note the mask in the calculation of delta ensures
+> that overflows are taken care of.
 
-On Thu, 2011-04-28 at 17:12 +0100, Jamie Iles wrote:
-> On Thu, Apr 28, 2011 at 04:41:08PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Apr 27, 2011 at 10:57:16AM +0100, Mark Rutland wrote:
-> > > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> > > index fd6403c..29a0cf8 100644
-> > > --- a/arch/arm/kernel/perf_event.c
-> > > +++ b/arch/arm/kernel/perf_event.c
-> > > @@ -560,11 +560,6 @@ static int armpmu_event_init(struct perf_event *event)
-> > >     event->destroy = hw_perf_event_destroy;
-> > > 
-> > >     if (!atomic_inc_not_zero(&active_events)) {
-> > > -           if (atomic_read(&active_events) > armpmu->num_events) {
-> > > -                   atomic_dec(&active_events);
-> >
-> > Yuck.  This is a good example of atomic_* abuse.  The above does nothing
-> > to deal with the situation where two threads are running thusly:
-> > CPU0                                  CPU1
-> > atomic_inc_not_zero(&active_events)
-> >                                       atomic_inc_not_zero(&active_events)
+The timekeeping_get_ns() in kernel/time/timekeeping.c takes care of the above.
+So my job is to provide a good *continuous* clocksource with correct
+mult,shift and mask values.
+And also, the mult and shift values can be calculated from the
+clocks_calc_mult_shift() function.
+Then the arch independent code takes care of everything.
 
-Agreed. Mark's patch is deleting the offending code though, so that's a
-plus.
+>
+>> > This counter should never be reset.
+>>
+>> So this timer should always be on, no matter what happens to the system.
+>
+> What I mean is that at no point should the clocksource counter be re-
+> initialized while the system is running and it is in use, otherwise
+> the 'delta' value will spike and 'ns' will become very large. ?You'll
+> then find the kernels idea of time spontaneously jumps forward when
+> it shouldn't.
+>
+>> > A clockevent device is some sort of timer which it used to trigger either
+>> > a periodic interrupt or a one-shot interrupt to cause CPUs to do some
+>> > maintainence task (such as reading the clock source, comparing that with
+>> > the previous reading, and using the delta to update the kernels idea of
+>> > current time.)
+>>
+>> This is used for setting up the next event by using the set_next_event
+>> callback and set the mode(one shot or periodic) by set_mode callback.
+>> So, this timer is the heart of tickless kernel functionality(NO_HZ).
+>
+> Correct. ?The mode is changed when required - when switching to periodic
+> mode, you're expected to program the hardware for that mode and set it
+> up to produce interrupts at a frequency of HZ.
+>
+The define HZ is important only for one-shot mode. and for a tickless
+kernel this value is not of great importance.
+And also if I use the same timer for clocksource and clockevent, it
+will surely gonna mess up my system's time sooner or latter.
+> When you're called to switch to one-shot mode, program it for one-shot
+> mode, disable it, and wait for set_next_event(). ?On set_next_event(),
+> you program the timer to produce an interrupt after the specified
+> interval and enable it.
+>
+For the clockevent device, If I provide all the data structures,
+next_event and set_mode, then this will work perfectly.
 
-> Yup, I messed up there.  How about the patch below that eliminates the
-> atomic_t's entirely?  This means that we always lock the mutex in event
-> destruction rather than just for the last one but that seems acceptable
-> to me.
-> 
-> The MIPS perf events code is based on this so could do with the same
-> change.
+Hope I have understood your explanations in the right way and all my
+above statements make sense.
 
-Does the x86 code also need updating to address Ashwin's comments about
-the standard deviation? AFAICT the original patch would simply make ARM
-in line with x86 anyway, where -ENOSPC is returned at the add() level
-for individual events.
-
-One argument for leaving the policy like it is, is that the user should
-be grouping the events, so that the deviation is at least consistent and
-the group will not be scheduled unless the whole thing can go on at
-once.
-
-Will
+Thanks,
+Vikram
