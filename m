@@ -1,81 +1,73 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 28 Apr 2011 18:50:21 -0400
-Subject: [PATCH 6/9] ARM: zImage: simplify decompress_kernel()
+Date: Thu, 28 Apr 2011 18:50:22 -0400
+Subject: [PATCH 7/9] ARM: zImage: don't ignore error returned from decompress()
 In-Reply-To: <1304031024-5121-1-git-send-email-nico@fluxnic.net>
 References: <1304031024-5121-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1304031024-5121-7-git-send-email-nico@fluxnic.net>
+Message-ID: <1304031024-5121-8-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-The return value for decompress_kernel() is no longer used.  Furthermore,
-this was obtained and stored in a variable called output_ptr which is
-a complete misnomer for what is actually the size of the decompressed
-kernel image.  Let's get rid of it.
+If decompress() returns an error without calling error(), we must
+not attempt to boot the resulting kernel.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 Tested-by: Shawn Guo <shawn.guo@linaro.org>
-Tested-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/compressed/misc.c |   13 ++-----------
- 1 files changed, 2 insertions(+), 11 deletions(-)
+ arch/arm/boot/compressed/decompress.c |    4 ++--
+ arch/arm/boot/compressed/misc.c       |   13 +++++++++----
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 4c72a97..07be5a2 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -44,7 +44,7 @@ extern void error(char *);
+ #include "../../../../lib/decompress_unlzma.c"
+ #endif
+ 
+-void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
++int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+-	decompress(input, len, NULL, NULL, output, NULL, error);
++	return decompress(input, len, NULL, NULL, output, NULL, error);
+ }
 diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 4657e87..51b87b5 100644
+index 51b87b5..65871a7 100644
 --- a/arch/arm/boot/compressed/misc.c
 +++ b/arch/arm/boot/compressed/misc.c
-@@ -26,8 +26,6 @@ unsigned int __machine_arch_type;
- #include <linux/linkage.h>
- #include <asm/string.h>
- 
--#include <asm/unaligned.h>
--
- 
- static void putstr(const char *ptr);
- extern void error(char *x);
-@@ -149,13 +147,12 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
+@@ -177,7 +177,7 @@ asmlinkage void __div0(void)
+ 	error("Attempting division by 0!");
  }
  
- /*
-- * gzip delarations
-+ * gzip declarations
-  */
- extern char input_data[];
- extern char input_data_end[];
- 
- unsigned char *output_data;
--unsigned long output_ptr;
- 
- unsigned long free_mem_ptr;
- unsigned long free_mem_end_ptr;
-@@ -183,13 +180,11 @@ asmlinkage void __div0(void)
- extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
+-extern void do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
++extern int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
  
  
--unsigned long
-+void
- decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ void
+@@ -185,6 +185,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
  		unsigned long free_mem_ptr_end_p,
  		int arch_id)
  {
--	unsigned char *tmp;
--
++	int ret;
++
  	output_data		= (unsigned char *)output_start;
  	free_mem_ptr		= free_mem_ptr_p;
  	free_mem_end_ptr	= free_mem_ptr_end_p;
-@@ -197,12 +192,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 
+@@ -193,7 +195,10 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
  	arch_decomp_setup();
  
--	tmp = (unsigned char *) (((unsigned long)input_data_end) - 4);
--	output_ptr = get_unaligned_le32(tmp);
--
  	putstr("Uncompressing Linux...");
- 	do_decompress(input_data, input_data_end - input_data,
- 			output_data, error);
- 	putstr(" done, booting the kernel.\n");
--	return output_ptr;
+-	do_decompress(input_data, input_data_end - input_data,
+-			output_data, error);
+-	putstr(" done, booting the kernel.\n");
++	ret = do_decompress(input_data, input_data_end - input_data,
++			    output_data, error);
++	if (ret)
++		error("decompressor returned an error");
++	else
++		putstr(" done, booting the kernel.\n");
  }
 -- 
 1.7.4
