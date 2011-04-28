@@ -1,72 +1,71 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Apr 2011 12:44:05 +0900
-Subject: [PATCH] clkdev: add support to lookup for early platform device
-In-Reply-To: <20110428032906.GN29103@game.jcrosoft.org>
-References: <20110427084247.GK17290@n2100.arm.linux.org.uk>
-	<20110427103145.GF29103@game.jcrosoft.org>
-	<20110427104758.GG29103@game.jcrosoft.org>
-	<20110427150057.GH29103@game.jcrosoft.org>
-	<20110428020910.GA13539@linux-sh.org>
-	<20110428024559.GK29103@game.jcrosoft.org>
-	<20110428030817.GC13539@linux-sh.org>
-	<20110428031704.GL29103@game.jcrosoft.org>
-	<20110428032000.GM29103@game.jcrosoft.org>
-	<BANLkTiktGTDUvLfmuH-9WgQhdc1e_S4wuQ@mail.gmail.com>
-	<20110428032906.GN29103@game.jcrosoft.org>
-Message-ID: <BANLkTi=7FAR-KyL+ZEU4MwZpN6xgHE0hzw@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 28 Apr 2011 15:59:03 +1200
+Subject: [PATCH 0/14] at91: factorize soc init and switch to early platform
+In-Reply-To: <20110428024144.GJ29103@game.jcrosoft.org>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<4DB886FD.7000209@bluewatersys.com>
+	<20110428024144.GJ29103@game.jcrosoft.org>
+Message-ID: <4DB8E607.1090807@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 12:29 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 12:35 Thu 28 Apr ? ? , Magnus Damm wrote:
->> On Thu, Apr 28, 2011 at 12:20 PM, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->> >> > > > >
->> >> > > > Are you willfully ignoring the init_name handling in
->> >> > > > early_platform_driver_probe_id() or something?
->> >> > > >
->> >> > > > See a636ee7fb35b731ba2b331f6294e809bb6be09c8 for example.
->> >> > > excatly but the issue is that the slab is not availlable yet
->> >> > > see 06fe53beb636294587d8e94ef83c06cef07c21fd
->> >> > > so init_name is still NULL :(
->> >> > >
->> >> > This is a non-argument until you demonstrate a use case where we have a
->> >> > reasonable expectation for the clock framework to be available and the
->> >> > slab allocator not.
->> >> >
->> >> > If you're thinking about the SH earlyprintk case then I suggest you look
->> >> > at the sh-sci driver to see how we presently deal with the situation
->> >> > there.
->> >> the sh-sci driver expect the clock will enable for him
->> >> which did IIRC Magnus on sh-mobile
->> >> I do not want to do so
->> >>
->> >> I've unfortunatly on at91 I use the early device during the map_io
+On 04/28/2011 02:41 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 09:13 Thu 28 Apr     , Ryan Mallon wrote:
+>> On 04/26/2011 06:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> Hi,
+>>>
+>>> 	The following patch series start to factorize the soc init
+>>> 	and switch gpio and timers to early platform
+>>>
+>>> 	diff stat on arm
+>>>
+>>> 	80 files changed, 1690 insertions(+), 2053 deletions(-)
 >>
->> But so do we on SH-Mobile ARM.
+>> I finally had a chance to test this. On our Snapper 9G20 board
+>> (AT91SAM9G20) the latest linux-next gives me:
 >>
->> >> so the slab is available and bootmem either
->> > sorry none of theem is available yet
+>> Starting kernel ...
 >>
->> Sounds like you are aiming to use earlyprintk a little bit too early,
->> or perhaps your idea of using clocks that early on is what is causing
->> you trouble?
+>> Uncompressing Linux... done, booting the kernel.
+>> <5>Linux version 2.6.39-rc4-next-20110427+ (ryan at okiwi) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #850 Thu Apr 28 09:07:43 NZST 2011
+>> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+>> CPU: VIVT data cache, VIVT instruction cache
+>> Machine: Bluewater Systems Snapper 9260/9G20 module
+>> Memory policy: ECC disabled, Data cache writeback
+>> <0>Kernel panic - not syncing: Impossible to detect the CPU type
+>> [<c002fb1c>] (unwind_backtrace+0x0/0xe4) from [<c0230820>] (panic+0x50/0x178)
+>> [<c0230820>] (panic+0x50/0x178) from [<c000d414>] (at91_initialize+0x18/0x20)
+>> [<c000d414>] (at91_initialize+0x18/0x20) from [<c000e298>] (snapper9260_map_io+0xc/0x5c)
+>> [<c000e298>] (snapper9260_map_io+0xc/0x5c) from [<c000d0ec>] (paging_init+0x668/0x728)
+>> [<c000d0ec>] (paging_init+0x668/0x728) from [<c000b5cc>] (setup_arch+0x39c/0x620)
+>> [<c000b5cc>] (setup_arch+0x39c/0x620) from [<c000873c>] (start_kernel+0x6c/0x2c8)
 >>
->> Why don't you move down your earlyprintk setup to a time when you have
->> slabs available? Or for clocks, in the sh-sci driver we don't deal
->> with clocks in the earlyprintk case.
 >>
->> I understand you want output as early as possible, but there is always
->> going to be a time when you need to hack up some static serial output
->> code.
-> I use it for gpio drivers that are init during map_io
->
-> so not yet for earlyprintk
+>> I'll have a better look at this later to see if I can find the problem,
+>> though I suspect the remapping of the AT91_DBGU location is to blame.
+>> What platforms have you tested this on?
+> I already found the issue and fix it
+> 
+>  git://github.com/at91linux/linux-2.6-at91.git test_cleanup
 
-You may have explained this before, but why do you need to deal with
-that early on?
+Okay, that is working a bit better, not quite booting yet, but a little
+further along :-).
 
-Can't you simply setup the clocks statically for the early case?
+Couple of bugs I've noticed so far: In board-stamp9g20.c and
+board-sam9g20ek.c you have missed the .init_irq initialisation change
+for the first MACHINE_START. It causes a build failure if either of
+these boards are included.
 
-/ magnus
+Also at91x40 (e.g. board-eb01.c) does not get converted? I don't known
+anything about this SoC. Is this intentional?
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
