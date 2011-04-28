@@ -1,61 +1,77 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Thu, 28 Apr 2011 16:04:59 +0200
-Subject: [PATCH 05/14] at91: use structure to store the current soc
-In-Reply-To: <20110426042131.GD12904@game.jcrosoft.org>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DB5F0C7.2070903@bluewatersys.com>
-	<20110426042131.GD12904@game.jcrosoft.org>
-Message-ID: <BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 15:09:53 +0100
+Subject: [PATCH] OMAP4: SRAM: Fix warning: format '%08lx' expects type
+	'long unsigned int'
+In-Reply-To: <4D9993AD.3080401@ti.com>
+References: <1301907896-30954-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110404091223.GA19854@n2100.arm.linux.org.uk>
+	<4D9993AD.3080401@ti.com>
+Message-ID: <20110428140953.GD19709@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-
->> If this eventually reduces code size then I think it is useful, but
->> otherwise I'm not sure I see the point?
-> It's on purpose as the dbgu physical address is not at the same place
-> so read the other register really does not impact the chip but if we do it
-> later duting the boot or the life to the kernel it's an other story
+On Mon, Apr 04, 2011 at 03:17:25PM +0530, Santosh Shilimkar wrote:
+> From 4d8d4e5c99c1477a8cb04b525ff5a2d93bbdacfd Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Mon, 4 Apr 2011 14:20:08 +0530
+> Subject: [PATCH] OMAP: SRAM: Fix warning: format '%08lx' expects type  
+> 'long unsigned int'
 >
-> so the split between __cpu_is and cpu_is is necessarly
+> Fix below build warning.
 >
-> all of this work is in preparation to allow multiple soc in the same kernel
-> that's also why I map the system controller the same way on all at91 arm9
+>  CC	arch/arm/plat-omap/sram.o
+> 	arch/arm/plat-omap/sram.c: In function 'omap_map_sram':
+> 	arch/arm/plat-omap/sram.c:224: warning: format '%08lx' expects
+> 	type 'long unsigned int', but argument 2 has type 'unsigned int'
+>
+> While at this, convert SRAM printk(* "") to pr_*("").
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/plat-omap/sram.c |   12 ++++++------
+>  1 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> index a3f50b3..6af3d0b 100644
+> --- a/arch/arm/plat-omap/sram.c
+> +++ b/arch/arm/plat-omap/sram.c
+> @@ -166,7 +166,7 @@ static void __init omap_detect_sram(void)
+>  		else if (cpu_is_omap1611())
+>  			omap_sram_size = SZ_256K;
+>  		else {
+> -			printk(KERN_ERR "Could not detect SRAM size\n");
+> +			pr_err("Could not detect SRAM size\n");
+>  			omap_sram_size = 0x4000;
+>  		}
+>  	}
+> @@ -221,10 +221,10 @@ static void __init omap_map_sram(void)
+>  	omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size, PAGE_SIZE);
+>  	iotable_init(omap_sram_io_desc, ARRAY_SIZE(omap_sram_io_desc));
+>
+> -	printk(KERN_INFO "SRAM: Mapped pa 0x%08lx to va 0x%08lx size: 0x%lx\n",
+> -	__pfn_to_phys(omap_sram_io_desc[0].pfn),
+> -	omap_sram_io_desc[0].virtual,
+> -	       omap_sram_io_desc[0].length);
+> +	pr_info("SRAM: Mapped pa 0x%08llx to va 0x%08lx size: 0x%lx\n",
+> +		(long long) __pfn_to_phys(omap_sram_io_desc[0].pfn),
+> +		omap_sram_io_desc[0].virtual,
+> +		omap_sram_io_desc[0].length);
+>
+>  	/*
+>  	 * Normally devicemaps_init() would flush caches and tlb after
+> @@ -252,7 +252,7 @@ static void __init omap_map_sram(void)
+>  void *omap_sram_push_address(unsigned long size)
+>  {
+>  	if (size > (omap_sram_ceil - (omap_sram_base + SRAM_BOOTLOADER_SZ))) {
+> -		printk(KERN_ERR "Not enough space in SRAM\n");
+> +		pr_err("Not enough space in SRAM\n");
+>  		return NULL;
+>  	}
+>
 
-The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
-registers.
+This looks much better.
 
-But the address of the DBGU differs between CPUs regardless if you map
-the system controller the same:
-   at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
-   at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
-   at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
-   at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
-   at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
-   at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
-   at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
-   at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-So I don't see how you can "detect" the CPU without first knowing
-which CPU and therefore where the DBGU register is anyway.
-And probing different addresses for a value is not an acceptable solution.
-
-
-While having a single kernel image that supports AT91 processors is a
-good goal, the soc.h is a totally unnecessary complication.
-I can't think of any situation where an AT91 board.c file doesn't know
-what processor it has.
-
-So instead of :
-   boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
-at91XX_initialize()
-just do:
-   boardXYZ-init  -> at91XX_initialize()
-
-And soc.c's not really removing much code duplication...  most of the
-code in there is the newly-added early_platform_devices.
-
-
-Regards,
-  Andrew Victor
+It looks like Tony hasn't taken it...  Tony, are you going to handle
+this patch?
