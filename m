@@ -1,10 +1,10 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 28 Apr 2011 04:26:47 +0200
+Date: Thu, 28 Apr 2011 04:41:44 +0200
 Subject: [PATCH 0/14] at91: factorize soc init and switch to early platform
 In-Reply-To: <4DB886FD.7000209@bluewatersys.com>
 References: <20110425180847.GA12904@game.jcrosoft.org>
 	<4DB886FD.7000209@bluewatersys.com>
-Message-ID: <20110428022647.GI29103@game.jcrosoft.org>
+Message-ID: <20110428024144.GJ29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -42,13 +42,9 @@ On 09:13 Thu 28 Apr     , Ryan Mallon wrote:
 > I'll have a better look at this later to see if I can find the problem,
 > though I suspect the remapping of the AT91_DBGU location is to blame.
 > What platforms have you tested this on?
-9263ek
+I already found the issue and fix it
 
-rm9200ek
-
-try this branch
-git://github.com/at91linux/linux-2.6-at91.git
-branch test_cleanup
+ git://github.com/at91linux/linux-2.6-at91.git test_cleanup
 
 Best Regards,
 J.
