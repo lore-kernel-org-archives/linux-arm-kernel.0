@@ -1,70 +1,103 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 28 Apr 2011 09:55:00 +0200
-Subject: [PATCH 2/2] ARM: mx5/mx51_babbage: Use gpio_request_one when
-	possible
-In-Reply-To: <1303951472-22234-2-git-send-email-festevam@gmail.com>
-References: <1303951472-22234-1-git-send-email-festevam@gmail.com>
-	<1303951472-22234-2-git-send-email-festevam@gmail.com>
-Message-ID: <20110428075500.GM31131@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Apr 2011 01:12:04 -0700
+Subject: [PATCH] ARM: Fix relocation if image end past uncompressed
+	kernel end
+In-Reply-To: <20110428063808.GK16892@atomide.com>
+References: <alpine.LFD.2.00.1104200850030.24613@xanadu.home>
+	<20110420165514.GE10402@atomide.com>
+	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
+	<20110421055945.GB13688@atomide.com>
+	<20110421104954.GH13688@atomide.com>
+	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
+	<20110427124726.GE3755@atomide.com>
+	<20110427125631.GF3755@atomide.com>
+	<alpine.LFD.2.00.1104271810450.24613@xanadu.home>
+	<20110428063808.GK16892@atomide.com>
+Message-ID: <20110428081204.GL3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-ah, this patch makes my review comment to your patch 1 nil.
-
-On Wed, Apr 27, 2011 at 09:44:32PM -0300, Fabio Estevam wrote:
-> Instead of using gpio_request followed by gpio_direction_output use gpio_request_one.
+* Tony Lindgren <tony@atomide.com> [110427 23:35]:
+> * Nicolas Pitre <nicolas.pitre@linaro.org> [110428 01:12]:
+> > On Wed, 27 Apr 2011, Tony Lindgren wrote:
+> > 
+> > > * Tony Lindgren <tony@atomide.com> [110427 05:44]:
+> > > > We can't overwrite the running code when relocating only a small amount,
+> > > > say 0x100 or so.
+> > > > 
+> > > > There's no need to relocate all the way past the compressed kernel,
+> > > > we just need to relocate past the size of the code in head.o.
+> > > > 
+> > > > Updated patch below using the GOT end instead of the compressed
+> > > > image end.
+> > > 
+> > > Oops, the mov should be movle of course. Updated patch below.
+> > 
+> > This is wrong.  You're using r12 before it is fixed up with the 
+> > proper offset.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 7b919bc..00203fb 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -179,25 +179,25 @@ static int gpio_usbh1_active(void)
->  
->  	/* Set USBH1_STP to GPIO and toggle it */
->  	mxc_iomux_v3_setup_pad(usbh1stp_gpio);
-This cannot go into the global list of pins to mux?
+> Hmm I see. I guess I was thinking it only needs to be fixed up after
+> the relocation.
 
-> -	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
-> +	ret = gpio_request_one(BABBAGE_USBH1_STP,
-> +					GPIOF_OUT_INIT_LOW, "usbh1_stp");
->  
->  	if (ret) {
->  		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
->  		return ret;
->  	}
-> -	gpio_direction_output(BABBAGE_USBH1_STP, 0);
->  	gpio_set_value(BABBAGE_USBH1_STP, 1);
->  	msleep(100);
-Why is the sleep between set_value(1) and free? I would have expected it
-between request_one(INIT_LOW) and set_value(1)?
+Here's this one with r12 calculation fixed using r0 delta. Also updated
+it to use movlt instead of movle as that should be sufficient.
 
->  	gpio_free(BABBAGE_USBH1_STP);
->  
->  	/* De-assert USB PHY RESETB */
-> -	ret = gpio_request(BABBAGE_USB_PHY_RESET, "phy_reset");
-> +	ret = gpio_request_one(BABBAGE_USB_PHY_RESET,
-> +					GPIOF_OUT_INIT_HIGH, "phy_reset");
->  
->  	if (ret) {
->  		pr_debug("failed to get MX51_PAD_EIM_D21__GPIO_2_5: %d\n", ret);
->  		return ret;
->  	}
-> -	gpio_direction_output(BABBAGE_USB_PHY_RESET, 1);
->  	return 0;
->  }
->  
-> -- 
-> 1.6.0.4
-> 
-> 
+Regards,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 27 Apr 2011 02:06:13 -0700
+Subject: [PATCH] ARM: Fix relocation to move past the running code
+
+Otherwise we end up overwriting ourselves partially when relocating
+less than size of the running code in head.S.
+
+Without this patch, a system will not boot if the compressed image
+load address is slightly less than where the compressed image gets
+relocated.
+
+For example, using mkimage to set the load address to something like
+zreladdr + uncompressed image size - 0x100 will make the system hang
+without this patch.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -282,10 +282,12 @@ dtb_check_done:
+ 
+ /*
+  * Check to see if we will overwrite ourselves.
++ *   r0  = delta
+  *   r4  = final kernel address
+  *   r5  = start of this image
+  *   r9  = size of decompressed image
+  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
++ *   r12 = GOT end, fixed up with delta in r0 if relocating
+  * We basically want:
+  *   r4 - 16k page directory >= r10 -> OK
+  *   r4 + image length <= r5 -> OK
+@@ -297,11 +299,20 @@ dtb_check_done:
+ 		cmp	r10, r5
+ 		bls	wont_overwrite
+ 
++		/*
++		 * Check if the relocate address overlaps the running code in
++		 * head.S. In that case we need to relocate past the code
++		 * to avoid overwriting some of the running code.
++		 */
++		add	r12, r12, r0		@ fixup GOT end with delta
++		cmp	r10, r12		@ relocating less than GOT end?
++		movlt	r10, r12		@ if so, relocate to GOT end
++
+ /*
+  * Relocate ourselves past the end of the decompressed kernel.
+  *   r5  = start of this image
+  *   r6  = _edata
+- *   r10 = end of the decompressed kernel
++ *   r10 = end of the decompressed kernel or end of GOT end if larger
+  * Because we always copy ahead, we need to do it from the end and go
+  * backward in case the source and destination overlap.
+  */
