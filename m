@@ -1,50 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 28 Apr 2011 11:25:29 +0200
-Subject: [PATCH] PXA: Fix typo in proc-xscale.S
-In-Reply-To: <4DB90DD8.7050406@compulab.co.il>
-References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
-	<4DB90DD8.7050406@compulab.co.il>
-Message-ID: <201104281125.30158.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 10:30:39 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1303940467.2513.188.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104271302.44249.arnd@arndb.de>
+	<20110427201605.GW17290@n2100.arm.linux.org.uk>
+	<201104272221.48601.arnd@arndb.de>
+	<20110427202603.GY17290@n2100.arm.linux.org.uk>
+	<1303940467.2513.188.camel@pasglop>
+Message-ID: <20110428093039.GU17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 28, 2011 08:48:56 AM Igor Grinberg wrote:
-> Hi Marek,
+On Thu, Apr 28, 2011 at 07:41:07AM +1000, Benjamin Herrenschmidt wrote:
 > 
-> On 04/28/11 04:46, Marek Vasut wrote:
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
+> > As I said above, I don't think bus code can do it.  Take my example
+> > above of a tulip pci device on x86 and a tulip pci device on ARM.  Both
+> > use the same PCI code.
 > > 
-> >  arch/arm/mm/proc-xscale.S |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > Maybe something in asm/pci.h - but that invites having lots of bus
+> > specific header files in asm/.
 > > 
-> > diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> > index ce233bc..42af976 100644
-> > --- a/arch/arm/mm/proc-xscale.S
-> > +++ b/arch/arm/mm/proc-xscale.S
-> > @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
-> > 
-> >  	teq	r2, #DMA_TO_DEVICE
-> >  	beq	xscale_dma_clean_range
-> >  	b	xscale_dma_flush_range
-> > 
-> > -ENDPROC(xscsale_dma_a0_map_area)
-> > +ENDPROC(xscale_dma_a0_map_area)
-> > 
-> >  /*
-> >  
-> >   *	dma_unmap_area(start, size, dir)
+> > A better solution imho would be to have an architecture callback for
+> > struct device which gets registered, which can inspect the type of
+> > the device, and set the flag depending on where it appears in the
+> > tree.
 > 
-> Similar patch:
-> http://www.spinics.net/lists/arm-kernel/msg118258.html
+> Now -that's gross :-)
 > 
-> has been sent to Russell quite a while ago,
-> but somehow got lost or something.
+> For PCI you can have the flag propagate from the PHB down, for busses
+> without a bus type (platform) then whoever instanciate them (the
+> platform code) can set that appropriately.
 
-Hi,
+How can you do that when it changes mid-bus heirarchy?  I'm thinking
+of the situation where the DRM stuff is on a child bus below the
+root bus, and the root bus has DMA coherent devices on it but the DRM
+stuff doesn't.
 
-I'm fine with the other one of course :) I didn't notice, thanks.
-
-Eric, can you pick that one ?
-
-Cheers
+Your solution doesn't allow that - and I believe that's what Arnd is
+talking about.
