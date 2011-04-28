@@ -1,46 +1,66 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Apr 2011 14:20:20 -0400 (EDT)
-Subject: [PATCH 2/3] ARM: compressed/misc.c: simplify decompress_kernel()
-In-Reply-To: <20110428081759.GM3755@atomide.com>
-References: <1303272904-31392-1-git-send-email-nicolas.pitre@linaro.org>
-	<1303272904-31392-3-git-send-email-nicolas.pitre@linaro.org>
-	<20110427085336.GL17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104271043160.24613@xanadu.home>
-	<20110428081759.GM3755@atomide.com>
-Message-ID: <alpine.LFD.2.00.1104281408060.24613@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 19:24:20 +0100
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+References: <4DB0F249.6000307@codeaurora.org>
+	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
+	<20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+	<20110428142822.GN17290@n2100.arm.linux.org.uk>
+	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+Message-ID: <20110428182420.GF17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2011, Tony Lindgren wrote:
-
-> Just to summarize, looks like there are three regressions:
+On Thu, Apr 28, 2011 at 10:59:01PM +0530, Vikram Narayanan wrote:
+> On Thu, Apr 28, 2011 at 7:58 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > What basically happens is:
+> >
+> > ? ? ? ?now = cs->read(cs);
+> > ? ? ? ?delta = (now - cs->cycle_last) & cs->mask;
+> > ? ? ? ?cs->cycle_last = now;
+> >
+> > ? ? ? ?ns = clocksource_cyc2ns(delta, cs...);
+> >
+> > ns now represents the amount of time which passed between this read and
+> > the previous read. ?Note the mask in the calculation of delta ensures
+> > that overflows are taken care of.
 > 
-> 1. The stack alignment mentioned above
+> The timekeeping_get_ns() in kernel/time/timekeeping.c takes care of the above.
+> So my job is to provide a good *continuous* clocksource with correct
+> mult,shift and mask values.
+> And also, the mult and shift values can be calculated from the
+> clocks_calc_mult_shift() function.
 
-This one has been there forever.  I marked it for inclusion into 
-the stable tree.
+For clocksources, please, no, don't use clocks_calc_mult_shift().  There
+is clocksource_register_hz() and clocksource_register_khz() which will
+sort out the shift and multiplier automatically for you.
 
-> 2. Stack overwriting relocated kernel with cache flush in some cases on ARMv7
+> The define HZ is important only for one-shot mode. and for a tickless
+> kernel this value is not of great importance.
 
-Yes, and I reverted to your original patch.  I think I agree with RMK 
-about the fact that having a stack available is more sane than trying to 
-squeeze everything into registers (including sp as my patch did).
+ITYM periodic mode.
 
-> 3. Reloction overwriting running code when the relocate offset is small
+> And also if I use the same timer for clocksource and clockevent, it
+> will surely gonna mess up my system's time sooner or latter.
 
-Yep.  However I agree with you that having a constant like my patch did 
-is prone to failure if the code grows big enough (unlikely but still).  
-However your usage of the GOT end is overshooting as only the copy loop 
-and cache flush code has to be protected.  I have an alternative patch 
-using an explicit symbol to mark critical code.
+Indeed it will.
 
-> These fixes would be nice to get merged in the -rc cycle. Then the
-> other patches like the static usage in uncompress.h can probably wait
-> until the merge window.
+> > When you're called to switch to one-shot mode, program it for one-shot
+> > mode, disable it, and wait for set_next_event(). ?On set_next_event(),
+> > you program the timer to produce an interrupt after the specified
+> > interval and enable it.
+>
+> For the clockevent device, If I provide all the data structures,
+> next_event and set_mode, then this will work perfectly.
+> 
+> Hope I have understood your explanations in the right way and all my
+> above statements make sense.
 
-Right.  I have sorted them so Russell can send a pointer to the first 
-part to Linus and keep the rest for later.  I'll repost the whole set 
-soon anyway.
-
-
-Nicolas
+I think so.
