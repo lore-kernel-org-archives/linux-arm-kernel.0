@@ -1,51 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 16:22:17 +0100
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <20110418094909.GE31131@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
-	<20110418094909.GE31131@pengutronix.de>
-Message-ID: <20110428152217.GT17290@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Apr 2011 16:26:23 +0100
+Subject: [PATCH] ARM: S3C6410: Add some lower frequencies for 800MHz base
+	clock operation
+Message-ID: <1304004383-16133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2011 at 11:49:09AM +0200, Uwe Kleine-K?nig wrote:
-> > +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	unsigned long best_parent_rate;
-> > +	struct clk_divider *divider = to_clk_divider(clk);
-> > +	unsigned int div;
-> > +	int ret;
-> > +	unsigned long flags = 0;
-> > +	u32 val;
-> > +
-> > +	div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
-> > +
-> > +	if (rate != best_parent_rate / div)
-> > +		return -EINVAL;
-> This is too harsh, isn't it. Or can you expect to only get values that
-> are returned by round_rate? Again you need DIV_ROUND_UP.
+By extension from the 667MHz based clocks currently supported add 100MHz
+and 200MHz operating points. Due to a lack of documentation these have not
+been confirmed as supported but by extension from the existing frequencies
+they should be OK and there is less risk than with the previuus patch for
+800MHz operation.
 
-It is too harsh, and I've wished many a time that people would implement
-clk_set_rate() and clk_round_rate() as:
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
 
-long clk_round_rate(struct clk *clk, unsigned long rate)
-{
-	err = calculate_clock_paramters(clk, params, rate);
-	if (err < 0)
-		return err;
-	return calculate_clock_rate(clk, params);
-}
+In spite of the commit log this is based on top of the previous patch.
 
-int clk_set_rate(struct clk *clk, unsigned long rate)
-{
-	err = calculate_clock_parameters(clk, params, rate);
-	if (err < 0)
-		return err;
-	set_clock_parameters(clk, params);
-	clk->rate = calculate_clock_rate(clk, params);
-	return 0;
-}
+ arch/arm/mach-s3c64xx/cpufreq.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-IOW, clk_round_rate() does what clk_set_rate() does but does _not_ set
-the hardware rate itself.
+diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-s3c64xx/cpufreq.c
+index db722a5..1e7df30 100644
+--- a/arch/arm/mach-s3c64xx/cpufreq.c
++++ b/arch/arm/mach-s3c64xx/cpufreq.c
+@@ -37,7 +37,9 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
+ 
+ static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
+ 	{ 0,  66000 },
++	{ 0, 100000 },
+ 	{ 0, 133000 },
++	{ 1, 200000 },
+ 	{ 1, 222000 },
+ 	{ 1, 266000 },
+ 	{ 2, 333000 },
+-- 
+1.7.4.1
