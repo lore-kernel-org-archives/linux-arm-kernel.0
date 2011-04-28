@@ -1,56 +1,46 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 28 Apr 2011 13:35:31 +0300
-Subject: [PATCH] PXA: Fix typo in proc-xscale.S
-In-Reply-To: <20110428095548.GY17290@n2100.arm.linux.org.uk>
-References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
-	<4DB90DD8.7050406@compulab.co.il>
-	<20110428095548.GY17290@n2100.arm.linux.org.uk>
-Message-ID: <4DB942F3.1070601@compulab.co.il>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 28 Apr 2011 12:41:44 +0200
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110427073514.GH17290@n2100.arm.linux.org.uk>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110427073514.GH17290@n2100.arm.linux.org.uk>
+Message-ID: <20110428104143.GB13402@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/11 12:55, Russell King - ARM Linux wrote:
+On Wed, Apr 27, 2011 at 08:35:14AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
 
-> On Thu, Apr 28, 2011 at 09:48:56AM +0300, Igor Grinberg wrote:
->> Hi Marek,
->>
->> On 04/28/11 04:46, Marek Vasut wrote:
->>
->>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->>> ---
->>>  arch/arm/mm/proc-xscale.S |    2 +-
->>>  1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
->>> index ce233bc..42af976 100644
->>> --- a/arch/arm/mm/proc-xscale.S
->>> +++ b/arch/arm/mm/proc-xscale.S
->>> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
->>>  	teq	r2, #DMA_TO_DEVICE
->>>  	beq	xscale_dma_clean_range
->>>  	b	xscale_dma_flush_range
->>> -ENDPROC(xscsale_dma_a0_map_area)
->>> +ENDPROC(xscale_dma_a0_map_area)
->>>  
->>>  /*
->>>   *	dma_unmap_area(start, size, dir)
->> Similar patch:
->> http://www.spinics.net/lists/arm-kernel/msg118258.html
->>
->> has been sent to Russell quite a while ago,
->> but somehow got lost or something.
-> As I keep saying, I'm useless dealing with patches sent only by email -
-> they tend to get quickly buried and forgotten, plus they need saving out,
-> sometimes editing and transferring between machines to be applied.
->
-> The patch system greatly simplifies that effort, and ensures that patches
-> don't get forgotten.
+> dma_map_ops design is broken - we can't have the entire DMA API indirected
+> through that structure.  Whether you have an IOMMU or not is completely
+> independent of whether you have to do DMA cache handling.  Moreover, with
+> dmabounce, having the DMA cache handling in place doesn't make sense.
+> 
+> So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
+> for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
+> work like that.
 
-Apparently, not many people read Documentation/arm/README :(
-May be it would be helpful to add a note to the MAINTAINERS file
-regarding the patch system and tweak scripts/get_maintainer.pl
-to spit it out in appropriate cases?
+Nobody says that the complete feature-set of the dma_ops needs to be
+provided through the IOMMU-API. The different APIs are there to solve
+different problems:
 
--- 
+The IOMMU-API provides low-level access to IOMMU hardware and to map io
+addresses to physical addresses (which can be chosen by the caller). The
+IOMMU-API does not care about address space layout or cache management.
+
+The DMA-API cares about address management. Every dma_ops implementation
+using an IOMMU has an address allocator for io addresses implemented.
+the DMA-API also cares about cache-management.
+
+So if we can abstract the different IOMMUs on all architectures in the
+IOMMU-API I see no reason why we can't have a common dma_ops
+implementation. The dma-buffer ownership management (cpu<->device) can
+be put into archtectural call-backs so that architectures that need it
+just implement them and everything should work.
+
+Or I am too naive to believe that (which is possible because of my
+limited ARM knowledge). In this case please correct me :)
+
 Regards,
-Igor.
+
+	Joerg
