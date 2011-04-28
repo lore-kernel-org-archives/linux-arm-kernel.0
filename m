@@ -1,68 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Apr 2011 09:38:08 +0300
-Subject: [PATCH] ARM: Fix relocation if image end past uncompressed
-	kernel end
-In-Reply-To: <alpine.LFD.2.00.1104271810450.24613@xanadu.home>
-References: <20110420072156.GA28679@atomide.com>
-	<alpine.LFD.2.00.1104200850030.24613@xanadu.home>
-	<20110420165514.GE10402@atomide.com>
-	<alpine.LFD.2.00.1104201318040.24613@xanadu.home>
-	<20110421055945.GB13688@atomide.com>
-	<20110421104954.GH13688@atomide.com>
-	<alpine.LFD.2.00.1104210919070.24613@xanadu.home>
-	<20110427124726.GE3755@atomide.com>
-	<20110427125631.GF3755@atomide.com>
-	<alpine.LFD.2.00.1104271810450.24613@xanadu.home>
-Message-ID: <20110428063808.GK16892@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 08:40:08 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1303940271.2513.187.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110427073514.GH17290@n2100.arm.linux.org.uk>
+	<1303940271.2513.187.camel@pasglop>
+Message-ID: <201104280840.09206.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110428 01:12]:
-> On Wed, 27 Apr 2011, Tony Lindgren wrote:
-> 
-> > * Tony Lindgren <tony@atomide.com> [110427 05:44]:
-> > > We can't overwrite the running code when relocating only a small amount,
-> > > say 0x100 or so.
-> > > 
-> > > There's no need to relocate all the way past the compressed kernel,
-> > > we just need to relocate past the size of the code in head.o.
-> > > 
-> > > Updated patch below using the GOT end instead of the compressed
-> > > image end.
+On Wednesday 27 April 2011 23:37:51 Benjamin Herrenschmidt wrote:
+> On Wed, 2011-04-27 at 08:35 +0100, Russell King - ARM Linux wrote:
+> > On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
+> > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> > >    that this is needed, and it currently is not implemented, with
+> > >    an outdated comment explaining why it used to not be possible
+> > >    to do it.
 > > 
-> > Oops, the mov should be movle of course. Updated patch below.
+> > dma_alloc_noncoherent is an entirely pointless API afaics.
 > 
-> This is wrong.  You're using r12 before it is fixed up with the 
-> proper offset.
+> I was about to ask what the point is ... (what is the expected
+> semantic ? Memory that is reachable but not necessarily cache
+> coherent ?)
 
-Hmm I see. I guess I was thinking it only needs to be fixed up after
-the relocation.
- 
-> And this could simply be fixed with a big enough constant like this:
+Drivers use this when they explicitly want to manage the caching
+themselves. I think this is most interesting on big NUMA systems,
+where you really want to use fast (local cached) memory and
+then flush it explicitly to do dma. Very few drivers use this:
+
+arnd at wuerfel:~/linux-2.6$ git grep dma_alloc_noncoherent drivers/
+drivers/base/dma-mapping.c:     vaddr = dma_alloc_noncoherent(dev, size, dma_handle, gfp);
+drivers/net/au1000_eth.c:       aup->vaddr = (u32)dma_alloc_noncoherent(NULL, MAX_BUF_SIZE *
+drivers/net/lasi_82596.c:#define DMA_ALLOC                        dma_alloc_noncoherent
+drivers/net/sgiseeq.c:  sr = dma_alloc_noncoherent(&pdev->dev, sizeof(*sp->srings),
+drivers/scsi/53c700.c:  memory = dma_alloc_noncoherent(hostdata->dev, TOTAL_MEM_SIZE,
+drivers/scsi/sgiwd93.c: hdata->cpu = dma_alloc_noncoherent(&pdev->dev, HPC_DMA_SIZE,
+drivers/tty/serial/mpsc.c:              } else if ((pi->dma_region = dma_alloc_noncoherent(pi->port.dev,
+drivers/video/au1200fb.c:               fbdev->fb_mem = dma_alloc_noncoherent(&dev->dev,
+
+> > So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
+> > for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
+> > work like that.
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 8dab5e3..71fc1d9 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -250,8 +250,11 @@ restart:	adr	r0, LC0
->   * Because we always copy ahead, we need to do it from the end and go
->   * backward in case the source and destination overlap.
->   */
-> -		/* Round up to next 256-byte boundary. */
-> -		add	r10, r10, #256
-> +		/*
-> +		 * Round to a 256-byte boundary on the next page. This
-> +		 * avoids overwriting ourself if the offset is small.
-> +		 */
-> +		add	r10, r10, #4096
->  		bic	r10, r10, #255
->  
->  		sub	r9, r6, r5		@ size to copy
+> Well, the dmabounce and cache handling is one implementation that's just
+> on/off with parameters no ?. iommu is different implementations. So the
+> ops should be for the iommu backends. The dmabounce & cache handling is
+> then done by those backends based on flags you stick in struct device
+> for example.
 
-Yeah that's what I had originally, but then we'll be potentially
-hitting the same bug again once more cache flushing code etc gets
-added.
+Well, what we are currently discussing is to have a common implementation
+for IOMMUs that provide the generic iommu_ops that the KVM people introduced.
+Once we get there, we only need a single dma_map_ops structure for all
+IOMMUs.
 
-Regards,
-
-Tony
+	Arnd
