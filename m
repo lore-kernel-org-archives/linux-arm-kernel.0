@@ -1,36 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 10:19:19 +0100
-Subject: [PATCH v2 23/23] at91: Remove mAgic and ISI device code
-In-Reply-To: <4DB08FC5.2@bluewatersys.com>
-References: <1303364535-11557-1-git-send-email-ryan@bluewatersys.com>
-	<1303364535-11557-24-git-send-email-ryan@bluewatersys.com>
-	<0D753D10438DA54287A00B027084269764D242FC6C@AUSP01VMBX24.collaborationhost.net>
-	<4DB08FC5.2@bluewatersys.com>
-Message-ID: <20110428091919.GQ17290@n2100.arm.linux.org.uk>
+Date: Thu, 28 Apr 2011 10:23:27 +0100
+Subject: [PATCHv3 2.6.40 2/4] ARM: simpad: Cleanup CS3 accessors.
+In-Reply-To: <1303377543-24794-3-git-send-email-jochen@scram.de>
+References: <1303377543-24794-1-git-send-email-jochen@scram.de>
+	<1303377543-24794-3-git-send-email-jochen@scram.de>
+Message-ID: <20110428092327.GR17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2011 at 08:12:53AM +1200, Ryan Mallon wrote:
-> On 22/04/11 05:33, H Hartley Sweeten wrote:
-> > On Wednesday, April 20, 2011 10:42 PM, Ryan Mallon wrote:
-> >>
-> >> The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
-> >> have drivers yet and therefore the platform code in arch/arm/mach-at91
-> >> is unused and can be removed.
-> > 
-> > Is anyone planning on adding these drivers?
-> > 
-> > I wonder if it makes sense to add the infrastructure to devices.[ch] and
-> > convert the users even it the drivers are not in mainline yet?
-> 
-> I removed them because there is currently a push to reduce the size of
-> the ARM tree. The ISI code has been there since 2008 and the mAgic
-> device code since 2009 without drivers. The ISI device at least is
-> supported on more than one variant, but only had code present for the
-> AT91SAM9263.
+On Thu, Apr 21, 2011 at 11:19:01AM +0200, Jochen Friedrich wrote:
+> @@ -171,12 +226,13 @@ static void __init simpad_map_io(void)
+>  
+>  static void simpad_power_off(void)
+>  {
+> -	local_irq_disable(); // was cli
+> -	set_cs3(0x800);        /* only SD_MEDIAQ */
+> +	local_irq_disable(); /* was cli */
 
-If they've not been merged for two to three years, they probably aren't
-going to ever be merged.  Removing them seems to be the right thing to
-do as they're not doing *anything* useful by remaining there.
+I think you can get rid of this comment - cli is ages old and I doubt
+many people can remember that it was.
 
-They should be kept as part of the patch series adding the drivers.
+> @@ -47,15 +43,15 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+>  			   struct pcmcia_state *state)
+>  {
+>  	unsigned long levels = GPLR;
+> -	long cs3reg = get_cs3_shadow();
+> +	long cs3reg = simpad_get_cs3_shadow();
+>  
+>  	state->detect=((levels & GPIO_CF_CD)==0)?1:0;
+>  	state->ready=(levels & GPIO_CF_IRQ)?1:0;
+>  	state->bvd1=1; /* Not available on Simpad. */
+>  	state->bvd2=1; /* Not available on Simpad. */
+>  	state->wrprot=0; /* Not available on Simpad. */
+> -  
+> -	if((cs3reg & 0x0c) == 0x0c) {
+> +
+> +	if ((cs3reg & 0x0c) == 0x0c) {
+
+Are there no definitions for the 0x0c magic value?
