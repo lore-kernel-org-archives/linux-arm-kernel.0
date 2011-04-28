@@ -1,56 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Apr 2011 08:40:08 +0200
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1303940271.2513.187.camel@pasglop>
-References: <201104212129.17013.arnd@arndb.de>
-	<20110427073514.GH17290@n2100.arm.linux.org.uk>
-	<1303940271.2513.187.camel@pasglop>
-Message-ID: <201104280840.09206.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Apr 2011 07:46:23 +0100
+Subject: [PATCH 1/3] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <20110427204835.GB17290@n2100.arm.linux.org.uk>
+References: <1302792592-17484-1-git-send-email-lee.jones@linaro.org>
+	<201104172036.45052.arnd@arndb.de> <4DAFFC6B.80708@linaro.org>
+	<201104211303.04043.arnd@arndb.de> <4DB01B57.9090909@linaro.org>
+	<20110427204835.GB17290@n2100.arm.linux.org.uk>
+Message-ID: <4DB90D3F.8040108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 April 2011 23:37:51 Benjamin Herrenschmidt wrote:
-> On Wed, 2011-04-27 at 08:35 +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
-> > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
-> > >    that this is needed, and it currently is not implemented, with
-> > >    an outdated comment explaining why it used to not be possible
-> > >    to do it.
-> > 
-> > dma_alloc_noncoherent is an entirely pointless API afaics.
+Hi Russell,
+
+>>> Ok, in that case, I'd suggest you use your ST-Ericsson address for
+>>> Signed-off-by and the author statement above.
+>>
+>> I'm not an ST-Ericsson employee, thus do not have an associated address.
+>>
+>> I work for Linaro, currently on assignment to ST-Ericsson.
 > 
-> I was about to ask what the point is ... (what is the expected
-> semantic ? Memory that is reachable but not necessarily cache
-> coherent ?)
-
-Drivers use this when they explicitly want to manage the caching
-themselves. I think this is most interesting on big NUMA systems,
-where you really want to use fast (local cached) memory and
-then flush it explicitly to do dma. Very few drivers use this:
-
-arnd at wuerfel:~/linux-2.6$ git grep dma_alloc_noncoherent drivers/
-drivers/base/dma-mapping.c:     vaddr = dma_alloc_noncoherent(dev, size, dma_handle, gfp);
-drivers/net/au1000_eth.c:       aup->vaddr = (u32)dma_alloc_noncoherent(NULL, MAX_BUF_SIZE *
-drivers/net/lasi_82596.c:#define DMA_ALLOC                        dma_alloc_noncoherent
-drivers/net/sgiseeq.c:  sr = dma_alloc_noncoherent(&pdev->dev, sizeof(*sp->srings),
-drivers/scsi/53c700.c:  memory = dma_alloc_noncoherent(hostdata->dev, TOTAL_MEM_SIZE,
-drivers/scsi/sgiwd93.c: hdata->cpu = dma_alloc_noncoherent(&pdev->dev, HPC_DMA_SIZE,
-drivers/tty/serial/mpsc.c:              } else if ((pi->dma_region = dma_alloc_noncoherent(pi->port.dev,
-drivers/video/au1200fb.c:               fbdev->fb_mem = dma_alloc_noncoherent(&dev->dev,
-
-> > So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
-> > for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
-> > work like that.
+> It was my understanding gained last week was that Linaro is a separate
+> organization, and that while folk are working for Linaro, stuff they
+> create belongs to Linaro and not the company whose office they happen
+> to be sitting in.
 > 
-> Well, the dmabounce and cache handling is one implementation that's just
-> on/off with parameters no ?. iommu is different implementations. So the
-> ops should be for the iommu backends. The dmabounce & cache handling is
-> then done by those backends based on flags you stick in struct device
-> for example.
+> I also thought Linaro was supposed to be an organization for solving
+> the _common_ problems being experienced by each member organization,
+> rather than being a contracting house to any one particular
+> organization.  Am I mistaken?
 
-Well, what we are currently discussing is to have a common implementation
-for IOMMUs that provide the generic iommu_ops that the KVM people introduced.
-Once we get there, we only need a single dma_map_ops structure for all
-IOMMUs.
+You are not mistaken for the most part. However, you are referring to
+the engineering work carried out by the engineers contained in the
+Linaro Working Groups. The role I occupy within the company is slightly
+different. I lead a group of individuals called a "Landing Team". There
+are currently four of these within Linaro; ST-Ericsson (mine), Texas
+Instruments, Samsung and Freescale, with a view on increasing that
+number over the upcoming months. The Landing Team's main purpose is to
+upstream as much code as possible for a previously specified SoC, in our
+case the u8500. How the Landing Team spends their time is my
+responsibility and as such (unless Linaro or ST-Ericsson management have
+a special request) is depicted by me.
 
-	Arnd
+With regards to the Copyright label, I will endeavor to find a
+definitive answer. We came to the conclusion of "Written by Linaro for
+ST-Ericsson" some time ago in a Landing Team meeting we held some months
+ago. If you or Arnd see this as an issue clearly we need to have more
+meetings and involve more senior people from Linaro to chase a
+conclusive answer.
+
+Thanks for your time and input Russell and Arnd, it is appreciated.
+
+Kind regards,
+Lee Jones
+Team Lead, Linaro ST-Ericsson Landing Team
