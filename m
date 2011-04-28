@@ -1,33 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Apr 2011 09:31:12 +0100
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1303940737.2513.190.camel@pasglop>
-References: <201104212129.17013.arnd@arndb.de>
-	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
-	<1303940737.2513.190.camel@pasglop>
-Message-ID: <1303979472.26744.6.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 09:33:12 +0100
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <20110428032906.GN29103@game.jcrosoft.org>
+References: <20110427103145.GF29103@game.jcrosoft.org>
+	<20110427104758.GG29103@game.jcrosoft.org>
+	<20110427150057.GH29103@game.jcrosoft.org>
+	<20110428020910.GA13539@linux-sh.org>
+	<20110428024559.GK29103@game.jcrosoft.org>
+	<20110428030817.GC13539@linux-sh.org>
+	<20110428031704.GL29103@game.jcrosoft.org>
+	<20110428032000.GM29103@game.jcrosoft.org>
+	<BANLkTiktGTDUvLfmuH-9WgQhdc1e_S4wuQ@mail.gmail.com>
+	<20110428032906.GN29103@game.jcrosoft.org>
+Message-ID: <20110428083312.GL17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-04-27 at 22:45 +0100, Benjamin Herrenschmidt wrote:
-> On Wed, 2011-04-27 at 10:52 +0100, Catalin Marinas wrote:
-> > It's not broken since we moved to using Normal non-cacheable memory
-> > for the coherent DMA buffers (as long as you flush the cacheable alias
-> > before using the buffer, as we already do). The ARM ARM currently says
-> > unpredictable for such situations but this is being clarified in
-> > future updates and the Normal non-cacheable vs cacheable aliases can
-> > be used (given correct cache maintenance before using the buffer).
-> 
-> Don't you have a risk where speculative loads or prefetches might bring
-> back some stuff into the cache via the cachable mapping ? Is that an
-> issue ? As long as it's non-dirty and the cachable mapping isn't
-> otherwise used, I suppose it might be a non-issue, tho I've seen in
-> powerpc land cases of processors that can checkstop if a subsequent non
-> cachable access "hits" the stuff that was loaded in the cache.
+On Thu, Apr 28, 2011 at 05:29:06AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> I use it for gpio drivers that are init during map_io
 
-At the CPU cache level, unexpected cache hit is considered a miss, IOW
-non-cacheable memory accesses ignore the cache lines that may have been
-speculatively loaded.
+Why are you initializing hardware during map_io?  That's totally crazy.
+Don't do that - the new mappings won't be flushed out of the cache/tlb
+at that point, so it's going to be hit and miss whether you can access
+the device without locking up the kernel.
 
--- 
-Catalin
+Instead, use the early initialization hook which I've recently added for
+this stuff, and keep the map_io for _only_ doing what the name says.
