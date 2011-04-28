@@ -1,37 +1,41 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 28 Apr 2011 15:46:06 +0900
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104280840.09206.arnd@arndb.de>
-References: <20110427073514.GH17290@n2100.arm.linux.org.uk>
-	<1303940271.2513.187.camel@pasglop>
-	<201104280840.09206.arnd@arndb.de>
-Message-ID: <20110428154347Z.fujita.tomonori@lab.ntt.co.jp>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 28 Apr 2011 09:48:56 +0300
+Subject: [PATCH] PXA: Fix typo in proc-xscale.S
+In-Reply-To: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
+References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <4DB90DD8.7050406@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2011 08:40:08 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Marek,
 
-> On Wednesday 27 April 2011 23:37:51 Benjamin Herrenschmidt wrote:
-> > On Wed, 2011-04-27 at 08:35 +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
-> > > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
-> > > >    that this is needed, and it currently is not implemented, with
-> > > >    an outdated comment explaining why it used to not be possible
-> > > >    to do it.
-> > > 
-> > > dma_alloc_noncoherent is an entirely pointless API afaics.
-> > 
-> > I was about to ask what the point is ... (what is the expected
-> > semantic ? Memory that is reachable but not necessarily cache
-> > coherent ?)
-> 
-> Drivers use this when they explicitly want to manage the caching
-> themselves.
+On 04/28/11 04:46, Marek Vasut wrote:
 
-Not "want to manage". The API is for drivers that "have to" manage the
-cache because of architectures that can't allocate coherent memory.
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  arch/arm/mm/proc-xscale.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> index ce233bc..42af976 100644
+> --- a/arch/arm/mm/proc-xscale.S
+> +++ b/arch/arm/mm/proc-xscale.S
+> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+>  	teq	r2, #DMA_TO_DEVICE
+>  	beq	xscale_dma_clean_range
+>  	b	xscale_dma_flush_range
+> -ENDPROC(xscsale_dma_a0_map_area)
+> +ENDPROC(xscale_dma_a0_map_area)
+>  
+>  /*
+>   *	dma_unmap_area(start, size, dir)
 
-> I think this is most interesting on big NUMA systems,
-> where you really want to use fast (local cached) memory and
-> then flush it explicitly to do dma. Very few drivers use this:
+Similar patch:
+http://www.spinics.net/lists/arm-kernel/msg118258.html
+
+has been sent to Russell quite a while ago,
+but somehow got lost or something.
+
+-- 
+Regards,
+Igor.
