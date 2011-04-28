@@ -1,75 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 15:28:22 +0100
-Subject: Architecture specific implementations for tickless kernel and
-	deferrable timers
-In-Reply-To: <BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-References: <BANLkTi=q8-1ybXNky04A6WA7+VA5ZgOB-g@mail.gmail.com>
-	<4DB0F249.6000307@codeaurora.org>
-	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
-	<20110426203756.GD17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
-	<alpine.LFD.2.02.1104271015000.3323@ionos>
-	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
-	<20110428133826.GM17290@n2100.arm.linux.org.uk>
-	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-Message-ID: <20110428142822.GN17290@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Apr 2011 16:29:52 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110428131531.GK17290@n2100.arm.linux.org.uk>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104281428.56780.arnd@arndb.de>
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+Message-ID: <201104281629.52863.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 07:24:41PM +0530, Vikram Narayanan wrote:
-> On Thu, Apr 28, 2011 at 7:08 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Apr 28, 2011 at 07:01:53PM +0530, Vikram Narayanan wrote:
-> >> I am still confused about the terms clocksource and clockevents. Can
-> >> someone please explain it in simple terms or lead me to a good
-> >> documentation that elaborates clearly about this?
-> >
-> > A clocksource is a monotonically incrementing counter which measures the
-> > passing of time.
->
-> So, this is the timer that keeps the wall time always up as long as
-> the system is running. If the system isn't running, a backup RTC
-> should take care of the time. When the system is back, again
-> clocksource will be having the control.
-> Even if the above timer count overflows, that should be taken care of.
+On Thursday 28 April 2011, Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 02:28:56PM +0200, Arnd Bergmann wrote:
+> > On Thursday 28 April 2011, Russell King - ARM Linux wrote:
+> > > What I'd suggest is that dma_alloc_noncoherent() should be architecture
+> > > independent, and should call into whatever iommu support the device has
+> > > to setup an approprite iommu mapping.  IOW, I don't see any need for
+> > > every architecture to provide its own dma_alloc_noncoherent() allocation
+> > > function - or indeed every iommu implementation to deal with the
+> > > allocation issues either.
+> > 
+> > Almost all architectures today define dma_alloc_noncoherent to
+> > dma_alloc_coherent, which is totally fine on architectures
+> > where cacheable coherent mappings are the default or where
+> > we don't need to flush individual cache lines for dma_sync_*.
+> 
+> However, dma_alloc_coherent() memory can't be used with the dma_sync_*
+> API as its return address (unlike other architectures) is not in the
+> kernel direct mapped memory range.
 
-What basically happens is:
+Right, because ARM does not fit in the two categories I listed
+above: the regular DMA is not cache coherent and we need to flush
+the cache lines for the data we want to access in dma_sync_*.
 
-	now = cs->read(cs);
-	delta = (now - cs->cycle_last) & cs->mask;
-	cs->cycle_last = now;
+> The only thing valid for dma_sync_* are buffers which have been passed
+> to the dma_map_* APIs.
+> 
+> Instead, I think what you're referring to is dma_cache_sync(), which is
+> the API to be used with dma_alloc_noncoherent(), which we don't
+> implement.
+> 
+> As we have problems with some SMP implementations, and the noncoherent
+> API doesn't have the idea of buffer ownership, it's rather hard to deal
+> with the DMA cache implications with the existing API, especially with
+> the issues of speculative prefetching.  The current usage (looking at
+> drivers/scsi/53c700.c) doesn't cater for speculative prefetch as the
+> dma_cache_sync(,,,DMA_FROM_DEVICE) is done well in advance of the DMA
+> actually happening.
+> 
+> So all in all, I think the noncoherent API is broken as currently
+> designed - and until we have devices on ARM which use it, I don't see
+> much point into trying to fix the current thing especially as we'd be
+> unable to test.
 
-	ns = clocksource_cyc2ns(delta, cs...);
+I agree that dma_cache_sync() is totally unusable on ARM, I thought we
+had killed that off and replaced it with dma_sync_*. Unfortunately,
+I was mistaken there: all drivers that use dma_alloc_noncoherent
+either use dma_cache_sync() or they do something that is more broken,
+but they don't do dma_sync_*.
 
-ns now represents the amount of time which passed between this read and
-the previous read.  Note the mask in the calculation of delta ensures
-that overflows are taken care of.
+Given that people still want to have an interface that does what I
+though this one did, I guess we have two options:
 
-> > This counter should never be reset.
->
-> So this timer should always be on, no matter what happens to the system.
+* Kill off dma_cache_sync and replace it with calls to dma_sync_*
+  so we can start using dma_alloc_noncoherent on ARM
 
-What I mean is that at no point should the clocksource counter be re-
-initialized while the system is running and it is in use, otherwise
-the 'delta' value will spike and 'ns' will become very large.  You'll
-then find the kernels idea of time spontaneously jumps forward when
-it shouldn't.
+* Introduce a new interface
 
-> > A clockevent device is some sort of timer which it used to trigger either
-> > a periodic interrupt or a one-shot interrupt to cause CPUs to do some
-> > maintainence task (such as reading the clock source, comparing that with
-> > the previous reading, and using the delta to update the kernels idea of
-> > current time.)
->
-> This is used for setting up the next event by using the set_next_event
-> callback and set the mode(one shot or periodic) by set_mode callback.
-> So, this timer is the heart of tickless kernel functionality(NO_HZ).
-
-Correct.  The mode is changed when required - when switching to periodic
-mode, you're expected to program the hardware for that mode and set it
-up to produce interrupts at a frequency of HZ.
-
-When you're called to switch to one-shot mode, program it for one-shot
-mode, disable it, and wait for set_next_event().  On set_next_event(),
-you program the timer to produce an interrupt after the specified
-interval and enable it.
+	Arnd
