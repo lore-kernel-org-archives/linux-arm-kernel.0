@@ -1,53 +1,56 @@
-From: dudl@cypress.com (dudl at cypress.com)
-Date: Thu, 28 Apr 2011 07:00:50 +0000
-Subject: update cyapa_i2c_platfrom_data,
-	remove relative mode supporting. (issue6902105)
-Message-ID: <90e6ba3fd225155e1504a1f51e79@google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Apr 2011 09:07:33 +0200
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewers: ccross_android.com, konkers_android.com, olof_lixom.net,  
-linux_arm.linux.org.uk, linux-tegra_vger.kernel.org,  
-linux-arm-kernel_lists.infradead.org, linux-kernel_vger.kernel.org, Micah  
-C, dudl, dso_cypress.com,
+2011/4/27 H Hartley Sweeten <hartleys@visionengravers.com>:
+> On Wednesday, April 27, 2011 6:13 AM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This rewrites the U300 GPIO driver using gpiolib and the irq_chip
+>> abstractions, makes it runtime-configured rather than compile-time,
+>> and moves it to the drivers/gpio subsystem where it belongs,
+>> depopulating the ARM tree of one more driver.
+>>
+>> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> If this and other platform-specific GPIO drivers are going to be
+> moved to the drivers/gpio subsystem, the Kconfig and Makefile should
+> probably be updated to reflect this.
+>
+> In drivers/gpio/Kconfig:
+>
+> #
+> # platform-neutral GPIO infrastructure and expanders
+> #
+>
+> And in drivers/gpio/Makefile:
+>
+> # generic gpio support: dedicated expander chips, etc
+> #
+> # NOTE: platform-specific GPIO drivers don't belong in the
+> # drivers/gpio directory; put them with other platform setup
+> # code, IRQ controllers, board init, etc.
 
-Description:
-update cyapa_i2c_platfrom_data, remove relative mode supporting.
+Yeah, you're right. I can take these comments out, simply.
+I'll review the files as bit to make sure there aren't any more
+statements like that.
 
-Change-Id: Ic9fb8f11c8a4343ff7746f6f885e26d22e773830
-Signed-off-by: Du, Dudley <dudl@cypress.com>
+> The Makefile should probably be reordered, either alphabetically
+> or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
+> alphabetically in order to reduce merge conflicts.
 
-R=ccross at android.com,konkers at android.com,olof at lixom.net,linux at arm.linux.org.uk,linux-tegra at vger.kernel.org,linux-arm-kernel at lists.infradead.org,linux-kernel at vger.kernel.org,micahc at google.com,dudl at cypress.com,dso at cypress.com
-BUG=
-TEST=test on kaen board
+Yes, but if I do that in my patchset I will screw up Grants GPIO tree
+completely, so I prefer that Grant do this. And maybe after pulling
+in my GPIO consolidation tree to his in that case, so we don't get
+undesired collisions. So leaving this for the GPIO maintainer.
 
-1. becasuse relative mode is removed from cyapa driver, so setting for using
-relative or absolute mode are also removed in platform data.
-
-
-Please review this at http://codereview.chromium.org/6902105/
-
-SVN Base: http://git.chromium.org/git/kernel-next.git at chromeos-2.6.38
-
-Affected files:
-   M arch/arm/mach-tegra/board-seaboard.c
-
-
-Index: arch/arm/mach-tegra/board-seaboard.c
-diff --git a/arch/arm/mach-tegra/board-seaboard.c  
-b/arch/arm/mach-tegra/board-seaboard.c
-index  
-090ae201153aa6fdb87f7095e9b43ec65aa183d9..b52eec18d314ec75bb4a551baf3b19fce0ad274a  
-100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -206,8 +206,6 @@ static struct cyapa_platform_data  
-cyapa_i2c_platform_data = {
-  	.flag				= 0,
-  	.gen				= CYAPA_GEN2,
-  	.power_state			= CYAPA_PWR_ACTIVE,
--	.use_absolute_mode		= false,
--	.use_polling_mode		= false,
-  	.polling_interval_time_active	= CYAPA_ACTIVE_POLLING_INTVAL_TIME,
-  	.polling_interval_time_lowpower	= CYAPA_LOWPOWER_POLLING_INTVAL_TIME,
-  	.active_touch_timeout		= CYAPA_ACTIVE_TOUCH_TIMEOUT,
+Yours,
+Linus Walleij
