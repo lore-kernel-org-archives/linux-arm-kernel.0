@@ -1,26 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Apr 2011 09:10:36 +0200
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
-	<BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
-Message-ID: <BANLkTimG+DQ3yE6hMiTSHGC6VFQ6Nkq4oA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 28 Apr 2011 09:10:58 +0200
+Subject: [PATCH] pxa/mioa701: use gpio arrays for global and gsm gpio
+	initialization
+In-Reply-To: <BANLkTinE3Rubb4Kr-JqT_6ep-LNwLmTd5A@mail.gmail.com> (Eric Miao's
+	message of "Mon\, 25 Apr 2011 11\:31\:12 +0800")
+References: <1303329331.21545.7.camel@flow> <87tydre1c7.fsf@free.fr>
+	<BANLkTimXsD6BYa2PPXmrY=aABLNFSRW4Sw@mail.gmail.com>
+	<BANLkTinE3Rubb4Kr-JqT_6ep-LNwLmTd5A@mail.gmail.com>
+Message-ID: <877haeetq5.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/28 Linus Walleij <linus.walleij@linaro.org>:
-> 2011/4/27 H Hartley Sweeten <hartleys@visionengravers.com>:
->> # NOTE: platform-specific GPIO drivers don't belong in the
->> # drivers/gpio directory; put them with other platform setup
->> # code, IRQ controllers, board init, etc.
+Eric Miao <eric.y.miao@gmail.com> writes:
+
+> On Fri, Apr 22, 2011 at 6:35 PM, pHilipp Zabel <philipp.zabel@gmail.com> wrote:
+>> On Thu, Apr 21, 2011 at 11:33 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>> Philipp Zabel <philipp.zabel@gmail.com> writes:
+>>>
+>>>> gpio_request_arrays() / gpio_free_arrays() are functional replacements for
+>>>> mio_gpio_request() / mio_gpio_free(), which are now obsolete.
+>>>>
+>>>> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+>>>
+>>> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>>
+>> Dmitry Artamonow pointed out that contrary to
+>> hx4700/mio_gpio_request(), gpio_request_array() is silent when a
+>> request fails. Would you prefer something like
+>>
+>> int rc;
+>> rc = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+>> if (rc)
+>> ? ?pr_err("MioA701: Failed to request GPIOs.\n");
+>>
+>> in there?
+>>
 >
-> Yeah, you're right. I can take these comments out, simply.
-> I'll review the files as bit to make sure there aren't any more
-> statements like that.
+> That will always be good.
+Indeed.
 
-Thinking of this, the pl061.c driver is already no expansion
-chip (it's SoC silicon) so this statement has been wrong for
-some time already.
+pHilipp, keep the ack, the usage of gpio_request_array() is a very good
+idea. Reporting the error is even better than saying nothing.
 
-Linus Walleij
+Cheers.
+
+-- 
+Robert
