@@ -1,48 +1,42 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 27 Apr 2011 07:59:39 -0700
-Subject: [alsa-devel] [PATCH] ASoC: prevent compilers from optimising
-	pll calculation into __aeabi__uldivmod
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0497F1AA8C@HQMAIL01.nvidia.com>
+From: pwaechtler@mac.com (Peter Waechtler)
+Date: Thu, 28 Apr 2011 22:26:22 +0200
+Subject: since when does ARM map the kernel memory in sections?
+Message-ID: <201104282226.23005.pwaechtler@mac.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry Song wrote at Wednesday, April 27, 2011 1:28 AM:
-> The newest compiliers can optimize pll calculation in several codecs into
-> __aeabi__uldivmod which doesn't exist in kernel.
-> Then the link will fail:
-> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8974.ko] undefined!
-> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8940.ko] undefined!
-> ERROR: "__aeabi_uldivmod" [sound/soc/codecs/snd-soc-wm8510.ko] undefined!
-> This patch prevent the optimizaton by insert ASM.
+Am Mittwoch, 27. April 2011, 02:27:57 schrieben Sie:
+> On Tue, Apr 26, 2011 at 5:58 PM, Jamie Lokier <jamie@shareable.org> wrote:
+> >> Reliable writes are exposed via REQ_FUA.
+> > 
+> > Are you sure that's appropriate?
+> > 
+> > Unless I have misunderstood (very possible), REQ_FUA means writes hit
+> > non-volatile storage before acknowledgement, not that they are atomic.
+> > I think the normal users of REQ_FUA don't require or expect large
+> > atomic writes; they use it as a shortcut for (write & flush this
+> > write) without implying anything else is flushed.
+> 
+> I would agree with you that it's not the best mapping. However, a failed
+> MMC write transaction has other properties. If I understand correctly,
+> depending on mode of failure (say pulling power), you might wind up
+> with extra data getting erased (because erase
+> happens at erase unit boundary), and erase can be done before all the
+> data was transferred from host to card.
+> 
 
-Aren't there compiler flags that tell gcc it isn't operating in a hosted(?)
-environment, and hence not to emit calls to these functions? If so, I
-imagine they should be added to the kernel's core (or ARM arch ) makefiles.
+No, it's not because of the erase unit size larger than write size.
+An "erase unit" is cleared by garbage collection only IFF the complete unit is 
+unused - asynchronously by the ongoing write transaction. The problem with 
+damaging neighboring data is: density. No beer (today), i'm drinking wine ;)
 
-I doubt __aeabi_uldivmod is the only function of this type. How was this
-solved for other such functions; does the kernel implement the AEABI
-functions, and this implementation is simply missing?
+The cells storing the "bits" gets smaller and smaller and with multi level 
+cells even more bits are represented by "fewer electrons". Programming the 
+neighbor cell disturbs the fragile cells. If the error correction is disturbed 
+by power loss: off we go... 
 
-But yes either way, ask on the main kernel or ARM kernel mailing list
-(ARM now CC'd)
+Someone from the flash vendors eavesdropping? Please, pretty please ... :)
 
-diff --git a/sound/soc/codecs/wm8510.c b/sound/soc/codecs/wm8510.c
-index db0dced..a636b15 100644
---- a/sound/soc/codecs/wm8510.c
-+++ b/sound/soc/codecs/wm8510.c
-@@ -258,6 +258,12 @@ static void pll_factors(unsigned int target, unsigned int source)
- 	Nmod = target % source;
- 	Kpart = FIXED_PLL_SIZE * (long long)Nmod;
- 
-+	/*
-+	 * The following asm() prevents the compiler from optimising
-+	 * into a standard EABI function __aeabi__uldivmod()
-+	 */
-+	asm("" : "+r"(source));
-+
- 	do_div(Kpart, source);
- 
- 	K = Kpart & 0xFFFFFFFF;
+	Peter
 
--- 
-nvpublic
+P.S. Andrei: sorry for reposting, but Kmail confuses me with "Reply to all"
