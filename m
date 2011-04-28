@@ -1,24 +1,36 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 28 Apr 2011 22:05:32 +0200
-Subject: S3C2416, S3C2443 HS-SPI driver?
-Message-ID: <201104282205.33100.heiko@sntech.de>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Thu, 28 Apr 2011 22:16:43 +0200
+Subject: [PATCH v2] pxa/hx4700: use gpio arrays for global gpio
+	initialization
+In-Reply-To: <20110428090528.GN17290@n2100.arm.linux.org.uk>
+References: <1303329317.21545.5.camel@flow> <20110421150226.GA10052@rainbow>
+	<1303930220.14964.8.camel@flow>
+	<20110428090528.GN17290@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTim-9PpQCc3oy05-pc5SCyc=nNuw+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 28, 2011 at 11:05 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 27, 2011 at 08:50:19PM +0200, Philipp Zabel wrote:
+>> - ? ? hx4700_gpio_request(ARRAY_AND_SIZE(global_gpios));
+>> + ? ? ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+>> + ? ? if (ret)
+>> + ? ? ? ? ? ? pr_err ("hx4700: Failed to request GPIOs.\n");
+>
+> No space between pr_err and (.
 
-does a driver for spi on s3c2416/s3c2443 SoCs exist somewhere? The one for the 
-other s3c24XX SoCs seems to be different.
+checkpatch issue. Sorry about that.
 
-I did a comparison of the spi-parts of s3c2416 and s3c6400 manuals and they 
-seem very much alike in their registers and working descriptions.
+> Does the return code convey useful information as to _why_ it failed? ?If
+> yes, you really should print its value. ?Knowing whether it's -EBUSY
+> (eg, already in use) instead of -EINVAL (eg, invalid GPIO number) really
+> helps to debug problems.
 
-The only real differences I found are bit 6 of CH_CFG (High_speed_en) which 
-only exists on 2416/2443 and the max values of RxTrigger and TxTrigger are 
-greater on 2416 than on 6400 (63 vs 40).
+Yes, it does. It is certainly better to include the error code.
+Recompiling with DEBUG_GPIO enabled might still be necessary to get
+information about which GPIO failed, and whether -EINVAL was returned
+by gpio_request() or gpio_direction_input/output().
 
-So question for the samsung experts, could the s3c64xx spi-driver be a valid 
-starting point for me?
-
-Thanks
-Heiko
+regards
+Philipp
