@@ -1,150 +1,99 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Thu, 28 Apr 2011 22:19:32 +0200
-Subject: [PATCH v3] pxa/mioa701: use gpio arrays for global and gsm gpio
-	initialization
-In-Reply-To: <877haeetq5.fsf@free.fr>
-References: <1303329331.21545.7.camel@flow> <87tydre1c7.fsf@free.fr>
-	<BANLkTimXsD6BYa2PPXmrY=aABLNFSRW4Sw@mail.gmail.com>
-	<BANLkTinE3Rubb4Kr-JqT_6ep-LNwLmTd5A@mail.gmail.com>
-	<877haeetq5.fsf@free.fr>
-Message-ID: <1304021974.6554.2.camel@flow>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 29 Apr 2011 08:20:23 +1200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <20110428141046.GB10594@game.jcrosoft.org>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
+	<20110428141046.GB10594@game.jcrosoft.org>
+Message-ID: <4DB9CC07.4020903@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_request_array() / gpio_free_array() are functional replacements for
-mio_gpio_request() / mio_gpio_free(), which are now obsolete.
+On 04/29/2011 02:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:04 Thu 28 Apr     , Andrew Victor wrote:
+>> hi,
+>>
+>>>> If this eventually reduces code size then I think it is useful, but
+>>>> otherwise I'm not sure I see the point?
+>>> It's on purpose as the dbgu physical address is not at the same place
+>>> so read the other register really does not impact the chip but if we do it
+>>> later duting the boot or the life to the kernel it's an other story
+>>>
+>>> so the split between __cpu_is and cpu_is is necessarly
+>>>
+>>> all of this work is in preparation to allow multiple soc in the same kernel
+>>> that's also why I map the system controller the same way on all at91 arm9
+>>
+>> The cpu_is() or__cpu_is() perform a at91_sys_read() of one of the DBGU
+>> registers.
+>>
+>> But the address of the DBGU differs between CPUs regardless if you map
+>> the system controller the same:
+>>    at572d940hf.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>>    at91cap9.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>>    at91rm9200.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>>    at91sam9260.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>>    at91sam9261.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>>    at91sam9263.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>>    at91sam9g45.h:#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>>    at91sam9rl.h:#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>>
+>> So I don't see how you can "detect" the CPU without first knowing
+>> which CPU and therefore where the DBGU register is anyway.
+>> And probing different addresses for a value is not an acceptable solution.
+>>
+>>
+>> While having a single kernel image that supports AT91 processors is a
+>> good goal, the soc.h is a totally unnecessary complication.
+>> I can't think of any situation where an AT91 board.c file doesn't know
+>> what processor it has.
+>>
+>> So instead of :
+>>    boardXYZ-init ->  at91_initialize() --> magic-cpu-detection -->
+>> at91XX_initialize()
+>> just do:
+>>    boardXYZ-init  -> at91XX_initialize()
+> except there is no need to known it and board seach as the usb-926x are the
+> same nearly and do not need to known on which soc they are
+> 
+> ditto for other boards you do not need to known the soc we are on.
+> And when you work on CPU module the board is the same but not the cpu on the
+> module so detect the SOC allow to have one kernel for all and not multiple
+> machine ID for each module and board combination
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/mioa701.c |   70 +++++++++---------------------------------
- 1 files changed, 15 insertions(+), 55 deletions(-)
+I Agree with Andrew. When can determine everything we need from the
+mach-type. For boards such as the usb-926x we have two separate
+mach-types for the 9263 and the 9260 variants. The init_machine callback
+can be separated in this case so that both of the boards initialise the
+correct cpu type.
 
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index 23925db..403819c 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -177,50 +177,6 @@ static unsigned long mioa701_pin_config[] = {
- 	MFP_CFG_OUT(GPIO116, AF0, DRIVE_HIGH),
- };
- 
--#define MIO_GPIO_IN(num, _desc) \
--	{ .gpio = (num), .dir = 0, .desc = (_desc) }
--#define MIO_GPIO_OUT(num, _init, _desc) \
--	{ .gpio = (num), .dir = 1, .init = (_init), .desc = (_desc) }
--struct gpio_ress {
--	unsigned gpio : 8;
--	unsigned dir : 1;
--	unsigned init : 1;
--	char *desc;
--};
--
--static int mio_gpio_request(struct gpio_ress *gpios, int size)
--{
--	int i, rc = 0;
--	int gpio;
--	int dir;
--
--	for (i = 0; (!rc) && (i < size); i++) {
--		gpio = gpios[i].gpio;
--		dir = gpios[i].dir;
--		rc = gpio_request(gpio, gpios[i].desc);
--		if (rc) {
--			printk(KERN_ERR "Error requesting GPIO %d(%s) : %d\n",
--			       gpio, gpios[i].desc, rc);
--			continue;
--		}
--		if (dir)
--			gpio_direction_output(gpio, gpios[i].init);
--		else
--			gpio_direction_input(gpio);
--	}
--	while ((rc) && (--i >= 0))
--		gpio_free(gpios[i].gpio);
--	return rc;
--}
--
--static void mio_gpio_free(struct gpio_ress *gpios, int size)
--{
--	int i;
--
--	for (i = 0; i < size; i++)
--		gpio_free(gpios[i].gpio);
--}
--
- /* LCD Screen and Backlight */
- static struct platform_pwm_backlight_data mioa701_backlight_data = {
- 	.pwm_id		= 0,
-@@ -346,16 +302,16 @@ irqreturn_t gsm_on_irq(int irq, void *p)
- 	return IRQ_HANDLED;
- }
- 
--struct gpio_ress gsm_gpios[] = {
--	MIO_GPIO_IN(GPIO25_GSM_MOD_ON_STATE, "GSM state"),
--	MIO_GPIO_IN(GPIO113_GSM_EVENT, "GSM event"),
-+static struct gpio gsm_gpios[] = {
-+	{ GPIO25_GSM_MOD_ON_STATE, GPIOF_IN, "GSM state" },
-+	{ GPIO113_GSM_EVENT, GPIOF_IN, "GSM event" },
- };
- 
- static int __init gsm_init(void)
- {
- 	int rc;
- 
--	rc = mio_gpio_request(ARRAY_AND_SIZE(gsm_gpios));
-+	rc = gpio_request_array(ARRAY_AND_SIZE(gsm_gpios));
- 	if (rc)
- 		goto err_gpio;
- 	rc = request_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), gsm_on_irq,
-@@ -369,7 +325,7 @@ static int __init gsm_init(void)
- 
- err_irq:
- 	printk(KERN_ERR "Mioa701: Can't request GSM_ON irq\n");
--	mio_gpio_free(ARRAY_AND_SIZE(gsm_gpios));
-+	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
- err_gpio:
- 	printk(KERN_ERR "Mioa701: gsm not available\n");
- 	return rc;
-@@ -378,7 +334,7 @@ err_gpio:
- static void gsm_exit(void)
- {
- 	free_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), NULL);
--	mio_gpio_free(ARRAY_AND_SIZE(gsm_gpios));
-+	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
- }
- 
- /*
-@@ -776,14 +732,16 @@ static void mioa701_restart(char c, const char *cmd)
- 	arm_machine_restart('s', cmd);
- }
- 
--static struct gpio_ress global_gpios[] = {
--	MIO_GPIO_OUT(GPIO9_CHARGE_EN, 1, "Charger enable"),
--	MIO_GPIO_OUT(GPIO18_POWEROFF, 0, "Power Off"),
--	MIO_GPIO_OUT(GPIO87_LCD_POWER, 0, "LCD Power"),
-+static struct gpio global_gpios[] = {
-+	{ GPIO9_CHARGE_EN, GPIOF_OUT_INIT_HIGH, "Charger enable" },
-+	{ GPIO18_POWEROFF, GPIOF_OUT_INIT_LOW, "Power Off" },
-+	{ GPIO87_LCD_POWER, GPIOF_OUT_INIT_LOW, "LCD Power" },
- };
- 
- static void __init mioa701_machine_init(void)
- {
-+	int rc;
-+
- 	PSLR  = 0xff100000; /* SYSDEL=125ms, PWRDEL=125ms, PSLR_SL_ROD=1 */
- 	PCFR = PCFR_DC_EN | PCFR_GPR_EN | PCFR_OPDE;
- 	RTTR = 32768 - 1; /* Reset crazy WinCE value */
-@@ -793,7 +751,9 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
--	mio_gpio_request(ARRAY_AND_SIZE(global_gpios));
-+	rc = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
-+	if (rc)
-+		pr_err("MioA701: Failed to request GPIOs: %d", rc);
- 	bootstrap_init();
- 	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
- 	pxa_set_mci_info(&mioa701_mci_info);
+For cases such as the Snapper 9260/9G20, where a single mach-type is
+used for two boards, we can then read the DBGU registers because the
+location is the same for the 9260 and 9G20 (same sub-family). I don't
+think there are any boards in the kernel which share a mach-type, but
+have different sub-families and therefore different locations for DBGU.
+
+If we took the approach that the boards must explicitly specify (as
+closely as possible) their cpu/soc type then we could remove much of the
+cpu detection code. We will still need the sub-family detection (e.g.
+9260/9G20, CAP9 revision, etc) to distinguish some boards.
+
+As Andrew says, cpu detection will not reliably work if we have a kernel
+where all boards are compiled in. We have a chicken and egg problem in
+that we need to know the cpu type in order to know where the DBGU
+registers are, and we need to read the DBGU registers in order to
+determine the cpu type. Catch 22.
+
+~Ryan
+
 -- 
-1.7.4.4
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
