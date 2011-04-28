@@ -1,178 +1,142 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 28 Apr 2011 23:15:46 +0800
-Subject: [PATCH 3/3] ARM: mmp: add hardware lock support in PXA910
-In-Reply-To: <2011042801>
-References: <2011042801>
-Message-ID: <1304003746-12127-3-git-send-email-haojian.zhuang@gmail.com>
+From: torbenh@gmx.de (torbenh)
+Date: Thu, 28 Apr 2011 17:18:19 +0200
+Subject: AT91: Convert to fasteoi IRQ handler, and remove ARM irq_finish
+In-Reply-To: <1303909742.18407.12.camel@redbox>
+References: <1303909742.18407.12.camel@redbox>
+Message-ID: <20110428151819.GE13755@siel.b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RIPC register is used to implement hardware lock between CP and
-AP in Marvell PXA910.
+On Wed, Apr 27, 2011 at 03:09:02PM +0200, Andrew Victor wrote:
+> The AT91's AIC interrupt controller will internally mask the current
+> (and lower-priority) interrupts until software acknowledges that the
+> interrupt was handled by writing to the AIC_EOICR register.
+> 
+> This matches the "fasteoi" IRQ flow-handler, so convert the AT91 to use
+> handle_fasteoi_irq rather than handle_level_irq.
+> 
+> This also allows the irq_finish() call to be removed from the low-level
+> ARM IRQ handler.
+> 
+> 
+> Signed-off-by: Andrew Victor <linux@maxim.org.za>
+> 
+> 
+> 
+> diff -urN -x CVS linux-2.6.38/arch/arm/kernel/irq.c linux-2.6/arch/arm/kernel/irq.c
+> --- linux-2.6.38/arch/arm/kernel/irq.c	2011-04-27 12:28:25.609111745 +0200
+> +++ linux-2.6/arch/arm/kernel/irq.c	2011-04-27 14:20:32.784167994 +0200
+> @@ -42,13 +42,6 @@
+>  #include <asm/mach/irq.h>
+>  #include <asm/mach/time.h>
+>  
+> -/*
+> - * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
+> - */
+> -#ifndef irq_finish
+> -#define irq_finish(irq) do { } while (0)
+> -#endif
+> -
+>  unsigned long irq_err_count;
+>  
+>  int show_interrupts(struct seq_file *p, void *v)
+> @@ -135,9 +128,6 @@
+>  		generic_handle_irq(irq);
+>  	}
+>  
+> -	/* AT91 specific workaround */
+> -	irq_finish(irq);
+> -
+>  	irq_exit();
+>  	set_irq_regs(old_regs);
+>  }
+> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
+> --- linux-2.6.38/arch/arm/mach-at91/gpio.c	2011-04-27 12:28:26.157080664 +0200
+> +++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-27 14:45:42.672364605 +0200
+> @@ -392,8 +392,6 @@
+>  	at91_gpio = get_irq_chip_data(irq);
+>  	pio = at91_gpio->regbase;
+>  
+> -	/* temporarily mask (level sensitive) parent IRQ */
+> -	desc->irq_data.chip->irq_ack(&desc->irq_data);
+>  	for (;;) {
+>  		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
+>  		 * When there none are pending, we're finished unless we need
+> @@ -429,8 +427,8 @@
+>  			isr >>= 1;
+>  		}
+>  	}
+> -	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> -	/* now it may re-trigger */
+> +	/* acknowledge interrupt - now it may re-trigger */
+> +	desc->irq_data.chip->irq_eoi(&desc->irq_data);
+>  }
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Jean Delvare <khali@linux-fr.org>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/mach-mmp/include/mach/pxa910.h |   13 +++++---
- arch/arm/mach-mmp/pxa910.c              |   23 +++++++++++++++-
- arch/arm/mach-mmp/ttc_dkb.c             |   45 +++++++++++++++++++++++++++++++
- 3 files changed, 75 insertions(+), 6 deletions(-)
+why does this handler mess with the parent irq chip ?
+this looks pretty wrong to me.
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 91be755..2973466 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -1,16 +1,19 @@
- #ifndef __ASM_MACH_PXA910_H
- #define __ASM_MACH_PXA910_H
- 
--struct sys_timer;
--
--extern struct sys_timer pxa910_timer;
--extern void __init pxa910_init_irq(void);
--
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
- #include <mach/devices.h>
- #include <plat/pxa3xx_nand.h>
- 
-+struct sys_timer;
-+
-+extern struct sys_timer pxa910_timer;
-+extern void __init pxa910_init_irq(void);
-+extern void pxa910_ripc_lock(struct i2c_adapter *);
-+extern void pxa910_ripc_unlock(struct i2c_adapter *);
-+extern int pxa910_ripc_trylock(struct i2c_adapter *);
-+
- extern struct pxa_device_desc pxa910_device_uart1;
- extern struct pxa_device_desc pxa910_device_uart2;
- extern struct pxa_device_desc pxa910_device_twsi0;
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 8f92ccd..4fbe485 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/io.h>
-+#include <linux/i2c.h>
- 
- #include <asm/mach/time.h>
- #include <mach/addr-map.h>
-@@ -28,7 +29,10 @@
- #include "common.h"
- #include "clock.h"
- 
--#define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
-+#define MFPR_VIRT_BASE		(APB_VIRT_BASE + 0x1e000)
-+
-+#define RIPC0_VIRT_BASE		(APB_VIRT_BASE + 0x3D000)
-+#define RIPC0_STATUS		(RIPC0_VIRT_BASE + 0x00)
- 
- static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
- {
-@@ -100,6 +104,23 @@ void __init pxa910_init_irq(void)
- 	pxa910_init_gpio();
- }
- 
-+void pxa910_ripc_lock(struct i2c_adapter *adap)
-+{
-+	while (__raw_readl(RIPC0_STATUS))
-+		cpu_relax();
-+}
-+
-+/* return 1 -- succeed to get lock; 0 -- fail to get lock */
-+int pxa910_ripc_trylock(struct i2c_adapter *adap)
-+{
-+	return (!__raw_readl(RIPC0_STATUS));
-+}
-+
-+void pxa910_ripc_unlock(struct i2c_adapter *adap)
-+{
-+	__raw_writel(1, RIPC0_STATUS);
-+}
-+
- /* APB peripheral clocks */
- static APBC_CLK(uart1, PXA910_UART0, 1, 14745600);
- static APBC_CLK(uart2, PXA910_UART1, 1, 14745600);
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index e411039..c6af021 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -15,6 +15,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
- #include <linux/interrupt.h>
-+#include <linux/mfd/88pm860x.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -32,6 +33,10 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
- 	GPIO47_UART2_RXD,
- 	GPIO48_UART2_TXD,
- 
-+	/* I2C */
-+	GPIO53_CI2C_SCL,
-+	GPIO54_CI2C_SDA,
-+
- 	/* DFI */
- 	DF_IO0_ND_IO0,
- 	DF_IO1_ND_IO1,
-@@ -113,12 +118,52 @@ static struct platform_device *ttc_dkb_devices[] = {
- 	&ttc_dkb_device_onenand,
- };
- 
-+static struct pm860x_led_pdata dkb_pm860x_led[] = {
-+	{
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_RED,
-+	}, {
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_GREEN,
-+	}, {
-+		.id		= PM8606_ID_LED,
-+		.iset		= PM8606_LED_CURRENT(12),
-+		.flags		= PM8606_LED1_BLUE,
-+	},
-+};
-+
-+static struct pm860x_platform_data dkb_pm8607_info = {
-+	.led			= &dkb_pm860x_led[0],
-+	.i2c_port		= GI2C_PORT,
-+	.companion_addr		= 0x11,
-+	.irq_mode		= 0,
-+	.irq_base		= IRQ_BOARD_START,
-+};
-+
-+static struct i2c_board_info dkb_i2c_info[] = {
-+	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &dkb_pm8607_info,
-+		.irq		= IRQ_PXA910_PMIC_INT,
-+	},
-+};
-+
-+static struct i2c_pxa_platform_data dkb_i2c_pdata = {
-+	.hardware_lock		= pxa910_ripc_lock,
-+	.hardware_unlock	= pxa910_ripc_unlock,
-+	.hardware_trylock	= pxa910_ripc_trylock,
-+};
-+
- static void __init ttc_dkb_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
- 
- 	/* on-chip devices */
- 	pxa910_add_uart(1);
-+	pxa910_add_twsi(0, &dkb_i2c_pdata, ARRAY_AND_SIZE(dkb_i2c_info));
- 
- 	/* off-chip devices */
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+>  
+>  /*--------------------------------------------------------------------------*/
+> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h linux-2.6/arch/arm/mach-at91/include/mach/irqs.h
+> --- linux-2.6.38/arch/arm/mach-at91/include/mach/irqs.h	2009-06-10 05:05:27.000000000 +0200
+> +++ linux-2.6/arch/arm/mach-at91/include/mach/irqs.h	2011-04-27 14:20:48.471334804 +0200
+> @@ -28,13 +28,6 @@
+>  
+>  
+>  /*
+> - * Acknowledge interrupt with AIC after interrupt has been handled.
+> - *   (by kernel/irq.c)
+> - */
+> -#define irq_finish(irq) do { at91_sys_write(AT91_AIC_EOICR, 0); } while (0)
+> -
+> -
+> -/*
+>   * IRQ interrupt symbols are the AT91xxx_ID_* symbols
+>   * for IRQs handled directly through the AIC, or else the AT91_PIN_*
+>   * symbols in gpio.h for ones handled indirectly as GPIOs.
+> diff -urN -x CVS linux-2.6.38/arch/arm/mach-at91/irq.c linux-2.6/arch/arm/mach-at91/irq.c
+> --- linux-2.6.38/arch/arm/mach-at91/irq.c	2011-04-27 12:28:26.197078404 +0200
+> +++ linux-2.6/arch/arm/mach-at91/irq.c	2011-04-27 14:23:29.817625842 +0200
+> @@ -46,6 +46,12 @@
+>  	at91_sys_write(AT91_AIC_IECR, 1 << d->irq);
+>  }
+>  
+> +static void at91_aic_eoi(struct irq_data *d)
+> +{
+> +	/* Acknowledge with AIC after interrupt has been handled */
+> +	at91_sys_write(AT91_AIC_EOICR, 0);	
+> +}
+> +
+>  unsigned int at91_extern_irq;
+>  
+>  #define is_extern_irq(irq) ((1 << (irq)) & at91_extern_irq)
+> @@ -122,6 +128,7 @@
+>  	.irq_ack	= at91_aic_mask_irq,
+
+you should probably remove the ack. its just confusing.
+
+>  	.irq_mask	= at91_aic_mask_irq,
+>  	.irq_unmask	= at91_aic_unmask_irq,
+> +	.irq_eoi	= at91_aic_eoi,
+>  	.irq_set_type	= at91_aic_set_type,
+>  	.irq_set_wake	= at91_aic_set_wake,
+>  };
+> @@ -144,7 +151,7 @@
+>  		at91_sys_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
+>  
+>  		set_irq_chip(i, &at91_aic_chip);
+> -		set_irq_handler(i, handle_level_irq);
+> +		set_irq_handler(i, handle_fasteoi_irq);
+>  		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+>  
+>  		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.7.1
+torben Hohn
