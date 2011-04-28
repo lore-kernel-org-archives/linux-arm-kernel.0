@@ -1,46 +1,72 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 28 Apr 2011 12:41:44 +0200
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110427073514.GH17290@n2100.arm.linux.org.uk>
-References: <201104212129.17013.arnd@arndb.de>
-	<20110427073514.GH17290@n2100.arm.linux.org.uk>
-Message-ID: <20110428104143.GB13402@8bytes.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 28 Apr 2011 12:47:32 +0200
+Subject: [PATCH] PXA: Fix typo in proc-xscale.S
+In-Reply-To: <4DB942F3.1070601@compulab.co.il>
+References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
+	<4DB90DD8.7050406@compulab.co.il>
+	<20110428095548.GY17290@n2100.arm.linux.org.uk>
+	<4DB942F3.1070601@compulab.co.il>
+Message-ID: <20110428104732.GO31131@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 08:35:14AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 21, 2011 at 09:29:16PM +0200, Arnd Bergmann wrote:
+Hello,
 
-> dma_map_ops design is broken - we can't have the entire DMA API indirected
-> through that structure.  Whether you have an IOMMU or not is completely
-> independent of whether you have to do DMA cache handling.  Moreover, with
-> dmabounce, having the DMA cache handling in place doesn't make sense.
+[adding Ben as the author of the linked patch to Cc:]
+
+On Thu, Apr 28, 2011 at 01:35:31PM +0300, Igor Grinberg wrote:
+> On 04/28/11 12:55, Russell King - ARM Linux wrote:
 > 
-> So you can't have a dma_map_ops for the cache handling bits, a dma_map_ops
-> for IOMMU, and a dma_map_ops for the dmabounce stuff.  It just doesn't
-> work like that.
+> > On Thu, Apr 28, 2011 at 09:48:56AM +0300, Igor Grinberg wrote:
+> >> Hi Marek,
+> >>
+> >> On 04/28/11 04:46, Marek Vasut wrote:
+> >>
+> >>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >>> ---
+> >>>  arch/arm/mm/proc-xscale.S |    2 +-
+> >>>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> >>> index ce233bc..42af976 100644
+> >>> --- a/arch/arm/mm/proc-xscale.S
+> >>> +++ b/arch/arm/mm/proc-xscale.S
+> >>> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+> >>>  	teq	r2, #DMA_TO_DEVICE
+> >>>  	beq	xscale_dma_clean_range
+> >>>  	b	xscale_dma_flush_range
+> >>> -ENDPROC(xscsale_dma_a0_map_area)
+> >>> +ENDPROC(xscale_dma_a0_map_area)
+> >>>  
+> >>>  /*
+> >>>   *	dma_unmap_area(start, size, dir)
+> >> Similar patch:
+> >> http://www.spinics.net/lists/arm-kernel/msg118258.html
+> >>
+> >> has been sent to Russell quite a while ago,
+> >> but somehow got lost or something.
+> > As I keep saying, I'm useless dealing with patches sent only by email -
+> > they tend to get quickly buried and forgotten, plus they need saving out,
+> > sometimes editing and transferring between machines to be applied.
+> >
+> > The patch system greatly simplifies that effort, and ensures that patches
+> > don't get forgotten.
+> 
+> Apparently, not many people read Documentation/arm/README :(
+> May be it would be helpful to add a note to the MAINTAINERS file
+> regarding the patch system and tweak scripts/get_maintainer.pl
+> to spit it out in appropriate cases?
+another problem is that the patch system is for reviewed patches only.
+If the patch is forgotten before it gets some reply sending it to the
+patch system is wrong (at least for non-trivial patches).
 
-Nobody says that the complete feature-set of the dma_ops needs to be
-provided through the IOMMU-API. The different APIs are there to solve
-different problems:
+Patchwork comes to mind. That doesn't forget patches.
+I think for that to be practical for lakml some automatic delegation
+would be needed though.
 
-The IOMMU-API provides low-level access to IOMMU hardware and to map io
-addresses to physical addresses (which can be chosen by the caller). The
-IOMMU-API does not care about address space layout or cache management.
+Best regards
+Uwe
 
-The DMA-API cares about address management. Every dma_ops implementation
-using an IOMMU has an address allocator for io addresses implemented.
-the DMA-API also cares about cache-management.
-
-So if we can abstract the different IOMMUs on all architectures in the
-IOMMU-API I see no reason why we can't have a common dma_ops
-implementation. The dma-buffer ownership management (cpu<->device) can
-be put into archtectural call-backs so that architectures that need it
-just implement them and everything should work.
-
-Or I am too naive to believe that (which is possible because of my
-limited ARM knowledge). In this case please correct me :)
-
-Regards,
-
-	Joerg
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
