@@ -1,70 +1,86 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 28 Apr 2011 06:14:40 +0200
-Subject: [PATCH 0/14] at91: factorize soc init and switch to early platform
-In-Reply-To: <4DB8E607.1090807@bluewatersys.com>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<4DB886FD.7000209@bluewatersys.com>
-	<20110428024144.GJ29103@game.jcrosoft.org>
-	<4DB8E607.1090807@bluewatersys.com>
-Message-ID: <20110428041440.GO29103@game.jcrosoft.org>
+Date: Thu, 28 Apr 2011 06:31:43 +0200
+Subject: [PATCH] clkdev: add support to lookup for early platform device
+In-Reply-To: <20110428033808.GE13539@linux-sh.org>
+References: <1303308314-3213-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110427084247.GK17290@n2100.arm.linux.org.uk>
+	<20110427103145.GF29103@game.jcrosoft.org>
+	<20110427104758.GG29103@game.jcrosoft.org>
+	<20110427150057.GH29103@game.jcrosoft.org>
+	<20110428020910.GA13539@linux-sh.org>
+	<20110428024559.GK29103@game.jcrosoft.org>
+	<20110428030817.GC13539@linux-sh.org>
+	<20110428031704.GL29103@game.jcrosoft.org>
+	<20110428033808.GE13539@linux-sh.org>
+Message-ID: <20110428043143.GP29103@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:59 Thu 28 Apr     , Ryan Mallon wrote:
-> On 04/28/2011 02:41 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 09:13 Thu 28 Apr     , Ryan Mallon wrote:
-> >> On 04/26/2011 06:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>> Hi,
-> >>>
-> >>> 	The following patch series start to factorize the soc init
-> >>> 	and switch gpio and timers to early platform
-> >>>
-> >>> 	diff stat on arm
-> >>>
-> >>> 	80 files changed, 1690 insertions(+), 2053 deletions(-)
-> >>
-> >> I finally had a chance to test this. On our Snapper 9G20 board
-> >> (AT91SAM9G20) the latest linux-next gives me:
-> >>
-> >> Starting kernel ...
-> >>
-> >> Uncompressing Linux... done, booting the kernel.
-> >> <5>Linux version 2.6.39-rc4-next-20110427+ (ryan at okiwi) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #850 Thu Apr 28 09:07:43 NZST 2011
-> >> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> >> CPU: VIVT data cache, VIVT instruction cache
-> >> Machine: Bluewater Systems Snapper 9260/9G20 module
-> >> Memory policy: ECC disabled, Data cache writeback
-> >> <0>Kernel panic - not syncing: Impossible to detect the CPU type
-> >> [<c002fb1c>] (unwind_backtrace+0x0/0xe4) from [<c0230820>] (panic+0x50/0x178)
-> >> [<c0230820>] (panic+0x50/0x178) from [<c000d414>] (at91_initialize+0x18/0x20)
-> >> [<c000d414>] (at91_initialize+0x18/0x20) from [<c000e298>] (snapper9260_map_io+0xc/0x5c)
-> >> [<c000e298>] (snapper9260_map_io+0xc/0x5c) from [<c000d0ec>] (paging_init+0x668/0x728)
-> >> [<c000d0ec>] (paging_init+0x668/0x728) from [<c000b5cc>] (setup_arch+0x39c/0x620)
-> >> [<c000b5cc>] (setup_arch+0x39c/0x620) from [<c000873c>] (start_kernel+0x6c/0x2c8)
-> >>
-> >>
-> >> I'll have a better look at this later to see if I can find the problem,
-> >> though I suspect the remapping of the AT91_DBGU location is to blame.
-> >> What platforms have you tested this on?
-> > I already found the issue and fix it
+On 12:38 Thu 28 Apr     , Paul Mundt wrote:
+> On Thu, Apr 28, 2011 at 05:17:04AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:08 Thu 28 Apr     , Paul Mundt wrote:
+> > > This is a non-argument until you demonstrate a use case where we have a
+> > > reasonable expectation for the clock framework to be available and the
+> > > slab allocator not.
+> > > 
+> > > If you're thinking about the SH earlyprintk case then I suggest you look
+> > > at the sh-sci driver to see how we presently deal with the situation
+> > > there.
+> > the sh-sci driver expect the clock will enable for him
+> > which did IIRC Magnus on sh-mobile
+> > I do not want to do so
 > > 
-> >  git://github.com/at91linux/linux-2.6-at91.git test_cleanup
+> > I've unfortunatly on at91 I use the early device during the map_io
+> > 
+> > so the slab is available and bootmem either
+> > 
+> Yes, on sh-sci we assume that the clock is supplied to the port that we
+> are using for earlyprintk and we simply take over management of it via
+> the clock framework when the rest of the driver core comes online.
 > 
-> Okay, that is working a bit better, not quite booting yet, but a little
-> further along :-).
+> Oddly enough, 100% of the time that we've wanted to have a serial console
+> it's been on the same port as the boot loader, which has to do the
+> initialization anyways. If you're using JTAG or something else for
+> loading, you've already got to do register writes for setting up bus
+> timings and the like, so it's not obvious why you can't set up some
+> sensible defaults for the clock registers supplying your serial port,
+> either.
 > 
-> Couple of bugs I've noticed so far: In board-stamp9g20.c and
-> board-sam9g20ek.c you have missed the .init_irq initialisation change
-> for the first MACHINE_START. It causes a build failure if either of
-> these boards are included.
+> On top of that, ARM also has its own earlyprintk and eartly uart debug
+> macros available to you. If you're trying to bring more driver core stuff
+> online before either of slab or bootmem are available to you outside of
+> the context of the existing functionality: too bad. It's not worth the
+> world of pain for a corner case of a corner case.
 > 
-> Also at91x40 (e.g. board-eb01.c) does not get converted? I don't known
-> anything about this SoC. Is this intentional?
-Yes it's intentionnal
+> Again, until you explain concretely why you have this as a real use case
+> that needs to be solved generically instead of some pointless theoretical
+> wanking it's simply not possible to take this requirement seriously. This
+> was the conclusion we came to when modelling the earlytimer and
+> earlyprintk code for SH in the first place, and the burden of proof is on
+> you to demonstrate why any of these things are insufficient for your
+> platform.
+in the map_io  I need to init the gpio drivers
+and on AT91 we have between 3 and 5 pio bank which have different clock
+and the resource for the gpio driver is soc specifc
+so I switch the gpio driver to early device
+so as the init of the gpio drivers I need to get the clock for each bank
 
-this is a nommu soc and with just timer and clock driver so I do not update it
-and this soc does not have a DBGU so until we have a real implementation it's
-stay as now
+as example on 9263
+at91_gpio.0 use clock pioA
+at91_gpio.1 use clock pioB
+at91_gpio.2 use clock pioCDE
+at91_gpio.3 use clock pioCDE
+at91_gpio.4 use clock pioCDE
+
+on 9g45
+at91_gpio.0 use clock pioA
+at91_gpio.1 use clock pioB
+at91_gpio.2 use clock pioC
+at91_gpio.3 use clock pioDE
+at91_gpio.4 use clock pioDE
+
+so I need to known the clock early if I want to be able to use the gpio
+driver early
 
 Best Regards,
 J.
