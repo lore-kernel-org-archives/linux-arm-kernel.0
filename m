@@ -1,28 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 10:24:17 +0100
-Subject: [PATCHv3 2.6.40 0/4] ARM: simpad: Add support for GPIO
-	attached hardware
-In-Reply-To: <1303377543-24794-1-git-send-email-jochen@scram.de>
-References: <1303377543-24794-1-git-send-email-jochen@scram.de>
-Message-ID: <20110428092417.GS17290@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 28 Apr 2011 11:25:29 +0200
+Subject: [PATCH] PXA: Fix typo in proc-xscale.S
+In-Reply-To: <4DB90DD8.7050406@compulab.co.il>
+References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
+	<4DB90DD8.7050406@compulab.co.il>
+Message-ID: <201104281125.30158.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 11:18:59AM +0200, Jochen Friedrich wrote:
-> This series enables GPIO API on UCB1x00 and implements the GPIO
-> API on the CS3 latch. The third patch finally registers platform
-> devices for the GPIO attached LED, buttons and I2C bus.
+On Thursday, April 28, 2011 08:48:56 AM Igor Grinberg wrote:
+> Hi Marek,
 > 
-> v2: In response to the Linus rant, remove the ARM specific LED
->     support for simpad hardware instead of supporting it
->     alternatively to the generic LED code.
+> On 04/28/11 04:46, Marek Vasut wrote:
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
+> > 
+> >  arch/arm/mm/proc-xscale.S |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> > index ce233bc..42af976 100644
+> > --- a/arch/arm/mm/proc-xscale.S
+> > +++ b/arch/arm/mm/proc-xscale.S
+> > @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
+> > 
+> >  	teq	r2, #DMA_TO_DEVICE
+> >  	beq	xscale_dma_clean_range
+> >  	b	xscale_dma_flush_range
+> > 
+> > -ENDPROC(xscsale_dma_a0_map_area)
+> > +ENDPROC(xscale_dma_a0_map_area)
+> > 
+> >  /*
+> >  
+> >   *	dma_unmap_area(start, size, dir)
 > 
-> v3: Move LED changes into a seperate patch.
+> Similar patch:
+> http://www.spinics.net/lists/arm-kernel/msg118258.html
 > 
-> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
-> ARM: simpad: Cleanup CS3 accessors and add GPIO API
-> ARM: simpad: add GPIO based device definitions
-> ARM: simpad: replace ARM specific LED code
+> has been sent to Russell quite a while ago,
+> but somehow got lost or something.
 
-It would be useful to provide the overall diffstat for this set of changes,
-so we can see what the effect of all patches together are.
+Hi,
+
+I'm fine with the other one of course :) I didn't notice, thanks.
+
+Eric, can you pick that one ?
+
+Cheers
