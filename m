@@ -1,26 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Apr 2011 18:12:27 +0100
-Subject: [PATCH V3 4/7] dmaengine/dw_dmac: Enable resubmission from
-	callback routine.
-In-Reply-To: <adbd175c9fc15e65b584d342b65cd1c3c0c58322.1303896567.git.viresh.kumar@st.com>
-References: <cover.1303896566.git.viresh.kumar@st.com>
-	<adbd175c9fc15e65b584d342b65cd1c3c0c58322.1303896567.git.viresh.kumar@st.com>
-Message-ID: <20110428171227.GD17290@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 28 Apr 2011 17:19:10 +0000
+Subject: [PATCH] msm: watchdog: support watchdog on 8x60 and 8960
+In-Reply-To: <20110330161419.GB28252@pulham.picochip.com>
+References: <1301105894-22835-1-git-send-email-johlstei@codeaurora.org>
+	<1301426560.4049.0.camel@m0nster> <4D92B43B.5050101@codeaurora.org>
+	<1301501006.5346.2.camel@m0nster>
+	<20110330161419.GB28252@pulham.picochip.com>
+Message-ID: <20110428171909.GC7345@localhost.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2011 at 03:06:46PM +0530, Viresh Kumar wrote:
->  static void
->  dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc,
-> -		bool callback_required)
-> +		bool callback_required, unsigned long flags)
->  {
-...
->  	if (callback_required) {
-> +		spin_unlock_irqrestore(&dwc->lock, flags);
->  		if (callback)
->  			callback(param);
-> +		spin_lock_irqsave(&dwc->lock, flags);
+> > It doesn't sound too different that all the other watchdogs in
+> > drivers/watchdog/ .. Your just detecting lockups right?
+> 
+> There are some watchdogs in there such as 
+> drivers/watchdog/at91sam9_wdt.c that can't be stopped once enabled so 
+> the driver sets up a soft timer in the kernel that kicks the watchdog to 
+> prevent the system rebooting.
+> 
+> With this approach you could have the watchdog always enabled and being 
+> kicked even if the userspace daemon wasn't running, but with the 
+> flexibility of kicking it from userspace if you wanted.
 
-Again, this isn't really on.  It seems to me that this code needs some
-serious reworking.
+sounds like a way to do it.
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
