@@ -1,72 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 28 Apr 2011 12:47:32 +0200
-Subject: [PATCH] PXA: Fix typo in proc-xscale.S
-In-Reply-To: <4DB942F3.1070601@compulab.co.il>
-References: <1303955164-22197-1-git-send-email-marek.vasut@gmail.com>
-	<4DB90DD8.7050406@compulab.co.il>
-	<20110428095548.GY17290@n2100.arm.linux.org.uk>
-	<4DB942F3.1070601@compulab.co.il>
-Message-ID: <20110428104732.GO31131@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Apr 2011 11:51:31 +0100
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <003e01cc058f$94beb490$be3c1db0$%szyprowski@samsung.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110427073514.GH17290@n2100.arm.linux.org.uk>
+	<1303940271.2513.187.camel@pasglop>
+	<20110428093741.GV17290@n2100.arm.linux.org.uk>
+	<003e01cc058f$94beb490$be3c1db0$%szyprowski@samsung.com>
+Message-ID: <20110428105131.GD17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-[adding Ben as the author of the linked patch to Cc:]
-
-On Thu, Apr 28, 2011 at 01:35:31PM +0300, Igor Grinberg wrote:
-> On 04/28/11 12:55, Russell King - ARM Linux wrote:
+On Thu, Apr 28, 2011 at 12:32:32PM +0200, Marek Szyprowski wrote:
+> On Thursday, April 28, 2011 11:38 AM Russell King - ARM Linux wrote:
+> > > > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> > > > >    that this is needed, and it currently is not implemented, with
+> > > > >    an outdated comment explaining why it used to not be possible
+> > > > >    to do it.
+> > > >
+> > > > dma_alloc_noncoherent is an entirely pointless API afaics.
+> > >
+> > > I was about to ask what the point is ... (what is the expected
+> > > semantic ? Memory that is reachable but not necessarily cache
+> > > coherent ?)
+> > 
+> > As far as I can see, dma_alloc_noncoherent() should just be a wrapper
+> > around the normal page allocation function.  I don't see it ever needing
+> > to do anything special - and the advantage of just being the normal
+> > page allocation function is that its properties are well known and
+> > architecture independent.
 > 
-> > On Thu, Apr 28, 2011 at 09:48:56AM +0300, Igor Grinberg wrote:
-> >> Hi Marek,
-> >>
-> >> On 04/28/11 04:46, Marek Vasut wrote:
-> >>
-> >>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> >>> ---
-> >>>  arch/arm/mm/proc-xscale.S |    2 +-
-> >>>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> >>> index ce233bc..42af976 100644
-> >>> --- a/arch/arm/mm/proc-xscale.S
-> >>> +++ b/arch/arm/mm/proc-xscale.S
-> >>> @@ -395,7 +395,7 @@ ENTRY(xscale_dma_a0_map_area)
-> >>>  	teq	r2, #DMA_TO_DEVICE
-> >>>  	beq	xscale_dma_clean_range
-> >>>  	b	xscale_dma_flush_range
-> >>> -ENDPROC(xscsale_dma_a0_map_area)
-> >>> +ENDPROC(xscale_dma_a0_map_area)
-> >>>  
-> >>>  /*
-> >>>   *	dma_unmap_area(start, size, dir)
-> >> Similar patch:
-> >> http://www.spinics.net/lists/arm-kernel/msg118258.html
-> >>
-> >> has been sent to Russell quite a while ago,
-> >> but somehow got lost or something.
-> > As I keep saying, I'm useless dealing with patches sent only by email -
-> > they tend to get quickly buried and forgotten, plus they need saving out,
-> > sometimes editing and transferring between machines to be applied.
-> >
-> > The patch system greatly simplifies that effort, and ensures that patches
-> > don't get forgotten.
-> 
-> Apparently, not many people read Documentation/arm/README :(
-> May be it would be helpful to add a note to the MAINTAINERS file
-> regarding the patch system and tweak scripts/get_maintainer.pl
-> to spit it out in appropriate cases?
-another problem is that the patch system is for reviewed patches only.
-If the patch is forgotten before it gets some reply sending it to the
-patch system is wrong (at least for non-trivial patches).
+> If there is IOMMU chip that supports pages larger than 4KiB then
+> dma_alloc_noncoherent() might try to allocate such larger pages what will
+> result in faster access to the buffer (lower iommu tlb miss ratio).
+> For large buffers even 64KiB 'pages' gives a significant performance
+> improvement.
 
-Patchwork comes to mind. That doesn't forget patches.
-I think for that to be practical for lakml some automatic delegation
-would be needed though.
+The memory allocated by dma_alloc_noncoherent() (and dma_alloc_coherent())
+has to be virtually contiguous, and DMA contiguous.  It is assumed by all
+drivers that:
 
-Best regards
-Uwe
+	virt = dma_alloc_foo(size, &dma);
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	cpuaddr = virt + offset;
+	dmaaddr = dma + offset;
+
+results in the CPU and DMA seeing ultimately the same address for cpuaddr
+and dmaaddr for 0 <= offset < size.
+
+The standard alloc_pages() also ensures that if you ask for an order-N
+page, you'll end up with that allocation being contiguous - so there's
+no difference there.
+
+What I'd suggest is that dma_alloc_noncoherent() should be architecture
+independent, and should call into whatever iommu support the device has
+to setup an approprite iommu mapping.  IOW, I don't see any need for
+every architecture to provide its own dma_alloc_noncoherent() allocation
+function - or indeed every iommu implementation to deal with the
+allocation issues either.
