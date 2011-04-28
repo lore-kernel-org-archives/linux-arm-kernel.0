@@ -1,131 +1,53 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 28 Apr 2011 08:59:00 +0200
-Subject: [PATCH] gpio: rename VIA local config struct
-Message-ID: <1303973940-13296-1-git-send-email-linus.walleij@stericsson.com>
+From: dudl@cypress.com (dudl at cypress.com)
+Date: Thu, 28 Apr 2011 07:00:50 +0000
+Subject: update cyapa_i2c_platfrom_data,
+	remove relative mode supporting. (issue6902105)
+Message-ID: <90e6ba3fd225155e1504a1f51e79@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Reviewers: ccross_android.com, konkers_android.com, olof_lixom.net,  
+linux_arm.linux.org.uk, linux-tegra_vger.kernel.org,  
+linux-arm-kernel_lists.infradead.org, linux-kernel_vger.kernel.org, Micah  
+C, dudl, dso_cypress.com,
 
-The local VIA GPIO config struct "gpio_config" collides with my
-extension to the gpio_chip struct, so rename it to via_gpio_config
-so we don't get this clash.
+Description:
+update cyapa_i2c_platfrom_data, remove relative mode supporting.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/video/via/via-gpio.c |   49 +++++++++++++++++++++--------------------
- 1 files changed, 25 insertions(+), 24 deletions(-)
+Change-Id: Ic9fb8f11c8a4343ff7746f6f885e26d22e773830
+Signed-off-by: Du, Dudley <dudl@cypress.com>
 
-diff --git a/drivers/video/via/via-gpio.c b/drivers/video/via/via-gpio.c
-index c2a0a1c..4b26f3f 100644
---- a/drivers/video/via/via-gpio.c
-+++ b/drivers/video/via/via-gpio.c
-@@ -145,7 +145,7 @@ static int via_gpio_get(struct gpio_chip *chip, unsigned int nr)
- }
- 
- 
--static struct viafb_gpio_cfg gpio_config = {
-+static struct viafb_gpio_cfg via_gpio_config = {
- 	.gpio_chip = {
- 		.label = "VIAFB onboard GPIO",
- 		.owner = THIS_MODULE,
-@@ -183,8 +183,8 @@ static int viafb_gpio_resume(void *private)
- {
- 	int i;
- 
--	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
--		viafb_gpio_enable(gpio_config.active_gpios[i]);
-+	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i += 2)
-+		viafb_gpio_enable(via_gpio_config.active_gpios[i]);
- 	return 0;
- }
- 
-@@ -201,9 +201,9 @@ int viafb_gpio_lookup(const char *name)
- {
- 	int i;
- 
--	for (i = 0; i < gpio_config.gpio_chip.ngpio; i++)
--		if (!strcmp(name, gpio_config.active_gpios[i]->vg_name))
--			return gpio_config.gpio_chip.base + i;
-+	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i++)
-+		if (!strcmp(name, via_gpio_config.active_gpios[i]->vg_name))
-+			return via_gpio_config.gpio_chip.base + i;
- 	return -1;
- }
- EXPORT_SYMBOL_GPL(viafb_gpio_lookup);
-@@ -229,14 +229,15 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
- 		for (gpio = viafb_all_gpios;
- 		     gpio < viafb_all_gpios + VIAFB_NUM_GPIOS; gpio++)
- 			if (gpio->vg_port_index == port_cfg[i].ioport_index) {
--				gpio_config.active_gpios[ngpio] = gpio;
--				gpio_config.gpio_names[ngpio] = gpio->vg_name;
-+				via_gpio_config.active_gpios[ngpio] = gpio;
-+				via_gpio_config.gpio_names[ngpio] =
-+					gpio->vg_name;
- 				ngpio++;
- 			}
- 	}
--	gpio_config.gpio_chip.ngpio = ngpio;
--	gpio_config.gpio_chip.names = gpio_config.gpio_names;
--	gpio_config.vdev = vdev;
-+	via_gpio_config.gpio_chip.ngpio = ngpio;
-+	via_gpio_config.gpio_chip.names = via_gpio_config.gpio_names;
-+	via_gpio_config.vdev = vdev;
- 	if (ngpio == 0) {
- 		printk(KERN_INFO "viafb: no GPIOs configured\n");
- 		return 0;
-@@ -245,18 +246,18 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
- 	 * Enable the ports.  They come in pairs, with a single
- 	 * enable bit for both.
- 	 */
--	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
-+	spin_lock_irqsave(&via_gpio_config.vdev->reg_lock, flags);
- 	for (i = 0; i < ngpio; i += 2)
--		viafb_gpio_enable(gpio_config.active_gpios[i]);
--	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
-+		viafb_gpio_enable(via_gpio_config.active_gpios[i]);
-+	spin_unlock_irqrestore(&via_gpio_config.vdev->reg_lock, flags);
- 	/*
- 	 * Get registered.
- 	 */
--	gpio_config.gpio_chip.base = -1;  /* Dynamic */
--	ret = gpiochip_add(&gpio_config.gpio_chip);
-+	via_gpio_config.gpio_chip.base = -1;  /* Dynamic */
-+	ret = gpiochip_add(&via_gpio_config.gpio_chip);
- 	if (ret) {
- 		printk(KERN_ERR "viafb: failed to add gpios (%d)\n", ret);
--		gpio_config.gpio_chip.ngpio = 0;
-+		via_gpio_config.gpio_chip.ngpio = 0;
- 	}
- #ifdef CONFIG_PM
- 	viafb_pm_register(&viafb_gpio_pm_hooks);
-@@ -277,8 +278,8 @@ static int viafb_gpio_remove(struct platform_device *platdev)
- 	/*
- 	 * Get unregistered.
- 	 */
--	if (gpio_config.gpio_chip.ngpio > 0) {
--		ret = gpiochip_remove(&gpio_config.gpio_chip);
-+	if (via_gpio_config.gpio_chip.ngpio > 0) {
-+		ret = gpiochip_remove(&via_gpio_config.gpio_chip);
- 		if (ret) { /* Somebody still using it? */
- 			printk(KERN_ERR "Viafb: GPIO remove failed\n");
- 			return ret;
-@@ -287,11 +288,11 @@ static int viafb_gpio_remove(struct platform_device *platdev)
- 	/*
- 	 * Disable the ports.
- 	 */
--	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
--	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
--		viafb_gpio_disable(gpio_config.active_gpios[i]);
--	gpio_config.gpio_chip.ngpio = 0;
--	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
-+	spin_lock_irqsave(&via_gpio_config.vdev->reg_lock, flags);
-+	for (i = 0; i < via_gpio_config.gpio_chip.ngpio; i += 2)
-+		viafb_gpio_disable(via_gpio_config.active_gpios[i]);
-+	via_gpio_config.gpio_chip.ngpio = 0;
-+	spin_unlock_irqrestore(&via_gpio_config.vdev->reg_lock, flags);
- 	return ret;
- }
- 
--- 
-1.7.3.2
+R=ccross at android.com,konkers at android.com,olof at lixom.net,linux at arm.linux.org.uk,linux-tegra at vger.kernel.org,linux-arm-kernel at lists.infradead.org,linux-kernel at vger.kernel.org,micahc at google.com,dudl at cypress.com,dso at cypress.com
+BUG=
+TEST=test on kaen board
+
+1. becasuse relative mode is removed from cyapa driver, so setting for using
+relative or absolute mode are also removed in platform data.
+
+
+Please review this at http://codereview.chromium.org/6902105/
+
+SVN Base: http://git.chromium.org/git/kernel-next.git at chromeos-2.6.38
+
+Affected files:
+   M arch/arm/mach-tegra/board-seaboard.c
+
+
+Index: arch/arm/mach-tegra/board-seaboard.c
+diff --git a/arch/arm/mach-tegra/board-seaboard.c  
+b/arch/arm/mach-tegra/board-seaboard.c
+index  
+090ae201153aa6fdb87f7095e9b43ec65aa183d9..b52eec18d314ec75bb4a551baf3b19fce0ad274a  
+100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -206,8 +206,6 @@ static struct cyapa_platform_data  
+cyapa_i2c_platform_data = {
+  	.flag				= 0,
+  	.gen				= CYAPA_GEN2,
+  	.power_state			= CYAPA_PWR_ACTIVE,
+-	.use_absolute_mode		= false,
+-	.use_polling_mode		= false,
+  	.polling_interval_time_active	= CYAPA_ACTIVE_POLLING_INTVAL_TIME,
+  	.polling_interval_time_lowpower	= CYAPA_LOWPOWER_POLLING_INTVAL_TIME,
+  	.active_touch_timeout		= CYAPA_ACTIVE_TOUCH_TIMEOUT,
