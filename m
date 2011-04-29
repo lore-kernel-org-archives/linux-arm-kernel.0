@@ -1,140 +1,143 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Fri, 29 Apr 2011 11:26:25 +0200
-Subject: [PATCH 4/5] OMAP3: cpuidle: code rework for improved readability
-In-Reply-To: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1304069186-3086-5-git-send-email-j-pihet@ti.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 29 Apr 2011 21:38:36 +1200
+Subject: [PATCH v3 02/23] at91: Make Ethernet device common
+In-Reply-To: <20110429090809.GY17290@n2100.arm.linux.org.uk>
+References: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+	<1304045972-19319-3-git-send-email-ryan@bluewatersys.com>
+	<20110429090809.GY17290@n2100.arm.linux.org.uk>
+Message-ID: <4DBA871C.1030007@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On 29/04/11 21:08, Russell King - ARM Linux wrote:
+> On Fri, Apr 29, 2011 at 02:59:11PM +1200, Ryan Mallon wrote:
+>> +#if defined(CONFIG_MACB) || defined(CONFIG_MACB_MODULE)
+>> +static u64 eth_dmamask = DMA_BIT_MASK(32);
+>> +static struct at91_eth_data eth_data;
+>> +
+>> +static struct resource eth_resources[] = {
+>> +	[0] = {
+>> +		.end	= SZ_16K,
+>> +		.flags	= IORESOURCE_MEM,
+>> +	},
+>> +	[1] = {
+>> +		.flags	= IORESOURCE_IRQ,
+>> +	},
+>> +};
+>> +
+>> +static struct platform_device at91_eth_device = {
+>> +	.name		= "macb",
+>> +	.id		= -1,
+>> +	.dev		= {
+>> +				.dma_mask		= &eth_dmamask,
+>> +				.coherent_dma_mask	= DMA_BIT_MASK(32),
+>> +				.platform_data		= &eth_data,
+> 
+> These three lines have twice as many tabs as is needed.
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/cpuidle34xx.c |   52 +++++++++++++-----------------------
- 1 files changed, 19 insertions(+), 33 deletions(-)
+Hartley pointed this out also. The reason it is this way is because I
+cut and pasted the code from one of the existing implementations (to
+make the changeset minimal). I can fix this if preferred.
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index f84315c..4673cc6 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -80,13 +80,6 @@ static struct cpuidle_params cpuidle_params_table[OMAP3_MAX_STATES] = {
- 	{10000 + 30000, 300000, 1},
- };
- 
--static int omap3_idle_bm_check(void)
--{
--	if (!omap3_can_sleep())
--		return 1;
--	return 0;
--}
--
- static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
- 				struct clockdomain *clkdm)
- {
-@@ -166,9 +159,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- 					      struct cpuidle_state *curr)
- {
- 	struct cpuidle_state *next = NULL;
--	struct omap3_idle_statedata *cx;
--
--	cx = cpuidle_get_statedata(curr);
-+	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr);
- 
- 	/* Check if current state is valid */
- 	if (cx->valid) {
-@@ -176,9 +167,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- 	} else {
- 		u8 idx = OMAP3_STATE_MAX;
- 
--		/*
--		 * Reach the current state starting at highest C-state
--		 */
-+		/* Reach the current state starting at highest C-state */
- 		for (; idx >= OMAP3_STATE_C1; idx--) {
- 			if (&dev->states[idx] == curr) {
- 				next = &dev->states[idx];
-@@ -186,9 +175,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- 			}
+> 
+>> +	},
+>> +	.resource	= eth_resources,
+>> +	.num_resources	= ARRAY_SIZE(eth_resources),
+>> +};
+>> +
+>> +void __init at91_add_device_eth(struct at91_eth_data *data)
+>> +{
+>> +	struct at91_dev_table_ethernet *info = devices->ethernet;
+>> +
+>> +	BUG_ON(!info);
+>> +	init_resource_mem(&eth_resources[0], info->mmio_base);
+>> +	init_resource_irq(&eth_resources[1], info->irq);
+> 
+> Hmm.  How about something like this instead:
+> 
+> 	struct resource eth_res[2];
+> 	int err;
+> 
+> 	BUG_ON(!info);
+> 
+> 	init_resource_mem(&eth_res[0], info->mmio_base, SZ_16K);
+> 	init_resource_irq(&eth_res[1], info->irq);
+> 
+> 	...
+> 
+> 	err = platform_device_add_resources(&at91_eth_device, eth_res, 2);
+> 	if (err) {
+> 		pr_err("eth: unable to add resources: %d\n", err);
+> 		return;
+> 	}
+> 
+> 	err = platform_device_add_data(&at91_eth_device, data, sizeof(*data));
+> 	if (err) {
+> 		pr_err("eth: unable to add platform data: %d\n", err);
+> 		/* res leaked */
+> 		return;
+> 	}
+> 
+> 	err = platform_device_register(&at91_eth_device);
+> 	if (err) {
+> 		pr_err("eth: unable to register device: %d\n", err);
+> 		/* res and data leaked */
+> 	}
+> 
+> With Uwe's patches, we can plug those leaks.  Note that we can't use
+> platform_device_register_resndata() because it doesn't set the DMA
+> masks etc (which is one of the problems I've always had with interfaces
+> which try to wrap too much stuff up - they always lack something.)
+> 
+> This would get rid of the need to have the resources and platform
+> data storage declared for each and every device.  I'd suggest wrapping
+> the last bit adding the platform data and resources up in its own
+> function common to each device as its going to be the same for
+> everything.  Remember to pass the size of the platform data though.
+
+That seems sensible. It should be possible to make the whole lot
+generic. i.e.
+
+static void __init add_device(struct device *dev, struct resource *res,
+				int nr_res, void *data,
+				size_t data_size)
+{
+	if (res) {
+ 		err = platform_device_add_resources(dev, res, nr_res);
+ 		if (err) {
+ 			pr_err("eth: unable to add resources: %d\n", err);
+ 			return;
  		}
- 
--		/*
--		 * Should never hit this condition.
--		 */
-+		/* Should never hit this condition */
- 		WARN_ON(next == NULL);
- 
- 		/*
-@@ -223,29 +210,16 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 			       struct cpuidle_state *state)
- {
--	struct cpuidle_state *new_state = next_valid_state(dev, state);
--	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
--	u32 cam_state;
-+	struct cpuidle_state *new_state;
-+	u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
- 	struct omap3_idle_statedata *cx;
- 	int ret;
- 
--	if (omap3_idle_bm_check()) {
--		BUG_ON(!dev->safe_state);
-+	if (!omap3_can_sleep()) {
- 		new_state = dev->safe_state;
- 		goto select_state;
- 	}
- 
--	cx = cpuidle_get_statedata(state);
--	core_next_state = cx->core_state;
--
--	/*
--	 * FIXME: we currently manage device-specific idle states
--	 *        for PER and CORE in combination with CPU-specific
--	 *        idle states.  This is wrong, and device-specific
--	 *        idle management needs to be separated out into 
--	 *        its own code.
--	 */
--
- 	/*
- 	 * Prevent idle completely if CAM is active.
- 	 * CAM does not have wakeup capability in OMAP3.
-@@ -257,9 +231,19 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	}
- 
- 	/*
-+	 * FIXME: we currently manage device-specific idle states
-+	 *        for PER and CORE in combination with CPU-specific
-+	 *        idle states.  This is wrong, and device-specific
-+	 *        idle management needs to be separated out into
-+	 *        its own code.
-+	 */
-+
-+	/*
- 	 * Prevent PER off if CORE is not in retention or off as this
- 	 * would disable PER wakeups completely.
- 	 */
-+	cx = cpuidle_get_statedata(state);
-+	core_next_state = cx->core_state;
- 	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
- 	if ((per_next_state == PWRDM_POWER_OFF) &&
- 	    (core_next_state > PWRDM_POWER_RET))
-@@ -269,6 +253,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	if (per_next_state != per_saved_state)
- 		pwrdm_set_next_pwrst(per_pd, per_next_state);
- 
-+	new_state = next_valid_state(dev, state);
-+
- select_state:
- 	dev->last_state = new_state;
- 	ret = omap3_enter_idle(dev, new_state);
-@@ -329,7 +315,7 @@ struct cpuidle_driver omap3_idle_driver = {
- 	.owner = 	THIS_MODULE,
- };
- 
--/* Fill in the state data from the mach tables and register the driver_data */
-+/* Helper to fill the C-state common data and register the driver_data */
- #define FILL_IN_STATE(idx, descr)					\
- do {									\
- 	state				= &dev->states[count];		\
--- 
-1.7.1
+	}
+
+	if (data) {
+ 		err = platform_device_add_data(dev, data, data_size);
+ 		if (err) {
+ 			pr_err("eth: unable to add platform data: %d\n", err);
+ 			/* res leaked */
+ 			return;
+ 		}
+	}
+
+ 	err = platform_device_register(dev);
+ 	if (err) {
+ 		pr_err("eth: unable to register device: %d\n", err);
+ 		/* res and data leaked */
+ 	}	
+}
+
+void __init at91_add_device_eth(struct at91_eth_data *data)
+{
+	struct at91_dev_table_ethernet *info = devices->ethernet;
+	struct resource res[2];
+
+	BUG_ON(!info);
+	init_resource_mem(&res[0], info->mmio_base, SZ_16K);
+	init_resource_irq(&res[1], info->irq);
+	add_device(&at91_eth_device, res, ARRAY_SIZE(res),
+			 data, sizeof(*data));
+}
+
+Is this what you mean?
+
+~Ryan
