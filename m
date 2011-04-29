@@ -1,57 +1,46 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 29 Apr 2011 16:44:44 +0400
-Subject: [PATCH 2/2] AM35xx-Craneboard:Display: Add DVI and TV Support
-In-Reply-To: <1304077261-17811-2-git-send-email-srinath@mistralsolutions.com>
-References: <[PATCH]>
-	<1304077261-17811-2-git-send-email-srinath@mistralsolutions.com>
-Message-ID: <4DBAB2BC.1090202@ru.mvista.com>
+From: hunold@linuxtv.org (Michael Hunold)
+Date: Fri, 29 Apr 2011 14:50:37 +0200
+Subject: dma_alloc_writecombine() and MAX_ORDER
+Message-ID: <4DBAB41D.7030705@linuxtv.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello,
 
-On 29-04-2011 15:41, srinath at mistralsolutions.com wrote:
+I'm using dma_alloc_writecombine() to allocate memory in my framebuffer
+device driver just like many other drivers do.
 
-> From: Srinath <srinath@mistralsolutions.com>
+Now I have a new panel with a higher resolution and more bits-per-pixel.
+I want to use double-buffering with DirectFB and so my framebuffer size
+exceeds 4Mb.
 
-> Added Display (DVI and TV) support for CraneBoard.
+Even though my embedded system has plenty of memory, now I receive the
+following warning and the allocation fails:
 
-> Signed-off-by: Srinath <srinath@mistralsolutions.com>
-[...]
+WARNING: at /home/teemhu/mcu/has/topas/mm/page_alloc.c:2012
+__alloc_pages_nodemask+0x444/0x650()
 
-> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> index 05867b5..83fe85b 100644
-> --- a/arch/arm/mach-omap2/board-am3517crane.c
-> +++ b/arch/arm/mach-omap2/board-am3517crane.c
-[...]
-> @@ -66,11 +69,83 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
->   	.reset_gpio_port[2]  = -EINVAL
->   };
->
-> +static void __init am3517_crane_display_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = omap_mux_init_gpio(GPIO_DVI_ENABLE, OMAP_PIN_OUTPUT);
-> +	if (ret<  0) {
-> +		pr_err("Can not configure mux for GPIO_DVI_ENABLE %d\n",
-> +			GPIO_DVI_ENABLE);
-> +		return;
-> +	}
-> +
-> +	ret = gpio_request(GPIO_DVI_ENABLE, "dvi_enable");
-> +	if (ret<  0) {
-> +		pr_err("Can not request GPIO %d\n", GPIO_DVI_ENABLE);
-> +		return;
-> +	}
-> +
-> +	ret = gpio_direction_output(GPIO_DVI_ENABLE, 1);
-> +	if (ret<  0) {
-> +		gpio_free(GPIO_DVI_ENABLE);
-> +		pr_err("Unable to enable DVI\n");
-> +		return;
-> +	}
+This is due to the following check in __alloc_pages_slowpath():
+	if (order >= MAX_ORDER) {
+		WARN_ON_ONCE(!(gfp_mask & __GFP_NOWARN));
+		return NULL;
+	}
 
-    You can use gpio_request_one() ISO gpio_request()/gpio_direction_output().
+Because MAX_ORDER is 11, only memory chunks of size (PAGE_SIZE <<
+MAX_ORDER_NR_PAGES) = 4Mb can be allocated.
 
-WBR, Sergei
+Apparently this topic has come up when using the OMAP DSS already:
+http://www.spinics.net/lists/linux-omap/msg08124.html
+
+Another user has asked this question on the linuxfb-dev mailing list in
+October 2010, but did not receive an answer:
+http://www.spinics.net/lists/linux-fbdev/msg01745.html
+
+So, would increasing MAX_ORDER in order to allow bigger memory chunks to
+be allocated via dma_alloc_writecombine() be acceptable?
+
+If not, can anybody give me some advice how to do the memory allocation
+for the framebuffer memory instead in order to circumvent the problem?
+
+CU
+Michael.
