@@ -1,77 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Apr 2011 03:16:47 -0700
-Subject: [GIT PULL] omap fixes for v2.6.39-rc5
-Message-ID: <20110429101647.GW3755@atomide.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 29 Apr 2011 15:47:19 +0530
+Subject: [PATCH V3 2/7] dmaengine/dw_dmac: Replace spin_lock* with	irqsave
+	variants
+In-Reply-To: <20110429091557.GZ17290@n2100.arm.linux.org.uk>
+References: <cover.1303896566.git.viresh.kumar@st.com>
+	<50dc2f47f2c9f94fce78583568830a66af49307d.1303896567.git.viresh.kumar@st.com>
+	<20110428171020.GB17290@n2100.arm.linux.org.uk>
+	<20110429091557.GZ17290@n2100.arm.linux.org.uk>
+Message-ID: <4DBA902F.2080009@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 04/29/2011 02:45 PM, Russell King - ARM Linux wrote:
+> BTW, how this gets handled in other drivers is basically as follows in
+> the tasklet:
+> 
+> tasklet()
+> {
+> 	LIST_HEAD(completed);
+> 
+> 	spin_lock_irqsave(lock, flags);
+> 	for each txd(txd) {
+> 		if (completed(txd))
+> 			list_move_tail(&txd->node, &completed);
+> 	}
+> 	try to start new txd();
+> 	spin_unlock_irqrestore(lock, flags);
+> 
+> 	for each list entry safe(txd, &completed) {
+> 		void (*callback)(void *) = txd->callback;
+> 		void *param = txd->callback_param;
+> 
+> 		free_txd(txd);
+> 
+> 		if (callback)
+> 			callback(param);
+> 	}
+> }
+> 
+> I'm not sure how easy it is to move dw_dmac to that kind of structure,
 
-Please pull omap fixes from:
+I will check that.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Most of the diffstat is fixing clock related flags, the kind
-of stuff that will be eventually coming from device tree as
-discussed earlier. Anyways necessariy fixes for correct clocking
-for the -rc cycle.  
-
-The other patches are quite trivial one liner fixes.
-
-Regards,
-
-Tony
-
-
-The following changes since commit 8e10cd74342c7f5ce259cceca36f6eba084f5d58:
-  Linus Torvalds (1):
-        Linux 2.6.39-rc5
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Avinash.H.M (1):
-      OMAP2/3: hwmod: fix gpio-reset timeouts seen during bootup.
-
-Benoit Cousson (1):
-      OMAP2+: hwmod data: Fix wrong dma_system end address
-
-Eduardo Valentin (2):
-      OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad area
-      OMAP3: PM: Do not rely on ROM code to restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-
-Felipe Contreras (1):
-      omap: rx51: mark reserved memory earlier
-
-Nishanth Menon (1):
-      OMAP3+: voltage: remove initial voltage
-
-Oskar Andero (1):
-      arm: omap2: enable smc instruction for sleep34xx
-
-Shweta Gulati (1):
-      OMAP4: Intialize IVA Device in addition to DSP device.
-
-Tomi Valkeinen (1):
-      OMAP4: clock data: Change DSS clock aliases
-
-Tony Lindgren (1):
-      Merge branch 'for_tony_a_2.6.39rc' of git://git.pwsan.com/linux-2.6 into devel-fixes
-
-omar ramirez (1):
-      OMAP3: l3: fix for "irq 10: nobody cared" message
-
- arch/arm/mach-omap2/Makefile               |    2 +-
- arch/arm/mach-omap2/board-rx51.c           |    9 +++++++--
- arch/arm/mach-omap2/clock44xx_data.c       |    9 ++-------
- arch/arm/mach-omap2/cm2xxx_3xxx.c          |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c              |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    6 +++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- arch/arm/mach-omap2/omap_l3_smx.c          |    4 ++--
- arch/arm/mach-omap2/pm.c                   |    1 +
- arch/arm/mach-omap2/voltage.c              |    1 -
- 12 files changed, 56 insertions(+), 18 deletions(-)
+-- 
+viresh
