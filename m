@@ -1,7 +1,7 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Apr 2011 13:01:58 +0200 (CEST)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2011 12:06:10 +0100
 Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110429103723.GF5126@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.LFD.2.02.1104291252080.3005@ionos>
 References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
 	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<alpine.LFD.2.02.1104201704350.3323@ionos>
@@ -10,62 +10,43 @@ References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
 	<20110421072259.GG31131@pengutronix.de>
 	<alpine.LFD.2.02.1104211045220.3323@ionos>
 	<20110429103723.GF5126@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1104291252080.3005@ionos>
+	<alpine.LFD.2.02.1104291252080.3005@ionos>
+Message-ID: <20110429110610.GJ5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
-> > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
-> > > > Which is a complete failure to begin with. Why the heck do you need a
-> > > > callback to figure that out?
-> > > > 
-> > > > Because someone claimed, that you need a callback to make it safe from
-> > > > changing? Or what's the reason for this?
-> > > If there were a pointer tracking the parent you still needed to program
-> > > out the get_parent function anyhow to set the pointer initially. But I
-> > > agree that in other situations having a pointer is more comfortable and
-> > > saves ugly error handling e.g. in set_parent.
-> > 
-> > That's nonsense. Why do you want a get_parent() function at all?
-> > parent is set up when the clock is established in the clock tree. And
-> > that's not done by some random driver. That's a property of the clock.
+On Fri, Apr 29, 2011 at 01:01:58PM +0200, Thomas Gleixner wrote:
+> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 > 
-> It's *not* a fixed property of the clock.  It's a runtime property.
+> > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
+> > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > > > Which is a complete failure to begin with. Why the heck do you need a
+> > > > > callback to figure that out?
+> > > > > 
+> > > > > Because someone claimed, that you need a callback to make it safe from
+> > > > > changing? Or what's the reason for this?
+> > > > If there were a pointer tracking the parent you still needed to program
+> > > > out the get_parent function anyhow to set the pointer initially. But I
+> > > > agree that in other situations having a pointer is more comfortable and
+> > > > saves ugly error handling e.g. in set_parent.
+> > > 
+> > > That's nonsense. Why do you want a get_parent() function at all?
+> > > parent is set up when the clock is established in the clock tree. And
+> > > that's not done by some random driver. That's a property of the clock.
+> > 
+> > It's *not* a fixed property of the clock.  It's a runtime property.
+> 
+> I know that stuff can change and needs to be changed runtime. But this
+> has to be done at the framework level and not at some random place in
+> some random clk->ops->fn() implementation.
 
-I know that stuff can change and needs to be changed runtime. But this
-has to be done at the framework level and not at some random place in
-some random clk->ops->fn() implementation.
- 
-> If you change the rate of a clock, you may need to change its parent.
+Look, how do you _not_ do it at the clk->ops->fn() level when you have
+clocks which are pure muxes, and so are selected by a bitfield in a
+register vs other clocks which are muxes _and_ dividers combined which
+can't be separated.  Do you _really_ want to teach the core clock
+framework about every type of platform quirk like that?
 
-If you have a proper description of properties like possible parents,
-then you can figure out at the framework level that you need to change
-the parent in order to get the requested rate. It's not a SoC specific
-problem, it's a problem which can be described pretty well for the
-most common cases.
-
-> If you change the operating point of the device, (eg, sleep mode where
-> the main system PLL gets turned off) you may need to change its parent
-> to a slower clock to ensure wakeup timers continue to run but at a lower
-> resolution.
-
-Again. That's a problem to be solved at the framework level. If the
-sleep code decides to shut down the main pll then the framework can
-walk the tree and figure out which clocks need to be moved to a
-different parent, as long as the affected clocks are marked "keep me
-always alive" or whatever property is chosen to make such decisions.
- 
-> Sure the API doesn't handle the runtime cases at all well, but that's
-> not a reason to enforce a fixed tree structure on something which isn't
-> a fixed tree structure.
-
-I don't want to enforce a fixed tree structure. I want proper tree
-handling - which includes runtime changes to the tree - at the
-framework level and not encoded in 10 different bogus ways in every
-other SoC implementation.
-
-Thanks,
-
-	tglx
+That's the direction you're heading for by demanding that the core clk
+code does all this kind of crap.  Crap in the core clock code, rather
+than a set of compartmentalized clock implementations for fixed rate
+clocks, muxes, dividers, dividers with muxes, plls, etc.
