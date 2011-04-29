@@ -1,65 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Apr 2011 14:19:25 +0200 (CEST)
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110429113823.GK5126@n2100.arm.linux.org.uk>
-References: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-	<20110429104951.GG5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291302420.3005@ionos>
-	<20110429113823.GK5126@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1104291413550.3005@ionos>
+From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
+Date: Fri, 29 Apr 2011 17:11:00 +0530
+Subject: [PATCH 1/2] AM35xx-Craneboard: USB EHCI: Fix USB ECHI PHY reset
+In-Reply-To: <[PATCH]>
+References: <[PATCH]>
+Message-ID: <1304077261-17811-1-git-send-email-srinath@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> On Fri, Apr 29, 2011 at 01:11:25PM +0200, Thomas Gleixner wrote:
-> > I tend to disagree. Yes, he created the minimal common level for a
-> > struct clk and the ops around it. But does that change anything about
-> > the status quo of duplicated functions walking the tree, duplicated
-> > functions to validate and round clock rates? The whole approach will
-> > keep the whole code mess in the SoCs the same as it is now and just
-> > enforce a common data structure and a dozen wrapper "API" functions
-> > around it.
-> > 
-> > So omap will simply have their bloat in a struct omap_clk() and every
-> > other SoC will do the same. The duplicated code, the locking mess
-> > etc. will all remain in totally incompatible ways. So what's the win?
-> 
-> I disagree.  With a 'divider+mux' clk, OMAP can move those clocks
-> over.  With a 'pll' clk, OMAP can move the PLL stuff over.  With a
-> simple enable/disable clk, OMAP can move those over.  That's a
-> significant portion of the OMAP clk mess converted over to smaller,
-> much more well defined, self contained clk structures.
-> 
-> I don't see any reason with this why OMAP - or anyone else - should
-> have their own platform_clk structure if we have the necessary building
-> blocks, and provided there is sufficient review to ensure that those
-> building blocks which are found to be lacking get fixed along the way.
+From: Srinath <srinath@mistralsolutions.com>
 
-Agreed. But that's an orthogonal problem to the proper handling of the
-tree walks, propagation of rates, enable, prepare etc. and common
-validation functions.
+This patch fixes the EHCI PHY reset issue found on CraneBoard.
+
+Signed-off-by: Srinath <srinath@mistralsolutions.com>
+---
+ arch/arm/mach-omap2/board-am3517crane.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+index a890d24..05867b5 100644
+--- a/arch/arm/mach-omap2/board-am3517crane.c
++++ b/arch/arm/mach-omap2/board-am3517crane.c
+@@ -60,7 +60,7 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+ 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+ 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
  
-> As for the locking mess, that's what happens when you try to generalize
-> stuff and end up with a finer locking scheme.  The more locks you have,
-> the more complex the locking rules become, and the more problems you
-> encounter with potential deadlocks.  And it seems that lockdep also
-> starts to struggle too (as it operates on classes of locks not actual
-> locks.)
-
-The per clk locking is not going to work ever except you want to have
-the trylock dance if you need to propagate changes up the tree and
-down the tree. So yes, we need per tree locking and I can see the need
-for the mutex and the spinlock to protect the tree, but you really
-want to have the logic dealing with those locks and how they both
-protect the tree in common code and not in some random place.
-
-Thanks,
-
-	tglx
+-	.phy_reset  = true,
++	.phy_reset  = false,
+ 	.reset_gpio_port[0]  = GPIO_USB_NRESET,
+ 	.reset_gpio_port[1]  = -EINVAL,
+ 	.reset_gpio_port[2]  = -EINVAL
+-- 
+1.7.1.226.g770c5
