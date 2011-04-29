@@ -1,60 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 14:47:46 +0100
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <20110429133223.GB11885@S2100-06.ap.freescale.net>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-	<20110420083258.GB1517@S2100-06.ap.freescale.net>
-	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-	<20110428152735.GU17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
-	<20110429075346.GU17290@n2100.arm.linux.org.uk>
-	<20110429133223.GB11885@S2100-06.ap.freescale.net>
-Message-ID: <20110429134746.GP5126@n2100.arm.linux.org.uk>
+Date: Fri, 29 Apr 2011 14:49:36 +0100
+Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
+In-Reply-To: <4DBAB2CB.2030700@stericsson.com>
+References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
+	<20110419092049.GC22799@n2100.arm.linux.org.uk>
+	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
+	<20110419120344.GG22799@n2100.arm.linux.org.uk>
+	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
+	<20110428170342.GA17290@n2100.arm.linux.org.uk>
+	<4DBAB2CB.2030700@stericsson.com>
+Message-ID: <20110429134936.GQ5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 09:32:24PM +0800, Shawn Guo wrote:
-> Hi Russell,
-> 
-> On Fri, Apr 29, 2011 at 08:53:46AM +0100, Russell King - ARM Linux wrote:
-> [...]
-> > Linus wants this information _out_ of the kernel tree (remember he
-> > referred to the "crazy clock files") which in his opinion should be in
-> > some kind of pre-loader to the kernel and not the kernel itself.
-> > Remember that this is what sparked this whole shebang in the first
-> > place.
-> > 
-> If I understand correctly, you are suggesting put dts into bootloader
-> tree.  Here are the possible problems I can see.
+On Fri, Apr 29, 2011 at 02:44:59PM +0200, Ulf Hansson wrote:
+>>
+>> That's rather unfortunate, because it means that trying it on ARM
+>> hardware is going to hang indefinitely waiting for the nonexistent
+>> DMA stuff to finish.
+>
+> I see the problem, we need a way of being able to switch between using  
+> the dma callback and not using it. I think the variant data should be  
+> used for this, what do you think?
 
-No, I'm talking about putting it into an entirely separate "ARM
-device tree description" project.
+How can we do that when it actually depends on how the primecell is wired
+and the characteristics of the DMA controller to which it is connected?
 
-> Also, I failed to understand how Linus could complain about getting
-> dts files maintained in kernel tree, which is the thing that powerpc
-> have been doing for quite some time.  As dtc is sitting in the
-> kernel tree (scripts/dtc/), it's hard for me to understand why dts
-> can not be put in the tree.
+> host->dataend and host->size==0 controls whether the data transfer has  
+> finished successfully. I believe this should be handled correctly in my  
+> patch. Maybe it is possible to make some minor restructuring to make it  
+> more clear what the end condition really is, I can see if I can figure  
+> something out.
 
-You need to read:
-
-http://lists.arm.linux.org.uk/lurker/message/20110330.192132.f01e0669.en.html
-
-and understand Linus' position on this:
-
-   Something needs to be done. A small part is to make sure the source
-   code is more hierarchical, so that we don't have those crazy shared
-   data-files that are ugly as hell and get conflicts because different
-   boards all think they need to care.
-
-|| But the larger problem is that somebody really REALLY needs to think   ||
-|| about how to get those crazy board details out of the kernel entirely. ||
-|| Having per-board drivers for real hardware is sane - having to have    ||
-|| per-board detail files for clock chips is just crazy. Split off that   ||
-|| thing a "Linux ARM second-stage bootloader" project that has the       ||
-|| per-board tables or something. Don't pollute the main kernel with      ||
-|| crazy details like this.                                               ||
-
-That is pretty clear to me that Linus does _not_ want these kinds of
-details in the main kernel source _at_ _all_.  No matter how they're
-represented, be it .c file or .dts file.
+host->size never goes to zero when DMA is in progress, as it doesn't
+track the progress of the transfer.  That's only tracked with PIO,
+and the remainder is calculated on error from the primecells counters.
