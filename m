@@ -1,52 +1,68 @@
-From: thellstrom@vmware.com (Thomas Hellstrom)
-Date: Fri, 29 Apr 2011 14:06:12 +0200
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104291326.25634.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>	<20110428093039.GU17290@n2100.arm.linux.org.uk>	<1304024836.2513.198.camel@pasglop>
-	<201104291326.25634.arnd@arndb.de>
-Message-ID: <4DBAA9B4.3070306@vmware.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 29 Apr 2011 14:13:06 +0200 (CEST)
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110429110610.GJ5126@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110429103723.GF5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291252080.3005@ionos>
+	<20110429110610.GJ5126@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1104291344020.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2011 01:26 PM, Arnd Bergmann wrote:
-> On Thursday 28 April 2011, Benjamin Herrenschmidt wrote:
->    
->>>> For PCI you can have the flag propagate from the PHB down, for busses
->>>> without a bus type (platform) then whoever instanciate them (the
->>>> platform code) can set that appropriately.
->>>>          
->>> How can you do that when it changes mid-bus heirarchy?  I'm thinking
->>> of the situation where the DRM stuff is on a child bus below the
->>> root bus, and the root bus has DMA coherent devices on it but the DRM
->>> stuff doesn't.
->>>        
->> But that's not PCI right ? IE. with PCI, coherency is a property of the
->> PHB...
->>      
-> That is my understanding at least, but I'd like to have a confirmation
-> from the DRM folks.
->
-> I believe that the PC graphics cards that have noncoherent DMA mappings
-> are all of the unified memory (integrated into the northbridge) kind,
-> so they are not on the same host bridge as all regular PCI devices,
-> even if they appear as a PCI device.
->    
+On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+> On Fri, Apr 29, 2011 at 01:01:58PM +0200, Thomas Gleixner wrote:
+> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+> > 
+> > > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
+> > > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > > > > Which is a complete failure to begin with. Why the heck do you need a
+> > > > > > callback to figure that out?
+> > > > > > 
+> > > > > > Because someone claimed, that you need a callback to make it safe from
+> > > > > > changing? Or what's the reason for this?
+> > > > > If there were a pointer tracking the parent you still needed to program
+> > > > > out the get_parent function anyhow to set the pointer initially. But I
+> > > > > agree that in other situations having a pointer is more comfortable and
+> > > > > saves ugly error handling e.g. in set_parent.
+> > > > 
+> > > > That's nonsense. Why do you want a get_parent() function at all?
+> > > > parent is set up when the clock is established in the clock tree. And
+> > > > that's not done by some random driver. That's a property of the clock.
+> > > 
+> > > It's *not* a fixed property of the clock.  It's a runtime property.
+> > 
+> > I know that stuff can change and needs to be changed runtime. But this
+> > has to be done at the framework level and not at some random place in
+> > some random clk->ops->fn() implementation.
+> 
+> Look, how do you _not_ do it at the clk->ops->fn() level when you have
+> clocks which are pure muxes, and so are selected by a bitfield in a
+> register vs other clocks which are muxes _and_ dividers combined which
+> can't be separated.  Do you _really_ want to teach the core clock
+> framework about every type of platform quirk like that?
 
-I think Jerome has mentioned at one point that the Radeon graphics cards 
-support
-non-coherent mappings.
+Not at all. The core code should merily handle the tree structure
+correctly and some common other functions, nothing else. 
+ 
+> That's the direction you're heading for by demanding that the core clk
+> code does all this kind of crap.  Crap in the core clock code, rather
+> than a set of compartmentalized clock implementations for fixed rate
+> clocks, muxes, dividers, dividers with muxes, plls, etc.
 
-Fwiw, the PowerVR SGX MMU also supports this mode of operation, although 
-it being functional I guess depends on the system implementation.
+You need that anyway. The core code does not want to know about those
+ugly details and there is no need to know it.
 
-/Thomas
+So lets look at an example:
 
-
-
-> 	Arnd
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
->    
+[Root clock A]-
+      	      |
+      	      - [Selector] -- [Divisor] -- [ Gate ]
+              |
+[Root clock B]-
