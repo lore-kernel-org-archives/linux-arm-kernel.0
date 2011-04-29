@@ -1,52 +1,48 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Apr 2011 19:01:18 +0200 (CEST)
-Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
-	sched_clock
-In-Reply-To: <20110429103208.GA2849@atomide.com>
-References: <20110423205036.795894921@linutronix.de>
-	<20110429094606.GA5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291217120.3005@ionos>
-	<20110429103208.GA2849@atomide.com>
-Message-ID: <alpine.LFD.2.02.1104291900290.3005@ionos>
+Date: Fri, 29 Apr 2011 19:05:03 +0200 (CEST)
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <20110429143435.GU5126@n2100.arm.linux.org.uk>
+References: <20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+	<20110428142822.GN17290@n2100.arm.linux.org.uk>
+	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+	<20110428182420.GF17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
+	<20110429143435.GU5126@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1104291902370.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011, Tony Lindgren wrote:
-> * Thomas Gleixner <tglx@linutronix.de> [110429 13:19]:
-> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Sat, Apr 23, 2011 at 08:54:39PM -0000, Thomas Gleixner wrote:
-> > > > Most of ARM sched_clocks is using the timekeeping clocksource as the
-> > > > sched_clock. Only versatile uses a different clock for it, but there
-> > > > is no real reason why it can't use the clocksource as well.
-> > > 
-> > > sched_clock really needs to be setup earlier than clocksources are setup,
-> > > before sched_init() is called in init/main.c.  This is where the scheduler
-> > > reads the initial value of sched_clock() to start its time measurements.
-> > > This is well before clocksources are initialized, or even the irq subsystem.
-> > > 
-> > > So I don't believe bolting it directly into the clocksource code in this
-> > > way is correct.  As things are currently setup with my sched_clock()
-> > > implementation, we can (and in any cases do) get the sched_clock() up
-> > > and running really early which is what's required.
-> > 
-> > Not really. There is no requirement to have a high resolution sched
-> > clock in the early boot process. The only requirement is that
-> > sched_clock is monotonic increasing nsecs. So the code utilizes
-> > jiffies up to the point where the clocksource is installed and then
-> > switches over keeping the clock monotonic. The scheduler does not care
-> > whether it gets coarse grained time information in the early boot
-> > stage and then fine grained information at some point later.
-> > 
-> > The only drawback is that you don't get precise timestamps for tracing
-> > up to the point where the clock source is installed. But that's really
-> > not a big deal to worry about.
-> 
-> What about PRINTK_TIME? I think that uses sched_clock right from the
-> start.
+On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 
-Right, but where is the problem ? A few time stamps with jiffies
-resolution and then the finegrained ones.
+> On Fri, Apr 29, 2011 at 07:56:56PM +0530, Vikram Narayanan wrote:
+> > Can you also give some idea on how the system's RTC is hooked up with
+> > the generic timekeeping code.
+> > Is it hooked up in someway so that the walltime is calculated wrt the
+> > initial value of the RTC?
+> 
+> I'd like to pass you over to the RTC folk, but I don't think they're
+> very active anymore.
+> 
+> Suffice it to say that the RTC subsystem will set the system date/time
+> on initialization from the RTC device if one is provided.  All I can
+> suggest is to look at drivers/rtc and include/linux/rtc.h for the
+> details.  The MAINTAINERS file should list who is responsible for RTC
+> stuff as well as a mailing list for it.
+
+read_persistant_clock() is used for boottime / resume time readouts of
+a direct accessible RTC.
+
+If the RTC sits behind a slow bus which is not accessible in early
+boot, then the RTC framework will take care of updating the time once
+the RTC becomes available.
+
+John Stultz is the guy who knows all the details.
 
 Thanks,
 
