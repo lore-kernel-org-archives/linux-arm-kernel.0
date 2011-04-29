@@ -1,89 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 14:33:40 +0100
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <alpine.LFD.2.00.1104290814380.24613@xanadu.home>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-	<20110420083258.GB1517@S2100-06.ap.freescale.net>
-	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-	<20110428152735.GU17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
-	<20110429075346.GU17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104290814380.24613@xanadu.home>
-Message-ID: <20110429133340.GN5126@n2100.arm.linux.org.uk>
+From: j.glisse@gmail.com (Jerome Glisse)
+Date: Fri, 29 Apr 2011 09:34:05 -0400
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <4DBAA9B4.3070306@vmware.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110428093039.GU17290@n2100.arm.linux.org.uk>
+	<1304024836.2513.198.camel@pasglop>
+	<201104291326.25634.arnd@arndb.de> <4DBAA9B4.3070306@vmware.com>
+Message-ID: <BANLkTinNMxpAcjpBR7r1f1RA31kww=v6Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 08:32:59AM -0400, Nicolas Pitre wrote:
-> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> 
-> > On Thu, Apr 28, 2011 at 09:00:08PM -0400, Nicolas Pitre wrote:
-> > > On Thu, 28 Apr 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > > If/when we move to DT, do people think that Linus is going to accept
-> > > > having the DT files in the kernel for all these platforms, and will he
-> > > > be happy to see stuff like the files containing the OMAP clock definitions
-> > > > being constantly patched?  Remember, it's *exactly* this data which Linus
-> > > > wants out of the kernel source.
-> > > 
-> > > Well, here's what he said:
-> > > 
-> > > |But trust me, if you start doing a better job at platform code, I
-> > > |won't be complaining when I get lots of deleted code, or when I start
-> > > |getting devicetree descriptions instead of new drivers.
-> > > (http://article.gmane.org/gmane.linux.kernel/1121387)
-> > > 
-> > > So of course this "getting devicetree descriptions" might be interpreted 
-> > > to mean different things.
-> > > 
-> > > OTOH, the device tree source files can be arranged with common 
-> > > definitions in something like a header file that is included by board 
-> > > specific files.  So, at least in theory, differences between similar 
-> > > boards should be small, hopefully smaller than the equivalent in C.
-> > > 
-> > > Also, DT files should be a representation of the hardware which is meant 
-> > > to be stable.  If it wasn't stable, there would be no point using a data 
-> > > structure that can also be used outside of the kernel.  Remember that 
-> > > one of the selling point for DT is to be able to boot an existing kernel 
-> > > binary on yet-to-be-created hardware simply by creating the appropriate 
-> > > DT description for it.  Hence the DT files for existing hardware 
-> > > shouldn't have to change even if the kernel side implementation does.
-> > >
-> > > > I suspect the answer to that is no.  So I think we should start right now
-> > > > with the idea that putting DT files - even the core SoC ones - into the
-> > > > kernel isn't going to be acceptable.
-> > > 
-> > > Well, if you look at arch/powerpc/boot/dts/* you'll find a bunch of 
-> > > board specific DT files in there already, and Linus has identified PPC 
-> > > as one architecture that did it right in his mind.
-> > 
-> > Sigh, you really don't understand.
-> > 
-> > For OMAP we're likely to see several dts files around 200K in size
-> > describing _just_ the clock trees.  As we've seen, the OMAP clock tree
-> > information is modified fairly regularly, adding new clocks, changing
-> > flags, and so forth.
-> 
-> What do I not understand?  Let me repeat myself again:
-> 
-> | DT files should be a representation of the hardware which is meant to 
-> | be stable. [...] Hence the DT files for existing hardware shouldn't 
-> | have to change even if the kernel side implementation does.
-> 
-> So there shouldn't be constant changes to those files as they are 
-> supposed to be hardware description only.
+On Fri, Apr 29, 2011 at 8:06 AM, Thomas Hellstrom <thellstrom@vmware.com> wrote:
+> On 04/29/2011 01:26 PM, Arnd Bergmann wrote:
+>>
+>> On Thursday 28 April 2011, Benjamin Herrenschmidt wrote:
+>>
+>>>>>
+>>>>> For PCI you can have the flag propagate from the PHB down, for busses
+>>>>> without a bus type (platform) then whoever instanciate them (the
+>>>>> platform code) can set that appropriately.
+>>>>>
+>>>>
+>>>> How can you do that when it changes mid-bus heirarchy? ?I'm thinking
+>>>> of the situation where the DRM stuff is on a child bus below the
+>>>> root bus, and the root bus has DMA coherent devices on it but the DRM
+>>>> stuff doesn't.
+>>>>
+>>>
+>>> But that's not PCI right ? IE. with PCI, coherency is a property of the
+>>> PHB...
+>>>
+>>
+>> That is my understanding at least, but I'd like to have a confirmation
+>> from the DRM folks.
+>>
+>> I believe that the PC graphics cards that have noncoherent DMA mappings
+>> are all of the unified memory (integrated into the northbridge) kind,
+>> so they are not on the same host bridge as all regular PCI devices,
+>> even if they appear as a PCI device.
+>>
+>
+> I think Jerome has mentioned at one point that the Radeon graphics cards
+> support
+> non-coherent mappings.
+>
+> Fwiw, the PowerVR SGX MMU also supports this mode of operation, although it
+> being functional I guess depends on the system implementation.
+>
+> /Thomas
+>
 
-You really haven't seen what goes on in the OMAP community then.  If
-you think its possible to come up with a hardware description of the
-OMAP clock tree which is right first time, you're in cloud cuckoo land.
+Radeon memory controller can do non snooped pci transaction, as far as
+i have tested most of the x86 pci bridge don't try to be coherent then
+ie they don't analyze pci dma and ask for cpu flush they just perform
+the request (and i guess it's what all bridge will do), so it endup
+being noncoherent. I haven't done any benchmark of how faster it's for
+the GPU when it's not snooping but i guess it can give 50% boost as it
+likely drastictly reduce pci transaction overhead.
 
-Even the OMAP4 clock data which is supposedly generated from TIs
-internal hardware database changes on a fairly regular basis.  You'll
-find that the per-clk flags get changed, the operations get changed,
-etc.
+I am talking here about device that you plug into any pci or pcie
+slot, so it's not igp integrated into northbridge or into the cpu.
 
-It doesn't _matter_ how it is represented, it will continue to be patched
-whether it's structures in a .c file (as it currently is) or whether it's
-a device tree description for each clock.
-
-So please, get rid of this stupid idea that its possible to come up with
-a One True Hardware Description which is fixed for all time.
+Cheers,
+Jerome
