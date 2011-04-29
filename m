@@ -1,1359 +1,294 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 29 Apr 2011 15:06:43 +0200
-Subject: [PATCH 5/5] arm: plat-stmp: remove plat
+Date: Fri, 29 Apr 2011 15:06:42 +0200
+Subject: [PATCH 4/5] arm: mach-stmp378x: remove mach
 In-Reply-To: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
 References: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1304082403-8897-6-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1304082403-8897-5-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that both users of plat-stmp have been deleted in previous patches,
-delete the platform, too.
+This mach has not seen any updates since the initial inclusion besides
+generic cleanup. Furthermore:
+
+- The i.MX23 covered in mach-mxs is just a renamed version of the
+  STMP378x.
+
+- mach-stmp378x has a lot of reinvented interfaces, leaking all sorts of
+  mach-related includes into the drivers. One example is the dmaengine
+  which does not use the linux dmaengine-API but some privately exported
+  symbols. So drivers cannot be reused. mach-mxs does it better.
+
+- There is only one board defined (which I couldn't find any trace of
+  despite being a development board). It has been converted to
+  mach-mxs in a previous patch.
+
+Since the only user of this mach was converted, it means that
+mach-stmp378x can go.
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/Kconfig                                  |   12 -
- arch/arm/Makefile                                 |    1 -
- arch/arm/plat-stmp3xxx/Kconfig                    |    7 -
- arch/arm/plat-stmp3xxx/Makefile                   |    5 -
- arch/arm/plat-stmp3xxx/clock.c                    | 1134 ---------------------
- arch/arm/plat-stmp3xxx/clock.h                    |   61 --
- arch/arm/plat-stmp3xxx/core.c                     |  128 ---
- arch/arm/plat-stmp3xxx/devices.c                  |  389 -------
- arch/arm/plat-stmp3xxx/dma.c                      |  464 ---------
- arch/arm/plat-stmp3xxx/include/mach/clkdev.h      |   18 -
- arch/arm/plat-stmp3xxx/include/mach/cputype.h     |   33 -
- arch/arm/plat-stmp3xxx/include/mach/debug-macro.S |   39 -
- arch/arm/plat-stmp3xxx/include/mach/dma.h         |  153 ---
- arch/arm/plat-stmp3xxx/include/mach/gpio.h        |   28 -
- arch/arm/plat-stmp3xxx/include/mach/gpmi.h        |   12 -
- arch/arm/plat-stmp3xxx/include/mach/hardware.h    |   32 -
- arch/arm/plat-stmp3xxx/include/mach/io.h          |   25 -
- arch/arm/plat-stmp3xxx/include/mach/memory.h      |   22 -
- arch/arm/plat-stmp3xxx/include/mach/mmc.h         |   14 -
- arch/arm/plat-stmp3xxx/include/mach/pinmux.h      |  157 ---
- arch/arm/plat-stmp3xxx/include/mach/pins.h        |   30 -
- arch/arm/plat-stmp3xxx/include/mach/platform.h    |   68 --
- arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h    |   54 -
- arch/arm/plat-stmp3xxx/include/mach/system.h      |   49 -
- arch/arm/plat-stmp3xxx/include/mach/timex.h       |   20 -
- arch/arm/plat-stmp3xxx/include/mach/uncompress.h  |   53 -
- arch/arm/plat-stmp3xxx/include/mach/vmalloc.h     |   12 -
- arch/arm/plat-stmp3xxx/irq.c                      |   50 -
- arch/arm/plat-stmp3xxx/pinmux.c                   |  550 ----------
- arch/arm/plat-stmp3xxx/timer.c                    |  186 ----
- 30 files changed, 0 insertions(+), 3806 deletions(-)
- delete mode 100644 arch/arm/plat-stmp3xxx/Kconfig
- delete mode 100644 arch/arm/plat-stmp3xxx/Makefile
- delete mode 100644 arch/arm/plat-stmp3xxx/clock.c
- delete mode 100644 arch/arm/plat-stmp3xxx/clock.h
- delete mode 100644 arch/arm/plat-stmp3xxx/core.c
- delete mode 100644 arch/arm/plat-stmp3xxx/devices.c
- delete mode 100644 arch/arm/plat-stmp3xxx/dma.c
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/clkdev.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/cputype.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/dma.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpio.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpmi.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/hardware.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/io.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/memory.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/mmc.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pinmux.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pins.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/platform.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/system.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/timex.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/uncompress.h
- delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
- delete mode 100644 arch/arm/plat-stmp3xxx/irq.c
- delete mode 100644 arch/arm/plat-stmp3xxx/pinmux.c
- delete mode 100644 arch/arm/plat-stmp3xxx/timer.c
+ arch/arm/Makefile                                  |    1 -
+ arch/arm/configs/stmp378x_defconfig                |  128 --------
+ arch/arm/mach-stmp378x/Makefile                    |    2 -
+ arch/arm/mach-stmp378x/Makefile.boot               |    3 -
+ arch/arm/mach-stmp378x/include/mach/entry-macro.S  |   35 --
+ arch/arm/mach-stmp378x/include/mach/irqs.h         |   95 ------
+ arch/arm/mach-stmp378x/include/mach/pins.h         |  151 ---------
+ arch/arm/mach-stmp378x/include/mach/regs-apbh.h    |  101 ------
+ arch/arm/mach-stmp378x/include/mach/regs-apbx.h    |  119 -------
+ arch/arm/mach-stmp378x/include/mach/regs-audioin.h |   63 ----
+ .../arm/mach-stmp378x/include/mach/regs-audioout.h |  104 ------
+ arch/arm/mach-stmp378x/include/mach/regs-bch.h     |   56 ----
+ arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h |   88 -----
+ arch/arm/mach-stmp378x/include/mach/regs-dcp.h     |   87 -----
+ arch/arm/mach-stmp378x/include/mach/regs-digctl.h  |   38 ---
+ arch/arm/mach-stmp378x/include/mach/regs-dram.h    |   27 --
+ arch/arm/mach-stmp378x/include/mach/regs-dri.h     |   45 ---
+ arch/arm/mach-stmp378x/include/mach/regs-ecc8.h    |   39 ---
+ arch/arm/mach-stmp378x/include/mach/regs-emi.h     |   25 --
+ arch/arm/mach-stmp378x/include/mach/regs-gpmi.h    |   78 -----
+ arch/arm/mach-stmp378x/include/mach/regs-i2c.h     |   55 ----
+ arch/arm/mach-stmp378x/include/mach/regs-icoll.h   |   45 ---
+ arch/arm/mach-stmp378x/include/mach/regs-ir.h      |   23 --
+ arch/arm/mach-stmp378x/include/mach/regs-lcdif.h   |  195 ------------
+ arch/arm/mach-stmp378x/include/mach/regs-lradc.h   |   99 ------
+ arch/arm/mach-stmp378x/include/mach/regs-ocotp.h   |   40 ---
+ arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h |   90 ------
+ arch/arm/mach-stmp378x/include/mach/regs-power.h   |   63 ----
+ arch/arm/mach-stmp378x/include/mach/regs-pwm.h     |   53 ---
+ arch/arm/mach-stmp378x/include/mach/regs-pxp.h     |  140 --------
+ arch/arm/mach-stmp378x/include/mach/regs-rtc.h     |   59 ----
+ arch/arm/mach-stmp378x/include/mach/regs-saif.h    |   21 --
+ arch/arm/mach-stmp378x/include/mach/regs-spdif.h   |   49 ---
+ arch/arm/mach-stmp378x/include/mach/regs-ssp.h     |  102 ------
+ arch/arm/mach-stmp378x/include/mach/regs-sydma.h   |   23 --
+ arch/arm/mach-stmp378x/include/mach/regs-timrot.h  |   68 ----
+ arch/arm/mach-stmp378x/include/mach/regs-tvenc.h   |   67 ----
+ arch/arm/mach-stmp378x/include/mach/regs-uartapp.h |   87 -----
+ arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h |  268 ----------------
+ arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h |   40 ---
+ arch/arm/mach-stmp378x/include/mach/regs-usbphy.h  |   37 ---
+ arch/arm/mach-stmp378x/stmp378x.c                  |  299 ------------------
+ arch/arm/mach-stmp378x/stmp378x.h                  |   25 --
+ arch/arm/mach-stmp378x/stmp378x_devb.c             |  332 --------------------
+ arch/arm/plat-stmp3xxx/Kconfig                     |   20 --
+ 45 files changed, 0 insertions(+), 3585 deletions(-)
+ delete mode 100644 arch/arm/configs/stmp378x_defconfig
+ delete mode 100644 arch/arm/mach-stmp378x/Makefile
+ delete mode 100644 arch/arm/mach-stmp378x/Makefile.boot
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/pins.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-apbh.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-apbx.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-audioin.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-audioout.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-bch.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dcp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-digctl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dram.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-dri.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ecc8.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-emi.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-gpmi.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-i2c.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-icoll.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ir.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-lcdif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-lradc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ocotp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-power.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pwm.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-pxp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-rtc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-saif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-spdif.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-ssp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-sydma.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-timrot.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-tvenc.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-uartapp.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h
+ delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-usbphy.h
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x.c
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x.h
+ delete mode 100644 arch/arm/mach-stmp378x/stmp378x_devb.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 377a7a5..c9f69e0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -378,16 +378,6 @@ config ARCH_MXS
- 	help
- 	  Support for Freescale MXS-based family of processors
- 
--config ARCH_STMP3XXX
--	bool "Freescale STMP3xxx"
--	select CPU_ARM926T
--	select CLKDEV_LOOKUP
--	select ARCH_REQUIRE_GPIOLIB
--	select GENERIC_CLOCKEVENTS
--	select USB_ARCH_HAS_EHCI
--	help
--	  Support for systems based on the Freescale 3xxx CPUs.
--
- config ARCH_NETX
- 	bool "Hilscher NetX based"
- 	select CPU_ARM926T
-@@ -1005,8 +995,6 @@ source "arch/arm/mach-exynos4/Kconfig"
- 
- source "arch/arm/mach-shmobile/Kconfig"
- 
--source "arch/arm/plat-stmp3xxx/Kconfig"
--
- source "arch/arm/mach-tegra/Kconfig"
- 
- source "arch/arm/mach-u300/Kconfig"
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ca473b1..692c481 100644
+index 23ecbda..ca473b1 100644
 --- a/arch/arm/Makefile
 +++ b/arch/arm/Makefile
-@@ -205,7 +205,6 @@ machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
- plat-$(CONFIG_ARCH_MXC)		:= mxc
- plat-$(CONFIG_ARCH_OMAP)	:= omap
- plat-$(CONFIG_ARCH_S3C64XX)	:= samsung
--plat-$(CONFIG_ARCH_STMP3XXX)	:= stmp3xxx
- plat-$(CONFIG_ARCH_TCC_926)	:= tcc
- plat-$(CONFIG_PLAT_IOP)		:= iop
- plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
-diff --git a/arch/arm/plat-stmp3xxx/Kconfig b/arch/arm/plat-stmp3xxx/Kconfig
+@@ -185,7 +185,6 @@ machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos4
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
+-machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+ machine-$(CONFIG_ARCH_TCC8K)		:= tcc8k
+ machine-$(CONFIG_ARCH_TEGRA)		:= tegra
+ machine-$(CONFIG_ARCH_U300)		:= u300
+diff --git a/arch/arm/configs/stmp378x_defconfig b/arch/arm/configs/stmp378x_defconfig
 deleted file mode 100644
-index e6e312b..0000000
---- a/arch/arm/plat-stmp3xxx/Kconfig
-+++ /dev/null
-@@ -1,7 +0,0 @@
--if ARCH_STMP3XXX
--
--menu "Freescale STMP3xxx implementations"
--
--endmenu
--
--endif
-diff --git a/arch/arm/plat-stmp3xxx/Makefile b/arch/arm/plat-stmp3xxx/Makefile
-deleted file mode 100644
-index 31dd518..0000000
---- a/arch/arm/plat-stmp3xxx/Makefile
-+++ /dev/null
-@@ -1,5 +0,0 @@
--#
--# Makefile for the linux kernel.
--#
--# Object file lists.
--obj-y += core.o timer.o irq.o dma.o clock.o pinmux.o devices.o
-diff --git a/arch/arm/plat-stmp3xxx/clock.c b/arch/arm/plat-stmp3xxx/clock.c
-deleted file mode 100644
-index 2e712e1..0000000
---- a/arch/arm/plat-stmp3xxx/clock.c
-+++ /dev/null
-@@ -1,1134 +0,0 @@
--/*
-- * Clock manipulation routines for Freescale STMP37XX/STMP378X
-- *
-- * Author: Vitaly Wool <vital@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#define DEBUG
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/spinlock.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/delay.h>
--#include <linux/io.h>
--#include <linux/clkdev.h>
--
--#include <asm/mach-types.h>
--#include <mach/platform.h>
--#include <mach/regs-clkctrl.h>
--
--#include "clock.h"
--
--static DEFINE_SPINLOCK(clocks_lock);
--
--static struct clk osc_24M;
--static struct clk pll_clk;
--static struct clk cpu_clk;
--static struct clk hclk;
--
--static int propagate_rate(struct clk *);
--
--static inline int clk_is_busy(struct clk *clk)
--{
--	return __raw_readl(clk->busy_reg) & (1 << clk->busy_bit);
--}
--
--static inline int clk_good(struct clk *clk)
--{
--	return clk && !IS_ERR(clk) && clk->ops;
--}
--
--static int std_clk_enable(struct clk *clk)
--{
--	if (clk->enable_reg) {
--		u32 clk_reg = __raw_readl(clk->enable_reg);
--		if (clk->enable_negate)
--			clk_reg &= ~(1 << clk->enable_shift);
--		else
--			clk_reg |= (1 << clk->enable_shift);
--		__raw_writel(clk_reg, clk->enable_reg);
--		if (clk->enable_wait)
--			udelay(clk->enable_wait);
--		return 0;
--	} else
--		return -EINVAL;
--}
--
--static int std_clk_disable(struct clk *clk)
--{
--	if (clk->enable_reg) {
--		u32 clk_reg = __raw_readl(clk->enable_reg);
--		if (clk->enable_negate)
--			clk_reg |= (1 << clk->enable_shift);
--		else
--			clk_reg &= ~(1 << clk->enable_shift);
--		__raw_writel(clk_reg, clk->enable_reg);
--		return 0;
--	} else
--		return -EINVAL;
--}
--
--static int io_set_rate(struct clk *clk, u32 rate)
--{
--	u32 reg_frac, clkctrl_frac;
--	int i, ret = 0, mask = 0x1f;
--
--	clkctrl_frac = (clk->parent->rate * 18 + rate - 1) / rate;
--
--	if (clkctrl_frac < 18 || clkctrl_frac > 35) {
--		ret = -EINVAL;
--		goto out;
--	}
--
--	reg_frac = __raw_readl(clk->scale_reg);
--	reg_frac &= ~(mask << clk->scale_shift);
--	__raw_writel(reg_frac | (clkctrl_frac << clk->scale_shift),
--				clk->scale_reg);
--	if (clk->busy_reg) {
--		for (i = 10000; i; i--)
--			if (!clk_is_busy(clk))
--				break;
--		if (!i)
--			ret = -ETIMEDOUT;
--		else
--			ret = 0;
--	}
--out:
--	return ret;
--}
--
--static long io_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate * 18;
--	int mask = 0x1f;
--
--	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
--	clk->rate = rate;
--
--	return rate;
--}
--
--static long per_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate;
--	long div;
--	const int mask = 0xff;
--
--	if (clk->enable_reg &&
--			!(__raw_readl(clk->enable_reg) & clk->enable_shift))
--		clk->rate = 0;
--	else {
--		div = (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
--		if (div)
--			rate /= div;
--		clk->rate = rate;
--	}
--
--	return clk->rate;
--}
--
--static int per_set_rate(struct clk *clk, u32 rate)
--{
--	int ret = -EINVAL;
--	int div = (clk->parent->rate + rate - 1) / rate;
--	u32 reg_frac;
--	const int mask = 0xff;
--	int try = 10;
--	int i = -1;
--
--	if (div == 0 || div > mask)
--		goto out;
--
--	reg_frac = __raw_readl(clk->scale_reg);
--	reg_frac &= ~(mask << clk->scale_shift);
--
--	while (try--) {
--		__raw_writel(reg_frac | (div << clk->scale_shift),
--				clk->scale_reg);
--
--		if (clk->busy_reg) {
--			for (i = 10000; i; i--)
--				if (!clk_is_busy(clk))
--					break;
--		}
--		if (i)
--			break;
--	}
--
--	if (!i)
--		ret = -ETIMEDOUT;
--	else
--		ret = 0;
--
--out:
--	if (ret != 0)
--		printk(KERN_ERR "%s: error %d\n", __func__, ret);
--	return ret;
--}
--
--static long lcdif_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate;
--	long div;
--	const int mask = 0xff;
--
--	div = (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
--	if (div) {
--		rate /= div;
--		div = (__raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC) &
--			BM_CLKCTRL_FRAC_PIXFRAC) >> BP_CLKCTRL_FRAC_PIXFRAC;
--		rate /= div;
--	}
--	clk->rate = rate;
--
--	return rate;
--}
--
--static int lcdif_set_rate(struct clk *clk, u32 rate)
--{
--	int ret = 0;
--	/*
--	 * On 3700, we can get most timings exact by modifying ref_pix
--	 * and the divider, but keeping the phase timings at 1 (2
--	 * phases per cycle).
--	 *
--	 * ref_pix can be between 480e6*18/35=246.9MHz and 480e6*18/18=480MHz,
--	 * which is between 18/(18*480e6)=2.084ns and 35/(18*480e6)=4.050ns.
--	 *
--	 * ns_cycle >= 2*18e3/(18*480) = 25/6
--	 * ns_cycle <= 2*35e3/(18*480) = 875/108
--	 *
--	 * Multiply the ns_cycle by 'div' to lengthen it until it fits the
--	 * bounds. This is the divider we'll use after ref_pix.
--	 *
--	 * 6 * ns_cycle >= 25 * div
--	 * 108 * ns_cycle <= 875 * div
--	 */
--	u32 ns_cycle = 1000000 / rate;
--	u32 div, reg_val;
--	u32 lowest_result = (u32) -1;
--	u32 lowest_div = 0, lowest_fracdiv = 0;
--
--	for (div = 1; div < 256; ++div) {
--		u32 fracdiv;
--		u32 ps_result;
--		int lower_bound = 6 * ns_cycle >= 25 * div;
--		int upper_bound = 108 * ns_cycle <= 875 * div;
--		if (!lower_bound)
--			break;
--		if (!upper_bound)
--			continue;
--		/*
--		 * Found a matching div. Calculate fractional divider needed,
--		 * rounded up.
--		 */
--		fracdiv = ((clk->parent->rate / 1000 * 18 / 2) *
--				ns_cycle + 1000 * div - 1) /
--				(1000 * div);
--		if (fracdiv < 18 || fracdiv > 35) {
--			ret = -EINVAL;
--			goto out;
--		}
--		/* Calculate the actual cycle time this results in */
--		ps_result = 6250 * div * fracdiv / 27;
--
--		/* Use the fastest result that doesn't break ns_cycle */
--		if (ps_result <= lowest_result) {
--			lowest_result = ps_result;
--			lowest_div = div;
--			lowest_fracdiv = fracdiv;
--		}
--	}
--
--	if (div >= 256 || lowest_result == (u32) -1) {
--		ret = -EINVAL;
--		goto out;
--	}
--	pr_debug("Programming PFD=%u,DIV=%u ref_pix=%uMHz "
--			"PIXCLK=%uMHz cycle=%u.%03uns\n",
--			lowest_fracdiv, lowest_div,
--			480*18/lowest_fracdiv, 480*18/lowest_fracdiv/lowest_div,
--			lowest_result / 1000, lowest_result % 1000);
--
--	/* Program ref_pix phase fractional divider */
--	reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
--	reg_val &= ~BM_CLKCTRL_FRAC_PIXFRAC;
--	reg_val |= BF(lowest_fracdiv, CLKCTRL_FRAC_PIXFRAC);
--	__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
--
--	/* Ungate PFD */
--	stmp3xxx_clearl(BM_CLKCTRL_FRAC_CLKGATEPIX,
--			REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
--
--	/* Program pix divider */
--	reg_val = __raw_readl(clk->scale_reg);
--	reg_val &= ~(BM_CLKCTRL_PIX_DIV | BM_CLKCTRL_PIX_CLKGATE);
--	reg_val |= BF(lowest_div, CLKCTRL_PIX_DIV);
--	__raw_writel(reg_val, clk->scale_reg);
--
--	/* Wait for divider update */
--	if (clk->busy_reg) {
--		int i;
--		for (i = 10000; i; i--)
--			if (!clk_is_busy(clk))
--				break;
--		if (!i) {
--			ret = -ETIMEDOUT;
--			goto out;
--		}
--	}
--
--	/* Switch to ref_pix source */
--	reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ);
--	reg_val &= ~BM_CLKCTRL_CLKSEQ_BYPASS_PIX;
--	__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ);
--
--out:
--	return ret;
--}
--
--
--static int cpu_set_rate(struct clk *clk, u32 rate)
--{
--	u32 reg_val;
--
--	if (rate < 24000)
--		return -EINVAL;
--	else if (rate == 24000) {
--		/* switch to the 24M source */
--		clk_set_parent(clk, &osc_24M);
--	} else {
--		int i;
--		u32 clkctrl_cpu = 1;
--		u32 c = clkctrl_cpu;
--		u32 clkctrl_frac = 1;
--		u32 val;
--		for ( ; c < 0x40; c++) {
--			u32 f = (pll_clk.rate*18/c + rate/2) / rate;
--			int s1, s2;
--
--			if (f < 18 || f > 35)
--				continue;
--			s1 = pll_clk.rate*18/clkctrl_frac/clkctrl_cpu - rate;
--			s2 = pll_clk.rate*18/c/f - rate;
--			pr_debug("%s: s1 %d, s2 %d\n", __func__, s1, s2);
--			if (abs(s1) > abs(s2)) {
--				clkctrl_cpu = c;
--				clkctrl_frac = f;
--			}
--			if (s2 == 0)
--				break;
--		};
--		pr_debug("%s: clkctrl_cpu %d, clkctrl_frac %d\n", __func__,
--				clkctrl_cpu, clkctrl_frac);
--		if (c == 0x40) {
--			int  d = pll_clk.rate*18/clkctrl_frac/clkctrl_cpu -
--				rate;
--			if (abs(d) > 100 ||
--			    clkctrl_frac < 18 || clkctrl_frac > 35)
--				return -EINVAL;
--		}
--
--		/* 4.6.2 */
--		val = __raw_readl(clk->scale_reg);
--		val &= ~(0x3f << clk->scale_shift);
--		val |= clkctrl_frac;
--		clk_set_parent(clk, &osc_24M);
--		udelay(10);
--		__raw_writel(val, clk->scale_reg);
--		/* ungate */
--		__raw_writel(1<<7, clk->scale_reg + 8);
--		/* write clkctrl_cpu */
--		clk->saved_div = clkctrl_cpu;
--
--		reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
--		reg_val &= ~0x3F;
--		reg_val |= clkctrl_cpu;
--		__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
--
--		for (i = 10000; i; i--)
--			if (!clk_is_busy(clk))
--				break;
--		if (!i) {
--			printk(KERN_ERR "couldn't set up CPU divisor\n");
--			return -ETIMEDOUT;
--		}
--		clk_set_parent(clk, &pll_clk);
--		clk->saved_div = 0;
--		udelay(10);
--	}
--	return 0;
--}
--
--static long cpu_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate * 18;
--
--	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & 0x3f;
--	rate /= __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU) & 0x3f;
--	rate = ((rate + 9) / 10) * 10;
--	clk->rate = rate;
--
--	return rate;
--}
--
--static long cpu_round_rate(struct clk *clk, u32 rate)
--{
--	unsigned long r = 0;
--
--	if (rate <= 24000)
--		r = 24000;
--	else {
--		u32 clkctrl_cpu = 1;
--		u32 clkctrl_frac;
--		do {
--			clkctrl_frac =
--				(pll_clk.rate*18 / clkctrl_cpu + rate/2) / rate;
--			if (clkctrl_frac > 35)
--				continue;
--			if (pll_clk.rate*18 / clkctrl_frac / clkctrl_cpu/10 ==
--			    rate / 10)
--				break;
--		} while (pll_clk.rate / 2  >= clkctrl_cpu++ * rate);
--		if (pll_clk.rate / 2 < (clkctrl_cpu - 1) * rate)
--			clkctrl_cpu--;
--		pr_debug("%s: clkctrl_cpu %d, clkctrl_frac %d\n", __func__,
--				clkctrl_cpu, clkctrl_frac);
--		if (clkctrl_frac < 18)
--			clkctrl_frac = 18;
--		if (clkctrl_frac > 35)
--			clkctrl_frac = 35;
--
--		r = pll_clk.rate * 18;
--		r /= clkctrl_frac;
--		r /= clkctrl_cpu;
--		r = 10 * ((r + 9) / 10);
--	}
--	return r;
--}
--
--static long emi_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate * 18;
--
--	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & 0x3f;
--	rate /= __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI) & 0x3f;
--	clk->rate = rate;
--
--	return rate;
--}
--
--static int clkseq_set_parent(struct clk *clk, struct clk *parent)
--{
--	int ret = -EINVAL;
--	int shift = 8;
--
--	/* bypass? */
--	if (parent == &osc_24M)
--		shift = 4;
--
--	if (clk->bypass_reg) {
--#ifdef CONFIG_ARCH_STMP378X
--		u32 hbus_val, cpu_val;
--
--		if (clk == &cpu_clk && shift == 4) {
--			hbus_val = __raw_readl(REGS_CLKCTRL_BASE +
--					HW_CLKCTRL_HBUS);
--			cpu_val = __raw_readl(REGS_CLKCTRL_BASE +
--					HW_CLKCTRL_CPU);
--
--			hbus_val &= ~(BM_CLKCTRL_HBUS_DIV_FRAC_EN |
--				      BM_CLKCTRL_HBUS_DIV);
--			clk->saved_div = cpu_val & BM_CLKCTRL_CPU_DIV_CPU;
--			cpu_val &= ~BM_CLKCTRL_CPU_DIV_CPU;
--			cpu_val |= 1;
--
--			if (machine_is_stmp378x()) {
--				__raw_writel(hbus_val,
--					REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
--				__raw_writel(cpu_val,
--					REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
--				hclk.rate = 0;
--			}
--		} else if (clk == &cpu_clk && shift == 8) {
--			hbus_val = __raw_readl(REGS_CLKCTRL_BASE +
--							HW_CLKCTRL_HBUS);
--			cpu_val = __raw_readl(REGS_CLKCTRL_BASE +
--							HW_CLKCTRL_CPU);
--			hbus_val &= ~(BM_CLKCTRL_HBUS_DIV_FRAC_EN |
--				      BM_CLKCTRL_HBUS_DIV);
--			hbus_val |= 2;
--			cpu_val &= ~BM_CLKCTRL_CPU_DIV_CPU;
--			if (clk->saved_div)
--				cpu_val |= clk->saved_div;
--			else
--				cpu_val |= 2;
--
--			if (machine_is_stmp378x()) {
--				__raw_writel(hbus_val,
--					REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
--				__raw_writel(cpu_val,
--					REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
--				hclk.rate = 0;
--			}
--		}
--#endif
--		__raw_writel(1 << clk->bypass_shift, clk->bypass_reg + shift);
--
--		ret = 0;
--	}
--
--	return ret;
--}
--
--static int hbus_set_rate(struct clk *clk, u32 rate)
--{
--	u8 div = 0;
--	int is_frac = 0;
--	u32 clkctrl_hbus;
--	struct clk *parent = clk->parent;
--
--	pr_debug("%s: rate %d, parent rate %d\n", __func__, rate,
--			parent->rate);
--
--	if (rate > parent->rate)
--		return -EINVAL;
--
--	if (((parent->rate + rate/2) / rate) * rate != parent->rate &&
--	    parent->rate / rate < 32) {
--		pr_debug("%s: switching to fractional mode\n", __func__);
--		is_frac = 1;
--	}
--
--	if (is_frac)
--		div = (32 * rate + parent->rate / 2) / parent->rate;
--	else
--		div = (parent->rate + rate - 1) / rate;
--	pr_debug("%s: div calculated is %d\n", __func__, div);
--	if (!div || div > 0x1f)
--		return -EINVAL;
--
--	clk_set_parent(&cpu_clk, &osc_24M);
--	udelay(10);
--	clkctrl_hbus = __raw_readl(clk->scale_reg);
--	clkctrl_hbus &= ~0x3f;
--	clkctrl_hbus |= div;
--	clkctrl_hbus |= (is_frac << 5);
--
--	__raw_writel(clkctrl_hbus, clk->scale_reg);
--	if (clk->busy_reg) {
--		int i;
--		for (i = 10000; i; i--)
--			if (!clk_is_busy(clk))
--				break;
--		if (!i) {
--			printk(KERN_ERR "couldn't set up CPU divisor\n");
--			return -ETIMEDOUT;
--		}
--	}
--	clk_set_parent(&cpu_clk, &pll_clk);
--	__raw_writel(clkctrl_hbus, clk->scale_reg);
--	udelay(10);
--	return 0;
--}
--
--static long hbus_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate;
--
--	if (__raw_readl(clk->scale_reg) & 0x20) {
--		rate *= __raw_readl(clk->scale_reg) & 0x1f;
--		rate /= 32;
--	} else
--		rate /= __raw_readl(clk->scale_reg) & 0x1f;
--	clk->rate = rate;
--
--	return rate;
--}
--
--static int xbus_set_rate(struct clk *clk, u32 rate)
--{
--	u16 div = 0;
--	u32 clkctrl_xbus;
--
--	pr_debug("%s: rate %d, parent rate %d\n", __func__, rate,
--			clk->parent->rate);
--
--	div = (clk->parent->rate + rate - 1) / rate;
--	pr_debug("%s: div calculated is %d\n", __func__, div);
--	if (!div || div > 0x3ff)
--		return -EINVAL;
--
--	clkctrl_xbus = __raw_readl(clk->scale_reg);
--	clkctrl_xbus &= ~0x3ff;
--	clkctrl_xbus |= div;
--	__raw_writel(clkctrl_xbus, clk->scale_reg);
--	if (clk->busy_reg) {
--		int i;
--		for (i = 10000; i; i--)
--			if (!clk_is_busy(clk))
--				break;
--		if (!i) {
--			printk(KERN_ERR "couldn't set up xbus divisor\n");
--			return -ETIMEDOUT;
--		}
--	}
--	return 0;
--}
--
--static long xbus_get_rate(struct clk *clk)
--{
--	long rate = clk->parent->rate;
--
--	rate /= __raw_readl(clk->scale_reg) & 0x3ff;
--	clk->rate = rate;
--
--	return rate;
--}
--
--
--/* Clock ops */
--
--static struct clk_ops std_ops = {
--	.enable		= std_clk_enable,
--	.disable	= std_clk_disable,
--	.get_rate	= per_get_rate,
--	.set_rate	= per_set_rate,
--	.set_parent	= clkseq_set_parent,
--};
--
--static struct clk_ops min_ops = {
--	.enable		= std_clk_enable,
--	.disable	= std_clk_disable,
--};
--
--static struct clk_ops cpu_ops = {
--	.enable		= std_clk_enable,
--	.disable	= std_clk_disable,
--	.get_rate	= cpu_get_rate,
--	.set_rate	= cpu_set_rate,
--	.round_rate	= cpu_round_rate,
--	.set_parent	= clkseq_set_parent,
--};
--
--static struct clk_ops io_ops = {
--	.enable		= std_clk_enable,
--	.disable	= std_clk_disable,
--	.get_rate	= io_get_rate,
--	.set_rate	= io_set_rate,
--};
--
--static struct clk_ops hbus_ops = {
--	.get_rate	= hbus_get_rate,
--	.set_rate	= hbus_set_rate,
--};
--
--static struct clk_ops xbus_ops = {
--	.get_rate	= xbus_get_rate,
--	.set_rate	= xbus_set_rate,
--};
--
--static struct clk_ops lcdif_ops = {
--	.enable		= std_clk_enable,
--	.disable	= std_clk_disable,
--	.get_rate	= lcdif_get_rate,
--	.set_rate	= lcdif_set_rate,
--	.set_parent	= clkseq_set_parent,
--};
--
--static struct clk_ops emi_ops = {
--	.get_rate	= emi_get_rate,
--};
--
--/* List of on-chip clocks */
--
--static struct clk osc_24M = {
--	.flags		= FIXED_RATE | ENABLED,
--	.rate		= 24000,
--};
--
--static struct clk pll_clk = {
--	.parent		= &osc_24M,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PLLCTRL0,
--	.enable_shift	= 16,
--	.enable_wait	= 10,
--	.flags		= FIXED_RATE | ENABLED,
--	.rate		= 480000,
--	.ops		= &min_ops,
--};
--
--static struct clk cpu_clk = {
--	.parent		= &pll_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
--	.scale_shift	= 0,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 7,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU,
--	.busy_bit	= 28,
--	.flags		= RATE_PROPAGATES | ENABLED,
--	.ops		= &cpu_ops,
--};
--
--static struct clk io_clk = {
--	.parent		= &pll_clk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
--	.scale_shift	= 24,
--	.flags		= RATE_PROPAGATES | ENABLED,
--	.ops		= &io_ops,
--};
--
--static struct clk hclk = {
--	.parent		= &cpu_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 7,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS,
--	.busy_bit	= 29,
--	.flags		= RATE_PROPAGATES | ENABLED,
--	.ops		= &hbus_ops,
--};
--
--static struct clk xclk = {
--	.parent		= &osc_24M,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XBUS,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XBUS,
--	.busy_bit	= 31,
--	.flags		= RATE_PROPAGATES | ENABLED,
--	.ops		= &xbus_ops,
--};
--
--static struct clk uart_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.flags		= ENABLED,
--	.ops		= &min_ops,
--};
--
--static struct clk audio_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 30,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--static struct clk pwm_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 29,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--static struct clk dri_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 28,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--static struct clk digctl_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 27,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--static struct clk timer_clk = {
--	.parent		= &xclk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
--	.enable_shift	= 26,
--	.enable_negate	= 1,
--	.flags		= ENABLED,
--	.ops		= &min_ops,
--};
--
--static struct clk lcdif_clk = {
--	.parent		= &pll_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
--	.busy_bit	= 29,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 1,
--	.flags		= NEEDS_SET_PARENT,
--	.ops		= &lcdif_ops,
--};
--
--static struct clk ssp_clk = {
--	.parent		= &io_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
--	.busy_bit	= 29,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
--	.enable_shift	= 31,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 5,
--	.enable_negate	= 1,
--	.flags		= NEEDS_SET_PARENT,
--	.ops		= &std_ops,
--};
--
--static struct clk gpmi_clk = {
--	.parent		= &io_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
--	.busy_bit	= 29,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 4,
--	.flags		= NEEDS_SET_PARENT,
--	.ops		= &std_ops,
--};
--
--static struct clk spdif_clk = {
--	.parent		= &pll_clk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SPDIF,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--static struct clk emi_clk = {
--	.parent		= &pll_clk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
--	.scale_shift	= 8,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI,
--	.busy_bit	= 28,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 6,
--	.flags		= ENABLED,
--	.ops		= &emi_ops,
--};
--
--static struct clk ir_clk = {
--	.parent		= &io_clk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_IR,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 3,
--	.ops		= &min_ops,
--};
--
--static struct clk saif_clk = {
--	.parent		= &pll_clk,
--	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
--	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
--	.busy_bit	= 29,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
--	.enable_shift	= 31,
--	.enable_negate	= 1,
--	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
--	.bypass_shift	= 0,
--	.ops		= &std_ops,
--};
--
--static struct clk usb_clk = {
--	.parent		= &pll_clk,
--	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PLLCTRL0,
--	.enable_shift	= 18,
--	.enable_negate	= 1,
--	.ops		= &min_ops,
--};
--
--/* list of all the clocks */
--static struct clk_lookup onchip_clks[] = {
--	{
--		.con_id = "osc_24M",
--		.clk = &osc_24M,
--	}, {
--		.con_id = "pll",
--		.clk = &pll_clk,
--	}, {
--		.con_id = "cpu",
--		.clk = &cpu_clk,
--	}, {
--		.con_id = "hclk",
--		.clk = &hclk,
--	}, {
--		.con_id = "xclk",
--		.clk = &xclk,
--	}, {
--		.con_id = "io",
--		.clk = &io_clk,
--	}, {
--		.con_id = "uart",
--		.clk = &uart_clk,
--	}, {
--		.con_id = "audio",
--		.clk = &audio_clk,
--	}, {
--		.con_id = "pwm",
--		.clk = &pwm_clk,
--	}, {
--		.con_id = "dri",
--		.clk = &dri_clk,
--	}, {
--		.con_id = "digctl",
--		.clk = &digctl_clk,
--	}, {
--		.con_id = "timer",
--		.clk = &timer_clk,
--	}, {
--		.con_id = "lcdif",
--		.clk = &lcdif_clk,
--	}, {
--		.con_id = "ssp",
--		.clk = &ssp_clk,
--	}, {
--		.con_id = "gpmi",
--		.clk = &gpmi_clk,
--	}, {
--		.con_id = "spdif",
--		.clk = &spdif_clk,
--	}, {
--		.con_id = "emi",
--		.clk = &emi_clk,
--	}, {
--		.con_id = "ir",
--		.clk = &ir_clk,
--	}, {
--		.con_id = "saif",
--		.clk = &saif_clk,
--	}, {
--		.con_id = "usb",
--		.clk = &usb_clk,
--	},
--};
--
--static int __init propagate_rate(struct clk *clk)
--{
--	struct clk_lookup *cl;
--
--	for (cl = onchip_clks; cl < onchip_clks + ARRAY_SIZE(onchip_clks);
--	     cl++) {
--		if (unlikely(!clk_good(cl->clk)))
--			continue;
--		if (cl->clk->parent == clk && cl->clk->ops->get_rate) {
--			cl->clk->ops->get_rate(cl->clk);
--			if (cl->clk->flags & RATE_PROPAGATES)
--				propagate_rate(cl->clk);
--		}
--	}
--
--	return 0;
--}
--
--/* Exported API */
--unsigned long clk_get_rate(struct clk *clk)
--{
--	if (unlikely(!clk_good(clk)))
--		return 0;
--
--	if (clk->rate != 0)
--		return clk->rate;
--
--	if (clk->ops->get_rate != NULL)
--		return clk->ops->get_rate(clk);
--
--	return clk_get_rate(clk->parent);
--}
--EXPORT_SYMBOL(clk_get_rate);
--
--long clk_round_rate(struct clk *clk, unsigned long rate)
--{
--	if (unlikely(!clk_good(clk)))
--		return 0;
--
--	if (clk->ops->round_rate)
--		return clk->ops->round_rate(clk, rate);
--
--	return 0;
--}
--EXPORT_SYMBOL(clk_round_rate);
--
--static inline int close_enough(long rate1, long rate2)
--{
--	return rate1 && !((rate2 - rate1) * 1000 / rate1);
--}
--
--int clk_set_rate(struct clk *clk, unsigned long rate)
--{
--	int ret = -EINVAL;
--
--	if (unlikely(!clk_good(clk)))
--		goto out;
--
--	if (clk->flags & FIXED_RATE || !clk->ops->set_rate)
--		goto out;
--
--	else if (!close_enough(clk->rate, rate)) {
--		ret = clk->ops->set_rate(clk, rate);
--		if (ret < 0)
--			goto out;
--		clk->rate = rate;
--		if (clk->flags & RATE_PROPAGATES)
--			propagate_rate(clk);
--	} else
--		ret = 0;
--
--out:
--	return ret;
--}
--EXPORT_SYMBOL(clk_set_rate);
--
--int clk_enable(struct clk *clk)
--{
--	unsigned long clocks_flags;
--
--	if (unlikely(!clk_good(clk)))
--		return -EINVAL;
--
--	if (clk->parent)
--		clk_enable(clk->parent);
--
--	spin_lock_irqsave(&clocks_lock, clocks_flags);
--
--	clk->usage++;
--	if (clk->ops && clk->ops->enable)
--		clk->ops->enable(clk);
--
--	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
--	return 0;
--}
--EXPORT_SYMBOL(clk_enable);
--
--static void local_clk_disable(struct clk *clk)
--{
--	if (unlikely(!clk_good(clk)))
--		return;
--
--	if (clk->usage == 0 && clk->ops->disable)
--		clk->ops->disable(clk);
--
--	if (clk->parent)
--		local_clk_disable(clk->parent);
--}
--
--void clk_disable(struct clk *clk)
--{
--	unsigned long clocks_flags;
--
--	if (unlikely(!clk_good(clk)))
--		return;
--
--	spin_lock_irqsave(&clocks_lock, clocks_flags);
--
--	if ((--clk->usage) == 0 && clk->ops->disable)
--		clk->ops->disable(clk);
--
--	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
--	if (clk->parent)
--		clk_disable(clk->parent);
--}
--EXPORT_SYMBOL(clk_disable);
--
--/* Some additional API */
--int clk_set_parent(struct clk *clk, struct clk *parent)
--{
--	int ret = -ENODEV;
--	unsigned long clocks_flags;
--
--	if (unlikely(!clk_good(clk)))
--		goto out;
--
--	if (!clk->ops->set_parent)
--		goto out;
--
--	spin_lock_irqsave(&clocks_lock, clocks_flags);
--
--	ret = clk->ops->set_parent(clk, parent);
--	if (!ret) {
--		/* disable if usage count is 0 */
--		local_clk_disable(parent);
--
--		parent->usage += clk->usage;
--		clk->parent->usage -= clk->usage;
--
--		/* disable if new usage count is 0 */
--		local_clk_disable(clk->parent);
--
--		clk->parent = parent;
--	}
--	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
--
--out:
--	return ret;
--}
--EXPORT_SYMBOL(clk_set_parent);
--
--struct clk *clk_get_parent(struct clk *clk)
--{
--	if (unlikely(!clk_good(clk)))
--		return NULL;
--	return clk->parent;
--}
--EXPORT_SYMBOL(clk_get_parent);
--
--static int __init clk_init(void)
--{
--	struct clk_lookup *cl;
--	struct clk_ops *ops;
--
--	spin_lock_init(&clocks_lock);
--
--	for (cl = onchip_clks; cl < onchip_clks + ARRAY_SIZE(onchip_clks);
--	     cl++) {
--		if (cl->clk->flags & ENABLED)
--			clk_enable(cl->clk);
--		else
--			local_clk_disable(cl->clk);
--
--		ops = cl->clk->ops;
--
--		if ((cl->clk->flags & NEEDS_INITIALIZATION) &&
--				ops && ops->set_rate)
--			ops->set_rate(cl->clk, cl->clk->rate);
--
--		if (cl->clk->flags & FIXED_RATE) {
--			if (cl->clk->flags & RATE_PROPAGATES)
--				propagate_rate(cl->clk);
--		} else {
--			if (ops && ops->get_rate)
--				ops->get_rate(cl->clk);
--		}
--
--		if (cl->clk->flags & NEEDS_SET_PARENT) {
--			if (ops && ops->set_parent)
--				ops->set_parent(cl->clk, cl->clk->parent);
--		}
--	}
--	clkdev_add_table(onchip_clks, ARRAY_SIZE(onchip_clks));
--	return 0;
--}
--
--arch_initcall(clk_init);
-diff --git a/arch/arm/plat-stmp3xxx/clock.h b/arch/arm/plat-stmp3xxx/clock.h
-deleted file mode 100644
-index a6611e1..0000000
---- a/arch/arm/plat-stmp3xxx/clock.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * Clock control driver for Freescale STMP37XX/STMP378X - internal header file
-- *
-- * Author: Vitaly Wool <vital@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ARCH_ARM_STMX3XXX_CLOCK_H__
--#define __ARCH_ARM_STMX3XXX_CLOCK_H__
--
--#ifndef __ASSEMBLER__
--
--struct clk_ops {
--	int (*enable) (struct clk *);
--	int (*disable) (struct clk *);
--	long (*get_rate) (struct clk *);
--	long (*round_rate) (struct clk *, u32);
--	int (*set_rate) (struct clk *, u32);
--	int (*set_parent) (struct clk *, struct clk *);
--};
--
--struct clk {
--	struct clk *parent;
--	u32 rate;
--	u32 flags;
--	u8 scale_shift;
--	u8 enable_shift;
--	u8 bypass_shift;
--	u8 busy_bit;
--	s8 usage;
--	int enable_wait;
--	int enable_negate;
--	u32 saved_div;
--	void __iomem *enable_reg;
--	void __iomem *scale_reg;
--	void __iomem *bypass_reg;
--	void __iomem *busy_reg;
--	struct clk_ops *ops;
--};
--
--#endif /* __ASSEMBLER__ */
--
--/* Flags */
--#define RATE_PROPAGATES      (1<<0)
--#define NEEDS_INITIALIZATION (1<<1)
--#define PARENT_SET_RATE      (1<<2)
--#define FIXED_RATE           (1<<3)
--#define ENABLED	             (1<<4)
--#define NEEDS_SET_PARENT     (1<<5)
--
--#endif
-diff --git a/arch/arm/plat-stmp3xxx/core.c b/arch/arm/plat-stmp3xxx/core.c
-deleted file mode 100644
-index 37b8a09..0000000
---- a/arch/arm/plat-stmp3xxx/core.c
+index 1079c2b..0000000
+--- a/arch/arm/configs/stmp378x_defconfig
 +++ /dev/null
 @@ -1,128 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_LOCALVERSION="-default"
+-CONFIG_SYSVIPC=y
+-CONFIG_POSIX_MQUEUE=y
+-CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_EXPERT=y
+-CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODULE_FORCE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_MODULE_SRCVERSION_ALL=y
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_STMP3XXX=y
+-CONFIG_ARCH_STMP378X=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-CONFIG_HIGHMEM=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="console=ttySDBG0,115200 mem=32M"
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_MULTICAST=y
+-CONFIG_IP_ADVANCED_ROUTER=y
+-CONFIG_IP_MULTIPLE_TABLES=y
+-CONFIG_IP_ROUTE_MULTIPATH=y
+-CONFIG_IP_ROUTE_VERBOSE=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_IP_PNP_BOOTP=y
+-CONFIG_IP_MROUTE=y
+-CONFIG_IP_PIMSM_V1=y
+-CONFIG_IP_PIMSM_V2=y
+-CONFIG_SYN_COOKIES=y
+-# CONFIG_INET_LRO is not set
+-# CONFIG_IPV6 is not set
+-CONFIG_NET_SCHED=y
+-# CONFIG_WIRELESS is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-# CONFIG_STANDALONE is not set
+-CONFIG_MTD=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_NAND=y
+-CONFIG_MTD_UBI=y
+-CONFIG_MTD_UBI_GLUEBI=y
+-CONFIG_BLK_DEV_LOOP=y
+-CONFIG_BLK_DEV_CRYPTOLOOP=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_COUNT=4
+-CONFIG_BLK_DEV_RAM_SIZE=6144
+-# CONFIG_MISC_DEVICES is not set
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_CHR_DEV_SG=y
+-# CONFIG_SCSI_LOWLEVEL is not set
+-CONFIG_INPUT_POLLDEV=y
+-CONFIG_INPUT_MOUSEDEV_SCREEN_X=320
+-CONFIG_INPUT_MOUSEDEV_SCREEN_Y=240
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_KEYBOARD_ATKBD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_INPUT_MISC=y
+-# CONFIG_SERIO_SERPORT is not set
+-CONFIG_VT_HW_CONSOLE_BINDING=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_HW_RANDOM=y
+-CONFIG_DEBUG_GPIO=y
+-CONFIG_GPIO_SYSFS=y
+-# CONFIG_HWMON is not set
+-CONFIG_FB=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
+-CONFIG_LCD_CLASS_DEVICE=y
+-CONFIG_BACKLIGHT_CLASS_DEVICE=y
+-# CONFIG_VGA_CONSOLE is not set
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_LOGO=y
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-# CONFIG_DNOTIFY is not set
+-CONFIG_TMPFS=y
+-CONFIG_CONFIGFS_FS=m
+-# CONFIG_MISC_FILESYSTEMS is not set
+-# CONFIG_NETWORK_FILESYSTEMS is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-CONFIG_STRIP_ASM_SYMS=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_SHIRQ=y
+-# CONFIG_SCHED_DEBUG is not set
+-CONFIG_DEBUG_OBJECTS=y
+-CONFIG_DEBUG_OBJECTS_SELFTEST=y
+-CONFIG_DEBUG_OBJECTS_FREE=y
+-CONFIG_DEBUG_OBJECTS_TIMERS=y
+-CONFIG_DEBUG_SLAB=y
+-CONFIG_DEBUG_SLAB_LEAK=y
+-CONFIG_DEBUG_RT_MUTEXES=y
+-CONFIG_PROVE_LOCKING=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+-CONFIG_DEBUG_KOBJECT=y
+-# CONFIG_DEBUG_BUGVERBOSE is not set
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+-CONFIG_BOOT_TRACER=y
+-CONFIG_STACK_TRACER=y
+-CONFIG_BLK_DEV_IO_TRACE=y
+-CONFIG_KEYS=y
+-CONFIG_KEYS_DEBUG_PROC_KEYS=y
+-CONFIG_SECURITY=y
+-CONFIG_CRYPTO_TEST=m
+-CONFIG_CRYPTO_ECB=y
+-CONFIG_CRYPTO_HMAC=y
+-CONFIG_CRYPTO_MD5=y
+-CONFIG_CRYPTO_SHA1=m
+-CONFIG_CRYPTO_AES=m
+-CONFIG_CRYPTO_DES=y
+-CONFIG_CRYPTO_DEFLATE=y
+-CONFIG_CRYPTO_LZO=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-CONFIG_CRC_CCITT=m
+-CONFIG_CRC16=y
+diff --git a/arch/arm/mach-stmp378x/Makefile b/arch/arm/mach-stmp378x/Makefile
+deleted file mode 100644
+index d156f76..0000000
+--- a/arch/arm/mach-stmp378x/Makefile
++++ /dev/null
+@@ -1,2 +0,0 @@
+-obj-$(CONFIG_ARCH_STMP378X) += stmp378x.o
+-obj-$(CONFIG_MACH_STMP378X) += stmp378x_devb.o
+diff --git a/arch/arm/mach-stmp378x/Makefile.boot b/arch/arm/mach-stmp378x/Makefile.boot
+deleted file mode 100644
+index 1568ad4..0000000
+--- a/arch/arm/mach-stmp378x/Makefile.boot
++++ /dev/null
+@@ -1,3 +0,0 @@
+-   zreladdr-y	:= 0x40008000
+-params_phys-y	:= 0x40000100
+-initrd_phys-y	:= 0x40800000
+diff --git a/arch/arm/mach-stmp378x/include/mach/entry-macro.S b/arch/arm/mach-stmp378x/include/mach/entry-macro.S
+deleted file mode 100644
+index 731a922..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/entry-macro.S
++++ /dev/null
+@@ -1,35 +0,0 @@
 -/*
-- * Freescale STMP37XX/STMP378X core routines
+- * Low-level IRQ helper macros for Freescale STMP378X
 - *
 - * Embedded Alley Solutions, Inc <source@embeddedalley.com>
 - *
@@ -1369,522 +304,34 @@ index 37b8a09..0000000
 - * http://www.opensource.org/licenses/gpl-license.html
 - * http://www.gnu.org/copyleft/gpl.html
 - */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
 -
--#include <mach/stmp3xxx.h>
--#include <mach/platform.h>
--#include <mach/dma.h>
--#include <mach/regs-clkctrl.h>
+-		.macro	disable_fiq
+-		.endm
 -
--static int __stmp3xxx_reset_block(void __iomem *hwreg, int just_enable)
--{
--	u32 c;
--	int timeout;
+-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 -
--	/* the process of software reset of IP block is done
--	   in several steps:
+-	        mov	\base, #0xf0000000	@ vm address of IRQ controller
+-		ldr	\irqnr, [\base, #0x70]	@ HW_ICOLL_STAT
+-		cmp	\irqnr, #0x7f
+-		moveqs	\irqnr, #0		@ Zero flag set for no IRQ
 -
--	   - clear SFTRST and wait for block is enabled;
--	   - clear clock gating (CLKGATE bit);
--	   - set the SFTRST again and wait for block is in reset;
--	   - clear SFTRST and wait for reset completion.
--	*/
--	c = __raw_readl(hwreg);
--	c &= ~(1<<31);		/* clear SFTRST */
--	__raw_writel(c, hwreg);
--	for (timeout = 1000000; timeout > 0; timeout--)
--		/* still in SFTRST state ? */
--		if ((__raw_readl(hwreg) & (1<<31)) == 0)
--			break;
--	if (timeout <= 0) {
--		printk(KERN_ERR"%s(%p): timeout when enabling\n",
--				__func__, hwreg);
--		return -ETIME;
--	}
+-		.endm
 -
--	c = __raw_readl(hwreg);
--	c &= ~(1<<30);		/* clear CLKGATE */
--	__raw_writel(c, hwreg);
+-                .macro  get_irqnr_preamble, base, tmp
+-                .endm
 -
--	if (!just_enable) {
--		c = __raw_readl(hwreg);
--		c |= (1<<31);		/* now again set SFTRST */
--		__raw_writel(c, hwreg);
--		for (timeout = 1000000; timeout > 0; timeout--)
--			/* poll until CLKGATE set */
--			if (__raw_readl(hwreg) & (1<<30))
--				break;
--		if (timeout <= 0) {
--			printk(KERN_ERR"%s(%p): timeout when resetting\n",
--					__func__, hwreg);
--			return -ETIME;
--		}
--
--		c = __raw_readl(hwreg);
--		c &= ~(1<<31);		/* clear SFTRST */
--		__raw_writel(c, hwreg);
--		for (timeout = 1000000; timeout > 0; timeout--)
--			/* still in SFTRST state ? */
--			if ((__raw_readl(hwreg) & (1<<31)) == 0)
--				break;
--		if (timeout <= 0) {
--			printk(KERN_ERR"%s(%p): timeout when enabling "
--					"after reset\n", __func__, hwreg);
--			return -ETIME;
--		}
--
--		c = __raw_readl(hwreg);
--		c &= ~(1<<30);		/* clear CLKGATE */
--		__raw_writel(c, hwreg);
--	}
--	for (timeout = 1000000; timeout > 0; timeout--)
--		/* still in SFTRST state ? */
--		if ((__raw_readl(hwreg) & (1<<30)) == 0)
--			break;
--
--	if (timeout <= 0) {
--		printk(KERN_ERR"%s(%p): timeout when unclockgating\n",
--				__func__, hwreg);
--		return -ETIME;
--	}
--
--	return 0;
--}
--
--int stmp3xxx_reset_block(void __iomem *hwreg, int just_enable)
--{
--	int try = 10;
--	int r;
--
--	while (try--) {
--		r = __stmp3xxx_reset_block(hwreg, just_enable);
--		if (!r)
--			break;
--		pr_debug("%s: try %d failed\n", __func__, 10 - try);
--	}
--	return r;
--}
--EXPORT_SYMBOL(stmp3xxx_reset_block);
--
--struct platform_device stmp3xxx_dbguart = {
--	.name = "stmp3xxx-dbguart",
--	.id = -1,
--};
--
--void __init stmp3xxx_init(void)
--{
--	/* Turn off auto-slow and other tricks */
--	stmp3xxx_clearl(0x7f00000, REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
--
--	stmp3xxx_dma_init();
--}
-diff --git a/arch/arm/plat-stmp3xxx/devices.c b/arch/arm/plat-stmp3xxx/devices.c
+-                .macro  arch_ret_to_user, tmp1, tmp2
+-                .endm
+diff --git a/arch/arm/mach-stmp378x/include/mach/irqs.h b/arch/arm/mach-stmp378x/include/mach/irqs.h
 deleted file mode 100644
-index 68fed4b..0000000
---- a/arch/arm/plat-stmp3xxx/devices.c
+index cc59673..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/irqs.h
 +++ /dev/null
-@@ -1,389 +0,0 @@
+@@ -1,95 +0,0 @@
 -/*
--* Freescale STMP37XX/STMP378X platform devices
--*
--* Embedded Alley Solutions, Inc <source@embeddedalley.com>
--*
--* Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
--* Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
--*/
--
--/*
--* The code contained herein is licensed under the GNU General Public
--* License. You may obtain a copy of the GNU General Public License
--* Version 2 or later at the following locations:
--*
--* http://www.opensource.org/licenses/gpl-license.html
--* http://www.gnu.org/copyleft/gpl.html
--*/
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/device.h>
--#include <linux/platform_device.h>
--#include <linux/dma-mapping.h>
--
--#include <mach/dma.h>
--#include <mach/platform.h>
--#include <mach/stmp3xxx.h>
--#include <mach/regs-lcdif.h>
--#include <mach/regs-uartapp.h>
--#include <mach/regs-gpmi.h>
--#include <mach/regs-usbctrl.h>
--#include <mach/regs-ssp.h>
--#include <mach/regs-rtc.h>
--
--static u64 common_dmamask = DMA_BIT_MASK(32);
--
--static struct resource appuart_resources[] = {
--	{
--		.start = IRQ_UARTAPP_INTERNAL,
--		.end = IRQ_UARTAPP_INTERNAL,
--		.flags = IORESOURCE_IRQ,
--	}, {
--		.start = IRQ_UARTAPP_RX_DMA,
--		.end = IRQ_UARTAPP_RX_DMA,
--		.flags = IORESOURCE_IRQ,
--	}, {
--		.start = IRQ_UARTAPP_TX_DMA,
--		.end = IRQ_UARTAPP_TX_DMA,
--		.flags = IORESOURCE_IRQ,
--	}, {
--		.start = REGS_UARTAPP1_PHYS,
--		.end = REGS_UARTAPP1_PHYS + REGS_UARTAPP_SIZE,
--		.flags = IORESOURCE_MEM,
--	}, {
--		/* Rx DMA channel */
--		.start = STMP3XXX_DMA(6, STMP3XXX_BUS_APBX),
--		.end = STMP3XXX_DMA(6, STMP3XXX_BUS_APBX),
--		.flags = IORESOURCE_DMA,
--	}, {
--		/* Tx DMA channel */
--		.start = STMP3XXX_DMA(7, STMP3XXX_BUS_APBX),
--		.end = STMP3XXX_DMA(7, STMP3XXX_BUS_APBX),
--		.flags = IORESOURCE_DMA,
--	},
--};
--
--struct platform_device stmp3xxx_appuart = {
--	.name = "stmp3xxx-appuart",
--	.id = 0,
--	.resource = appuart_resources,
--	.num_resources = ARRAY_SIZE(appuart_resources),
--	.dev = {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--};
--
--struct platform_device stmp3xxx_watchdog = {
--      .name   = "stmp3xxx_wdt",
--      .id     = -1,
--};
--
--static struct resource ts_resource[] = {
--	{
--		.flags  = IORESOURCE_IRQ,
--		.start  = IRQ_TOUCH_DETECT,
--		.end    = IRQ_TOUCH_DETECT,
--	}, {
--		.flags  = IORESOURCE_IRQ,
--		.start  = IRQ_LRADC_CH5,
--		.end    = IRQ_LRADC_CH5,
--	},
--};
--
--struct platform_device stmp3xxx_touchscreen = {
--	.name		= "stmp3xxx_ts",
--	.id		= -1,
--	.resource	= ts_resource,
--	.num_resources	= ARRAY_SIZE(ts_resource),
--};
--
--/*
--* Keypad device
--*/
--struct platform_device stmp3xxx_keyboard = {
--	.name		= "stmp3xxx-keyboard",
--	.id		= -1,
--};
--
--static struct resource gpmi_resources[] = {
--	{
--		.flags = IORESOURCE_MEM,
--		.start = REGS_GPMI_PHYS,
--		.end = REGS_GPMI_PHYS + REGS_GPMI_SIZE,
--	}, {
--		.flags = IORESOURCE_IRQ,
--		.start = IRQ_GPMI_DMA,
--		.end = IRQ_GPMI_DMA,
--	}, {
--		.flags = IORESOURCE_DMA,
--		.start = STMP3XXX_DMA(4, STMP3XXX_BUS_APBH),
--		.end = STMP3XXX_DMA(8, STMP3XXX_BUS_APBH),
--	},
--};
--
--struct platform_device stmp3xxx_gpmi = {
--	.name = "gpmi",
--	.id = -1,
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--	.resource = gpmi_resources,
--	.num_resources = ARRAY_SIZE(gpmi_resources),
--};
--
--static struct resource mmc1_resource[] = {
--	{
--		.flags	= IORESOURCE_MEM,
--		.start	= REGS_SSP1_PHYS,
--		.end	= REGS_SSP1_PHYS + REGS_SSP_SIZE,
--	}, {
--		.flags	= IORESOURCE_DMA,
--		.start	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
--		.end	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
--	}, {
--		.flags	= IORESOURCE_IRQ,
--		.start	= IRQ_SSP1_DMA,
--		.end	= IRQ_SSP1_DMA,
--	}, {
--		.flags	= IORESOURCE_IRQ,
--		.start	= IRQ_SSP_ERROR,
--		.end	= IRQ_SSP_ERROR,
--	},
--};
--
--struct platform_device stmp3xxx_mmc = {
--	.name	= "stmp3xxx-mmc",
--	.id	= 1,
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--	.resource = mmc1_resource,
--	.num_resources = ARRAY_SIZE(mmc1_resource),
--};
--
--static struct resource usb_resources[] = {
--	{
--		.start	= REGS_USBCTRL_PHYS,
--		.end	= REGS_USBCTRL_PHYS + SZ_4K,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_USB_CTRL,
--		.end	= IRQ_USB_CTRL,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device stmp3xxx_udc = {
--	.name		= "fsl-usb2-udc",
--	.id		= -1,
--	.dev		= {
--		.dma_mask		= &common_dmamask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--	.resource = usb_resources,
--	.num_resources = ARRAY_SIZE(usb_resources),
--};
--
--struct platform_device stmp3xxx_ehci = {
--	.name		= "fsl-ehci",
--	.id		= -1,
--	.dev		= {
--		.dma_mask		= &common_dmamask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--	.resource	= usb_resources,
--	.num_resources	= ARRAY_SIZE(usb_resources),
--};
--
--static struct resource rtc_resources[] = {
--	{
--		.start	= REGS_RTC_PHYS,
--		.end	= REGS_RTC_PHYS + REGS_RTC_SIZE,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_RTC_ALARM,
--		.end	= IRQ_RTC_ALARM,
--		.flags	= IORESOURCE_IRQ,
--	}, {
--		.start	= IRQ_RTC_1MSEC,
--		.end	= IRQ_RTC_1MSEC,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device stmp3xxx_rtc = {
--	.name		= "stmp3xxx-rtc",
--	.id		= -1,
--	.resource	= rtc_resources,
--	.num_resources	= ARRAY_SIZE(rtc_resources),
--};
--
--static struct resource ssp1_resources[] = {
--	{
--		.start	= REGS_SSP1_PHYS,
--		.end	= REGS_SSP1_PHYS + REGS_SSP_SIZE,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_SSP1_DMA,
--		.end	= IRQ_SSP1_DMA,
--		.flags	= IORESOURCE_IRQ,
--	}, {
--		.start	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
--		.end	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
--		.flags	= IORESOURCE_DMA,
--	},
--};
--
--static struct resource ssp2_resources[] = {
--	{
--		.start	= REGS_SSP2_PHYS,
--		.end	= REGS_SSP2_PHYS + REGS_SSP_SIZE,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_SSP2_DMA,
--		.end	= IRQ_SSP2_DMA,
--		.flags	= IORESOURCE_IRQ,
--	}, {
--		.start	= STMP3XXX_DMA(2, STMP3XXX_BUS_APBH),
--		.end	= STMP3XXX_DMA(2, STMP3XXX_BUS_APBH),
--		.flags	= IORESOURCE_DMA,
--	},
--};
--
--struct platform_device stmp3xxx_spi1 = {
--	.name	= "stmp3xxx_ssp",
--	.id	= 1,
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--	.resource = ssp1_resources,
--	.num_resources = ARRAY_SIZE(ssp1_resources),
--};
--
--struct platform_device stmp3xxx_spi2 = {
--	.name	= "stmp3xxx_ssp",
--	.id	= 2,
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--	.resource = ssp2_resources,
--	.num_resources = ARRAY_SIZE(ssp2_resources),
--};
--
--static struct resource fb_resource[] = {
--	{
--		.flags	= IORESOURCE_IRQ,
--		.start	= IRQ_LCDIF_DMA,
--		.end	= IRQ_LCDIF_DMA,
--	}, {
--		.flags	= IORESOURCE_IRQ,
--		.start	= IRQ_LCDIF_ERROR,
--		.end	= IRQ_LCDIF_ERROR,
--	}, {
--		.flags	= IORESOURCE_MEM,
--		.start	= REGS_LCDIF_PHYS,
--		.end	= REGS_LCDIF_PHYS + REGS_LCDIF_SIZE,
--	},
--};
--
--struct platform_device stmp3xxx_framebuffer = {
--	.name		= "stmp3xxx-fb",
--	.id		= -1,
--	.dev		= {
--		.dma_mask		= &common_dmamask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--	.num_resources	= ARRAY_SIZE(fb_resource),
--	.resource	= fb_resource,
--};
--
--#define CMDLINE_DEVICE_CHOOSE(name, dev1, dev2)			\
--	static char *cmdline_device_##name;			\
--	static int cmdline_device_##name##_setup(char *dev)	\
--	{							\
--		cmdline_device_##name = dev + 1;		\
--		return 0;					\
--	}							\
--	__setup(#name, cmdline_device_##name##_setup);		\
--	int stmp3xxx_##name##_device_register(void)		\
--	{							\
--		struct platform_device *d = NULL;		\
--		if (!cmdline_device_##name ||			\
--			!strcmp(cmdline_device_##name, #dev1))	\
--				d = &stmp3xxx_##dev1;		\
--		else if (!strcmp(cmdline_device_##name, #dev2))	\
--				d = &stmp3xxx_##dev2;		\
--		else						\
--			printk(KERN_ERR"Unknown %s assignment '%s'.\n",	\
--				#name, cmdline_device_##name);	\
--		return d ? platform_device_register(d) : -ENOENT;	\
--	}
--
--CMDLINE_DEVICE_CHOOSE(ssp1, mmc, spi1)
--CMDLINE_DEVICE_CHOOSE(ssp2, gpmi, spi2)
--
--struct platform_device stmp3xxx_backlight = {
--	.name		= "stmp3xxx-bl",
--	.id		= -1,
--};
--
--struct platform_device stmp3xxx_rotdec = {
--	.name	= "stmp3xxx-rotdec",
--	.id	= -1,
--};
--
--struct platform_device stmp3xxx_persistent = {
--	.name			= "stmp3xxx-persistent",
--	.id			= -1,
--};
--
--struct platform_device stmp3xxx_dcp_bootstream = {
--	.name			= "stmp3xxx-dcpboot",
--	.id			= -1,
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--};
--
--static struct resource dcp_resources[] = {
--	{
--		.start = IRQ_DCP_VMI,
--		.end = IRQ_DCP_VMI,
--		.flags = IORESOURCE_IRQ,
--	}, {
--		.start = IRQ_DCP,
--		.end = IRQ_DCP,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device stmp3xxx_dcp = {
--	.name			= "stmp3xxx-dcp",
--	.id			= -1,
--	.resource		= dcp_resources,
--	.num_resources		= ARRAY_SIZE(dcp_resources),
--	.dev	= {
--		.dma_mask	= &common_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--};
--
--static struct resource battery_resource[] = {
--	{
--		.flags  = IORESOURCE_IRQ,
--		.start  = IRQ_VDD5V,
--		.end    = IRQ_VDD5V,
--	},
--};
--
--struct platform_device stmp3xxx_battery = {
--	.name   = "stmp3xxx-battery",
--	.resource = battery_resource,
--	.num_resources = ARRAY_SIZE(battery_resource),
--};
-diff --git a/arch/arm/plat-stmp3xxx/dma.c b/arch/arm/plat-stmp3xxx/dma.c
-deleted file mode 100644
-index b4dcf8c..0000000
---- a/arch/arm/plat-stmp3xxx/dma.c
-+++ /dev/null
-@@ -1,464 +0,0 @@
--/*
-- * DMA helper routines for Freescale STMP37XX/STMP378X
+- * Freescale STMP378X interrupts
 - *
-- * Author: dmitry pervushin <dpervushin@embeddedalley.com>
+- * Copyright (C) 2005 Sigmatel Inc
 - *
 - * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
@@ -1898,487 +345,94 @@ index b4dcf8c..0000000
 - * http://www.opensource.org/licenses/gpl-license.html
 - * http://www.gnu.org/copyleft/gpl.html
 - */
--#include <linux/gfp.h>
--#include <linux/kernel.h>
--#include <linux/device.h>
--#include <linux/dmapool.h>
--#include <linux/sysdev.h>
--#include <linux/cpufreq.h>
 -
--#include <asm/page.h>
+-#define IRQ_DEBUG_UART			0
+-#define IRQ_COMMS_RX			1
+-#define IRQ_COMMS_TX			1
+-#define IRQ_SSP2_ERROR			2
+-#define IRQ_VDD5V			3
+-#define IRQ_HEADPHONE_SHORT		4
+-#define IRQ_DAC_DMA			5
+-#define IRQ_DAC_ERROR			6
+-#define IRQ_ADC_DMA			7
+-#define IRQ_ADC_ERROR			8
+-#define IRQ_SPDIF_DMA			9
+-#define IRQ_SAIF2_DMA			9
+-#define IRQ_SPDIF_ERROR			10
+-#define IRQ_SAIF1_IRQ			10
+-#define IRQ_SAIF2_IRQ			10
+-#define IRQ_USB_CTRL			11
+-#define IRQ_USB_WAKEUP			12
+-#define IRQ_GPMI_DMA			13
+-#define IRQ_SSP1_DMA			14
+-#define IRQ_SSP_ERROR			15
+-#define IRQ_GPIO0			16
+-#define IRQ_GPIO1			17
+-#define IRQ_GPIO2			18
+-#define IRQ_SAIF1_DMA			19
+-#define IRQ_SSP2_DMA			20
+-#define IRQ_ECC8_IRQ			21
+-#define IRQ_RTC_ALARM			22
+-#define IRQ_UARTAPP_TX_DMA		23
+-#define IRQ_UARTAPP_INTERNAL		24
+-#define IRQ_UARTAPP_RX_DMA		25
+-#define IRQ_I2C_DMA			26
+-#define IRQ_I2C_ERROR			27
+-#define IRQ_TIMER0			28
+-#define IRQ_TIMER1			29
+-#define IRQ_TIMER2			30
+-#define IRQ_TIMER3			31
+-#define IRQ_BATT_BRNOUT			32
+-#define IRQ_VDDD_BRNOUT			33
+-#define IRQ_VDDIO_BRNOUT		34
+-#define IRQ_VDD18_BRNOUT		35
+-#define IRQ_TOUCH_DETECT		36
+-#define IRQ_LRADC_CH0			37
+-#define IRQ_LRADC_CH1			38
+-#define IRQ_LRADC_CH2			39
+-#define IRQ_LRADC_CH3			40
+-#define IRQ_LRADC_CH4			41
+-#define IRQ_LRADC_CH5			42
+-#define IRQ_LRADC_CH6			43
+-#define IRQ_LRADC_CH7			44
+-#define IRQ_LCDIF_DMA			45
+-#define IRQ_LCDIF_ERROR			46
+-#define IRQ_DIGCTL_DEBUG_TRAP		47
+-#define IRQ_RTC_1MSEC			48
+-#define IRQ_DRI_DMA			49
+-#define IRQ_DRI_ATTENTION		50
+-#define IRQ_GPMI_ATTENTION		51
+-#define IRQ_IR				52
+-#define IRQ_DCP_VMI			53
+-#define IRQ_DCP				54
+-#define IRQ_BCH				56
+-#define IRQ_PXP				57
+-#define IRQ_UARTAPP2_TX_DMA		58
+-#define IRQ_UARTAPP2_INTERNAL		59
+-#define IRQ_UARTAPP2_RX_DMA		60
+-#define IRQ_VDAC_DETECT			61
+-#define IRQ_VDD5V_DROOP			64
+-#define IRQ_DCDC4P2_BO			65
 -
--#include <mach/platform.h>
--#include <mach/dma.h>
--#include <mach/regs-apbx.h>
--#include <mach/regs-apbh.h>
 -
--static const size_t pool_item_size = sizeof(struct stmp3xxx_dma_command);
--static const size_t pool_alignment = 8;
--static struct stmp3xxx_dma_user {
--	void *pool;
--	int inuse;
--	const char *name;
--} channels[MAX_DMA_CHANNELS];
+-#define NR_REAL_IRQS	128
+-#define NR_IRQS		(NR_REAL_IRQS + 32 * 3)
 -
--#define IS_VALID_CHANNEL(ch) ((ch) >= 0 && (ch) < MAX_DMA_CHANNELS)
--#define IS_USED(ch) (channels[ch].inuse)
+-/* All interrupts are FIQ capable */
+-#define FIQ_START		IRQ_DEBUG_UART
 -
--int stmp3xxx_dma_request(int ch, struct device *dev, const char *name)
--{
--	struct stmp3xxx_dma_user *user;
--	int err = 0;
--
--	user = channels + ch;
--	if (!IS_VALID_CHANNEL(ch)) {
--		err = -ENODEV;
--		goto out;
--	}
--	if (IS_USED(ch)) {
--		err = -EBUSY;
--		goto out;
--	}
--	/* Create a pool to allocate dma commands from */
--	user->pool = dma_pool_create(name, dev, pool_item_size,
--				     pool_alignment, PAGE_SIZE);
--	if (user->pool == NULL) {
--		err = -ENOMEM;
--		goto out;
--	}
--	user->name = name;
--	user->inuse++;
--out:
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_request);
--
--int stmp3xxx_dma_release(int ch)
--{
--	struct stmp3xxx_dma_user *user = channels + ch;
--	int err = 0;
--
--	if (!IS_VALID_CHANNEL(ch)) {
--		err = -ENODEV;
--		goto out;
--	}
--	if (!IS_USED(ch)) {
--		err = -EBUSY;
--		goto out;
--	}
--	BUG_ON(user->pool == NULL);
--	dma_pool_destroy(user->pool);
--	user->inuse--;
--out:
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_release);
--
--int stmp3xxx_dma_read_semaphore(int channel)
--{
--	int sem = -1;
--
--	switch (STMP3XXX_DMA_BUS(channel)) {
--	case STMP3XXX_BUS_APBH:
--		sem = __raw_readl(REGS_APBH_BASE + HW_APBH_CHn_SEMA +
--				STMP3XXX_DMA_CHANNEL(channel) * 0x70);
--		sem &= BM_APBH_CHn_SEMA_PHORE;
--		sem >>= BP_APBH_CHn_SEMA_PHORE;
--		break;
--
--	case STMP3XXX_BUS_APBX:
--		sem = __raw_readl(REGS_APBX_BASE + HW_APBX_CHn_SEMA +
--				STMP3XXX_DMA_CHANNEL(channel) * 0x70);
--		sem &= BM_APBX_CHn_SEMA_PHORE;
--		sem >>= BP_APBX_CHn_SEMA_PHORE;
--		break;
--	default:
--		BUG();
--	}
--	return sem;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_read_semaphore);
--
--int stmp3xxx_dma_allocate_command(int channel,
--				  struct stmp3xxx_dma_descriptor *descriptor)
--{
--	struct stmp3xxx_dma_user *user = channels + channel;
--	int err = 0;
--
--	if (!IS_VALID_CHANNEL(channel)) {
--		err = -ENODEV;
--		goto out;
--	}
--	if (!IS_USED(channel)) {
--		err = -EBUSY;
--		goto out;
--	}
--	if (descriptor == NULL) {
--		err = -EINVAL;
--		goto out;
--	}
--
--	/* Allocate memory for a command from the buffer */
--	descriptor->command =
--	    dma_pool_alloc(user->pool, GFP_KERNEL, &descriptor->handle);
--
--	/* Check it worked */
--	if (!descriptor->command) {
--		err = -ENOMEM;
--		goto out;
--	}
--
--	memset(descriptor->command, 0, pool_item_size);
--out:
--	WARN_ON(err);
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_allocate_command);
--
--int stmp3xxx_dma_free_command(int channel,
--			      struct stmp3xxx_dma_descriptor *descriptor)
--{
--	int err = 0;
--
--	if (!IS_VALID_CHANNEL(channel)) {
--		err = -ENODEV;
--		goto out;
--	}
--	if (!IS_USED(channel)) {
--		err = -EBUSY;
--		goto out;
--	}
--
--	/* Return the command memory to the pool */
--	dma_pool_free(channels[channel].pool, descriptor->command,
--		      descriptor->handle);
--
--	/* Initialise descriptor so we're not tempted to use it */
--	descriptor->command = NULL;
--	descriptor->handle = 0;
--	descriptor->virtual_buf_ptr = NULL;
--	descriptor->next_descr = NULL;
--
--	WARN_ON(err);
--out:
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_free_command);
--
--void stmp3xxx_dma_go(int channel,
--		     struct stmp3xxx_dma_descriptor *head, u32 semaphore)
--{
--	int ch = STMP3XXX_DMA_CHANNEL(channel);
--	void __iomem *c, *s;
--
--	switch (STMP3XXX_DMA_BUS(channel)) {
--	case STMP3XXX_BUS_APBH:
--		c = REGS_APBH_BASE + HW_APBH_CHn_NXTCMDAR + 0x70 * ch;
--		s = REGS_APBH_BASE + HW_APBH_CHn_SEMA + 0x70 * ch;
--		break;
--
--	case STMP3XXX_BUS_APBX:
--		c = REGS_APBX_BASE + HW_APBX_CHn_NXTCMDAR + 0x70 * ch;
--		s = REGS_APBX_BASE + HW_APBX_CHn_SEMA + 0x70 * ch;
--		break;
--
--	default:
--		return;
--	}
--
--	/* Set next command */
--	__raw_writel(head->handle, c);
--	/* Set counting semaphore (kicks off transfer). Assumes
--	   peripheral has been set up correctly */
--	__raw_writel(semaphore, s);
--}
--EXPORT_SYMBOL(stmp3xxx_dma_go);
--
--int stmp3xxx_dma_running(int channel)
--{
--	switch (STMP3XXX_DMA_BUS(channel)) {
--	case STMP3XXX_BUS_APBH:
--		return (__raw_readl(REGS_APBH_BASE + HW_APBH_CHn_SEMA +
--			0x70 * STMP3XXX_DMA_CHANNEL(channel))) &
--			    BM_APBH_CHn_SEMA_PHORE;
--
--	case STMP3XXX_BUS_APBX:
--		return (__raw_readl(REGS_APBX_BASE + HW_APBX_CHn_SEMA +
--			0x70 * STMP3XXX_DMA_CHANNEL(channel))) &
--			    BM_APBX_CHn_SEMA_PHORE;
--	default:
--		BUG();
--		return 0;
--	}
--}
--EXPORT_SYMBOL(stmp3xxx_dma_running);
--
--/*
-- * Circular dma chain management
-- */
--void stmp3xxx_dma_free_chain(struct stmp37xx_circ_dma_chain *chain)
--{
--	int i;
--
--	for (i = 0; i < chain->total_count; i++)
--		stmp3xxx_dma_free_command(
--			STMP3XXX_DMA(chain->channel, chain->bus),
--			&chain->chain[i]);
--}
--EXPORT_SYMBOL(stmp3xxx_dma_free_chain);
--
--int stmp3xxx_dma_make_chain(int ch, struct stmp37xx_circ_dma_chain *chain,
--			    struct stmp3xxx_dma_descriptor descriptors[],
--			    unsigned items)
--{
--	int i;
--	int err = 0;
--
--	if (items == 0)
--		return err;
--
--	for (i = 0; i < items; i++) {
--		err = stmp3xxx_dma_allocate_command(ch, &descriptors[i]);
--		if (err) {
--			WARN_ON(err);
--			/*
--			 * Couldn't allocate the whole chain.
--			 * deallocate what has been allocated
--			 */
--			if (i) {
--				do {
--					stmp3xxx_dma_free_command(ch,
--								  &descriptors
--								  [i]);
--				} while (i-- > 0);
--			}
--			return err;
--		}
--
--		/* link them! */
--		if (i > 0) {
--			descriptors[i - 1].next_descr = &descriptors[i];
--			descriptors[i - 1].command->next =
--						descriptors[i].handle;
--		}
--	}
--
--	/* make list circular */
--	descriptors[items - 1].next_descr = &descriptors[0];
--	descriptors[items - 1].command->next = descriptors[0].handle;
--
--	chain->total_count = items;
--	chain->chain = descriptors;
--	chain->free_index = 0;
--	chain->active_index = 0;
--	chain->cooked_index = 0;
--	chain->free_count = items;
--	chain->active_count = 0;
--	chain->cooked_count = 0;
--	chain->bus = STMP3XXX_DMA_BUS(ch);
--	chain->channel = STMP3XXX_DMA_CHANNEL(ch);
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_dma_make_chain);
--
--void stmp37xx_circ_clear_chain(struct stmp37xx_circ_dma_chain *chain)
--{
--	BUG_ON(stmp3xxx_dma_running(STMP3XXX_DMA(chain->channel, chain->bus)));
--	chain->free_index = 0;
--	chain->active_index = 0;
--	chain->cooked_index = 0;
--	chain->free_count = chain->total_count;
--	chain->active_count = 0;
--	chain->cooked_count = 0;
--}
--EXPORT_SYMBOL(stmp37xx_circ_clear_chain);
--
--void stmp37xx_circ_advance_free(struct stmp37xx_circ_dma_chain *chain,
--		unsigned count)
--{
--	BUG_ON(chain->cooked_count < count);
--
--	chain->cooked_count -= count;
--	chain->cooked_index += count;
--	chain->cooked_index %= chain->total_count;
--	chain->free_count += count;
--}
--EXPORT_SYMBOL(stmp37xx_circ_advance_free);
--
--void stmp37xx_circ_advance_active(struct stmp37xx_circ_dma_chain *chain,
--		unsigned count)
--{
--	void __iomem *c;
--	u32 mask_clr, mask;
--	BUG_ON(chain->free_count < count);
--
--	chain->free_count -= count;
--	chain->free_index += count;
--	chain->free_index %= chain->total_count;
--	chain->active_count += count;
--
--	switch (chain->bus) {
--	case STMP3XXX_BUS_APBH:
--		c = REGS_APBH_BASE + HW_APBH_CHn_SEMA + 0x70 * chain->channel;
--		mask_clr = BM_APBH_CHn_SEMA_INCREMENT_SEMA;
--		mask = BF(count, APBH_CHn_SEMA_INCREMENT_SEMA);
--		break;
--	case STMP3XXX_BUS_APBX:
--		c = REGS_APBX_BASE + HW_APBX_CHn_SEMA + 0x70 * chain->channel;
--		mask_clr = BM_APBX_CHn_SEMA_INCREMENT_SEMA;
--		mask = BF(count, APBX_CHn_SEMA_INCREMENT_SEMA);
--		break;
--	default:
--		BUG();
--		return;
--	}
--
--	/* Set counting semaphore (kicks off transfer). Assumes
--	   peripheral has been set up correctly */
--	stmp3xxx_clearl(mask_clr, c);
--	stmp3xxx_setl(mask, c);
--}
--EXPORT_SYMBOL(stmp37xx_circ_advance_active);
--
--unsigned stmp37xx_circ_advance_cooked(struct stmp37xx_circ_dma_chain *chain)
--{
--	unsigned cooked;
--
--	cooked = chain->active_count -
--	  stmp3xxx_dma_read_semaphore(STMP3XXX_DMA(chain->channel, chain->bus));
--
--	chain->active_count -= cooked;
--	chain->active_index += cooked;
--	chain->active_index %= chain->total_count;
--
--	chain->cooked_count += cooked;
--
--	return cooked;
--}
--EXPORT_SYMBOL(stmp37xx_circ_advance_cooked);
--
--void stmp3xxx_dma_set_alt_target(int channel, int function)
--{
--#if defined(CONFIG_ARCH_STMP37XX)
--	unsigned bits = 4;
--#elif defined(CONFIG_ARCH_STMP378X)
--	unsigned bits = 2;
--#else
--#error wrong arch
--#endif
--	int shift = STMP3XXX_DMA_CHANNEL(channel) * bits;
--	unsigned mask = (1<<bits) - 1;
--	void __iomem *c;
--
--	BUG_ON(function < 0 || function >= (1<<bits));
--	pr_debug("%s: channel = %d, using mask %x, "
--		 "shift = %d\n", __func__, channel, mask, shift);
--
--	switch (STMP3XXX_DMA_BUS(channel)) {
--	case STMP3XXX_BUS_APBH:
--		c = REGS_APBH_BASE + HW_APBH_DEVSEL;
--		break;
--	case STMP3XXX_BUS_APBX:
--		c = REGS_APBX_BASE + HW_APBX_DEVSEL;
--		break;
--	default:
--		BUG();
--	}
--	stmp3xxx_clearl(mask << shift, c);
--	stmp3xxx_setl(mask << shift, c);
--}
--EXPORT_SYMBOL(stmp3xxx_dma_set_alt_target);
--
--void stmp3xxx_dma_suspend(void)
--{
--	stmp3xxx_setl(BM_APBH_CTRL0_CLKGATE, REGS_APBH_BASE + HW_APBH_CTRL0);
--	stmp3xxx_setl(BM_APBX_CTRL0_CLKGATE, REGS_APBX_BASE + HW_APBX_CTRL0);
--}
--
--void stmp3xxx_dma_resume(void)
--{
--	stmp3xxx_clearl(BM_APBH_CTRL0_CLKGATE | BM_APBH_CTRL0_SFTRST,
--			REGS_APBH_BASE + HW_APBH_CTRL0);
--	stmp3xxx_clearl(BM_APBX_CTRL0_CLKGATE | BM_APBX_CTRL0_SFTRST,
--			REGS_APBX_BASE + HW_APBX_CTRL0);
--}
--
--#ifdef CONFIG_CPU_FREQ
--
--struct dma_notifier_block {
--	struct notifier_block nb;
--	void *data;
--};
--
--static int dma_cpufreq_notifier(struct notifier_block *self,
--				unsigned long phase, void *p)
--{
--	switch (phase) {
--	case CPUFREQ_POSTCHANGE:
--		stmp3xxx_dma_resume();
--		break;
--
--	case CPUFREQ_PRECHANGE:
--		stmp3xxx_dma_suspend();
--		break;
--
--	default:
--		break;
--	}
--
--	return NOTIFY_DONE;
--}
--
--static struct dma_notifier_block dma_cpufreq_nb = {
--	.nb = {
--		.notifier_call = dma_cpufreq_notifier,
--	},
--};
--#endif /* CONFIG_CPU_FREQ */
--
--void __init stmp3xxx_dma_init(void)
--{
--	stmp3xxx_clearl(BM_APBH_CTRL0_CLKGATE | BM_APBH_CTRL0_SFTRST,
--			REGS_APBH_BASE + HW_APBH_CTRL0);
--	stmp3xxx_clearl(BM_APBX_CTRL0_CLKGATE | BM_APBX_CTRL0_SFTRST,
--			REGS_APBX_BASE + HW_APBX_CTRL0);
--#ifdef CONFIG_CPU_FREQ
--	cpufreq_register_notifier(&dma_cpufreq_nb.nb,
--				CPUFREQ_TRANSITION_NOTIFIER);
--#endif /* CONFIG_CPU_FREQ */
--}
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/clkdev.h b/arch/arm/plat-stmp3xxx/include/mach/clkdev.h
+-/* Hard disk IRQ is a GPMI attention IRQ */
+-#define IRQ_HARDDISK		IRQ_GPMI_ATTENTION
+diff --git a/arch/arm/mach-stmp378x/include/mach/pins.h b/arch/arm/mach-stmp378x/include/mach/pins.h
 deleted file mode 100644
-index f9c3977..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/clkdev.h
+index 93f952d..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/pins.h
 +++ /dev/null
-@@ -1,18 +0,0 @@
+@@ -1,151 +0,0 @@
 -/*
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- * Freescale STMP378X SoC pin multiplexing
 - *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_MACH_CLKDEV_H
--#define __ASM_MACH_CLKDEV_H
--
--#define __clk_get(clk) ({ 1; })
--#define __clk_put(clk) do { } while (0)
--
--#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/cputype.h b/arch/arm/plat-stmp3xxx/include/mach/cputype.h
-deleted file mode 100644
-index b4e205b..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/cputype.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Freescale STMP37XX/STMP378X CPU type detection
-- *
-- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
 - *
 - * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
@@ -2392,676 +446,2846 @@ index b4e205b..0000000
 - * http://www.opensource.org/licenses/gpl-license.html
 - * http://www.gnu.org/copyleft/gpl.html
 - */
--#ifndef __ASM_PLAT_CPU_H
--#define __ASM_PLAT_CPU_H
+-#ifndef __ASM_ARCH_PINS_H
+-#define __ASM_ARCH_PINS_H
 -
--#ifdef CONFIG_ARCH_STMP37XX
--#define cpu_is_stmp37xx()	(1)
--#else
--#define cpu_is_stmp37xx()	(0)
--#endif
+-/*
+- * Define all STMP378x pins, a pin name corresponds to a STMP378x hardware
+- * interface  this pin belongs to.
+- */
 -
--#ifdef CONFIG_ARCH_STMP378X
--#define cpu_is_stmp378x()	(1)
--#else
--#define cpu_is_stmp378x()	(0)
--#endif
+-/* Bank 0 */
+-#define PINID_GPMI_D00		STMP3XXX_PINID(0, 0)
+-#define PINID_GPMI_D01		STMP3XXX_PINID(0, 1)
+-#define PINID_GPMI_D02		STMP3XXX_PINID(0, 2)
+-#define PINID_GPMI_D03		STMP3XXX_PINID(0, 3)
+-#define PINID_GPMI_D04		STMP3XXX_PINID(0, 4)
+-#define PINID_GPMI_D05		STMP3XXX_PINID(0, 5)
+-#define PINID_GPMI_D06		STMP3XXX_PINID(0, 6)
+-#define PINID_GPMI_D07		STMP3XXX_PINID(0, 7)
+-#define PINID_GPMI_D08		STMP3XXX_PINID(0, 8)
+-#define PINID_GPMI_D09		STMP3XXX_PINID(0, 9)
+-#define PINID_GPMI_D10		STMP3XXX_PINID(0, 10)
+-#define PINID_GPMI_D11		STMP3XXX_PINID(0, 11)
+-#define PINID_GPMI_D12		STMP3XXX_PINID(0, 12)
+-#define PINID_GPMI_D13		STMP3XXX_PINID(0, 13)
+-#define PINID_GPMI_D14		STMP3XXX_PINID(0, 14)
+-#define PINID_GPMI_D15		STMP3XXX_PINID(0, 15)
+-#define PINID_GPMI_CLE		STMP3XXX_PINID(0, 16)
+-#define PINID_GPMI_ALE		STMP3XXX_PINID(0, 17)
+-#define PINID_GMPI_CE2N		STMP3XXX_PINID(0, 18)
+-#define PINID_GPMI_RDY0		STMP3XXX_PINID(0, 19)
+-#define PINID_GPMI_RDY1		STMP3XXX_PINID(0, 20)
+-#define PINID_GPMI_RDY2		STMP3XXX_PINID(0, 21)
+-#define PINID_GPMI_RDY3		STMP3XXX_PINID(0, 22)
+-#define PINID_GPMI_WPN		STMP3XXX_PINID(0, 23)
+-#define PINID_GPMI_WRN		STMP3XXX_PINID(0, 24)
+-#define PINID_GPMI_RDN		STMP3XXX_PINID(0, 25)
+-#define PINID_AUART1_CTS	STMP3XXX_PINID(0, 26)
+-#define PINID_AUART1_RTS	STMP3XXX_PINID(0, 27)
+-#define PINID_AUART1_RX		STMP3XXX_PINID(0, 28)
+-#define PINID_AUART1_TX		STMP3XXX_PINID(0, 29)
+-#define PINID_I2C_SCL		STMP3XXX_PINID(0, 30)
+-#define PINID_I2C_SDA		STMP3XXX_PINID(0, 31)
 -
--#endif /* __ASM_PLAT_CPU_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
+-/* Bank 1 */
+-#define PINID_LCD_D00		STMP3XXX_PINID(1, 0)
+-#define PINID_LCD_D01		STMP3XXX_PINID(1, 1)
+-#define PINID_LCD_D02		STMP3XXX_PINID(1, 2)
+-#define PINID_LCD_D03		STMP3XXX_PINID(1, 3)
+-#define PINID_LCD_D04		STMP3XXX_PINID(1, 4)
+-#define PINID_LCD_D05		STMP3XXX_PINID(1, 5)
+-#define PINID_LCD_D06		STMP3XXX_PINID(1, 6)
+-#define PINID_LCD_D07		STMP3XXX_PINID(1, 7)
+-#define PINID_LCD_D08		STMP3XXX_PINID(1, 8)
+-#define PINID_LCD_D09		STMP3XXX_PINID(1, 9)
+-#define PINID_LCD_D10		STMP3XXX_PINID(1, 10)
+-#define PINID_LCD_D11		STMP3XXX_PINID(1, 11)
+-#define PINID_LCD_D12		STMP3XXX_PINID(1, 12)
+-#define PINID_LCD_D13		STMP3XXX_PINID(1, 13)
+-#define PINID_LCD_D14		STMP3XXX_PINID(1, 14)
+-#define PINID_LCD_D15		STMP3XXX_PINID(1, 15)
+-#define PINID_LCD_D16		STMP3XXX_PINID(1, 16)
+-#define PINID_LCD_D17		STMP3XXX_PINID(1, 17)
+-#define PINID_LCD_RESET		STMP3XXX_PINID(1, 18)
+-#define PINID_LCD_RS		STMP3XXX_PINID(1, 19)
+-#define PINID_LCD_WR		STMP3XXX_PINID(1, 20)
+-#define PINID_LCD_CS		STMP3XXX_PINID(1, 21)
+-#define PINID_LCD_DOTCK		STMP3XXX_PINID(1, 22)
+-#define PINID_LCD_ENABLE	STMP3XXX_PINID(1, 23)
+-#define PINID_LCD_HSYNC		STMP3XXX_PINID(1, 24)
+-#define PINID_LCD_VSYNC		STMP3XXX_PINID(1, 25)
+-#define PINID_PWM0		STMP3XXX_PINID(1, 26)
+-#define PINID_PWM1		STMP3XXX_PINID(1, 27)
+-#define PINID_PWM2		STMP3XXX_PINID(1, 28)
+-#define PINID_PWM3		STMP3XXX_PINID(1, 29)
+-#define PINID_PWM4		STMP3XXX_PINID(1, 30)
+-
+-/* Bank 2 */
+-#define PINID_SSP1_CMD		STMP3XXX_PINID(2, 0)
+-#define PINID_SSP1_DETECT	STMP3XXX_PINID(2, 1)
+-#define PINID_SSP1_DATA0	STMP3XXX_PINID(2, 2)
+-#define PINID_SSP1_DATA1	STMP3XXX_PINID(2, 3)
+-#define PINID_SSP1_DATA2	STMP3XXX_PINID(2, 4)
+-#define PINID_SSP1_DATA3	STMP3XXX_PINID(2, 5)
+-#define PINID_SSP1_SCK		STMP3XXX_PINID(2, 6)
+-#define PINID_ROTARYA		STMP3XXX_PINID(2, 7)
+-#define PINID_ROTARYB		STMP3XXX_PINID(2, 8)
+-#define PINID_EMI_A00		STMP3XXX_PINID(2, 9)
+-#define PINID_EMI_A01		STMP3XXX_PINID(2, 10)
+-#define PINID_EMI_A02		STMP3XXX_PINID(2, 11)
+-#define PINID_EMI_A03		STMP3XXX_PINID(2, 12)
+-#define PINID_EMI_A04		STMP3XXX_PINID(2, 13)
+-#define PINID_EMI_A05		STMP3XXX_PINID(2, 14)
+-#define PINID_EMI_A06		STMP3XXX_PINID(2, 15)
+-#define PINID_EMI_A07		STMP3XXX_PINID(2, 16)
+-#define PINID_EMI_A08		STMP3XXX_PINID(2, 17)
+-#define PINID_EMI_A09		STMP3XXX_PINID(2, 18)
+-#define PINID_EMI_A10		STMP3XXX_PINID(2, 19)
+-#define PINID_EMI_A11		STMP3XXX_PINID(2, 20)
+-#define PINID_EMI_A12		STMP3XXX_PINID(2, 21)
+-#define PINID_EMI_BA0		STMP3XXX_PINID(2, 22)
+-#define PINID_EMI_BA1		STMP3XXX_PINID(2, 23)
+-#define PINID_EMI_CASN		STMP3XXX_PINID(2, 24)
+-#define PINID_EMI_CE0N		STMP3XXX_PINID(2, 25)
+-#define PINID_EMI_CE1N		STMP3XXX_PINID(2, 26)
+-#define PINID_GPMI_CE1N		STMP3XXX_PINID(2, 27)
+-#define PINID_GPMI_CE0N		STMP3XXX_PINID(2, 28)
+-#define PINID_EMI_CKE		STMP3XXX_PINID(2, 29)
+-#define PINID_EMI_RASN		STMP3XXX_PINID(2, 30)
+-#define PINID_EMI_WEN		STMP3XXX_PINID(2, 31)
+-
+-/* Bank 3 */
+-#define PINID_EMI_D00		STMP3XXX_PINID(3, 0)
+-#define PINID_EMI_D01		STMP3XXX_PINID(3, 1)
+-#define PINID_EMI_D02		STMP3XXX_PINID(3, 2)
+-#define PINID_EMI_D03		STMP3XXX_PINID(3, 3)
+-#define PINID_EMI_D04		STMP3XXX_PINID(3, 4)
+-#define PINID_EMI_D05		STMP3XXX_PINID(3, 5)
+-#define PINID_EMI_D06		STMP3XXX_PINID(3, 6)
+-#define PINID_EMI_D07		STMP3XXX_PINID(3, 7)
+-#define PINID_EMI_D08		STMP3XXX_PINID(3, 8)
+-#define PINID_EMI_D09		STMP3XXX_PINID(3, 9)
+-#define PINID_EMI_D10		STMP3XXX_PINID(3, 10)
+-#define PINID_EMI_D11		STMP3XXX_PINID(3, 11)
+-#define PINID_EMI_D12		STMP3XXX_PINID(3, 12)
+-#define PINID_EMI_D13		STMP3XXX_PINID(3, 13)
+-#define PINID_EMI_D14		STMP3XXX_PINID(3, 14)
+-#define PINID_EMI_D15		STMP3XXX_PINID(3, 15)
+-#define PINID_EMI_DQM0		STMP3XXX_PINID(3, 16)
+-#define PINID_EMI_DQM1		STMP3XXX_PINID(3, 17)
+-#define PINID_EMI_DQS0		STMP3XXX_PINID(3, 18)
+-#define PINID_EMI_DQS1		STMP3XXX_PINID(3, 19)
+-#define PINID_EMI_CLK		STMP3XXX_PINID(3, 20)
+-#define PINID_EMI_CLKN		STMP3XXX_PINID(3, 21)
+-
+-#endif /* __ASM_ARCH_PINS_H */
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-apbh.h b/arch/arm/mach-stmp378x/include/mach/regs-apbh.h
 deleted file mode 100644
-index d3a0985..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
+index dbcf85b..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-apbh.h
++++ /dev/null
+@@ -1,101 +0,0 @@
+-/*
+- * stmp378x: APBH register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_APBH
+-#define _MACH_REGS_APBH
+-
+-#define REGS_APBH_BASE	(STMP3XXX_REGS_BASE + 0x4000)
+-#define REGS_APBH_PHYS	0x80004000
+-#define REGS_APBH_SIZE	0x2000
+-
+-#define HW_APBH_CTRL0		0x0
+-#define BM_APBH_CTRL0_RESET_CHANNEL	0x00FF0000
+-#define BP_APBH_CTRL0_RESET_CHANNEL	16
+-#define BM_APBH_CTRL0_CLKGATE	0x40000000
+-#define BM_APBH_CTRL0_SFTRST	0x80000000
+-
+-#define HW_APBH_CTRL1		0x10
+-#define BM_APBH_CTRL1_CH0_CMDCMPLT_IRQ	0x00000001
+-#define BP_APBH_CTRL1_CH0_CMDCMPLT_IRQ	0
+-
+-#define HW_APBH_CTRL2		0x20
+-
+-#define HW_APBH_DEVSEL		0x30
+-
+-#define HW_APBH_CH0_NXTCMDAR	(0x50 + 0 * 0x70)
+-#define HW_APBH_CH1_NXTCMDAR	(0x50 + 1 * 0x70)
+-#define HW_APBH_CH2_NXTCMDAR	(0x50 + 2 * 0x70)
+-#define HW_APBH_CH3_NXTCMDAR	(0x50 + 3 * 0x70)
+-#define HW_APBH_CH4_NXTCMDAR	(0x50 + 4 * 0x70)
+-#define HW_APBH_CH5_NXTCMDAR	(0x50 + 5 * 0x70)
+-#define HW_APBH_CH6_NXTCMDAR	(0x50 + 6 * 0x70)
+-#define HW_APBH_CH7_NXTCMDAR	(0x50 + 7 * 0x70)
+-#define HW_APBH_CH8_NXTCMDAR	(0x50 + 8 * 0x70)
+-#define HW_APBH_CH9_NXTCMDAR	(0x50 + 9 * 0x70)
+-#define HW_APBH_CH10_NXTCMDAR	(0x50 + 10 * 0x70)
+-#define HW_APBH_CH11_NXTCMDAR	(0x50 + 11 * 0x70)
+-#define HW_APBH_CH12_NXTCMDAR	(0x50 + 12 * 0x70)
+-#define HW_APBH_CH13_NXTCMDAR	(0x50 + 13 * 0x70)
+-#define HW_APBH_CH14_NXTCMDAR	(0x50 + 14 * 0x70)
+-#define HW_APBH_CH15_NXTCMDAR	(0x50 + 15 * 0x70)
+-
+-#define HW_APBH_CHn_NXTCMDAR	0x50
+-
+-#define BV_APBH_CHn_CMD_COMMAND__NO_DMA_XFER	 0
+-#define BV_APBH_CHn_CMD_COMMAND__DMA_WRITE	 1
+-#define BV_APBH_CHn_CMD_COMMAND__DMA_READ	 2
+-#define BV_APBH_CHn_CMD_COMMAND__DMA_SENSE	 3
+-#define BM_APBH_CHn_CMD_COMMAND	0x00000003
+-#define BP_APBH_CHn_CMD_COMMAND	0
+-#define BM_APBH_CHn_CMD_CHAIN	0x00000004
+-#define BM_APBH_CHn_CMD_IRQONCMPLT	0x00000008
+-#define BM_APBH_CHn_CMD_NANDLOCK	0x00000010
+-#define BM_APBH_CHn_CMD_NANDWAIT4READY	0x00000020
+-#define BM_APBH_CHn_CMD_SEMAPHORE	0x00000040
+-#define BM_APBH_CHn_CMD_WAIT4ENDCMD	0x00000080
+-#define BM_APBH_CHn_CMD_CMDWORDS	0x0000F000
+-#define BP_APBH_CHn_CMD_CMDWORDS	12
+-#define BM_APBH_CHn_CMD_XFER_COUNT	0xFFFF0000
+-#define BP_APBH_CHn_CMD_XFER_COUNT	16
+-
+-#define HW_APBH_CH0_SEMA	(0x80 + 0 * 0x70)
+-#define HW_APBH_CH1_SEMA	(0x80 + 1 * 0x70)
+-#define HW_APBH_CH2_SEMA	(0x80 + 2 * 0x70)
+-#define HW_APBH_CH3_SEMA	(0x80 + 3 * 0x70)
+-#define HW_APBH_CH4_SEMA	(0x80 + 4 * 0x70)
+-#define HW_APBH_CH5_SEMA	(0x80 + 5 * 0x70)
+-#define HW_APBH_CH6_SEMA	(0x80 + 6 * 0x70)
+-#define HW_APBH_CH7_SEMA	(0x80 + 7 * 0x70)
+-#define HW_APBH_CH8_SEMA	(0x80 + 8 * 0x70)
+-#define HW_APBH_CH9_SEMA	(0x80 + 9 * 0x70)
+-#define HW_APBH_CH10_SEMA	(0x80 + 10 * 0x70)
+-#define HW_APBH_CH11_SEMA	(0x80 + 11 * 0x70)
+-#define HW_APBH_CH12_SEMA	(0x80 + 12 * 0x70)
+-#define HW_APBH_CH13_SEMA	(0x80 + 13 * 0x70)
+-#define HW_APBH_CH14_SEMA	(0x80 + 14 * 0x70)
+-#define HW_APBH_CH15_SEMA	(0x80 + 15 * 0x70)
+-
+-#define HW_APBH_CHn_SEMA	0x80
+-#define BM_APBH_CHn_SEMA_INCREMENT_SEMA	0x000000FF
+-#define BP_APBH_CHn_SEMA_INCREMENT_SEMA	0
+-#define BM_APBH_CHn_SEMA_PHORE	0x00FF0000
+-#define BP_APBH_CHn_SEMA_PHORE	16
+-
+-#endif
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-apbx.h b/arch/arm/mach-stmp378x/include/mach/regs-apbx.h
+deleted file mode 100644
+index 3b934a4..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-apbx.h
++++ /dev/null
+@@ -1,119 +0,0 @@
+-/*
+- * stmp378x: APBX register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_APBX
+-#define _MACH_REGS_APBX
+-
+-#define REGS_APBX_BASE	(STMP3XXX_REGS_BASE + 0x24000)
+-#define REGS_APBX_PHYS	0x80024000
+-#define REGS_APBX_SIZE	0x2000
+-
+-#define HW_APBX_CTRL0		0x0
+-#define BM_APBX_CTRL0_CLKGATE	0x40000000
+-#define BM_APBX_CTRL0_SFTRST	0x80000000
+-
+-#define HW_APBX_CTRL1		0x10
+-
+-#define HW_APBX_CTRL2		0x20
+-
+-#define HW_APBX_CHANNEL_CTRL	0x30
+-#define BM_APBX_CHANNEL_CTRL_RESET_CHANNEL	0xFFFF0000
+-#define BP_APBX_CHANNEL_CTRL_RESET_CHANNEL	16
+-
+-#define HW_APBX_DEVSEL		0x40
+-
+-#define HW_APBX_CH0_NXTCMDAR	(0x110 + 0 * 0x70)
+-#define HW_APBX_CH1_NXTCMDAR	(0x110 + 1 * 0x70)
+-#define HW_APBX_CH2_NXTCMDAR	(0x110 + 2 * 0x70)
+-#define HW_APBX_CH3_NXTCMDAR	(0x110 + 3 * 0x70)
+-#define HW_APBX_CH4_NXTCMDAR	(0x110 + 4 * 0x70)
+-#define HW_APBX_CH5_NXTCMDAR	(0x110 + 5 * 0x70)
+-#define HW_APBX_CH6_NXTCMDAR	(0x110 + 6 * 0x70)
+-#define HW_APBX_CH7_NXTCMDAR	(0x110 + 7 * 0x70)
+-#define HW_APBX_CH8_NXTCMDAR	(0x110 + 8 * 0x70)
+-#define HW_APBX_CH9_NXTCMDAR	(0x110 + 9 * 0x70)
+-#define HW_APBX_CH10_NXTCMDAR	(0x110 + 10 * 0x70)
+-#define HW_APBX_CH11_NXTCMDAR	(0x110 + 11 * 0x70)
+-#define HW_APBX_CH12_NXTCMDAR	(0x110 + 12 * 0x70)
+-#define HW_APBX_CH13_NXTCMDAR	(0x110 + 13 * 0x70)
+-#define HW_APBX_CH14_NXTCMDAR	(0x110 + 14 * 0x70)
+-#define HW_APBX_CH15_NXTCMDAR	(0x110 + 15 * 0x70)
+-
+-#define HW_APBX_CHn_NXTCMDAR	0x110
+-#define BM_APBX_CHn_CMD_COMMAND	0x00000003
+-#define BP_APBX_CHn_CMD_COMMAND	0
+-#define BV_APBX_CHn_CMD_COMMAND__NO_DMA_XFER	 0
+-#define BV_APBX_CHn_CMD_COMMAND__DMA_WRITE	 1
+-#define BV_APBX_CHn_CMD_COMMAND__DMA_READ	 2
+-#define BV_APBX_CHn_CMD_COMMAND__DMA_SENSE	 3
+-#define BM_APBX_CHn_CMD_CHAIN	0x00000004
+-#define BM_APBX_CHn_CMD_IRQONCMPLT	0x00000008
+-#define BM_APBX_CHn_CMD_SEMAPHORE	0x00000040
+-#define BM_APBX_CHn_CMD_WAIT4ENDCMD	0x00000080
+-#define BM_APBX_CHn_CMD_HALTONTERMINATE	0x00000100
+-#define BM_APBX_CHn_CMD_CMDWORDS	0x0000F000
+-#define BP_APBX_CHn_CMD_CMDWORDS	12
+-#define BM_APBX_CHn_CMD_XFER_COUNT	0xFFFF0000
+-#define BP_APBX_CHn_CMD_XFER_COUNT	16
+-
+-#define HW_APBX_CH0_BAR		(0x130 + 0 * 0x70)
+-#define HW_APBX_CH1_BAR		(0x130 + 1 * 0x70)
+-#define HW_APBX_CH2_BAR		(0x130 + 2 * 0x70)
+-#define HW_APBX_CH3_BAR		(0x130 + 3 * 0x70)
+-#define HW_APBX_CH4_BAR		(0x130 + 4 * 0x70)
+-#define HW_APBX_CH5_BAR		(0x130 + 5 * 0x70)
+-#define HW_APBX_CH6_BAR		(0x130 + 6 * 0x70)
+-#define HW_APBX_CH7_BAR		(0x130 + 7 * 0x70)
+-#define HW_APBX_CH8_BAR		(0x130 + 8 * 0x70)
+-#define HW_APBX_CH9_BAR		(0x130 + 9 * 0x70)
+-#define HW_APBX_CH10_BAR		(0x130 + 10 * 0x70)
+-#define HW_APBX_CH11_BAR		(0x130 + 11 * 0x70)
+-#define HW_APBX_CH12_BAR		(0x130 + 12 * 0x70)
+-#define HW_APBX_CH13_BAR		(0x130 + 13 * 0x70)
+-#define HW_APBX_CH14_BAR		(0x130 + 14 * 0x70)
+-#define HW_APBX_CH15_BAR		(0x130 + 15 * 0x70)
+-
+-#define HW_APBX_CHn_BAR		0x130
+-
+-#define HW_APBX_CH0_SEMA	(0x140 + 0 * 0x70)
+-#define HW_APBX_CH1_SEMA	(0x140 + 1 * 0x70)
+-#define HW_APBX_CH2_SEMA	(0x140 + 2 * 0x70)
+-#define HW_APBX_CH3_SEMA	(0x140 + 3 * 0x70)
+-#define HW_APBX_CH4_SEMA	(0x140 + 4 * 0x70)
+-#define HW_APBX_CH5_SEMA	(0x140 + 5 * 0x70)
+-#define HW_APBX_CH6_SEMA	(0x140 + 6 * 0x70)
+-#define HW_APBX_CH7_SEMA	(0x140 + 7 * 0x70)
+-#define HW_APBX_CH8_SEMA	(0x140 + 8 * 0x70)
+-#define HW_APBX_CH9_SEMA	(0x140 + 9 * 0x70)
+-#define HW_APBX_CH10_SEMA	(0x140 + 10 * 0x70)
+-#define HW_APBX_CH11_SEMA	(0x140 + 11 * 0x70)
+-#define HW_APBX_CH12_SEMA	(0x140 + 12 * 0x70)
+-#define HW_APBX_CH13_SEMA	(0x140 + 13 * 0x70)
+-#define HW_APBX_CH14_SEMA	(0x140 + 14 * 0x70)
+-#define HW_APBX_CH15_SEMA	(0x140 + 15 * 0x70)
+-
+-#define HW_APBX_CHn_SEMA	0x140
+-#define BM_APBX_CHn_SEMA_INCREMENT_SEMA	0x000000FF
+-#define BP_APBX_CHn_SEMA_INCREMENT_SEMA	0
+-#define BM_APBX_CHn_SEMA_PHORE	0x00FF0000
+-#define BP_APBX_CHn_SEMA_PHORE	16
+-
+-#endif
+-
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-audioin.h b/arch/arm/mach-stmp378x/include/mach/regs-audioin.h
+deleted file mode 100644
+index 641ac61..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-audioin.h
++++ /dev/null
+@@ -1,63 +0,0 @@
+-/*
+- * stmp378x: AUDIOIN register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_AUDIOIN_BASE	(STMP3XXX_REGS_BASE + 0x4C000)
+-#define REGS_AUDIOIN_PHYS	0x8004C000
+-#define REGS_AUDIOIN_SIZE	0x2000
+-
+-#define HW_AUDIOIN_CTRL		0x0
+-#define BM_AUDIOIN_CTRL_RUN	0x00000001
+-#define BP_AUDIOIN_CTRL_RUN	0
+-#define BM_AUDIOIN_CTRL_FIFO_ERROR_IRQ_EN	0x00000002
+-#define BM_AUDIOIN_CTRL_FIFO_OVERFLOW_IRQ	0x00000004
+-#define BM_AUDIOIN_CTRL_FIFO_UNDERFLOW_IRQ	0x00000008
+-#define BM_AUDIOIN_CTRL_WORD_LENGTH	0x00000020
+-#define BM_AUDIOIN_CTRL_CLKGATE	0x40000000
+-#define BM_AUDIOIN_CTRL_SFTRST	0x80000000
+-
+-#define HW_AUDIOIN_STAT		0x10
+-
+-#define HW_AUDIOIN_ADCSRR	0x20
+-
+-#define HW_AUDIOIN_ADCVOLUME	0x30
+-#define BM_AUDIOIN_ADCVOLUME_VOLUME_RIGHT	0x000000FF
+-#define BP_AUDIOIN_ADCVOLUME_VOLUME_RIGHT	0
+-#define BM_AUDIOIN_ADCVOLUME_VOLUME_LEFT	0x00FF0000
+-#define BP_AUDIOIN_ADCVOLUME_VOLUME_LEFT	16
+-
+-#define HW_AUDIOIN_ADCDEBUG	0x40
+-
+-#define HW_AUDIOIN_ADCVOL	0x50
+-#define BM_AUDIOIN_ADCVOL_GAIN_RIGHT	0x0000000F
+-#define BP_AUDIOIN_ADCVOL_GAIN_RIGHT	0
+-#define BM_AUDIOIN_ADCVOL_SELECT_RIGHT	0x00000030
+-#define BP_AUDIOIN_ADCVOL_SELECT_RIGHT	4
+-#define BM_AUDIOIN_ADCVOL_GAIN_LEFT	0x00000F00
+-#define BP_AUDIOIN_ADCVOL_GAIN_LEFT	8
+-#define BM_AUDIOIN_ADCVOL_SELECT_LEFT	0x00003000
+-#define BP_AUDIOIN_ADCVOL_SELECT_LEFT	12
+-#define BM_AUDIOIN_ADCVOL_MUTE	0x01000000
+-
+-#define HW_AUDIOIN_MICLINE	0x60
+-
+-#define HW_AUDIOIN_ANACLKCTRL	0x70
+-#define BM_AUDIOIN_ANACLKCTRL_CLKGATE	0x80000000
+-
+-#define HW_AUDIOIN_DATA		0x80
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-audioout.h b/arch/arm/mach-stmp378x/include/mach/regs-audioout.h
+deleted file mode 100644
+index f533e23..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-audioout.h
++++ /dev/null
+@@ -1,104 +0,0 @@
+-/*
+- * stmp378x: AUDIOOUT register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_AUDIOOUT_BASE	(STMP3XXX_REGS_BASE + 0x48000)
+-#define REGS_AUDIOOUT_PHYS	0x80048000
+-#define REGS_AUDIOOUT_SIZE	0x2000
+-
+-#define HW_AUDIOOUT_CTRL	0x0
+-#define BM_AUDIOOUT_CTRL_RUN	0x00000001
+-#define BP_AUDIOOUT_CTRL_RUN	0
+-#define BM_AUDIOOUT_CTRL_FIFO_ERROR_IRQ_EN	0x00000002
+-#define BM_AUDIOOUT_CTRL_FIFO_OVERFLOW_IRQ	0x00000004
+-#define BM_AUDIOOUT_CTRL_FIFO_UNDERFLOW_IRQ	0x00000008
+-#define BM_AUDIOOUT_CTRL_WORD_LENGTH	0x00000040
+-#define BM_AUDIOOUT_CTRL_CLKGATE	0x40000000
+-#define BM_AUDIOOUT_CTRL_SFTRST	0x80000000
+-
+-#define HW_AUDIOOUT_STAT	0x10
+-
+-#define HW_AUDIOOUT_DACSRR	0x20
+-#define BM_AUDIOOUT_DACSRR_SRC_FRAC	0x00001FFF
+-#define BP_AUDIOOUT_DACSRR_SRC_FRAC	0
+-#define BM_AUDIOOUT_DACSRR_SRC_INT	0x001F0000
+-#define BP_AUDIOOUT_DACSRR_SRC_INT	16
+-#define BM_AUDIOOUT_DACSRR_SRC_HOLD	0x07000000
+-#define BP_AUDIOOUT_DACSRR_SRC_HOLD	24
+-#define BM_AUDIOOUT_DACSRR_BASEMULT	0x70000000
+-#define BP_AUDIOOUT_DACSRR_BASEMULT	28
+-
+-#define HW_AUDIOOUT_DACVOLUME	0x30
+-#define BM_AUDIOOUT_DACVOLUME_MUTE_RIGHT	0x00000100
+-#define BM_AUDIOOUT_DACVOLUME_MUTE_LEFT	0x01000000
+-#define BM_AUDIOOUT_DACVOLUME_EN_ZCD	0x02000000
+-
+-#define HW_AUDIOOUT_DACDEBUG	0x40
+-
+-#define HW_AUDIOOUT_HPVOL	0x50
+-#define BM_AUDIOOUT_HPVOL_MUTE	0x01000000
+-#define BM_AUDIOOUT_HPVOL_EN_MSTR_ZCD	0x02000000
+-
+-#define HW_AUDIOOUT_PWRDN	0x70
+-#define BM_AUDIOOUT_PWRDN_HEADPHONE	0x00000001
+-#define BP_AUDIOOUT_PWRDN_HEADPHONE	0
+-#define BM_AUDIOOUT_PWRDN_CAPLESS	0x00000010
+-#define BM_AUDIOOUT_PWRDN_ADC	0x00000100
+-#define BM_AUDIOOUT_PWRDN_DAC	0x00001000
+-#define BM_AUDIOOUT_PWRDN_RIGHT_ADC	0x00010000
+-#define BM_AUDIOOUT_PWRDN_SPEAKER	0x01000000
+-
+-#define HW_AUDIOOUT_REFCTRL	0x80
+-#define BM_AUDIOOUT_REFCTRL_VAG_VAL	0x000000F0
+-#define BP_AUDIOOUT_REFCTRL_VAG_VAL	4
+-#define BM_AUDIOOUT_REFCTRL_ADC_REFVAL	0x00000F00
+-#define BP_AUDIOOUT_REFCTRL_ADC_REFVAL	8
+-#define BM_AUDIOOUT_REFCTRL_ADJ_VAG	0x00001000
+-#define BM_AUDIOOUT_REFCTRL_ADJ_ADC	0x00002000
+-#define BM_AUDIOOUT_REFCTRL_BIAS_CTRL	0x00030000
+-#define BP_AUDIOOUT_REFCTRL_BIAS_CTRL	16
+-#define BM_AUDIOOUT_REFCTRL_LOW_PWR	0x00080000
+-#define BM_AUDIOOUT_REFCTRL_VBG_ADJ	0x00700000
+-#define BP_AUDIOOUT_REFCTRL_VBG_ADJ	20
+-#define BM_AUDIOOUT_REFCTRL_XTAL_BGR_BIAS	0x01000000
+-#define BM_AUDIOOUT_REFCTRL_RAISE_REF	0x02000000
+-
+-#define HW_AUDIOOUT_ANACTRL	0x90
+-#define BM_AUDIOOUT_ANACTRL_HP_CLASSAB	0x00000010
+-#define BM_AUDIOOUT_ANACTRL_HP_HOLD_GND	0x00000020
+-
+-#define HW_AUDIOOUT_TEST	0xA0
+-#define BM_AUDIOOUT_TEST_HP_I1_ADJ	0x00C00000
+-#define BP_AUDIOOUT_TEST_HP_I1_ADJ	22
+-
+-#define HW_AUDIOOUT_BISTCTRL	0xB0
+-
+-#define HW_AUDIOOUT_BISTSTAT0	0xC0
+-
+-#define HW_AUDIOOUT_BISTSTAT1	0xD0
+-
+-#define HW_AUDIOOUT_ANACLKCTRL	0xE0
+-#define BM_AUDIOOUT_ANACLKCTRL_CLKGATE	0x80000000
+-
+-#define HW_AUDIOOUT_DATA	0xF0
+-
+-#define HW_AUDIOOUT_SPEAKERCTRL	0x100
+-#define BM_AUDIOOUT_SPEAKERCTRL_MUTE	0x01000000
+-
+-#define HW_AUDIOOUT_VERSION	0x200
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-bch.h b/arch/arm/mach-stmp378x/include/mach/regs-bch.h
+deleted file mode 100644
+index 532d246..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-bch.h
++++ /dev/null
+@@ -1,56 +0,0 @@
+-/*
+- * stmp378x: BCH register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_BCH_BASE	(STMP3XXX_REGS_BASE + 0xA000)
+-#define REGS_BCH_PHYS	0x8000A000
+-#define REGS_BCH_SIZE	0x2000
+-
+-#define HW_BCH_CTRL		0x0
+-#define BM_BCH_CTRL_COMPLETE_IRQ	0x00000001
+-#define BP_BCH_CTRL_COMPLETE_IRQ	0
+-#define BM_BCH_CTRL_COMPLETE_IRQ_EN	0x00000100
+-
+-#define HW_BCH_STATUS0		0x10
+-#define BM_BCH_STATUS0_UNCORRECTABLE	0x00000004
+-#define BM_BCH_STATUS0_CORRECTED	0x00000008
+-#define BM_BCH_STATUS0_STATUS_BLK0	0x0000FF00
+-#define BP_BCH_STATUS0_STATUS_BLK0	8
+-#define BM_BCH_STATUS0_COMPLETED_CE	0x000F0000
+-#define BP_BCH_STATUS0_COMPLETED_CE	16
+-
+-#define HW_BCH_LAYOUTSELECT	0x70
+-
+-#define HW_BCH_FLASH0LAYOUT0	0x80
+-#define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	0x00000FFF
+-#define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE	0
+-#define BM_BCH_FLASH0LAYOUT0_ECC0	0x0000F000
+-#define BP_BCH_FLASH0LAYOUT0_ECC0	12
+-#define BM_BCH_FLASH0LAYOUT0_META_SIZE	0x00FF0000
+-#define BP_BCH_FLASH0LAYOUT0_META_SIZE	16
+-#define BM_BCH_FLASH0LAYOUT0_NBLOCKS	0xFF000000
+-#define BP_BCH_FLASH0LAYOUT0_NBLOCKS	24
+-#define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	0x00000FFF
+-#define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE	0
+-#define BM_BCH_FLASH0LAYOUT1_ECCN	0x0000F000
+-#define BP_BCH_FLASH0LAYOUT1_ECCN	12
+-#define BM_BCH_FLASH0LAYOUT1_PAGE_SIZE	0xFFFF0000
+-#define BP_BCH_FLASH0LAYOUT1_PAGE_SIZE	16
+-
+-#define HW_BCH_BLOCKNAME	0x150
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h b/arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h
+deleted file mode 100644
+index 7c546af..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-clkctrl.h
++++ /dev/null
+@@ -1,88 +0,0 @@
+-/*
+- * stmp378x: CLKCTRL register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_CLKCTRL
+-#define _MACH_REGS_CLKCTRL
+-
+-#define REGS_CLKCTRL_BASE	(STMP3XXX_REGS_BASE + 0x40000)
+-#define REGS_CLKCTRL_PHYS	0x80040000
+-#define REGS_CLKCTRL_SIZE	0x2000
+-
+-#define HW_CLKCTRL_PLLCTRL0	0x0
+-#define BM_CLKCTRL_PLLCTRL0_EN_USB_CLKS	0x00040000
+-
+-#define HW_CLKCTRL_CPU		0x20
+-#define BM_CLKCTRL_CPU_DIV_CPU	0x0000003F
+-#define BP_CLKCTRL_CPU_DIV_CPU	0
+-
+-#define HW_CLKCTRL_HBUS		0x30
+-#define BM_CLKCTRL_HBUS_DIV	0x0000001F
+-#define BP_CLKCTRL_HBUS_DIV	0
+-#define BM_CLKCTRL_HBUS_DIV_FRAC_EN	0x00000020
+-
+-#define HW_CLKCTRL_XBUS		0x40
+-
+-#define HW_CLKCTRL_XTAL		0x50
+-#define BM_CLKCTRL_XTAL_DRI_CLK24M_GATE	0x10000000
+-
+-#define HW_CLKCTRL_PIX		0x60
+-#define BM_CLKCTRL_PIX_DIV	0x00000FFF
+-#define BP_CLKCTRL_PIX_DIV	0
+-#define BM_CLKCTRL_PIX_CLKGATE	0x80000000
+-
+-#define HW_CLKCTRL_SSP		0x70
+-
+-#define HW_CLKCTRL_GPMI		0x80
+-
+-#define HW_CLKCTRL_SPDIF	0x90
+-
+-#define HW_CLKCTRL_EMI		0xA0
+-#define BM_CLKCTRL_EMI_DIV_EMI	0x0000003F
+-#define BP_CLKCTRL_EMI_DIV_EMI	0
+-#define BM_CLKCTRL_EMI_DCC_RESYNC_ENABLE	0x00010000
+-#define BM_CLKCTRL_EMI_BUSY_DCC_RESYNC	0x00020000
+-#define BM_CLKCTRL_EMI_BUSY_REF_EMI	0x10000000
+-#define BM_CLKCTRL_EMI_BUSY_REF_XTAL	0x20000000
+-
+-#define HW_CLKCTRL_IR		0xB0
+-
+-#define HW_CLKCTRL_SAIF		0xC0
+-
+-#define HW_CLKCTRL_TV		0xD0
+-
+-#define HW_CLKCTRL_ETM		0xE0
+-
+-#define HW_CLKCTRL_FRAC		0xF0
+-#define BM_CLKCTRL_FRAC_EMIFRAC	0x00003F00
+-#define BP_CLKCTRL_FRAC_EMIFRAC	8
+-#define BM_CLKCTRL_FRAC_PIXFRAC	0x003F0000
+-#define BP_CLKCTRL_FRAC_PIXFRAC	16
+-#define BM_CLKCTRL_FRAC_CLKGATEPIX	0x00800000
+-
+-#define HW_CLKCTRL_FRAC1	0x100
+-
+-#define HW_CLKCTRL_CLKSEQ	0x110
+-#define BM_CLKCTRL_CLKSEQ_BYPASS_PIX	0x00000002
+-
+-#define HW_CLKCTRL_RESET	0x120
+-#define BM_CLKCTRL_RESET_DIG	0x00000001
+-#define BP_CLKCTRL_RESET_DIG	0
+-
+-#endif
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-dcp.h b/arch/arm/mach-stmp378x/include/mach/regs-dcp.h
+deleted file mode 100644
+index fdedd00..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-dcp.h
++++ /dev/null
+@@ -1,87 +0,0 @@
+-/*
+- * stmp378x: DCP register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_DCP_BASE	(STMP3XXX_REGS_BASE + 0x28000)
+-#define REGS_DCP_PHYS	0x80028000
+-#define REGS_DCP_SIZE	0x2000
+-
+-#define HW_DCP_CTRL		0x0
+-#define BM_DCP_CTRL_CHANNEL_INTERRUPT_ENABLE	0x000000FF
+-#define BP_DCP_CTRL_CHANNEL_INTERRUPT_ENABLE	0
+-#define BM_DCP_CTRL_ENABLE_CONTEXT_CACHING	0x00400000
+-#define BM_DCP_CTRL_GATHER_RESIDUAL_WRITES	0x00800000
+-#define BM_DCP_CTRL_CLKGATE	0x40000000
+-#define BM_DCP_CTRL_SFTRST	0x80000000
+-
+-#define HW_DCP_STAT		0x10
+-#define BM_DCP_STAT_IRQ		0x0000000F
+-#define BP_DCP_STAT_IRQ		0
+-
+-#define HW_DCP_CHANNELCTRL	0x20
+-#define BM_DCP_CHANNELCTRL_ENABLE_CHANNEL	0x000000FF
+-#define BP_DCP_CHANNELCTRL_ENABLE_CHANNEL	0
+-
+-#define HW_DCP_CONTEXT		0x50
+-#define BM_DCP_PACKET1_INTERRUPT	0x00000001
+-#define BP_DCP_PACKET1_INTERRUPT	0
+-#define BM_DCP_PACKET1_DECR_SEMAPHORE	0x00000002
+-#define BM_DCP_PACKET1_CHAIN	0x00000004
+-#define BM_DCP_PACKET1_CHAIN_CONTIGUOUS	0x00000008
+-#define BM_DCP_PACKET1_ENABLE_CIPHER	0x00000020
+-#define BM_DCP_PACKET1_ENABLE_HASH	0x00000040
+-#define BM_DCP_PACKET1_CIPHER_ENCRYPT	0x00000100
+-#define BM_DCP_PACKET1_CIPHER_INIT	0x00000200
+-#define BM_DCP_PACKET1_OTP_KEY	0x00000400
+-#define BM_DCP_PACKET1_PAYLOAD_KEY	0x00000800
+-#define BM_DCP_PACKET1_HASH_INIT	0x00001000
+-#define BM_DCP_PACKET1_HASH_TERM	0x00002000
+-#define BM_DCP_PACKET2_CIPHER_SELECT	0x0000000F
+-#define BP_DCP_PACKET2_CIPHER_SELECT	0
+-#define BM_DCP_PACKET2_CIPHER_MODE	0x000000F0
+-#define BP_DCP_PACKET2_CIPHER_MODE	4
+-#define BM_DCP_PACKET2_KEY_SELECT	0x0000FF00
+-#define BP_DCP_PACKET2_KEY_SELECT	8
+-#define BM_DCP_PACKET2_HASH_SELECT	0x000F0000
+-#define BP_DCP_PACKET2_HASH_SELECT	16
+-#define BM_DCP_PACKET2_CIPHER_CFG	0xFF000000
+-#define BP_DCP_PACKET2_CIPHER_CFG	24
+-
+-#define HW_DCP_CH0CMDPTR	(0x100 + 0 * 0x40)
+-#define HW_DCP_CH1CMDPTR	(0x100 + 1 * 0x40)
+-#define HW_DCP_CH2CMDPTR	(0x100 + 2 * 0x40)
+-#define HW_DCP_CH3CMDPTR	(0x100 + 3 * 0x40)
+-
+-#define HW_DCP_CHnCMDPTR	0x100
+-
+-#define HW_DCP_CH0SEMA		(0x110 + 0 * 0x40)
+-#define HW_DCP_CH1SEMA		(0x110 + 1 * 0x40)
+-#define HW_DCP_CH2SEMA		(0x110 + 2 * 0x40)
+-#define HW_DCP_CH3SEMA		(0x110 + 3 * 0x40)
+-
+-#define HW_DCP_CHnSEMA		0x110
+-#define BM_DCP_CHnSEMA_INCREMENT	0x000000FF
+-#define BP_DCP_CHnSEMA_INCREMENT	0
+-
+-#define HW_DCP_CH0STAT		(0x120 + 0 * 0x40)
+-#define HW_DCP_CH1STAT		(0x120 + 1 * 0x40)
+-#define HW_DCP_CH2STAT		(0x120 + 2 * 0x40)
+-#define HW_DCP_CH3STAT		(0x120 + 3 * 0x40)
+-
+-#define HW_DCP_CHnSTAT		0x120
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-digctl.h b/arch/arm/mach-stmp378x/include/mach/regs-digctl.h
+deleted file mode 100644
+index 5293005..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-digctl.h
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/*
+- * stmp378x: DIGCTL register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_DIGCTL_BASE	(STMP3XXX_REGS_BASE + 0x1C000)
+-#define REGS_DIGCTL_PHYS	0x8001C000
+-#define REGS_DIGCTL_SIZE	0x2000
+-
+-#define HW_DIGCTL_CTRL		0x0
+-#define BM_DIGCTL_CTRL_USB_CLKGATE	0x00000004
+-
+-#define HW_DIGCTL_ARMCACHE	0x2B0
+-#define BM_DIGCTL_ARMCACHE_ITAG_SS	0x00000003
+-#define BP_DIGCTL_ARMCACHE_ITAG_SS	0
+-#define BM_DIGCTL_ARMCACHE_DTAG_SS	0x00000030
+-#define BP_DIGCTL_ARMCACHE_DTAG_SS	4
+-#define BM_DIGCTL_ARMCACHE_CACHE_SS	0x00000300
+-#define BP_DIGCTL_ARMCACHE_CACHE_SS	8
+-#define BM_DIGCTL_ARMCACHE_DRTY_SS	0x00003000
+-#define BP_DIGCTL_ARMCACHE_DRTY_SS	12
+-#define BM_DIGCTL_ARMCACHE_VALID_SS	0x00030000
+-#define BP_DIGCTL_ARMCACHE_VALID_SS	16
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-dram.h b/arch/arm/mach-stmp378x/include/mach/regs-dram.h
+deleted file mode 100644
+index 0285143..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-dram.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * stmp378x: DRAM register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_DRAM_BASE	(STMP3XXX_REGS_BASE + 0xE0000)
+-#define REGS_DRAM_PHYS	0x800E0000
+-#define REGS_DRAM_SIZE	0x2000
+-
+-#define HW_DRAM_CTL06		0x18
+-
+-#define HW_DRAM_CTL08		0x20
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-dri.h b/arch/arm/mach-stmp378x/include/mach/regs-dri.h
+deleted file mode 100644
+index da25f7e..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-dri.h
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/*
+- * stmp378x: DRI register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_DRI_BASE	(STMP3XXX_REGS_BASE + 0x74000)
+-#define REGS_DRI_PHYS	0x80074000
+-#define REGS_DRI_SIZE	0x2000
+-
+-#define HW_DRI_CTRL		0x0
+-#define BM_DRI_CTRL_RUN		0x00000001
+-#define BP_DRI_CTRL_RUN		0
+-#define BM_DRI_CTRL_ATTENTION_IRQ	0x00000002
+-#define BM_DRI_CTRL_PILOT_SYNC_LOSS_IRQ	0x00000004
+-#define BM_DRI_CTRL_OVERFLOW_IRQ	0x00000008
+-#define BM_DRI_CTRL_ATTENTION_IRQ_EN	0x00000200
+-#define BM_DRI_CTRL_PILOT_SYNC_LOSS_IRQ_EN	0x00000400
+-#define BM_DRI_CTRL_OVERFLOW_IRQ_EN	0x00000800
+-#define BM_DRI_CTRL_REACQUIRE_PHASE	0x00008000
+-#define BM_DRI_CTRL_STOP_ON_PILOT_ERROR	0x02000000
+-#define BM_DRI_CTRL_STOP_ON_OFLOW_ERROR	0x04000000
+-#define BM_DRI_CTRL_ENABLE_INPUTS	0x20000000
+-#define BM_DRI_CTRL_CLKGATE	0x40000000
+-#define BM_DRI_CTRL_SFTRST	0x80000000
+-
+-#define HW_DRI_TIMING		0x10
+-#define BM_DRI_TIMING_GAP_DETECTION_INTERVAL	0x000000FF
+-#define BP_DRI_TIMING_GAP_DETECTION_INTERVAL	0
+-#define BM_DRI_TIMING_PILOT_REP_RATE	0x000F0000
+-#define BP_DRI_TIMING_PILOT_REP_RATE	16
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-ecc8.h b/arch/arm/mach-stmp378x/include/mach/regs-ecc8.h
+deleted file mode 100644
+index cc353be..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-ecc8.h
 +++ /dev/null
 @@ -1,39 +0,0 @@
 -/*
-- * Debugging macro include header
+- * stmp378x: ECC8 register definitions
 - *
-- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (c) 2008 Freescale Semiconductor
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
+-#define REGS_ECC8_BASE	(STMP3XXX_REGS_BASE + 0x8000)
+-#define REGS_ECC8_PHYS	0x80008000
+-#define REGS_ECC8_SIZE	0x2000
 -
--		.macro	addruart, rp, rv
--		mov	\rp,      #0x00070000
--		add	\rv, \rp, #0xf0000000	@ virtual base
--		add	\rp, \rp, #0x80000000	@ physical base
--		.endm
+-#define HW_ECC8_CTRL		0x0
+-#define BM_ECC8_CTRL_COMPLETE_IRQ	0x00000001
+-#define BP_ECC8_CTRL_COMPLETE_IRQ	0
+-#define BM_ECC8_CTRL_COMPLETE_IRQ_EN	0x00000100
+-#define BM_ECC8_CTRL_AHBM_SFTRST	0x20000000
 -
--		.macro	senduart,rd,rx
--		strb	\rd, [\rx, #0]		@ data register at 0
--		.endm
+-#define HW_ECC8_STATUS0		0x10
+-#define BM_ECC8_STATUS0_UNCORRECTABLE	0x00000004
+-#define BM_ECC8_STATUS0_CORRECTED	0x00000008
+-#define BM_ECC8_STATUS0_STATUS_AUX	0x00000F00
+-#define BP_ECC8_STATUS0_STATUS_AUX	8
+-#define BM_ECC8_STATUS0_COMPLETED_CE	0x000F0000
+-#define BP_ECC8_STATUS0_COMPLETED_CE	16
 -
--		.macro	waituart,rd,rx
--1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
--		tst	\rd, #1 << 5		@ UARTFLGUTXFF - 1 when full
--		bne	1001b
--		.endm
--
--		.macro	busyuart,rd,rx
--1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
--		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
--		bne	1001b
--		.endm
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/dma.h b/arch/arm/plat-stmp3xxx/include/mach/dma.h
+-#define HW_ECC8_STATUS1		0x20
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-emi.h b/arch/arm/mach-stmp378x/include/mach/regs-emi.h
 deleted file mode 100644
-index 7c58557..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/dma.h
-+++ /dev/null
-@@ -1,153 +0,0 @@
--/*
-- * Freescale STMP37XX/STMP378X DMA helper interface
-- *
-- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_PLAT_STMP3XXX_DMA_H
--#define __ASM_PLAT_STMP3XXX_DMA_H
--
--#include <linux/platform_device.h>
--#include <linux/dmapool.h>
--
--#if !defined(MAX_PIO_WORDS)
--#define MAX_PIO_WORDS   (15)
--#endif
--
--#define STMP3XXX_BUS_APBH		0
--#define STMP3XXX_BUS_APBX		1
--#define STMP3XXX_DMA_MAX_CHANNEL	16
--#define STMP3XXX_DMA_BUS(dma)		((dma) / 16)
--#define STMP3XXX_DMA_CHANNEL(dma)	((dma) % 16)
--#define STMP3XXX_DMA(channel, bus)	((bus) * 16 + (channel))
--#define MAX_DMA_ADDRESS			0xffffffff
--#define MAX_DMA_CHANNELS		32
--
--struct stmp3xxx_dma_command {
--	u32 next;
--	u32 cmd;
--	union {
--		u32 buf_ptr;
--		u32 alternate;
--	};
--	u32 pio_words[MAX_PIO_WORDS];
--};
--
--struct stmp3xxx_dma_descriptor {
--	struct stmp3xxx_dma_command *command;
--	dma_addr_t handle;
--
--	/* The virtual address of the buffer pointer */
--	void *virtual_buf_ptr;
--	/* The next descriptor in a the DMA chain (optional) */
--	struct stmp3xxx_dma_descriptor *next_descr;
--};
--
--struct stmp37xx_circ_dma_chain {
--	unsigned total_count;
--	struct stmp3xxx_dma_descriptor *chain;
--
--	unsigned free_index;
--	unsigned free_count;
--	unsigned active_index;
--	unsigned active_count;
--	unsigned cooked_index;
--	unsigned cooked_count;
--
--	int bus;
--	unsigned channel;
--};
--
--static inline struct stmp3xxx_dma_descriptor
--    *stmp3xxx_dma_circ_get_free_head(struct stmp37xx_circ_dma_chain *chain)
--{
--	return &(chain->chain[chain->free_index]);
--}
--
--static inline struct stmp3xxx_dma_descriptor
--    *stmp3xxx_dma_circ_get_cooked_head(struct stmp37xx_circ_dma_chain *chain)
--{
--	return &(chain->chain[chain->cooked_index]);
--}
--
--int stmp3xxx_dma_request(int ch, struct device *dev, const char *name);
--int stmp3xxx_dma_release(int ch);
--int stmp3xxx_dma_allocate_command(int ch,
--				  struct stmp3xxx_dma_descriptor *descriptor);
--int stmp3xxx_dma_free_command(int ch,
--			      struct stmp3xxx_dma_descriptor *descriptor);
--void stmp3xxx_dma_continue(int channel, u32 semaphore);
--void stmp3xxx_dma_go(int ch, struct stmp3xxx_dma_descriptor *head,
--		     u32 semaphore);
--int stmp3xxx_dma_running(int ch);
--int stmp3xxx_dma_make_chain(int ch, struct stmp37xx_circ_dma_chain *chain,
--			    struct stmp3xxx_dma_descriptor descriptors[],
--			    unsigned items);
--void stmp3xxx_dma_free_chain(struct stmp37xx_circ_dma_chain *chain);
--void stmp37xx_circ_clear_chain(struct stmp37xx_circ_dma_chain *chain);
--void stmp37xx_circ_advance_free(struct stmp37xx_circ_dma_chain *chain,
--		unsigned count);
--void stmp37xx_circ_advance_active(struct stmp37xx_circ_dma_chain *chain,
--		unsigned count);
--unsigned stmp37xx_circ_advance_cooked(struct stmp37xx_circ_dma_chain *chain);
--int stmp3xxx_dma_read_semaphore(int ch);
--void stmp3xxx_dma_init(void);
--void stmp3xxx_dma_set_alt_target(int ch, int target);
--void stmp3xxx_dma_suspend(void);
--void stmp3xxx_dma_resume(void);
--
--/*
-- * STMP37xx and STMP378x have different DMA control
-- * registers layout
-- */
--
--void stmp3xxx_arch_dma_freeze(int ch);
--void stmp3xxx_arch_dma_unfreeze(int ch);
--void stmp3xxx_arch_dma_reset_channel(int ch);
--void stmp3xxx_arch_dma_enable_interrupt(int ch);
--void stmp3xxx_arch_dma_clear_interrupt(int ch);
--int stmp3xxx_arch_dma_is_interrupt(int ch);
--
--static inline void stmp3xxx_dma_reset_channel(int ch)
--{
--	stmp3xxx_arch_dma_reset_channel(ch);
--}
--
--
--static inline void stmp3xxx_dma_freeze(int ch)
--{
--	stmp3xxx_arch_dma_freeze(ch);
--}
--
--static inline void stmp3xxx_dma_unfreeze(int ch)
--{
--	stmp3xxx_arch_dma_unfreeze(ch);
--}
--
--static inline void stmp3xxx_dma_enable_interrupt(int ch)
--{
--	stmp3xxx_arch_dma_enable_interrupt(ch);
--}
--
--static inline void stmp3xxx_dma_clear_interrupt(int ch)
--{
--	stmp3xxx_arch_dma_clear_interrupt(ch);
--}
--
--static inline int stmp3xxx_dma_is_interrupt(int ch)
--{
--	return stmp3xxx_arch_dma_is_interrupt(ch);
--}
--
--#endif /* __ASM_PLAT_STMP3XXX_DMA_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/gpio.h b/arch/arm/plat-stmp3xxx/include/mach/gpio.h
-deleted file mode 100644
-index a8b5792..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/gpio.h
-+++ /dev/null
-@@ -1,28 +0,0 @@
--/*
-- * Freescale STMP37XX/STMP378X GPIO interface
-- *
-- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_PLAT_GPIO_H
--#define __ASM_PLAT_GPIO_H
--
--#define ARCH_NR_GPIOS	(32 * 3)
--#define gpio_to_irq(gpio) __gpio_to_irq(gpio)
--#define gpio_get_value(gpio) __gpio_get_value(gpio)
--#define gpio_set_value(gpio, value) __gpio_set_value(gpio, value)
--
--#include <asm-generic/gpio.h>
--
--#endif /* __ASM_PLAT_GPIO_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/gpmi.h b/arch/arm/plat-stmp3xxx/include/mach/gpmi.h
-deleted file mode 100644
-index e166432..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/gpmi.h
-+++ /dev/null
-@@ -1,12 +0,0 @@
--#ifndef __MACH_GPMI_H
--
--#include <linux/mtd/partitions.h>
--#include <mach/regs-gpmi.h>
--
--struct gpmi_platform_data {
--	void *pins;
--	int nr_parts;
--	struct mtd_partition *parts;
--	const char *part_types[];
--};
--#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/hardware.h b/arch/arm/plat-stmp3xxx/include/mach/hardware.h
-deleted file mode 100644
-index 47b8978..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/hardware.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/*
-- * This file contains the hardware definitions of the Freescale STMP3XXX
-- *
-- * Copyright (C) 2005 Sigmatel Inc
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_ARCH_HARDWARE_H
--#define __ASM_ARCH_HARDWARE_H
--
--/*
-- * Where in virtual memory the IO devices (timers, system controllers
-- * and so on)
-- */
--#define IO_BASE			0xF0000000                 /* VA of IO  */
--#define IO_SIZE			0x00100000                 /* How much? */
--#define IO_START		0x80000000                 /* PA of IO  */
--
--/* macro to get at IO space when running virtually */
--#define IO_ADDRESS(x) (((x) & 0x000fffff) | IO_BASE)
--
--#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/io.h b/arch/arm/plat-stmp3xxx/include/mach/io.h
-deleted file mode 100644
-index d08b1b7..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/io.h
+index 98773fc..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-emi.h
 +++ /dev/null
 @@ -1,25 +0,0 @@
 -/*
-- * Copyright (C) 2005 Sigmatel Inc
+- * stmp378x: EMI register definitions
 - *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (c) 2008 Freescale Semiconductor
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#ifndef __ASM_ARM_ARCH_IO_H
--#define __ASM_ARM_ARCH_IO_H
+-#define REGS_EMI_BASE	(STMP3XXX_REGS_BASE + 0x20000)
+-#define REGS_EMI_PHYS	0x80020000
+-#define REGS_EMI_SIZE	0x2000
 -
--#define IO_SPACE_LIMIT 0xffffffff
+-#define HW_EMI_STAT		0x10
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-gpmi.h b/arch/arm/mach-stmp378x/include/mach/regs-gpmi.h
+deleted file mode 100644
+index 2cc8bbe..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-gpmi.h
++++ /dev/null
+@@ -1,78 +0,0 @@
+-/*
+- * stmp378x: GPMI register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_GPMI_BASE	(STMP3XXX_REGS_BASE + 0xC000)
+-#define REGS_GPMI_PHYS	0x8000C000
+-#define REGS_GPMI_SIZE	0x2000
 -
--#define __io(a) 	__typesafe_io(a)
--#define __mem_pci(a)	(a)
--#define __mem_isa(a)	(a)
+-#define HW_GPMI_CTRL0		0x0
+-#define BM_GPMI_CTRL0_XFER_COUNT	0x0000FFFF
+-#define BP_GPMI_CTRL0_XFER_COUNT	0
+-#define BM_GPMI_CTRL0_CS	0x00300000
+-#define BP_GPMI_CTRL0_CS	20
+-#define BM_GPMI_CTRL0_LOCK_CS	0x00400000
+-#define BM_GPMI_CTRL0_WORD_LENGTH	0x00800000
+-#define BM_GPMI_CTRL0_ADDRESS      0x000E0000
+-#define BP_GPMI_CTRL0_ADDRESS      17
+-#define BV_GPMI_CTRL0_ADDRESS__NAND_DATA  0x0
+-#define BV_GPMI_CTRL0_ADDRESS__NAND_CLE   0x1
+-#define BV_GPMI_CTRL0_ADDRESS__NAND_ALE   0x2
+-#define BM_GPMI_CTRL0_ADDRESS_INCREMENT      0x00010000
+-#define BM_GPMI_CTRL0_COMMAND_MODE	0x03000000
+-#define BP_GPMI_CTRL0_COMMAND_MODE	24
+-#define BV_GPMI_CTRL0_COMMAND_MODE__WRITE	    0x0
+-#define BV_GPMI_CTRL0_COMMAND_MODE__READ	     0x1
+-#define BV_GPMI_CTRL0_COMMAND_MODE__READ_AND_COMPARE 0x2
+-#define BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY   0x3
+-#define BM_GPMI_CTRL0_RUN	0x20000000
+-#define BM_GPMI_CTRL0_CLKGATE	0x40000000
+-#define BM_GPMI_CTRL0_SFTRST	0x80000000
+-#define BM_GPMI_ECCCTRL_BUFFER_MASK	0x000001FF
+-#define BP_GPMI_ECCCTRL_BUFFER_MASK	0
+-#define BM_GPMI_ECCCTRL_ENABLE_ECC	0x00001000
+-#define BM_GPMI_ECCCTRL_ECC_CMD	0x00006000
+-#define BP_GPMI_ECCCTRL_ECC_CMD	13
+-#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE_4_BIT			0
+-#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE_4_BIT			1
+-#define BV_GPMI_ECCCTRL_ECC_CMD__DECODE_8_BIT			2
+-#define BV_GPMI_ECCCTRL_ECC_CMD__ENCODE_8_BIT			3
+-
+-#define HW_GPMI_CTRL1		0x60
+-#define BM_GPMI_CTRL1_GPMI_MODE	0x00000001
+-#define BP_GPMI_CTRL1_GPMI_MODE	0
+-#define BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY	0x00000004
+-#define BM_GPMI_CTRL1_DEV_RESET	0x00000008
+-#define BM_GPMI_CTRL1_TIMEOUT_IRQ	0x00000200
+-#define BM_GPMI_CTRL1_DEV_IRQ	0x00000400
+-#define BM_GPMI_CTRL1_RDN_DELAY	0x0000F000
+-#define BP_GPMI_CTRL1_RDN_DELAY	12
+-#define BM_GPMI_CTRL1_BCH_MODE	0x00040000
+-
+-#define HW_GPMI_TIMING0		0x70
+-#define BM_GPMI_TIMING0_DATA_SETUP	0x000000FF
+-#define BP_GPMI_TIMING0_DATA_SETUP	0
+-#define BM_GPMI_TIMING0_DATA_HOLD	0x0000FF00
+-#define BP_GPMI_TIMING0_DATA_HOLD	8
+-#define BM_GPMI_TIMING0_ADDRESS_SETUP	0x00FF0000
+-#define BP_GPMI_TIMING0_ADDRESS_SETUP	16
+-
+-#define HW_GPMI_TIMING1		0x80
+-#define BM_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT	0xFFFF0000
+-#define BP_GPMI_TIMING1_DEVICE_BUSY_TIMEOUT	16
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-i2c.h b/arch/arm/mach-stmp378x/include/mach/regs-i2c.h
+deleted file mode 100644
+index 13a234c..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-i2c.h
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * stmp378x: I2C register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_I2C_BASE	(STMP3XXX_REGS_BASE + 0x58000)
+-#define REGS_I2C_PHYS	0x80058000
+-#define REGS_I2C_SIZE	0x2000
+-
+-#define HW_I2C_CTRL0		0x0
+-#define BM_I2C_CTRL0_XFER_COUNT	0x0000FFFF
+-#define BP_I2C_CTRL0_XFER_COUNT	0
+-#define BM_I2C_CTRL0_DIRECTION	0x00010000
+-#define BM_I2C_CTRL0_MASTER_MODE	0x00020000
+-#define BM_I2C_CTRL0_PRE_SEND_START	0x00080000
+-#define BM_I2C_CTRL0_POST_SEND_STOP	0x00100000
+-#define BM_I2C_CTRL0_RETAIN_CLOCK	0x00200000
+-#define BM_I2C_CTRL0_SEND_NAK_ON_LAST	0x02000000
+-#define BM_I2C_CTRL0_CLKGATE	0x40000000
+-#define BM_I2C_CTRL0_SFTRST	0x80000000
+-
+-#define HW_I2C_TIMING0		0x10
+-
+-#define HW_I2C_TIMING1		0x20
+-
+-#define HW_I2C_TIMING2		0x30
+-
+-#define HW_I2C_CTRL1		0x40
+-#define BM_I2C_CTRL1_SLAVE_IRQ	0x00000001
+-#define BP_I2C_CTRL1_SLAVE_IRQ	0
+-#define BM_I2C_CTRL1_SLAVE_STOP_IRQ	0x00000002
+-#define BM_I2C_CTRL1_MASTER_LOSS_IRQ	0x00000004
+-#define BM_I2C_CTRL1_EARLY_TERM_IRQ	0x00000008
+-#define BM_I2C_CTRL1_OVERSIZE_XFER_TERM_IRQ	0x00000010
+-#define BM_I2C_CTRL1_NO_SLAVE_ACK_IRQ	0x00000020
+-#define BM_I2C_CTRL1_DATA_ENGINE_CMPLT_IRQ	0x00000040
+-#define BM_I2C_CTRL1_BUS_FREE_IRQ	0x00000080
+-#define BM_I2C_CTRL1_CLR_GOT_A_NAK	0x10000000
+-
+-#define HW_I2C_VERSION		0x90
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-icoll.h b/arch/arm/mach-stmp378x/include/mach/regs-icoll.h
+deleted file mode 100644
+index f996e80..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-icoll.h
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/*
+- * stmp378x: ICOLL register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_ICOLL
+-#define _MACH_REGS_ICOLL
+-
+-#define REGS_ICOLL_BASE	(STMP3XXX_REGS_BASE + 0x0)
+-#define REGS_ICOLL_PHYS	0x80000000
+-#define REGS_ICOLL_SIZE	0x2000
+-
+-#define HW_ICOLL_VECTOR		0x0
+-
+-#define HW_ICOLL_LEVELACK	0x10
+-#define BM_ICOLL_LEVELACK_IRQLEVELACK	0x0000000F
+-#define BP_ICOLL_LEVELACK_IRQLEVELACK	0
+-
+-#define HW_ICOLL_CTRL		0x20
+-#define BM_ICOLL_CTRL_CLKGATE	0x40000000
+-#define BM_ICOLL_CTRL_SFTRST	0x80000000
+-
+-#define HW_ICOLL_STAT		0x70
+-
+-#define HW_ICOLL_INTERRUPTn	0x120
+-
+-#define HW_ICOLL_INTERRUPTn	0x120
+-#define BM_ICOLL_INTERRUPTn_ENABLE	0x00000004
 -
 -#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/memory.h b/arch/arm/plat-stmp3xxx/include/mach/memory.h
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-ir.h b/arch/arm/mach-stmp378x/include/mach/regs-ir.h
 deleted file mode 100644
-index 61fa548..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/memory.h
+index a5b4ef1..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-ir.h
 +++ /dev/null
-@@ -1,22 +0,0 @@
+@@ -1,23 +0,0 @@
 -/*
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
+- * stmp378x: IR register definitions
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#ifndef __ASM_ARCH_MEMORY_H
--#define __ASM_ARCH_MEMORY_H
--
+-#define REGS_IR_BASE	(STMP3XXX_REGS_BASE + 0x78000)
+-#define REGS_IR_PHYS	0x80078000
+-#define REGS_IR_SIZE	0x2000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-lcdif.h b/arch/arm/mach-stmp378x/include/mach/regs-lcdif.h
+deleted file mode 100644
+index 9cdbef4..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-lcdif.h
++++ /dev/null
+@@ -1,195 +0,0 @@
 -/*
-- * Physical DRAM offset.
+- * stmp378x: LCDIF register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#define PLAT_PHYS_OFFSET	UL(0x40000000)
+-#define REGS_LCDIF_BASE	(STMP3XXX_REGS_BASE + 0x30000)
+-#define REGS_LCDIF_PHYS	0x80030000
+-#define REGS_LCDIF_SIZE	0x2000
+-
+-#define HW_LCDIF_CTRL		0x0
+-#define BM_LCDIF_CTRL_RUN	0x00000001
+-#define BP_LCDIF_CTRL_RUN	0
+-#define BM_LCDIF_CTRL_LCDIF_MASTER	0x00000020
+-#define BM_LCDIF_CTRL_RGB_TO_YCBCR422_CSC	0x00000080
+-#define BM_LCDIF_CTRL_WORD_LENGTH	0x00000300
+-#define BP_LCDIF_CTRL_WORD_LENGTH	8
+-#define BM_LCDIF_CTRL_LCD_DATABUS_WIDTH	0x00000C00
+-#define BP_LCDIF_CTRL_LCD_DATABUS_WIDTH	10
+-#define BM_LCDIF_CTRL_INPUT_DATA_SWIZZLE	0x0000C000
+-#define BP_LCDIF_CTRL_INPUT_DATA_SWIZZLE	14
+-#define BM_LCDIF_CTRL_DATA_SELECT	0x00010000
+-#define BM_LCDIF_CTRL_DOTCLK_MODE	0x00020000
+-#define BM_LCDIF_CTRL_VSYNC_MODE	0x00040000
+-#define BM_LCDIF_CTRL_BYPASS_COUNT	0x00080000
+-#define BM_LCDIF_CTRL_DVI_MODE	0x00100000
+-#define BM_LCDIF_CTRL_SHIFT_NUM_BITS	0x03E00000
+-#define BP_LCDIF_CTRL_SHIFT_NUM_BITS	21
+-#define BM_LCDIF_CTRL_DATA_SHIFT_DIR	0x04000000
+-#define BM_LCDIF_CTRL_WAIT_FOR_VSYNC_EDGE	0x08000000
+-#define BM_LCDIF_CTRL_CLKGATE	0x40000000
+-#define BM_LCDIF_CTRL_SFTRST	0x80000000
+-
+-#define HW_LCDIF_CTRL1		0x10
+-#define BM_LCDIF_CTRL1_RESET	0x00000001
+-#define BP_LCDIF_CTRL1_RESET	0
+-#define BM_LCDIF_CTRL1_MODE86	0x00000002
+-#define BM_LCDIF_CTRL1_BUSY_ENABLE	0x00000004
+-#define BM_LCDIF_CTRL1_VSYNC_EDGE_IRQ	0x00000100
+-#define BM_LCDIF_CTRL1_CUR_FRAME_DONE_IRQ	0x00000200
+-#define BM_LCDIF_CTRL1_UNDERFLOW_IRQ	0x00000400
+-#define BM_LCDIF_CTRL1_OVERFLOW_IRQ	0x00000800
+-#define BM_LCDIF_CTRL1_VSYNC_EDGE_IRQ_EN	0x00001000
+-#define BM_LCDIF_CTRL1_BYTE_PACKING_FORMAT	0x000F0000
+-#define BP_LCDIF_CTRL1_BYTE_PACKING_FORMAT	16
+-#define BM_LCDIF_CTRL1_INTERLACE_FIELDS	0x00800000
+-#define BM_LCDIF_CTRL1_RECOVER_ON_UNDERFLOW	0x01000000
+-
+-#define HW_LCDIF_TRANSFER_COUNT	0x20
+-#define BM_LCDIF_TRANSFER_COUNT_H_COUNT	0x0000FFFF
+-#define BP_LCDIF_TRANSFER_COUNT_H_COUNT	0
+-#define BM_LCDIF_TRANSFER_COUNT_V_COUNT	0xFFFF0000
+-#define BP_LCDIF_TRANSFER_COUNT_V_COUNT	16
+-
+-#define HW_LCDIF_CUR_BUF	0x30
+-
+-#define HW_LCDIF_NEXT_BUF	0x40
+-
+-#define HW_LCDIF_TIMING		0x60
+-
+-#define HW_LCDIF_VDCTRL0	0x70
+-#define BM_LCDIF_VDCTRL0_VSYNC_PULSE_WIDTH	0x0003FFFF
+-#define BP_LCDIF_VDCTRL0_VSYNC_PULSE_WIDTH	0
+-#define BM_LCDIF_VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	0x00100000
+-#define BM_LCDIF_VDCTRL0_VSYNC_PERIOD_UNIT	0x00200000
+-#define BM_LCDIF_VDCTRL0_ENABLE_POL	0x01000000
+-#define BM_LCDIF_VDCTRL0_DOTCLK_POL	0x02000000
+-#define BM_LCDIF_VDCTRL0_HSYNC_POL	0x04000000
+-#define BM_LCDIF_VDCTRL0_VSYNC_POL	0x08000000
+-#define BM_LCDIF_VDCTRL0_ENABLE_PRESENT	0x10000000
+-#define BM_LCDIF_VDCTRL0_VSYNC_OEB	0x20000000
+-
+-#define HW_LCDIF_VDCTRL1	0x80
+-#define BM_LCDIF_VDCTRL1_VSYNC_PERIOD	0xFFFFFFFF
+-#define BP_LCDIF_VDCTRL1_VSYNC_PERIOD	0
+-
+-#define HW_LCDIF_VDCTRL2	0x90
+-#define BM_LCDIF_VDCTRL2_HSYNC_PERIOD	0x0003FFFF
+-#define BP_LCDIF_VDCTRL2_HSYNC_PERIOD	0
+-#define BM_LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH	0xFF000000
+-#define BP_LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH	24
+-
+-#define HW_LCDIF_VDCTRL3	0xA0
+-#define BM_LCDIF_VDCTRL3_VERTICAL_WAIT_CNT	0x0000FFFF
+-#define BP_LCDIF_VDCTRL3_VERTICAL_WAIT_CNT	0
+-#define BM_LCDIF_VDCTRL3_HORIZONTAL_WAIT_CNT	0x0FFF0000
+-#define BP_LCDIF_VDCTRL3_HORIZONTAL_WAIT_CNT	16
+-
+-#define HW_LCDIF_VDCTRL4	0xB0
+-#define BM_LCDIF_VDCTRL4_DOTCLK_H_VALID_DATA_CNT	0x0003FFFF
+-#define BP_LCDIF_VDCTRL4_DOTCLK_H_VALID_DATA_CNT	0
+-#define BM_LCDIF_VDCTRL4_SYNC_SIGNALS_ON	0x00040000
+-
+-#define HW_LCDIF_DVICTRL0	0xC0
+-#define BM_LCDIF_DVICTRL0_V_LINES_CNT	0x000003FF
+-#define BP_LCDIF_DVICTRL0_V_LINES_CNT	0
+-#define BM_LCDIF_DVICTRL0_H_BLANKING_CNT	0x000FFC00
+-#define BP_LCDIF_DVICTRL0_H_BLANKING_CNT	10
+-#define BM_LCDIF_DVICTRL0_H_ACTIVE_CNT	0x7FF00000
+-#define BP_LCDIF_DVICTRL0_H_ACTIVE_CNT	20
+-
+-#define HW_LCDIF_DVICTRL1	0xD0
+-#define BM_LCDIF_DVICTRL1_F2_START_LINE	0x000003FF
+-#define BP_LCDIF_DVICTRL1_F2_START_LINE	0
+-#define BM_LCDIF_DVICTRL1_F1_END_LINE	0x000FFC00
+-#define BP_LCDIF_DVICTRL1_F1_END_LINE	10
+-#define BM_LCDIF_DVICTRL1_F1_START_LINE	0x3FF00000
+-#define BP_LCDIF_DVICTRL1_F1_START_LINE	20
+-
+-#define HW_LCDIF_DVICTRL2	0xE0
+-#define BM_LCDIF_DVICTRL2_V1_BLANK_END_LINE	0x000003FF
+-#define BP_LCDIF_DVICTRL2_V1_BLANK_END_LINE	0
+-#define BM_LCDIF_DVICTRL2_V1_BLANK_START_LINE	0x000FFC00
+-#define BP_LCDIF_DVICTRL2_V1_BLANK_START_LINE	10
+-#define BM_LCDIF_DVICTRL2_F2_END_LINE	0x3FF00000
+-#define BP_LCDIF_DVICTRL2_F2_END_LINE	20
+-
+-#define HW_LCDIF_DVICTRL3	0xF0
+-#define BM_LCDIF_DVICTRL3_V2_BLANK_END_LINE	0x000003FF
+-#define BP_LCDIF_DVICTRL3_V2_BLANK_END_LINE	0
+-#define BM_LCDIF_DVICTRL3_V2_BLANK_START_LINE	0x03FF0000
+-#define BP_LCDIF_DVICTRL3_V2_BLANK_START_LINE	16
+-
+-#define HW_LCDIF_DVICTRL4	0x100
+-#define BM_LCDIF_DVICTRL4_H_FILL_CNT	0x000000FF
+-#define BP_LCDIF_DVICTRL4_H_FILL_CNT	0
+-#define BM_LCDIF_DVICTRL4_CR_FILL_VALUE	0x0000FF00
+-#define BP_LCDIF_DVICTRL4_CR_FILL_VALUE	8
+-#define BM_LCDIF_DVICTRL4_CB_FILL_VALUE	0x00FF0000
+-#define BP_LCDIF_DVICTRL4_CB_FILL_VALUE	16
+-#define BM_LCDIF_DVICTRL4_Y_FILL_VALUE	0xFF000000
+-#define BP_LCDIF_DVICTRL4_Y_FILL_VALUE	24
+-
+-#define HW_LCDIF_CSC_COEFF0	0x110
+-#define BM_LCDIF_CSC_COEFF0_CSC_SUBSAMPLE_FILTER	0x00000003
+-#define BP_LCDIF_CSC_COEFF0_CSC_SUBSAMPLE_FILTER	0
+-#define BM_LCDIF_CSC_COEFF0_C0	0x03FF0000
+-#define BP_LCDIF_CSC_COEFF0_C0	16
+-
+-#define HW_LCDIF_CSC_COEFF1	0x120
+-#define BM_LCDIF_CSC_COEFF1_C1	0x000003FF
+-#define BP_LCDIF_CSC_COEFF1_C1	0
+-#define BM_LCDIF_CSC_COEFF1_C2	0x03FF0000
+-#define BP_LCDIF_CSC_COEFF1_C2	16
+-
+-#define HW_LCDIF_CSC_COEFF2	0x130
+-#define BM_LCDIF_CSC_COEFF2_C3	0x000003FF
+-#define BP_LCDIF_CSC_COEFF2_C3	0
+-#define BM_LCDIF_CSC_COEFF2_C4	0x03FF0000
+-#define BP_LCDIF_CSC_COEFF2_C4	16
+-
+-#define HW_LCDIF_CSC_COEFF3	0x140
+-#define BM_LCDIF_CSC_COEFF3_C5	0x000003FF
+-#define BP_LCDIF_CSC_COEFF3_C5	0
+-#define BM_LCDIF_CSC_COEFF3_C6	0x03FF0000
+-#define BP_LCDIF_CSC_COEFF3_C6	16
+-
+-#define HW_LCDIF_CSC_COEFF4	0x150
+-#define BM_LCDIF_CSC_COEFF4_C7	0x000003FF
+-#define BP_LCDIF_CSC_COEFF4_C7	0
+-#define BM_LCDIF_CSC_COEFF4_C8	0x03FF0000
+-#define BP_LCDIF_CSC_COEFF4_C8	16
+-
+-#define HW_LCDIF_CSC_OFFSET	0x160
+-#define BM_LCDIF_CSC_OFFSET_Y_OFFSET	0x000001FF
+-#define BP_LCDIF_CSC_OFFSET_Y_OFFSET	0
+-#define BM_LCDIF_CSC_OFFSET_CBCR_OFFSET	0x01FF0000
+-#define BP_LCDIF_CSC_OFFSET_CBCR_OFFSET	16
+-
+-#define HW_LCDIF_CSC_LIMIT	0x170
+-#define BM_LCDIF_CSC_LIMIT_Y_MAX	0x000000FF
+-#define BP_LCDIF_CSC_LIMIT_Y_MAX	0
+-#define BM_LCDIF_CSC_LIMIT_Y_MIN	0x0000FF00
+-#define BP_LCDIF_CSC_LIMIT_Y_MIN	8
+-#define BM_LCDIF_CSC_LIMIT_CBCR_MAX	0x00FF0000
+-#define BP_LCDIF_CSC_LIMIT_CBCR_MAX	16
+-#define BM_LCDIF_CSC_LIMIT_CBCR_MIN	0xFF000000
+-#define BP_LCDIF_CSC_LIMIT_CBCR_MIN	24
+-
+-#define HW_LCDIF_STAT		0x1D0
+-#define BM_LCDIF_STAT_TXFIFO_EMPTY	0x04000000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-lradc.h b/arch/arm/mach-stmp378x/include/mach/regs-lradc.h
+deleted file mode 100644
+index cb8cb06..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-lradc.h
++++ /dev/null
+@@ -1,99 +0,0 @@
+-/*
+- * stmp378x: LRADC register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_LRADC_BASE	(STMP3XXX_REGS_BASE + 0x50000)
+-#define REGS_LRADC_PHYS	0x80050000
+-#define REGS_LRADC_SIZE	0x2000
+-
+-#define HW_LRADC_CTRL0		0x0
+-#define BM_LRADC_CTRL0_SCHEDULE	0x000000FF
+-#define BP_LRADC_CTRL0_SCHEDULE	0
+-#define BM_LRADC_CTRL0_XPLUS_ENABLE	0x00010000
+-#define BM_LRADC_CTRL0_YPLUS_ENABLE	0x00020000
+-#define BM_LRADC_CTRL0_XMINUS_ENABLE	0x00040000
+-#define BM_LRADC_CTRL0_YMINUS_ENABLE	0x00080000
+-#define BM_LRADC_CTRL0_TOUCH_DETECT_ENABLE	0x00100000
+-#define BM_LRADC_CTRL0_ONCHIP_GROUNDREF	0x00200000
+-#define BM_LRADC_CTRL0_CLKGATE	0x40000000
+-#define BM_LRADC_CTRL0_SFTRST	0x80000000
+-
+-#define HW_LRADC_CTRL1		0x10
+-#define BM_LRADC_CTRL1_LRADC0_IRQ	0x00000001
+-#define BP_LRADC_CTRL1_LRADC0_IRQ	0
+-#define BM_LRADC_CTRL1_LRADC5_IRQ	0x00000020
+-#define BM_LRADC_CTRL1_LRADC6_IRQ	0x00000040
+-#define BM_LRADC_CTRL1_TOUCH_DETECT_IRQ	0x00000100
+-#define BM_LRADC_CTRL1_LRADC0_IRQ_EN	0x00010000
+-#define BM_LRADC_CTRL1_LRADC5_IRQ_EN	0x00200000
+-#define BM_LRADC_CTRL1_TOUCH_DETECT_IRQ_EN	0x01000000
+-
+-#define HW_LRADC_CTRL2		0x20
+-#define BM_LRADC_CTRL2_BL_BRIGHTNESS	0x001F0000
+-#define BP_LRADC_CTRL2_BL_BRIGHTNESS	16
+-#define BM_LRADC_CTRL2_BL_MUX_SELECT	0x00200000
+-#define BM_LRADC_CTRL2_BL_ENABLE	0x00400000
+-#define BM_LRADC_CTRL2_DIVIDE_BY_TWO	0xFF000000
+-#define BP_LRADC_CTRL2_DIVIDE_BY_TWO	24
+-
+-#define HW_LRADC_CTRL3		0x30
+-#define BM_LRADC_CTRL3_CYCLE_TIME	0x00000300
+-#define BP_LRADC_CTRL3_CYCLE_TIME	8
+-
+-#define HW_LRADC_STATUS		0x40
+-#define BM_LRADC_STATUS_TOUCH_DETECT_RAW	0x00000001
+-#define BP_LRADC_STATUS_TOUCH_DETECT_RAW	0
+-
+-#define HW_LRADC_CH0		(0x50 + 0 * 0x10)
+-#define HW_LRADC_CH1		(0x50 + 1 * 0x10)
+-#define HW_LRADC_CH2		(0x50 + 2 * 0x10)
+-#define HW_LRADC_CH3		(0x50 + 3 * 0x10)
+-#define HW_LRADC_CH4		(0x50 + 4 * 0x10)
+-#define HW_LRADC_CH5		(0x50 + 5 * 0x10)
+-#define HW_LRADC_CH6		(0x50 + 6 * 0x10)
+-#define HW_LRADC_CH7		(0x50 + 7 * 0x10)
+-
+-#define HW_LRADC_CHn		0x50
+-#define BM_LRADC_CHn_VALUE	0x0003FFFF
+-#define BP_LRADC_CHn_VALUE	0
+-#define BM_LRADC_CHn_NUM_SAMPLES	0x1F000000
+-#define BP_LRADC_CHn_NUM_SAMPLES	24
+-#define BM_LRADC_CHn_ACCUMULATE	0x20000000
+-
+-#define HW_LRADC_DELAY0		(0xD0 + 0 * 0x10)
+-#define HW_LRADC_DELAY1		(0xD0 + 1 * 0x10)
+-#define HW_LRADC_DELAY2		(0xD0 + 2 * 0x10)
+-#define HW_LRADC_DELAY3		(0xD0 + 3 * 0x10)
+-
+-#define HW_LRADC_DELAYn		0xD0
+-#define BM_LRADC_DELAYn_DELAY	0x000007FF
+-#define BP_LRADC_DELAYn_DELAY	0
+-#define BM_LRADC_DELAYn_LOOP_COUNT	0x0000F800
+-#define BP_LRADC_DELAYn_LOOP_COUNT	11
+-#define BM_LRADC_DELAYn_TRIGGER_DELAYS	0x000F0000
+-#define BP_LRADC_DELAYn_TRIGGER_DELAYS	16
+-#define BM_LRADC_DELAYn_KICK	0x00100000
+-#define BM_LRADC_DELAYn_TRIGGER_LRADCS	0xFF000000
+-#define BP_LRADC_DELAYn_TRIGGER_LRADCS	24
+-
+-#define HW_LRADC_CTRL4		0x140
+-#define BM_LRADC_CTRL4_LRADC6SELECT	0x0F000000
+-#define BP_LRADC_CTRL4_LRADC6SELECT	24
+-#define BM_LRADC_CTRL4_LRADC7SELECT	0xF0000000
+-#define BP_LRADC_CTRL4_LRADC7SELECT	28
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-ocotp.h b/arch/arm/mach-stmp378x/include/mach/regs-ocotp.h
+deleted file mode 100644
+index f0af64d..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-ocotp.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * stmp378x: OCOTP register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_OCOTP_BASE	(STMP3XXX_REGS_BASE + 0x2C000)
+-#define REGS_OCOTP_PHYS	0x8002C000
+-#define REGS_OCOTP_SIZE	0x2000
+-
+-#define HW_OCOTP_CTRL		0x0
+-#define BM_OCOTP_CTRL_BUSY	0x00000100
+-#define BM_OCOTP_CTRL_ERROR	0x00000200
+-#define BM_OCOTP_CTRL_RD_BANK_OPEN	0x00001000
+-#define BM_OCOTP_CTRL_RELOAD_SHADOWS	0x00002000
+-#define BM_OCOTP_CTRL_WR_UNLOCK	0xFFFF0000
+-#define BP_OCOTP_CTRL_WR_UNLOCK	16
+-
+-#define HW_OCOTP_DATA		0x10
+-
+-#define HW_OCOTP_CUST0		(0x20 + 0 * 0x10)
+-#define HW_OCOTP_CUST1		(0x20 + 1 * 0x10)
+-#define HW_OCOTP_CUST2		(0x20 + 2 * 0x10)
+-#define HW_OCOTP_CUST3		(0x20 + 3 * 0x10)
+-
+-#define HW_OCOTP_CUSTn		0x20
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h b/arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h
+deleted file mode 100644
+index 50d90ea..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-pinctrl.h
++++ /dev/null
+@@ -1,90 +0,0 @@
+-/*
+- * stmp378x: PINCTRL register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_PINCTRL
+-#define _MACH_REGS_PINCTRL
+-
+-#define REGS_PINCTRL_BASE	(STMP3XXX_REGS_BASE + 0x18000)
+-#define REGS_PINCTRL_PHYS	0x80018000
+-#define REGS_PINCTRL_SIZE	0x2000
+-
+-#define HW_PINCTRL_MUXSEL0	0x100
+-#define HW_PINCTRL_MUXSEL1	0x110
+-#define HW_PINCTRL_MUXSEL2	0x120
+-#define HW_PINCTRL_MUXSEL3	0x130
+-#define HW_PINCTRL_MUXSEL4	0x140
+-#define HW_PINCTRL_MUXSEL5	0x150
+-#define HW_PINCTRL_MUXSEL6	0x160
+-#define HW_PINCTRL_MUXSEL7	0x170
+-
+-#define HW_PINCTRL_DRIVE0	0x200
+-#define HW_PINCTRL_DRIVE1	0x210
+-#define HW_PINCTRL_DRIVE2	0x220
+-#define HW_PINCTRL_DRIVE3	0x230
+-#define HW_PINCTRL_DRIVE4	0x240
+-#define HW_PINCTRL_DRIVE5	0x250
+-#define HW_PINCTRL_DRIVE6	0x260
+-#define HW_PINCTRL_DRIVE7	0x270
+-#define HW_PINCTRL_DRIVE8	0x280
+-#define HW_PINCTRL_DRIVE9	0x290
+-#define HW_PINCTRL_DRIVE10	0x2A0
+-#define HW_PINCTRL_DRIVE11	0x2B0
+-#define HW_PINCTRL_DRIVE12	0x2C0
+-#define HW_PINCTRL_DRIVE13	0x2D0
+-#define HW_PINCTRL_DRIVE14	0x2E0
+-
+-#define HW_PINCTRL_PULL0	0x400
+-#define HW_PINCTRL_PULL1	0x410
+-#define HW_PINCTRL_PULL2	0x420
+-#define HW_PINCTRL_PULL3	0x430
+-
+-#define HW_PINCTRL_DOUT0	0x500
+-#define HW_PINCTRL_DOUT1	0x510
+-#define HW_PINCTRL_DOUT2	0x520
+-
+-#define HW_PINCTRL_DIN0		0x600
+-#define HW_PINCTRL_DIN1		0x610
+-#define HW_PINCTRL_DIN2		0x620
+-
+-#define HW_PINCTRL_DOE0		0x700
+-#define HW_PINCTRL_DOE1		0x710
+-#define HW_PINCTRL_DOE2		0x720
+-
+-#define HW_PINCTRL_PIN2IRQ0	0x800
+-#define HW_PINCTRL_PIN2IRQ1	0x810
+-#define HW_PINCTRL_PIN2IRQ2	0x820
+-
+-#define HW_PINCTRL_IRQEN0	0x900
+-#define HW_PINCTRL_IRQEN1	0x910
+-#define HW_PINCTRL_IRQEN2	0x920
+-
+-#define HW_PINCTRL_IRQLEVEL0	0xA00
+-#define HW_PINCTRL_IRQLEVEL1	0xA10
+-#define HW_PINCTRL_IRQLEVEL2	0xA20
+-
+-#define HW_PINCTRL_IRQPOL0	0xB00
+-#define HW_PINCTRL_IRQPOL1	0xB10
+-#define HW_PINCTRL_IRQPOL2	0xB20
+-
+-#define HW_PINCTRL_IRQSTAT0	0xC00
+-#define HW_PINCTRL_IRQSTAT1	0xC10
+-#define HW_PINCTRL_IRQSTAT2	0xC20
 -
 -#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/mmc.h b/arch/arm/plat-stmp3xxx/include/mach/mmc.h
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-power.h b/arch/arm/mach-stmp378x/include/mach/regs-power.h
 deleted file mode 100644
-index ba81e15..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/mmc.h
+index e454c83..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-power.h
 +++ /dev/null
-@@ -1,14 +0,0 @@
--#ifndef _MACH_MMC_H
--#define _MACH_MMC_H
+@@ -1,63 +0,0 @@
+-/*
+- * stmp378x: POWER register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#ifndef _MACH_REGS_POWER
+-#define _MACH_REGS_POWER
 -
--#include <mach/regs-ssp.h>
+-#define REGS_POWER_BASE	(STMP3XXX_REGS_BASE + 0x44000)
+-#define REGS_POWER_PHYS	0x80044000
+-#define REGS_POWER_SIZE	0x2000
 -
--struct stmp3xxxmmc_platform_data {
--	int (*get_wp)(void);
--	unsigned long (*setclock)(void __iomem *base, unsigned long);
--	void (*cmd_pullup)(int);
--	int  (*hw_init)(void);
--	void (*hw_release)(void);
--};
+-#define HW_POWER_CTRL		0x0
+-#define BM_POWER_CTRL_ENIRQ_VDD5V_GT_VDDIO	0x00000001
+-#define BP_POWER_CTRL_ENIRQ_VDD5V_GT_VDDIO	0
+-#define BM_POWER_CTRL_ENIRQ_PSWITCH	0x00020000
+-#define BM_POWER_CTRL_PSWITCH_IRQ	0x00100000
+-#define BM_POWER_CTRL_CLKGATE	0x40000000
+-
+-#define HW_POWER_5VCTRL		0x10
+-#define BM_POWER_5VCTRL_ENABLE_LINREG_ILIMIT	0x00000040
+-
+-#define HW_POWER_MINPWR		0x20
+-
+-#define HW_POWER_CHARGE		0x30
+-
+-#define HW_POWER_VDDDCTRL	0x40
+-
+-#define HW_POWER_VDDACTRL	0x50
+-
+-#define HW_POWER_VDDIOCTRL	0x60
+-#define BM_POWER_VDDIOCTRL_TRG	0x0000001F
+-#define BP_POWER_VDDIOCTRL_TRG	0
+-
+-#define HW_POWER_STS		0xC0
+-#define BM_POWER_STS_VBUSVALID	0x00000002
+-#define BM_POWER_STS_BVALID	0x00000004
+-#define BM_POWER_STS_AVALID	0x00000008
+-#define BM_POWER_STS_DC_OK	0x00000200
+-
+-#define HW_POWER_RESET		0x100
+-
+-#define HW_POWER_DEBUG		0x110
+-#define BM_POWER_DEBUG_BVALIDPIOLOCK	0x00000002
+-#define BM_POWER_DEBUG_AVALIDPIOLOCK	0x00000004
+-#define BM_POWER_DEBUG_VBUSVALIDPIOLOCK	0x00000008
 -
 -#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/pinmux.h b/arch/arm/plat-stmp3xxx/include/mach/pinmux.h
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-pwm.h b/arch/arm/mach-stmp378x/include/mach/regs-pwm.h
 deleted file mode 100644
-index cc5af82..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/pinmux.h
+index 0d0f9e5..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-pwm.h
 +++ /dev/null
-@@ -1,157 +0,0 @@
+@@ -1,53 +0,0 @@
 -/*
-- * Freescale STMP37XX/STMP378X Pin Multiplexing
+- * stmp378x: PWM register definitions
 - *
-- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (c) 2008 Freescale Semiconductor
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#ifndef __PINMUX_H
--#define __PINMUX_H
+-#define REGS_PWM_BASE	(STMP3XXX_REGS_BASE + 0x64000)
+-#define REGS_PWM_PHYS	0x80064000
+-#define REGS_PWM_SIZE	0x2000
 -
--#include <linux/spinlock.h>
--#include <linux/types.h>
--#include <linux/gpio.h>
--#include <asm-generic/gpio.h>
+-#define HW_PWM_CTRL		0x0
+-#define BM_PWM_CTRL_PWM2_ENABLE	0x00000004
+-#define BM_PWM_CTRL_PWM2_ANA_CTRL_ENABLE	0x00000020
 -
--/* Pin definitions */
--#include "pins.h"
--#include <mach/pins.h>
+-#define HW_PWM_ACTIVE0		(0x10 + 0 * 0x20)
+-#define HW_PWM_ACTIVE1		(0x10 + 1 * 0x20)
+-#define HW_PWM_ACTIVE2		(0x10 + 2 * 0x20)
+-#define HW_PWM_ACTIVE3		(0x10 + 3 * 0x20)
 -
--/*
-- * Each pin may be routed up to four different HW interfaces
-- * including GPIO
-- */
--enum pin_fun {
--	PIN_FUN1 = 0,
--	PIN_FUN2,
--	PIN_FUN3,
--	PIN_GPIO,
--};
+-#define HW_PWM_ACTIVEn		0x10
+-#define BM_PWM_ACTIVEn_ACTIVE	0x0000FFFF
+-#define BP_PWM_ACTIVEn_ACTIVE	0
+-#define BM_PWM_ACTIVEn_INACTIVE	0xFFFF0000
+-#define BP_PWM_ACTIVEn_INACTIVE	16
 -
--/*
-- * Each pin may have different output drive strength in range from
-- * 4mA to 20mA. The most common case is 4, 8 and 12 mA strengths.
-- */
--enum pin_strength {
--	PIN_4MA = 0,
--	PIN_8MA,
--	PIN_12MA,
--	PIN_16MA,
--	PIN_20MA,
--};
+-#define HW_PWM_PERIOD0		(0x20 + 0 * 0x20)
+-#define HW_PWM_PERIOD1		(0x20 + 1 * 0x20)
+-#define HW_PWM_PERIOD2		(0x20 + 2 * 0x20)
+-#define HW_PWM_PERIOD3		(0x20 + 3 * 0x20)
 -
--/*
-- * Each pin can be programmed for 1.8V or 3.3V
-- */
--enum pin_voltage {
--	PIN_1_8V = 0,
--	PIN_3_3V,
--};
--
--/*
-- * Structure to define a group of pins and their parameters
-- */
--struct pin_desc {
--	unsigned id;
--	enum pin_fun fun;
--	enum pin_strength strength;
--	enum pin_voltage voltage;
--	unsigned pullup:1;
--};
--
--struct pin_group {
--	struct pin_desc *pins;
--	int nr_pins;
--};
--
--/* Set pin drive strength */
--void stmp3xxx_pin_strength(unsigned id, enum pin_strength strength,
--			   const char *label);
--
--/* Set pin voltage */
--void stmp3xxx_pin_voltage(unsigned id, enum pin_voltage voltage,
--			   const char *label);
--
--/* Enable pull-up resistor for a pin */
--void stmp3xxx_pin_pullup(unsigned id, int enable, const char *label);
--
--/*
-- * Request a pin ownership, only one module (identified by @label)
-- * may own a pin.
-- */
--int stmp3xxx_request_pin(unsigned id, enum pin_fun fun, const char *label);
--
--/* Release pin */
--void stmp3xxx_release_pin(unsigned id, const char *label);
--
--void stmp3xxx_set_pin_type(unsigned id, enum pin_fun fun);
--
--/*
-- * Each bank is associated with a number of registers to control
-- * pin function, drive strength, voltage and pull-up reigster. The
-- * number of registers of a given type depends on the number of bits
-- * describin particular pin.
-- */
--#define HW_MUXSEL_NUM		2	/* registers per bank */
--#define HW_MUXSEL_PIN_LEN	2	/* bits per pin */
--#define HW_MUXSEL_PIN_NUM	16	/* pins per register */
--#define HW_MUXSEL_PINFUN_MASK	0x3	/* pin function mask */
--#define HW_MUXSEL_PINFUN_NUM	4	/* four options for a pin */
--
--#define HW_DRIVE_NUM		4	/* registers per bank */
--#define HW_DRIVE_PIN_LEN	4	/* bits per pin */
--#define HW_DRIVE_PIN_NUM	8	/* pins per register */
--#define HW_DRIVE_PINDRV_MASK	0x3	/* pin strength mask - 2 bits */
--#define HW_DRIVE_PINDRV_NUM	5	/* five possible strength values */
--#define HW_DRIVE_PINV_MASK	0x4	/* pin voltage mask - 1 bit */
--
--
--struct stmp3xxx_pinmux_bank {
--	struct gpio_chip chip;
--
--	/* Pins allocation map */
--	unsigned long pin_map;
--
--	/* Pin owner names */
--	const char *pin_labels[32];
--
--	/* Bank registers */
--	void __iomem *hw_muxsel[HW_MUXSEL_NUM];
--	void __iomem *hw_drive[HW_DRIVE_NUM];
--	void __iomem *hw_pull;
--
--	void __iomem *pin2irq,
--		*irqlevel,
--		*irqpolarity,
--		*irqen,
--		*irqstat;
--
--	/* HW MUXSEL register function bit values */
--	u8 functions[HW_MUXSEL_PINFUN_NUM];
--
--	/*
--	 * HW DRIVE register strength bit values:
--	 * 0xff - requested strength is not supported for this bank
--	 */
--	u8 strengths[HW_DRIVE_PINDRV_NUM];
--
--	/* GPIO things */
--	void __iomem *hw_gpio_in,
--		     *hw_gpio_out,
--		     *hw_gpio_doe;
--	int irq, virq;
--};
--
--int __init stmp3xxx_pinmux_init(int virtual_irq_start);
--
--#endif /* __PINMUX_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/pins.h b/arch/arm/plat-stmp3xxx/include/mach/pins.h
+-#define HW_PWM_PERIODn		0x20
+-#define BM_PWM_PERIODn_PERIOD	0x0000FFFF
+-#define BP_PWM_PERIODn_PERIOD	0
+-#define BM_PWM_PERIODn_ACTIVE_STATE	0x00030000
+-#define BP_PWM_PERIODn_ACTIVE_STATE	16
+-#define BM_PWM_PERIODn_INACTIVE_STATE	0x000C0000
+-#define BP_PWM_PERIODn_INACTIVE_STATE	18
+-#define BM_PWM_PERIODn_CDIV	0x00700000
+-#define BP_PWM_PERIODn_CDIV	20
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-pxp.h b/arch/arm/mach-stmp378x/include/mach/regs-pxp.h
 deleted file mode 100644
-index c573318..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/pins.h
+index 54d2978..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-pxp.h
 +++ /dev/null
-@@ -1,30 +0,0 @@
+@@ -1,140 +0,0 @@
 -/*
-- * Freescale STMP37XX/STMP378X Pin multiplexing interface definitions
+- * stmp378x: PXP register definitions
 - *
-- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (c) 2008 Freescale Semiconductor
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#ifndef __ASM_PLAT_PINS_H
--#define __ASM_PLAT_PINS_H
+-#define REGS_PXP_BASE	(STMP3XXX_REGS_BASE + 0x2A000)
+-#define REGS_PXP_PHYS	0x8002A000
+-#define REGS_PXP_SIZE	0x2000
 -
--#define STMP3XXX_PINID(bank, pin)	(bank * 32 + pin)
--#define STMP3XXX_PINID_TO_BANK(pinid)	(pinid / 32)
--#define STMP3XXX_PINID_TO_PINNUM(pinid)	(pinid % 32)
+-#define HW_PXP_CTRL		0x0
+-#define BM_PXP_CTRL_ENABLE	0x00000001
+-#define BP_PXP_CTRL_ENABLE	0
+-#define BM_PXP_CTRL_IRQ_ENABLE	0x00000002
+-#define BM_PXP_CTRL_OUTPUT_RGB_FORMAT	0x000000F0
+-#define BP_PXP_CTRL_OUTPUT_RGB_FORMAT	4
+-#define BM_PXP_CTRL_ROTATE	0x00000300
+-#define BP_PXP_CTRL_ROTATE	8
+-#define BM_PXP_CTRL_HFLIP	0x00000400
+-#define BM_PXP_CTRL_VFLIP	0x00000800
+-#define BM_PXP_CTRL_S0_FORMAT	0x0000F000
+-#define BP_PXP_CTRL_S0_FORMAT	12
+-#define BM_PXP_CTRL_SCALE	0x00040000
+-#define BM_PXP_CTRL_CROP	0x00080000
 -
--/*
-- * Special invalid pin identificator to show a pin doesn't exist
-- */
--#define PINID_NO_PIN	STMP3XXX_PINID(0xFF, 0xFF)
+-#define HW_PXP_STAT		0x10
+-#define BM_PXP_STAT_IRQ		0x00000001
+-#define BP_PXP_STAT_IRQ		0
 -
--#endif /* __ASM_PLAT_PINS_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/platform.h b/arch/arm/plat-stmp3xxx/include/mach/platform.h
+-#define HW_PXP_RGBBUF		0x20
+-
+-#define HW_PXP_RGBSIZE		0x40
+-#define BM_PXP_RGBSIZE_HEIGHT	0x00000FFF
+-#define BP_PXP_RGBSIZE_HEIGHT	0
+-#define BM_PXP_RGBSIZE_WIDTH	0x00FFF000
+-#define BP_PXP_RGBSIZE_WIDTH	12
+-
+-#define HW_PXP_S0BUF		0x50
+-
+-#define HW_PXP_S0UBUF		0x60
+-
+-#define HW_PXP_S0VBUF		0x70
+-
+-#define HW_PXP_S0PARAM		0x80
+-#define BM_PXP_S0PARAM_HEIGHT	0x000000FF
+-#define BP_PXP_S0PARAM_HEIGHT	0
+-#define BM_PXP_S0PARAM_WIDTH	0x0000FF00
+-#define BP_PXP_S0PARAM_WIDTH	8
+-#define BM_PXP_S0PARAM_YBASE	0x00FF0000
+-#define BP_PXP_S0PARAM_YBASE	16
+-#define BM_PXP_S0PARAM_XBASE	0xFF000000
+-#define BP_PXP_S0PARAM_XBASE	24
+-
+-#define HW_PXP_S0BACKGROUND	0x90
+-
+-#define HW_PXP_S0CROP		0xA0
+-#define BM_PXP_S0CROP_HEIGHT	0x000000FF
+-#define BP_PXP_S0CROP_HEIGHT	0
+-#define BM_PXP_S0CROP_WIDTH	0x0000FF00
+-#define BP_PXP_S0CROP_WIDTH	8
+-#define BM_PXP_S0CROP_YBASE	0x00FF0000
+-#define BP_PXP_S0CROP_YBASE	16
+-#define BM_PXP_S0CROP_XBASE	0xFF000000
+-#define BP_PXP_S0CROP_XBASE	24
+-
+-#define HW_PXP_S0SCALE		0xB0
+-#define BM_PXP_S0SCALE_XSCALE	0x00003FFF
+-#define BP_PXP_S0SCALE_XSCALE	0
+-#define BM_PXP_S0SCALE_YSCALE	0x3FFF0000
+-#define BP_PXP_S0SCALE_YSCALE	16
+-
+-#define HW_PXP_CSCCOEFF0	0xD0
+-
+-#define HW_PXP_CSCCOEFF1	0xE0
+-
+-#define HW_PXP_CSCCOEFF2	0xF0
+-
+-#define HW_PXP_S0COLORKEYLOW	0x180
+-
+-#define HW_PXP_S0COLORKEYHIGH	0x190
+-
+-#define HW_PXP_OL0		(0x200 + 0 * 0x40)
+-#define HW_PXP_OL1		(0x200 + 1 * 0x40)
+-#define HW_PXP_OL2		(0x200 + 2 * 0x40)
+-#define HW_PXP_OL3		(0x200 + 3 * 0x40)
+-#define HW_PXP_OL4		(0x200 + 4 * 0x40)
+-#define HW_PXP_OL5		(0x200 + 5 * 0x40)
+-#define HW_PXP_OL6		(0x200 + 6 * 0x40)
+-#define HW_PXP_OL7		(0x200 + 7 * 0x40)
+-
+-#define HW_PXP_OLn		0x200
+-
+-#define HW_PXP_OL0SIZE		(0x210 + 0 * 0x40)
+-#define HW_PXP_OL1SIZE		(0x210 + 1 * 0x40)
+-#define HW_PXP_OL2SIZE		(0x210 + 2 * 0x40)
+-#define HW_PXP_OL3SIZE		(0x210 + 3 * 0x40)
+-#define HW_PXP_OL4SIZE		(0x210 + 4 * 0x40)
+-#define HW_PXP_OL5SIZE		(0x210 + 5 * 0x40)
+-#define HW_PXP_OL6SIZE		(0x210 + 6 * 0x40)
+-#define HW_PXP_OL7SIZE		(0x210 + 7 * 0x40)
+-
+-#define HW_PXP_OLnSIZE		0x210
+-#define BM_PXP_OLnSIZE_HEIGHT	0x000000FF
+-#define BP_PXP_OLnSIZE_HEIGHT	0
+-#define BM_PXP_OLnSIZE_WIDTH	0x0000FF00
+-#define BP_PXP_OLnSIZE_WIDTH	8
+-
+-#define HW_PXP_OL0PARAM		(0x220 + 0 * 0x40)
+-#define HW_PXP_OL1PARAM		(0x220 + 1 * 0x40)
+-#define HW_PXP_OL2PARAM		(0x220 + 2 * 0x40)
+-#define HW_PXP_OL3PARAM		(0x220 + 3 * 0x40)
+-#define HW_PXP_OL4PARAM		(0x220 + 4 * 0x40)
+-#define HW_PXP_OL5PARAM		(0x220 + 5 * 0x40)
+-#define HW_PXP_OL6PARAM		(0x220 + 6 * 0x40)
+-#define HW_PXP_OL7PARAM		(0x220 + 7 * 0x40)
+-
+-#define HW_PXP_OLnPARAM		0x220
+-#define BM_PXP_OLnPARAM_ENABLE	0x00000001
+-#define BP_PXP_OLnPARAM_ENABLE	0
+-#define BM_PXP_OLnPARAM_ALPHA_CNTL	0x00000006
+-#define BP_PXP_OLnPARAM_ALPHA_CNTL	1
+-#define BM_PXP_OLnPARAM_ENABLE_COLORKEY	0x00000008
+-#define BM_PXP_OLnPARAM_FORMAT	0x000000F0
+-#define BP_PXP_OLnPARAM_FORMAT	4
+-#define BM_PXP_OLnPARAM_ALPHA	0x0000FF00
+-#define BP_PXP_OLnPARAM_ALPHA	8
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-rtc.h b/arch/arm/mach-stmp378x/include/mach/regs-rtc.h
 deleted file mode 100644
-index 7007dda..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/platform.h
+index b8dbd67..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-rtc.h
++++ /dev/null
+@@ -1,59 +0,0 @@
+-/*
+- * stmp378x: RTC register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_RTC_BASE	(STMP3XXX_REGS_BASE + 0x5C000)
+-#define REGS_RTC_PHYS	0x8005C000
+-#define REGS_RTC_SIZE	0x2000
+-
+-#define HW_RTC_CTRL		0x0
+-#define BM_RTC_CTRL_ALARM_IRQ_EN	0x00000001
+-#define BP_RTC_CTRL_ALARM_IRQ_EN	0
+-#define BM_RTC_CTRL_ONEMSEC_IRQ_EN	0x00000002
+-#define BM_RTC_CTRL_ALARM_IRQ	0x00000004
+-#define BM_RTC_CTRL_ONEMSEC_IRQ	0x00000008
+-#define BM_RTC_CTRL_WATCHDOGEN	0x00000010
+-
+-#define HW_RTC_STAT		0x10
+-#define BM_RTC_STAT_NEW_REGS	0x0000FF00
+-#define BP_RTC_STAT_NEW_REGS	8
+-#define BM_RTC_STAT_STALE_REGS	0x00FF0000
+-#define BP_RTC_STAT_STALE_REGS	16
+-#define BM_RTC_STAT_RTC_PRESENT	0x80000000
+-
+-#define HW_RTC_SECONDS		0x30
+-
+-#define HW_RTC_ALARM		0x40
+-
+-#define HW_RTC_WATCHDOG		0x50
+-
+-#define HW_RTC_PERSISTENT0	0x60
+-#define BM_RTC_PERSISTENT0_ALARM_WAKE_EN	0x00000002
+-#define BM_RTC_PERSISTENT0_ALARM_EN	0x00000004
+-#define BM_RTC_PERSISTENT0_XTAL24MHZ_PWRUP	0x00000010
+-#define BM_RTC_PERSISTENT0_XTAL32KHZ_PWRUP	0x00000020
+-#define BM_RTC_PERSISTENT0_ALARM_WAKE	0x00000080
+-#define BM_RTC_PERSISTENT0_SPARE_ANALOG	0xFFFC0000
+-#define BP_RTC_PERSISTENT0_SPARE_ANALOG	18
+-
+-#define HW_RTC_PERSISTENT1	0x70
+-#define BM_RTC_PERSISTENT1_GENERAL	0xFFFFFFFF
+-#define BP_RTC_PERSISTENT1_GENERAL	0
+-
+-#define HW_RTC_VERSION		0xD0
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-saif.h b/arch/arm/mach-stmp378x/include/mach/regs-saif.h
+deleted file mode 100644
+index 6df4176..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-saif.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * stmp378x: SAIF register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_SAIF_SIZE	0x2000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-spdif.h b/arch/arm/mach-stmp378x/include/mach/regs-spdif.h
+deleted file mode 100644
+index 8015398..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-spdif.h
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*
+- * stmp378x: SPDIF register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_SPDIF_BASE	(STMP3XXX_REGS_BASE + 0x54000)
+-#define REGS_SPDIF_PHYS	0x80054000
+-#define REGS_SPDIF_SIZE	0x2000
+-
+-#define HW_SPDIF_CTRL		0x0
+-#define BM_SPDIF_CTRL_RUN	0x00000001
+-#define BP_SPDIF_CTRL_RUN	0
+-#define BM_SPDIF_CTRL_FIFO_ERROR_IRQ_EN	0x00000002
+-#define BM_SPDIF_CTRL_FIFO_OVERFLOW_IRQ	0x00000004
+-#define BM_SPDIF_CTRL_FIFO_UNDERFLOW_IRQ	0x00000008
+-#define BM_SPDIF_CTRL_WORD_LENGTH	0x00000010
+-#define BM_SPDIF_CTRL_CLKGATE	0x40000000
+-#define BM_SPDIF_CTRL_SFTRST	0x80000000
+-
+-#define HW_SPDIF_STAT		0x10
+-
+-#define HW_SPDIF_FRAMECTRL	0x20
+-
+-#define HW_SPDIF_SRR		0x30
+-#define BM_SPDIF_SRR_RATE	0x000FFFFF
+-#define BP_SPDIF_SRR_RATE	0
+-#define BM_SPDIF_SRR_BASEMULT	0x70000000
+-#define BP_SPDIF_SRR_BASEMULT	28
+-
+-#define HW_SPDIF_DEBUG		0x40
+-
+-#define HW_SPDIF_DATA		0x50
+-
+-#define HW_SPDIF_VERSION	0x60
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-ssp.h b/arch/arm/mach-stmp378x/include/mach/regs-ssp.h
+deleted file mode 100644
+index 28aacf0..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-ssp.h
++++ /dev/null
+@@ -1,102 +0,0 @@
+-/*
+- * stmp378x: SSP register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_SSP1_BASE	(STMP3XXX_REGS_BASE + 0x10000)
+-#define REGS_SSP1_PHYS	0x80010000
+-#define REGS_SSP2_BASE	(STMP3XXX_REGS_BASE + 0x34000)
+-#define REGS_SSP2_PHYS	0x80034000
+-#define REGS_SSP_SIZE	0x2000
+-
+-#define HW_SSP_CTRL0		0x0
+-#define BM_SSP_CTRL0_XFER_COUNT	0x0000FFFF
+-#define BP_SSP_CTRL0_XFER_COUNT	0
+-#define BM_SSP_CTRL0_ENABLE	0x00010000
+-#define BM_SSP_CTRL0_GET_RESP	0x00020000
+-#define BM_SSP_CTRL0_LONG_RESP	0x00080000
+-#define BM_SSP_CTRL0_WAIT_FOR_CMD	0x00100000
+-#define BM_SSP_CTRL0_WAIT_FOR_IRQ	0x00200000
+-#define BM_SSP_CTRL0_BUS_WIDTH	0x00C00000
+-#define BP_SSP_CTRL0_BUS_WIDTH	22
+-#define BM_SSP_CTRL0_DATA_XFER	0x01000000
+-#define BM_SSP_CTRL0_READ	0x02000000
+-#define BM_SSP_CTRL0_IGNORE_CRC	0x04000000
+-#define BM_SSP_CTRL0_LOCK_CS	0x08000000
+-#define BM_SSP_CTRL0_RUN	0x20000000
+-#define BM_SSP_CTRL0_CLKGATE	0x40000000
+-#define BM_SSP_CTRL0_SFTRST	0x80000000
+-
+-#define HW_SSP_CMD0		0x10
+-#define BM_SSP_CMD0_CMD		0x000000FF
+-#define BP_SSP_CMD0_CMD		0
+-#define BM_SSP_CMD0_BLOCK_COUNT	0x0000FF00
+-#define BP_SSP_CMD0_BLOCK_COUNT	8
+-#define BM_SSP_CMD0_BLOCK_SIZE	0x000F0000
+-#define BP_SSP_CMD0_BLOCK_SIZE	16
+-#define BM_SSP_CMD0_APPEND_8CYC	0x00100000
+-#define BM_SSP_CMD1_CMD_ARG	0xFFFFFFFF
+-#define BP_SSP_CMD1_CMD_ARG	0
+-
+-#define HW_SSP_TIMING		0x50
+-#define BM_SSP_TIMING_CLOCK_RATE	0x000000FF
+-#define BP_SSP_TIMING_CLOCK_RATE	0
+-#define BM_SSP_TIMING_CLOCK_DIVIDE	0x0000FF00
+-#define BP_SSP_TIMING_CLOCK_DIVIDE	8
+-#define BM_SSP_TIMING_TIMEOUT	0xFFFF0000
+-#define BP_SSP_TIMING_TIMEOUT	16
+-
+-#define HW_SSP_CTRL1		0x60
+-#define BM_SSP_CTRL1_SSP_MODE	0x0000000F
+-#define BP_SSP_CTRL1_SSP_MODE	0
+-#define BM_SSP_CTRL1_WORD_LENGTH	0x000000F0
+-#define BP_SSP_CTRL1_WORD_LENGTH	4
+-#define BM_SSP_CTRL1_POLARITY	0x00000200
+-#define BM_SSP_CTRL1_PHASE	0x00000400
+-#define BM_SSP_CTRL1_DMA_ENABLE	0x00002000
+-#define BM_SSP_CTRL1_FIFO_OVERRUN_IRQ	0x00008000
+-#define BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN	0x00010000
+-#define BM_SSP_CTRL1_RECV_TIMEOUT_IRQ	0x00020000
+-#define BM_SSP_CTRL1_FIFO_UNDERRUN_IRQ	0x00200000
+-#define BM_SSP_CTRL1_DATA_CRC_IRQ_EN	0x00400000
+-#define BM_SSP_CTRL1_DATA_CRC_IRQ	0x00800000
+-#define BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN	0x01000000
+-#define BM_SSP_CTRL1_DATA_TIMEOUT_IRQ	0x02000000
+-#define BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN	0x04000000
+-#define BM_SSP_CTRL1_RESP_TIMEOUT_IRQ	0x08000000
+-#define BM_SSP_CTRL1_RESP_ERR_IRQ_EN	0x10000000
+-#define BM_SSP_CTRL1_RESP_ERR_IRQ	0x20000000
+-#define BM_SSP_CTRL1_SDIO_IRQ	0x80000000
+-
+-#define HW_SSP_DATA		0x70
+-
+-#define HW_SSP_SDRESP0		0x80
+-
+-#define HW_SSP_SDRESP1		0x90
+-
+-#define HW_SSP_SDRESP2		0xA0
+-
+-#define HW_SSP_SDRESP3		0xB0
+-
+-#define HW_SSP_STATUS		0xC0
+-#define BM_SSP_STATUS_FIFO_EMPTY	0x00000020
+-#define BM_SSP_STATUS_TIMEOUT	0x00001000
+-#define BM_SSP_STATUS_RESP_TIMEOUT	0x00004000
+-#define BM_SSP_STATUS_RESP_ERR	0x00008000
+-#define BM_SSP_STATUS_RESP_CRC_ERR	0x00010000
+-#define BM_SSP_STATUS_CARD_DETECT	0x10000000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-sydma.h b/arch/arm/mach-stmp378x/include/mach/regs-sydma.h
+deleted file mode 100644
+index 08343a8..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-sydma.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * stmp378x: SYDMA register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_SYDMA_BASE	(STMP3XXX_REGS_BASE + 0x26000)
+-#define REGS_SYDMA_PHYS	0x80026000
+-#define REGS_SYDMA_SIZE	0x2000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-timrot.h b/arch/arm/mach-stmp378x/include/mach/regs-timrot.h
+deleted file mode 100644
+index b552795..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-timrot.h
 +++ /dev/null
 @@ -1,68 +0,0 @@
 -/*
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
+- * stmp378x: TIMROT register definitions
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 - */
--#ifndef __ASM_PLAT_PLATFORM_H
--#define __ASM_PLAT_PLATFORM_H
+-#ifndef _MACH_REGS_TIMROT
+-#define _MACH_REGS_TIMROT
 -
--#ifndef __ASSEMBLER__
--#include <linux/io.h>
+-#define REGS_TIMROT_BASE	(STMP3XXX_REGS_BASE + 0x68000)
+-#define REGS_TIMROT_PHYS	0x80068000
+-#define REGS_TIMROT_SIZE	0x2000
+-
+-#define HW_TIMROT_ROTCTRL	0x0
+-#define BM_TIMROT_ROTCTRL_SELECT_A	0x00000007
+-#define BP_TIMROT_ROTCTRL_SELECT_A	0
+-#define BM_TIMROT_ROTCTRL_SELECT_B	0x00000070
+-#define BP_TIMROT_ROTCTRL_SELECT_B	4
+-#define BM_TIMROT_ROTCTRL_POLARITY_A	0x00000100
+-#define BM_TIMROT_ROTCTRL_POLARITY_B	0x00000200
+-#define BM_TIMROT_ROTCTRL_OVERSAMPLE	0x00000C00
+-#define BP_TIMROT_ROTCTRL_OVERSAMPLE	10
+-#define BM_TIMROT_ROTCTRL_RELATIVE	0x00001000
+-#define BM_TIMROT_ROTCTRL_DIVIDER	0x003F0000
+-#define BP_TIMROT_ROTCTRL_DIVIDER	16
+-#define BM_TIMROT_ROTCTRL_ROTARY_PRESENT	0x20000000
+-#define BM_TIMROT_ROTCTRL_CLKGATE	0x40000000
+-#define BM_TIMROT_ROTCTRL_SFTRST	0x80000000
+-
+-#define HW_TIMROT_ROTCOUNT	0x10
+-#define BM_TIMROT_ROTCOUNT_UPDOWN	0x0000FFFF
+-#define BP_TIMROT_ROTCOUNT_UPDOWN	0
+-
+-#define HW_TIMROT_TIMCTRL0	(0x20 + 0 * 0x20)
+-#define HW_TIMROT_TIMCTRL1	(0x20 + 1 * 0x20)
+-#define HW_TIMROT_TIMCTRL2	(0x20 + 2 * 0x20)
+-
+-#define HW_TIMROT_TIMCTRLn	0x20
+-#define BM_TIMROT_TIMCTRLn_SELECT	0x0000000F
+-#define BP_TIMROT_TIMCTRLn_SELECT	0
+-#define BM_TIMROT_TIMCTRLn_PRESCALE	0x00000030
+-#define BP_TIMROT_TIMCTRLn_PRESCALE	4
+-#define BM_TIMROT_TIMCTRLn_RELOAD	0x00000040
+-#define BM_TIMROT_TIMCTRLn_UPDATE	0x00000080
+-#define BM_TIMROT_TIMCTRLn_IRQ_EN	0x00004000
+-#define BM_TIMROT_TIMCTRLn_IRQ	0x00008000
+-
+-#define HW_TIMROT_TIMCOUNT0	(0x30 + 0 * 0x20)
+-#define HW_TIMROT_TIMCOUNT1	(0x30 + 1 * 0x20)
+-#define HW_TIMROT_TIMCOUNT2	(0x30 + 2 * 0x20)
+-
+-#define HW_TIMROT_TIMCOUNTn	0x30
+-
 -#endif
--#include <asm/sizes.h>
--
--/* Virtual address where registers are mapped */
--#define STMP3XXX_REGS_PHBASE	0x80000000
--#ifdef __ASSEMBLER__
--#define STMP3XXX_REGS_BASE	0xF0000000
--#else
--#define STMP3XXX_REGS_BASE	(void __iomem *)0xF0000000
--#endif
--#define STMP3XXX_REGS_SIZE	SZ_1M
--
--/* Virtual address where OCRAM is mapped */
--#define STMP3XXX_OCRAM_PHBASE	0x00000000
--#ifdef __ASSEMBLER__
--#define STMP3XXX_OCRAM_BASE	0xf1000000
--#else
--#define STMP3XXX_OCRAM_BASE	(void __iomem *)0xf1000000
--#endif
--#define STMP3XXX_OCRAM_SIZE	(32 * SZ_1K)
--
--#ifdef CONFIG_ARCH_STMP37XX
--#define IRQ_PRIORITY_REG_RD	HW_ICOLL_PRIORITYn_RD
--#define IRQ_PRIORITY_REG_WR	HW_ICOLL_PRIORITYn_WR
--#endif
--
--#ifdef CONFIG_ARCH_STMP378X
--#define IRQ_PRIORITY_REG_RD	HW_ICOLL_INTERRUPTn_RD
--#define IRQ_PRIORITY_REG_WR	HW_ICOLL_INTERRUPTn_WR
--#endif
--
--#define HW_STMP3XXX_SET		0x04
--#define HW_STMP3XXX_CLR		0x08
--#define HW_STMP3XXX_TOG		0x0c
--
--#ifndef __ASSEMBLER__
--static inline void stmp3xxx_clearl(u32 v, void __iomem *r)
--{
--	__raw_writel(v, r + HW_STMP3XXX_CLR);
--}
--
--static inline void stmp3xxx_setl(u32 v, void __iomem *r)
--{
--	__raw_writel(v, r + HW_STMP3XXX_SET);
--}
--#endif
--
--#define BF(value, field) (((value) << BP_##field) & BM_##field)
--
--#endif /* __ASM_ARCH_PLATFORM_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h b/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-tvenc.h b/arch/arm/mach-stmp378x/include/mach/regs-tvenc.h
 deleted file mode 100644
-index 2e300fe..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
+index 7f895cb..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-tvenc.h
 +++ /dev/null
-@@ -1,54 +0,0 @@
+@@ -1,67 +0,0 @@
 -/*
-- * Freescale STMP37XX/STMP378X core structure and function declarations
+- * stmp378x: TVENC register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_TVENC_BASE	(STMP3XXX_REGS_BASE + 0x38000)
+-#define REGS_TVENC_PHYS	0x80038000
+-#define REGS_TVENC_SIZE	0x2000
+-
+-#define HW_TVENC_CTRL		0x0
+-#define BM_TVENC_CTRL_CLKGATE	0x40000000
+-#define BM_TVENC_CTRL_SFTRST	0x80000000
+-
+-#define HW_TVENC_CONFIG		0x10
+-#define BM_TVENC_CONFIG_ENCD_MODE	0x00000007
+-#define BP_TVENC_CONFIG_ENCD_MODE	0
+-#define BM_TVENC_CONFIG_SYNC_MODE	0x00000070
+-#define BP_TVENC_CONFIG_SYNC_MODE	4
+-#define BM_TVENC_CONFIG_FSYNC_PHS	0x00000200
+-#define BM_TVENC_CONFIG_CGAIN	0x0000C000
+-#define BP_TVENC_CONFIG_CGAIN	14
+-#define BM_TVENC_CONFIG_YGAIN_SEL	0x00030000
+-#define BP_TVENC_CONFIG_YGAIN_SEL	16
+-#define BM_TVENC_CONFIG_PAL_SHAPE	0x00100000
+-
+-#define HW_TVENC_SYNCOFFSET	0x30
+-
+-#define HW_TVENC_COLORSUB0	0xC0
+-
+-#define HW_TVENC_COLORBURST	0x140
+-#define BM_TVENC_COLORBURST_PBA	0x00FF0000
+-#define BP_TVENC_COLORBURST_PBA	16
+-#define BM_TVENC_COLORBURST_NBA	0xFF000000
+-#define BP_TVENC_COLORBURST_NBA	24
+-
+-#define HW_TVENC_MACROVISION0	0x150
+-
+-#define HW_TVENC_MACROVISION1	0x160
+-
+-#define HW_TVENC_MACROVISION2	0x170
+-
+-#define HW_TVENC_MACROVISION3	0x180
+-
+-#define HW_TVENC_MACROVISION4	0x190
+-
+-#define HW_TVENC_DACCTRL	0x1A0
+-#define BM_TVENC_DACCTRL_RVAL	0x00000070
+-#define BP_TVENC_DACCTRL_RVAL	4
+-#define BM_TVENC_DACCTRL_DUMP_TOVDD1	0x00000100
+-#define BM_TVENC_DACCTRL_PWRUP1	0x00001000
+-#define BM_TVENC_DACCTRL_GAINUP	0x00040000
+-#define BM_TVENC_DACCTRL_GAINDN	0x00080000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-uartapp.h b/arch/arm/mach-stmp378x/include/mach/regs-uartapp.h
+deleted file mode 100644
+index a251e68..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-uartapp.h
++++ /dev/null
+@@ -1,87 +0,0 @@
+-/*
+- * stmp378x: UARTAPP register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_UARTAPP1_BASE	(STMP3XXX_REGS_BASE + 0x6C000)
+-#define REGS_UARTAPP1_PHYS	0x8006C000
+-#define REGS_UARTAPP2_BASE	(STMP3XXX_REGS_BASE + 0x6E000)
+-#define REGS_UARTAPP2_PHYS	0x8006E000
+-#define REGS_UARTAPP_SIZE	0x2000
+-
+-#define HW_UARTAPP_CTRL0	0x0
+-#define BM_UARTAPP_CTRL0_XFER_COUNT	0x0000FFFF
+-#define BP_UARTAPP_CTRL0_XFER_COUNT	0
+-#define BM_UARTAPP_CTRL0_RXTIMEOUT	0x07FF0000
+-#define BP_UARTAPP_CTRL0_RXTIMEOUT	16
+-#define BM_UARTAPP_CTRL0_RXTO_ENABLE	0x08000000
+-#define BM_UARTAPP_CTRL0_RUN	0x20000000
+-#define BM_UARTAPP_CTRL0_SFTRST	0x80000000
+-#define BM_UARTAPP_CTRL1_XFER_COUNT	0x0000FFFF
+-#define BP_UARTAPP_CTRL1_XFER_COUNT	0
+-#define BM_UARTAPP_CTRL1_RUN	0x10000000
+-
+-#define HW_UARTAPP_CTRL2	0x20
+-#define BM_UARTAPP_CTRL2_UARTEN	0x00000001
+-#define BP_UARTAPP_CTRL2_UARTEN	0
+-#define BM_UARTAPP_CTRL2_TXE	0x00000100
+-#define BM_UARTAPP_CTRL2_RXE	0x00000200
+-#define BM_UARTAPP_CTRL2_RTS	0x00000800
+-#define BM_UARTAPP_CTRL2_RTSEN	0x00004000
+-#define BM_UARTAPP_CTRL2_CTSEN	0x00008000
+-#define BM_UARTAPP_CTRL2_RXDMAE	0x01000000
+-#define BM_UARTAPP_CTRL2_TXDMAE	0x02000000
+-#define BM_UARTAPP_CTRL2_DMAONERR	0x04000000
+-
+-#define HW_UARTAPP_LINECTRL	0x30
+-#define BM_UARTAPP_LINECTRL_BRK	0x00000001
+-#define BP_UARTAPP_LINECTRL_BRK	0
+-#define BM_UARTAPP_LINECTRL_PEN	0x00000002
+-#define BM_UARTAPP_LINECTRL_EPS	0x00000004
+-#define BM_UARTAPP_LINECTRL_STP2	0x00000008
+-#define BM_UARTAPP_LINECTRL_FEN	0x00000010
+-#define BM_UARTAPP_LINECTRL_WLEN	0x00000060
+-#define BP_UARTAPP_LINECTRL_WLEN	5
+-#define BM_UARTAPP_LINECTRL_SPS	0x00000080
+-#define BM_UARTAPP_LINECTRL_BAUD_DIVFRAC	0x00003F00
+-#define BP_UARTAPP_LINECTRL_BAUD_DIVFRAC	8
+-#define BM_UARTAPP_LINECTRL_BAUD_DIVINT	0xFFFF0000
+-#define BP_UARTAPP_LINECTRL_BAUD_DIVINT	16
+-
+-#define HW_UARTAPP_INTR		0x50
+-#define BM_UARTAPP_INTR_CTSMIS	0x00000002
+-#define BM_UARTAPP_INTR_RTIS	0x00000040
+-#define BM_UARTAPP_INTR_CTSMIEN	0x00020000
+-#define BM_UARTAPP_INTR_RXIEN	0x00100000
+-#define BM_UARTAPP_INTR_RTIEN	0x00400000
+-
+-#define HW_UARTAPP_DATA		0x60
+-
+-#define HW_UARTAPP_STAT		0x70
+-#define BM_UARTAPP_STAT_RXCOUNT	0x0000FFFF
+-#define BP_UARTAPP_STAT_RXCOUNT	0
+-#define BM_UARTAPP_STAT_FERR	0x00010000
+-#define BM_UARTAPP_STAT_PERR	0x00020000
+-#define BM_UARTAPP_STAT_BERR	0x00040000
+-#define BM_UARTAPP_STAT_OERR	0x00080000
+-#define BM_UARTAPP_STAT_RXFE	0x01000000
+-#define BM_UARTAPP_STAT_TXFF	0x02000000
+-#define BM_UARTAPP_STAT_TXFE	0x08000000
+-#define BM_UARTAPP_STAT_CTS	0x10000000
+-
+-#define HW_UARTAPP_VERSION	0x90
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h b/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
+deleted file mode 100644
+index b810deb..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
++++ /dev/null
+@@ -1,268 +0,0 @@
+-/*
+- * stmp378x: UARTDBG register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_UARTDBG_BASE	(STMP3XXX_REGS_BASE + 0x70000)
+-#define REGS_UARTDBG_PHYS	0x80070000
+-#define REGS_UARTDBG_SIZE	0x2000
+-
+-#define HW_UARTDBGDR 0x00000000
+-#define BP_UARTDBGDR_UNAVAILABLE      16
+-#define BM_UARTDBGDR_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGDR_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGDR_UNAVAILABLE)
+-#define BP_UARTDBGDR_RESERVED      12
+-#define BM_UARTDBGDR_RESERVED 0x0000F000
+-#define BF_UARTDBGDR_RESERVED(v)  \
+-	(((v) << 12) & BM_UARTDBGDR_RESERVED)
+-#define BM_UARTDBGDR_OE 0x00000800
+-#define BM_UARTDBGDR_BE 0x00000400
+-#define BM_UARTDBGDR_PE 0x00000200
+-#define BM_UARTDBGDR_FE 0x00000100
+-#define BP_UARTDBGDR_DATA      0
+-#define BM_UARTDBGDR_DATA 0x000000FF
+-#define BF_UARTDBGDR_DATA(v)  \
+-	(((v) << 0) & BM_UARTDBGDR_DATA)
+-#define HW_UARTDBGRSR_ECR 0x00000004
+-#define BP_UARTDBGRSR_ECR_UNAVAILABLE      8
+-#define BM_UARTDBGRSR_ECR_UNAVAILABLE 0xFFFFFF00
+-#define BF_UARTDBGRSR_ECR_UNAVAILABLE(v) \
+-	(((v) << 8) & BM_UARTDBGRSR_ECR_UNAVAILABLE)
+-#define BP_UARTDBGRSR_ECR_EC      4
+-#define BM_UARTDBGRSR_ECR_EC 0x000000F0
+-#define BF_UARTDBGRSR_ECR_EC(v)  \
+-	(((v) << 4) & BM_UARTDBGRSR_ECR_EC)
+-#define BM_UARTDBGRSR_ECR_OE 0x00000008
+-#define BM_UARTDBGRSR_ECR_BE 0x00000004
+-#define BM_UARTDBGRSR_ECR_PE 0x00000002
+-#define BM_UARTDBGRSR_ECR_FE 0x00000001
+-#define HW_UARTDBGFR 0x00000018
+-#define BP_UARTDBGFR_UNAVAILABLE      16
+-#define BM_UARTDBGFR_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGFR_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGFR_UNAVAILABLE)
+-#define BP_UARTDBGFR_RESERVED      9
+-#define BM_UARTDBGFR_RESERVED 0x0000FE00
+-#define BF_UARTDBGFR_RESERVED(v)  \
+-	(((v) << 9) & BM_UARTDBGFR_RESERVED)
+-#define BM_UARTDBGFR_RI 0x00000100
+-#define BM_UARTDBGFR_TXFE 0x00000080
+-#define BM_UARTDBGFR_RXFF 0x00000040
+-#define BM_UARTDBGFR_TXFF 0x00000020
+-#define BM_UARTDBGFR_RXFE 0x00000010
+-#define BM_UARTDBGFR_BUSY 0x00000008
+-#define BM_UARTDBGFR_DCD 0x00000004
+-#define BM_UARTDBGFR_DSR 0x00000002
+-#define BM_UARTDBGFR_CTS 0x00000001
+-#define HW_UARTDBGILPR 0x00000020
+-#define BP_UARTDBGILPR_UNAVAILABLE      8
+-#define BM_UARTDBGILPR_UNAVAILABLE 0xFFFFFF00
+-#define BF_UARTDBGILPR_UNAVAILABLE(v) \
+-	(((v) << 8) & BM_UARTDBGILPR_UNAVAILABLE)
+-#define BP_UARTDBGILPR_ILPDVSR      0
+-#define BM_UARTDBGILPR_ILPDVSR 0x000000FF
+-#define BF_UARTDBGILPR_ILPDVSR(v)  \
+-	(((v) << 0) & BM_UARTDBGILPR_ILPDVSR)
+-#define HW_UARTDBGIBRD 0x00000024
+-#define BP_UARTDBGIBRD_UNAVAILABLE      16
+-#define BM_UARTDBGIBRD_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGIBRD_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGIBRD_UNAVAILABLE)
+-#define BP_UARTDBGIBRD_BAUD_DIVINT      0
+-#define BM_UARTDBGIBRD_BAUD_DIVINT 0x0000FFFF
+-#define BF_UARTDBGIBRD_BAUD_DIVINT(v)  \
+-	(((v) << 0) & BM_UARTDBGIBRD_BAUD_DIVINT)
+-#define HW_UARTDBGFBRD 0x00000028
+-#define BP_UARTDBGFBRD_UNAVAILABLE      8
+-#define BM_UARTDBGFBRD_UNAVAILABLE 0xFFFFFF00
+-#define BF_UARTDBGFBRD_UNAVAILABLE(v) \
+-	(((v) << 8) & BM_UARTDBGFBRD_UNAVAILABLE)
+-#define BP_UARTDBGFBRD_RESERVED      6
+-#define BM_UARTDBGFBRD_RESERVED 0x000000C0
+-#define BF_UARTDBGFBRD_RESERVED(v)  \
+-	(((v) << 6) & BM_UARTDBGFBRD_RESERVED)
+-#define BP_UARTDBGFBRD_BAUD_DIVFRAC      0
+-#define BM_UARTDBGFBRD_BAUD_DIVFRAC 0x0000003F
+-#define BF_UARTDBGFBRD_BAUD_DIVFRAC(v)  \
+-	(((v) << 0) & BM_UARTDBGFBRD_BAUD_DIVFRAC)
+-#define HW_UARTDBGLCR_H 0x0000002c
+-#define BP_UARTDBGLCR_H_UNAVAILABLE      16
+-#define BM_UARTDBGLCR_H_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGLCR_H_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGLCR_H_UNAVAILABLE)
+-#define BP_UARTDBGLCR_H_RESERVED      8
+-#define BM_UARTDBGLCR_H_RESERVED 0x0000FF00
+-#define BF_UARTDBGLCR_H_RESERVED(v)  \
+-	(((v) << 8) & BM_UARTDBGLCR_H_RESERVED)
+-#define BM_UARTDBGLCR_H_SPS 0x00000080
+-#define BP_UARTDBGLCR_H_WLEN      5
+-#define BM_UARTDBGLCR_H_WLEN 0x00000060
+-#define BF_UARTDBGLCR_H_WLEN(v)  \
+-	(((v) << 5) & BM_UARTDBGLCR_H_WLEN)
+-#define BM_UARTDBGLCR_H_FEN 0x00000010
+-#define BM_UARTDBGLCR_H_STP2 0x00000008
+-#define BM_UARTDBGLCR_H_EPS 0x00000004
+-#define BM_UARTDBGLCR_H_PEN 0x00000002
+-#define BM_UARTDBGLCR_H_BRK 0x00000001
+-#define HW_UARTDBGCR 0x00000030
+-#define BP_UARTDBGCR_UNAVAILABLE      16
+-#define BM_UARTDBGCR_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGCR_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGCR_UNAVAILABLE)
+-#define BM_UARTDBGCR_CTSEN 0x00008000
+-#define BM_UARTDBGCR_RTSEN 0x00004000
+-#define BM_UARTDBGCR_OUT2 0x00002000
+-#define BM_UARTDBGCR_OUT1 0x00001000
+-#define BM_UARTDBGCR_RTS 0x00000800
+-#define BM_UARTDBGCR_DTR 0x00000400
+-#define BM_UARTDBGCR_RXE 0x00000200
+-#define BM_UARTDBGCR_TXE 0x00000100
+-#define BM_UARTDBGCR_LBE 0x00000080
+-#define BP_UARTDBGCR_RESERVED      3
+-#define BM_UARTDBGCR_RESERVED 0x00000078
+-#define BF_UARTDBGCR_RESERVED(v)  \
+-	(((v) << 3) & BM_UARTDBGCR_RESERVED)
+-#define BM_UARTDBGCR_SIRLP 0x00000004
+-#define BM_UARTDBGCR_SIREN 0x00000002
+-#define BM_UARTDBGCR_UARTEN 0x00000001
+-#define HW_UARTDBGIFLS 0x00000034
+-#define BP_UARTDBGIFLS_UNAVAILABLE      16
+-#define BM_UARTDBGIFLS_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGIFLS_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGIFLS_UNAVAILABLE)
+-#define BP_UARTDBGIFLS_RESERVED      6
+-#define BM_UARTDBGIFLS_RESERVED 0x0000FFC0
+-#define BF_UARTDBGIFLS_RESERVED(v)  \
+-	(((v) << 6) & BM_UARTDBGIFLS_RESERVED)
+-#define BP_UARTDBGIFLS_RXIFLSEL      3
+-#define BM_UARTDBGIFLS_RXIFLSEL 0x00000038
+-#define BF_UARTDBGIFLS_RXIFLSEL(v)  \
+-	(((v) << 3) & BM_UARTDBGIFLS_RXIFLSEL)
+-#define BV_UARTDBGIFLS_RXIFLSEL__NOT_EMPTY      0x0
+-#define BV_UARTDBGIFLS_RXIFLSEL__ONE_QUARTER    0x1
+-#define BV_UARTDBGIFLS_RXIFLSEL__ONE_HALF       0x2
+-#define BV_UARTDBGIFLS_RXIFLSEL__THREE_QUARTERS 0x3
+-#define BV_UARTDBGIFLS_RXIFLSEL__SEVEN_EIGHTHS  0x4
+-#define BV_UARTDBGIFLS_RXIFLSEL__INVALID5       0x5
+-#define BV_UARTDBGIFLS_RXIFLSEL__INVALID6       0x6
+-#define BV_UARTDBGIFLS_RXIFLSEL__INVALID7       0x7
+-#define BP_UARTDBGIFLS_TXIFLSEL      0
+-#define BM_UARTDBGIFLS_TXIFLSEL 0x00000007
+-#define BF_UARTDBGIFLS_TXIFLSEL(v)  \
+-	(((v) << 0) & BM_UARTDBGIFLS_TXIFLSEL)
+-#define BV_UARTDBGIFLS_TXIFLSEL__EMPTY	  0x0
+-#define BV_UARTDBGIFLS_TXIFLSEL__ONE_QUARTER    0x1
+-#define BV_UARTDBGIFLS_TXIFLSEL__ONE_HALF       0x2
+-#define BV_UARTDBGIFLS_TXIFLSEL__THREE_QUARTERS 0x3
+-#define BV_UARTDBGIFLS_TXIFLSEL__SEVEN_EIGHTHS  0x4
+-#define BV_UARTDBGIFLS_TXIFLSEL__INVALID5       0x5
+-#define BV_UARTDBGIFLS_TXIFLSEL__INVALID6       0x6
+-#define BV_UARTDBGIFLS_TXIFLSEL__INVALID7       0x7
+-#define HW_UARTDBGIMSC 0x00000038
+-#define BP_UARTDBGIMSC_UNAVAILABLE      16
+-#define BM_UARTDBGIMSC_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGIMSC_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGIMSC_UNAVAILABLE)
+-#define BP_UARTDBGIMSC_RESERVED      11
+-#define BM_UARTDBGIMSC_RESERVED 0x0000F800
+-#define BF_UARTDBGIMSC_RESERVED(v)  \
+-	(((v) << 11) & BM_UARTDBGIMSC_RESERVED)
+-#define BM_UARTDBGIMSC_OEIM 0x00000400
+-#define BM_UARTDBGIMSC_BEIM 0x00000200
+-#define BM_UARTDBGIMSC_PEIM 0x00000100
+-#define BM_UARTDBGIMSC_FEIM 0x00000080
+-#define BM_UARTDBGIMSC_RTIM 0x00000040
+-#define BM_UARTDBGIMSC_TXIM 0x00000020
+-#define BM_UARTDBGIMSC_RXIM 0x00000010
+-#define BM_UARTDBGIMSC_DSRMIM 0x00000008
+-#define BM_UARTDBGIMSC_DCDMIM 0x00000004
+-#define BM_UARTDBGIMSC_CTSMIM 0x00000002
+-#define BM_UARTDBGIMSC_RIMIM 0x00000001
+-#define HW_UARTDBGRIS 0x0000003c
+-#define BP_UARTDBGRIS_UNAVAILABLE      16
+-#define BM_UARTDBGRIS_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGRIS_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGRIS_UNAVAILABLE)
+-#define BP_UARTDBGRIS_RESERVED      11
+-#define BM_UARTDBGRIS_RESERVED 0x0000F800
+-#define BF_UARTDBGRIS_RESERVED(v)  \
+-	(((v) << 11) & BM_UARTDBGRIS_RESERVED)
+-#define BM_UARTDBGRIS_OERIS 0x00000400
+-#define BM_UARTDBGRIS_BERIS 0x00000200
+-#define BM_UARTDBGRIS_PERIS 0x00000100
+-#define BM_UARTDBGRIS_FERIS 0x00000080
+-#define BM_UARTDBGRIS_RTRIS 0x00000040
+-#define BM_UARTDBGRIS_TXRIS 0x00000020
+-#define BM_UARTDBGRIS_RXRIS 0x00000010
+-#define BM_UARTDBGRIS_DSRRMIS 0x00000008
+-#define BM_UARTDBGRIS_DCDRMIS 0x00000004
+-#define BM_UARTDBGRIS_CTSRMIS 0x00000002
+-#define BM_UARTDBGRIS_RIRMIS 0x00000001
+-#define HW_UARTDBGMIS 0x00000040
+-#define BP_UARTDBGMIS_UNAVAILABLE      16
+-#define BM_UARTDBGMIS_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGMIS_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGMIS_UNAVAILABLE)
+-#define BP_UARTDBGMIS_RESERVED      11
+-#define BM_UARTDBGMIS_RESERVED 0x0000F800
+-#define BF_UARTDBGMIS_RESERVED(v)  \
+-	(((v) << 11) & BM_UARTDBGMIS_RESERVED)
+-#define BM_UARTDBGMIS_OEMIS 0x00000400
+-#define BM_UARTDBGMIS_BEMIS 0x00000200
+-#define BM_UARTDBGMIS_PEMIS 0x00000100
+-#define BM_UARTDBGMIS_FEMIS 0x00000080
+-#define BM_UARTDBGMIS_RTMIS 0x00000040
+-#define BM_UARTDBGMIS_TXMIS 0x00000020
+-#define BM_UARTDBGMIS_RXMIS 0x00000010
+-#define BM_UARTDBGMIS_DSRMMIS 0x00000008
+-#define BM_UARTDBGMIS_DCDMMIS 0x00000004
+-#define BM_UARTDBGMIS_CTSMMIS 0x00000002
+-#define BM_UARTDBGMIS_RIMMIS 0x00000001
+-#define HW_UARTDBGICR 0x00000044
+-#define BP_UARTDBGICR_UNAVAILABLE      16
+-#define BM_UARTDBGICR_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGICR_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGICR_UNAVAILABLE)
+-#define BP_UARTDBGICR_RESERVED      11
+-#define BM_UARTDBGICR_RESERVED 0x0000F800
+-#define BF_UARTDBGICR_RESERVED(v)  \
+-	(((v) << 11) & BM_UARTDBGICR_RESERVED)
+-#define BM_UARTDBGICR_OEIC 0x00000400
+-#define BM_UARTDBGICR_BEIC 0x00000200
+-#define BM_UARTDBGICR_PEIC 0x00000100
+-#define BM_UARTDBGICR_FEIC 0x00000080
+-#define BM_UARTDBGICR_RTIC 0x00000040
+-#define BM_UARTDBGICR_TXIC 0x00000020
+-#define BM_UARTDBGICR_RXIC 0x00000010
+-#define BM_UARTDBGICR_DSRMIC 0x00000008
+-#define BM_UARTDBGICR_DCDMIC 0x00000004
+-#define BM_UARTDBGICR_CTSMIC 0x00000002
+-#define BM_UARTDBGICR_RIMIC 0x00000001
+-#define HW_UARTDBGDMACR 0x00000048
+-#define BP_UARTDBGDMACR_UNAVAILABLE      16
+-#define BM_UARTDBGDMACR_UNAVAILABLE 0xFFFF0000
+-#define BF_UARTDBGDMACR_UNAVAILABLE(v) \
+-	(((v) << 16) & BM_UARTDBGDMACR_UNAVAILABLE)
+-#define BP_UARTDBGDMACR_RESERVED      3
+-#define BM_UARTDBGDMACR_RESERVED 0x0000FFF8
+-#define BF_UARTDBGDMACR_RESERVED(v)  \
+-	(((v) << 3) & BM_UARTDBGDMACR_RESERVED)
+-#define BM_UARTDBGDMACR_DMAONERR 0x00000004
+-#define BM_UARTDBGDMACR_TXDMAE 0x00000002
+-#define BM_UARTDBGDMACR_RXDMAE 0x00000001
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h b/arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h
+deleted file mode 100644
+index 25112c1..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-usbctrl.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * stmp378x: USBCTRL register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_USBCTRL_BASE	(STMP3XXX_REGS_BASE + 0x80000)
+-#define REGS_USBCTRL_PHYS	0x80080000
+-#define REGS_USBCTRL_SIZE	0x2000
+-
+-#define HW_USBCTRL_USBCMD	0x140
+-#define BM_USBCTRL_USBCMD_RS	0x00000001
+-#define BP_USBCTRL_USBCMD_RS	0
+-#define BM_USBCTRL_USBCMD_RST	0x00000002
+-
+-#define HW_USBCTRL_USBINTR	0x148
+-#define BM_USBCTRL_USBINTR_UE	0x00000001
+-#define BP_USBCTRL_USBINTR_UE	0
+-
+-#define HW_USBCTRL_PORTSC1	0x184
+-#define BM_USBCTRL_PORTSC1_PHCD	0x00800000
+-
+-#define HW_USBCTRL_OTGSC	0x1A4
+-#define BM_USBCTRL_OTGSC_ID	0x00000100
+-#define BM_USBCTRL_OTGSC_IDIS	0x00010000
+-#define BM_USBCTRL_OTGSC_IDIE	0x01000000
+diff --git a/arch/arm/mach-stmp378x/include/mach/regs-usbphy.h b/arch/arm/mach-stmp378x/include/mach/regs-usbphy.h
+deleted file mode 100644
+index 11f3b73..0000000
+--- a/arch/arm/mach-stmp378x/include/mach/regs-usbphy.h
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- * stmp378x: USBPHY register definitions
+- *
+- * Copyright (c) 2008 Freescale Semiconductor
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+- */
+-#define REGS_USBPHY_BASE	(STMP3XXX_REGS_BASE + 0x7C000)
+-#define REGS_USBPHY_PHYS	0x8007C000
+-#define REGS_USBPHY_SIZE	0x2000
+-
+-#define HW_USBPHY_PWD		0x0
+-
+-#define HW_USBPHY_CTRL		0x30
+-#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	0x00000002
+-#define BM_USBPHY_CTRL_ENDEVPLUGINDETECT	0x00000010
+-#define BM_USBPHY_CTRL_ENOTGIDDETECT	0x00000080
+-#define BM_USBPHY_CTRL_ENIRQDEVPLUGIN	0x00000800
+-#define BM_USBPHY_CTRL_CLKGATE	0x40000000
+-#define BM_USBPHY_CTRL_SFTRST	0x80000000
+-
+-#define HW_USBPHY_STATUS	0x40
+-#define BM_USBPHY_STATUS_DEVPLUGIN_STATUS	0x00000040
+-#define BM_USBPHY_STATUS_OTGID_STATUS	0x00000100
+diff --git a/arch/arm/mach-stmp378x/stmp378x.c b/arch/arm/mach-stmp378x/stmp378x.c
+deleted file mode 100644
+index c2f9fe0..0000000
+--- a/arch/arm/mach-stmp378x/stmp378x.c
++++ /dev/null
+@@ -1,299 +0,0 @@
+-/*
+- * Freescale STMP378X platform support
 - *
 - * Embedded Alley Solutions, Inc <source@embeddedalley.com>
 - *
@@ -3077,267 +3301,298 @@ index 2e300fe..0000000
 - * http://www.opensource.org/licenses/gpl-license.html
 - * http://www.gnu.org/copyleft/gpl.html
 - */
--#ifndef __ASM_PLAT_STMP3XXX_H
--#define __ASM_PLAT_STMP3XXX_H
--
--#include <linux/irq.h>
--
--extern struct sys_timer stmp3xxx_timer;
--
--void stmp3xxx_init_irq(struct irq_chip *chip);
--void stmp3xxx_init(void);
--int stmp3xxx_reset_block(void __iomem *hwreg, int just_enable);
--extern struct platform_device stmp3xxx_dbguart,
--			      stmp3xxx_appuart,
--			      stmp3xxx_watchdog,
--			      stmp3xxx_touchscreen,
--			      stmp3xxx_keyboard,
--			      stmp3xxx_gpmi,
--			      stmp3xxx_mmc,
--			      stmp3xxx_udc,
--			      stmp3xxx_ehci,
--			      stmp3xxx_rtc,
--			      stmp3xxx_spi1,
--			      stmp3xxx_spi2,
--			      stmp3xxx_backlight,
--			      stmp3xxx_rotdec,
--			      stmp3xxx_dcp,
--			      stmp3xxx_dcp_bootstream,
--			      stmp3xxx_persistent,
--			      stmp3xxx_framebuffer,
--			      stmp3xxx_battery;
--int stmp3xxx_ssp1_device_register(void);
--int stmp3xxx_ssp2_device_register(void);
--
--struct pin_group;
--void stmp3xxx_release_pin_group(struct pin_group *pin_group, const char *label);
--int stmp3xxx_request_pin_group(struct pin_group *pin_group, const char *label);
--
--#endif /* __ASM_PLAT_STMP3XXX_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/system.h b/arch/arm/plat-stmp3xxx/include/mach/system.h
-deleted file mode 100644
-index 28a9888..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/system.h
-+++ /dev/null
-@@ -1,49 +0,0 @@
--/*
-- * Copyright (C) 2005 Sigmatel Inc
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_ARCH_SYSTEM_H
--#define __ASM_ARCH_SYSTEM_H
--
--#include <asm/proc-fns.h>
--#include <mach/platform.h>
--#include <mach/regs-clkctrl.h>
--#include <mach/regs-power.h>
--
--static inline void arch_idle(void)
--{
--	/*
--	 * This should do all the clock switching
--	 * and wait for interrupt tricks
--	 */
--
--	cpu_do_idle();
--}
--
--static inline void arch_reset(char mode, const char *cmd)
--{
--	/* Set BATTCHRG to default value */
--	__raw_writel(0x00010000, REGS_POWER_BASE + HW_POWER_CHARGE);
--
--	/* Set MINPWR to default value   */
--	__raw_writel(0, REGS_POWER_BASE + HW_POWER_MINPWR);
--
--	/* Reset digital side of chip (but not power or RTC) */
--	__raw_writel(BM_CLKCTRL_RESET_DIG,
--			REGS_CLKCTRL_BASE + HW_CLKCTRL_RESET);
--
--	/* Should not return */
--}
--
--#endif
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/timex.h b/arch/arm/plat-stmp3xxx/include/mach/timex.h
-deleted file mode 100644
-index 3373985..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/timex.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Copyright (C) 1999 ARM Limited
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--
--/*
-- * System time clock is sourced from the 32k clock
-- */
--#define CLOCK_TICK_RATE		(32768)
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/uncompress.h b/arch/arm/plat-stmp3xxx/include/mach/uncompress.h
-deleted file mode 100644
-index f79f5ee..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,53 +0,0 @@
--/*
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#ifndef __ASM_PLAT_UNCOMPRESS_H
--#define __ASM_PLAT_UNCOMPRESS_H
--
--/*
-- * Register includes are for when the MMU enabled; we need to define our
-- * own stuff here for pre-MMU use
-- */
--#define UARTDBG_BASE		0x80070000
--#define UART(c)			(((volatile unsigned *)UARTDBG_BASE)[c])
--
--/*
-- * This does not append a newline
-- */
--static void putc(char c)
--{
--	/* Wait for TX fifo empty */
--	while ((UART(6) & (1<<7)) == 0)
--		continue;
--
--	/* Write byte */
--	UART(0) = c;
--
--	/* Wait for last bit to exit the UART */
--	while (UART(6) & (1<<3))
--		continue;
--}
--
--static void flush(void)
--{
--}
--
--/*
-- * nothing to do
-- */
--#define arch_decomp_setup()
--
--#define arch_decomp_wdog()
--
--#endif /* __ASM_PLAT_UNCOMPRESS_H */
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h b/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
-deleted file mode 100644
-index 943c1a2..0000000
---- a/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
-+++ /dev/null
-@@ -1,12 +0,0 @@
--/*
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--#define VMALLOC_END       0xf0000000UL
-diff --git a/arch/arm/plat-stmp3xxx/irq.c b/arch/arm/plat-stmp3xxx/irq.c
-deleted file mode 100644
-index 6fdf9ac..0000000
---- a/arch/arm/plat-stmp3xxx/irq.c
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- * Freescale STMP37XX/STMP378X common interrupt handling code
-- *
-- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
-- *
-- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- */
--
--/*
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
+-#include <linux/kernel.h>
 -#include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/delay.h>
+-#include <linux/platform_device.h>
 -#include <linux/irq.h>
--#include <linux/sysdev.h>
+-#include <linux/dma-mapping.h>
 -
--#include <mach/stmp3xxx.h>
+-#include <asm/dma.h>
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-
+-#include <asm/mach/arch.h>
+-#include <asm/mach/irq.h>
+-#include <asm/mach/map.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/pins.h>
+-#include <mach/pinmux.h>
+-#include <mach/dma.h>
+-#include <mach/hardware.h>
+-#include <mach/system.h>
 -#include <mach/platform.h>
+-#include <mach/stmp3xxx.h>
 -#include <mach/regs-icoll.h>
+-#include <mach/regs-apbh.h>
+-#include <mach/regs-apbx.h>
+-#include <mach/regs-pxp.h>
+-#include <mach/regs-i2c.h>
 -
--void __init stmp3xxx_init_irq(struct irq_chip *chip)
+-#include "stmp378x.h"
+-/*
+- * IRQ handling
+- */
+-static void stmp378x_ack_irq(struct irq_data *d)
 -{
--	unsigned int i, lv;
--
--	/* Reset the interrupt controller */
--	stmp3xxx_reset_block(REGS_ICOLL_BASE + HW_ICOLL_CTRL, true);
--
--	/* Disable all interrupts initially */
--	for (i = 0; i < NR_REAL_IRQS; i++) {
--		chip->irq_mask(irq_get_irq_data(i));
--		irq_set_chip_and_handler(i, chip, handle_level_irq);
--		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
--	}
--
--	/* Ensure vector is cleared */
--	for (lv = 0; lv < 4; lv++)
--		__raw_writel(1 << lv, REGS_ICOLL_BASE + HW_ICOLL_LEVELACK);
+-	/* Tell ICOLL to release IRQ line */
 -	__raw_writel(0, REGS_ICOLL_BASE + HW_ICOLL_VECTOR);
+-
+-	/* ACK current interrupt */
+-	__raw_writel(0x01 /* BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 */,
+-			REGS_ICOLL_BASE + HW_ICOLL_LEVELACK);
 -
 -	/* Barrier */
 -	(void)__raw_readl(REGS_ICOLL_BASE + HW_ICOLL_STAT);
 -}
 -
-diff --git a/arch/arm/plat-stmp3xxx/pinmux.c b/arch/arm/plat-stmp3xxx/pinmux.c
-deleted file mode 100644
-index 3def03b..0000000
---- a/arch/arm/plat-stmp3xxx/pinmux.c
-+++ /dev/null
-@@ -1,550 +0,0 @@
+-static void stmp378x_mask_irq(struct irq_data *d)
+-{
+-	/* IRQ disable */
+-	stmp3xxx_clearl(BM_ICOLL_INTERRUPTn_ENABLE,
+-			REGS_ICOLL_BASE + HW_ICOLL_INTERRUPTn + d->irq * 0x10);
+-}
+-
+-static void stmp378x_unmask_irq(struct irq_data *d)
+-{
+-	/* IRQ enable */
+-	stmp3xxx_setl(BM_ICOLL_INTERRUPTn_ENABLE,
+-		      REGS_ICOLL_BASE + HW_ICOLL_INTERRUPTn + d->irq * 0x10);
+-}
+-
+-static struct irq_chip stmp378x_chip = {
+-	.irq_ack	= stmp378x_ack_irq,
+-	.irq_mask	= stmp378x_mask_irq,
+-	.irq_unmask	= stmp378x_unmask_irq,
+-};
+-
+-void __init stmp378x_init_irq(void)
+-{
+-	stmp3xxx_init_irq(&stmp378x_chip);
+-}
+-
 -/*
-- * Freescale STMP378X/STMP378X Pin Multiplexing
+- * DMA interrupt handling
+- */
+-void stmp3xxx_arch_dma_enable_interrupt(int channel)
+-{
+-	void __iomem *c1, *c2;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		c1 = REGS_APBH_BASE + HW_APBH_CTRL1;
+-		c2 = REGS_APBH_BASE + HW_APBH_CTRL2;
+-		break;
+-
+-	case STMP3XXX_BUS_APBX:
+-		c1 = REGS_APBX_BASE + HW_APBX_CTRL1;
+-		c2 = REGS_APBX_BASE + HW_APBX_CTRL2;
+-		break;
+-
+-	default:
+-		return;
+-	}
+-	stmp3xxx_setl(1 << (16 + STMP3XXX_DMA_CHANNEL(channel)), c1);
+-	stmp3xxx_setl(1 << (16 + STMP3XXX_DMA_CHANNEL(channel)), c2);
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_enable_interrupt);
+-
+-void stmp3xxx_arch_dma_clear_interrupt(int channel)
+-{
+-	void __iomem *c1, *c2;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		c1 = REGS_APBH_BASE + HW_APBH_CTRL1;
+-		c2 = REGS_APBH_BASE + HW_APBH_CTRL2;
+-		break;
+-
+-	case STMP3XXX_BUS_APBX:
+-		c1 = REGS_APBX_BASE + HW_APBX_CTRL1;
+-		c2 = REGS_APBX_BASE + HW_APBX_CTRL2;
+-		break;
+-
+-	default:
+-		return;
+-	}
+-	stmp3xxx_clearl(1 << STMP3XXX_DMA_CHANNEL(channel), c1);
+-	stmp3xxx_clearl(1 << STMP3XXX_DMA_CHANNEL(channel), c2);
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_clear_interrupt);
+-
+-int stmp3xxx_arch_dma_is_interrupt(int channel)
+-{
+-	int r = 0;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		r = __raw_readl(REGS_APBH_BASE + HW_APBH_CTRL1) &
+-			(1 << STMP3XXX_DMA_CHANNEL(channel));
+-		break;
+-
+-	case STMP3XXX_BUS_APBX:
+-		r = __raw_readl(REGS_APBX_BASE + HW_APBX_CTRL1) &
+-			(1 << STMP3XXX_DMA_CHANNEL(channel));
+-		break;
+-	}
+-	return r;
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_is_interrupt);
+-
+-void stmp3xxx_arch_dma_reset_channel(int channel)
+-{
+-	unsigned chbit = 1 << STMP3XXX_DMA_CHANNEL(channel);
+-	void __iomem *c0;
+-	u32 mask;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		c0 = REGS_APBH_BASE + HW_APBH_CTRL0;
+-		mask = chbit << BP_APBH_CTRL0_RESET_CHANNEL;
+-		break;
+-	case STMP3XXX_BUS_APBX:
+-		c0 = REGS_APBX_BASE + HW_APBX_CHANNEL_CTRL;
+-		mask = chbit << BP_APBX_CHANNEL_CTRL_RESET_CHANNEL;
+-		break;
+-	default:
+-		return;
+-	}
+-
+-	/* Reset channel and wait for it to complete */
+-	stmp3xxx_setl(mask, c0);
+-	while (__raw_readl(c0) & mask)
+-		cpu_relax();
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_reset_channel);
+-
+-void stmp3xxx_arch_dma_freeze(int channel)
+-{
+-	unsigned chbit = 1 << STMP3XXX_DMA_CHANNEL(channel);
+-	u32 mask = 1 << chbit;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		stmp3xxx_setl(mask, REGS_APBH_BASE + HW_APBH_CTRL0);
+-		break;
+-	case STMP3XXX_BUS_APBX:
+-		stmp3xxx_setl(mask, REGS_APBX_BASE + HW_APBX_CHANNEL_CTRL);
+-		break;
+-	}
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_freeze);
+-
+-void stmp3xxx_arch_dma_unfreeze(int channel)
+-{
+-	unsigned chbit = 1 << STMP3XXX_DMA_CHANNEL(channel);
+-	u32 mask = 1 << chbit;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		stmp3xxx_clearl(mask, REGS_APBH_BASE + HW_APBH_CTRL0);
+-		break;
+-	case STMP3XXX_BUS_APBX:
+-		stmp3xxx_clearl(mask, REGS_APBX_BASE + HW_APBX_CHANNEL_CTRL);
+-		break;
+-	}
+-}
+-EXPORT_SYMBOL(stmp3xxx_arch_dma_unfreeze);
+-
+-/*
+- * The registers are all very closely mapped, so we might as well map them all
+- * with a single mapping
 - *
-- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
+- * Logical      Physical
+- * f0000000	80000000	On-chip registers
+- * f1000000	00000000	32k on-chip SRAM
+- */
+-
+-static struct map_desc stmp378x_io_desc[] __initdata = {
+-	{
+-		.virtual	= (u32)STMP3XXX_REGS_BASE,
+-		.pfn		= __phys_to_pfn(STMP3XXX_REGS_PHBASE),
+-		.length		= STMP3XXX_REGS_SIZE,
+-		.type		= MT_DEVICE,
+-	},
+-	{
+-		.virtual	= (u32)STMP3XXX_OCRAM_BASE,
+-		.pfn		= __phys_to_pfn(STMP3XXX_OCRAM_PHBASE),
+-		.length		= STMP3XXX_OCRAM_SIZE,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+-
+-static u64 common_dmamask = DMA_BIT_MASK(32);
+-
+-/*
+- * devices that are present only on stmp378x, not on all 3xxx boards:
+- * 	PxP
+- * 	I2C
+- */
+-static struct resource pxp_resource[] = {
+-	{
+-		.flags	= IORESOURCE_MEM,
+-		.start	= REGS_PXP_PHYS,
+-		.end	= REGS_PXP_PHYS + REGS_PXP_SIZE,
+-	}, {
+-		.flags	= IORESOURCE_IRQ,
+-		.start	= IRQ_PXP,
+-		.end	= IRQ_PXP,
+-	},
+-};
+-
+-struct platform_device stmp378x_pxp = {
+-	.name		= "stmp3xxx-pxp",
+-	.id		= -1,
+-	.dev		= {
+-		.dma_mask		= &common_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.num_resources	= ARRAY_SIZE(pxp_resource),
+-	.resource	= pxp_resource,
+-};
+-
+-static struct resource i2c_resources[] = {
+-	{
+-		.flags = IORESOURCE_IRQ,
+-		.start = IRQ_I2C_ERROR,
+-		.end = IRQ_I2C_ERROR,
+-	}, {
+-		.flags = IORESOURCE_MEM,
+-		.start = REGS_I2C_PHYS,
+-		.end = REGS_I2C_PHYS + REGS_I2C_SIZE,
+-	}, {
+-		.flags = IORESOURCE_DMA,
+-		.start = STMP3XXX_DMA(3, STMP3XXX_BUS_APBX),
+-		.end = STMP3XXX_DMA(3, STMP3XXX_BUS_APBX),
+-	},
+-};
+-
+-struct platform_device stmp378x_i2c = {
+-	.name = "i2c_stmp3xxx",
+-	.id = 0,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-	.resource = i2c_resources,
+-	.num_resources = ARRAY_SIZE(i2c_resources),
+-};
+-
+-void __init stmp378x_map_io(void)
+-{
+-	iotable_init(stmp378x_io_desc, ARRAY_SIZE(stmp378x_io_desc));
+-}
+diff --git a/arch/arm/mach-stmp378x/stmp378x.h b/arch/arm/mach-stmp378x/stmp378x.h
+deleted file mode 100644
+index 0dc15b3..0000000
+--- a/arch/arm/mach-stmp378x/stmp378x.h
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X internal functions and data declarations
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
 - *
 - * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
 - * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
@@ -3351,547 +3606,22 @@ index 3def03b..0000000
 - * http://www.opensource.org/licenses/gpl-license.html
 - * http://www.gnu.org/copyleft/gpl.html
 - */
--#define DEBUG
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/sysdev.h>
--#include <linux/string.h>
--#include <linux/bitops.h>
--#include <linux/irq.h>
--
--#include <mach/hardware.h>
--#include <mach/platform.h>
--#include <mach/regs-pinctrl.h>
--#include <mach/pins.h>
--#include <mach/pinmux.h>
--
--#define NR_BANKS ARRAY_SIZE(pinmux_banks)
--static struct stmp3xxx_pinmux_bank pinmux_banks[] = {
--	[0] = {
--		.hw_muxsel = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL0,
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL1,
--		},
--		.hw_drive = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE0,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE1,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE2,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE3,
--		},
--		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL0,
--		.functions = { 0x0, 0x1, 0x2, 0x3 },
--		.strengths = { 0x0, 0x1, 0x2, 0x3, 0xff },
--
--		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN0,
--		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT0,
--		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE0,
--		.irq = IRQ_GPIO0,
--
--		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ0,
--		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT0,
--		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL0,
--		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL0,
--		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN0,
--	},
--	[1] = {
--		.hw_muxsel = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL2,
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL3,
--		},
--		.hw_drive = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE4,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE5,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE6,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE7,
--		},
--		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL1,
--		.functions = { 0x0, 0x1, 0x2, 0x3 },
--		.strengths = { 0x0, 0x1, 0x2, 0x3, 0xff },
--
--		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN1,
--		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT1,
--		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE1,
--		.irq = IRQ_GPIO1,
--
--		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ1,
--		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT1,
--		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL1,
--		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL1,
--		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN1,
--	},
--	[2] = {
--	       .hw_muxsel = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL4,
--			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL5,
--		},
--		.hw_drive = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE8,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE9,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE10,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE11,
--		},
--		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL2,
--		.functions = { 0x0, 0x1, 0x2, 0x3 },
--		.strengths = { 0x0, 0x1, 0x2, 0x1, 0x2 },
--
--		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN2,
--		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT2,
--		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE2,
--		.irq = IRQ_GPIO2,
--
--		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ2,
--		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT2,
--		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL2,
--		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL2,
--		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN2,
--	},
--	[3] = {
--	       .hw_muxsel = {
--		       REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL6,
--		       REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL7,
--	       },
--	       .hw_drive = {
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE12,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE13,
--			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE14,
--			NULL,
--	       },
--	       .hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL3,
--	       .functions = {0x0, 0x1, 0x2, 0x3},
--	       .strengths = {0x0, 0x1, 0x2, 0x3, 0xff},
--	},
--};
--
--static inline struct stmp3xxx_pinmux_bank *
--stmp3xxx_pinmux_bank(unsigned id, unsigned *bank, unsigned *pin)
--{
--	unsigned b, p;
--
--	b = STMP3XXX_PINID_TO_BANK(id);
--	p = STMP3XXX_PINID_TO_PINNUM(id);
--	BUG_ON(b >= NR_BANKS);
--	if (bank)
--		*bank = b;
--	if (pin)
--		*pin = p;
--	return &pinmux_banks[b];
--}
--
--/* Check if requested pin is owned by caller */
--static int stmp3xxx_check_pin(unsigned id, const char *label)
--{
--	unsigned pin;
--	struct stmp3xxx_pinmux_bank *pm = stmp3xxx_pinmux_bank(id, NULL, &pin);
--
--	if (!test_bit(pin, &pm->pin_map)) {
--		printk(KERN_WARNING
--		       "%s: Accessing free pin %x, caller %s\n",
--		       __func__, id, label);
--
--		return -EINVAL;
--	}
--
--	if (label && pm->pin_labels[pin] &&
--	    strcmp(label, pm->pin_labels[pin])) {
--		printk(KERN_WARNING
--		       "%s: Wrong pin owner %x, caller %s owner %s\n",
--		       __func__, id, label, pm->pin_labels[pin]);
--
--		return -EINVAL;
--	}
--	return 0;
--}
--
--void stmp3xxx_pin_strength(unsigned id, enum pin_strength strength,
--		const char *label)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	void __iomem *hwdrive;
--	u32 shift, val;
--	u32 bank, pin;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--	pr_debug("%s: label %s bank %d pin %d strength %d\n", __func__, label,
--		 bank, pin, strength);
--
--	hwdrive = pbank->hw_drive[pin / HW_DRIVE_PIN_NUM];
--	shift = (pin % HW_DRIVE_PIN_NUM) * HW_DRIVE_PIN_LEN;
--	val = pbank->strengths[strength];
--	if (val == 0xff) {
--		printk(KERN_WARNING
--		       "%s: strength is not supported for bank %d, caller %s",
--		       __func__, bank, label);
--		return;
--	}
--
--	if (stmp3xxx_check_pin(id, label))
--		return;
--
--	pr_debug("%s: writing 0x%x to 0x%p register\n", __func__,
--			val << shift, hwdrive);
--	stmp3xxx_clearl(HW_DRIVE_PINDRV_MASK << shift, hwdrive);
--	stmp3xxx_setl(val << shift, hwdrive);
--}
--
--void stmp3xxx_pin_voltage(unsigned id, enum pin_voltage voltage,
--			  const char *label)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	void __iomem *hwdrive;
--	u32 shift;
--	u32 bank, pin;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--	pr_debug("%s: label %s bank %d pin %d voltage %d\n", __func__, label,
--		 bank, pin, voltage);
--
--	hwdrive = pbank->hw_drive[pin / HW_DRIVE_PIN_NUM];
--	shift = (pin % HW_DRIVE_PIN_NUM) * HW_DRIVE_PIN_LEN;
--
--	if (stmp3xxx_check_pin(id, label))
--		return;
--
--	pr_debug("%s: changing 0x%x bit in 0x%p register\n",
--			__func__, HW_DRIVE_PINV_MASK << shift, hwdrive);
--	if (voltage == PIN_1_8V)
--		stmp3xxx_clearl(HW_DRIVE_PINV_MASK << shift, hwdrive);
--	else
--		stmp3xxx_setl(HW_DRIVE_PINV_MASK << shift, hwdrive);
--}
--
--void stmp3xxx_pin_pullup(unsigned id, int enable, const char *label)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	void __iomem *hwpull;
--	u32 bank, pin;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--	pr_debug("%s: label %s bank %d pin %d enable %d\n", __func__, label,
--		 bank, pin, enable);
--
--	hwpull = pbank->hw_pull;
--
--	if (stmp3xxx_check_pin(id, label))
--		return;
--
--	pr_debug("%s: changing 0x%x bit in 0x%p register\n",
--			__func__, 1 << pin, hwpull);
--	if (enable)
--		stmp3xxx_setl(1 << pin, hwpull);
--	else
--		stmp3xxx_clearl(1 << pin, hwpull);
--}
--
--int stmp3xxx_request_pin(unsigned id, enum pin_fun fun, const char *label)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	u32 bank, pin;
--	int ret = 0;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--	pr_debug("%s: label %s bank %d pin %d fun %d\n", __func__, label,
--		 bank, pin, fun);
--
--	if (test_bit(pin, &pbank->pin_map)) {
--		printk(KERN_WARNING
--		       "%s: CONFLICT DETECTED pin %d:%d caller %s owner %s\n",
--		       __func__, bank, pin, label, pbank->pin_labels[pin]);
--		return -EBUSY;
--	}
--
--	set_bit(pin, &pbank->pin_map);
--	pbank->pin_labels[pin] = label;
--
--	stmp3xxx_set_pin_type(id, fun);
--
--	return ret;
--}
--
--void stmp3xxx_set_pin_type(unsigned id, enum pin_fun fun)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	void __iomem *hwmux;
--	u32 shift, val;
--	u32 bank, pin;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--
--	hwmux = pbank->hw_muxsel[pin / HW_MUXSEL_PIN_NUM];
--	shift = (pin % HW_MUXSEL_PIN_NUM) * HW_MUXSEL_PIN_LEN;
--
--	val = pbank->functions[fun];
--	shift = (pin % HW_MUXSEL_PIN_NUM) * HW_MUXSEL_PIN_LEN;
--	pr_debug("%s: writing 0x%x to 0x%p register\n",
--			__func__, val << shift, hwmux);
--	stmp3xxx_clearl(HW_MUXSEL_PINFUN_MASK << shift, hwmux);
--	stmp3xxx_setl(val << shift, hwmux);
--}
--
--void stmp3xxx_release_pin(unsigned id, const char *label)
--{
--	struct stmp3xxx_pinmux_bank *pbank;
--	u32 bank, pin;
--
--	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
--	pr_debug("%s: label %s bank %d pin %d\n", __func__, label, bank, pin);
--
--	if (stmp3xxx_check_pin(id, label))
--		return;
--
--	clear_bit(pin, &pbank->pin_map);
--	pbank->pin_labels[pin] = NULL;
--}
--
--int stmp3xxx_request_pin_group(struct pin_group *pin_group, const char *label)
--{
--	struct pin_desc *pin;
--	int p;
--	int err = 0;
--
--	/* Allocate and configure pins */
--	for (p = 0; p < pin_group->nr_pins; p++) {
--		pr_debug("%s: #%d\n", __func__, p);
--		pin = &pin_group->pins[p];
--
--		err = stmp3xxx_request_pin(pin->id, pin->fun, label);
--		if (err)
--			goto out_err;
--
--		stmp3xxx_pin_strength(pin->id, pin->strength, label);
--		stmp3xxx_pin_voltage(pin->id, pin->voltage, label);
--		stmp3xxx_pin_pullup(pin->id, pin->pullup, label);
--	}
--
--	return 0;
--
--out_err:
--	/* Release allocated pins in case of error */
--	while (--p >= 0) {
--		pr_debug("%s: releasing #%d\n", __func__, p);
--		stmp3xxx_release_pin(pin_group->pins[p].id, label);
--	}
--	return err;
--}
--EXPORT_SYMBOL(stmp3xxx_request_pin_group);
--
--void stmp3xxx_release_pin_group(struct pin_group *pin_group, const char *label)
--{
--	struct pin_desc *pin;
--	int p;
--
--	for (p = 0; p < pin_group->nr_pins; p++) {
--		pin = &pin_group->pins[p];
--		stmp3xxx_release_pin(pin->id, label);
--	}
--}
--EXPORT_SYMBOL(stmp3xxx_release_pin_group);
--
--static int stmp3xxx_irq_data_to_gpio(struct irq_data *d,
--	struct stmp3xxx_pinmux_bank **bank, unsigned *gpio)
--{
--	struct stmp3xxx_pinmux_bank *pm;
--
--	for (pm = pinmux_banks; pm < pinmux_banks + NR_BANKS; pm++)
--		if (pm->virq <= d->irq && d->irq < pm->virq + 32) {
--			*bank = pm;
--			*gpio = d->irq - pm->virq;
--			return 0;
--		}
--	return -ENOENT;
--}
--
--static int stmp3xxx_set_irqtype(struct irq_data *d, unsigned type)
--{
--	struct stmp3xxx_pinmux_bank *pm;
--	unsigned gpio;
--	int l, p;
--
--	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
--	switch (type) {
--	case IRQ_TYPE_EDGE_RISING:
--		l = 0; p = 1; break;
--	case IRQ_TYPE_EDGE_FALLING:
--		l = 0; p = 0; break;
--	case IRQ_TYPE_LEVEL_HIGH:
--		l = 1; p = 1; break;
--	case IRQ_TYPE_LEVEL_LOW:
--		l = 1; p = 0; break;
--	default:
--		pr_debug("%s: Incorrect GPIO interrupt type 0x%x\n",
--				__func__, type);
--		return -ENXIO;
--	}
--
--	if (l)
--		stmp3xxx_setl(1 << gpio, pm->irqlevel);
--	else
--		stmp3xxx_clearl(1 << gpio, pm->irqlevel);
--	if (p)
--		stmp3xxx_setl(1 << gpio, pm->irqpolarity);
--	else
--		stmp3xxx_clearl(1 << gpio, pm->irqpolarity);
--	return 0;
--}
--
--static void stmp3xxx_pin_ack_irq(struct irq_data *d)
--{
--	u32 stat;
--	struct stmp3xxx_pinmux_bank *pm;
--	unsigned gpio;
--
--	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
--	stat = __raw_readl(pm->irqstat) & (1 << gpio);
--	stmp3xxx_clearl(stat, pm->irqstat);
--}
--
--static void stmp3xxx_pin_mask_irq(struct irq_data *d)
--{
--	struct stmp3xxx_pinmux_bank *pm;
--	unsigned gpio;
--
--	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
--	stmp3xxx_clearl(1 << gpio, pm->irqen);
--	stmp3xxx_clearl(1 << gpio, pm->pin2irq);
--}
--
--static void stmp3xxx_pin_unmask_irq(struct irq_data *d)
--{
--	struct stmp3xxx_pinmux_bank *pm;
--	unsigned gpio;
--
--	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
--	stmp3xxx_setl(1 << gpio, pm->irqen);
--	stmp3xxx_setl(1 << gpio, pm->pin2irq);
--}
--
--static inline
--struct stmp3xxx_pinmux_bank *to_pinmux_bank(struct gpio_chip *chip)
--{
--	return container_of(chip, struct stmp3xxx_pinmux_bank, chip);
--}
--
--static int stmp3xxx_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
--{
--	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
--	return pm->virq + offset;
--}
--
--static int stmp3xxx_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
--	unsigned v;
--
--	v = __raw_readl(pm->hw_gpio_in) & (1 << offset);
--	return v ? 1 : 0;
--}
--
--static void stmp3xxx_gpio_set(struct gpio_chip *chip, unsigned offset, int v)
--{
--	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
--
--	if (v)
--		stmp3xxx_setl(1 << offset, pm->hw_gpio_out);
--	else
--		stmp3xxx_clearl(1 << offset, pm->hw_gpio_out);
--}
--
--static int stmp3xxx_gpio_output(struct gpio_chip *chip, unsigned offset, int v)
--{
--	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
--
--	stmp3xxx_setl(1 << offset, pm->hw_gpio_doe);
--	stmp3xxx_gpio_set(chip, offset, v);
--	return 0;
--}
--
--static int stmp3xxx_gpio_input(struct gpio_chip *chip, unsigned offset)
--{
--	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
--
--	stmp3xxx_clearl(1 << offset, pm->hw_gpio_doe);
--	return 0;
--}
--
--static int stmp3xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
--{
--	return stmp3xxx_request_pin(chip->base + offset, PIN_GPIO, "gpio");
--}
--
--static void stmp3xxx_gpio_free(struct gpio_chip *chip, unsigned offset)
--{
--	stmp3xxx_release_pin(chip->base + offset, "gpio");
--}
--
--static void stmp3xxx_gpio_irq(u32 irq, struct irq_desc *desc)
--{
--	struct stmp3xxx_pinmux_bank *pm = irq_get_handler_data(irq);
--	int gpio_irq = pm->virq;
--	u32 stat = __raw_readl(pm->irqstat);
--
--	while (stat) {
--		if (stat & 1)
--			generic_handle_irq(gpio_irq);
--		gpio_irq++;
--		stat >>= 1;
--	}
--}
--
--static struct irq_chip gpio_irq_chip = {
--	.irq_ack	= stmp3xxx_pin_ack_irq,
--	.irq_mask	= stmp3xxx_pin_mask_irq,
--	.irq_unmask	= stmp3xxx_pin_unmask_irq,
--	.irq_set_type	= stmp3xxx_set_irqtype,
--};
--
--int __init stmp3xxx_pinmux_init(int virtual_irq_start)
--{
--	int b, r = 0;
--	struct stmp3xxx_pinmux_bank *pm;
--	int virq;
--
--	for (b = 0; b < 3; b++) {
--		/* only banks 0,1,2 are allowed to GPIO */
--		pm = pinmux_banks + b;
--		pm->chip.base = 32 * b;
--		pm->chip.ngpio = 32;
--		pm->chip.owner = THIS_MODULE;
--		pm->chip.can_sleep = 1;
--		pm->chip.exported = 1;
--		pm->chip.to_irq = stmp3xxx_gpio_to_irq;
--		pm->chip.direction_input = stmp3xxx_gpio_input;
--		pm->chip.direction_output = stmp3xxx_gpio_output;
--		pm->chip.get = stmp3xxx_gpio_get;
--		pm->chip.set = stmp3xxx_gpio_set;
--		pm->chip.request = stmp3xxx_gpio_request;
--		pm->chip.free = stmp3xxx_gpio_free;
--		pm->virq = virtual_irq_start + b * 32;
--
--		for (virq = pm->virq; virq < pm->virq; virq++) {
--			gpio_irq_chip.irq_mask(irq_get_irq_data(virq));
--			irq_set_chip_and_handler(virq, &gpio_irq_chip,
--						 handle_level_irq);
--			set_irq_flags(virq, IRQF_VALID);
--		}
--		r = gpiochip_add(&pm->chip);
--		if (r < 0)
--			break;
--		irq_set_chained_handler(pm->irq, stmp3xxx_gpio_irq);
--		irq_set_handler_data(pm->irq, pm);
--	}
--	return r;
--}
--
--MODULE_AUTHOR("Vladislav Buzov");
--MODULE_LICENSE("GPL");
-diff --git a/arch/arm/plat-stmp3xxx/timer.c b/arch/arm/plat-stmp3xxx/timer.c
+-#ifndef __MACH_STMP378X_H
+-#define __MACH_STMP378X_H
+-
+-void stmp378x_map_io(void);
+-void stmp378x_init_irq(void);
+-
+-extern struct platform_device stmp378x_pxp, stmp378x_i2c;
+-#endif /* __MACH_STMP378X_COMMON_H */
+diff --git a/arch/arm/mach-stmp378x/stmp378x_devb.c b/arch/arm/mach-stmp378x/stmp378x_devb.c
 deleted file mode 100644
-index c395630..0000000
---- a/arch/arm/plat-stmp3xxx/timer.c
+index 0615884..0000000
+--- a/arch/arm/mach-stmp378x/stmp378x_devb.c
 +++ /dev/null
-@@ -1,186 +0,0 @@
+@@ -1,332 +0,0 @@
 -/*
-- * System timer for Freescale STMP37XX/STMP378X
+- * Freescale STMP378X development board support
 - *
 - * Embedded Alley Solutions, Inc <source@embeddedalley.com>
 - *
@@ -3909,172 +3639,349 @@ index c395630..0000000
 - */
 -#include <linux/kernel.h>
 -#include <linux/init.h>
--#include <linux/spinlock.h>
--#include <linux/clocksource.h>
--#include <linux/clockchips.h>
 -#include <linux/io.h>
--#include <linux/irq.h>
--#include <linux/interrupt.h>
+-#include <linux/platform_device.h>
+-#include <linux/delay.h>
+-#include <linux/clk.h>
+-#include <linux/err.h>
+-#include <linux/spi/spi.h>
 -
--#include <asm/mach/time.h>
--#include <mach/stmp3xxx.h>
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include <mach/pins.h>
+-#include <mach/pinmux.h>
 -#include <mach/platform.h>
--#include <mach/regs-timrot.h>
+-#include <mach/stmp3xxx.h>
+-#include <mach/mmc.h>
+-#include <mach/gpmi.h>
 -
--static irqreturn_t
--stmp3xxx_timer_interrupt(int irq, void *dev_id)
+-#include "stmp378x.h"
+-
+-static struct platform_device *devices[] = {
+-	&stmp3xxx_dbguart,
+-	&stmp3xxx_appuart,
+-	&stmp3xxx_watchdog,
+-	&stmp3xxx_touchscreen,
+-	&stmp3xxx_rtc,
+-	&stmp3xxx_keyboard,
+-	&stmp3xxx_framebuffer,
+-	&stmp3xxx_backlight,
+-	&stmp3xxx_rotdec,
+-	&stmp3xxx_persistent,
+-	&stmp3xxx_dcp_bootstream,
+-	&stmp3xxx_dcp,
+-	&stmp3xxx_battery,
+-	&stmp378x_pxp,
+-	&stmp378x_i2c,
+-};
+-
+-static struct pin_desc i2c_pins_desc[] = {
+-	{ PINID_I2C_SCL, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_I2C_SDA, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-};
+-
+-static struct pin_group i2c_pins = {
+-	.pins		= i2c_pins_desc,
+-	.nr_pins	= ARRAY_SIZE(i2c_pins_desc),
+-};
+-
+-static struct pin_desc dbguart_pins_0[] = {
+-	{ PINID_PWM0, PIN_FUN3, },
+-	{ PINID_PWM1, PIN_FUN3, },
+-};
+-
+-static struct pin_group dbguart_pins[] = {
+-	[0] = {
+-		.pins		= dbguart_pins_0,
+-		.nr_pins	= ARRAY_SIZE(dbguart_pins_0),
+-	},
+-};
+-
+-static int dbguart_pins_control(int id, int request)
 -{
--	struct clock_event_device *c = dev_id;
+-	int r = 0;
 -
--	/* timer 0 */
--	if (__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0) &
--			BM_TIMROT_TIMCTRLn_IRQ) {
--		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ,
--				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
--		c->event_handler(c);
--	}
--
--	/* timer 1 */
--	else if (__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1)
--			& BM_TIMROT_TIMCTRLn_IRQ) {
--		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ,
--				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
--		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ_EN,
--				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
--		__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
--	}
--
--	return IRQ_HANDLED;
+-	if (request)
+-		r = stmp3xxx_request_pin_group(&dbguart_pins[id], "debug uart");
+-	else
+-		stmp3xxx_release_pin_group(&dbguart_pins[id], "debug uart");
+-	return r;
 -}
 -
--static cycle_t stmp3xxx_clock_read(struct clocksource *cs)
+-static struct pin_desc appuart_pins_0[] = {
+-	{ PINID_AUART1_CTS, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART1_RTS, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART1_RX, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART1_TX, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-};
+-
+-static struct pin_desc appuart_pins_1[] = {
+-#if 0 /* enable these when second appuart will be connected */
+-	{ PINID_AUART2_CTS, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART2_RTS, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART2_RX, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-	{ PINID_AUART2_TX, PIN_FUN1, PIN_4MA, PIN_1_8V, 0, },
+-#endif
+-};
+-
+-static struct pin_desc mmc_pins_desc[] = {
+-	{ PINID_SSP1_DATA0, PIN_FUN1, PIN_8MA, PIN_3_3V, 1 },
+-	{ PINID_SSP1_DATA1, PIN_FUN1, PIN_8MA, PIN_3_3V, 1 },
+-	{ PINID_SSP1_DATA2, PIN_FUN1, PIN_8MA, PIN_3_3V, 1 },
+-	{ PINID_SSP1_DATA3, PIN_FUN1, PIN_8MA, PIN_3_3V, 1 },
+-	{ PINID_SSP1_CMD, PIN_FUN1, PIN_8MA, PIN_3_3V, 1 },
+-	{ PINID_SSP1_SCK, PIN_FUN1, PIN_8MA, PIN_3_3V, 0 },
+-	{ PINID_SSP1_DETECT, PIN_FUN1, PIN_8MA, PIN_3_3V, 0 },
+-};
+-
+-static struct pin_group mmc_pins = {
+-	.pins		= mmc_pins_desc,
+-	.nr_pins	= ARRAY_SIZE(mmc_pins_desc),
+-};
+-
+-static int stmp3xxxmmc_get_wp(void)
 -{
--	return ~((__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1)
--				& 0xFFFF0000) >> 16);
+-	return gpio_get_value(PINID_PWM4);
 -}
 -
--static int
--stmp3xxx_timrot_set_next_event(unsigned long delta,
--		struct clock_event_device *dev)
+-static int stmp3xxxmmc_hw_init_ssp1(void)
 -{
--	/* reload the timer */
--	__raw_writel(delta, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
+-	int ret;
+-
+-	ret = stmp3xxx_request_pin_group(&mmc_pins, "mmc");
+-	if (ret)
+-		goto out;
+-
+-	/* Configure write protect GPIO pin */
+-	ret = gpio_request(PINID_PWM4, "mmc wp");
+-	if (ret)
+-		goto out_wp;
+-
+-	gpio_direction_input(PINID_PWM4);
+-
+-	/* Configure POWER pin as gpio to drive power to MMC slot */
+-	ret = gpio_request(PINID_PWM3, "mmc power");
+-	if (ret)
+-		goto out_power;
+-
+-	gpio_direction_output(PINID_PWM3, 0);
+-	mdelay(100);
+-
 -	return 0;
+-
+-out_power:
+-	gpio_free(PINID_PWM4);
+-out_wp:
+-	stmp3xxx_release_pin_group(&mmc_pins, "mmc");
+-out:
+-	return ret;
 -}
 -
--static void
--stmp3xxx_timrot_set_mode(enum clock_event_mode mode,
--		struct clock_event_device *dev)
+-static void stmp3xxxmmc_hw_release_ssp1(void)
 -{
+-	gpio_free(PINID_PWM3);
+-	gpio_free(PINID_PWM4);
+-	stmp3xxx_release_pin_group(&mmc_pins, "mmc");
 -}
 -
--static struct clock_event_device ckevt_timrot = {
--	.name		= "timrot",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.shift		= 32,
--	.set_next_event	= stmp3xxx_timrot_set_next_event,
--	.set_mode	= stmp3xxx_timrot_set_mode,
+-static void stmp3xxxmmc_cmd_pullup_ssp1(int enable)
+-{
+-	stmp3xxx_pin_pullup(PINID_SSP1_CMD, enable, "mmc");
+-}
+-
+-static unsigned long
+-stmp3xxxmmc_setclock_ssp1(void __iomem *base, unsigned long hz)
+-{
+-	struct clk *ssp, *parent;
+-	char *p;
+-	long r;
+-
+-	ssp = clk_get(NULL, "ssp");
+-
+-	/* using SSP1, no timeout, clock rate 1 */
+-	writel(BF(2, SSP_TIMING_CLOCK_DIVIDE) |
+-	       BF(0xFFFF, SSP_TIMING_TIMEOUT),
+-	       base + HW_SSP_TIMING);
+-
+-	p = (hz > 1000000) ? "io" : "osc_24M";
+-	parent = clk_get(NULL, p);
+-	clk_set_parent(ssp, parent);
+-	r = clk_set_rate(ssp, 2 * hz / 1000);
+-	clk_put(parent);
+-	clk_put(ssp);
+-
+-	return hz;
+-}
+-
+-static struct stmp3xxxmmc_platform_data mmc_data = {
+-	.hw_init	= stmp3xxxmmc_hw_init_ssp1,
+-	.hw_release	= stmp3xxxmmc_hw_release_ssp1,
+-	.get_wp		= stmp3xxxmmc_get_wp,
+-	.cmd_pullup	= stmp3xxxmmc_cmd_pullup_ssp1,
+-	.setclock	= stmp3xxxmmc_setclock_ssp1,
 -};
 -
--static struct clocksource cksrc_stmp3xxx = {
--	.name           = "cksrc_stmp3xxx",
--	.rating         = 250,
--	.read           = stmp3xxx_clock_read,
--	.mask           = CLOCKSOURCE_MASK(16),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-
+-static struct pin_group appuart_pins[] = {
+-	[0] = {
+-		.pins		= appuart_pins_0,
+-		.nr_pins	= ARRAY_SIZE(appuart_pins_0),
+-	},
+-	[1] = {
+-		.pins		= appuart_pins_1,
+-		.nr_pins	= ARRAY_SIZE(appuart_pins_1),
+-	},
 -};
 -
--static struct irqaction stmp3xxx_timer_irq = {
--	.name		= "stmp3xxx_timer",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
--	.handler	= stmp3xxx_timer_interrupt,
--	.dev_id		= &ckevt_timrot,
+-static struct pin_desc ssp1_pins_desc[] = {
+-	{ PINID_SSP1_SCK,	PIN_FUN1, PIN_8MA, PIN_3_3V, 0, },
+-	{ PINID_SSP1_CMD,	PIN_FUN1, PIN_4MA, PIN_3_3V, 0, },
+-	{ PINID_SSP1_DATA0,	PIN_FUN1, PIN_4MA, PIN_3_3V, 0, },
+-	{ PINID_SSP1_DATA3,	PIN_FUN1, PIN_4MA, PIN_3_3V, 0, },
 -};
 -
--
--/*
-- * Set up timer interrupt, and return the current time in seconds.
-- */
--static void __init stmp3xxx_init_timer(void)
--{
--	ckevt_timrot.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
--				ckevt_timrot.shift);
--	ckevt_timrot.min_delta_ns = clockevent_delta2ns(2, &ckevt_timrot);
--	ckevt_timrot.max_delta_ns = clockevent_delta2ns(0xFFF, &ckevt_timrot);
--	ckevt_timrot.cpumask = cpumask_of(0);
--
--	stmp3xxx_reset_block(REGS_TIMROT_BASE, false);
--
--	/* clear two timers */
--	__raw_writel(0, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
--	__raw_writel(0, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
--
--	/* configure them */
--	__raw_writel(
--		(8 << BP_TIMROT_TIMCTRLn_SELECT) |  /* 32 kHz */
--		BM_TIMROT_TIMCTRLn_RELOAD |
--		BM_TIMROT_TIMCTRLn_UPDATE |
--		BM_TIMROT_TIMCTRLn_IRQ_EN,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
--	__raw_writel(
--		(8 << BP_TIMROT_TIMCTRLn_SELECT) |  /* 32 kHz */
--		BM_TIMROT_TIMCTRLn_RELOAD |
--		BM_TIMROT_TIMCTRLn_UPDATE |
--		BM_TIMROT_TIMCTRLn_IRQ_EN,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
--
--	__raw_writel(CLOCK_TICK_RATE / HZ - 1,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
--	__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
--
--	setup_irq(IRQ_TIMER0, &stmp3xxx_timer_irq);
--
--	clocksource_register_hz(&cksrc_stmp3xxx, CLOCK_TICK_RATE);
--	clockevents_register_device(&ckevt_timrot);
--}
--
--#ifdef CONFIG_PM
--
--void stmp3xxx_suspend_timer(void)
--{
--	stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ_EN | BM_TIMROT_TIMCTRLn_IRQ,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
--	stmp3xxx_setl(BM_TIMROT_ROTCTRL_CLKGATE,
--			REGS_TIMROT_BASE + HW_TIMROT_ROTCTRL);
--}
--
--void stmp3xxx_resume_timer(void)
--{
--	stmp3xxx_clearl(BM_TIMROT_ROTCTRL_SFTRST | BM_TIMROT_ROTCTRL_CLKGATE,
--			REGS_TIMROT_BASE + HW_TIMROT_ROTCTRL);
--	__raw_writel(
--		8 << BP_TIMROT_TIMCTRLn_SELECT |  /* 32 kHz */
--		BM_TIMROT_TIMCTRLn_RELOAD |
--		BM_TIMROT_TIMCTRLn_UPDATE |
--		BM_TIMROT_TIMCTRLn_IRQ_EN,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
--	__raw_writel(
--		8 << BP_TIMROT_TIMCTRLn_SELECT |  /* 32 kHz */
--		BM_TIMROT_TIMCTRLn_RELOAD |
--		BM_TIMROT_TIMCTRLn_UPDATE |
--		BM_TIMROT_TIMCTRLn_IRQ_EN,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
--	__raw_writel(CLOCK_TICK_RATE / HZ - 1,
--			REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
--	__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
--}
--
--#else
--
--#define stmp3xxx_suspend_timer	NULL
--#define	stmp3xxx_resume_timer	NULL
--
--#endif	/* CONFIG_PM */
--
--struct sys_timer stmp3xxx_timer = {
--	.init		= stmp3xxx_init_timer,
--	.suspend	= stmp3xxx_suspend_timer,
--	.resume		= stmp3xxx_resume_timer,
+-static struct pin_desc ssp2_pins_desc[] = {
+-	{ PINID_GPMI_WRN,	PIN_FUN3, PIN_8MA, PIN_3_3V, 0, },
+-	{ PINID_GPMI_RDY1,	PIN_FUN3, PIN_4MA, PIN_3_3V, 0, },
+-	{ PINID_GPMI_D00,	PIN_FUN3, PIN_4MA, PIN_3_3V, 0, },
+-	{ PINID_GPMI_D03,	PIN_FUN3, PIN_4MA, PIN_3_3V, 0, },
 -};
+-
+-static struct pin_group ssp1_pins = {
+-	.pins = ssp1_pins_desc,
+-	.nr_pins = ARRAY_SIZE(ssp1_pins_desc),
+-};
+-
+-static struct pin_group ssp2_pins = {
+-	.pins = ssp1_pins_desc,
+-	.nr_pins = ARRAY_SIZE(ssp2_pins_desc),
+-};
+-
+-static struct pin_desc gpmi_pins_desc[] = {
+-	{ PINID_GPMI_CE0N, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_CE1N, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GMPI_CE2N, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_CLE, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_ALE, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_WPN, PIN_FUN1, PIN_12MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_RDY1, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D00, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D01, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D02, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D03, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D04, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D05, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D06, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_D07, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_RDY0, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_RDY2, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_RDY3, PIN_FUN1, PIN_4MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_WRN, PIN_FUN1, PIN_12MA, PIN_3_3V, 0 },
+-	{ PINID_GPMI_RDN, PIN_FUN1, PIN_12MA, PIN_3_3V, 0 },
+-};
+-
+-static struct pin_group gpmi_pins = {
+-	.pins		= gpmi_pins_desc,
+-	.nr_pins	= ARRAY_SIZE(gpmi_pins_desc),
+-};
+-
+-static struct mtd_partition gpmi_partitions[] = {
+-	[0] = {
+-		.name	= "boot",
+-		.size	= 10 * SZ_1M,
+-		.offset	= 0,
+-	},
+-	[1] = {
+-		.name	= "data",
+-		.size	= MTDPART_SIZ_FULL,
+-		.offset	= MTDPART_OFS_APPEND,
+-	},
+-};
+-
+-static struct gpmi_platform_data gpmi_data = {
+-	.pins = &gpmi_pins,
+-	.nr_parts = ARRAY_SIZE(gpmi_partitions),
+-	.parts = gpmi_partitions,
+-	.part_types = { "cmdline", NULL },
+-};
+-
+-static struct spi_board_info spi_board_info[] __initdata = {
+-#if defined(CONFIG_ENC28J60) || defined(CONFIG_ENC28J60_MODULE)
+-	{
+-		.modalias       = "enc28j60",
+-		.max_speed_hz   = 6 * 1000 * 1000,
+-		.bus_num	= 1,
+-		.chip_select    = 0,
+-		.platform_data  = NULL,
+-	},
+-#endif
+-};
+-
+-static void __init stmp378x_devb_init(void)
+-{
+-	stmp3xxx_pinmux_init(NR_REAL_IRQS);
+-
+-	/* init stmp3xxx platform */
+-	stmp3xxx_init();
+-
+-	stmp3xxx_dbguart.dev.platform_data = dbguart_pins_control;
+-	stmp3xxx_appuart.dev.platform_data = appuart_pins;
+-	stmp3xxx_mmc.dev.platform_data = &mmc_data;
+-	stmp3xxx_gpmi.dev.platform_data = &gpmi_data;
+-	stmp3xxx_spi1.dev.platform_data = &ssp1_pins;
+-	stmp3xxx_spi2.dev.platform_data = &ssp2_pins;
+-	stmp378x_i2c.dev.platform_data = &i2c_pins;
+-
+-	/* register spi devices */
+-	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+-
+-	/* add board's devices */
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	/* add devices selected by command line ssp1= and ssp2= options */
+-	stmp3xxx_ssp1_device_register();
+-	stmp3xxx_ssp2_device_register();
+-}
+-
+-MACHINE_START(STMP378X, "STMP378X")
+-	.boot_params	= 0x40000100,
+-	.map_io		= stmp378x_map_io,
+-	.init_irq	= stmp378x_init_irq,
+-	.timer		= &stmp3xxx_timer,
+-	.init_machine	= stmp378x_devb_init,
+-MACHINE_END
+diff --git a/arch/arm/plat-stmp3xxx/Kconfig b/arch/arm/plat-stmp3xxx/Kconfig
+index dcdbe32..e6e312b 100644
+--- a/arch/arm/plat-stmp3xxx/Kconfig
++++ b/arch/arm/plat-stmp3xxx/Kconfig
+@@ -2,26 +2,6 @@ if ARCH_STMP3XXX
+ 
+ menu "Freescale STMP3xxx implementations"
+ 
+-choice
+-	prompt "Select STMP3xxx chip family"
+-
+-config ARCH_STMP378X
+-	bool "Freescale STMP378x"
+-	select CPU_ARM926T
+-	---help---
+-	 STMP378x refers to 3780 through 3789 chips
+-
+-endchoice
+-
+-choice
+-	prompt "Select STMP3xxx board type"
+-
+-config MACH_STMP378X
+-	depends on ARCH_STMP378X
+-	bool "Freescale STMP378x development board"
+-
+-endchoice
+-
+ endmenu
+ 
+ endif
 -- 
 1.7.2.5
