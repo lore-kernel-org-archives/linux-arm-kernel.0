@@ -1,33 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 15:34:35 +0100
-Subject: Architecture specific implementations for tickless kernel and
-	deferrable timers
-In-Reply-To: <BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
-References: <20110426203756.GD17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
-	<alpine.LFD.2.02.1104271015000.3323@ionos>
-	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
-	<20110428133826.GM17290@n2100.arm.linux.org.uk>
-	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-	<20110428142822.GN17290@n2100.arm.linux.org.uk>
-	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
-	<20110428182420.GF17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
-Message-ID: <20110429143435.GU5126@n2100.arm.linux.org.uk>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Fri, 29 Apr 2011 16:38:37 +0200
+Subject: [PATCHv3 2.6.40 2/4] ARM: simpad: Cleanup CS3 accessors.
+In-Reply-To: <20110428092327.GR17290@n2100.arm.linux.org.uk>
+References: <1303377543-24794-1-git-send-email-jochen@scram.de>	<1303377543-24794-3-git-send-email-jochen@scram.de>
+	<20110428092327.GR17290@n2100.arm.linux.org.uk>
+Message-ID: <4DBACD6D.1070200@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 07:56:56PM +0530, Vikram Narayanan wrote:
-> Can you also give some idea on how the system's RTC is hooked up with
-> the generic timekeeping code.
-> Is it hooked up in someway so that the walltime is calculated wrt the
-> initial value of the RTC?
+Hi Russell,
 
-I'd like to pass you over to the RTC folk, but I don't think they're
-very active anymore.
+thanks for the review.
 
-Suffice it to say that the RTC subsystem will set the system date/time
-on initialization from the RTC device if one is provided.  All I can
-suggest is to look at drivers/rtc and include/linux/rtc.h for the
-details.  The MAINTAINERS file should list who is responsible for RTC
-stuff as well as a mailing list for it.
+>> @@ -47,15 +43,15 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+>>   			   struct pcmcia_state *state)
+>>   {
+>>   	unsigned long levels = GPLR;
+>> -	long cs3reg = get_cs3_shadow();
+>> +	long cs3reg = simpad_get_cs3_shadow();
+>>
+>>   	state->detect=((levels&  GPIO_CF_CD)==0)?1:0;
+>>   	state->ready=(levels&  GPIO_CF_IRQ)?1:0;
+>>   	state->bvd1=1; /* Not available on Simpad. */
+>>   	state->bvd2=1; /* Not available on Simpad. */
+>>   	state->wrprot=0; /* Not available on Simpad. */
+>> -
+>> -	if((cs3reg&  0x0c) == 0x0c) {
+>> +
+>> +	if ((cs3reg&  0x0c) == 0x0c) {
+>
+> Are there no definitions for the 0x0c magic value?
+
+Unfortunately, this function has a bug as it currently accesses EN0|EN1, 
+but then this test is never true as EN1 is never being set in this 
+driver. Intended was the access to PCMCIA_VS1|PCMCIA_VS2, but then 
+get_cs3_shadow() was wrong and should now be simpad_get_cs3_ro().
+
+I'll fix this and hope someone can test this as I don't have a Simpad 
+with PCMCIA.
+
+Thanks,
+Jochen
