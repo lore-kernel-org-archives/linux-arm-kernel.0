@@ -1,104 +1,185 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 29 Apr 2011 18:09:44 +0530
-Subject: [PATCH v2 00/12] OMAP2+: Serial: Runtime adaptation + cleanup
-Message-ID: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+Date: Fri, 29 Apr 2011 18:09:45 +0530
+Subject: [PATCH v2 01/12] OMAP2+: UART: Remove certain uart calls from
+	sram_idle
+In-Reply-To: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1304080796-625-2-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Converting uart driver to adapt to pm runtime api's.
-Code re-org + cleanup.
-Moving some functionality from serial.c to omap-serial.c
+In preparation to UART runtime conversion. Remove certain uart specific calls
+from sram_idle path in pm24xx/34xx files.
+These func calls will no more be used with upcoming uart runtime design.
 
-Changes involves:
-================
-1.) Cleaning up certain uart calls from sram_idle func.
-2.) Removed all types of uart clock handling code from serial.c   
-3.) Using hwmod_mux api enable wakeup capability for uart pad during
-    hwmod_idle state i.e., when uart clocks are disabled we can enable
-    io-pad wakeup capability for uart if mux_data is available for 
-    given uart. Also during during resume from idle call to uart we need
-    to enable clocks back conditionally and this can be done only when io-pad
-    wakeup event bit is set for uart_rx pad. So we need a hwmod api
-    which can probe the uart pad and let us know whether a uart wakeup
-    happened. So omap_hmwod_pad_wakeup_status api is added to meet this 
-    requirement.
-3.) Adapted omap-serial driver to use runtime api's.
-4.) Modify serial_init calls to accept certain uart parameters from board file.
-5.) using resume_call to enable uart port back untill we have irq_chaining available.
+1.) Removing console lock holding :- Now can be handled with omap-serial file
+    itself.
+2.) omap_uart_can_sleep :- not needed driver can autosuspend based on usage_count
+    and autosuspend delay.
+3.) omap_uart_prepare_suspend :- omap-serial can be taken care with driver
+    suspend/resume hooks.
+4.) Also remove individual uart_prepare/resume calls.
 
-Patch series is based on Kevin's PM Tree / pm-core branch [2.6.39-rc4]
-Patch series hosted at https://gitorious.org/uart_runtime/pm
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/pm24xx.c             |   19 -------------------
+ arch/arm/mach-omap2/pm34xx.c             |   24 ------------------------
+ arch/arm/plat-omap/include/plat/serial.h |    6 ------
+ 3 files changed, 0 insertions(+), 49 deletions(-)
 
-Testing updates:
-----------------
-3430SDP:
-retention, off_mode, system_wide suspend is tested.
-(earlyprintk & no_console_suspend checked)
-
-OMAP3630 - Zoom3:
-pm-retention checked, off mode for per domain checked.
-[uart3/uart4 in per domain on omap3630].
-[ZOOM3 tested with uart3 as console uart and pm-ret checked]
-
-OMAP4430-SDP: Boot tested.
-OMAP2420/2430SDP: Boot tested.
--------------
-
-Deepak K (1):
-  OMAP: Serial: Allow UART parameters to be configured from board file
-
-Govindraj.R (10):
-  OMAP2+: UART: Remove certain uart calls from sram_idle
-  OMAP2+: UART: Remove uart clock handling code from serial.c
-  OMAP2+: Serial: Add default mux for all uarts.
-  Serial: OMAP: Add runtime pm support for omap-serial driver
-  OMAP: Serial: Hold console lock for console usage.
-  Serial: OMAP2+: Move erratum handling from serial.c
-  OMAP3: Serial: Remove uart pads from 3430 board file.
-  OMAP2+: hwmod: Add api to enable io_ring wakeup.
-  OMAP: Serial: Use resume call from prcm to enable uart
-  OMAP2: Serial: Add no async wake flag.
-
-Jon Hunter (1):
-  Serial: OMAP2+: Make the RX_TIMEOUT for DMA configurable for each
-    UART
-
- arch/arm/mach-omap2/board-2430sdp.c           |    3 +-
- arch/arm/mach-omap2/board-3430sdp.c           |  101 +---
- arch/arm/mach-omap2/board-4430sdp.c           |   11 +-
- arch/arm/mach-omap2/board-am3517evm.c         |    3 +-
- arch/arm/mach-omap2/board-apollon.c           |    3 +-
- arch/arm/mach-omap2/board-cm-t35.c            |    3 +-
- arch/arm/mach-omap2/board-cm-t3517.c          |    3 +-
- arch/arm/mach-omap2/board-devkit8000.c        |    3 +-
- arch/arm/mach-omap2/board-generic.c           |    3 +-
- arch/arm/mach-omap2/board-h4.c                |    3 +-
- arch/arm/mach-omap2/board-igep0020.c          |    3 +-
- arch/arm/mach-omap2/board-igep0030.c          |    3 +-
- arch/arm/mach-omap2/board-ldp.c               |    3 +-
- arch/arm/mach-omap2/board-n8x0.c              |    9 +-
- arch/arm/mach-omap2/board-omap3beagle.c       |    3 +-
- arch/arm/mach-omap2/board-omap3evm.c          |    3 +-
- arch/arm/mach-omap2/board-omap3logic.c        |    3 +-
- arch/arm/mach-omap2/board-omap3pandora.c      |    3 +-
- arch/arm/mach-omap2/board-omap3stalker.c      |    3 +-
- arch/arm/mach-omap2/board-omap3touchbook.c    |    3 +-
- arch/arm/mach-omap2/board-omap4panda.c        |   11 +-
- arch/arm/mach-omap2/board-overo.c             |    3 +-
- arch/arm/mach-omap2/board-rm680.c             |    3 +-
- arch/arm/mach-omap2/board-rx51.c              |    3 +-
- arch/arm/mach-omap2/board-ti8168evm.c         |    2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c  |    3 +-
- arch/arm/mach-omap2/mux.c                     |   23 +
- arch/arm/mach-omap2/mux.h                     |   13 +
- arch/arm/mach-omap2/omap_hwmod.c              |   47 ++
- arch/arm/mach-omap2/pm24xx.c                  |   19 +-
- arch/arm/mach-omap2/pm34xx.c                  |   26 +-
- arch/arm/mach-omap2/serial.c                  |  917 +++++++------------------
- arch/arm/plat-omap/include/plat/omap-serial.h |   38 +-
- arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +
- arch/arm/plat-omap/include/plat/serial.h      |   13 +-
- arch/arm/plat-omap/omap_device.c              |   34 +-
- drivers/tty/serial/omap-serial.c              |  319 ++++++++-
- 38 files changed, 747 insertions(+), 902 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index df3ded6..c405bda 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -132,27 +132,11 @@ static void omap2_enter_full_retention(void)
+ 	if (omap_irq_pending())
+ 		goto no_sleep;
+ 
+-	/* Block console output in case it is on one of the OMAP UARTs */
+-	if (!is_suspending())
+-		if (!console_trylock())
+-			goto no_sleep;
+-
+-	omap_uart_prepare_idle(0);
+-	omap_uart_prepare_idle(1);
+-	omap_uart_prepare_idle(2);
+-
+ 	/* Jump to SRAM suspend code */
+ 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
+ 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
+ 			   OMAP_SDRC_REGADDR(SDRC_POWER));
+ 
+-	omap_uart_resume_idle(2);
+-	omap_uart_resume_idle(1);
+-	omap_uart_resume_idle(0);
+-
+-	if (!is_suspending())
+-		console_unlock();
+-
+ no_sleep:
+ 	if (omap2_pm_debug) {
+ 		unsigned long long tmp;
+@@ -267,8 +251,6 @@ static int omap2_can_sleep(void)
+ {
+ 	if (omap2_fclks_active())
+ 		return 0;
+-	if (!omap_uart_can_sleep())
+-		return 0;
+ 	if (osc_ck->usecount > 1)
+ 		return 0;
+ 	if (omap_dma_running())
+@@ -319,7 +301,6 @@ static int omap2_pm_suspend(void)
+ 	mir1 = omap_readl(0x480fe0a4);
+ 	omap_writel(1 << 5, 0x480fe0ac);
+ 
+-	omap_uart_prepare_suspend();
+ 	omap2_enter_full_retention();
+ 
+ 	omap_writel(mir1, 0x480fe0a4);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 0c5e3a4..ce0ecdc 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -391,18 +391,9 @@ void omap_sram_idle(void)
+ 		omap3_enable_io_chain();
+ 	}
+ 
+-	/* Block console output in case it is on one of the OMAP UARTs */
+-	if (!is_suspending())
+-		if (per_next_state < PWRDM_POWER_ON ||
+-		    core_next_state < PWRDM_POWER_ON)
+-			if (!console_trylock())
+-				goto console_still_active;
+-
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+-		omap_uart_prepare_idle(2);
+-		omap_uart_prepare_idle(3);
+ 		omap2_gpio_prepare_for_idle(per_going_off);
+ 		if (per_next_state == PWRDM_POWER_OFF)
+ 				omap3_per_save_context();
+@@ -410,8 +401,6 @@ void omap_sram_idle(void)
+ 
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_POWER_ON) {
+-		omap_uart_prepare_idle(0);
+-		omap_uart_prepare_idle(1);
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+ 			omap3_core_save_context();
+ 			omap3_cm_save_context();
+@@ -458,8 +447,6 @@ void omap_sram_idle(void)
+ 			omap3_sram_restore_context();
+ 			omap2_sms_restore_context();
+ 		}
+-		omap_uart_resume_idle(0);
+-		omap_uart_resume_idle(1);
+ 		if (core_next_state == PWRDM_POWER_OFF)
+ 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+ 					       OMAP3430_GR_MOD,
+@@ -473,14 +460,8 @@ void omap_sram_idle(void)
+ 		omap2_gpio_resume_after_idle();
+ 		if (per_prev_state == PWRDM_POWER_OFF)
+ 			omap3_per_restore_context();
+-		omap_uart_resume_idle(2);
+-		omap_uart_resume_idle(3);
+ 	}
+ 
+-	if (!is_suspending())
+-		console_unlock();
+-
+-console_still_active:
+ 	/* Disable IO-PAD and IO-CHAIN wakeup */
+ 	if (omap3_has_io_wakeup() &&
+ 	    (per_next_state < PWRDM_POWER_ON ||
+@@ -499,8 +480,6 @@ int omap3_can_sleep(void)
+ {
+ 	if (!sleep_while_idle)
+ 		return 0;
+-	if (!omap_uart_can_sleep())
+-		return 0;
+ 	return 1;
+ }
+ 
+@@ -549,7 +528,6 @@ static int omap3_pm_suspend(void)
+ 			goto restore;
+ 	}
+ 
+-	omap_uart_prepare_suspend();
+ 	omap3_intc_suspend();
+ 
+ 	omap_sram_idle();
+@@ -596,14 +574,12 @@ static int omap3_pm_begin(suspend_state_t state)
+ {
+ 	disable_hlt();
+ 	suspend_state = state;
+-	omap_uart_enable_irqs(0);
+ 	return 0;
+ }
+ 
+ static void omap3_pm_end(void)
+ {
+ 	suspend_state = PM_SUSPEND_ON;
+-	omap_uart_enable_irqs(1);
+ 	enable_hlt();
+ 	return;
+ }
+diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+index 2723f91..ab1761a 100644
+--- a/arch/arm/plat-omap/include/plat/serial.h
++++ b/arch/arm/plat-omap/include/plat/serial.h
+@@ -106,12 +106,6 @@ struct omap_board_data;
+ 
+ extern void omap_serial_init(void);
+ extern void omap_serial_init_port(struct omap_board_data *bdata);
+-extern int omap_uart_can_sleep(void);
+-extern void omap_uart_check_wakeup(void);
+-extern void omap_uart_prepare_suspend(void);
+-extern void omap_uart_prepare_idle(int num);
+-extern void omap_uart_resume_idle(int num);
+-extern void omap_uart_enable_irqs(int enable);
+ #endif
+ 
+ #endif
+-- 
+1.7.1
