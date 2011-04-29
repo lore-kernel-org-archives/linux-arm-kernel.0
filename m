@@ -1,42 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 11:20:39 +0100
-Subject: [PATCH 04/10] clk: implement parent pass through functions
-In-Reply-To: <20110419175318.GB15233@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
-	<4DADC45C.1020202@codeaurora.org>
-	<20110419175318.GB15233@pengutronix.de>
-Message-ID: <20110429102039.GD5126@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 29 Apr 2011 12:22:25 +0200 (CEST)
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
+	sched_clock
+In-Reply-To: <20110429094606.GA5126@n2100.arm.linux.org.uk>
+References: <20110423205036.795894921@linutronix.de>
+	<20110429094606.GA5126@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1104291217120.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2011 at 07:53:18PM +0200, Sascha Hauer wrote:
-> That's the current behaviour (except that ERR_PTR(-ENOSYS) is returned
-> instead of NULL).
+On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 
-I think you're getting confused about clk being NULL.  Let's take a
-step backwards shall we?
+> On Sat, Apr 23, 2011 at 08:54:39PM -0000, Thomas Gleixner wrote:
+> > Most of ARM sched_clocks is using the timekeeping clocksource as the
+> > sched_clock. Only versatile uses a different clock for it, but there
+> > is no real reason why it can't use the clocksource as well.
+> 
+> sched_clock really needs to be setup earlier than clocksources are setup,
+> before sched_init() is called in init/main.c.  This is where the scheduler
+> reads the initial value of sched_clock() to start its time measurements.
+> This is well before clocksources are initialized, or even the irq subsystem.
+> 
+> So I don't believe bolting it directly into the clocksource code in this
+> way is correct.  As things are currently setup with my sched_clock()
+> implementation, we can (and in any cases do) get the sched_clock() up
+> and running really early which is what's required.
 
-A NULL clk has no pointers to anything useful.  It gets treated by the
-clk_* functions as a no-op.  So, if clk_get_parent() returns NULL, then
-internally within the clk code, we know that it's going to be reated as
-a no-op clock.  If it's a no-op clock then there is no parent.
+Not really. There is no requirement to have a high resolution sched
+clock in the early boot process. The only requirement is that
+sched_clock is monotonic increasing nsecs. So the code utilizes
+jiffies up to the point where the clocksource is installed and then
+switches over keeping the clock monotonic. The scheduler does not care
+whether it gets coarse grained time information in the early boot
+stage and then fine grained information at some point later.
 
-The next point is - should clk_get_parent() return NULL?  It can do
-as that's a valid return from clk_get() which is not an error case.
-Any driver asking for the parent clock should treat it no different
-from a non-NULL value:
+The only drawback is that you don't get precise timestamps for tracing
+up to the point where the clock source is installed. But that's really
+not a big deal to worry about.
 
-/**
- * clk_get_parent - get the parent clock source for this clock
- * @clk: clock source
- *
- * Returns struct clk corresponding to parent clock source, or
- * valid IS_ERR() condition containing errno.
- */
-struct clk *clk_get_parent(struct clk *clk);
+Thanks,
 
-However, internally within the clk API we can make the assumption that
-a NULL return value means "no clk" because the clk internals is on the
-clock implementation side of the API dividing line and can deal with
-this knowledge.
+	tglx
