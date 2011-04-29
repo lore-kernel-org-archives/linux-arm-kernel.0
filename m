@@ -1,48 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 12:38:23 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104291302420.3005@ionos>
-References: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-	<20110429104951.GG5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291302420.3005@ionos>
-Message-ID: <20110429113823.GK5126@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 29 Apr 2011 21:47:21 +1000
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104291326.25634.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110428093039.GU17290@n2100.arm.linux.org.uk>
+	<1304024836.2513.198.camel@pasglop> <201104291326.25634.arnd@arndb.de>
+Message-ID: <1304077641.2513.242.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 01:11:25PM +0200, Thomas Gleixner wrote:
-> I tend to disagree. Yes, he created the minimal common level for a
-> struct clk and the ops around it. But does that change anything about
-> the status quo of duplicated functions walking the tree, duplicated
-> functions to validate and round clock rates? The whole approach will
-> keep the whole code mess in the SoCs the same as it is now and just
-> enforce a common data structure and a dozen wrapper "API" functions
-> around it.
+On Fri, 2011-04-29 at 13:26 +0200, Arnd Bergmann wrote:
+> On Thursday 28 April 2011, Benjamin Herrenschmidt wrote:
+> > > > 
+> > > > For PCI you can have the flag propagate from the PHB down, for busses
+> > > > without a bus type (platform) then whoever instanciate them (the
+> > > > platform code) can set that appropriately.
+> > > 
+> > > How can you do that when it changes mid-bus heirarchy?  I'm thinking
+> > > of the situation where the DRM stuff is on a child bus below the
+> > > root bus, and the root bus has DMA coherent devices on it but the DRM
+> > > stuff doesn't.
+> > 
+> > But that's not PCI right ? IE. with PCI, coherency is a property of the
+> > PHB... 
 > 
-> So omap will simply have their bloat in a struct omap_clk() and every
-> other SoC will do the same. The duplicated code, the locking mess
-> etc. will all remain in totally incompatible ways. So what's the win?
+> That is my understanding at least, but I'd like to have a confirmation
+> from the DRM folks.
+> 
+> I believe that the PC graphics cards that have noncoherent DMA mappings
+> are all of the unified memory (integrated into the northbridge) kind,
+> so they are not on the same host bridge as all regular PCI devices,
+> even if they appear as a PCI device.
 
-I disagree.  With a 'divider+mux' clk, OMAP can move those clocks
-over.  With a 'pll' clk, OMAP can move the PLL stuff over.  With a
-simple enable/disable clk, OMAP can move those over.  That's a
-significant portion of the OMAP clk mess converted over to smaller,
-much more well defined, self contained clk structures.
+Hrm... beware with x86 , they love playing tricks :-) Since too many
+BIOSes don't understand PCI domains, they make devices on separate
+bridges look like sibling on the same segment and that sort of thing.
 
-I don't see any reason with this why OMAP - or anyone else - should
-have their own platform_clk structure if we have the necessary building
-blocks, and provided there is sufficient review to ensure that those
-building blocks which are found to be lacking get fixed along the way.
-
-As for the locking mess, that's what happens when you try to generalize
-stuff and end up with a finer locking scheme.  The more locks you have,
-the more complex the locking rules become, and the more problems you
-encounter with potential deadlocks.  And it seems that lockdep also
-starts to struggle too (as it operates on classes of locks not actual
-locks.)
+Cheers,
+Ben.
