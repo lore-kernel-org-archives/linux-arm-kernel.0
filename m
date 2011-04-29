@@ -1,65 +1,34 @@
-From: j.glisse@gmail.com (Jerome Glisse)
-Date: Fri, 29 Apr 2011 09:34:05 -0400
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 29 Apr 2011 15:42:31 +0200
 Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <4DBAA9B4.3070306@vmware.com>
+In-Reply-To: <BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
 References: <201104212129.17013.arnd@arndb.de>
-	<20110428093039.GU17290@n2100.arm.linux.org.uk>
-	<1304024836.2513.198.camel@pasglop>
-	<201104291326.25634.arnd@arndb.de> <4DBAA9B4.3070306@vmware.com>
-Message-ID: <BANLkTinNMxpAcjpBR7r1f1RA31kww=v6Fw@mail.gmail.com>
+	<201104281428.56780.arnd@arndb.de>
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+	<201104281629.52863.arnd@arndb.de>
+	<20110428143440.GP17290@n2100.arm.linux.org.uk>
+	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
+Message-ID: <20110429134231.GI13402@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 8:06 AM, Thomas Hellstrom <thellstrom@vmware.com> wrote:
-> On 04/29/2011 01:26 PM, Arnd Bergmann wrote:
->>
->> On Thursday 28 April 2011, Benjamin Herrenschmidt wrote:
->>
->>>>>
->>>>> For PCI you can have the flag propagate from the PHB down, for busses
->>>>> without a bus type (platform) then whoever instanciate them (the
->>>>> platform code) can set that appropriately.
->>>>>
->>>>
->>>> How can you do that when it changes mid-bus heirarchy? ?I'm thinking
->>>> of the situation where the DRM stuff is on a child bus below the
->>>> root bus, and the root bus has DMA coherent devices on it but the DRM
->>>> stuff doesn't.
->>>>
->>>
->>> But that's not PCI right ? IE. with PCI, coherency is a property of the
->>> PHB...
->>>
->>
->> That is my understanding at least, but I'd like to have a confirmation
->> from the DRM folks.
->>
->> I believe that the PC graphics cards that have noncoherent DMA mappings
->> are all of the unified memory (integrated into the northbridge) kind,
->> so they are not on the same host bridge as all regular PCI devices,
->> even if they appear as a PCI device.
->>
->
-> I think Jerome has mentioned at one point that the Radeon graphics cards
-> support
-> non-coherent mappings.
->
-> Fwiw, the PowerVR SGX MMU also supports this mode of operation, although it
-> being functional I guess depends on the system implementation.
->
-> /Thomas
->
+On Thu, Apr 28, 2011 at 03:37:00PM -0400, Jerome Glisse wrote:
+> As Jesse pointed out already, for performance reasons it's lot better
+> if you let the driver decide even if you have an iommu capable of
+> handling coherency for you. My understanding is that each time
+> coherency is asked for it trigger bus activities of some kind (i think
+> snoop is the term used for pci) this traffic can slow down both the
+> cpu and the device. For graphic driver we have a lot of write once and
+> use (once or more) buffer and it makes a lot of sense to have those
+> buffer allocated using uncached memory so we can tell the device (in
+> case of drm driver) that there is no need to trigger snoop activities
+> for coherency. So i believe the decision should ultimately be in the
+> driver side.
 
-Radeon memory controller can do non snooped pci transaction, as far as
-i have tested most of the x86 pci bridge don't try to be coherent then
-ie they don't analyze pci dma and ask for cpu flush they just perform
-the request (and i guess it's what all bridge will do), so it endup
-being noncoherent. I haven't done any benchmark of how faster it's for
-the GPU when it's not snooping but i guess it can give 50% boost as it
-likely drastictly reduce pci transaction overhead.
+Stupid question: Couldn't these write-once-read-often buffers just stay
+in the memory of the GPU instead of refetching them every time from main
+memory? Or is that necessary because of the limited space on some GPUs?
 
-I am talking here about device that you plug into any pci or pcie
-slot, so it's not igp integrated into northbridge or into the cpu.
+Regards,
 
-Cheers,
-Jerome
+	Joerg
