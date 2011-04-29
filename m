@@ -1,72 +1,79 @@
-From: johnstul@us.ibm.com (john stultz)
-Date: Fri, 29 Apr 2011 10:57:29 -0700
-Subject: Architecture specific implementations for tickless kernel and
-	deferrable timers
-In-Reply-To: <alpine.LFD.2.02.1104291902370.3005@ionos>
-References: <20110426203756.GD17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
-	<alpine.LFD.2.02.1104271015000.3323@ionos>
-	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
-	<20110428133826.GM17290@n2100.arm.linux.org.uk>
-	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
-	<20110428142822.GN17290@n2100.arm.linux.org.uk>
-	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
-	<20110428182420.GF17290@n2100.arm.linux.org.uk>
-	<BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
-	<20110429143435.GU5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291902370.3005@ionos>
-Message-ID: <1304099849.30215.10.camel@work-vm>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 29 Apr 2011 13:04:13 -0500
+Subject: [PATCH v3 00/23] Create common framework for AT91 device
+	initialisation
+In-Reply-To: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+References: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B027084269764D274304B@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-29 at 19:05 +0200, Thomas Gleixner wrote:
-> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+On Thursday, April 28, 2011 7:59 PM, Ryan Mallon wrote:
+>
+> Each AT91 variant (AT91RM9200, AT91SAM9260, etc) currently has its own
+> devices file, which includes the MMIO address, interrupt
+> configuration, GPIO setup, etc for each device. This results in a large
+> amount of duplicated code.
+>
+> This patch set introduces a framework for adding shared devices for the
+> AT91 platform and replaces the multiple device setup implementations for
+> each device with single implementations in the new framework. This has
+> a net reduction of nearly 5000 lines of code.
+>
+> Each of the arch/arm/mach-at91/*_devices.c files becomes a collection of
+> structures (with some initialisation callbacks where necessary) with a
+> table of devices which are present on the particular AT91 variant. All
+> structures/functions are marked as __init/__initdata so there is little
+> additional memory overhead. This also means that the #ifdefs around each
+> device can be removed from the *_devices.c files (but remain in the new
+> common devices.c file) without overhead.
+>
+> This patch series does not introduce any functional changes to how the
+> board files add devices, it only replaces the duplicate device 
+> initialisation code with common versions. The patch series attempts to
+> have minimum change by rewriting as little as possible of the actual
+> device initialisation functions.
+>
+> This is also a step towards allowing more than one AT91 variant to be
+> built into a single kernel by removing duplicate function names across
+> the *_devices.c files.
 > 
-> > On Fri, Apr 29, 2011 at 07:56:56PM +0530, Vikram Narayanan wrote:
-> > > Can you also give some idea on how the system's RTC is hooked up with
-> > > the generic timekeeping code.
-> > > Is it hooked up in someway so that the walltime is calculated wrt the
-> > > initial value of the RTC?
-> > 
-> > I'd like to pass you over to the RTC folk, but I don't think they're
-> > very active anymore.
-> > 
-> > Suffice it to say that the RTC subsystem will set the system date/time
-> > on initialization from the RTC device if one is provided.  All I can
-> > suggest is to look at drivers/rtc and include/linux/rtc.h for the
-> > details.  The MAINTAINERS file should list who is responsible for RTC
-> > stuff as well as a mailing list for it.
-> 
-> read_persistant_clock() is used for boottime / resume time readouts of
-> a direct accessible RTC.
+> I have build tested the patch series for all of the  AT91 variants 
+> and devices, and have boot tested it on the AT91SAM9G20 (Snapper 9G20
+> board) and tested basic device functionality.
 
-Right. read_persistent_clock has the benefit of being able to be read
-with irqs off, which really is useful in reducing error in the
-suspend/resume code. This makes it the preferred interface for
-timekeeping.
+Ryan,
 
+This patch series does not apply to linux-next.
 
-> If the RTC sits behind a slow bus which is not accessible in early
-> boot, then the RTC framework will take care of updating the time once
-> the RTC becomes available.
+It appears Jean-Christophe PLAGNIOL-VILLARD has recently committed a number
+of patches to that branch.
 
-Right. I sent out a patch "Add timekeeping_inject_sleeptime" that
-corrects the irqs-required RTC paths on suspend and resume, which Thomas
-just pulled into -tip for 2.6.40. It should improve things on the
-non-read_persistent_clock/irq-required RTC side of things.
+    at91: move clock subsystem init to soc generic init
+    at91: move register clocks to soc generic init
+    at91: move st timer to drivers/clocksource
+    at91: move pit timer to drivers/clocksource
+    at91: switch st timer to early platform devices
+    at91: switch pit timer to early platform devices
+    at91: move gpio to drivers/gpio
+    at91: switch gpio to early platfrom device
+    at91: switch to CLKDEV_LOOKUP
+    at91: use structure to store the current soc
+    at91: merge board usb-a9260 and usb-a9263 together
+    at91: factorize at91 interrupts init to soc
+    at91: introduce commom AT91_BASE_SYS
+    at91rm9200: introduce at91rm9200_set_type to specficy cpu package
+    at91: 9260 and 9g20 add support of join SRAM Memory Mapping
+    at91/board-eco920: remove at91_beeper ressource as no driver at91_beeper exist
+    atmel_serial: keep the platform_device unchanged
+    at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
+    at91: Add ARCH_ID and basic cpu macros definition for 5series chips family.
 
-With 2.6.39 and earlier, the RTC code basically just calls
-settimeofday() fairly late in the resume step, which makes a window for
-resume timestamps to show the suspend time, as well as not properly
-allowing us to account for the amount of time the system was sleeping
-(which mucks up the boot time).
+There are also these three ahead of Linus' linux-2.6 tree:
 
-Of course, another issue with the RTC interface is that it
-isbottlenecked at second granularity, which also hurts suspend/resume
-time accuracy. Where as read_persistent_clock() allows for finer grained
-resolution (if possible).
+    arm: at91: fix compiler warning for eb01 board build
+    ARM: at91: AT91CAP9 has a macb device
+    treewide: remove extra semicolons
 
-Let me know if you have any more questions I can try to answer.
-
-thanks
--john
+Regards,
+Hartley
