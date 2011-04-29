@@ -1,50 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 14:53:34 +0100
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <alpine.LFD.2.00.1104290909310.24613@xanadu.home>
-References: <20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-	<20110427142306.GI3755@atomide.com>
-	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-	<20110427144335.GK3755@atomide.com>
-	<20110429102623.GX3755@atomide.com>
-	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
-Message-ID: <20110429135334.GR5126@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 29 Apr 2011 16:00:40 +0200
+Subject: [PATCH 5/5] OMAP3: cpuidle: change the power domains modes
+	determination logic
+In-Reply-To: <4DBAA12D.6070203@ti.com>
+References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
+	<1304069186-3086-6-git-send-email-j-pihet@ti.com>
+	<4DBAA12D.6070203@ti.com>
+Message-ID: <BANLkTinEwUukmE2LP6F3q_8KDBHvdRqkVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 09:16:39AM -0400, Nicolas Pitre wrote:
-> On Fri, 29 Apr 2011, Tony Lindgren wrote:
-> 
-> > If the compressed image is smaller than BSS, then we end up
-> > having DT data in the BSS area. In this case the compressed
-> > image is about 2.3 MB for LZMA.
-> > 
-> > The uncompress code does not know about the kernel BSS,
-> > and does not necessarily relocate anything depending on the
-> > compressed image load address.
-> > 
-> > So in which code do we want to relocate the DT data?
-> > 
-> > We could do it based on estimated BSS size in uncompress code,
-> > or based on the real BSS size in __mmap_switched before BSS
-> > gets reset.
-> 
-> Estimations for that kind of thing is always bound to create problems 
-> some day.
-> 
-> The DT data should probably be moved out of the way from 
-> arch/arm/kernel/head.S before the .bss is cleared, and even before 
-> enabling the MMU, like in __vet_atags.
+Hi Santosh,
 
-Err, no.  Moving stuff around becomes quite expensive when the cache is
-not on.  It's far better to work out where to place it first time around
-so its not in the way.
+On Fri, Apr 29, 2011 at 1:29 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On 4/29/2011 2:56 PM, jean.pihet at newoldbits.com wrote:
+>>
+>> From: Jean Pihet<j-pihet@ti.com>
+>>
+>> The achievable power modes of the power domains in cpuidle
+>> depends on the system wide 'enable_off_mode' knob in debugfs.
+>> Upon changing enable_off_mode, do not change the C-states
+>> 'valid' field but instead dynamically restrict the power modes
+>> when entering idle.
+>>
+>> The C-states 'valid' field is just used to enable/disable some
+>> C-states at init and shall not be changed later on.
+>>
+>> Signed-off-by: Jean Pihet<j-pihet@ti.com>
+...
 
-Remember that there is a section of the community which cares deeply about
-boot time and has already put quite some resources into sorting that out.
-CELF springs to mind.
+> Since you have started clean-up, we should get rid of the
+> "enable_off_mode" some how. I got that done for OMAP4 using
+> prepare() hook and IGNORE flag as per Kevin's suggestion
+> but unfortunately its seems to getting removed from
+> core cpuidle code.
+
+The idea is to remove the enable_off_mode knob from debugfs and
+instead have the devices constraints API control the power domains
+behavior.
+Cf. PATCH 0/5 of this series for some remarks about further clean-up work.
+
+Thanks!
+Jean
+
+>
+> Regards
+> Santosh
+>
