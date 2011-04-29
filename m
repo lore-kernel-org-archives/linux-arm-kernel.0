@@ -1,76 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 29 Apr 2011 13:25:03 -0500
-Subject: [PATCH 00/10] ARM: SMP initialization consolidation
-In-Reply-To: <1303940515-8807-1-git-send-email-robherring2@gmail.com>
-References: <1303940515-8807-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4DBB027F.2010405@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Apr 2011 20:29:50 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110429093209.1926c732@jbarnes-desktop>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110429075958.GV17290@n2100.arm.linux.org.uk>
+	<20110429093209.1926c732@jbarnes-desktop>
+Message-ID: <201104292029.50680.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2011 04:41 PM, Rob Herring wrote:
-> From: Rob Herring<rob.herring@calxeda.com>
->
-> In order to avoid duplicating the same platform code yet again for a new
-> platform, this series consolidates platforms using similar SMP startup code to
-> a common implementation. A new kconfig entry SMP_COMMON_PEN is added for
-> platforms using the common pen functions.
->
-> OMAP uses a h/w mechansism for its pen, but it seems like it could use the same
-> mechansism.
->
-> Rob
-> Rob Herring (10):
->    ARM: move Versatile SMP pen code to common location
->    ARM: ux500: convert to use common secondary pen code
->    ARM: msm: use common secondary pen code
->    ARM: add common scu_init_cpus
->    ARM: omap: use common scu_init_cpus
->    ARM: realview: use common scu_init_cpus
->    ARM: vexpress: use common scu_init_cpus
->    ARM: ux500: use common scu_init_cpus
->    ARM: shmobile: use common scu_init_cpus
->    ARM: move set_cpu_present calls to common smp code
->
->   arch/arm/Kconfig                             |    8 ++
->   arch/arm/include/asm/smp.h                   |    4 +
->   arch/arm/include/asm/smp_scu.h               |    1 +
->   arch/arm/kernel/Makefile                     |    3 +-
->   arch/arm/kernel/headsmp.S                    |   40 ++++++++++
->   arch/arm/kernel/smp.c                        |    4 +
->   arch/arm/kernel/smp_pen.c                    |  104 +++++++++++++++++++++++++
->   arch/arm/kernel/smp_scu.c                    |   19 +++++
->   arch/arm/mach-msm/Makefile                   |    2 +-
->   arch/arm/mach-msm/headsmp.S                  |   40 ----------
->   arch/arm/mach-msm/platsmp.c                  |   84 +-------------------
->   arch/arm/mach-omap2/omap-smp.c               |   25 +------
->   arch/arm/mach-realview/include/mach/smp.h    |    3 +
->   arch/arm/mach-realview/platsmp.c             |   30 +-------
->   arch/arm/mach-shmobile/include/mach/common.h |    2 +-
->   arch/arm/mach-shmobile/platsmp.c             |   20 +-----
->   arch/arm/mach-shmobile/smp-sh73a0.c          |    6 +-
->   arch/arm/mach-ux500/Kconfig                  |    1 +
->   arch/arm/mach-ux500/Makefile                 |    2 +-
->   arch/arm/mach-ux500/headsmp.S                |   37 ---------
->   arch/arm/mach-ux500/include/mach/smp.h       |    4 +-
->   arch/arm/mach-ux500/platsmp.c                |  105 +-------------------------
->   arch/arm/mach-vexpress/ct-ca9x4.c            |    9 +--
->   arch/arm/mach-vexpress/include/mach/smp.h    |    3 +
->   arch/arm/mach-vexpress/platsmp.c             |    9 +--
->   arch/arm/plat-versatile/Makefile             |    1 -
->   arch/arm/plat-versatile/headsmp.S            |   40 ----------
->   arch/arm/plat-versatile/platsmp.c            |  104 -------------------------
->   28 files changed, 210 insertions(+), 500 deletions(-)
->   create mode 100644 arch/arm/kernel/headsmp.S
->   create mode 100644 arch/arm/kernel/smp_pen.c
->   delete mode 100644 arch/arm/mach-msm/headsmp.S
->   delete mode 100644 arch/arm/mach-ux500/headsmp.S
->   delete mode 100644 arch/arm/plat-versatile/headsmp.S
->   delete mode 100644 arch/arm/plat-versatile/platsmp.c
->
+On Friday 29 April 2011 18:32:09 Jesse Barnes wrote:
+> On Fri, 29 Apr 2011 08:59:58 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Fri, Apr 29, 2011 at 07:50:12AM +0200, Thomas Hellstrom wrote:
+> > > However, we should be able to construct a completely generic api around  
+> > > these operations, and for architectures that don't support them we need  
+> > > to determine
+> > >
+> > > a)  Whether we want to support them anyway (IIRC the problem with PPC is  
+> > > that the linear kernel map has huge tlb entries that are very  
+> > > inefficient to break up?)
+> > 
+> > That same issue applies to ARM too - you'd need to stop the entire
+> > machine, rewrite all processes page tables, flush tlbs, and only
+> > then restart.  Otherwise there's the possibility of ending up with
+> > conflicting types of TLB entries, and I'm not sure what the effect
+> > of having two matching TLB entries for the same address would be.
+> 
+> Right, I don't think anyone wants to see this sort of thing happen with
+> any frequency.  So either a large, uncached region can be set up a boot
+> time for allocations, or infrequent, large requests and conversions can
+> be made on demand, with memory being freed back to the main, coherent
+> pool under pressure.
 
-Comments?
+I'd like to first have an official confirmation from the CPU designers
+if there is actually a problem with mapping a single page both cacheable
+and noncacheable. Based on what Catalin said, it's probably allowed and
+the current spec is just being more paranoid than it needs to be. Also,
+KyongHo Cho said that it might only be relevant for pages that are mapped
+executable.
 
-I only have a Versatile Express to test on, so any Tested-by's would be 
-appreciated.
+If that is the case, we can probably work around this by turning the entire
+linear mapping (except for the kernel binary) into nonexecutable mode,
+if we don't do that already.
+This is desirable for security purposes anyway.
 
-Rob
+	Arnd
