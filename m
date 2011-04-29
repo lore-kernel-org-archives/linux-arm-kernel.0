@@ -1,139 +1,146 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 29 Apr 2011 18:09:53 +0530
-Subject: [PATCH v2 09/12] OMAP3: Serial: Remove uart pads from 3430 board file.
+Date: Fri, 29 Apr 2011 18:09:54 +0530
+Subject: [PATCH v2 10/12] OMAP2+: hwmod: Add api to enable io_ring wakeup.
 In-Reply-To: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
 References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1304080796-625-10-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1304080796-625-11-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pad values here are same as the default pad values updated in serial.c file.
-Avoid structure duplication and use default pads.
+Add api to enable io_pad wakeup based on mux dynamic pad and
+wake_up enable flag initialized during hwmod_mux.
+
+Use the wakeup flag and pad_remux flag and enable wakeup capability
+for the pad having these flags enabled.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/board-3430sdp.c |  100 +----------------------------------
- 1 files changed, 1 insertions(+), 99 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c              |   34 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/serial.c                  |    6 ++++
+ arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
+ arch/arm/plat-omap/omap_device.c              |   26 +++++++++++++++++++
+ 5 files changed, 68 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 7912174..7dab960 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -651,106 +651,8 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
- static struct omap_board_mux board_mux[] __initdata = {
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
--
--static struct omap_device_pad serial1_pads[] __initdata = {
--	/*
--	 * Note that off output enable is an active low
--	 * signal. So setting this means pin is a
--	 * input enabled in off mode
--	 */
--	OMAP_MUX_STATIC("uart1_cts.uart1_cts",
--			 OMAP_PIN_INPUT |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart1_rts.uart1_rts",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart1_rx.uart1_rx",
--			 OMAP_PIN_INPUT |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart1_tx.uart1_tx",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--};
--
--static struct omap_device_pad serial2_pads[] __initdata = {
--	OMAP_MUX_STATIC("uart2_cts.uart2_cts",
--			 OMAP_PIN_INPUT_PULLUP |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart2_rts.uart2_rts",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart2_rx.uart2_rx",
--			 OMAP_PIN_INPUT |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart2_tx.uart2_tx",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--};
--
--static struct omap_device_pad serial3_pads[] __initdata = {
--	OMAP_MUX_STATIC("uart3_cts_rctx.uart3_cts_rctx",
--			 OMAP_PIN_INPUT_PULLDOWN |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart3_rts_sd.uart3_rts_sd",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart3_rx_irrx.uart3_rx_irrx",
--			 OMAP_PIN_INPUT |
--			 OMAP_PIN_OFF_INPUT_PULLDOWN |
--			 OMAP_OFFOUT_EN |
--			 OMAP_MUX_MODE0),
--	OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
--			 OMAP_PIN_OUTPUT |
--			 OMAP_OFF_EN |
--			 OMAP_MUX_MODE0),
--};
--
--static struct omap_board_data serial1_data = {
--	.id		= 0,
--	.pads		= serial1_pads,
--	.pads_cnt	= ARRAY_SIZE(serial1_pads),
--};
--
--static struct omap_board_data serial2_data = {
--	.id		= 1,
--	.pads		= serial2_pads,
--	.pads_cnt	= ARRAY_SIZE(serial2_pads),
--};
--
--static struct omap_board_data serial3_data = {
--	.id		= 2,
--	.pads		= serial3_pads,
--	.pads_cnt	= ARRAY_SIZE(serial3_pads),
--};
--
--static inline void board_serial_init(void)
--{
--	omap_serial_init_port(&serial1_data, NULL);
--	omap_serial_init_port(&serial2_data, NULL);
--	omap_serial_init_port(&serial3_data, NULL);
--}
- #else
- #define board_mux	NULL
--
--static inline void board_serial_init(void)
--{
--	omap_serial_init(NULL);
--}
- #endif
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e034294..4a12336 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2369,3 +2369,37 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++/**
++ * omap_hwmod_enable_ioring_wakeup - Set wakeup bit for iopad ring.
++ * @oh: struct omap_hwmod *
++ * @enable: based on 0 or 1 set or unset wakeup bit.
++ *
++ * traverse through dynamic pads. If pad is enabled then
++ * set wakeup bit for the mux pin. Return error if pads are
++ * not enabled or not available.
++ */
++int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh, bool enable)
++{
++	struct omap_device_pad *pad;
++	int ret = -EINVAL, j;
++	int val = 0;
++
++	/* Enable pin mux to make pad wake-up capable */
++	if (enable)
++		val = OMAP_WAKEUP_EN;
++	else
++		val = ~OMAP_WAKEUP_EN;
++
++	if (oh->mux->enabled) {
++		for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
++			pad = oh->mux->pads_dynamic[j];
++			if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
++				pad->idle = pad->enable | val;
++				ret = 0;
++			}
++		}
++	}
++
++	return ret;
++}
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 84f3ad1..5b2bdf8 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -212,6 +212,12 @@ static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
+ 			v &= ~up->wk_mask;
+ 		__raw_writel(v, up->wk_en);
+ 	}
++
++	/* Enable or clear io-pad wakeup */
++	if (enable)
++		omap_device_enable_ioring_wakeup(pdev, true);
++	else
++		omap_device_enable_ioring_wakeup(pdev, false);
+ }
+ 
+ static void omap_uart_idle_init(struct omap_uart_port_info *uart,
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index e4c349f..ce8e3e8 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -117,6 +117,7 @@ int omap_device_enable_hwmods(struct omap_device *od);
+ int omap_device_disable_clocks(struct omap_device *od);
+ int omap_device_enable_clocks(struct omap_device *od);
+ 
++int omap_device_enable_ioring_wakeup(struct platform_device *pdev, bool enable);
  
  /*
-@@ -895,7 +797,7 @@ static void __init omap_3430sdp_init(void)
- 	spi_register_board_info(sdp3430_spi_board_info,
- 				ARRAY_SIZE(sdp3430_spi_board_info));
- 	ads7846_dev_init();
--	board_serial_init();
-+	omap_serial_init(NULL);
- 	usb_musb_init(&musb_board_data);
- 	board_smc91x_init();
- 	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
+  * Entries should be kept in latency order ascending
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 1adea9c..b7f8d1b 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -601,6 +601,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
+ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+ 
+ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
++int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh, bool enable);
+ 
+ /*
+  * Chip variant-specific hwmod init routines - XXX should be converted
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index f7c6dca..7df74ba 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -742,6 +742,32 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od)
+ 	return omap_hwmod_get_mpu_rt_va(od->hwmods[0]);
+ }
+ 
++/**
++ * omap_device_enable_ioring_wakeup - Set wakeup bit for iopad ring.
++ * @pdev: platform_device for which wakeup needs to be set.
++ * @enable: based on 0 or 1 set or unset wakeup bit.
++ *
++ * Caller should ensure this is called if device_may_wakeup(dev) is true
++ * traverse through each hwmod and check each available pads
++ * if pad is enabled then set wakeup bit for the mux pin.
++ * Return error if pads are not enabled or not available.
++ * If pad is not enabled for the given device then return NULL.
++ */
++int omap_device_enable_ioring_wakeup(struct platform_device *pdev, bool enable)
++{
++	int ret = -EINVAL, i;
++	struct omap_device *od;
++	struct omap_hwmod *oh;
++
++	od = _find_by_pdev(pdev);
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		oh = od->hwmods[i];
++		ret = omap_hwmod_enable_ioring_wakeup(oh, enable);
++	}
++
++	return ret;
++}
++
+ /*
+  * Public functions intended for use in omap_device_pm_latency
+  * .activate_func and .deactivate_func function pointers
 -- 
 1.7.1
