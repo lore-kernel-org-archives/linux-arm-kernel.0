@@ -1,73 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 29 Apr 2011 11:16:15 +0200
-Subject: [PATCH v2 5/5] driver core: let dev_set_drvdata return int
-	instead of void as it can fail
-In-Reply-To: <20110429081257.GW17290@n2100.arm.linux.org.uk>
-References: <20110420074248.GS31131@pengutronix.de>
-	<1303285486-28598-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1303285486-28598-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110429081257.GW17290@n2100.arm.linux.org.uk>
-Message-ID: <20110429091615.GR31131@pengutronix.de>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Fri, 29 Apr 2011 11:26:21 +0200
+Subject: [PATCH 0/5] OMAP: cpuidle code clean-up
+Message-ID: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Jean Pihet <j-pihet@ti.com>
 
-On Fri, Apr 29, 2011 at 09:12:57AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 20, 2011 at 09:44:46AM +0200, Uwe Kleine-K?nig wrote:
-> > Before commit
-> > 
-> > 	b402843 (Driver core: move dev_get/set_drvdata to drivers/base/dd.c)
-> > 
-> > calling dev_set_drvdata with dev=NULL was an unchecked error. After some
-> > discussion about what to return in this case removing the check (and so
-> > producing a null pointer exception) seems fine.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  drivers/base/dd.c      |    7 +++----
-> >  include/linux/device.h |    2 +-
-> >  2 files changed, 4 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> > index da57ee9..f9d69d7 100644
-> > --- a/drivers/base/dd.c
-> > +++ b/drivers/base/dd.c
-> > @@ -408,17 +408,16 @@ void *dev_get_drvdata(const struct device *dev)
-> >  }
-> >  EXPORT_SYMBOL(dev_get_drvdata);
-> >  
-> > -void dev_set_drvdata(struct device *dev, void *data)
-> > +int dev_set_drvdata(struct device *dev, void *data)
-> >  {
-> >  	int error;
-> >  
-> > -	if (!dev)
-> > -		return;
-> >  	if (!dev->p) {
-> >  		error = device_private_init(dev);
-> >  		if (error)
-> > -			return;
-> > +			return error;
-> >  	}
-> >  	dev->p->driver_data = data;
-> > +	return 0;
-> 
-> Who is going to modify all the thousands of drivers we have in the kernel
-> tree to check this return value?
-> 
-> If the answer is no one, its pointless returning an error value in the
-> first place (which I think is what the original author already thought
-> about.)
-In the meantime I learned that dev->p is valid when the device is
-registered. As calling dev_set_drvdata on an unregisted device is not
-allowed maybe issuing a warning instead would be OK for me, too.
+Rework the cpuidle code:
+- optimize the cpuidle C-states data registration and storage,
+- change the interaction with the debugfs 'enable_off_mode' knob
+ and the use of the C-states 'valid' internal field,
+- remove dead code,
+- improve code readability.
 
-Thoughts?
+Tested on Beagleboard B5 with cpuidle in RET and OFF modes.
 
-Best regards
-Uwe
+Another 161 lines of OMAP code gone ;p
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Notes:
+1) the debugfs 'enable_off_mode' knob will be deprecated by the use
+ of the devices constraints framework to restrict the power domains
+ power modes.
+2) the MPU and CORE power domains low power modes are controlled
+ by cpuidle, based on the allowed overall sleep+wake-up latencies
+ and the wake-up latency constraints on the MPU. This is incorrect.
+ The devices constraints framework shall be used instead to control
+ all power domains.
+
+ToDo:
+- integrate cpuidle with the devices constraints framework, when merged in,
+- refine the latency figures and express them in term of available data
+ from other frameworks (OMAP PM, constaints framework, omap_devices,
+ new VC/VP voltage and DVFS code ...),
+
+Jean Pihet (5):
+  OMAP3 cpuidle: remove useless SDP specific timings
+  OMAP3: clean-up mach specific cpuidle data structures
+  OMAP3: cpuidle: re-organize the C-states data
+  OMAP3: cpuidle: code rework for improved readability
+  OMAP3: cpuidle: change the power domains modes determination logic
+
+ arch/arm/mach-omap2/board-3430sdp.c |   19 --
+ arch/arm/mach-omap2/board-rx51.c    |   15 +-
+ arch/arm/mach-omap2/cpuidle34xx.c   |  424 ++++++++++++-----------------------
+ arch/arm/mach-omap2/pm.h            |   17 +-
+ arch/arm/mach-omap2/pm34xx.c        |   12 -
+ 5 files changed, 163 insertions(+), 324 deletions(-)
