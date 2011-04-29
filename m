@@ -1,68 +1,65 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Apr 2011 14:13:06 +0200 (CEST)
+Date: Fri, 29 Apr 2011 14:19:25 +0200 (CEST)
 Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <20110429110610.GJ5126@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+In-Reply-To: <20110429113823.GK5126@n2100.arm.linux.org.uk>
+References: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<alpine.LFD.2.02.1104201704350.3323@ionos>
 	<20110420185922.GD31131@pengutronix.de>
 	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421072259.GG31131@pengutronix.de>
-	<alpine.LFD.2.02.1104211045220.3323@ionos>
-	<20110429103723.GF5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291252080.3005@ionos>
-	<20110429110610.GJ5126@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1104291344020.3005@ionos>
+	<20110421074214.GE15233@pengutronix.de>
+	<alpine.LFD.2.02.1104211113030.3323@ionos>
+	<20110421115050.GC16776@sirena.org.uk>
+	<alpine.LFD.2.02.1104211403130.3323@ionos>
+	<20110429104951.GG5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291302420.3005@ionos>
+	<20110429113823.GK5126@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1104291413550.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> On Fri, Apr 29, 2011 at 01:01:58PM +0200, Thomas Gleixner wrote:
-> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+> On Fri, Apr 29, 2011 at 01:11:25PM +0200, Thomas Gleixner wrote:
+> > I tend to disagree. Yes, he created the minimal common level for a
+> > struct clk and the ops around it. But does that change anything about
+> > the status quo of duplicated functions walking the tree, duplicated
+> > functions to validate and round clock rates? The whole approach will
+> > keep the whole code mess in the SoCs the same as it is now and just
+> > enforce a common data structure and a dozen wrapper "API" functions
+> > around it.
 > > 
-> > > On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
-> > > > On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
-> > > > > > Which is a complete failure to begin with. Why the heck do you need a
-> > > > > > callback to figure that out?
-> > > > > > 
-> > > > > > Because someone claimed, that you need a callback to make it safe from
-> > > > > > changing? Or what's the reason for this?
-> > > > > If there were a pointer tracking the parent you still needed to program
-> > > > > out the get_parent function anyhow to set the pointer initially. But I
-> > > > > agree that in other situations having a pointer is more comfortable and
-> > > > > saves ugly error handling e.g. in set_parent.
-> > > > 
-> > > > That's nonsense. Why do you want a get_parent() function at all?
-> > > > parent is set up when the clock is established in the clock tree. And
-> > > > that's not done by some random driver. That's a property of the clock.
-> > > 
-> > > It's *not* a fixed property of the clock.  It's a runtime property.
-> > 
-> > I know that stuff can change and needs to be changed runtime. But this
-> > has to be done at the framework level and not at some random place in
-> > some random clk->ops->fn() implementation.
+> > So omap will simply have their bloat in a struct omap_clk() and every
+> > other SoC will do the same. The duplicated code, the locking mess
+> > etc. will all remain in totally incompatible ways. So what's the win?
 > 
-> Look, how do you _not_ do it at the clk->ops->fn() level when you have
-> clocks which are pure muxes, and so are selected by a bitfield in a
-> register vs other clocks which are muxes _and_ dividers combined which
-> can't be separated.  Do you _really_ want to teach the core clock
-> framework about every type of platform quirk like that?
+> I disagree.  With a 'divider+mux' clk, OMAP can move those clocks
+> over.  With a 'pll' clk, OMAP can move the PLL stuff over.  With a
+> simple enable/disable clk, OMAP can move those over.  That's a
+> significant portion of the OMAP clk mess converted over to smaller,
+> much more well defined, self contained clk structures.
+> 
+> I don't see any reason with this why OMAP - or anyone else - should
+> have their own platform_clk structure if we have the necessary building
+> blocks, and provided there is sufficient review to ensure that those
+> building blocks which are found to be lacking get fixed along the way.
 
-Not at all. The core code should merily handle the tree structure
-correctly and some common other functions, nothing else. 
+Agreed. But that's an orthogonal problem to the proper handling of the
+tree walks, propagation of rates, enable, prepare etc. and common
+validation functions.
  
-> That's the direction you're heading for by demanding that the core clk
-> code does all this kind of crap.  Crap in the core clock code, rather
-> than a set of compartmentalized clock implementations for fixed rate
-> clocks, muxes, dividers, dividers with muxes, plls, etc.
+> As for the locking mess, that's what happens when you try to generalize
+> stuff and end up with a finer locking scheme.  The more locks you have,
+> the more complex the locking rules become, and the more problems you
+> encounter with potential deadlocks.  And it seems that lockdep also
+> starts to struggle too (as it operates on classes of locks not actual
+> locks.)
 
-You need that anyway. The core code does not want to know about those
-ugly details and there is no need to know it.
+The per clk locking is not going to work ever except you want to have
+the trylock dance if you need to propagate changes up the tree and
+down the tree. So yes, we need per tree locking and I can see the need
+for the mutex and the spinlock to protect the tree, but you really
+want to have the logic dealing with those locks and how they both
+protect the tree in common code and not in some random place.
 
-So lets look at an example:
+Thanks,
 
-[Root clock A]-
-      	      |
-      	      - [Selector] -- [Divisor] -- [ Gate ]
-              |
-[Root clock B]-
+	tglx
