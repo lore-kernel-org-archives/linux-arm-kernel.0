@@ -1,3821 +1,4080 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 29 Apr 2011 14:59:21 +1200
-Subject: [PATCH v3 12/23] at91: Make UART devices common
-In-Reply-To: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
-References: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1304045972-19319-13-git-send-email-ryan@bluewatersys.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 29 Apr 2011 15:06:43 +0200
+Subject: [PATCH 5/5] arm: plat-stmp: remove plat
+In-Reply-To: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
+References: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1304082403-8897-6-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual UART, including debug UART, code for each at91
-variiant with a single implementation in devices.c
+Now that both users of plat-stmp have been deleted in previous patches,
+delete the platform, too.
 
-The original code used the interrupt numbers for the UARTs as unique
-identifiers. Because the interrupt numbers differ between the AT91
-variants we introduce a new enum for the UART ids. The AT91_UARTx
-names are already used by the early UART code as the base address of
-the UART, so we cannot use those names. Instead we introduce
-AT91_UART_DBGU and AT91_UART_USx.
-
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-at91/at572d940hf_devices.c  |  267 +++--------------
- arch/arm/mach-at91/at91cap9_devices.c     |  285 ++++---------------
- arch/arm/mach-at91/at91rm9200_devices.c   |  358 +++++------------------
- arch/arm/mach-at91/at91sam9260_devices.c  |  449 ++++++-----------------------
- arch/arm/mach-at91/at91sam9261_devices.c  |  273 ++++--------------
- arch/arm/mach-at91/at91sam9263_devices.c  |  286 ++++---------------
- arch/arm/mach-at91/at91sam9g45_devices.c  |  348 +++++------------------
- arch/arm/mach-at91/at91sam9rl_devices.c   |  360 +++++------------------
- arch/arm/mach-at91/board-1arm.c           |    4 +-
- arch/arm/mach-at91/board-afeb-9260v1.c    |    4 +-
- arch/arm/mach-at91/board-at572d940hf_ek.c |    6 +-
- arch/arm/mach-at91/board-carmeva.c        |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c       |   12 +-
- arch/arm/mach-at91/board-cpuat91.c        |    8 +-
- arch/arm/mach-at91/board-eb9200.c         |    4 +-
- arch/arm/mach-at91/board-ecbat91.c        |    2 +-
- arch/arm/mach-at91/board-foxg20.c         |   12 +-
- arch/arm/mach-at91/board-gsia18s.c        |   10 +-
- arch/arm/mach-at91/board-kafa.c           |    2 +-
- arch/arm/mach-at91/board-kb9202.c         |    6 +-
- arch/arm/mach-at91/board-neocore926.c     |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c   |    6 +-
- arch/arm/mach-at91/board-picotux200.c     |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c      |    6 +-
- arch/arm/mach-at91/board-rm9200dk.c       |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c       |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c     |    4 +-
- arch/arm/mach-at91/board-sam9260ek.c      |    4 +-
- arch/arm/mach-at91/board-sam9263ek.c      |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c      |    4 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c   |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c       |    2 +-
- arch/arm/mach-at91/board-snapper9260.c    |    6 +-
- arch/arm/mach-at91/board-stamp9g20.c      |   12 +-
- arch/arm/mach-at91/board-yl-9200.c        |    6 +-
- arch/arm/mach-at91/devices.c              |  300 +++++++++++++++++++
- arch/arm/mach-at91/devices.h              |   17 ++
- arch/arm/mach-at91/include/mach/board.h   |   10 +
- 38 files changed, 919 insertions(+), 2168 deletions(-)
+ arch/arm/Kconfig                                  |   12 -
+ arch/arm/Makefile                                 |    1 -
+ arch/arm/plat-stmp3xxx/Kconfig                    |    7 -
+ arch/arm/plat-stmp3xxx/Makefile                   |    5 -
+ arch/arm/plat-stmp3xxx/clock.c                    | 1134 ---------------------
+ arch/arm/plat-stmp3xxx/clock.h                    |   61 --
+ arch/arm/plat-stmp3xxx/core.c                     |  128 ---
+ arch/arm/plat-stmp3xxx/devices.c                  |  389 -------
+ arch/arm/plat-stmp3xxx/dma.c                      |  464 ---------
+ arch/arm/plat-stmp3xxx/include/mach/clkdev.h      |   18 -
+ arch/arm/plat-stmp3xxx/include/mach/cputype.h     |   33 -
+ arch/arm/plat-stmp3xxx/include/mach/debug-macro.S |   39 -
+ arch/arm/plat-stmp3xxx/include/mach/dma.h         |  153 ---
+ arch/arm/plat-stmp3xxx/include/mach/gpio.h        |   28 -
+ arch/arm/plat-stmp3xxx/include/mach/gpmi.h        |   12 -
+ arch/arm/plat-stmp3xxx/include/mach/hardware.h    |   32 -
+ arch/arm/plat-stmp3xxx/include/mach/io.h          |   25 -
+ arch/arm/plat-stmp3xxx/include/mach/memory.h      |   22 -
+ arch/arm/plat-stmp3xxx/include/mach/mmc.h         |   14 -
+ arch/arm/plat-stmp3xxx/include/mach/pinmux.h      |  157 ---
+ arch/arm/plat-stmp3xxx/include/mach/pins.h        |   30 -
+ arch/arm/plat-stmp3xxx/include/mach/platform.h    |   68 --
+ arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h    |   54 -
+ arch/arm/plat-stmp3xxx/include/mach/system.h      |   49 -
+ arch/arm/plat-stmp3xxx/include/mach/timex.h       |   20 -
+ arch/arm/plat-stmp3xxx/include/mach/uncompress.h  |   53 -
+ arch/arm/plat-stmp3xxx/include/mach/vmalloc.h     |   12 -
+ arch/arm/plat-stmp3xxx/irq.c                      |   50 -
+ arch/arm/plat-stmp3xxx/pinmux.c                   |  550 ----------
+ arch/arm/plat-stmp3xxx/timer.c                    |  186 ----
+ 30 files changed, 0 insertions(+), 3806 deletions(-)
+ delete mode 100644 arch/arm/plat-stmp3xxx/Kconfig
+ delete mode 100644 arch/arm/plat-stmp3xxx/Makefile
+ delete mode 100644 arch/arm/plat-stmp3xxx/clock.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/clock.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/core.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/devices.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/dma.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/clkdev.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/cputype.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/dma.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/gpmi.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/hardware.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/io.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/memory.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/mmc.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pinmux.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/pins.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/platform.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/system.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/timex.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/irq.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/pinmux.c
+ delete mode 100644 arch/arm/plat-stmp3xxx/timer.c
 
-diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 9220201..9910fc8 100644
---- a/arch/arm/mach-at91/at572d940hf_devices.c
-+++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -195,238 +195,61 @@ static struct at91_dev_table_rtt device_rtt __initdata = {
-  *  UART
-  * -------------------------------------------------------------------- */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 377a7a5..c9f69e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -378,16 +378,6 @@ config ARCH_MXS
+ 	help
+ 	  Support for Freescale MXS-based family of processors
  
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
- 	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
+-config ARCH_STMP3XXX
+-	bool "Freescale STMP3xxx"
+-	select CPU_ARM926T
+-	select CLKDEV_LOOKUP
+-	select ARCH_REQUIRE_GPIOLIB
+-	select GENERIC_CLOCKEVENTS
+-	select USB_ARCH_HAS_EHCI
+-	help
+-	  Support for systems based on the Freescale 3xxx CPUs.
 -
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
--
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at572d940hf_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
--};
--
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PC31, 1);		/* DTXD */
--	at91_set_A_periph(AT91_PIN_PC30, 0);		/* DRXD */
--}
--
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT572D940HF_BASE_US0,
--		.end	= AT572D940HF_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT572D940HF_ID_US0,
--		.end	= AT572D940HF_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+	.tx_pin		= {AT91_PIN_PC31, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
+ config ARCH_NETX
+ 	bool "Hilscher NetX based"
+ 	select CPU_ARM926T
+@@ -1005,8 +995,6 @@ source "arch/arm/mach-exynos4/Kconfig"
  
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at572d940hf_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT572D940HF_BASE_US0,
-+	.irq		= AT572D940HF_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
-+	.tx_pin		= {AT91_PIN_PA8,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA7,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA10, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA9,  AT91_PIN_PERIPH_A, 0, 0, 0},
- };
+ source "arch/arm/mach-shmobile/Kconfig"
  
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA8, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PA7, 0);		/* RXD0 */
+-source "arch/arm/plat-stmp3xxx/Kconfig"
 -
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA10, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA9, 0);	/* CTS0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT572D940HF_BASE_US1,
--		.end	= AT572D940HF_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT572D940HF_ID_US1,
--		.end	= AT572D940HF_ID_US1,
--		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT572D940HF_BASE_US1,
-+	.irq		= AT572D940HF_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
-+	.tx_pin		= {AT91_PIN_PC10, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC9,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA12, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA11, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
+ source "arch/arm/mach-tegra/Kconfig"
  
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
+ source "arch/arm/mach-u300/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ca473b1..692c481 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -205,7 +205,6 @@ machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
+ plat-$(CONFIG_ARCH_MXC)		:= mxc
+ plat-$(CONFIG_ARCH_OMAP)	:= omap
+ plat-$(CONFIG_ARCH_S3C64XX)	:= samsung
+-plat-$(CONFIG_ARCH_STMP3XXX)	:= stmp3xxx
+ plat-$(CONFIG_ARCH_TCC_926)	:= tcc
+ plat-$(CONFIG_PLAT_IOP)		:= iop
+ plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
+diff --git a/arch/arm/plat-stmp3xxx/Kconfig b/arch/arm/plat-stmp3xxx/Kconfig
+deleted file mode 100644
+index e6e312b..0000000
+--- a/arch/arm/plat-stmp3xxx/Kconfig
++++ /dev/null
+@@ -1,7 +0,0 @@
+-if ARCH_STMP3XXX
 -
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
+-menu "Freescale STMP3xxx implementations"
 -
--static struct platform_device at572d940hf_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT572D940HF_BASE_US2,
-+	.irq		= AT572D940HF_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
-+	.tx_pin		= {AT91_PIN_PC15, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC14,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA17, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static inline void configure_usart1_pins(unsigned pins)
+-endmenu
+-
+-endif
+diff --git a/arch/arm/plat-stmp3xxx/Makefile b/arch/arm/plat-stmp3xxx/Makefile
+deleted file mode 100644
+index 31dd518..0000000
+--- a/arch/arm/plat-stmp3xxx/Makefile
++++ /dev/null
+@@ -1,5 +0,0 @@
+-#
+-# Makefile for the linux kernel.
+-#
+-# Object file lists.
+-obj-y += core.o timer.o irq.o dma.o clock.o pinmux.o devices.o
+diff --git a/arch/arm/plat-stmp3xxx/clock.c b/arch/arm/plat-stmp3xxx/clock.c
+deleted file mode 100644
+index 2e712e1..0000000
+--- a/arch/arm/plat-stmp3xxx/clock.c
++++ /dev/null
+@@ -1,1134 +0,0 @@
+-/*
+- * Clock manipulation routines for Freescale STMP37XX/STMP378X
+- *
+- * Author: Vitaly Wool <vital@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#define DEBUG
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/spinlock.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/clkdev.h>
+-
+-#include <asm/mach-types.h>
+-#include <mach/platform.h>
+-#include <mach/regs-clkctrl.h>
+-
+-#include "clock.h"
+-
+-static DEFINE_SPINLOCK(clocks_lock);
+-
+-static struct clk osc_24M;
+-static struct clk pll_clk;
+-static struct clk cpu_clk;
+-static struct clk hclk;
+-
+-static int propagate_rate(struct clk *);
+-
+-static inline int clk_is_busy(struct clk *clk)
 -{
--	at91_set_A_periph(AT91_PIN_PC10, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PC9 , 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PC12, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PC11, 0);	/* CTS1 */
+-	return __raw_readl(clk->busy_reg) & (1 << clk->busy_bit);
 -}
 -
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT572D940HF_BASE_US2,
--		.end	= AT572D940HF_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT572D940HF_ID_US2,
--		.end	= AT572D940HF_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at572d940hf_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
--};
--
--static inline void configure_usart2_pins(unsigned pins)
+-static inline int clk_good(struct clk *clk)
 -{
--	at91_set_A_periph(AT91_PIN_PC15, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PC14, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PC17, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PC16, 0);	/* CTS2 */
+-	return clk && !IS_ERR(clk) && clk->ops;
 -}
 -
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+-static int std_clk_enable(struct clk *clk)
 -{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at572d940hf_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT572D940HF_ID_US0:
--			pdev = &at572d940hf_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT572D940HF_ID_US1:
--			pdev = &at572d940hf_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT572D940HF_ID_US2:
--			pdev = &at572d940hf_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
+-	if (clk->enable_reg) {
+-		u32 clk_reg = __raw_readl(clk->enable_reg);
+-		if (clk->enable_negate)
+-			clk_reg &= ~(1 << clk->enable_shift);
+-		else
+-			clk_reg |= (1 << clk->enable_shift);
+-		__raw_writel(clk_reg, clk->enable_reg);
+-		if (clk->enable_wait)
+-			udelay(clk->enable_wait);
+-		return 0;
+-	} else
+-		return -EINVAL;
 -}
 -
--void __init at91_set_serial_console(unsigned portnr)
+-static int std_clk_disable(struct clk *clk)
 -{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
+-	if (clk->enable_reg) {
+-		u32 clk_reg = __raw_readl(clk->enable_reg);
+-		if (clk->enable_negate)
+-			clk_reg |= (1 << clk->enable_shift);
+-		else
+-			clk_reg &= ~(1 << clk->enable_shift);
+-		__raw_writel(clk_reg, clk->enable_reg);
+-		return 0;
+-	} else
+-		return -EINVAL;
 -}
 -
--void __init at91_add_device_serial(void)
+-static int io_set_rate(struct clk *clk, u32 rate)
 -{
--	int i;
+-	u32 reg_frac, clkctrl_frac;
+-	int i, ret = 0, mask = 0x1f;
 -
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
+-	clkctrl_frac = (clk->parent->rate * 18 + rate - 1) / rate;
+-
+-	if (clkctrl_frac < 18 || clkctrl_frac > 35) {
+-		ret = -EINVAL;
+-		goto out;
 -	}
 -
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
--
--#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
--#endif
--
--
- /* --------------------------------------------------------------------
-  *  mAgic
-  * -------------------------------------------------------------------- */
-@@ -512,6 +335,10 @@ static struct at91_device_table at572d940hf_device_table __initdata = {
- 	.spi[1]		= &device_spi1,
- 	.tcb[0]		= &device_tcb,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
- };
- 
- void __init at572d940hf_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index dce861c..754a562 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -609,236 +609,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
--
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91cap9_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
--};
--
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PC30, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PC31, 1);		/* DTXD */
--}
--
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91CAP9_BASE_US0,
--		.end	= AT91CAP9_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91CAP9_ID_US0,
--		.end	= AT91CAP9_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
-+	},
-+	.tx_pin		= {AT91_PIN_PC31, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91CAP9_BASE_US0,
-+	.irq		= AT91CAP9_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA22, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA23, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA24, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA25, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91CAP9_BASE_US1,
-+	.irq		= AT91CAP9_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PD0, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PD1, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD7, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD8, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91CAP9_BASE_US2,
-+	.irq		= AT91CAP9_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PD2, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PD3, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD5, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD6, AT91_PIN_PERIPH_B, 0, 0, 0},
- };
- 
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91cap9_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
--	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA22, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PA23, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA24, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA25, 0);	/* CTS0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91CAP9_BASE_US1,
--		.end	= AT91CAP9_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91CAP9_ID_US1,
--		.end	= AT91CAP9_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91cap9_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PD0, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PD1, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PD7, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PD8, 0);	/* CTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91CAP9_BASE_US2,
--		.end	= AT91CAP9_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91CAP9_ID_US2,
--		.end	= AT91CAP9_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91cap9_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
--};
--
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PD2, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PD3, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PD5, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PD6, 0);	/* CTS2 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91cap9_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91CAP9_ID_US0:
--			pdev = &at91cap9_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91CAP9_ID_US1:
--			pdev = &at91cap9_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91CAP9_ID_US2:
--			pdev = &at91cap9_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
+-	reg_frac = __raw_readl(clk->scale_reg);
+-	reg_frac &= ~(mask << clk->scale_shift);
+-	__raw_writel(reg_frac | (clkctrl_frac << clk->scale_shift),
+-				clk->scale_reg);
+-	if (clk->busy_reg) {
+-		for (i = 10000; i; i--)
+-			if (!clk_is_busy(clk))
+-				break;
+-		if (!i)
+-			ret = -ETIMEDOUT;
+-		else
+-			ret = 0;
 -	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
+-out:
+-	return ret;
 -}
 -
--void __init at91_set_serial_console(unsigned portnr)
+-static long io_get_rate(struct clk *clk)
 -{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
+-	long rate = clk->parent->rate * 18;
+-	int mask = 0x1f;
+-
+-	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
+-	clk->rate = rate;
+-
+-	return rate;
 -}
 -
--void __init at91_add_device_serial(void)
+-static long per_get_rate(struct clk *clk)
 -{
--	int i;
+-	long rate = clk->parent->rate;
+-	long div;
+-	const int mask = 0xff;
 -
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
+-	if (clk->enable_reg &&
+-			!(__raw_readl(clk->enable_reg) & clk->enable_shift))
+-		clk->rate = 0;
+-	else {
+-		div = (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
+-		if (div)
+-			rate /= div;
+-		clk->rate = rate;
 -	}
 -
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
--#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
--#endif
--
- static struct at91_device_table at91cap9_device_table __initdata = {
- 	.ethernet	= &device_eth,
- 	.usbh_ohci	= &device_usbh_ohci,
-@@ -850,6 +675,10 @@ static struct at91_device_table at91cap9_device_table __initdata = {
- 	.spi[1]		= &device_spi1,
- 	.tcb[0]		= &device_tcb,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
- };
- 
- void __init at91cap9_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 6cec253..3a783f4 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -472,299 +472,84 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
--
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91rm9200_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
- 	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
-+	.tx_pin		= {AT91_PIN_PC31, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PA30, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PA31, 1);		/* DTXD */
+-	return clk->rate;
 -}
 -
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91RM9200_BASE_US0,
--		.end	= AT91RM9200_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91RM9200_ID_US0,
--		.end	= AT91RM9200_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91rm9200_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91RM9200_BASE_US0,
-+	.irq		= AT91RM9200_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
+-static int per_set_rate(struct clk *clk, u32 rate)
 -{
--	at91_set_A_periph(AT91_PIN_PA17, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PA18, 0);		/* RXD0 */
+-	int ret = -EINVAL;
+-	int div = (clk->parent->rate + rate - 1) / rate;
+-	u32 reg_frac;
+-	const int mask = 0xff;
+-	int try = 10;
+-	int i = -1;
 -
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA20, 0);	/* CTS0 */
+-	if (div == 0 || div > mask)
+-		goto out;
 -
--	if (pins & ATMEL_UART_RTS) {
+-	reg_frac = __raw_readl(clk->scale_reg);
+-	reg_frac &= ~(mask << clk->scale_shift);
+-
+-	while (try--) {
+-		__raw_writel(reg_frac | (div << clk->scale_shift),
+-				clk->scale_reg);
+-
+-		if (clk->busy_reg) {
+-			for (i = 10000; i; i--)
+-				if (!clk_is_busy(clk))
+-					break;
+-		}
+-		if (i)
+-			break;
+-	}
+-
+-	if (!i)
+-		ret = -ETIMEDOUT;
+-	else
+-		ret = 0;
+-
+-out:
+-	if (ret != 0)
+-		printk(KERN_ERR "%s: error %d\n", __func__, ret);
+-	return ret;
+-}
+-
+-static long lcdif_get_rate(struct clk *clk)
+-{
+-	long rate = clk->parent->rate;
+-	long div;
+-	const int mask = 0xff;
+-
+-	div = (__raw_readl(clk->scale_reg) >> clk->scale_shift) & mask;
+-	if (div) {
+-		rate /= div;
+-		div = (__raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC) &
+-			BM_CLKCTRL_FRAC_PIXFRAC) >> BP_CLKCTRL_FRAC_PIXFRAC;
+-		rate /= div;
+-	}
+-	clk->rate = rate;
+-
+-	return rate;
+-}
+-
+-static int lcdif_set_rate(struct clk *clk, u32 rate)
+-{
+-	int ret = 0;
+-	/*
+-	 * On 3700, we can get most timings exact by modifying ref_pix
+-	 * and the divider, but keeping the phase timings at 1 (2
+-	 * phases per cycle).
+-	 *
+-	 * ref_pix can be between 480e6*18/35=246.9MHz and 480e6*18/18=480MHz,
+-	 * which is between 18/(18*480e6)=2.084ns and 35/(18*480e6)=4.050ns.
+-	 *
+-	 * ns_cycle >= 2*18e3/(18*480) = 25/6
+-	 * ns_cycle <= 2*35e3/(18*480) = 875/108
+-	 *
+-	 * Multiply the ns_cycle by 'div' to lengthen it until it fits the
+-	 * bounds. This is the divider we'll use after ref_pix.
+-	 *
+-	 * 6 * ns_cycle >= 25 * div
+-	 * 108 * ns_cycle <= 875 * div
+-	 */
+-	u32 ns_cycle = 1000000 / rate;
+-	u32 div, reg_val;
+-	u32 lowest_result = (u32) -1;
+-	u32 lowest_div = 0, lowest_fracdiv = 0;
+-
+-	for (div = 1; div < 256; ++div) {
+-		u32 fracdiv;
+-		u32 ps_result;
+-		int lower_bound = 6 * ns_cycle >= 25 * div;
+-		int upper_bound = 108 * ns_cycle <= 875 * div;
+-		if (!lower_bound)
+-			break;
+-		if (!upper_bound)
+-			continue;
 -		/*
--		 * AT91RM9200 Errata #39 - RTS0 is not internally connected to PA21.
--		 *  We need to drive the pin manually.  Default is off (RTS is active low).
+-		 * Found a matching div. Calculate fractional divider needed,
+-		 * rounded up.
 -		 */
--		at91_set_gpio_output(AT91_PIN_PA21, 1);
+-		fracdiv = ((clk->parent->rate / 1000 * 18 / 2) *
+-				ns_cycle + 1000 * div - 1) /
+-				(1000 * div);
+-		if (fracdiv < 18 || fracdiv > 35) {
+-			ret = -EINVAL;
+-			goto out;
+-		}
+-		/* Calculate the actual cycle time this results in */
+-		ps_result = 6250 * div * fracdiv / 27;
+-
+-		/* Use the fastest result that doesn't break ns_cycle */
+-		if (ps_result <= lowest_result) {
+-			lowest_result = ps_result;
+-			lowest_div = div;
+-			lowest_fracdiv = fracdiv;
+-		}
+-	}
+-
+-	if (div >= 256 || lowest_result == (u32) -1) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-	pr_debug("Programming PFD=%u,DIV=%u ref_pix=%uMHz "
+-			"PIXCLK=%uMHz cycle=%u.%03uns\n",
+-			lowest_fracdiv, lowest_div,
+-			480*18/lowest_fracdiv, 480*18/lowest_fracdiv/lowest_div,
+-			lowest_result / 1000, lowest_result % 1000);
+-
+-	/* Program ref_pix phase fractional divider */
+-	reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
+-	reg_val &= ~BM_CLKCTRL_FRAC_PIXFRAC;
+-	reg_val |= BF(lowest_fracdiv, CLKCTRL_FRAC_PIXFRAC);
+-	__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
+-
+-	/* Ungate PFD */
+-	stmp3xxx_clearl(BM_CLKCTRL_FRAC_CLKGATEPIX,
+-			REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC);
+-
+-	/* Program pix divider */
+-	reg_val = __raw_readl(clk->scale_reg);
+-	reg_val &= ~(BM_CLKCTRL_PIX_DIV | BM_CLKCTRL_PIX_CLKGATE);
+-	reg_val |= BF(lowest_div, CLKCTRL_PIX_DIV);
+-	__raw_writel(reg_val, clk->scale_reg);
+-
+-	/* Wait for divider update */
+-	if (clk->busy_reg) {
+-		int i;
+-		for (i = 10000; i; i--)
+-			if (!clk_is_busy(clk))
+-				break;
+-		if (!i) {
+-			ret = -ETIMEDOUT;
+-			goto out;
+-		}
+-	}
+-
+-	/* Switch to ref_pix source */
+-	reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ);
+-	reg_val &= ~BM_CLKCTRL_CLKSEQ_BYPASS_PIX;
+-	__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ);
+-
+-out:
+-	return ret;
+-}
+-
+-
+-static int cpu_set_rate(struct clk *clk, u32 rate)
+-{
+-	u32 reg_val;
+-
+-	if (rate < 24000)
+-		return -EINVAL;
+-	else if (rate == 24000) {
+-		/* switch to the 24M source */
+-		clk_set_parent(clk, &osc_24M);
+-	} else {
+-		int i;
+-		u32 clkctrl_cpu = 1;
+-		u32 c = clkctrl_cpu;
+-		u32 clkctrl_frac = 1;
+-		u32 val;
+-		for ( ; c < 0x40; c++) {
+-			u32 f = (pll_clk.rate*18/c + rate/2) / rate;
+-			int s1, s2;
+-
+-			if (f < 18 || f > 35)
+-				continue;
+-			s1 = pll_clk.rate*18/clkctrl_frac/clkctrl_cpu - rate;
+-			s2 = pll_clk.rate*18/c/f - rate;
+-			pr_debug("%s: s1 %d, s2 %d\n", __func__, s1, s2);
+-			if (abs(s1) > abs(s2)) {
+-				clkctrl_cpu = c;
+-				clkctrl_frac = f;
+-			}
+-			if (s2 == 0)
+-				break;
+-		};
+-		pr_debug("%s: clkctrl_cpu %d, clkctrl_frac %d\n", __func__,
+-				clkctrl_cpu, clkctrl_frac);
+-		if (c == 0x40) {
+-			int  d = pll_clk.rate*18/clkctrl_frac/clkctrl_cpu -
+-				rate;
+-			if (abs(d) > 100 ||
+-			    clkctrl_frac < 18 || clkctrl_frac > 35)
+-				return -EINVAL;
+-		}
+-
+-		/* 4.6.2 */
+-		val = __raw_readl(clk->scale_reg);
+-		val &= ~(0x3f << clk->scale_shift);
+-		val |= clkctrl_frac;
+-		clk_set_parent(clk, &osc_24M);
+-		udelay(10);
+-		__raw_writel(val, clk->scale_reg);
+-		/* ungate */
+-		__raw_writel(1<<7, clk->scale_reg + 8);
+-		/* write clkctrl_cpu */
+-		clk->saved_div = clkctrl_cpu;
+-
+-		reg_val = __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
+-		reg_val &= ~0x3F;
+-		reg_val |= clkctrl_cpu;
+-		__raw_writel(reg_val, REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
+-
+-		for (i = 10000; i; i--)
+-			if (!clk_is_busy(clk))
+-				break;
+-		if (!i) {
+-			printk(KERN_ERR "couldn't set up CPU divisor\n");
+-			return -ETIMEDOUT;
+-		}
+-		clk_set_parent(clk, &pll_clk);
+-		clk->saved_div = 0;
+-		udelay(10);
+-	}
+-	return 0;
+-}
+-
+-static long cpu_get_rate(struct clk *clk)
+-{
+-	long rate = clk->parent->rate * 18;
+-
+-	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & 0x3f;
+-	rate /= __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU) & 0x3f;
+-	rate = ((rate + 9) / 10) * 10;
+-	clk->rate = rate;
+-
+-	return rate;
+-}
+-
+-static long cpu_round_rate(struct clk *clk, u32 rate)
+-{
+-	unsigned long r = 0;
+-
+-	if (rate <= 24000)
+-		r = 24000;
+-	else {
+-		u32 clkctrl_cpu = 1;
+-		u32 clkctrl_frac;
+-		do {
+-			clkctrl_frac =
+-				(pll_clk.rate*18 / clkctrl_cpu + rate/2) / rate;
+-			if (clkctrl_frac > 35)
+-				continue;
+-			if (pll_clk.rate*18 / clkctrl_frac / clkctrl_cpu/10 ==
+-			    rate / 10)
+-				break;
+-		} while (pll_clk.rate / 2  >= clkctrl_cpu++ * rate);
+-		if (pll_clk.rate / 2 < (clkctrl_cpu - 1) * rate)
+-			clkctrl_cpu--;
+-		pr_debug("%s: clkctrl_cpu %d, clkctrl_frac %d\n", __func__,
+-				clkctrl_cpu, clkctrl_frac);
+-		if (clkctrl_frac < 18)
+-			clkctrl_frac = 18;
+-		if (clkctrl_frac > 35)
+-			clkctrl_frac = 35;
+-
+-		r = pll_clk.rate * 18;
+-		r /= clkctrl_frac;
+-		r /= clkctrl_cpu;
+-		r = 10 * ((r + 9) / 10);
+-	}
+-	return r;
+-}
+-
+-static long emi_get_rate(struct clk *clk)
+-{
+-	long rate = clk->parent->rate * 18;
+-
+-	rate /= (__raw_readl(clk->scale_reg) >> clk->scale_shift) & 0x3f;
+-	rate /= __raw_readl(REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI) & 0x3f;
+-	clk->rate = rate;
+-
+-	return rate;
+-}
+-
+-static int clkseq_set_parent(struct clk *clk, struct clk *parent)
+-{
+-	int ret = -EINVAL;
+-	int shift = 8;
+-
+-	/* bypass? */
+-	if (parent == &osc_24M)
+-		shift = 4;
+-
+-	if (clk->bypass_reg) {
+-#ifdef CONFIG_ARCH_STMP378X
+-		u32 hbus_val, cpu_val;
+-
+-		if (clk == &cpu_clk && shift == 4) {
+-			hbus_val = __raw_readl(REGS_CLKCTRL_BASE +
+-					HW_CLKCTRL_HBUS);
+-			cpu_val = __raw_readl(REGS_CLKCTRL_BASE +
+-					HW_CLKCTRL_CPU);
+-
+-			hbus_val &= ~(BM_CLKCTRL_HBUS_DIV_FRAC_EN |
+-				      BM_CLKCTRL_HBUS_DIV);
+-			clk->saved_div = cpu_val & BM_CLKCTRL_CPU_DIV_CPU;
+-			cpu_val &= ~BM_CLKCTRL_CPU_DIV_CPU;
+-			cpu_val |= 1;
+-
+-			if (machine_is_stmp378x()) {
+-				__raw_writel(hbus_val,
+-					REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
+-				__raw_writel(cpu_val,
+-					REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
+-				hclk.rate = 0;
+-			}
+-		} else if (clk == &cpu_clk && shift == 8) {
+-			hbus_val = __raw_readl(REGS_CLKCTRL_BASE +
+-							HW_CLKCTRL_HBUS);
+-			cpu_val = __raw_readl(REGS_CLKCTRL_BASE +
+-							HW_CLKCTRL_CPU);
+-			hbus_val &= ~(BM_CLKCTRL_HBUS_DIV_FRAC_EN |
+-				      BM_CLKCTRL_HBUS_DIV);
+-			hbus_val |= 2;
+-			cpu_val &= ~BM_CLKCTRL_CPU_DIV_CPU;
+-			if (clk->saved_div)
+-				cpu_val |= clk->saved_div;
+-			else
+-				cpu_val |= 2;
+-
+-			if (machine_is_stmp378x()) {
+-				__raw_writel(hbus_val,
+-					REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
+-				__raw_writel(cpu_val,
+-					REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU);
+-				hclk.rate = 0;
+-			}
+-		}
+-#endif
+-		__raw_writel(1 << clk->bypass_shift, clk->bypass_reg + shift);
+-
+-		ret = 0;
+-	}
+-
+-	return ret;
+-}
+-
+-static int hbus_set_rate(struct clk *clk, u32 rate)
+-{
+-	u8 div = 0;
+-	int is_frac = 0;
+-	u32 clkctrl_hbus;
+-	struct clk *parent = clk->parent;
+-
+-	pr_debug("%s: rate %d, parent rate %d\n", __func__, rate,
+-			parent->rate);
+-
+-	if (rate > parent->rate)
+-		return -EINVAL;
+-
+-	if (((parent->rate + rate/2) / rate) * rate != parent->rate &&
+-	    parent->rate / rate < 32) {
+-		pr_debug("%s: switching to fractional mode\n", __func__);
+-		is_frac = 1;
+-	}
+-
+-	if (is_frac)
+-		div = (32 * rate + parent->rate / 2) / parent->rate;
+-	else
+-		div = (parent->rate + rate - 1) / rate;
+-	pr_debug("%s: div calculated is %d\n", __func__, div);
+-	if (!div || div > 0x1f)
+-		return -EINVAL;
+-
+-	clk_set_parent(&cpu_clk, &osc_24M);
+-	udelay(10);
+-	clkctrl_hbus = __raw_readl(clk->scale_reg);
+-	clkctrl_hbus &= ~0x3f;
+-	clkctrl_hbus |= div;
+-	clkctrl_hbus |= (is_frac << 5);
+-
+-	__raw_writel(clkctrl_hbus, clk->scale_reg);
+-	if (clk->busy_reg) {
+-		int i;
+-		for (i = 10000; i; i--)
+-			if (!clk_is_busy(clk))
+-				break;
+-		if (!i) {
+-			printk(KERN_ERR "couldn't set up CPU divisor\n");
+-			return -ETIMEDOUT;
+-		}
+-	}
+-	clk_set_parent(&cpu_clk, &pll_clk);
+-	__raw_writel(clkctrl_hbus, clk->scale_reg);
+-	udelay(10);
+-	return 0;
+-}
+-
+-static long hbus_get_rate(struct clk *clk)
+-{
+-	long rate = clk->parent->rate;
+-
+-	if (__raw_readl(clk->scale_reg) & 0x20) {
+-		rate *= __raw_readl(clk->scale_reg) & 0x1f;
+-		rate /= 32;
+-	} else
+-		rate /= __raw_readl(clk->scale_reg) & 0x1f;
+-	clk->rate = rate;
+-
+-	return rate;
+-}
+-
+-static int xbus_set_rate(struct clk *clk, u32 rate)
+-{
+-	u16 div = 0;
+-	u32 clkctrl_xbus;
+-
+-	pr_debug("%s: rate %d, parent rate %d\n", __func__, rate,
+-			clk->parent->rate);
+-
+-	div = (clk->parent->rate + rate - 1) / rate;
+-	pr_debug("%s: div calculated is %d\n", __func__, div);
+-	if (!div || div > 0x3ff)
+-		return -EINVAL;
+-
+-	clkctrl_xbus = __raw_readl(clk->scale_reg);
+-	clkctrl_xbus &= ~0x3ff;
+-	clkctrl_xbus |= div;
+-	__raw_writel(clkctrl_xbus, clk->scale_reg);
+-	if (clk->busy_reg) {
+-		int i;
+-		for (i = 10000; i; i--)
+-			if (!clk_is_busy(clk))
+-				break;
+-		if (!i) {
+-			printk(KERN_ERR "couldn't set up xbus divisor\n");
+-			return -ETIMEDOUT;
+-		}
+-	}
+-	return 0;
+-}
+-
+-static long xbus_get_rate(struct clk *clk)
+-{
+-	long rate = clk->parent->rate;
+-
+-	rate /= __raw_readl(clk->scale_reg) & 0x3ff;
+-	clk->rate = rate;
+-
+-	return rate;
+-}
+-
+-
+-/* Clock ops */
+-
+-static struct clk_ops std_ops = {
+-	.enable		= std_clk_enable,
+-	.disable	= std_clk_disable,
+-	.get_rate	= per_get_rate,
+-	.set_rate	= per_set_rate,
+-	.set_parent	= clkseq_set_parent,
+-};
+-
+-static struct clk_ops min_ops = {
+-	.enable		= std_clk_enable,
+-	.disable	= std_clk_disable,
+-};
+-
+-static struct clk_ops cpu_ops = {
+-	.enable		= std_clk_enable,
+-	.disable	= std_clk_disable,
+-	.get_rate	= cpu_get_rate,
+-	.set_rate	= cpu_set_rate,
+-	.round_rate	= cpu_round_rate,
+-	.set_parent	= clkseq_set_parent,
+-};
+-
+-static struct clk_ops io_ops = {
+-	.enable		= std_clk_enable,
+-	.disable	= std_clk_disable,
+-	.get_rate	= io_get_rate,
+-	.set_rate	= io_set_rate,
+-};
+-
+-static struct clk_ops hbus_ops = {
+-	.get_rate	= hbus_get_rate,
+-	.set_rate	= hbus_set_rate,
+-};
+-
+-static struct clk_ops xbus_ops = {
+-	.get_rate	= xbus_get_rate,
+-	.set_rate	= xbus_set_rate,
+-};
+-
+-static struct clk_ops lcdif_ops = {
+-	.enable		= std_clk_enable,
+-	.disable	= std_clk_disable,
+-	.get_rate	= lcdif_get_rate,
+-	.set_rate	= lcdif_set_rate,
+-	.set_parent	= clkseq_set_parent,
+-};
+-
+-static struct clk_ops emi_ops = {
+-	.get_rate	= emi_get_rate,
+-};
+-
+-/* List of on-chip clocks */
+-
+-static struct clk osc_24M = {
+-	.flags		= FIXED_RATE | ENABLED,
+-	.rate		= 24000,
+-};
+-
+-static struct clk pll_clk = {
+-	.parent		= &osc_24M,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PLLCTRL0,
+-	.enable_shift	= 16,
+-	.enable_wait	= 10,
+-	.flags		= FIXED_RATE | ENABLED,
+-	.rate		= 480000,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk cpu_clk = {
+-	.parent		= &pll_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
+-	.scale_shift	= 0,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 7,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CPU,
+-	.busy_bit	= 28,
+-	.flags		= RATE_PROPAGATES | ENABLED,
+-	.ops		= &cpu_ops,
+-};
+-
+-static struct clk io_clk = {
+-	.parent		= &pll_clk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
+-	.scale_shift	= 24,
+-	.flags		= RATE_PROPAGATES | ENABLED,
+-	.ops		= &io_ops,
+-};
+-
+-static struct clk hclk = {
+-	.parent		= &cpu_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 7,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS,
+-	.busy_bit	= 29,
+-	.flags		= RATE_PROPAGATES | ENABLED,
+-	.ops		= &hbus_ops,
+-};
+-
+-static struct clk xclk = {
+-	.parent		= &osc_24M,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XBUS,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XBUS,
+-	.busy_bit	= 31,
+-	.flags		= RATE_PROPAGATES | ENABLED,
+-	.ops		= &xbus_ops,
+-};
+-
+-static struct clk uart_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.flags		= ENABLED,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk audio_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 30,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk pwm_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 29,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk dri_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 28,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk digctl_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 27,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk timer_clk = {
+-	.parent		= &xclk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_XTAL,
+-	.enable_shift	= 26,
+-	.enable_negate	= 1,
+-	.flags		= ENABLED,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk lcdif_clk = {
+-	.parent		= &pll_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
+-	.busy_bit	= 29,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PIX,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 1,
+-	.flags		= NEEDS_SET_PARENT,
+-	.ops		= &lcdif_ops,
+-};
+-
+-static struct clk ssp_clk = {
+-	.parent		= &io_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
+-	.busy_bit	= 29,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SSP,
+-	.enable_shift	= 31,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 5,
+-	.enable_negate	= 1,
+-	.flags		= NEEDS_SET_PARENT,
+-	.ops		= &std_ops,
+-};
+-
+-static struct clk gpmi_clk = {
+-	.parent		= &io_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
+-	.busy_bit	= 29,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_GPMI,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 4,
+-	.flags		= NEEDS_SET_PARENT,
+-	.ops		= &std_ops,
+-};
+-
+-static struct clk spdif_clk = {
+-	.parent		= &pll_clk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SPDIF,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk emi_clk = {
+-	.parent		= &pll_clk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_FRAC,
+-	.scale_shift	= 8,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_EMI,
+-	.busy_bit	= 28,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 6,
+-	.flags		= ENABLED,
+-	.ops		= &emi_ops,
+-};
+-
+-static struct clk ir_clk = {
+-	.parent		= &io_clk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_IR,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 3,
+-	.ops		= &min_ops,
+-};
+-
+-static struct clk saif_clk = {
+-	.parent		= &pll_clk,
+-	.scale_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
+-	.busy_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
+-	.busy_bit	= 29,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_SAIF,
+-	.enable_shift	= 31,
+-	.enable_negate	= 1,
+-	.bypass_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_CLKSEQ,
+-	.bypass_shift	= 0,
+-	.ops		= &std_ops,
+-};
+-
+-static struct clk usb_clk = {
+-	.parent		= &pll_clk,
+-	.enable_reg	= REGS_CLKCTRL_BASE + HW_CLKCTRL_PLLCTRL0,
+-	.enable_shift	= 18,
+-	.enable_negate	= 1,
+-	.ops		= &min_ops,
+-};
+-
+-/* list of all the clocks */
+-static struct clk_lookup onchip_clks[] = {
+-	{
+-		.con_id = "osc_24M",
+-		.clk = &osc_24M,
+-	}, {
+-		.con_id = "pll",
+-		.clk = &pll_clk,
+-	}, {
+-		.con_id = "cpu",
+-		.clk = &cpu_clk,
+-	}, {
+-		.con_id = "hclk",
+-		.clk = &hclk,
+-	}, {
+-		.con_id = "xclk",
+-		.clk = &xclk,
+-	}, {
+-		.con_id = "io",
+-		.clk = &io_clk,
+-	}, {
+-		.con_id = "uart",
+-		.clk = &uart_clk,
+-	}, {
+-		.con_id = "audio",
+-		.clk = &audio_clk,
+-	}, {
+-		.con_id = "pwm",
+-		.clk = &pwm_clk,
+-	}, {
+-		.con_id = "dri",
+-		.clk = &dri_clk,
+-	}, {
+-		.con_id = "digctl",
+-		.clk = &digctl_clk,
+-	}, {
+-		.con_id = "timer",
+-		.clk = &timer_clk,
+-	}, {
+-		.con_id = "lcdif",
+-		.clk = &lcdif_clk,
+-	}, {
+-		.con_id = "ssp",
+-		.clk = &ssp_clk,
+-	}, {
+-		.con_id = "gpmi",
+-		.clk = &gpmi_clk,
+-	}, {
+-		.con_id = "spdif",
+-		.clk = &spdif_clk,
+-	}, {
+-		.con_id = "emi",
+-		.clk = &emi_clk,
+-	}, {
+-		.con_id = "ir",
+-		.clk = &ir_clk,
+-	}, {
+-		.con_id = "saif",
+-		.clk = &saif_clk,
+-	}, {
+-		.con_id = "usb",
+-		.clk = &usb_clk,
+-	},
+-};
+-
+-static int __init propagate_rate(struct clk *clk)
+-{
+-	struct clk_lookup *cl;
+-
+-	for (cl = onchip_clks; cl < onchip_clks + ARRAY_SIZE(onchip_clks);
+-	     cl++) {
+-		if (unlikely(!clk_good(cl->clk)))
+-			continue;
+-		if (cl->clk->parent == clk && cl->clk->ops->get_rate) {
+-			cl->clk->ops->get_rate(cl->clk);
+-			if (cl->clk->flags & RATE_PROPAGATES)
+-				propagate_rate(cl->clk);
+-		}
+-	}
+-
+-	return 0;
+-}
+-
+-/* Exported API */
+-unsigned long clk_get_rate(struct clk *clk)
+-{
+-	if (unlikely(!clk_good(clk)))
+-		return 0;
+-
+-	if (clk->rate != 0)
+-		return clk->rate;
+-
+-	if (clk->ops->get_rate != NULL)
+-		return clk->ops->get_rate(clk);
+-
+-	return clk_get_rate(clk->parent);
+-}
+-EXPORT_SYMBOL(clk_get_rate);
+-
+-long clk_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	if (unlikely(!clk_good(clk)))
+-		return 0;
+-
+-	if (clk->ops->round_rate)
+-		return clk->ops->round_rate(clk, rate);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(clk_round_rate);
+-
+-static inline int close_enough(long rate1, long rate2)
+-{
+-	return rate1 && !((rate2 - rate1) * 1000 / rate1);
+-}
+-
+-int clk_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	int ret = -EINVAL;
+-
+-	if (unlikely(!clk_good(clk)))
+-		goto out;
+-
+-	if (clk->flags & FIXED_RATE || !clk->ops->set_rate)
+-		goto out;
+-
+-	else if (!close_enough(clk->rate, rate)) {
+-		ret = clk->ops->set_rate(clk, rate);
+-		if (ret < 0)
+-			goto out;
+-		clk->rate = rate;
+-		if (clk->flags & RATE_PROPAGATES)
+-			propagate_rate(clk);
+-	} else
+-		ret = 0;
+-
+-out:
+-	return ret;
+-}
+-EXPORT_SYMBOL(clk_set_rate);
+-
+-int clk_enable(struct clk *clk)
+-{
+-	unsigned long clocks_flags;
+-
+-	if (unlikely(!clk_good(clk)))
+-		return -EINVAL;
+-
+-	if (clk->parent)
+-		clk_enable(clk->parent);
+-
+-	spin_lock_irqsave(&clocks_lock, clocks_flags);
+-
+-	clk->usage++;
+-	if (clk->ops && clk->ops->enable)
+-		clk->ops->enable(clk);
+-
+-	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
+-	return 0;
+-}
+-EXPORT_SYMBOL(clk_enable);
+-
+-static void local_clk_disable(struct clk *clk)
+-{
+-	if (unlikely(!clk_good(clk)))
+-		return;
+-
+-	if (clk->usage == 0 && clk->ops->disable)
+-		clk->ops->disable(clk);
+-
+-	if (clk->parent)
+-		local_clk_disable(clk->parent);
+-}
+-
+-void clk_disable(struct clk *clk)
+-{
+-	unsigned long clocks_flags;
+-
+-	if (unlikely(!clk_good(clk)))
+-		return;
+-
+-	spin_lock_irqsave(&clocks_lock, clocks_flags);
+-
+-	if ((--clk->usage) == 0 && clk->ops->disable)
+-		clk->ops->disable(clk);
+-
+-	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
+-	if (clk->parent)
+-		clk_disable(clk->parent);
+-}
+-EXPORT_SYMBOL(clk_disable);
+-
+-/* Some additional API */
+-int clk_set_parent(struct clk *clk, struct clk *parent)
+-{
+-	int ret = -ENODEV;
+-	unsigned long clocks_flags;
+-
+-	if (unlikely(!clk_good(clk)))
+-		goto out;
+-
+-	if (!clk->ops->set_parent)
+-		goto out;
+-
+-	spin_lock_irqsave(&clocks_lock, clocks_flags);
+-
+-	ret = clk->ops->set_parent(clk, parent);
+-	if (!ret) {
+-		/* disable if usage count is 0 */
+-		local_clk_disable(parent);
+-
+-		parent->usage += clk->usage;
+-		clk->parent->usage -= clk->usage;
+-
+-		/* disable if new usage count is 0 */
+-		local_clk_disable(clk->parent);
+-
+-		clk->parent = parent;
+-	}
+-	spin_unlock_irqrestore(&clocks_lock, clocks_flags);
+-
+-out:
+-	return ret;
+-}
+-EXPORT_SYMBOL(clk_set_parent);
+-
+-struct clk *clk_get_parent(struct clk *clk)
+-{
+-	if (unlikely(!clk_good(clk)))
+-		return NULL;
+-	return clk->parent;
+-}
+-EXPORT_SYMBOL(clk_get_parent);
+-
+-static int __init clk_init(void)
+-{
+-	struct clk_lookup *cl;
+-	struct clk_ops *ops;
+-
+-	spin_lock_init(&clocks_lock);
+-
+-	for (cl = onchip_clks; cl < onchip_clks + ARRAY_SIZE(onchip_clks);
+-	     cl++) {
+-		if (cl->clk->flags & ENABLED)
+-			clk_enable(cl->clk);
+-		else
+-			local_clk_disable(cl->clk);
+-
+-		ops = cl->clk->ops;
+-
+-		if ((cl->clk->flags & NEEDS_INITIALIZATION) &&
+-				ops && ops->set_rate)
+-			ops->set_rate(cl->clk, cl->clk->rate);
+-
+-		if (cl->clk->flags & FIXED_RATE) {
+-			if (cl->clk->flags & RATE_PROPAGATES)
+-				propagate_rate(cl->clk);
+-		} else {
+-			if (ops && ops->get_rate)
+-				ops->get_rate(cl->clk);
+-		}
+-
+-		if (cl->clk->flags & NEEDS_SET_PARENT) {
+-			if (ops && ops->set_parent)
+-				ops->set_parent(cl->clk, cl->clk->parent);
+-		}
+-	}
+-	clkdev_add_table(onchip_clks, ARRAY_SIZE(onchip_clks));
+-	return 0;
+-}
+-
+-arch_initcall(clk_init);
+diff --git a/arch/arm/plat-stmp3xxx/clock.h b/arch/arm/plat-stmp3xxx/clock.h
+deleted file mode 100644
+index a6611e1..0000000
+--- a/arch/arm/plat-stmp3xxx/clock.h
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/*
+- * Clock control driver for Freescale STMP37XX/STMP378X - internal header file
+- *
+- * Author: Vitaly Wool <vital@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ARCH_ARM_STMX3XXX_CLOCK_H__
+-#define __ARCH_ARM_STMX3XXX_CLOCK_H__
+-
+-#ifndef __ASSEMBLER__
+-
+-struct clk_ops {
+-	int (*enable) (struct clk *);
+-	int (*disable) (struct clk *);
+-	long (*get_rate) (struct clk *);
+-	long (*round_rate) (struct clk *, u32);
+-	int (*set_rate) (struct clk *, u32);
+-	int (*set_parent) (struct clk *, struct clk *);
+-};
+-
+-struct clk {
+-	struct clk *parent;
+-	u32 rate;
+-	u32 flags;
+-	u8 scale_shift;
+-	u8 enable_shift;
+-	u8 bypass_shift;
+-	u8 busy_bit;
+-	s8 usage;
+-	int enable_wait;
+-	int enable_negate;
+-	u32 saved_div;
+-	void __iomem *enable_reg;
+-	void __iomem *scale_reg;
+-	void __iomem *bypass_reg;
+-	void __iomem *busy_reg;
+-	struct clk_ops *ops;
+-};
+-
+-#endif /* __ASSEMBLER__ */
+-
+-/* Flags */
+-#define RATE_PROPAGATES      (1<<0)
+-#define NEEDS_INITIALIZATION (1<<1)
+-#define PARENT_SET_RATE      (1<<2)
+-#define FIXED_RATE           (1<<3)
+-#define ENABLED	             (1<<4)
+-#define NEEDS_SET_PARENT     (1<<5)
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/core.c b/arch/arm/plat-stmp3xxx/core.c
+deleted file mode 100644
+index 37b8a09..0000000
+--- a/arch/arm/plat-stmp3xxx/core.c
++++ /dev/null
+@@ -1,128 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X core routines
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-
+-#include <mach/stmp3xxx.h>
+-#include <mach/platform.h>
+-#include <mach/dma.h>
+-#include <mach/regs-clkctrl.h>
+-
+-static int __stmp3xxx_reset_block(void __iomem *hwreg, int just_enable)
+-{
+-	u32 c;
+-	int timeout;
+-
+-	/* the process of software reset of IP block is done
+-	   in several steps:
+-
+-	   - clear SFTRST and wait for block is enabled;
+-	   - clear clock gating (CLKGATE bit);
+-	   - set the SFTRST again and wait for block is in reset;
+-	   - clear SFTRST and wait for reset completion.
+-	*/
+-	c = __raw_readl(hwreg);
+-	c &= ~(1<<31);		/* clear SFTRST */
+-	__raw_writel(c, hwreg);
+-	for (timeout = 1000000; timeout > 0; timeout--)
+-		/* still in SFTRST state ? */
+-		if ((__raw_readl(hwreg) & (1<<31)) == 0)
+-			break;
+-	if (timeout <= 0) {
+-		printk(KERN_ERR"%s(%p): timeout when enabling\n",
+-				__func__, hwreg);
+-		return -ETIME;
+-	}
+-
+-	c = __raw_readl(hwreg);
+-	c &= ~(1<<30);		/* clear CLKGATE */
+-	__raw_writel(c, hwreg);
+-
+-	if (!just_enable) {
+-		c = __raw_readl(hwreg);
+-		c |= (1<<31);		/* now again set SFTRST */
+-		__raw_writel(c, hwreg);
+-		for (timeout = 1000000; timeout > 0; timeout--)
+-			/* poll until CLKGATE set */
+-			if (__raw_readl(hwreg) & (1<<30))
+-				break;
+-		if (timeout <= 0) {
+-			printk(KERN_ERR"%s(%p): timeout when resetting\n",
+-					__func__, hwreg);
+-			return -ETIME;
+-		}
+-
+-		c = __raw_readl(hwreg);
+-		c &= ~(1<<31);		/* clear SFTRST */
+-		__raw_writel(c, hwreg);
+-		for (timeout = 1000000; timeout > 0; timeout--)
+-			/* still in SFTRST state ? */
+-			if ((__raw_readl(hwreg) & (1<<31)) == 0)
+-				break;
+-		if (timeout <= 0) {
+-			printk(KERN_ERR"%s(%p): timeout when enabling "
+-					"after reset\n", __func__, hwreg);
+-			return -ETIME;
+-		}
+-
+-		c = __raw_readl(hwreg);
+-		c &= ~(1<<30);		/* clear CLKGATE */
+-		__raw_writel(c, hwreg);
+-	}
+-	for (timeout = 1000000; timeout > 0; timeout--)
+-		/* still in SFTRST state ? */
+-		if ((__raw_readl(hwreg) & (1<<30)) == 0)
+-			break;
+-
+-	if (timeout <= 0) {
+-		printk(KERN_ERR"%s(%p): timeout when unclockgating\n",
+-				__func__, hwreg);
+-		return -ETIME;
+-	}
+-
+-	return 0;
+-}
+-
+-int stmp3xxx_reset_block(void __iomem *hwreg, int just_enable)
+-{
+-	int try = 10;
+-	int r;
+-
+-	while (try--) {
+-		r = __stmp3xxx_reset_block(hwreg, just_enable);
+-		if (!r)
+-			break;
+-		pr_debug("%s: try %d failed\n", __func__, 10 - try);
+-	}
+-	return r;
+-}
+-EXPORT_SYMBOL(stmp3xxx_reset_block);
+-
+-struct platform_device stmp3xxx_dbguart = {
+-	.name = "stmp3xxx-dbguart",
+-	.id = -1,
+-};
+-
+-void __init stmp3xxx_init(void)
+-{
+-	/* Turn off auto-slow and other tricks */
+-	stmp3xxx_clearl(0x7f00000, REGS_CLKCTRL_BASE + HW_CLKCTRL_HBUS);
+-
+-	stmp3xxx_dma_init();
+-}
+diff --git a/arch/arm/plat-stmp3xxx/devices.c b/arch/arm/plat-stmp3xxx/devices.c
+deleted file mode 100644
+index 68fed4b..0000000
+--- a/arch/arm/plat-stmp3xxx/devices.c
++++ /dev/null
+@@ -1,389 +0,0 @@
+-/*
+-* Freescale STMP37XX/STMP378X platform devices
+-*
+-* Embedded Alley Solutions, Inc <source@embeddedalley.com>
+-*
+-* Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+-* Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+-*/
+-
+-/*
+-* The code contained herein is licensed under the GNU General Public
+-* License. You may obtain a copy of the GNU General Public License
+-* Version 2 or later at the following locations:
+-*
+-* http://www.opensource.org/licenses/gpl-license.html
+-* http://www.gnu.org/copyleft/gpl.html
+-*/
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/device.h>
+-#include <linux/platform_device.h>
+-#include <linux/dma-mapping.h>
+-
+-#include <mach/dma.h>
+-#include <mach/platform.h>
+-#include <mach/stmp3xxx.h>
+-#include <mach/regs-lcdif.h>
+-#include <mach/regs-uartapp.h>
+-#include <mach/regs-gpmi.h>
+-#include <mach/regs-usbctrl.h>
+-#include <mach/regs-ssp.h>
+-#include <mach/regs-rtc.h>
+-
+-static u64 common_dmamask = DMA_BIT_MASK(32);
+-
+-static struct resource appuart_resources[] = {
+-	{
+-		.start = IRQ_UARTAPP_INTERNAL,
+-		.end = IRQ_UARTAPP_INTERNAL,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start = IRQ_UARTAPP_RX_DMA,
+-		.end = IRQ_UARTAPP_RX_DMA,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start = IRQ_UARTAPP_TX_DMA,
+-		.end = IRQ_UARTAPP_TX_DMA,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start = REGS_UARTAPP1_PHYS,
+-		.end = REGS_UARTAPP1_PHYS + REGS_UARTAPP_SIZE,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		/* Rx DMA channel */
+-		.start = STMP3XXX_DMA(6, STMP3XXX_BUS_APBX),
+-		.end = STMP3XXX_DMA(6, STMP3XXX_BUS_APBX),
+-		.flags = IORESOURCE_DMA,
+-	}, {
+-		/* Tx DMA channel */
+-		.start = STMP3XXX_DMA(7, STMP3XXX_BUS_APBX),
+-		.end = STMP3XXX_DMA(7, STMP3XXX_BUS_APBX),
+-		.flags = IORESOURCE_DMA,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_appuart = {
+-	.name = "stmp3xxx-appuart",
+-	.id = 0,
+-	.resource = appuart_resources,
+-	.num_resources = ARRAY_SIZE(appuart_resources),
+-	.dev = {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-};
+-
+-struct platform_device stmp3xxx_watchdog = {
+-      .name   = "stmp3xxx_wdt",
+-      .id     = -1,
+-};
+-
+-static struct resource ts_resource[] = {
+-	{
+-		.flags  = IORESOURCE_IRQ,
+-		.start  = IRQ_TOUCH_DETECT,
+-		.end    = IRQ_TOUCH_DETECT,
+-	}, {
+-		.flags  = IORESOURCE_IRQ,
+-		.start  = IRQ_LRADC_CH5,
+-		.end    = IRQ_LRADC_CH5,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_touchscreen = {
+-	.name		= "stmp3xxx_ts",
+-	.id		= -1,
+-	.resource	= ts_resource,
+-	.num_resources	= ARRAY_SIZE(ts_resource),
+-};
+-
+-/*
+-* Keypad device
+-*/
+-struct platform_device stmp3xxx_keyboard = {
+-	.name		= "stmp3xxx-keyboard",
+-	.id		= -1,
+-};
+-
+-static struct resource gpmi_resources[] = {
+-	{
+-		.flags = IORESOURCE_MEM,
+-		.start = REGS_GPMI_PHYS,
+-		.end = REGS_GPMI_PHYS + REGS_GPMI_SIZE,
+-	}, {
+-		.flags = IORESOURCE_IRQ,
+-		.start = IRQ_GPMI_DMA,
+-		.end = IRQ_GPMI_DMA,
+-	}, {
+-		.flags = IORESOURCE_DMA,
+-		.start = STMP3XXX_DMA(4, STMP3XXX_BUS_APBH),
+-		.end = STMP3XXX_DMA(8, STMP3XXX_BUS_APBH),
+-	},
+-};
+-
+-struct platform_device stmp3xxx_gpmi = {
+-	.name = "gpmi",
+-	.id = -1,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-	.resource = gpmi_resources,
+-	.num_resources = ARRAY_SIZE(gpmi_resources),
+-};
+-
+-static struct resource mmc1_resource[] = {
+-	{
+-		.flags	= IORESOURCE_MEM,
+-		.start	= REGS_SSP1_PHYS,
+-		.end	= REGS_SSP1_PHYS + REGS_SSP_SIZE,
+-	}, {
+-		.flags	= IORESOURCE_DMA,
+-		.start	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
+-		.end	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
+-	}, {
+-		.flags	= IORESOURCE_IRQ,
+-		.start	= IRQ_SSP1_DMA,
+-		.end	= IRQ_SSP1_DMA,
+-	}, {
+-		.flags	= IORESOURCE_IRQ,
+-		.start	= IRQ_SSP_ERROR,
+-		.end	= IRQ_SSP_ERROR,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_mmc = {
+-	.name	= "stmp3xxx-mmc",
+-	.id	= 1,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-	.resource = mmc1_resource,
+-	.num_resources = ARRAY_SIZE(mmc1_resource),
+-};
+-
+-static struct resource usb_resources[] = {
+-	{
+-		.start	= REGS_USBCTRL_PHYS,
+-		.end	= REGS_USBCTRL_PHYS + SZ_4K,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_USB_CTRL,
+-		.end	= IRQ_USB_CTRL,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_udc = {
+-	.name		= "fsl-usb2-udc",
+-	.id		= -1,
+-	.dev		= {
+-		.dma_mask		= &common_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource = usb_resources,
+-	.num_resources = ARRAY_SIZE(usb_resources),
+-};
+-
+-struct platform_device stmp3xxx_ehci = {
+-	.name		= "fsl-ehci",
+-	.id		= -1,
+-	.dev		= {
+-		.dma_mask		= &common_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.resource	= usb_resources,
+-	.num_resources	= ARRAY_SIZE(usb_resources),
+-};
+-
+-static struct resource rtc_resources[] = {
+-	{
+-		.start	= REGS_RTC_PHYS,
+-		.end	= REGS_RTC_PHYS + REGS_RTC_SIZE,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_RTC_ALARM,
+-		.end	= IRQ_RTC_ALARM,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= IRQ_RTC_1MSEC,
+-		.end	= IRQ_RTC_1MSEC,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_rtc = {
+-	.name		= "stmp3xxx-rtc",
+-	.id		= -1,
+-	.resource	= rtc_resources,
+-	.num_resources	= ARRAY_SIZE(rtc_resources),
+-};
+-
+-static struct resource ssp1_resources[] = {
+-	{
+-		.start	= REGS_SSP1_PHYS,
+-		.end	= REGS_SSP1_PHYS + REGS_SSP_SIZE,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_SSP1_DMA,
+-		.end	= IRQ_SSP1_DMA,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
+-		.end	= STMP3XXX_DMA(1, STMP3XXX_BUS_APBH),
+-		.flags	= IORESOURCE_DMA,
+-	},
+-};
+-
+-static struct resource ssp2_resources[] = {
+-	{
+-		.start	= REGS_SSP2_PHYS,
+-		.end	= REGS_SSP2_PHYS + REGS_SSP_SIZE,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_SSP2_DMA,
+-		.end	= IRQ_SSP2_DMA,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.start	= STMP3XXX_DMA(2, STMP3XXX_BUS_APBH),
+-		.end	= STMP3XXX_DMA(2, STMP3XXX_BUS_APBH),
+-		.flags	= IORESOURCE_DMA,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_spi1 = {
+-	.name	= "stmp3xxx_ssp",
+-	.id	= 1,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-	.resource = ssp1_resources,
+-	.num_resources = ARRAY_SIZE(ssp1_resources),
+-};
+-
+-struct platform_device stmp3xxx_spi2 = {
+-	.name	= "stmp3xxx_ssp",
+-	.id	= 2,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-	.resource = ssp2_resources,
+-	.num_resources = ARRAY_SIZE(ssp2_resources),
+-};
+-
+-static struct resource fb_resource[] = {
+-	{
+-		.flags	= IORESOURCE_IRQ,
+-		.start	= IRQ_LCDIF_DMA,
+-		.end	= IRQ_LCDIF_DMA,
+-	}, {
+-		.flags	= IORESOURCE_IRQ,
+-		.start	= IRQ_LCDIF_ERROR,
+-		.end	= IRQ_LCDIF_ERROR,
+-	}, {
+-		.flags	= IORESOURCE_MEM,
+-		.start	= REGS_LCDIF_PHYS,
+-		.end	= REGS_LCDIF_PHYS + REGS_LCDIF_SIZE,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_framebuffer = {
+-	.name		= "stmp3xxx-fb",
+-	.id		= -1,
+-	.dev		= {
+-		.dma_mask		= &common_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-	.num_resources	= ARRAY_SIZE(fb_resource),
+-	.resource	= fb_resource,
+-};
+-
+-#define CMDLINE_DEVICE_CHOOSE(name, dev1, dev2)			\
+-	static char *cmdline_device_##name;			\
+-	static int cmdline_device_##name##_setup(char *dev)	\
+-	{							\
+-		cmdline_device_##name = dev + 1;		\
+-		return 0;					\
+-	}							\
+-	__setup(#name, cmdline_device_##name##_setup);		\
+-	int stmp3xxx_##name##_device_register(void)		\
+-	{							\
+-		struct platform_device *d = NULL;		\
+-		if (!cmdline_device_##name ||			\
+-			!strcmp(cmdline_device_##name, #dev1))	\
+-				d = &stmp3xxx_##dev1;		\
+-		else if (!strcmp(cmdline_device_##name, #dev2))	\
+-				d = &stmp3xxx_##dev2;		\
+-		else						\
+-			printk(KERN_ERR"Unknown %s assignment '%s'.\n",	\
+-				#name, cmdline_device_##name);	\
+-		return d ? platform_device_register(d) : -ENOENT;	\
+-	}
+-
+-CMDLINE_DEVICE_CHOOSE(ssp1, mmc, spi1)
+-CMDLINE_DEVICE_CHOOSE(ssp2, gpmi, spi2)
+-
+-struct platform_device stmp3xxx_backlight = {
+-	.name		= "stmp3xxx-bl",
+-	.id		= -1,
+-};
+-
+-struct platform_device stmp3xxx_rotdec = {
+-	.name	= "stmp3xxx-rotdec",
+-	.id	= -1,
+-};
+-
+-struct platform_device stmp3xxx_persistent = {
+-	.name			= "stmp3xxx-persistent",
+-	.id			= -1,
+-};
+-
+-struct platform_device stmp3xxx_dcp_bootstream = {
+-	.name			= "stmp3xxx-dcpboot",
+-	.id			= -1,
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-};
+-
+-static struct resource dcp_resources[] = {
+-	{
+-		.start = IRQ_DCP_VMI,
+-		.end = IRQ_DCP_VMI,
+-		.flags = IORESOURCE_IRQ,
+-	}, {
+-		.start = IRQ_DCP,
+-		.end = IRQ_DCP,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_dcp = {
+-	.name			= "stmp3xxx-dcp",
+-	.id			= -1,
+-	.resource		= dcp_resources,
+-	.num_resources		= ARRAY_SIZE(dcp_resources),
+-	.dev	= {
+-		.dma_mask	= &common_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-};
+-
+-static struct resource battery_resource[] = {
+-	{
+-		.flags  = IORESOURCE_IRQ,
+-		.start  = IRQ_VDD5V,
+-		.end    = IRQ_VDD5V,
+-	},
+-};
+-
+-struct platform_device stmp3xxx_battery = {
+-	.name   = "stmp3xxx-battery",
+-	.resource = battery_resource,
+-	.num_resources = ARRAY_SIZE(battery_resource),
+-};
+diff --git a/arch/arm/plat-stmp3xxx/dma.c b/arch/arm/plat-stmp3xxx/dma.c
+deleted file mode 100644
+index b4dcf8c..0000000
+--- a/arch/arm/plat-stmp3xxx/dma.c
++++ /dev/null
+@@ -1,464 +0,0 @@
+-/*
+- * DMA helper routines for Freescale STMP37XX/STMP378X
+- *
+- * Author: dmitry pervushin <dpervushin@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#include <linux/gfp.h>
+-#include <linux/kernel.h>
+-#include <linux/device.h>
+-#include <linux/dmapool.h>
+-#include <linux/sysdev.h>
+-#include <linux/cpufreq.h>
+-
+-#include <asm/page.h>
+-
+-#include <mach/platform.h>
+-#include <mach/dma.h>
+-#include <mach/regs-apbx.h>
+-#include <mach/regs-apbh.h>
+-
+-static const size_t pool_item_size = sizeof(struct stmp3xxx_dma_command);
+-static const size_t pool_alignment = 8;
+-static struct stmp3xxx_dma_user {
+-	void *pool;
+-	int inuse;
+-	const char *name;
+-} channels[MAX_DMA_CHANNELS];
+-
+-#define IS_VALID_CHANNEL(ch) ((ch) >= 0 && (ch) < MAX_DMA_CHANNELS)
+-#define IS_USED(ch) (channels[ch].inuse)
+-
+-int stmp3xxx_dma_request(int ch, struct device *dev, const char *name)
+-{
+-	struct stmp3xxx_dma_user *user;
+-	int err = 0;
+-
+-	user = channels + ch;
+-	if (!IS_VALID_CHANNEL(ch)) {
+-		err = -ENODEV;
+-		goto out;
+-	}
+-	if (IS_USED(ch)) {
+-		err = -EBUSY;
+-		goto out;
+-	}
+-	/* Create a pool to allocate dma commands from */
+-	user->pool = dma_pool_create(name, dev, pool_item_size,
+-				     pool_alignment, PAGE_SIZE);
+-	if (user->pool == NULL) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-	user->name = name;
+-	user->inuse++;
+-out:
+-	return err;
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_request);
+-
+-int stmp3xxx_dma_release(int ch)
+-{
+-	struct stmp3xxx_dma_user *user = channels + ch;
+-	int err = 0;
+-
+-	if (!IS_VALID_CHANNEL(ch)) {
+-		err = -ENODEV;
+-		goto out;
+-	}
+-	if (!IS_USED(ch)) {
+-		err = -EBUSY;
+-		goto out;
+-	}
+-	BUG_ON(user->pool == NULL);
+-	dma_pool_destroy(user->pool);
+-	user->inuse--;
+-out:
+-	return err;
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_release);
+-
+-int stmp3xxx_dma_read_semaphore(int channel)
+-{
+-	int sem = -1;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		sem = __raw_readl(REGS_APBH_BASE + HW_APBH_CHn_SEMA +
+-				STMP3XXX_DMA_CHANNEL(channel) * 0x70);
+-		sem &= BM_APBH_CHn_SEMA_PHORE;
+-		sem >>= BP_APBH_CHn_SEMA_PHORE;
+-		break;
+-
+-	case STMP3XXX_BUS_APBX:
+-		sem = __raw_readl(REGS_APBX_BASE + HW_APBX_CHn_SEMA +
+-				STMP3XXX_DMA_CHANNEL(channel) * 0x70);
+-		sem &= BM_APBX_CHn_SEMA_PHORE;
+-		sem >>= BP_APBX_CHn_SEMA_PHORE;
+-		break;
+-	default:
+-		BUG();
+-	}
+-	return sem;
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_read_semaphore);
+-
+-int stmp3xxx_dma_allocate_command(int channel,
+-				  struct stmp3xxx_dma_descriptor *descriptor)
+-{
+-	struct stmp3xxx_dma_user *user = channels + channel;
+-	int err = 0;
+-
+-	if (!IS_VALID_CHANNEL(channel)) {
+-		err = -ENODEV;
+-		goto out;
+-	}
+-	if (!IS_USED(channel)) {
+-		err = -EBUSY;
+-		goto out;
+-	}
+-	if (descriptor == NULL) {
+-		err = -EINVAL;
+-		goto out;
+-	}
+-
+-	/* Allocate memory for a command from the buffer */
+-	descriptor->command =
+-	    dma_pool_alloc(user->pool, GFP_KERNEL, &descriptor->handle);
+-
+-	/* Check it worked */
+-	if (!descriptor->command) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-
+-	memset(descriptor->command, 0, pool_item_size);
+-out:
+-	WARN_ON(err);
+-	return err;
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_allocate_command);
+-
+-int stmp3xxx_dma_free_command(int channel,
+-			      struct stmp3xxx_dma_descriptor *descriptor)
+-{
+-	int err = 0;
+-
+-	if (!IS_VALID_CHANNEL(channel)) {
+-		err = -ENODEV;
+-		goto out;
+-	}
+-	if (!IS_USED(channel)) {
+-		err = -EBUSY;
+-		goto out;
+-	}
+-
+-	/* Return the command memory to the pool */
+-	dma_pool_free(channels[channel].pool, descriptor->command,
+-		      descriptor->handle);
+-
+-	/* Initialise descriptor so we're not tempted to use it */
+-	descriptor->command = NULL;
+-	descriptor->handle = 0;
+-	descriptor->virtual_buf_ptr = NULL;
+-	descriptor->next_descr = NULL;
+-
+-	WARN_ON(err);
+-out:
+-	return err;
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_free_command);
+-
+-void stmp3xxx_dma_go(int channel,
+-		     struct stmp3xxx_dma_descriptor *head, u32 semaphore)
+-{
+-	int ch = STMP3XXX_DMA_CHANNEL(channel);
+-	void __iomem *c, *s;
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		c = REGS_APBH_BASE + HW_APBH_CHn_NXTCMDAR + 0x70 * ch;
+-		s = REGS_APBH_BASE + HW_APBH_CHn_SEMA + 0x70 * ch;
+-		break;
+-
+-	case STMP3XXX_BUS_APBX:
+-		c = REGS_APBX_BASE + HW_APBX_CHn_NXTCMDAR + 0x70 * ch;
+-		s = REGS_APBX_BASE + HW_APBX_CHn_SEMA + 0x70 * ch;
+-		break;
+-
+-	default:
+-		return;
+-	}
+-
+-	/* Set next command */
+-	__raw_writel(head->handle, c);
+-	/* Set counting semaphore (kicks off transfer). Assumes
+-	   peripheral has been set up correctly */
+-	__raw_writel(semaphore, s);
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_go);
+-
+-int stmp3xxx_dma_running(int channel)
+-{
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		return (__raw_readl(REGS_APBH_BASE + HW_APBH_CHn_SEMA +
+-			0x70 * STMP3XXX_DMA_CHANNEL(channel))) &
+-			    BM_APBH_CHn_SEMA_PHORE;
+-
+-	case STMP3XXX_BUS_APBX:
+-		return (__raw_readl(REGS_APBX_BASE + HW_APBX_CHn_SEMA +
+-			0x70 * STMP3XXX_DMA_CHANNEL(channel))) &
+-			    BM_APBX_CHn_SEMA_PHORE;
+-	default:
+-		BUG();
+-		return 0;
 -	}
 -}
+-EXPORT_SYMBOL(stmp3xxx_dma_running);
 -
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91RM9200_BASE_US1,
--		.end	= AT91RM9200_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91RM9200_ID_US1,
--		.end	= AT91RM9200_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91rm9200_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB20, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PB21, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RI)
--		at91_set_A_periph(AT91_PIN_PB18, 0);	/* RI1 */
--	if (pins & ATMEL_UART_DTR)
--		at91_set_A_periph(AT91_PIN_PB19, 0);	/* DTR1 */
--	if (pins & ATMEL_UART_DCD)
--		at91_set_A_periph(AT91_PIN_PB23, 0);	/* DCD1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PB24, 0);	/* CTS1 */
--	if (pins & ATMEL_UART_DSR)
--		at91_set_A_periph(AT91_PIN_PB25, 0);	/* DSR1 */
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PB26, 0);	/* RTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91RM9200_BASE_US2,
--		.end	= AT91RM9200_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91RM9200_ID_US2,
--		.end	= AT91RM9200_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91rm9200_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
--};
--
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA22, 0);		/* RXD2 */
--	at91_set_A_periph(AT91_PIN_PA23, 1);		/* TXD2 */
--
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PA30, 0);	/* CTS2 */
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PA31, 0);	/* RTS2 */
--}
--
--static struct resource uart3_resources[] = {
--	[0] = {
--		.start	= AT91RM9200_BASE_US3,
--		.end	= AT91RM9200_BASE_US3 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
-+	.tx_pin		= {AT91_PIN_PA17, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA18, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA20, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	/*
-+	 * AT91RM9200 Errata #39 - RTS0 is not internally connected to PA21.
-+	 * We need to drive the pin manually.  Default is off (RTS is active
-+	 * low).
-+	 */	
-+	.cts_pin	= {AT91_PIN_PA21, AT91_PIN_PERIPH_A, 1, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91RM9200_BASE_US1,
-+	.irq		= AT91RM9200_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	[1] = {
--		.start	= AT91RM9200_ID_US3,
--		.end	= AT91RM9200_ID_US3,
--		.flags	= IORESOURCE_IRQ,
-+	.tx_pin		= {AT91_PIN_PA20, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA21, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB26, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA24, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.ri_pin		= {AT91_PIN_PB18, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dtr_pin	= {AT91_PIN_PB19, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dcd_pin	= {AT91_PIN_PB23, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dsr_pin	= {AT91_PIN_PB25, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91RM9200_BASE_US2,
-+	.irq		= AT91RM9200_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--};
--
--static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart3_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91rm9200_uart3_device = {
--	.name		= "atmel_usart",
--	.id		= 4,
--	.dev		= {
--				.dma_mask		= &uart3_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart3_data,
-+	.tx_pin		= {AT91_PIN_PA23, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA22, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB31, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA30, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart3 __initdata = {
-+	.mmio_base	= AT91RM9200_BASE_US3,
-+	.irq		= AT91RM9200_ID_US3,
-+	.clock_asc	= "usart3_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart3_resources,
--	.num_resources	= ARRAY_SIZE(uart3_resources),
-+	.tx_pin		= {AT91_PIN_PA5, AT91_PIN_PERIPH_B, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA6, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB1, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PB0, AT91_PIN_PERIPH_B, 0, 0, 0},
- };
- 
--static inline void configure_usart3_pins(unsigned pins)
--{
--	at91_set_B_periph(AT91_PIN_PA5, 1);		/* TXD3 */
--	at91_set_B_periph(AT91_PIN_PA6, 0);		/* RXD3 */
--
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PB1, 0);	/* CTS3 */
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PB0, 0);	/* RTS3 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91rm9200_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91RM9200_ID_US0:
--			pdev = &at91rm9200_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91RM9200_ID_US1:
--			pdev = &at91rm9200_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91RM9200_ID_US2:
--			pdev = &at91rm9200_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		case AT91RM9200_ID_US3:
--			pdev = &at91rm9200_uart3_device;
--			configure_usart3_pins(pins);
--			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
--
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
--
--void __init at91_add_device_serial(void)
+-/*
+- * Circular dma chain management
+- */
+-void stmp3xxx_dma_free_chain(struct stmp37xx_circ_dma_chain *chain)
 -{
 -	int i;
 -
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
--	}
--
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
+-	for (i = 0; i < chain->total_count; i++)
+-		stmp3xxx_dma_free_command(
+-			STMP3XXX_DMA(chain->channel, chain->bus),
+-			&chain->chain[i]);
 -}
--#else
--void __init __deprecated at91_init_serial(struct at91_uart_config *config) {}
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
--#endif
+-EXPORT_SYMBOL(stmp3xxx_dma_free_chain);
 -
- static struct at91_device_table at91rm9200_device_table __initdata = {
- 	.ethernet	= &device_eth,
- 	.usbh_ohci	= &device_usbh_ohci,
-@@ -775,6 +560,11 @@ static struct at91_device_table at91rm9200_device_table __initdata = {
- 	.spi[0]		= &device_spi,
- 	.tcb[0]		= &device_tcb0,
- 	.tcb[1]		= &device_tcb1,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
-+	.uart[3]	= &device_uart3,
- };
- 
- void __init at91rm9200_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 8f1f866..0759be2 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -278,378 +278,104 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- /* --------------------------------------------------------------------
-  *  UART
-  * -------------------------------------------------------------------- */
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
- 
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
- 	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
-+	.tx_pin		= {AT91_PIN_PB15, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB14, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PB14, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PB15, 1);		/* DTXD */
--}
--
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US0,
--		.end	= AT91SAM9260_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US0,
-+	.irq		= AT91SAM9260_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US0,
--		.end	= AT91SAM9260_ID_US0,
--		.flags	= IORESOURCE_IRQ,
-+	.tx_pin		= {AT91_PIN_PB4,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB5,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB26, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PB27, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dtr_pin	= {AT91_PIN_PB24, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dsr_pin	= {AT91_PIN_PB22, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dcd_pin	= {AT91_PIN_PB23, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.ri_pin		= {AT91_PIN_PB25, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US1,
-+	.irq		= AT91SAM9260_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
-+	.tx_pin		= {AT91_PIN_PB6,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB7,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB28, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PB29, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US2,
-+	.irq		= AT91SAM9260_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB4, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PB5, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PB26, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PB27, 0);	/* CTS0 */
--	if (pins & ATMEL_UART_DTR)
--		at91_set_A_periph(AT91_PIN_PB24, 0);	/* DTR0 */
--	if (pins & ATMEL_UART_DSR)
--		at91_set_A_periph(AT91_PIN_PB22, 0);	/* DSR0 */
--	if (pins & ATMEL_UART_DCD)
--		at91_set_A_periph(AT91_PIN_PB23, 0);	/* DCD0 */
--	if (pins & ATMEL_UART_RI)
--		at91_set_A_periph(AT91_PIN_PB25, 0);	/* RI0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US1,
--		.end	= AT91SAM9260_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
-+	.tx_pin		= {AT91_PIN_PB8, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB9, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA4, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA5, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart3 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US3,
-+	.irq		= AT91SAM9260_ID_US3,
-+	.clock_asc	= "usart3_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US1,
--		.end	= AT91SAM9260_ID_US1,
--		.flags	= IORESOURCE_IRQ,
-+	.tx_pin		= {AT91_PIN_PB10, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB11, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PC8,  AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PC10, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart4 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US4,
-+	.irq		= AT91SAM9260_ID_US4,
-+	.clock_asc	= "usart4_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
-+	.tx_pin		= {AT91_PIN_PA31, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA30, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB6, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PB7, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PB28, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PB29, 0);	/* CTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US2,
--		.end	= AT91SAM9260_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US2,
--		.end	= AT91SAM9260_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
-+static struct at91_dev_table_uart device_uart5 __initdata = {
-+	.mmio_base	= AT91SAM9260_BASE_US5,
-+	.irq		= AT91SAM9260_ID_US5,
-+	.clock_asc	= "usart5_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
-+	.tx_pin		= {AT91_PIN_PB12, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB13, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB8, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PB9, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA4, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA5, 0);	/* CTS2 */
--}
--
--static struct resource uart3_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US3,
--		.end	= AT91SAM9260_BASE_US3 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US3,
--		.end	= AT91SAM9260_ID_US3,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart3_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart3_device = {
--	.name		= "atmel_usart",
--	.id		= 4,
--	.dev		= {
--				.dma_mask		= &uart3_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart3_data,
--	},
--	.resource	= uart3_resources,
--	.num_resources	= ARRAY_SIZE(uart3_resources),
--};
--
--static inline void configure_usart3_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB10, 1);		/* TXD3 */
--	at91_set_A_periph(AT91_PIN_PB11, 0);		/* RXD3 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PC8, 0);	/* RTS3 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PC10, 0);	/* CTS3 */
--}
--
--static struct resource uart4_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US4,
--		.end	= AT91SAM9260_BASE_US4 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US4,
--		.end	= AT91SAM9260_ID_US4,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart4_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart4_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart4_device = {
--	.name		= "atmel_usart",
--	.id		= 5,
--	.dev		= {
--				.dma_mask		= &uart4_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart4_data,
--	},
--	.resource	= uart4_resources,
--	.num_resources	= ARRAY_SIZE(uart4_resources),
--};
--
--static inline void configure_usart4_pins(void)
--{
--	at91_set_B_periph(AT91_PIN_PA31, 1);		/* TXD4 */
--	at91_set_B_periph(AT91_PIN_PA30, 0);		/* RXD4 */
--}
--
--static struct resource uart5_resources[] = {
--	[0] = {
--		.start	= AT91SAM9260_BASE_US5,
--		.end	= AT91SAM9260_BASE_US5 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9260_ID_US5,
--		.end	= AT91SAM9260_ID_US5,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart5_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart5_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9260_uart5_device = {
--	.name		= "atmel_usart",
--	.id		= 6,
--	.dev		= {
--				.dma_mask		= &uart5_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart5_data,
--	},
--	.resource	= uart5_resources,
--	.num_resources	= ARRAY_SIZE(uart5_resources),
--};
--
--static inline void configure_usart5_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PB12, 1);		/* TXD5 */
--	at91_set_A_periph(AT91_PIN_PB13, 0);		/* RXD5 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91sam9260_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US0:
--			pdev = &at91sam9260_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US1:
--			pdev = &at91sam9260_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US2:
--			pdev = &at91sam9260_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US3:
--			pdev = &at91sam9260_uart3_device;
--			configure_usart3_pins(pins);
--			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US4:
--			pdev = &at91sam9260_uart4_device;
--			configure_usart4_pins();
--			at91_clock_associate("usart4_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9260_ID_US5:
--			pdev = &at91sam9260_uart5_device;
--			configure_usart5_pins();
--			at91_clock_associate("usart5_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
--
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
--
--void __init at91_add_device_serial(void)
+-int stmp3xxx_dma_make_chain(int ch, struct stmp37xx_circ_dma_chain *chain,
+-			    struct stmp3xxx_dma_descriptor descriptors[],
+-			    unsigned items)
 -{
 -	int i;
+-	int err = 0;
 -
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
+-	if (items == 0)
+-		return err;
+-
+-	for (i = 0; i < items; i++) {
+-		err = stmp3xxx_dma_allocate_command(ch, &descriptors[i]);
+-		if (err) {
+-			WARN_ON(err);
+-			/*
+-			 * Couldn't allocate the whole chain.
+-			 * deallocate what has been allocated
+-			 */
+-			if (i) {
+-				do {
+-					stmp3xxx_dma_free_command(ch,
+-								  &descriptors
+-								  [i]);
+-				} while (i-- > 0);
+-			}
+-			return err;
+-		}
+-
+-		/* link them! */
+-		if (i > 0) {
+-			descriptors[i - 1].next_descr = &descriptors[i];
+-			descriptors[i - 1].command->next =
+-						descriptors[i].handle;
+-		}
 -	}
 -
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
+-	/* make list circular */
+-	descriptors[items - 1].next_descr = &descriptors[0];
+-	descriptors[items - 1].command->next = descriptors[0].handle;
+-
+-	chain->total_count = items;
+-	chain->chain = descriptors;
+-	chain->free_index = 0;
+-	chain->active_index = 0;
+-	chain->cooked_index = 0;
+-	chain->free_count = items;
+-	chain->active_count = 0;
+-	chain->cooked_count = 0;
+-	chain->bus = STMP3XXX_DMA_BUS(ch);
+-	chain->channel = STMP3XXX_DMA_CHANNEL(ch);
+-	return err;
 -}
+-EXPORT_SYMBOL(stmp3xxx_dma_make_chain);
+-
+-void stmp37xx_circ_clear_chain(struct stmp37xx_circ_dma_chain *chain)
+-{
+-	BUG_ON(stmp3xxx_dma_running(STMP3XXX_DMA(chain->channel, chain->bus)));
+-	chain->free_index = 0;
+-	chain->active_index = 0;
+-	chain->cooked_index = 0;
+-	chain->free_count = chain->total_count;
+-	chain->active_count = 0;
+-	chain->cooked_count = 0;
+-}
+-EXPORT_SYMBOL(stmp37xx_circ_clear_chain);
+-
+-void stmp37xx_circ_advance_free(struct stmp37xx_circ_dma_chain *chain,
+-		unsigned count)
+-{
+-	BUG_ON(chain->cooked_count < count);
+-
+-	chain->cooked_count -= count;
+-	chain->cooked_index += count;
+-	chain->cooked_index %= chain->total_count;
+-	chain->free_count += count;
+-}
+-EXPORT_SYMBOL(stmp37xx_circ_advance_free);
+-
+-void stmp37xx_circ_advance_active(struct stmp37xx_circ_dma_chain *chain,
+-		unsigned count)
+-{
+-	void __iomem *c;
+-	u32 mask_clr, mask;
+-	BUG_ON(chain->free_count < count);
+-
+-	chain->free_count -= count;
+-	chain->free_index += count;
+-	chain->free_index %= chain->total_count;
+-	chain->active_count += count;
+-
+-	switch (chain->bus) {
+-	case STMP3XXX_BUS_APBH:
+-		c = REGS_APBH_BASE + HW_APBH_CHn_SEMA + 0x70 * chain->channel;
+-		mask_clr = BM_APBH_CHn_SEMA_INCREMENT_SEMA;
+-		mask = BF(count, APBH_CHn_SEMA_INCREMENT_SEMA);
+-		break;
+-	case STMP3XXX_BUS_APBX:
+-		c = REGS_APBX_BASE + HW_APBX_CHn_SEMA + 0x70 * chain->channel;
+-		mask_clr = BM_APBX_CHn_SEMA_INCREMENT_SEMA;
+-		mask = BF(count, APBX_CHn_SEMA_INCREMENT_SEMA);
+-		break;
+-	default:
+-		BUG();
+-		return;
+-	}
+-
+-	/* Set counting semaphore (kicks off transfer). Assumes
+-	   peripheral has been set up correctly */
+-	stmp3xxx_clearl(mask_clr, c);
+-	stmp3xxx_setl(mask, c);
+-}
+-EXPORT_SYMBOL(stmp37xx_circ_advance_active);
+-
+-unsigned stmp37xx_circ_advance_cooked(struct stmp37xx_circ_dma_chain *chain)
+-{
+-	unsigned cooked;
+-
+-	cooked = chain->active_count -
+-	  stmp3xxx_dma_read_semaphore(STMP3XXX_DMA(chain->channel, chain->bus));
+-
+-	chain->active_count -= cooked;
+-	chain->active_index += cooked;
+-	chain->active_index %= chain->total_count;
+-
+-	chain->cooked_count += cooked;
+-
+-	return cooked;
+-}
+-EXPORT_SYMBOL(stmp37xx_circ_advance_cooked);
+-
+-void stmp3xxx_dma_set_alt_target(int channel, int function)
+-{
+-#if defined(CONFIG_ARCH_STMP37XX)
+-	unsigned bits = 4;
+-#elif defined(CONFIG_ARCH_STMP378X)
+-	unsigned bits = 2;
 -#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
+-#error wrong arch
+-#endif
+-	int shift = STMP3XXX_DMA_CHANNEL(channel) * bits;
+-	unsigned mask = (1<<bits) - 1;
+-	void __iomem *c;
+-
+-	BUG_ON(function < 0 || function >= (1<<bits));
+-	pr_debug("%s: channel = %d, using mask %x, "
+-		 "shift = %d\n", __func__, channel, mask, shift);
+-
+-	switch (STMP3XXX_DMA_BUS(channel)) {
+-	case STMP3XXX_BUS_APBH:
+-		c = REGS_APBH_BASE + HW_APBH_DEVSEL;
+-		break;
+-	case STMP3XXX_BUS_APBX:
+-		c = REGS_APBX_BASE + HW_APBX_DEVSEL;
+-		break;
+-	default:
+-		BUG();
+-	}
+-	stmp3xxx_clearl(mask << shift, c);
+-	stmp3xxx_setl(mask << shift, c);
+-}
+-EXPORT_SYMBOL(stmp3xxx_dma_set_alt_target);
+-
+-void stmp3xxx_dma_suspend(void)
+-{
+-	stmp3xxx_setl(BM_APBH_CTRL0_CLKGATE, REGS_APBH_BASE + HW_APBH_CTRL0);
+-	stmp3xxx_setl(BM_APBX_CTRL0_CLKGATE, REGS_APBX_BASE + HW_APBX_CTRL0);
+-}
+-
+-void stmp3xxx_dma_resume(void)
+-{
+-	stmp3xxx_clearl(BM_APBH_CTRL0_CLKGATE | BM_APBH_CTRL0_SFTRST,
+-			REGS_APBH_BASE + HW_APBH_CTRL0);
+-	stmp3xxx_clearl(BM_APBX_CTRL0_CLKGATE | BM_APBX_CTRL0_SFTRST,
+-			REGS_APBX_BASE + HW_APBX_CTRL0);
+-}
+-
+-#ifdef CONFIG_CPU_FREQ
+-
+-struct dma_notifier_block {
+-	struct notifier_block nb;
+-	void *data;
+-};
+-
+-static int dma_cpufreq_notifier(struct notifier_block *self,
+-				unsigned long phase, void *p)
+-{
+-	switch (phase) {
+-	case CPUFREQ_POSTCHANGE:
+-		stmp3xxx_dma_resume();
+-		break;
+-
+-	case CPUFREQ_PRECHANGE:
+-		stmp3xxx_dma_suspend();
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	return NOTIFY_DONE;
+-}
+-
+-static struct dma_notifier_block dma_cpufreq_nb = {
+-	.nb = {
+-		.notifier_call = dma_cpufreq_notifier,
+-	},
+-};
+-#endif /* CONFIG_CPU_FREQ */
+-
+-void __init stmp3xxx_dma_init(void)
+-{
+-	stmp3xxx_clearl(BM_APBH_CTRL0_CLKGATE | BM_APBH_CTRL0_SFTRST,
+-			REGS_APBH_BASE + HW_APBH_CTRL0);
+-	stmp3xxx_clearl(BM_APBX_CTRL0_CLKGATE | BM_APBX_CTRL0_SFTRST,
+-			REGS_APBX_BASE + HW_APBX_CTRL0);
+-#ifdef CONFIG_CPU_FREQ
+-	cpufreq_register_notifier(&dma_cpufreq_nb.nb,
+-				CPUFREQ_TRANSITION_NOTIFIER);
+-#endif /* CONFIG_CPU_FREQ */
+-}
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/clkdev.h b/arch/arm/plat-stmp3xxx/include/mach/clkdev.h
+deleted file mode 100644
+index f9c3977..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/clkdev.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_MACH_CLKDEV_H
+-#define __ASM_MACH_CLKDEV_H
+-
+-#define __clk_get(clk) ({ 1; })
+-#define __clk_put(clk) do { } while (0)
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/cputype.h b/arch/arm/plat-stmp3xxx/include/mach/cputype.h
+deleted file mode 100644
+index b4e205b..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/cputype.h
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X CPU type detection
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_CPU_H
+-#define __ASM_PLAT_CPU_H
+-
+-#ifdef CONFIG_ARCH_STMP37XX
+-#define cpu_is_stmp37xx()	(1)
+-#else
+-#define cpu_is_stmp37xx()	(0)
 -#endif
 -
- /* --------------------------------------------------------------------
-  *  CF/IDE
-  * -------------------------------------------------------------------- */
-@@ -779,6 +505,13 @@ static struct at91_device_table at91sam9260_device_table __initdata = {
- 	.tcb[0]		= &device_tcb0,
- 	.tcb[1]		= &device_tcb1,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
-+	.uart[3]	= &device_uart3,
-+	.uart[4]	= &device_uart4,
-+	.uart[5]	= &device_uart5,
- };
- 
- void __init at91sam9260_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index bc9f0c7..9e48f36 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -425,236 +425,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
--
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9261_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
--};
--
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PA9, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PA10, 1);		/* DTXD */
--}
--
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91SAM9261_BASE_US0,
--		.end	= AT91SAM9261_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9261_ID_US0,
--		.end	= AT91SAM9261_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9261_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
--	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PC8, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PC9, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PC10, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PC11, 0);	/* CTS0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91SAM9261_BASE_US1,
--		.end	= AT91SAM9261_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9261_ID_US1,
--		.end	= AT91SAM9261_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9261_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
- 	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
-+	.tx_pin		= {AT91_PIN_PA10, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA9,  AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PC12, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PC13, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PA12, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PA13, 0);	/* CTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91SAM9261_BASE_US2,
--		.end	= AT91SAM9261_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91SAM9261_BASE_US0,
-+	.irq		= AT91SAM9261_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	[1] = {
--		.start	= AT91SAM9261_ID_US2,
--		.end	= AT91SAM9261_ID_US2,
--		.flags	= IORESOURCE_IRQ,
-+	.tx_pin		= {AT91_PIN_PC8,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC9,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PC10, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PC11, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91SAM9261_BASE_US1,
-+	.irq		= AT91SAM9261_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9261_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
-+	.tx_pin		= {AT91_PIN_PC12, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC13, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA12, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA13, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91SAM9261_BASE_US2,
-+	.irq		= AT91SAM9261_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
- 	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
-+	.tx_pin		= {AT91_PIN_PC14, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC15, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA15, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA16, AT91_PIN_PERIPH_B, 0, 0, 0},
- };
- 
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PC15, 0);		/* RXD2 */
--	at91_set_A_periph(AT91_PIN_PC14, 1);		/* TXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PA15, 0);	/* RTS2*/
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PA16, 0);	/* CTS2 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91sam9261_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91SAM9261_ID_US0:
--			pdev = &at91sam9261_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9261_ID_US1:
--			pdev = &at91sam9261_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9261_ID_US2:
--			pdev = &at91sam9261_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
--
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
--
--void __init at91_add_device_serial(void)
--{
--	int i;
--
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
--	}
--
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
+-#ifdef CONFIG_ARCH_STMP378X
+-#define cpu_is_stmp378x()	(1)
 -#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
+-#define cpu_is_stmp378x()	(0)
 -#endif
 -
- static struct at91_device_table at91sam9261_device_table __initdata = {
- 	.usbh_ohci	= &device_usbh_ohci,
- 	.udc		= &device_udc,
-@@ -665,6 +490,10 @@ static struct at91_device_table at91sam9261_device_table __initdata = {
- 	.spi[1]		= &device_spi1,
- 	.tcb[0]		= &device_tcb,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
- };
- 
- void __init at91sam9261_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 109e230..1bc3da2 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -715,237 +715,61 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
+-#endif /* __ASM_PLAT_CPU_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
+deleted file mode 100644
+index d3a0985..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,39 +0,0 @@
+-/*
+- * Debugging macro include header
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
 -
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
 -
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
+-		.macro	addruart, rp, rv
+-		mov	\rp,      #0x00070000
+-		add	\rv, \rp, #0xf0000000	@ virtual base
+-		add	\rp, \rp, #0x80000000	@ physical base
+-		.endm
 -
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+-		.macro	senduart,rd,rx
+-		strb	\rd, [\rx, #0]		@ data register at 0
+-		.endm
 -
--static struct platform_device at91sam9263_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
--};
+-		.macro	waituart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+-		tst	\rd, #1 << 5		@ UARTFLGUTXFF - 1 when full
+-		bne	1001b
+-		.endm
 -
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PC30, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PC31, 1);		/* DTXD */
--}
+-		.macro	busyuart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+-		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
+-		bne	1001b
+-		.endm
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/dma.h b/arch/arm/plat-stmp3xxx/include/mach/dma.h
+deleted file mode 100644
+index 7c58557..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/dma.h
++++ /dev/null
+@@ -1,153 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X DMA helper interface
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
 -
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_US0,
--		.end	= AT91SAM9263_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_US0,
--		.end	= AT91SAM9263_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_STMP3XXX_DMA_H
+-#define __ASM_PLAT_STMP3XXX_DMA_H
 -
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
+-#include <linux/platform_device.h>
+-#include <linux/dmapool.h>
 -
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9263_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
--	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA26, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PA27, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA28, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA29, 0);	/* CTS0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_US1,
--		.end	= AT91SAM9263_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_US1,
--		.end	= AT91SAM9263_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
-+	},
-+	.tx_pin		= {AT91_PIN_PC31, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PC30, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91SAM9263_BASE_US0,
-+	.irq		= AT91SAM9263_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA26, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA27, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA28, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA29, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91SAM9263_BASE_US1,
-+	.irq		= AT91SAM9263_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PD0, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PD1, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD7, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD8, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91SAM9263_BASE_US2,
-+	.irq		= AT91SAM9263_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PD2, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PD3, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD5, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD6, AT91_PIN_PERIPH_B, 0, 0, 0},
- };
- 
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9263_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PD0, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PD1, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PD7, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PD8, 0);	/* CTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_US2,
--		.end	= AT91SAM9263_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_US2,
--		.end	= AT91SAM9263_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9263_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
--};
--
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PD2, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PD3, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PD5, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PD6, 0);	/* CTS2 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91sam9263_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91SAM9263_ID_US0:
--			pdev = &at91sam9263_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9263_ID_US1:
--			pdev = &at91sam9263_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9263_ID_US2:
--			pdev = &at91sam9263_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
--
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
--
--void __init at91_add_device_serial(void)
--{
--	int i;
--
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
--	}
--
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
--#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
+-#if !defined(MAX_PIO_WORDS)
+-#define MAX_PIO_WORDS   (15)
 -#endif
 -
- static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.ethernet	= &device_eth,
- 	.usbh_ohci	= &device_usbh_ohci,
-@@ -959,6 +783,10 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.tcb[0]		= &device_tcb,
- 	.rtt[0]		= &device_rtt0,
- 	.rtt[1]		= &device_rtt1,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
- };
- 
- void __init at91sam9263_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 96631f3..be9435b 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -748,284 +748,75 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
+-#define STMP3XXX_BUS_APBH		0
+-#define STMP3XXX_BUS_APBX		1
+-#define STMP3XXX_DMA_MAX_CHANNEL	16
+-#define STMP3XXX_DMA_BUS(dma)		((dma) / 16)
+-#define STMP3XXX_DMA_CHANNEL(dma)	((dma) % 16)
+-#define STMP3XXX_DMA(channel, bus)	((bus) * 16 + (channel))
+-#define MAX_DMA_ADDRESS			0xffffffff
+-#define MAX_DMA_CHANNELS		32
+-
+-struct stmp3xxx_dma_command {
+-	u32 next;
+-	u32 cmd;
+-	union {
+-		u32 buf_ptr;
+-		u32 alternate;
+-	};
+-	u32 pio_words[MAX_PIO_WORDS];
 -};
 -
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
+-struct stmp3xxx_dma_descriptor {
+-	struct stmp3xxx_dma_command *command;
+-	dma_addr_t handle;
+-
+-	/* The virtual address of the buffer pointer */
+-	void *virtual_buf_ptr;
+-	/* The next descriptor in a the DMA chain (optional) */
+-	struct stmp3xxx_dma_descriptor *next_descr;
 -};
 -
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
+-struct stmp37xx_circ_dma_chain {
+-	unsigned total_count;
+-	struct stmp3xxx_dma_descriptor *chain;
 -
--static struct platform_device at91sam9g45_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
+-	unsigned free_index;
+-	unsigned free_count;
+-	unsigned active_index;
+-	unsigned active_count;
+-	unsigned cooked_index;
+-	unsigned cooked_count;
+-
+-	int bus;
+-	unsigned channel;
 -};
 -
--static inline void configure_dbgu_pins(void)
+-static inline struct stmp3xxx_dma_descriptor
+-    *stmp3xxx_dma_circ_get_free_head(struct stmp37xx_circ_dma_chain *chain)
 -{
--	at91_set_A_periph(AT91_PIN_PB12, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PB13, 1);		/* DTXD */
+-	return &(chain->chain[chain->free_index]);
 -}
 -
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_BASE_US0,
--		.end	= AT91SAM9G45_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_ID_US0,
--		.end	= AT91SAM9G45_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9g45_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
--	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
+-static inline struct stmp3xxx_dma_descriptor
+-    *stmp3xxx_dma_circ_get_cooked_head(struct stmp37xx_circ_dma_chain *chain)
 -{
--	at91_set_A_periph(AT91_PIN_PB19, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PB18, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PB17, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PB15, 0);	/* CTS0 */
+-	return &(chain->chain[chain->cooked_index]);
 -}
 -
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_BASE_US1,
--		.end	= AT91SAM9G45_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_ID_US1,
--		.end	= AT91SAM9G45_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
+-int stmp3xxx_dma_request(int ch, struct device *dev, const char *name);
+-int stmp3xxx_dma_release(int ch);
+-int stmp3xxx_dma_allocate_command(int ch,
+-				  struct stmp3xxx_dma_descriptor *descriptor);
+-int stmp3xxx_dma_free_command(int ch,
+-			      struct stmp3xxx_dma_descriptor *descriptor);
+-void stmp3xxx_dma_continue(int channel, u32 semaphore);
+-void stmp3xxx_dma_go(int ch, struct stmp3xxx_dma_descriptor *head,
+-		     u32 semaphore);
+-int stmp3xxx_dma_running(int ch);
+-int stmp3xxx_dma_make_chain(int ch, struct stmp37xx_circ_dma_chain *chain,
+-			    struct stmp3xxx_dma_descriptor descriptors[],
+-			    unsigned items);
+-void stmp3xxx_dma_free_chain(struct stmp37xx_circ_dma_chain *chain);
+-void stmp37xx_circ_clear_chain(struct stmp37xx_circ_dma_chain *chain);
+-void stmp37xx_circ_advance_free(struct stmp37xx_circ_dma_chain *chain,
+-		unsigned count);
+-void stmp37xx_circ_advance_active(struct stmp37xx_circ_dma_chain *chain,
+-		unsigned count);
+-unsigned stmp37xx_circ_advance_cooked(struct stmp37xx_circ_dma_chain *chain);
+-int stmp3xxx_dma_read_semaphore(int ch);
+-void stmp3xxx_dma_init(void);
+-void stmp3xxx_dma_set_alt_target(int ch, int target);
+-void stmp3xxx_dma_suspend(void);
+-void stmp3xxx_dma_resume(void);
 -
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
+-/*
+- * STMP37xx and STMP378x have different DMA control
+- * registers layout
+- */
 -
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
+-void stmp3xxx_arch_dma_freeze(int ch);
+-void stmp3xxx_arch_dma_unfreeze(int ch);
+-void stmp3xxx_arch_dma_reset_channel(int ch);
+-void stmp3xxx_arch_dma_enable_interrupt(int ch);
+-void stmp3xxx_arch_dma_clear_interrupt(int ch);
+-int stmp3xxx_arch_dma_is_interrupt(int ch);
 -
--static struct platform_device at91sam9g45_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
+-static inline void stmp3xxx_dma_reset_channel(int ch)
 -{
--	at91_set_A_periph(AT91_PIN_PB4, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PB5, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PD16, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PD17, 0);	/* CTS1 */
+-	stmp3xxx_arch_dma_reset_channel(ch);
 -}
 -
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_BASE_US2,
--		.end	= AT91SAM9G45_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_ID_US2,
--		.end	= AT91SAM9G45_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
 -
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9g45_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
-+	},
-+	.tx_pin		= {AT91_PIN_PB13, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB12, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91SAM9G45_BASE_US0,
-+	.irq		= AT91SAM9G45_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA19, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA18, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PB17, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PB15, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91SAM9G45_BASE_US1,
-+	.irq		= AT91SAM9G45_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PB4,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB5,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD16, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD17, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91SAM9G45_BASE_US2,
-+	.irq		= AT91SAM9G45_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PB6,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB7,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PC9,  AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PC11, AT91_PIN_PERIPH_B, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart3 __initdata = {
-+	.mmio_base	= AT91SAM9G45_BASE_US3,
-+	.irq		= AT91SAM9G45_ID_US3,
-+	.clock_asc	= "usart3_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PB8,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB9,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA23, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA24, AT91_PIN_PERIPH_B, 0, 0, 0},
- };
- 
--static inline void configure_usart2_pins(unsigned pins)
+-static inline void stmp3xxx_dma_freeze(int ch)
 -{
--	at91_set_A_periph(AT91_PIN_PB6, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PB7, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PC9, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PC11, 0);	/* CTS2 */
+-	stmp3xxx_arch_dma_freeze(ch);
 -}
 -
--static struct resource uart3_resources[] = {
--	[0] = {
--		.start	= AT91SAM9G45_BASE_US3,
--		.end	= AT91SAM9G45_BASE_US3 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9G45_ID_US3,
--		.end	= AT91SAM9G45_ID_US3,
--		.flags	= IORESOURCE_IRQ,
--	},
+-static inline void stmp3xxx_dma_unfreeze(int ch)
+-{
+-	stmp3xxx_arch_dma_unfreeze(ch);
+-}
+-
+-static inline void stmp3xxx_dma_enable_interrupt(int ch)
+-{
+-	stmp3xxx_arch_dma_enable_interrupt(ch);
+-}
+-
+-static inline void stmp3xxx_dma_clear_interrupt(int ch)
+-{
+-	stmp3xxx_arch_dma_clear_interrupt(ch);
+-}
+-
+-static inline int stmp3xxx_dma_is_interrupt(int ch)
+-{
+-	return stmp3xxx_arch_dma_is_interrupt(ch);
+-}
+-
+-#endif /* __ASM_PLAT_STMP3XXX_DMA_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/gpio.h b/arch/arm/plat-stmp3xxx/include/mach/gpio.h
+deleted file mode 100644
+index a8b5792..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/gpio.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X GPIO interface
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_GPIO_H
+-#define __ASM_PLAT_GPIO_H
+-
+-#define ARCH_NR_GPIOS	(32 * 3)
+-#define gpio_to_irq(gpio) __gpio_to_irq(gpio)
+-#define gpio_get_value(gpio) __gpio_get_value(gpio)
+-#define gpio_set_value(gpio, value) __gpio_set_value(gpio, value)
+-
+-#include <asm-generic/gpio.h>
+-
+-#endif /* __ASM_PLAT_GPIO_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/gpmi.h b/arch/arm/plat-stmp3xxx/include/mach/gpmi.h
+deleted file mode 100644
+index e166432..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/gpmi.h
++++ /dev/null
+@@ -1,12 +0,0 @@
+-#ifndef __MACH_GPMI_H
+-
+-#include <linux/mtd/partitions.h>
+-#include <mach/regs-gpmi.h>
+-
+-struct gpmi_platform_data {
+-	void *pins;
+-	int nr_parts;
+-	struct mtd_partition *parts;
+-	const char *part_types[];
+-};
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/hardware.h b/arch/arm/plat-stmp3xxx/include/mach/hardware.h
+deleted file mode 100644
+index 47b8978..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/hardware.h
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * This file contains the hardware definitions of the Freescale STMP3XXX
+- *
+- * Copyright (C) 2005 Sigmatel Inc
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_ARCH_HARDWARE_H
+-#define __ASM_ARCH_HARDWARE_H
+-
+-/*
+- * Where in virtual memory the IO devices (timers, system controllers
+- * and so on)
+- */
+-#define IO_BASE			0xF0000000                 /* VA of IO  */
+-#define IO_SIZE			0x00100000                 /* How much? */
+-#define IO_START		0x80000000                 /* PA of IO  */
+-
+-/* macro to get at IO space when running virtually */
+-#define IO_ADDRESS(x) (((x) & 0x000fffff) | IO_BASE)
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/io.h b/arch/arm/plat-stmp3xxx/include/mach/io.h
+deleted file mode 100644
+index d08b1b7..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/io.h
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- * Copyright (C) 2005 Sigmatel Inc
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a) 	__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-#define __mem_isa(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/memory.h b/arch/arm/plat-stmp3xxx/include/mach/memory.h
+deleted file mode 100644
+index 61fa548..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/memory.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_ARCH_MEMORY_H
+-#define __ASM_ARCH_MEMORY_H
+-
+-/*
+- * Physical DRAM offset.
+- */
+-#define PLAT_PHYS_OFFSET	UL(0x40000000)
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/mmc.h b/arch/arm/plat-stmp3xxx/include/mach/mmc.h
+deleted file mode 100644
+index ba81e15..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/mmc.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#ifndef _MACH_MMC_H
+-#define _MACH_MMC_H
+-
+-#include <mach/regs-ssp.h>
+-
+-struct stmp3xxxmmc_platform_data {
+-	int (*get_wp)(void);
+-	unsigned long (*setclock)(void __iomem *base, unsigned long);
+-	void (*cmd_pullup)(int);
+-	int  (*hw_init)(void);
+-	void (*hw_release)(void);
 -};
 -
--static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/pinmux.h b/arch/arm/plat-stmp3xxx/include/mach/pinmux.h
+deleted file mode 100644
+index cc5af82..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/pinmux.h
++++ /dev/null
+@@ -1,157 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X Pin Multiplexing
+- *
+- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __PINMUX_H
+-#define __PINMUX_H
+-
+-#include <linux/spinlock.h>
+-#include <linux/types.h>
+-#include <linux/gpio.h>
+-#include <asm-generic/gpio.h>
+-
+-/* Pin definitions */
+-#include "pins.h"
+-#include <mach/pins.h>
+-
+-/*
+- * Each pin may be routed up to four different HW interfaces
+- * including GPIO
+- */
+-enum pin_fun {
+-	PIN_FUN1 = 0,
+-	PIN_FUN2,
+-	PIN_FUN3,
+-	PIN_GPIO,
 -};
 -
--static u64 uart3_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9g45_uart3_device = {
--	.name		= "atmel_usart",
--	.id		= 4,
--	.dev		= {
--				.dma_mask		= &uart3_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart3_data,
--	},
--	.resource	= uart3_resources,
--	.num_resources	= ARRAY_SIZE(uart3_resources),
+-/*
+- * Each pin may have different output drive strength in range from
+- * 4mA to 20mA. The most common case is 4, 8 and 12 mA strengths.
+- */
+-enum pin_strength {
+-	PIN_4MA = 0,
+-	PIN_8MA,
+-	PIN_12MA,
+-	PIN_16MA,
+-	PIN_20MA,
 -};
 -
--static inline void configure_usart3_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB8, 1);		/* TXD3 */
--	at91_set_A_periph(AT91_PIN_PB9, 0);		/* RXD3 */
+-/*
+- * Each pin can be programmed for 1.8V or 3.3V
+- */
+-enum pin_voltage {
+-	PIN_1_8V = 0,
+-	PIN_3_3V,
+-};
 -
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PA23, 0);	/* RTS3 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PA24, 0);	/* CTS3 */
--}
+-/*
+- * Structure to define a group of pins and their parameters
+- */
+-struct pin_desc {
+-	unsigned id;
+-	enum pin_fun fun;
+-	enum pin_strength strength;
+-	enum pin_voltage voltage;
+-	unsigned pullup:1;
+-};
 -
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
+-struct pin_group {
+-	struct pin_desc *pins;
+-	int nr_pins;
+-};
 -
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
+-/* Set pin drive strength */
+-void stmp3xxx_pin_strength(unsigned id, enum pin_strength strength,
+-			   const char *label);
 -
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91sam9g45_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91SAM9G45_ID_US0:
--			pdev = &at91sam9g45_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9G45_ID_US1:
--			pdev = &at91sam9g45_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9G45_ID_US2:
--			pdev = &at91sam9g45_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9G45_ID_US3:
--			pdev = &at91sam9g45_uart3_device;
--			configure_usart3_pins(pins);
--			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
+-/* Set pin voltage */
+-void stmp3xxx_pin_voltage(unsigned id, enum pin_voltage voltage,
+-			   const char *label);
 -
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
+-/* Enable pull-up resistor for a pin */
+-void stmp3xxx_pin_pullup(unsigned id, int enable, const char *label);
 -
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
+-/*
+- * Request a pin ownership, only one module (identified by @label)
+- * may own a pin.
+- */
+-int stmp3xxx_request_pin(unsigned id, enum pin_fun fun, const char *label);
 -
--void __init at91_add_device_serial(void)
--{
--	int i;
+-/* Release pin */
+-void stmp3xxx_release_pin(unsigned id, const char *label);
 -
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
--	}
+-void stmp3xxx_set_pin_type(unsigned id, enum pin_fun fun);
 -
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
+-/*
+- * Each bank is associated with a number of registers to control
+- * pin function, drive strength, voltage and pull-up reigster. The
+- * number of registers of a given type depends on the number of bits
+- * describin particular pin.
+- */
+-#define HW_MUXSEL_NUM		2	/* registers per bank */
+-#define HW_MUXSEL_PIN_LEN	2	/* bits per pin */
+-#define HW_MUXSEL_PIN_NUM	16	/* pins per register */
+-#define HW_MUXSEL_PINFUN_MASK	0x3	/* pin function mask */
+-#define HW_MUXSEL_PINFUN_NUM	4	/* four options for a pin */
+-
+-#define HW_DRIVE_NUM		4	/* registers per bank */
+-#define HW_DRIVE_PIN_LEN	4	/* bits per pin */
+-#define HW_DRIVE_PIN_NUM	8	/* pins per register */
+-#define HW_DRIVE_PINDRV_MASK	0x3	/* pin strength mask - 2 bits */
+-#define HW_DRIVE_PINDRV_NUM	5	/* five possible strength values */
+-#define HW_DRIVE_PINV_MASK	0x4	/* pin voltage mask - 1 bit */
+-
+-
+-struct stmp3xxx_pinmux_bank {
+-	struct gpio_chip chip;
+-
+-	/* Pins allocation map */
+-	unsigned long pin_map;
+-
+-	/* Pin owner names */
+-	const char *pin_labels[32];
+-
+-	/* Bank registers */
+-	void __iomem *hw_muxsel[HW_MUXSEL_NUM];
+-	void __iomem *hw_drive[HW_DRIVE_NUM];
+-	void __iomem *hw_pull;
+-
+-	void __iomem *pin2irq,
+-		*irqlevel,
+-		*irqpolarity,
+-		*irqen,
+-		*irqstat;
+-
+-	/* HW MUXSEL register function bit values */
+-	u8 functions[HW_MUXSEL_PINFUN_NUM];
+-
+-	/*
+-	 * HW DRIVE register strength bit values:
+-	 * 0xff - requested strength is not supported for this bank
+-	 */
+-	u8 strengths[HW_DRIVE_PINDRV_NUM];
+-
+-	/* GPIO things */
+-	void __iomem *hw_gpio_in,
+-		     *hw_gpio_out,
+-		     *hw_gpio_doe;
+-	int irq, virq;
+-};
+-
+-int __init stmp3xxx_pinmux_init(int virtual_irq_start);
+-
+-#endif /* __PINMUX_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/pins.h b/arch/arm/plat-stmp3xxx/include/mach/pins.h
+deleted file mode 100644
+index c573318..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/pins.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X Pin multiplexing interface definitions
+- *
+- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_PINS_H
+-#define __ASM_PLAT_PINS_H
+-
+-#define STMP3XXX_PINID(bank, pin)	(bank * 32 + pin)
+-#define STMP3XXX_PINID_TO_BANK(pinid)	(pinid / 32)
+-#define STMP3XXX_PINID_TO_PINNUM(pinid)	(pinid % 32)
+-
+-/*
+- * Special invalid pin identificator to show a pin doesn't exist
+- */
+-#define PINID_NO_PIN	STMP3XXX_PINID(0xFF, 0xFF)
+-
+-#endif /* __ASM_PLAT_PINS_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/platform.h b/arch/arm/plat-stmp3xxx/include/mach/platform.h
+deleted file mode 100644
+index 7007dda..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/platform.h
++++ /dev/null
+@@ -1,68 +0,0 @@
+-/*
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_PLATFORM_H
+-#define __ASM_PLAT_PLATFORM_H
+-
+-#ifndef __ASSEMBLER__
+-#include <linux/io.h>
+-#endif
+-#include <asm/sizes.h>
+-
+-/* Virtual address where registers are mapped */
+-#define STMP3XXX_REGS_PHBASE	0x80000000
+-#ifdef __ASSEMBLER__
+-#define STMP3XXX_REGS_BASE	0xF0000000
 -#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
+-#define STMP3XXX_REGS_BASE	(void __iomem *)0xF0000000
+-#endif
+-#define STMP3XXX_REGS_SIZE	SZ_1M
+-
+-/* Virtual address where OCRAM is mapped */
+-#define STMP3XXX_OCRAM_PHBASE	0x00000000
+-#ifdef __ASSEMBLER__
+-#define STMP3XXX_OCRAM_BASE	0xf1000000
+-#else
+-#define STMP3XXX_OCRAM_BASE	(void __iomem *)0xf1000000
+-#endif
+-#define STMP3XXX_OCRAM_SIZE	(32 * SZ_1K)
+-
+-#ifdef CONFIG_ARCH_STMP37XX
+-#define IRQ_PRIORITY_REG_RD	HW_ICOLL_PRIORITYn_RD
+-#define IRQ_PRIORITY_REG_WR	HW_ICOLL_PRIORITYn_WR
 -#endif
 -
- static struct at91_device_table at91sam9g45_device_table __initdata = {
- 	.ethernet	= &device_eth,
- 	.usbh_ohci	= &device_usb_ohci,
-@@ -1040,6 +831,11 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
- 	.tcb[0]		= &device_tcb0,
- 	.tcb[1]		= &device_tcb1,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
-+	.uart[3]	= &device_uart3,
- };
- 
- void __init at91sam9g45_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index fa11eac..8f43d23 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -626,292 +626,79 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
-  *  UART
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_SERIAL_ATMEL)
--static struct resource dbgu_resources[] = {
--	[0] = {
--		.start	= AT91_VA_BASE_SYS + AT91_DBGU,
--		.end	= AT91_VA_BASE_SYS + AT91_DBGU + SZ_512 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91_ID_SYS,
--		.end	= AT91_ID_SYS,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data dbgu_data = {
--	.use_dma_tx	= 0,
--	.use_dma_rx	= 0,		/* DBGU not capable of receive DMA */
--	.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
--};
--
--static u64 dbgu_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9rl_dbgu_device = {
--	.name		= "atmel_usart",
--	.id		= 0,
--	.dev		= {
--				.dma_mask		= &dbgu_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &dbgu_data,
--	},
--	.resource	= dbgu_resources,
--	.num_resources	= ARRAY_SIZE(dbgu_resources),
-+static struct at91_dev_table_uart device_dbgu __initdata = {
-+	.mmio_base	= AT91_VA_BASE_SYS + AT91_DBGU,
-+	.irq		= AT91_ID_SYS,
-+	.clock_asc	= "mck",
-+	.uart_data	= {
-+		.use_dma_tx	= 0,
-+		.use_dma_rx	= 0,
-+		.regs		= (void __iomem *)(AT91_VA_BASE_SYS + AT91_DBGU),
-+	},
-+	.tx_pin		= {AT91_PIN_PA22, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA21, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart0 __initdata = {
-+	.mmio_base	= AT91SAM9RL_BASE_US0,
-+	.irq		= AT91SAM9RL_ID_US0,
-+	.clock_asc	= "usart0_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA6,  AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA7,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA9,  AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA10, AT91_PIN_PERIPH_A, 0, 0, 0},	
-+	.dsr_pin	= {AT91_PIN_PD14, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.dtr_pin	= {AT91_PIN_PD15, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.dcd_pin	= {AT91_PIN_PD16, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.ri_pin		= {AT91_PIN_PD17, AT91_PIN_PERIPH_A, 0, 0, 0},
-+};
-+
-+static struct at91_dev_table_uart device_uart1 __initdata = {
-+	.mmio_base	= AT91SAM9RL_BASE_US1,
-+	.irq		= AT91SAM9RL_ID_US1,
-+	.clock_asc	= "usart1_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA11, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA12, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA18, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA19, AT91_PIN_PERIPH_B, 0, 0, 0},	
-+};
-+
-+static struct at91_dev_table_uart device_uart2 __initdata = {
-+	.mmio_base	= AT91SAM9RL_BASE_US2,
-+	.irq		= AT91SAM9RL_ID_US2,
-+	.clock_asc	= "usart2_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PA13, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PA14, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PA29, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PA30, AT91_PIN_PERIPH_A, 0, 0, 0},	
-+};
-+
-+static struct at91_dev_table_uart device_uart3 __initdata = {
-+	.mmio_base	= AT91SAM9RL_BASE_US3,
-+	.irq		= AT91SAM9RL_ID_US3,
-+	.clock_asc	= "usart3_clk",
-+	.uart_data	= {
-+		.use_dma_tx	= 1,
-+		.use_dma_rx	= 1,
-+	},
-+	.tx_pin		= {AT91_PIN_PB0, AT91_PIN_PERIPH_A, 1, 0, 0},
-+	.rx_pin		= {AT91_PIN_PB1, AT91_PIN_PERIPH_A, 0, 0, 0},
-+	.rts_pin	= {AT91_PIN_PD4, AT91_PIN_PERIPH_B, 0, 0, 0},
-+	.cts_pin	= {AT91_PIN_PD3, AT91_PIN_PERIPH_B, 0, 0, 0},	
- };
- 
--static inline void configure_dbgu_pins(void)
--{
--	at91_set_A_periph(AT91_PIN_PA21, 0);		/* DRXD */
--	at91_set_A_periph(AT91_PIN_PA22, 1);		/* DTXD */
--}
--
--static struct resource uart0_resources[] = {
--	[0] = {
--		.start	= AT91SAM9RL_BASE_US0,
--		.end	= AT91SAM9RL_BASE_US0 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9RL_ID_US0,
--		.end	= AT91SAM9RL_ID_US0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart0_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart0_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9rl_uart0_device = {
--	.name		= "atmel_usart",
--	.id		= 1,
--	.dev		= {
--				.dma_mask		= &uart0_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart0_data,
--	},
--	.resource	= uart0_resources,
--	.num_resources	= ARRAY_SIZE(uart0_resources),
--};
--
--static inline void configure_usart0_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA6, 1);		/* TXD0 */
--	at91_set_A_periph(AT91_PIN_PA7, 0);		/* RXD0 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA9, 0);	/* RTS0 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA10, 0);	/* CTS0 */
--	if (pins & ATMEL_UART_DSR)
--		at91_set_A_periph(AT91_PIN_PD14, 0);	/* DSR0 */
--	if (pins & ATMEL_UART_DTR)
--		at91_set_A_periph(AT91_PIN_PD15, 0);	/* DTR0 */
--	if (pins & ATMEL_UART_DCD)
--		at91_set_A_periph(AT91_PIN_PD16, 0);	/* DCD0 */
--	if (pins & ATMEL_UART_RI)
--		at91_set_A_periph(AT91_PIN_PD17, 0);	/* RI0 */
--}
--
--static struct resource uart1_resources[] = {
--	[0] = {
--		.start	= AT91SAM9RL_BASE_US1,
--		.end	= AT91SAM9RL_BASE_US1 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9RL_ID_US1,
--		.end	= AT91SAM9RL_ID_US1,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart1_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart1_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9rl_uart1_device = {
--	.name		= "atmel_usart",
--	.id		= 2,
--	.dev		= {
--				.dma_mask		= &uart1_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart1_data,
--	},
--	.resource	= uart1_resources,
--	.num_resources	= ARRAY_SIZE(uart1_resources),
--};
--
--static inline void configure_usart1_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA11, 1);		/* TXD1 */
--	at91_set_A_periph(AT91_PIN_PA12, 0);		/* RXD1 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PA18, 0);	/* RTS1 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PA19, 0);	/* CTS1 */
--}
--
--static struct resource uart2_resources[] = {
--	[0] = {
--		.start	= AT91SAM9RL_BASE_US2,
--		.end	= AT91SAM9RL_BASE_US2 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9RL_ID_US2,
--		.end	= AT91SAM9RL_ID_US2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart2_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart2_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9rl_uart2_device = {
--	.name		= "atmel_usart",
--	.id		= 3,
--	.dev		= {
--				.dma_mask		= &uart2_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart2_data,
--	},
--	.resource	= uart2_resources,
--	.num_resources	= ARRAY_SIZE(uart2_resources),
--};
--
--static inline void configure_usart2_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PA13, 1);		/* TXD2 */
--	at91_set_A_periph(AT91_PIN_PA14, 0);		/* RXD2 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_A_periph(AT91_PIN_PA29, 0);	/* RTS2 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_A_periph(AT91_PIN_PA30, 0);	/* CTS2 */
--}
--
--static struct resource uart3_resources[] = {
--	[0] = {
--		.start	= AT91SAM9RL_BASE_US3,
--		.end	= AT91SAM9RL_BASE_US3 + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9RL_ID_US3,
--		.end	= AT91SAM9RL_ID_US3,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct atmel_uart_data uart3_data = {
--	.use_dma_tx	= 1,
--	.use_dma_rx	= 1,
--};
--
--static u64 uart3_dmamask = DMA_BIT_MASK(32);
--
--static struct platform_device at91sam9rl_uart3_device = {
--	.name		= "atmel_usart",
--	.id		= 4,
--	.dev		= {
--				.dma_mask		= &uart3_dmamask,
--				.coherent_dma_mask	= DMA_BIT_MASK(32),
--				.platform_data		= &uart3_data,
--	},
--	.resource	= uart3_resources,
--	.num_resources	= ARRAY_SIZE(uart3_resources),
--};
--
--static inline void configure_usart3_pins(unsigned pins)
--{
--	at91_set_A_periph(AT91_PIN_PB0, 1);		/* TXD3 */
--	at91_set_A_periph(AT91_PIN_PB1, 0);		/* RXD3 */
--
--	if (pins & ATMEL_UART_RTS)
--		at91_set_B_periph(AT91_PIN_PD4, 0);	/* RTS3 */
--	if (pins & ATMEL_UART_CTS)
--		at91_set_B_periph(AT91_PIN_PD3, 0);	/* CTS3 */
--}
--
--static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
--struct platform_device *atmel_default_console_device;	/* the serial console device */
--
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
--{
--	struct platform_device *pdev;
--
--	switch (id) {
--		case 0:		/* DBGU */
--			pdev = &at91sam9rl_dbgu_device;
--			configure_dbgu_pins();
--			at91_clock_associate("mck", &pdev->dev, "usart");
--			break;
--		case AT91SAM9RL_ID_US0:
--			pdev = &at91sam9rl_uart0_device;
--			configure_usart0_pins(pins);
--			at91_clock_associate("usart0_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9RL_ID_US1:
--			pdev = &at91sam9rl_uart1_device;
--			configure_usart1_pins(pins);
--			at91_clock_associate("usart1_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9RL_ID_US2:
--			pdev = &at91sam9rl_uart2_device;
--			configure_usart2_pins(pins);
--			at91_clock_associate("usart2_clk", &pdev->dev, "usart");
--			break;
--		case AT91SAM9RL_ID_US3:
--			pdev = &at91sam9rl_uart3_device;
--			configure_usart3_pins(pins);
--			at91_clock_associate("usart3_clk", &pdev->dev, "usart");
--			break;
--		default:
--			return;
--	}
--	pdev->id = portnr;		/* update to mapped ID */
--
--	if (portnr < ATMEL_MAX_UART)
--		at91_uarts[portnr] = pdev;
--}
--
--void __init at91_set_serial_console(unsigned portnr)
--{
--	if (portnr < ATMEL_MAX_UART)
--		atmel_default_console_device = at91_uarts[portnr];
--}
--
--void __init at91_add_device_serial(void)
--{
--	int i;
--
--	for (i = 0; i < ATMEL_MAX_UART; i++) {
--		if (at91_uarts[i])
--			platform_device_register(at91_uarts[i]);
--	}
--
--	if (!atmel_default_console_device)
--		printk(KERN_INFO "AT91: No default serial console defined.\n");
--}
--#else
--void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
--void __init at91_set_serial_console(unsigned portnr) {}
--void __init at91_add_device_serial(void) {}
+-#ifdef CONFIG_ARCH_STMP378X
+-#define IRQ_PRIORITY_REG_RD	HW_ICOLL_INTERRUPTn_RD
+-#define IRQ_PRIORITY_REG_WR	HW_ICOLL_INTERRUPTn_WR
 -#endif
 -
- static struct at91_device_table at91sam9rl_device_table __initdata = {
- 	.mmc[0]		= &device_mmc,
- 	.nand		= &device_nand,
-@@ -919,6 +706,11 @@ static struct at91_device_table at91sam9rl_device_table __initdata = {
- 	.spi[0]		= &device_spi,
- 	.tcb[0]		= &device_tcb,
- 	.rtt[0]		= &device_rtt,
-+	.dbgu		= &device_dbgu,
-+	.uart[0]	= &device_uart0,
-+	.uart[1]	= &device_uart1,
-+	.uart[2]	= &device_uart2,
-+	.uart[3]	= &device_uart3,
- };
- 
- void __init at91sam9rl_init_devices(void)
-diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index 244e8bb..9a4ff1b 100644
---- a/arch/arm/mach-at91/board-1arm.c
-+++ b/arch/arm/mach-at91/board-1arm.c
-@@ -48,10 +48,10 @@ static void __init onearm_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* USART1 on ttyS2 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index c64b7d6..9c7073a 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -57,13 +57,13 @@ static void __init afeb9260_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+	at91_register_uart(AT91_UART_US0, 1,
- 			     ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR
- 			   | ATMEL_UART_DCD | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+	at91_register_uart(AT91_UART_US1, 2,
- 			ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
-diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-index edbbce4..8955133 100644
---- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-+++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-@@ -55,13 +55,13 @@ static void __init eb_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx & Tx only) */
--	at91_register_uart(AT572D940HF_ID_US0, 1, 0);
-+	at91_register_uart(AT91_UART_US0, 1, 0);
- 
- 	/* USART1 on ttyS2. (Rx & Tx only) */
--	at91_register_uart(AT572D940HF_ID_US1, 2, 0);
-+	at91_register_uart(AT91_UART_US1, 2, 0);
- 
- 	/* USART2 on ttyS3. (Tx & Rx only */
--	at91_register_uart(AT572D940HF_ID_US2, 3, 0);
-+	at91_register_uart(AT91_UART_US2, 3, 0);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index b9033cb..a1afc1b 100644
---- a/arch/arm/mach-at91/board-carmeva.c
-+++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -49,7 +49,7 @@ static void __init carmeva_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 9a88ca0..99f74b0 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -56,26 +56,26 @@ static void __init cpu9krea_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
- 		ATMEL_UART_DCD | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS);
- 
- 	/* USART2 on ttyS3. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US2, 3, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS);
- 
- 	/* USART3 on ttyS4. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US3, 4, 0);
-+	at91_register_uart(AT91_UART_US3, 4, 0);
- 
- 	/* USART4 on ttyS5. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+	at91_register_uart(AT91_UART_US4, 5, 0);
- 
- 	/* USART5 on ttyS6. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
-+	at91_register_uart(AT91_UART_US5, 6, 0);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index fbdd54b..689aef6 100644
---- a/arch/arm/mach-at91/board-cpuat91.c
-+++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -59,19 +59,19 @@ static void __init cpuat91_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
- 		ATMEL_UART_DCD | ATMEL_UART_RI);
- 
- 	/* USART2 on ttyS3 (Rx, Tx) */
--	at91_register_uart(AT91RM9200_ID_US2, 3, 0);
-+	at91_register_uart(AT91_UART_US2, 3, 0);
- 
- 	/* USART3 on ttyS4 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_CTS |
-+	at91_register_uart(AT91_UART_US3, 4, ATMEL_UART_CTS |
- 		ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
-diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index eed4d6c..9d7dba2 100644
---- a/arch/arm/mach-at91/board-eb9200.c
-+++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -49,12 +49,12 @@ static void __init eb9200_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			| ATMEL_UART_RI);
- 
- 	/* USART2 on ttyS2. (Rx, Tx) - IRDA */
--	at91_register_uart(AT91RM9200_ID_US2, 2, 0);
-+	at91_register_uart(AT91_UART_US2, 2, 0);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index b730b01..4f0c76c 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -54,7 +54,7 @@ static void __init ecb_at91map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx & Tx only) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
-+	at91_register_uart(AT91_UART_US0, 1, 0);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index 79c54fc..fb3cfdd 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -66,7 +66,7 @@ static void __init foxg20_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+	at91_register_uart(AT91_UART_US0, 1,
- 				ATMEL_UART_CTS
- 				| ATMEL_UART_RTS
- 				| ATMEL_UART_DTR
-@@ -75,23 +75,23 @@ static void __init foxg20_map_io(void)
- 				| ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+	at91_register_uart(AT91_UART_US1, 2,
- 		ATMEL_UART_CTS
- 		| ATMEL_UART_RTS);
- 
- 	/* USART2 on ttyS3. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
-+	at91_register_uart(AT91_UART_US2, 3, 0);
- 
- 	/* USART3 on ttyS4. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US3, 4,
-+	at91_register_uart(AT91_UART_US3, 4,
- 		ATMEL_UART_CTS
- 		| ATMEL_UART_RTS);
- 
- 	/* USART4 on ttyS5. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+	at91_register_uart(AT91_UART_US4, 5, 0);
- 
- 	/* USART5 on ttyS6. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
-+	at91_register_uart(AT91_UART_US5, 6, 0);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-index e32833d..06d9be7 100644
---- a/arch/arm/mach-at91/board-gsia18s.c
-+++ b/arch/arm/mach-at91/board-gsia18s.c
-@@ -46,7 +46,7 @@ static void __init gsia18s_map_io(void)
- 	 * USART0 on ttyS1 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI).
- 	 * Used for Internal Analog Modem.
- 	 */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+	at91_register_uart(AT91_UART_US0, 1,
- 				ATMEL_UART_CTS | ATMEL_UART_RTS |
- 				ATMEL_UART_DTR | ATMEL_UART_DSR |
- 				ATMEL_UART_DCD | ATMEL_UART_RI);
-@@ -54,25 +54,25 @@ static void __init gsia18s_map_io(void)
- 	 * USART1 on ttyS2 (Rx, Tx, CTS, RTS).
- 	 * Used for GPS or WiFi or Data stream.
- 	 */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+	at91_register_uart(AT91_UART_US1, 2,
- 				ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	/*
- 	 * USART2 on ttyS3 (Rx, Tx, CTS, RTS).
- 	 * Used for External Modem.
- 	 */
--	at91_register_uart(AT91SAM9260_ID_US2, 3,
-+	at91_register_uart(AT91_UART_US2, 3,
- 				ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	/*
- 	 * USART3 on ttyS4 (Rx, Tx, RTS).
- 	 * Used for RS-485.
- 	 */
--	at91_register_uart(AT91SAM9260_ID_US3, 4, ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US3, 4, ATMEL_UART_RTS);
- 
- 	/*
- 	 * USART4 on ttyS5 (Rx, Tx).
- 	 * Used for TRX433 Radio Module.
- 	 */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+	at91_register_uart(AT91_UART_US4, 5, 0);
- }
- 
- static void __init init_irq(void)
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 1edff1b..ddab49b 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -51,7 +51,7 @@ static void __init kafa_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index 682e9f4..22a421b 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -54,13 +54,13 @@ static void __init kb9202_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1 (Rx & Tx only) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
-+	at91_register_uart(AT91_UART_US0, 1, 0);
- 
- 	/* USART1 on ttyS2 (Rx & Tx only) - IRDA (optional) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, 0);
-+	at91_register_uart(AT91_UART_US1, 2, 0);
- 
- 	/* USART3 on ttyS3 (Rx, Tx, CTS, RTS) - RS485 (optional) */
--	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US3, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index f2c79fb..a76c43e 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -60,7 +60,7 @@ static void __init neocore926_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-index ad9cc28..777c35c 100644
---- a/arch/arm/mach-at91/board-pcontrol-g20.c
-+++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-@@ -42,15 +42,15 @@ static void __init pcontrol_g20_map_io(void)
- 	stamp9g20_map_io();
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) piggyback  A2 */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS
- 						| ATMEL_UART_RTS);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) isolated RS485  X5 */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS
- 						| ATMEL_UART_RTS);
- 
- 	/* USART2 on ttyS3. (Rx, Tx)  9bit-Bus  Multidrop-mode  X4 */
--	at91_register_uart(AT91SAM9260_ID_US4, 3, 0);
-+	at91_register_uart(AT91_UART_US4, 3, 0);
- }
- 
- 
-diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index 2b0958b..3c88f0b 100644
---- a/arch/arm/mach-at91/board-picotux200.c
-+++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -52,7 +52,7 @@ static void __init picotux200_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			  | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			  | ATMEL_UART_RI);
- 
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index c00b292..1cbc7ef 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -57,15 +57,15 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS1 (ie, USART0) */
- 	at91_set_serial_console(1);
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index 746b6ea..192440d 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -57,7 +57,7 @@ static void __init dk_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 5e1dca0..0d91eb7 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -57,7 +57,7 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index bc62008..c6119f1 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -56,12 +56,12 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index c8c53ac..2bfac4e 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -58,12 +58,12 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 5e1aac1..994db00 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -61,7 +61,7 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 3dd5013..cc43eae 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -69,12 +69,12 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			   | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 6c999db..85b8519 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -56,7 +56,7 @@ static void __init ek_map_io(void)
- 
- 	/* USART0 not connected on the -EK board */
- 	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 475b485..9c7a971 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -47,7 +47,7 @@ static void __init ek_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9RL_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index e93a11b..4c90ee3 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -48,11 +48,11 @@ static void __init snapper9260_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 	at91_set_serial_console(0);
- 
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+	at91_register_uart(AT91_UART_US0, 1,
- 			   ATMEL_UART_CTS | ATMEL_UART_RTS);
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+	at91_register_uart(AT91_UART_US1, 2,
- 			   ATMEL_UART_CTS | ATMEL_UART_RTS);
--	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
-+	at91_register_uart(AT91_UART_US2, 3, 0);
- }
- 
- static void __init snapper9260_init_irq(void)
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 9b7f333..915128a 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -49,7 +49,7 @@ static void __init stamp9g20evb_map_io(void)
- 	stamp9g20_map_io();
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 						| ATMEL_UART_DTR | ATMEL_UART_DSR
- 						| ATMEL_UART_DCD | ATMEL_UART_RI);
- }
-@@ -59,21 +59,21 @@ static void __init portuxg20_map_io(void)
- 	stamp9g20_map_io();
- 
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 						| ATMEL_UART_DTR | ATMEL_UART_DSR
- 						| ATMEL_UART_DCD | ATMEL_UART_RI);
- 
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 
- 	/* USART4 on ttyS5. (Rx, Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+	at91_register_uart(AT91_UART_US4, 5, 0);
- 
- 	/* USART5 on ttyS6. (Rx, Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
-+	at91_register_uart(AT91_UART_US5, 6, 0);
- }
- 
- static void __init init_irq(void)
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index ef80db1..3939065 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -61,15 +61,15 @@ static void __init yl9200_map_io(void)
- 	at91_register_uart(0, 0, 0);
- 
- 	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+	at91_register_uart(AT91_UART_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
- 			| ATMEL_UART_RI);
- 
- 	/* USART0 on ttyS2. (Rx & Tx only to JP3) */
--	at91_register_uart(AT91RM9200_ID_US0, 2, 0);
-+	at91_register_uart(AT91_UART_US0, 2, 0);
- 
- 	/* USART3 on ttyS3. (Rx, Tx, RTS - RS485 interface) */
--	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_RTS);
-+	at91_register_uart(AT91_UART_US3, 3, ATMEL_UART_RTS);
- 
- 	/* set serial console to ttyS0 (ie, DBGU) */
- 	at91_set_serial_console(0);
-diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 760ed81..b759187 100644
---- a/arch/arm/mach-at91/devices.c
-+++ b/arch/arm/mach-at91/devices.c
-@@ -23,6 +23,7 @@
- #include <mach/board.h>
- 
- #include "devices.h"
-+#include "generic.h"
- 
- static struct at91_device_table *devices __initdata;
- 
-@@ -1000,6 +1001,305 @@ void __init at91_init_devices(struct at91_device_table *device_table)
- 	devices = device_table;
- }
- 
-+/* --------------------------------------------------------------------
-+ *  UART
-+ * -------------------------------------------------------------------- */
-+
-+#if defined(CONFIG_SERIAL_ATMEL)
-+static struct resource dbgu_resources[] = {
-+	[0] = {
-+		.end	= SZ_512,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data dbgu_data;
-+static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_dbgu_device = {
-+	.name		= "atmel_usart",
-+	.id		= 0,
-+	.dev		= {
-+				.dma_mask		= &dbgu_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &dbgu_data,
-+	},
-+	.resource	= dbgu_resources,
-+	.num_resources	= ARRAY_SIZE(dbgu_resources),
-+};
-+
-+static struct resource uart0_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart0_data;
-+static u64 uart0_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart0_device = {
-+	.name		= "atmel_usart",
-+	.id		= 1,
-+	.dev		= {
-+				.dma_mask		= &uart0_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart0_data,
-+	},
-+	.resource	= uart0_resources,
-+	.num_resources	= ARRAY_SIZE(uart0_resources),
-+};
-+
-+static struct resource uart1_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart1_data;
-+static u64 uart1_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart1_device = {
-+	.name		= "atmel_usart",
-+	.id		= 2,
-+	.dev		= {
-+				.dma_mask		= &uart1_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart1_data,
-+	},
-+	.resource	= uart1_resources,
-+	.num_resources	= ARRAY_SIZE(uart1_resources),
-+};
-+
-+static struct resource uart2_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart2_data;
-+static u64 uart2_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart2_device = {
-+	.name		= "atmel_usart",
-+	.id		= 3,
-+	.dev		= {
-+				.dma_mask		= &uart2_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart2_data,
-+	},
-+	.resource	= uart2_resources,
-+	.num_resources	= ARRAY_SIZE(uart2_resources),
-+};
-+
-+static struct resource uart3_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart3_data;
-+static u64 uart3_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart3_device = {
-+	.name		= "atmel_usart",
-+	.id		= 4,
-+	.dev		= {
-+				.dma_mask		= &uart3_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart3_data,
-+	},
-+	.resource	= uart3_resources,
-+	.num_resources	= ARRAY_SIZE(uart3_resources),
-+};
-+
-+static struct resource uart4_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart4_data;
-+static u64 uart4_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart4_device = {
-+	.name		= "atmel_usart",
-+	.id		= 5,
-+	.dev		= {
-+				.dma_mask		= &uart4_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart4_data,
-+	},
-+	.resource	= uart4_resources,
-+	.num_resources	= ARRAY_SIZE(uart4_resources),
-+};
-+
-+static struct resource uart5_resources[] = {
-+	[0] = {
-+		.end	= SZ_16K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct atmel_uart_data uart5_data;
-+static u64 uart5_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device at91_uart5_device = {
-+	.name		= "atmel_usart",
-+	.id		= 6,
-+	.dev		= {
-+				.dma_mask		= &uart5_dmamask,
-+				.coherent_dma_mask	= DMA_BIT_MASK(32),
-+				.platform_data		= &uart5_data,
-+	},
-+	.resource	= uart5_resources,
-+	.num_resources	= ARRAY_SIZE(uart5_resources),
-+};
-+
-+/* the UARTs to use */
-+static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];
-+/* the serial console device */
-+struct platform_device *atmel_default_console_device;
-+
-+static void __init configure_uart(struct atmel_uart_data *uart_data,
-+				  struct resource *uart_res,
-+				  struct at91_dev_table_uart *uart,
-+				  unsigned pins)
-+{
-+	init_resource_mem(&uart_res[0], uart->mmio_base);
-+	init_resource_irq(&uart_res[1], uart->irq);
-+	memcpy(uart_data, &uart->uart_data, sizeof(struct atmel_uart_data));
-+
-+	at91_config_pins(&uart->tx_pin, 1);
-+	at91_config_pins(&uart->rx_pin, 1);
-+	
-+	if (pins & ATMEL_UART_RTS)
-+		at91_config_pins(&uart->rts_pin, 1);
-+	if (pins & ATMEL_UART_CTS)
-+		at91_config_pins(&uart->cts_pin, 1);
-+	if (pins & ATMEL_UART_RI)
-+		at91_config_pins(&uart->ri_pin, 1);
-+	if (pins & ATMEL_UART_DTR)
-+		at91_config_pins(&uart->dtr_pin, 1);
-+	if (pins & ATMEL_UART_DCD)
-+		at91_config_pins(&uart->dcd_pin, 1);
-+	if (pins & ATMEL_UART_DSR)
-+		at91_config_pins(&uart->dsr_pin, 1);
-+}
-+
-+void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
-+{
-+	struct platform_device *pdev;
-+	struct at91_dev_table_uart *uart;
-+	struct atmel_uart_data *uart_data;
-+	struct resource *uart_res;
-+	
-+	BUG_ON(id < 0 || id > ARRAY_SIZE(devices->uart));
-+	if (id == 0)
-+		uart = devices->dbgu;
-+	else
-+		uart = devices->uart[id - 1];
-+	BUG_ON(!uart);
-+	
-+	switch (id) {
-+	case AT91_UART_DBGU:
-+		pdev 	  = &at91_dbgu_device;
-+		uart_data = &dbgu_data;
-+		uart_res  = dbgu_resources;
-+		break;
-+	case AT91_UART_US0:
-+		pdev 	  = &at91_uart0_device;
-+		uart_data = &uart0_data;
-+		uart_res  = uart0_resources;
-+		break;
-+	case AT91_UART_US1:
-+		pdev 	  = &at91_uart1_device;
-+		uart_data = &uart1_data;
-+		uart_res  = uart1_resources;
-+		break;
-+	case AT91_UART_US2:
-+		pdev 	  = &at91_uart2_device;
-+		uart_data = &uart2_data;
-+		uart_res  = uart2_resources;
-+		break;
-+	case AT91_UART_US3:
-+		pdev 	  = &at91_uart3_device;
-+		uart_data = &uart3_data;
-+		uart_res  = uart3_resources;
-+		break;
-+	case AT91_UART_US4:
-+		pdev 	  = &at91_uart4_device;
-+		uart_data = &uart4_data;
-+		uart_res  = uart4_resources;
-+		break;
-+	case AT91_UART_US5:
-+		pdev 	  = &at91_uart5_device;
-+		uart_data = &uart5_data;
-+		uart_res  = uart5_resources;
-+		break;
-+	default:
-+		return;
-+	}
-+	
-+	configure_uart(uart_data, uart_res, uart, pins);
-+	if (uart->clock_asc)
-+		at91_clock_associate(uart->clock_asc, &pdev->dev, "usart");
-+	pdev->id = portnr;		/* update to mapped ID */
-+	
-+	if (portnr < ATMEL_MAX_UART)
-+		at91_uarts[portnr] = pdev;
-+}
-+
-+void __init at91_set_serial_console(unsigned portnr)
-+{
-+	if (portnr < ATMEL_MAX_UART)
-+		atmel_default_console_device = at91_uarts[portnr];
-+}
-+
-+void __init at91_add_device_serial(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ATMEL_MAX_UART; i++) {
-+		if (at91_uarts[i])
-+			platform_device_register(at91_uarts[i]);
-+	}
-+
-+	if (!atmel_default_console_device)
-+		printk(KERN_INFO "AT91: No default serial console defined.\n");
-+}
-+
-+#else
-+void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
-+void __init at91_set_serial_console(unsigned portnr) {}
-+void __init at91_add_device_serial(void) {}
-+#endif
-+
- static int __init at91_add_standard_devices(void)
- {
- 	at91_add_device_tc();
-diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index d7855ec..c535f58 100644
---- a/arch/arm/mach-at91/devices.h
-+++ b/arch/arm/mach-at91/devices.h
-@@ -107,6 +107,21 @@ struct at91_dev_table_rtt {
- 	unsigned		mmio_base;
- };
- 
-+struct at91_dev_table_uart {
-+	unsigned		mmio_base;
-+	int			irq;
-+	struct atmel_uart_data	uart_data;
-+	const char		*clock_asc;
-+	struct at91_pin_config	tx_pin;
-+	struct at91_pin_config	rx_pin;
-+	struct at91_pin_config	rts_pin;
-+	struct at91_pin_config	cts_pin;
-+	struct at91_pin_config	ri_pin;
-+	struct at91_pin_config	dtr_pin;
-+	struct at91_pin_config	dcd_pin;
-+	struct at91_pin_config	dsr_pin;
-+};
-+
- struct at91_device_table {
- 	struct at91_dev_table_ethernet		*ethernet;
- 	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -118,6 +133,8 @@ struct at91_device_table {
- 	struct at91_dev_table_spi		*spi[2];
- 	struct at91_dev_table_tcb		*tcb[2];
- 	struct at91_dev_table_rtt		*rtt[2];
-+	struct at91_dev_table_uart		*dbgu;
-+	struct at91_dev_table_uart		*uart[6];
- };
- 
- extern void __init at91_init_devices(struct at91_device_table *device_table);
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index 94232a4..25a6127 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -122,6 +122,16 @@ extern void __init at91_add_device_i2c(short i2c_id, struct i2c_board_info *devi
- extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices);
- 
-  /* Serial */
-+enum {
-+	AT91_UART_DBGU = 0,
-+	AT91_UART_US0,
-+	AT91_UART_US1,
-+	AT91_UART_US2,
-+	AT91_UART_US3,
-+	AT91_UART_US4,
-+	AT91_UART_US5,
-+};
-+
- #define ATMEL_UART_CTS	0x01
- #define ATMEL_UART_RTS	0x02
- #define ATMEL_UART_DSR	0x04
+-#define HW_STMP3XXX_SET		0x04
+-#define HW_STMP3XXX_CLR		0x08
+-#define HW_STMP3XXX_TOG		0x0c
+-
+-#ifndef __ASSEMBLER__
+-static inline void stmp3xxx_clearl(u32 v, void __iomem *r)
+-{
+-	__raw_writel(v, r + HW_STMP3XXX_CLR);
+-}
+-
+-static inline void stmp3xxx_setl(u32 v, void __iomem *r)
+-{
+-	__raw_writel(v, r + HW_STMP3XXX_SET);
+-}
+-#endif
+-
+-#define BF(value, field) (((value) << BP_##field) & BM_##field)
+-
+-#endif /* __ASM_ARCH_PLATFORM_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h b/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
+deleted file mode 100644
+index 2e300fe..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/stmp3xxx.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X core structure and function declarations
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_STMP3XXX_H
+-#define __ASM_PLAT_STMP3XXX_H
+-
+-#include <linux/irq.h>
+-
+-extern struct sys_timer stmp3xxx_timer;
+-
+-void stmp3xxx_init_irq(struct irq_chip *chip);
+-void stmp3xxx_init(void);
+-int stmp3xxx_reset_block(void __iomem *hwreg, int just_enable);
+-extern struct platform_device stmp3xxx_dbguart,
+-			      stmp3xxx_appuart,
+-			      stmp3xxx_watchdog,
+-			      stmp3xxx_touchscreen,
+-			      stmp3xxx_keyboard,
+-			      stmp3xxx_gpmi,
+-			      stmp3xxx_mmc,
+-			      stmp3xxx_udc,
+-			      stmp3xxx_ehci,
+-			      stmp3xxx_rtc,
+-			      stmp3xxx_spi1,
+-			      stmp3xxx_spi2,
+-			      stmp3xxx_backlight,
+-			      stmp3xxx_rotdec,
+-			      stmp3xxx_dcp,
+-			      stmp3xxx_dcp_bootstream,
+-			      stmp3xxx_persistent,
+-			      stmp3xxx_framebuffer,
+-			      stmp3xxx_battery;
+-int stmp3xxx_ssp1_device_register(void);
+-int stmp3xxx_ssp2_device_register(void);
+-
+-struct pin_group;
+-void stmp3xxx_release_pin_group(struct pin_group *pin_group, const char *label);
+-int stmp3xxx_request_pin_group(struct pin_group *pin_group, const char *label);
+-
+-#endif /* __ASM_PLAT_STMP3XXX_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/system.h b/arch/arm/plat-stmp3xxx/include/mach/system.h
+deleted file mode 100644
+index 28a9888..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/system.h
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*
+- * Copyright (C) 2005 Sigmatel Inc
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_ARCH_SYSTEM_H
+-#define __ASM_ARCH_SYSTEM_H
+-
+-#include <asm/proc-fns.h>
+-#include <mach/platform.h>
+-#include <mach/regs-clkctrl.h>
+-#include <mach/regs-power.h>
+-
+-static inline void arch_idle(void)
+-{
+-	/*
+-	 * This should do all the clock switching
+-	 * and wait for interrupt tricks
+-	 */
+-
+-	cpu_do_idle();
+-}
+-
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-	/* Set BATTCHRG to default value */
+-	__raw_writel(0x00010000, REGS_POWER_BASE + HW_POWER_CHARGE);
+-
+-	/* Set MINPWR to default value   */
+-	__raw_writel(0, REGS_POWER_BASE + HW_POWER_MINPWR);
+-
+-	/* Reset digital side of chip (but not power or RTC) */
+-	__raw_writel(BM_CLKCTRL_RESET_DIG,
+-			REGS_CLKCTRL_BASE + HW_CLKCTRL_RESET);
+-
+-	/* Should not return */
+-}
+-
+-#endif
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/timex.h b/arch/arm/plat-stmp3xxx/include/mach/timex.h
+deleted file mode 100644
+index 3373985..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/timex.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * Copyright (C) 1999 ARM Limited
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-
+-/*
+- * System time clock is sourced from the 32k clock
+- */
+-#define CLOCK_TICK_RATE		(32768)
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/uncompress.h b/arch/arm/plat-stmp3xxx/include/mach/uncompress.h
+deleted file mode 100644
+index f79f5ee..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/uncompress.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#ifndef __ASM_PLAT_UNCOMPRESS_H
+-#define __ASM_PLAT_UNCOMPRESS_H
+-
+-/*
+- * Register includes are for when the MMU enabled; we need to define our
+- * own stuff here for pre-MMU use
+- */
+-#define UARTDBG_BASE		0x80070000
+-#define UART(c)			(((volatile unsigned *)UARTDBG_BASE)[c])
+-
+-/*
+- * This does not append a newline
+- */
+-static void putc(char c)
+-{
+-	/* Wait for TX fifo empty */
+-	while ((UART(6) & (1<<7)) == 0)
+-		continue;
+-
+-	/* Write byte */
+-	UART(0) = c;
+-
+-	/* Wait for last bit to exit the UART */
+-	while (UART(6) & (1<<3))
+-		continue;
+-}
+-
+-static void flush(void)
+-{
+-}
+-
+-/*
+- * nothing to do
+- */
+-#define arch_decomp_setup()
+-
+-#define arch_decomp_wdog()
+-
+-#endif /* __ASM_PLAT_UNCOMPRESS_H */
+diff --git a/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h b/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
+deleted file mode 100644
+index 943c1a2..0000000
+--- a/arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
++++ /dev/null
+@@ -1,12 +0,0 @@
+-/*
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#define VMALLOC_END       0xf0000000UL
+diff --git a/arch/arm/plat-stmp3xxx/irq.c b/arch/arm/plat-stmp3xxx/irq.c
+deleted file mode 100644
+index 6fdf9ac..0000000
+--- a/arch/arm/plat-stmp3xxx/irq.c
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * Freescale STMP37XX/STMP378X common interrupt handling code
+- *
+- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/delay.h>
+-#include <linux/irq.h>
+-#include <linux/sysdev.h>
+-
+-#include <mach/stmp3xxx.h>
+-#include <mach/platform.h>
+-#include <mach/regs-icoll.h>
+-
+-void __init stmp3xxx_init_irq(struct irq_chip *chip)
+-{
+-	unsigned int i, lv;
+-
+-	/* Reset the interrupt controller */
+-	stmp3xxx_reset_block(REGS_ICOLL_BASE + HW_ICOLL_CTRL, true);
+-
+-	/* Disable all interrupts initially */
+-	for (i = 0; i < NR_REAL_IRQS; i++) {
+-		chip->irq_mask(irq_get_irq_data(i));
+-		irq_set_chip_and_handler(i, chip, handle_level_irq);
+-		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+-	}
+-
+-	/* Ensure vector is cleared */
+-	for (lv = 0; lv < 4; lv++)
+-		__raw_writel(1 << lv, REGS_ICOLL_BASE + HW_ICOLL_LEVELACK);
+-	__raw_writel(0, REGS_ICOLL_BASE + HW_ICOLL_VECTOR);
+-
+-	/* Barrier */
+-	(void)__raw_readl(REGS_ICOLL_BASE + HW_ICOLL_STAT);
+-}
+-
+diff --git a/arch/arm/plat-stmp3xxx/pinmux.c b/arch/arm/plat-stmp3xxx/pinmux.c
+deleted file mode 100644
+index 3def03b..0000000
+--- a/arch/arm/plat-stmp3xxx/pinmux.c
++++ /dev/null
+@@ -1,550 +0,0 @@
+-/*
+- * Freescale STMP378X/STMP378X Pin Multiplexing
+- *
+- * Author: Vladislav Buzov <vbuzov@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#define DEBUG
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/sysdev.h>
+-#include <linux/string.h>
+-#include <linux/bitops.h>
+-#include <linux/irq.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/platform.h>
+-#include <mach/regs-pinctrl.h>
+-#include <mach/pins.h>
+-#include <mach/pinmux.h>
+-
+-#define NR_BANKS ARRAY_SIZE(pinmux_banks)
+-static struct stmp3xxx_pinmux_bank pinmux_banks[] = {
+-	[0] = {
+-		.hw_muxsel = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL0,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL1,
+-		},
+-		.hw_drive = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE0,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE1,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE2,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE3,
+-		},
+-		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL0,
+-		.functions = { 0x0, 0x1, 0x2, 0x3 },
+-		.strengths = { 0x0, 0x1, 0x2, 0x3, 0xff },
+-
+-		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN0,
+-		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT0,
+-		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE0,
+-		.irq = IRQ_GPIO0,
+-
+-		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ0,
+-		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT0,
+-		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL0,
+-		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL0,
+-		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN0,
+-	},
+-	[1] = {
+-		.hw_muxsel = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL2,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL3,
+-		},
+-		.hw_drive = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE4,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE5,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE6,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE7,
+-		},
+-		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL1,
+-		.functions = { 0x0, 0x1, 0x2, 0x3 },
+-		.strengths = { 0x0, 0x1, 0x2, 0x3, 0xff },
+-
+-		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN1,
+-		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT1,
+-		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE1,
+-		.irq = IRQ_GPIO1,
+-
+-		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ1,
+-		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT1,
+-		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL1,
+-		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL1,
+-		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN1,
+-	},
+-	[2] = {
+-	       .hw_muxsel = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL4,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL5,
+-		},
+-		.hw_drive = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE8,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE9,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE10,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE11,
+-		},
+-		.hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL2,
+-		.functions = { 0x0, 0x1, 0x2, 0x3 },
+-		.strengths = { 0x0, 0x1, 0x2, 0x1, 0x2 },
+-
+-		.hw_gpio_in = REGS_PINCTRL_BASE + HW_PINCTRL_DIN2,
+-		.hw_gpio_out = REGS_PINCTRL_BASE + HW_PINCTRL_DOUT2,
+-		.hw_gpio_doe = REGS_PINCTRL_BASE + HW_PINCTRL_DOE2,
+-		.irq = IRQ_GPIO2,
+-
+-		.pin2irq = REGS_PINCTRL_BASE + HW_PINCTRL_PIN2IRQ2,
+-		.irqstat = REGS_PINCTRL_BASE + HW_PINCTRL_IRQSTAT2,
+-		.irqlevel = REGS_PINCTRL_BASE + HW_PINCTRL_IRQLEVEL2,
+-		.irqpolarity = REGS_PINCTRL_BASE + HW_PINCTRL_IRQPOL2,
+-		.irqen = REGS_PINCTRL_BASE + HW_PINCTRL_IRQEN2,
+-	},
+-	[3] = {
+-	       .hw_muxsel = {
+-		       REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL6,
+-		       REGS_PINCTRL_BASE + HW_PINCTRL_MUXSEL7,
+-	       },
+-	       .hw_drive = {
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE12,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE13,
+-			REGS_PINCTRL_BASE + HW_PINCTRL_DRIVE14,
+-			NULL,
+-	       },
+-	       .hw_pull = REGS_PINCTRL_BASE + HW_PINCTRL_PULL3,
+-	       .functions = {0x0, 0x1, 0x2, 0x3},
+-	       .strengths = {0x0, 0x1, 0x2, 0x3, 0xff},
+-	},
+-};
+-
+-static inline struct stmp3xxx_pinmux_bank *
+-stmp3xxx_pinmux_bank(unsigned id, unsigned *bank, unsigned *pin)
+-{
+-	unsigned b, p;
+-
+-	b = STMP3XXX_PINID_TO_BANK(id);
+-	p = STMP3XXX_PINID_TO_PINNUM(id);
+-	BUG_ON(b >= NR_BANKS);
+-	if (bank)
+-		*bank = b;
+-	if (pin)
+-		*pin = p;
+-	return &pinmux_banks[b];
+-}
+-
+-/* Check if requested pin is owned by caller */
+-static int stmp3xxx_check_pin(unsigned id, const char *label)
+-{
+-	unsigned pin;
+-	struct stmp3xxx_pinmux_bank *pm = stmp3xxx_pinmux_bank(id, NULL, &pin);
+-
+-	if (!test_bit(pin, &pm->pin_map)) {
+-		printk(KERN_WARNING
+-		       "%s: Accessing free pin %x, caller %s\n",
+-		       __func__, id, label);
+-
+-		return -EINVAL;
+-	}
+-
+-	if (label && pm->pin_labels[pin] &&
+-	    strcmp(label, pm->pin_labels[pin])) {
+-		printk(KERN_WARNING
+-		       "%s: Wrong pin owner %x, caller %s owner %s\n",
+-		       __func__, id, label, pm->pin_labels[pin]);
+-
+-		return -EINVAL;
+-	}
+-	return 0;
+-}
+-
+-void stmp3xxx_pin_strength(unsigned id, enum pin_strength strength,
+-		const char *label)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	void __iomem *hwdrive;
+-	u32 shift, val;
+-	u32 bank, pin;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-	pr_debug("%s: label %s bank %d pin %d strength %d\n", __func__, label,
+-		 bank, pin, strength);
+-
+-	hwdrive = pbank->hw_drive[pin / HW_DRIVE_PIN_NUM];
+-	shift = (pin % HW_DRIVE_PIN_NUM) * HW_DRIVE_PIN_LEN;
+-	val = pbank->strengths[strength];
+-	if (val == 0xff) {
+-		printk(KERN_WARNING
+-		       "%s: strength is not supported for bank %d, caller %s",
+-		       __func__, bank, label);
+-		return;
+-	}
+-
+-	if (stmp3xxx_check_pin(id, label))
+-		return;
+-
+-	pr_debug("%s: writing 0x%x to 0x%p register\n", __func__,
+-			val << shift, hwdrive);
+-	stmp3xxx_clearl(HW_DRIVE_PINDRV_MASK << shift, hwdrive);
+-	stmp3xxx_setl(val << shift, hwdrive);
+-}
+-
+-void stmp3xxx_pin_voltage(unsigned id, enum pin_voltage voltage,
+-			  const char *label)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	void __iomem *hwdrive;
+-	u32 shift;
+-	u32 bank, pin;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-	pr_debug("%s: label %s bank %d pin %d voltage %d\n", __func__, label,
+-		 bank, pin, voltage);
+-
+-	hwdrive = pbank->hw_drive[pin / HW_DRIVE_PIN_NUM];
+-	shift = (pin % HW_DRIVE_PIN_NUM) * HW_DRIVE_PIN_LEN;
+-
+-	if (stmp3xxx_check_pin(id, label))
+-		return;
+-
+-	pr_debug("%s: changing 0x%x bit in 0x%p register\n",
+-			__func__, HW_DRIVE_PINV_MASK << shift, hwdrive);
+-	if (voltage == PIN_1_8V)
+-		stmp3xxx_clearl(HW_DRIVE_PINV_MASK << shift, hwdrive);
+-	else
+-		stmp3xxx_setl(HW_DRIVE_PINV_MASK << shift, hwdrive);
+-}
+-
+-void stmp3xxx_pin_pullup(unsigned id, int enable, const char *label)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	void __iomem *hwpull;
+-	u32 bank, pin;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-	pr_debug("%s: label %s bank %d pin %d enable %d\n", __func__, label,
+-		 bank, pin, enable);
+-
+-	hwpull = pbank->hw_pull;
+-
+-	if (stmp3xxx_check_pin(id, label))
+-		return;
+-
+-	pr_debug("%s: changing 0x%x bit in 0x%p register\n",
+-			__func__, 1 << pin, hwpull);
+-	if (enable)
+-		stmp3xxx_setl(1 << pin, hwpull);
+-	else
+-		stmp3xxx_clearl(1 << pin, hwpull);
+-}
+-
+-int stmp3xxx_request_pin(unsigned id, enum pin_fun fun, const char *label)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	u32 bank, pin;
+-	int ret = 0;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-	pr_debug("%s: label %s bank %d pin %d fun %d\n", __func__, label,
+-		 bank, pin, fun);
+-
+-	if (test_bit(pin, &pbank->pin_map)) {
+-		printk(KERN_WARNING
+-		       "%s: CONFLICT DETECTED pin %d:%d caller %s owner %s\n",
+-		       __func__, bank, pin, label, pbank->pin_labels[pin]);
+-		return -EBUSY;
+-	}
+-
+-	set_bit(pin, &pbank->pin_map);
+-	pbank->pin_labels[pin] = label;
+-
+-	stmp3xxx_set_pin_type(id, fun);
+-
+-	return ret;
+-}
+-
+-void stmp3xxx_set_pin_type(unsigned id, enum pin_fun fun)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	void __iomem *hwmux;
+-	u32 shift, val;
+-	u32 bank, pin;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-
+-	hwmux = pbank->hw_muxsel[pin / HW_MUXSEL_PIN_NUM];
+-	shift = (pin % HW_MUXSEL_PIN_NUM) * HW_MUXSEL_PIN_LEN;
+-
+-	val = pbank->functions[fun];
+-	shift = (pin % HW_MUXSEL_PIN_NUM) * HW_MUXSEL_PIN_LEN;
+-	pr_debug("%s: writing 0x%x to 0x%p register\n",
+-			__func__, val << shift, hwmux);
+-	stmp3xxx_clearl(HW_MUXSEL_PINFUN_MASK << shift, hwmux);
+-	stmp3xxx_setl(val << shift, hwmux);
+-}
+-
+-void stmp3xxx_release_pin(unsigned id, const char *label)
+-{
+-	struct stmp3xxx_pinmux_bank *pbank;
+-	u32 bank, pin;
+-
+-	pbank = stmp3xxx_pinmux_bank(id, &bank, &pin);
+-	pr_debug("%s: label %s bank %d pin %d\n", __func__, label, bank, pin);
+-
+-	if (stmp3xxx_check_pin(id, label))
+-		return;
+-
+-	clear_bit(pin, &pbank->pin_map);
+-	pbank->pin_labels[pin] = NULL;
+-}
+-
+-int stmp3xxx_request_pin_group(struct pin_group *pin_group, const char *label)
+-{
+-	struct pin_desc *pin;
+-	int p;
+-	int err = 0;
+-
+-	/* Allocate and configure pins */
+-	for (p = 0; p < pin_group->nr_pins; p++) {
+-		pr_debug("%s: #%d\n", __func__, p);
+-		pin = &pin_group->pins[p];
+-
+-		err = stmp3xxx_request_pin(pin->id, pin->fun, label);
+-		if (err)
+-			goto out_err;
+-
+-		stmp3xxx_pin_strength(pin->id, pin->strength, label);
+-		stmp3xxx_pin_voltage(pin->id, pin->voltage, label);
+-		stmp3xxx_pin_pullup(pin->id, pin->pullup, label);
+-	}
+-
+-	return 0;
+-
+-out_err:
+-	/* Release allocated pins in case of error */
+-	while (--p >= 0) {
+-		pr_debug("%s: releasing #%d\n", __func__, p);
+-		stmp3xxx_release_pin(pin_group->pins[p].id, label);
+-	}
+-	return err;
+-}
+-EXPORT_SYMBOL(stmp3xxx_request_pin_group);
+-
+-void stmp3xxx_release_pin_group(struct pin_group *pin_group, const char *label)
+-{
+-	struct pin_desc *pin;
+-	int p;
+-
+-	for (p = 0; p < pin_group->nr_pins; p++) {
+-		pin = &pin_group->pins[p];
+-		stmp3xxx_release_pin(pin->id, label);
+-	}
+-}
+-EXPORT_SYMBOL(stmp3xxx_release_pin_group);
+-
+-static int stmp3xxx_irq_data_to_gpio(struct irq_data *d,
+-	struct stmp3xxx_pinmux_bank **bank, unsigned *gpio)
+-{
+-	struct stmp3xxx_pinmux_bank *pm;
+-
+-	for (pm = pinmux_banks; pm < pinmux_banks + NR_BANKS; pm++)
+-		if (pm->virq <= d->irq && d->irq < pm->virq + 32) {
+-			*bank = pm;
+-			*gpio = d->irq - pm->virq;
+-			return 0;
+-		}
+-	return -ENOENT;
+-}
+-
+-static int stmp3xxx_set_irqtype(struct irq_data *d, unsigned type)
+-{
+-	struct stmp3xxx_pinmux_bank *pm;
+-	unsigned gpio;
+-	int l, p;
+-
+-	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+-	switch (type) {
+-	case IRQ_TYPE_EDGE_RISING:
+-		l = 0; p = 1; break;
+-	case IRQ_TYPE_EDGE_FALLING:
+-		l = 0; p = 0; break;
+-	case IRQ_TYPE_LEVEL_HIGH:
+-		l = 1; p = 1; break;
+-	case IRQ_TYPE_LEVEL_LOW:
+-		l = 1; p = 0; break;
+-	default:
+-		pr_debug("%s: Incorrect GPIO interrupt type 0x%x\n",
+-				__func__, type);
+-		return -ENXIO;
+-	}
+-
+-	if (l)
+-		stmp3xxx_setl(1 << gpio, pm->irqlevel);
+-	else
+-		stmp3xxx_clearl(1 << gpio, pm->irqlevel);
+-	if (p)
+-		stmp3xxx_setl(1 << gpio, pm->irqpolarity);
+-	else
+-		stmp3xxx_clearl(1 << gpio, pm->irqpolarity);
+-	return 0;
+-}
+-
+-static void stmp3xxx_pin_ack_irq(struct irq_data *d)
+-{
+-	u32 stat;
+-	struct stmp3xxx_pinmux_bank *pm;
+-	unsigned gpio;
+-
+-	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+-	stat = __raw_readl(pm->irqstat) & (1 << gpio);
+-	stmp3xxx_clearl(stat, pm->irqstat);
+-}
+-
+-static void stmp3xxx_pin_mask_irq(struct irq_data *d)
+-{
+-	struct stmp3xxx_pinmux_bank *pm;
+-	unsigned gpio;
+-
+-	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+-	stmp3xxx_clearl(1 << gpio, pm->irqen);
+-	stmp3xxx_clearl(1 << gpio, pm->pin2irq);
+-}
+-
+-static void stmp3xxx_pin_unmask_irq(struct irq_data *d)
+-{
+-	struct stmp3xxx_pinmux_bank *pm;
+-	unsigned gpio;
+-
+-	stmp3xxx_irq_data_to_gpio(d, &pm, &gpio);
+-	stmp3xxx_setl(1 << gpio, pm->irqen);
+-	stmp3xxx_setl(1 << gpio, pm->pin2irq);
+-}
+-
+-static inline
+-struct stmp3xxx_pinmux_bank *to_pinmux_bank(struct gpio_chip *chip)
+-{
+-	return container_of(chip, struct stmp3xxx_pinmux_bank, chip);
+-}
+-
+-static int stmp3xxx_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
+-	return pm->virq + offset;
+-}
+-
+-static int stmp3xxx_gpio_get(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
+-	unsigned v;
+-
+-	v = __raw_readl(pm->hw_gpio_in) & (1 << offset);
+-	return v ? 1 : 0;
+-}
+-
+-static void stmp3xxx_gpio_set(struct gpio_chip *chip, unsigned offset, int v)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
+-
+-	if (v)
+-		stmp3xxx_setl(1 << offset, pm->hw_gpio_out);
+-	else
+-		stmp3xxx_clearl(1 << offset, pm->hw_gpio_out);
+-}
+-
+-static int stmp3xxx_gpio_output(struct gpio_chip *chip, unsigned offset, int v)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
+-
+-	stmp3xxx_setl(1 << offset, pm->hw_gpio_doe);
+-	stmp3xxx_gpio_set(chip, offset, v);
+-	return 0;
+-}
+-
+-static int stmp3xxx_gpio_input(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = to_pinmux_bank(chip);
+-
+-	stmp3xxx_clearl(1 << offset, pm->hw_gpio_doe);
+-	return 0;
+-}
+-
+-static int stmp3xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
+-{
+-	return stmp3xxx_request_pin(chip->base + offset, PIN_GPIO, "gpio");
+-}
+-
+-static void stmp3xxx_gpio_free(struct gpio_chip *chip, unsigned offset)
+-{
+-	stmp3xxx_release_pin(chip->base + offset, "gpio");
+-}
+-
+-static void stmp3xxx_gpio_irq(u32 irq, struct irq_desc *desc)
+-{
+-	struct stmp3xxx_pinmux_bank *pm = irq_get_handler_data(irq);
+-	int gpio_irq = pm->virq;
+-	u32 stat = __raw_readl(pm->irqstat);
+-
+-	while (stat) {
+-		if (stat & 1)
+-			generic_handle_irq(gpio_irq);
+-		gpio_irq++;
+-		stat >>= 1;
+-	}
+-}
+-
+-static struct irq_chip gpio_irq_chip = {
+-	.irq_ack	= stmp3xxx_pin_ack_irq,
+-	.irq_mask	= stmp3xxx_pin_mask_irq,
+-	.irq_unmask	= stmp3xxx_pin_unmask_irq,
+-	.irq_set_type	= stmp3xxx_set_irqtype,
+-};
+-
+-int __init stmp3xxx_pinmux_init(int virtual_irq_start)
+-{
+-	int b, r = 0;
+-	struct stmp3xxx_pinmux_bank *pm;
+-	int virq;
+-
+-	for (b = 0; b < 3; b++) {
+-		/* only banks 0,1,2 are allowed to GPIO */
+-		pm = pinmux_banks + b;
+-		pm->chip.base = 32 * b;
+-		pm->chip.ngpio = 32;
+-		pm->chip.owner = THIS_MODULE;
+-		pm->chip.can_sleep = 1;
+-		pm->chip.exported = 1;
+-		pm->chip.to_irq = stmp3xxx_gpio_to_irq;
+-		pm->chip.direction_input = stmp3xxx_gpio_input;
+-		pm->chip.direction_output = stmp3xxx_gpio_output;
+-		pm->chip.get = stmp3xxx_gpio_get;
+-		pm->chip.set = stmp3xxx_gpio_set;
+-		pm->chip.request = stmp3xxx_gpio_request;
+-		pm->chip.free = stmp3xxx_gpio_free;
+-		pm->virq = virtual_irq_start + b * 32;
+-
+-		for (virq = pm->virq; virq < pm->virq; virq++) {
+-			gpio_irq_chip.irq_mask(irq_get_irq_data(virq));
+-			irq_set_chip_and_handler(virq, &gpio_irq_chip,
+-						 handle_level_irq);
+-			set_irq_flags(virq, IRQF_VALID);
+-		}
+-		r = gpiochip_add(&pm->chip);
+-		if (r < 0)
+-			break;
+-		irq_set_chained_handler(pm->irq, stmp3xxx_gpio_irq);
+-		irq_set_handler_data(pm->irq, pm);
+-	}
+-	return r;
+-}
+-
+-MODULE_AUTHOR("Vladislav Buzov");
+-MODULE_LICENSE("GPL");
+diff --git a/arch/arm/plat-stmp3xxx/timer.c b/arch/arm/plat-stmp3xxx/timer.c
+deleted file mode 100644
+index c395630..0000000
+--- a/arch/arm/plat-stmp3xxx/timer.c
++++ /dev/null
+@@ -1,186 +0,0 @@
+-/*
+- * System timer for Freescale STMP37XX/STMP378X
+- *
+- * Embedded Alley Solutions, Inc <source@embeddedalley.com>
+- *
+- * Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
+- */
+-
+-/*
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/spinlock.h>
+-#include <linux/clocksource.h>
+-#include <linux/clockchips.h>
+-#include <linux/io.h>
+-#include <linux/irq.h>
+-#include <linux/interrupt.h>
+-
+-#include <asm/mach/time.h>
+-#include <mach/stmp3xxx.h>
+-#include <mach/platform.h>
+-#include <mach/regs-timrot.h>
+-
+-static irqreturn_t
+-stmp3xxx_timer_interrupt(int irq, void *dev_id)
+-{
+-	struct clock_event_device *c = dev_id;
+-
+-	/* timer 0 */
+-	if (__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0) &
+-			BM_TIMROT_TIMCTRLn_IRQ) {
+-		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ,
+-				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
+-		c->event_handler(c);
+-	}
+-
+-	/* timer 1 */
+-	else if (__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1)
+-			& BM_TIMROT_TIMCTRLn_IRQ) {
+-		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ,
+-				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
+-		stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ_EN,
+-				REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
+-		__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
+-	}
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static cycle_t stmp3xxx_clock_read(struct clocksource *cs)
+-{
+-	return ~((__raw_readl(REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1)
+-				& 0xFFFF0000) >> 16);
+-}
+-
+-static int
+-stmp3xxx_timrot_set_next_event(unsigned long delta,
+-		struct clock_event_device *dev)
+-{
+-	/* reload the timer */
+-	__raw_writel(delta, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
+-	return 0;
+-}
+-
+-static void
+-stmp3xxx_timrot_set_mode(enum clock_event_mode mode,
+-		struct clock_event_device *dev)
+-{
+-}
+-
+-static struct clock_event_device ckevt_timrot = {
+-	.name		= "timrot",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT,
+-	.shift		= 32,
+-	.set_next_event	= stmp3xxx_timrot_set_next_event,
+-	.set_mode	= stmp3xxx_timrot_set_mode,
+-};
+-
+-static struct clocksource cksrc_stmp3xxx = {
+-	.name           = "cksrc_stmp3xxx",
+-	.rating         = 250,
+-	.read           = stmp3xxx_clock_read,
+-	.mask           = CLOCKSOURCE_MASK(16),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-static struct irqaction stmp3xxx_timer_irq = {
+-	.name		= "stmp3xxx_timer",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER,
+-	.handler	= stmp3xxx_timer_interrupt,
+-	.dev_id		= &ckevt_timrot,
+-};
+-
+-
+-/*
+- * Set up timer interrupt, and return the current time in seconds.
+- */
+-static void __init stmp3xxx_init_timer(void)
+-{
+-	ckevt_timrot.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
+-				ckevt_timrot.shift);
+-	ckevt_timrot.min_delta_ns = clockevent_delta2ns(2, &ckevt_timrot);
+-	ckevt_timrot.max_delta_ns = clockevent_delta2ns(0xFFF, &ckevt_timrot);
+-	ckevt_timrot.cpumask = cpumask_of(0);
+-
+-	stmp3xxx_reset_block(REGS_TIMROT_BASE, false);
+-
+-	/* clear two timers */
+-	__raw_writel(0, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
+-	__raw_writel(0, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
+-
+-	/* configure them */
+-	__raw_writel(
+-		(8 << BP_TIMROT_TIMCTRLn_SELECT) |  /* 32 kHz */
+-		BM_TIMROT_TIMCTRLn_RELOAD |
+-		BM_TIMROT_TIMCTRLn_UPDATE |
+-		BM_TIMROT_TIMCTRLn_IRQ_EN,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
+-	__raw_writel(
+-		(8 << BP_TIMROT_TIMCTRLn_SELECT) |  /* 32 kHz */
+-		BM_TIMROT_TIMCTRLn_RELOAD |
+-		BM_TIMROT_TIMCTRLn_UPDATE |
+-		BM_TIMROT_TIMCTRLn_IRQ_EN,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
+-
+-	__raw_writel(CLOCK_TICK_RATE / HZ - 1,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
+-	__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
+-
+-	setup_irq(IRQ_TIMER0, &stmp3xxx_timer_irq);
+-
+-	clocksource_register_hz(&cksrc_stmp3xxx, CLOCK_TICK_RATE);
+-	clockevents_register_device(&ckevt_timrot);
+-}
+-
+-#ifdef CONFIG_PM
+-
+-void stmp3xxx_suspend_timer(void)
+-{
+-	stmp3xxx_clearl(BM_TIMROT_TIMCTRLn_IRQ_EN | BM_TIMROT_TIMCTRLn_IRQ,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
+-	stmp3xxx_setl(BM_TIMROT_ROTCTRL_CLKGATE,
+-			REGS_TIMROT_BASE + HW_TIMROT_ROTCTRL);
+-}
+-
+-void stmp3xxx_resume_timer(void)
+-{
+-	stmp3xxx_clearl(BM_TIMROT_ROTCTRL_SFTRST | BM_TIMROT_ROTCTRL_CLKGATE,
+-			REGS_TIMROT_BASE + HW_TIMROT_ROTCTRL);
+-	__raw_writel(
+-		8 << BP_TIMROT_TIMCTRLn_SELECT |  /* 32 kHz */
+-		BM_TIMROT_TIMCTRLn_RELOAD |
+-		BM_TIMROT_TIMCTRLn_UPDATE |
+-		BM_TIMROT_TIMCTRLn_IRQ_EN,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL0);
+-	__raw_writel(
+-		8 << BP_TIMROT_TIMCTRLn_SELECT |  /* 32 kHz */
+-		BM_TIMROT_TIMCTRLn_RELOAD |
+-		BM_TIMROT_TIMCTRLn_UPDATE |
+-		BM_TIMROT_TIMCTRLn_IRQ_EN,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCTRL1);
+-	__raw_writel(CLOCK_TICK_RATE / HZ - 1,
+-			REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT0);
+-	__raw_writel(0xFFFF, REGS_TIMROT_BASE + HW_TIMROT_TIMCOUNT1);
+-}
+-
+-#else
+-
+-#define stmp3xxx_suspend_timer	NULL
+-#define	stmp3xxx_resume_timer	NULL
+-
+-#endif	/* CONFIG_PM */
+-
+-struct sys_timer stmp3xxx_timer = {
+-	.init		= stmp3xxx_init_timer,
+-	.suspend	= stmp3xxx_suspend_timer,
+-	.resume		= stmp3xxx_resume_timer,
+-};
 -- 
-1.7.0.4
+1.7.2.5
