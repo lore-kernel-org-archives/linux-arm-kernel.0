@@ -1,36 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 11:09:27 +0100
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <alpine.LFD.2.02.1104212146400.3323@ionos>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1104212146400.3323@ionos>
-Message-ID: <20110429100927.GC5126@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Apr 2011 03:16:47 -0700
+Subject: [GIT PULL] omap fixes for v2.6.39-rc5
+Message-ID: <20110429101647.GW3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
-> On Fri, 15 Apr 2011, Sascha Hauer wrote:
-> > From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > + * @get:	Called by the core clock code when a device driver acquires a
-> > + *		clock via clk_get(). Optional.
-> > + *
-> > + * @put:	Called by the core clock code when a devices driver releases a
-> > + *		clock via clk_put(). Optional.
-> 
-> These callbacks are completely pointless. There are only two non empty
-> implementations in tree:
-> 
-> One does a try_module_get(clk->owner), which should be done in generic
-> code. The other does special clock enabling magic which wants to go to
-> clk->prepare().
+Hi Linus,
 
-I disagree.  Most clocks don't live in a module - there's only one
-platform which does at present.  To force every clock to have an owner
-field is rediculous.  We already know that the OMAP tree represents a
-significant amount of data, and for every additional unnecessary word,
-it gobbles up another 4K of data space.
+Please pull omap fixes from:
 
-If we go down the route of separating clock stuff into bite-size pieces,
-OMAP is going to end up with yet more struct clks, which is going to add
-to the bloat even more.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Most of the diffstat is fixing clock related flags, the kind
+of stuff that will be eventually coming from device tree as
+discussed earlier. Anyways necessariy fixes for correct clocking
+for the -rc cycle.  
+
+The other patches are quite trivial one liner fixes.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 8e10cd74342c7f5ce259cceca36f6eba084f5d58:
+  Linus Torvalds (1):
+        Linux 2.6.39-rc5
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Avinash.H.M (1):
+      OMAP2/3: hwmod: fix gpio-reset timeouts seen during bootup.
+
+Benoit Cousson (1):
+      OMAP2+: hwmod data: Fix wrong dma_system end address
+
+Eduardo Valentin (2):
+      OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad area
+      OMAP3: PM: Do not rely on ROM code to restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
+
+Felipe Contreras (1):
+      omap: rx51: mark reserved memory earlier
+
+Nishanth Menon (1):
+      OMAP3+: voltage: remove initial voltage
+
+Oskar Andero (1):
+      arm: omap2: enable smc instruction for sleep34xx
+
+Shweta Gulati (1):
+      OMAP4: Intialize IVA Device in addition to DSP device.
+
+Tomi Valkeinen (1):
+      OMAP4: clock data: Change DSS clock aliases
+
+Tony Lindgren (1):
+      Merge branch 'for_tony_a_2.6.39rc' of git://git.pwsan.com/linux-2.6 into devel-fixes
+
+omar ramirez (1):
+      OMAP3: l3: fix for "irq 10: nobody cared" message
+
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/board-rx51.c           |    9 +++++++--
+ arch/arm/mach-omap2/clock44xx_data.c       |    9 ++-------
+ arch/arm/mach-omap2/cm2xxx_3xxx.c          |   17 +++++++++++++++++
+ arch/arm/mach-omap2/control.c              |    8 +++++++-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    6 +++++-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ arch/arm/mach-omap2/omap_l3_smx.c          |    4 ++--
+ arch/arm/mach-omap2/pm.c                   |    1 +
+ arch/arm/mach-omap2/voltage.c              |    1 -
+ 12 files changed, 56 insertions(+), 18 deletions(-)
