@@ -1,55 +1,57 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 29 Apr 2011 14:44:59 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <20110428170342.GA17290@n2100.arm.linux.org.uk>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-	<20110419120344.GG22799@n2100.arm.linux.org.uk>
-	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
-	<20110428170342.GA17290@n2100.arm.linux.org.uk>
-Message-ID: <4DBAB2CB.2030700@stericsson.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 29 Apr 2011 16:44:44 +0400
+Subject: [PATCH 2/2] AM35xx-Craneboard:Display: Add DVI and TV Support
+In-Reply-To: <1304077261-17811-2-git-send-email-srinath@mistralsolutions.com>
+References: <[PATCH]>
+	<1304077261-17811-2-git-send-email-srinath@mistralsolutions.com>
+Message-ID: <4DBAB2BC.1090202@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> That's rather unfortunate, because it means that trying it on ARM
-> hardware is going to hang indefinitely waiting for the nonexistent
-> DMA stuff to finish.
+Hello.
 
-I see the problem, we need a way of being able to switch between using 
-the dma callback and not using it. I think the variant data should be 
-used for this, what do you think?
+On 29-04-2011 15:41, srinath at mistralsolutions.com wrote:
 
-> 
-> I remain unconvinced whether this problem applies only to ARMs
-> evaluation boards as I believe the whole primecell DMA stuff from
-> the outset is fundamentally misdesigned.  I suspect there maybe SoCs
-> out there which suffer from the same broken DMA issues which ARMs
-> eval boards do.
-> 
-> Maybe an alternative solution is on data end to set a timer, which
-> is cancelled when the DMA engine callback arrives.  If the timer
-> expires, it means we have broken DMA and that needs to be shutdown
-> for that instance.
+> From: Srinath <srinath@mistralsolutions.com>
 
-This could be a very good alternative for error handling of the DMA job. 
-I will try to add some code that handles this.
+> Added Display (DVI and TV) support for CraneBoard.
 
-> 
-> However, one thing worries me - what if the DMA callback comes before
-> we get the data end interrupt.  Given the weirdnesses of your
-> implementation found so far (which are well beyond what's visible
-> on ARMs own implementation) I wouldn't put any guarantees on the
-> relative ordering of that either.
-> 
+> Signed-off-by: Srinath <srinath@mistralsolutions.com>
+[...]
 
-host->dataend and host->size==0 controls whether the data transfer has 
-finished successfully. I believe this should be handled correctly in my 
-patch. Maybe it is possible to make some minor restructuring to make it 
-more clear what the end condition really is, I can see if I can figure 
-something out.
+> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+> index 05867b5..83fe85b 100644
+> --- a/arch/arm/mach-omap2/board-am3517crane.c
+> +++ b/arch/arm/mach-omap2/board-am3517crane.c
+[...]
+> @@ -66,11 +69,83 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+>   	.reset_gpio_port[2]  = -EINVAL
+>   };
+>
+> +static void __init am3517_crane_display_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = omap_mux_init_gpio(GPIO_DVI_ENABLE, OMAP_PIN_OUTPUT);
+> +	if (ret<  0) {
+> +		pr_err("Can not configure mux for GPIO_DVI_ENABLE %d\n",
+> +			GPIO_DVI_ENABLE);
+> +		return;
+> +	}
+> +
+> +	ret = gpio_request(GPIO_DVI_ENABLE, "dvi_enable");
+> +	if (ret<  0) {
+> +		pr_err("Can not request GPIO %d\n", GPIO_DVI_ENABLE);
+> +		return;
+> +	}
+> +
+> +	ret = gpio_direction_output(GPIO_DVI_ENABLE, 1);
+> +	if (ret<  0) {
+> +		gpio_free(GPIO_DVI_ENABLE);
+> +		pr_err("Unable to enable DVI\n");
+> +		return;
+> +	}
 
+    You can use gpio_request_one() ISO gpio_request()/gpio_direction_output().
 
-BR
-Ulf Hansson
+WBR, Sergei
