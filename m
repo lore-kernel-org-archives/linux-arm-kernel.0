@@ -1,34 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 23:19:21 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104300009420.3005@ionos>
-References: <20110421072259.GG31131@pengutronix.de>
-	<alpine.LFD.2.02.1104211045220.3323@ionos>
-	<20110429103723.GF5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291252080.3005@ionos>
-	<20110429110610.GJ5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291344020.3005@ionos>
-	<20110429132613.GL5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291620170.3005@ionos>
-	<20110429220746.GB14871@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104300009420.3005@ionos>
-Message-ID: <20110429221921.GE14871@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 30 Apr 2011 08:37:17 +1000
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104292029.50680.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110429075958.GV17290@n2100.arm.linux.org.uk>
+	<20110429093209.1926c732@jbarnes-desktop>
+	<201104292029.50680.arnd@arndb.de>
+Message-ID: <1304116637.2513.252.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2011 at 12:16:52AM +0200, Thomas Gleixner wrote:
-> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> > On Fri, Apr 29, 2011 at 05:31:44PM +0200, Thomas Gleixner wrote:
-> > > }
-> > 
-> > I'm going to give up discussing this with you - you have no desire to
-> > even understand what I'm saying.  I don't see any point continuing this
-> > discussion any further.
+On Fri, 2011-04-29 at 20:29 +0200, Arnd Bergmann wrote:
 > 
-> Right, I have no interest in understanding what you want to do. 
+> If that is the case, we can probably work around this by turning the
+> entire
+> linear mapping (except for the kernel binary) into nonexecutable mode,
+> if we don't do that already.
+> This is desirable for security purposes anyway 
 
-And that's your basic problem.  You don't even want to try and understand
-these arguments.  So its pointless continuing the discussion.
+You'd still have an "edge" problem if you use large pages for the linear
+mapping, you can't obviously make part of the kernel text NX and you'd
+have to make sure you 'exclude' from those GPU allocations whatever
+overlaps with your last executable large page.
 
-Thanks for confirming that I've been wasting my time over the last couple
-of days.
+In a way, it's a similar problem I have with bolted memory on BookE
+where I can't restrict GPU allocations to memory that isn't bolted :-)
+
+Cheers,
+Ben.
