@@ -1,51 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Apr 2011 17:42:59 +0100
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104291741.18190.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104271243.16868.arnd@arndb.de>
-	<1303902508.15101.21.camel@e102109-lin.cambridge.arm.com>
-	<201104291741.18190.arnd@arndb.de>
-Message-ID: <BANLkTimJoc_DR3bjxehDFcTM13CavAX_=A@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 29 Apr 2011 19:01:18 +0200 (CEST)
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
+	sched_clock
+In-Reply-To: <20110429103208.GA2849@atomide.com>
+References: <20110423205036.795894921@linutronix.de>
+	<20110429094606.GA5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291217120.3005@ionos>
+	<20110429103208.GA2849@atomide.com>
+Message-ID: <alpine.LFD.2.02.1104291900290.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, 29 April 2011, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 27 April 2011, Catalin Marinas wrote:
->> > >
->> > > It's not broken since we moved to using Normal non-cacheable memory
->> > > for the coherent DMA buffers (as long as you flush the cacheable alias
->> > > before using the buffer, as we already do). The ARM ARM currently says
->> > > unpredictable for such situations but this is being clarified in
->> > > future updates and the Normal non-cacheable vs cacheable aliases can
->> > > be used (given correct cache maintenance before using the buffer).
->> >
->> > Thanks for that information, I believe a number of people in the
->> > previous discussions were relying on the information from the
->> > documentation. Are you sure that this is not only correct for the
->> > cores made by ARM ltd but also for the other implementations that
->> > may have relied on documentation?
->>
->> It is a clarification in the ARM ARM so it covers all the cores made by
->> architecture licensees, not just ARM Ltd. It basically makes the
->> "unpredictable" part more predictable to allow certain types of aliases
->> (e.g. Strongly Ordered vs Normal memory would still be disallowed).
->>
->> All the current implementations are safe with Normal memory aliases
->> (cacheable vs non-cacheable) but of course, there may be some
->> performance benefits in not having any alias.
->
-> A lot of the discussions we are about to have in Budapest will be
-> around solving the problem of having only valid combinations of
-> mappings, so we really need to have a clear statement in specification
-> form about what is actually valid.
->
-> Would it be possible to have an updated version of the relevant
-> section of the ARM ARM by next week so we can use that as the
-> base for our discussions?
+On Fri, 29 Apr 2011, Tony Lindgren wrote:
+> * Thomas Gleixner <tglx@linutronix.de> [110429 13:19]:
+> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+> > 
+> > > On Sat, Apr 23, 2011 at 08:54:39PM -0000, Thomas Gleixner wrote:
+> > > > Most of ARM sched_clocks is using the timekeeping clocksource as the
+> > > > sched_clock. Only versatile uses a different clock for it, but there
+> > > > is no real reason why it can't use the clocksource as well.
+> > > 
+> > > sched_clock really needs to be setup earlier than clocksources are setup,
+> > > before sched_init() is called in init/main.c.  This is where the scheduler
+> > > reads the initial value of sched_clock() to start its time measurements.
+> > > This is well before clocksources are initialized, or even the irq subsystem.
+> > > 
+> > > So I don't believe bolting it directly into the clocksource code in this
+> > > way is correct.  As things are currently setup with my sched_clock()
+> > > implementation, we can (and in any cases do) get the sched_clock() up
+> > > and running really early which is what's required.
+> > 
+> > Not really. There is no requirement to have a high resolution sched
+> > clock in the early boot process. The only requirement is that
+> > sched_clock is monotonic increasing nsecs. So the code utilizes
+> > jiffies up to the point where the clocksource is installed and then
+> > switches over keeping the clock monotonic. The scheduler does not care
+> > whether it gets coarse grained time information in the early boot
+> > stage and then fine grained information at some point later.
+> > 
+> > The only drawback is that you don't get precise timestamps for tracing
+> > up to the point where the clock source is installed. But that's really
+> > not a big deal to worry about.
+> 
+> What about PRINTK_TIME? I think that uses sched_clock right from the
+> start.
 
-I'll ask the architecture people here in ARM and get back to you
-(there is holiday until Tuesday next week in the UK).
+Right, but where is the problem ? A few time stamps with jiffies
+resolution and then the finegrained ones.
 
--- 
-Catalin
+Thanks,
+
+	tglx
