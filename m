@@ -1,59 +1,84 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Apr 2011 14:28:32 +0200 (CEST)
-Subject: [patch 07/16] arm: omap: Use clocksource based sched_clock
-In-Reply-To: <20110429115744.GZ3755@atomide.com>
-References: <20110423205036.795894921@linutronix.de>
-	<20110423205132.221790438@linutronix.de>
-	<20110429115744.GZ3755@atomide.com>
-Message-ID: <alpine.LFD.2.02.1104291420240.3005@ionos>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 29 Apr 2011 08:32:59 -0400 (EDT)
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <20110429075346.GU17290@n2100.arm.linux.org.uk>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+	<20110428152735.GU17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
+	<20110429075346.GU17290@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104290814380.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-B1;2601;0cOn Fri, 29 Apr 2011, Tony Lindgren wrote:
+On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 
-> * Thomas Gleixner <tglx@linutronix.de> [110423 13:51]:
-> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > ---
-> >  arch/arm/mach-omap1/time.c               |   62 +--------------------------
-> >  arch/arm/mach-omap2/timer-gp.c           |   17 -------
-> >  arch/arm/plat-omap/counter_32k.c         |   71 ++-----------------------------
-> >  arch/arm/plat-omap/dmtimer.c             |    4 -
-> >  arch/arm/plat-omap/include/plat/common.h |    1 
-> >  5 files changed, 13 insertions(+), 142 deletions(-)
+> On Thu, Apr 28, 2011 at 09:00:08PM -0400, Nicolas Pitre wrote:
+> > On Thu, 28 Apr 2011, Russell King - ARM Linux wrote:
+> > 
+> > > If/when we move to DT, do people think that Linus is going to accept
+> > > having the DT files in the kernel for all these platforms, and will he
+> > > be happy to see stuff like the files containing the OMAP clock definitions
+> > > being constantly patched?  Remember, it's *exactly* this data which Linus
+> > > wants out of the kernel source.
+> > 
+> > Well, here's what he said:
+> > 
+> > |But trust me, if you start doing a better job at platform code, I
+> > |won't be complaining when I get lots of deleted code, or when I start
+> > |getting devicetree descriptions instead of new drivers.
+> > (http://article.gmane.org/gmane.linux.kernel/1121387)
+> > 
+> > So of course this "getting devicetree descriptions" might be interpreted 
+> > to mean different things.
+> > 
+> > OTOH, the device tree source files can be arranged with common 
+> > definitions in something like a header file that is included by board 
+> > specific files.  So, at least in theory, differences between similar 
+> > boards should be small, hopefully smaller than the equivalent in C.
+> > 
+> > Also, DT files should be a representation of the hardware which is meant 
+> > to be stable.  If it wasn't stable, there would be no point using a data 
+> > structure that can also be used outside of the kernel.  Remember that 
+> > one of the selling point for DT is to be able to boot an existing kernel 
+> > binary on yet-to-be-created hardware simply by creating the appropriate 
+> > DT description for it.  Hence the DT files for existing hardware 
+> > shouldn't have to change even if the kernel side implementation does.
+> >
+> > > I suspect the answer to that is no.  So I think we should start right now
+> > > with the idea that putting DT files - even the core SoC ones - into the
+> > > kernel isn't going to be acceptable.
+> > 
+> > Well, if you look at arch/powerpc/boot/dts/* you'll find a bunch of 
+> > board specific DT files in there already, and Linus has identified PPC 
+> > as one architecture that did it right in his mind.
 > 
-> This one needs the following patch to compile. Also, this
-> fails with following, probably because the clocks are not
-> set up at that point.
+> Sigh, you really don't understand.
 > 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = c0004000
-> [00000000] *pgd=00000000
-> Internal error: Oops: 80000005 [#1] SMP
-> last sysfs file: 
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.39-rc5-00081-gc3dec8c #166)
-> PC is at 0x0
-> LR is at read_persistent_clock+0x24/0xb4
+> For OMAP we're likely to see several dts files around 200K in size
+> describing _just_ the clock trees.  As we've seen, the OMAP clock tree
+> information is modified fairly regularly, adding new clocks, changing
+> flags, and so forth.
 
-> The generic code should probably just return 0 until the clocks are
-> initialized. Or do you have some other solution for that in mind?
+What do I not understand?  Let me repeat myself again:
 
-The generic sched_clock implementation returns a jiffies based value
-as long as there is no clocksource registered. But the above does not
-fail in sched_clock() it fails in read_persistent_clock() which does
+| DT files should be a representation of the hardware which is meant to 
+| be stable. [...] Hence the DT files for existing hardware shouldn't 
+| have to change even if the kernel side implementation does.
 
-        last_cycles = cycles;
-        cycles = clocksource_32k.read(&clocksource_32k);
+So there shouldn't be constant changes to those files as they are 
+supposed to be hardware description only.
 
-So the following change causes this:
+I agree that having a DT source file for every piece of hardware in 
+existence out there being stuffed in the kernel tree is a bit silly.  
+In a perfect world, the DT data would be tied and maintained with the 
+bootloader, but I'm a bit skeptical about this going well given past 
+history with even much simpler data. Therefore I think it is important 
+to have at least a few ones being shipped with the kernel tree to 
+provide at least a few reference cases for which the corresponding 
+kernel code was tested and thus having some kind of officially validated 
+combinations available.
 
--     .read           = omap_32k_read_dummy,
 
-Which leads to the question why you have a read_persistent_clock() at
-all if it always reads 0 via omap_32k_read_dummy ? Or is this meant
-just for the resume case? Then the above and the removal of
-omap_32k_read_dummy() needs to be undone.
-
-Thanks,
-
-	tglx
+Nicolas
