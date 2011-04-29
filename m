@@ -1,65 +1,158 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 29 Apr 2011 07:02:35 -0600
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to
-	be appended to zImage
-In-Reply-To: <20110429102623.GX3755@atomide.com>
-References: <20110324231830.2586.7150.stgit@riker>
-	<20110328091259.GA18721@S2100-06.ap.freescale.net>
-	<20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-	<20110427142306.GI3755@atomide.com>
-	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-	<20110427144335.GK3755@atomide.com>
-	<20110429102623.GX3755@atomide.com>
-Message-ID: <BANLkTi=jcb8Piki6RrijGOQG=wJ=ULv5Gw@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 29 Apr 2011 15:06:40 +0200
+Subject: [PATCH 2/5] arm: configs: add defconfig for mach-mxs
+In-Reply-To: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
+References: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1304082403-8897-3-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 4:26 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [110427 07:41]:
->> * Nicolas Pitre <nico@fluxnic.net> [110427 07:37]:
->> > On Wed, 27 Apr 2011, Tony Lindgren wrote:
->> > >
->> > > I guess the issue is that when setup_machine_fdt gets called we only
->> > > have minimal MMU mapping done.
->> >
->> > In head.S (the final kernel image one) there is a 1MB mapping
->> > established when r2 contains a valid ATAG/DTB pointer. ?See commit
->> > 4d901c42 (you even ACK'd it).
->>
->> Yeah thanks was just looking at that too :) Need to debug further..
->
-> OK figured this one out. Looks like we have an issue where kernel BSS
-> can easily overlap the appended DT data. Then kernel __mmap_switched
-> will clear the BSS and DT data.
->
-> This happens for example with omap2plus_defconfig where we have:
->
-> $ stat -c "%s" arch/arm/boot/Image
-> 6405100
->
-> $ size kernel/built-in.o
-> ? text ? ?data ? ? bss ? ? dec ? ? hex filename
-> ?660576 ?110852 5475500 6246928 ?5f5210 kernel/built-in.o
->
-> If the compressed image is smaller than BSS, then we end up
-> having DT data in the BSS area. In this case the compressed
-> image is about 2.3 MB for LZMA.
->
-> The uncompress code does not know about the kernel BSS,
-> and does not necessarily relocate anything depending on the
-> compressed image load address.
->
-> So in which code do we want to relocate the DT data?
->
-> We could do it based on estimated BSS size in uncompress code,
-> or based on the real BSS size in __mmap_switched before BSS
-> gets reset.
+Covers MX23, MX28 and STMP378x.
 
-How about telling the wrapper what the final size will be by scraping
-the __bss_end value out of System.map?
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+---
 
-g.
+Shawn: I now included your suggestions.
+
+ arch/arm/configs/mxs_defconfig |  129 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 129 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/mxs_defconfig
+
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+new file mode 100644
+index 0000000..2bf2243
+--- /dev/null
++++ b/arch/arm/configs/mxs_defconfig
+@@ -0,0 +1,129 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_TASKSTATS=y
++CONFIG_TASK_DELAY_ACCT=y
++CONFIG_TASK_XACCT=y
++CONFIG_TASK_IO_ACCOUNTING=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++# CONFIG_UTS_NS is not set
++# CONFIG_IPC_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++# CONFIG_NET_NS is not set
++CONFIG_PERF_EVENTS=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODULE_FORCE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_BLK_DEV_INTEGRITY=y
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_MXS=y
++CONFIG_MACH_STMP378X_DEVB=y
++CONFIG_MACH_TX28=y
++# CONFIG_ARM_THUMB is not set
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_AEABI=y
++CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_FPE_NWFPE=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_SYN_COOKIES=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++CONFIG_CAN=m
++CONFIG_CAN_RAW=m
++CONFIG_CAN_BCM=m
++CONFIG_CAN_DEV=m
++CONFIG_CAN_FLEXCAN=m
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++# CONFIG_BLK_DEV is not set
++CONFIG_NETDEVICES=y
++CONFIG_NET_ETHERNET=y
++CONFIG_ENC28J60=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=m
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_TSC2007=m
++# CONFIG_SERIO is not set
++CONFIG_VT_HW_CONSOLE_BINDING=y
++CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=m
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=m
++CONFIG_I2C_MXS=m
++CONFIG_SPI=y
++CONFIG_SPI_GPIO=m
++CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_HWMON is not set
++# CONFIG_MFD_SUPPORT is not set
++CONFIG_DISPLAY_SUPPORT=m
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_MXS=y
++CONFIG_RTC_CLASS=m
++CONFIG_RTC_DRV_DS1307=m
++CONFIG_DMADEVICES=y
++CONFIG_MXS_DMA=y
++CONFIG_EXT3_FS=y
++# CONFIG_DNOTIFY is not set
++CONFIG_FSCACHE=m
++CONFIG_FSCACHE_STATS=y
++CONFIG_CACHEFILES=m
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_FRAME_WARN=2048
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_UNUSED_SYMBOLS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_TIMER_STATS=y
++CONFIG_PROVE_LOCKING=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
++CONFIG_SYSCTL_SYSCALL_CHECK=y
++CONFIG_BLK_DEV_IO_TRACE=y
++CONFIG_STRICT_DEVMEM=y
++CONFIG_DEBUG_USER=y
++CONFIG_CRYPTO=y
++CONFIG_CRYPTO_CRC32C=m
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_ITU_T=m
++CONFIG_CRC7=m
+-- 
+1.7.2.5
