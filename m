@@ -1,43 +1,32 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Fri, 29 Apr 2011 16:38:37 +0200
-Subject: [PATCHv3 2.6.40 2/4] ARM: simpad: Cleanup CS3 accessors.
-In-Reply-To: <20110428092327.GR17290@n2100.arm.linux.org.uk>
-References: <1303377543-24794-1-git-send-email-jochen@scram.de>	<1303377543-24794-3-git-send-email-jochen@scram.de>
-	<20110428092327.GR17290@n2100.arm.linux.org.uk>
-Message-ID: <4DBACD6D.1070200@scram.de>
+From: drosenberg@vsecurity.com (Dan Rosenberg)
+Date: Fri, 29 Apr 2011 10:48:07 -0400
+Subject: [PATCH] arm: prevent heap corruption in OABI semtimedop
+Message-ID: <1304088487.28093.7.camel@dan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+When CONFIG_OABI_COMPAT is set, the wrapper for semtimedop does not
+bound the nsops argument.  A sufficiently large value will cause an
+integer overflow in allocation size, followed by copying too much data
+into the allocated buffer.  Fix this by restricting nsops to SEMOPM.
+Untested.
 
-thanks for the review.
+Signed-off-by: Dan Rosenberg <drosenberg@vsecurity.com>
+Cc: stable at kernel.org
+---
+ arch/arm/kernel/sys_oabi-compat.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
->> @@ -47,15 +43,15 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
->>   			   struct pcmcia_state *state)
->>   {
->>   	unsigned long levels = GPLR;
->> -	long cs3reg = get_cs3_shadow();
->> +	long cs3reg = simpad_get_cs3_shadow();
->>
->>   	state->detect=((levels&  GPIO_CF_CD)==0)?1:0;
->>   	state->ready=(levels&  GPIO_CF_IRQ)?1:0;
->>   	state->bvd1=1; /* Not available on Simpad. */
->>   	state->bvd2=1; /* Not available on Simpad. */
->>   	state->wrprot=0; /* Not available on Simpad. */
->> -
->> -	if((cs3reg&  0x0c) == 0x0c) {
->> +
->> +	if ((cs3reg&  0x0c) == 0x0c) {
->
-> Are there no definitions for the 0x0c magic value?
-
-Unfortunately, this function has a bug as it currently accesses EN0|EN1, 
-but then this test is never true as EN1 is never being set in this 
-driver. Intended was the access to PCMCIA_VS1|PCMCIA_VS2, but then 
-get_cs3_shadow() was wrong and should now be simpad_get_cs3_ro().
-
-I'll fix this and hope someone can test this as I don't have a Simpad 
-with PCMCIA.
-
-Thanks,
-Jochen
+diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
+index 4ad8da1..af0aaeb 100644
+--- a/arch/arm/kernel/sys_oabi-compat.c
++++ b/arch/arm/kernel/sys_oabi-compat.c
+@@ -311,7 +311,7 @@ asmlinkage long sys_oabi_semtimedop(int semid,
+ 	long err;
+ 	int i;
+ 
+-	if (nsops < 1)
++	if (nsops < 1 || nsops > SEMOPM)
+ 		return -EINVAL;
+ 	sops = kmalloc(sizeof(*sops) * nsops, GFP_KERNEL);
+ 	if (!sops)
