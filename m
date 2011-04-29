@@ -1,50 +1,350 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 29 Apr 2011 16:00:40 +0200
-Subject: [PATCH 5/5] OMAP3: cpuidle: change the power domains modes
-	determination logic
-In-Reply-To: <4DBAA12D.6070203@ti.com>
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-	<1304069186-3086-6-git-send-email-j-pihet@ti.com>
-	<4DBAA12D.6070203@ti.com>
-Message-ID: <BANLkTinEwUukmE2LP6F3q_8KDBHvdRqkVA@mail.gmail.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Fri, 29 Apr 2011 16:11:43 +0200
+Subject: AT91: PIO base-address should be calculated by processor-specific code
+Message-ID: <1304086303.21884.36.camel@redbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+For supporting multiple AT91 processors in a single kernel image, the
+base-address of the system peripherals is processor-dependent.  The GPIO
+driver should therefore not reference AT91_VA_BASE_SYS, but rather the
+correct peripheral base-address needs to be provided by the
+processor-specific initialization code.
 
-On Fri, Apr 29, 2011 at 1:29 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 4/29/2011 2:56 PM, jean.pihet at newoldbits.com wrote:
->>
->> From: Jean Pihet<j-pihet@ti.com>
->>
->> The achievable power modes of the power domains in cpuidle
->> depends on the system wide 'enable_off_mode' knob in debugfs.
->> Upon changing enable_off_mode, do not change the C-states
->> 'valid' field but instead dynamically restrict the power modes
->> when entering idle.
->>
->> The C-states 'valid' field is just used to enable/disable some
->> C-states at init and shall not be changed later on.
->>
->> Signed-off-by: Jean Pihet<j-pihet@ti.com>
-...
 
-> Since you have started clean-up, we should get rid of the
-> "enable_off_mode" some how. I got that done for OMAP4 using
-> prepare() hook and IGNORE flag as per Kevin's suggestion
-> but unfortunately its seems to getting removed from
-> core cpuidle code.
+Signed-off-by: Andrew Victor <linux@maxim.org.za>
 
-The idea is to remove the enable_off_mode knob from debugfs and
-instead have the devices constraints API control the power domains
-behavior.
-Cf. PATCH 0/5 of this series for some remarks about further clean-up work.
 
-Thanks!
-Jean
-
->
-> Regards
-> Santosh
->
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at572d940hf.c linux-2.6/arch/arm/mach-at91/at572d940hf.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at572d940hf.c	2010-12-24 16:52:59.323332139 +0200
++++ linux-2.6/arch/arm/mach-at91/at572d940hf.c	2011-04-28 14:51:20.626598251 +0200
+@@ -279,15 +279,15 @@
+ static struct at91_gpio_bank at572d940hf_gpio[] = {
+ 	{
+ 		.id		= AT572D940HF_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT572D940HF_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT572D940HF_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91cap9.c linux-2.6/arch/arm/mach-at91/at91cap9.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91cap9.c	2009-06-10 05:05:27.000000000 +0200
++++ linux-2.6/arch/arm/mach-at91/at91cap9.c	2011-04-28 14:52:15.627736528 +0200
+@@ -271,19 +271,19 @@
+ static struct at91_gpio_bank at91cap9_gpio[] = {
+ 	{
+ 		.id		= AT91CAP9_ID_PIOABCD,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioABCD_clk,
+ 	}, {
+ 		.id		= AT91CAP9_ID_PIOABCD,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioABCD_clk,
+ 	}, {
+ 		.id		= AT91CAP9_ID_PIOABCD,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioABCD_clk,
+ 	}, {
+ 		.id		= AT91CAP9_ID_PIOABCD,
+-		.offset		= AT91_PIOD,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
+ 		.clock		= &pioABCD_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91rm9200.c linux-2.6/arch/arm/mach-at91/at91rm9200.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91rm9200.c	2009-06-10 05:05:27.000000000 +0200
++++ linux-2.6/arch/arm/mach-at91/at91rm9200.c	2011-04-28 14:33:14.161390776 +0200
+@@ -240,19 +240,19 @@
+ static struct at91_gpio_bank at91rm9200_gpio[] = {
+ 	{
+ 		.id		= AT91RM9200_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91RM9200_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91RM9200_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}, {
+ 		.id		= AT91RM9200_ID_PIOD,
+-		.offset		= AT91_PIOD,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
+ 		.clock		= &pioD_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9260.c linux-2.6/arch/arm/mach-at91/at91sam9260.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9260.c	2011-04-26 20:02:18.348726273 +0200
++++ linux-2.6/arch/arm/mach-at91/at91sam9260.c	2011-04-28 14:53:53.510630116 +0200
+@@ -266,15 +266,15 @@
+ static struct at91_gpio_bank at91sam9260_gpio[] = {
+ 	{
+ 		.id		= AT91SAM9260_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91SAM9260_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91SAM9260_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9261.c linux-2.6/arch/arm/mach-at91/at91sam9261.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9261.c	2011-04-26 20:02:18.348726273 +0200
++++ linux-2.6/arch/arm/mach-at91/at91sam9261.c	2011-04-28 14:54:36.792366992 +0200
+@@ -244,15 +244,15 @@
+ static struct at91_gpio_bank at91sam9261_gpio[] = {
+ 	{
+ 		.id		= AT91SAM9261_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91SAM9261_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91SAM9261_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9263.c linux-2.6/arch/arm/mach-at91/at91sam9263.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9263.c	2011-04-26 20:02:18.348726273 +0200
++++ linux-2.6/arch/arm/mach-at91/at91sam9263.c	2011-04-28 14:55:50.240519738 +0200
+@@ -248,23 +248,23 @@
+ static struct at91_gpio_bank at91sam9263_gpio[] = {
+ 	{
+ 		.id		= AT91SAM9263_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91SAM9263_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91SAM9263_ID_PIOCDE,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioCDE_clk,
+ 	}, {
+ 		.id		= AT91SAM9263_ID_PIOCDE,
+-		.offset		= AT91_PIOD,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
+ 		.clock		= &pioCDE_clk,
+ 	}, {
+ 		.id		= AT91SAM9263_ID_PIOCDE,
+-		.offset		= AT91_PIOE,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOE,
+ 		.clock		= &pioCDE_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9g45.c linux-2.6/arch/arm/mach-at91/at91sam9g45.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9g45.c	2010-12-24 16:54:07.564396678 +0200
++++ linux-2.6/arch/arm/mach-at91/at91sam9g45.c	2011-04-28 14:56:43.621718542 +0200
+@@ -270,23 +270,23 @@
+ static struct at91_gpio_bank at91sam9g45_gpio[] = {
+ 	{
+ 		.id		= AT91SAM9G45_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91SAM9G45_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91SAM9G45_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}, {
+ 		.id		= AT91SAM9G45_ID_PIODE,
+-		.offset		= AT91_PIOD,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
+ 		.clock		= &pioDE_clk,
+ 	}, {
+ 		.id		= AT91SAM9G45_ID_PIODE,
+-		.offset		= AT91_PIOE,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOE,
+ 		.clock		= &pioDE_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9rl.c linux-2.6/arch/arm/mach-at91/at91sam9rl.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9rl.c	2011-04-26 20:02:18.348726273 +0200
++++ linux-2.6/arch/arm/mach-at91/at91sam9rl.c	2011-04-28 14:57:24.215612004 +0200
+@@ -225,19 +225,19 @@
+ static struct at91_gpio_bank at91sam9rl_gpio[] = {
+ 	{
+ 		.id		= AT91SAM9RL_ID_PIOA,
+-		.offset		= AT91_PIOA,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
+ 		.clock		= &pioA_clk,
+ 	}, {
+ 		.id		= AT91SAM9RL_ID_PIOB,
+-		.offset		= AT91_PIOB,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
+ 		.clock		= &pioB_clk,
+ 	}, {
+ 		.id		= AT91SAM9RL_ID_PIOC,
+-		.offset		= AT91_PIOC,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
+ 		.clock		= &pioC_clk,
+ 	}, {
+ 		.id		= AT91SAM9RL_ID_PIOD,
+-		.offset		= AT91_PIOD,
++		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
+ 		.clock		= &pioD_clk,
+ 	}
+ };
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/generic.h linux-2.6/arch/arm/mach-at91/generic.h
+--- linux-2.6.38.at91/arch/arm/mach-at91/generic.h	2011-04-28 17:01:30.074425436 +0200
++++ linux-2.6/arch/arm/mach-at91/generic.h	2011-04-28 14:39:51.365842238 +0200
+@@ -56,7 +56,7 @@
+ 
+ struct at91_gpio_bank {
+ 	unsigned short id;		/* peripheral ID */
+-	unsigned long offset;		/* offset from system peripheral base */
++	void __iomem *regbase;		/* base address of PIO register bank */
+ 	struct clk *clock;		/* associated clock */
+ };
+ extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
+diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
+--- linux-2.6.38.at91/arch/arm/mach-at91/gpio.c	2011-04-28 17:01:35.838026699 +0200
++++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-28 14:40:55.418627104 +0200
+@@ -32,7 +32,6 @@
+ 	struct gpio_chip	chip;
+ 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
+ 	struct at91_gpio_bank	*bank;		/* Bank definition */
+-	void __iomem		*regbase;	/* Base of register bank */
+ };
+ 
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+@@ -74,7 +73,7 @@
+ 	pin -= PIN_BASE;
+ 	pin /= 32;
+ 	if (likely(pin < gpio_banks))
+-		return gpio_chip[pin].regbase;
++		return gpio_chip[pin].bank->regbase;
+ 
+ 	return NULL;
+ }
+@@ -297,7 +296,7 @@
+ 	int i;
+ 
+ 	for (i = 0; i < gpio_banks; i++) {
+-		void __iomem	*pio = gpio_chip[i].regbase;
++		void __iomem	*pio = gpio_chip[i].bank->regbase;
+ 
+ 		backups[i] = __raw_readl(pio + PIO_IMR);
+ 		__raw_writel(backups[i], pio + PIO_IDR);
+@@ -318,7 +317,7 @@
+ 	int i;
+ 
+ 	for (i = 0; i < gpio_banks; i++) {
+-		void __iomem	*pio = gpio_chip[i].regbase;
++		void __iomem	*pio = gpio_chip[i].bank->regbase;
+ 
+ 		if (!wakeups[i])
+ 			clk_enable(gpio_chip[i].bank->clock);
+@@ -390,7 +389,7 @@
+ 	u32		isr;
+ 
+ 	at91_gpio = get_irq_chip_data(irq);
+-	pio = at91_gpio->regbase;
++	pio = at91_gpio->bank->regbase;
+ 
+ 	for (;;) {
+ 		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
+@@ -402,7 +401,7 @@
+ 			if (!at91_gpio->next)
+ 				break;
+ 			at91_gpio = at91_gpio->next;
+-			pio = at91_gpio->regbase;
++			pio = at91_gpio->bank->regbase;
+ 			continue;
+ 		}
+ 
+@@ -513,7 +512,7 @@
+ 		unsigned	id = this->bank->id;
+ 		unsigned	i;
+ 
+-		__raw_writel(~0, this->regbase + PIO_IDR);
++		__raw_writel(~0, this->bank->regbase + PIO_IDR);
+ 
+ 		for (i = 0, pin = this->chip.base; i < 32; i++, pin++) {
+ 			lockdep_set_class(&irq_desc[pin].lock, &gpio_lock_class);
+@@ -545,7 +544,7 @@
+ 					unsigned offset)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+-	void __iomem *pio = at91_gpio->regbase;
++	void __iomem *pio = at91_gpio->bank->regbase;
+ 	unsigned mask = 1 << offset;
+ 
+ 	__raw_writel(mask, pio + PIO_ODR);
+@@ -556,7 +555,7 @@
+ 					 unsigned offset, int val)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+-	void __iomem *pio = at91_gpio->regbase;
++	void __iomem *pio = at91_gpio->bank->regbase;
+ 	unsigned mask = 1 << offset;
+ 
+ 	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+@@ -567,7 +566,7 @@
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+-	void __iomem *pio = at91_gpio->regbase;
++	void __iomem *pio = at91_gpio->bank->regbase;
+ 	unsigned mask = 1 << offset;
+ 	u32 pdsr;
+ 
+@@ -578,7 +577,7 @@
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+-	void __iomem *pio = at91_gpio->regbase;
++	void __iomem *pio = at91_gpio->bank->regbase;
+ 	unsigned mask = 1 << offset;
+ 
+ 	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+@@ -627,8 +626,6 @@
+ 
+ 		at91_gpio->bank = &data[i];
+ 		at91_gpio->chip.base = PIN_BASE + i * 32;
+-		at91_gpio->regbase = at91_gpio->bank->offset +
+-			(void __iomem *)AT91_VA_BASE_SYS;
+ 
+ 		/* enable PIO controller's clock */
+ 		clk_enable(at91_gpio->bank->clock);
