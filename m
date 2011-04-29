@@ -1,8 +1,9 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 29 Apr 2011 14:59:09 +1200
-Subject: [PATCH v3 00/23] Create common framework for AT91 device
-	initialisation
-Message-ID: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+Date: Fri, 29 Apr 2011 14:59:10 +1200
+Subject: [PATCH v3 01/23] at91: Add common devices framework
+In-Reply-To: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+References: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1304045972-19319-2-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,124 +12,150 @@ devices file, which includes the MMIO address, interrupt
 configuration, GPIO setup, etc for each device. This results in a large
 amount of duplicated code.
 
-This patch set introduces a framework for adding shared devices for the
-AT91 platform and replaces the multiple device setup implementations for
-each device with single implementations in the new framework. This has
-a net reduction of nearly 5000 lines of code.
+This patch introduces a framework for adding shared devices for the
+AT91 platform. The subsequent patches in this series replace the
+multiple device setup implementations for each device with single
+implementations in the new framework.
 
-Each of the arch/arm/mach-at91/*_devices.c files becomes a collection of
-structures (with some initialisation callbacks where necessary) with a
-table of devices which are present on the particular AT91 variant. All
-structures/functions are marked as __init/__initdata so there is little
-additional memory overhead. This also means that the #ifdefs around each
-device can be removed from the *_devices.c files (but remain in the new
-common devices.c file) without overhead.
-
-This patch series does not introduce any functional changes to how the
-board files add devices, it only replaces the duplicate device 
-initialisation code with common versions. The patch series attempts to
-have minimum change by rewriting as little as possible of the actual
-device initialisation functions.
-
-This is also a step towards allowing more than one AT91 variant to be
-built into a single kernel by removing duplicate function names across
-the *_devices.c files.
-
-I have build tested the patch series for all of the  AT91 variants 
-and devices, and have boot tested it on the AT91SAM9G20 (Snapper 9G20
-board) and tested basic device functionality.
-
-Changes from v1:
- - Moved __initdata to the end of lines
- - Fixed at572d940hf EMAC MMIO base
- - Fixed some whitespace issues
-
-Changes from v2:
- - Renamed UART identifiers from AT91_ID_USx to AT91_UART_USx. The
-   AT91_UARTx names are already in use. See patch 12 for more details.
- - Removed some left over debugging.
-
-Ryan Mallon (23):
-  at91: Add common devices framework
-  at91: Make Ethernet device common
-  at91: Make USB OHCI/EHCI devices common
-  at91: Make UDC device common
-  at91: Make MMC device common
-  at91: Make NAND device common
-  at91: Make TWI device common
-  at91: Make SPI device common
-  at91: Make TCB device common
-  at91: Make RTT device common
-  at91: Make watchdog device common
-  at91: Make UART devices common
-  at91: Make PWM device common
-  at91: Make SSC device common
-  at91: Make AC97 device common
-  at91: Make LCD controller device common
-  at91: Make touchscreen device common
-  at91: Make HDMAC device common
-  at91: Make RTC device common
-  at91: Make high speed USB gadget device common
-  at91: Make compact flash device common
-  at91: Move at91sam9263 CAN device to common devices
-  at91: Remove mAgic and ISI device code
-
- arch/arm/mach-at91/Makefile               |    2 +-
- arch/arm/mach-at91/at572d940hf.c          |    4 +
- arch/arm/mach-at91/at572d940hf_devices.c  | 1022 +++-------------
- arch/arm/mach-at91/at91cap9.c             |    4 +
- arch/arm/mach-at91/at91cap9_devices.c     | 1411 ++++----------------
- arch/arm/mach-at91/at91rm9200.c           |    4 +
- arch/arm/mach-at91/at91rm9200_devices.c   | 1321 ++++---------------
- arch/arm/mach-at91/at91sam9260.c          |    4 +
- arch/arm/mach-at91/at91sam9260_devices.c  | 1471 ++++-----------------
- arch/arm/mach-at91/at91sam9261.c          |    4 +
- arch/arm/mach-at91/at91sam9261_devices.c  | 1172 ++++--------------
- arch/arm/mach-at91/at91sam9263.c          |    4 +
- arch/arm/mach-at91/at91sam9263_devices.c  | 1589 +++++------------------
- arch/arm/mach-at91/at91sam9g45.c          |    4 +
- arch/arm/mach-at91/at91sam9g45_devices.c  | 1779 +++++---------------------
- arch/arm/mach-at91/at91sam9rl.c           |    4 +
- arch/arm/mach-at91/at91sam9rl_devices.c   | 1332 ++++----------------
- arch/arm/mach-at91/board-1arm.c           |    6 +-
- arch/arm/mach-at91/board-afeb-9260v1.c    |   10 +-
- arch/arm/mach-at91/board-at572d940hf_ek.c |   12 +-
- arch/arm/mach-at91/board-cam60.c          |    2 +-
- arch/arm/mach-at91/board-cap9adk.c        |    4 +-
- arch/arm/mach-at91/board-carmeva.c        |    6 +-
- arch/arm/mach-at91/board-cpu9krea.c       |   16 +-
- arch/arm/mach-at91/board-cpuat91.c        |   12 +-
- arch/arm/mach-at91/board-csb337.c         |    4 +-
- arch/arm/mach-at91/board-csb637.c         |    4 +-
- arch/arm/mach-at91/board-eb9200.c         |    8 +-
- arch/arm/mach-at91/board-ecbat91.c        |    6 +-
- arch/arm/mach-at91/board-eco920.c         |    2 +-
- arch/arm/mach-at91/board-flexibity.c      |    2 +-
- arch/arm/mach-at91/board-foxg20.c         |   16 +-
- arch/arm/mach-at91/board-gsia18s.c        |   14 +-
- arch/arm/mach-at91/board-kafa.c           |    6 +-
- arch/arm/mach-at91/board-kb9202.c         |   10 +-
- arch/arm/mach-at91/board-neocore926.c     |    6 +-
- arch/arm/mach-at91/board-pcontrol-g20.c   |   10 +-
- arch/arm/mach-at91/board-picotux200.c     |    6 +-
- arch/arm/mach-at91/board-qil-a9260.c      |   10 +-
- arch/arm/mach-at91/board-rm9200dk.c       |    6 +-
- arch/arm/mach-at91/board-rm9200ek.c       |    6 +-
- arch/arm/mach-at91/board-sam9-l9260.c     |    8 +-
- arch/arm/mach-at91/board-sam9260ek.c      |   10 +-
- arch/arm/mach-at91/board-sam9261ek.c      |    6 +-
- arch/arm/mach-at91/board-sam9263ek.c      |    6 +-
- arch/arm/mach-at91/board-sam9g20ek.c      |   10 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c   |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c       |    4 +-
- arch/arm/mach-at91/board-snapper9260.c    |   14 +-
- arch/arm/mach-at91/board-stamp9g20.c      |   20 +-
- arch/arm/mach-at91/board-usb-a9260.c      |    4 +-
- arch/arm/mach-at91/board-usb-a9263.c      |    4 +-
- arch/arm/mach-at91/board-yl-9200.c        |   10 +-
- arch/arm/mach-at91/devices.c              | 1999 +++++++++++++++++++++++++++++
- arch/arm/mach-at91/devices.h              |  237 ++++
- arch/arm/mach-at91/include/mach/board.h   |   21 +-
- 56 files changed, 4480 insertions(+), 9190 deletions(-)
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+---
+ arch/arm/mach-at91/Makefile  |    2 +-
+ arch/arm/mach-at91/devices.c |   70 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/devices.h |   36 +++++++++++++++++++++
+ 3 files changed, 107 insertions(+), 1 deletions(-)
  create mode 100644 arch/arm/mach-at91/devices.c
  create mode 100644 arch/arm/mach-at91/devices.h
+
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index a83835e..14962f2 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-obj-y		:= irq.o gpio.o
++obj-y		:= irq.o gpio.o devices.o
+ obj-m		:=
+ obj-n		:=
+ obj-		:=
+diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
+new file mode 100644
+index 0000000..6f6e0d5
+--- /dev/null
++++ b/arch/arm/mach-at91/devices.c
+@@ -0,0 +1,70 @@
++/*
++ * arch/arm/mach-at91/devices.c
++ *
++ *  Copyright (C) 2011 Bluewater Systems
++ *  Copyright (C) 2011 Ryan Mallon <ryan@bluewatersys.com>
++ * 
++ * Based on code from arch/arm/mach-at91/*_devices.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++
++#include "devices.h"
++
++static struct at91_device_table *devices __initdata;
++
++static __init void at91_config_pins(struct at91_pin_config *pins, int nr_pins)
++{
++	int i;
++
++	for (i = 0; i < nr_pins; i++) {		
++		switch (pins[i].mode) {
++		case AT91_PIN_PERIPH_A:
++			at91_set_A_periph(pins[i].pin, pins[i].pullup);
++			break;
++
++		case AT91_PIN_PERIPH_B:
++			at91_set_B_periph(pins[i].pin, pins[i].pullup);
++			break;
++
++		default:
++			/* GPIO */
++			if (pins[i].direction == GPIOF_DIR_OUT)
++				at91_set_gpio_output(pins[i].pin,
++						     pins[i].value);
++			else
++				at91_set_gpio_input(pins[i].pin,
++						    pins[i].pullup);
++			break;
++		}
++	}
++}
++
++static inline void __init init_resource_mem(struct resource *res,
++					    unsigned mmio_base)
++{
++	BUG_ON(res->flags != IORESOURCE_MEM);
++	res->start = mmio_base;
++	res->end  += mmio_base - 1;
++}
++
++static inline void __init init_resource_irq(struct resource *res, int irq)
++{
++	if (irq) {
++		BUG_ON(res->flags != IORESOURCE_IRQ);
++		res->start = irq;
++		res->end   = irq;
++	}
++}
++
++void __init at91_init_devices(struct at91_device_table *device_table)
++{
++	devices = device_table;
++}
+diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
+new file mode 100644
+index 0000000..738f736
+--- /dev/null
++++ b/arch/arm/mach-at91/devices.h
+@@ -0,0 +1,36 @@
++/*
++ * arch/arm/mach-at91/devices.h
++ *
++ *  Copyright (C) 2011 Bluewater Systems
++ *  Copyright (C) 2011 Ryan Mallon <ryan@bluewatersys.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#ifndef _AT91_DEVICES_H
++#define _AT91_DEVICES_H
++
++enum {
++	AT91_PIN_PERIPH_A,
++	AT91_PIN_PERIPH_B,
++	AT91_PIN_GPIO,
++};
++
++struct at91_pin_config {
++	int pin;
++	int mode;
++	int pullup;
++	int direction;
++	int value;
++};
++
++struct at91_device_table {
++};
++
++extern void __init at91_init_devices(struct at91_device_table *device_table);
++
++#endif /* _AT91_DEVICES_H */
+-- 
+1.7.0.4
