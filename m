@@ -1,46 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Apr 2011 13:32:09 +0300
-Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource
-	based sched_clock
-In-Reply-To: <alpine.LFD.2.02.1104291217120.3005@ionos>
-References: <20110423205036.795894921@linutronix.de>
-	<20110429094606.GA5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291217120.3005@ionos>
-Message-ID: <20110429103208.GA2849@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2011 11:37:23 +0100
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104211045220.3323@ionos>
+References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
+	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+Message-ID: <20110429103723.GF5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner <tglx@linutronix.de> [110429 13:19]:
-> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+On Thu, Apr 21, 2011 at 11:12:36AM +0200, Thomas Gleixner wrote:
+> On Thu, 21 Apr 2011, Uwe Kleine-K?nig wrote:
+> > > Which is a complete failure to begin with. Why the heck do you need a
+> > > callback to figure that out?
+> > > 
+> > > Because someone claimed, that you need a callback to make it safe from
+> > > changing? Or what's the reason for this?
+> > If there were a pointer tracking the parent you still needed to program
+> > out the get_parent function anyhow to set the pointer initially. But I
+> > agree that in other situations having a pointer is more comfortable and
+> > saves ugly error handling e.g. in set_parent.
 > 
-> > On Sat, Apr 23, 2011 at 08:54:39PM -0000, Thomas Gleixner wrote:
-> > > Most of ARM sched_clocks is using the timekeeping clocksource as the
-> > > sched_clock. Only versatile uses a different clock for it, but there
-> > > is no real reason why it can't use the clocksource as well.
-> > 
-> > sched_clock really needs to be setup earlier than clocksources are setup,
-> > before sched_init() is called in init/main.c.  This is where the scheduler
-> > reads the initial value of sched_clock() to start its time measurements.
-> > This is well before clocksources are initialized, or even the irq subsystem.
-> > 
-> > So I don't believe bolting it directly into the clocksource code in this
-> > way is correct.  As things are currently setup with my sched_clock()
-> > implementation, we can (and in any cases do) get the sched_clock() up
-> > and running really early which is what's required.
-> 
-> Not really. There is no requirement to have a high resolution sched
-> clock in the early boot process. The only requirement is that
-> sched_clock is monotonic increasing nsecs. So the code utilizes
-> jiffies up to the point where the clocksource is installed and then
-> switches over keeping the clock monotonic. The scheduler does not care
-> whether it gets coarse grained time information in the early boot
-> stage and then fine grained information at some point later.
-> 
-> The only drawback is that you don't get precise timestamps for tracing
-> up to the point where the clock source is installed. But that's really
-> not a big deal to worry about.
+> That's nonsense. Why do you want a get_parent() function at all?
+> parent is set up when the clock is established in the clock tree. And
+> that's not done by some random driver. That's a property of the clock.
 
-What about PRINTK_TIME? I think that uses sched_clock right from the
-start.
+It's *not* a fixed property of the clock.  It's a runtime property.
 
-Tony
+If you change the rate of a clock, you may need to change its parent.
+If you change the operating point of the device, (eg, sleep mode where
+the main system PLL gets turned off) you may need to change its parent
+to a slower clock to ensure wakeup timers continue to run but at a lower
+resolution.
+
+Sure the API doesn't handle the runtime cases at all well, but that's
+not a reason to enforce a fixed tree structure on something which isn't
+a fixed tree structure.
