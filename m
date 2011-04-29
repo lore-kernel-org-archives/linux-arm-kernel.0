@@ -1,79 +1,76 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 29 Apr 2011 13:04:13 -0500
-Subject: [PATCH v3 00/23] Create common framework for AT91 device
-	initialisation
-In-Reply-To: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
-References: <1304045972-19319-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <0D753D10438DA54287A00B027084269764D274304B@AUSP01VMBX24.collaborationhost.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 29 Apr 2011 13:25:03 -0500
+Subject: [PATCH 00/10] ARM: SMP initialization consolidation
+In-Reply-To: <1303940515-8807-1-git-send-email-robherring2@gmail.com>
+References: <1303940515-8807-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4DBB027F.2010405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 28, 2011 7:59 PM, Ryan Mallon wrote:
+On 04/27/2011 04:41 PM, Rob Herring wrote:
+> From: Rob Herring<rob.herring@calxeda.com>
 >
-> Each AT91 variant (AT91RM9200, AT91SAM9260, etc) currently has its own
-> devices file, which includes the MMIO address, interrupt
-> configuration, GPIO setup, etc for each device. This results in a large
-> amount of duplicated code.
+> In order to avoid duplicating the same platform code yet again for a new
+> platform, this series consolidates platforms using similar SMP startup code to
+> a common implementation. A new kconfig entry SMP_COMMON_PEN is added for
+> platforms using the common pen functions.
 >
-> This patch set introduces a framework for adding shared devices for the
-> AT91 platform and replaces the multiple device setup implementations for
-> each device with single implementations in the new framework. This has
-> a net reduction of nearly 5000 lines of code.
+> OMAP uses a h/w mechansism for its pen, but it seems like it could use the same
+> mechansism.
 >
-> Each of the arch/arm/mach-at91/*_devices.c files becomes a collection of
-> structures (with some initialisation callbacks where necessary) with a
-> table of devices which are present on the particular AT91 variant. All
-> structures/functions are marked as __init/__initdata so there is little
-> additional memory overhead. This also means that the #ifdefs around each
-> device can be removed from the *_devices.c files (but remain in the new
-> common devices.c file) without overhead.
+> Rob
+> Rob Herring (10):
+>    ARM: move Versatile SMP pen code to common location
+>    ARM: ux500: convert to use common secondary pen code
+>    ARM: msm: use common secondary pen code
+>    ARM: add common scu_init_cpus
+>    ARM: omap: use common scu_init_cpus
+>    ARM: realview: use common scu_init_cpus
+>    ARM: vexpress: use common scu_init_cpus
+>    ARM: ux500: use common scu_init_cpus
+>    ARM: shmobile: use common scu_init_cpus
+>    ARM: move set_cpu_present calls to common smp code
 >
-> This patch series does not introduce any functional changes to how the
-> board files add devices, it only replaces the duplicate device 
-> initialisation code with common versions. The patch series attempts to
-> have minimum change by rewriting as little as possible of the actual
-> device initialisation functions.
+>   arch/arm/Kconfig                             |    8 ++
+>   arch/arm/include/asm/smp.h                   |    4 +
+>   arch/arm/include/asm/smp_scu.h               |    1 +
+>   arch/arm/kernel/Makefile                     |    3 +-
+>   arch/arm/kernel/headsmp.S                    |   40 ++++++++++
+>   arch/arm/kernel/smp.c                        |    4 +
+>   arch/arm/kernel/smp_pen.c                    |  104 +++++++++++++++++++++++++
+>   arch/arm/kernel/smp_scu.c                    |   19 +++++
+>   arch/arm/mach-msm/Makefile                   |    2 +-
+>   arch/arm/mach-msm/headsmp.S                  |   40 ----------
+>   arch/arm/mach-msm/platsmp.c                  |   84 +-------------------
+>   arch/arm/mach-omap2/omap-smp.c               |   25 +------
+>   arch/arm/mach-realview/include/mach/smp.h    |    3 +
+>   arch/arm/mach-realview/platsmp.c             |   30 +-------
+>   arch/arm/mach-shmobile/include/mach/common.h |    2 +-
+>   arch/arm/mach-shmobile/platsmp.c             |   20 +-----
+>   arch/arm/mach-shmobile/smp-sh73a0.c          |    6 +-
+>   arch/arm/mach-ux500/Kconfig                  |    1 +
+>   arch/arm/mach-ux500/Makefile                 |    2 +-
+>   arch/arm/mach-ux500/headsmp.S                |   37 ---------
+>   arch/arm/mach-ux500/include/mach/smp.h       |    4 +-
+>   arch/arm/mach-ux500/platsmp.c                |  105 +-------------------------
+>   arch/arm/mach-vexpress/ct-ca9x4.c            |    9 +--
+>   arch/arm/mach-vexpress/include/mach/smp.h    |    3 +
+>   arch/arm/mach-vexpress/platsmp.c             |    9 +--
+>   arch/arm/plat-versatile/Makefile             |    1 -
+>   arch/arm/plat-versatile/headsmp.S            |   40 ----------
+>   arch/arm/plat-versatile/platsmp.c            |  104 -------------------------
+>   28 files changed, 210 insertions(+), 500 deletions(-)
+>   create mode 100644 arch/arm/kernel/headsmp.S
+>   create mode 100644 arch/arm/kernel/smp_pen.c
+>   delete mode 100644 arch/arm/mach-msm/headsmp.S
+>   delete mode 100644 arch/arm/mach-ux500/headsmp.S
+>   delete mode 100644 arch/arm/plat-versatile/headsmp.S
+>   delete mode 100644 arch/arm/plat-versatile/platsmp.c
 >
-> This is also a step towards allowing more than one AT91 variant to be
-> built into a single kernel by removing duplicate function names across
-> the *_devices.c files.
-> 
-> I have build tested the patch series for all of the  AT91 variants 
-> and devices, and have boot tested it on the AT91SAM9G20 (Snapper 9G20
-> board) and tested basic device functionality.
 
-Ryan,
+Comments?
 
-This patch series does not apply to linux-next.
+I only have a Versatile Express to test on, so any Tested-by's would be 
+appreciated.
 
-It appears Jean-Christophe PLAGNIOL-VILLARD has recently committed a number
-of patches to that branch.
-
-    at91: move clock subsystem init to soc generic init
-    at91: move register clocks to soc generic init
-    at91: move st timer to drivers/clocksource
-    at91: move pit timer to drivers/clocksource
-    at91: switch st timer to early platform devices
-    at91: switch pit timer to early platform devices
-    at91: move gpio to drivers/gpio
-    at91: switch gpio to early platfrom device
-    at91: switch to CLKDEV_LOOKUP
-    at91: use structure to store the current soc
-    at91: merge board usb-a9260 and usb-a9263 together
-    at91: factorize at91 interrupts init to soc
-    at91: introduce commom AT91_BASE_SYS
-    at91rm9200: introduce at91rm9200_set_type to specficy cpu package
-    at91: 9260 and 9g20 add support of join SRAM Memory Mapping
-    at91/board-eco920: remove at91_beeper ressource as no driver at91_beeper exist
-    atmel_serial: keep the platform_device unchanged
-    at91: remove MTD_NAND_ATMEL_BUSWIDTH_16 option
-    at91: Add ARCH_ID and basic cpu macros definition for 5series chips family.
-
-There are also these three ahead of Linus' linux-2.6 tree:
-
-    arm: at91: fix compiler warning for eb01 board build
-    ARM: at91: AT91CAP9 has a macb device
-    treewide: remove extra semicolons
-
-Regards,
-Hartley
+Rob
