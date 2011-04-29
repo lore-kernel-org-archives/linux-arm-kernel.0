@@ -1,72 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 29 Apr 2011 01:38:23 +0200
-Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
-In-Reply-To: <20110428214632.GQ17290@n2100.arm.linux.org.uk>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
-	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
-	<20110428113427.GG17290@n2100.arm.linux.org.uk>
-	<20110428131538.GA10594@game.jcrosoft.org>
-	<1304009792.3081.8.camel@redbox>
-	<20110428181502.GE17290@n2100.arm.linux.org.uk>
-	<BANLkTimT4dpOKcuMbWOWU4Mz=Uk81642Rw@mail.gmail.com>
-	<20110428214632.GQ17290@n2100.arm.linux.org.uk>
-Message-ID: <20110428233823.GC13104@game.jcrosoft.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 29 Apr 2011 10:25:54 +1000
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <20110428131531.GK17290@n2100.arm.linux.org.uk>
+References: <201104212129.17013.arnd@arndb.de>
+	<003e01cc058f$94beb490$be3c1db0$%szyprowski@samsung.com>
+	<20110428105131.GD17290@n2100.arm.linux.org.uk>
+	<201104281428.56780.arnd@arndb.de>
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+Message-ID: <1304036754.2513.201.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:46 Thu 28 Apr     , Russell King - ARM Linux wrote:
-> On Thu, Apr 28, 2011 at 10:47:37PM +0200, Andrew Victor wrote:
-> > hi Russell,
-> > 
-> > >> I think it would be cleaner still if the "struct sys_timer" could
-> > >> include a register-base-address field. ?Russell?
-> > >
-> > > That's not really what all platforms want, and with the advent of
-> > > clocksources and clock events, I think the sys_timer thing is mostly
-> > > dead.
-> > 
-> > How would those systems initialize the system-timer?
-> > An "init_timer" method in the machine-description?
+
+> However, dma_alloc_coherent() memory can't be used with the dma_sync_*
+> API as its return address (unlike other architectures) is not in the
+> kernel direct mapped memory range.
+
+Well, on non-coherent architectures, dma_sync_* are cache flushes, I
+don't see the point of doing those on a non-cachable mapping anyways.
+
+> The only thing valid for dma_sync_* are buffers which have been passed
+> to the dma_map_* APIs.
+
+Right, at least that's our expectation on powerpc as well.
+
+> Instead, I think what you're referring to is dma_cache_sync(), which is
+> the API to be used with dma_alloc_noncoherent(), which we don't
+> implement.
+
+Too may confusing APIs....
+
+Ben.
+
+> As we have problems with some SMP implementations, and the noncoherent
+> API doesn't have the idea of buffer ownership, it's rather hard to deal
+> with the DMA cache implications with the existing API, especially with
+> the issues of speculative prefetching.  The current usage (looking at
+> drivers/scsi/53c700.c) doesn't cater for speculative prefetch as the
+> dma_cache_sync(,,,DMA_FROM_DEVICE) is done well in advance of the DMA
+> actually happening.
 > 
-> I was thinking of an init_timekeeping() callback in the machine record
-> rather than having platforms provide a useless sys_timer structure, and
-> maybe having an ARM generic init_legacy_timekeeping() function for those
-> platforms which still use sys_timer() to put into the init_timekeeping()
-> hook.
-> 
-> I've not really firmed up the idea yet though.
-> 
-> Alternatively, if someone wants to come up with a better way to initialize
-> the clocksource and clock event stuff across all platforms...
-
-I propose we use early device as I did and Magnus did on SH-Mobile
-
-we will have a common early param "earlytimer"
-
-then we register the drivers like this
-
-early_platform_init("earlytimer", &time_device_driver);
-
-and in the arm init we just have to do
-early_platform_driver_register_all("earlytimer");
-and call
-early_platform_driver_probe("earlytimer", 1 , 0);
-or let the platform do so as some of them may have more than 1 timer to
-register example on shmobile
-
-We could also have two init one for soc one for machine
-if (machine_time_init)
-	machine_time_init()
-else
-	soc_time_init()
-
-as the timer is not really is ofen not machine specific but platform specific.
-I see that on shmobile, at91 (3 timers sam9, rm9200, x40), nomadok, and other
-
-This will simplify timer sharing across architecture such shmobile arm and sh
-for renesas but other vendor get the same issue when they soc on different
-architecture
-
-Best Regards,
-J.
+> So all in all, I think the noncoherent API is broken as currently
+> designed - and until we have devices on ARM which use it, I don't see
+> much point into trying to fix the current thing especially as we'd be
+> unable to test.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
