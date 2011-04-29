@@ -1,32 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 14:27:56 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104291413550.3005@ionos>
-References: <20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110421074214.GE15233@pengutronix.de>
-	<alpine.LFD.2.02.1104211113030.3323@ionos>
-	<20110421115050.GC16776@sirena.org.uk>
-	<alpine.LFD.2.02.1104211403130.3323@ionos>
-	<20110429104951.GG5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291302420.3005@ionos>
-	<20110429113823.GK5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291413550.3005@ionos>
-Message-ID: <20110429132756.GM5126@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 29 Apr 2011 21:32:24 +0800
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <20110429075346.GU17290@n2100.arm.linux.org.uk>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+	<20110428152735.GU17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
+	<20110429075346.GU17290@n2100.arm.linux.org.uk>
+Message-ID: <20110429133223.GB11885@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 02:19:25PM +0200, Thomas Gleixner wrote:
-> The per clk locking is not going to work ever except you want to have
-> the trylock dance if you need to propagate changes up the tree and
-> down the tree. So yes, we need per tree locking and I can see the need
-> for the mutex and the spinlock to protect the tree, but you really
-> want to have the logic dealing with those locks and how they both
-> protect the tree in common code and not in some random place.
+Hi Russell,
 
-rotfl.  "per tree locking".  That's farsical when you have muxes which
-select between different distinct trees.  That _surely_ is the path to
-locking mayhem, because the child clocks can have their lock changed
-beneath them as the mux changes its parent.
+On Fri, Apr 29, 2011 at 08:53:46AM +0100, Russell King - ARM Linux wrote:
+[...]
+> Linus wants this information _out_ of the kernel tree (remember he
+> referred to the "crazy clock files") which in his opinion should be in
+> some kind of pre-loader to the kernel and not the kernel itself.
+> Remember that this is what sparked this whole shebang in the first
+> place.
+> 
+If I understand correctly, you are suggesting put dts into bootloader
+tree.  Here are the possible problems I can see.
 
-I still think you're in a different universe.
+* Thought u-boot is the most popular bootloader, it's not the only
+  option.  Some platforms sitting on mainline does not use it, e.g.
+  mach-mxs.  That means the dts file for the same platform has to
+  get maintained in various bootloader tree.
+
+* Maintaining dts file in bootloader tree will get kernel depend on
+  bootloader so heavily.  The kernel code and dts file will easily
+  get out of sync, which may stop kernel booting immediately.
+
+Also, I failed to understand how Linus could complain about getting
+dts files maintained in kernel tree, which is the thing that powerpc
+have been doing for quite some time.  As dtc is sitting in the
+kernel tree (scripts/dtc/), it's hard for me to understand why dts
+can not be put in the tree.
+
+-- 
+Regards,
+Shawn
