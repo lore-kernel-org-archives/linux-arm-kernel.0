@@ -1,179 +1,83 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Fri, 29 Apr 2011 11:26:26 +0200
-Subject: [PATCH 5/5] OMAP3: cpuidle: change the power domains modes
-	determination logic
-In-Reply-To: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1304069186-3086-6-git-send-email-j-pihet@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2011 10:28:12 +0100
+Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
+In-Reply-To: <20110428233823.GC13104@game.jcrosoft.org>
+References: <20110425180847.GA12904@game.jcrosoft.org>
+	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
+	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
+	<20110428113427.GG17290@n2100.arm.linux.org.uk>
+	<20110428131538.GA10594@game.jcrosoft.org>
+	<1304009792.3081.8.camel@redbox>
+	<20110428181502.GE17290@n2100.arm.linux.org.uk>
+	<BANLkTimT4dpOKcuMbWOWU4Mz=Uk81642Rw@mail.gmail.com>
+	<20110428214632.GQ17290@n2100.arm.linux.org.uk>
+	<20110428233823.GC13104@game.jcrosoft.org>
+Message-ID: <20110429092812.GA17290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Fri, Apr 29, 2011 at 01:38:23AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 22:46 Thu 28 Apr     , Russell King - ARM Linux wrote:
+> > On Thu, Apr 28, 2011 at 10:47:37PM +0200, Andrew Victor wrote:
+> > > hi Russell,
+> > > 
+> > > >> I think it would be cleaner still if the "struct sys_timer" could
+> > > >> include a register-base-address field. ?Russell?
+> > > >
+> > > > That's not really what all platforms want, and with the advent of
+> > > > clocksources and clock events, I think the sys_timer thing is mostly
+> > > > dead.
+> > > 
+> > > How would those systems initialize the system-timer?
+> > > An "init_timer" method in the machine-description?
+> > 
+> > I was thinking of an init_timekeeping() callback in the machine record
+> > rather than having platforms provide a useless sys_timer structure, and
+> > maybe having an ARM generic init_legacy_timekeeping() function for those
+> > platforms which still use sys_timer() to put into the init_timekeeping()
+> > hook.
+> > 
+> > I've not really firmed up the idea yet though.
+> > 
+> > Alternatively, if someone wants to come up with a better way to initialize
+> > the clocksource and clock event stuff across all platforms...
+> 
+> I propose we use early device as I did and Magnus did on SH-Mobile
+> 
+> we will have a common early param "earlytimer"
+> 
+> then we register the drivers like this
+> 
+> early_platform_init("earlytimer", &time_device_driver);
+> 
+> and in the arm init we just have to do
+> early_platform_driver_register_all("earlytimer");
+> and call
+> early_platform_driver_probe("earlytimer", 1 , 0);
+> or let the platform do so as some of them may have more than 1 timer to
+> register example on shmobile
+> 
+> We could also have two init one for soc one for machine
+> if (machine_time_init)
+> 	machine_time_init()
+> else
+> 	soc_time_init()
+> 
+> as the timer is not really is ofen not machine specific but platform specific.
+> I see that on shmobile, at91 (3 timers sam9, rm9200, x40), nomadok, and other
+> 
+> This will simplify timer sharing across architecture such shmobile arm and sh
+> for renesas but other vendor get the same issue when they soc on different
+> architecture
 
-The achievable power modes of the power domains in cpuidle
-depends on the system wide 'enable_off_mode' knob in debugfs.
-Upon changing enable_off_mode, do not change the C-states
-'valid' field but instead dynamically restrict the power modes
-when entering idle.
+It doesn't sound like this eliminates anything - it just makes things
+more complex.  It seems we _still_ need a callback into the platform
+code to execute some kind of initialization, eg calling
+early_platform_driver_* with appropriate arguments.  So I'm not sure
+what we're saving by effectively breaking the initialization function
+out into two separate functions and an early platform driver thing.
 
-The C-states 'valid' field is just used to enable/disable some
-C-states at init and shall not be changed later on.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/cpuidle34xx.c |   59 +++++++++++++++---------------------
- arch/arm/mach-omap2/pm.h          |    4 --
- arch/arm/mach-omap2/pm34xx.c      |   12 -------
- 3 files changed, 25 insertions(+), 50 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 4673cc6..45ccfa7 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -147,22 +147,40 @@ return_sleep_time:
- }
- 
- /**
-- * next_valid_state - Find next valid c-state
-+ * next_valid_state - Find next valid C-state
-  * @dev: cpuidle device
-- * @state: Currently selected c-state
-+ * @state: Currently selected C-state
-  *
-  * If the current state is valid, it is returned back to the caller.
-  * Else, this function searches for a lower c-state which is still
-  * valid.
-+ *
-+ * A state is valid if the 'valid' field is enabled and
-+ * if it satisfies the enable_off_mode condition.
-  */
- static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- 					      struct cpuidle_state *curr)
- {
- 	struct cpuidle_state *next = NULL;
- 	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr);
-+	u32 mpu_deepest_state = PWRDM_POWER_RET;
-+	u32 core_deepest_state = PWRDM_POWER_RET;
-+
-+	if (enable_off_mode) {
-+		mpu_deepest_state = PWRDM_POWER_OFF;
-+		/*
-+		 * Erratum i583: valable for ES rev < Es1.2 on 3630.
-+		 * CORE OFF mode is not supported in a stable form, restrict
-+		 * instead the CORE state to RET.
-+		 */
-+		if (!IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
-+			core_deepest_state = PWRDM_POWER_OFF;
-+	}
- 
- 	/* Check if current state is valid */
--	if (cx->valid) {
-+	if ((cx->valid) &&
-+	    (cx->mpu_state >= mpu_deepest_state) &&
-+	    (cx->core_state >= core_deepest_state)) {
- 		return curr;
- 	} else {
- 		u8 idx = OMAP3_STATE_MAX;
-@@ -185,7 +203,9 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
- 		idx--;
- 		for (; idx >= OMAP3_STATE_C1; idx--) {
- 			cx = cpuidle_get_statedata(&dev->states[idx]);
--			if (cx->valid) {
-+			if ((cx->valid) &&
-+			    (cx->mpu_state >= mpu_deepest_state) &&
-+			    (cx->core_state >= core_deepest_state)) {
- 				next = &dev->states[idx];
- 				break;
- 			}
-@@ -268,31 +288,6 @@ select_state:
- 
- DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
- 
--/**
-- * omap3_cpuidle_update_states() - Update the cpuidle states
-- * @mpu_deepest_state:	Enable states up to and including this for mpu domain
-- * @core_deepest_state:	Enable states up to and including this for core domain
-- *
-- * This goes through the list of states available and enables and disables the
-- * validity of C states based on deepest state that can be achieved for the
-- * variable domain
-- */
--void omap3_cpuidle_update_states(u32 mpu_deepest_state, u32 core_deepest_state)
--{
--	int i;
--
--	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
--		struct omap3_idle_statedata *cx = &omap3_idle_data[i];
--
--		if ((cx->mpu_state >= mpu_deepest_state) &&
--		    (cx->core_state >= core_deepest_state)) {
--			cx->valid = 1;
--		} else {
--			cx->valid = 0;
--		}
--	}
--}
--
- void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
- {
- 	int i;
-@@ -365,6 +360,7 @@ int __init omap3_idle_init(void)
- 
- 	/* C2 . MPU WFI + Core inactive */
- 	FILL_IN_STATE(OMAP3_STATE_C2, "MPU ON + CORE ON")
-+	data->valid = 1;	/* C2 is always valid */
- 	data->mpu_state = PWRDM_POWER_ON;
- 	data->core_state = PWRDM_POWER_ON;
- 
-@@ -405,11 +401,6 @@ int __init omap3_idle_init(void)
- 
- 	dev->state_count = count;
- 
--	if (enable_off_mode)
--		omap3_cpuidle_update_states(PWRDM_POWER_OFF, PWRDM_POWER_OFF);
--	else
--		omap3_cpuidle_update_states(PWRDM_POWER_RET, PWRDM_POWER_RET);
--
- 	if (cpuidle_register_device(dev)) {
- 		printk(KERN_ERR "%s: CPUidle register device failed\n",
- 		       __func__);
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 32dbc13..45bcfce 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -78,10 +78,6 @@ extern u32 sleep_while_idle;
- #define sleep_while_idle 0
- #endif
- 
--#if defined(CONFIG_CPU_IDLE)
--extern void omap3_cpuidle_update_states(u32, u32);
--#endif
--
- #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
- extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
- extern int pm_dbg_regset_save(int reg_set);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 0c5e3a4..caf9f6c 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -779,18 +779,6 @@ void omap3_pm_off_mode_enable(int enable)
- 	else
- 		state = PWRDM_POWER_RET;
- 
--#ifdef CONFIG_CPU_IDLE
--	/*
--	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
--	 * enable OFF mode in a stable form for previous revisions, restrict
--	 * instead to RET
--	 */
--	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
--		omap3_cpuidle_update_states(state, PWRDM_POWER_RET);
--	else
--		omap3_cpuidle_update_states(state, state);
--#endif
--
- 	list_for_each_entry(pwrst, &pwrst_list, node) {
- 		if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
- 				pwrst->pwrdm == core_pwrdm &&
--- 
-1.7.1
+It all sounds much more complex to me with very little benefit for the
+majority of platforms, and it doesn't seem to change what's required
+from core code at all - we still need to provide an initialization
+call into platform code at the appropriate time.
